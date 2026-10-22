@@ -100,7 +100,8 @@ fn ambiguous_catalog_names_are_rejected_before_state_selection() {
         .write_to(&mut bytes)
         .expect("write source");
 
-    let mut opc = OpcPackage::from_bytes(&bytes.into_inner()).expect("OPC source");
+    let mut opc = OpcPackage::from_bytes(&bytes.into_inner(), litchi_opc::SourceLimits::default())
+        .expect("OPC source");
     let workbook_uri = PackURI::new("/xl/workbook.bin").expect("workbook URI");
     let original = opc
         .get_part(&workbook_uri)
@@ -603,7 +604,8 @@ fn signed_package() -> Package {
 }
 
 fn with_states(bytes: &[u8], states: &[(usize, u32)]) -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(bytes).expect("OPC source");
+    let mut package =
+        OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()).expect("OPC source");
     let workbook_uri = PackURI::new("/xl/workbook.bin").expect("workbook URI");
     let original = package
         .get_part(&workbook_uri)
@@ -636,7 +638,8 @@ fn with_states(bytes: &[u8], states: &[(usize, u32)]) -> Vec<u8> {
 }
 
 fn with_unknown_workbook_record(bytes: &[u8]) -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(bytes).expect("OPC source");
+    let mut package =
+        OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()).expect("OPC source");
     let workbook_uri = PackURI::new("/xl/workbook.bin").expect("workbook URI");
     let original = package
         .get_part(&workbook_uri)
@@ -774,7 +777,8 @@ fn sheet_view_flags(package: &Package, position: usize) -> u16 {
 }
 
 fn with_opaque_sheet_records(bytes: &[u8], positions: &[usize]) -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(bytes).expect("OPC source");
+    let mut package =
+        OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()).expect("OPC source");
     for &position in positions {
         let uri = sheet_partname(&package, position);
         let original = package.get_part(&uri).expect("sheet part").blob().to_vec();
@@ -855,7 +859,8 @@ fn every_kind_workbook() -> Vec<u8> {
 }
 
 fn retype_sheet(bytes: &[u8], name: &str, relationship_type: &str, content_type: &str) -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(bytes).expect("OPC source");
+    let mut package =
+        OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()).expect("OPC source");
     let workbook_uri = PackURI::new("/xl/workbook.bin").expect("workbook URI");
     let entries = bundle_entries(&package);
     let position = entries
@@ -899,7 +904,8 @@ fn retype_sheet(bytes: &[u8], name: &str, relationship_type: &str, content_type:
 }
 
 fn with_null_relationship(bytes: &[u8], position: usize, state: u32) -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(bytes).expect("OPC source");
+    let mut package =
+        OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()).expect("OPC source");
     let workbook_uri = PackURI::new("/xl/workbook.bin").expect("workbook URI");
     let original = package
         .get_part(&workbook_uri)
@@ -949,7 +955,8 @@ fn with_null_relationship(bytes: &[u8], position: usize, state: u32) -> Vec<u8> 
 }
 
 fn with_duplicate_chart_view(bytes: &[u8]) -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(bytes).expect("OPC source");
+    let mut package =
+        OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()).expect("OPC source");
     let uri = sheet_partname(&package, 1);
     let original = package.get_part(&uri).expect("chart part").blob().to_vec();
     let mut rewritten = Vec::new();
@@ -985,7 +992,8 @@ fn with_duplicate_chart_view(bytes: &[u8]) -> Vec<u8> {
 }
 
 fn without_chart_views(bytes: &[u8]) -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(bytes).expect("OPC source");
+    let mut package =
+        OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()).expect("OPC source");
     let uri = sheet_partname(&package, 1);
     let original = package.get_part(&uri).expect("chart part").blob().to_vec();
     let mut rewritten = Vec::new();

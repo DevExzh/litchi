@@ -546,7 +546,9 @@ fn change_0622_oracle_over_test_data_worksheets() {
         let Ok(bytes) = std::fs::read(&path) else {
             continue;
         };
-        let Ok(package) = litchi_opc::OpcPackage::from_bytes(&bytes) else {
+        let Ok(package) =
+            litchi_opc::OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default())
+        else {
             continue;
         };
         for part in package

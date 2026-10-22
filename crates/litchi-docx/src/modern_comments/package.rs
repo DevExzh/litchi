@@ -328,7 +328,8 @@ mod tests {
     #[test]
     fn loads_poi_and_libreoffice_reference_packages() {
         for bytes in [POI_DOCX, LO_DOCX] {
-            let package = OpcPackage::from_bytes(bytes).unwrap();
+            let package =
+                OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()).unwrap();
             let metadata = load_modern_comment_metadata(
                 &package,
                 &PackURI::new("/word/document.xml").unwrap(),
@@ -338,7 +339,7 @@ mod tests {
             assert_eq!(metadata.comments_ids.as_ref().unwrap().len(), 1);
             assert_eq!(metadata.comments_extensible.as_ref().unwrap().len(), 1);
         }
-        let package = OpcPackage::from_bytes(LO_DOCX).unwrap();
+        let package = OpcPackage::from_bytes(LO_DOCX, litchi_opc::SourceLimits::default()).unwrap();
         let metadata =
             load_modern_comment_metadata(&package, &PackURI::new("/word/document.xml").unwrap())
                 .unwrap();

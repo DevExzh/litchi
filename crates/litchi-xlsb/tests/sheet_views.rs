@@ -50,7 +50,11 @@ fn workbook_bytes(configure: impl FnOnce(&mut builder::Worksheet)) -> Vec<u8> {
 }
 
 fn part_blob(package_bytes: &[u8], path: &str) -> Vec<u8> {
-    let package = OpcPackage::from_reader(Cursor::new(package_bytes)).unwrap();
+    let package = OpcPackage::from_reader(
+        Cursor::new(package_bytes),
+        litchi_opc::SourceLimits::default(),
+    )
+    .unwrap();
     package
         .get_part(&PackURI::new(path).unwrap())
         .unwrap()

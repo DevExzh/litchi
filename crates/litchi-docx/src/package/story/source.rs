@@ -635,7 +635,14 @@ mod tests {
         }
         package.relate_to("word/document.xml", rt::OFFICE_DOCUMENT);
         let bytes = PackageWriter::to_bytes(&package).unwrap();
-        SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(bytes))).unwrap()
+        SourceBackedPackage::from_read_at(
+            Arc::new(OwnedSource::new(bytes)),
+            litchi_opc::SourceLimits::default(),
+            litchi_opc::SourceCacheLimits::default(),
+            litchi_opc::SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap()
     }
 
     #[test]

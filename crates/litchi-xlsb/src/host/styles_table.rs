@@ -414,7 +414,11 @@ mod tests {
                 "{}/../../test-data/ooxml/xlsb/{fixture}",
                 env!("CARGO_MANIFEST_DIR")
             );
-            let package = OpcPackage::from_reader(File::open(path).unwrap()).unwrap();
+            let package = OpcPackage::from_reader(
+                File::open(path).unwrap(),
+                litchi_opc::SourceLimits::default(),
+            )
+            .unwrap();
             let part = package
                 .get_part(&PackURI::new("/xl/styles.bin").unwrap())
                 .unwrap();
@@ -450,7 +454,11 @@ mod tests {
         if !path.exists() {
             return;
         }
-        let package = OpcPackage::from_reader(File::open(path).unwrap()).unwrap();
+        let package = OpcPackage::from_reader(
+            File::open(path).unwrap(),
+            litchi_opc::SourceLimits::default(),
+        )
+        .unwrap();
         let part = package
             .get_part(&PackURI::new("/xl/styles.bin").unwrap())
             .unwrap();

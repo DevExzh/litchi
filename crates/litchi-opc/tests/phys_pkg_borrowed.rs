@@ -114,7 +114,7 @@ fn assert_zip_refusal(error: OpcError) {
 #[test]
 fn phys_pkg_borrowed_store_returns_source_slice_with_identity() {
     let archive = mixed_archive();
-    let reader = PhysPkgReader::new(&archive).expect("fixture must parse");
+    let reader = PhysPkgReader::new(&archive, SourceLimits::default()).expect("fixture must parse");
     let uri = pack(STORED_URI);
 
     // This annotation also fixes the public contract at plain bytes: no
@@ -134,7 +134,7 @@ fn phys_pkg_borrowed_store_returns_source_slice_with_identity() {
 #[test]
 fn phys_pkg_borrowed_normalizes_pack_uri_to_zip_member_name() {
     let archive = mixed_archive();
-    let reader = PhysPkgReader::new(&archive).expect("fixture must parse");
+    let reader = PhysPkgReader::new(&archive, SourceLimits::default()).expect("fixture must parse");
     let uri = pack(STORED_URI);
 
     assert_eq!(uri.membername(), STORED_MEMBER);
@@ -149,7 +149,7 @@ fn phys_pkg_borrowed_normalizes_pack_uri_to_zip_member_name() {
 #[test]
 fn phys_pkg_borrowed_deflate_returns_none_and_owned_blob_is_exact() {
     let archive = mixed_archive();
-    let reader = PhysPkgReader::new(&archive).expect("fixture must parse");
+    let reader = PhysPkgReader::new(&archive, SourceLimits::default()).expect("fixture must parse");
     let uri = pack(DEFLATED_URI);
 
     assert_eq!(
@@ -169,7 +169,7 @@ fn phys_pkg_borrowed_deflate_returns_none_and_owned_blob_is_exact() {
 #[test]
 fn phys_pkg_borrowed_missing_part_is_typed_error() {
     let archive = mixed_archive();
-    let reader = PhysPkgReader::new(&archive).expect("fixture must parse");
+    let reader = PhysPkgReader::new(&archive, SourceLimits::default()).expect("fixture must parse");
     let missing = pack("/missing.bin");
 
     let error = reader
@@ -186,7 +186,8 @@ fn phys_pkg_borrowed_rejects_encrypted_store_and_deflate() {
     for (member, uri) in [(STORED_MEMBER, STORED_URI), (DEFLATED_MEMBER, DEFLATED_URI)] {
         let mut archive = mixed_archive();
         mark_encrypted(&mut archive, member);
-        let reader = PhysPkgReader::new(&archive).expect("encrypted fixture must parse");
+        let reader = PhysPkgReader::new(&archive, SourceLimits::default())
+            .expect("encrypted fixture must parse");
 
         let error = reader
             .blob_for_borrowed(&pack(uri))
@@ -206,7 +207,8 @@ fn phys_pkg_owned_reads_reject_strong_and_local_only_encryption() {
                 encrypted_flag,
                 if local_only { 0 } else { encrypted_flag },
             );
-            let reader = PhysPkgReader::new(&archive).expect("encrypted fixture must parse");
+            let reader = PhysPkgReader::new(&archive, SourceLimits::default())
+                .expect("encrypted fixture must parse");
             assert_zip_refusal(
                 reader
                     .blob_for(&pack(DEFLATED_URI))
@@ -225,7 +227,8 @@ fn phys_pkg_owned_reads_reject_strong_and_local_only_encryption() {
 fn phys_pkg_target_reads_preserve_unrelated_encryption_behavior() {
     let mut archive = mixed_archive();
     mark_encrypted(&mut archive, STORED_MEMBER);
-    let reader = PhysPkgReader::new(&archive).expect("encrypted fixture must parse");
+    let reader = PhysPkgReader::new(&archive, SourceLimits::default())
+        .expect("encrypted fixture must parse");
 
     assert_eq!(
         reader.blob_for(&pack(DEFLATED_URI)).unwrap(),
@@ -242,7 +245,8 @@ fn phys_pkg_borrowed_rejects_corrupt_stored_payload_and_crc() {
     let mut payload_corrupt = mixed_archive();
     let payload_offset = stored_payload_offset(&payload_corrupt, STORED_MEMBER);
     payload_corrupt[payload_offset] ^= 0x80;
-    let reader = PhysPkgReader::new(&payload_corrupt).expect("corrupt payload must still parse");
+    let reader = PhysPkgReader::new(&payload_corrupt, SourceLimits::default())
+        .expect("corrupt payload must still parse");
     assert_zip_refusal(
         reader
             .blob_for_borrowed(&pack(STORED_URI))
@@ -260,7 +264,8 @@ fn phys_pkg_borrowed_rejects_corrupt_stored_payload_and_crc() {
     ]) ^ 0xffff_ffff;
     crc_corrupt[local + 14..local + 18].copy_from_slice(&incorrect_crc.to_le_bytes());
     crc_corrupt[central + 16..central + 20].copy_from_slice(&incorrect_crc.to_le_bytes());
-    let reader = PhysPkgReader::new(&crc_corrupt).expect("wrong CRC must still parse");
+    let reader = PhysPkgReader::new(&crc_corrupt, SourceLimits::default())
+        .expect("wrong CRC must still parse");
     assert_zip_refusal(
         reader
             .blob_for_borrowed(&pack(STORED_URI))
@@ -277,7 +282,7 @@ fn phys_pkg_borrowed_enforces_part_limit_without_materialization_charge() {
         .expect("positive part limit must be accepted")
         .build()
         .expect("part limit profile must be valid");
-    let oversized_reader = PhysPkgReader::new_with_limits(&archive, oversized_limits)
+    let oversized_reader = PhysPkgReader::new(&archive, oversized_limits)
         .expect("archive metadata must fit the archive limits");
     let error = oversized_reader
         .blob_for_borrowed(&pack(STORED_URI))
@@ -301,7 +306,7 @@ fn phys_pkg_borrowed_enforces_part_limit_without_materialization_charge() {
         .expect("stored payload must fit the aggregate limit")
         .build()
         .expect("materialization profile must be valid");
-    let materialization_reader = PhysPkgReader::new_with_limits(&archive, materialization_limits)
+    let materialization_reader = PhysPkgReader::new(&archive, materialization_limits)
         .expect("archive metadata must fit the materialization limits");
 
     assert_eq!(
@@ -330,7 +335,7 @@ fn phys_pkg_borrowed_enforces_part_limit_without_materialization_charge() {
 }
 
 fn borrow_stored_from_source(source: &[u8]) -> &[u8] {
-    let reader = PhysPkgReader::new(source).expect("fixture must parse");
+    let reader = PhysPkgReader::new(source, SourceLimits::default()).expect("fixture must parse");
     reader
         .blob_for_borrowed(&pack(STORED_URI))
         .expect("stored member must be readable")

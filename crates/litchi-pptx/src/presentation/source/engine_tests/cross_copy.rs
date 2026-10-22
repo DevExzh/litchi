@@ -570,7 +570,7 @@ fn source_backed_cross_copy_chart_source_version_changes_are_refused() -> TestRe
 }
 
 fn chart_source_fixture_0383(bindings: &[(&str, &str)]) -> TestResult<Vec<u8>> {
-    let mut package = OpcPackage::from_vec(source_fixture()?)?;
+    let mut package = OpcPackage::from_vec(source_fixture()?, litchi_opc::SourceLimits::default())?;
     let slide_uri = PackURI::new("/ppt/slides/slide1.xml").map_err(Error::Uri)?;
     let mut chart_targets = BTreeSet::new();
     for (relationship_id, filename) in bindings {
@@ -601,7 +601,7 @@ fn chart_source_fixture_0383(bindings: &[(&str, &str)]) -> TestResult<Vec<u8>> {
 
 fn chart_source_with_relationship_id_0383(relationship_id: &str) -> TestResult<Vec<u8>> {
     let bytes = chart_source_fixture_0383(&[("rIdChartSource", "chart-one.xml")])?;
-    let package = OpcPackage::from_vec(bytes.clone())?;
+    let package = OpcPackage::from_vec(bytes.clone(), litchi_opc::SourceLimits::default())?;
     let slide_uri = PackURI::new("/ppt/slides/slide1.xml").map_err(Error::Uri)?;
     let source_layout_id = package
         .get_part(&slide_uri)?
@@ -631,7 +631,8 @@ fn chart_source_with_relationship_id_0383(relationship_id: &str) -> TestResult<V
 }
 
 fn destination_fixture_with_chart_collision_0383() -> TestResult<Vec<u8>> {
-    let mut package = OpcPackage::from_vec(destination_fixture()?)?;
+    let mut package =
+        OpcPackage::from_vec(destination_fixture()?, litchi_opc::SourceLimits::default())?;
     package.try_add_part(Box::new(BlobPart::new(
         PackURI::new("/ppt/charts/chart1.xml").map_err(Error::Uri)?,
         CHART_0383_CONTENT_TYPE.to_owned(),
@@ -715,7 +716,7 @@ fn chart_members_0383(bytes: &[u8]) -> TestResult<Vec<String>> {
 }
 
 fn add_chart_outbound_relationships_0383(bytes: &[u8]) -> TestResult<Vec<u8>> {
-    let mut package = OpcPackage::from_vec(bytes.to_vec())?;
+    let mut package = OpcPackage::from_vec(bytes.to_vec(), litchi_opc::SourceLimits::default())?;
     let workbook_uri = PackURI::new("/ppt/embeddings/workbook.xlsx").map_err(Error::Uri)?;
     let style_uri = PackURI::new("/ppt/charts/style1.xml").map_err(Error::Uri)?;
     let colors_uri = PackURI::new("/ppt/charts/colors1.xml").map_err(Error::Uri)?;
@@ -978,7 +979,7 @@ fn destination_fixture() -> TestResult<Vec<u8>> {
     // Keep an unrelated, registered media part in the destination. It is
     // deliberately outside the copied slide closure and must be carried
     // through byte-for-byte by the source-backed publisher.
-    let mut package = OpcPackage::from_vec(renamed)?;
+    let mut package = OpcPackage::from_vec(renamed, litchi_opc::SourceLimits::default())?;
     package.try_add_part(Box::new(BlobPart::new(
         PackURI::new("/ppt/media/unrelated.png").map_err(Error::Uri)?,
         ct::PNG.to_owned(),
@@ -2437,7 +2438,7 @@ fn add_stored_member(bytes: &[u8], name: &str, payload: &[u8]) -> TestResult<Vec
 }
 
 fn add_unreferenced_slide_part(bytes: &[u8]) -> TestResult<Vec<u8>> {
-    let mut package = OpcPackage::from_vec(bytes.to_vec())?;
+    let mut package = OpcPackage::from_vec(bytes.to_vec(), litchi_opc::SourceLimits::default())?;
     let slide_name = PackURI::new("/ppt/slides/slide3.xml").map_err(Error::Uri)?;
     let mut slide = BlobPart::new(
         slide_name,
@@ -2455,7 +2456,7 @@ fn add_unreferenced_slide_part(bytes: &[u8]) -> TestResult<Vec<u8>> {
 }
 
 fn add_unreferenced_media_part(bytes: &[u8]) -> TestResult<Vec<u8>> {
-    let mut package = OpcPackage::from_vec(bytes.to_vec())?;
+    let mut package = OpcPackage::from_vec(bytes.to_vec(), litchi_opc::SourceLimits::default())?;
     package.try_add_part(Box::new(BlobPart::new(
         PackURI::new("/ppt/media/unused.png").map_err(Error::Uri)?,
         ct::PNG.to_owned(),
@@ -2526,7 +2527,7 @@ fn mark_entry_encrypted(mut bytes: Vec<u8>, wanted: &str) -> TestResult<Vec<u8>>
 }
 
 fn add_media_relationship(bytes: &[u8], slide_member: &str) -> TestResult<Vec<u8>> {
-    let mut package = OpcPackage::from_vec(bytes.to_vec())?;
+    let mut package = OpcPackage::from_vec(bytes.to_vec(), litchi_opc::SourceLimits::default())?;
     package.try_add_part(Box::new(BlobPart::new(
         PackURI::new("/ppt/media/source-only.png").map_err(Error::Uri)?,
         ct::PNG.to_owned(),
@@ -2957,7 +2958,7 @@ fn expect_plan_refusal(
 
 fn picture_source_with_image_relationship_id(relationship_id: &str) -> TestResult<Vec<u8>> {
     let bytes = picture_source_fixture()?;
-    let package = OpcPackage::from_vec(bytes.clone())?;
+    let package = OpcPackage::from_vec(bytes.clone(), litchi_opc::SourceLimits::default())?;
     let slide_uri = PackURI::new("/ppt/slides/slide1.xml").map_err(Error::Uri)?;
     let source_layout_id = package
         .get_part(&slide_uri)?
@@ -3208,7 +3209,8 @@ fn picture_source_fixture() -> TestResult<Vec<u8>> {
 }
 
 fn destination_fixture_with_media_collision() -> TestResult<Vec<u8>> {
-    let mut package = OpcPackage::from_vec(destination_fixture()?)?;
+    let mut package =
+        OpcPackage::from_vec(destination_fixture()?, litchi_opc::SourceLimits::default())?;
     package.try_add_part(Box::new(BlobPart::new(
         PackURI::new("/ppt/media/source-only.png").map_err(Error::Uri)?,
         "image/jpeg".to_owned(),
@@ -3233,7 +3235,7 @@ fn append_direct_picture(bytes: &[u8], relationship_id: &str) -> TestResult<Vec<
 }
 
 fn add_second_image_relationship(bytes: &[u8]) -> TestResult<Vec<u8>> {
-    let mut package = OpcPackage::from_vec(bytes.to_vec())?;
+    let mut package = OpcPackage::from_vec(bytes.to_vec(), litchi_opc::SourceLimits::default())?;
     package.try_add_part(Box::new(BlobPart::new(
         PackURI::new("/ppt/media/second-source.png").map_err(Error::Uri)?,
         ct::PNG.to_owned(),
@@ -3803,7 +3805,7 @@ fn add_embedded_image_relationship(
     content_type: &str,
     payload: &[u8],
 ) -> TestResult<Vec<u8>> {
-    let mut package = OpcPackage::from_vec(bytes.to_vec())?;
+    let mut package = OpcPackage::from_vec(bytes.to_vec(), litchi_opc::SourceLimits::default())?;
     package.try_add_part(Box::new(BlobPart::new(
         PackURI::new(format!("/ppt/media/{member}")).map_err(Error::Uri)?,
         content_type.to_owned(),
@@ -3834,7 +3836,10 @@ fn append_picture_element(
 }
 
 fn destination_fixture_with_case_equivalent_media_collision() -> TestResult<Vec<u8>> {
-    let mut package = OpcPackage::from_vec(destination_fixture_with_media_collision()?)?;
+    let mut package = OpcPackage::from_vec(
+        destination_fixture_with_media_collision()?,
+        litchi_opc::SourceLimits::default(),
+    )?;
     package.try_add_part(Box::new(BlobPart::new(
         PackURI::new("/ppt/media/SOURCE-ONLY-COPY1.PNG").map_err(Error::Uri)?,
         ct::PNG.to_owned(),
@@ -4796,7 +4801,8 @@ fn source_backed_cross_copy_shared_image_has_exact_physical_media_closure() -> T
 }
 
 fn destination_fixture_with_anchor_picture() -> TestResult<Vec<u8>> {
-    let mut package = OpcPackage::from_vec(destination_fixture()?)?;
+    let mut package =
+        OpcPackage::from_vec(destination_fixture()?, litchi_opc::SourceLimits::default())?;
     package.try_add_part(Box::new(BlobPart::new(
         PackURI::new("/ppt/media/anchor.png").map_err(Error::Uri)?,
         ct::PNG.to_owned(),

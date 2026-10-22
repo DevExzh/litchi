@@ -772,25 +772,34 @@ fn source_backed_package(
         ..
     } = options;
     Ok(match (cache_limits, execution_context) {
-        (None, None) => SourceBackedPackage::from_read_at_with_limits(source, source_limits)?,
-        (Some(cache), None) => SourceBackedPackage::from_read_at_with_limits_and_cache_limits(
+        (None, None) => SourceBackedPackage::from_read_at(
+            source,
+            source_limits,
+            litchi_opc::SourceCacheLimits::default(),
+            litchi_opc::SourceReadPolicy::exact(),
+            None,
+        )?,
+        (Some(cache), None) => SourceBackedPackage::from_read_at(
             source,
             source_limits,
             cache,
+            litchi_opc::SourceReadPolicy::exact(),
+            None,
         )?,
-        (None, Some(context)) => SourceBackedPackage::from_read_at_with_execution_context(
+        (None, Some(context)) => SourceBackedPackage::from_read_at(
             source,
             source_limits,
-            context,
+            litchi_opc::SourceCacheLimits::default(),
+            litchi_opc::SourceReadPolicy::exact(),
+            Some(context),
         )?,
-        (Some(cache), Some(context)) => {
-            SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
-                source,
-                source_limits,
-                cache,
-                context,
-            )?
-        },
+        (Some(cache), Some(context)) => SourceBackedPackage::from_read_at(
+            source,
+            source_limits,
+            cache,
+            litchi_opc::SourceReadPolicy::exact(),
+            Some(context),
+        )?,
     })
 }
 
@@ -1363,7 +1372,12 @@ impl SourceBackedPresentation {
         options.check_owning()?;
         let limits = options.source_limits;
         Self::from_source_backed_package_with_limits(
-            SourceBackedPackage::from_reader_with_limits(reader, limits)?,
+            SourceBackedPackage::from_reader(
+                reader,
+                limits,
+                litchi_opc::SourceCacheLimits::default(),
+                None,
+            )?,
             limits,
         )
     }
@@ -6350,9 +6364,14 @@ mod tests {
     }
 
     fn source_backed_root_and_second_slide_bytes() -> (u64, u64) {
-        let package =
-            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(source_backed_pptx())))
-                .unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(source_backed_pptx())),
+            litchi_opc::SourceLimits::default(),
+            litchi_opc::SourceCacheLimits::default(),
+            litchi_opc::SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let presentation = package.main_document_part().unwrap();
         let root = presentation.data().unwrap().as_bytes().len() as u64;
         let second = package
@@ -6385,7 +6404,14 @@ mod tests {
         let source = Arc::new(CorePropertyCountingSource::new(
             source_backed_pptx_with_core_properties(),
         ));
-        let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            source.clone(),
+            litchi_opc::SourceLimits::default(),
+            litchi_opc::SourceCacheLimits::default(),
+            litchi_opc::SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let presentation = SourceBackedPresentation::from_source_backed_package(package).unwrap();
         assert_eq!(source.core_payload_reads.load(Ordering::SeqCst), 0);
         assert_eq!(source.slide_payload_reads.load(Ordering::SeqCst), 0);
@@ -7561,10 +7587,12 @@ mod tests {
         cancellation_source.cancel();
 
         assert!(matches!(
-            SourceBackedPackage::from_read_at_with_execution_context(
+            SourceBackedPackage::from_read_at(
                 source.clone(),
                 SourceLimits::default(),
-                context,
+                litchi_opc::SourceCacheLimits::default(),
+                litchi_opc::SourceReadPolicy::exact(),
+                Some(context)
             ),
             Err(litchi_opc::OpcError::Cancelled)
         ));
@@ -7596,10 +7624,12 @@ mod tests {
         )
         .unwrap();
         let context = ExecutionContext::new(budget.clone(), cancellation, execution_limits);
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
+        let package = SourceBackedPackage::from_read_at(
             source.clone(),
             SourceLimits::default(),
-            context,
+            litchi_opc::SourceCacheLimits::default(),
+            litchi_opc::SourceReadPolicy::exact(),
+            Some(context),
         )
         .unwrap();
         let presentation = SourceBackedPresentation::from_source_backed_package(package).unwrap();
@@ -7887,8 +7917,12 @@ mod tests {
             .unwrap();
         assert_ne!(output, archive);
 
-        let source = litchi_opc::OpcPackage::from_bytes(&archive).unwrap();
-        let candidate = litchi_opc::OpcPackage::from_bytes(&output).unwrap();
+        let source =
+            litchi_opc::OpcPackage::from_bytes(&archive, litchi_opc::SourceLimits::default())
+                .unwrap();
+        let candidate =
+            litchi_opc::OpcPackage::from_bytes(&output, litchi_opc::SourceLimits::default())
+                .unwrap();
         for part in source
             .try_iter_parts()
             .map(|part| part.expect("part payload decodes"))

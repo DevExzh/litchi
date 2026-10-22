@@ -310,12 +310,12 @@ fn logical_package_size(package: &Package) -> usize {
     let opc = package.opc_package();
     let root = uri("/");
     let mut total = opc
-        .source_content_types()
+        .source_content_types(litchi_opc::SourceLimits::default())
         .expect("source content types exist")
         .bytes()
         .len();
     total += opc
-        .source_relationships(&root)
+        .source_relationships(&root, litchi_opc::SourceLimits::default())
         .expect("source package relationships exist")
         .bytes()
         .len();
@@ -325,7 +325,7 @@ fn logical_package_size(package: &Package) -> usize {
     {
         total += part.blob().len();
         total += opc
-            .source_relationships(part.partname())
+            .source_relationships(part.partname(), litchi_opc::SourceLimits::default())
             .expect("source part relationships exist")
             .bytes()
             .len();
@@ -337,19 +337,19 @@ fn max_relationship_xml_size(package: &Package) -> usize {
     let opc = package.opc_package();
     let root = uri("/");
     let mut maximum = opc
-        .source_content_types()
+        .source_content_types(litchi_opc::SourceLimits::default())
         .expect("source content types exist")
         .bytes()
         .len()
         .max(
-            opc.source_relationships(&root)
+            opc.source_relationships(&root, litchi_opc::SourceLimits::default())
                 .expect("source package relationships exist")
                 .bytes()
                 .len(),
         );
     for part in opc.iter_parts() {
         maximum = maximum.max(
-            opc.source_relationships(part.partname())
+            opc.source_relationships(part.partname(), litchi_opc::SourceLimits::default())
                 .expect("source part relationships exist")
                 .bytes()
                 .len(),
@@ -361,7 +361,7 @@ fn max_relationship_xml_size(package: &Package) -> usize {
 fn relationship_xml_size(package: &Package, owner: &str) -> usize {
     package
         .opc_package()
-        .source_relationships(&uri(owner))
+        .source_relationships(&uri(owner), litchi_opc::SourceLimits::default())
         .expect("source relationship member exists")
         .bytes()
         .len()
@@ -376,7 +376,8 @@ fn package_with_part_bytes(package: Package, part_name: &str, bytes: Vec<u8>) ->
 }
 
 fn rewrite_physical_member(bytes: &[u8], wanted: &str, replacement: Vec<u8>) -> Vec<u8> {
-    let reader = PhysPkgReader::new(bytes).expect("synthetic package is a physical ZIP");
+    let reader = PhysPkgReader::new(bytes, litchi_opc::SourceLimits::default())
+        .expect("synthetic package is a physical ZIP");
     let mut writer = PhysPkgWriter::new();
     for member in reader
         .member_names()
@@ -751,7 +752,7 @@ fn inverse_refuses_oversized_source_template_under_temporary_cap_atomically() {
         fixture
             .package
             .opc_package()
-            .source_content_types()
+            .source_content_types(litchi_opc::SourceLimits::default())
             .expect("source content types exist")
             .bytes()
             .len(),

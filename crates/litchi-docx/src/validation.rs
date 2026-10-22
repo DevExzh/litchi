@@ -304,11 +304,12 @@ fn open_validation_package(
         cancellation,
         execution_limits,
     );
-    SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
+    SourceBackedPackage::from_read_at(
         source,
         read_limits,
         litchi_opc::SourceCacheLimits::default(),
-        context,
+        litchi_opc::SourceReadPolicy::exact(),
+        Some(context),
     )
 }
 

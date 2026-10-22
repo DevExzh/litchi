@@ -159,7 +159,13 @@ fn every_route_matches_the_facade_on_real_fixtures() {
 #[test]
 fn metadata_matches_the_leaf_core_properties_read() {
     let bytes = fixture("xlsx/DateFormatTests.xlsx");
-    let package = SourceBackedPackage::from_vec(bytes.clone()).unwrap();
+    let package = SourceBackedPackage::from_vec(
+        bytes.clone(),
+        litchi_opc::SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap();
     let (leaf, _) =
         crate::detect::workbook_metadata::read_source_backed_metadata(&package).unwrap();
     let handle = open_bytes(bytes, &OpenOptions::new());
@@ -746,7 +752,14 @@ fn transient_promotion_read_failure_can_retry_the_same_source() {
         source: OwnedSource::new(bytes.clone()),
         fail_next: AtomicBool::new(false),
     });
-    let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+    let package = SourceBackedPackage::from_read_at(
+        source.clone(),
+        litchi_opc::SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        litchi_opc::SourceReadPolicy::exact(),
+        None,
+    )
+    .unwrap();
     let handle = Xlsx::from_source_package(package, &OpenOptions::new()).unwrap();
     source.fail_next.store(true, Ordering::SeqCst);
     let error = handle.editor().expect_err("first promotion read fails");

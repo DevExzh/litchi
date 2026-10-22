@@ -236,7 +236,7 @@ mod tests {
         let root = PackURI::new("/").unwrap();
         GraphSnapshot {
             content_types_publication: opc
-                .source_content_types_with_limits(opc.read_limits())
+                .source_content_types(opc.read_limits())
                 .unwrap()
                 .bytes()
                 .to_vec(),
@@ -316,7 +316,7 @@ mod tests {
         opc: &mut litchi_opc::OpcPackage,
     ) -> crate::package::error::Result<()> {
         let limits = opc.read_limits();
-        let source = opc.source_content_types_with_limits(limits)?;
+        let source = opc.source_content_types(limits)?;
         let marker = b"</Types>";
         let at = source
             .bytes()
@@ -325,11 +325,7 @@ mod tests {
             .expect("content-types root close");
         let mut replacement = source.bytes().to_vec();
         replacement.splice(at..at, [b'\n']);
-        opc.try_replace_content_types_bytes_with_limits(
-            source.bytes(),
-            Arc::new(replacement),
-            limits,
-        )?;
+        opc.try_replace_content_types_bytes(source.bytes(), Arc::new(replacement), limits)?;
         Ok(())
     }
 
@@ -609,7 +605,7 @@ mod tests {
         let replacement = edit
             .update(|opc| {
                 let limits = opc.read_limits();
-                let current = opc.source_content_types_with_limits(limits)?;
+                let current = opc.source_content_types(limits)?;
                 let marker = b"application/octet-stream";
                 let at = current
                     .bytes()
@@ -618,7 +614,7 @@ mod tests {
                     .expect("authored content type");
                 let mut bytes = current.bytes().to_vec();
                 bytes.splice(at..at + marker.len(), b"application/custom".iter().copied());
-                opc.try_replace_content_types_bytes_with_limits(
+                opc.try_replace_content_types_bytes(
                     current.bytes(),
                     Arc::new(bytes.clone()),
                     limits,
@@ -702,7 +698,7 @@ mod tests {
         make_stale
             .update(|opc| {
                 let limits = opc.read_limits();
-                let current = opc.source_content_types_with_limits(limits)?;
+                let current = opc.source_content_types(limits)?;
                 let marker = b"application/octet-stream";
                 let at = current
                     .bytes()
@@ -711,11 +707,7 @@ mod tests {
                     .expect("authored content type");
                 let mut bytes = current.bytes().to_vec();
                 bytes.splice(at..at + marker.len(), b"application/custom".iter().copied());
-                opc.try_replace_content_types_bytes_with_limits(
-                    current.bytes(),
-                    Arc::new(bytes),
-                    limits,
-                )?;
+                opc.try_replace_content_types_bytes(current.bytes(), Arc::new(bytes), limits)?;
                 Ok(())
             })
             .unwrap();

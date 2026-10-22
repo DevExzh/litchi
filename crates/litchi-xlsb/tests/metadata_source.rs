@@ -34,7 +34,8 @@ fn published(workbook: &SourceBackedWorkbook) -> Vec<u8> {
 
 /// Every part outside `docProps/` with its payload.
 fn workbook_parts(bytes: &[u8]) -> Vec<(String, Vec<u8>)> {
-    let package = OpcPackage::from_bytes(bytes).expect("package");
+    let package =
+        OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()).expect("package");
     let mut parts: Vec<_> = package
         .iter_parts()
         .filter(|part| !part.partname().as_str().starts_with("/docProps/"))
@@ -247,7 +248,7 @@ fn a_signed_source_refuses_a_changed_edit_and_keeps_a_no_op() {
 }
 
 fn signed(plain: &[u8]) -> Vec<u8> {
-    let source = OpcPackage::from_bytes(plain).unwrap();
+    let source = OpcPackage::from_bytes(plain, litchi_opc::SourceLimits::default()).unwrap();
     let mut package = OpcPackage::new();
     for relationship in source.rels().iter() {
         package
@@ -318,6 +319,10 @@ fn signed(plain: &[u8]) -> Vec<u8> {
         )
         .unwrap();
     let bytes = PackageWriter::to_bytes(&package).unwrap();
-    assert!(OpcPackage::from_bytes(&bytes).unwrap().is_signed());
+    assert!(
+        OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default())
+            .unwrap()
+            .is_signed()
+    );
     bytes
 }

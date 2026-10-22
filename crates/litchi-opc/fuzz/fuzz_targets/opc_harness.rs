@@ -8,7 +8,7 @@ use std::io::Cursor;
 
 use litchi_opc::{
     AuthoredXmlFragment, OpcError, OpcPackage, PackURI, SourceBackedPackage, SourceLimitKind,
-    SourceLimits, SourceTopologyPlan, probe_package_catalog_from_reader_with_limits,
+    SourceLimits, SourceTopologyPlan, probe_package_catalog_from_reader,
 };
 
 /// Maximum fuzzer input retained by one exercise.
@@ -253,7 +253,7 @@ pub fn exercise(data: &[u8]) -> ExerciseStats {
 
 fn probe_package(data: &[u8], limits: SourceLimits) -> bool {
     let mut reader = Cursor::new(data);
-    probe_package_catalog_from_reader_with_limits(&mut reader, limits).is_ok()
+    probe_package_catalog_from_reader(&mut reader, limits).is_ok()
 }
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -319,7 +319,12 @@ fn eager_main_document_resolves(package: &OpcPackage) -> bool {
 }
 
 fn topology_reopens(data: &[u8], limits: SourceLimits) -> bool {
-    let Ok(source) = SourceBackedPackage::from_vec_with_limits(data.to_vec(), limits) else {
+    let Ok(source) = SourceBackedPackage::from_vec(
+        data.to_vec(),
+        limits,
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    ) else {
         return false;
     };
     if !source_relationships_resolve(&source)
@@ -331,7 +336,7 @@ fn topology_reopens(data: &[u8], limits: SourceLimits) -> bool {
     {
         return false;
     }
-    let Ok(eager) = OpcPackage::from_bytes_with_limits(data, limits) else {
+    let Ok(eager) = OpcPackage::from_bytes(data, limits) else {
         return false;
     };
     eager_relationships_resolve(&eager)
@@ -343,7 +348,12 @@ fn topology_reopens(data: &[u8], limits: SourceLimits) -> bool {
 }
 
 fn exercise_source_backed(data: &[u8], limits: SourceLimits) -> SourceBackedStats {
-    let Ok(package) = SourceBackedPackage::from_vec_with_limits(data.to_vec(), limits) else {
+    let Ok(package) = SourceBackedPackage::from_vec(
+        data.to_vec(),
+        limits,
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    ) else {
         return SourceBackedStats::default();
     };
 
@@ -420,7 +430,7 @@ fn exercise_source_backed(data: &[u8], limits: SourceLimits) -> SourceBackedStat
 }
 
 fn exercise_eager(data: &[u8], limits: SourceLimits) -> EagerStats {
-    let Ok(package) = OpcPackage::from_bytes_with_limits(data, limits) else {
+    let Ok(package) = OpcPackage::from_bytes(data, limits) else {
         return EagerStats::default();
     };
 
@@ -541,9 +551,15 @@ fn boundary_limits(kind: BoundaryKind, value: usize) -> SourceLimits {
 fn ingress_stats(data: &[u8], limits: SourceLimits) -> ExerciseStats {
     let mut reader = Cursor::new(data);
     ExerciseStats {
-        source_backed_ok: SourceBackedPackage::from_vec_with_limits(data.to_vec(), limits).is_ok(),
-        eager_ok: OpcPackage::from_bytes_with_limits(data, limits).is_ok(),
-        probe_ok: probe_package_catalog_from_reader_with_limits(&mut reader, limits).is_ok(),
+        source_backed_ok: SourceBackedPackage::from_vec(
+            data.to_vec(),
+            limits,
+            litchi_opc::SourceCacheLimits::default(),
+            None,
+        )
+        .is_ok(),
+        eager_ok: OpcPackage::from_bytes(data, limits).is_ok(),
+        probe_ok: probe_package_catalog_from_reader(&mut reader, limits).is_ok(),
         ..ExerciseStats::default()
     }
 }
@@ -555,7 +571,12 @@ fn assert_boundary_rejected(
     expected_resource: SourceLimitKind,
 ) {
     let limits = boundary_limits(kind, value);
-    let source = SourceBackedPackage::from_vec_with_limits(data.to_vec(), limits);
+    let source = SourceBackedPackage::from_vec(
+        data.to_vec(),
+        limits,
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    );
     assert!(
         matches!(
             source,
@@ -564,7 +585,7 @@ fn assert_boundary_rejected(
         "source-backed path must reject the {} boundary at {value}",
         kind.label()
     );
-    let eager = OpcPackage::from_bytes_with_limits(data, limits);
+    let eager = OpcPackage::from_bytes(data, limits);
     assert!(
         matches!(
             eager,
@@ -574,7 +595,7 @@ fn assert_boundary_rejected(
         kind.label()
     );
     let mut reader = Cursor::new(data);
-    let probe = probe_package_catalog_from_reader_with_limits(&mut reader, limits);
+    let probe = probe_package_catalog_from_reader(&mut reader, limits);
     assert!(
         matches!(
             probe,

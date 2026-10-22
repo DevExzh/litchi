@@ -98,7 +98,8 @@ fn color_style_xml() -> String {
 #[test]
 fn poi_and_libreoffice_internal_charts_round_trip_deterministically() {
     for (bytes, count) in [(POI, 2usize), (LO_INTERNAL, 1usize)] {
-        let mut package = OpcPackage::from_bytes(bytes).unwrap();
+        let mut package =
+            OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()).unwrap();
         let name = document();
         let graph = load(&package, &name).unwrap();
         assert_eq!(graph.charts.len(), count);
@@ -195,7 +196,7 @@ fn strict_mce_graph_round_trips_without_opening_workbook() {
 
 #[test]
 fn rejects_external_ole_malformed_orphan_unsupported_and_caps_before_mutation() {
-    let package = OpcPackage::from_bytes(LO_EXTERNAL).unwrap();
+    let package = OpcPackage::from_bytes(LO_EXTERNAL, litchi_opc::SourceLimits::default()).unwrap();
     assert!(load(&package, &document()).is_err());
     let (mut package, name) = synthetic(Conformance::Transitional);
     package

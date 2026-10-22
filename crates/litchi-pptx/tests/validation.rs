@@ -109,7 +109,14 @@ fn valid_package() -> Vec<u8> {
 fn valid_source_report_reuses_catalog_and_reports_external_presence_only() {
     let bytes = valid_package();
     let source: Arc<dyn ReadAt> = Arc::new(OwnedSource::new(bytes.clone()));
-    let package = SourceBackedPackage::from_read_at(source).unwrap();
+    let package = SourceBackedPackage::from_read_at(
+        source,
+        litchi_opc::SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        litchi_opc::SourceReadPolicy::exact(),
+        None,
+    )
+    .unwrap();
     let report = validate_source_backed(
         &package,
         PptxValidationLimits::default(),
@@ -290,7 +297,14 @@ fn signature_and_macro_presence_are_inert_facts() {
 #[test]
 fn source_backed_limits_are_finite_and_report_owned_xml_ceiling() {
     let bytes = valid_package();
-    let package = SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(bytes))).unwrap();
+    let package = SourceBackedPackage::from_read_at(
+        Arc::new(OwnedSource::new(bytes)),
+        litchi_opc::SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        litchi_opc::SourceReadPolicy::exact(),
+        None,
+    )
+    .unwrap();
     let report = validate_source_backed(
         &package,
         PptxValidationLimits::default().with_max_owner_bytes(1),

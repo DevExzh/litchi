@@ -44,7 +44,8 @@ fn numbers_workbook() -> Vec<u8> {
 
 /// Replace the cached `Xnum` of the first record of `record_type`.
 fn with_cached_number(source: &[u8], record_type: Kind, value: f64) -> Vec<u8> {
-    let mut package = OpcPackage::from_reader(Cursor::new(source)).unwrap();
+    let mut package =
+        OpcPackage::from_reader(Cursor::new(source), litchi_opc::SourceLimits::default()).unwrap();
     let uri = PackURI::new(SHEET1).unwrap();
     let mut stream: Vec<(Kind, Vec<u8>)> = Records::new(
         package.get_part(&uri).unwrap().blob(),

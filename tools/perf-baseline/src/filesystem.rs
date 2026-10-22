@@ -1331,7 +1331,7 @@ fn build_xlsx_repeat_store_medium_corpus() -> Result<super::Corpus, Box<dyn Erro
 fn build_xlsx_repeat_store_oversized_corpus() -> Result<super::Corpus, Box<dyn Error>> {
     let mut corpus = build_xlsx_repeat_store_medium_corpus()?;
     let worksheet_uri = PackURI::new(format!("/{XLSX_REPEAT_STORE_SELECTED_MEMBER}"))?;
-    let mut package = OpcPackage::from_bytes(&corpus.archive)?;
+    let mut package = OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
     let original = package.get_part(&worksheet_uri)?.blob().to_vec();
     let closing = b"</worksheet>";
     let closing_position = original
@@ -1423,7 +1423,7 @@ fn assert_pinned_xlsx_repeat_store_corpus(
             )
             .into());
         }
-        let package = OpcPackage::from_bytes(&corpus.archive)?;
+        let package = OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
         let worksheet_uri = PackURI::new(format!("/{XLSX_REPEAT_STORE_SELECTED_MEMBER}"))?;
         let worksheet_bytes = package.get_part(&worksheet_uri)?.blob().len();
         if worksheet_bytes < XLSX_REPEAT_STORE_OVERSIZED_MIN_BYTES {
@@ -1968,16 +1968,20 @@ fn expected_opc_output_for_source_bytes(
     let target_uri = PackURI::new(format!("/{}", super::entry_name(OPC_FILE_TARGET_INDEX)))?;
     match operation {
         Operation::OpcEagerSave => {
-            let mut package = OpcPackage::from_bytes(source)?;
+            let mut package = OpcPackage::from_bytes(source, litchi_opc::SourceLimits::default())?;
             package
                 .get_part_mut(&target_uri)?
                 .set_blob(replacement.to_vec());
             Ok(PackageWriter::to_bytes(&package)?)
         },
         Operation::OpcSourceSave | Operation::ProviderAtomicSave => {
-            let package = SourceBackedPackage::from_read_at(Arc::new(super::OwnedSource::new(
-                source.to_vec(),
-            )))?;
+            let package = SourceBackedPackage::from_read_at(
+                Arc::new(super::OwnedSource::new(source.to_vec())),
+                litchi_opc::SourceLimits::default(),
+                litchi_opc::SourceCacheLimits::default(),
+                litchi_opc::SourceReadPolicy::exact(),
+                None,
+            )?;
             let mut output = Vec::new();
             package.write_part_overlay_to_stream(&mut output, &target_uri, replacement.to_vec())?;
             Ok(output)
@@ -2404,7 +2408,11 @@ fn filesystem_provider_axis_summary(
         match operation {
             Operation::ProviderFileReadAt => (
                 "filesystem_read_at",
-                "SourceBackedPackage::from_read_at(FileSource)",
+                "SourceBackedPackage::from_read_at(FileSource,
+            litchi_opc::SourceLimits::default(),
+            litchi_opc::SourceCacheLimits::default(),
+            litchi_opc::SourceReadPolicy::exact(),
+            None)",
                 "timed child SourceBackedPackage open; source hash, package identity, and decompressed target payload oracle are outside elapsed_ns",
                 "known target payload bytes from the post-timing decompression oracle",
                 "source-backed OPC part count, main relationship, target payload bytes, and source SHA-256 verified after every sample",
@@ -2498,7 +2506,8 @@ fn expected_digest_for_source(
         Operation::OpcEagerSave => {
             let target_uri =
                 PackURI::new(format!("/{}", super::entry_name(OPC_FILE_TARGET_INDEX)))?;
-            let mut package = OpcPackage::from_bytes(&fs::read(source)?)?;
+            let mut package =
+                OpcPackage::from_bytes(&fs::read(source)?, litchi_opc::SourceLimits::default())?;
             package
                 .get_part_mut(&target_uri)?
                 .set_blob(filesystem_opc_replacement()?);
@@ -2507,7 +2516,13 @@ fn expected_digest_for_source(
         Operation::OpcSourceSave | Operation::ProviderAtomicSave => {
             let target_uri =
                 PackURI::new(format!("/{}", super::entry_name(OPC_FILE_TARGET_INDEX)))?;
-            let package = SourceBackedPackage::from_read_at(Arc::new(FileSource::open(source)?))?;
+            let package = SourceBackedPackage::from_read_at(
+                Arc::new(FileSource::open(source)?),
+                litchi_opc::SourceLimits::default(),
+                litchi_opc::SourceCacheLimits::default(),
+                litchi_opc::SourceReadPolicy::exact(),
+                None,
+            )?;
             let mut output = Vec::new();
             package.write_part_overlay_to_stream(
                 &mut output,
@@ -3327,13 +3342,13 @@ fn prepare_xlsx_repeat_store_operation(
         // their aggregate interval is reported explicitly below.
         let (control_source, _) = XlsxRepeatStoreSource::from_bytes(Arc::clone(&bytes))?;
         let source_for_package: Arc<dyn ReadAt> = control_source.clone();
-        let package =
-            SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
-                source_for_package,
-                SourceLimits::default(),
-                cache_limits,
-                xlsx_repeat_store_context(u64::try_from(bytes.len())?)?,
-            )?;
+        let package = SourceBackedPackage::from_read_at(
+            source_for_package,
+            SourceLimits::default(),
+            cache_limits,
+            litchi_opc::SourceReadPolicy::exact(),
+            Some(xlsx_repeat_store_context(u64::try_from(bytes.len())?)?),
+        )?;
         reacquire_xlsx_repeat_store_part(&package, &selected_member)?;
         if scenario == XlsxRepeatStoreScenario::Medium {
             let sheet_two = PackURI::new("/xl/worksheets/sheet2.xml")?;
@@ -5639,7 +5654,7 @@ fn run_opc_eager_open(
     source: &Path,
     details: &mut OperationDetails,
 ) -> Result<Option<Arc<CountingReadAt>>, Box<dyn Error>> {
-    let package = OpcPackage::from_bytes(&fs::read(source)?)?;
+    let package = OpcPackage::from_bytes(&fs::read(source)?, litchi_opc::SourceLimits::default())?;
     details.opc_materialized_parts = Some(u64::try_from(package.part_count())?);
     std::hint::black_box(&package);
     Ok(None)
@@ -5649,7 +5664,13 @@ fn run_opc_source_open(
     source: &Path,
 ) -> Result<(Option<Arc<CountingReadAt>>, SourceBackedPackage), Box<dyn Error>> {
     let counter = Arc::new(CountingReadAt::new(Arc::new(FileSource::open(source)?)));
-    let package = SourceBackedPackage::from_read_at(counter.clone())?;
+    let package = SourceBackedPackage::from_read_at(
+        counter.clone(),
+        litchi_opc::SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        litchi_opc::SourceReadPolicy::exact(),
+        None,
+    )?;
     std::hint::black_box(&package);
     Ok((Some(counter), package))
 }
@@ -5723,7 +5744,7 @@ fn xlsx_typed_semantic_oracle(
         return Err("typed XLSX filesystem oracle worksheet shape differs from its pin".into());
     }
 
-    let package = OpcPackage::from_bytes(&corpus.archive)?;
+    let package = OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
     let metadata = super::xlsx_root_metadata_oracle(&package)?;
     let metadata_sha256 = super::xlsx_root_metadata_digest(&metadata)?;
     Ok(XlsxRootSemanticProjection {
@@ -5784,7 +5805,8 @@ fn run_opc_eager_save(
     details: &mut OperationDetails,
 ) -> Result<Option<Arc<CountingReadAt>>, Box<dyn Error>> {
     let target_uri = PackURI::new(format!("/{}", super::entry_name(OPC_FILE_TARGET_INDEX)))?;
-    let mut package = OpcPackage::from_bytes(&fs::read(source)?)?;
+    let mut package =
+        OpcPackage::from_bytes(&fs::read(source)?, litchi_opc::SourceLimits::default())?;
     details.opc_materialized_parts = Some(u64::try_from(package.part_count())?);
     package
         .get_part_mut(&target_uri)?
@@ -5801,7 +5823,13 @@ fn run_opc_source_save(
 ) -> Result<Option<Arc<CountingReadAt>>, Box<dyn Error>> {
     let target_uri = PackURI::new(format!("/{}", super::entry_name(OPC_FILE_TARGET_INDEX)))?;
     let counter = Arc::new(CountingReadAt::new(Arc::new(FileSource::open(source)?)));
-    let package = SourceBackedPackage::from_read_at(counter.clone())?;
+    let package = SourceBackedPackage::from_read_at(
+        counter.clone(),
+        litchi_opc::SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        litchi_opc::SourceReadPolicy::exact(),
+        None,
+    )?;
     litchi_opc::atomic::replace_with(destination, |file| {
         package.write_part_overlay_to_stream(file, &target_uri, replacement.to_vec())
     })?;
@@ -5957,12 +5985,19 @@ fn verify_child_output(
 ) -> Result<(), Box<dyn Error>> {
     match operation {
         Operation::OpcEagerOpen => {
-            let package = OpcPackage::from_bytes(&fs::read(source)?)?;
+            let package =
+                OpcPackage::from_bytes(&fs::read(source)?, litchi_opc::SourceLimits::default())?;
             verify_opc_package(&package, corpus)
         },
         Operation::OpcSourceOpen | Operation::ProviderFileReadAt => {
             let file_source = FileSource::open(source)?;
-            let package = SourceBackedPackage::from_read_at(Arc::new(file_source))?;
+            let package = SourceBackedPackage::from_read_at(
+                Arc::new(file_source),
+                litchi_opc::SourceLimits::default(),
+                litchi_opc::SourceCacheLimits::default(),
+                litchi_opc::SourceReadPolicy::exact(),
+                None,
+            )?;
             if package.iter_parts().count() != corpus.manifest.entry_count {
                 return Err("source-backed OPC filesystem reopen part count differs".into());
             }
@@ -6461,7 +6496,7 @@ struct DocxArchiveSignature {
 }
 
 fn docx_archive_signature(bytes: &[u8]) -> Result<DocxArchiveSignature, Box<dyn Error>> {
-    let package = OpcPackage::from_bytes(bytes)?;
+    let package = OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default())?;
     let mut parts = package
         .try_iter_parts()
         .map(|part| part.expect("part payload decodes"))
@@ -7665,7 +7700,8 @@ mod tests {
         assert_eq!(aligned.len() % 4096, 0);
         assert_ne!(aligned, corpus.archive);
 
-        let package = super::OpcPackage::from_bytes(&aligned).unwrap();
+        let package =
+            super::OpcPackage::from_bytes(&aligned, litchi_opc::SourceLimits::default()).unwrap();
         assert!(package.part_count() > 0);
         let spec = corpus.xlsx.as_ref().unwrap();
         let typed = litchi_xlsx::Package::from_bytes(&aligned).unwrap();

@@ -34,7 +34,11 @@ fn fixture() -> Vec<u8> {
 }
 
 fn rewrite(package_bytes: &[u8], part: &str, transform: impl FnOnce(&mut Stream)) -> Vec<u8> {
-    let mut package = OpcPackage::from_reader(Cursor::new(package_bytes)).unwrap();
+    let mut package = OpcPackage::from_reader(
+        Cursor::new(package_bytes),
+        litchi_opc::SourceLimits::default(),
+    )
+    .unwrap();
     let uri = PackURI::new(part).unwrap();
     let mut stream: Stream = Records::new(
         package.get_part(&uri).unwrap().blob(),
@@ -457,7 +461,8 @@ fn standalone_codec_functions_still_refuse_what_they_cannot_report() {
     let mut calc = None;
     let mut border = None;
     let bytes = fixture();
-    let package = OpcPackage::from_reader(Cursor::new(bytes)).unwrap();
+    let package =
+        OpcPackage::from_reader(Cursor::new(bytes), litchi_opc::SourceLimits::default()).unwrap();
     for record in Records::new(
         package
             .get_part(&PackURI::new(WORKBOOK).unwrap())

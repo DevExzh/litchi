@@ -156,14 +156,14 @@ fn managed_package_with_cache_limits(
     scope: &'static str,
 ) -> (SourceBackedPackage, Budget, CancellationSource) {
     let (budget, cancellation_source, context) = managed_context(scope, 128 * 1024 * 1024, 1 << 40);
-    let package =
-        SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
-            source,
-            limits,
-            cache_limits,
-            context,
-        )
-        .expect("managed fixture package must open");
+    let package = SourceBackedPackage::from_read_at(
+        source,
+        limits,
+        cache_limits,
+        SourceReadPolicy::exact(),
+        Some(context),
+    )
+    .expect("managed fixture package must open");
     (package, budget, cancellation_source)
 }
 
@@ -727,13 +727,25 @@ fn derived_hint_returns_current_original_and_keeps_derived_bytes_live() {
 
 #[test]
 fn malformed_current_source_is_revalidated_after_foreign_hint_mismatch() {
-    let hint_package = SourceBackedPackage::from_vec(archive_bytes(FORMATTED_DOCUMENT)).unwrap();
+    let hint_package = SourceBackedPackage::from_vec(
+        archive_bytes(FORMATTED_DOCUMENT),
+        SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap();
     let hint = hint_package
         .part(&pack(DOCUMENT_URI))
         .unwrap()
         .source_xml()
         .unwrap();
-    let current = SourceBackedPackage::from_vec(archive_bytes(MALFORMED_DOCUMENT)).unwrap();
+    let current = SourceBackedPackage::from_vec(
+        archive_bytes(MALFORMED_DOCUMENT),
+        SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap();
     let error = current
         .part(&pack(DOCUMENT_URI))
         .unwrap()
@@ -811,13 +823,21 @@ fn cancellation_before_and_during_hint_read_remains_typed_and_budgeted() {
         archive_bytes(FORMATTED_DOCUMENT),
         during_cancellation.clone(),
     ));
-    let package = SourceBackedPackage::from_read_at_with_execution_context(
+    let package = SourceBackedPackage::from_read_at(
         source.clone(),
         SourceLimits::default(),
-        context,
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(context),
     )
     .expect("managed cancellation fixture must open");
-    let foreign = SourceBackedPackage::from_vec(archive_bytes(FORMATTED_DOCUMENT)).unwrap();
+    let foreign = SourceBackedPackage::from_vec(
+        archive_bytes(FORMATTED_DOCUMENT),
+        SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap();
     let hint = foreign
         .part(&pack(DOCUMENT_URI))
         .unwrap()
@@ -837,19 +857,25 @@ fn cancellation_before_and_during_hint_read_remains_typed_and_budgeted() {
 
 #[test]
 fn signed_and_encrypted_packages_refuse_hints_before_payload_transfer() {
-    let hint_package = SourceBackedPackage::from_vec(archive_bytes(FORMATTED_DOCUMENT)).unwrap();
+    let hint_package = SourceBackedPackage::from_vec(
+        archive_bytes(FORMATTED_DOCUMENT),
+        SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap();
     let hint = hint_package
         .part(&pack(DOCUMENT_URI))
         .unwrap()
         .source_xml()
         .unwrap();
 
-    let signed = SourceBackedPackage::from_vec(archive_with_options(
-        FORMATTED_DOCUMENT,
-        "application/xml",
+    let signed = SourceBackedPackage::from_vec(
+        archive_with_options(FORMATTED_DOCUMENT, "application/xml", None, true),
+        SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
         None,
-        true,
-    ))
+    )
     .expect("signed fixture must open");
     let signed_error = signed
         .part(&pack(DOCUMENT_URI))
@@ -866,7 +892,12 @@ fn signed_and_encrypted_packages_refuse_hints_before_payload_transfer() {
     // never reach an encrypted package's payload.
     let encrypted_archive =
         mark_entry_encrypted(archive_bytes(FORMATTED_DOCUMENT), DOCUMENT_MEMBER);
-    let encrypted_error = match SourceBackedPackage::from_vec(encrypted_archive) {
+    let encrypted_error = match SourceBackedPackage::from_vec(
+        encrypted_archive,
+        SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    ) {
         Ok(_) => panic!("an encrypted member must be refused during admission"),
         Err(error) => error,
     };

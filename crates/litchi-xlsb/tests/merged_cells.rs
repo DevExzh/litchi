@@ -75,7 +75,11 @@ fn save(workbook: &Workbook) -> Vec<u8> {
 }
 
 fn part_blob(package_bytes: &[u8], path: &str) -> Vec<u8> {
-    let package = OpcPackage::from_reader(Cursor::new(package_bytes)).unwrap();
+    let package = OpcPackage::from_reader(
+        Cursor::new(package_bytes),
+        litchi_opc::SourceLimits::default(),
+    )
+    .unwrap();
     package
         .get_part(&PackURI::new(path).unwrap())
         .unwrap()
@@ -112,7 +116,11 @@ fn insert_before_end_sheet(data: &[u8], inserted: &[u8]) -> Vec<u8> {
 }
 
 fn rewrite_first_sheet(package_bytes: &[u8], transform: impl FnOnce(&[u8]) -> Vec<u8>) -> Vec<u8> {
-    let mut package = OpcPackage::from_reader(Cursor::new(package_bytes)).unwrap();
+    let mut package = OpcPackage::from_reader(
+        Cursor::new(package_bytes),
+        litchi_opc::SourceLimits::default(),
+    )
+    .unwrap();
     let uri = PackURI::new("/xl/worksheets/sheet1.bin").unwrap();
     let changed = transform(package.get_part(&uri).unwrap().blob());
     package.get_part_mut(&uri).unwrap().set_blob(changed);
@@ -191,8 +199,10 @@ fn inserts_absent_block_preserving_unknown_records_parts_and_package_metadata() 
     );
     assert_eq!(part_blob(&output, "/xl/workbook.bin"), original_workbook);
 
-    let before_package = OpcPackage::from_reader(Cursor::new(&source)).unwrap();
-    let after_package = OpcPackage::from_reader(Cursor::new(&output)).unwrap();
+    let before_package =
+        OpcPackage::from_reader(Cursor::new(&source), litchi_opc::SourceLimits::default()).unwrap();
+    let after_package =
+        OpcPackage::from_reader(Cursor::new(&output), litchi_opc::SourceLimits::default()).unwrap();
     for path in [
         "/xl/workbook.bin",
         "/xl/worksheets/sheet1.bin",

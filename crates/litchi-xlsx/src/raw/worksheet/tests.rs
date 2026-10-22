@@ -3006,7 +3006,8 @@ mod streaming_0365_range_tests {
         let archive = committed
             .to_bytes()
             .expect("dense-wide package serialization");
-        let package = OpcPackage::from_bytes(&archive).expect("dense-wide OPC package");
+        let package = OpcPackage::from_bytes(&archive, litchi_opc::SourceLimits::default())
+            .expect("dense-wide OPC package");
         let part = package
             .get_part(&PackURI::new("/xl/worksheets/sheet1.xml").expect("worksheet URI"))
             .expect("dense-wide worksheet part");

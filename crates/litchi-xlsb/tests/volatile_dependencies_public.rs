@@ -124,7 +124,7 @@ fn changed_workbook_relationship_source(package: &Package) -> Package {
         .partname()
         .clone();
     let source = opc
-        .source_relationships(&workbook)
+        .source_relationships(&workbook, litchi_opc::SourceLimits::default())
         .expect("workbook relationship source");
     let relationship = opc
         .get_part(&workbook)
@@ -155,7 +155,7 @@ fn changed_workbook_relationship_source(package: &Package) -> Package {
             .expect("add lexical stale relationship token");
     }
     assert_ne!(replacement.bytes(), source.bytes());
-    opc.try_replace_relationships(&source, &replacement)
+    opc.try_replace_relationships(&source, &replacement, litchi_opc::SourceLimits::default())
         .expect("replace workbook relationship source");
     Package::from_opc(opc).expect("reopen relationship stale fixture")
 }
@@ -163,7 +163,9 @@ fn changed_workbook_relationship_source(package: &Package) -> Package {
 fn changed_content_types_source(package: &Package) -> Package {
     let original_bytes = package_bytes(package);
     let opc = package.clone().into_opc();
-    let source = opc.source_content_types().expect("content-types source");
+    let source = opc
+        .source_content_types(litchi_opc::SourceLimits::default())
+        .expect("content-types source");
     let candidates = opc
         .iter_parts()
         .map(|part| (part.partname().clone(), part.content_type().to_owned()))
@@ -180,7 +182,11 @@ fn changed_content_types_source(package: &Package) -> Package {
         }
         let mut candidate = opc.clone();
         if candidate
-            .try_replace_content_types(source.bytes(), &replacement)
+            .try_replace_content_types(
+                source.bytes(),
+                &replacement,
+                litchi_opc::SourceLimits::default(),
+            )
             .is_err()
         {
             continue;

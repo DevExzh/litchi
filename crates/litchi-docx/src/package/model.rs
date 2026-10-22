@@ -981,7 +981,7 @@ mod font_settings_tests {
                 .expect("stored settings payload");
             bytes[offset] ^= 1;
         }
-        OpcPackage::from_vec(bytes).expect("deferred open")
+        OpcPackage::from_vec(bytes, litchi_opc::SourceLimits::default()).expect("deferred open")
     }
 
     // Found after the 0759 review: every settings lookup error read as
@@ -1098,7 +1098,9 @@ mod font_settings_tests {
                 env!("CARGO_MANIFEST_DIR")
             ))
             .expect("signed fixture");
-            let mut signed = OpcPackage::from_vec(original.clone()).expect("signed open");
+            let mut signed =
+                OpcPackage::from_vec(original.clone(), litchi_opc::SourceLimits::default())
+                    .expect("signed open");
             let result = ensure_word_font_settings(&mut signed, transitional, true);
             assert!(
                 matches!(
@@ -1122,7 +1124,9 @@ mod font_settings_tests {
             // Settings that already carry the flags publish nothing, so a
             // signed package keeps its exact source.
             let resigned = signed_source(&signed);
-            let mut package = OpcPackage::from_vec(resigned.clone()).expect("resigned open");
+            let mut package =
+                OpcPackage::from_vec(resigned.clone(), litchi_opc::SourceLimits::default())
+                    .expect("resigned open");
             assert!(package.is_signed());
             assert!(!ensure_word_font_settings(&mut package, transitional, true).expect("no-op"));
             assert_eq!(

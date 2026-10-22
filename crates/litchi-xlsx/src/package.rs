@@ -75,10 +75,7 @@ impl Package {
     /// Open and validate an XLSX package from a filesystem path with explicit
     /// ingress policies.
     pub fn open_with_options(path: impl AsRef<Path>, options: OpenOptions) -> Result<Self> {
-        Self::from_validated(
-            OpcPackage::open_with_limits(path, options.source_limits)?,
-            options,
-        )
+        Self::from_validated(OpcPackage::open(path, options.source_limits)?, options)
     }
 
     /// Read and validate an XLSX package from bytes.
@@ -93,7 +90,7 @@ impl Package {
     /// policies.
     pub fn from_bytes_with_options(bytes: &[u8], options: OpenOptions) -> Result<Self> {
         Self::from_validated(
-            OpcPackage::from_vec_with_limits(owned_input(bytes, &options)?, options.source_limits)?,
+            OpcPackage::from_vec(owned_input(bytes, &options)?, options.source_limits)?,
             options,
         )
     }
@@ -107,7 +104,7 @@ impl Package {
     /// explicit ingress policies.
     pub fn from_reader_with_options(reader: impl Read, options: OpenOptions) -> Result<Self> {
         Self::from_validated(
-            OpcPackage::from_reader_with_limits(reader, options.source_limits)?,
+            OpcPackage::from_reader(reader, options.source_limits)?,
             options,
         )
     }
@@ -189,7 +186,7 @@ impl Package {
         let provenance = opened
             .mode()
             .map_or_else(PackageEncryption::plain, PackageEncryption::encrypted);
-        let package = OpcPackage::from_vec_with_limits(opened.into_bytes(), options.source_limits)?;
+        let package = OpcPackage::from_vec(opened.into_bytes(), options.source_limits)?;
         Ok(Self {
             workbook: Workbook::from_package_with_encryption(package, provenance, options)?,
         })

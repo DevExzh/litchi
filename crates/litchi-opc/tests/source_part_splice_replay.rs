@@ -116,7 +116,13 @@ fn multi_window_fragment() -> Vec<u8> {
 
 fn open(deflated: bool) -> (SourceBackedPackage, Vec<u8>) {
     let bytes = archive(deflated);
-    let package = SourceBackedPackage::from_vec(bytes.clone()).expect("fixture package must open");
+    let package = SourceBackedPackage::from_vec(
+        bytes.clone(),
+        SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .expect("fixture package must open");
     (package, bytes)
 }
 
@@ -146,14 +152,19 @@ fn proof_for(
 }
 
 fn target_bytes(archive: &[u8]) -> Vec<u8> {
-    SourceBackedPackage::from_vec(archive.to_vec())
-        .expect("published archive must open")
-        .part(&pack(TARGET_URI))
-        .expect("published target must exist")
-        .data()
-        .expect("published target must read")
-        .as_bytes()
-        .to_vec()
+    SourceBackedPackage::from_vec(
+        archive.to_vec(),
+        SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .expect("published archive must open")
+    .part(&pack(TARGET_URI))
+    .expect("published target must exist")
+    .data()
+    .expect("published target must read")
+    .as_bytes()
+    .to_vec()
 }
 
 fn managed_context(memory: u64) -> (Budget, CancellationSource, ExecutionContext) {
@@ -725,8 +736,13 @@ fn replay_512_byte_window_handles_multi_window_source_and_payload() {
 
     for deflated in [false, true] {
         let source_archive = archive_with_source(deflated, &source);
-        let package = SourceBackedPackage::from_vec(source_archive.clone())
-            .expect("multi-window fixture package must open");
+        let package = SourceBackedPackage::from_vec(
+            source_archive.clone(),
+            SourceLimits::default(),
+            litchi_opc::SourceCacheLimits::default(),
+            None,
+        )
+        .expect("multi-window fixture package must open");
         let provider = ChunkedReplayProvider::new(fragment.clone(), 173);
         let plan = package
             .prepare_source_part_splice_with_replay(
@@ -845,10 +861,12 @@ fn replay_expected_artifact_charges_one_managed_output_artifact() {
         let (expected, expected_len, expected_hash) = expected_replay_artifact(deflated);
         let (budget, _cancellation, context) =
             managed_context_with_output(128 * 1024 * 1024, expected_len);
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
+        let package = SourceBackedPackage::from_read_at(
             Arc::new(OwnedSource::new(archive(deflated))),
             SourceLimits::default(),
-            context,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
         )
         .expect("managed expected-artifact fixture must open");
         let plan = replay_plan(
@@ -924,10 +942,12 @@ fn replay_expected_artifact_noop_releases_preview_memory_and_charges_once() {
     let expected_hash = SourceArtifactFingerprint::from_sha256(digest(&source_archive));
     let (budget, _cancellation, context) =
         managed_context_with_output(128 * 1024 * 1024, expected_len);
-    let package = SourceBackedPackage::from_read_at_with_execution_context(
+    let package = SourceBackedPackage::from_read_at(
         Arc::new(OwnedSource::new(source_archive.clone())),
         SourceLimits::default(),
-        context,
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(context),
     )
     .expect("managed no-op fixture must open");
     let provider = ReplayProvider::new(&[], ReplayMode::Exact);
@@ -1101,10 +1121,12 @@ fn replay_provider_open_and_mid_read_errors_are_typed() {
 #[test]
 fn replay_reader_cancellation_is_reported_as_typed_cancelled() {
     let (_budget, cancellation, context) = managed_context(64 * 1024 * 1024);
-    let package = SourceBackedPackage::from_read_at_with_execution_context(
+    let package = SourceBackedPackage::from_read_at(
         Arc::new(OwnedSource::new(archive(false))),
         SourceLimits::default(),
-        context,
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(context),
     )
     .expect("managed replay fixture must open");
     let provider = CancellingReplayProvider::new(cancellation);
@@ -1188,10 +1210,12 @@ fn concurrent_replay_publications_charge_one_window_per_live_reader() {
     let source_archive = archive(false);
     let limits = SourcePartSpliceLimits::default();
     let (budget, _cancellation, context) = managed_context(128 * 1024 * 1024);
-    let package = SourceBackedPackage::from_read_at_with_execution_context(
+    let package = SourceBackedPackage::from_read_at(
         Arc::new(OwnedSource::new(source_archive.clone())),
         SourceLimits::default(),
-        context,
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(context),
     )
     .expect("managed replay fixture must open");
     let provider = BlockingReplayProvider::new(FRAGMENT);
@@ -1423,8 +1447,14 @@ fn contains_source_change(error: &OpcError) -> bool {
 fn replay_source_change_after_sink_progress_is_incomplete() {
     let source_bytes = archive(false);
     let source = MutableSource::new(source_bytes);
-    let package = SourceBackedPackage::from_read_at(source.clone())
-        .expect("mutable replay fixture must open");
+    let package = SourceBackedPackage::from_read_at(
+        source.clone(),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        None,
+    )
+    .expect("mutable replay fixture must open");
     let provider = ReplayProvider::new(FRAGMENT, ReplayMode::Exact);
     let plan = replay_plan(&package, provider, SourcePartSpliceLimits::default());
     let mut sink = MutatingSink {

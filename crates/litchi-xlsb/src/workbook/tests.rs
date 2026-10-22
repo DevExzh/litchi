@@ -1323,7 +1323,7 @@ fn reads_external_book_metadata_from_local_fixture() {
         "/../../test-data/ooxml/xlsb/bug66682.xlsb"
     );
 
-    let package = OpcPackage::open(path).unwrap();
+    let package = OpcPackage::open(path, litchi_opc::SourceLimits::default()).unwrap();
     let workbook = Workbook {
         package,
         worksheet_cache: super::cache::WorksheetCache::new(),

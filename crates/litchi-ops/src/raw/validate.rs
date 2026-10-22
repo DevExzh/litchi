@@ -156,9 +156,11 @@ pub(super) fn validate(file: &File) -> Result<Validation> {
         #[cfg(any(feature = "xlsx", feature = "xlsb"))]
         FileFormat::Xlsx | FileFormat::Xlsb => {
             let bytes = Arc::new(file.to_bytes()?);
-            let leaf = litchi_opc::validate_read_at(Arc::new(litchi_core::OwnedSource::from_arc(
-                Arc::clone(&bytes),
-            )))
+            let leaf = litchi_opc::validate_read_at(
+                Arc::new(litchi_core::OwnedSource::from_arc(Arc::clone(&bytes))),
+                litchi_opc::SourceLimits::default(),
+                litchi_core::ValidationLimits::default(),
+            )
             .map_err(Error::Opc)?;
             with_parts(leaf, bytes)?
         },
@@ -233,10 +235,9 @@ fn refused(file: &File) -> OpsError {
 /// package indexes.
 #[cfg(any(feature = "docx", feature = "xlsx", feature = "pptx", feature = "xlsb"))]
 fn with_parts(leaf: ValidateReport, bytes: Arc<Vec<u8>>) -> Result<ValidateReport> {
-    let Ok(package) = litchi_opc::OpcPackage::from_shared_vec_with_limits(
-        bytes,
-        litchi_opc::SourceLimits::default(),
-    ) else {
+    let Ok(package) =
+        litchi_opc::OpcPackage::from_shared_vec(bytes, litchi_opc::SourceLimits::default())
+    else {
         // The leaf report already records the ingress rejection.
         return Ok(leaf);
     };

@@ -101,10 +101,12 @@ fn managed_package(
     scope: &'static str,
 ) -> (SourceBackedPackage, Budget, CancellationSource) {
     let (budget, cancellation_source, context) = managed_context(scope, 128 * 1024 * 1024, 1 << 40);
-    let package = SourceBackedPackage::from_read_at_with_execution_context(
+    let package = SourceBackedPackage::from_read_at(
         Arc::new(OwnedSource::new(archive_bytes(document))),
         limits,
-        context,
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(context),
     )
     .expect("managed fixture package must open");
     (package, budget, cancellation_source)
@@ -357,9 +359,14 @@ fn content_type_and_lineage_guards_precede_proof_reuse() {
     assert_eq!(budget.used(Resource::Work), before);
 
     let mut foreign = source.clone();
-    foreign.source_lineage = SourceBackedPackage::from_vec(archive_bytes(SOURCE_XML))
-        .expect("foreign package must open")
-        .source_lineage();
+    foreign.source_lineage = SourceBackedPackage::from_vec(
+        archive_bytes(SOURCE_XML),
+        SourceLimits::default(),
+        crate::SourceCacheLimits::default(),
+        None,
+    )
+    .expect("foreign package must open")
+    .source_lineage();
     let lineage_error = foreign
         .check_for_publication(foreign.content_type(), foreign.limits)
         .expect_err("an inconsistent source lineage must remain refused");
@@ -426,8 +433,14 @@ impl ReadAt for MutableSource {
 #[test]
 fn source_revision_invalidates_a_previously_valid_publication_proof() {
     let source = Arc::new(MutableSource::new(archive_bytes(SOURCE_XML)));
-    let package = SourceBackedPackage::from_read_at(source.clone())
-        .expect("mutable fixture package must open");
+    let package = SourceBackedPackage::from_read_at(
+        source.clone(),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        None,
+    )
+    .expect("mutable fixture package must open");
     let proof = capture(&package);
     source.replace_bytes(archive_bytes(SOURCE_XML));
     let error = proof
@@ -438,10 +451,20 @@ fn source_revision_invalidates_a_previously_valid_publication_proof() {
 
 #[test]
 fn destination_identity_is_checked_for_replacements() {
-    let first =
-        SourceBackedPackage::from_vec(archive_bytes(SOURCE_XML)).expect("first package must open");
-    let second =
-        SourceBackedPackage::from_vec(archive_bytes(SOURCE_XML)).expect("second package must open");
+    let first = SourceBackedPackage::from_vec(
+        archive_bytes(SOURCE_XML),
+        SourceLimits::default(),
+        crate::SourceCacheLimits::default(),
+        None,
+    )
+    .expect("first package must open");
+    let second = SourceBackedPackage::from_vec(
+        archive_bytes(SOURCE_XML),
+        SourceLimits::default(),
+        crate::SourceCacheLimits::default(),
+        None,
+    )
+    .expect("second package must open");
     let first_proof = capture(&first);
     let second_proof = capture(&second);
     let error = first_proof
@@ -462,7 +485,14 @@ fn destination_identity_is_checked_for_replacements() {
 #[test]
 fn logical_revisions_keep_physical_source_change_fences() {
     let source = Arc::new(MutableSource::new(archive_bytes(SOURCE_XML)));
-    let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+    let package = SourceBackedPackage::from_read_at(
+        source.clone(),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        None,
+    )
+    .unwrap();
     let original = capture(&package);
     let revision = original.begin_revision().unwrap();
     let publication = revision.clone().into_publication().unwrap();
@@ -487,7 +517,13 @@ fn logical_revisions_keep_physical_source_change_fences() {
 
 #[test]
 fn range_proofs_check_content_type_as_well_as_revision() {
-    let package = SourceBackedPackage::from_vec(archive_bytes(SOURCE_XML)).unwrap();
+    let package = SourceBackedPackage::from_vec(
+        archive_bytes(SOURCE_XML),
+        SourceLimits::default(),
+        crate::SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap();
     let original = capture(&package).begin_revision().unwrap();
     let mut different_type = original.clone();
     different_type.source_content_type =
@@ -504,7 +540,14 @@ fn range_proofs_check_content_type_as_well_as_revision() {
 #[test]
 fn retained_candidate_edits_recheck_physical_sources_after_callbacks() {
     let source = Arc::new(MutableSource::new(archive_bytes(SOURCE_XML)));
-    let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+    let package = SourceBackedPackage::from_read_at(
+        source.clone(),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        None,
+    )
+    .unwrap();
     let root = package
         .prepare_topology(crate::SourceTopologyPlan::new())
         .unwrap();

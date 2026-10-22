@@ -13,13 +13,13 @@ const LO_DOCX: &[u8] = include_bytes!(
 
 #[test]
 fn loads_poi_and_libreoffice_reference_fixtures() {
-    let poi = OpcPackage::from_bytes(POI_XLSX).unwrap();
+    let poi = OpcPackage::from_bytes(POI_XLSX, litchi_opc::SourceLimits::default()).unwrap();
     let items = discover(&poi).unwrap();
     assert_eq!(items.len(), 1);
     assert_eq!(items[0].root().local_name, "easyPacket");
     assert!(items[0].props().unwrap().schemas.is_empty());
 
-    let libreoffice = OpcPackage::from_bytes(LO_DOCX).unwrap();
+    let libreoffice = OpcPackage::from_bytes(LO_DOCX, litchi_opc::SourceLimits::default()).unwrap();
     let items = discover(&libreoffice).unwrap();
     assert_eq!(items.len(), 1);
     assert_eq!(items[0].root().local_name, "Sources");

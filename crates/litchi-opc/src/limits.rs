@@ -99,9 +99,9 @@ impl fmt::Display for SourceLimitKind {
 
 /// Checked resource ceilings for reading one OPC package.
 ///
-/// Create a profile with [`SourceLimits::builder`]. Existing open methods use
-/// [`SourceLimits::default`], while `*_with_limits` constructors let callers
-/// select tighter bounds for hostile or multi-tenant input.
+/// Create a profile with [`SourceLimits::builder`]. Every public ingress takes
+/// the selected profile, so callers can choose tighter bounds for hostile or
+/// multi-tenant input without an unbounded escape hatch.
 ///
 /// The default profile is intentionally bounded across compressed input, ZIP
 /// structure and declared sizes, materialized parts, content types, and

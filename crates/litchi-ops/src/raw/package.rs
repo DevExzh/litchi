@@ -184,7 +184,7 @@ fn relationships(package: &litchi_opc::OpcPackage, spec: &str) -> Option<Part> {
 /// Index published OPC bytes without copying them.
 #[cfg(any(feature = "docx", feature = "xlsx", feature = "pptx", feature = "xlsb"))]
 pub(super) fn open_opc(bytes: Vec<u8>) -> Result<litchi_opc::OpcPackage> {
-    litchi_opc::OpcPackage::from_shared_vec_with_limits(
+    litchi_opc::OpcPackage::from_shared_vec(
         std::sync::Arc::new(bytes),
         litchi_opc::SourceLimits::default(),
     )

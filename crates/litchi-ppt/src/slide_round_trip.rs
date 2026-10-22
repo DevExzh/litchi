@@ -296,11 +296,12 @@ pub(crate) fn parse_embedded_xml_package(
     expected_namespace: &[u8],
     expected_root: &[u8],
 ) -> Result<EmbeddedXmlPackage> {
-    let package = OpcPackage::from_bytes(data).map_err(|error| {
-        Error::Corrupted(format!(
-            "{record_name} contains an invalid ECMA-376 package: {error}"
-        ))
-    })?;
+    let package =
+        OpcPackage::from_bytes(data, litchi_opc::SourceLimits::default()).map_err(|error| {
+            Error::Corrupted(format!(
+                "{record_name} contains an invalid ECMA-376 package: {error}"
+            ))
+        })?;
     let mut found_part_name = None;
     for part in package.try_iter_parts() {
         let part = part.map_err(|error| {
@@ -344,11 +345,12 @@ pub(crate) fn parse_embedded_xml_package(
 }
 
 pub(crate) fn parse_theme_package(data: &[u8]) -> Result<ThemePackage> {
-    let package = OpcPackage::from_bytes(data).map_err(|error| {
-        Error::Corrupted(format!(
-            "RoundTripThemeAtom contains an invalid ECMA-376 package: {error}"
-        ))
-    })?;
+    let package =
+        OpcPackage::from_bytes(data, litchi_opc::SourceLimits::default()).map_err(|error| {
+            Error::Corrupted(format!(
+                "RoundTripThemeAtom contains an invalid ECMA-376 package: {error}"
+            ))
+        })?;
     let mut theme_part = None;
     for part in package.try_iter_parts() {
         let part = part.map_err(|error| {
@@ -567,11 +569,12 @@ fn parse_color_scheme_index(value: &str) -> std::result::Result<ColorSchemeIndex
 }
 
 pub(crate) fn parse_animation_package(data: &[u8]) -> Result<AnimationPackage> {
-    let package = OpcPackage::from_bytes(data).map_err(|error| {
-        Error::Corrupted(format!(
-            "RoundTripAnimationAtom contains an invalid ECMA-376 package: {error}"
-        ))
-    })?;
+    let package =
+        OpcPackage::from_bytes(data, litchi_opc::SourceLimits::default()).map_err(|error| {
+            Error::Corrupted(format!(
+                "RoundTripAnimationAtom contains an invalid ECMA-376 package: {error}"
+            ))
+        })?;
     let mut timing_relationships = package
         .rels()
         .iter()

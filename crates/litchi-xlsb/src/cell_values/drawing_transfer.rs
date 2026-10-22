@@ -2125,7 +2125,8 @@ mod tests {
         let extra_length =
             usize::from(u16::from_le_bytes([bytes[header + 28], bytes[header + 29]]));
         bytes[header + 30 + name_length + extra_length] ^= 0xff;
-        let package = litchi_opc::OpcPackage::from_vec(bytes).expect("the deferred open admits it");
+        let package = litchi_opc::OpcPackage::from_vec(bytes, litchi_opc::SourceLimits::default())
+            .expect("the deferred open admits it");
         let relationship = package
             .part_metadata(&chart_uri)
             .expect("chart part")

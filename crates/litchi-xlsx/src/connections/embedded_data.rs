@@ -159,8 +159,7 @@ impl Bindings {
         }
         let (slots, values, unmodeled_context) = parse_with_limits(part.blob(), limits)?;
         let values = Arc::<[String]>::from(values);
-        let relationships =
-            package.source_relationships_with_limits(part.partname(), read_limits)?;
+        let relationships = package.source_relationships(part.partname(), read_limits)?;
         if relationships.bytes().len() > limits.max_relationship_xml_bytes() {
             return Err(limit(
                 super::LimitKind::RelationshipBytes,
@@ -450,9 +449,8 @@ impl Bindings {
             }
             let current = package.get_part(&source.name)?.blob_arc();
             package.try_replace_owned_xml_part(&current, source.proof.clone())?;
-            let current_relationships =
-                package.source_relationships_with_limits(&source.name, read_limits)?;
-            package.try_replace_relationships_with_limits(
+            let current_relationships = package.source_relationships(&source.name, read_limits)?;
+            package.try_replace_relationships(
                 &current_relationships,
                 &source.relationships,
                 read_limits,
@@ -928,7 +926,7 @@ mod tests {
         )));
         let proof = package.source_xml_part(&name).unwrap();
         let relationships = package
-            .source_relationships_with_limits(&name, package.read_limits())
+            .source_relationships(&name, package.read_limits())
             .unwrap();
         let bindings = Bindings {
             source: Some(Arc::new(Source {

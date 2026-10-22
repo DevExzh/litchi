@@ -568,7 +568,7 @@ pub(crate) fn store_slicer_part_prepared_limited(
             value.relationship_id.clone(),
             false,
         );
-    package.source_content_types_with_limits(*limits)?;
+    package.source_content_types(*limits)?;
     Ok(())
 }
 

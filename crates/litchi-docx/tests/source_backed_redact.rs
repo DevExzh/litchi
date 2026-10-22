@@ -74,7 +74,7 @@ fn fixture(document: Vec<u8>, links: Vec<Link>, non_main_link: bool, signed: boo
 }
 
 fn add_external_owner(bytes: &[u8], package_level: bool, relationship_type: &str) -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(bytes).unwrap();
+    let mut package = OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()).unwrap();
     if package_level {
         package
             .rels_mut()
@@ -214,7 +214,7 @@ fn inventories_and_irreversibly_redacts_duplicate_target_ids_first_middle_last()
     let mut output = Vec::new();
     commit.package().write_to(&mut output).unwrap();
     assert!(!contains_bytes(&output, b"https://remove.invalid/"));
-    let reopened = OpcPackage::from_bytes(&output).unwrap();
+    let reopened = OpcPackage::from_bytes(&output, litchi_opc::SourceLimits::default()).unwrap();
     let main = reopened.main_document_part().unwrap();
     assert!(main.rels().get("rFirst").is_none());
     assert!(main.rels().get("rLast").is_none());
@@ -273,7 +273,7 @@ fn zero_is_an_exact_noop_and_one_removes_the_only_link() {
         .unwrap();
     let mut output = Vec::new();
     commit.package().write_to(&mut output).unwrap();
-    let reopened = OpcPackage::from_bytes(&output).unwrap();
+    let reopened = OpcPackage::from_bytes(&output, litchi_opc::SourceLimits::default()).unwrap();
     let main = reopened.main_document_part().unwrap();
     assert!(main.rels().is_empty());
     let reopened = Package::from_opc_package(reopened).unwrap();
@@ -352,7 +352,8 @@ fn full_artifact_fingerprint_defeats_colliding_custom_source_versions() {
         .commit()
         .unwrap();
 
-    let mut foreign = OpcPackage::from_bytes(&original).unwrap();
+    let mut foreign =
+        OpcPackage::from_bytes(&original, litchi_opc::SourceLimits::default()).unwrap();
     foreign
         .get_part_mut(&PackURI::new(KEEP).unwrap())
         .unwrap()

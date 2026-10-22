@@ -219,14 +219,14 @@ pub(super) fn commit(mut edit: Edit) -> Result<Planned> {
             .saturating_mul(2)
             .saturating_add(
                 candidate
-                    .source_relationships(story.part())?
+                    .source_relationships(story.part(), litchi_opc::SourceLimits::default())?
                     .bytes()
                     .len()
                     .saturating_mul(2),
             )
             .saturating_add(
                 candidate
-                    .source_content_types()?
+                    .source_content_types(litchi_opc::SourceLimits::default())?
                     .bytes()
                     .len()
                     .saturating_mul(2),

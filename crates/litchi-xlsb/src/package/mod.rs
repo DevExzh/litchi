@@ -230,7 +230,7 @@ impl Package {
     /// errors, and the workbook validation errors.
     pub fn open_with_options(path: impl AsRef<Path>, options: OpenOptions) -> Result<Self> {
         options.check_owning()?;
-        let package = OpcPackage::open_with_limits(path, options.source_limits)?;
+        let package = OpcPackage::open(path, options.source_limits)?;
         Self::from_opc_with_options(package, options)
     }
 
@@ -253,8 +253,7 @@ impl Package {
     /// The errors of [`Self::open_with_options`].
     pub fn from_bytes_with_options(bytes: &[u8], options: OpenOptions) -> Result<Self> {
         options.check_owning()?;
-        let package =
-            OpcPackage::from_vec_with_limits(owned_input(bytes, &options)?, options.source_limits)?;
+        let package = OpcPackage::from_vec(owned_input(bytes, &options)?, options.source_limits)?;
         Self::from_opc_with_options(package, options)
     }
 
@@ -271,7 +270,7 @@ impl Package {
     /// The errors of [`Self::open_with_options`].
     pub fn from_reader_with_options(reader: impl Read, options: OpenOptions) -> Result<Self> {
         options.check_owning()?;
-        let package = OpcPackage::from_reader_with_limits(reader, options.source_limits)?;
+        let package = OpcPackage::from_reader(reader, options.source_limits)?;
         Self::from_opc_with_options(package, options)
     }
 

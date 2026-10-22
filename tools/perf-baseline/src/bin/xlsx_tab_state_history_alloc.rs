@@ -557,7 +557,7 @@ fn verify_history(
         } else {
             hidden_fixture
         };
-        let mut package = OpcPackage::from_bytes(fixture)?;
+        let mut package = OpcPackage::from_bytes(fixture, litchi_opc::SourceLimits::default())?;
         patch.apply(&mut package)?;
         let forward = PackageWriter::to_bytes(&package)?;
         if forward == fixture {
@@ -573,7 +573,8 @@ fn verify_history(
             .checked_add(1)
             .ok_or("forward check counter overflow")?;
 
-        let mut inverse_package = OpcPackage::from_bytes(&forward)?;
+        let mut inverse_package =
+            OpcPackage::from_bytes(&forward, litchi_opc::SourceLimits::default())?;
         patch.inverse().apply(&mut inverse_package)?;
         let restored = PackageWriter::to_bytes(&inverse_package)?;
         if restored != fixture {
@@ -760,7 +761,7 @@ fn verify_fixture(identity: &FixtureIdentity, print: bool) -> AnyResult<()> {
 }
 
 fn workbook_sha256(bytes: &[u8]) -> AnyResult<String> {
-    let package = OpcPackage::from_bytes(bytes)?;
+    let package = OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default())?;
     Ok(sha256_hex(
         package.get_part(&PackURI::new(MAIN_PART)?)?.blob(),
     ))

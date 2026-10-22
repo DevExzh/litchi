@@ -1464,7 +1464,7 @@ pub(crate) fn eager_options() -> UnifiedOpenOptions {
 /// The leaf calls the unified eager DOCX owner makes: one eager OPC parse,
 /// the owning package, and its one-pass text validation.
 pub(crate) fn leaf_docx_eager(bytes: Vec<u8>) -> Result<litchi_docx::Package, Box<dyn Error>> {
-    let opc = OpcPackage::from_bytes_with_limits(&bytes, SourceLimits::default())?;
+    let opc = OpcPackage::from_bytes(&bytes, SourceLimits::default())?;
     drop(bytes);
     let package = litchi_docx::Package::from_opc_package(opc)?;
     let document = package.document()?;
@@ -1484,7 +1484,13 @@ pub(crate) struct LeafXlsx {
 /// The leaf calls the unified source-backed XLSX open makes: one OPC index,
 /// the core-properties read, and the deferred workbook catalog.
 pub(crate) fn leaf_xlsx_open(source: Arc<dyn ReadAt>) -> Result<LeafXlsx, Box<dyn Error>> {
-    let package = SourceBackedPackage::from_read_at_with_limits(source, SourceLimits::default())?;
+    let package = SourceBackedPackage::from_read_at(
+        source,
+        SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        litchi_opc::SourceReadPolicy::exact(),
+        None,
+    )?;
     let mut repairs = litchi_ooxml_common::leniency::ToleranceReport::default();
     let metadata =
         litchi_ooxml_common::properties::read_source_backed_with_report(&package, &mut repairs)?
@@ -2359,7 +2365,7 @@ fn run_xlsx_bytes(
         typed.workbook_ref().len(),
         &crate::xlsx_typed_full_text(&typed, spec)?,
         crate::xlsx_root_metadata_digest(&crate::xlsx_root_metadata_oracle(
-            &OpcPackage::from_bytes(&corpus.archive)?,
+            &OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?,
         )?)?,
     );
     drop(typed);
@@ -2432,7 +2438,11 @@ fn run_xlsx_bytes(
             "litchi::open_bytes(Vec<u8>) + File::workbook()?.worksheet_names() + worksheet_count() + File::text()"
         },
         (Leg::Leaf, false) => {
-            "SourceBackedPackage::from_read_at_with_limits(OwnedSource) + core-properties read + litchi_xlsx::SourceBackedWorkbook::from_source_backed_package"
+            "SourceBackedPackage::from_read_at(OwnedSource,
+            litchi_opc::SourceLimits::default(),
+            litchi_opc::SourceCacheLimits::default(),
+            litchi_opc::SourceReadPolicy::exact(),
+            None) + core-properties read + litchi_xlsx::SourceBackedWorkbook::from_source_backed_package"
         },
         (Leg::Leaf, true) => {
             "leaf open (as for open) + sheet names + len() + a row-by-row cell-text projection over SourceWorksheet::cells"

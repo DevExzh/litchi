@@ -28,7 +28,7 @@ fn fixture(name: &str) -> Vec<u8> {
 
 /// Whether `bytes` still carries any OPC signature infrastructure.
 fn carries_signature(bytes: &[u8]) -> bool {
-    let package = OpcPackage::from_bytes(bytes).unwrap();
+    let package = OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()).unwrap();
     package.is_signed()
         || package
             .iter_parts()

@@ -158,7 +158,7 @@ pub fn parse(xml: &[u8]) -> Result<Theme> {
 /// Returns [`Error::Corrupted`] when the package or its theme part is
 /// malformed.
 pub fn from_package(package: &crate::slide_round_trip::ThemePackage) -> Result<Theme> {
-    let opc = OpcPackage::from_bytes(&package.data)
+    let opc = OpcPackage::from_bytes(&package.data, litchi_opc::SourceLimits::default())
         .map_err(|error| Error::Corrupted(format!("theme package: {error}")))?;
     for part in opc.try_iter_parts() {
         let part =

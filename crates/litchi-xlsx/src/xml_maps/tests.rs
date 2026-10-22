@@ -7,7 +7,7 @@ use litchi_opc::part::{BlobPart, Part};
 use litchi_opc::{OpcPackage, PackURI, PackageWriter};
 
 fn package(bytes: &[u8]) -> XmlMapInfo {
-    let package = OpcPackage::from_bytes(bytes).unwrap();
+    let package = OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()).unwrap();
     load_from_package(&package).unwrap().unwrap()
 }
 
@@ -314,9 +314,10 @@ fn preserves_unrelated_references_when_removing_xml_maps() {
 
 #[test]
 fn writes_real_poi_xml_maps_package_without_resolving_schema_payloads() {
-    let mut package = OpcPackage::from_bytes(include_bytes!(
-        "../../../../test-data/poi/test-data/spreadsheet/CustomXMLMappings.xlsx"
-    ))
+    let mut package = OpcPackage::from_bytes(
+        include_bytes!("../../../../test-data/poi/test-data/spreadsheet/CustomXMLMappings.xlsx"),
+        litchi_opc::SourceLimits::default(),
+    )
     .unwrap();
     let (value, conformance) = load_from_package_with_conformance(&package)
         .unwrap()
@@ -326,7 +327,7 @@ fn writes_real_poi_xml_maps_package_without_resolving_schema_payloads() {
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("xml-maps.xlsx");
     package.save(&path).unwrap();
-    let reopened = OpcPackage::open(&path).unwrap();
+    let reopened = OpcPackage::open(&path, litchi_opc::SourceLimits::default()).unwrap();
     assert_eq!(
         load_from_package_with_conformance(&reopened).unwrap(),
         Some((value, conformance))

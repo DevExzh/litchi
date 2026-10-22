@@ -42,7 +42,7 @@ fn calculation_chain_survives_package_publication_and_reopen() {
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("chain-owner.xlsx");
     package.save(&path).unwrap();
-    let reopened = OpcPackage::open(&path).unwrap();
+    let reopened = OpcPackage::open(&path, litchi_opc::SourceLimits::default()).unwrap();
 
     assert_eq!(
         chain::load(&reopened).unwrap(),

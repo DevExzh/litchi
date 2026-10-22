@@ -215,7 +215,7 @@ fn changed_commit(editor: &SourceBackedWorkbook) -> litchi_xlsx::page_setup::sou
 }
 
 fn part_len(bytes: &[u8], member: &str) -> u64 {
-    OpcPackage::from_bytes(bytes)
+    OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default())
         .unwrap()
         .get_part(&PackURI::new(member).unwrap())
         .unwrap()
@@ -257,14 +257,14 @@ fn managed_payload_retention_publication_and_owning_escape_are_explicit() {
     assert_eq!(budget.used(Resource::Memory), part_len(&bytes, MAIN));
     let commit = changed_commit(&editor);
     assert_eq!(budget.used(Resource::Memory), exact);
-    let mut replay = OpcPackage::from_bytes(&bytes).unwrap();
+    let mut replay = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
     replay_patch(&mut replay, commit.patch()).unwrap();
     replay_patch(&mut replay, &commit.patch().inverse()).unwrap();
     let mut output = Vec::new();
     commit.package().write_to(&mut output).unwrap();
     assert_eq!(
         litchi_xlsx::page_setup::Snapshot::load(
-            &OpcPackage::from_bytes(&output).unwrap(),
+            &OpcPackage::from_bytes(&output, litchi_opc::SourceLimits::default()).unwrap(),
             "Sheet1",
         )
         .unwrap()
@@ -319,7 +319,8 @@ fn changed_edit_matches_eager_reopens_inverts_and_preserves_every_relationship()
     let commit = changed_commit(&editor);
     assert_eq!(editor.cache_diagnostics().successful_loads, opened + 1);
 
-    let mut replay = OpcPackage::from_bytes(&source_bytes).unwrap();
+    let mut replay =
+        OpcPackage::from_bytes(&source_bytes, litchi_opc::SourceLimits::default()).unwrap();
     replay_patch(&mut replay, commit.patch()).unwrap();
     assert_eq!(
         litchi_xlsx::page_setup::Snapshot::load(&replay, "Sheet1")
@@ -333,7 +334,7 @@ fn changed_edit_matches_eager_reopens_inverts_and_preserves_every_relationship()
             .get_part(&PackURI::new(SHEET).unwrap())
             .unwrap()
             .blob(),
-        OpcPackage::from_bytes(&source_bytes)
+        OpcPackage::from_bytes(&source_bytes, litchi_opc::SourceLimits::default())
             .unwrap()
             .get_part(&PackURI::new(SHEET).unwrap())
             .unwrap()
@@ -346,8 +347,9 @@ fn changed_edit_matches_eager_reopens_inverts_and_preserves_every_relationship()
     assert_eq!(published.page_setup(), Some(&target_setup()));
     assert_eq!(output, eager_output(&source_bytes));
 
-    let source = OpcPackage::from_bytes(&source_bytes).unwrap();
-    let candidate = OpcPackage::from_bytes(&output).unwrap();
+    let source =
+        OpcPackage::from_bytes(&source_bytes, litchi_opc::SourceLimits::default()).unwrap();
+    let candidate = OpcPackage::from_bytes(&output, litchi_opc::SourceLimits::default()).unwrap();
     assert_eq!(source.part_count(), candidate.part_count());
     assert_eq!(
         relationship_signatures(source.rels()),
@@ -445,7 +447,11 @@ fn printer_references_and_relationships_are_refused_without_materializing_resour
         Err(Error::Unsupported { .. })
     ));
 
-    let mut package = OpcPackage::from_bytes(&ordinary_fixture("", false)).unwrap();
+    let mut package = OpcPackage::from_bytes(
+        &ordinary_fixture("", false),
+        litchi_opc::SourceLimits::default(),
+    )
+    .unwrap();
     package
         .try_add_part(Box::new(BlobPart::new(
             PackURI::new("/xl/printerSettings/printerSettings1.bin").unwrap(),
@@ -500,7 +506,8 @@ fn foreign_version_retarget_and_outbound_relationship_changes_are_rejected() {
     ));
     assert!(output.is_empty());
 
-    let mut retargeted = OpcPackage::from_bytes(&bytes).unwrap();
+    let mut retargeted =
+        OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
     retargeted
         .get_part_mut(&PackURI::new(MAIN).unwrap())
         .unwrap()
@@ -510,7 +517,8 @@ fn foreign_version_retarget_and_outbound_relationship_changes_are_rejected() {
     // An owner refuses the retargeted graph at open.
     assert!(replay_patch(&mut retargeted, commit.patch()).is_err());
 
-    let mut changed_relationship = OpcPackage::from_bytes(&bytes).unwrap();
+    let mut changed_relationship =
+        OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
     changed_relationship
         .get_part_mut(&PackURI::new(SHEET).unwrap())
         .unwrap()
@@ -578,7 +586,11 @@ fn source_edit_is_send_and_chartsheets_are_refused() {
         "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chartsheet";
     const CHARTSHEET_CT: &str =
         "application/vnd.openxmlformats-officedocument.spreadsheetml.chartsheet+xml";
-    let mut package = OpcPackage::from_bytes(&ordinary_fixture("", false)).unwrap();
+    let mut package = OpcPackage::from_bytes(
+        &ordinary_fixture("", false),
+        litchi_opc::SourceLimits::default(),
+    )
+    .unwrap();
     let sheet = package.get_part_mut(&PackURI::new(SHEET).unwrap()).unwrap();
     sheet.set_content_type(CHARTSHEET_CT.to_owned()).unwrap();
     sheet.set_blob(format!(r#"<chartsheet xmlns="{SML}"/>"#).into_bytes());
@@ -615,6 +627,6 @@ fn replay_patch(
         .apply_page_setup(patch)?
         .into_package()
         .to_bytes()?;
-    *package = OpcPackage::from_bytes(&next)?;
+    *package = OpcPackage::from_bytes(&next, litchi_opc::SourceLimits::default())?;
     Ok(())
 }

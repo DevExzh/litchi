@@ -1117,7 +1117,9 @@ mod tests {
             )
             .unwrap();
         let bytes = value_writer.finish().unwrap();
-        let package = litchi_opc::phys_pkg::PhysPkgReader::new(&bytes).unwrap();
+        let package =
+            litchi_opc::phys_pkg::PhysPkgReader::new(&bytes, litchi_opc::SourceLimits::default())
+                .unwrap();
         assert_eq!(
             package.member_names().unwrap(),
             vec![
@@ -1150,7 +1152,9 @@ mod tests {
     #[test]
     fn empty_workbook_has_compact_canonical_six_part_topology() {
         let bytes = writer().finish().unwrap();
-        let package = litchi_opc::phys_pkg::PhysPkgReader::new(&bytes).unwrap();
+        let package =
+            litchi_opc::phys_pkg::PhysPkgReader::new(&bytes, litchi_opc::SourceLimits::default())
+                .unwrap();
         assert_eq!(package.len(), 6);
         for (uri, expected) in [
             (CONTENT_TYPES_URI, CONTENT_TYPES_XML),

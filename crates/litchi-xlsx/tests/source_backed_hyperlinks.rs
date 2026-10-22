@@ -386,7 +386,7 @@ fn eager_changed_links(bytes: &[u8]) -> Vec<Hyperlink> {
 }
 
 fn part_len(bytes: &[u8], member: &str) -> u64 {
-    OpcPackage::from_bytes(bytes)
+    OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default())
         .unwrap()
         .get_part(&PackURI::new(member).unwrap())
         .unwrap()
@@ -480,7 +480,8 @@ fn patch_forward_inverse_restore_exact_worksheet_and_relationships_and_reject_st
     let commit = changed_commit(&editor);
     let patch: &litchi_xlsx::hyperlinks::source::Patch = commit.patch();
 
-    let original = OpcPackage::from_bytes(&source_bytes).unwrap();
+    let original =
+        OpcPackage::from_bytes(&source_bytes, litchi_opc::SourceLimits::default()).unwrap();
     let sheet_uri = PackURI::new(SHEET).unwrap();
     let before_sheet = original.get_part(&sheet_uri).unwrap().blob().to_vec();
     let before_relationships =
@@ -488,13 +489,13 @@ fn patch_forward_inverse_restore_exact_worksheet_and_relationships_and_reject_st
     // Replay onto a second open of the source bytes, then invert onto a
     // reopened copy of the output.
     let forward = replay_bytes(&source_bytes, patch).unwrap();
-    let replay = OpcPackage::from_bytes(&forward).unwrap();
+    let replay = OpcPackage::from_bytes(&forward, litchi_opc::SourceLimits::default()).unwrap();
     assert_eq!(
         eager_links_from_opc(replay.clone()),
         source_links(commit.patch().after())
     );
     let restored = replay_bytes(&forward, &patch.inverse()).unwrap();
-    let replay = OpcPackage::from_bytes(&restored).unwrap();
+    let replay = OpcPackage::from_bytes(&restored, litchi_opc::SourceLimits::default()).unwrap();
     assert_eq!(replay.get_part(&sheet_uri).unwrap().blob(), before_sheet);
     assert_eq!(
         relationship_signatures(replay.get_part(&sheet_uri).unwrap().rels()),
@@ -538,8 +539,10 @@ fn changed_publication_raw_preserves_relationships_and_unselected_members() {
 
     let mut output = Vec::new();
     commit.package().write_to(&mut output).unwrap();
-    let source_package = OpcPackage::from_bytes(&source_bytes).unwrap();
-    let output_package = OpcPackage::from_bytes(&output).unwrap();
+    let source_package =
+        OpcPackage::from_bytes(&source_bytes, litchi_opc::SourceLimits::default()).unwrap();
+    let output_package =
+        OpcPackage::from_bytes(&output, litchi_opc::SourceLimits::default()).unwrap();
     assert_eq!(source_package.part_count(), output_package.part_count());
     for source_part in source_package
         .try_iter_parts()

@@ -282,8 +282,22 @@ mod tests {
     #[test]
     fn foreign_part_view_is_rejected_before_source_work() {
         let source = Arc::new(CountingSource::new(mixed_archive()));
-        let first = SourceBackedPackage::from_read_at(source.clone()).unwrap();
-        let second = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+        let first = SourceBackedPackage::from_read_at(
+            source.clone(),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
+        let second = SourceBackedPackage::from_read_at(
+            source.clone(),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let foreign = first.part(&document_uri()).unwrap();
         let reads_before = source.reads.load(Ordering::SeqCst);
 
@@ -300,7 +314,14 @@ mod tests {
     #[test]
     fn a_clone_view_reads_through_the_original_session_and_back() {
         let source = Arc::new(CountingSource::new(mixed_archive()));
-        let original = SourceBackedPackage::from_read_at(source).unwrap();
+        let original = SourceBackedPackage::from_read_at(
+            source,
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let clone = original.clone();
 
         // A clone shares the catalog, so its views index this package.
@@ -318,9 +339,14 @@ mod tests {
         assert_eq!(session.read(view).unwrap().as_bytes(), DOCUMENT);
 
         // A separate open of the same source is still foreign to both.
-        let reopened =
-            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(mixed_archive())))
-                .unwrap();
+        let reopened = SourceBackedPackage::from_read_at(
+            Arc::new(CountingSource::new(mixed_archive())),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let foreign = reopened.part(&document_uri()).unwrap();
         assert!(matches!(
             clone.read_session().read(foreign),
@@ -330,7 +356,13 @@ mod tests {
 
     #[test]
     fn unmanaged_session_reads_mixed_compression_and_cache_hits_are_free() {
-        let package = SourceBackedPackage::from_vec(mixed_archive()).unwrap();
+        let package = SourceBackedPackage::from_vec(
+            mixed_archive(),
+            SourceLimits::default(),
+            crate::SourceCacheLimits::default(),
+            None,
+        )
+        .unwrap();
         let deflated = package.part(&document_uri()).unwrap();
         let second = package.part(&second_uri()).unwrap();
         let stored = package.part(&orphan_uri()).unwrap();
@@ -383,7 +415,14 @@ mod tests {
 
         for bytes in [crc_bytes, size_bytes] {
             let source = Arc::new(CountingSource::new(bytes));
-            let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+            let package = SourceBackedPackage::from_read_at(
+                source.clone(),
+                SourceLimits::default(),
+                SourceCacheLimits::default(),
+                SourceReadPolicy::exact(),
+                None,
+            )
+            .unwrap();
             let bad = package.part(&document_uri()).unwrap();
             let stored = package.part(&orphan_uri()).unwrap();
             let valid_deflate = package.part(&second_uri()).unwrap();
@@ -403,7 +442,14 @@ mod tests {
     #[test]
     fn stale_source_is_refused_and_session_can_be_reused_after_freshness_restored() {
         let source = Arc::new(CountingSource::new(ordinary_archive(DOCUMENT)));
-        let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            source.clone(),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let part = package.part(&document_uri()).unwrap();
         let mut session = package.read_session();
 
@@ -419,10 +465,12 @@ mod tests {
     #[test]
     fn managed_session_cancellation_and_payload_handles_release_budget() {
         let (budget, cancellation_source, context) = managed_context(4096);
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
+        let package = SourceBackedPackage::from_read_at(
             Arc::new(CountingSource::new(ordinary_archive(DOCUMENT))),
             SourceLimits::default(),
-            context,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
         )
         .unwrap();
         let part = package.part(&document_uri()).unwrap();
@@ -443,10 +491,12 @@ mod tests {
     fn managed_deflate_quota_refusal_is_preflighted_and_keeps_session_cold() {
         let source = Arc::new(CountingSource::new(mixed_archive()));
         let (budget, _cancellation_source, context) = managed_context((DOCUMENT.len() - 1) as u64);
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
+        let package = SourceBackedPackage::from_read_at(
             source.clone(),
             SourceLimits::default(),
-            context,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
         )
         .unwrap();
         let part = package.part(&document_uri()).unwrap();

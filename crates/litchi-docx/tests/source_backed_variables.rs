@@ -224,7 +224,7 @@ fn variables_xml(namespace: &str) -> Vec<u8> {
 }
 
 fn change_unrelated_member(bytes: &[u8]) -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(bytes).unwrap();
+    let mut package = OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()).unwrap();
     package
         .get_part_mut(&PackURI::new(format!("/{UNUSED}")).unwrap())
         .unwrap()
@@ -269,7 +269,7 @@ fn set_remove_clear_noop_and_inverse_reopen_complete_packages() {
     assert_eq!(variables.get("first"), Some("updated"));
     assert_eq!(variables.get("second"), Some("two"));
     assert_eq!(variables.get("third"), Some("three"));
-    let opc = OpcPackage::from_bytes(&set_output).unwrap();
+    let opc = OpcPackage::from_bytes(&set_output, litchi_opc::SourceLimits::default()).unwrap();
     let settings = opc
         .get_part(&PackURI::new(format!("/{SETTINGS}")).unwrap())
         .unwrap();
@@ -474,7 +474,7 @@ fn creates_first_owner_before_math_properties_without_rsids() {
         .and_then(|committed| committed.package().write_to(&mut output))
         .unwrap();
 
-    let opc = OpcPackage::from_bytes(&output).unwrap();
+    let opc = OpcPackage::from_bytes(&output, litchi_opc::SourceLimits::default()).unwrap();
     let settings = std::str::from_utf8(
         opc.get_part(&PackURI::new(format!("/{SETTINGS}")).unwrap())
             .unwrap()

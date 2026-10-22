@@ -87,16 +87,19 @@ fn outcome<T, E: std::fmt::Display>(
 }
 
 fn read_opc(bytes: &[u8]) -> String {
-    outcome(litchi_opc::OpcPackage::from_bytes(bytes), |package| {
-        // The package keeps its parts in a hash map, whose order differs from
-        // one process to the next: digest them in name order.
-        let mut parts: Vec<String> = package
-            .iter_parts()
-            .map(|part| format!("{} {}\n", part.partname(), part.content_type()))
-            .collect();
-        parts.sort_unstable();
-        sha256_hex(parts.concat().as_bytes())
-    })
+    outcome(
+        litchi_opc::OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()),
+        |package| {
+            // The package keeps its parts in a hash map, whose order differs from
+            // one process to the next: digest them in name order.
+            let mut parts: Vec<String> = package
+                .iter_parts()
+                .map(|part| format!("{} {}\n", part.partname(), part.content_type()))
+                .collect();
+            parts.sort_unstable();
+            sha256_hex(parts.concat().as_bytes())
+        },
+    )
 }
 
 fn read_docx(bytes: &[u8]) -> String {

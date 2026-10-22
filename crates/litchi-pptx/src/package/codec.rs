@@ -202,10 +202,7 @@ impl Package {
     /// the input exceeds the source limits, cannot be read or is malformed.
     pub fn open_with_options<P: AsRef<Path>>(path: P, options: crate::OpenOptions) -> Result<Self> {
         options.check_owning()?;
-        Self::from_opc_package_with_provenance(
-            OpcPackage::open_with_limits(path, options.source_limits)?,
-            true,
-        )
+        Self::from_opc_package_with_provenance(OpcPackage::open(path, options.source_limits)?, true)
     }
 
     /// Parse a PPTX from a reader.
@@ -232,7 +229,7 @@ impl Package {
     ) -> Result<Self> {
         options.check_owning()?;
         Self::from_opc_package_with_provenance(
-            OpcPackage::from_reader_with_limits(reader, options.source_limits)?,
+            OpcPackage::from_reader(reader, options.source_limits)?,
             true,
         )
     }
@@ -255,10 +252,7 @@ impl Package {
     /// malformed.
     pub fn from_bytes_with_options(bytes: &[u8], options: crate::OpenOptions) -> Result<Self> {
         options.check_owning()?;
-        Self::from_opc_package(OpcPackage::from_bytes_with_limits(
-            bytes,
-            options.source_limits,
-        )?)
+        Self::from_opc_package(OpcPackage::from_bytes(bytes, options.source_limits)?)
     }
 
     /// Adopt an already parsed OPC graph without hydrating a mutable model.

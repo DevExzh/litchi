@@ -6,8 +6,11 @@ use crate::data_validation::{MAX_FORMULA_BYTES, MAX_REFERENCES};
 use litchi_opc::PackURI;
 fn sheet(relative: &str, index: u32) -> Vec<Collection> {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let package = litchi_opc::phys_pkg::OwnedPhysPkgReader::open(root.join(relative))
-        .unwrap_or_else(|e| panic!("open {relative}: {e}"));
+    let package = litchi_opc::phys_pkg::OwnedPhysPkgReader::open(
+        root.join(relative),
+        litchi_opc::SourceLimits::default(),
+    )
+    .unwrap_or_else(|e| panic!("open {relative}: {e}"));
     let uri = PackURI::new(format!("/xl/worksheets/sheet{index}.xml")).unwrap();
     let bytes = package
         .blob_for(&uri)

@@ -132,8 +132,14 @@ fn path_default_catalog_and_selected_data_match_from_vec_without_eager_unselecte
     );
     let file = write_fixture(&source);
 
-    let from_vec = SourceBackedPackage::from_vec(source).unwrap();
-    let from_path = SourceBackedPackage::from_path(file.path()).unwrap();
+    let from_vec = SourceBackedPackage::from_vec(
+        source,
+        SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap();
+    let from_path = SourceBackedPackage::from_path(file.path(), SourceLimits::default()).unwrap();
 
     assert_eq!(catalog(&from_path), catalog(&from_vec));
     assert_eq!(
@@ -165,14 +171,16 @@ fn path_with_limits_matches_from_vec_and_rejects_exact_too_small_input_and_part_
         .unwrap()
         .build()
         .unwrap();
-    let from_path = SourceBackedPackage::from_path_with_limits(file.path(), exact_input).unwrap();
-    let from_vec = SourceBackedPackage::from_vec_with_limits(
+    let from_path = SourceBackedPackage::from_path(file.path(), exact_input).unwrap();
+    let from_vec = SourceBackedPackage::from_vec(
         source.clone(),
         SourceLimits::builder()
             .max_input_bytes(source.len() as u64)
             .unwrap()
             .build()
             .unwrap(),
+        litchi_opc::SourceCacheLimits::default(),
+        None,
     )
     .unwrap();
     assert_eq!(catalog(&from_path), catalog(&from_vec));
@@ -184,17 +192,19 @@ fn path_with_limits_matches_from_vec_and_rejects_exact_too_small_input_and_part_
         .build()
         .unwrap();
     assert!(matches!(
-        SourceBackedPackage::from_path_with_limits(file.path(), too_small_input),
+        SourceBackedPackage::from_path(file.path(), too_small_input),
         Err(OpcError::Limit { .. })
     ));
     assert!(matches!(
-        SourceBackedPackage::from_vec_with_limits(
+        SourceBackedPackage::from_vec(
             source.clone(),
             SourceLimits::builder()
                 .max_input_bytes((source.len() - 1) as u64)
                 .unwrap()
                 .build()
                 .unwrap(),
+            litchi_opc::SourceCacheLimits::default(),
+            None
         ),
         Err(OpcError::Limit { .. })
     ));
@@ -205,17 +215,19 @@ fn path_with_limits_matches_from_vec_and_rejects_exact_too_small_input_and_part_
         .build()
         .unwrap();
     assert!(matches!(
-        SourceBackedPackage::from_path_with_limits(file.path(), too_small_part),
+        SourceBackedPackage::from_path(file.path(), too_small_part),
         Err(OpcError::Limit { .. })
     ));
     assert!(matches!(
-        SourceBackedPackage::from_vec_with_limits(
+        SourceBackedPackage::from_vec(
             source,
             SourceLimits::builder()
                 .max_part_bytes((unused.len() - 1) as u64)
                 .unwrap()
                 .build()
                 .unwrap(),
+            litchi_opc::SourceCacheLimits::default(),
+            None
         ),
         Err(OpcError::Limit { .. })
     ));
@@ -226,7 +238,7 @@ fn path_source_reports_external_change_without_retargeting_or_stale_hydration() 
     let original = archive_bytes(SELECTED_PAYLOAD, UNUSED_PAYLOAD);
     let replacement = archive_bytes(b"<document>replacement</document>", UNUSED_PAYLOAD);
     let file = write_fixture(&original);
-    let package = SourceBackedPackage::from_path(file.path()).unwrap();
+    let package = SourceBackedPackage::from_path(file.path(), SourceLimits::default()).unwrap();
     let selected = package.part(&pack(SELECTED_URI)).unwrap();
     fs::write(file.path(), replacement).unwrap();
 
@@ -239,7 +251,7 @@ fn path_source_reports_external_change_without_retargeting_or_stale_hydration() 
         Err(OpcError::SourceChanged { .. })
     ));
 
-    let reopened = SourceBackedPackage::from_path(file.path()).unwrap();
+    let reopened = SourceBackedPackage::from_path(file.path(), SourceLimits::default()).unwrap();
     assert_eq!(
         selected_payload(&reopened),
         b"<document>replacement</document>"

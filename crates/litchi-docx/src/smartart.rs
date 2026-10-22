@@ -797,7 +797,8 @@ mod tests {
 
     #[test]
     fn reads_libreoffice_strict_fixture() {
-        let package = OpcPackage::from_bytes(STRICT_DOCX).unwrap();
+        let package =
+            OpcPackage::from_bytes(STRICT_DOCX, litchi_opc::SourceLimits::default()).unwrap();
         let name = document_name();
         let smart_arts = load_smart_arts(&package, &name).unwrap();
         assert_eq!(smart_arts.len(), 1);

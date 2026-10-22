@@ -49,11 +49,7 @@ impl<'a> RelationshipFragment<'a> {
 impl RelationshipFragments {
     /// Decode untrusted XML under byte, event, graph and structural bounds.
     /// Duplicate IDs and repaired/nonstandard lexical roots are not editable.
-    pub fn from_bytes_with_limits(
-        owner: PackURI,
-        bytes: Arc<Vec<u8>>,
-        limits: SourceLimits,
-    ) -> Result<Self> {
+    pub fn from_bytes(owner: PackURI, bytes: Arc<Vec<u8>>, limits: SourceLimits) -> Result<Self> {
         let inner =
             Fragments::from_bytes_with_limits(Kind::Relationships(owner.clone()), bytes, limits)?;
         Ok(Self { owner, inner })
@@ -92,8 +88,8 @@ pub struct RelationshipFragmentPlan<'a> {
 }
 impl OwnedRelationships {
     /// Capture bounded exact entries for a durable metadata delta.
-    pub fn fragments_with_limits(&self, limits: SourceLimits) -> Result<RelationshipFragments> {
-        RelationshipFragments::from_bytes_with_limits(self.owner.clone(), self.bytes_arc(), limits)
+    pub fn fragments(&self, limits: SourceLimits) -> Result<RelationshipFragments> {
+        RelationshipFragments::from_bytes(self.owner.clone(), self.bytes_arc(), limits)
     }
     /// Plan guarded entry transport while retaining unrelated destination XML.
     ///

@@ -177,7 +177,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         for route in [false, true, true, false] {
             let start = Instant::now();
             if route {
-                let package = litchi_opc::SourceBackedPackage::from_vec(bytes.clone())?;
+                let package = litchi_opc::SourceBackedPackage::from_vec(
+                    bytes.clone(),
+                    litchi_opc::SourceLimits::default(),
+                    litchi_opc::SourceCacheLimits::default(),
+                    None,
+                )?;
                 let started = Instant::now();
                 black_box(litchi_ooxml_common::properties::app::read_source_backed(
                     &package,

@@ -8,7 +8,8 @@ use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use std::sync::Arc;
 
 fn fixture(bytes: &[u8]) -> (Catalog, Conformance) {
-    let package = OpcPackage::from_bytes(bytes).expect("package");
+    let package =
+        OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()).expect("package");
     load(&package).expect("load").expect("glossary")
 }
 
@@ -1656,7 +1657,7 @@ fn raw_transfer_rebases_owner_target_and_allocates_a_free_id() {
     assert!(destination.is_signed());
     let mut bytes = Vec::new();
     destination.write_to(&mut bytes).unwrap();
-    let reopened = OpcPackage::from_bytes(&bytes).unwrap();
+    let reopened = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
     assert_eq!(
         raw::load(&reopened).unwrap().unwrap().owner_main_part(),
         Some("/custom/main.xml")

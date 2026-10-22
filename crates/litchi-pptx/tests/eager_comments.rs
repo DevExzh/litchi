@@ -72,7 +72,7 @@ fn eager_and_source_comment_snapshots_share_author_and_native_metadata() {
 fn eager_comment_snapshot_requires_an_author_relationship() {
     let package = package_with_comments();
     let bytes = package.to_bytes().unwrap();
-    let mut opc = OpcPackage::from_bytes(&bytes).unwrap();
+    let mut opc = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
     opc.get_part_mut(&PackURI::new("/ppt/presentation.xml").unwrap())
         .unwrap()
         .rels_mut()
@@ -172,7 +172,7 @@ fn package_with_comments() -> Package {
     let comments_name = PackURI::new("/ppt/comments/comment1.xml").unwrap();
 
     let bytes = package.to_bytes().unwrap();
-    let mut package = OpcPackage::from_bytes(&bytes).unwrap();
+    let mut package = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
     {
         let presentation = package.get_part_mut(&presentation_name).unwrap();
         presentation.set_blob(PRESENTATION_XML.to_vec());
@@ -219,7 +219,7 @@ fn package_with_comments() -> Package {
 
 fn rewrite_package(package: Package, edit: impl FnOnce(&mut OpcPackage)) -> Package {
     let bytes = package.to_bytes().unwrap();
-    let mut opc = OpcPackage::from_bytes(&bytes).unwrap();
+    let mut opc = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
     edit(&mut opc);
     Package::from_opc_package(opc).unwrap()
 }

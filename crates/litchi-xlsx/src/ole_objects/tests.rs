@@ -122,7 +122,7 @@ fn strict_round_trip_covers_complete_typed_properties() {
 
 #[test]
 fn loads_real_poi_mce_objects_without_opening_payloads() {
-    let package = OpcPackage::from_bytes(POI).unwrap();
+    let package = OpcPackage::from_bytes(POI, litchi_opc::SourceLimits::default()).unwrap();
     let uri = PackURI::new("/xl/worksheets/sheet1.xml").unwrap();
     let objects = load_ole_objects(&package, &uri).unwrap().unwrap();
     assert_eq!(objects.objects.len(), 2);
@@ -383,7 +383,7 @@ fn patches_replay_exact_sources_invert_and_reject_stale_targets_atomically() {
 
 #[test]
 fn mce_choice_and_fallback_sources_remain_editable_without_activation() {
-    let mut package = OpcPackage::from_bytes(POI).unwrap();
+    let mut package = OpcPackage::from_bytes(POI, litchi_opc::SourceLimits::default()).unwrap();
     let uri = PackURI::new("/xl/worksheets/sheet1.xml").unwrap();
     let source_before = package.get_part(&uri).unwrap().blob().to_vec();
     let mut transaction = Transaction::new(&mut package, &uri).unwrap();

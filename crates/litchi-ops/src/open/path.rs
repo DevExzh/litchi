@@ -379,16 +379,19 @@ mod zip {
             #[cfg(any(test, feature = "test-support"))]
             crate::detect::record_opc_probe();
             let probe = match options.ooxml_cache {
-                Some(cache) => {
-                    litchi_opc::SourceBackedPackage::from_read_at_with_limits_and_cache_limits(
-                        Arc::clone(&source),
-                        limits,
-                        cache,
-                    )
-                },
-                None => litchi_opc::SourceBackedPackage::from_read_at_with_limits(
+                Some(cache) => litchi_opc::SourceBackedPackage::from_read_at(
                     Arc::clone(&source),
                     limits,
+                    cache,
+                    litchi_opc::SourceReadPolicy::exact(),
+                    None,
+                ),
+                None => litchi_opc::SourceBackedPackage::from_read_at(
+                    Arc::clone(&source),
+                    limits,
+                    litchi_opc::SourceCacheLimits::default(),
+                    litchi_opc::SourceReadPolicy::exact(),
+                    None,
                 ),
             };
             match probe {

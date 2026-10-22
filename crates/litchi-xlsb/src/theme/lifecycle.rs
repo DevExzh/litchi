@@ -595,13 +595,13 @@ pub(crate) fn read_owner(package: &OpcPackage, limits: Limits) -> Result<OwnerSn
     let part_names = collect_part_names(package)?;
     let opc_limits = litchi_opc::SourceLimits::default();
     let workbook_relationship_xml =
-        package.source_relationships_with_limits(workbook.partname(), opc_limits)?;
-    let content_types = package.source_content_types_with_limits(opc_limits)?;
+        package.source_relationships(workbook.partname(), opc_limits)?;
+    let content_types = package.source_content_types(opc_limits)?;
     let theme_relationship_xml = theme
         .as_ref()
         .map(|snapshot| -> Result<ThemeRelationships> {
             let name = PackURI::new(&snapshot.graph.theme_name)?;
-            let relationships = package.source_relationships_with_limits(&name, opc_limits)?;
+            let relationships = package.source_relationships(&name, opc_limits)?;
             if relationships.member_present() {
                 Ok(ThemeRelationships::Exact(relationships))
             } else {
@@ -876,9 +876,9 @@ fn materialize(
 fn restore_source_tokens(package: &mut OpcPackage, source: &OwnerSource) -> Result<()> {
     let limits = litchi_opc::SourceLimits::default();
     let workbook_name = PackURI::new(&source.workbook_name)?;
-    let current_workbook = package.source_relationships_with_limits(&workbook_name, limits)?;
+    let current_workbook = package.source_relationships(&workbook_name, limits)?;
     if current_workbook != source.workbook_relationship_xml {
-        package.try_replace_relationships_with_limits(
+        package.try_replace_relationships(
             &current_workbook,
             &source.workbook_relationship_xml,
             limits,
@@ -888,7 +888,7 @@ fn restore_source_tokens(package: &mut OpcPackage, source: &OwnerSource) -> Resu
         ThemeRelationships::Absent => {},
         ThemeRelationships::FreshAbsent { owner } => {
             let owner = PackURI::new(owner)?;
-            let current = package.source_relationships_with_limits(&owner, limits)?;
+            let current = package.source_relationships(&owner, limits)?;
             if current.member_present() {
                 return Err(invalid(
                     "new Theme unexpectedly acquired a physical relationship member",
@@ -897,9 +897,9 @@ fn restore_source_tokens(package: &mut OpcPackage, source: &OwnerSource) -> Resu
         },
         ThemeRelationships::Exact(theme_relationship_xml) => {
             let current_theme =
-                package.source_relationships_with_limits(theme_relationship_xml.owner(), limits)?;
+                package.source_relationships(theme_relationship_xml.owner(), limits)?;
             if current_theme != *theme_relationship_xml {
-                package.try_replace_relationships_with_limits(
+                package.try_replace_relationships(
                     &current_theme,
                     theme_relationship_xml,
                     limits,
@@ -907,9 +907,9 @@ fn restore_source_tokens(package: &mut OpcPackage, source: &OwnerSource) -> Resu
             }
         },
     }
-    let current_content_types = package.source_content_types_with_limits(limits)?;
+    let current_content_types = package.source_content_types(limits)?;
     if current_content_types.bytes() != source.content_types.bytes() {
-        package.try_replace_content_types_with_limits(
+        package.try_replace_content_types(
             current_content_types.bytes(),
             &source.content_types,
             limits,

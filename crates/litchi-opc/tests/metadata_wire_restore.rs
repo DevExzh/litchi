@@ -21,7 +21,7 @@ fn package(rels: bool) -> OpcPackage {
             .write_deflated("custom/_rels/item.bin.rels", RELS)
             .unwrap();
     }
-    OpcPackage::from_vec(writer.finish_to_bytes().unwrap()).unwrap()
+    OpcPackage::from_vec(writer.finish_to_bytes().unwrap(), SourceLimits::default()).unwrap()
 }
 
 fn owner() -> PackURI {
@@ -41,27 +41,22 @@ fn changed(bytes: &[u8], before: &str, after: &str) -> Arc<Vec<u8>> {
 fn wire_metadata_restores_exact_bytes_after_publication_and_reopen() {
     let mut package = package(true);
     let limits = SourceLimits::default();
-    let types = package.source_content_types().unwrap();
-    let rels = package.source_relationships(&owner()).unwrap();
+    let types = package
+        .source_content_types(SourceLimits::default())
+        .unwrap();
+    let rels = package
+        .source_relationships(&owner(), SourceLimits::default())
+        .unwrap();
     let next_types = changed(TYPES, "<!--types-->", "<!--types--><?overlay retained?>");
     let next_rels = changed(RELS, "/old", "/new");
     assert!(
         package
-            .try_replace_content_types_bytes_with_limits(
-                types.bytes(),
-                Arc::clone(&next_types),
-                limits
-            )
+            .try_replace_content_types_bytes(types.bytes(), Arc::clone(&next_types), limits)
             .unwrap()
     );
     assert!(
         package
-            .try_replace_relationships_bytes_with_limits(
-                &rels,
-                Arc::clone(&next_rels),
-                true,
-                limits
-            )
+            .try_replace_relationships_bytes(&rels, Arc::clone(&next_rels), true, limits)
             .unwrap()
     );
     let saved = PackageWriter::to_bytes(&package).unwrap();
@@ -71,30 +66,32 @@ fn wire_metadata_restores_exact_bytes_after_publication_and_reopen() {
         archive.read("custom/_rels/item.bin.rels").unwrap(),
         *next_rels
     );
-    let mut reopened = OpcPackage::from_bytes(&saved).unwrap();
-    let expected = reopened.source_relationships(&owner()).unwrap();
+    let mut reopened = OpcPackage::from_bytes(&saved, SourceLimits::default()).unwrap();
+    let expected = reopened
+        .source_relationships(&owner(), SourceLimits::default())
+        .unwrap();
     assert!(
         reopened
-            .try_replace_content_types_bytes_with_limits(
-                &next_types,
-                Arc::new(TYPES.to_vec()),
-                limits
-            )
+            .try_replace_content_types_bytes(&next_types, Arc::new(TYPES.to_vec()), limits)
             .unwrap()
     );
     assert!(
         reopened
-            .try_replace_relationships_bytes_with_limits(
-                &expected,
-                Arc::new(RELS.to_vec()),
-                true,
-                limits
-            )
+            .try_replace_relationships_bytes(&expected, Arc::new(RELS.to_vec()), true, limits)
             .unwrap()
     );
-    assert_eq!(reopened.source_content_types().unwrap().bytes(), TYPES);
     assert_eq!(
-        reopened.source_relationships(&owner()).unwrap().bytes(),
+        reopened
+            .source_content_types(SourceLimits::default())
+            .unwrap()
+            .bytes(),
+        TYPES
+    );
+    assert_eq!(
+        reopened
+            .source_relationships(&owner(), SourceLimits::default())
+            .unwrap()
+            .bytes(),
         RELS
     );
 }
@@ -103,17 +100,21 @@ fn wire_metadata_restores_exact_bytes_after_publication_and_reopen() {
 fn stale_guards_refuse_wire_images_without_overwriting_destination_overlays() {
     let mut package = package(true);
     let limits = SourceLimits::default();
-    let types = package.source_content_types().unwrap();
-    let rels = package.source_relationships(&owner()).unwrap();
+    let types = package
+        .source_content_types(SourceLimits::default())
+        .unwrap();
+    let rels = package
+        .source_relationships(&owner(), SourceLimits::default())
+        .unwrap();
     package
-        .try_replace_content_types_bytes_with_limits(
+        .try_replace_content_types_bytes(
             types.bytes(),
             changed(TYPES, "<!--types-->", "<!--destination-->"),
             limits,
         )
         .unwrap();
     package
-        .try_replace_relationships_bytes_with_limits(
+        .try_replace_relationships_bytes(
             &rels,
             changed(RELS, "<!--rels-->", "<!--destination-->"),
             true,
@@ -123,10 +124,10 @@ fn stale_guards_refuse_wire_images_without_overwriting_destination_overlays() {
     let before = PackageWriter::to_bytes(&package).unwrap();
     // Staleness wins even over a malformed replacement payload.
     assert!(
-        matches!(package.try_replace_content_types_bytes_with_limits(types.bytes(), Arc::new(b"<".to_vec()), limits), Err(OpcError::InvalidContentTypesManifest(message)) if message.contains("stale"))
+        matches!(package.try_replace_content_types_bytes(types.bytes(), Arc::new(b"<".to_vec()), limits), Err(OpcError::InvalidContentTypesManifest(message)) if message.contains("stale"))
     );
     let error = package
-        .try_replace_relationships_bytes_with_limits(&rels, Arc::new(b"<".to_vec()), true, limits)
+        .try_replace_relationships_bytes(&rels, Arc::new(b"<".to_vec()), true, limits)
         .unwrap_err();
     assert!(error.to_string().contains("stale"));
     assert_eq!(PackageWriter::to_bytes(&package).unwrap(), before);
@@ -136,27 +137,22 @@ fn stale_guards_refuse_wire_images_without_overwriting_destination_overlays() {
 fn invalid_and_oversized_wire_metadata_leave_the_package_unchanged() {
     let mut package = package(true);
     let limits = SourceLimits::default();
-    let types = package.source_content_types().unwrap();
-    let rels = package.source_relationships(&owner()).unwrap();
+    let types = package
+        .source_content_types(SourceLimits::default())
+        .unwrap();
+    let rels = package
+        .source_relationships(&owner(), SourceLimits::default())
+        .unwrap();
     let before = PackageWriter::to_bytes(&package).unwrap();
     for bytes in [b"<".as_slice(), b"<wrong/>", b"<!DOCTYPE x><x/>"] {
         assert!(
             package
-                .try_replace_content_types_bytes_with_limits(
-                    types.bytes(),
-                    Arc::new(bytes.to_vec()),
-                    limits
-                )
+                .try_replace_content_types_bytes(types.bytes(), Arc::new(bytes.to_vec()), limits)
                 .is_err()
         );
         assert!(
             package
-                .try_replace_relationships_bytes_with_limits(
-                    &rels,
-                    Arc::new(bytes.to_vec()),
-                    true,
-                    limits
-                )
+                .try_replace_relationships_bytes(&rels, Arc::new(bytes.to_vec()), true, limits)
                 .is_err()
         );
         assert_eq!(PackageWriter::to_bytes(&package).unwrap(), before);
@@ -169,7 +165,7 @@ fn invalid_and_oversized_wire_metadata_leave_the_package_unchanged() {
     ] {
         assert!(
             package
-                .try_replace_content_types_bytes_with_limits(types.bytes(), bytes, limits)
+                .try_replace_content_types_bytes(types.bytes(), bytes, limits)
                 .is_err()
         );
     }
@@ -179,7 +175,7 @@ fn invalid_and_oversized_wire_metadata_leave_the_package_unchanged() {
     ] {
         assert!(
             package
-                .try_replace_relationships_bytes_with_limits(&rels, bytes, true, limits)
+                .try_replace_relationships_bytes(&rels, bytes, true, limits)
                 .is_err()
         );
     }
@@ -194,11 +190,7 @@ fn invalid_and_oversized_wire_metadata_leave_the_package_unchanged() {
         .build()
         .unwrap();
     assert!(matches!(
-        package.try_replace_content_types_bytes_with_limits(
-            types.bytes(),
-            too_many_types,
-            types_limit
-        ),
+        package.try_replace_content_types_bytes(types.bytes(), too_many_types, types_limit),
         Err(OpcError::Limit {
             kind: SourceLimitKind::ContentTypesBytes,
             ..
@@ -211,7 +203,7 @@ fn invalid_and_oversized_wire_metadata_leave_the_package_unchanged() {
         .build()
         .unwrap();
     assert!(matches!(
-        package.try_replace_relationships_bytes_with_limits(&rels, too_many_rels, true, rels_limit),
+        package.try_replace_relationships_bytes(&rels, too_many_rels, true, rels_limit),
         Err(OpcError::Limit {
             kind: SourceLimitKind::RelationshipXmlBytes,
             ..
@@ -224,20 +216,24 @@ fn invalid_and_oversized_wire_metadata_leave_the_package_unchanged() {
 fn wire_member_presence_is_explicit_and_cannot_discard_lexical_content() {
     let mut package = package(false);
     let limits = SourceLimits::default();
-    let absent = package.source_relationships(&owner()).unwrap();
+    let absent = package
+        .source_relationships(&owner(), SourceLimits::default())
+        .unwrap();
     assert!(!absent.member_present());
     let empty = Arc::new(br#"<Relationships xmlns='http://schemas.openxmlformats.org/package/2006/relationships'><!--keep--></Relationships>"#.to_vec());
     assert!(
         package
-            .try_replace_relationships_bytes_with_limits(&absent, Arc::clone(&empty), false, limits)
+            .try_replace_relationships_bytes(&absent, Arc::clone(&empty), false, limits)
             .is_err()
     );
     assert!(
         package
-            .try_replace_relationships_bytes_with_limits(&absent, empty, true, limits)
+            .try_replace_relationships_bytes(&absent, empty, true, limits)
             .unwrap()
     );
-    let present = package.source_relationships(&owner()).unwrap();
+    let present = package
+        .source_relationships(&owner(), SourceLimits::default())
+        .unwrap();
     assert!(present.member_present());
     let saved = PackageWriter::to_bytes(&package).unwrap();
     assert!(
@@ -248,7 +244,7 @@ fn wire_member_presence_is_explicit_and_cannot_discard_lexical_content() {
     );
     assert!(
         package
-            .try_replace_relationships_bytes_with_limits(
+            .try_replace_relationships_bytes(
                 &present,
                 Arc::new(absent.bytes().to_vec()),
                 false,
@@ -256,7 +252,12 @@ fn wire_member_presence_is_explicit_and_cannot_discard_lexical_content() {
             )
             .unwrap()
     );
-    assert_eq!(package.source_relationships(&owner()).unwrap(), absent);
+    assert_eq!(
+        package
+            .source_relationships(&owner(), SourceLimits::default())
+            .unwrap(),
+        absent
+    );
     let saved = PackageWriter::to_bytes(&package).unwrap();
     assert!(
         !ArchiveReader::new(&saved)
@@ -265,16 +266,11 @@ fn wire_member_presence_is_explicit_and_cannot_discard_lexical_content() {
             .any(|name| name == "custom/_rels/item.bin.rels")
     );
     let root = package
-        .source_relationships(&PackURI::new("/").unwrap())
+        .source_relationships(&PackURI::new("/").unwrap(), SourceLimits::default())
         .unwrap();
     assert!(
         package
-            .try_replace_relationships_bytes_with_limits(
-                &root,
-                Arc::new(root.bytes().to_vec()),
-                false,
-                limits
-            )
+            .try_replace_relationships_bytes(&root, Arc::new(root.bytes().to_vec()), false, limits)
             .is_err()
     );
     assert_eq!(PackageWriter::to_bytes(&package).unwrap(), saved);
@@ -291,11 +287,15 @@ fn signed_wire_replacements_refuse_changes_but_allow_exact_noops() {
         )))
         .unwrap();
     let limits = SourceLimits::default();
-    let types = package.source_content_types().unwrap();
-    let rels = package.source_relationships(&owner()).unwrap();
+    let types = package
+        .source_content_types(SourceLimits::default())
+        .unwrap();
+    let rels = package
+        .source_relationships(&owner(), SourceLimits::default())
+        .unwrap();
     assert!(
         !package
-            .try_replace_content_types_bytes_with_limits(
+            .try_replace_content_types_bytes(
                 types.bytes(),
                 Arc::new(types.bytes().to_vec()),
                 limits
@@ -304,33 +304,29 @@ fn signed_wire_replacements_refuse_changes_but_allow_exact_noops() {
     );
     assert!(
         !package
-            .try_replace_relationships_bytes_with_limits(
-                &rels,
-                Arc::new(rels.bytes().to_vec()),
-                true,
-                limits
-            )
+            .try_replace_relationships_bytes(&rels, Arc::new(rels.bytes().to_vec()), true, limits)
             .unwrap()
     );
     assert!(matches!(
-        package.try_replace_content_types_bytes_with_limits(
-            types.bytes(),
-            Arc::new(b"<".to_vec()),
-            limits
-        ),
+        package.try_replace_content_types_bytes(types.bytes(), Arc::new(b"<".to_vec()), limits),
         Err(OpcError::SignedSourceRequiresExplicitPolicy)
     ));
     assert!(matches!(
-        package.try_replace_relationships_bytes_with_limits(
-            &rels,
-            Arc::new(b"<".to_vec()),
-            true,
-            limits
-        ),
+        package.try_replace_relationships_bytes(&rels, Arc::new(b"<".to_vec()), true, limits),
         Err(OpcError::SignedSourceRequiresExplicitPolicy)
     ));
-    assert_eq!(package.source_content_types().unwrap(), types);
-    assert_eq!(package.source_relationships(&owner()).unwrap(), rels);
+    assert_eq!(
+        package
+            .source_content_types(SourceLimits::default())
+            .unwrap(),
+        types
+    );
+    assert_eq!(
+        package
+            .source_relationships(&owner(), SourceLimits::default())
+            .unwrap(),
+        rels
+    );
 }
 
 #[test]
@@ -344,21 +340,23 @@ fn entry_ceiling_applies_to_retained_and_authored_metadata_even_for_noops() {
         )))
         .unwrap();
     for mut package in [package(true), authored] {
-        let types = package.source_content_types().unwrap();
+        let types = package
+            .source_content_types(SourceLimits::default())
+            .unwrap();
         let tight = SourceLimits::builder()
             .max_entry_bytes((types.bytes().len() - 1) as u64)
             .unwrap()
             .build()
             .unwrap();
         assert!(matches!(
-            package.source_content_types_with_limits(tight),
+            package.source_content_types(tight),
             Err(OpcError::Limit {
                 kind: SourceLimitKind::EntryBytes,
                 ..
             })
         ));
         assert!(matches!(
-            package.try_replace_content_types_bytes_with_limits(
+            package.try_replace_content_types_bytes(
                 types.bytes(),
                 Arc::new(types.bytes().to_vec()),
                 tight
@@ -375,7 +373,7 @@ fn entry_ceiling_applies_to_retained_and_authored_metadata_even_for_noops() {
             .unwrap();
         assert!(
             !package
-                .try_replace_content_types_bytes_with_limits(
+                .try_replace_content_types_bytes(
                     types.bytes(),
                     Arc::new(types.bytes().to_vec()),
                     exact
@@ -383,28 +381,30 @@ fn entry_ceiling_applies_to_retained_and_authored_metadata_even_for_noops() {
                 .unwrap()
         );
 
-        let rels = package.source_relationships(&owner()).unwrap();
+        let rels = package
+            .source_relationships(&owner(), SourceLimits::default())
+            .unwrap();
         let tight = SourceLimits::builder()
             .max_entry_bytes((rels.bytes().len() - 1) as u64)
             .unwrap()
             .build()
             .unwrap();
         assert!(matches!(
-            package.source_relationships_with_limits(&owner(), tight),
+            package.source_relationships(&owner(), tight),
             Err(OpcError::Limit {
                 kind: SourceLimitKind::EntryBytes,
                 ..
             })
         ));
         assert!(matches!(
-            package.plan_source_relationships_with_limits(&owner(), tight),
+            package.plan_source_relationships(&owner(), tight),
             Err(OpcError::Limit {
                 kind: SourceLimitKind::EntryBytes,
                 ..
             })
         ));
         assert!(matches!(
-            package.try_replace_relationships_bytes_with_limits(
+            package.try_replace_relationships_bytes(
                 &rels,
                 Arc::new(rels.bytes().to_vec()),
                 rels.member_present(),
@@ -422,7 +422,7 @@ fn entry_ceiling_applies_to_retained_and_authored_metadata_even_for_noops() {
             .unwrap();
         assert!(
             !package
-                .try_replace_relationships_bytes_with_limits(
+                .try_replace_relationships_bytes(
                     &rels,
                     Arc::new(rels.bytes().to_vec()),
                     rels.member_present(),

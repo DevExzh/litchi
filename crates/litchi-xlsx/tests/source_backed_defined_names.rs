@@ -225,7 +225,7 @@ fn relationship_signatures(relationships: &litchi_opc::Relationships) -> Vec<Str
 }
 
 fn part_len(bytes: &[u8], member: &str) -> u64 {
-    OpcPackage::from_bytes(bytes)
+    OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default())
         .unwrap()
         .get_part(&PackURI::new(member).unwrap())
         .unwrap()
@@ -261,7 +261,8 @@ fn changed_edit_reopens_and_changes_only_workbook_xml() {
     let commit = changed_commit(&editor);
     assert_eq!(editor.cache_diagnostics().successful_loads, opened);
 
-    let mut replay = OpcPackage::from_bytes(&source_bytes).unwrap();
+    let mut replay =
+        OpcPackage::from_bytes(&source_bytes, litchi_opc::SourceLimits::default()).unwrap();
     replay_patch(&mut replay, commit.patch()).unwrap();
     assert_eq!(
         Snapshot::load(&replay).unwrap().defined_names(),
@@ -277,8 +278,9 @@ fn changed_edit_reopens_and_changes_only_workbook_xml() {
     let published = commit.patch().after().clone();
     assert_eq!(published.defined_names(), target_names());
 
-    let source = OpcPackage::from_bytes(&source_bytes).unwrap();
-    let candidate = OpcPackage::from_bytes(&output).unwrap();
+    let source =
+        OpcPackage::from_bytes(&source_bytes, litchi_opc::SourceLimits::default()).unwrap();
+    let candidate = OpcPackage::from_bytes(&output, litchi_opc::SourceLimits::default()).unwrap();
     assert_eq!(source.part_count(), candidate.part_count());
     assert_eq!(
         relationship_signatures(source.rels()),
@@ -506,7 +508,7 @@ fn managed_workbook_payload_is_budgeted_streamed_and_released() {
     assert_eq!(budget.used(Resource::Memory), exact);
 
     let commit = changed_commit(&editor);
-    let mut replay = OpcPackage::from_bytes(&bytes).unwrap();
+    let mut replay = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
     replay_patch(&mut replay, commit.patch()).unwrap();
     replay_patch(&mut replay, &commit.patch().inverse()).unwrap();
 
@@ -515,9 +517,11 @@ fn managed_workbook_payload_is_budgeted_streamed_and_released() {
     let published = commit.patch().after().clone();
     assert_eq!(published.defined_names(), target_names());
     assert_eq!(
-        Snapshot::load(&OpcPackage::from_bytes(&output).unwrap())
-            .unwrap()
-            .defined_names(),
+        Snapshot::load(
+            &OpcPackage::from_bytes(&output, litchi_opc::SourceLimits::default()).unwrap()
+        )
+        .unwrap()
+        .defined_names(),
         target_names()
     );
     drop(commit);
@@ -597,6 +601,6 @@ fn replay_patch(
         .apply_defined_names(patch)?
         .into_package()
         .to_bytes()?;
-    *package = OpcPackage::from_bytes(&next)?;
+    *package = OpcPackage::from_bytes(&next, litchi_opc::SourceLimits::default())?;
     Ok(())
 }

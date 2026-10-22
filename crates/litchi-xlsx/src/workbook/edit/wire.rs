@@ -235,11 +235,17 @@ fn validate_sealed(patch: &CorePatch<ForwardOnly>) -> Result<()> {
 
 fn workbook_from_target<Mode>(patch: &CorePatch<Mode>) -> Result<crate::Package> {
     let target = direction(patch)?.target_bytes;
-    crate::Package::from_opc(OpcPackage::from_vec(copy_bytes(target)?)?)
+    crate::Package::from_opc(OpcPackage::from_vec(
+        copy_bytes(target)?,
+        litchi_opc::SourceLimits::default(),
+    )?)
 }
 
 fn validate_workbook_bytes(bytes: &[u8]) -> Result<()> {
-    let _ = crate::Package::from_opc(OpcPackage::from_vec(copy_bytes(bytes)?)?)?;
+    let _ = crate::Package::from_opc(OpcPackage::from_vec(
+        copy_bytes(bytes)?,
+        litchi_opc::SourceLimits::default(),
+    )?)?;
     Ok(())
 }
 

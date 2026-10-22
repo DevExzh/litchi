@@ -43,14 +43,17 @@ fn inventories_all_seven_real_world_fixtures_without_opening_payloads() {
 
 #[test]
 fn preserves_malformed_and_recursive_payload_bytes_opaquely() {
-    let malformed = OpcPackage::from_bytes(LO_DOCX_BAD_COMPOUND).expect("fixture opens");
+    let malformed =
+        OpcPackage::from_bytes(LO_DOCX_BAD_COMPOUND, litchi_opc::SourceLimits::default())
+            .expect("fixture opens");
     let entries = scan(&malformed, &Limits::default()).expect("malformed payload remains opaque");
     let Target::Internal(payload) = entries[0].target() else {
         panic!("expected internal malformed payload")
     };
     assert_eq!(payload.bytes().len(), 2_560);
 
-    let recursive = OpcPackage::from_bytes(POI_DOCX_RECURSIVE).expect("fixture opens");
+    let recursive = OpcPackage::from_bytes(POI_DOCX_RECURSIVE, litchi_opc::SourceLimits::default())
+        .expect("fixture opens");
     let entries = scan(&recursive, &Limits::default()).expect("recursive payload remains opaque");
     let Target::Internal(payload) = entries[0].target() else {
         panic!("expected internal recursive payload")
@@ -60,7 +63,8 @@ fn preserves_malformed_and_recursive_payload_bytes_opaquely() {
 
 #[test]
 fn preserves_server_specific_object_content_types_without_sniffing() {
-    let package = OpcPackage::from_bytes(POI_XLSX_TWO).expect("fixture opens");
+    let package = OpcPackage::from_bytes(POI_XLSX_TWO, litchi_opc::SourceLimits::default())
+        .expect("fixture opens");
     let entries = scan(&package, &Limits::default()).expect("fixture graph is valid");
     assert!(entries.iter().any(|entry| {
         entry.kind() == Kind::Object
@@ -403,9 +407,15 @@ fn source_scan_matches_eager_metadata_on_real_fixtures() {
         LO_PPTX_PACKAGE,
         POI_PPTX_MIXED,
     ] {
-        let eager_package = OpcPackage::from_bytes(bytes).expect("fixture opens eagerly");
-        let source_package =
-            SourceBackedPackage::from_vec(bytes.to_vec()).expect("fixture opens source-backed");
+        let eager_package = OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default())
+            .expect("fixture opens eagerly");
+        let source_package = SourceBackedPackage::from_vec(
+            bytes.to_vec(),
+            litchi_opc::SourceLimits::default(),
+            litchi_opc::SourceCacheLimits::default(),
+            None,
+        )
+        .expect("fixture opens source-backed");
         let eager = scan(&eager_package, &Limits::default()).expect("eager fixture scan succeeds");
         let source =
             scan_source(&source_package, &Limits::default()).expect("source fixture scan succeeds");
@@ -438,8 +448,14 @@ fn source_scan_reads_no_payload_until_selected_data_or_stream() {
     );
     let eager_bytes = package_bytes(&eager_package);
     let source = Arc::new(CountingSource::new(eager_bytes.clone()));
-    let source_package =
-        SourceBackedPackage::from_read_at(source.clone()).expect("source package opens");
+    let source_package = SourceBackedPackage::from_read_at(
+        source.clone(),
+        litchi_opc::SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        litchi_opc::SourceReadPolicy::exact(),
+        None,
+    )
+    .expect("source package opens");
     let opened_reads = source.reads();
 
     let entries = scan_source(&source_package, &Limits::default()).expect("external scan succeeds");
@@ -458,8 +474,14 @@ fn source_scan_reads_no_payload_until_selected_data_or_stream() {
     let eager_entries = scan(&eager_package, &Limits::default()).expect("eager scan succeeds");
     let source_bytes = package_bytes(&eager_package);
     let source = Arc::new(CountingSource::new(source_bytes));
-    let source_package =
-        SourceBackedPackage::from_read_at(source.clone()).expect("source package opens");
+    let source_package = SourceBackedPackage::from_read_at(
+        source.clone(),
+        litchi_opc::SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        litchi_opc::SourceReadPolicy::exact(),
+        None,
+    )
+    .expect("source package opens");
     let opened_reads = source.reads();
     let entries = scan_source(&source_package, &Limits::default()).expect("internal scan succeeds");
     assert_eq!(source.reads(), opened_reads);
@@ -508,7 +530,13 @@ fn source_duplicate_canonical_targets_are_ordered_and_charged_once() {
 fn source_limits_stale_sources_and_cancellation_fail_closed() {
     let package = duplicate_target_package();
     let bytes = package_bytes(&package);
-    let relationships = SourceBackedPackage::from_vec(bytes.clone()).expect("source opens");
+    let relationships = SourceBackedPackage::from_vec(
+        bytes.clone(),
+        litchi_opc::SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .expect("source opens");
     assert!(matches!(
         scan_source(
             &relationships,
@@ -531,7 +559,14 @@ fn source_limits_stale_sources_and_cancellation_fail_closed() {
     ));
 
     let mutable_source = Arc::new(CountingSource::new(bytes.clone()));
-    let stale = SourceBackedPackage::from_read_at(mutable_source.clone()).expect("source opens");
+    let stale = SourceBackedPackage::from_read_at(
+        mutable_source.clone(),
+        litchi_opc::SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        litchi_opc::SourceReadPolicy::exact(),
+        None,
+    )
+    .expect("source opens");
     mutable_source.bump_revision();
     assert!(scan_source(&stale, &Limits::default()).is_err());
 
@@ -548,10 +583,12 @@ fn source_limits_stale_sources_and_cancellation_fail_closed() {
     )
     .expect("execution limits are valid");
     let context = ExecutionContext::new(budget, cancellation, execution_limits);
-    let cancelled = SourceBackedPackage::from_read_at_with_execution_context(
+    let cancelled = SourceBackedPackage::from_read_at(
         Arc::new(litchi_core::OwnedSource::new(bytes)),
         SourceLimits::default(),
-        context,
+        litchi_opc::SourceCacheLimits::default(),
+        litchi_opc::SourceReadPolicy::exact(),
+        Some(context),
     )
     .expect("source opens before cancellation");
     cancellation_source.cancel();
@@ -559,7 +596,8 @@ fn source_limits_stale_sources_and_cancellation_fail_closed() {
 }
 
 fn assert_fixture(bytes: &[u8], total: usize, objects: usize, packages: usize) {
-    let package = OpcPackage::from_bytes(bytes).expect("fixture opens");
+    let package =
+        OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()).expect("fixture opens");
     let entries = scan(&package, &Limits::default()).expect("fixture graph is valid");
     assert_eq!(entries.len(), total);
     assert_eq!(
@@ -618,7 +656,13 @@ fn source_part(name: &str, content_type: &str) -> BlobPart {
 }
 
 fn source_backed_package(package: &OpcPackage) -> SourceBackedPackage {
-    SourceBackedPackage::from_vec(package_bytes(package)).expect("source package opens")
+    SourceBackedPackage::from_vec(
+        package_bytes(package),
+        litchi_opc::SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .expect("source package opens")
 }
 
 fn package_bytes(package: &OpcPackage) -> Vec<u8> {

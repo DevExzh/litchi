@@ -314,8 +314,11 @@ fn rejects_truncated_numbering_states_without_panicking() {
 fn parses_libreoffice_picture_bullet_fixture() {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let relative = "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/lvlPicBulletId.docx";
-    let package = litchi_opc::phys_pkg::OwnedPhysPkgReader::open(root.join(relative))
-        .unwrap_or_else(|error| panic!("failed to open {relative}: {error}"));
+    let package = litchi_opc::phys_pkg::OwnedPhysPkgReader::open(
+        root.join(relative),
+        litchi_opc::SourceLimits::default(),
+    )
+    .unwrap_or_else(|error| panic!("failed to open {relative}: {error}"));
     let uri = PackURI::new("/word/numbering.xml").expect("valid numbering URI");
     let bytes = package
         .blob_for(&uri)
@@ -516,8 +519,11 @@ fn parses_poi_and_libreoffice_numbering_fixtures() {
         "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/NumberedList.docx",
         "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/lvlPicBulletId.docx",
     ] {
-        let package = litchi_opc::phys_pkg::OwnedPhysPkgReader::open(root.join(relative))
-            .unwrap_or_else(|error| panic!("failed to open {relative}: {error}"));
+        let package = litchi_opc::phys_pkg::OwnedPhysPkgReader::open(
+            root.join(relative),
+            litchi_opc::SourceLimits::default(),
+        )
+        .unwrap_or_else(|error| panic!("failed to open {relative}: {error}"));
         let uri = PackURI::new("/word/numbering.xml").expect("valid numbering URI");
         let bytes = package
             .blob_for(&uri)

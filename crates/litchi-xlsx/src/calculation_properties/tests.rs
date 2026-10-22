@@ -120,7 +120,7 @@ fn rejects_oversized_workbook_xml() {
 }
 
 fn fixture(bytes: &[u8]) -> Properties {
-    let package = OpcPackage::from_bytes(bytes).unwrap();
+    let package = OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()).unwrap();
     let part = package
         .get_part(&PackURI::new("/xl/workbook.xml").unwrap())
         .unwrap();

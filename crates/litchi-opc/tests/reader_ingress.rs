@@ -145,16 +145,15 @@ fn take_error<T>(result: litchi_opc::Result<T>, message: &str) -> OpcError {
 }
 
 fn document_from_physical(source: Vec<u8>, policy: SourceLimits) -> Vec<u8> {
-    let reader =
-        OwnedPhysPkgReader::from_reader_with_limits(ChunkedReader::new(source, 3, 2), policy)
-            .expect("physical reader ingress");
+    let reader = OwnedPhysPkgReader::from_reader(ChunkedReader::new(source, 3, 2), policy)
+        .expect("physical reader ingress");
     reader
         .blob_for(&PackURI::new(DOCUMENT_URI).expect("document URI"))
         .expect("physical document payload")
 }
 
 fn document_from_package(source: Vec<u8>, policy: SourceLimits) -> Vec<u8> {
-    let package = OpcPackage::from_reader_with_limits(ChunkedReader::new(source, 3, 2), policy)
+    let package = OpcPackage::from_reader(ChunkedReader::new(source, 3, 2), policy)
         .expect("eager package reader ingress");
     package
         .get_part(&PackURI::new(DOCUMENT_URI).expect("document URI"))
@@ -164,9 +163,13 @@ fn document_from_package(source: Vec<u8>, policy: SourceLimits) -> Vec<u8> {
 }
 
 fn document_from_source_backed(source: Vec<u8>, policy: SourceLimits) -> Vec<u8> {
-    let package =
-        SourceBackedPackage::from_reader_with_limits(ChunkedReader::new(source, 3, 2), policy)
-            .expect("source-backed reader ingress");
+    let package = SourceBackedPackage::from_reader(
+        ChunkedReader::new(source, 3, 2),
+        policy,
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .expect("source-backed reader ingress");
     package
         .part(&PackURI::new(DOCUMENT_URI).expect("document URI"))
         .expect("source-backed document part")
@@ -198,10 +201,7 @@ fn reader_routes_report_input_limit_before_zip_validation() {
 
     input_limit_error(
         take_error(
-            OwnedPhysPkgReader::from_reader_with_limits(
-                ChunkedReader::new(source.clone(), 1, 0),
-                policy,
-            ),
+            OwnedPhysPkgReader::from_reader(ChunkedReader::new(source.clone(), 1, 0), policy),
             "physical reader must reject oversized input",
         ),
         maximum,
@@ -209,7 +209,7 @@ fn reader_routes_report_input_limit_before_zip_validation() {
     );
     input_limit_error(
         take_error(
-            OpcPackage::from_reader_with_limits(ChunkedReader::new(source.clone(), 1, 0), policy),
+            OpcPackage::from_reader(ChunkedReader::new(source.clone(), 1, 0), policy),
             "eager package must reject oversized input",
         ),
         maximum,
@@ -217,7 +217,12 @@ fn reader_routes_report_input_limit_before_zip_validation() {
     );
     input_limit_error(
         take_error(
-            SourceBackedPackage::from_reader_with_limits(ChunkedReader::new(source, 1, 0), policy),
+            SourceBackedPackage::from_reader(
+                ChunkedReader::new(source, 1, 0),
+                policy,
+                litchi_opc::SourceCacheLimits::default(),
+                None,
+            ),
             "source-backed package must reject oversized input",
         ),
         maximum,
@@ -231,7 +236,7 @@ fn reader_routes_preserve_underlying_errors_before_zip_validation() {
 
     for error in [
         take_error(
-            OwnedPhysPkgReader::from_reader_with_limits(
+            OwnedPhysPkgReader::from_reader(
                 BrokenReader {
                     kind: io::ErrorKind::BrokenPipe,
                 },
@@ -240,7 +245,7 @@ fn reader_routes_preserve_underlying_errors_before_zip_validation() {
             "physical reader must preserve input errors",
         ),
         take_error(
-            OpcPackage::from_reader_with_limits(
+            OpcPackage::from_reader(
                 BrokenReader {
                     kind: io::ErrorKind::BrokenPipe,
                 },
@@ -249,11 +254,13 @@ fn reader_routes_preserve_underlying_errors_before_zip_validation() {
             "eager package must preserve input errors",
         ),
         take_error(
-            SourceBackedPackage::from_reader_with_limits(
+            SourceBackedPackage::from_reader(
                 BrokenReader {
                     kind: io::ErrorKind::BrokenPipe,
                 },
                 policy,
+                litchi_opc::SourceCacheLimits::default(),
+                None,
             ),
             "source-backed package must preserve input errors",
         ),
@@ -272,7 +279,7 @@ fn reader_routes_report_probe_errors_after_exact_limit() {
 
     for error in [
         take_error(
-            OwnedPhysPkgReader::from_reader_with_limits(
+            OwnedPhysPkgReader::from_reader(
                 ErrorAfterLimit {
                     bytes: source.clone(),
                     offset: 0,
@@ -283,7 +290,7 @@ fn reader_routes_report_probe_errors_after_exact_limit() {
             "physical reader must report the probe error",
         ),
         take_error(
-            OpcPackage::from_reader_with_limits(
+            OpcPackage::from_reader(
                 ErrorAfterLimit {
                     bytes: source.clone(),
                     offset: 0,
@@ -294,13 +301,15 @@ fn reader_routes_report_probe_errors_after_exact_limit() {
             "eager package must report the probe error",
         ),
         take_error(
-            SourceBackedPackage::from_reader_with_limits(
+            SourceBackedPackage::from_reader(
                 ErrorAfterLimit {
                     bytes: source.clone(),
                     offset: 0,
                     fail_at: source.len(),
                 },
                 policy,
+                litchi_opc::SourceCacheLimits::default(),
+                None,
             ),
             "source-backed package must report the probe error",
         ),
@@ -319,7 +328,7 @@ fn physical_path_ingress_uses_file_size_for_input_limit_precheck() {
     std::fs::write(file.path(), &source).expect("write package path");
     let document = PackURI::new(DOCUMENT_URI).expect("document URI");
 
-    let exact = OwnedPhysPkgReader::open_with_limits(file.path(), limits(source.len()))
+    let exact = OwnedPhysPkgReader::open(file.path(), limits(source.len()))
         .expect("exact path input limit");
     assert_eq!(
         exact.blob_for(&document).expect("path document"),
@@ -328,7 +337,7 @@ fn physical_path_ingress_uses_file_size_for_input_limit_precheck() {
 
     let maximum = source.len() - 1;
     let error = take_error(
-        OwnedPhysPkgReader::open_with_limits(file.path(), limits(maximum)),
+        OwnedPhysPkgReader::open(file.path(), limits(maximum)),
         "path metadata must reject an oversized input before opening ZIP",
     );
     input_limit_error(error, maximum, source.len());

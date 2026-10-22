@@ -1523,7 +1523,7 @@ fn with_relationship_source_markers(bytes: &[u8], members: &[&str]) -> Vec<u8> {
 
 fn reopened_action_package(bytes: Vec<u8>, limits: SourceLimits) -> (OpcPackage, PackURI, PackURI) {
     (
-        OpcPackage::from_vec_with_limits(bytes, limits).unwrap(),
+        OpcPackage::from_vec(bytes, limits).unwrap(),
         PackURI::new(SLIDE_NAME).unwrap(),
         PackURI::new(ACTION_NAME).unwrap(),
     )
@@ -2012,14 +2012,18 @@ fn owner_relationship_metadata_and_read_policy_are_stale_patch_inputs() {
 fn exact_root_and_owner_relationship_source_members_are_stale_patch_inputs() {
     let seed = package_with_presentation();
     let bytes = serialized_opc(&seed);
-    let base = OpcPackage::from_vec(bytes.clone()).unwrap();
+    let base = OpcPackage::from_vec(bytes.clone(), litchi_opc::SourceLimits::default()).unwrap();
     let slide_name = PackURI::new(SLIDE_NAME).unwrap();
     let root = PackURI::new("/").unwrap();
     let owner_rels_member = "ppt/slides/_rels/slide1.xml.rels";
     let root_rels_member = "_rels/.rels";
 
-    let base_owner_source = base.source_relationships(&slide_name).unwrap();
-    let base_root_source = base.source_relationships(&root).unwrap();
+    let base_owner_source = base
+        .source_relationships(&slide_name, litchi_opc::SourceLimits::default())
+        .unwrap();
+    let base_root_source = base
+        .source_relationships(&root, litchi_opc::SourceLimits::default())
+        .unwrap();
     assert!(base_owner_source.member_present());
     assert!(base_root_source.member_present());
     let base_snapshot = action_snapshot(&base, &slide_name);
@@ -2036,11 +2040,16 @@ fn exact_root_and_owner_relationship_source_members_are_stale_patch_inputs() {
 
     for member in [owner_rels_member, root_rels_member] {
         let mutated_bytes = with_relationship_source_markers(&bytes, &[member]);
-        let mut mutated = OpcPackage::from_vec(mutated_bytes).unwrap();
+        let mut mutated =
+            OpcPackage::from_vec(mutated_bytes, litchi_opc::SourceLimits::default()).unwrap();
         let changed_source = if member == owner_rels_member {
-            mutated.source_relationships(&slide_name).unwrap()
+            mutated
+                .source_relationships(&slide_name, litchi_opc::SourceLimits::default())
+                .unwrap()
         } else {
-            mutated.source_relationships(&root).unwrap()
+            mutated
+                .source_relationships(&root, litchi_opc::SourceLimits::default())
+                .unwrap()
         };
         let original_source = if member == owner_rels_member {
             &base_owner_source

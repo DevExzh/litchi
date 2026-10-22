@@ -90,7 +90,11 @@ fn package_with_slide() -> OpcPackage {
     let mut builder = litchi_pptx::builder::Builder::new().unwrap();
     builder.presentation().unwrap().add_slide().unwrap();
     let authored = builder.build().unwrap();
-    OpcPackage::from_bytes(&authored.to_bytes().unwrap()).unwrap()
+    OpcPackage::from_bytes(
+        &authored.to_bytes().unwrap(),
+        litchi_opc::SourceLimits::default(),
+    )
+    .unwrap()
 }
 
 fn package_with_show_event_extension(extension: &str) -> OpcPackage {
@@ -98,7 +102,7 @@ fn package_with_show_event_extension(extension: &str) -> OpcPackage {
     builder.presentation().unwrap().add_slide().unwrap();
     let authored = builder.build().unwrap();
     let bytes = authored.to_bytes().unwrap();
-    let mut package = OpcPackage::from_bytes(&bytes).unwrap();
+    let mut package = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
     let slide_name = PackURI::new("/ppt/slides/slide1.xml").unwrap();
     let slide = package.get_part_mut(&slide_name).unwrap();
     let xml = std::str::from_utf8(slide.blob()).unwrap();

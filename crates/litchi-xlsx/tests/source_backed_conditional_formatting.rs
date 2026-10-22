@@ -260,7 +260,7 @@ fn initial_owners(namespace: &str) -> String {
 }
 
 fn part_len(bytes: &[u8], member: &str) -> u64 {
-    OpcPackage::from_bytes(bytes)
+    OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default())
         .unwrap()
         .get_part(&PackURI::new(member).unwrap())
         .unwrap()
@@ -329,8 +329,11 @@ fn whole_collection_add_replace_clear_noop_and_order_are_exact() {
             &[first.clone(), middle.clone(), last.clone()]
         );
 
-        let mut package =
-            OpcPackage::from_bytes(&fixture(&worksheet_xml(namespace, ""), strict, false)).unwrap();
+        let mut package = OpcPackage::from_bytes(
+            &fixture(&worksheet_xml(namespace, ""), strict, false),
+            litchi_opc::SourceLimits::default(),
+        )
+        .unwrap();
         replay_patch(&mut package, commit.patch()).unwrap();
         assert_eq!(
             Snapshot::load(&package, 0usize).unwrap().collections(),
@@ -430,8 +433,10 @@ fn publication_reopens_and_preserves_every_unselected_part_and_relationship() {
     let mut output = Vec::new();
     commit.package().write_to(&mut output).unwrap();
 
-    let source_package = OpcPackage::from_bytes(&source).unwrap();
-    let output_package = OpcPackage::from_bytes(&output).unwrap();
+    let source_package =
+        OpcPackage::from_bytes(&source, litchi_opc::SourceLimits::default()).unwrap();
+    let output_package =
+        OpcPackage::from_bytes(&output, litchi_opc::SourceLimits::default()).unwrap();
     assert_eq!(
         Snapshot::load(&output_package, "Sheet1")
             .unwrap()
@@ -492,7 +497,8 @@ fn managed_snapshot_changed_publication_retains_styles_and_releases_budget() {
     let mut edit = editor.edit_conditional_formats("Sheet1").unwrap();
     edit.set_collections(expected.clone()).unwrap();
     let commit = edit.commit().unwrap();
-    let mut replay = OpcPackage::from_bytes(&source_bytes).unwrap();
+    let mut replay =
+        OpcPackage::from_bytes(&source_bytes, litchi_opc::SourceLimits::default()).unwrap();
     replay_patch(&mut replay, commit.patch()).unwrap();
     assert_eq!(
         Snapshot::load(&replay, "Sheet1").unwrap().collections(),
@@ -502,7 +508,7 @@ fn managed_snapshot_changed_publication_retains_styles_and_releases_budget() {
 
     let mut output = Vec::new();
     commit.package().write_to(&mut output).unwrap();
-    let published = OpcPackage::from_bytes(&output).unwrap();
+    let published = OpcPackage::from_bytes(&output, litchi_opc::SourceLimits::default()).unwrap();
     assert_eq!(
         Snapshot::load(&published, "Sheet1").unwrap().collections(),
         expected.as_slice()
@@ -512,7 +518,7 @@ fn managed_snapshot_changed_publication_retains_styles_and_releases_budget() {
             .get_part(&PackURI::new(MEDIA).unwrap())
             .unwrap()
             .blob(),
-        OpcPackage::from_bytes(&source_bytes)
+        OpcPackage::from_bytes(&source_bytes, litchi_opc::SourceLimits::default())
             .unwrap()
             .get_part(&PackURI::new(MEDIA).unwrap())
             .unwrap()
@@ -588,8 +594,11 @@ fn closure_conflicts_signatures_protection_and_partial_sinks_fail_closed() {
     let commit = edit.commit().unwrap();
     assert!(commit.package().write_to(FailingSink(32)).is_err());
 
-    let mut foreign =
-        OpcPackage::from_bytes(&fixture(&worksheet_xml(SML, ""), false, false)).unwrap();
+    let mut foreign = OpcPackage::from_bytes(
+        &fixture(&worksheet_xml(SML, ""), false, false),
+        litchi_opc::SourceLimits::default(),
+    )
+    .unwrap();
     foreign
         .get_part_mut(&PackURI::new(STYLES).unwrap())
         .unwrap()
@@ -728,6 +737,6 @@ fn replay_patch(
         .apply_conditional_formats(patch)?
         .into_package()
         .to_bytes()?;
-    *package = OpcPackage::from_bytes(&next)?;
+    *package = OpcPackage::from_bytes(&next, litchi_opc::SourceLimits::default())?;
     Ok(())
 }

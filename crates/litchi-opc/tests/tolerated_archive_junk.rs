@@ -31,7 +31,8 @@ fn fixture(relative: &str) -> PathBuf {
 fn open(relative: &str) -> OpcPackage {
     let path = fixture(relative);
     let bytes = std::fs::read(&path).unwrap_or_else(|error| panic!("read {relative}: {error}"));
-    OpcPackage::from_bytes(&bytes).unwrap_or_else(|error| panic!("open {relative}: {error}"))
+    OpcPackage::from_bytes(&bytes, SourceLimits::default())
+        .unwrap_or_else(|error| panic!("open {relative}: {error}"))
 }
 
 /// Return the part with the given name, or fail the test.

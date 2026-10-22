@@ -131,7 +131,8 @@ fn assert_reopens_all_authored_content(
         assert_eq!(bounds.height(), height);
     }
 
-    let physical = PhysPkgReader::new(bytes).expect("OPC physical reader");
+    let physical = PhysPkgReader::new(bytes, litchi_opc::SourceLimits::default())
+        .expect("OPC physical reader");
     let names = physical.member_names().expect("physical member names");
     assert!(!names.is_empty());
     for name in &names {

@@ -76,7 +76,13 @@ enum Door {
 const DOORS: [Door; 3] = [Door::Topology, Door::SingleOverlay, Door::MultipleOverlays];
 
 fn publish(door: Door, original: &[u8], replacement: Vec<u8>) -> (Result<(), OpcError>, Vec<u8>) {
-    let package = SourceBackedPackage::from_vec(archive(original)).expect("fixture opens");
+    let package = SourceBackedPackage::from_vec(
+        archive(original),
+        SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .expect("fixture opens");
     let mut output = Vec::new();
     let result = match door {
         Door::Topology => {
@@ -120,8 +126,20 @@ fn a_local_edit_publishes_the_replacement_and_leaves_every_other_member_exact() 
     for door in DOORS {
         let (result, output) = publish(door, &original, replacement.clone());
         result.unwrap_or_else(|error| panic!("{door:?}: the local edit publishes: {error:?}"));
-        let before = SourceBackedPackage::from_vec(archive(&original)).unwrap();
-        let after = SourceBackedPackage::from_vec(output).expect("published package reopens");
+        let before = SourceBackedPackage::from_vec(
+            archive(&original),
+            SourceLimits::default(),
+            litchi_opc::SourceCacheLimits::default(),
+            None,
+        )
+        .unwrap();
+        let after = SourceBackedPackage::from_vec(
+            output,
+            SourceLimits::default(),
+            litchi_opc::SourceCacheLimits::default(),
+            None,
+        )
+        .expect("published package reopens");
         for part in before.iter_parts() {
             let name = part.partname().clone();
             let published = after.part(&name).unwrap().data().unwrap();

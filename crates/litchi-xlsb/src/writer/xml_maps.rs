@@ -375,7 +375,9 @@ mod tests {
         let mut bytes = Cursor::new(Vec::new());
         workbook.build().unwrap().write_to(&mut bytes).unwrap();
 
-        let package = OpcPackage::from_bytes(&bytes.into_inner()).unwrap();
+        let package =
+            OpcPackage::from_bytes(&bytes.into_inner(), litchi_opc::SourceLimits::default())
+                .unwrap();
         let workbook_part = package
             .get_part(&PackURI::new("/xl/workbook.bin").unwrap())
             .unwrap();
@@ -826,7 +828,9 @@ mod tests {
         }
         let mut output = Cursor::new(Vec::new());
         workbook.build().unwrap().write_to(&mut output).unwrap();
-        let package = OpcPackage::from_bytes(&output.into_inner()).unwrap();
+        let package =
+            OpcPackage::from_bytes(&output.into_inner(), litchi_opc::SourceLimits::default())
+                .unwrap();
         let mut targets = HashSet::new();
         for sheet_index in 1..=2 {
             let sheet = package

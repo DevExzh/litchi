@@ -157,7 +157,7 @@ fn compact_public_guard_keeps_row_order_in_planning_and_cell_order_in_commit() {
 #[test]
 fn compact_public_guard_handles_empty_sheet_data_inverse_and_recommit() {
     let bytes = fixture(worksheet(r#"<sheetData/>"#), false);
-    let original_sheet = OpcPackage::from_bytes(&bytes)
+    let original_sheet = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default())
         .unwrap()
         .get_part(&PackURI::new(SHEET).unwrap())
         .unwrap()
@@ -203,7 +203,7 @@ fn compact_public_guard_handles_empty_sheet_data_inverse_and_recommit() {
         Some(&Value::Number(Number::new("7").unwrap()))
     );
 
-    let mut replay = OpcPackage::from_bytes(&bytes).unwrap();
+    let mut replay = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
     replay_patch(&mut replay, commit.patch()).unwrap();
     assert_eq!(
         litchi_xlsx::cell_values::Snapshot::load_multi(&replay, "Sheet1")
@@ -328,7 +328,7 @@ fn compact_public_guard_preserves_typed_prefixed_scalar_forms() {
         );
         assert!(xml.contains(r#"t="b""#), "{label}: boolean type");
 
-        let package = OpcPackage::from_bytes(&output).unwrap();
+        let package = OpcPackage::from_bytes(&output, litchi_opc::SourceLimits::default()).unwrap();
         let snapshot = litchi_xlsx::cell_values::Snapshot::load_multi(&package, "Sheet1").unwrap();
         assert_eq!(snapshot.value(address("A1")), Some(&Value::Bool(false)));
     }

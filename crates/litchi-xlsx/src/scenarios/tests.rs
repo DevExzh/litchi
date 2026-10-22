@@ -202,10 +202,13 @@ fn writer_rejects_output_over_limit_before_final_append() {
 
 #[test]
 fn reads_libreoffice_scenario_fixture() {
-    let package = OpcPackage::from_bytes(include_bytes!(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/../../test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf97598_scenarios.xlsx"
-    )))
+    let package = OpcPackage::from_bytes(
+        include_bytes!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf97598_scenarios.xlsx"
+        )),
+        litchi_opc::SourceLimits::default(),
+    )
     .unwrap();
     let part = package
         .get_part(&PackURI::new("/xl/worksheets/sheet1.xml").unwrap())

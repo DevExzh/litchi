@@ -1418,7 +1418,7 @@ fn typed_source_changed(error: &litchi_docx::Error) -> bool {
 }
 
 fn run_eager_oracle(corpus: &Corpus) -> AnyResult<OracleStatus> {
-    let opc = OpcPackage::from_bytes(&corpus.archive)?;
+    let opc = OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
     let package = litchi_docx::Package::from_opc_package(opc)?;
     let document = package.document()?;
     let count = document.paragraph_count()?;

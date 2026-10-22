@@ -283,7 +283,13 @@ fn timed_iteration(
             Route::Owned => litchi_pptx::Package::from_reader(std::io::Cursor::new(input))?,
             Route::Materialized => {
                 let source: Arc<dyn ReadAt> = Arc::new(OwnedSource::new(input));
-                let package = SourceBackedPackage::from_read_at(source)?;
+                let package = SourceBackedPackage::from_read_at(
+                    source,
+                    litchi_opc::SourceLimits::default(),
+                    litchi_opc::SourceCacheLimits::default(),
+                    litchi_opc::SourceReadPolicy::exact(),
+                    None,
+                )?;
                 let opc = package.into_opc_package()?;
                 litchi_pptx::Package::from_opc_package(opc)?
             },

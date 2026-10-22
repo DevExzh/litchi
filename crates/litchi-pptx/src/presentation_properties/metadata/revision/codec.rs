@@ -806,8 +806,11 @@ mod tests {
     #[test]
     fn loads_real_powerpoint_and_libreoffice_revision_parts() {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-        let powerpoint =
-            OpcPackage::open(root.join("test-data/poi/test-data/slideshow/bug65551.pptx")).unwrap();
+        let powerpoint = OpcPackage::open(
+            root.join("test-data/poi/test-data/slideshow/bug65551.pptx"),
+            litchi_opc::SourceLimits::default(),
+        )
+        .unwrap();
         let loaded = load(&powerpoint).unwrap().unwrap();
         assert_eq!(loaded.part_name, "/ppt/revisionInfo.xml");
         assert_eq!(loaded.revision_information.clients.len(), 2);
@@ -816,6 +819,7 @@ mod tests {
 
         let libreoffice = OpcPackage::open(
             root.join("test-data/libreoffice-core/sd/qa/unit/data/pptx/tdf114821.pptx"),
+            litchi_opc::SourceLimits::default(),
         )
         .unwrap();
         let loaded = load(&libreoffice).unwrap().unwrap();

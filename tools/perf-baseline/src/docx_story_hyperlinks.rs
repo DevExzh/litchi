@@ -284,7 +284,7 @@ fn build_archive() -> Result<Vec<u8>, Box<dyn std::error::Error>> {
 /// Build the deterministic high-cardinality DOCX package used by the case.
 pub(super) fn build_corpus() -> Result<Corpus, Box<dyn std::error::Error>> {
     let archive = build_archive()?;
-    let opc = OpcPackage::from_bytes(&archive)?;
+    let opc = OpcPackage::from_bytes(&archive, litchi_opc::SourceLimits::default())?;
     let archive_member_count = ArchiveReader::new(&archive)?.file_names().count();
     let uncompressed_payload_bytes = opc
         .try_iter_parts()
@@ -367,7 +367,7 @@ fn verify_plan_effect(plan: &litchi_docx::story_hyperlinks::Plan, corpus: &Corpu
 }
 
 fn verify_output_parts(output: &[u8]) -> Result<bool, Box<dyn std::error::Error>> {
-    let package = OpcPackage::from_bytes(output)?;
+    let package = OpcPackage::from_bytes(output, litchi_opc::SourceLimits::default())?;
     for story_index in 0..STORY_COUNT {
         let file_name = story_file_name(story_index)?;
         let part_name = generated_string(48, "DOCX output story URI", |value| {

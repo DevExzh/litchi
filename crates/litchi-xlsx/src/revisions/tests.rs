@@ -84,7 +84,7 @@ fn package() -> OpcPackage {
 #[test]
 fn loads_libreoffice_and_poi_reference_packages() {
     let a = load_workbook_revisions(
-        &OpcPackage::from_bytes(LO).unwrap(),
+        &OpcPackage::from_bytes(LO, litchi_opc::SourceLimits::default()).unwrap(),
         &litchi_opc::SourceLimits::default(),
     )
     .unwrap()
@@ -103,7 +103,7 @@ fn loads_libreoffice_and_poi_reference_packages() {
             .any(|r| r.kind == RevisionRecordKind::CustomView)
     );
     let b = load_workbook_revisions(
-        &OpcPackage::from_bytes(POI).unwrap(),
+        &OpcPackage::from_bytes(POI, litchi_opc::SourceLimits::default()).unwrap(),
         &litchi_opc::SourceLimits::default(),
     )
     .unwrap()

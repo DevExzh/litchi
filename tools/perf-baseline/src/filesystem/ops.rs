@@ -772,7 +772,7 @@ impl Route {
                 query,
             } => match query {
                 DocxQuery::Open => {
-                    "fs::read + OpcPackage::from_bytes_with_limits + litchi_docx::Package::from_opc_package + Package::document()?.text() validation pass, as the unified eager owner runs it"
+                    "fs::read + OpcPackage::from_bytes + litchi_docx::Package::from_opc_package + Package::document()?.text() validation pass, as the unified eager owner runs it"
                 },
                 DocxQuery::ParagraphCount => {
                     "Package::document()?.paragraph_count() on a package prepared outside the timer"
@@ -925,7 +925,11 @@ impl Route {
                 query,
             } => match query {
                 XlsxQuery::Open => {
-                    "SourceBackedPackage::from_read_at_with_limits(FileSource) + core-properties read + litchi_xlsx::SourceBackedWorkbook::from_source_backed_package, as the unified open runs them"
+                    "SourceBackedPackage::from_read_at(FileSource,
+            litchi_opc::SourceLimits::default(),
+            litchi_opc::SourceCacheLimits::default(),
+            litchi_opc::SourceReadPolicy::exact(),
+            None) + core-properties read + litchi_xlsx::SourceBackedWorkbook::from_source_backed_package, as the unified open runs them"
                 },
                 XlsxQuery::OpenLifecycle => {
                     "leaf open (as for open) + sheet names + len() + a row-by-row cell-text projection over SourceWorksheet::cells"

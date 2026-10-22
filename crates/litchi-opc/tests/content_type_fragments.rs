@@ -15,11 +15,8 @@ fn xml(body: &str) -> String {
     format!("\u{feff}{ROOT}{BASE}<?head retained?>{body}</t:Types><!--end-->")
 }
 fn catalog(xml: &str) -> ContentTypeFragments {
-    ContentTypeFragments::from_bytes_with_limits(
-        Arc::new(xml.as_bytes().to_vec()),
-        SourceLimits::default(),
-    )
-    .unwrap()
+    ContentTypeFragments::from_bytes(Arc::new(xml.as_bytes().to_vec()), SourceLimits::default())
+        .unwrap()
 }
 fn package(xml: &str) -> OpcPackage {
     let mut writer = StreamingArchiveWriter::new();
@@ -28,15 +25,17 @@ fn package(xml: &str) -> OpcPackage {
         .unwrap();
     writer.write_deflated("custom/item.bin", b"opaque").unwrap();
     writer.write_deflated("_rels/.rels", br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>"#).unwrap();
-    OpcPackage::from_vec(writer.finish_to_bytes().unwrap()).unwrap()
+    OpcPackage::from_vec(writer.finish_to_bytes().unwrap(), SourceLimits::default()).unwrap()
 }
 #[test]
 fn publication_inverse_preserves_destination_changes_and_exact_mapping_bytes() {
     let original = xml(&format!("{A}\n<!--before-->{B}<x:kept/>{C}\n"));
     let mut package = package(&original);
-    let source = package.source_content_types().unwrap();
+    let source = package
+        .source_content_types(SourceLimits::default())
+        .unwrap();
     let limits = SourceLimits::default();
-    let fragments = source.fragments_with_limits(limits).unwrap();
+    let fragments = source.fragments(limits).unwrap();
     assert_eq!(fragments.iter().len(), 5);
     let b = fragments.get(Key::Override("/CUSTOM/item.BIN")).unwrap();
     assert_eq!(b.unwrap().bytes(), B.as_bytes());
@@ -55,23 +54,23 @@ fn publication_inverse_preserves_destination_changes_and_exact_mapping_bytes() {
         .materialize(limits)
         .unwrap();
     package
-        .try_replace_content_types(source.bytes(), &removed)
+        .try_replace_content_types(source.bytes(), &removed, SourceLimits::default())
         .unwrap();
     let saved = PackageWriter::to_bytes(&package).unwrap();
-    let mut reopened = OpcPackage::from_bytes(&saved).unwrap();
-    let current = reopened.source_content_types().unwrap();
+    let mut reopened = OpcPackage::from_bytes(&saved, SourceLimits::default()).unwrap();
+    let current = reopened
+        .source_content_types(SourceLimits::default())
+        .unwrap();
     let overlay = original
         .replace(B, "")
         .replace("head retained", "head overlay")
         .replace("application/x-one", "application/x-changed");
     reopened
-        .try_replace_content_types_bytes_with_limits(
-            current.bytes(),
-            Arc::new(overlay.into_bytes()),
-            limits,
-        )
+        .try_replace_content_types_bytes(current.bytes(), Arc::new(overlay.into_bytes()), limits)
         .unwrap();
-    let current = reopened.source_content_types().unwrap();
+    let current = reopened
+        .source_content_types(SourceLimits::default())
+        .unwrap();
     let restored = current
         .plan_fragment_edits(
             &[Edit {
@@ -88,7 +87,7 @@ fn publication_inverse_preserves_destination_changes_and_exact_mapping_bytes() {
         .replace("application/x-one", "application/x-changed");
     assert_eq!(restored.bytes(), expected.as_bytes());
     reopened
-        .try_replace_content_types(current.bytes(), &restored)
+        .try_replace_content_types(current.bytes(), &restored, SourceLimits::default())
         .unwrap();
     let saved = PackageWriter::to_bytes(&reopened).unwrap();
     assert_eq!(
@@ -99,9 +98,9 @@ fn publication_inverse_preserves_destination_changes_and_exact_mapping_bytes() {
         expected.as_bytes()
     );
     assert_eq!(
-        OpcPackage::from_bytes(&saved)
+        OpcPackage::from_bytes(&saved, SourceLimits::default())
             .unwrap()
-            .source_content_types()
+            .source_content_types(SourceLimits::default())
             .unwrap()
             .bytes(),
         expected.as_bytes()
@@ -111,7 +110,9 @@ fn publication_inverse_preserves_destination_changes_and_exact_mapping_bytes() {
 fn all_deletion_subsets_restore_in_any_batch_order_ahead_of_unrelated_append() {
     let original = xml(&format!("{A}\n{B}<!--gap-->{C}\n"));
     let fragments = catalog(&original);
-    let source = package(&original).source_content_types().unwrap();
+    let source = package(&original)
+        .source_content_types(SourceLimits::default())
+        .unwrap();
     let limits = SourceLimits::default();
     let append = "<t:Default Extension='z' ContentType='application/x-extra'/>";
     for mask in 1..8 {
@@ -140,7 +141,9 @@ fn all_deletion_subsets_restore_in_any_batch_order_ahead_of_unrelated_append() {
         let overlay = String::from_utf8(removed.bytes().to_vec())
             .unwrap()
             .replace("</t:Types>", &format!("{append}</t:Types>"));
-        let current = package(&overlay).source_content_types().unwrap();
+        let current = package(&overlay)
+            .source_content_types(SourceLimits::default())
+            .unwrap();
         let mut edits: Vec<_> = selected
             .iter()
             .map(|&after| Edit {
@@ -190,7 +193,7 @@ fn native_key_normalization_and_duplicate_identity_guards_agree() {
         )),
     ] {
         assert!(
-            ContentTypeFragments::from_bytes_with_limits(
+            ContentTypeFragments::from_bytes(
                 Arc::new(duplicate.into_bytes()),
                 SourceLimits::default()
             )
@@ -207,7 +210,9 @@ fn simultaneous_replacements_keep_destination_slots_and_unrelated_gaps() {
     let before = catalog(&original);
     let after = catalog(&changed);
     let destination = original.replace("<!--gap-->", "<?overlay kept?>");
-    let source = package(&destination).source_content_types().unwrap();
+    let source = package(&destination)
+        .source_content_types(SourceLimits::default())
+        .unwrap();
     let edits: Vec<_> = [
         Key::Default("y"),
         Key::Default("X"),
@@ -233,7 +238,9 @@ fn simultaneous_replacements_keep_destination_slots_and_unrelated_gaps() {
 fn exact_noops_share_bytes_but_recheck_tightened_xml_limits() {
     let original = xml(A);
     let fragments = catalog(&original);
-    let source = package(&original).source_content_types().unwrap();
+    let source = package(&original)
+        .source_content_types(SourceLimits::default())
+        .unwrap();
     let item = fragments.get(Key::Default("x")).unwrap();
     let limits = SourceLimits::default();
     let plan = source
@@ -273,7 +280,9 @@ fn output_byte_mapping_event_and_entry_limits_are_admitted_before_materializatio
     let original = xml(A);
     let expanded = xml(&format!("{A}{B}{C}"));
     let after = catalog(&expanded);
-    let source = package(&original).source_content_types().unwrap();
+    let source = package(&original)
+        .source_content_types(SourceLimits::default())
+        .unwrap();
     let edits = [
         Edit {
             before: None,
@@ -358,7 +367,9 @@ fn output_byte_mapping_event_and_entry_limits_are_admitted_before_materializatio
 fn stale_entries_context_keys_and_terminal_gaps_refuse_without_mutation() {
     let original = xml(&format!("{A}<!--gap-->{B}"));
     let before = catalog(&original);
-    let source = package(&original).source_content_types().unwrap();
+    let source = package(&original)
+        .source_content_types(SourceLimits::default())
+        .unwrap();
     let limits = SourceLimits::default();
     let key = Key::Default("x");
     let a = before.get(key).unwrap();
@@ -409,7 +420,9 @@ fn stale_entries_context_keys_and_terminal_gaps_refuse_without_mutation() {
             .is_err()
     );
     let destination = xml(&format!("{A}<!--changed-->{C}"));
-    let destination_source = package(&destination).source_content_types().unwrap();
+    let destination_source = package(&destination)
+        .source_content_types(SourceLimits::default())
+        .unwrap();
     assert!(
         destination_source
             .plan_fragment_edits(
@@ -430,8 +443,11 @@ fn empty_aliased_root_expands_without_canonicalizing_its_wrapper() {
     writer
         .write_deflated("[Content_Types].xml", original.as_bytes())
         .unwrap();
-    let package = OpcPackage::from_vec(writer.finish_to_bytes().unwrap()).unwrap();
-    let source = package.source_content_types().unwrap();
+    let package =
+        OpcPackage::from_vec(writer.finish_to_bytes().unwrap(), SourceLimits::default()).unwrap();
+    let source = package
+        .source_content_types(SourceLimits::default())
+        .unwrap();
     let after = catalog(&format!("{ROOT}{A}</t:Types>"));
     let limits = SourceLimits::default();
     let result = source
@@ -465,7 +481,7 @@ fn malformed_or_unbound_catalogs_never_grant_edit_authority() {
             .replace("</t:Types>", "</t:Wrong>"),
     ] {
         assert!(
-            ContentTypeFragments::from_bytes_with_limits(
+            ContentTypeFragments::from_bytes(
                 Arc::new(source.into_bytes()),
                 SourceLimits::default()
             )

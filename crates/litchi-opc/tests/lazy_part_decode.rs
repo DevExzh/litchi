@@ -57,7 +57,8 @@ fn corrupt_bad_member(mut bytes: Vec<u8>) -> Vec<u8> {
 #[test]
 fn metadata_and_exact_noop_leave_owned_payloads_cold() {
     let source = archive();
-    let package = OpcPackage::from_vec(source.clone()).expect("open lazy owned package");
+    let package = OpcPackage::from_vec(source.clone(), SourceLimits::default())
+        .expect("open lazy owned package");
 
     assert_eq!(package.deferred_decode_counters(), Some((0, 0)));
     let names: Vec<_> = package
@@ -77,7 +78,8 @@ fn metadata_and_exact_noop_leave_owned_payloads_cold() {
 
 #[test]
 fn fallible_access_decodes_only_the_selected_owned_part() {
-    let package = OpcPackage::from_vec(archive()).expect("open lazy owned package");
+    let package =
+        OpcPackage::from_vec(archive(), SourceLimits::default()).expect("open lazy owned package");
     let selected = package.get_part(&uri(GOOD_URI)).expect("good part");
     assert_eq!(selected.blob(), GOOD_PAYLOAD);
     assert_eq!(
@@ -94,8 +96,8 @@ fn fallible_access_decodes_only_the_selected_owned_part() {
 
 #[test]
 fn part_metadata_separates_absence_from_a_failed_decode_without_decoding() {
-    let package =
-        OpcPackage::from_vec(corrupt_bad_member(archive())).expect("corruption is deferred");
+    let package = OpcPackage::from_vec(corrupt_bad_member(archive()), SourceLimits::default())
+        .expect("corruption is deferred");
 
     let bad = package
         .part_metadata(&uri(BAD_URI))
@@ -119,11 +121,15 @@ fn part_metadata_separates_absence_from_a_failed_decode_without_decoding() {
 
 #[test]
 fn batch_relationship_to_a_corrupt_present_part_targets_an_existing_part() {
-    let mut package =
-        OpcPackage::from_vec(corrupt_bad_member(archive())).expect("corruption is deferred");
+    let mut package = OpcPackage::from_vec(corrupt_bad_member(archive()), SourceLimits::default())
+        .expect("corruption is deferred");
     let root = uri("/");
-    let content_types = package.source_content_types().expect("manifest token");
-    let expected = package.source_relationships(&root).expect("root token");
+    let content_types = package
+        .source_content_types(SourceLimits::default())
+        .expect("manifest token");
+    let expected = package
+        .source_relationships(&root, SourceLimits::default())
+        .expect("root token");
     let replacement = expected
         .with_relationship(
             "urn:test:bad",
@@ -158,7 +164,8 @@ fn failed_first_access_is_stable_and_never_becomes_an_empty_generated_part() {
     let source = corrupt_bad_member(archive());
     let bad = uri(BAD_URI);
 
-    let package = OpcPackage::from_vec(source.clone()).expect("corruption is deferred");
+    let package = OpcPackage::from_vec(source.clone(), SourceLimits::default())
+        .expect("corruption is deferred");
     let first = match package.get_part(&bad) {
         Ok(_) => panic!("corrupt member must refuse on first access"),
         Err(error) => error,
@@ -180,13 +187,15 @@ fn failed_first_access_is_stable_and_never_becomes_an_empty_generated_part() {
     // copying the failed, untouched member byte-for-byte. It must never turn
     // the failed payload into the empty fallback used by the infallible trait
     // method.
-    let mut edited = OpcPackage::from_vec(source.clone()).expect("reopen corrupt source");
+    let mut edited = OpcPackage::from_vec(source.clone(), SourceLimits::default())
+        .expect("reopen corrupt source");
     edited
         .get_part_mut(&uri(GOOD_URI))
         .expect("good part remains editable")
         .set_blob(b"<changed/>".to_vec());
     let output = PackageWriter::to_bytes(&edited).expect("targeted edit publication");
-    let reopened = OpcPackage::from_vec(output).expect("reopen targeted output");
+    let reopened =
+        OpcPackage::from_vec(output, SourceLimits::default()).expect("reopen targeted output");
     assert_eq!(
         reopened.get_part(&uri(GOOD_URI)).unwrap().blob(),
         b"<changed/>"

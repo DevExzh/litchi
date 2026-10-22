@@ -610,7 +610,11 @@ fn payload_range(zip: &[u8], name: &str) -> std::ops::Range<usize> {
 }
 
 fn main_xml(zip: &[u8]) -> String {
-    let package = OpcPackage::from_reader(io::Cursor::new(zip.to_vec())).unwrap();
+    let package = OpcPackage::from_reader(
+        io::Cursor::new(zip.to_vec()),
+        litchi_opc::SourceLimits::default(),
+    )
+    .unwrap();
     let main = package
         .get_part(&PackURI::new(format!("/{MAIN}")).unwrap())
         .unwrap()
@@ -1149,7 +1153,9 @@ fn section_layout_clear_is_lossless_and_single_property_patch_preserves_siblings
         .apply_section_layout(&commit.patch().clone())
         .and_then(|committed| committed.package().write_to(&mut output))
         .unwrap();
-    let reopened = OpcPackage::from_reader(io::Cursor::new(output)).unwrap();
+    let reopened =
+        OpcPackage::from_reader(io::Cursor::new(output), litchi_opc::SourceLimits::default())
+            .unwrap();
     let main = reopened
         .get_part(&PackURI::new(format!("/{MAIN}")).unwrap())
         .unwrap()
@@ -1207,7 +1213,9 @@ fn section_layout_alias_foreign_children_and_column_comments_are_preserved() {
         .apply_section_layout(&commit.patch().clone())
         .and_then(|committed| committed.package().write_to(&mut output))
         .unwrap();
-    let reopened = OpcPackage::from_reader(io::Cursor::new(output)).unwrap();
+    let reopened =
+        OpcPackage::from_reader(io::Cursor::new(output), litchi_opc::SourceLimits::default())
+            .unwrap();
     let main = reopened
         .get_part(&PackURI::new(format!("/{MAIN}")).unwrap())
         .unwrap()
@@ -1252,7 +1260,9 @@ fn section_layout_namespace_shadowing_restores_section_root_alias() {
         .apply_section_layout(&commit.patch().clone())
         .and_then(|committed| committed.package().write_to(&mut output))
         .unwrap();
-    let reopened = OpcPackage::from_reader(io::Cursor::new(output)).unwrap();
+    let reopened =
+        OpcPackage::from_reader(io::Cursor::new(output), litchi_opc::SourceLimits::default())
+            .unwrap();
     let main = reopened
         .get_part(&PackURI::new(format!("/{MAIN}")).unwrap())
         .unwrap()
@@ -1305,7 +1315,11 @@ fn section_layout_default_word_namespace_rebinds_inserted_qnames() {
             .apply_section_layout(&commit.patch().clone())
             .and_then(|committed| committed.package().write_to(&mut output))
             .unwrap();
-        let reopened_opc = OpcPackage::from_reader(io::Cursor::new(output.clone())).unwrap();
+        let reopened_opc = OpcPackage::from_reader(
+            io::Cursor::new(output.clone()),
+            litchi_opc::SourceLimits::default(),
+        )
+        .unwrap();
         let main = reopened_opc
             .get_part(&PackURI::new(format!("/{MAIN}")).unwrap())
             .unwrap()

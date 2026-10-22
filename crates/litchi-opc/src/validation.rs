@@ -26,24 +26,13 @@ const CATALOG: &str = "opc.package.catalog";
 const LOADED_RELATIONSHIPS: &str = "opc.package.loaded_relationship_manifests";
 const SIGNATURE_PRESENCE: &str = "opc.package.signature_presence";
 
-/// Validate an immutable positional OPC source under the default finite read
-/// and report limits.
-///
-/// Ordinary part payloads are not materialized. Structural package rejection
-/// is returned as a complete ingress check plus a deterministic issue. A
-/// resource ceiling is a blocked check. I/O, source mutation, cancellation,
-/// allocation, invalid policy, and report-construction failures remain errors.
-pub fn validate_read_at(source: Arc<dyn ReadAt>) -> Result<ValidateReport> {
-    validate_read_at_with_limits(source, SourceLimits::default(), ValidationLimits::default())
-}
-
 /// Validate an immutable positional OPC source with explicit finite policies.
 ///
 /// `read_limits` bounds ZIP indexing, content-type parsing, the relationship
 /// manifests loaded during catalog admission, and all bytes read by OPC
 /// ingress. `report_limits` bounds the retained diagnostic value. No operation
 /// mutates the source.
-pub fn validate_read_at_with_limits(
+pub fn validate_read_at(
     source: Arc<dyn ReadAt>,
     read_limits: SourceLimits,
     report_limits: ValidationLimits,

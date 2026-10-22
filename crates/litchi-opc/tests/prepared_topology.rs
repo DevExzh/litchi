@@ -245,14 +245,27 @@ fn source_bytes_with_large_untouched_part() -> (Vec<u8>, Vec<u8>) {
 }
 
 fn open(source: Arc<VersionedSource>) -> SourceBackedPackage {
-    SourceBackedPackage::from_read_at(source).unwrap()
+    SourceBackedPackage::from_read_at(
+        source,
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        None,
+    )
+    .unwrap()
 }
 
 fn open_with_limits(
     source: Arc<VersionedSource>,
     limits: litchi_opc::SourceLimits,
 ) -> litchi_opc::Result<SourceBackedPackage> {
-    SourceBackedPackage::from_read_at_with_limits(source, limits)
+    SourceBackedPackage::from_read_at(
+        source,
+        limits,
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        None,
+    )
 }
 
 fn mutation_plan() -> SourceTopologyPlan {
@@ -840,10 +853,12 @@ fn content_types_byte_cap_refuses_new_mapping_before_candidate() {
         .build()
         .unwrap();
     let (_budget, _cancellation_source, context) = managed_context();
-    let package = SourceBackedPackage::from_read_at_with_execution_context(
+    let package = SourceBackedPackage::from_read_at(
         Arc::new(VersionedSource::new(source)),
         limits,
-        context,
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(context),
     )
     .unwrap();
     let mut plan = SourceTopologyPlan::new();
@@ -1190,10 +1205,12 @@ fn borrowed_candidate_refuses_transferred_source_change_after_callback() {
 #[test]
 fn managed_borrowed_candidate_keeps_prepared_payload_reserved_during_callback() {
     let (budget, _cancellation_source, context) = managed_context();
-    let package = SourceBackedPackage::from_read_at_with_execution_context(
+    let package = SourceBackedPackage::from_read_at(
         Arc::new(VersionedSource::new(source_bytes())),
         litchi_opc::SourceLimits::default(),
-        context,
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(context),
     )
     .unwrap();
     let before = budget.used(Resource::Memory);
@@ -1227,10 +1244,12 @@ fn large_unchanged_part_stays_cold_and_publishes_under_smaller_managed_memory_ca
         u64::MAX,
     );
     let source_for_package: Arc<dyn ReadAt> = source_handle.clone();
-    let package = SourceBackedPackage::from_read_at_with_execution_context(
+    let package = SourceBackedPackage::from_read_at(
         source_for_package,
         litchi_opc::SourceLimits::default(),
-        context,
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(context),
     )
     .unwrap();
     let mut plan = SourceTopologyPlan::new();
@@ -1280,10 +1299,12 @@ fn large_unchanged_part_stays_cold_and_publishes_under_smaller_managed_memory_ca
             u64::MAX,
         );
     let large_read_source: Arc<dyn ReadAt> = source_handle.clone();
-    let large_read_package = SourceBackedPackage::from_read_at_with_execution_context(
+    let large_read_package = SourceBackedPackage::from_read_at(
         large_read_source,
         litchi_opc::SourceLimits::default(),
-        large_read_context,
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(large_read_context),
     )
     .unwrap();
     let large_read_error = large_read_package
@@ -1306,10 +1327,12 @@ fn large_unchanged_part_stays_cold_and_publishes_under_smaller_managed_memory_ca
             u64::MAX,
         );
     let publication_source: Arc<dyn ReadAt> = source_handle.clone();
-    let publication_package = SourceBackedPackage::from_read_at_with_execution_context(
+    let publication_package = SourceBackedPackage::from_read_at(
         publication_source,
         litchi_opc::SourceLimits::default(),
-        publication_context,
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(publication_context),
     )
     .unwrap();
     let mut publication_plan = SourceTopologyPlan::new();
@@ -1329,10 +1352,12 @@ fn large_unchanged_part_stays_cold_and_publishes_under_smaller_managed_memory_ca
 fn managed_low_memory_refuses_preparation_before_candidate() {
     let (_budget, _cancellation_source, context) =
         managed_context_with_resources(64 * 1024, u64::MAX, u64::MAX, u64::MAX, u64::MAX);
-    let package = SourceBackedPackage::from_read_at_with_execution_context(
+    let package = SourceBackedPackage::from_read_at(
         Arc::new(VersionedSource::new(whitespace_rich_relationship_source())),
         litchi_opc::SourceLimits::default(),
-        context,
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(context),
     )
     .unwrap();
     let invoked = Arc::new(AtomicBool::new(false));
@@ -1354,10 +1379,12 @@ fn managed_low_memory_refuses_preparation_before_candidate() {
 fn managed_low_input_limit_refuses_source_open() {
     let (_budget, _cancellation_source, context) =
         managed_context_with_resources(16 * 1024 * 1024, 1, u64::MAX, u64::MAX, u64::MAX);
-    let result = SourceBackedPackage::from_read_at_with_execution_context(
+    let result = SourceBackedPackage::from_read_at(
         Arc::new(VersionedSource::new(source_bytes())),
         litchi_opc::SourceLimits::default(),
-        context,
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(context),
     );
     assert!(matches!(
         result,
@@ -1370,10 +1397,12 @@ fn managed_low_input_limit_refuses_source_open() {
 fn managed_low_work_limit_refuses_candidate_before_callback() {
     let (_budget, _cancellation_source, context) =
         managed_context_with_resources(16 * 1024 * 1024, u64::MAX, u64::MAX, u64::MAX, 1);
-    let package = SourceBackedPackage::from_read_at_with_execution_context(
+    let package = SourceBackedPackage::from_read_at(
         Arc::new(VersionedSource::new(source_bytes())),
         litchi_opc::SourceLimits::default(),
-        context,
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(context),
     )
     .unwrap();
     let invoked = Arc::new(AtomicBool::new(false));
@@ -1400,10 +1429,12 @@ fn managed_low_output_limit_reports_sink_accounting() {
         u64::MAX,
         u64::MAX,
     );
-    let package = SourceBackedPackage::from_read_at_with_execution_context(
+    let package = SourceBackedPackage::from_read_at(
         Arc::new(VersionedSource::new(source_bytes())),
         litchi_opc::SourceLimits::default(),
-        context,
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(context),
     )
     .unwrap();
     let prepared = package.prepare_topology(mutation_plan()).unwrap();
@@ -1543,10 +1574,12 @@ fn managed_prepared_candidate_reads_and_publishes_with_reservations_attached() {
     let source = source_bytes();
     let (_budget, cancellation_source, context) = managed_context();
     let source_handle = Arc::new(VersionedSource::new(source));
-    let package = SourceBackedPackage::from_read_at_with_execution_context(
+    let package = SourceBackedPackage::from_read_at(
         source_handle,
         litchi_opc::SourceLimits::default(),
-        context,
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(context),
     )
     .unwrap();
     assert!(package.cache_diagnostics().budget_managed);
@@ -1571,10 +1604,12 @@ fn managed_prepared_candidate_reads_and_publishes_with_reservations_attached() {
 fn prepared_source_xml_token_keeps_managed_reservation_until_publication_drop() {
     let (budget, _cancellation_source, context) = managed_context();
     let source_handle = Arc::new(VersionedSource::new(source_bytes()));
-    let package = SourceBackedPackage::from_read_at_with_execution_context(
+    let package = SourceBackedPackage::from_read_at(
         source_handle,
         litchi_opc::SourceLimits::default(),
-        context,
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(context),
     )
     .unwrap();
     let before_capture = budget.used(Resource::Memory);
@@ -1627,10 +1662,12 @@ fn prepared_source_xml_token_keeps_managed_reservation_until_publication_drop() 
 fn prepared_precompressed_token_keeps_managed_reservation_until_publication_drop() {
     let (budget, _cancellation_source, context) = managed_context();
     let source_handle = Arc::new(VersionedSource::new(source_bytes()));
-    let package = SourceBackedPackage::from_read_at_with_execution_context(
+    let package = SourceBackedPackage::from_read_at(
         source_handle,
         litchi_opc::SourceLimits::default(),
-        context,
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(context),
     )
     .unwrap();
     let before_capture = budget.used(Resource::Memory);
@@ -1756,10 +1793,12 @@ fn prepared_clones_publish_concurrently_from_one_retained_topology() {
 #[test]
 fn retained_prepared_reservations_release_after_the_last_share() {
     let (budget, _cancellation, context) = managed_context();
-    let package = SourceBackedPackage::from_read_at_with_execution_context(
+    let package = SourceBackedPackage::from_read_at(
         Arc::new(VersionedSource::new(source_bytes())),
         litchi_opc::SourceLimits::default(),
-        context,
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(context),
     )
     .unwrap();
     let prepared = package.prepare_topology(mutation_plan()).unwrap();
@@ -1842,7 +1881,8 @@ fn owned_effective_views_are_lazy_and_outlive_an_unchanged_candidate() {
     send_sync::<litchi_opc::PreparedPartView>();
     send_sync::<litchi_opc::PreparedPartData>();
     let (generated, _) = source_bytes_with_large_untouched_part();
-    let reader = litchi_opc::phys_pkg::PhysPkgReader::new(&generated).unwrap();
+    let reader =
+        litchi_opc::phys_pkg::PhysPkgReader::new(&generated, SourceLimits::default()).unwrap();
     let mut writer = StreamingArchiveWriter::new();
     for name in reader.member_names().unwrap() {
         writer
@@ -1999,10 +2039,12 @@ fn owned_effective_views_keep_prior_revisions_and_capture_current_xml_provenance
 fn owned_payloads_pin_reservations_and_new_reads_recheck_source_and_cancellation() {
     let (budget, _cancel, context) = managed_context();
     let source = Arc::new(VersionedSource::new(source_bytes()));
-    let package = SourceBackedPackage::from_read_at_with_execution_context(
+    let package = SourceBackedPackage::from_read_at(
         source.clone(),
         litchi_opc::SourceLimits::default(),
-        context,
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(context),
     )
     .unwrap();
     let candidate = package.prepare_topology(mutation_plan()).unwrap();
@@ -2033,10 +2075,12 @@ fn owned_payloads_pin_reservations_and_new_reads_recheck_source_and_cancellation
     assert_eq!(budget.used(Resource::Objects), 0);
 
     let (budget, cancel, context) = managed_context();
-    let package = SourceBackedPackage::from_read_at_with_execution_context(
+    let package = SourceBackedPackage::from_read_at(
         Arc::new(VersionedSource::new(source_bytes())),
         litchi_opc::SourceLimits::default(),
-        context,
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(context),
     )
     .unwrap();
     let candidate = package.prepare_topology(SourceTopologyPlan::new()).unwrap();
@@ -2145,7 +2189,13 @@ fn materialization_uses_effective_graph_and_outlives_candidate() {
     drop(candidate);
     drop(retained);
     let bytes = PackageWriter::to_bytes(&owned).unwrap();
-    let reopened = SourceBackedPackage::from_vec(bytes).unwrap();
+    let reopened = SourceBackedPackage::from_vec(
+        bytes,
+        SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap();
     assert_eq!(
         reopened.main_document_part().unwrap().partname(),
         &pack(ADDED)
@@ -2202,10 +2252,12 @@ fn materialization_refuses_managed_candidates_before_cold_reads() {
     for changed in [false, true] {
         let source = Arc::new(VersionedSource::new(source_bytes()));
         let (_budget, cancel, context) = managed_context();
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
+        let package = SourceBackedPackage::from_read_at(
             source.clone(),
             litchi_opc::SourceLimits::default(),
-            context,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
         )
         .unwrap();
         let candidate = package
@@ -2280,10 +2332,12 @@ fn materialization_refuses_managed_donor_on_unmanaged_base() {
     for xml_transfer in [false, true] {
         let donor_source = Arc::new(VersionedSource::new(source_bytes()));
         let (_budget, cancel, context) = managed_context();
-        let donor = SourceBackedPackage::from_read_at_with_execution_context(
+        let donor = SourceBackedPackage::from_read_at(
             donor_source.clone(),
             litchi_opc::SourceLimits::default(),
-            context,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
         )
         .unwrap();
         let mut plan = SourceTopologyPlan::new();
@@ -2370,10 +2424,12 @@ fn checked_full_xml_replacements_chain_with_exact_preconditions() {
 #[test]
 fn full_xml_replacement_rejects_invalid_documents_and_releases_managed_output() {
     let (budget, cancel, context) = managed_context();
-    let physical = SourceBackedPackage::from_read_at_with_execution_context(
+    let physical = SourceBackedPackage::from_read_at(
         Arc::new(VersionedSource::new(source_bytes())),
         litchi_opc::SourceLimits::default(),
-        context,
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(context),
     )
     .unwrap();
     let original = physical.main_document_part().unwrap().source_xml().unwrap();
@@ -2406,7 +2462,8 @@ fn full_xml_replacement_rejects_invalid_documents_and_releases_managed_output() 
 /// so the source may hold XML the writer would refuse.
 fn source_bytes_with_document(document: &[u8]) -> Vec<u8> {
     let generated = source_bytes();
-    let reader = litchi_opc::phys_pkg::PhysPkgReader::new(&generated).unwrap();
+    let reader =
+        litchi_opc::phys_pkg::PhysPkgReader::new(&generated, SourceLimits::default()).unwrap();
     let mut writer = StreamingArchiveWriter::new();
     for name in reader.member_names().unwrap() {
         let bytes = if name == "word/document.xml" {
@@ -2703,10 +2760,12 @@ fn full_document_byte_replacements_preserve_producer_namespaces_and_chain() {
         first_xml.as_slice()
     );
     let (_budget, _cancel, context) = managed_context();
-    let managed = SourceBackedPackage::from_read_at_with_execution_context(
+    let managed = SourceBackedPackage::from_read_at(
         Arc::new(VersionedSource::new(source_bytes())),
         litchi_opc::SourceLimits::default(),
-        context,
+        SourceCacheLimits::default(),
+        SourceReadPolicy::exact(),
+        Some(context),
     )
     .unwrap()
     .prepare_topology(SourceTopologyPlan::new())

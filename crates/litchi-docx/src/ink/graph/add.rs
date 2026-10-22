@@ -151,8 +151,10 @@ impl AddDelta {
         let relationship_count = preflight_graph(package, limits)?;
         let owner_name = canonical_owner(package, owner)?;
         let owner_relationships = owner_relationships(package, &owner_name)?;
-        let owner_before = package.source_relationships(&owner_name)?;
-        let content_types_before = package.source_content_types()?;
+        let owner_before =
+            package.source_relationships(&owner_name, litchi_opc::SourceLimits::default())?;
+        let content_types_before =
+            package.source_content_types(litchi_opc::SourceLimits::default())?;
         if inputs.is_empty() {
             return Ok((
                 Vec::new(),
@@ -312,10 +314,12 @@ impl AddDelta {
                 content_type: part.content_type().to_owned(),
                 payload: part.blob_arc(),
                 relationships: capture_relationships(part.rels())?,
-                relationship_token: package.source_relationships(&target.part)?,
+                relationship_token: package
+                    .source_relationships(&target.part, litchi_opc::SourceLimits::default())?,
             });
         }
-        let owner_after_token = package.source_relationships(&owner_name)?;
+        let owner_after_token =
+            package.source_relationships(&owner_name, litchi_opc::SourceLimits::default())?;
         debug_assert_eq!(owner_after_token, owner_after);
         Ok((
             targets,
@@ -346,7 +350,11 @@ impl AddDelta {
                 &self.inner.content_types_after,
             )
         };
-        if package.source_content_types()?.bytes() != expected_content.bytes() {
+        if package
+            .source_content_types(litchi_opc::SourceLimits::default())?
+            .bytes()
+            != expected_content.bytes()
+        {
             return Err(Error::Invalid(
                 "DOCX Ink add content-types source is stale".into(),
             ));
@@ -356,7 +364,10 @@ impl AddDelta {
         } else {
             (&self.inner.owner_before, &self.inner.owner_after)
         };
-        if package.source_relationships(expected_owner.owner())? != *expected_owner {
+        if package
+            .source_relationships(expected_owner.owner(), litchi_opc::SourceLimits::default())?
+            != *expected_owner
+        {
             return Err(Error::Invalid(
                 "DOCX Ink add relationship source is stale".into(),
             ));
@@ -364,7 +375,11 @@ impl AddDelta {
         self.validate_targets(package)?;
         if self.reversed {
             ensure_no_foreign_incoming_batch(package, &self.inner.targets, &self.inner.owner)?;
-            package.try_replace_relationships(expected_owner, replacement_owner)?;
+            package.try_replace_relationships(
+                expected_owner,
+                replacement_owner,
+                litchi_opc::SourceLimits::default(),
+            )?;
             for target in &self.inner.targets {
                 if !package.remove_part(&target.target.part) {
                     return Err(Error::Invalid(
@@ -397,8 +412,14 @@ impl AddDelta {
                 parts,
             )?;
         }
-        if package.source_content_types()?.bytes() != replacement_content.bytes()
-            || package.source_relationships(replacement_owner.owner())? != *replacement_owner
+        if package
+            .source_content_types(litchi_opc::SourceLimits::default())?
+            .bytes()
+            != replacement_content.bytes()
+            || package.source_relationships(
+                replacement_owner.owner(),
+                litchi_opc::SourceLimits::default(),
+            )? != *replacement_owner
         {
             return Err(Error::Invalid("DOCX Ink add result is stale".into()));
         }
@@ -457,7 +478,10 @@ impl AddDelta {
                     || (part.blob() != target.payload.as_slice()
                         && !std::ptr::eq(part.blob(), target.payload.as_slice()))
                     || !same_relationships(part.rels(), &target.relationships)
-                    || package.source_relationships(part.partname())? != target.relationship_token
+                    || package.source_relationships(
+                        part.partname(),
+                        litchi_opc::SourceLimits::default(),
+                    )? != target.relationship_token
                 {
                     return Err(Error::Invalid("DOCX Ink add target is stale".into()));
                 }
@@ -716,9 +740,16 @@ mod tests {
     #[test]
     fn batch_add_and_inverse_restore_the_exact_authored_tokens() {
         let mut package = package();
-        let before_content = package.source_content_types().unwrap().bytes().to_vec();
+        let before_content = package
+            .source_content_types(litchi_opc::SourceLimits::default())
+            .unwrap()
+            .bytes()
+            .to_vec();
         let before_owner = package
-            .source_relationships(&PackURI::new("/word/document.xml").unwrap())
+            .source_relationships(
+                &PackURI::new("/word/document.xml").unwrap(),
+                litchi_opc::SourceLimits::default(),
+            )
             .unwrap();
         let input = NewTarget::ink(Arc::new(INK.to_vec()), CONTENT_TYPE);
         let (targets, delta) = AddDelta::insert_many(
@@ -733,7 +764,7 @@ mod tests {
         assert_eq!(targets[0].relationship_id(), "rId1");
         assert!(
             package
-                .source_content_types()
+                .source_content_types(litchi_opc::SourceLimits::default())
                 .unwrap()
                 .bytes()
                 .windows(b"/word/ink/ink1.xml".len())
@@ -746,12 +777,18 @@ mod tests {
                 .is_err()
         );
         assert_eq!(
-            package.source_content_types().unwrap().bytes(),
+            package
+                .source_content_types(litchi_opc::SourceLimits::default())
+                .unwrap()
+                .bytes(),
             before_content
         );
         assert_eq!(
             package
-                .source_relationships(&PackURI::new("/word/document.xml").unwrap())
+                .source_relationships(
+                    &PackURI::new("/word/document.xml").unwrap(),
+                    litchi_opc::SourceLimits::default()
+                )
                 .unwrap(),
             before_owner
         );
@@ -760,9 +797,16 @@ mod tests {
     #[test]
     fn inverse_after_save_and_reopen_restores_the_source_tokens() {
         let mut package = package();
-        let before_content = package.source_content_types().unwrap().bytes().to_vec();
+        let before_content = package
+            .source_content_types(litchi_opc::SourceLimits::default())
+            .unwrap()
+            .bytes()
+            .to_vec();
         let before_owner = package
-            .source_relationships(&PackURI::new("/word/document.xml").unwrap())
+            .source_relationships(
+                &PackURI::new("/word/document.xml").unwrap(),
+                litchi_opc::SourceLimits::default(),
+            )
             .unwrap();
         let (_, delta) = AddDelta::insert_many(
             &mut package,
@@ -772,15 +816,22 @@ mod tests {
         )
         .unwrap();
         let saved = PackageWriter::to_bytes(&package).unwrap();
-        let mut reopened = OpcPackage::from_bytes(&saved).unwrap();
+        let mut reopened =
+            OpcPackage::from_bytes(&saved, litchi_opc::SourceLimits::default()).unwrap();
         delta.inverse().apply(&mut reopened).unwrap();
         assert_eq!(
-            reopened.source_content_types().unwrap().bytes(),
+            reopened
+                .source_content_types(litchi_opc::SourceLimits::default())
+                .unwrap()
+                .bytes(),
             before_content
         );
         assert_eq!(
             reopened
-                .source_relationships(&PackURI::new("/word/document.xml").unwrap())
+                .source_relationships(
+                    &PackURI::new("/word/document.xml").unwrap(),
+                    litchi_opc::SourceLimits::default()
+                )
                 .unwrap(),
             before_owner
         );

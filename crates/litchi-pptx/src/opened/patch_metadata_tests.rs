@@ -26,11 +26,15 @@ fn durable_forward_and_inverse_preserve_exact_metadata() {
         writer.write_stored(name, &bytes).unwrap();
     }
     let original = writer.finish().unwrap().into_inner();
-    let source = OpcPackage::from_bytes(&original).unwrap();
+    let source = OpcPackage::from_bytes(&original, litchi_opc::SourceLimits::default()).unwrap();
     let main = PackURI::new("/ppt/presentation.xml").unwrap();
     let added = PackURI::new("/custom/probe.bin").unwrap();
-    let content_types = source.source_content_types().unwrap();
-    let relationships = source.source_relationships(&main).unwrap();
+    let content_types = source
+        .source_content_types(litchi_opc::SourceLimits::default())
+        .unwrap();
+    let relationships = source
+        .source_relationships(&main, litchi_opc::SourceLimits::default())
+        .unwrap();
     assert!(
         content_types
             .bytes()
@@ -74,12 +78,24 @@ fn durable_forward_and_inverse_preserve_exact_metadata() {
     let mut replayed = source.clone();
     apply(&mut replayed, &patch, true).unwrap();
     assert_eq!(
-        direct.source_content_types().unwrap().bytes(),
-        replayed.source_content_types().unwrap().bytes()
+        direct
+            .source_content_types(litchi_opc::SourceLimits::default())
+            .unwrap()
+            .bytes(),
+        replayed
+            .source_content_types(litchi_opc::SourceLimits::default())
+            .unwrap()
+            .bytes()
     );
     assert_eq!(
-        direct.source_relationships(&main).unwrap().bytes(),
-        replayed.source_relationships(&main).unwrap().bytes()
+        direct
+            .source_relationships(&main, litchi_opc::SourceLimits::default())
+            .unwrap()
+            .bytes(),
+        replayed
+            .source_relationships(&main, litchi_opc::SourceLimits::default())
+            .unwrap()
+            .bytes()
     );
     assert_eq!(
         PackageWriter::to_bytes(&direct).unwrap(),
@@ -87,12 +103,24 @@ fn durable_forward_and_inverse_preserve_exact_metadata() {
     );
     apply(&mut replayed, &patch.inverse(), true).unwrap();
     assert_eq!(
-        source.source_content_types().unwrap().bytes(),
-        replayed.source_content_types().unwrap().bytes()
+        source
+            .source_content_types(litchi_opc::SourceLimits::default())
+            .unwrap()
+            .bytes(),
+        replayed
+            .source_content_types(litchi_opc::SourceLimits::default())
+            .unwrap()
+            .bytes()
     );
     assert_eq!(
-        source.source_relationships(&main).unwrap().bytes(),
-        replayed.source_relationships(&main).unwrap().bytes()
+        source
+            .source_relationships(&main, litchi_opc::SourceLimits::default())
+            .unwrap()
+            .bytes(),
+        replayed
+            .source_relationships(&main, litchi_opc::SourceLimits::default())
+            .unwrap()
+            .bytes()
     );
 }
 
@@ -105,24 +133,28 @@ fn main() -> PackURI {
 }
 fn source() -> OpcPackage {
     let bytes = crate::Package::new().unwrap().to_bytes().unwrap();
-    let mut source = OpcPackage::from_bytes(&bytes).unwrap();
-    let token = source.source_content_types().unwrap();
+    let mut source = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
+    let token = source
+        .source_content_types(litchi_opc::SourceLimits::default())
+        .unwrap();
     let bytes = String::from_utf8(token.bytes().to_vec())
         .unwrap()
         .replace("</Types>", "<!--types retained--></Types>");
     source
-        .try_replace_content_types_bytes_with_limits(
+        .try_replace_content_types_bytes(
             token.bytes(),
             Arc::new(bytes.into_bytes()),
             litchi_opc::SourceLimits::default(),
         )
         .unwrap();
-    let token = source.source_relationships(&main()).unwrap();
+    let token = source
+        .source_relationships(&main(), litchi_opc::SourceLimits::default())
+        .unwrap();
     let bytes = String::from_utf8(token.bytes().to_vec())
         .unwrap()
         .replace("</Relationships>", "<!--rels retained--></Relationships>");
     source
-        .try_replace_relationships_bytes_with_limits(
+        .try_replace_relationships_bytes(
             &token,
             Arc::new(bytes.into_bytes()),
             true,
@@ -133,8 +165,12 @@ fn source() -> OpcPackage {
 }
 fn add(source: &OpcPackage, id: &str) -> OpcPackage {
     let name = PackURI::new(format!("/custom/{id}.bin")).unwrap();
-    let types = source.source_content_types().unwrap();
-    let rels = source.source_relationships(&main()).unwrap();
+    let types = source
+        .source_content_types(litchi_opc::SourceLimits::default())
+        .unwrap();
+    let rels = source
+        .source_relationships(&main(), litchi_opc::SourceLimits::default())
+        .unwrap();
     let after_types = types
         .with_part_overrides(&[(&name, "application/octet-stream")], 1 << 20)
         .unwrap();
@@ -198,17 +234,30 @@ fn disjoint_metadata_keys_join_deterministically_and_invert_exactly() {
             .is_some()
     );
     let published = PackageWriter::to_bytes(&result).unwrap();
-    let mut result = OpcPackage::from_bytes(&published).unwrap();
+    let mut result =
+        OpcPackage::from_bytes(&published, litchi_opc::SourceLimits::default()).unwrap();
     let inverse =
         Patch::from_bytes(&joined.inverse().to_bytes().unwrap(), Limits::default()).unwrap();
     apply(&mut result, &inverse, true).unwrap();
     assert_eq!(
-        result.source_content_types().unwrap().bytes(),
-        source.source_content_types().unwrap().bytes()
+        result
+            .source_content_types(litchi_opc::SourceLimits::default())
+            .unwrap()
+            .bytes(),
+        source
+            .source_content_types(litchi_opc::SourceLimits::default())
+            .unwrap()
+            .bytes()
     );
     assert_eq!(
-        result.source_relationships(&main()).unwrap().bytes(),
-        source.source_relationships(&main()).unwrap().bytes()
+        result
+            .source_relationships(&main(), litchi_opc::SourceLimits::default())
+            .unwrap()
+            .bytes(),
+        source
+            .source_relationships(&main(), litchi_opc::SourceLimits::default())
+            .unwrap()
+            .bytes()
     );
 }
 #[test]
@@ -216,8 +265,12 @@ fn replay_and_inverse_preserve_unrelated_destination_metadata_and_edges() {
     let source = source();
     let patch = durable(&source, &add(&source, "rIdPatch"));
     let overlay = add(&source, "rIdOverlay");
-    let expected_types = overlay.source_content_types().unwrap();
-    let expected_rels = overlay.source_relationships(&main()).unwrap();
+    let expected_types = overlay
+        .source_content_types(litchi_opc::SourceLimits::default())
+        .unwrap();
+    let expected_rels = overlay
+        .source_relationships(&main(), litchi_opc::SourceLimits::default())
+        .unwrap();
     let mut result = overlay.clone();
     apply(&mut result, &patch, true).unwrap();
     assert!(
@@ -237,14 +290,20 @@ fn replay_and_inverse_preserve_unrelated_destination_metadata_and_edges() {
             .is_some()
     );
     let bytes = PackageWriter::to_bytes(&result).unwrap();
-    let mut reopened = OpcPackage::from_bytes(&bytes).unwrap();
+    let mut reopened = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
     apply(&mut reopened, &patch.inverse(), true).unwrap();
     assert_eq!(
-        reopened.source_content_types().unwrap().bytes(),
+        reopened
+            .source_content_types(litchi_opc::SourceLimits::default())
+            .unwrap()
+            .bytes(),
         expected_types.bytes()
     );
     assert_eq!(
-        reopened.source_relationships(&main()).unwrap().bytes(),
+        reopened
+            .source_relationships(&main(), litchi_opc::SourceLimits::default())
+            .unwrap()
+            .bytes(),
         expected_rels.bytes()
     );
 }
@@ -252,12 +311,14 @@ fn replay_and_inverse_preserve_unrelated_destination_metadata_and_edges() {
 fn metadata_only_spelling_change_is_durable_and_not_a_noop() {
     let source = source();
     let mut target = source.clone();
-    let token = target.source_relationships(&main()).unwrap();
+    let token = target
+        .source_relationships(&main(), litchi_opc::SourceLimits::default())
+        .unwrap();
     let changed = String::from_utf8(token.bytes().to_vec())
         .unwrap()
         .replace("rels retained", "rels changed");
     target
-        .try_replace_relationships_bytes_with_limits(
+        .try_replace_relationships_bytes(
             &token,
             Arc::new(changed.into_bytes()),
             true,
@@ -275,7 +336,10 @@ fn metadata_only_spelling_change_is_durable_and_not_a_noop() {
     );
     apply(&mut result, &patch.inverse(), true).unwrap();
     assert_eq!(
-        result.source_relationships(&main()).unwrap().bytes(),
+        result
+            .source_relationships(&main(), litchi_opc::SourceLimits::default())
+            .unwrap()
+            .bytes(),
         token.bytes()
     );
 }
@@ -288,13 +352,15 @@ fn source_context_and_touched_entry_conflicts_leave_destination_unchanged() {
     assert!(apply(&mut stale, &patch, true).is_err());
     assert_eq!(PackageWriter::to_bytes(&stale).unwrap(), before);
     let mut context = add(&source, "rIdOverlay");
-    let token = context.source_relationships(&main()).unwrap();
+    let token = context
+        .source_relationships(&main(), litchi_opc::SourceLimits::default())
+        .unwrap();
     let bytes = String::from_utf8(token.bytes().to_vec()).unwrap().replace(
         "<Relationships ",
         "<Relationships xmlns:extra='urn:changed' ",
     );
     context
-        .try_replace_relationships_bytes_with_limits(
+        .try_replace_relationships_bytes(
             &token,
             Arc::new(bytes.into_bytes()),
             true,
@@ -343,13 +409,15 @@ fn metadata_wire_is_framed_before_allocation_and_old_versions_are_refused() {
 
 fn root_edit(source: &OpcPackage, id: &str, target: &str) -> OpcPackage {
     let owner = PackURI::new("/").unwrap();
-    let token = source.source_relationships(&owner).unwrap();
+    let token = source
+        .source_relationships(&owner, litchi_opc::SourceLimits::default())
+        .unwrap();
     let after = token
         .with_relationship("urn:root-probe", target, id, TargetMode::External, 1 << 20)
         .unwrap();
     let mut result = source.clone();
     result
-        .try_replace_relationships_bytes_with_limits(
+        .try_replace_relationships_bytes(
             &token,
             after.bytes_arc(),
             true,
@@ -360,7 +428,10 @@ fn root_edit(source: &OpcPackage, id: &str, target: &str) -> OpcPackage {
 }
 fn root_comment(source: &OpcPackage, comment: &str) -> OpcPackage {
     let token = source
-        .source_relationships(&PackURI::new("/").unwrap())
+        .source_relationships(
+            &PackURI::new("/").unwrap(),
+            litchi_opc::SourceLimits::default(),
+        )
         .unwrap();
     let xml = String::from_utf8(token.bytes().to_vec()).unwrap().replace(
         "</Relationships>",
@@ -368,7 +439,7 @@ fn root_comment(source: &OpcPackage, comment: &str) -> OpcPackage {
     );
     let mut result = source.clone();
     result
-        .try_replace_relationships_bytes_with_limits(
+        .try_replace_relationships_bytes(
             &token,
             Arc::new(xml.into_bytes()),
             true,
@@ -602,7 +673,9 @@ fn root_three_way_admits_combined_counts_and_wire_bytes() {
 }
 
 fn part_relationship(source: &OpcPackage, target: &str) -> OpcPackage {
-    let token = source.source_relationships(&main()).unwrap();
+    let token = source
+        .source_relationships(&main(), litchi_opc::SourceLimits::default())
+        .unwrap();
     let after = token
         .with_relationship(
             "urn:part-probe",
@@ -614,7 +687,7 @@ fn part_relationship(source: &OpcPackage, target: &str) -> OpcPackage {
         .unwrap();
     let mut result = source.clone();
     result
-        .try_replace_relationships_bytes_with_limits(
+        .try_replace_relationships_bytes(
             &token,
             after.bytes_arc(),
             true,
@@ -624,14 +697,16 @@ fn part_relationship(source: &OpcPackage, target: &str) -> OpcPackage {
     result
 }
 fn part_comment(source: &OpcPackage, comment: &str) -> OpcPackage {
-    let token = source.source_relationships(&main()).unwrap();
+    let token = source
+        .source_relationships(&main(), litchi_opc::SourceLimits::default())
+        .unwrap();
     let bytes = String::from_utf8(token.bytes().to_vec()).unwrap().replace(
         "</Relationships>",
         &format!("<!--{comment}--></Relationships>"),
     );
     let mut result = source.clone();
     result
-        .try_replace_relationships_bytes_with_limits(
+        .try_replace_relationships_bytes(
             &token,
             Arc::new(bytes.into_bytes()),
             true,

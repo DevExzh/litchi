@@ -1208,9 +1208,11 @@ mod tests {
 
     #[test]
     fn loads_poi_and_libreoffice_reference_packages() {
-        let poi = load_presentation_comments(&OpcPackage::from_bytes(POI).unwrap())
-            .unwrap()
-            .unwrap();
+        let poi = load_presentation_comments(
+            &OpcPackage::from_bytes(POI, litchi_opc::SourceLimits::default()).unwrap(),
+        )
+        .unwrap()
+        .unwrap();
         assert_eq!(poi.authors.len(), 1);
         assert_eq!(poi.slides.len(), 2);
         assert_eq!(
@@ -1220,9 +1222,11 @@ mod tests {
                 .sum::<usize>(),
             2
         );
-        let libreoffice = load_presentation_comments(&OpcPackage::from_bytes(LIBREOFFICE).unwrap())
-            .unwrap()
-            .unwrap();
+        let libreoffice = load_presentation_comments(
+            &OpcPackage::from_bytes(LIBREOFFICE, litchi_opc::SourceLimits::default()).unwrap(),
+        )
+        .unwrap()
+        .unwrap();
         assert_eq!(libreoffice.authors[0].name, "Anonymous");
         assert_eq!(libreoffice.slides[0].comments[0].text, "Comment");
     }

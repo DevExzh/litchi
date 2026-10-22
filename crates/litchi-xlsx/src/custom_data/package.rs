@@ -609,10 +609,10 @@ impl Snapshot {
         Ok(Self {
             entries: Arc::from(entries.into_boxed_slice()),
             source: SourceState {
-                content_types: package.source_content_types_with_limits(read_limits)?,
+                content_types: package.source_content_types(read_limits)?,
                 workbook_blob: workbook.blob_arc(),
                 workbook_relationships: package
-                    .source_relationships_with_limits(workbook.partname(), read_limits)?,
+                    .source_relationships(workbook.partname(), read_limits)?,
                 incoming_relationships: Arc::from(incoming_relationships.into_boxed_slice()),
                 connections,
             },
@@ -1561,7 +1561,7 @@ fn source_relationships_bounded(
     limits: Limits,
 ) -> Result<OwnedRelationships> {
     let read_limits = bounded_read_limits(package, limits)?;
-    let relationships = package.source_relationships_with_limits(owner, read_limits)?;
+    let relationships = package.source_relationships(owner, read_limits)?;
     if relationships.bytes().len() > limits.max_relationship_xml_bytes() {
         return Err(limit(
             LimitKind::RelationshipXmlBytes,
@@ -1580,14 +1580,11 @@ fn source_relationships_bounded(
 fn package_size(package: &OpcPackage, limits: Limits) -> Result<usize> {
     let read_limits = bounded_read_limits(package, limits)?;
     let root = PackURI::new("/").map_err(invalid)?;
-    let mut total = package
-        .source_content_types_with_limits(read_limits)?
-        .bytes()
-        .len();
+    let mut total = package.source_content_types(read_limits)?.bytes().len();
     total = total
         .checked_add(
             package
-                .source_relationships_with_limits(&root, read_limits)?
+                .source_relationships(&root, read_limits)?
                 .bytes()
                 .len(),
         )
@@ -1602,7 +1599,7 @@ fn package_size(package: &OpcPackage, limits: Limits) -> Result<usize> {
         total = total
             .checked_add(
                 package
-                    .source_relationships_with_limits(part.partname(), read_limits)?
+                    .source_relationships(part.partname(), read_limits)?
                     .bytes()
                     .len(),
             )
@@ -1655,7 +1652,7 @@ fn validate_relationship_xml_limits(package: &OpcPackage, limits: Limits) -> Res
     let root = PackURI::new("/").map_err(invalid)?;
     let owners = std::iter::once(&root).chain(package.iter_parts().map(|part| part.partname()));
     for owner in owners {
-        let relationships = package.source_relationships_with_limits(owner, read_limits)?;
+        let relationships = package.source_relationships(owner, read_limits)?;
         if relationships.bytes().len() > maximum {
             return Err(limit(
                 LimitKind::RelationshipXmlBytes,
@@ -1951,9 +1948,9 @@ fn apply_entries(
         }
     }
     let read_limits = bounded_read_limits(package, *limits)?;
-    let current_content_types = package.source_content_types_with_limits(read_limits)?;
+    let current_content_types = package.source_content_types(read_limits)?;
     if current_content_types.bytes() != content_types.bytes() {
-        package.try_replace_content_types_with_limits(
+        package.try_replace_content_types(
             current_content_types.bytes(),
             content_types,
             read_limits,
@@ -2154,7 +2151,7 @@ fn preflight_snapshot_output_budget(
     total = total
         .checked_add(
             package
-                .source_relationships_with_limits(&root, read_limits)?
+                .source_relationships(&root, read_limits)?
                 .bytes()
                 .len(),
         )
@@ -2167,8 +2164,7 @@ fn preflight_snapshot_output_budget(
         {
             continue;
         }
-        let relationships =
-            package.source_relationships_with_limits(part.partname(), read_limits)?;
+        let relationships = package.source_relationships(part.partname(), read_limits)?;
         // The output ceiling is charged against inflated bytes, so each
         // retained part is decoded here (ADR 0030).
         let bytes = package.get_part(part.partname())?.blob().len();
@@ -2243,7 +2239,7 @@ fn preflight_staged_output_budget(
     total = total
         .checked_add(
             package
-                .source_relationships_with_limits(&root, read_limits)?
+                .source_relationships(&root, read_limits)?
                 .bytes()
                 .len(),
         )
@@ -2256,8 +2252,7 @@ fn preflight_staged_output_budget(
         {
             continue;
         }
-        let relationships =
-            package.source_relationships_with_limits(part.partname(), read_limits)?;
+        let relationships = package.source_relationships(part.partname(), read_limits)?;
         // The output ceiling is charged against inflated bytes, so each
         // retained part is decoded here (ADR 0030).
         let bytes = package.get_part(part.partname())?.blob().len();
@@ -2512,7 +2507,7 @@ fn add_entry(package: &mut OpcPackage, entry: &Part, limits: &Limits) -> Result<
         TargetMode::Internal,
         properties_output_limit,
     )?;
-    package.try_replace_relationships_with_limits(
+    package.try_replace_relationships(
         &properties_relationships,
         &properties_replacement,
         read_limits,
@@ -2528,7 +2523,7 @@ fn add_entry(package: &mut OpcPackage, entry: &Part, limits: &Limits) -> Result<
         TargetMode::Internal,
         workbook_output_limit,
     )?;
-    package.try_replace_relationships_with_limits(
+    package.try_replace_relationships(
         &workbook_relationships,
         &workbook_replacement,
         read_limits,
@@ -2594,12 +2589,12 @@ fn remove_entry(package: &mut OpcPackage, entry: &Part, limits: &Limits) -> Resu
         .min(limits.max_temporary_bytes());
     let properties_replacement = properties_relationships
         .without_relationship(&entry.data_relationship_id, properties_output_limit)?;
-    package.try_replace_relationships_with_limits(
+    package.try_replace_relationships(
         &workbook_relationships,
         &workbook_replacement,
         read_limits,
     )?;
-    package.try_replace_relationships_with_limits(
+    package.try_replace_relationships(
         &properties_relationships,
         &properties_replacement,
         read_limits,
@@ -2683,7 +2678,7 @@ fn restore_relationship_provenance(
             ));
         }
         let current = source_relationships_bounded(package, source.owner(), limits)?;
-        package.try_replace_relationships_with_limits(&current, source, read_limits)?;
+        package.try_replace_relationships(&current, source, read_limits)?;
         Ok(())
     };
     restore(package, &snapshot.source.workbook_relationships)?;
@@ -2904,7 +2899,11 @@ mod tests {
         writer
             .write_stored("_rels/.rels", package.rels().to_xml().as_bytes())
             .unwrap();
-        OpcPackage::from_bytes(&writer.finish_to_bytes().unwrap()).unwrap()
+        OpcPackage::from_bytes(
+            &writer.finish_to_bytes().unwrap(),
+            litchi_opc::SourceLimits::default(),
+        )
+        .unwrap()
     }
 
     #[test]
@@ -3032,7 +3031,8 @@ mod tests {
                 .any(|window| window == b"/xl/customData/data1.bin")
         );
 
-        let mut reopened = OpcPackage::from_vec(removed_bytes).unwrap();
+        let mut reopened =
+            OpcPackage::from_vec(removed_bytes, litchi_opc::SourceLimits::default()).unwrap();
         commit.patch().inverse().apply(&mut reopened).unwrap();
         let restored_bytes = PackageWriter::to_bytes(&reopened).unwrap();
         let restored_archive = soapberry_zip::office::ArchiveReader::new(&restored_bytes).unwrap();
@@ -3362,7 +3362,8 @@ mod tests {
             transaction.commit().unwrap()
         };
         let removed = PackageWriter::to_bytes(&package).unwrap();
-        let mut reopened = OpcPackage::from_vec(removed).unwrap();
+        let mut reopened =
+            OpcPackage::from_vec(removed, litchi_opc::SourceLimits::default()).unwrap();
         commit.patch().inverse().apply(&mut reopened).unwrap();
 
         let restored = PackageWriter::to_bytes(&reopened).unwrap();
@@ -3385,7 +3386,7 @@ mod tests {
                 .unwrap(),
             data_relationships
         );
-        let restored = OpcPackage::from_vec(restored).unwrap();
+        let restored = OpcPackage::from_vec(restored, litchi_opc::SourceLimits::default()).unwrap();
         assert!(Snapshot::load(&restored).unwrap().same_source(&before));
     }
 
@@ -3424,7 +3425,8 @@ mod tests {
             transaction.commit().unwrap()
         };
         let removed = PackageWriter::to_bytes(&package).unwrap();
-        let mut reopened = OpcPackage::from_vec(removed).unwrap();
+        let mut reopened =
+            OpcPackage::from_vec(removed, litchi_opc::SourceLimits::default()).unwrap();
         commit.patch().inverse().apply(&mut reopened).unwrap();
         let restored = PackageWriter::to_bytes(&reopened).unwrap();
         let archive = soapberry_zip::office::ArchiveReader::new(&restored).unwrap();
@@ -3468,7 +3470,7 @@ mod tests {
             archive.read("xl/connections.xml").unwrap(),
             before_connections
         );
-        let restored = OpcPackage::from_vec(restored).unwrap();
+        let restored = OpcPackage::from_vec(restored, litchi_opc::SourceLimits::default()).unwrap();
         assert!(Snapshot::load(&restored).unwrap().same_source(&before));
     }
 

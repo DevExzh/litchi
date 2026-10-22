@@ -1306,7 +1306,13 @@ mod tests {
 
     #[test]
     fn stale_ready_hint_after_eviction_uses_authoritative_prepared_read() {
-        let package = SourceBackedPackage::from_vec(archive_bytes()).unwrap();
+        let package = SourceBackedPackage::from_vec(
+            archive_bytes(),
+            SourceLimits::default(),
+            crate::SourceCacheLimits::default(),
+            None,
+        )
+        .unwrap();
         let index = package
             .catalog
             .parts

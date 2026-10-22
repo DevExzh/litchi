@@ -79,7 +79,7 @@ pub struct OwnedPhysPkgReader {
 }
 
 impl OwnedPhysPkgReader {
-    /// Open an OPC package from a file path.
+    /// Open an OPC package from a file path under the caller's source limits.
     ///
     /// # Arguments
     /// * `path` - Path to the OPC package file (.docx, .xlsx, .pptx, etc.)
@@ -88,36 +88,19 @@ impl OwnedPhysPkgReader {
     /// A new `OwnedPhysPkgReader` instance
     ///
     /// # Errors
-    /// Returns an error if the file doesn't exist, isn't a valid ZIP file,
-    /// or cannot be opened.
-    pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
-        Self::open_with_limits(path, SourceLimits::default())
-    }
-
-    /// Open an OPC package from a file path with explicit resource limits.
-    ///
-    /// # Errors
     /// Returns an error if the file does not exist, cannot be read, exceeds the
     /// input-byte limit, or is not a valid ZIP archive.
-    pub fn open_with_limits<P: AsRef<Path>>(path: P, limits: SourceLimits) -> Result<Self> {
+    pub fn open<P: AsRef<Path>>(path: P, limits: SourceLimits) -> Result<Self> {
         let data = read_owned_path_with_limits(path, limits)?;
-        Self::from_bytes_with_limits(data, limits)
+        Self::from_bytes(data, limits)
     }
 
-    /// Create a new `OwnedPhysPkgReader` from owned bytes.
-    ///
-    /// # Errors
-    /// Returns an error if `data` is not a valid ZIP archive under the default limits.
-    pub fn from_bytes(data: Vec<u8>) -> Result<Self> {
-        Self::from_bytes_with_limits(data, SourceLimits::default())
-    }
-
-    /// Create a new owned physical reader with explicit resource limits.
+    /// Create a new `OwnedPhysPkgReader` from owned bytes under explicit limits.
     ///
     /// # Errors
     /// Returns an error if `data` exceeds the input-byte limit or is not a valid
     /// ZIP archive under `limits`.
-    pub fn from_bytes_with_limits(data: Vec<u8>, limits: SourceLimits) -> Result<Self> {
+    pub fn from_bytes(data: Vec<u8>, limits: SourceLimits) -> Result<Self> {
         limits.check_input_bytes(data.len() as u64)?;
         admit_total_archive_entries(&data, limits)?;
         // Validate the ZIP archive can be parsed
@@ -131,7 +114,7 @@ impl OwnedPhysPkgReader {
         })
     }
 
-    /// Create a new `OwnedPhysPkgReader` from a reader.
+    /// Create a new `OwnedPhysPkgReader` from a reader under explicit limits.
     ///
     /// # Arguments
     /// * `reader` - A reader that implements Read
@@ -140,20 +123,11 @@ impl OwnedPhysPkgReader {
     /// A new `OwnedPhysPkgReader` instance
     ///
     /// # Errors
-    /// Returns an error if the stream cannot be read or is not a valid ZIP archive
-    /// under the default limits.
-    pub fn from_reader<R: Read>(mut reader: R) -> Result<Self> {
-        Self::from_reader_with_limits(&mut reader, SourceLimits::default())
-    }
-
-    /// Create a new owned physical reader from a stream with explicit limits.
-    ///
-    /// # Errors
     /// Returns an error if the stream cannot be read, exceeds `limits`, or is not
     /// a valid ZIP archive.
-    pub fn from_reader_with_limits<R: Read>(reader: R, limits: SourceLimits) -> Result<Self> {
+    pub fn from_reader<R: Read>(reader: R, limits: SourceLimits) -> Result<Self> {
         let data = read_limited(reader, limits)?;
-        Self::from_bytes_with_limits(data, limits)
+        Self::from_bytes(data, limits)
     }
 
     /// Get a borrowed reader for accessing archive contents.
@@ -274,16 +248,8 @@ impl<'data> PhysPkgReader<'data> {
     /// A new `PhysPkgReader` instance
     ///
     /// # Errors
-    /// Returns an error if `data` is not a valid ZIP archive under the default limits.
-    pub fn new(data: &'data [u8]) -> Result<Self> {
-        Self::new_with_limits(data, SourceLimits::default())
-    }
-
-    /// Create a physical reader from a byte slice with explicit resource limits.
-    ///
-    /// # Errors
     /// Returns an error if `data` exceeds `limits` or is not a valid ZIP archive.
-    pub fn new_with_limits(data: &'data [u8], limits: SourceLimits) -> Result<Self> {
+    pub fn new(data: &'data [u8], limits: SourceLimits) -> Result<Self> {
         Self::new_with_limits_and_budget(
             data,
             limits,
@@ -2194,7 +2160,7 @@ mod tests {
             .build()
             .unwrap();
         assert!(matches!(
-            PhysPkgReader::new_with_limits(&bytes, limits),
+            PhysPkgReader::new(&bytes, limits),
             Err(OpcError::Limit {
                 kind: SourceLimitKind::ArchiveTotalEntries,
                 observed: 4_097,
@@ -2218,7 +2184,7 @@ mod tests {
             .unwrap()
             .build()
             .unwrap();
-        let reader = PhysPkgReader::new_with_limits(&bytes, independent).unwrap();
+        let reader = PhysPkgReader::new(&bytes, independent).unwrap();
         assert_eq!(reader.content_types_xml().unwrap(), b"types");
         assert_eq!(reader.rels_xml_for(&root).unwrap(), Some(b"rels".to_vec()));
 
@@ -2232,7 +2198,7 @@ mod tests {
             .build()
             .unwrap();
         assert!(matches!(
-            PhysPkgReader::new_with_limits(&bytes, content_types_over)
+            PhysPkgReader::new(&bytes, content_types_over)
                 .unwrap()
                 .content_types_xml(),
             Err(OpcError::Limit {
@@ -2252,7 +2218,7 @@ mod tests {
             .build()
             .unwrap();
         assert!(matches!(
-            PhysPkgReader::new_with_limits(&bytes, relationships_over)
+            PhysPkgReader::new(&bytes, relationships_over)
                 .unwrap()
                 .rels_xml_for(&root),
             Err(OpcError::Limit {
@@ -2276,7 +2242,7 @@ mod tests {
             .unwrap()
             .build()
             .unwrap();
-        let reader = PhysPkgReader::new_with_limits(&bytes, exact).unwrap();
+        let reader = PhysPkgReader::new(&bytes, exact).unwrap();
         assert_eq!(reader.rels_xml_for(&root).unwrap(), Some(b"rels".to_vec()));
         assert!(matches!(
             reader.rels_xml_for(&root),
@@ -2296,7 +2262,7 @@ mod tests {
             .unwrap()
             .build()
             .unwrap();
-        let aggregate_reader = PhysPkgReader::new_with_limits(&bytes, aggregate).unwrap();
+        let aggregate_reader = PhysPkgReader::new(&bytes, aggregate).unwrap();
         assert_eq!(
             aggregate_reader.rels_xml_for(&root).unwrap(),
             Some(b"rels".to_vec())
@@ -2320,7 +2286,7 @@ mod tests {
             .build()
             .unwrap();
         assert!(matches!(
-            PhysPkgReader::new_with_limits(&bytes, byte_over)
+            PhysPkgReader::new(&bytes, byte_over)
                 .unwrap()
                 .rels_xml_for(&root),
             Err(OpcError::Limit {
@@ -2330,7 +2296,7 @@ mod tests {
             })
         ));
 
-        let owned = OwnedPhysPkgReader::from_bytes_with_limits(bytes, exact).unwrap();
+        let owned = OwnedPhysPkgReader::from_bytes(bytes, exact).unwrap();
         assert_eq!(
             owned.reader().unwrap().rels_xml_for(&root).unwrap(),
             Some(b"rels".to_vec())
@@ -2360,7 +2326,7 @@ mod tests {
             .unwrap()
             .build()
             .unwrap();
-        let rollback_reader = PhysPkgReader::new_with_limits(&corrupt, rollback).unwrap();
+        let rollback_reader = PhysPkgReader::new(&corrupt, rollback).unwrap();
         assert!(matches!(
             rollback_reader.rels_xml_for(&root),
             Err(OpcError::ZipError(_))
@@ -2380,7 +2346,7 @@ mod tests {
         let zip_data = writer.finish().unwrap();
 
         // Read the ZIP archive
-        let reader = PhysPkgReader::new(&zip_data).unwrap();
+        let reader = PhysPkgReader::new(&zip_data, SourceLimits::default()).unwrap();
         let content = reader.blob_for(&pack_uri).unwrap();
         assert_eq!(content, b"Hello, World!");
     }
@@ -2398,7 +2364,7 @@ mod tests {
         writer.write(&document, b"<document/>").unwrap();
 
         let zip_data = writer.finish().unwrap();
-        let reader = PhysPkgReader::new(&zip_data).unwrap();
+        let reader = PhysPkgReader::new(&zip_data, SourceLimits::default()).unwrap();
 
         assert!(reader.contains(&content_types));
         assert!(reader.contains(&rels));
@@ -2424,7 +2390,7 @@ mod tests {
         writer = styles_writer.finish().unwrap();
 
         let bytes = writer.finish().unwrap();
-        let reader = PhysPkgReader::new(&bytes).unwrap();
+        let reader = PhysPkgReader::new(&bytes, SourceLimits::default()).unwrap();
         assert_eq!(
             reader.blob_for(&document).unwrap(),
             b"<document>streamed</document>"
@@ -2449,7 +2415,7 @@ mod tests {
         let actual = spooled.finish_into_inner().unwrap();
         assert_eq!(actual, expected);
 
-        let reader = PhysPkgReader::new(&actual).unwrap();
+        let reader = PhysPkgReader::new(&actual, SourceLimits::default()).unwrap();
         assert_eq!(
             reader
                 .blob_for(&PackURI::new("/word/document.xml").unwrap())
@@ -2486,7 +2452,7 @@ mod tests {
         ));
 
         let bytes = writer.finish().unwrap();
-        let reader = PhysPkgReader::new(&bytes).unwrap();
+        let reader = PhysPkgReader::new(&bytes, SourceLimits::default()).unwrap();
         assert_eq!(reader.blob_for(&document).unwrap(), b"document");
 
         let mut child_first = PhysPkgWriter::new();
@@ -2787,7 +2753,7 @@ mod tests {
             .unwrap();
 
         let bytes = writer.finish_into_inner().unwrap();
-        let reader = PhysPkgReader::new(&bytes).unwrap();
+        let reader = PhysPkgReader::new(&bytes, SourceLimits::default()).unwrap();
         assert_eq!(
             reader.blob_for(&PackURI::new("/doc.xml").unwrap()).unwrap(),
             b"document"
@@ -2985,7 +2951,7 @@ mod tests {
             .build()
             .unwrap();
         assert!(matches!(
-            PhysPkgReader::new_with_limits(b"four", limits),
+            PhysPkgReader::new(b"four", limits),
             Err(OpcError::Limit {
                 kind: SourceLimitKind::InputBytes,
                 observed: 4,
@@ -2993,7 +2959,7 @@ mod tests {
             })
         ));
         assert!(matches!(
-            OwnedPhysPkgReader::from_reader_with_limits(Cursor::new(b"four"), limits),
+            OwnedPhysPkgReader::from_reader(Cursor::new(b"four"), limits),
             Err(OpcError::Limit {
                 kind: SourceLimitKind::InputBytes,
                 observed: 4,
@@ -3005,11 +2971,14 @@ mod tests {
     #[test]
     fn public_owned_reader_still_validates_zip_at_construction() {
         assert!(matches!(
-            OwnedPhysPkgReader::from_bytes(b"not an OPC ZIP".to_vec()),
+            OwnedPhysPkgReader::from_bytes(b"not an OPC ZIP".to_vec(), SourceLimits::default()),
             Err(OpcError::ZipError(_))
         ));
         assert!(matches!(
-            OwnedPhysPkgReader::from_reader(Cursor::new(b"not an OPC ZIP")),
+            OwnedPhysPkgReader::from_reader(
+                Cursor::new(b"not an OPC ZIP"),
+                SourceLimits::default()
+            ),
             Err(OpcError::ZipError(_))
         ));
     }
@@ -3034,7 +3003,7 @@ mod tests {
             .build()
             .unwrap();
         assert!(matches!(
-            PhysPkgReader::new_with_limits(&archive, limits),
+            PhysPkgReader::new(&archive, limits),
             Err(OpcError::Limit {
                 kind: SourceLimitKind::Members,
                 observed: 2,
@@ -3056,7 +3025,7 @@ mod tests {
             .unwrap()
             .build()
             .unwrap();
-        let reader = PhysPkgReader::new_with_limits(&bytes, exact).unwrap();
+        let reader = PhysPkgReader::new(&bytes, exact).unwrap();
         assert_eq!(reader.blob_for(&first).unwrap(), b"one");
         assert_eq!(reader.blob_for(&second).unwrap(), b"four");
 
@@ -3067,7 +3036,7 @@ mod tests {
             .unwrap()
             .build()
             .unwrap();
-        let per_part_reader = PhysPkgReader::new_with_limits(&bytes, per_part).unwrap();
+        let per_part_reader = PhysPkgReader::new(&bytes, per_part).unwrap();
         assert!(matches!(
             per_part_reader.blob_for(&second),
             Err(OpcError::Limit {
@@ -3082,7 +3051,7 @@ mod tests {
             .unwrap()
             .build()
             .unwrap();
-        let total_reader = PhysPkgReader::new_with_limits(&bytes, total).unwrap();
+        let total_reader = PhysPkgReader::new(&bytes, total).unwrap();
         assert_eq!(total_reader.blob_for(&first).unwrap(), b"one");
         assert!(matches!(
             total_reader.blob_for(&second),
@@ -3093,7 +3062,7 @@ mod tests {
             })
         ));
 
-        let owned = OwnedPhysPkgReader::from_bytes_with_limits(bytes, per_part).unwrap();
+        let owned = OwnedPhysPkgReader::from_bytes(bytes, per_part).unwrap();
         assert!(matches!(
             owned.blob_for(&second),
             Err(OpcError::Limit {
@@ -3114,7 +3083,7 @@ mod tests {
             .unwrap()
             .build()
             .unwrap();
-        let reader = PhysPkgReader::new_with_limits(&bytes, limits).unwrap();
+        let reader = PhysPkgReader::new(&bytes, limits).unwrap();
 
         assert_eq!(reader.blob_for(&first).unwrap(), b"one");
         assert_eq!(reader.blob_for(&second).unwrap(), b"two");
@@ -3139,7 +3108,7 @@ mod tests {
             .build()
             .unwrap();
 
-        let reader = PhysPkgReader::new_with_limits(&bytes, limits).unwrap();
+        let reader = PhysPkgReader::new(&bytes, limits).unwrap();
         assert_eq!(reader.blob_for(&first).unwrap(), b"one");
         assert!(matches!(
             reader.blob_for(&second),
@@ -3150,7 +3119,7 @@ mod tests {
             })
         ));
 
-        let repeat_reader = PhysPkgReader::new_with_limits(&bytes, limits).unwrap();
+        let repeat_reader = PhysPkgReader::new(&bytes, limits).unwrap();
         assert_eq!(repeat_reader.blob_for(&first).unwrap(), b"one");
         assert!(matches!(
             repeat_reader.blob_for(&first),
@@ -3171,7 +3140,7 @@ mod tests {
             .unwrap()
             .build()
             .unwrap();
-        let reader = PhysPkgReader::new_with_limits(&bytes, limits).unwrap();
+        let reader = PhysPkgReader::new(&bytes, limits).unwrap();
 
         assert_eq!(
             reader.blobs_parallel(std::slice::from_ref(&part)).unwrap(),
@@ -3218,7 +3187,7 @@ mod tests {
             .unwrap()
             .build()
             .unwrap();
-        let reader = PhysPkgReader::new_with_limits(&bytes, limits).unwrap();
+        let reader = PhysPkgReader::new(&bytes, limits).unwrap();
 
         assert!(matches!(
             reader.blobs_parallel(&[good.clone(), bad]),
@@ -3243,7 +3212,7 @@ mod tests {
             .unwrap()
             .build()
             .unwrap();
-        let owned = OwnedPhysPkgReader::from_bytes_with_limits(bytes, limits).unwrap();
+        let owned = OwnedPhysPkgReader::from_bytes(bytes, limits).unwrap();
 
         assert_eq!(owned.reader().unwrap().blob_for(&first).unwrap(), b"one");
         assert!(matches!(
@@ -3268,7 +3237,7 @@ mod tests {
             .unwrap()
             .build()
             .unwrap();
-        let reader = PhysPkgReader::new_with_limits(&bytes, exact).unwrap();
+        let reader = PhysPkgReader::new(&bytes, exact).unwrap();
         let blobs = reader
             .blobs_parallel(&[first.clone(), second.clone()])
             .unwrap();
@@ -3280,7 +3249,7 @@ mod tests {
             .unwrap()
             .build()
             .unwrap();
-        let over_reader = PhysPkgReader::new_with_limits(&bytes, over).unwrap();
+        let over_reader = PhysPkgReader::new(&bytes, over).unwrap();
         assert!(matches!(
             over_reader.blobs_parallel(&[first, second]),
             Err(OpcError::Limit {
@@ -3301,7 +3270,7 @@ mod tests {
             .unwrap()
             .build()
             .unwrap();
-        let reader = PhysPkgReader::new_with_limits(&bytes, limits).unwrap();
+        let reader = PhysPkgReader::new(&bytes, limits).unwrap();
         let reservation = reader.reserve_declared_parts(&[3]).unwrap();
         assert!(matches!(
             reader.commit_actual_parts(reservation, &[vec![0; 4]]),
@@ -3326,7 +3295,7 @@ mod tests {
         let good = PackURI::new("/good.bin").unwrap();
         let bad = PackURI::new("/bad.bin").unwrap();
         let missing = PackURI::new("/missing.bin").unwrap();
-        let reader = PhysPkgReader::new(&bytes).unwrap();
+        let reader = PhysPkgReader::new(&bytes, SourceLimits::default()).unwrap();
 
         assert_eq!(reader.blob_for(&good).unwrap(), b"good");
         assert!(matches!(reader.blob_for(&bad), Err(OpcError::ZipError(_))));
@@ -3335,7 +3304,7 @@ mod tests {
             Err(OpcError::PartNotFound(name)) if name == "/missing.bin"
         ));
 
-        let bulk_reader = PhysPkgReader::new(&bytes).unwrap();
+        let bulk_reader = PhysPkgReader::new(&bytes, SourceLimits::default()).unwrap();
         assert!(matches!(
             bulk_reader.blobs_parallel(&[good, bad]),
             Err(OpcError::ZipError(_))

@@ -40,7 +40,7 @@ impl<'a> ContentTypeFragmentKey<'a> {
 /// use litchi_opc::{ContentTypeFragmentKey, ContentTypeFragments, SourceLimits};
 /// use std::sync::Arc;
 /// let xml = br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="PNG" ContentType="image/png"/></Types>"#;
-/// let entries = ContentTypeFragments::from_bytes_with_limits(
+/// let entries = ContentTypeFragments::from_bytes(
 ///     Arc::new(xml.to_vec()), SourceLimits::default())?;
 /// let image = entries.get(ContentTypeFragmentKey::Default("png"))?.unwrap();
 /// assert!(image.bytes().starts_with(b"<Default"));
@@ -53,7 +53,7 @@ pub struct ContentTypeFragments {
 impl ContentTypeFragments {
     /// Decode untrusted XML under explicit byte, mapping, event and XML limits.
     /// Duplicate native keys and nonstandard roots cannot be edited.
-    pub fn from_bytes_with_limits(bytes: Arc<Vec<u8>>, limits: SourceLimits) -> Result<Self> {
+    pub fn from_bytes(bytes: Arc<Vec<u8>>, limits: SourceLimits) -> Result<Self> {
         Ok(Self {
             inner: Fragments::from_bytes_with_limits(Kind::ContentTypes, bytes, limits)?,
         })
@@ -123,8 +123,8 @@ impl std::fmt::Debug for ContentTypeFragmentPlan<'_> {
 }
 impl OwnedContentTypes {
     /// Capture exact Default and Override entries for a durable metadata delta.
-    pub fn fragments_with_limits(&self, limits: SourceLimits) -> Result<ContentTypeFragments> {
-        ContentTypeFragments::from_bytes_with_limits(Arc::clone(&self.xml.bytes), limits)
+    pub fn fragments(&self, limits: SourceLimits) -> Result<ContentTypeFragments> {
+        ContentTypeFragments::from_bytes(Arc::clone(&self.xml.bytes), limits)
     }
     /// Plan exact mapping deltas while retaining unrelated destination XML.
     ///

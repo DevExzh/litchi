@@ -313,15 +313,20 @@ impl Package {
         let cache_limits = options.cache_limits.unwrap_or_default();
         let read_policy = options.source_read_policy.unwrap_or_default();
         let package = if let Some(context) = options.execution_context.clone() {
-            SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_source_read_policy_and_execution_context(
-                source, options.source_limits, cache_limits, read_policy, context,
-            )?
-        } else {
-            SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_source_read_policy(
+            SourceBackedPackage::from_read_at(
                 source,
                 options.source_limits,
                 cache_limits,
                 read_policy,
+                Some(context),
+            )?
+        } else {
+            SourceBackedPackage::from_read_at(
+                source,
+                options.source_limits,
+                cache_limits,
+                read_policy,
+                None,
             )?
         };
         let limits = options.semantic_limits.clone();
@@ -351,13 +356,13 @@ impl Package {
         {
             // Preserve the existing move-owned OPC fast path and its memoized
             // immutable-source proofs when no lazy policy is selected.
-            return Ok(
-                Self::from_source_backed(SourceBackedPackage::from_reader_with_limits(
-                    reader,
-                    options.source_limits,
-                )?)?
-                .with_semantic_limits(options.semantic_limits),
-            );
+            return Ok(Self::from_source_backed(SourceBackedPackage::from_reader(
+                reader,
+                options.source_limits,
+                litchi_opc::SourceCacheLimits::default(),
+                None,
+            )?)?
+            .with_semantic_limits(options.semantic_limits));
         }
         let source = ingress::from_reader(reader, &options)?;
         Self::from_read_at_with_options(source, options)

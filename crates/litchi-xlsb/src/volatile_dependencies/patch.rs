@@ -225,25 +225,44 @@ fn restore_lexical_tokens(
     source: &super::snapshot::SourceState,
 ) -> Result<()> {
     let root_name = litchi_opc::PackURI::new("/")?;
-    let current_root = package.source_relationships(&root_name)?;
+    let current_root =
+        package.source_relationships(&root_name, litchi_opc::SourceLimits::default())?;
     if current_root != source.root_relationships {
-        package.try_replace_relationships(&current_root, &source.root_relationships)?;
+        package.try_replace_relationships(
+            &current_root,
+            &source.root_relationships,
+            litchi_opc::SourceLimits::default(),
+        )?;
     }
     let workbook_name = litchi_opc::PackURI::new(&source.workbook.name)?;
-    let current_workbook = package.source_relationships(&workbook_name)?;
+    let current_workbook =
+        package.source_relationships(&workbook_name, litchi_opc::SourceLimits::default())?;
     if current_workbook != source.workbook_relationships {
-        package.try_replace_relationships(&current_workbook, &source.workbook_relationships)?;
+        package.try_replace_relationships(
+            &current_workbook,
+            &source.workbook_relationships,
+            litchi_opc::SourceLimits::default(),
+        )?;
     }
     if let Some(owner) = source.owner.as_ref() {
         let owner_name = litchi_opc::PackURI::new(&owner.name)?;
-        let current_owner = package.source_relationships(&owner_name)?;
+        let current_owner =
+            package.source_relationships(&owner_name, litchi_opc::SourceLimits::default())?;
         if current_owner != owner.relationships {
-            package.try_replace_relationships(&current_owner, &owner.relationships)?;
+            package.try_replace_relationships(
+                &current_owner,
+                &owner.relationships,
+                litchi_opc::SourceLimits::default(),
+            )?;
         }
     }
-    let current_content_types = package.source_content_types()?;
+    let current_content_types = package.source_content_types(litchi_opc::SourceLimits::default())?;
     if current_content_types != source.content_types {
-        package.try_replace_content_types(current_content_types.bytes(), &source.content_types)?;
+        package.try_replace_content_types(
+            current_content_types.bytes(),
+            &source.content_types,
+            litchi_opc::SourceLimits::default(),
+        )?;
     }
     Ok(())
 }

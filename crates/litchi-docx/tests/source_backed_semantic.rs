@@ -561,8 +561,14 @@ fn source_package_materializes_through_the_owned_docx_facade_on_explicit_request
         "fallbackouternestedtail"
     );
 
-    let adopted_opc =
-        SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(semantic_fixture()))).unwrap();
+    let adopted_opc = SourceBackedPackage::from_read_at(
+        Arc::new(OwnedSource::new(semantic_fixture())),
+        litchi_opc::SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        litchi_opc::SourceReadPolicy::exact(),
+        None,
+    )
+    .unwrap();
     let adopted = source_backed::Package::from_source_backed_package(adopted_opc).unwrap();
     assert_eq!(
         adopted.document().unwrap().extract_text().unwrap(),
@@ -910,8 +916,13 @@ fn effective_xml(text: &str) -> Vec<u8> {
 
 #[test]
 fn effective_owner_reads_publishes_and_materializes_current_graph() {
-    let physical =
-        SourceBackedPackage::from_vec(package_bytes(effective_xml("before"), None, false)).unwrap();
+    let physical = SourceBackedPackage::from_vec(
+        package_bytes(effective_xml("before"), None, false),
+        litchi_opc::SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap();
     let owner = source_backed::Package::from_source_backed_package(physical.clone()).unwrap();
     let old_view = owner.document().unwrap();
     assert_eq!(old_view.paragraph_count().unwrap(), 1);
@@ -939,7 +950,13 @@ fn effective_owner_reads_publishes_and_materializes_current_graph() {
     );
     let mut bytes = Vec::new();
     changed.write_to(&mut bytes).unwrap();
-    let reopened = SourceBackedPackage::from_vec(bytes).unwrap();
+    let reopened = SourceBackedPackage::from_vec(
+        bytes,
+        litchi_opc::SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap();
     assert!(
         reopened
             .part(&PackURI::new("/word/unrelated.bin").unwrap())
@@ -979,8 +996,13 @@ fn effective_owner_reads_publishes_and_materializes_current_graph() {
 
 #[test]
 fn effective_owner_refuses_unmigrated_operations_and_foreign_candidates() {
-    let physical =
-        SourceBackedPackage::from_vec(package_bytes(effective_xml("before"), None, false)).unwrap();
+    let physical = SourceBackedPackage::from_vec(
+        package_bytes(effective_xml("before"), None, false),
+        litchi_opc::SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap();
     let owner = source_backed::Package::from_source_backed_package(physical.clone()).unwrap();
     let commit = owner.edit().unwrap().commit().unwrap();
     for changed in [false, true] {
@@ -1035,11 +1057,15 @@ fn effective_owner_refuses_unmigrated_operations_and_foreign_candidates() {
             }
         );
     }
-    let foreign =
-        SourceBackedPackage::from_vec(package_bytes(effective_xml("foreign"), None, false))
-            .unwrap()
-            .prepare_topology(litchi_opc::SourceTopologyPlan::new())
-            .unwrap();
+    let foreign = SourceBackedPackage::from_vec(
+        package_bytes(effective_xml("foreign"), None, false),
+        litchi_opc::SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap()
+    .prepare_topology(litchi_opc::SourceTopologyPlan::new())
+    .unwrap();
     assert!(matches!(
         owner.with_prepared_topology(foreign),
         Err(Error::PatchConflict { .. })
@@ -1079,10 +1105,22 @@ fn effective_owner_checks_donor_fences_through_source_version() {
         package_bytes(effective_xml("donor"), None, false),
         None,
     ));
-    let donor = SourceBackedPackage::from_read_at(donor_source.clone()).unwrap();
+    let donor = SourceBackedPackage::from_read_at(
+        donor_source.clone(),
+        litchi_opc::SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        litchi_opc::SourceReadPolicy::exact(),
+        None,
+    )
+    .unwrap();
     let xml = donor.main_document_part().unwrap().source_xml().unwrap();
-    let physical =
-        SourceBackedPackage::from_vec(package_bytes(effective_xml("base"), None, false)).unwrap();
+    let physical = SourceBackedPackage::from_vec(
+        package_bytes(effective_xml("base"), None, false),
+        litchi_opc::SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap();
     let owner = source_backed::Package::from_source_backed_package(physical.clone()).unwrap();
     let mut plan = litchi_opc::SourceTopologyPlan::new();
     plan.try_add_source_xml_part(PackURI::new("/word/copied.xml").unwrap(), xml)
@@ -1127,19 +1165,30 @@ fn effective_owner_pinned_document_checks_managed_donor_cancellation() {
         0,
     )
     .unwrap();
-    let donor = SourceBackedPackage::from_read_at_with_execution_context(
+    let donor = SourceBackedPackage::from_read_at(
         Arc::new(OwnedSource::new(package_bytes(
             effective_xml("donor"),
             None,
             false,
         ))),
         litchi_opc::SourceLimits::default(),
-        litchi_core::ExecutionContext::new(budget.clone(), cancellation, limits),
+        litchi_opc::SourceCacheLimits::default(),
+        litchi_opc::SourceReadPolicy::exact(),
+        Some(litchi_core::ExecutionContext::new(
+            budget.clone(),
+            cancellation,
+            limits,
+        )),
     )
     .unwrap();
     let xml = donor.main_document_part().unwrap().source_xml().unwrap();
-    let physical =
-        SourceBackedPackage::from_vec(package_bytes(effective_xml("base"), None, false)).unwrap();
+    let physical = SourceBackedPackage::from_vec(
+        package_bytes(effective_xml("base"), None, false),
+        litchi_opc::SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap();
     let owner = source_backed::Package::from_source_backed_package(physical.clone()).unwrap();
     let mut plan = litchi_opc::SourceTopologyPlan::new();
     plan.try_add_source_xml_part(PackURI::new("/word/copied.xml").unwrap(), xml)
@@ -1232,9 +1281,13 @@ fn retained_semantic_apply_preserves_graph_edits_and_effective_protection() {
         "<w:documentProtection w:enforcement=\"1\"/>",
         "<w:trackRevisions/>",
     ] {
-        let physical =
-            SourceBackedPackage::from_vec(package_bytes(effective_xml("before"), None, false))
-                .unwrap();
+        let physical = SourceBackedPackage::from_vec(
+            package_bytes(effective_xml("before"), None, false),
+            litchi_opc::SourceLimits::default(),
+            litchi_opc::SourceCacheLimits::default(),
+            None,
+        )
+        .unwrap();
         let owner = source_backed::Package::from_source_backed_package(physical.clone()).unwrap();
         let mut plan = litchi_opc::SourceTopologyPlan::new();
         let settings = PackURI::new("/word/settings.xml").unwrap();
@@ -1270,7 +1323,13 @@ fn retained_semantic_apply_preserves_graph_edits_and_effective_protection() {
             let next = canonical.commit().unwrap().into_package();
             let mut bytes = Vec::new();
             next.write_to(&mut bytes).unwrap();
-            let package = SourceBackedPackage::from_vec(bytes).unwrap();
+            let package = SourceBackedPackage::from_vec(
+                bytes,
+                litchi_opc::SourceLimits::default(),
+                litchi_opc::SourceCacheLimits::default(),
+                None,
+            )
+            .unwrap();
             assert!(package.part(&settings).is_ok());
             assert!(
                 package
@@ -1424,7 +1483,13 @@ fn effective_metadata_tracks_payload_relationships_and_owner_reports() {
         Some((&transitional_core("original"), rt::CORE_PROPERTIES)),
         false,
     );
-    let physical = SourceBackedPackage::from_vec(bytes).unwrap();
+    let physical = SourceBackedPackage::from_vec(
+        bytes,
+        litchi_opc::SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap();
     let owner = source_backed::Package::from_source_backed_package(physical.clone()).unwrap();
     assert_eq!(owner.metadata().unwrap().title.as_deref(), Some("original"));
     let mut edit = owner.edit().unwrap();
@@ -1512,7 +1577,14 @@ fn effective_metadata_reads_only_selected_payload_and_fences_source_changes() {
         );
         let range = payload_range(&bytes, "docProps/core.xml");
         let observed = Arc::new(ProbeSource::new(bytes, Some(range)));
-        let physical = SourceBackedPackage::from_read_at(observed.clone()).unwrap();
+        let physical = SourceBackedPackage::from_read_at(
+            observed.clone(),
+            litchi_opc::SourceLimits::default(),
+            litchi_opc::SourceCacheLimits::default(),
+            litchi_opc::SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
         let owner = source_backed::Package::from_source_backed_package(physical.clone()).unwrap();
         let mut plan = litchi_opc::SourceTopologyPlan::new();
         plan.try_replace_part(
@@ -1554,20 +1626,31 @@ fn effective_metadata_checks_managed_donor_context_and_releases_admissions() {
         0,
     )
     .unwrap();
-    let donor = SourceBackedPackage::from_read_at_with_execution_context(
+    let donor = SourceBackedPackage::from_read_at(
         Arc::new(OwnedSource::new(package_bytes(
             effective_xml("donor"),
             Some((&transitional_core("donor-title"), rt::CORE_PROPERTIES)),
             false,
         ))),
         litchi_opc::SourceLimits::default(),
-        litchi_core::ExecutionContext::new(budget.clone(), cancellation, limits),
+        litchi_opc::SourceCacheLimits::default(),
+        litchi_opc::SourceReadPolicy::exact(),
+        Some(litchi_core::ExecutionContext::new(
+            budget.clone(),
+            cancellation,
+            limits,
+        )),
     )
     .unwrap();
     let core = PackURI::new("/docProps/core.xml").unwrap();
     let xml = donor.part(&core).unwrap().source_xml().unwrap();
-    let physical =
-        SourceBackedPackage::from_vec(package_bytes(effective_xml("base"), None, false)).unwrap();
+    let physical = SourceBackedPackage::from_vec(
+        package_bytes(effective_xml("base"), None, false),
+        litchi_opc::SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap();
     let owner = source_backed::Package::from_source_backed_package(physical.clone()).unwrap();
     let mut plan = litchi_opc::SourceTopologyPlan::new();
     plan.try_add_source_xml_part(core.clone(), xml).unwrap();

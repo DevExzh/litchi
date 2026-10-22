@@ -13,25 +13,16 @@ fn annotate(xml: &[u8]) -> Arc<Vec<u8>> {
 
 fn content_types(opc: &mut OpcPackage) -> litchi_pptx::Result<()> {
     let limits = opc.read_limits();
-    let before = opc.source_content_types_with_limits(limits)?;
-    opc.try_replace_content_types_bytes_with_limits(
-        before.bytes(),
-        annotate(before.bytes()),
-        limits,
-    )?;
+    let before = opc.source_content_types(limits)?;
+    opc.try_replace_content_types_bytes(before.bytes(), annotate(before.bytes()), limits)?;
     Ok(())
 }
 
 fn relationships(opc: &mut OpcPackage, owner: &str) -> litchi_pptx::Result<()> {
     let limits = opc.read_limits();
     let owner = PackURI::new(owner).map_err(litchi_pptx::Error::Uri)?;
-    let before = opc.source_relationships_with_limits(&owner, limits)?;
-    opc.try_replace_relationships_bytes_with_limits(
-        &before,
-        annotate(before.bytes()),
-        true,
-        limits,
-    )?;
+    let before = opc.source_relationships(&owner, limits)?;
+    opc.try_replace_relationships_bytes(&before, annotate(before.bytes()), true, limits)?;
     Ok(())
 }
 
@@ -286,10 +277,10 @@ fn lexical_change_then_restore_is_an_exact_noop() {
     let mut edit = package.edit_opc().unwrap();
     edit.update(|opc| {
         let limits = opc.read_limits();
-        let original = opc.source_content_types_with_limits(limits)?;
+        let original = opc.source_content_types(limits)?;
         content_types(opc)?;
-        let changed = opc.source_content_types_with_limits(limits)?;
-        opc.try_replace_content_types_with_limits(changed.bytes(), &original, limits)?;
+        let changed = opc.source_content_types(limits)?;
+        opc.try_replace_content_types(changed.bytes(), &original, limits)?;
         Ok(())
     })
     .unwrap();

@@ -80,16 +80,16 @@ fn create_xlsx(directory: &Path) -> Result<()> {
     let package = xlsx::Package::new()?;
     package.save(&authored)?;
 
-    let mut graph = OpcPackage::open(&authored)?;
+    let mut graph = OpcPackage::open(&authored, litchi_opc::SourceLimits::default())?;
     let _ = properties::write(&mut graph, &smoke_props("XLSX"))?;
     let package = xlsx::Package::from_opc(graph)?;
     package.save(&authored)?;
 
-    let graph = OpcPackage::open(&authored)?;
+    let graph = OpcPackage::open(&authored, litchi_opc::SourceLimits::default())?;
     if read_clean(&graph)?.is_none() {
         return Err("XLSX core properties were not published".into());
     }
-    let mut graph = OpcPackage::open(&authored)?;
+    let mut graph = OpcPackage::open(&authored, litchi_opc::SourceLimits::default())?;
     let _ = properties::clear(&mut graph)?;
     let package = xlsx::Package::from_opc(graph)?;
     package.save(&cleared)?;

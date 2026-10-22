@@ -107,15 +107,21 @@ fn plan(added: Arc<Vec<u8>>) -> Result<SourceTopologyPlan, Box<dyn Error>> {
 }
 
 fn publish(source: &[u8], plan: SourceTopologyPlan) -> Result<Vec<u8>, Box<dyn Error>> {
-    let package = SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(source.to_vec())))?;
+    let package = SourceBackedPackage::from_read_at(
+        Arc::new(OwnedSource::new(source.to_vec())),
+        litchi_opc::SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        litchi_opc::SourceReadPolicy::exact(),
+        None,
+    )?;
     let mut output = Vec::new();
     package.write_topology_to_stream(&mut output, plan)?;
     Ok(output)
 }
 
 fn verify(corpus: &Corpus, output: &[u8], added: &[u8]) -> Result<(), Box<dyn Error>> {
-    let source = OpcPackage::from_bytes(&corpus.archive)?;
-    let actual = OpcPackage::from_bytes(output)?;
+    let source = OpcPackage::from_bytes(&corpus.archive, litchi_opc::SourceLimits::default())?;
+    let actual = OpcPackage::from_bytes(output, litchi_opc::SourceLimits::default())?;
     if actual.part_count() != corpus.manifest.entry_count + 1 {
         return Err("Part addition count differs".into());
     }
@@ -242,8 +248,13 @@ fn verify_gates(
         ADDED_TYPE,
         vec![1],
     )?;
-    let package =
-        SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(corpus.archive.clone())))?;
+    let package = SourceBackedPackage::from_read_at(
+        Arc::new(OwnedSource::new(corpus.archive.clone())),
+        litchi_opc::SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        litchi_opc::SourceReadPolicy::exact(),
+        None,
+    )?;
     let mut refused = Vec::new();
     if !matches!(
         package.write_topology_to_stream(&mut refused, duplicate),
@@ -259,8 +270,13 @@ fn verify_gates(
         REL_TYPE,
         PackURI::new("/missing.bin")?,
     )?;
-    let package =
-        SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(corpus.archive.clone())))?;
+    let package = SourceBackedPackage::from_read_at(
+        Arc::new(OwnedSource::new(corpus.archive.clone())),
+        litchi_opc::SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        litchi_opc::SourceReadPolicy::exact(),
+        None,
+    )?;
     if !matches!(
         package.write_topology_to_stream(&mut refused, missing),
         Err(OpcError::PartNotFound(_))
@@ -269,7 +285,13 @@ fn verify_gates(
         return Err("missing relationship target did not refuse before output".into());
     }
     let changing = Arc::new(PptxRevisionSource::new(corpus.archive.clone()));
-    let package = SourceBackedPackage::from_read_at(changing.clone())?;
+    let package = SourceBackedPackage::from_read_at(
+        changing.clone(),
+        litchi_opc::SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        litchi_opc::SourceReadPolicy::exact(),
+        None,
+    )?;
     changing.replace(corpus.archive.clone())?;
     if !matches!(
         package.write_topology_to_stream(&mut refused, plan(added.clone())?),
@@ -278,16 +300,25 @@ fn verify_gates(
     {
         return Err("stale topology source did not refuse before output".into());
     }
-    let package = SourceBackedPackage::from_read_at(Arc::new(ShortSource(OwnedSource::new(
-        corpus.archive.clone(),
-    ))))?;
+    let package = SourceBackedPackage::from_read_at(
+        Arc::new(ShortSource(OwnedSource::new(corpus.archive.clone()))),
+        litchi_opc::SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        litchi_opc::SourceReadPolicy::exact(),
+        None,
+    )?;
     let mut short = Vec::new();
     package.write_topology_to_stream(&mut short, plan(added.clone())?)?;
     if short != output {
         return Err("short-read topology output differs".into());
     }
-    let package =
-        SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(corpus.archive.clone())))?;
+    let package = SourceBackedPackage::from_read_at(
+        Arc::new(OwnedSource::new(corpus.archive.clone())),
+        litchi_opc::SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        litchi_opc::SourceReadPolicy::exact(),
+        None,
+    )?;
     let mut partial = PartialSink {
         bytes: Vec::new(),
         limit: 257,
@@ -301,8 +332,13 @@ fn verify_gates(
     {
         return Err("partial sink failure contract differs".into());
     }
-    let package =
-        SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(corpus.archive.clone())))?;
+    let package = SourceBackedPackage::from_read_at(
+        Arc::new(OwnedSource::new(corpus.archive.clone())),
+        litchi_opc::SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        litchi_opc::SourceReadPolicy::exact(),
+        None,
+    )?;
     let mut limited =
         HashingDiscardSink::without_authoring_window(u64::try_from(output.len() - 1)?);
     if package
@@ -314,9 +350,12 @@ fn verify_gates(
     let parts = corpus.manifest.entry_count;
     for maximum in [parts, parts + 1] {
         let limits = SourceLimits::builder().max_parts(maximum)?.build()?;
-        let package = SourceBackedPackage::from_read_at_with_limits(
+        let package = SourceBackedPackage::from_read_at(
             Arc::new(OwnedSource::new(corpus.archive.clone())),
             limits,
+            litchi_opc::SourceCacheLimits::default(),
+            litchi_opc::SourceReadPolicy::exact(),
+            None,
         )?;
         let mut bounded = Vec::new();
         let result = package.write_topology_to_stream(&mut bounded, plan(added.clone())?);
@@ -405,7 +444,7 @@ pub(crate) fn build(shape: SemanticShape) -> Result<Fixture, Box<dyn Error>> {
     let summary = Summary {
         role: "part_addition",
         source_mode: "instrumented_read_at_v1",
-        implementation: "SourceBackedPackage::from_read_at_with_cache_limits + SourceTopologyPlan + write_topology_to_stream",
+        implementation: "SourceBackedPackage::from_read_at + SourceTopologyPlan + write_topology_to_stream",
         timing_scope: "caller source wrapper/input bytes, prepared payload and discard sink exist before entry; clock/allocation region include catalog open, plan construction and consuming sequential publication; catalog is dropped by the endpoint; input/payload remain live; source counter snapshots, digest finalization and full artifact oracles are outside",
         performance_claim: "current-revision low-level OPC Part-addition baseline only; no optimization, semantic Office owner, patch/merge, native, cold, remote, or bounded-total-memory claim",
         shape: shape.name(),
@@ -470,7 +509,13 @@ pub(crate) fn run(
         let process_before = process_metrics::Snapshot::read().ok();
         let region = allocation_metrics::begin();
         let start = std::time::Instant::now();
-        let package = SourceBackedPackage::from_read_at_with_cache_limits(source.clone(), limits)?;
+        let package = SourceBackedPackage::from_read_at(
+            source.clone(),
+            limits,
+            litchi_opc::SourceCacheLimits::default(),
+            litchi_opc::SourceReadPolicy::exact(),
+            None,
+        )?;
         let topology = plan(payload.clone())?;
         package.write_topology_to_stream(&mut sink, topology)?;
         let duration = start.elapsed();
@@ -595,7 +640,9 @@ mod tests {
     fn opc_part_add_oracle_rejects_added_payload_and_untouched_part_changes() {
         let fixture = build(SemanticShape::Tiny).unwrap();
         for name in [ADDED_NAME.to_owned(), entry_name(0)] {
-            let mut package = OpcPackage::from_bytes(&fixture.output).unwrap();
+            let mut package =
+                OpcPackage::from_bytes(&fixture.output, litchi_opc::SourceLimits::default())
+                    .unwrap();
             package
                 .get_part_mut(&PackURI::new(format!("/{name}")).unwrap())
                 .unwrap()

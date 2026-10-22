@@ -2319,10 +2319,12 @@ mod tests {
         let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("tests/fixtures/form_control_properties/tdf134769.xlsx");
         let (budget, context) = managed_context();
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
+        let package = SourceBackedPackage::from_read_at(
             Arc::new(FileSource::open(&fixture).expect("managed fixture source")),
             SourceLimits::default(),
-            context,
+            litchi_opc::SourceCacheLimits::default(),
+            litchi_opc::SourceReadPolicy::exact(),
+            Some(context),
         )
         .expect("managed fixture package");
         let part = package
@@ -2459,7 +2461,13 @@ mod row_reuse_tests {
         }
         let bytes = writer.finish_to_bytes().unwrap();
         SourceBackedEditor::from_source_backed_package(
-            SourceBackedPackage::from_vec(bytes).unwrap(),
+            SourceBackedPackage::from_vec(
+                bytes,
+                litchi_opc::SourceLimits::default(),
+                litchi_opc::SourceCacheLimits::default(),
+                None,
+            )
+            .unwrap(),
         )
         .unwrap()
     }
@@ -2673,6 +2681,9 @@ mod row_reuse_tests {
                 std::str::from_utf8(first.source_xml()).expect("worksheet XML is UTF-8"),
             ))
             .expect("visibility package archive"),
+            litchi_opc::SourceLimits::default(),
+            litchi_opc::SourceCacheLimits::default(),
+            None,
         )
         .expect("visibility source package");
         let visibility_editor =
@@ -3174,7 +3185,8 @@ mod row_reuse_tests {
             .publish_commit_to_stream(&mut published, &commit)
             .unwrap();
 
-        let package = OpcPackage::from_bytes(&published).unwrap();
+        let package =
+            OpcPackage::from_bytes(&published, litchi_opc::SourceLimits::default()).unwrap();
         let published_workbook = package
             .get_part(&PackURI::new(MAIN).unwrap())
             .unwrap()

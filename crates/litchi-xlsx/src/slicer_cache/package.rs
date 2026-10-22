@@ -254,7 +254,7 @@ pub(crate) fn store_slicer_cache_prepared_in_place(
             false,
         );
     package.get_part_mut(&workbook_name)?.set_blob(updated);
-    package.source_content_types_with_limits(*limits)?;
+    package.source_content_types(*limits)?;
     Ok(())
 }
 

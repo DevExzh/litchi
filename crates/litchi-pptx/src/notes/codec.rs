@@ -1447,7 +1447,9 @@ mod tests {
             let Ok(bytes) = std::fs::read(&fixture) else {
                 continue;
             };
-            let Ok(package) = litchi_opc::OpcPackage::from_vec(bytes) else {
+            let Ok(package) =
+                litchi_opc::OpcPackage::from_vec(bytes, litchi_opc::SourceLimits::default())
+            else {
                 continue;
             };
             // Package parts iterate in hash order; take them by name so the

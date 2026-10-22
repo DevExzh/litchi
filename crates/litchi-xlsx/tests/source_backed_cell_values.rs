@@ -307,7 +307,7 @@ fn zip_member_data_offset(bytes: &[u8], member: &[u8]) -> u64 {
 }
 
 fn part_len(bytes: &[u8], member: &str) -> u64 {
-    OpcPackage::from_bytes(bytes)
+    OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default())
         .unwrap()
         .get_part(&PackURI::new(member).unwrap())
         .unwrap()
@@ -333,7 +333,7 @@ fn managed_context(memory: u64) -> (Budget, CancellationSource, ExecutionContext
 }
 
 fn with_style_and_theme(bytes: &[u8]) -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(bytes).unwrap();
+    let mut package = OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()).unwrap();
     package
         .try_add_part(Box::new(BlobPart::new(
             PackURI::new("/xl/theme/theme1.xml").unwrap(),
@@ -373,7 +373,8 @@ fn oversized_worksheet_xml(padding: usize, value: &str) -> Vec<u8> {
 }
 
 fn oversized_multi_sheet_source() -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(&two_sheets()).unwrap();
+    let mut package =
+        OpcPackage::from_bytes(&two_sheets(), litchi_opc::SourceLimits::default()).unwrap();
     package
         .get_part_mut(&PackURI::new("/xl/worksheets/sheet1.xml").unwrap())
         .unwrap()
@@ -441,7 +442,7 @@ fn signed_two_sheets() -> Vec<u8> {
 }
 
 fn with_two_cell_styles(bytes: &[u8]) -> (Vec<u8>, PackURI, Vec<u8>) {
-    let mut package = OpcPackage::from_bytes(bytes).unwrap();
+    let mut package = OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()).unwrap();
     let style_uri = PackURI::new("/xl/styles.xml").unwrap();
     let style_xml = format!(
         r#"<styleSheet xmlns="{SML}"><cellXfs count="2"><xf/><xf numFmtId="1"/></cellXfs></styleSheet>"#
@@ -649,7 +650,8 @@ fn first_middle_last_batch_reopens_preserves_unselected_parts_and_inverts() {
     let commit = changed_commit(&editor);
     assert_eq!(editor.cache_diagnostics().successful_loads, opened + 1);
 
-    let mut replay = OpcPackage::from_bytes(&source_bytes).unwrap();
+    let mut replay =
+        OpcPackage::from_bytes(&source_bytes, litchi_opc::SourceLimits::default()).unwrap();
     replay_patch(&mut replay, commit.patch()).unwrap();
     assert_eq!(
         litchi_xlsx::cell_values::Snapshot::load(&replay, "Sheet1")
@@ -663,7 +665,7 @@ fn first_middle_last_batch_reopens_preserves_unselected_parts_and_inverts() {
             .get_part(&PackURI::new(SHEET).unwrap())
             .unwrap()
             .blob(),
-        OpcPackage::from_bytes(&source_bytes)
+        OpcPackage::from_bytes(&source_bytes, litchi_opc::SourceLimits::default())
             .unwrap()
             .get_part(&PackURI::new(SHEET).unwrap())
             .unwrap()
@@ -674,8 +676,9 @@ fn first_middle_last_batch_reopens_preserves_unselected_parts_and_inverts() {
     editor
         .publish_commit_to_stream(&mut output, &commit)
         .unwrap();
-    let source = OpcPackage::from_bytes(&source_bytes).unwrap();
-    let published = OpcPackage::from_bytes(&output).unwrap();
+    let source =
+        OpcPackage::from_bytes(&source_bytes, litchi_opc::SourceLimits::default()).unwrap();
+    let published = OpcPackage::from_bytes(&output, litchi_opc::SourceLimits::default()).unwrap();
     litchi_xlsx::Package::from_bytes(&output).unwrap();
     assert_eq!(
         source
@@ -846,7 +849,8 @@ fn multi_source_insert_uses_selector_first_operations_across_sheets() {
     editor
         .publish_multi_commit_to_stream(&mut output, &commit)
         .unwrap();
-    let mut published = OpcPackage::from_bytes(&output).unwrap();
+    let mut published =
+        OpcPackage::from_bytes(&output, litchi_opc::SourceLimits::default()).unwrap();
     assert_eq!(
         litchi_xlsx::cell_values::Snapshot::load_multi(&published, "Sheet1")
             .unwrap()
@@ -859,7 +863,7 @@ fn multi_source_insert_uses_selector_first_operations_across_sheets() {
             .value(address("A4")),
         Some(&Value::Number(Number::new("50").unwrap()))
     );
-    let original = OpcPackage::from_bytes(&bytes).unwrap();
+    let original = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
     replay_patch(&mut published, &commit.patch().inverse()).unwrap();
     for part in [SHEET, "/xl/worksheets/sheet2.xml"] {
         let uri = PackURI::new(part).unwrap();
@@ -1039,7 +1043,7 @@ fn insert_accepts_exact_cell_character_limit_and_rejects_one_over() {
 #[test]
 fn insert_invalidates_calculation_properties_and_chain() {
     let bytes = scalar_formula_source();
-    let original = OpcPackage::from_bytes(&bytes).unwrap();
+    let original = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
     let original_chain_target = calculation_chain_target(&original);
     let original_chain = original
         .get_part(&PackURI::new(CALC_CHAIN).unwrap())
@@ -1058,7 +1062,7 @@ fn insert_invalidates_calculation_properties_and_chain() {
     edit.insert(address("C1"), Number::new("3").unwrap())
         .unwrap();
     let commit = edit.commit().unwrap();
-    let mut replay = OpcPackage::from_bytes(&bytes).unwrap();
+    let mut replay = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
     replay_patch(&mut replay, commit.patch()).unwrap();
     assert!(!has_calculation_chain(&replay));
     let workbook = String::from_utf8_lossy(
@@ -1096,7 +1100,7 @@ fn insert_invalidates_calculation_properties_and_chain() {
 #[test]
 fn insert_patch_is_deterministic_and_inverse_restores_exact_source_and_absence() {
     let bytes = three_cells();
-    let original = OpcPackage::from_bytes(&bytes).unwrap();
+    let original = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
     let original_sheet = original
         .get_part(&PackURI::new(SHEET).unwrap())
         .unwrap()
@@ -1110,8 +1114,8 @@ fn insert_patch_is_deterministic_and_inverse_restores_exact_source_and_absence()
     let commit = edit.commit().unwrap();
     assert!(commit.patch().after().contains_cell(address("D4")));
 
-    let mut first = OpcPackage::from_bytes(&bytes).unwrap();
-    let mut second = OpcPackage::from_bytes(&bytes).unwrap();
+    let mut first = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
+    let mut second = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
     replay_patch(&mut first, commit.patch()).unwrap();
     replay_patch(&mut second, commit.patch()).unwrap();
     assert_eq!(
@@ -1133,7 +1137,7 @@ fn insert_patch_is_deterministic_and_inverse_restores_exact_source_and_absence()
 #[test]
 fn insert_preserves_untouched_members_relationships_and_content_types() {
     let (bytes, style_uri, style_xml) = with_two_cell_styles(&three_cells());
-    let original = OpcPackage::from_bytes(&bytes).unwrap();
+    let original = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
     let original_unused = original
         .get_part(&PackURI::new(UNUSED).unwrap())
         .unwrap()
@@ -1163,7 +1167,7 @@ fn insert_preserves_untouched_members_relationships_and_content_types() {
     edit.insert(address("D1"), Number::new("4").unwrap())
         .unwrap();
     let commit = edit.commit().unwrap();
-    let mut replay = OpcPackage::from_bytes(&bytes).unwrap();
+    let mut replay = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
     replay_patch(&mut replay, commit.patch()).unwrap();
 
     assert_eq!(
@@ -1266,7 +1270,7 @@ fn remove_deletes_exact_cell_owners_but_retains_rows_dimension_and_style_table()
         false,
     );
     let (bytes, style_uri, style_xml) = with_two_cell_styles(&base);
-    let original = OpcPackage::from_bytes(&bytes)
+    let original = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default())
         .unwrap()
         .get_part(&PackURI::new(SHEET).unwrap())
         .unwrap()
@@ -1308,7 +1312,7 @@ fn remove_deletes_exact_cell_owners_but_retains_rows_dimension_and_style_table()
     assert!(!xml.contains(r#"r="B2""#));
     assert!(!xml.contains(r#"r="C3""#));
 
-    let mut replay = OpcPackage::from_bytes(&bytes).unwrap();
+    let mut replay = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
     replay_patch(&mut replay, commit.patch()).unwrap();
     assert_eq!(replay.get_part(&style_uri).unwrap().blob(), style_xml);
     replay_patch(&mut replay, &commit.patch().inverse()).unwrap();
@@ -1325,7 +1329,7 @@ fn remove_deletes_exact_cell_owners_but_retains_rows_dimension_and_style_table()
         .publish_commit_to_stream(&mut output, &commit)
         .unwrap();
     assert_eq!(
-        OpcPackage::from_bytes(&output)
+        OpcPackage::from_bytes(&output, litchi_opc::SourceLimits::default())
             .unwrap()
             .get_part(&style_uri)
             .unwrap()
@@ -1333,12 +1337,12 @@ fn remove_deletes_exact_cell_owners_but_retains_rows_dimension_and_style_table()
         style_xml,
     );
     assert_eq!(
-        OpcPackage::from_bytes(&output)
+        OpcPackage::from_bytes(&output, litchi_opc::SourceLimits::default())
             .unwrap()
             .get_part(&PackURI::new(UNUSED).unwrap())
             .unwrap()
             .blob(),
-        OpcPackage::from_bytes(&bytes)
+        OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default())
             .unwrap()
             .get_part(&PackURI::new(UNUSED).unwrap())
             .unwrap()
@@ -1518,7 +1522,8 @@ fn bounded_multi_sheet_transaction_publishes_one_overlay_and_inverts() {
     assert_eq!(commit.patch().after().value(1, address("B2")), None);
     assert!(!commit.patch().after().contains_cell(1, address("C3")));
 
-    let mut replay = OpcPackage::from_bytes(&source_bytes).unwrap();
+    let mut replay =
+        OpcPackage::from_bytes(&source_bytes, litchi_opc::SourceLimits::default()).unwrap();
     replay_patch(&mut replay, commit.patch()).unwrap();
     assert_eq!(
         litchi_xlsx::cell_values::Snapshot::load_multi(&replay, "Sheet2")
@@ -1532,7 +1537,7 @@ fn bounded_multi_sheet_transaction_publishes_one_overlay_and_inverts() {
             .get_part(&PackURI::new(SHEET).unwrap())
             .unwrap()
             .blob(),
-        OpcPackage::from_bytes(&source_bytes)
+        OpcPackage::from_bytes(&source_bytes, litchi_opc::SourceLimits::default())
             .unwrap()
             .get_part(&PackURI::new(SHEET).unwrap())
             .unwrap()
@@ -1543,13 +1548,13 @@ fn bounded_multi_sheet_transaction_publishes_one_overlay_and_inverts() {
     editor
         .publish_multi_commit_to_stream(&mut output, &commit)
         .unwrap();
-    let published = OpcPackage::from_bytes(&output).unwrap();
+    let published = OpcPackage::from_bytes(&output, litchi_opc::SourceLimits::default()).unwrap();
     assert_eq!(
         published
             .get_part(&PackURI::new(UNUSED).unwrap())
             .unwrap()
             .blob(),
-        OpcPackage::from_bytes(&source_bytes)
+        OpcPackage::from_bytes(&source_bytes, litchi_opc::SourceLimits::default())
             .unwrap()
             .get_part(&PackURI::new(UNUSED).unwrap())
             .unwrap()
@@ -1691,7 +1696,8 @@ fn multi_sheet_patch_rejects_unselected_graph_tampering() {
         .unwrap();
 
     let sheet2 = PackURI::new("/xl/worksheets/sheet2.xml").unwrap();
-    let mut wrong_type = OpcPackage::from_bytes(&bytes).unwrap();
+    let mut wrong_type =
+        OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
     wrong_type
         .get_part_mut(&sheet2)
         .unwrap()
@@ -1701,7 +1707,8 @@ fn multi_sheet_patch_rejects_unselected_graph_tampering() {
     // the replay refuses it; either way the patch does not apply.
     assert!(replay_patch(&mut wrong_type, commit.patch()).is_err());
 
-    let mut wrong_relationship = OpcPackage::from_bytes(&bytes).unwrap();
+    let mut wrong_relationship =
+        OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
     wrong_relationship
         .get_part_mut(&sheet2)
         .unwrap()
@@ -1718,7 +1725,8 @@ fn multi_sheet_patch_rejects_unselected_graph_tampering() {
         Err(Error::PatchConflict { .. })
     ));
 
-    let mut wrong_owner = OpcPackage::from_bytes(&bytes).unwrap();
+    let mut wrong_owner =
+        OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
     wrong_owner
         .rels_mut()
         .try_add_relationship(
@@ -1748,7 +1756,7 @@ fn multi_sheet_patch_composes_with_unselected_payload_edits_and_inverse() {
         r#"<worksheet xmlns="{SML}"><dimension ref="A1:C3"/><sheetData><row r="1"><c r="A1"><v>20</v></c></row><row r="2"><c r="B2" t="b"><v>0</v></c></row><row r="3"><c r="C3" t="inlineStr"><is><t>independent</t></is></c></row></sheetData></worksheet>"#
     )
     .into_bytes();
-    let mut composed = OpcPackage::from_bytes(&bytes).unwrap();
+    let mut composed = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
     composed
         .get_part_mut(&sheet2)
         .unwrap()
@@ -1841,7 +1849,8 @@ fn mce_relationships_and_signed_changes_are_refused() {
         assert!(editor.edit("Sheet1").is_err());
     }
 
-    let mut shared = OpcPackage::from_bytes(&three_cells()).unwrap();
+    let mut shared =
+        OpcPackage::from_bytes(&three_cells(), litchi_opc::SourceLimits::default()).unwrap();
     shared
         .try_add_part(Box::new(BlobPart::new(
             PackURI::new("/xl/sharedStrings.xml").unwrap(),
@@ -1909,7 +1918,7 @@ fn changed_positional_source_and_stale_in_memory_patch_are_refused() {
     ));
     assert!(output.is_empty());
 
-    let mut stale = OpcPackage::from_bytes(&bytes).unwrap();
+    let mut stale = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
     stale
         .get_part_mut(&PackURI::new(SHEET).unwrap())
         .unwrap()
@@ -2025,7 +2034,7 @@ fn shared_style_owner_is_preserved_and_bound_into_patch_closure() {
         ),
         false,
     );
-    let mut package = OpcPackage::from_bytes(&bytes).unwrap();
+    let mut package = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
     let style_uri = PackURI::new("/xl/styles.xml").unwrap();
     let style_xml = format!(
         r#"<styleSheet xmlns="{SML}"><cellXfs count="2"><xf/><xf/></cellXfs></styleSheet>"#
@@ -2060,7 +2069,7 @@ fn shared_style_owner_is_preserved_and_bound_into_patch_closure() {
         .publish_commit_to_stream(&mut output, &commit)
         .unwrap();
     assert_eq!(
-        OpcPackage::from_bytes(&output)
+        OpcPackage::from_bytes(&output, litchi_opc::SourceLimits::default())
             .unwrap()
             .get_part(&style_uri)
             .unwrap()
@@ -2068,7 +2077,7 @@ fn shared_style_owner_is_preserved_and_bound_into_patch_closure() {
         style_xml
     );
 
-    let mut hostile = OpcPackage::from_bytes(&bytes).unwrap();
+    let mut hostile = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
     hostile
         .get_part_mut(&style_uri)
         .unwrap()
@@ -2090,7 +2099,7 @@ fn noop_patch_rejects_added_worksheet_relationship() {
     let editor =
         SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(bytes.clone()))).unwrap();
     let noop = editor.edit("Sheet1").unwrap().commit().unwrap();
-    let mut hostile = OpcPackage::from_bytes(&bytes).unwrap();
+    let mut hostile = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
     hostile
         .get_part_mut(&PackURI::new(SHEET).unwrap())
         .unwrap()
@@ -2184,7 +2193,7 @@ fn managed_multi_sheet_batch_retains_each_selected_payload_and_streams_once() {
     editor
         .publish_multi_commit_to_stream(&mut output, &commit)
         .unwrap();
-    let published = OpcPackage::from_bytes(&output).unwrap();
+    let published = OpcPackage::from_bytes(&output, litchi_opc::SourceLimits::default()).unwrap();
     assert_eq!(
         litchi_xlsx::cell_values::Snapshot::load_multi(&published, "Sheet1")
             .unwrap()
@@ -2251,7 +2260,7 @@ fn managed_stream_publication_works_and_inverse_materialization_is_explicit() {
     let commit = changed_commit(&editor);
     assert_eq!(budget.used(Resource::Memory), exact);
 
-    let mut replay = OpcPackage::from_bytes(&bytes).unwrap();
+    let mut replay = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
     replay_patch(&mut replay, commit.patch()).unwrap();
     replay_patch(
         &mut replay,
@@ -2267,7 +2276,7 @@ fn managed_stream_publication_works_and_inverse_materialization_is_explicit() {
             .get_part(&PackURI::new(SHEET).unwrap())
             .unwrap()
             .blob(),
-        OpcPackage::from_bytes(&bytes)
+        OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default())
             .unwrap()
             .get_part(&PackURI::new(SHEET).unwrap())
             .unwrap()
@@ -2280,7 +2289,7 @@ fn managed_stream_publication_works_and_inverse_materialization_is_explicit() {
         .unwrap();
     assert_eq!(
         litchi_xlsx::cell_values::Snapshot::load(
-            &OpcPackage::from_bytes(&output).unwrap(),
+            &OpcPackage::from_bytes(&output, litchi_opc::SourceLimits::default()).unwrap(),
             "Sheet1",
         )
         .unwrap()
@@ -2479,7 +2488,8 @@ fn source_backed_date_edit_retains_date_semantics() {
 #[test]
 fn scalar_formula_replacement_drops_cache_invalidates_calculation_and_preserves_members() {
     let bytes = scalar_formula_source();
-    let source_package = OpcPackage::from_bytes(&bytes).unwrap();
+    let source_package =
+        OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
     assert!(has_calculation_chain(&source_package));
     let unused = source_package
         .get_part(&PackURI::new(UNUSED).unwrap())
@@ -2503,7 +2513,7 @@ fn scalar_formula_replacement_drops_cache_invalidates_calculation_and_preserves_
     editor
         .publish_commit_to_stream(&mut output, &commit)
         .unwrap();
-    let published = OpcPackage::from_bytes(&output).unwrap();
+    let published = OpcPackage::from_bytes(&output, litchi_opc::SourceLimits::default()).unwrap();
     assert!(!has_calculation_chain(&published));
     assert!(
         published
@@ -2591,14 +2601,14 @@ fn formula_noop_is_byte_exact_and_retains_calculation_chain() {
         .unwrap();
     assert_eq!(output, bytes);
     assert!(has_calculation_chain(
-        &OpcPackage::from_bytes(&output).unwrap()
+        &OpcPackage::from_bytes(&output, litchi_opc::SourceLimits::default()).unwrap()
     ));
 }
 
 #[test]
 fn formula_patch_inverse_restores_calculation_topology_and_formula_cache() {
     let bytes = scalar_formula_source();
-    let original = OpcPackage::from_bytes(&bytes).unwrap();
+    let original = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
     let original_chain = original
         .get_part(&PackURI::new(CALC_CHAIN).unwrap())
         .unwrap()
@@ -2646,7 +2656,11 @@ fn formula_patch_inverse_restores_calculation_topology_and_formula_cache() {
 
 #[test]
 fn formula_patch_refuses_another_calc_chain_inbound_edge_atomically() {
-    let mut source = OpcPackage::from_bytes(&scalar_formula_source()).unwrap();
+    let mut source = OpcPackage::from_bytes(
+        &scalar_formula_source(),
+        litchi_opc::SourceLimits::default(),
+    )
+    .unwrap();
     source
         .get_part_mut(&PackURI::new(UNUSED).unwrap())
         .unwrap()
@@ -2666,7 +2680,7 @@ fn formula_patch_refuses_another_calc_chain_inbound_edge_atomically() {
         .unwrap();
     let commit = edit.commit().unwrap();
 
-    let mut replay = OpcPackage::from_bytes(&bytes).unwrap();
+    let mut replay = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
     assert!(replay_patch(&mut replay, commit.patch()).is_err());
     assert!(has_calculation_chain(&replay));
     assert!(
@@ -2701,7 +2715,8 @@ fn formula_publication_rejects_a_stale_source_before_output() {
 #[test]
 fn shared_formula_master_edit_preserves_wire_group_and_drops_group_caches() {
     let bytes = shared_formula_source();
-    let source_package = OpcPackage::from_bytes(&bytes).unwrap();
+    let source_package =
+        OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
     let unused = source_package
         .get_part(&PackURI::new(UNUSED).unwrap())
         .unwrap()
@@ -2724,7 +2739,7 @@ fn shared_formula_master_edit_preserves_wire_group_and_drops_group_caches() {
     editor
         .publish_commit_to_stream(&mut output, &commit)
         .unwrap();
-    let published = OpcPackage::from_bytes(&output).unwrap();
+    let published = OpcPackage::from_bytes(&output, litchi_opc::SourceLimits::default()).unwrap();
     assert!(!has_calculation_chain(&published));
     assert_eq!(
         published
@@ -2827,7 +2842,7 @@ fn shared_formula_master_noop_is_byte_exact_and_retains_caches_and_chain() {
         .publish_commit_to_stream(&mut output, &commit)
         .unwrap();
     assert_eq!(output, bytes);
-    let package = OpcPackage::from_bytes(&output).unwrap();
+    let package = OpcPackage::from_bytes(&output, litchi_opc::SourceLimits::default()).unwrap();
     assert!(has_calculation_chain(&package));
     let worksheet_xml = String::from_utf8(zip_member(&output, "xl/worksheets/sheet1.xml")).unwrap();
     for reference in ["A1", "B1", "A2", "B2"] {
@@ -2838,7 +2853,7 @@ fn shared_formula_master_noop_is_byte_exact_and_retains_caches_and_chain() {
 #[test]
 fn shared_formula_patch_inverse_restores_original_bytes_semantics_and_topology() {
     let bytes = shared_formula_source();
-    let original = OpcPackage::from_bytes(&bytes).unwrap();
+    let original = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
     let original_sheet = original
         .get_part(&PackURI::new(SHEET).unwrap())
         .unwrap()

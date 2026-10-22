@@ -68,7 +68,11 @@ fn catalog_fixture() -> CatalogFixture {
         .unwrap()
         .part_name;
 
-    let mut opc = OpcPackage::from_bytes(&package.to_bytes().unwrap()).unwrap();
+    let mut opc = OpcPackage::from_bytes(
+        &package.to_bytes().unwrap(),
+        litchi_opc::SourceLimits::default(),
+    )
+    .unwrap();
     set_c_sld_name(&mut opc, &master_one, "Master One");
     set_c_sld_name(&mut opc, &master_two, "Master Two");
     set_master_preserve(&mut opc, &master_one, true);
@@ -170,7 +174,7 @@ fn open(bytes: &[u8]) -> SourceBackedPresentation {
 }
 
 fn rewrite(bytes: &[u8], edit: impl FnOnce(&mut OpcPackage)) -> Vec<u8> {
-    let mut opc = OpcPackage::from_bytes(bytes).unwrap();
+    let mut opc = OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()).unwrap();
     edit(&mut opc);
     PackageWriter::to_bytes(&opc).unwrap()
 }

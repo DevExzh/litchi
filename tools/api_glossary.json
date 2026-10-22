@@ -1466,6 +1466,12 @@
           "replacement": "use OpcError::InvalidLimit"
         },
         {
+          "name": "_with_limits",
+          "scope": "litchi_opc",
+          "replacement": "pass SourceLimits to the canonical raw entry point (record 0362rl)",
+          "match": "suffix"
+        },
+        {
           "name": "resource",
           "scope": "litchi_opc::OpcError::Limit",
           "replacement": "use kind"
@@ -1611,6 +1617,12 @@
           "name": "InvalidReadLimit",
           "scope": "litchi_opc::OpcError",
           "replacement": "use OpcError::InvalidLimit"
+        },
+        {
+          "name": "_with_limits",
+          "scope": "litchi_opc",
+          "replacement": "pass SourceLimits to the canonical raw entry point (record 0362rl)",
+          "match": "suffix"
         },
         {
           "name": "resource",

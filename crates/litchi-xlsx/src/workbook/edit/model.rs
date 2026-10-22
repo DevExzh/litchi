@@ -2123,7 +2123,7 @@ impl SvgReadGuard {
             }
         }
         let current = package
-            .source_relationships_with_limits(&self.owner, package.read_limits())
+            .source_relationships(&self.owner, package.read_limits())
             .map_err(|_| Error::PatchConflict {
                 part: self.owner.to_string(),
             })?;
@@ -2147,8 +2147,7 @@ impl RelationshipChange {
 
     pub(super) fn validate(&self, package: &OpcPackage) -> Result<()> {
         if let Some(expected) = &self.before_source {
-            let current = package
-                .source_relationships_with_limits(expected.owner(), package.read_limits())?;
+            let current = package.source_relationships(expected.owner(), package.read_limits())?;
             if current != *expected {
                 return Err(Error::PatchConflict {
                     part: expected.owner().to_string(),
@@ -2171,11 +2170,7 @@ impl RelationshipChange {
 
     pub(super) fn apply(&self, package: &mut OpcPackage) -> Result<()> {
         if let (Some(expected), Some(replacement)) = (&self.before_source, &self.after_source) {
-            package.try_replace_relationships_with_limits(
-                expected,
-                replacement,
-                package.read_limits(),
-            )?;
+            package.try_replace_relationships(expected, replacement, package.read_limits())?;
             return Ok(());
         }
         let relationship_id = self.relationship_id()?.to_owned();
@@ -2347,7 +2342,7 @@ impl fmt::Debug for SvgPartChange {
 
 impl ContentTypesChange {
     pub(super) fn validate(&self, package: &OpcPackage) -> Result<()> {
-        if package.source_content_types_with_limits(package.read_limits())? != self.before {
+        if package.source_content_types(package.read_limits())? != self.before {
             return Err(Error::PatchConflict {
                 part: "[Content_Types].xml".to_owned(),
             });
@@ -2356,7 +2351,7 @@ impl ContentTypesChange {
     }
 
     pub(super) fn apply(&self, package: &mut OpcPackage) -> Result<()> {
-        package.try_replace_content_types_with_limits(
+        package.try_replace_content_types(
             self.before.bytes(),
             &self.after,
             package.read_limits(),
@@ -2433,7 +2428,7 @@ pub(super) fn validate_svg_final_removals(
     changes: &[SvgPartChange],
 ) -> Result<()> {
     let limits = package.read_limits();
-    package.source_content_types_with_limits(limits)?;
+    package.source_content_types(limits)?;
 
     let part_count = package.part_count();
     if part_count > limits.max_parts() {
@@ -2486,7 +2481,7 @@ pub(super) fn validate_svg_final_removals(
     let mut graph_nodes = HashSet::new();
     let root = PackURI::new("/").map_err(invalid)?;
     let mut visit = |owner: &PackURI, relationships: &Relationships| -> Result<()> {
-        let source = package.source_relationships_with_limits(owner, limits)?;
+        let source = package.source_relationships(owner, limits)?;
         if source.member_present() {
             relationship_parts = relationship_parts
                 .checked_add(1)

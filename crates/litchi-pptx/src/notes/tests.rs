@@ -81,7 +81,8 @@ fn consuming_put_moves_changed_xml_and_refuses_signed_changes_until_unsigned() {
 #[test]
 fn poi_and_libreoffice_notes_graphs_load_and_store_deterministically() {
     for bytes in [POI, LO] {
-        let mut package = OpcPackage::from_bytes(bytes).unwrap();
+        let mut package =
+            OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()).unwrap();
         let name = presentation();
         let graph = load(&package, &name).unwrap().unwrap();
         assert_eq!(graph.slides.len(), 1);

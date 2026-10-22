@@ -34,7 +34,14 @@ fn retained_nodes_and_lazy_reads_refuse_changed_sources() {
         bytes: kitchen(),
         revision: AtomicU64::new(0),
     });
-    let package = litchi_opc::SourceBackedPackage::from_read_at(source.clone()).unwrap();
+    let package = litchi_opc::SourceBackedPackage::from_read_at(
+        source.clone(),
+        litchi_opc::SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        litchi_opc::SourceReadPolicy::exact(),
+        None,
+    )
+    .unwrap();
     let handle = super::Xlsx::from_source_package(package, &OpenOptions::default()).unwrap();
     let file = File::Xlsx(handle);
     let sheet = file.get("/Data").unwrap();
@@ -317,7 +324,14 @@ fn observed_header_query(rows: u32) -> (usize, u64) {
         revision: AtomicU64::new(0),
         versions: AtomicU64::new(0),
     });
-    let package = litchi_opc::SourceBackedPackage::from_read_at(source.clone()).unwrap();
+    let package = litchi_opc::SourceBackedPackage::from_read_at(
+        source.clone(),
+        litchi_opc::SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        litchi_opc::SourceReadPolicy::exact(),
+        None,
+    )
+    .unwrap();
     let handle = super::Xlsx::from_source_package(package, &OpenOptions::default()).unwrap();
     let file = File::Xlsx(handle);
     let matches = file.query("row[Sales>5]").unwrap().count();
@@ -344,7 +358,14 @@ fn header_row_probes_share_the_step_check() {
         revision: AtomicU64::new(0),
         versions: AtomicU64::new(0),
     });
-    let package = litchi_opc::SourceBackedPackage::from_read_at(source.clone()).unwrap();
+    let package = litchi_opc::SourceBackedPackage::from_read_at(
+        source.clone(),
+        litchi_opc::SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        litchi_opc::SourceReadPolicy::exact(),
+        None,
+    )
+    .unwrap();
     let handle = super::Xlsx::from_source_package(package, &OpenOptions::default()).unwrap();
     let file = File::Xlsx(handle);
     let paths = file

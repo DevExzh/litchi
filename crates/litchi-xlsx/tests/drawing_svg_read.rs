@@ -321,7 +321,7 @@ fn synthetic_fixture(strict: bool, picture_count: usize, svg: bool) -> Vec<u8> {
 }
 
 fn rewrite_sheet(bytes: &[u8], source: Vec<u8>) -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(bytes).unwrap();
+    let mut package = OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()).unwrap();
     package
         .get_part_mut(&PackURI::new(SHEET).unwrap())
         .unwrap()
@@ -334,7 +334,7 @@ fn rewrite_physical_member(
     wanted: &str,
     rewrite: impl FnOnce(Vec<u8>) -> Vec<u8>,
 ) -> Vec<u8> {
-    let reader = PhysPkgReader::new(bytes).unwrap();
+    let reader = PhysPkgReader::new(bytes, litchi_opc::SourceLimits::default()).unwrap();
     let members = reader.member_names().unwrap();
     let mut writer = PhysPkgWriter::new();
     let mut rewrite = Some(rewrite);
@@ -610,7 +610,7 @@ fn case_variant_svg_media_target_resolves_the_canonical_package_part() {
 #[test]
 fn entity_escaped_drawing_namespace_uris_pair_source_and_typed_reads() {
     let bytes = encoded_drawing_namespace_fixture(&synthetic_fixture(false, 1, true));
-    let package = OpcPackage::from_bytes(&bytes).unwrap();
+    let package = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
     let drawing_bytes = package
         .get_part(&PackURI::new(DRAWING).unwrap())
         .unwrap()
@@ -700,7 +700,7 @@ fn duplicate_direct_and_hidden_mce_drawing_owners_are_refused() {
         .unwrap();
     assert_eq!(worksheet.drawing(0).unwrap().picture_count(), 1);
 
-    let package = OpcPackage::from_bytes(&bytes).unwrap();
+    let package = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
     let retained = package
         .get_part(&PackURI::new(SHEET).unwrap())
         .unwrap()

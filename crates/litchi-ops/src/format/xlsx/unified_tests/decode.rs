@@ -93,7 +93,14 @@ impl Probe {
             bytes: Arc::new(bytes),
             offsets: Arc::clone(&offsets),
         });
-        let package = SourceBackedPackage::from_read_at(source).expect("indexes");
+        let package = SourceBackedPackage::from_read_at(
+            source,
+            litchi_opc::SourceLimits::default(),
+            litchi_opc::SourceCacheLimits::default(),
+            litchi_opc::SourceReadPolicy::exact(),
+            None,
+        )
+        .expect("indexes");
         let file = Xlsx::from_source_package(package, &OpenOptions::default()).expect("opens");
         let probe = Self {
             file,

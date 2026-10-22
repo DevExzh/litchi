@@ -62,9 +62,11 @@ fn opened_package_with_explicit_empty_chain_relationships(bytes: Vec<u8>) -> Pac
 
     let package = package_with_chain(bytes).into_opc();
     let root = PackURI::new("/").expect("package URI");
-    let content_types = package.source_content_types().expect("content types");
+    let content_types = package
+        .source_content_types(litchi_opc::SourceLimits::default())
+        .expect("content types");
     let root_relationships = package
-        .source_relationships(&root)
+        .source_relationships(&root, litchi_opc::SourceLimits::default())
         .expect("root relationships");
     let chain = PackURI::new("/xl/calcChain.bin").expect("chain URI");
 
@@ -86,7 +88,7 @@ fn opened_package_with_explicit_empty_chain_relationships(bytes: Vec<u8>) -> Pac
             .write_stored(part.partname().membername(), part.blob())
             .expect("part member");
         let relationships = package
-            .source_relationships(part.partname())
+            .source_relationships(part.partname(), litchi_opc::SourceLimits::default())
             .expect("part relationships");
         if part.partname().is_equivalent_to(&chain) {
             let member = part
@@ -237,7 +239,7 @@ fn empty_owner_relationships_are_captured_and_restored() {
     let chain = PackURI::new("/xl/calcChain.bin").expect("chain URI");
     let restored_member = reopened
         .opc_package()
-        .source_relationships(&chain)
+        .source_relationships(&chain, litchi_opc::SourceLimits::default())
         .expect("reopened chain relationships");
     assert!(restored_member.member_present());
     assert_eq!(restored_member.bytes(), EMPTY_RELATIONSHIPS);
@@ -604,7 +606,9 @@ fn content_types_source_changed_with_owner_and_workbook_bytes_unchanged_is_stale
         "application/octet-stream".to_string(),
         Vec::new(),
     )));
-    let current = changed.source_content_types().expect("content types");
+    let current = changed
+        .source_content_types(litchi_opc::SourceLimits::default())
+        .expect("content types");
     let replacement = current
         .without_parts(
             std::slice::from_ref(&stale_part),
@@ -612,7 +616,11 @@ fn content_types_source_changed_with_owner_and_workbook_bytes_unchanged_is_stale
         )
         .expect("replacement content types");
     changed
-        .try_replace_content_types(current.bytes(), &replacement)
+        .try_replace_content_types(
+            current.bytes(),
+            &replacement,
+            litchi_opc::SourceLimits::default(),
+        )
         .expect("replace content types");
     let changed = Package::from_opc(changed).expect("changed package");
     assert!(

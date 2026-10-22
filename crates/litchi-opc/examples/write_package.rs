@@ -64,7 +64,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     writeln!(out, "Serialized package size: {on_disk_size} bytes")?;
 
     // --- 3. Read the package back to verify the round trip --------------
-    let reopened = OpcPackage::open(&out_path)?;
+    let reopened = OpcPackage::open(&out_path, SourceLimits::default())?;
     writeln!(
         out,
         "\nRe-opened package: {} parts, {} package relationships",

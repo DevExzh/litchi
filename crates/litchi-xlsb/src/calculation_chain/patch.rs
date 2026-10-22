@@ -278,28 +278,44 @@ fn restore_lexical_tokens_from_parts(
     limits: litchi_opc::SourceLimits,
 ) -> Result<()> {
     let root_name = PackURIRef::new("/")?;
-    let current_root = package.source_relationships_with_limits(&root_name, limits)?;
+    let current_root = package.source_relationships(&root_name, limits)?;
     if current_root != *root_relationships {
-        package.try_replace_relationships(&current_root, root_relationships)?;
+        package.try_replace_relationships(
+            &current_root,
+            root_relationships,
+            litchi_opc::SourceLimits::default(),
+        )?;
     }
 
     let workbook_name = package.main_document_part()?.partname().clone();
-    let current_workbook = package.source_relationships_with_limits(&workbook_name, limits)?;
+    let current_workbook = package.source_relationships(&workbook_name, limits)?;
     if current_workbook != *workbook_relationships {
-        package.try_replace_relationships(&current_workbook, workbook_relationships)?;
+        package.try_replace_relationships(
+            &current_workbook,
+            workbook_relationships,
+            litchi_opc::SourceLimits::default(),
+        )?;
     }
 
     if let Some(owner_relationships) = owner_relationships {
         let owner_name = owner_relationships.owner().clone();
-        let current_owner = package.source_relationships_with_limits(&owner_name, limits)?;
+        let current_owner = package.source_relationships(&owner_name, limits)?;
         if current_owner != *owner_relationships {
-            package.try_replace_relationships(&current_owner, owner_relationships)?;
+            package.try_replace_relationships(
+                &current_owner,
+                owner_relationships,
+                litchi_opc::SourceLimits::default(),
+            )?;
         }
     }
 
-    let current_content_types = package.source_content_types_with_limits(limits)?;
+    let current_content_types = package.source_content_types(limits)?;
     if current_content_types != *content_types {
-        package.try_replace_content_types(current_content_types.bytes(), content_types)?;
+        package.try_replace_content_types(
+            current_content_types.bytes(),
+            content_types,
+            litchi_opc::SourceLimits::default(),
+        )?;
     }
     Ok(())
 }

@@ -61,7 +61,8 @@ fn rewrite(
     record_type: Kind,
     edit: impl FnOnce(&mut Vec<u8>),
 ) -> Vec<u8> {
-    let mut package = OpcPackage::from_reader(Cursor::new(source)).unwrap();
+    let mut package =
+        OpcPackage::from_reader(Cursor::new(source), litchi_opc::SourceLimits::default()).unwrap();
     let uri = PackURI::new(part).unwrap();
     let mut stream: Vec<(Kind, Vec<u8>)> = Records::new(
         package.get_part(&uri).unwrap().blob(),

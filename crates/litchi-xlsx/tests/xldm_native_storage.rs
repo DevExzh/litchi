@@ -59,7 +59,7 @@ fn native_tabular_xpress_members_decode_with_explicit_framing_and_limits() {
         (51516, 35, 64),
         (51555, 34, 64),
     ];
-    let raw = OpcPackage::from_bytes(SOURCE).unwrap();
+    let raw = OpcPackage::from_bytes(SOURCE, litchi_opc::SourceLimits::default()).unwrap();
     let part = raw
         .get_part(&PackURI::new("/xl/model/item.data").unwrap())
         .unwrap();
@@ -95,7 +95,7 @@ fn native_tabular_xpress_members_decode_with_explicit_framing_and_limits() {
 #[test]
 fn native_outer_storage_is_borrowed_exact_and_checks_member_crcs() {
     use litchi_xlsx::package::xldm::{StorageProfile, inspect, write};
-    let package = OpcPackage::from_bytes(SOURCE).unwrap();
+    let package = OpcPackage::from_bytes(SOURCE, litchi_opc::SourceLimits::default()).unwrap();
     let part = package
         .get_part(&PackURI::new("/xl/model/item.data").unwrap())
         .unwrap();

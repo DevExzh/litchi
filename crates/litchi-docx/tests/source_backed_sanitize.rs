@@ -207,7 +207,7 @@ fn plan_is_non_mutating_and_detaches_first_middle_last_while_retaining_text() {
         .unwrap();
     let mut output = Vec::new();
     fresh_commit.package().write_to(&mut output).unwrap();
-    let reopened = OpcPackage::from_bytes(&output).unwrap();
+    let reopened = OpcPackage::from_bytes(&output, litchi_opc::SourceLimits::default()).unwrap();
     let main = reopened.main_document_part().unwrap();
     assert_eq!(
         main.rels().get("rOne").unwrap().target_ref(),

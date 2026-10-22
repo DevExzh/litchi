@@ -488,8 +488,11 @@ mod tests {
                 .expect("stored settings payload");
             bytes[offset] ^= 1;
         }
-        Package::from_opc_package(OpcPackage::from_vec(bytes).expect("deferred open"))
-            .expect("the main document decodes")
+        Package::from_opc_package(
+            OpcPackage::from_vec(bytes, litchi_opc::SourceLimits::default())
+                .expect("deferred open"),
+        )
+        .expect("the main document decodes")
     }
 
     // Review of the 0759 merge: the helper decoded the settings part only to

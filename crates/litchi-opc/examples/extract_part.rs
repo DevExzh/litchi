@@ -51,7 +51,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     writeln!(err)?;
 
-    let pkg = OpcPackage::open(&pkg_path)?;
+    let pkg = OpcPackage::open(&pkg_path, SourceLimits::default())?;
     writeln!(
         err,
         "Opened {} ({} parts). Looking up {partname}...",

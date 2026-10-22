@@ -750,7 +750,7 @@ impl Fixture {
     }
 
     fn package(&self) -> OpcPackage {
-        OpcPackage::from_bytes(&self.bytes).unwrap()
+        OpcPackage::from_bytes(&self.bytes, litchi_opc::SourceLimits::default()).unwrap()
     }
 }
 
@@ -1936,7 +1936,7 @@ fn decoded_utf16_name_limit_counts_supplementary_scalars_and_is_atomic() {
         .unwrap()
         .build()
         .unwrap();
-    let package = OpcPackage::from_bytes_with_limits(&fixture.bytes, limits).unwrap();
+    let package = OpcPackage::from_bytes(&fixture.bytes, limits).unwrap();
     assert_eq!(
         Snapshot::load(&package, cache_selector(), field_selector())
             .unwrap()
@@ -1952,21 +1952,21 @@ fn decoded_utf16_name_limit_counts_supplementary_scalars_and_is_atomic() {
         names: vec![(0, "a".repeat(65_536)), (1, "other".to_owned())],
         ..FixtureOptions::default()
     });
-    let package = OpcPackage::from_bytes_with_limits(&too_long.bytes, limits).unwrap();
+    let package = OpcPackage::from_bytes(&too_long.bytes, limits).unwrap();
     assert!(Snapshot::load(&package, cache_selector(), field_selector()).is_err());
 
     let supplementary = Fixture::build(FixtureOptions {
         names: vec![(0, "😀".repeat(32_767) + "a"), (1, "other".to_owned())],
         ..FixtureOptions::default()
     });
-    let package = OpcPackage::from_bytes_with_limits(&supplementary.bytes, limits).unwrap();
+    let package = OpcPackage::from_bytes(&supplementary.bytes, limits).unwrap();
     let supplementary_result = Snapshot::load(&package, cache_selector(), field_selector());
     assert!(supplementary_result.is_ok(), "{supplementary_result:?}");
     let over_supplementary = Fixture::build(FixtureOptions {
         names: vec![(0, "😀".repeat(32_768)), (1, "other".to_owned())],
         ..FixtureOptions::default()
     });
-    let package = OpcPackage::from_bytes_with_limits(&over_supplementary.bytes, limits).unwrap();
+    let package = OpcPackage::from_bytes(&over_supplementary.bytes, limits).unwrap();
     assert!(Snapshot::load(&package, cache_selector(), field_selector()).is_err());
 }
 
@@ -2183,8 +2183,7 @@ fn caller_limits_reject_large_source_or_candidate_before_publication() {
         .unwrap()
         .build()
         .unwrap();
-    let tiny_package =
-        OpcPackage::from_bytes_with_limits(&fixture.bytes, tiny_attribute_limit).unwrap();
+    let tiny_package = OpcPackage::from_bytes(&fixture.bytes, tiny_attribute_limit).unwrap();
     assert!(Snapshot::load(&tiny_package, cache_selector(), field_selector()).is_err());
 
     let generous_limits = SourceLimits::builder()
@@ -2192,7 +2191,7 @@ fn caller_limits_reject_large_source_or_candidate_before_publication() {
         .unwrap()
         .build()
         .unwrap();
-    let mut package = OpcPackage::from_bytes_with_limits(&fixture.bytes, generous_limits).unwrap();
+    let mut package = OpcPackage::from_bytes(&fixture.bytes, generous_limits).unwrap();
     let before = cache_blob(&package);
     let mut transaction =
         Transaction::new(&mut package, cache_selector(), field_selector()).unwrap();
@@ -2410,8 +2409,10 @@ fn ordinary_workbook_patch_is_fresh_source_bound_stale_atomic_and_exactly_revers
     let restored = patch.inverse().apply(committed.package()).unwrap();
     let restored_bytes = restored.package().to_bytes().unwrap();
     assert_eq!(restored_bytes, base_bytes);
-    let base_package = OpcPackage::from_bytes(&base_bytes).unwrap();
-    let restored_package = OpcPackage::from_bytes(&restored_bytes).unwrap();
+    let base_package =
+        OpcPackage::from_bytes(&base_bytes, litchi_opc::SourceLimits::default()).unwrap();
+    let restored_package =
+        OpcPackage::from_bytes(&restored_bytes, litchi_opc::SourceLimits::default()).unwrap();
     assert_eq!(
         base_package
             .get_part(&PackURI::new(WORKBOOK_URI).unwrap())

@@ -1734,8 +1734,7 @@ fn owned_view(snapshot: &Snapshot, limits: Limits) -> Result<Cow<'_, OpcPackage>
             let _first = snapshot.physical_revision.set((bound, revision));
         },
     }
-    let view =
-        OpcPackage::from_vec_with_limits(bytes, package.source_read_limits().unwrap_or_default())?;
+    let view = OpcPackage::from_vec(bytes, package.source_read_limits().unwrap_or_default())?;
     if !view.is_unmodified_owned_source() {
         return Err(invalid(
             "cross-slide could not reopen a package's serialization as an owned source",
@@ -1912,7 +1911,9 @@ fn build_candidate(
                 &candidate,
             )?
         },
-        CandidateBytes::Owned(bytes) => OpcPackage::from_vec(bytes)?,
+        CandidateBytes::Owned(bytes) => {
+            OpcPackage::from_vec(bytes, litchi_opc::SourceLimits::default())?
+        },
         CandidateBytes::Shared(bytes) if destination_view.is_unmodified_owned_source() => {
             OpcPackage::from_shared_vec_reusing_payloads(
                 bytes,
@@ -1921,7 +1922,7 @@ fn build_candidate(
             )?
         },
         CandidateBytes::Shared(bytes) => {
-            OpcPackage::from_shared_vec_with_limits(bytes, litchi_opc::SourceLimits::default())?
+            OpcPackage::from_shared_vec(bytes, litchi_opc::SourceLimits::default())?
         },
     };
     // Owned ingress retains the archive it was opened from and republishes it

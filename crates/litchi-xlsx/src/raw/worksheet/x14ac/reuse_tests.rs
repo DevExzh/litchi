@@ -396,7 +396,8 @@ fn actual_xlsx_worksheet_parts_match_the_baseline_reference() {
 
     let mut total = 0;
     for &(fixture_name, expected_count, bytes) in fixtures {
-        let package = OpcPackage::from_bytes(bytes).expect(fixture_name);
+        let package =
+            OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()).expect(fixture_name);
         let mut count = 0;
         for part in package.try_iter_parts() {
             let part = part.expect("fixture part payload");

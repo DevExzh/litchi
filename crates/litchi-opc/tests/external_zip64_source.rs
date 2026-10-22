@@ -100,7 +100,7 @@ fn independent_zip64_source_metadata_and_small_xml_edit_preserve_large_member() 
     assert_eq!(source_bytes.len() as u64, source_length);
 
     let limits = interoperability_limits();
-    let package = SourceBackedPackage::from_path_with_limits(&source_path, limits)
+    let package = SourceBackedPackage::from_path(&source_path, limits)
         .expect("independent ZIP64 OPC source should open with the declared-size profile");
 
     package
@@ -141,13 +141,18 @@ fn independent_zip64_source_metadata_and_small_xml_edit_preserve_large_member() 
     // A fresh source-backed package performs the small selected read needed by
     // the overlay. The 4 GiB member remains a raw preservation span throughout.
     let mut output = Vec::new();
-    SourceBackedPackage::from_path_with_limits(&source_path, limits)
+    SourceBackedPackage::from_path(&source_path, limits)
         .unwrap()
         .write_part_overlay_to_stream(&mut output, &pack(DOCUMENT_URI), REPLACEMENT.to_vec())
         .expect("small XML edit should publish while retaining ZIP64 source members");
 
-    let output_package = SourceBackedPackage::from_vec_with_limits(output.clone(), limits)
-        .expect("edited ZIP64 publication should reopen as an OPC package");
+    let output_package = SourceBackedPackage::from_vec(
+        output.clone(),
+        limits,
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )
+    .expect("edited ZIP64 publication should reopen as an OPC package");
     output_package
         .validate_topology_source_boundary()
         .expect("edited ZIP64 publication should retain a valid source topology");

@@ -27,7 +27,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             .next()
             .unwrap_or_else(|| OsString::from("dump_xlsb_structure")),
     })?;
-    let package = OpcPackage::from_reader(File::open(&path)?)?;
+    let package = OpcPackage::from_reader(File::open(&path)?, litchi_opc::SourceLimits::default())?;
 
     println!("=== Parts ===");
     for part in package.iter_parts() {

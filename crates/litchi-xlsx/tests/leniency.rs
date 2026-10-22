@@ -158,7 +158,8 @@ fn core_properties_repairs_fold_through_the_public_hand_off() {
             "<dc:title>a</dc:title><dc:title>b</dc:title></cp:coreProperties>",
         ),
     )]);
-    let opc = litchi_opc::OpcPackage::from_bytes(&bytes).unwrap();
+    let opc =
+        litchi_opc::OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
     let mut metadata = litchi_ooxml_common::leniency::ToleranceReport::default();
     litchi_ooxml_common::properties::read_with_report(&opc, &mut metadata).unwrap();
     assert!(!metadata.is_clean());

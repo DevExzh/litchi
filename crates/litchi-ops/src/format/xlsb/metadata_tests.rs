@@ -158,7 +158,9 @@ fn eager_and_source_owners_store_the_same_property_parts() {
             .expect("set")
             .to_bytes()
             .expect("bytes");
-        let package = litchi_opc::OpcPackage::from_bytes(&bytes).expect("package");
+        let package =
+            litchi_opc::OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default())
+                .expect("package");
         let mut parts: Vec<_> = package
             .iter_parts()
             .map(|part| part.partname().clone())

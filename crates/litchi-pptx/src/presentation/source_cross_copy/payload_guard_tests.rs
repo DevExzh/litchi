@@ -124,7 +124,10 @@ fn flipped_payload(payload: &PreparedPayload) -> PreparedPayload {
 }
 
 fn source_fixture() -> TestResult<Vec<u8>> {
-    let mut package = OpcPackage::from_vec(authored_fixture(&["source-one", "source-two"])?)?;
+    let mut package = OpcPackage::from_vec(
+        authored_fixture(&["source-one", "source-two"])?,
+        litchi_opc::SourceLimits::default(),
+    )?;
     let image_uri = PackURI::new("/ppt/media/guard-image.png").map_err(Error::Uri)?;
     let chart_uri = PackURI::new("/ppt/charts/guard-chart.xml").map_err(Error::Uri)?;
     package.try_add_part(Box::new(BlobPart::new(
@@ -183,7 +186,8 @@ fn authored_fixture(slide_titles: &[&str]) -> TestResult<Vec<u8>> {
         }
     }
     let package = builder.build()?;
-    let mut archive = OpcPackage::from_vec(package.to_bytes()?)?;
+    let mut archive =
+        OpcPackage::from_vec(package.to_bytes()?, litchi_opc::SourceLimits::default())?;
     for (index, title) in slide_titles.iter().enumerate() {
         let uri =
             PackURI::new(format!("/ppt/slides/slide{}.xml", index + 1)).map_err(Error::Uri)?;

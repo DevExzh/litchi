@@ -185,7 +185,10 @@ fn lexical_source_package() -> (OpcPackage, PackURI) {
         ("web/_rels/taskpanes.xml.rels", TASK_RELATIONSHIPS),
         ("web/extension.xml", EXT_XML),
     ]);
-    (OpcPackage::from_bytes(&archive).unwrap(), task)
+    (
+        OpcPackage::from_bytes(&archive, litchi_opc::SourceLimits::default()).unwrap(),
+        task,
+    )
 }
 
 #[test]
@@ -196,8 +199,12 @@ fn inverse_restores_content_types_relationships_and_xml_after_reopen() {
         .iter()
         .find(|relationship| relationship.reltype() == TASK_PANES_RELATIONSHIP)
         .map(RelationshipState::capture);
-    let before_content_types = package.source_content_types().unwrap();
-    let before_relationships = package.source_relationships(&task).unwrap();
+    let before_content_types = package
+        .source_content_types(litchi_opc::SourceLimits::default())
+        .unwrap();
+    let before_relationships = package
+        .source_relationships(&task, litchi_opc::SourceLimits::default())
+        .unwrap();
     let before_xml = package.source_xml_part(&task).unwrap();
     let old_image_bytes = package.get_part(&old_image).unwrap().blob_arc();
     let extension_state = PartState::capture(package.get_part(&extension).unwrap());
@@ -267,11 +274,15 @@ fn inverse_restores_content_types_relationships_and_xml_after_reopen() {
     let inverse = patch.inverse();
     assert!(inverse.apply(&mut package).unwrap());
     assert_eq!(
-        package.source_content_types().unwrap(),
+        package
+            .source_content_types(litchi_opc::SourceLimits::default())
+            .unwrap(),
         before_content_types
     );
     assert_eq!(
-        package.source_relationships(&task).unwrap(),
+        package
+            .source_relationships(&task, litchi_opc::SourceLimits::default())
+            .unwrap(),
         before_relationships
     );
     assert_eq!(package.source_xml_part(&task).unwrap(), before_xml);
@@ -284,13 +295,17 @@ fn inverse_restores_content_types_relationships_and_xml_after_reopen() {
 
     let mut bytes = Vec::new();
     PackageWriter::write_to(&mut bytes, &package).unwrap();
-    let reopened = OpcPackage::from_vec(bytes).unwrap();
+    let reopened = OpcPackage::from_vec(bytes, litchi_opc::SourceLimits::default()).unwrap();
     assert_eq!(
-        reopened.source_content_types().unwrap(),
+        reopened
+            .source_content_types(litchi_opc::SourceLimits::default())
+            .unwrap(),
         before_content_types
     );
     assert_eq!(
-        reopened.source_relationships(&task).unwrap(),
+        reopened
+            .source_relationships(&task, litchi_opc::SourceLimits::default())
+            .unwrap(),
         before_relationships
     );
     assert_eq!(reopened.source_xml_part(&task).unwrap(), before_xml);
@@ -305,7 +320,9 @@ fn source_bound_noop_checks_source_and_inverse_before_returning_false() {
 
     let (mut lexical_package, lexical_task) = lexical_source_package();
     let lexical_patch = task_noop_patch(&lexical_package, &lexical_task);
-    let before_relationships = lexical_package.source_relationships(&lexical_task).unwrap();
+    let before_relationships = lexical_package
+        .source_relationships(&lexical_task, litchi_opc::SourceLimits::default())
+        .unwrap();
     let removed = before_relationships
         .without_relationship("rIdExtension", Limits::standard().xml_bytes)
         .unwrap();
@@ -320,10 +337,14 @@ fn source_bound_noop_checks_source_and_inverse_before_returning_false() {
         .unwrap();
     assert_ne!(before_relationships, rewritten);
     lexical_package
-        .try_replace_relationships(&before_relationships, &removed)
+        .try_replace_relationships(
+            &before_relationships,
+            &removed,
+            litchi_opc::SourceLimits::default(),
+        )
         .unwrap();
     lexical_package
-        .try_replace_relationships(&removed, &rewritten)
+        .try_replace_relationships(&removed, &rewritten, litchi_opc::SourceLimits::default())
         .unwrap();
     assert!(lexical_patch.apply(&mut lexical_package).is_err());
 

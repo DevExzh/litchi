@@ -392,7 +392,7 @@ fn authored_package(names: &[&str]) -> TestResult<Vec<u8>> {
     }
     let package = builder.build()?;
     let bytes = package.to_bytes()?;
-    let mut opc = OpcPackage::from_vec(bytes)?;
+    let mut opc = OpcPackage::from_vec(bytes, litchi_opc::SourceLimits::default())?;
     for (index, name) in names.iter().enumerate() {
         let slide_name =
             PackURI::new(format!("/ppt/slides/slide{}.xml", index + 1)).map_err(Error::Uri)?;

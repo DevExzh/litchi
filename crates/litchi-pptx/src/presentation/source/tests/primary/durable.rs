@@ -103,7 +103,9 @@ fn durable_binding_and_before_state_drift_refuse_without_changing_destination() 
     let encoded = wire(&fresh(bytes.clone()), "changed");
     let patch = Patch::from_bytes(&encoded).unwrap();
     for root_drift in [false, true] {
-        let mut raw = litchi_opc::OpcPackage::from_bytes(&bytes).unwrap();
+        let mut raw =
+            litchi_opc::OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default())
+                .unwrap();
         if root_drift {
             let root = raw
                 .get_part_mut(&PackURI::new("/ppt/presentation.xml").unwrap())
@@ -453,7 +455,9 @@ fn durable_text_and_order_patches_allow_large_unchanged_catalogs() {
 
 #[test]
 fn durable_text_only_replay_keeps_positional_owner_contexts_supported() {
-    let mut raw = litchi_opc::OpcPackage::from_bytes(&fixture()).unwrap();
+    let mut raw =
+        litchi_opc::OpcPackage::from_bytes(&fixture(), litchi_opc::SourceLimits::default())
+            .unwrap();
     let root = raw
         .get_part_mut(&PackURI::new("/ppt/presentation.xml").unwrap())
         .unwrap();

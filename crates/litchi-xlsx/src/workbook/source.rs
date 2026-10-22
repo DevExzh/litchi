@@ -500,18 +500,19 @@ impl SourceBackedWorkbook {
             .as_ref()
             .and_then(|owner_options| owner_options.execution_context.as_deref().cloned());
         let package = match execution {
-            Some(context) => {
-                SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
-                    source,
-                    limits,
-                    cache_limits,
-                    context,
-                )?
-            },
-            None => SourceBackedPackage::from_read_at_with_limits_and_cache_limits(
+            Some(context) => SourceBackedPackage::from_read_at(
                 source,
                 limits,
                 cache_limits,
+                litchi_opc::SourceReadPolicy::exact(),
+                Some(context),
+            )?,
+            None => SourceBackedPackage::from_read_at(
+                source,
+                limits,
+                cache_limits,
+                litchi_opc::SourceReadPolicy::exact(),
+                None,
             )?,
         };
         Self::open_source_backed_package_with_shared_catalog(
@@ -541,7 +542,7 @@ impl SourceBackedWorkbook {
         reader: R,
         options: crate::OpenOptions,
     ) -> Result<Self> {
-        let package = SourceBackedPackage::from_reader_with_source_options(
+        let package = SourceBackedPackage::from_reader(
             reader,
             options.source_limits,
             options.cache_limits.unwrap_or_default(),
@@ -2441,7 +2442,7 @@ mod tests {
     }
 
     fn part_len(bytes: &[u8], member: &str) -> u64 {
-        let package = OpcPackage::from_bytes(bytes).unwrap();
+        let package = OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()).unwrap();
         package
             .get_part(&PackURI::new(member).unwrap())
             .unwrap()
@@ -2888,14 +2889,14 @@ mod tests {
         let source = Arc::new(CountingSource::new(archive));
         let (budget, cancellation_source, context) = managed_context(u64::MAX);
         let cache_limits = SourceCacheLimits::new(256 * 1024, 4).unwrap();
-        let package =
-            SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
-                source.clone(),
-                SourceLimits::default(),
-                cache_limits,
-                context,
-            )
-            .unwrap();
+        let package = SourceBackedPackage::from_read_at(
+            source.clone(),
+            SourceLimits::default(),
+            cache_limits,
+            litchi_opc::SourceReadPolicy::exact(),
+            Some(context),
+        )
+        .unwrap();
         let workbook = SourceBackedWorkbook::from_source_backed_package(package).unwrap();
         let first = workbook.sheet("First").unwrap().unwrap();
         assert!(first.cell("A1").is_ok());
@@ -4166,14 +4167,14 @@ mod tests {
                 None,
             )));
             let (_budget, cancellation_source, context) = managed_context(u64::MAX);
-            let package =
-                SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
-                    source,
-                    SourceLimits::default(),
-                    SourceCacheLimits::new(256 * 1024, 4).unwrap(),
-                    context,
-                )
-                .unwrap();
+            let package = SourceBackedPackage::from_read_at(
+                source,
+                SourceLimits::default(),
+                SourceCacheLimits::new(256 * 1024, 4).unwrap(),
+                litchi_opc::SourceReadPolicy::exact(),
+                Some(context),
+            )
+            .unwrap();
             let workbook = SourceBackedWorkbook::from_source_backed_package(package).unwrap();
             assert!(workbook.inner.package.execution_context().is_some());
             let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
@@ -4200,10 +4201,12 @@ mod tests {
                 None,
             )));
             let (_budget, _cancellation_source, context) = managed_context(u64::MAX);
-            let package = SourceBackedPackage::from_read_at_with_execution_context(
+            let package = SourceBackedPackage::from_read_at(
                 source.clone(),
                 SourceLimits::default(),
-                context,
+                litchi_opc::SourceCacheLimits::default(),
+                litchi_opc::SourceReadPolicy::exact(),
+                Some(context),
             )
             .unwrap();
             let workbook = SourceBackedWorkbook::from_source_backed_package(package).unwrap();

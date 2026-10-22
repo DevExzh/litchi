@@ -63,6 +63,7 @@ fn mce_and_real_strict_fixture() {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let physical = litchi_opc::phys_pkg::OwnedPhysPkgReader::open(
         root.join("test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx"),
+        litchi_opc::SourceLimits::default(),
     )
     .expect("open fixture");
     let uri = PackURI::new("/word/fontTable.xml").expect("test URI");
@@ -92,8 +93,11 @@ fn malformed_order_and_bounds_are_rejected() {
 #[test]
 fn poi_resources_share_package_allocations() {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let package = OpcPackage::open(root.join("test-data/poi/test-data/document/saut_page.docx"))
-        .expect("open fixture");
+    let package = OpcPackage::open(
+        root.join("test-data/poi/test-data/document/saut_page.docx"),
+        litchi_opc::SourceLimits::default(),
+    )
+    .expect("open fixture");
     let table = read(&package).expect("read").expect("font table");
     assert_eq!(table.len(), 7);
     let embeds = table.iter().flat_map(Font::embeds).collect::<Vec<_>>();

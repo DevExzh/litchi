@@ -25,6 +25,8 @@ pub(crate) struct Deferred {
     pub(crate) base: Package,
     publish: Box<Publish>,
     limits: SourceLimits,
+    cache_limits: litchi_opc::SourceCacheLimits,
+    execution_context: Option<litchi_core::ExecutionContext>,
     materialized: OnceLock<SourceBackedPackage>,
     /// The length and SHA-256 of the written artifact.
     fingerprint: OnceLock<(u64, [u8; 32])>,
@@ -47,7 +49,12 @@ impl Deferred {
                 reason: format!("materializing a committed source-backed package: {other}"),
             },
         })?;
-        let package = SourceBackedPackage::from_vec_with_limits(bytes, self.limits)?;
+        let package = SourceBackedPackage::from_vec(
+            bytes,
+            self.limits,
+            self.cache_limits,
+            self.execution_context.clone(),
+        )?;
         Ok(self.materialized.get_or_init(|| package))
     }
 
@@ -86,6 +93,8 @@ impl Package {
         }
         let base = self.clone();
         let limits = physical.read_limits();
+        let cache_limits = physical.cache_limits();
+        let execution_context = physical.execution_context();
         let mut next =
             Self::with_execution(self.physical_source()?.clone(), self.execution.clone())?
                 .with_semantic_limits(self.semantic_limits().clone());
@@ -93,6 +102,8 @@ impl Package {
             base,
             publish: Box::new(publish),
             limits,
+            cache_limits,
+            execution_context,
             materialized: OnceLock::new(),
             fingerprint: OnceLock::new(),
         }));
@@ -199,7 +210,10 @@ impl Package {
             return Ok(after.clone());
         }
         let current = self.physical_source()?.clone();
-        let original = after.physical_source()?.source_artifact();
+        let after_physical = after.physical_source()?;
+        let original = after_physical.source_artifact();
+        let cache_limits = after_physical.cache_limits();
+        let execution_context = after_physical.execution_context();
         let current_artifact = current.source_artifact();
         let proof = litchi_opc::SourceArtifactRestoreProof {
             current_len: current_artifact.len(),
@@ -220,7 +234,9 @@ impl Package {
                     writer,
                 )?)
             }),
-            limits: after.physical_source()?.read_limits(),
+            limits: after_physical.read_limits(),
+            cache_limits,
+            execution_context,
             materialized: OnceLock::new(),
             fingerprint: OnceLock::from((proof.original_len, proof.original_sha256.into_sha256())),
         }));

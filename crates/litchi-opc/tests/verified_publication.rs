@@ -14,7 +14,9 @@
 use std::sync::Arc;
 
 use litchi_opc::part::PayloadHandle;
-use litchi_opc::{OpcError, OpcPackage, PackURI, PackageWriter, Part, Relationships, XmlPart};
+use litchi_opc::{
+    OpcError, OpcPackage, PackURI, PackageWriter, Part, Relationships, SourceLimits, XmlPart,
+};
 use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
 use xml_minifier::audit::{Limits, VerifiedSource, verify_source};
 
@@ -54,7 +56,7 @@ fn document_uri() -> PackURI {
 }
 
 fn package() -> OpcPackage {
-    OpcPackage::from_bytes(&archive(ORIGINAL)).unwrap()
+    OpcPackage::from_bytes(&archive(ORIGINAL), SourceLimits::default()).unwrap()
 }
 
 fn proof(bytes: &[u8]) -> VerifiedSource {
@@ -308,9 +310,9 @@ fn every_route_audits_the_bytes_it_publishes() {
         for owned in [true, false] {
             let archive = archive(ORIGINAL);
             let mut package = if owned {
-                OpcPackage::from_vec(archive).unwrap()
+                OpcPackage::from_vec(archive, SourceLimits::default()).unwrap()
             } else {
-                OpcPackage::from_bytes(&archive).unwrap()
+                OpcPackage::from_bytes(&archive, SourceLimits::default()).unwrap()
             };
             package.add_part(Box::new(Split::new(
                 Arc::clone(&shown),
@@ -348,9 +350,9 @@ fn a_consistent_custom_part_publishes_on_the_owned_source_route() {
     for owned in [true, false] {
         let archive = archive(ORIGINAL);
         let mut package = if owned {
-            OpcPackage::from_vec(archive).unwrap()
+            OpcPackage::from_vec(archive, SourceLimits::default()).unwrap()
         } else {
-            OpcPackage::from_bytes(&archive).unwrap()
+            OpcPackage::from_bytes(&archive, SourceLimits::default()).unwrap()
         };
         package.add_part(Box::new(Split::new(
             Arc::new(EDITED.to_vec()),

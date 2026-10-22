@@ -192,7 +192,8 @@ fn publish_data_model(
             .find(|rel| rel.reltype() == NATIVE_MODEL_RELATIONSHIP_TYPE)
             .map(|rel| rel.r_id().to_owned());
         id.map(|id| -> Result<_> {
-            let before = package.source_relationships(workbook_name)?;
+            let before =
+                package.source_relationships(workbook_name, litchi_opc::SourceLimits::default())?;
             let after = before.without_relationship(&id, before.bytes().len())?;
             Ok((before, after))
         })
@@ -276,7 +277,7 @@ fn publish_data_model(
         package.try_replace_owned_xml_part(workbook_source.bytes(), updated)?;
     }
     if let Some((before, after)) = relationship_update {
-        package.try_replace_relationships(&before, &after)?;
+        package.try_replace_relationships(&before, &after, litchi_opc::SourceLimits::default())?;
     }
     if let Some(removal) = removal {
         removal.publish(package)?;
@@ -1308,10 +1309,11 @@ fn capture_source(
         })
         .transpose()?;
     Ok(SourceState {
-        content_types: package.source_content_types()?,
+        content_types: package.source_content_types(litchi_opc::SourceLimits::default())?,
         workbook_blob: workbook.blob_arc(),
         workbook_proof: package.source_xml_part(workbook_name)?,
-        workbook_relationships: package.source_relationships(workbook_name)?,
+        workbook_relationships: package
+            .source_relationships(workbook_name, litchi_opc::SourceLimits::default())?,
         model_part,
         model_incoming_relationships,
         connections_part,
@@ -1323,7 +1325,8 @@ fn source_part(package: &OpcPackage, part: &dyn Part) -> Result<SourcePart> {
         name: part.partname().clone(),
         content_type: part.content_type().into(),
         blob: part.blob_arc(),
-        relationships: package.source_relationships(part.partname())?,
+        relationships: package
+            .source_relationships(part.partname(), litchi_opc::SourceLimits::default())?,
         xml: (part.content_type() == CONNECTIONS_CONTENT_TYPE)
             .then(|| package.source_xml_part(part.partname()))
             .transpose()?,
@@ -1382,10 +1385,12 @@ fn publish_snapshot(
 ) -> Result<()> {
     let current = package.get_part(&snapshot.workbook_name)?.blob_arc();
     package.try_replace_owned_xml_part(&current, snapshot.source.workbook_proof.clone())?;
-    let current_relationships = package.source_relationships(&snapshot.workbook_name)?;
+    let current_relationships = package
+        .source_relationships(&snapshot.workbook_name, litchi_opc::SourceLimits::default())?;
     package.try_replace_relationships(
         &current_relationships,
         &snapshot.source.workbook_relationships,
+        litchi_opc::SourceLimits::default(),
     )?;
     let model_uri = PackURI::new(DATA_MODEL_PART_NAME).map_err(invalid)?;
     match snapshot.source.model_part.as_ref() {
@@ -1412,10 +1417,11 @@ fn publish_snapshot(
         },
         (None, None) => {},
     }
-    let current_content_types = package.source_content_types()?;
+    let current_content_types = package.source_content_types(litchi_opc::SourceLimits::default())?;
     package.try_replace_content_types(
         current_content_types.bytes(),
         &snapshot.source.content_types,
+        litchi_opc::SourceLimits::default(),
     )?;
     Ok(())
 }
@@ -1449,8 +1455,12 @@ fn publish_source_part(package: &mut OpcPackage, part: &SourcePart) -> Result<()
             Arc::clone(&part.blob),
         )))?;
     }
-    let current = package.source_relationships(&part.name)?;
-    package.try_replace_relationships(&current, &part.relationships)?;
+    let current = package.source_relationships(&part.name, litchi_opc::SourceLimits::default())?;
+    package.try_replace_relationships(
+        &current,
+        &part.relationships,
+        litchi_opc::SourceLimits::default(),
+    )?;
     Ok(())
 }
 
@@ -1584,7 +1594,11 @@ mod tests {
         writer
             .write_stored("_rels/.rels", package.rels().to_xml().as_bytes())
             .unwrap();
-        OpcPackage::from_bytes(&writer.finish_to_bytes().unwrap()).unwrap()
+        OpcPackage::from_bytes(
+            &writer.finish_to_bytes().unwrap(),
+            litchi_opc::SourceLimits::default(),
+        )
+        .unwrap()
     }
 
     fn model() -> Model {
@@ -1753,11 +1767,12 @@ mod tests {
         assert!(xml.contains(r#"xmlns:q="urn:source""#));
         assert!(xml.contains(r#"xmlns="""#));
         let bytes = litchi_opc::PackageWriter::to_bytes(&package).unwrap();
-        let mut reopened = OpcPackage::from_bytes(&bytes).unwrap();
+        let mut reopened =
+            OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
         assert!(Snapshot::load(&reopened).unwrap().same_source(&after));
         patch.inverse().apply(&mut reopened).unwrap();
         let bytes = litchi_opc::PackageWriter::to_bytes(&reopened).unwrap();
-        let restored = OpcPackage::from_bytes(&bytes).unwrap();
+        let restored = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
         assert!(Snapshot::load(&restored).unwrap().same_source(&before));
     }
 
@@ -1818,14 +1833,15 @@ mod tests {
         let commit = transaction.commit().unwrap();
         let patch = commit.patch().clone();
         let bytes = litchi_opc::PackageWriter::to_bytes(&package).unwrap();
-        let mut reopened = OpcPackage::from_bytes(&bytes).unwrap();
+        let mut reopened =
+            OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
         assert_eq!(
             reopened.get_part(&workbook).unwrap().blob(),
             xml.replace("= '7'", "= '8'").as_bytes()
         );
         patch.inverse().apply(&mut reopened).unwrap();
         let bytes = litchi_opc::PackageWriter::to_bytes(&reopened).unwrap();
-        let restored = OpcPackage::from_bytes(&bytes).unwrap();
+        let restored = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
         assert!(Snapshot::load(&restored).unwrap().same_source(&before));
         assert_eq!(restored.get_part(&workbook).unwrap().blob(), xml.as_bytes());
     }
@@ -2151,7 +2167,8 @@ mod tests {
 
         let after = litchi_opc::PackageWriter::to_bytes(&package).unwrap();
         assert_eq!(after, before);
-        let mut reopened = OpcPackage::from_bytes(&after).unwrap();
+        let mut reopened =
+            OpcPackage::from_bytes(&after, litchi_opc::SourceLimits::default()).unwrap();
         assert_eq!(
             load_model(&reopened, &workbook)
                 .unwrap()
@@ -2203,7 +2220,8 @@ mod tests {
         );
 
         let after = litchi_opc::PackageWriter::to_bytes(&package).unwrap();
-        let mut reopened = OpcPackage::from_bytes(&after).unwrap();
+        let mut reopened =
+            OpcPackage::from_bytes(&after, litchi_opc::SourceLimits::default()).unwrap();
         commit.patch().inverse().apply(&mut reopened).unwrap();
         assert_eq!(
             litchi_opc::PackageWriter::to_bytes(&reopened).unwrap(),
@@ -2670,7 +2688,7 @@ mod tests {
         .unwrap();
         let commit = edit.commit().unwrap();
         let saved = litchi_opc::PackageWriter::to_bytes(&package).unwrap();
-        let reopened = OpcPackage::from_bytes(&saved).unwrap();
+        let reopened = OpcPackage::from_bytes(&saved, litchi_opc::SourceLimits::default()).unwrap();
         assert!(
             Snapshot::load(&reopened)
                 .unwrap()
@@ -2684,9 +2702,11 @@ mod tests {
                 .as_bytes()
         );
         commit.patch().inverse().apply(&mut package).unwrap();
-        let restored =
-            OpcPackage::from_bytes(&litchi_opc::PackageWriter::to_bytes(&package).unwrap())
-                .unwrap();
+        let restored = OpcPackage::from_bytes(
+            &litchi_opc::PackageWriter::to_bytes(&package).unwrap(),
+            litchi_opc::SourceLimits::default(),
+        )
+        .unwrap();
         assert_eq!(
             restored.get_part(&workbook).unwrap().blob(),
             original.as_bytes()
@@ -2721,7 +2741,8 @@ mod tests {
             .unwrap();
             let commit = edit.commit().unwrap();
             let saved = litchi_opc::PackageWriter::to_bytes(&package).unwrap();
-            let reopened = OpcPackage::from_bytes(&saved).unwrap();
+            let reopened =
+                OpcPackage::from_bytes(&saved, litchi_opc::SourceLimits::default()).unwrap();
             assert!(
                 Snapshot::load(&reopened)
                     .unwrap()
@@ -2738,9 +2759,11 @@ mod tests {
                 6
             );
             commit.patch().inverse().apply(&mut package).unwrap();
-            let restored =
-                OpcPackage::from_bytes(&litchi_opc::PackageWriter::to_bytes(&package).unwrap())
-                    .unwrap();
+            let restored = OpcPackage::from_bytes(
+                &litchi_opc::PackageWriter::to_bytes(&package).unwrap(),
+                litchi_opc::SourceLimits::default(),
+            )
+            .unwrap();
             assert_eq!(
                 restored.get_part(&workbook).unwrap().blob(),
                 original.as_bytes()
@@ -2775,7 +2798,8 @@ mod tests {
             edit.set(value).unwrap();
             let inserted = edit.commit().unwrap();
             let saved = litchi_opc::PackageWriter::to_bytes(&package).unwrap();
-            let reopened = OpcPackage::from_bytes(&saved).unwrap();
+            let reopened =
+                OpcPackage::from_bytes(&saved, litchi_opc::SourceLimits::default()).unwrap();
             assert!(
                 Snapshot::load(&reopened)
                     .unwrap()
@@ -2786,22 +2810,28 @@ mod tests {
                     .contains("<!--root-->")
             );
             inserted.patch().inverse().apply(&mut package).unwrap();
-            let restored =
-                OpcPackage::from_bytes(&litchi_opc::PackageWriter::to_bytes(&package).unwrap())
-                    .unwrap();
+            let restored = OpcPackage::from_bytes(
+                &litchi_opc::PackageWriter::to_bytes(&package).unwrap(),
+                litchi_opc::SourceLimits::default(),
+            )
+            .unwrap();
             assert!(Snapshot::load(&restored).unwrap().same_source(&before));
             inserted.patch().apply(&mut package).unwrap();
             let mut remove = Transaction::new(&mut package).unwrap();
             remove.remove().unwrap();
             let removed = remove.commit().unwrap();
-            let reopened =
-                OpcPackage::from_bytes(&litchi_opc::PackageWriter::to_bytes(&package).unwrap())
-                    .unwrap();
+            let reopened = OpcPackage::from_bytes(
+                &litchi_opc::PackageWriter::to_bytes(&package).unwrap(),
+                litchi_opc::SourceLimits::default(),
+            )
+            .unwrap();
             assert!(Snapshot::load(&reopened).unwrap().is_empty());
             removed.patch().inverse().apply(&mut package).unwrap();
-            let restored =
-                OpcPackage::from_bytes(&litchi_opc::PackageWriter::to_bytes(&package).unwrap())
-                    .unwrap();
+            let restored = OpcPackage::from_bytes(
+                &litchi_opc::PackageWriter::to_bytes(&package).unwrap(),
+                litchi_opc::SourceLimits::default(),
+            )
+            .unwrap();
             assert!(
                 Snapshot::load(&restored)
                     .unwrap()

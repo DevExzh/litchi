@@ -94,7 +94,7 @@ fn external_links_round_trip_with_inert_package_topology() {
     let mut output = Cursor::new(Vec::new());
     workbook.build().unwrap().write_to(&mut output).unwrap();
     let bytes = output.into_inner();
-    let package = OpcPackage::from_bytes(&bytes).unwrap();
+    let package = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
     let workbook_part = package
         .get_part(&PackURI::new("/xl/workbook.bin").unwrap())
         .unwrap();
@@ -353,7 +353,7 @@ fn chart_sheet_metadata_chart_and_printer_settings_round_trip_in_sheet_order() {
     let mut output = Cursor::new(Vec::new());
     workbook.build().unwrap().write_to(&mut output).unwrap();
     let bytes = output.into_inner();
-    let package = OpcPackage::from_bytes(&bytes).unwrap();
+    let package = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
     let reader = crate::Workbook::new(Cursor::new(bytes)).unwrap();
     assert_eq!(
         reader.worksheet_names(),

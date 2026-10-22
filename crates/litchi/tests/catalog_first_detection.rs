@@ -279,8 +279,11 @@ fn catalog_first_detection_matches_bytes_reader_and_typed_docx_without_payload_r
     catalog_reader
         .seek(SeekFrom::Start(17))
         .expect("initial reader position is valid");
-    let catalog = litchi::opc::probe_package_catalog_from_reader(&mut catalog_reader)
-        .expect("valid OPC catalog should be admitted");
+    let catalog = litchi::opc::probe_package_catalog_from_reader(
+        &mut catalog_reader,
+        litchi_opc::SourceLimits::default(),
+    )
+    .expect("valid OPC catalog should be admitted");
     assert_eq!(catalog.part_count(), 1);
     assert!(
         catalog
@@ -317,8 +320,11 @@ fn typed_catalog_and_owner_restore_reader_position_on_error_and_limit() {
     malformed_reader
         .seek(SeekFrom::Start(23))
         .expect("initial reader position is valid");
-    let malformed_error = litchi::opc::probe_package_catalog_from_reader(&mut malformed_reader)
-        .expect_err("malformed OPC catalog must return a typed error");
+    let malformed_error = litchi::opc::probe_package_catalog_from_reader(
+        &mut malformed_reader,
+        litchi_opc::SourceLimits::default(),
+    )
+    .expect_err("malformed OPC catalog must return a typed error");
     assert!(matches!(
         malformed_error,
         litchi::opc::OpcError::PartNotFound(_)
@@ -350,7 +356,7 @@ fn typed_catalog_and_owner_restore_reader_position_on_error_and_limit() {
     limited_reader
         .seek(SeekFrom::Start(29))
         .expect("initial reader position is valid");
-    let limited_error = litchi::opc::probe_package_catalog_from_reader_with_limits(
+    let limited_error = litchi::opc::probe_package_catalog_from_reader(
         &mut limited_reader,
         input_limit_below(&fixture),
     )

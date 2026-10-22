@@ -363,7 +363,8 @@ fn inverse_round_trip(
     commit: &MultiCommit,
     published_output: &[u8],
 ) -> AnyResult<bool> {
-    let mut package = OpcPackage::from_bytes(published_output)?;
+    let mut package =
+        OpcPackage::from_bytes(published_output, litchi_opc::SourceLimits::default())?;
     crate::xlsx_source_editors::replay_patch(&mut package, &commit.patch().inverse())?;
     let restored = PackageWriter::to_bytes(&package)?;
     if restored != corpus.archive {

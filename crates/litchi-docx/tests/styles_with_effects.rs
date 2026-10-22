@@ -363,7 +363,7 @@ fn relationship_xml_events(xml: &[u8], name: &str) -> FixtureResult<usize> {
 }
 
 fn package_metrics(bytes: &[u8]) -> FixtureResult<PackageMetrics> {
-    let opc = litchi_opc::OpcPackage::from_vec(bytes.to_vec())
+    let opc = litchi_opc::OpcPackage::from_vec(bytes.to_vec(), litchi_opc::SourceLimits::default())
         .map_err(|error| FixtureError(format!("open OPC metrics source: {error:?}")))?;
     let total_part_bytes = opc.try_iter_parts().try_fold(0_u64, |total, part| {
         let part = part.map_err(|error| FixtureError(format!("decode part payload: {error:?}")))?;
@@ -1359,7 +1359,7 @@ fn native_effects_read_honors_caller_event_and_depth_limits() -> FixtureResult<(
             .unwrap(),
     ];
     for limit in limits {
-        let package = litchi_opc::OpcPackage::from_vec_with_limits(bytes.clone(), limit)
+        let package = litchi_opc::OpcPackage::from_vec(bytes.clone(), limit)
             .expect("native OPC package fits ingress limits");
         assert!(litchi_docx::styles::effects::load(&package, Owner::MainDocument).is_err());
     }

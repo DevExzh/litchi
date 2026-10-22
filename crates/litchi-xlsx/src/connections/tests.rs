@@ -42,11 +42,11 @@ fn validate(package: &OpcPackage) -> crate::error::Result<Option<Connections>> {
 }
 
 fn f(b: &[u8]) -> Connections {
-    let p = OpcPackage::from_bytes(b).unwrap();
+    let p = OpcPackage::from_bytes(b, litchi_opc::SourceLimits::default()).unwrap();
     load(&p).unwrap().unwrap()
 }
 fn f_without_broken_thumbnail(b: &[u8]) -> Connections {
-    let reader = PhysPkgReader::new(b).unwrap();
+    let reader = PhysPkgReader::new(b, litchi_opc::SourceLimits::default()).unwrap();
     let mut writer = PhysPkgWriter::new();
     for name in reader.member_names().unwrap() {
         if name == "docProps/thumbnail.jpeg" {

@@ -18,7 +18,7 @@ fn owner() -> PackURI {
     PackURI::new("/custom/item.bin").unwrap()
 }
 fn catalog(xml: &str) -> RelationshipFragments {
-    RelationshipFragments::from_bytes_with_limits(
+    RelationshipFragments::from_bytes(
         owner(),
         Arc::new(xml.as_bytes().to_vec()),
         SourceLimits::default(),
@@ -33,15 +33,17 @@ fn package(xml: &str) -> OpcPackage {
     writer
         .write_deflated("custom/_rels/item.bin.rels", xml.as_bytes())
         .unwrap();
-    OpcPackage::from_vec(writer.finish_to_bytes().unwrap()).unwrap()
+    OpcPackage::from_vec(writer.finish_to_bytes().unwrap(), SourceLimits::default()).unwrap()
 }
 #[test]
 fn removal_inverse_retains_exact_xml_and_unrelated_destination_overlays() {
     let original = xml(&format!("<?before keep?>{A}\n<!--gap-->{B}<x:extra/>{C}\n"));
     let mut package = package(&original);
     let limits = SourceLimits::default();
-    let source = package.source_relationships(&owner()).unwrap();
-    let fragments = source.fragments_with_limits(limits).unwrap();
+    let source = package
+        .source_relationships(&owner(), SourceLimits::default())
+        .unwrap();
+    let fragments = source.fragments(limits).unwrap();
     assert_eq!(fragments.iter().len(), 3);
     let removed = source
         .plan_fragment_edits(
@@ -56,24 +58,23 @@ fn removal_inverse_retains_exact_xml_and_unrelated_destination_overlays() {
         .unwrap();
     assert_eq!(removed.bytes(), original.replace(B, "").as_bytes());
     package
-        .try_replace_relationships(&source, &removed)
+        .try_replace_relationships(&source, &removed, SourceLimits::default())
         .unwrap();
     let saved = PackageWriter::to_bytes(&package).unwrap();
-    let mut package = OpcPackage::from_bytes(&saved).unwrap();
-    let current = package.source_relationships(&owner()).unwrap();
+    let mut package = OpcPackage::from_bytes(&saved, SourceLimits::default()).unwrap();
+    let current = package
+        .source_relationships(&owner(), SourceLimits::default())
+        .unwrap();
     let overlay = String::from_utf8(current.bytes().to_vec())
         .unwrap()
         .replace("before keep", "before overlay")
         .replace("https://example.test/a", "https://example.test/changed");
     package
-        .try_replace_relationships_bytes_with_limits(
-            &current,
-            Arc::new(overlay.into_bytes()),
-            true,
-            limits,
-        )
+        .try_replace_relationships_bytes(&current, Arc::new(overlay.into_bytes()), true, limits)
         .unwrap();
-    let current = package.source_relationships(&owner()).unwrap();
+    let current = package
+        .source_relationships(&owner(), SourceLimits::default())
+        .unwrap();
     let restored = current
         .plan_fragment_edits(
             &[Edit {
@@ -90,7 +91,7 @@ fn removal_inverse_retains_exact_xml_and_unrelated_destination_overlays() {
         .replace("https://example.test/a", "https://example.test/changed");
     assert_eq!(restored.bytes(), expected.as_bytes());
     package
-        .try_replace_relationships(&current, &restored)
+        .try_replace_relationships(&current, &restored, SourceLimits::default())
         .unwrap();
     let saved = PackageWriter::to_bytes(&package).unwrap();
     assert_eq!(
@@ -101,9 +102,9 @@ fn removal_inverse_retains_exact_xml_and_unrelated_destination_overlays() {
         expected.as_bytes()
     );
     assert_eq!(
-        OpcPackage::from_bytes(&saved)
+        OpcPackage::from_bytes(&saved, SourceLimits::default())
             .unwrap()
-            .source_relationships(&owner())
+            .source_relationships(&owner(), SourceLimits::default())
             .unwrap()
             .bytes(),
         expected.as_bytes()
@@ -114,7 +115,9 @@ fn adjacent_suffix_inverse_precedes_unrelated_appended_entry() {
     let original = xml(&format!("<!--head-->{A}\n{B}<!--between-->{C}\n"));
     let fragments = catalog(&original);
     let package = package(&original);
-    let source = package.source_relationships(&owner()).unwrap();
+    let source = package
+        .source_relationships(&owner(), SourceLimits::default())
+        .unwrap();
     let limits = SourceLimits::default();
     let removed = source
         .plan_fragment_edits(
@@ -141,7 +144,9 @@ fn adjacent_suffix_inverse_precedes_unrelated_appended_entry() {
             &format!("{appended}</r:Relationships>"),
         );
     let package = self::package(&overlay);
-    let current = package.source_relationships(&owner()).unwrap();
+    let current = package
+        .source_relationships(&owner(), SourceLimits::default())
+        .unwrap();
     for reverse in [false, true] {
         let mut edits = [
             Edit {
@@ -179,7 +184,9 @@ fn replacement_and_identity_preserve_spelling() {
     let before = catalog(&original);
     let after = catalog(&changed);
     let package = package(&original);
-    let source = package.source_relationships(&owner()).unwrap();
+    let source = package
+        .source_relationships(&owner(), SourceLimits::default())
+        .unwrap();
     let limits = SourceLimits::default();
     let noop = source
         .plan_fragment_edits(
@@ -216,7 +223,9 @@ fn first_entry_expands_aliased_empty_root() {
     let empty = format!("\u{feff}{} /><!--end-->", ROOT.trim_end_matches('>'));
     let after = catalog(&xml(A));
     let package = package(&empty);
-    let source = package.source_relationships(&owner()).unwrap();
+    let source = package
+        .source_relationships(&owner(), SourceLimits::default())
+        .unwrap();
     let limits = SourceLimits::default();
     let result = source
         .plan_fragment_edits(
@@ -241,7 +250,9 @@ fn stale_entry_context_and_duplicate_edits_leave_package_unchanged() {
     let original = xml(&format!("{A}{B}"));
     let before = catalog(&original);
     let package = package(&original);
-    let source = package.source_relationships(&owner()).unwrap();
+    let source = package
+        .source_relationships(&owner(), SourceLimits::default())
+        .unwrap();
     let limits = SourceLimits::default();
     let changed =
         catalog(&original.replace("https://example.test/a", "https://example.test/stale"));
@@ -300,7 +311,10 @@ fn stale_entry_context_and_duplicate_edits_leave_package_unchanged() {
             .is_err()
     );
     assert_eq!(
-        package.source_relationships(&owner()).unwrap().bytes(),
+        package
+            .source_relationships(&owner(), SourceLimits::default())
+            .unwrap()
+            .bytes(),
         original.as_bytes()
     );
 }
@@ -310,7 +324,9 @@ fn output_limits_are_admitted_before_materialization_and_rechecked() {
     let expanded = xml(&format!("{A}{B}"));
     let after = catalog(&expanded);
     let package = package(&original);
-    let source = package.source_relationships(&owner()).unwrap();
+    let source = package
+        .source_relationships(&owner(), SourceLimits::default())
+        .unwrap();
     let edits = [Edit {
         before: None,
         after: after.get("b"),
@@ -358,7 +374,7 @@ fn untrusted_fragments_reject_duplicate_ids_and_broken_xml() {
         xml(A).replace("</r:Relationships>", ""),
     ] {
         assert!(
-            RelationshipFragments::from_bytes_with_limits(
+            RelationshipFragments::from_bytes(
                 owner(),
                 Arc::new(source.into_bytes()),
                 SourceLimits::default()
@@ -375,7 +391,9 @@ fn batched_replacements_keep_destination_slots_and_unrelated_gap_changes() {
     let after = catalog(&changed);
     let destination = original.replace("<!--gap-->", "<?retained overlay?>");
     let package = package(&destination);
-    let source = package.source_relationships(&owner()).unwrap();
+    let source = package
+        .source_relationships(&owner(), SourceLimits::default())
+        .unwrap();
     let edits: Vec<_> = ["c", "a", "b"]
         .into_iter()
         .map(|id| Edit {
@@ -400,7 +418,9 @@ fn every_deletion_subset_restores_exactly_in_either_batch_order() {
     let original = xml(&format!("<!--head-->{A}\n{B}<!--middle-->{C}\n"));
     let fragments = catalog(&original);
     let package = package(&original);
-    let source = package.source_relationships(&owner()).unwrap();
+    let source = package
+        .source_relationships(&owner(), SourceLimits::default())
+        .unwrap();
     let limits = SourceLimits::default();
     for mask in 1..8 {
         let ids: Vec<_> = ["a", "b", "c"]
@@ -442,7 +462,9 @@ fn every_deletion_subset_restores_exactly_in_either_batch_order() {
 fn cycles_missing_anchors_and_wrong_owners_are_refused() {
     let empty = xml("");
     let package = package(&empty);
-    let source = package.source_relationships(&owner()).unwrap();
+    let source = package
+        .source_relationships(&owner(), SourceLimits::default())
+        .unwrap();
     let ab = catalog(&xml(&format!("{A}{B}")));
     let ba = catalog(&xml(&format!("{B}{A}")));
     let limits = SourceLimits::default();
@@ -474,7 +496,7 @@ fn cycles_missing_anchors_and_wrong_owners_are_refused() {
             )
             .is_err()
     );
-    let foreign = RelationshipFragments::from_bytes_with_limits(
+    let foreign = RelationshipFragments::from_bytes(
         PackURI::new("/foreign.bin").unwrap(),
         Arc::new(xml(A).into_bytes()),
         limits,
@@ -499,7 +521,9 @@ fn event_and_aggregate_byte_bounds_apply_before_output() {
     let expanded = xml(&format!("{A}{B}{C}"));
     let fragments = catalog(&expanded);
     let package = package(&original);
-    let source = package.source_relationships(&owner()).unwrap();
+    let source = package
+        .source_relationships(&owner(), SourceLimits::default())
+        .unwrap();
     let edits = [
         Edit {
             before: None,
@@ -562,7 +586,9 @@ fn stale_terminal_gap_cannot_relocate_restoration_after_an_unrelated_append() {
     let appended = C;
     let destination = xml(&format!("{A}<!--changed-->{appended}"));
     let package = package(&destination);
-    let source = package.source_relationships(&owner()).unwrap();
+    let source = package
+        .source_relationships(&owner(), SourceLimits::default())
+        .unwrap();
     assert!(
         source
             .plan_fragment_edits(
@@ -580,7 +606,9 @@ fn stale_terminal_gap_cannot_relocate_restoration_after_an_unrelated_append() {
 fn no_op_rechecks_tightened_structural_limits() {
     let original = xml(A);
     let package = package(&original);
-    let source = package.source_relationships(&owner()).unwrap();
+    let source = package
+        .source_relationships(&owner(), SourceLimits::default())
+        .unwrap();
     let plan = source
         .plan_fragment_edits(&[], SourceLimits::default())
         .unwrap();

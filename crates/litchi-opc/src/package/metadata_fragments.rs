@@ -794,10 +794,8 @@ impl Kind {
     fn parse(&self, bytes: &[u8], limits: SourceLimits) -> Result<Parsed> {
         match self {
             Self::Relationships(owner) => {
-                crate::pkgreader::PackageReader::parse_owned_relationships_with_limits(
-                    bytes, owner, limits,
-                )
-                .map(Parsed::Relationships)
+                crate::pkgreader::PackageReader::parse_owned_relationships(bytes, owner, limits)
+                    .map(Parsed::Relationships)
             },
             Self::ContentTypes => crate::content_type::ContentTypeMap::from_xml(bytes, limits)
                 .map(Parsed::ContentTypes),

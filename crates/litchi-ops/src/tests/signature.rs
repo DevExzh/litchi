@@ -140,7 +140,7 @@ fn editable_presentation() -> Vec<u8> {
 fn signed_opc(plain: &[u8]) -> Vec<u8> {
     use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter, Part as _, TargetMode};
 
-    let source = OpcPackage::from_bytes(plain).unwrap();
+    let source = OpcPackage::from_bytes(plain, litchi_opc::SourceLimits::default()).unwrap();
     let mut package = OpcPackage::new();
     for relationship in source.rels().iter() {
         package
@@ -499,7 +499,9 @@ fn assert_unsigned_output(format: FileFormat, output: &[u8], expected: &str, wha
                 stale.is_empty(),
                 "{what}: stale signature members {stale:?}"
             );
-            let package = litchi_opc::OpcPackage::from_bytes(output).unwrap();
+            let package =
+                litchi_opc::OpcPackage::from_bytes(output, litchi_opc::SourceLimits::default())
+                    .unwrap();
             assert!(!package.is_signed(), "{what}: the output graph is signed");
         },
         #[cfg(any(feature = "doc", feature = "ppt", feature = "xls"))]

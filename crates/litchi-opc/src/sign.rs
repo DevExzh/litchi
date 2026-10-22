@@ -1197,7 +1197,8 @@ mod tests {
     }
 
     fn fixture(bytes: &[u8], count: usize) {
-        let package = OpcPackage::from_bytes(bytes).expect("fixture opens");
+        let package =
+            OpcPackage::from_bytes(bytes, SourceLimits::default()).expect("fixture opens");
         let reports = package
             .signatures_with(&Policy::compatible())
             .expect("fixture verifies");
@@ -1225,7 +1226,8 @@ mod tests {
 
     #[test]
     fn safe_default_rejects_fixture_sha1() {
-        let package = OpcPackage::from_bytes(POI_DOCX).expect("fixture opens");
+        let package =
+            OpcPackage::from_bytes(POI_DOCX, SourceLimits::default()).expect("fixture opens");
         assert!(matches!(
             package.signatures(),
             Err(Error::Signature(litchi_sign::Error::Sha1))
@@ -1468,7 +1470,8 @@ mod tests {
 
     #[test]
     fn verifies_certificate_from_a_related_der_part() {
-        let mut package = OpcPackage::from_bytes(POI_DOCX).expect("fixture opens");
+        let mut package =
+            OpcPackage::from_bytes(POI_DOCX, SourceLimits::default()).expect("fixture opens");
         let initial = package
             .signatures_with(&Policy::compatible())
             .expect("initial verification");
@@ -1561,7 +1564,8 @@ mod tests {
         package.sign(&signer(7)).expect("sign");
         let mut output = std::io::Cursor::new(Vec::new());
         package.write_to(&mut output).expect("serialize");
-        let reopened = OpcPackage::from_bytes(output.get_ref()).expect("reopen");
+        let reopened =
+            OpcPackage::from_bytes(output.get_ref(), SourceLimits::default()).expect("reopen");
         let reports = reopened.signatures().expect("verify");
         assert_eq!(reports.len(), 1);
         assert_eq!(reports[0].integrity(), Status::Valid);

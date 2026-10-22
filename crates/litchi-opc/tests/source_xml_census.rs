@@ -141,7 +141,7 @@ fn every_well_formed_fixture_member_passes_the_source_audit() {
             .into_owned();
         let bytes = std::fs::read(&path).unwrap();
         if bytes.starts_with(b"PK\x03\x04") {
-            let Ok(archive) = PhysPkgReader::new(&bytes) else {
+            let Ok(archive) = PhysPkgReader::new(&bytes, SourceLimits::default()) else {
                 continue;
             };
             let Ok(names) = archive.member_names() else {

@@ -74,7 +74,8 @@ fn post_eof_boolean_worksheet(shape: Shape) -> Vec<u8> {
 }
 
 fn source_for_shape(shape: Shape) -> (Vec<u8>, Vec<u8>) {
-    let mut package = OpcPackage::from_bytes(&two_sheets()).unwrap();
+    let mut package =
+        OpcPackage::from_bytes(&two_sheets(), litchi_opc::SourceLimits::default()).unwrap();
     let second_sheet = package
         .get_part(&PackURI::new(SECOND_SHEET).unwrap())
         .unwrap()

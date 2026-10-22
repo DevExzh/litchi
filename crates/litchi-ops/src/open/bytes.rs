@@ -176,10 +176,7 @@ fn ooxml(
         #[cfg(any(test, feature = "test-support"))]
         crate::detect::record_opc_probe();
         let shared = Arc::new(bytes);
-        return match litchi_opc::OpcPackage::from_shared_vec_with_limits(
-            Arc::clone(&shared),
-            limits,
-        ) {
+        return match litchi_opc::OpcPackage::from_shared_vec(Arc::clone(&shared), limits) {
             Ok(package) => match crate::detect::ooxml::detect_ooxml_format_from_package(&package) {
                 Some(format) => Ok(Ok(super::ooxml_from_eager_package(
                     format, package, options,
@@ -202,10 +199,20 @@ fn ooxml(
     #[cfg(any(test, feature = "test-support"))]
     crate::detect::record_opc_probe();
     let probe = match options.ooxml_cache {
-        Some(cache) => litchi_opc::SourceBackedPackage::from_read_at_with_limits_and_cache_limits(
-            source, limits, cache,
+        Some(cache) => litchi_opc::SourceBackedPackage::from_read_at(
+            source,
+            limits,
+            cache,
+            litchi_opc::SourceReadPolicy::exact(),
+            None,
         ),
-        None => litchi_opc::SourceBackedPackage::from_read_at_with_limits(source, limits),
+        None => litchi_opc::SourceBackedPackage::from_read_at(
+            source,
+            limits,
+            litchi_opc::SourceCacheLimits::default(),
+            litchi_opc::SourceReadPolicy::exact(),
+            None,
+        ),
     };
     match probe {
         Ok(package) => {

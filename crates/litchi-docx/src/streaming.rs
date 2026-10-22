@@ -2218,8 +2218,11 @@ mod tests {
         let first = render_sample();
         let second = render_sample();
         assert_eq!(first, second);
-        let package = litchi_opc::phys_pkg::OwnedPhysPkgReader::from_bytes(first.clone())
-            .expect("physical package");
+        let package = litchi_opc::phys_pkg::OwnedPhysPkgReader::from_bytes(
+            first.clone(),
+            litchi_opc::SourceLimits::default(),
+        )
+        .expect("physical package");
         assert_eq!(
             package.member_names().expect("member names"),
             vec![

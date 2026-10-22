@@ -14,12 +14,13 @@ fn fixture(path: &str) -> PathBuf {
 }
 
 fn part(path: &Path, name: &str) -> Vec<u8> {
-    let package = OpcPackage::open(path).unwrap_or_else(|error| {
-        panic!(
-            "{} must remain a readable OPC package: {error}",
-            path.display()
-        )
-    });
+    let package =
+        OpcPackage::open(path, litchi_opc::SourceLimits::default()).unwrap_or_else(|error| {
+            panic!(
+                "{} must remain a readable OPC package: {error}",
+                path.display()
+            )
+        });
     let name = PackURI::new(name).unwrap_or_else(|error| panic!("invalid test part name: {error}"));
     package
         .get_part(&name)

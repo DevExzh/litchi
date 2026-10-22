@@ -340,7 +340,7 @@ fn a_capture_memo_is_projected_onto_the_facade_allocations() -> Result<()> {
 #[test]
 fn an_exact_source_seals_its_bound_digest_and_keeps_the_bound() -> Result<()> {
     let (source_bytes, _destination) = media_pair()?;
-    let package = OpcPackage::from_vec(source_bytes.clone())?;
+    let package = OpcPackage::from_vec(source_bytes.clone(), litchi_opc::SourceLimits::default())?;
     let limits = Limits::default();
     assert_eq!(package.exact_source_sha256(), {
         use sha2::Digest as _;

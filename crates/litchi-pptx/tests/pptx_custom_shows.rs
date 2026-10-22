@@ -53,7 +53,7 @@ fn presentation_structure_owner_validates_slide_relationships() {
 fn package_with_custom_shows() -> OpcPackage {
     let package = Package::new().unwrap();
     let bytes = package.to_bytes().unwrap();
-    let mut package = OpcPackage::from_vec(bytes).unwrap();
+    let mut package = OpcPackage::from_vec(bytes, litchi_opc::SourceLimits::default()).unwrap();
     let presentation_name = PackURI::new("/ppt/presentation.xml").unwrap();
     let presentation = package.get_part_mut(&presentation_name).unwrap();
     presentation.set_blob(PRESENTATION_XML.to_vec());

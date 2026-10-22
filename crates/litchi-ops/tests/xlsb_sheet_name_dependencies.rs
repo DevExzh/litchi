@@ -56,7 +56,8 @@ fn open_owner(bytes: &[u8], eager: bool) -> File {
 }
 
 fn xml_part(bytes: &[u8], content_type: &str) -> String {
-    let package = OpcPackage::from_bytes(bytes).expect("parse XLSB package");
+    let package = OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default())
+        .expect("parse XLSB package");
     let part = package
         .iter_parts()
         .find(|part| part.content_type() == content_type)
@@ -72,7 +73,8 @@ fn xml_part(bytes: &[u8], content_type: &str) -> String {
 }
 
 fn app_xml(bytes: &[u8]) -> String {
-    let package = OpcPackage::from_bytes(bytes).expect("parse XLSB package");
+    let package = OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default())
+        .expect("parse XLSB package");
     let uri = PackURI::new(APP_XML).expect("app properties URI");
     String::from_utf8(
         package
@@ -85,7 +87,8 @@ fn app_xml(bytes: &[u8]) -> String {
 }
 
 fn rewrite_app_xml(bytes: &[u8], replacement: &str) -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(bytes).expect("parse XLSB package");
+    let mut package = OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default())
+        .expect("parse XLSB package");
     let uri = PackURI::new(APP_XML).expect("app properties URI");
     let source = String::from_utf8(
         package
@@ -117,7 +120,8 @@ fn unknown_reference_fixture() -> Vec<u8> {
 }
 
 fn mce_reference_fixture() -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(&fixture()).expect("parse XLSB package");
+    let mut package = OpcPackage::from_bytes(&fixture(), litchi_opc::SourceLimits::default())
+        .expect("parse XLSB package");
     let uri = PackURI::new(APP_XML).expect("app properties URI");
     let source = String::from_utf8(
         package

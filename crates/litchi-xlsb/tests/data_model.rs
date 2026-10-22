@@ -120,13 +120,15 @@ fn package_with_explicit_empty_model_relationships_with_padding(padding: usize) 
     let package = package().into_opc();
     let content_types = noncanonical_content_types_with_padding(
         package
-            .source_content_types()
+            .source_content_types(litchi_opc::SourceLimits::default())
             .expect("content types")
             .bytes(),
         padding,
     );
     let root = PackURI::new("/").expect("root URI");
-    let root_relationships = package.source_relationships(&root).expect("root rels");
+    let root_relationships = package
+        .source_relationships(&root, litchi_opc::SourceLimits::default())
+        .expect("root rels");
     let model = PackURI::new(DATA_MODEL_PART_NAME).expect("model URI");
     let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
     writer
@@ -145,7 +147,7 @@ fn package_with_explicit_empty_model_relationships_with_padding(padding: usize) 
             .write_stored(part.partname().membername(), part.blob())
             .expect("part member");
         let relationships = package
-            .source_relationships(part.partname())
+            .source_relationships(part.partname(), litchi_opc::SourceLimits::default())
             .expect("part relationships");
         if part.partname().is_equivalent_to(&model) {
             writer
@@ -172,13 +174,11 @@ fn package_with_explicit_empty_model_relationships_with_padding(padding: usize) 
     let zip = writer.finish_to_bytes().expect("opened ZIP fixture bytes");
     let opc = if content_types.len() > litchi_opc::SourceLimits::default().max_content_types_bytes()
     {
-        litchi_opc::OpcPackage::from_bytes_with_limits(
-            &zip,
-            elevated_opc_limits(content_types.len()),
-        )
-        .expect("open elevated ZIP fixture")
+        litchi_opc::OpcPackage::from_bytes(&zip, elevated_opc_limits(content_types.len()))
+            .expect("open elevated ZIP fixture")
     } else {
-        litchi_opc::OpcPackage::from_bytes(&zip).expect("open ZIP fixture")
+        litchi_opc::OpcPackage::from_bytes(&zip, litchi_opc::SourceLimits::default())
+            .expect("open ZIP fixture")
     };
     Package::from_opc(opc).expect("package from ZIP fixture")
 }
@@ -763,7 +763,7 @@ fn elevated_source_tokens_survive_reopened_inverse_with_large_content_types() {
         .map(litchi_core::edit::Commit::into_package)
         .expect("remove model");
     let removed_zip = removed.to_bytes().expect("removed ZIP bytes");
-    let reopened_removed_opc = litchi_opc::OpcPackage::from_bytes_with_limits(
+    let reopened_removed_opc = litchi_opc::OpcPackage::from_bytes(
         &removed_zip,
         elevated_opc_limits(before_content_types.len()),
     )
@@ -788,7 +788,7 @@ fn elevated_source_tokens_survive_reopened_inverse_with_large_content_types() {
             .expect("restored model relationships member"),
         EMPTY_RELATIONSHIPS
     );
-    let reopened_opc = litchi_opc::OpcPackage::from_bytes_with_limits(
+    let reopened_opc = litchi_opc::OpcPackage::from_bytes(
         &restored_zip,
         elevated_opc_limits(before_content_types.len()),
     )

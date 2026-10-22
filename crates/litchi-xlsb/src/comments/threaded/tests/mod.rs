@@ -547,7 +547,7 @@ fn deferred_root_workbook_failure_is_not_replaced_by_canonical_fallback() {
     let (package, _canonical, _alternate) = dual_workbook_package();
     let mut bytes = PackageWriter::to_bytes(&package).unwrap();
     bytes = corrupt_zip_member(bytes, "xl/workbook-alt.bin");
-    let package = OpcPackage::from_vec(bytes).unwrap();
+    let package = OpcPackage::from_vec(bytes, litchi_opc::SourceLimits::default()).unwrap();
 
     let error = super::package::validate_graph(&package).unwrap_err();
     assert!(matches!(

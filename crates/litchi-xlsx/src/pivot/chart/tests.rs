@@ -536,7 +536,8 @@ mod legacy_tests {
 
     #[test]
     fn poi_fixture_pivot_chart_part_parses() {
-        let package = OpcPackage::from_bytes(POI_PIVOT_CHART).unwrap();
+        let package =
+            OpcPackage::from_bytes(POI_PIVOT_CHART, litchi_opc::SourceLimits::default()).unwrap();
         let chart_part = package
             .get_part(&PackURI::new("/xl/charts/chart1.xml").unwrap())
             .unwrap();
@@ -553,7 +554,8 @@ mod legacy_tests {
 
     #[test]
     fn poi_fixture_pivot_tables_and_chartsheet_chart_load() {
-        let package = OpcPackage::from_bytes(POI_PIVOT_CHART).unwrap();
+        let package =
+            OpcPackage::from_bytes(POI_PIVOT_CHART, litchi_opc::SourceLimits::default()).unwrap();
         // The workbook contains a chartsheet; the pivot-table read path that
         // used to reject it now tolerates it.
         let tables = read_pivot_tables(&package).unwrap();

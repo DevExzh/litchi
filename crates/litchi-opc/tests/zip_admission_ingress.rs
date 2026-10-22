@@ -101,36 +101,47 @@ fn open_all(archive: &[u8]) -> Vec<(&'static str, Result<(), String>)> {
     vec![
         (
             "from_vec (deferred)",
-            map(OpcPackage::from_vec(archive.to_vec()).map(drop)),
+            map(OpcPackage::from_vec(archive.to_vec(), SourceLimits::default()).map(drop)),
         ),
         (
             "from_shared_vec_with_limits (deferred)",
-            map(OpcPackage::from_shared_vec_with_limits(
-                Arc::new(archive.to_vec()),
+            map(
+                OpcPackage::from_shared_vec(Arc::new(archive.to_vec()), SourceLimits::default())
+                    .map(drop),
+            ),
+        ),
+        (
+            "from_bytes (eager)",
+            map(OpcPackage::from_bytes(archive, SourceLimits::default()).map(drop)),
+        ),
+        (
+            "source-backed from_vec",
+            map(SourceBackedPackage::from_vec(
+                archive.to_vec(),
                 SourceLimits::default(),
+                litchi_opc::SourceCacheLimits::default(),
+                None,
             )
             .map(drop)),
         ),
         (
-            "from_bytes (eager)",
-            map(OpcPackage::from_bytes(archive).map(drop)),
-        ),
-        (
-            "source-backed from_vec",
-            map(SourceBackedPackage::from_vec(archive.to_vec()).map(drop)),
-        ),
-        (
             "catalog probe",
-            map(
-                litchi_opc::probe_package_catalog_from_reader(&mut Cursor::new(archive.to_vec()))
-                    .map(drop),
-            ),
+            map(litchi_opc::probe_package_catalog_from_reader(
+                &mut Cursor::new(archive.to_vec()),
+                SourceLimits::default(),
+            )
+            .map(drop)),
         ),
     ]
 }
 
 fn first_positional_read(archive: Vec<u8>) -> Result<(), OpcError> {
-    let package = SourceBackedPackage::from_vec(archive)?;
+    let package = SourceBackedPackage::from_vec(
+        archive,
+        SourceLimits::default(),
+        litchi_opc::SourceCacheLimits::default(),
+        None,
+    )?;
     package
         .part(&PackURI::new(BLOB_URI).unwrap())?
         .data()
@@ -199,7 +210,7 @@ fn a_sized_members_local_crc_is_not_compared_at_open() {
             outcome.unwrap_or_else(|error| panic!("{ingress} decoded at open: {error}"));
         }
     }
-    let package = OpcPackage::from_vec(archive.clone()).unwrap();
+    let package = OpcPackage::from_vec(archive.clone(), SourceLimits::default()).unwrap();
     assert!(matches!(
         package.get_part(&PackURI::new(BLOB_URI).unwrap()),
         Err(OpcError::ZipError(_))
@@ -258,7 +269,7 @@ fn benign_streaming_members_with_zero_local_crc_open_everywhere() {
             panic!("{ingress} refused a benign streaming package: {error}")
         });
     }
-    let package = OpcPackage::from_vec(archive.clone()).unwrap();
+    let package = OpcPackage::from_vec(archive.clone(), SourceLimits::default()).unwrap();
     let uri = PackURI::new(BLOB_URI).unwrap();
     assert_eq!(package.get_part(&uri).unwrap().blob(), BLOB);
     first_positional_read(archive).expect("positional read of a benign streaming member");
@@ -291,9 +302,10 @@ fn payload_crc_mismatch_with_consistent_headers_moves_to_first_decode() {
     for streaming in [false, true] {
         let mut archive = package(streaming);
         consistent_crc_flip(&mut archive, BLOB_MEMBER);
-        let package = OpcPackage::from_vec(archive.clone()).unwrap_or_else(|error| {
-            panic!("deferred open must not decode (streaming={streaming}): {error:?}")
-        });
+        let package = OpcPackage::from_vec(archive.clone(), SourceLimits::default())
+            .unwrap_or_else(|error| {
+                panic!("deferred open must not decode (streaming={streaming}): {error:?}")
+            });
         let uri = PackURI::new(BLOB_URI).unwrap();
         let error = package
             .get_part(&uri)

@@ -85,7 +85,7 @@ fn replace_once(bytes: &[u8], before: &[u8], after: &[u8]) -> Vec<u8> {
 }
 
 fn with_part(bytes: &[u8], path: &str, replacement: &[u8]) -> Vec<u8> {
-    let mut package = OpcPackage::from_bytes(bytes).unwrap();
+    let mut package = OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()).unwrap();
     package
         .get_part_mut(&PackURI::new(path).unwrap())
         .unwrap()
@@ -94,7 +94,7 @@ fn with_part(bytes: &[u8], path: &str, replacement: &[u8]) -> Vec<u8> {
 }
 
 fn with_hidden_selected_slide(bytes: &[u8]) -> Vec<u8> {
-    let package = OpcPackage::from_bytes(bytes).unwrap();
+    let package = OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()).unwrap();
     let presentation = package.get_part(&PackURI::new(MAIN).unwrap()).unwrap();
     let selected_relationship = presentation
         .rels()
@@ -503,7 +503,7 @@ fn reseal_topology_wire(bytes: &mut [u8]) {
 #[test]
 fn resealed_topology_wire_cannot_change_unrelated_root_xml() {
     let bytes = fixture();
-    let opc = OpcPackage::from_bytes(&bytes).unwrap();
+    let opc = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
     let root = opc.get_part(&PackURI::new(MAIN).unwrap()).unwrap().blob();
     let root = replace_once(
         root,

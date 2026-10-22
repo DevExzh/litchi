@@ -66,7 +66,7 @@ fn package_with_embedded_font() -> Package {
     let font_name = PackURI::new("/ppt/fonts/example.odttf").unwrap();
 
     let bytes = package.to_bytes().unwrap();
-    let mut opc = OpcPackage::from_bytes(&bytes).unwrap();
+    let mut opc = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
     {
         let presentation = opc.get_part_mut(&presentation_name).unwrap();
         presentation.set_blob(PRESENTATION_XML.to_vec());
@@ -87,7 +87,7 @@ fn package_with_embedded_font() -> Package {
 
 fn edit_package(package: Package, edit: impl FnOnce(&mut OpcPackage)) -> Package {
     let bytes = package.to_bytes().unwrap();
-    let mut opc = OpcPackage::from_bytes(&bytes).unwrap();
+    let mut opc = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
     edit(&mut opc);
     Package::from_opc_package(opc).unwrap()
 }
