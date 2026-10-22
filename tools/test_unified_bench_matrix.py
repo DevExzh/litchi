@@ -48,6 +48,17 @@ class EvidenceCoverage(unittest.TestCase):
         self.assertIn("record 0342", problems[0])
         self.assertIn("contributes no rows", problems[0])
 
+    def test_follow_up_suffixes_cannot_hide_unregistered_evidence(self):
+        found = self.evidence(["0360ab", "0361fb-receipt.json", "0362lab-native"])
+        self.assertEqual(found, {
+            "0360ab": ["0360ab"],
+            "0361fb": ["0361fb-receipt.json"],
+            "0362lab": ["0362lab-native"],
+        })
+        problems = matrix.coverage_problems([], {}, found)
+        self.assertEqual(len(problems), 3)
+        self.assertTrue(all("contributes no rows" in problem for problem in problems))
+
     def test_an_exemption_needs_a_reason_and_must_not_go_stale(self):
         evidence = {"0339": ["0339"], "0328": ["0328"]}
         ok = {"evidence_without_rows": [{"record": "0339", "reason": "a probe, not a measurement"}]}

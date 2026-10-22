@@ -1902,3 +1902,39 @@ See [0063](0063-source-pptx-modern-comments.md).
   coverage. Raw ODF XML policy work from 0362n, remaining wave integration,
   native qualification, the complete inventory/glossary and final 53-check
   gate remain required. Nothing has been pushed.
+
+- Coordinator checkpoint (2026-10-22, XLSB assembly): the candidate on
+  `uo2/coordinator-w4-integration` is committed through `f3fed35c0d`, with
+  source merge `933ce43de3`. Record 0360d retains all failed and successful
+  validation attempts. The final source passes 1,317 XLSB tests (11 ignored
+  doctests), 23 facade tests, 36 unified XLSB tests, eleven-package
+  all-target/all-feature Clippy, the XLSB-only ops Clippy profile, the main
+  harness and all nine XLSB harness checks, both XLSB glossary profiles,
+  formatting and tooling checks. OPC/XLDM tests pass 824 cases. These
+  totals overlap earlier runs and do not represent the final workspace gate.
+  The assembly remains outside trunk pending performance qualification and
+  the remaining source repairs. The standalone XLSB raw API audit is
+  committed as `3267b9d627` (0360e); its required policy migrations remain.
+
+  Shared metadata scope candidate `00e6add236` is returned by
+  [0360ab](0360ab-w4-metadata-composition-review.md): independent assertions
+  reproduce inverse failure after creating a family while others are absent,
+  and refusal to compose a cancelled edit with a disjoint family change.
+  The worker's subsequent repair is under review, including independently
+  captured scopes and actual relationship-ID transitions. DOCX/PPTX metadata
+  Commit migration is committed as `2eca82b0f8` from the assembled API, with
+  focused suites, consumer checks and Clippy passing; integration with the
+  repaired common scope still requires validation. The general replay
+  return-shape gate and other primary replay migrations remain required.
+
+  W4 cold-reader allocation measurements also expose three extra calls and
+  1,016 extra bytes per first cell/style/cursor read against its original
+  reference; this is returned for attribution and repair, alongside the
+  source-owner admission residual. ODF raw policy testing found the default
+  token ceiling narrowed historical ODS admission. Its worker repair
+  preserves the owner default envelope while retaining explicit caller
+  policies, with further edited/replayed-owner propagation checks pending.
+  W5 deferred XLS projection remains a reviewed proposal, not an accepted
+  implementation; commit-time target validation must remain intact. Native
+  qualification, remaining integrations, the complete inventory/glossary
+  sweep and final 53-check gate remain required. Nothing has been pushed.
