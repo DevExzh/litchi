@@ -1,0 +1,52 @@
+{
+  "record": "0359re",
+  "status": "source-repair-build-open-native-open",
+  "source_base": "b0eb83e41e",
+  "final_source_measurement": "pending-cargo-hold",
+  "probe_source": "crates/litchi-rtf/examples/refusal_contract_bench.rs",
+  "prototype_binary": {
+    "sha256": "74cfeddc1fef9669bca6a2faea89a4a3a96f2fbfc84e7545b3a2d98a81f4ed91",
+    "role": "lazy-shared-storage-prototype-before-final-slice-bridge"
+  },
+  "original_binary": {
+    "sha256": "4693bd12232d92a61ef2f437de2d623e345a106288d5d0a5c5638cf27677420",
+    "role": "pre-api-0359b-baseline"
+  },
+  "heaptrack": {
+    "order": ["original", "prototype", "prototype", "original"],
+    "host_contaminated": true,
+    "accepted_for_native": false,
+    "original_allocations": [177971, 177971],
+    "prototype_allocations": [177975, 177975],
+    "temporary": [1258, 1258, 1258, 1258],
+    "peak_heap": [3570000, 3570000, 3570000, 3570000],
+    "leaked": [544, 544, 544, 544],
+    "prototype_minus_original_allocations": 4,
+    "promotion_edge": "litchi_rtf::edit::ChangeStorage::to_shared",
+    "captures": [
+      {"name": "heap-01-baseline.zst", "size": 18778, "sha256": "7e3dbe13ed7b1a4c19037dab5bde6e7b2434bdad5ed1c290618186533adfe5d3"},
+      {"name": "heap-02-candidate.zst", "size": 18989, "sha256": "291cd32349c64f3ea7fd418febfdba79cfa36cb098d33f136c383122a5bac639"},
+      {"name": "heap-03-candidate.zst", "size": 18974, "sha256": "cce62e5042422d8ea943e3bc25cad0290c33e9d81b47f40761dae54497b5d941"},
+      {"name": "heap-04-baseline.zst", "size": 18737, "sha256": "9c57c306f8ad49e46e8b47094d4aed5bb2964e06a0f6b8f827c2f716c4303a32"}
+    ]
+  },
+  "callgrind": {
+    "old_ir": [626297809, 626297658],
+    "prototype_ir": [624865766, 624866831],
+    "old_package_apply_inclusive_ir": 1679600,
+    "prototype_package_apply_inclusive_ir": 511281,
+    "prototype_promotion_inclusive_ir": 1191,
+    "old_files": [
+      {"name": "old-r1.callgrind", "size": 518437, "sha256": "3ff39b1f690057920493198ace3909bd737fae272126733b4a2779e8ddbc2b48"},
+      {"name": "old-r2.callgrind", "size": 518233, "sha256": "4c48f1767a9e8bb497a226a033c9c8330114e95e788d6220361514cdd91c98c6"}
+    ],
+    "prototype_files": [
+      {"name": "new-r1.callgrind", "size": 519703, "sha256": "e75baf1d3c31e28a52b58efd885d712961c34e9e8a50307f9ab55fb3dfc0edd4"},
+      {"name": "new-r2.callgrind", "size": 519983, "sha256": "31cdb9f1055f14dd00f469c6dfedbf27141979c434e5dca3b1a9f3928680b6bd"}
+    ]
+  },
+  "native": {
+    "accepted": false,
+    "status": "pending-clean-window-rebuild"
+  }
+}
