@@ -183,9 +183,7 @@ impl Error {
         match self {
             Self::Plan(error) => Some(error.progress()),
             Self::Publication(error) => Some(error.progress()),
-            Self::Invalid(_)
-            | Self::SourceMember(_)
-            | Self::PatchConflict { .. } => None,
+            Self::Invalid(_) | Self::SourceMember(_) | Self::PatchConflict { .. } => None,
             Self::SourceChanged { progress, .. } => Some(*progress),
         }
     }
@@ -197,12 +195,10 @@ fn invalid(message: impl Into<String>) -> Error {
 
 fn source_error(error: CoreError) -> Error {
     match error {
-        CoreError::SourceChanged { expected, observed } => {
-            Error::SourceChanged {
-                expected,
-                observed,
-                progress: SourceContentPublicationProgress::Untouched,
-            }
+        CoreError::SourceChanged { expected, observed } => Error::SourceChanged {
+            expected,
+            observed,
+            progress: SourceContentPublicationProgress::Untouched,
         },
         other => Error::Invalid(other),
     }
@@ -1870,8 +1866,9 @@ mod tests {
         }
 
         fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
-            let offset = usize::try_from(offset)
-                .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "source offset overflow"))?;
+            let offset = usize::try_from(offset).map_err(|_| {
+                io::Error::new(io::ErrorKind::InvalidInput, "source offset overflow")
+            })?;
             if offset >= self.bytes.len() {
                 return Ok(0);
             }

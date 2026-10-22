@@ -4,7 +4,10 @@ use crate::{
     Commit, Edit, FrameChange, Image, MetadataFields, Package, ResourceChange, frame::Frame,
     map::ImageMap, source::Source,
 };
-use litchi_core::{Error, Result, edit::{Refusal, RefusalKind}};
+use litchi_core::{
+    Error, Result,
+    edit::{Refusal, RefusalKind},
+};
 use quick_xml::{
     XmlVersion,
     events::Event,
