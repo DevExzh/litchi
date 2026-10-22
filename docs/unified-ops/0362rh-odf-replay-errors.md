@@ -123,12 +123,18 @@ Results:
 The follow-up's ODP stale-source filter passed all 4 freshness and diagnostic
 tests, and the complete `package::source_append::tests` filter passed all 18
 source-append tests.  The common conversion regression and the public ODP
-facade stale/conflict regression also passed.  Strict Clippy passed for
+facade stale/conflict regression also passed.  The repository pins
+`rustc 1.95.0` in `rust-toolchain.toml`.  The Clippy results below are
+exploratory host checks from `rustc 1.98.1`; this sparse checkout had
+temporarily omitted the tracked toolchain file, so these results are not the
+required 1.95 gate result.  Under 1.98.1, strict Clippy passed for
 `litchi-odf-common` and `litchi-odp`.  The strict `litchi-ops` command still
-encounters two pre-existing Rust 1.98 lint failures in `litchi-sheet-text`
+encountered two pre-existing Rust 1.98 lint failures in `litchi-sheet-text`
 (`byte_char_slices` and `chunks_exact_to_as_chunks`) and two pre-existing
 `litchi-ops` failures (`chunks_exact_to_as_chunks` and `question_mark`); the
 affected package passed with those four baseline lints explicitly allowed.
+The coordinator must rerun the affected strict checks with the pinned 1.95.0
+toolchain.
 Direct rustfmt on all changed Rust files and `git diff --check` passed.
 
 Strict `cargo clippy --lib -- -D warnings` passed for ODT, ODG, ODM, ODB,

@@ -5,8 +5,9 @@
 //! Limit failures are typed with their dimension; every other failure keeps
 //! the established common-core error as its [`Error::Core`] payload, while
 //! source-backed publication failures retain their typed progress and
-//! diagnostics. `?` conversions in either direction stay lossless for limit
-//! dimensions and source-publication error details.
+//! diagnostics. The ODF-facing error retains those details; conversion to the
+//! common-core error intentionally projects only the classification needed by
+//! core callers, while limit dimensions remain typed at the ODF boundary.
 
 use std::sync::Arc;
 
