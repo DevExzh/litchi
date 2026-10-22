@@ -536,9 +536,9 @@ fn family_state<P: PackageMetadata>(
 ///
 /// Changed patches carry before bytes only for the families they replace.
 /// An empty patch has no changed family to authenticate, so it records every
-/// property family instead. The synthetic relationship ID for an absent
-/// family is chosen from the source's free IDs; `check_change` then verifies
-/// that it remains free on the recipient.
+/// property family instead. The relationship ID retained for an absent family
+/// is diagnostic metadata; replay treats it as a wildcard and authenticates
+/// the actual absent-family state on the recipient.
 fn snapshot_scope(snapshot: &Snapshot) -> Result<Box<[Change]>> {
     let mut relationship_ids = snapshot.relationship_ids.clone();
     [Family::Core, Family::App, Family::Custom]
