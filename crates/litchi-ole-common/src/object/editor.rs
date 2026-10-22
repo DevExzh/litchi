@@ -95,6 +95,10 @@ fn observe_cfb_parse<T>(
 #[derive(Clone)]
 pub struct Edit {
     state: Arc<PackageState>,
+    /// The captured package the edit started from. This belongs to the
+    /// mutable edit, not the immutable owner state: a published `Package`
+    /// always uses its current capture as both its base and its package.
+    base_package: Arc<CapturedPackage>,
     /// The rendered candidate already validated by the last mutating
     /// operation.  Keeping this publication behind an `Arc` lets the outer
     /// owner hand the same bytes to its source-backed reader when it commits,
@@ -111,7 +115,7 @@ impl fmt::Debug for Edit {
             .field("changed", &self.state.changed)
             .field(
                 "catalog_is_shared",
-                &Arc::ptr_eq(&self.state.base_package, &self.state.package),
+                &Arc::ptr_eq(&self.base_package, &self.state.package),
             )
             .finish()
     }
@@ -253,14 +257,13 @@ impl Edit {
                 limits,
                 cfb_limits,
                 original: Arc::clone(&original),
-                current: original,
-                base_package: Arc::clone(&package),
-                package,
+                package: Arc::clone(&package),
                 objects: Arc::new(objects),
                 changed: false,
                 layout: SectorLayoutPolicy::default(),
                 validated_layout: SectorLayoutPolicy::default(),
             }),
+            base_package: package,
             pending_render: None,
         }
     }
@@ -285,17 +288,17 @@ impl Edit {
             self.state.cfb_limits,
             // A Package is the immutable publication of this edit.  Its
             // source identity must therefore be the bytes it publishes,
-            // rather than the editor's older base.  Keeping both handles on
-            // the same Arc preserves O(1) source sharing and lets a later
-            // Package::edit use the published content as its replay base.
+            // rather than the editor's older base.  `PackageState::original`
+            // is the editor base and the package's current publication at
+            // the same time, so one handle preserves O(1) source sharing and
+            // lets a later Package::edit use the published content as its
+            // replay base.
             Arc::clone(&current),
-            current,
             // A published package is a fresh immutable base. Do not carry
             // the editor's historical base or its `changed` marker into a
             // later edit: doing so would make an edit started from a prior
             // commit render against stale topology and could turn a no-op
             // follow-up into a byte-changing publication.
-            Arc::clone(&self.state.package),
             Arc::clone(&self.state.package),
             Arc::clone(&self.state.objects),
             false,
@@ -307,8 +310,6 @@ impl Edit {
     fn into_staged_with_current(mut self, current: Arc<Vec<u8>>) -> Package {
         let state = Arc::make_mut(&mut self.state);
         state.original = Arc::clone(&current);
-        state.current = current;
-        state.base_package = Arc::clone(&state.package);
         state.changed = false;
         state.validated_layout = state.layout;
         Package::from_state(self.state)
@@ -317,6 +318,7 @@ impl Edit {
     pub(crate) fn from_package(snapshot: &Package) -> Self {
         Self {
             state: snapshot.state_shared(),
+            base_package: Arc::clone(&snapshot.state.package),
             pending_render: None,
         }
     }
@@ -928,7 +930,7 @@ impl Edit {
         if self.state.changed {
             if self.state.layout == SectorLayoutPolicy::Reuse
                 && let Some(rendered) = self.state.package.render_copy_through(
-                    &self.state.base_package,
+                    &self.base_package,
                     &self.state.original,
                     self.state.limits,
                     self.state.cfb_limits,
@@ -990,7 +992,7 @@ impl Edit {
             self.state
                 .package
                 .render_copy_through(
-                    &self.state.base_package,
+                    &self.base_package,
                     &self.state.original,
                     self.state.limits,
                     self.state.cfb_limits,

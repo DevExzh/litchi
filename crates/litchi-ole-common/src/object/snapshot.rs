@@ -32,8 +32,6 @@ pub(crate) struct PackageState {
     pub(crate) limits: super::model::Limits,
     pub(crate) cfb_limits: OleFileLimits,
     pub(crate) original: Arc<Vec<u8>>,
-    pub(crate) current: Arc<Vec<u8>>,
-    pub(crate) base_package: Arc<CapturedPackage>,
     pub(crate) package: Arc<CapturedPackage>,
     pub(crate) objects: Arc<Objects>,
     pub(crate) changed: bool,
@@ -44,7 +42,7 @@ pub(crate) struct PackageState {
 /// Immutable, cheap-to-clone owner of a captured OLE object package.
 ///
 /// The owner keeps one [`Arc`] to [`PackageState`].  Cloning a package is
-/// therefore O(1) and shares the original/current bytes, captured topology,
+/// therefore O(1) and shares the published source bytes, captured topology,
 /// stream allocations, limits, and layout policy through that state.  A
 /// default edit retains the same state until its first mutation; an edit that
 /// needs copy-on-write detaches a private state while continuing to share the
@@ -64,10 +62,6 @@ impl fmt::Debug for Package {
             .field("target_count", &self.state.targets.len())
             .field("object_count", &self.state.objects.len())
             .field("changed", &self.state.changed)
-            .field(
-                "source_is_current",
-                &Arc::ptr_eq(&self.state.original, &self.state.current),
-            )
             .finish()
     }
 }
@@ -78,8 +72,6 @@ impl Package {
         limits: super::model::Limits,
         cfb_limits: OleFileLimits,
         original: Arc<Vec<u8>>,
-        current: Arc<Vec<u8>>,
-        base_package: Arc<CapturedPackage>,
         package: Arc<CapturedPackage>,
         objects: Arc<Objects>,
         changed: bool,
@@ -92,8 +84,6 @@ impl Package {
                 limits,
                 cfb_limits,
                 original,
-                current,
-                base_package,
                 package,
                 objects,
                 changed,
@@ -364,7 +354,7 @@ impl Package {
     /// Streams the package bytes to a sequential sink.
     pub fn write_to(&self, mut writer: impl std::io::Write) -> Result<(), Error> {
         writer
-            .write_all(self.state.current.as_slice())
+            .write_all(self.state.original.as_slice())
             .map_err(|source| Error::Cfb(OleError::Io(source)))
     }
 
@@ -377,6 +367,6 @@ impl Package {
     }
 
     pub(crate) fn current_bytes(&self) -> &[u8] {
-        self.state.current.as_slice()
+        self.state.original.as_slice()
     }
 }
