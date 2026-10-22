@@ -1978,6 +1978,31 @@ fn popup_public_physical_and_semantic_limits_fail_before_publication() -> TestRe
             .source_limits(exact_snappy_limits)
             .semantic_limits(litchi_numbers::SemanticLimits::DEFAULT),
     )?;
+    let exact_source_limits = exact_snappy_package.open_options().source_limits_value();
+    assert_eq!(
+        exact_source_limits.max_entry_bytes(),
+        profile_target_max_entry,
+        "the admitted physical profile must retain the selected entry ceiling"
+    );
+    let exact_archive_limits = Limits::new(
+        exact_source_limits.max_input_bytes(),
+        exact_source_limits.max_members(),
+        exact_source_limits.max_entry_bytes(),
+        exact_source_limits.max_aggregate_bytes(),
+        exact_source_limits.max_component_bytes(),
+    )?;
+    assert_eq!(
+        exact_archive_limits.max_entry_bytes(),
+        profile_target_max_entry,
+        "the catalog profile must retain the selected entry ceiling"
+    );
+    assert_eq!(
+        exact_archive_limits
+            .snappy_limits()?
+            .max_compressed_stream(),
+        usize::try_from(profile_target_max_entry)?,
+        "the physical Snappy profile must use the selected compressed ceiling"
+    );
     let exact_snappy_commit = exact_snappy_package
         .edit_table_cell_pop_up_menu_format(
             SheetSelector::index(0),

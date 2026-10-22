@@ -834,6 +834,31 @@ fn retained_compressed_entry_limit_accepts_exact_reply_output() -> TestResult {
         &source,
         litchi_numbers::OpenOptions::new().source_limits(exact_limits),
     )?;
+    let exact_source_limits = exact_package.open_options().source_limits_value();
+    assert_eq!(
+        exact_source_limits.max_entry_bytes(),
+        target_max_entry,
+        "the admitted physical profile must retain the selected entry ceiling"
+    );
+    let exact_archive_limits = Limits::new(
+        exact_source_limits.max_input_bytes(),
+        exact_source_limits.max_members(),
+        exact_source_limits.max_entry_bytes(),
+        exact_source_limits.max_aggregate_bytes(),
+        exact_source_limits.max_component_bytes(),
+    )?;
+    assert_eq!(
+        exact_archive_limits.max_entry_bytes(),
+        target_max_entry,
+        "the catalog profile must retain the selected entry ceiling"
+    );
+    assert_eq!(
+        exact_archive_limits
+            .snappy_limits()?
+            .max_compressed_stream(),
+        usize::try_from(target_max_entry)?,
+        "the physical Snappy profile must use the selected compressed ceiling"
+    );
     let exact_commit = exact_package.set_table_cell_comment_reply(
         SheetSelector::index(0),
         TableSelector::index(0),

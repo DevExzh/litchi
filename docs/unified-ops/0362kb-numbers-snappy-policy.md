@@ -27,8 +27,10 @@ arrangement-error mappers instead of flattening it to wire bytes.
 
 The owner boundary tests exercise both a popup replacement and a direct comment
 reply. They compute the admitted member limit from the actual target output,
-accept the exact limit, and reject one byte below it with a typed
-`CompressedBytes` error while leaving the source unchanged. The first version
+assert that the retained physical/catalog profile and its derived Snappy
+profile carry that exact ceiling, accept the exact limit, and reject one byte
+below it with a typed `CompressedBytes` error while leaving the source
+unchanged. The first version
 of this test exposed a separate accounting bug: popup `TransactionBudget`
 treated the per-entry ceiling as a cumulative ledger across the source and
 candidate members. The corrected budget checks each actual entry against
