@@ -1,7 +1,7 @@
 //! `styles.xml` storage.
 
 use super::XmlPart;
-use litchi_core::Result;
+use crate::limits::{SemanticLimitKind, SemanticLimits};
 
 /// Parsed `styles.xml`.
 #[derive(Debug)]
@@ -10,25 +10,29 @@ pub struct Styles {
 }
 
 impl Styles {
-    /// Parse `styles.xml` from bytes.
+    /// Copy `styles.xml` admitted under the caller's styles-bytes bound.
     ///
     /// # Errors
     ///
-    /// Returns an error when the bytes are not valid UTF-8.
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
+    /// Returns [`SemanticLimitKind::StylesBytes`] when the part exceeds the bound, and an invalid-format
+    /// error when it is not UTF-8.
+    pub fn from_bytes(bytes: &[u8], limits: SemanticLimits) -> Result<Self, crate::Error> {
+        limits.check_usize(SemanticLimitKind::StylesBytes, bytes.len())?;
         Ok(Self {
-            xml: XmlPart::from_bytes(bytes)?,
+            xml: XmlPart::copy(bytes)?,
         })
     }
 
-    /// Parse `styles.xml` while consuming owned bytes.
+    /// Adopt owned `styles.xml` bytes admitted under the caller's styles-bytes bound, without copying
+    /// the buffer.
     ///
     /// # Errors
     ///
-    /// Returns an error when the bytes are not valid UTF-8.
-    pub fn from_vec(bytes: Vec<u8>) -> Result<Self> {
+    /// As [`Self::from_bytes`].
+    pub fn from_vec(bytes: Vec<u8>, limits: SemanticLimits) -> Result<Self, crate::Error> {
+        limits.check_usize(SemanticLimitKind::StylesBytes, bytes.len())?;
         Ok(Self {
-            xml: XmlPart::from_vec(bytes)?,
+            xml: XmlPart::adopt(bytes)?,
         })
     }
 

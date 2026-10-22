@@ -259,7 +259,7 @@ impl Package {
         let Some(xml) = self.optional_xml_part(constants::ODF_META)? else {
             return Ok(Metadata::default());
         };
-        Meta::from_bytes(xml.as_bytes())?.try_extract_metadata()
+        Meta::from_bytes(xml.as_bytes(), self.xml_limits)?.try_extract_metadata()
     }
 
     /// Extract the complete format-specific metadata model, if `meta.xml` exists.
@@ -267,7 +267,9 @@ impl Package {
         let Some(xml) = self.optional_xml_part(constants::ODF_META)? else {
             return Ok(None);
         };
-        Ok(Some(Meta::from_bytes(xml.as_bytes())?.odf_metadata()?))
+        Ok(Some(
+            Meta::from_bytes(xml.as_bytes(), self.xml_limits)?.odf_metadata()?,
+        ))
     }
 
     fn optional_xml_part(&self, path: &str) -> Result<Option<String>> {

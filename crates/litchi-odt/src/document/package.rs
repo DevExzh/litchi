@@ -153,18 +153,18 @@ impl Document {
         let content_styles =
             super::open_parse::OpenParse::run_with_xml_limits(content_xml, xml_limits)?;
         limits.check(SemanticLimitKind::Units, content_styles.units())?;
-        let content = Content::from_vec(content_bytes)?;
+        let content = Content::from_vec(content_bytes, limits)?;
 
         let styles = if package.has_file("styles.xml") {
             let styles_bytes = package.get_file("styles.xml")?;
-            Some(Styles::from_vec(styles_bytes)?)
+            Some(Styles::from_vec(styles_bytes, limits)?)
         } else {
             None
         };
 
         let meta = if package.has_file("meta.xml") {
             let meta_bytes = package.get_file("meta.xml")?;
-            Some(Meta::from_vec(meta_bytes)?)
+            Some(Meta::from_vec(meta_bytes, xml_limits)?)
         } else {
             None
         };
@@ -327,18 +327,27 @@ mod tests {
             "<office:text",
             "ODT",
         )?;
-        let content = crate::core::Content::from_vec(content_bytes)?;
+        let content = crate::core::Content::from_vec(
+            content_bytes,
+            litchi_odf_common::SemanticLimits::DEFAULT,
+        )?;
 
         let styles = if package.has_file("styles.xml") {
             let styles_bytes = package.get_file("styles.xml")?;
-            Some(crate::core::Styles::from_vec(styles_bytes)?)
+            Some(crate::core::Styles::from_vec(
+                styles_bytes,
+                litchi_odf_common::SemanticLimits::DEFAULT,
+            )?)
         } else {
             None
         };
 
         let meta = if package.has_file("meta.xml") {
             let meta_bytes = package.get_file("meta.xml")?;
-            Some(crate::core::Meta::from_vec(meta_bytes)?)
+            Some(crate::core::Meta::from_vec(
+                meta_bytes,
+                XmlStreamLimits::owner_default_value(),
+            )?)
         } else {
             None
         };

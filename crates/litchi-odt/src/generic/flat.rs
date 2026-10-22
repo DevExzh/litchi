@@ -655,12 +655,12 @@ impl FlatDocument {
 
     /// Extract common document metadata from the combined XML document.
     pub fn metadata(&self) -> Result<Metadata> {
-        Meta::from_bytes(self.xml.as_bytes())?.try_extract_metadata()
+        Meta::from_bytes(self.xml.as_bytes(), self.xml_limits)?.try_extract_metadata()
     }
 
     /// Extract the complete format-specific metadata model.
     pub fn odf_metadata(&self) -> Result<crate::Metadata> {
-        Meta::from_bytes(self.xml.as_bytes())?.odf_metadata()
+        Meta::from_bytes(self.xml.as_bytes(), self.xml_limits)?.odf_metadata()
     }
 
     /// Discover inline and inert linked images in the flat document.

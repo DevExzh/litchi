@@ -254,7 +254,7 @@ impl SourceBackedDocument {
                     0,
                 );
             }
-            let content = Content::from_vec(content_bytes)?;
+            let content = Content::from_vec(content_bytes, limits)?;
             // One fused tokenization validates the content structure and
             // collects the automatic styles; a validation error returns
             // here, before styles.xml is fetched, exactly as the historical
@@ -268,6 +268,7 @@ impl SourceBackedDocument {
             let styles = if package.has_file(crate::constants::ODF_STYLES)? {
                 Some(Styles::from_vec(
                     package.get_file(crate::constants::ODF_STYLES)?,
+                    limits,
                 )?)
             } else {
                 None
@@ -279,6 +280,7 @@ impl SourceBackedDocument {
             let meta = if package.has_file(crate::constants::ODF_META)? {
                 Some(Meta::from_vec(
                     package.get_file(crate::constants::ODF_META)?,
+                    xml_limits,
                 )?)
             } else {
                 None
