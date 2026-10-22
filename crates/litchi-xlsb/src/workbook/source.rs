@@ -102,6 +102,7 @@ struct SourceInner {
     active_catalog_position: Option<usize>,
     formula_context: Context,
     external_link_limits: ExternalLinkLimits,
+    raw_limits: crate::raw::Limits,
     shared_strings_part: Option<PackURI>,
     styles_part: Option<PackURI>,
     incomplete_formula_context: bool,
@@ -484,6 +485,7 @@ impl SourceBackedWorkbook {
             options.external_link_limits,
             options.leniency,
             options.semantic_limits,
+            options.raw_limits,
         )
     }
 
@@ -521,6 +523,7 @@ impl SourceBackedWorkbook {
             options.external_link_limits,
             options.leniency,
             options.semantic_limits,
+            options.raw_limits,
         )
     }
 
@@ -531,6 +534,7 @@ impl SourceBackedWorkbook {
             ExternalLinkLimits::default(),
             Leniency::Strict,
             crate::SemanticLimits::new(),
+            crate::raw::Limits::DEFAULT,
         )
     }
 
@@ -539,6 +543,7 @@ impl SourceBackedWorkbook {
         external_link_limits: ExternalLinkLimits,
         leniency: Leniency,
         semantic_limits: crate::SemanticLimits,
+        raw_limits: crate::raw::Limits,
     ) -> Result<Self> {
         let _ = preflight_package(&package)?;
         let workbook_part = package.main_document_part()?;
@@ -549,10 +554,10 @@ impl SourceBackedWorkbook {
         }
 
         let workbook_data = workbook_part.data()?;
-        let mut records = Records::new(workbook_data.as_bytes(), crate::raw::Limits::DEFAULT);
+        let mut records = Records::new(workbook_data.as_bytes(), raw_limits);
         // The packaging repairs of the OPC read come first in discovery order.
         let mut tolerance = ToleranceReport::from_package(package.tolerance_report());
-        let info = Workbook::read_workbook(&mut records, &mut tolerance)?;
+        let info = Workbook::read_workbook(&mut records, &mut tolerance, raw_limits)?;
         let active_catalog_position =
             (!info.worksheet_names.is_empty()).then_some(info.active_catalog_position.unwrap_or(0));
         if info.worksheet_names.len() != info.worksheet_rel_ids.len() {
@@ -810,6 +815,7 @@ impl SourceBackedWorkbook {
                 active_catalog_position,
                 formula_context,
                 external_link_limits,
+                raw_limits,
                 shared_strings_part,
                 styles_part,
                 incomplete_formula_context,
@@ -987,6 +993,12 @@ impl SourceBackedWorkbook {
     #[must_use]
     pub fn external_link_limits(&self) -> ExternalLinkLimits {
         self.inner.external_link_limits
+    }
+
+    /// Return the BIFF12 raw policy retained by this source-backed owner.
+    #[must_use]
+    pub fn raw_limits_value(&self) -> crate::raw::Limits {
+        self.inner.raw_limits
     }
 
     /// Return the number of workbook tabs after checking source freshness.
@@ -1284,6 +1296,7 @@ impl SourceBackedWorkbook {
         let mut workbook = Workbook::from_opc_package_with_external_link_limits(
             package,
             self.inner.external_link_limits,
+            self.inner.raw_limits,
         )?;
         workbook.leniency = self.inner.leniency;
         postflight_package(&self.inner.package)?;
@@ -1888,6 +1901,7 @@ impl SourceBackedWorksheet {
         let comments_data = comments_part.data()?;
         Ok(crate::comments::read_recording(
             comments_data.as_bytes(),
+            self.inner.raw_limits,
             report,
         )?)
     }

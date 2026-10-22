@@ -720,6 +720,7 @@ impl Edit {
             self.base.external_link_limits(),
             self.base.drawing_load_policy(),
             self.base.leniency(),
+            self.base.raw_limits_value(),
         )?;
 
         let (package, after) = match applied {

@@ -483,9 +483,9 @@ fn standalone_codec_functions_still_refuse_what_they_cannot_report() {
         }
     }
     let mut calc = calc.unwrap();
-    litchi_xlsb::calc::read(&calc).unwrap();
+    litchi_xlsb::calc::read(&calc, litchi_xlsb::raw::Limits::DEFAULT).unwrap();
     calc[25] |= 0x80;
-    assert!(litchi_xlsb::calc::read(&calc).is_err());
+    assert!(litchi_xlsb::calc::read(&calc, litchi_xlsb::raw::Limits::DEFAULT).is_err());
 
     let mut border = border.unwrap();
     litchi_xlsb::styles::parse_border(&border).unwrap();

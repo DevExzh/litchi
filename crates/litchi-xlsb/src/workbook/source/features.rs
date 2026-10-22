@@ -67,7 +67,7 @@ impl SourceBackedWorksheet {
             };
             let comments = self.inner.package.part(&name)?;
             require_content_type(&comments, XLSB_COMMENTS_CONTENT_TYPE)?;
-            crate::comments::edit::read(comments.data()?.as_bytes())
+            crate::comments::edit::read(comments.data()?.as_bytes(), self.inner.raw_limits)
         })
     }
 

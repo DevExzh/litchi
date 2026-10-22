@@ -66,6 +66,7 @@ impl Workbook {
     pub(in crate::workbook) fn read_workbook(
         iter: &mut Records<'_>,
         report: &mut ToleranceReport,
+        raw_limits: crate::raw::Limits,
     ) -> Result<ParsedWorkbookInfo> {
         let mut info = ParsedWorkbookInfo::default();
         let worksheet_names = &mut info.worksheet_names;
@@ -166,6 +167,7 @@ impl Workbook {
                     }
                     info.calc = Some(calc::read_with(
                         record.payload(),
+                        raw_limits,
                         Tolerance::recording(report),
                     )?);
                 },

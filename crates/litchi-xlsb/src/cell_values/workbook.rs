@@ -69,6 +69,7 @@ pub(crate) fn apply_retaining_parse(
     external_link_limits: ExternalLinkLimits,
     drawing_load_policy: DrawingLoadPolicy,
     leniency: crate::Leniency,
+    raw_limits: crate::raw::Limits,
 ) -> Result<Applied> {
     let part = package.get_part(worksheet)?;
     require_worksheet(part)?;
@@ -86,6 +87,7 @@ pub(crate) fn apply_retaining_parse(
         external_link_limits,
         drawing_load_policy,
         leniency,
+        raw_limits,
     )?;
     let worksheet_index = (0..parsed.worksheet_count())
         .find_map(|index| {

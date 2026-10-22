@@ -104,9 +104,11 @@ impl Workbook {
                     val: "relationships are not permitted",
                 });
             }
-            for comment in
-                crate::comments::read_recording(part.blob(), worksheet.tolerance_report_mut())?
-            {
+            for comment in crate::comments::read_recording(
+                part.blob(),
+                self.raw_limits,
+                worksheet.tolerance_report_mut(),
+            )? {
                 worksheet.add_comment(comment);
             }
         }

@@ -51,6 +51,8 @@ pub struct Workbook {
     /// Primary `BrtBookView.itabCur` position in full workbook sheet order.
     pub(super) active_catalog_position: Option<usize>,
     pub(crate) formula_context: Context,
+    /// Caller-selected raw BIFF12 policy retained for lazy workbook reads.
+    pub(super) raw_limits: crate::raw::Limits,
     pub(super) external_link_limits: ExternalLinkLimits,
     pub(super) shared_strings: Vec<SharedString>,
     pub(super) styles: StylesTable,
@@ -173,6 +175,12 @@ impl Workbook {
     #[must_use]
     pub const fn semantic_limits(&self) -> crate::SemanticLimits {
         self.semantic_limits
+    }
+
+    /// The BIFF12 raw policy retained by this workbook projection.
+    #[must_use]
+    pub const fn raw_limits_value(&self) -> crate::raw::Limits {
+        self.raw_limits
     }
 
     /// Return the drawing projection boundary selected when this workbook was

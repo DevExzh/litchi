@@ -145,6 +145,7 @@ impl Workbook {
             self.external_link_limits,
             self.drawing_load_policy,
             self.leniency,
+            self.raw_limits,
         )
     }
 
@@ -160,11 +161,13 @@ impl Workbook {
         external_link_limits: ExternalLinkLimits,
         drawing_load_policy: DrawingLoadPolicy,
         leniency: Leniency,
+        raw_limits: crate::raw::Limits,
     ) -> Result<Self> {
         let mut workbook = Self::from_opc_package_with_external_link_limits_and_drawing_policy(
             package,
             external_link_limits,
             drawing_load_policy,
+            raw_limits,
         )?;
         workbook.set_projection_leniency(leniency);
         Ok(workbook)
@@ -573,6 +576,7 @@ impl Workbook {
             package,
             options.external_link_limits,
             options.drawing_load_policy(),
+            options.raw_limits,
         )?;
         workbook.leniency = options.leniency;
         workbook.semantic_limits = options.semantic_limits;
@@ -582,11 +586,13 @@ impl Workbook {
     pub(crate) fn from_opc_package_with_external_link_limits(
         package: OpcPackage,
         external_link_limits: ExternalLinkLimits,
+        raw_limits: crate::raw::Limits,
     ) -> Result<Self> {
         Self::from_opc_package_with_external_link_limits_and_drawing_policy(
             package,
             external_link_limits,
             DrawingLoadPolicy::Eager,
+            raw_limits,
         )
     }
 
@@ -594,6 +600,7 @@ impl Workbook {
         package: OpcPackage,
         external_link_limits: ExternalLinkLimits,
         drawing_load_policy: DrawingLoadPolicy,
+        raw_limits: crate::raw::Limits,
     ) -> Result<Self> {
         let mut external_link_budget = external_link_limits.budget();
         // The packaging repairs of the OPC read come first in discovery order.
@@ -608,6 +615,7 @@ impl Workbook {
             sheet_tabs: Vec::new(),
             active_catalog_position: None,
             formula_context: Context::default(),
+            raw_limits,
             external_link_limits,
             shared_strings: Vec::new(),
             styles: StylesTable::default(),
@@ -642,8 +650,8 @@ impl Workbook {
         let workbook_part = self.package.main_document_part()?;
 
         let blob = workbook_part.blob();
-        let mut iter = Records::new(blob, crate::raw::Limits::DEFAULT);
-        let info = Self::read_workbook(&mut iter, &mut self.tolerance)?;
+        let mut iter = Records::new(blob, self.raw_limits);
+        let info = Self::read_workbook(&mut iter, &mut self.tolerance, self.raw_limits)?;
         if info.worksheet_names.len() != info.worksheet_rel_ids.len() {
             return Err(crate::package::error::Error::InvalidFormat(
                 "XLSB sheet names and relationship identifiers have different lengths",

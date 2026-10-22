@@ -1087,6 +1087,11 @@ impl Staged {
         &self.workbook
     }
 
+    /// The raw BIFF12 policy retained by the package being edited.
+    pub(crate) fn raw_limits(&self) -> crate::raw::Limits {
+        self.workbook.raw_limits_value()
+    }
+
     /// The staged OPC graph.
     pub(crate) fn opc(&self) -> &OpcPackage {
         self.staged

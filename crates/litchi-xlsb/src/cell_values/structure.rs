@@ -2571,6 +2571,7 @@ fn insert_candidate_cell(
         external_link_limits,
         workbook.drawing_load_policy(),
         leniency,
+        workbook.raw_limits_value(),
     )?;
     if let super::workbook::Applied::Published {
         workbook: validated,
@@ -2956,6 +2957,7 @@ fn transfer_cell(
         external_link_limits,
         target.drawing_load_policy(),
         leniency,
+        target.raw_limits_value(),
     )?;
     if let super::workbook::Applied::Published {
         workbook: validated,
@@ -6652,6 +6654,7 @@ fn workbook_from_bytes(
         external_link_limits,
         drawing_load_policy,
         crate::Leniency::Strict,
+        crate::raw::Limits::DEFAULT,
     )
 }
 

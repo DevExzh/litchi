@@ -40,6 +40,10 @@ use crate::workbook::DrawingLoadPolicy;
 #[derive(Debug, Clone, Default)]
 pub struct OpenOptions {
     pub(crate) source_limits: SourceLimits,
+    /// Limits for detached BIFF12 record and string codecs reached by this
+    /// owner.  The profile is retained so lazy worksheet reads and edits do
+    /// not silently fall back to the raw kernel default.
+    pub(crate) raw_limits: crate::raw::Limits,
     pub(crate) external_link_limits: ExternalLinkLimits,
     pub(crate) leniency: Leniency,
     pub(crate) skip_drawings: bool,
@@ -59,6 +63,14 @@ impl OpenOptions {
     #[must_use]
     pub const fn source_limits(mut self, limits: SourceLimits) -> Self {
         self.source_limits = limits;
+        self
+    }
+
+    /// Select the finite BIFF12 payload and wide-string limits retained by
+    /// this owner for every raw record codec it reaches.
+    #[must_use]
+    pub const fn raw_limits(mut self, limits: crate::raw::Limits) -> Self {
+        self.raw_limits = limits;
         self
     }
 
@@ -117,6 +129,12 @@ impl OpenOptions {
     #[must_use]
     pub const fn source_limits_value(&self) -> SourceLimits {
         self.source_limits
+    }
+
+    /// The retained BIFF12 raw record and string policy.
+    #[must_use]
+    pub const fn raw_limits_value(&self) -> crate::raw::Limits {
+        self.raw_limits
     }
 
     /// The semantic limits of the external-link catalog.

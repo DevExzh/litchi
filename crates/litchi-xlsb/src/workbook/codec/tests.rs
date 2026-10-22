@@ -229,7 +229,11 @@ fn workbook_sheet_name_index_expands_unicode_lowercase_without_normalizing() {
     let duplicate_data = record_stream(&duplicate_records).unwrap();
     let mut duplicate_iter = Records::new(&duplicate_data, crate::raw::Limits::DEFAULT);
     assert!(matches!(
-        Workbook::read_workbook(&mut duplicate_iter, &mut Default::default()),
+        Workbook::read_workbook(
+            &mut duplicate_iter,
+            &mut Default::default(),
+            crate::raw::Limits::DEFAULT,
+        ),
         Err(Error::Unrecognized { typ, .. }) if typ == "BrtBundleSh strName"
     ));
 
@@ -250,6 +254,11 @@ fn workbook_sheet_name_index_expands_unicode_lowercase_without_normalizing() {
         .collect::<Vec<_>>();
     let distinct_data = record_stream(&distinct_records).unwrap();
     let mut distinct_iter = Records::new(&distinct_data, crate::raw::Limits::DEFAULT);
-    let info = Workbook::read_workbook(&mut distinct_iter, &mut Default::default()).unwrap();
+    let info = Workbook::read_workbook(
+        &mut distinct_iter,
+        &mut Default::default(),
+        crate::raw::Limits::DEFAULT,
+    )
+    .unwrap();
     assert_eq!(info.worksheet_names, canonically_equivalent_names);
 }
