@@ -24,11 +24,16 @@ fn body_edits_preserve_settings_part_byte_for_byte() {
 
 #[test]
 fn new_package_uses_leaf_owned_web_settings_bytes() {
-    use crate::web::{Conformance, Settings, write};
+    use crate::web::{Conformance, Limits, Settings, raw};
 
     let package = Package::new().unwrap();
     let uri = PackURI::new("/word/webSettings.xml").unwrap();
-    let expected = write(&Settings::default(), Conformance::Transitional).unwrap();
+    let expected = raw::write(
+        &Settings::default(),
+        Conformance::Transitional,
+        &Limits::DEFAULT,
+    )
+    .unwrap();
 
     assert_eq!(package.opc.get_part(&uri).unwrap().blob(), expected);
 }

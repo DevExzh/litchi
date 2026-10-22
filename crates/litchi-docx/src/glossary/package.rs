@@ -58,7 +58,7 @@ pub fn load(package: &OpcPackage) -> Result<Option<(Catalog, Conformance)>> {
 /// # Errors
 ///
 /// Returns an error if the operation cannot be completed.
-pub fn put(
+pub(crate) fn put(
     package: &mut OpcPackage,
     mut catalog: Catalog,
     conformance: Conformance,
@@ -233,6 +233,6 @@ pub(in crate::glossary) fn free_part_name(
 /// # Errors
 ///
 /// Returns an error if the operation cannot be completed.
-pub fn remove(package: &mut OpcPackage) -> Result<bool> {
+pub(crate) fn remove(package: &mut OpcPackage) -> Result<bool> {
     Ok(remove_graph(package)?.is_some())
 }

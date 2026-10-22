@@ -58,7 +58,8 @@ pub fn load_snapshot(package: &OpcPackage) -> Result<Option<Snapshot>> {
     };
     let part = package.get_part(&owner.target)?;
     let (_, conformance) = read(part)?;
-    Snapshot::from_xml_with_conformance(part.blob().to_vec(), conformance).map(Some)
+    Snapshot::from_xml_with_conformance(part.blob().to_vec(), conformance, &super::Limits::DEFAULT)
+        .map(Some)
 }
 
 /// Apply a source-checked web-settings patch to its owning OPC part.
@@ -80,7 +81,11 @@ pub(crate) fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Sna
     let owner = locate(package)?.ok_or_else(|| Error::PartNotFound("web-settings part".into()))?;
     let part = package.get_part(&owner.target)?;
     let (_, conformance) = read(part)?;
-    let current = Snapshot::from_xml_with_conformance(part.blob().to_vec(), conformance)?;
+    let current = Snapshot::from_xml_with_conformance(
+        part.blob().to_vec(),
+        conformance,
+        &super::Limits::DEFAULT,
+    )?;
     let candidate = patch.apply(&current)?;
     if candidate.xml_bytes() == current.xml_bytes() {
         return Ok(current);
@@ -112,8 +117,21 @@ pub(crate) fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Sna
 /// # Errors
 ///
 /// Returns an error if the operation cannot be completed.
-pub fn put(package: &mut OpcPackage, value: Settings, conformance: Conformance) -> Result<bool> {
+pub(crate) fn put(
+    package: &mut OpcPackage,
+    value: Settings,
+    conformance: Conformance,
+) -> Result<bool> {
     let xml = write(&value, conformance)?;
+    put_encoded(package, value, conformance, xml)
+}
+
+pub(crate) fn put_encoded(
+    package: &mut OpcPackage,
+    value: Settings,
+    conformance: Conformance,
+    xml: Vec<u8>,
+) -> Result<bool> {
     let package_conformance = package_conformance(package)?;
     if package_conformance != conformance {
         return Err(invalid(
@@ -184,7 +202,7 @@ pub fn put(package: &mut OpcPackage, value: Settings, conformance: Conformance) 
 /// # Errors
 ///
 /// Returns an error if the operation cannot be completed.
-pub fn remove(package: &mut OpcPackage) -> Result<bool> {
+pub(crate) fn remove(package: &mut OpcPackage) -> Result<bool> {
     let Some(owner) = locate(package)? else {
         return Ok(false);
     };

@@ -13,12 +13,13 @@
 //! Source-checked glossary catalog and auxiliary-graph transactions.
 
 use super::codec::{invalid, validate_physical_part};
+use super::codec::{read, write};
 use super::graph::{
-    graph_matches_catalog, load_graph, package_conformance, put_graph, raw, relationship_kind,
-    remove_graph, validate_raw_graph_metadata, validate_relationship_metadata,
+    graph_matches_catalog, package_conformance, put_graph, raw, relationship_kind, remove_graph,
+    validate_raw_graph_metadata, validate_relationship_metadata,
 };
 use super::model::{Catalog, Conformance, Entry, Name};
-use super::{OpcPackage, PackURI, Result, read, write};
+use super::{OpcPackage, PackURI, Result};
 
 /// Stable fingerprint of the complete glossary source graph.
 pub type Revision = u64;
@@ -35,13 +36,15 @@ pub struct Snapshot {
 impl Snapshot {
     /// Load and validate the glossary owner and every reachable auxiliary part.
     ///
+    /// The required raw policy is checked before the graph is allocated.
+    ///
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn load(package: &OpcPackage) -> Result<Self> {
+    pub fn load(package: &OpcPackage, limits: &super::Limits) -> Result<Self> {
         let main_part = package.main_document_part()?.partname().as_str().to_owned();
         let package_conformance = package_conformance(package)?;
-        let graph = load_graph(package)?;
+        let graph = super::raw::load(package, limits)?;
         let conformance = graph
             .as_ref()
             .map_or(package_conformance, |value| value.conformance);
@@ -55,12 +58,13 @@ impl Snapshot {
     }
 
     /// Alias for [`Self::load`] emphasizing the source-bound result.
+    /// The required raw policy is checked before the graph is allocated.
     ///
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn read(package: &OpcPackage) -> Result<Self> {
-        Self::load(package)
+    pub fn read(package: &OpcPackage, limits: &super::Limits) -> Result<Self> {
+        Self::load(package, limits)
     }
 
     /// Complete raw graph, when a glossary relationship exists.
@@ -142,7 +146,7 @@ impl Transaction {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn new(target: &OpcPackage) -> Result<Self> {
-        let before = Snapshot::load(target)?;
+        let before = Snapshot::load(target, &super::Limits::DEFAULT)?;
         Ok(Self {
             draft: before.graph.clone(),
             before,
@@ -362,8 +366,8 @@ impl Transaction {
         data: Vec<u8>,
         relationships: Vec<raw::Rel>,
     ) -> Result<bool> {
-        let mut part = raw::Part::new(name, content_type, data)?;
-        part.set_relationships(relationships)?;
+        let mut part = raw::Part::new(name, content_type, data, &super::Limits::DEFAULT)?;
+        part.set_relationships(relationships, &super::Limits::DEFAULT)?;
         let mut graph = self.candidate_graph();
         let requested = PackURI::new(name).map_err(crate::Error::Uri)?;
         let index = graph.parts.iter().position(|value| {
@@ -398,7 +402,7 @@ impl Transaction {
         if part.data() == data.as_slice() {
             return Ok(false);
         }
-        part.replace_data(data)?;
+        part.replace_data(data, &super::Limits::DEFAULT)?;
         validate_candidate(&graph)?;
         self.draft = Some(graph);
         Ok(true)
@@ -419,7 +423,7 @@ impl Transaction {
         if graph.parts[index].relationships() == relationships.as_slice() {
             return Ok(false);
         }
-        graph.parts[index].set_relationships(relationships)?;
+        graph.parts[index].set_relationships(relationships, &super::Limits::DEFAULT)?;
         validate_candidate(&graph)?;
         self.draft = Some(graph);
         Ok(true)
@@ -465,7 +469,7 @@ impl Transaction {
             return Ok(Commit::new(self.before, patch, false));
         }
         crate::signature_policy::ensure_unsigned(target)?;
-        let current = Snapshot::load(target)?;
+        let current = Snapshot::load(target, &super::Limits::DEFAULT)?;
         if !current.same_source(&self.before) {
             return Err(invalid("glossary transaction source is stale"));
         }
@@ -478,7 +482,7 @@ impl Transaction {
                 remove_graph(&mut candidate)?;
             },
         }
-        let snapshot = Snapshot::load(&candidate)?;
+        let snapshot = Snapshot::load(&candidate, &super::Limits::DEFAULT)?;
         match (self.draft.as_ref(), snapshot.graph.as_ref()) {
             (Some(expected), Some(actual)) => {
                 let expected_catalog = published_catalog(expected)?;
@@ -595,7 +599,7 @@ impl Patch {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn apply(&self, target: &mut OpcPackage) -> Result<Snapshot> {
-        let current = Snapshot::load(target)?;
+        let current = Snapshot::load(target, &super::Limits::DEFAULT)?;
         if !current.same_source(&self.before) {
             return Err(invalid("glossary patch source is stale"));
         }
@@ -612,7 +616,7 @@ impl Patch {
                 remove_graph(&mut candidate)?;
             },
         }
-        let resulting = Snapshot::load(&candidate)?;
+        let resulting = Snapshot::load(&candidate, &super::Limits::DEFAULT)?;
         if !resulting.same_source(&self.after) {
             return Err(invalid(
                 "glossary patch publication changed its target graph",

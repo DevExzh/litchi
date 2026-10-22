@@ -40,7 +40,15 @@ use super::{
     RS, Result, STRICT_REL, STYLES_EFFECTS_CT, STYLES_EFFECTS_REL, VecDeque, ct,
 };
 pub mod raw {
+    pub use super::super::limit::Limits;
+    use super::super::model::Catalog as TypedCatalog;
+    use super::super::{
+        CT, Error, MAX_GRAPH_BYTES, MAX_GRAPH_METADATA_BYTES, MAX_VALUES, OpcPackage, Result,
+    };
     use super::{Catalog, Conformance};
+    use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
+    use quick_xml::Reader;
+    use quick_xml::events::Event;
     use std::sync::Arc;
 
     #[derive(Clone, Debug, PartialEq, Eq)]
@@ -60,22 +68,21 @@ pub mod raw {
     }
 
     impl Part {
-        /// Validate basic physical metadata and take ownership of a payload.
+        /// Validate physical metadata under `limits` before retaining a payload.
         ///
         /// # Errors
         ///
         /// Returns an error if the operation cannot be completed.
         pub fn new(
-            name: impl Into<String>,
-            content_type: impl Into<String>,
+            name: impl AsRef<str>,
+            content_type: impl AsRef<str>,
             data: Vec<u8>,
+            limits: &Limits,
         ) -> super::Result<Self> {
-            let name = name.into();
-            let content_type = content_type.into();
-            super::validate_raw_part(&name, &content_type, data.len())?;
+            admit_part(name.as_ref(), content_type.as_ref(), data.len(), limits)?;
             Ok(Self {
-                name,
-                content_type,
+                name: name.as_ref().to_owned(),
+                content_type: content_type.as_ref().to_owned(),
                 data: Arc::new(data),
                 rels: Vec::new(),
             })
@@ -104,13 +111,13 @@ pub mod raw {
             &self.rels
         }
 
-        /// Replace the opaque payload after checking its physical bounds.
+        /// Replace the opaque payload after checking its physical bounds and policy.
         ///
         /// # Errors
         ///
         /// Returns an error if the operation cannot be completed.
-        pub fn replace_data(&mut self, data: Vec<u8>) -> super::Result<()> {
-            super::validate_raw_part(&self.name, &self.content_type, data.len())?;
+        pub fn replace_data(&mut self, data: Vec<u8>, limits: &Limits) -> super::Result<()> {
+            admit_part(&self.name, &self.content_type, data.len(), limits)?;
             self.data = Arc::new(data);
             Ok(())
         }
@@ -120,14 +127,12 @@ pub mod raw {
         /// # Errors
         ///
         /// Returns an error if the operation cannot be completed.
-        pub fn set_relationships(&mut self, relationships: Vec<Rel>) -> super::Result<()> {
-            if relationships.len() > super::MAX_VALUES {
-                return Err(crate::Error::GlossaryLimit {
-                    kind: crate::glossary::LimitKind::Relationship,
-                    actual: relationships.len(),
-                    maximum: super::MAX_VALUES,
-                });
-            }
+        pub fn set_relationships(
+            &mut self,
+            relationships: Vec<Rel>,
+            limits: &Limits,
+        ) -> super::Result<()> {
+            admit_relationships(&relationships, limits)?;
             let mut ids = std::collections::HashSet::new();
             for relationship in &relationships {
                 super::validate_relationship_metadata(
@@ -232,7 +237,8 @@ pub mod raw {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn load(package: &litchi_opc::OpcPackage) -> super::Result<Option<Graph>> {
+    pub fn load(package: &litchi_opc::OpcPackage, limits: &Limits) -> super::Result<Option<Graph>> {
+        admit_package(package, limits)?;
         super::load_graph(package)
     }
 
@@ -246,8 +252,13 @@ pub mod raw {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn put(package: &mut litchi_opc::OpcPackage, graph: &Graph) -> super::Result<bool> {
-        super::put_graph(package, graph)
+    pub fn put(
+        package: &mut litchi_opc::OpcPackage,
+        graph: &Graph,
+        limits: &Limits,
+    ) -> super::Result<bool> {
+        admit_graph(graph, limits)?;
+        super::put_graph_checked(package, graph, limits)
     }
 
     /// Remove and return the complete graph for graph-preserving transfer.
@@ -260,8 +271,452 @@ pub mod raw {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn remove(package: &mut litchi_opc::OpcPackage) -> super::Result<Option<Graph>> {
+    pub fn remove(
+        package: &mut litchi_opc::OpcPackage,
+        limits: &Limits,
+    ) -> super::Result<Option<Graph>> {
+        admit_package(package, limits)?;
         super::remove_graph(package)
+    }
+
+    /// Parse one detached glossary XML payload under `limits`.
+    pub fn read(xml: &[u8], limits: &Limits) -> super::Result<(TypedCatalog, Conformance)> {
+        admit_xml(xml, limits)?;
+        super::super::codec::read(xml)
+    }
+
+    /// Serialize one detached glossary catalog under `limits`.
+    pub fn write(
+        catalog: &TypedCatalog,
+        conformance: Conformance,
+        limits: &Limits,
+    ) -> super::Result<Vec<u8>> {
+        let xml = super::super::codec::write(catalog, conformance)?;
+        admit_xml(&xml, limits)?;
+        Ok(xml)
+    }
+
+    fn admit_part(
+        name: &str,
+        content_type: &str,
+        data_bytes: usize,
+        limits: &Limits,
+    ) -> Result<()> {
+        if name.len() > limits.name_bytes() || content_type.len() > limits.string_bytes() {
+            return Err(Error::GlossaryLimit {
+                kind: crate::glossary::LimitKind::StringBytes,
+                actual: name.len().max(content_type.len()),
+                maximum: limits.string_bytes(),
+            });
+        }
+        if data_bytes > limits.graph_bytes() {
+            return Err(Error::GlossaryLimit {
+                kind: crate::glossary::LimitKind::GraphBytes,
+                actual: data_bytes,
+                maximum: limits.graph_bytes(),
+            });
+        }
+        super::validate_raw_part(name, content_type, data_bytes)
+    }
+
+    fn admit_relationships(relationships: &[Rel], limits: &Limits) -> Result<()> {
+        if relationships.len() > limits.values() {
+            return Err(Error::GlossaryLimit {
+                kind: crate::glossary::LimitKind::Relationship,
+                actual: relationships.len(),
+                maximum: limits.values(),
+            });
+        }
+        let mut metadata = 0usize;
+        for relationship in relationships {
+            super::validate_relationship_metadata(
+                &relationship.id,
+                &relationship.kind,
+                &relationship.target,
+            )?;
+            metadata = metadata
+                .checked_add(relationship.id.len())
+                .and_then(|value| value.checked_add(relationship.kind.len()))
+                .and_then(|value| value.checked_add(relationship.target.len()))
+                .ok_or(Error::GlossaryLimit {
+                    kind: crate::glossary::LimitKind::GraphMetadataBytes,
+                    actual: usize::MAX,
+                    maximum: limits.metadata_bytes(),
+                })?;
+        }
+        if metadata > limits.metadata_bytes() {
+            return Err(Error::GlossaryLimit {
+                kind: crate::glossary::LimitKind::GraphMetadataBytes,
+                actual: metadata,
+                maximum: limits.metadata_bytes(),
+            });
+        }
+        Ok(())
+    }
+
+    fn admit_package(package: &OpcPackage, limits: &Limits) -> Result<()> {
+        let Some(owner) = super::locate(package)? else {
+            return Ok(());
+        };
+        let owned = super::glossary_owned_parts(package, &owner.root, owner.conformance)?;
+        let mut total = 0usize;
+        let mut metadata = 0usize;
+        let mut relationship_count = 0usize;
+        for uri in owned {
+            let part = package.get_part(&uri)?;
+            if part.partname().as_str().len() > limits.name_bytes()
+                || part.content_type().len() > limits.string_bytes()
+            {
+                return Err(Error::GlossaryLimit {
+                    kind: crate::glossary::LimitKind::StringBytes,
+                    actual: part
+                        .partname()
+                        .as_str()
+                        .len()
+                        .max(part.content_type().len()),
+                    maximum: limits.string_bytes(),
+                });
+            }
+            if part.content_type() == CT || is_xml_content_type(part.content_type()) {
+                admit_xml(part.blob(), limits)?;
+            }
+            total = total
+                .checked_add(part.blob().len())
+                .ok_or(Error::GlossaryLimit {
+                    kind: crate::glossary::LimitKind::GraphBytes,
+                    actual: usize::MAX,
+                    maximum: limits.graph_bytes(),
+                })?;
+            metadata = metadata
+                .checked_add(part.partname().as_str().len())
+                .and_then(|value| value.checked_add(part.content_type().len()))
+                .ok_or(Error::GlossaryLimit {
+                    kind: crate::glossary::LimitKind::GraphMetadataBytes,
+                    actual: usize::MAX,
+                    maximum: limits.metadata_bytes(),
+                })?;
+            let part_relationships = part.rels().iter().count();
+            if part_relationships > limits.values() {
+                return Err(Error::GlossaryLimit {
+                    kind: crate::glossary::LimitKind::Relationship,
+                    actual: part_relationships,
+                    maximum: limits.values(),
+                });
+            }
+            relationship_count =
+                relationship_count
+                    .checked_add(part_relationships)
+                    .ok_or(Error::GlossaryLimit {
+                        kind: crate::glossary::LimitKind::GraphWideRelationship,
+                        actual: usize::MAX,
+                        maximum: limits.values(),
+                    })?;
+            if relationship_count > limits.values() {
+                return Err(Error::GlossaryLimit {
+                    kind: crate::glossary::LimitKind::GraphWideRelationship,
+                    actual: relationship_count,
+                    maximum: limits.values(),
+                });
+            }
+            for relationship in part.rels().iter() {
+                metadata = metadata
+                    .checked_add(relationship.r_id().len())
+                    .and_then(|value| value.checked_add(relationship.reltype().len()))
+                    .and_then(|value| value.checked_add(relationship.target_ref().len()))
+                    .ok_or(Error::GlossaryLimit {
+                        kind: crate::glossary::LimitKind::GraphMetadataBytes,
+                        actual: usize::MAX,
+                        maximum: limits.metadata_bytes(),
+                    })?;
+            }
+        }
+        if total > limits.graph_bytes() {
+            return Err(Error::GlossaryLimit {
+                kind: crate::glossary::LimitKind::GraphBytes,
+                actual: total,
+                maximum: limits.graph_bytes(),
+            });
+        }
+        if metadata > limits.metadata_bytes() {
+            return Err(Error::GlossaryLimit {
+                kind: crate::glossary::LimitKind::GraphMetadataBytes,
+                actual: metadata,
+                maximum: limits.metadata_bytes(),
+            });
+        }
+        Ok(())
+    }
+
+    fn admit_graph(graph: &Graph, limits: &Limits) -> Result<()> {
+        if graph.parts.len() > limits.parts() {
+            return Err(Error::GlossaryLimit {
+                kind: crate::glossary::LimitKind::AuxiliaryPart,
+                actual: graph.parts.len(),
+                maximum: limits.parts(),
+            });
+        }
+        if graph.root_name.len() > limits.name_bytes() {
+            return Err(Error::GlossaryLimit {
+                kind: crate::glossary::LimitKind::StringBytes,
+                actual: graph.root_name.len(),
+                maximum: limits.name_bytes(),
+            });
+        }
+        let mut total = 0usize;
+        let mut metadata = graph.root_name.len();
+        for value in [
+            graph.owner_main.as_deref(),
+            graph.owner_id.as_deref(),
+            graph.owner_target.as_deref(),
+        ]
+        .into_iter()
+        .flatten()
+        {
+            metadata = metadata
+                .checked_add(value.len())
+                .ok_or(Error::GlossaryLimit {
+                    kind: crate::glossary::LimitKind::GraphMetadataBytes,
+                    actual: usize::MAX,
+                    maximum: limits.metadata_bytes(),
+                })?;
+        }
+        let mut relationship_count = 0usize;
+        admit_relationships(&graph.rels, limits)?;
+        relationship_count = graph.rels.len();
+        for relationship in &graph.rels {
+            metadata = metadata
+                .checked_add(relationship.id.len())
+                .and_then(|value| value.checked_add(relationship.kind.len()))
+                .and_then(|value| value.checked_add(relationship.target.len()))
+                .ok_or(Error::GlossaryLimit {
+                    kind: crate::glossary::LimitKind::GraphMetadataBytes,
+                    actual: usize::MAX,
+                    maximum: limits.metadata_bytes(),
+                })?;
+        }
+        if let Some(xml) = graph.root_xml() {
+            admit_xml(xml, limits)?;
+            total = total.checked_add(xml.len()).ok_or(Error::GlossaryLimit {
+                kind: crate::glossary::LimitKind::GraphBytes,
+                actual: usize::MAX,
+                maximum: limits.graph_bytes(),
+            })?;
+        }
+        for part in &graph.parts {
+            admit_part(part.name(), part.content_type(), part.data().len(), limits)?;
+            admit_relationships(&part.rels, limits)?;
+            relationship_count =
+                relationship_count
+                    .checked_add(part.rels.len())
+                    .ok_or(Error::GlossaryLimit {
+                        kind: crate::glossary::LimitKind::GraphWideRelationship,
+                        actual: usize::MAX,
+                        maximum: limits.values(),
+                    })?;
+            if relationship_count > limits.values() {
+                return Err(Error::GlossaryLimit {
+                    kind: crate::glossary::LimitKind::GraphWideRelationship,
+                    actual: relationship_count,
+                    maximum: limits.values(),
+                });
+            }
+            if is_xml_content_type(&part.content_type) {
+                admit_xml(part.data(), limits)?;
+            }
+            total = total
+                .checked_add(part.data().len())
+                .ok_or(Error::GlossaryLimit {
+                    kind: crate::glossary::LimitKind::GraphBytes,
+                    actual: usize::MAX,
+                    maximum: limits.graph_bytes(),
+                })?;
+            metadata = metadata
+                .checked_add(part.name().len() + part.content_type().len())
+                .ok_or(Error::GlossaryLimit {
+                    kind: crate::glossary::LimitKind::GraphMetadataBytes,
+                    actual: usize::MAX,
+                    maximum: limits.metadata_bytes(),
+                })?;
+            if part.relationships().len() > limits.values() {
+                return Err(Error::GlossaryLimit {
+                    kind: crate::glossary::LimitKind::Relationship,
+                    actual: part.relationships().len(),
+                    maximum: limits.values(),
+                });
+            }
+        }
+        if graph.parts.len() > MAX_VALUES || total > MAX_GRAPH_BYTES || total > limits.graph_bytes()
+        {
+            return Err(Error::GlossaryLimit {
+                kind: crate::glossary::LimitKind::GraphBytes,
+                actual: total,
+                maximum: limits.graph_bytes().min(MAX_GRAPH_BYTES),
+            });
+        }
+        if metadata > MAX_GRAPH_METADATA_BYTES || metadata > limits.metadata_bytes() {
+            return Err(Error::GlossaryLimit {
+                kind: crate::glossary::LimitKind::GraphMetadataBytes,
+                actual: metadata,
+                maximum: limits.metadata_bytes().min(MAX_GRAPH_METADATA_BYTES),
+            });
+        }
+        Ok(())
+    }
+
+    pub(in crate::glossary) fn admit_xml(xml: &[u8], limits: &Limits) -> Result<()> {
+        if xml.len() > limits.xml_bytes() {
+            return Err(Error::GlossaryLimit {
+                kind: crate::glossary::LimitKind::XmlBytes,
+                actual: xml.len(),
+                maximum: limits.xml_bytes(),
+            });
+        }
+        if xml.len() > limits.dom_bytes() {
+            return Err(Error::GlossaryLimit {
+                kind: crate::glossary::LimitKind::DomBytes,
+                actual: xml.len(),
+                maximum: limits.dom_bytes(),
+            });
+        }
+        let mut reader = Reader::from_reader(xml);
+        let mut buffer = Vec::new();
+        let mut depth = 0usize;
+        let mut nodes = 0usize;
+        let mut attributes = 0usize;
+        let mut attribute_bytes = 0usize;
+        let mut tokens = 0usize;
+        let mut contents = 0usize;
+        loop {
+            let event = reader
+                .read_event_into(&mut buffer)
+                .map_err(|error| Error::Xml(error.to_string()))?;
+            tokens = tokens.saturating_add(1);
+            if tokens > limits.tokens() {
+                return Err(Error::GlossaryLimit {
+                    kind: crate::glossary::LimitKind::XmlToken,
+                    actual: tokens,
+                    maximum: limits.tokens(),
+                });
+            }
+            match event {
+                Event::Start(element) => {
+                    depth = depth.saturating_add(1);
+                    nodes = nodes.saturating_add(1);
+                    check_xml_shape(depth, nodes, attributes, contents, limits)?;
+                    check_attributes(&element, &mut attributes, &mut attribute_bytes, limits)?;
+                },
+                Event::Empty(element) => {
+                    nodes = nodes.saturating_add(1);
+                    check_xml_shape(depth.saturating_add(1), nodes, attributes, contents, limits)?;
+                    check_attributes(&element, &mut attributes, &mut attribute_bytes, limits)?;
+                },
+                Event::End(_) => {
+                    depth = depth.checked_sub(1).ok_or_else(|| {
+                        Error::Invalid("glossary XML has an unexpected closing element".to_owned())
+                    })?
+                },
+                Event::Text(_) | Event::CData(_) | Event::Comment(_) | Event::GeneralRef(_) => {
+                    contents = contents.saturating_add(1);
+                    check_xml_shape(depth, nodes, attributes, contents, limits)?;
+                },
+                Event::DocType(_) | Event::PI(_) => {
+                    return Err(Error::Invalid(
+                        "glossary XML contains a forbidden declaration".to_owned(),
+                    ));
+                },
+                Event::Decl(_) => {},
+                Event::Eof => break,
+            }
+            buffer.clear();
+        }
+        if depth != 0 {
+            return Err(Error::Invalid("glossary XML is unterminated".to_owned()));
+        }
+        Ok(())
+    }
+
+    fn check_xml_shape(
+        depth: usize,
+        nodes: usize,
+        attributes: usize,
+        contents: usize,
+        limits: &Limits,
+    ) -> Result<()> {
+        if depth > limits.depth() {
+            return Err(Error::GlossaryLimit {
+                kind: crate::glossary::LimitKind::XmlDepth,
+                actual: depth,
+                maximum: limits.depth(),
+            });
+        }
+        if nodes > limits.nodes() {
+            return Err(Error::GlossaryLimit {
+                kind: crate::glossary::LimitKind::XmlNode,
+                actual: nodes,
+                maximum: limits.nodes(),
+            });
+        }
+        if attributes > limits.attributes() {
+            return Err(Error::GlossaryLimit {
+                kind: crate::glossary::LimitKind::XmlAttribute,
+                actual: attributes,
+                maximum: limits.attributes(),
+            });
+        }
+        if contents > limits.content() {
+            return Err(Error::GlossaryLimit {
+                kind: crate::glossary::LimitKind::XmlContentToken,
+                actual: contents,
+                maximum: limits.content(),
+            });
+        }
+        Ok(())
+    }
+
+    fn check_attributes(
+        element: &quick_xml::events::BytesStart<'_>,
+        attributes: &mut usize,
+        attribute_bytes: &mut usize,
+        limits: &Limits,
+    ) -> Result<()> {
+        for attribute in element.unchecked_attributes() {
+            let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+            *attributes = attributes.saturating_add(1);
+            *attribute_bytes = attribute_bytes
+                .checked_add(
+                    attribute
+                        .key
+                        .as_ref()
+                        .len()
+                        .saturating_add(attribute.value.len()),
+                )
+                .ok_or(Error::GlossaryLimit {
+                    kind: crate::glossary::LimitKind::XmlAggregateAttribute,
+                    actual: usize::MAX,
+                    maximum: limits.dom_bytes(),
+                })?;
+            if *attributes > limits.attributes() {
+                return Err(Error::GlossaryLimit {
+                    kind: crate::glossary::LimitKind::XmlAttribute,
+                    actual: *attributes,
+                    maximum: limits.attributes(),
+                });
+            }
+            if *attribute_bytes > limits.dom_bytes() {
+                return Err(Error::GlossaryLimit {
+                    kind: crate::glossary::LimitKind::XmlAggregateAttribute,
+                    actual: *attribute_bytes,
+                    maximum: limits.dom_bytes(),
+                });
+            }
+        }
+        Ok(())
+    }
+
+    fn is_xml_content_type(content_type: &str) -> bool {
+        content_type.ends_with("+xml")
+            || content_type.eq_ignore_ascii_case("application/xml")
+            || content_type.eq_ignore_ascii_case("text/xml")
     }
 }
 
@@ -344,6 +799,14 @@ pub(in crate::glossary) fn copy_relationships(part: &dyn Part) -> Result<Vec<raw
 }
 
 pub(in crate::glossary) fn put_graph(package: &mut OpcPackage, value: &raw::Graph) -> Result<bool> {
+    put_graph_checked(package, value, &super::Limits::DEFAULT)
+}
+
+pub(in crate::glossary) fn put_graph_checked(
+    package: &mut OpcPackage,
+    value: &raw::Graph,
+    limits: &raw::Limits,
+) -> Result<bool> {
     validate_package_conformance(package, value.conformance)?;
     validate_raw_graph_metadata(value)?;
     let preserve_root = if let Some(xml) = &value.root_xml {
@@ -369,11 +832,9 @@ pub(in crate::glossary) fn put_graph(package: &mut OpcPackage, value: &raw::Grap
                 .clone(),
         )
     } else {
-        BlobPart::new(
-            root_uri.clone(),
-            CT.to_owned(),
-            write(&value.catalog, value.conformance)?,
-        )
+        let xml = write(&value.catalog, value.conformance)?;
+        raw::admit_xml(&xml, limits)?;
+        BlobPart::new(root_uri.clone(), CT.to_owned(), xml)
     };
     let canonical_catalog;
     let effective_catalog = if preserve_root {

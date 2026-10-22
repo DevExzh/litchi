@@ -6,11 +6,11 @@ use litchi_opc::part::BlobPart;
 use litchi_opc::{OpcPackage, Part};
 
 fn parse_settings(xml: &[u8]) -> Result<Settings> {
-    parse(xml).map(|(settings, _)| settings)
+    raw::parse(xml, &Limits::DEFAULT).map(|(settings, _)| settings)
 }
 
 fn read_settings_part(part: &dyn Part) -> Result<Settings> {
-    read(part).map(|(settings, _)| settings)
+    raw::read(part, &Limits::DEFAULT).map(|(settings, _)| settings)
 }
 
 fn contains_xml(xml: &[u8], needle: &str) -> bool {
@@ -185,7 +185,7 @@ fn strict_graph_and_mce_round_trip() {
             xmlns:x="urn:unsupported" mc:Ignorable="x">
             <x:ignored/><w:allowPNG/>
         </w:webSettings>"#;
-    let (parsed, conformance) = parse(xml).unwrap();
+    let (parsed, conformance) = raw::parse(xml, &Limits::DEFAULT).unwrap();
     assert_eq!(conformance, Conformance::Strict);
     assert_eq!(parsed.allow_png(), Some(true));
 }
@@ -255,12 +255,12 @@ fn adversarial_xml_never_unwinds() {
             b"\xFF\xFE".as_slice(),
             br#"<w:webSettings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:divs><w:div w:id="same"/><w:div w:id="same"/></w:divs></w:webSettings>"#.as_slice(),
         ] {
-            let result = std::panic::catch_unwind(|| parse(xml));
+            let result = std::panic::catch_unwind(|| raw::parse(xml, &Limits::DEFAULT));
             assert!(result.is_ok());
             assert!(result.unwrap().is_err());
         }
     let oversized = vec![b' '; MAX_XML_BYTES + 1];
-    assert!(parse(&oversized).is_err());
+    assert!(raw::parse(&oversized, &Limits::DEFAULT).is_err());
 }
 
 #[test]
@@ -281,7 +281,7 @@ fn source_checked_web_edits_preserve_opaque_markup_and_round_trip_inverse() {
   <w:targetScreenSz w:val="800x600"/>
   <x:trailing>keep me</x:trailing>
 </w:webSettings>"#;
-    let snapshot = Snapshot::from_xml(source.to_vec()).unwrap();
+    let snapshot = Snapshot::from_xml(source.to_vec(), &Limits::DEFAULT).unwrap();
     assert_eq!(
         snapshot.settings().target_screen_size(),
         Some(Screen::Pixels800x600)
@@ -330,7 +330,7 @@ fn source_checked_web_edits_preserve_opaque_markup_and_round_trip_inverse() {
     assert_eq!(cancelled.snapshot().xml_bytes(), source);
 
     let stale_source = br#"<w:webSettings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:targetScreenSz w:val="1024x768"/></w:webSettings>"#;
-    let stale = Snapshot::from_xml(stale_source.to_vec()).unwrap();
+    let stale = Snapshot::from_xml(stale_source.to_vec(), &Limits::DEFAULT).unwrap();
     assert!(commit.patch().apply(&stale).is_err());
 }
 
@@ -394,7 +394,7 @@ fn mce_preprocessing_respects_web_settings_xml_bound() {
     xml.extend_from_slice(suffix);
 
     assert!(matches!(
-        parse(&xml),
+        raw::parse(&xml, &Limits::DEFAULT),
         Err(Error::Mce(
             litchi_ooxml_common::mce::Error::LimitExceeded { .. },
         ))

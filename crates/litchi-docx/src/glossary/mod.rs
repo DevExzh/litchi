@@ -4,12 +4,12 @@
 )]
 //! Layered `WordprocessingML` glossary / `AutoText` catalog owner.
 
-mod codec;
+pub(crate) mod codec;
 mod edit;
 mod graph;
 mod limit;
 mod model;
-mod package;
+pub(crate) mod package;
 #[allow(
     dead_code,
     unreachable_pub,
@@ -93,9 +93,9 @@ const MAX_GRAPH_BYTES: usize = 256 * 1024 * 1024;
 /// Aggregate ceiling for raw graph names, content types, and relationship metadata.
 const MAX_GRAPH_METADATA_BYTES: usize = 32 * 1024 * 1024;
 
-pub use codec::{read, write};
 pub use edit::{Commit, Diagnostics, Edit, LimitKind, Patch};
 pub use graph::raw;
+pub use limit::Limits;
 pub use model::{Catalog, Category, Conformance, Entry, Gallery, Id, Insert, Kind, Name, Props};
-pub use package::{load, put, remove};
+pub use package::load;
 pub use transaction::{Revision, Snapshot};

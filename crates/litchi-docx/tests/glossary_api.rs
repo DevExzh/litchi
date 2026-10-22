@@ -1,4 +1,4 @@
-use litchi_docx::glossary::{Catalog, Conformance, Entry, Name, read, write};
+use litchi_docx::glossary::{Catalog, Conformance, Entry, Limits, Name, raw};
 
 const W: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 
@@ -40,8 +40,8 @@ fn downstream_glossary_api_is_semantic_checked_and_move_first() -> litchi_docx::
     );
     assert!(catalog.at(usize::MAX).is_err());
 
-    let xml = write(&catalog, Conformance::Transitional)?;
-    let (round_trip, conformance) = read(&xml)?;
+    let xml = raw::write(&catalog, Conformance::Transitional, &Limits::DEFAULT)?;
+    let (round_trip, conformance) = raw::read(&xml, &Limits::DEFAULT)?;
     assert_eq!(conformance, Conformance::Transitional);
     assert_eq!(
         round_trip.get("renamed")?.and_then(Entry::name),

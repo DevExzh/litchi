@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 use super::codec;
 use super::model::{Border, BorderSide, Conformance, Frameset, Id, Key, Layout, Screen, Settings};
-use super::{Error, Result, invalid};
+use super::{Error, Limits, Result, invalid};
 
 /// One bounded semantic operation supported by the source-preserving codec.
 #[derive(Debug, Clone)]
@@ -37,9 +37,9 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn from_xml(xml: impl Into<Vec<u8>>) -> Result<Self> {
+    pub fn from_xml(xml: impl Into<Vec<u8>>, limits: &Limits) -> Result<Self> {
         let xml = xml.into();
-        let (settings, conformance) = codec::parse(&xml)?;
+        let (settings, conformance) = super::raw::parse(&xml, limits)?;
         Ok(Self {
             xml: Arc::from(xml.into_boxed_slice()),
             settings,
@@ -53,8 +53,9 @@ impl Snapshot {
     pub(super) fn from_xml_with_conformance(
         xml: impl Into<Vec<u8>>,
         conformance: Conformance,
+        limits: &Limits,
     ) -> Result<Self> {
-        let snapshot = Self::from_xml(xml)?;
+        let snapshot = Self::from_xml(xml, limits)?;
         if snapshot.conformance != conformance {
             return Err(invalid(
                 "web-settings XML conformance does not match its relationship",
@@ -291,7 +292,8 @@ impl Transaction {
         }
 
         let xml = codec::rewrite(self.base.xml_bytes(), &self.edits)?;
-        let snapshot = Snapshot::from_xml_with_conformance(xml, self.base.conformance)?;
+        let snapshot =
+            Snapshot::from_xml_with_conformance(xml, self.base.conformance, &Limits::DEFAULT)?;
         if snapshot.settings != self.next {
             return Err(invalid(
                 "source-preserving web-settings rewrite did not match its semantic projection",
@@ -499,7 +501,11 @@ impl Patch {
         if self.before == self.after {
             return Ok(source.clone());
         }
-        Snapshot::from_xml_with_conformance(self.after_xml.to_vec(), self.conformance)
+        Snapshot::from_xml_with_conformance(
+            self.after_xml.to_vec(),
+            self.conformance,
+            &Limits::DEFAULT,
+        )
     }
 }
 

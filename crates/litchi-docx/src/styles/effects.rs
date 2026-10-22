@@ -26,7 +26,10 @@ use crate::styles::{Style, Styles, Type};
 mod edit;
 #[path = "effects/limit.rs"]
 mod limit;
+#[path = "effects/raw.rs"]
+pub mod raw;
 pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind};
+pub use limit::Limits;
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 #[cfg(test)]
@@ -282,15 +285,12 @@ impl Resource {
     /// The source must have a w:styles root in either the Transitional or
     /// Strict WordprocessingML namespace. Unknown children and attributes are
     /// retained in the exact source bytes.
-    pub fn new(xml: impl Into<Vec<u8>>) -> Result<Self> {
-        let xml = Arc::new(xml.into());
+    pub fn new(xml: impl Into<Vec<u8>>, limits: &Limits) -> Result<Self> {
+        let xml = xml.into();
+        raw::admit_xml(&xml, limits)?;
+        let xml = Arc::new(xml);
         let conformance = validate_xml(&xml, None)?;
         Self::from_shared_with_conformance(xml, conformance)
-    }
-
-    /// Alias for Resource::new emphasizing its source-backed nature.
-    pub fn from_xml(xml: impl Into<Vec<u8>>) -> Result<Self> {
-        Self::new(xml)
     }
 
     /// Borrow the exact authored XML source.
@@ -410,8 +410,8 @@ impl Snapshot {
     }
 
     /// Construct a snapshot from a standalone XML resource.
-    pub fn from_xml(owner: Owner, xml: impl Into<Vec<u8>>) -> Result<Self> {
-        Self::new(owner, Some(Resource::new(xml)?))
+    pub fn from_xml(owner: Owner, xml: impl Into<Vec<u8>>, limits: &Limits) -> Result<Self> {
+        Self::new(owner, Some(Resource::new(xml, limits)?))
     }
 
     /// Semantic owner represented by this snapshot.
@@ -1348,7 +1348,7 @@ fn capture_graph_token(
 
 /// Load a complete owner-wide effects snapshot. Absence is represented by a
 /// present snapshot whose resource() is None.
-pub fn load(package: &OpcPackage, owner: Owner) -> Result<Snapshot> {
+pub(crate) fn load(package: &OpcPackage, owner: Owner) -> Result<Snapshot> {
     #[cfg(test)]
     test_trace::record_load();
 
@@ -1373,7 +1373,7 @@ pub fn load(package: &OpcPackage, owner: Owner) -> Result<Snapshot> {
 }
 
 /// Source-backed spelling of load.
-pub fn load_snapshot(package: &OpcPackage, owner: Owner) -> Result<Snapshot> {
+pub(crate) fn load_snapshot(package: &OpcPackage, owner: Owner) -> Result<Snapshot> {
     load(package, owner)
 }
 
@@ -1535,7 +1535,7 @@ fn readback_existing_resource_replacement(
 
 /// Add or replace one owner resource. The operation returns false for an
 /// exact source/conformance no-op and therefore leaves signatures untouched.
-pub fn put(package: &mut OpcPackage, owner: Owner, resource: Resource) -> Result<bool> {
+pub(crate) fn put(package: &mut OpcPackage, owner: Owner, resource: Resource) -> Result<bool> {
     let graph = inspect_graph(package)?;
     if resource.conformance != graph.conformance {
         return Err(invalid(
@@ -1573,7 +1573,7 @@ pub fn put(package: &mut OpcPackage, owner: Owner, resource: Resource) -> Result
 }
 
 /// Remove one owner resource. Missing resources are an exact no-op.
-pub fn remove(package: &mut OpcPackage, owner: Owner) -> Result<bool> {
+pub(crate) fn remove(package: &mut OpcPackage, owner: Owner) -> Result<bool> {
     let graph = inspect_graph(package)?;
     if graph.binding(owner).is_none() {
         return Ok(false);
@@ -2976,7 +2976,7 @@ mod tests {
             offset..offset,
             br#"<w:style w:type="paragraph" w:styleId="EffectsCountProbe"><w:name w:val="Effects Count Probe"/></w:style>"#.iter().copied(),
         );
-        Resource::from_xml(xml).expect("changed effects resource")
+        Resource::new(xml, &Limits::DEFAULT).expect("changed effects resource")
     }
 
     fn changed_patch(snapshot: &Snapshot) -> (Patch, Resource) {
@@ -3031,12 +3031,12 @@ mod tests {
             Owner::MainDocument,
             br#"<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#
                 .to_vec(),
-        )
+        &Limits::DEFAULT)
         .expect("standalone effects snapshot");
-        let replacement = Resource::from_xml(
+        let replacement = Resource::new(
             br#"<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:style w:type="paragraph" w:styleId="probe"/></w:styles>"#
                 .to_vec(),
-        )
+        &Limits::DEFAULT)
         .expect("standalone replacement resource");
         let mut edit = current.edit();
         edit.replace_resource(Some(replacement))

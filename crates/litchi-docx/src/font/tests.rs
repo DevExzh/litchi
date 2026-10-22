@@ -1,8 +1,9 @@
 //! Focused tests for the layered font owner.
 
-use super::codec::{parse, write};
+use super::Limits;
 use super::model::*;
-use super::package::{put, read, remove};
+use super::package::read;
+use super::raw as raw_codec;
 use litchi_opc::{OpcPackage, PackURI, XmlPart};
 use std::mem::size_of;
 use std::sync::Arc;
@@ -32,7 +33,7 @@ fn package() -> OpcPackage {
 #[test]
 fn strict_round_trip_and_safe_selectors() {
     let xml = br#"<w:fonts xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:font w:name="A&amp;B"><w:altName w:val="Alias"/><w:panose1 w:val="020F0502020204030204"/><w:charset w:val="00"/><w:family w:val="swiss"/><w:notTrueType w:val="0"/><w:pitch w:val="variable"/><w:sig w:usb0="E10002FF" w:usb1="4000ACFF" w:usb2="00000009" w:usb3="00000000" w:csb0="0000019F" w:csb1="00000000"/><w:embedRegular r:id="rId1" w:fontKey="{01014A78-CABC-4EF0-12AC-5CD89AEFDE01}" w:subsetted="1"/></w:font></w:fonts>"#;
-    let table = parse(xml).expect("parse");
+    let table = raw_codec::parse(xml, &Limits::DEFAULT).expect("parse");
     let by_name = table.get("a&b").expect("lookup").expect("font");
     let by_index = table.get(0usize).expect("lookup").expect("font");
     assert_eq!(by_name, by_index);
@@ -42,16 +43,19 @@ fn strict_round_trip_and_safe_selectors() {
         0x19F
     );
 
-    let strict = write(&table, Conformance::Strict).expect("write");
+    let strict = raw_codec::write(&table, Conformance::Strict, &Limits::DEFAULT).expect("write");
     assert!(std::str::from_utf8(&strict).expect("UTF-8").contains(WS));
-    assert_eq!(parse(&strict).expect("reparse"), table);
+    assert_eq!(
+        raw_codec::parse(&strict, &Limits::DEFAULT).expect("reparse"),
+        table
+    );
 }
 
 #[test]
 fn mce_and_real_strict_fixture() {
     let xml = br#"<w:fonts xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x="urn:future" mc:Ignorable="x"><mc:AlternateContent><mc:Choice Requires="x"><x:font/></mc:Choice><mc:Fallback><w:font w:name="Fallback"><w:family w:val="roman"/></w:font></mc:Fallback></mc:AlternateContent></w:fonts>"#;
     assert_eq!(
-        parse(xml)
+        raw_codec::parse(xml, &Limits::DEFAULT)
             .expect("MCE parse")
             .get("Fallback")
             .expect("lookup")
@@ -66,7 +70,11 @@ fn mce_and_real_strict_fixture() {
     )
     .expect("open fixture");
     let uri = PackURI::new("/word/fontTable.xml").expect("test URI");
-    let table = parse(&physical.blob_for(&uri).expect("font table")).expect("parse");
+    let table = raw_codec::parse(
+        &physical.blob_for(&uri).expect("font table"),
+        &Limits::DEFAULT,
+    )
+    .expect("parse");
     assert!(table.get("Calibri").expect("lookup").is_some());
     assert_eq!(
         table.get(0usize).expect("lookup").expect("font").charset(),
@@ -84,9 +92,12 @@ fn malformed_order_and_bounds_are_rejected() {
         r#"<w:fonts xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:font w:name="x"><w:embedRegular r:id="rId1" w:fontKey="bad"/></w:font></w:fonts>"#,
         r#"<!DOCTYPE x><w:fonts xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#,
     ] {
-        assert!(parse(xml.as_bytes()).is_err(), "{xml}");
+        assert!(
+            raw_codec::parse(xml.as_bytes(), &Limits::DEFAULT).is_err(),
+            "{xml}"
+        );
     }
-    assert!(parse(&vec![b' '; MAX_XML + 1]).is_err());
+    assert!(raw_codec::parse(&vec![b' '; MAX_XML + 1], &Limits::DEFAULT).is_err());
 }
 
 #[test]
@@ -152,7 +163,13 @@ fn move_first_crud_preserves_shared_resources_and_extensions() {
         .with_namespace(raw::Attr::new("xmlns:x", "urn:test-fonts").expect("namespace"))
         .expect("namespace");
     table.add(first).expect("add");
-    put(&mut package, table, Conformance::Transitional).expect("put");
+    raw_codec::put(
+        &mut package,
+        table,
+        Conformance::Transitional,
+        &Limits::DEFAULT,
+    )
+    .expect("put");
 
     let mut table = read(&package).expect("read").expect("table");
     table
@@ -164,7 +181,13 @@ fn move_first_crud_preserves_shared_resources_and_extensions() {
         )
         .expect("add");
     table.reorder(&["Beta", "Alpha"]).expect("reorder");
-    put(&mut package, table, Conformance::Transitional).expect("put");
+    raw_codec::put(
+        &mut package,
+        table,
+        Conformance::Transitional,
+        &Limits::DEFAULT,
+    )
+    .expect("put");
 
     let mut table = read(&package).expect("read").expect("table");
     assert_eq!(
@@ -197,7 +220,13 @@ fn move_first_crud_preserves_shared_resources_and_extensions() {
         .clone();
 
     assert!(table.remove("Alpha").expect("remove").is_some());
-    put(&mut package, table, Conformance::Transitional).expect("put");
+    raw_codec::put(
+        &mut package,
+        table,
+        Conformance::Transitional,
+        &Limits::DEFAULT,
+    )
+    .expect("put");
     assert!(
         package
             .get_part(&PackURI::new(&shared_part).expect("part URI"))
@@ -212,7 +241,13 @@ fn move_first_crud_preserves_shared_resources_and_extensions() {
             .is_some()
     );
 
-    put(&mut package, Table::new(), Conformance::Transitional).expect("remove graph");
+    raw_codec::put(
+        &mut package,
+        Table::new(),
+        Conformance::Transitional,
+        &Limits::DEFAULT,
+    )
+    .expect("remove graph");
     assert!(read(&package).expect("read").is_none());
     assert!(
         package
@@ -234,7 +269,13 @@ fn graph_delete_keeps_resources_referenced_outside_the_table() {
         .expect("face");
     let mut table = Table::new();
     table.add(font).expect("add");
-    put(&mut package, table, Conformance::Transitional).expect("put");
+    raw_codec::put(
+        &mut package,
+        table,
+        Conformance::Transitional,
+        &Limits::DEFAULT,
+    )
+    .expect("put");
 
     let table = read(&package).expect("read").expect("table");
     let resource_name = table.fonts[0].embedded_fonts[0]
@@ -260,10 +301,10 @@ fn graph_delete_keeps_resources_referenced_outside_the_table() {
             false,
         );
 
-    assert!(remove(&mut package).expect("remove graph"));
+    assert!(raw_codec::remove(&mut package, &Limits::DEFAULT).expect("remove graph"));
     assert!(read(&package).expect("read").is_none());
     assert!(package.get_part(&resource).is_ok());
-    assert!(!remove(&mut package).expect("already absent"));
+    assert!(!raw_codec::remove(&mut package, &Limits::DEFAULT).expect("already absent"));
 }
 
 #[test]
@@ -304,6 +345,7 @@ fn unicode_caseless_identity_is_consistent_and_ambiguous_sources_fail() {
     );
 
     let malformed_xml = r#"<w:fonts xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:font w:name="Straße"/><w:font w:name="STRASSE"/></w:fonts>"#;
-    let malformed = parse(malformed_xml.as_bytes()).expect("parse malformed producer table");
+    let malformed = raw_codec::parse(malformed_xml.as_bytes(), &Limits::DEFAULT)
+        .expect("parse malformed producer table");
     assert!(malformed.get("strasse").is_err());
 }

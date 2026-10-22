@@ -120,7 +120,7 @@ impl Table {
 /// # Errors
 ///
 /// Returns an error if the operation cannot be completed.
-pub fn read(package: &OpcPackage) -> Result<Option<Table>> {
+pub(crate) fn read(package: &OpcPackage) -> Result<Option<Table>> {
     let (main_name, table_name, _) = locate_font_table(package)?;
     validate_font_table_relationship_sources(package, &main_name)?;
     let Some(table_name) = table_name else {
@@ -150,7 +150,20 @@ pub fn read(package: &OpcPackage) -> Result<Option<Table>> {
 /// # Errors
 ///
 /// Returns an error if the operation cannot be completed.
-pub fn put(package: &mut OpcPackage, mut value: Table, conformance: Conformance) -> Result<bool> {
+pub(crate) fn put(
+    package: &mut OpcPackage,
+    value: Table,
+    conformance: Conformance,
+) -> Result<bool> {
+    put_checked(package, value, conformance, &super::Limits::DEFAULT)
+}
+
+pub(crate) fn put_checked(
+    package: &mut OpcPackage,
+    mut value: Table,
+    conformance: Conformance,
+    limits: &super::Limits,
+) -> Result<bool> {
     validate_package_conformance(package, conformance)?;
     let old = read(package)?.unwrap_or_default();
     let (main_name, old_table_name, old_table_relationship_id) = locate_font_table(package)?;
@@ -192,6 +205,7 @@ pub fn put(package: &mut OpcPackage, mut value: Table, conformance: Conformance)
     }
 
     let xml = write(&value, conformance)?;
+    super::raw::admit_xml(&xml, limits)?;
     let staged = parse(&xml)?;
     if !same_metadata(&staged, &value) {
         return Err(invalid("staged font-table XML did not round-trip"));
@@ -393,7 +407,7 @@ pub fn put(package: &mut OpcPackage, mut value: Table, conformance: Conformance)
 /// # Errors
 ///
 /// Returns an error if the operation cannot be completed.
-pub fn remove(package: &mut OpcPackage) -> Result<bool> {
+pub(crate) fn remove(package: &mut OpcPackage) -> Result<bool> {
     let old = read(package)?.unwrap_or_default();
     let (main_name, table_name, relationship_id) = locate_font_table(package)?;
     remove_graph(

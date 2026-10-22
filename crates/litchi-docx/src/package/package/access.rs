@@ -168,7 +168,7 @@ impl Package {
     /// Returns an error if the operation cannot be completed.
     pub fn chart_graph(&self) -> Result<crate::chart::Graph> {
         let document = self.opc.main_document_part()?.partname().clone();
-        crate::chart::load(&self.opc, &document)
+        crate::chart::package::load(&self.opc, &document)
     }
 
     /// The chart part (a `c:chartSpace` or `cx:chartSpace`) the main

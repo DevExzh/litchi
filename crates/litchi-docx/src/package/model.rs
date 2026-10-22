@@ -328,13 +328,13 @@ impl Package {
         let subsetted = prepared.iter().any(|font| font.subsetted);
         let conformance = word_font_conformance(&self.opc)?;
         let mut staged = self.opc.clone();
-        let mut table = font::read(&staged)?.unwrap_or_default();
+        let mut table = font::package::read(&staged)?.unwrap_or_default();
         let mut fonts_changed = false;
         for prepared in prepared {
             fonts_changed |= merge_word_font(&mut table, prepared, conformance)?;
         }
         if fonts_changed {
-            let _ = font::put(&mut staged, table, conformance)?;
+            let _ = font::package::put(&mut staged, table, conformance)?;
         }
         let settings_changed = ensure_word_font_settings(&mut staged, conformance, subsetted)?;
         if fonts_changed || settings_changed {
@@ -873,12 +873,12 @@ impl Package {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn fonts(&self) -> Result<Option<font::Table>> {
-        font::read(&self.opc)
+        font::package::read(&self.opc)
     }
 
     /// Move a complete font table into this package.
     ///
-    /// The signature policy is [`font::put`]'s: a change to a signed package
+    /// The signature policy is [`font::raw::put`]'s: a change to a signed package
     /// is refused until [`Self::unsign`] removes the signature.
     ///
     /// # Errors
@@ -889,19 +889,19 @@ impl Package {
         table: font::Table,
         conformance: font::Conformance,
     ) -> Result<bool> {
-        font::put(&mut self.opc, table, conformance)
+        font::package::put(&mut self.opc, table, conformance)
     }
 
     /// Remove the font table and font resources that become unreferenced.
     ///
-    /// The signature policy is [`font::remove`]'s: removing a table from a
+    /// The signature policy is [`font::raw::remove`]'s: removing a table from a
     /// signed package is refused until [`Self::unsign`] removes the signature.
     ///
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
     pub(crate) fn remove_fonts(&mut self) -> Result<bool> {
-        font::remove(&mut self.opc)
+        font::package::remove(&mut self.opc)
     }
 }
 

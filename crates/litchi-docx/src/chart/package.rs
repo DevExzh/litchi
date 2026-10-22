@@ -24,7 +24,7 @@ use std::collections::{BTreeSet, HashSet};
 /// # Errors
 ///
 /// Returns an error if the operation cannot be completed.
-pub fn load(package: &OpcPackage, document_name: &PackURI) -> Result<Graph> {
+pub(crate) fn load(package: &OpcPackage, document_name: &PackURI) -> Result<Graph> {
     let document = package.get_part(document_name)?;
     if document.content_type() != DOCUMENT_CT {
         return Err(invalid(
@@ -239,7 +239,11 @@ pub fn load(package: &OpcPackage, document_name: &PackURI) -> Result<Graph> {
 /// # Errors
 ///
 /// Returns an error if the operation cannot be completed.
-pub fn store(package: &mut OpcPackage, document_name: &PackURI, graph: &Graph) -> Result<()> {
+pub(crate) fn store(
+    package: &mut OpcPackage,
+    document_name: &PackURI,
+    graph: &Graph,
+) -> Result<()> {
     let current = load(package, document_name)?;
     validate_graph_value(graph)?;
     if ownership(&current) != ownership(graph) {

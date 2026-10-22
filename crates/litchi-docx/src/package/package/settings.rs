@@ -24,7 +24,7 @@ impl Package {
 
     /// Move complete web-output settings into package ownership.
     ///
-    /// The signature policy is [`docx_web::put`]'s: equal settings publish
+    /// The signature policy is [`docx_web::raw::put`]'s: equal settings publish
     /// nothing, and a change to a signed package is refused until
     /// [`Self::unsign`] removes the signature.
     ///
@@ -36,19 +36,19 @@ impl Package {
         settings: docx_web::Settings,
         conformance: docx_web::Conformance,
     ) -> Result<bool> {
-        docx_web::put(&mut self.opc, settings, conformance)
+        docx_web::package::put(&mut self.opc, settings, conformance)
     }
 
     /// Remove the document-owned web-settings part.
     ///
-    /// The signature policy is [`docx_web::remove`]'s: removing a part from a
+    /// The signature policy is [`docx_web::raw::remove`]'s: removing a part from a
     /// signed package is refused until [`Self::unsign`] removes the signature.
     ///
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
     pub(crate) fn remove_web(&mut self) -> Result<bool> {
-        docx_web::remove(&mut self.opc)
+        docx_web::package::remove(&mut self.opc)
     }
 
     /// Inspect the external template associated with this document without dereferencing it.
@@ -238,7 +238,7 @@ impl Package {
 
     /// Move a complete semantic catalog into the package.
     ///
-    /// The signature policy is [`glossary::put`]'s: an unchanged catalog
+    /// The signature policy is [`glossary::raw::put`]'s: an unchanged catalog
     /// publishes nothing, and a change to a signed package is refused until
     /// [`Self::unsign`] removes the signature.
     ///
@@ -250,7 +250,7 @@ impl Package {
         catalog: glossary::Catalog,
         conformance: glossary::Conformance,
     ) -> Result<bool> {
-        glossary::put(&mut self.opc, catalog, conformance)
+        glossary::package::put(&mut self.opc, catalog, conformance)
     }
 
     /// Load the complete low-level glossary OPC graph without copying payloads.
@@ -259,7 +259,7 @@ impl Package {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn glossary_graph(&self) -> Result<Option<glossary::raw::Graph>> {
-        glossary::raw::load(&self.opc)
+        glossary::raw::load(&self.opc, &glossary::Limits::default())
     }
 
     /// Publish a complete low-level glossary OPC graph into the package.
@@ -274,7 +274,7 @@ impl Package {
     ///
     /// Returns an error if the operation cannot be completed.
     pub(crate) fn put_glossary_graph(&mut self, graph: &glossary::raw::Graph) -> Result<bool> {
-        glossary::raw::put(&mut self.opc, graph)
+        glossary::raw::put(&mut self.opc, graph, &glossary::Limits::default())
     }
 
     /// Remove and return the complete low-level glossary OPC graph.
@@ -285,7 +285,7 @@ impl Package {
     ///
     /// Returns an error if the operation cannot be completed.
     pub(crate) fn take_glossary_graph(&mut self) -> Result<Option<glossary::raw::Graph>> {
-        glossary::raw::remove(&mut self.opc)
+        glossary::raw::remove(&mut self.opc, &glossary::Limits::default())
     }
 
     /// Remove the complete glossary-owned graph.
@@ -299,6 +299,6 @@ impl Package {
     ///
     /// Returns an error if the operation cannot be completed.
     pub(crate) fn remove_glossary(&mut self) -> Result<bool> {
-        glossary::remove(&mut self.opc)
+        glossary::package::remove(&mut self.opc)
     }
 }

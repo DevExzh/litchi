@@ -4,7 +4,8 @@
 )]
 use litchi_docx::Package;
 use litchi_docx::glossary::{
-    self, Catalog, Category, Conformance, Entry, Gallery, Id, Insert, Kind, Name, Props, raw,
+    self, Catalog, Category, Conformance, Entry, Gallery, Id, Insert, Kind, Limits, Name, Props,
+    raw,
 };
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{PackURI, part::BlobPart};
@@ -181,12 +182,14 @@ fn complete_raw_graph_round_trips_and_can_be_moved_out() {
             "/word/glossary/styles.xml",
             ct::WML_STYLES,
             format!(r#"<w:styles xmlns:w="{W}"/>"#).into_bytes(),
+            &Limits::DEFAULT,
         )
         .unwrap(),
         raw::Part::new(
             "/word/glossary/media/image1.png",
             "image/png",
             vec![0x89, b'P', b'N', b'G'],
+            &Limits::DEFAULT,
         )
         .unwrap(),
     ];
@@ -275,14 +278,18 @@ fn invalid_graph_update_is_failure_atomic() {
 
     assert!({
         let mut edit = package.edit_opc();
-        let removed = glossary::remove(edit.package_mut()).unwrap();
+        let removed = glossary::raw::remove(edit.package_mut(), &glossary::Limits::DEFAULT)
+            .unwrap()
+            .is_some();
         package = edit.commit().unwrap().into_package();
         removed
     });
     assert!(package.glossary().unwrap().is_none());
     assert!(!{
         let mut edit = package.edit_opc();
-        let removed = glossary::remove(edit.package_mut()).unwrap();
+        let removed = glossary::raw::remove(edit.package_mut(), &glossary::Limits::DEFAULT)
+            .unwrap()
+            .is_some();
         assert!(!edit.commit().unwrap().diagnostics().changed());
         removed
     });
