@@ -88,9 +88,12 @@ impl Edit {
     /// complete candidate graph is checked against `limits`, and publication
     /// still happens only through [`Self::commit`].
     pub fn insert_cache(&mut self, value: raw::Cache, limits: &SourceLimits) -> Result<()> {
+        let limits = crate::raw::effective_limits(self.staged.opc(), *limits);
+        let workbook = self.staged.opc().main_document_part()?.partname().clone();
+        raw::preflight_cache(&value, workbook.base_uri(), &limits)?;
         let value = value.into_model();
-        self.apply_raw(limits, move |candidate| {
-            crate::slicer_cache::package::store_slicer_cache_in_place(candidate, &value)
+        self.apply_raw(&limits, move |candidate| {
+            crate::slicer_cache::package::store_slicer_cache_in_place(candidate, &value, &limits)
         })
     }
 
@@ -133,10 +136,14 @@ impl Edit {
         value: raw::Part,
         limits: &SourceLimits,
     ) -> Result<()> {
+        let limits = crate::raw::effective_limits(self.staged.opc(), *limits);
         let worksheet = worksheet.clone();
+        raw::preflight_part(&value, worksheet.base_uri(), &limits)?;
         let value = value.into_model();
-        self.apply_raw(limits, move |candidate| {
-            crate::slicer_cache::views::store_slicer_part(candidate, &worksheet, &value)
+        self.apply_raw(&limits, move |candidate| {
+            crate::slicer_cache::views::store_slicer_part_limited(
+                candidate, &worksheet, &value, &limits,
+            )
         })
     }
 
@@ -215,12 +222,11 @@ impl Edit {
 
     fn apply_raw<T>(
         &mut self,
-        limits: &SourceLimits,
+        _limits: &SourceLimits,
         operation: impl FnOnce(&mut OpcPackage) -> Result<T>,
     ) -> Result<T> {
         self.staged.update(|candidate| {
             let value = operation(candidate)?;
-            crate::raw::check_package_limits(candidate, limits)?;
             super::validation::graph(candidate)?;
             Ok(value)
         })

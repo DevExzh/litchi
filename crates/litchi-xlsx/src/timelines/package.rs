@@ -1,9 +1,9 @@
 //! OPC part lifecycle, relationship graph validation, and atomic timeline CRUD.
 
 use super::codec::{
-    Node, attr, empty, escape, no_attributes, optional, parse_document,
-    parse_timeline_cache_definition, parse_timelines, require, required, whitespace,
-    write_timeline_cache_definition, write_timelines,
+    Node, empty, no_attributes, optional, parse_document, parse_timeline_cache_definition,
+    parse_timelines, require, required, whitespace, write_timeline_cache_definition,
+    write_timelines,
 };
 use super::model::{
     Cache, Part, validate_cache_set, validate_global_views, validate_relationship_id,
@@ -18,16 +18,79 @@ use super::{
 use crate::error::{Error, Result};
 use litchi_core::xml::ReaderOrigin;
 use litchi_opc::constants::content_type as ct;
-use litchi_opc::{BlobPart, OpcPackage, PackURI};
+use litchi_opc::{BlobPart, OpcPackage, PackURI, SourceLimits};
 use quick_xml::events::Event;
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
 use std::collections::HashSet;
 
+struct IntegrationXml {
+    bytes: Vec<u8>,
+    limit: usize,
+}
+
+impl IntegrationXml {
+    fn new(limit: usize) -> Self {
+        Self {
+            bytes: Vec::new(),
+            limit,
+        }
+    }
+
+    fn append(&mut self, bytes: &[u8]) -> Result<()> {
+        let length = self
+            .bytes
+            .len()
+            .checked_add(bytes.len())
+            .ok_or_else(|| limit("integration XML bytes"))?;
+        if length > self.limit {
+            return Err(limit("integration XML bytes"));
+        }
+        self.bytes
+            .try_reserve_exact(bytes.len())
+            .map_err(|source| Error::Allocation {
+                resource: "Timeline integration XML",
+                source,
+            })?;
+        self.bytes.extend_from_slice(bytes);
+        Ok(())
+    }
+
+    fn escape(&mut self, value: &str) -> Result<()> {
+        for character in value.chars() {
+            match character {
+                '&' => self.append(b"&amp;")?,
+                '<' => self.append(b"&lt;")?,
+                '"' => self.append(b"&quot;")?,
+                '\t' => self.append(b"&#x9;")?,
+                '\n' => self.append(b"&#xA;")?,
+                '\r' => self.append(b"&#xD;")?,
+                _ => {
+                    let mut bytes = [0; 4];
+                    self.append(character.encode_utf8(&mut bytes).as_bytes())?;
+                },
+            }
+        }
+        Ok(())
+    }
+
+    fn finish(self) -> Vec<u8> {
+        self.bytes
+    }
+}
+
 pub fn load_timeline_caches(package: &OpcPackage, workbook_name: &PackURI) -> Result<Vec<Cache>> {
+    load_timeline_caches_limited(package, workbook_name, &SourceLimits::default())
+}
+
+pub(crate) fn load_timeline_caches_limited(
+    package: &OpcPackage,
+    workbook_name: &PackURI,
+    limits: &SourceLimits,
+) -> Result<Vec<Cache>> {
     reject_root_relationships(package, TIMELINE_CACHE_RELATIONSHIP_TYPE, "View Cache")?;
     let workbook = package.get_part(workbook_name)?;
-    let workbook_root = parse_document(workbook.blob())?;
+    let workbook_root = super::codec::parse_document_limited(workbook.blob(), limits)?;
     let (core, rel) = source_namespaces(&workbook_root, "workbook")?;
     let refs = integration_refs(
         &workbook_root,
@@ -93,7 +156,7 @@ pub fn load_timeline_caches(package: &OpcPackage, workbook_name: &PackURI) -> Re
         output.push(Cache {
             relationship_id: id,
             part_name: target.to_string(),
-            definition: parse_timeline_cache_definition(part.blob())?,
+            definition: super::codec::parse_timeline_cache_definition_limited(part.blob(), limits)?,
         });
     }
     for relationship in workbook
@@ -119,6 +182,10 @@ pub fn load_timeline_caches(package: &OpcPackage, workbook_name: &PackURI) -> Re
             )));
         }
     }
+    let maximum = usize::try_from(limits.max_part_bytes()).unwrap_or(usize::MAX);
+    for cache in &output {
+        super::codec::preflight_cache_definition_limited(&cache.definition, maximum)?;
+    }
     validate_cache_set(&output)?;
     Ok(output)
 }
@@ -134,18 +201,32 @@ pub fn store_timeline_caches(
     workbook_name: &PackURI,
     caches: &[Cache],
 ) -> Result<()> {
+    store_timeline_caches_limited(package, workbook_name, caches, &SourceLimits::default())
+}
+
+pub(crate) fn store_timeline_caches_limited(
+    package: &mut OpcPackage,
+    workbook_name: &PackURI,
+    caches: &[Cache],
+    limits: &SourceLimits,
+) -> Result<()> {
     if caches.is_empty() {
         return Err(invalid("at least one View Cache is required for storage"));
     }
+    let maximum = usize::try_from(limits.max_part_bytes()).unwrap_or(usize::MAX);
+    for cache in caches {
+        super::codec::preflight_cache_definition_limited(&cache.definition, maximum)?;
+    }
     validate_cache_set(caches)?;
-    if !load_timeline_caches(package, workbook_name)?.is_empty() {
+    if !load_timeline_caches_limited(package, workbook_name, limits)?.is_empty() {
         return Err(invalid("workbook already contains View Caches"));
     }
     let workbook = package.get_part(workbook_name)?;
-    let root = parse_document(workbook.blob())?;
+    let root = super::codec::parse_document_limited(workbook.blob(), limits)?;
     let (core, rel) = source_namespaces(&root, "workbook")?;
     let mut targets = HashSet::new();
     let mut ids = HashSet::new();
+    let mut additions = Vec::with_capacity(caches.len());
     let mut plans = Vec::with_capacity(caches.len());
     for cache in caches {
         validate_relationship_id(&cache.relationship_id)?;
@@ -172,11 +253,22 @@ pub fn store_timeline_caches(
         {
             return Err(invalid(format!("View Cache target '{uri}' already exists")));
         }
-        plans.push((
+        additions.push((
             cache.relationship_id.clone(),
-            uri,
-            write_timeline_cache_definition(&cache.definition)?,
+            TIMELINE_CACHE_RELATIONSHIP_TYPE.to_owned(),
+            uri.relative_ref(workbook_name.base_uri()),
         ));
+    }
+    crate::raw::check_relationship_insertions(package, workbook_name, &additions, limits)?;
+    for cache in caches {
+        let uri = PackURI::new(&cache.part_name)
+            .map_err(|error| Error::Invalid(format!("invalid View Cache part URI: {error}")))?;
+        let xml = super::codec::write_timeline_cache_definition_limited(
+            &cache.definition,
+            usize::try_from(limits.max_part_bytes()).unwrap_or(usize::MAX),
+        )?;
+        crate::raw::check_output_bytes(xml.len(), limits)?;
+        plans.push((cache.relationship_id.clone(), uri, xml));
     }
     let refs: Vec<String> = plans.iter().map(|plan| plan.0.clone()).collect();
     let fragment = integration_extension(
@@ -186,13 +278,15 @@ pub fn store_timeline_caches(
         "timelineCacheRefs",
         "timelineCacheRef",
         &refs,
-    );
+        limits,
+    )?;
     let updated = insert_extension(
         workbook.blob(),
         &root,
         core,
         TIMELINE_CACHE_EXTENSION_URI,
         &fragment,
+        limits,
     )?;
     crate::signature_policy::ensure_unsigned(package)?;
     for (_, uri, xml) in &plans {
@@ -219,8 +313,16 @@ pub fn store_timeline_caches(
 
 /// Load every worksheet Views part and cross-validate views against View Caches.
 pub fn load_timelines(package: &OpcPackage, workbook_name: &PackURI) -> Result<Vec<Part>> {
+    load_timelines_limited(package, workbook_name, &SourceLimits::default())
+}
+
+pub(crate) fn load_timelines_limited(
+    package: &OpcPackage,
+    workbook_name: &PackURI,
+    limits: &SourceLimits,
+) -> Result<Vec<Part>> {
     reject_root_relationships(package, TIMELINES_RELATIONSHIP_TYPE, "Views")?;
-    let caches = load_timeline_caches(package, workbook_name)?;
+    let caches = load_timeline_caches_limited(package, workbook_name, limits)?;
     let cache_names: HashSet<String> = caches
         .iter()
         .map(|cache| cache.definition.name.to_lowercase())
@@ -242,7 +344,10 @@ pub fn load_timelines(package: &OpcPackage, workbook_name: &PackURI) -> Result<V
             }
             continue;
         }
-        let root = parse_document(package.get_part(part.partname())?.blob())?;
+        let root = super::codec::parse_document_limited(
+            package.get_part(part.partname())?.blob(),
+            limits,
+        )?;
         let (core, rel) = source_namespaces(&root, "worksheet")?;
         let refs = integration_refs(
             &root,
@@ -302,7 +407,7 @@ pub fn load_timelines(package: &OpcPackage, workbook_name: &PackURI) -> Result<V
                 "Views part '{target}' has forbidden outbound relationships"
             )));
         }
-        let timelines = parse_timelines(timeline_part.blob())?;
+        let timelines = super::codec::parse_timelines_limited(timeline_part.blob(), limits)?;
         for view in &timelines.timelines {
             if !cache_names.contains(&view.cache.to_lowercase()) {
                 return Err(invalid(format!(
@@ -341,8 +446,17 @@ pub fn store_worksheet_timelines(
     workbook_name: &PackURI,
     value: &Part,
 ) -> Result<()> {
+    store_worksheet_timelines_limited(package, workbook_name, value, &SourceLimits::default())
+}
+
+pub(crate) fn store_worksheet_timelines_limited(
+    package: &mut OpcPackage,
+    workbook_name: &PackURI,
+    value: &Part,
+    limits: &SourceLimits,
+) -> Result<()> {
     validate_views_local(&value.timelines)?;
-    let caches = load_timeline_caches(package, workbook_name)?;
+    let caches = load_timeline_caches_limited(package, workbook_name, limits)?;
     let cache_names: HashSet<String> = caches
         .iter()
         .map(|cache| cache.definition.name.to_lowercase())
@@ -355,7 +469,7 @@ pub fn store_worksheet_timelines(
             )));
         }
     }
-    let existing = load_timelines(package, workbook_name)?;
+    let existing = load_timelines_limited(package, workbook_name, limits)?;
     if existing
         .iter()
         .any(|sheet| sheet.worksheet_part_name == value.worksheet_part_name)
@@ -394,7 +508,7 @@ pub fn store_worksheet_timelines(
             value.relationship_id
         )));
     }
-    let root = parse_document(worksheet.blob())?;
+    let root = super::codec::parse_document_limited(worksheet.blob(), limits)?;
     let (core, rel) = source_namespaces(&root, "worksheet")?;
     let fragment = integration_extension(
         core,
@@ -403,15 +517,21 @@ pub fn store_worksheet_timelines(
         "timelineRefs",
         "timelineRef",
         std::slice::from_ref(&value.relationship_id),
-    );
+        limits,
+    )?;
     let updated = insert_extension(
         worksheet.blob(),
         &root,
         core,
         TIMELINES_EXTENSION_URI,
         &fragment,
+        limits,
     )?;
-    let xml = write_timelines(&value.timelines)?;
+    let xml = super::codec::write_timelines_limited(
+        &value.timelines,
+        usize::try_from(limits.max_part_bytes()).unwrap_or(usize::MAX),
+    )?;
+    crate::raw::check_output_bytes(xml.len(), limits)?;
     crate::signature_policy::ensure_unsigned(package)?;
     package.add_part(Box::new(BlobPart::new(
         target_uri.clone(),
@@ -490,29 +610,34 @@ fn integration_extension(
     list_name: &str,
     ref_name: &str,
     ids: &[String],
-) -> Vec<u8> {
-    let mut output = Vec::new();
-    output.extend_from_slice(b"<ext xmlns=\"");
-    escape(&mut output, core);
-    output.extend_from_slice(b"\" uri=\"");
-    escape(&mut output, uri);
-    output.extend_from_slice(b"\"><x15:");
-    output.extend_from_slice(list_name.as_bytes());
-    output.extend_from_slice(b" xmlns:x15=\"");
-    escape(&mut output, X15);
-    output.extend_from_slice(b"\" xmlns:r=\"");
-    escape(&mut output, rel);
-    output.extend_from_slice(b"\">");
+    limits: &SourceLimits,
+) -> Result<Vec<u8>> {
+    let maximum = usize::try_from(limits.max_part_bytes())
+        .unwrap_or(usize::MAX)
+        .min(MAX_REWRITE_BYTES);
+    let mut output = IntegrationXml::new(maximum);
+    output.append(b"<ext xmlns=\"")?;
+    output.escape(core)?;
+    output.append(b"\" uri=\"")?;
+    output.escape(uri)?;
+    output.append(b"\"><x15:")?;
+    output.append(list_name.as_bytes())?;
+    output.append(b" xmlns:x15=\"")?;
+    output.escape(X15)?;
+    output.append(b"\" xmlns:r=\"")?;
+    output.escape(rel)?;
+    output.append(b"\">")?;
     for id in ids {
-        output.extend_from_slice(b"<x15:");
-        output.extend_from_slice(ref_name.as_bytes());
-        attr(&mut output, "r:id", id);
-        output.extend_from_slice(b"/>");
+        output.append(b"<x15:")?;
+        output.append(ref_name.as_bytes())?;
+        output.append(b" r:id=\"")?;
+        output.escape(id)?;
+        output.append(b"\"/>")?;
     }
-    output.extend_from_slice(b"</x15:");
-    output.extend_from_slice(list_name.as_bytes());
-    output.extend_from_slice(b"></ext>");
-    output
+    output.append(b"</x15:")?;
+    output.append(list_name.as_bytes())?;
+    output.append(b"></ext>")?;
+    Ok(output.finish())
 }
 
 fn insert_extension(
@@ -521,6 +646,7 @@ fn insert_extension(
     core: &str,
     uri: &str,
     fragment: &[u8],
+    limits: &SourceLimits,
 ) -> Result<Vec<u8>> {
     if root
         .children
@@ -578,7 +704,9 @@ fn insert_extension(
                         .len()
                         .checked_add(fragment.len())
                         .ok_or_else(|| limit("rewrite bytes"))?;
-                    if size > MAX_REWRITE_BYTES {
+                    if size > MAX_REWRITE_BYTES
+                        || u64::try_from(size).unwrap_or(u64::MAX) > limits.max_part_bytes()
+                    {
                         return Err(limit("rewrite bytes"));
                     }
                     let mut output = Vec::with_capacity(size);
@@ -611,7 +739,9 @@ fn insert_extension(
             .len()
             .checked_add(fragment.len() + qname.len() + 2)
             .ok_or_else(|| limit("rewrite bytes"))?;
-        if size > MAX_REWRITE_BYTES {
+        if size > MAX_REWRITE_BYTES
+            || u64::try_from(size).unwrap_or(u64::MAX) > limits.max_part_bytes()
+        {
             return Err(limit("rewrite bytes"));
         }
         let raw = &xml[start..end];
@@ -631,17 +761,22 @@ fn insert_extension(
         return Ok(output);
     }
     let position = root_close.ok_or_else(|| invalid("missing source root closing element"))?;
-    let mut wrapper = Vec::new();
-    wrapper.extend_from_slice(b"<extLst xmlns=\"");
-    escape(&mut wrapper, core);
-    wrapper.extend_from_slice(b"\">");
-    wrapper.extend_from_slice(fragment);
-    wrapper.extend_from_slice(b"</extLst>");
+    let maximum = usize::try_from(limits.max_part_bytes())
+        .unwrap_or(usize::MAX)
+        .min(MAX_REWRITE_BYTES);
+    let mut wrapper = IntegrationXml::new(maximum);
+    wrapper.append(b"<extLst xmlns=\"")?;
+    wrapper.escape(core)?;
+    wrapper.append(b"\">")?;
+    wrapper.append(fragment)?;
+    wrapper.append(b"</extLst>")?;
+    let wrapper = wrapper.finish();
     let size = xml
         .len()
         .checked_add(wrapper.len())
         .ok_or_else(|| limit("rewrite bytes"))?;
-    if size > MAX_REWRITE_BYTES {
+    if size > MAX_REWRITE_BYTES || u64::try_from(size).unwrap_or(u64::MAX) > limits.max_part_bytes()
+    {
         return Err(limit("rewrite bytes"));
     }
     let mut output = Vec::with_capacity(size);

@@ -33,10 +33,13 @@ fn package() -> (OpcPackage, PackURI) {
 }
 
 fn slicer_cache(name: &str, source: &str) -> Definition {
-    slicer::read(
-        format!(r#"<slicerCacheDefinition xmlns="{X14}" name="{name}" sourceName="{source}"><data><tabular pivotCacheId="5"><items count="2"><i x="1"/><i x="0" s="1"/></items></tabular></data></slicerCacheDefinition>"#).as_bytes(),
+    slicer::read(slicer_cache_xml(name, source).as_bytes()).unwrap()
+}
+
+fn slicer_cache_xml(name: &str, source: &str) -> String {
+    format!(
+        r#"<slicerCacheDefinition xmlns="{X14}" name="{name}" sourceName="{source}"><data><tabular pivotCacheId="5"><items count="2"><i x="1"/><i x="0" s="1"/></items></tabular></data></slicerCacheDefinition>"#
     )
-    .unwrap()
 }
 
 fn timeline_cache(name: &str, source: &str) -> CacheDefinition {
@@ -95,7 +98,11 @@ fn raw_slicer_insert_preserves_identity_replay_inverse_and_untouched_bytes() {
     let before_worksheet = package.get_part(&worksheet).unwrap().blob().to_vec();
     let before_unrelated = package.get_part(&unrelated).unwrap().blob().to_vec();
     let source = litchi_xlsx::Package::from_opc(package).unwrap();
-    let limits = SourceLimits::default();
+    let limits = SourceLimits::builder()
+        .max_relationship_target_bytes(29)
+        .unwrap()
+        .build()
+        .unwrap();
     let tight_limits = SourceLimits::builder()
         .max_total_part_bytes(1)
         .unwrap()
@@ -115,12 +122,39 @@ fn raw_slicer_insert_preserves_identity_replay_inverse_and_untouched_bytes() {
             .is_err()
     );
     assert!(limited.cache("RejectedCache").unwrap().is_none());
+    let existing_max = before_workbook
+        .len()
+        .max(before_worksheet.len())
+        .max(before_unrelated.len());
+    let part_limited = SourceLimits::builder()
+        .max_part_bytes((existing_max + 1) as u64)
+        .unwrap()
+        .build()
+        .unwrap();
+    let mut writer_limited = source.edit_slicers().unwrap();
+    assert!(
+        writer_limited
+            .insert_cache(
+                slicer::raw::Cache {
+                    relationship_id: "rIdRejectedWriter".into(),
+                    part_name: "/xl/slicerCaches/rejected-writer.xml".into(),
+                    definition: slicer_cache("RejectedWriter", "State"),
+                },
+                &part_limited,
+            )
+            .is_err()
+    );
+    assert!(writer_limited.cache("RejectedWriter").unwrap().is_none());
     let mut edit = source.edit_slicers().unwrap();
     edit.insert_cache(
         slicer::raw::Cache {
             relationship_id: "rIdNativeSlicerCache".into(),
             part_name: "/xl/slicerCaches/native-cache.xml".into(),
-            definition: slicer_cache("NativeCache", "State"),
+            definition: slicer::raw::parse_cache(
+                slicer_cache_xml("NativeCache", "State").as_bytes(),
+                &limits,
+            )
+            .unwrap(),
         },
         &limits,
     )
@@ -130,8 +164,9 @@ fn raw_slicer_insert_preserves_identity_replay_inverse_and_untouched_bytes() {
         slicer::raw::Part {
             relationship_id: "rIdNativeSlicer".into(),
             part_name: "/xl/slicers/native.xml".into(),
-            slicers: slicer::read_views(
+            slicers: slicer::raw::parse_part(
                 format!(r#"<x14:slicers xmlns:x14="{X14}"><x14:slicer name="NativeView" cache="NativeCache" rowHeight="228600"/></x14:slicers>"#).as_bytes(),
+                &limits,
             )
             .unwrap(),
         },
@@ -231,25 +266,45 @@ fn raw_timeline_insert_preserves_identity_replay_inverse_and_untouched_bytes() {
     let before_worksheet = package.get_part(&worksheet).unwrap().blob().to_vec();
     let before_unrelated = package.get_part(&unrelated).unwrap().blob().to_vec();
     let source = litchi_xlsx::Package::from_opc(package).unwrap();
-    let limits = SourceLimits::default();
+    let limits = SourceLimits::builder()
+        .max_relationship_target_bytes(31)
+        .unwrap()
+        .build()
+        .unwrap();
+    let tight_limits = SourceLimits::builder()
+        .max_total_part_bytes(1)
+        .unwrap()
+        .build()
+        .unwrap();
+    let rejected = litchi_xlsx::timeline::raw::Cache {
+        relationship_id: "rIdRejectedTimelineCache".into(),
+        part_name: "/xl/timelineCaches/rejected.xml".into(),
+        definition: timeline_cache("RejectedTimelineCache", "Date"),
+    };
+    let mut limited = source.edit_timelines().unwrap();
+    assert!(limited.insert_caches(&[rejected], &tight_limits).is_err());
     let mut edit = source.edit_timelines().unwrap();
+    let cache_value = timeline_cache("NativeTimelineCache", "Date");
+    let cache_xml = litchi_xlsx::timeline::codec::write_cache(&cache_value).unwrap();
     edit.insert_caches(
         &[litchi_xlsx::timeline::raw::Cache {
             relationship_id: "rIdNativeTimelineCache".into(),
             part_name: "/xl/timelineCaches/native-cache.xml".into(),
-            definition: timeline_cache("NativeTimelineCache", "Date"),
+            definition: litchi_xlsx::timeline::raw::parse_cache(&cache_xml, &limits).unwrap(),
         }],
         &limits,
     )
     .unwrap();
+    let views_value = litchi_xlsx::timeline::Views {
+        timelines: vec![timeline("NativeTimeline", "NativeTimelineCache")],
+    };
+    let views_xml = litchi_xlsx::timeline::codec::write_views(&views_value).unwrap();
     edit.insert_part(
         litchi_xlsx::timeline::raw::Part {
             worksheet_part_name: worksheet.to_string(),
             relationship_id: "rIdNativeTimeline".into(),
             part_name: "/xl/timelines/native.xml".into(),
-            timelines: litchi_xlsx::timeline::Views {
-                timelines: vec![timeline("NativeTimeline", "NativeTimelineCache")],
-            },
+            timelines: litchi_xlsx::timeline::raw::parse_part(&views_xml, &limits).unwrap(),
         },
         &limits,
     )

@@ -20,6 +20,8 @@ pub mod web;
 pub(crate) mod worksheet;
 pub(crate) mod worksheet_property;
 
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
+
 /// Bounded source selection of one worksheet coordinate or rectangular range.
 ///
 /// This surface is an internal format-owner API. `NotEligible` is a
@@ -57,39 +59,233 @@ pub(crate) fn check_source_bytes(
     Ok(())
 }
 
-/// Check the materialized OPC graph against the caller's raw-operation
-/// policy after a staged graph operation.
-pub(crate) fn check_package_limits(
-    package: &litchi_opc::OpcPackage,
+pub(crate) fn check_limit(
+    kind: litchi_opc::SourceLimitKind,
+    actual: u64,
+    maximum: u64,
+) -> crate::Result<()> {
+    if actual > maximum {
+        return Err(crate::Error::Package(litchi_opc::OpcError::Limit {
+            kind,
+            observed: actual,
+            maximum,
+        }));
+    }
+    Ok(())
+}
+
+pub(crate) fn check_output_bytes(
+    actual: usize,
     limits: &litchi_opc::SourceLimits,
 ) -> crate::Result<()> {
-    let parts = package.iter_parts().count();
-    if parts > limits.max_parts() {
-        return Err(crate::Error::Package(litchi_opc::OpcError::Limit {
-            kind: litchi_opc::SourceLimitKind::Parts,
-            observed: parts as u64,
-            maximum: limits.max_parts() as u64,
-        }));
+    check_limit(
+        litchi_opc::SourceLimitKind::TotalPartBytes,
+        actual as u64,
+        limits.max_total_part_bytes(),
+    )
+}
+
+/// Admit an internal relationship target before its relative spelling is
+/// allocated. `PackURI::relative_ref_len` follows the writer without building
+/// the target string, so a tight target policy cannot be bypassed by an
+/// absolute native part name whose relative spelling is shorter.
+pub(crate) fn check_relationship_target(
+    target: &litchi_opc::PackURI,
+    owner_base_uri: &str,
+    limits: &litchi_opc::SourceLimits,
+) -> crate::Result<()> {
+    check_limit(
+        litchi_opc::SourceLimitKind::RelationshipTargetBytes,
+        target.relative_ref_len(owner_base_uri) as u64,
+        limits.max_relationship_target_bytes() as u64,
+    )
+}
+
+/// Keep a raw operation inside both the caller's requested policy and the
+/// policy retained when the package was opened. A later raw call may tighten
+/// that policy, but it cannot widen the package's original admission.
+pub(crate) fn effective_limits(
+    package: &litchi_opc::OpcPackage,
+    requested: litchi_opc::SourceLimits,
+) -> litchi_opc::SourceLimits {
+    requested.min(package.read_limits())
+}
+
+/// Admit one XML member under the caller's raw read policy before a format
+/// parser materializes its model.  The format codecs still perform their
+/// grammar and format-specific checks; this pass supplies the caller-owned
+/// event, depth, and attribute ceilings that those codecs do not own.
+pub(crate) fn check_xml_limits(
+    content: &[u8],
+    limits: &litchi_opc::SourceLimits,
+) -> crate::Result<()> {
+    check_source_bytes(content.len(), limits)?;
+    let mut reader = quick_xml::Reader::from_reader(content);
+    reader.config_mut().trim_text(false);
+    let mut depth = 0usize;
+    let mut events = 0usize;
+    loop {
+        let event = reader.read_event().map_err(|error| {
+            crate::Error::Xml(litchi_ooxml_common::XmlError::Malformed(error.to_string()))
+        })?;
+        events = events.checked_add(1).ok_or_else(|| {
+            limit_error(
+                litchi_opc::SourceLimitKind::Events,
+                u64::MAX,
+                limits.max_events() as u64,
+            )
+        })?;
+        if events > limits.max_events() {
+            return Err(limit_error(
+                litchi_opc::SourceLimitKind::Events,
+                events as u64,
+                limits.max_events() as u64,
+            ));
+        }
+        match event {
+            quick_xml::events::Event::Start(element) => {
+                check_xml_attributes(&element, limits)?;
+                depth = depth.checked_add(1).ok_or_else(|| {
+                    limit_error(
+                        litchi_opc::SourceLimitKind::Depth,
+                        u64::MAX,
+                        limits.max_depth() as u64,
+                    )
+                })?;
+                if depth > limits.max_depth() {
+                    return Err(limit_error(
+                        litchi_opc::SourceLimitKind::Depth,
+                        depth as u64,
+                        limits.max_depth() as u64,
+                    ));
+                }
+            },
+            quick_xml::events::Event::Empty(element) => {
+                check_xml_attributes(&element, limits)?;
+                let observed = depth.checked_add(1).ok_or_else(|| {
+                    limit_error(
+                        litchi_opc::SourceLimitKind::Depth,
+                        u64::MAX,
+                        limits.max_depth() as u64,
+                    )
+                })?;
+                if observed > limits.max_depth() {
+                    return Err(limit_error(
+                        litchi_opc::SourceLimitKind::Depth,
+                        observed as u64,
+                        limits.max_depth() as u64,
+                    ));
+                }
+            },
+            quick_xml::events::Event::End(_) => {
+                depth = depth.checked_sub(1).ok_or_else(|| {
+                    crate::Error::Invalid("XML closing element has no open parent".into())
+                })?;
+            },
+            quick_xml::events::Event::Eof => break,
+            _ => {},
+        }
+    }
+    Ok(())
+}
+
+fn check_xml_attributes(
+    element: &quick_xml::events::BytesStart<'_>,
+    limits: &litchi_opc::SourceLimits,
+) -> crate::Result<()> {
+    for attribute in element.checked_attributes() {
+        let attribute = attribute.map_err(|error| {
+            crate::Error::Xml(litchi_ooxml_common::XmlError::Malformed(error.to_string()))
+        })?;
+        let observed = attribute
+            .key
+            .as_ref()
+            .len()
+            .saturating_add(attribute.value.len());
+        if observed > limits.max_xml_attribute_bytes() {
+            return Err(limit_error(
+                litchi_opc::SourceLimitKind::XmlAttributeBytes,
+                observed as u64,
+                limits.max_xml_attribute_bytes() as u64,
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn limit_error(kind: litchi_opc::SourceLimitKind, observed: u64, maximum: u64) -> crate::Error {
+    crate::Error::Package(litchi_opc::OpcError::Limit {
+        kind,
+        observed,
+        maximum,
+    })
+}
+
+/// Admit a batch of newly authored internal relationships before any payload
+/// serializer or relationship mutation runs. Existing source relationship
+/// members retain their exact bytes; the affected owner uses the source-bound
+/// fragment plan that the mutation will publish. The admission is scoped to
+/// this owner so a raw edit does not add an unrelated package-wide scan to its
+/// already bounded family read.
+pub(crate) fn check_relationship_insertions(
+    package: &litchi_opc::OpcPackage,
+    owner: &litchi_opc::PackURI,
+    additions: &[(String, String, String)],
+    limits: &litchi_opc::SourceLimits,
+) -> crate::Result<()> {
+    if additions.len() > limits.max_relationships_per_part() {
+        return Err(limit_error(
+            litchi_opc::SourceLimitKind::RelationshipsPerPart,
+            additions.len() as u64,
+            limits.max_relationships_per_part() as u64,
+        ));
     }
 
-    let mut total = 0_u64;
-    for part in package.iter_parts() {
-        let bytes = package.get_part(part.partname())?.blob().len();
-        check_source_bytes(bytes, limits)?;
-        total = total.checked_add(bytes as u64).ok_or_else(|| {
-            crate::Error::Package(litchi_opc::OpcError::Limit {
-                kind: litchi_opc::SourceLimitKind::TotalPartBytes,
-                observed: u64::MAX,
-                maximum: limits.max_total_part_bytes(),
-            })
-        })?;
+    let mut edits = Vec::new();
+    edits.try_reserve_exact(additions.len()).map_err(|source| {
+        crate::Error::Package(litchi_opc::OpcError::Allocation {
+            resource: "XLSX raw relationship admission",
+            source,
+        })
+    })?;
+    for (id, reltype, target) in additions {
+        edits.push(litchi_opc::RelationshipEdit {
+            id,
+            reltype,
+            target,
+            mode: litchi_opc::TargetMode::Internal,
+        });
     }
-    if total > limits.max_total_part_bytes() {
-        return Err(crate::Error::Package(litchi_opc::OpcError::Limit {
-            kind: litchi_opc::SourceLimitKind::TotalPartBytes,
-            observed: total,
-            maximum: limits.max_total_part_bytes(),
-        }));
+    let source = package.source_relationships_with_limits(owner, *limits)?;
+    let plan = source.plan_edit(&edits, &[], *limits)?;
+    let relationship_parts = usize::from(plan.member_present());
+    if relationship_parts > limits.max_relationship_parts() {
+        return Err(limit_error(
+            litchi_opc::SourceLimitKind::RelationshipParts,
+            relationship_parts as u64,
+            limits.max_relationship_parts() as u64,
+        ));
+    }
+    if plan.final_len() > limits.max_total_relationship_xml_bytes() {
+        return Err(limit_error(
+            litchi_opc::SourceLimitKind::TotalRelationshipXmlBytes,
+            plan.final_len() as u64,
+            limits.max_total_relationship_xml_bytes() as u64,
+        ));
+    }
+    if plan.event_count() > limits.max_total_relationship_xml_events() {
+        return Err(limit_error(
+            litchi_opc::SourceLimitKind::TotalRelationshipXmlEvents,
+            plan.event_count() as u64,
+            limits.max_total_relationship_xml_events() as u64,
+        ));
+    }
+    if plan.relationship_count() > limits.max_total_relationships() {
+        return Err(limit_error(
+            litchi_opc::SourceLimitKind::TotalRelationships,
+            plan.relationship_count() as u64,
+            limits.max_total_relationships() as u64,
+        ));
     }
     Ok(())
 }

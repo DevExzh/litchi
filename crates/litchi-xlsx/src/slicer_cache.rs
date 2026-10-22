@@ -198,7 +198,7 @@ impl BoundedXml {
             return Err(limit(self.resource));
         }
         self.bytes
-            .try_reserve(bytes.len())
+            .try_reserve_exact(bytes.len())
             .map_err(|source| allocation(self.resource, source))?;
         self.bytes.extend_from_slice(bytes);
         Ok(())
@@ -488,9 +488,18 @@ pub fn parse(xml: &[u8]) -> Result<Definition> {
     Ok(value)
 }
 
+pub(crate) fn parse_limited(xml: &[u8], limits: &litchi_opc::SourceLimits) -> Result<Definition> {
+    crate::raw::check_xml_limits(xml, limits)?;
+    parse(xml)
+}
+
 pub fn write(value: &Definition) -> Result<Vec<u8>> {
+    write_limited(value, MAX_PART_BYTES)
+}
+
+pub(crate) fn write_limited(value: &Definition, maximum: usize) -> Result<Vec<u8>> {
     validate(value)?;
-    let mut output = BoundedXml::new(MAX_PART_BYTES, "serialized part bytes");
+    let mut output = BoundedXml::new(maximum.min(MAX_PART_BYTES), "serialized part bytes");
     output.append(b"<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>")?;
     output.append(b"<x14:slicerCacheDefinition xmlns:x14=\"")?;
     output.escape(X14)?;

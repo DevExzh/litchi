@@ -92,14 +92,18 @@ impl Edit {
     /// complete candidate graph is checked against `limits`, and publication
     /// still happens only through [`Self::commit`].
     pub fn insert_caches(&mut self, values: &[raw::Cache], limits: &SourceLimits) -> Result<()> {
+        let limits = crate::raw::effective_limits(self.staged.opc(), *limits);
+        for value in values {
+            raw::preflight_cache(value, self.workbook.base_uri(), &limits)?;
+        }
         let values = values
             .iter()
             .cloned()
             .map(raw::Cache::into_model)
             .collect::<Vec<_>>();
         let workbook = self.workbook.clone();
-        self.apply_raw(limits, move |candidate| {
-            crate::timelines::store_timeline_caches(candidate, &workbook, &values)
+        self.apply_raw(&limits, move |candidate| {
+            crate::timelines::store_timeline_caches_limited(candidate, &workbook, &values, &limits)
         })
     }
 
@@ -139,10 +143,14 @@ impl Edit {
     /// Insert a worksheet Timelines part with its caller-selected worksheet,
     /// relationship ID and part name.
     pub fn insert_part(&mut self, value: raw::Part, limits: &SourceLimits) -> Result<()> {
+        let limits = crate::raw::effective_limits(self.staged.opc(), *limits);
+        raw::preflight_part(&value, &limits)?;
         let value = value.into_model();
         let workbook = self.workbook.clone();
-        self.apply_raw(limits, move |candidate| {
-            crate::timelines::store_worksheet_timelines(candidate, &workbook, &value)
+        self.apply_raw(&limits, move |candidate| {
+            crate::timelines::store_worksheet_timelines_limited(
+                candidate, &workbook, &value, &limits,
+            )
         })
     }
 
@@ -222,13 +230,12 @@ impl Edit {
 
     fn apply_raw<T>(
         &mut self,
-        limits: &SourceLimits,
+        _limits: &SourceLimits,
         operation: impl FnOnce(&mut OpcPackage) -> Result<T>,
     ) -> Result<T> {
         let workbook = &self.workbook;
         self.staged.update(|candidate| {
             let value = operation(candidate)?;
-            crate::raw::check_package_limits(candidate, limits)?;
             super::validation::graph(candidate, workbook)?;
             Ok(value)
         })

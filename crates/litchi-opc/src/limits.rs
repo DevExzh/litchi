@@ -149,6 +149,59 @@ impl SourceLimits {
         }
     }
 
+    /// Intersect two source policies component by component.
+    ///
+    /// A format operation may tighten the policy supplied at open time, but
+    /// it must never widen that retained policy.  The componentwise minimum
+    /// preserves the consistency relationships checked by [`Self::build`].
+    #[must_use]
+    pub fn min(self, other: Self) -> Self {
+        Self {
+            input_bytes: self.input_bytes.min(other.input_bytes),
+            members: self.members.min(other.members),
+            archive_total_entries: self.archive_total_entries.min(other.archive_total_entries),
+            archive_member_name_bytes: self
+                .archive_member_name_bytes
+                .min(other.archive_member_name_bytes),
+            archive_metadata_bytes: self
+                .archive_metadata_bytes
+                .min(other.archive_metadata_bytes),
+            archive_compressed_bytes: self
+                .archive_compressed_bytes
+                .min(other.archive_compressed_bytes),
+            entry_bytes: self.entry_bytes.min(other.entry_bytes),
+            aggregate_bytes: self.aggregate_bytes.min(other.aggregate_bytes),
+            parts: self.parts.min(other.parts),
+            part_bytes: self.part_bytes.min(other.part_bytes),
+            total_part_bytes: self.total_part_bytes.min(other.total_part_bytes),
+            content_types_bytes: self.content_types_bytes.min(other.content_types_bytes),
+            content_type_mappings: self.content_type_mappings.min(other.content_type_mappings),
+            relationship_parts: self.relationship_parts.min(other.relationship_parts),
+            relationship_xml_bytes: self
+                .relationship_xml_bytes
+                .min(other.relationship_xml_bytes),
+            total_relationship_xml_bytes: self
+                .total_relationship_xml_bytes
+                .min(other.total_relationship_xml_bytes),
+            relationships_per_part: self
+                .relationships_per_part
+                .min(other.relationships_per_part),
+            total_relationships: self.total_relationships.min(other.total_relationships),
+            relationship_graph_nodes: self
+                .relationship_graph_nodes
+                .min(other.relationship_graph_nodes),
+            events: self.events.min(other.events),
+            total_relationship_xml_events: self
+                .total_relationship_xml_events
+                .min(other.total_relationship_xml_events),
+            depth: self.depth.min(other.depth),
+            xml_attribute_bytes: self.xml_attribute_bytes.min(other.xml_attribute_bytes),
+            relationship_target_bytes: self
+                .relationship_target_bytes
+                .min(other.relationship_target_bytes),
+        }
+    }
+
     /// Maximum accepted compressed package input bytes.
     #[must_use]
     pub const fn max_input_bytes(self) -> u64 {

@@ -6,12 +6,11 @@
 //! persistence.
 
 use super::{
-    Cache, Result, SLICER_CACHE_CONTENT_TYPE, SLICER_CACHE_RELATIONSHIP_TYPE, invalid, parse,
-    validate, write,
+    Cache, Result, SLICER_CACHE_CONTENT_TYPE, SLICER_CACHE_RELATIONSHIP_TYPE, invalid, validate,
 };
 use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
-use litchi_opc::{BlobPart, OpcPackage, PackURI};
+use litchi_opc::{BlobPart, OpcPackage, PackURI, SourceLimits};
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
@@ -32,8 +31,16 @@ const MAX_DEPTH: usize = 256;
 /// Load every Slicer Cache relationship listed by the workbook integration
 /// extension. Cache binaries and retained XML remain inert.
 pub fn load_slicer_caches(package: &OpcPackage) -> Result<Vec<Cache>> {
+    load_slicer_caches_limited(package, &SourceLimits::default())
+}
+
+pub(crate) fn load_slicer_caches_limited(
+    package: &OpcPackage,
+    limits: &SourceLimits,
+) -> Result<Vec<Cache>> {
     reject_root_relationship(package)?;
     let workbook = package.main_document_part()?;
+    crate::raw::check_xml_limits(workbook.blob(), limits)?;
     let (core, rel, ids) = integration_ids(workbook.blob())?;
     let _ = (core, rel);
     let mut seen_ids = HashSet::new();
@@ -74,7 +81,7 @@ pub fn load_slicer_caches(package: &OpcPackage) -> Result<Vec<Cache>> {
         output.push(Cache {
             relationship_id: id,
             part_name: target.to_string(),
-            definition: parse(part.blob())?,
+            definition: super::parse_limited(part.blob(), limits)?,
         });
     }
 
@@ -115,14 +122,23 @@ pub fn load_slicer_caches(package: &OpcPackage) -> Result<Vec<Cache>> {
 pub fn store_slicer_cache(package: &mut OpcPackage, value: &Cache) -> Result<()> {
     validate(&value.definition)?;
     let mut staged = package.clone();
-    store_slicer_cache_in_place(&mut staged, value)?;
+    store_slicer_cache_in_place(&mut staged, value, &SourceLimits::default())?;
     *package = staged;
     Ok(())
 }
 
-pub(crate) fn store_slicer_cache_in_place(package: &mut OpcPackage, value: &Cache) -> Result<()> {
+pub(crate) fn store_slicer_cache_in_place(
+    package: &mut OpcPackage,
+    value: &Cache,
+    limits: &SourceLimits,
+) -> Result<()> {
+    let xml = super::write_limited(
+        &value.definition,
+        usize::try_from(limits.max_part_bytes()).unwrap_or(usize::MAX),
+    )?;
+    crate::raw::check_output_bytes(xml.len(), limits)?;
     let workbook_name = package.main_document_part()?.partname().clone();
-    let existing = load_slicer_caches(package)?;
+    let existing = load_slicer_caches_limited(package, limits)?;
     if existing.iter().any(|cache| {
         cache
             .definition
@@ -166,7 +182,16 @@ pub(crate) fn store_slicer_cache_in_place(package: &mut OpcPackage, value: &Cach
         Err(litchi_opc::OpcError::PartNotFound(_)) => {},
         Err(error) => return Err(error.into()),
     }
-    let xml = write(&value.definition)?;
+    crate::raw::check_relationship_insertions(
+        package,
+        &workbook_name,
+        &[(
+            value.relationship_id.clone(),
+            SLICER_CACHE_RELATIONSHIP_TYPE.to_owned(),
+            uri.relative_ref(workbook_name.base_uri()),
+        )],
+        limits,
+    )?;
     let ids = existing
         .iter()
         .map(|cache| cache.relationship_id.clone())
@@ -179,6 +204,7 @@ pub(crate) fn store_slicer_cache_in_place(package: &mut OpcPackage, value: &Cach
         "slicerCaches",
         "slicerCache",
         X14,
+        limits,
     )?;
     crate::signature_policy::ensure_unsigned(package)?;
     package.try_add_part(Box::new(BlobPart::new(
@@ -358,6 +384,7 @@ fn rewrite_or_insert(
     list: &str,
     item: &str,
     family_ns: &str,
+    limits: &SourceLimits,
 ) -> Result<Vec<u8>> {
     let (core, rel) = root_namespaces(xml)?;
     let mut reader = NsReader::from_reader(xml);
@@ -436,14 +463,16 @@ fn rewrite_or_insert(
             return Err(invalid("Slicer Cache integration XML is too deep"));
         }
     }
-    let fragment = integration_fragment(core, rel, uri, family_ns, list, item, ids);
+    let fragment = integration_fragment(core, rel, uri, family_ns, list, item, ids, limits)?;
     if let (Some(start), Some(end)) = (start, end) {
         let size = xml
             .len()
             .checked_sub(end.saturating_sub(start))
             .and_then(|value| value.checked_add(fragment.len()))
             .ok_or_else(|| invalid("Slicer Cache rewrite size overflow"))?;
-        if size > MAX_REWRITE_BYTES {
+        if size > MAX_REWRITE_BYTES
+            || u64::try_from(size).unwrap_or(u64::MAX) > limits.max_part_bytes()
+        {
             return Err(invalid("rewritten Slicer Cache XML exceeds limit"));
         }
         let mut output = Vec::with_capacity(size);
@@ -460,7 +489,8 @@ fn rewrite_or_insert(
         .len()
         .checked_add(fragment.len())
         .ok_or_else(|| invalid("Slicer Cache XML size overflow"))?;
-    if size > MAX_REWRITE_BYTES {
+    if size > MAX_REWRITE_BYTES || u64::try_from(size).unwrap_or(u64::MAX) > limits.max_part_bytes()
+    {
         return Err(invalid("rewritten Slicer Cache XML exceeds limit"));
     }
     let mut output = Vec::with_capacity(size);
@@ -480,21 +510,34 @@ fn integration_fragment(
     list: &str,
     item: &str,
     ids: &[String],
-) -> Vec<u8> {
-    use std::fmt::Write as _;
-
-    let mut output = format!(
-        "<ext xmlns=\"{core}\" uri=\"{uri}\"><f:{list} xmlns:f=\"{family_ns}\" xmlns:r=\"{rel}\">"
-    );
+    limits: &SourceLimits,
+) -> Result<Vec<u8>> {
+    let maximum = usize::try_from(limits.max_part_bytes())
+        .unwrap_or(usize::MAX)
+        .min(MAX_REWRITE_BYTES);
+    let mut output = super::BoundedXml::new(maximum, "Slicer Cache integration XML");
+    output.append(b"<ext xmlns=\"")?;
+    output.escape(core)?;
+    output.append(b"\" uri=\"")?;
+    output.escape(uri)?;
+    output.append(b"\"><f:")?;
+    output.append(list.as_bytes())?;
+    output.append(b" xmlns:f=\"")?;
+    output.escape(family_ns)?;
+    output.append(b"\" xmlns:r=\"")?;
+    output.escape(rel)?;
+    output.append(b"\">")?;
     for id in ids {
-        write!(output, "<f:{item} r:id=\"{}\"/>", xml_escape(id)).unwrap_or_else(|error| {
-            crate::error::panic_error_invariant("writing to a String is infallible", error)
-        });
+        output.append(b"<f:")?;
+        output.append(item.as_bytes())?;
+        output.append(b" r:id=\"")?;
+        output.escape(id)?;
+        output.append(b"\"/>")?;
     }
-    write!(output, "</f:{list}></ext>").unwrap_or_else(|error| {
-        crate::error::panic_error_invariant("writing to a String is infallible", error)
-    });
-    output.into_bytes()
+    output.append(b"</f:")?;
+    output.append(list.as_bytes())?;
+    output.append(b"></ext>")?;
+    Ok(output.finish())
 }
 
 fn root_namespaces(xml: &[u8]) -> Result<(&'static str, &'static str)> {
@@ -568,11 +611,4 @@ fn validate_relationship_id(value: &str) -> Result<()> {
         )));
     }
     Ok(())
-}
-
-fn xml_escape(value: &str) -> String {
-    value
-        .replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('"', "&quot;")
 }
