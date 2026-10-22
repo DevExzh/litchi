@@ -708,7 +708,8 @@ pub fn resolved_namespace_uri<'uri>(
             "the namespace prefix is not bound",
         )),
         ResolveResult::Bound(Namespace(raw)) => {
-            let uri = decode_namespace_uri(raw, decoder, context, MAX_NAMESPACE_URI_BYTES)?;
+            let uri = decode_namespace_uri(raw, decoder, context, MAX_NAMESPACE_URI_BYTES)
+                .map_err(NamespaceUriError::into_core)?;
             if uri.as_ref() == XMLNS_DECLARATION_NAMESPACE {
                 return Err(invalid_namespace(
                     context,
@@ -844,8 +845,8 @@ pub fn normalize_namespace_uri<'uri>(
     decoder: quick_xml::Decoder,
     context: &str,
     max_uri_bytes: usize,
-) -> Result<Cow<'uri, str>> {
-    decode_namespace_uri(raw, decoder, context, max_uri_bytes)
+) -> std::result::Result<Cow<'uri, str>, crate::Error> {
+    decode_namespace_uri(raw, decoder, context, max_uri_bytes).map_err(NamespaceUriError::into_odf)
 }
 
 fn invalid_namespace(context: &str, reason: &str) -> Error {
@@ -857,13 +858,11 @@ fn decode_namespace_uri<'uri>(
     decoder: quick_xml::Decoder,
     context: &str,
     max_uri_bytes: usize,
-) -> Result<Cow<'uri, str>> {
+) -> NamespaceUriResult<Cow<'uri, str>> {
     if max_uri_bytes == 0 || max_uri_bytes > MAX_NAMESPACE_URI_BYTES {
-        return Err(Error::InvalidLimit {
-            kind: Resource::Memory,
+        return Err(NamespaceUriError::InvalidLimit {
             value: max_uri_bytes as u64,
             maximum: MAX_NAMESPACE_URI_BYTES as u64,
-            scope: "ODF raw XML namespace URI bytes",
         });
     }
     ensure_utf8_decoder(decoder, context)?;
@@ -871,10 +870,10 @@ fn decode_namespace_uri<'uri>(
         return Err(namespace_limit(raw.len(), max_uri_bytes));
     }
     if raw.contains(&b'<') {
-        return Err(invalid_namespace(
+        return Err(NamespaceUriError::from(invalid_namespace(
             context,
             "the lexical value contains an unescaped '<'",
-        ));
+        )));
     }
 
     let decoded = decoder.decode(raw).map_err(|error| {
@@ -907,13 +906,62 @@ fn decode_namespace_uri<'uri>(
     Ok(Cow::Owned(output))
 }
 
-fn namespace_limit(observed: usize, maximum: usize) -> Error {
-    Error::ResourceLimit(ResourceLimit {
-        resource: Resource::Memory,
+#[derive(Debug)]
+enum NamespaceUriError {
+    InvalidLimit { value: u64, maximum: u64 },
+    Limit { observed: u64, maximum: u64 },
+    Core(Error),
+}
+
+type NamespaceUriResult<T> = std::result::Result<T, NamespaceUriError>;
+
+impl From<Error> for NamespaceUriError {
+    fn from(error: Error) -> Self {
+        Self::Core(error)
+    }
+}
+
+impl NamespaceUriError {
+    fn into_core(self) -> Error {
+        match self {
+            Self::InvalidLimit { value, maximum } => Error::InvalidLimit {
+                kind: Resource::Memory,
+                value,
+                maximum,
+                scope: "ODF raw XML namespace URI bytes",
+            },
+            Self::Limit { observed, maximum } => Error::ResourceLimit(ResourceLimit {
+                resource: Resource::Memory,
+                observed,
+                limit: maximum,
+                scope: Arc::from("ODF raw XML namespace URI bytes"),
+            }),
+            Self::Core(error) => error,
+        }
+    }
+
+    fn into_odf(self) -> crate::Error {
+        match self {
+            Self::InvalidLimit { value, maximum } => crate::Error::InvalidLimit {
+                kind: crate::LimitKind::RawXml(crate::RawXmlLimitKind::NamespaceUriBytes),
+                value,
+                maximum,
+            },
+            Self::Limit { observed, maximum } => crate::Error::Limit {
+                kind: crate::LimitKind::RawXml(crate::RawXmlLimitKind::NamespaceUriBytes),
+                observed,
+                maximum,
+            },
+            Self::Core(error) => crate::Error::Core(error),
+        }
+    }
+}
+
+fn namespace_limit(observed: usize, maximum: usize) -> NamespaceUriError {
+    NamespaceUriError::Limit {
         observed: observed as u64,
-        limit: maximum as u64,
-        scope: Arc::from("ODF raw XML namespace URI bytes"),
-    })
+        maximum: maximum as u64,
+    }
 }
 
 fn ensure_utf8_decoder(decoder: quick_xml::Decoder, context: &str) -> Result<()> {

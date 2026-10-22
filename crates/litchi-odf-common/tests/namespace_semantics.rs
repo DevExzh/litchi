@@ -7,8 +7,9 @@
 
 use litchi_odf_common::namespace::{
     MAX_NAMESPACE_URI_BYTES, XMLNS, XMLNS_DECLARATION_NAMESPACE, namespace_matches,
-    resolved_namespace_uri, validate_namespace_binding,
+    normalize_namespace_uri, resolved_namespace_uri, validate_namespace_binding,
 };
+use litchi_odf_common::{Error as OdfError, LimitKind, RawXmlLimitKind};
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
 use std::borrow::Cow;
@@ -160,4 +161,34 @@ fn lexical_uri_and_normalized_output_are_bounded_before_destination_allocation()
     let raw = vec![b'x'; MAX_NAMESPACE_URI_BYTES];
     let namespace = ResolveResult::Bound(Namespace(raw.as_slice()));
     assert!(resolved_namespace_uri(&namespace, decoder(), "maximum URI").is_ok());
+}
+
+#[test]
+fn normalize_namespace_uri_reports_typed_raw_uri_limits() {
+    let raw = b"urn:example:namespace";
+    let normalized = normalize_namespace_uri(raw, decoder(), "namespace declaration", raw.len())
+        .expect("the exact URI byte limit must be accepted");
+    assert_eq!(normalized.as_ref(), "urn:example:namespace");
+
+    let error = normalize_namespace_uri(raw, decoder(), "namespace declaration", raw.len() - 1)
+        .expect_err("one byte below the URI must be rejected");
+    assert!(matches!(
+        error,
+        OdfError::Limit {
+            kind: LimitKind::RawXml(RawXmlLimitKind::NamespaceUriBytes),
+            observed,
+            maximum,
+        } if observed == raw.len() as u64 && maximum == (raw.len() - 1) as u64
+    ));
+
+    let invalid = normalize_namespace_uri(raw, decoder(), "namespace declaration", 0)
+        .expect_err("zero is not a valid URI byte limit");
+    assert!(matches!(
+        invalid,
+        OdfError::InvalidLimit {
+            kind: LimitKind::RawXml(RawXmlLimitKind::NamespaceUriBytes),
+            value: 0,
+            ..
+        }
+    ));
 }
