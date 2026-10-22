@@ -12,6 +12,8 @@ use std::{borrow::Cow, ops::Range, sync::Arc};
 
 use crate::Package;
 
+type FamilyResult<T> = std::result::Result<T, Error>;
+
 /// Whether a commit changed the package bytes.
 pub use litchi_core::edit::Diagnostics;
 /// The family error: typed limits, refusals and patch conflicts plus the
@@ -104,7 +106,7 @@ impl<'source> Edit<'source> {
     ///
     /// Returns an error when the target exceeds the bounded input size or is
     /// not representable as XML 1.0 character data.
-    pub fn set_href(&mut self, value: impl Into<String>) -> Result<()> {
+    pub fn set_href(&mut self, value: impl Into<String>) -> FamilyResult<()> {
         let href = value.into();
         validate_href(&href)?;
         self.after = href;

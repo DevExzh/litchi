@@ -3,10 +3,12 @@
 use super::mutable::MutablePresentation;
 use crate::core::OwnedPackage;
 use crate::{Presentation, Reference, Shape, Slide};
-use litchi_core::{Error, Result};
+use litchi_core::{Error as CoreError, Result as CoreResult};
 /// The family error of package-level verbs, [`Edit::commit`] and
 /// [`Package::apply`]: typed limits plus the common-core payload.
 pub use litchi_odf_common::Error as PackageError;
+
+type FamilyResult<T> = Result<T, PackageError>;
 pub use litchi_odf_common::{LimitKind, OpenOptions};
 use std::fs::File;
 use std::io::Read;
@@ -288,7 +290,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error only when the fixed minimal package cannot be built.
-    pub fn new() -> std::result::Result<Self, PackageError> {
+    pub fn new() -> Result<Self, PackageError> {
         crate::Builder::new().build()
     }
 
@@ -298,7 +300,7 @@ impl Package {
     ///
     /// Returns [`PackageError::Limit`] when a source dimension is exceeded and
     /// [`PackageError::Core`] for I/O, archive or family-validation failures.
-    pub fn open(path: impl AsRef<Path>) -> std::result::Result<Self, PackageError> {
+    pub fn open(path: impl AsRef<Path>) -> Result<Self, PackageError> {
         Self::open_with_options(path, OpenOptions::new())
     }
 
@@ -310,7 +312,7 @@ impl Package {
     pub fn open_with_options(
         path: impl AsRef<Path>,
         options: OpenOptions,
-    ) -> std::result::Result<Self, PackageError> {
+    ) -> Result<Self, PackageError> {
         Self::from_reader_with_options(File::open(path)?, options)
     }
 
@@ -322,7 +324,7 @@ impl Package {
     pub fn open_with_password(
         path: impl AsRef<Path>,
         password: impl Into<String>,
-    ) -> std::result::Result<Self, PackageError> {
+    ) -> Result<Self, PackageError> {
         Self::open_with_password_and_options(path, password, OpenOptions::new())
     }
 
@@ -335,7 +337,7 @@ impl Package {
         path: impl AsRef<Path>,
         password: impl Into<String>,
         options: OpenOptions,
-    ) -> std::result::Result<Self, PackageError> {
+    ) -> Result<Self, PackageError> {
         let password = zeroize::Zeroizing::new(password.into());
         let package = OwnedPackage::from_reader_with_password_and_options(
             File::open(path)?,
@@ -350,7 +352,7 @@ impl Package {
     /// # Errors
     ///
     /// As [`Self::open`].
-    pub fn from_bytes(bytes: &[u8]) -> std::result::Result<Self, PackageError> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, PackageError> {
         Self::from_bytes_with_options(bytes, OpenOptions::new())
     }
 
@@ -362,7 +364,7 @@ impl Package {
     pub fn from_bytes_with_options(
         bytes: &[u8],
         options: OpenOptions,
-    ) -> std::result::Result<Self, PackageError> {
+    ) -> Result<Self, PackageError> {
         let limits = options.source_limits_value();
         check_input_bytes(bytes.len(), limits)?;
         let package = OwnedPackage::from_bytes_with_options(
@@ -380,7 +382,7 @@ impl Package {
     pub fn from_bytes_with_password(
         bytes: &[u8],
         password: impl Into<String>,
-    ) -> std::result::Result<Self, PackageError> {
+    ) -> Result<Self, PackageError> {
         Self::from_bytes_with_password_and_options(bytes, password, OpenOptions::new())
     }
 
@@ -394,7 +396,7 @@ impl Package {
         bytes: &[u8],
         password: impl Into<String>,
         options: OpenOptions,
-    ) -> std::result::Result<Self, PackageError> {
+    ) -> Result<Self, PackageError> {
         let password = zeroize::Zeroizing::new(password.into());
         let limits = options.source_limits_value();
         check_input_bytes(bytes.len(), limits)?;
@@ -411,7 +413,7 @@ impl Package {
     /// # Errors
     ///
     /// As [`Self::open`].
-    pub fn from_reader(reader: impl Read) -> std::result::Result<Self, PackageError> {
+    pub fn from_reader(reader: impl Read) -> Result<Self, PackageError> {
         Self::from_reader_with_options(reader, OpenOptions::new())
     }
 
@@ -424,7 +426,7 @@ impl Package {
     pub fn from_reader_with_options(
         reader: impl Read,
         options: OpenOptions,
-    ) -> std::result::Result<Self, PackageError> {
+    ) -> Result<Self, PackageError> {
         let package = OwnedPackage::from_reader_with_options(reader, options)?;
         Self::from_opened(package, options)
     }
@@ -434,11 +436,11 @@ impl Package {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::UnexpectedFormat`] (as [`PackageError::Core`]) when
+    /// Returns [`CoreError::UnexpectedFormat`] (as [`PackageError::Core`]) when
     /// the prepared package is another family.
     pub fn from_prepared_package(
         prepared: litchi_odf_common::PreparedPackage,
-    ) -> std::result::Result<Self, PackageError> {
+    ) -> Result<Self, PackageError> {
         Self::from_prepared_package_with_options(prepared, OpenOptions::new())
     }
 
@@ -451,9 +453,9 @@ impl Package {
     pub fn from_prepared_package_with_options(
         prepared: litchi_odf_common::PreparedPackage,
         options: OpenOptions,
-    ) -> std::result::Result<Self, PackageError> {
+    ) -> Result<Self, PackageError> {
         if prepared.format() != litchi_core::FileFormat::Odp {
-            return Err(Error::UnexpectedFormat {
+            return Err(CoreError::UnexpectedFormat {
                 detected: prepared.format(),
             }
             .into());
@@ -461,10 +463,7 @@ impl Package {
         Self::from_opened(prepared.into_package(), options)
     }
 
-    fn from_opened(
-        package: OwnedPackage,
-        options: OpenOptions,
-    ) -> std::result::Result<Self, PackageError> {
+    fn from_opened(package: OwnedPackage, options: OpenOptions) -> Result<Self, PackageError> {
         let semantic = options.semantic_limits_value();
         if !semantic.is_default() {
             if let Some(size) = package.package()?.member_materialized_size("content.xml")? {
@@ -497,7 +496,7 @@ impl Package {
     /// archive is indexed and validated now; the projection is decoded on
     /// the first [`Self::presentation`] call and the bounded slide
     /// projection on the first edit.
-    pub(crate) fn from_authored(bytes: Vec<u8>) -> Result<Self> {
+    pub(crate) fn from_authored(bytes: Vec<u8>) -> CoreResult<Self> {
         let package = OwnedPackage::from_bytes(bytes)?;
         Ok(Self {
             bytes: package.shared_bytes(),
@@ -508,7 +507,7 @@ impl Package {
     }
 
     /// The parsed projection, decoded on first use.
-    fn projection(&self) -> Result<&Presentation> {
+    fn projection(&self) -> CoreResult<&Presentation> {
         if let Some(presentation) = self.presentation.get() {
             return Ok(presentation);
         }
@@ -517,11 +516,11 @@ impl Package {
     }
 
     /// Reopen complete bytes produced inside the crate.
-    pub(crate) fn from_vec(bytes: Vec<u8>) -> Result<Self> {
+    pub(crate) fn from_vec(bytes: Vec<u8>) -> CoreResult<Self> {
         Self::from_shared_bytes(Arc::new(bytes))
     }
 
-    pub(crate) fn from_shared_bytes(bytes: Arc<Vec<u8>>) -> Result<Self> {
+    pub(crate) fn from_shared_bytes(bytes: Arc<Vec<u8>>) -> CoreResult<Self> {
         if bytes.len() > MAX_PACKAGE_BYTES {
             return invalid("ODP editing package exceeds the 128 MiB limit");
         }
@@ -531,7 +530,7 @@ impl Package {
 
     /// Validate a candidate package and its bounded slide projection, as
     /// commit and patch decoding require.
-    pub(crate) fn from_owned_package(package: OwnedPackage) -> Result<Self> {
+    pub(crate) fn from_owned_package(package: OwnedPackage) -> CoreResult<Self> {
         validate_package_size(package.as_bytes().len())?;
         let presentation = Presentation::from_owned_package(package)?;
         let editing = editing_projection(&presentation)?;
@@ -541,7 +540,7 @@ impl Package {
     }
 
     /// The bounded slide projection, parsed and checked on first use.
-    fn editing(&self) -> Result<&Editing> {
+    fn editing(&self) -> CoreResult<&Editing> {
         if let Some(editing) = self.editing.get() {
             return Ok(editing);
         }
@@ -557,7 +556,7 @@ impl Package {
     ///
     /// Returns an error when a freshly built package's projection cannot be
     /// decoded; an opened package was decoded at open.
-    pub fn presentation(&self) -> Result<Presentation> {
+    pub fn presentation(&self) -> FamilyResult<Presentation> {
         Ok(self.projection()?.clone())
     }
 
@@ -582,7 +581,7 @@ impl Package {
     ///
     /// Returns an error when the package exceeds the editing slide-count or
     /// aggregate draft limits.
-    pub fn slides(&self) -> Result<&[Slide]> {
+    pub fn slides(&self) -> FamilyResult<&[Slide]> {
         Ok(&self.editing()?.slides)
     }
 
@@ -593,7 +592,7 @@ impl Package {
     /// Returns [`PackageError::PatchConflict`] when this package is not
     /// byte-identical to the patch source, or an error when its
     /// signature/encryption policy makes it read-only.
-    pub fn apply(&self, patch: &Patch) -> std::result::Result<Commit, PackageError> {
+    pub fn apply(&self, patch: &Patch) -> Result<Commit, PackageError> {
         if !same_source(&patch.before, self) {
             return Err(PackageError::patch_conflict(
                 "odp.apply",
@@ -612,7 +611,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns [`PackageError::Core`] carrying the I/O failure.
-    pub fn save(&self, path: impl AsRef<Path>) -> std::result::Result<(), PackageError> {
+    pub fn save(&self, path: impl AsRef<Path>) -> Result<(), PackageError> {
         self.save_with_durability(path, litchi_core::Durability::Full)
     }
 
@@ -625,7 +624,7 @@ impl Package {
         &self,
         path: impl AsRef<Path>,
         durability: litchi_core::Durability,
-    ) -> std::result::Result<(), PackageError> {
+    ) -> Result<(), PackageError> {
         litchi_odf_common::publish::save_bytes(path.as_ref(), self.as_bytes(), durability)
     }
 
@@ -634,7 +633,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns an allocation failure.
-    pub fn to_bytes(&self) -> std::result::Result<Vec<u8>, PackageError> {
+    pub fn to_bytes(&self) -> Result<Vec<u8>, PackageError> {
         Ok(copy_input(self.as_bytes())?)
     }
 
@@ -643,10 +642,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns the stream's I/O failure.
-    pub fn write_to(
-        &self,
-        mut writer: impl std::io::Write,
-    ) -> std::result::Result<(), PackageError> {
+    pub fn write_to(&self, mut writer: impl std::io::Write) -> Result<(), PackageError> {
         writer.write_all(self.as_bytes())?;
         Ok(())
     }
@@ -656,8 +652,8 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error when the retained package cannot be reopened.
-    pub fn security_policy(&self) -> Result<SecurityPolicy> {
-        package_security_policy(&self.package)
+    pub fn security_policy(&self) -> FamilyResult<SecurityPolicy> {
+        package_security_policy(&self.package).map_err(PackageError::from)
     }
 
     /// Resolve one crypto lifecycle request without mutating the package.
@@ -669,7 +665,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error when the retained package cannot be reopened.
-    pub fn crypto_capability(&self, operation: CryptoOperation) -> Result<CryptoCapability> {
+    pub fn crypto_capability(&self, operation: CryptoOperation) -> FamilyResult<CryptoCapability> {
         let policy = self.security_policy()?;
         Ok(match operation {
             CryptoOperation::VerifySignatures => {
@@ -708,13 +704,13 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error for malformed, ambiguous, or oversized content owners.
-    pub fn rich_content(&self) -> Result<crate::content::Inventory> {
-        crate::content::inventory(&self.package)
+    pub fn rich_content(&self) -> FamilyResult<crate::content::Inventory> {
+        crate::content::inventory(&self.package).map_err(PackageError::from)
     }
 
     /// Inspect typed drawing-layer declarations without eagerly materializing
     /// them during snapshot opening.
-    pub fn layers(&self) -> Result<crate::model::LayerInventory> {
+    pub fn layers(&self) -> FamilyResult<crate::model::LayerInventory> {
         let content = String::from_utf8(self.package.get_file("content.xml")?)
             .map_err(|error| invalid_error(format!("ODP content.xml is not UTF-8: {error}")))?;
         let styles = if self.package.has_file("styles.xml")? {
@@ -726,7 +722,7 @@ impl Package {
         } else {
             None
         };
-        crate::model::layer::inventory(&content, styles.as_deref())
+        crate::model::layer::inventory(&content, styles.as_deref()).map_err(PackageError::from)
     }
 
     /// Select a slide by checked zero-based position or exact title.
@@ -734,12 +730,14 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error when a title matches more than one slide.
-    pub fn slide<'a, S>(&self, selector: S) -> Result<Option<&Slide>>
+    pub fn slide<'a, S>(&self, selector: S) -> FamilyResult<Option<&Slide>>
     where
         S: Into<Selector<'a>>,
     {
         let slides = &self.editing()?.slides;
-        select(slides, selector.into()).map(|selected| selected.map(|position| &slides[position]))
+        select(slides, selector.into())
+            .map(|selected| selected.map(|position| &slides[position]))
+            .map_err(PackageError::from)
     }
 
     /// Start an isolated transaction over a detached staging engine.
@@ -748,11 +746,11 @@ impl Package {
     ///
     /// Returns an error when the exact source package cannot be reparsed for staging or
     /// its signature/encryption policy makes it read-only.
-    pub fn edit(&self) -> std::result::Result<Edit, PackageError> {
+    pub fn edit(&self) -> Result<Edit, PackageError> {
         Ok(self.edit_core()?)
     }
 
-    pub(crate) fn edit_core(&self) -> Result<Edit> {
+    pub(crate) fn edit_core(&self) -> CoreResult<Edit> {
         let editing = self.editing()?;
         let presentation = Presentation::from_owned_package(self.package.clone())?;
         ensure_editable_source(presentation.owned_package())?;
@@ -1032,9 +1030,9 @@ impl Edit {
     ///
     /// The inventory is rebuilt from the source-bound XML after replaying the
     /// staged layer operations.  Unknown XML remains outside this typed view.
-    pub fn layers(&self) -> Result<crate::model::LayerInventory> {
+    pub fn layers(&self) -> FamilyResult<crate::model::LayerInventory> {
         let package = self.layer_package()?;
-        crate::authoring::layer::inventory(&package)
+        crate::authoring::layer::inventory(&package).map_err(PackageError::from)
     }
 
     /// Add a drawing layer to a selected global, page-local, or master-page
@@ -1043,17 +1041,18 @@ impl Edit {
         &mut self,
         owner: crate::model::LayerOwner,
         layer: crate::model::Layer,
-    ) -> Result<()> {
+    ) -> FamilyResult<()> {
         self.stage_layer(crate::authoring::layer::Operation::Add { owner, layer })
+            .map_err(PackageError::from)
     }
 
     /// Add a global layer declared in `office:master-styles`.
-    pub fn add_global_layer(&mut self, layer: crate::model::Layer) -> Result<()> {
+    pub fn add_global_layer(&mut self, layer: crate::model::Layer) -> FamilyResult<()> {
         self.add_layer(crate::model::LayerOwner::master_styles(), layer)
     }
 
     /// Add a layer declared directly by a presentation page.
-    pub fn add_page_layer(&mut self, page: usize, layer: crate::model::Layer) -> Result<()> {
+    pub fn add_page_layer(&mut self, page: usize, layer: crate::model::Layer) -> FamilyResult<()> {
         self.add_layer(crate::model::LayerOwner::page(page), layer)
     }
 
@@ -1062,7 +1061,7 @@ impl Edit {
         &mut self,
         master_page: impl Into<String>,
         layer: crate::model::Layer,
-    ) -> Result<()> {
+    ) -> FamilyResult<()> {
         self.add_layer(crate::model::LayerOwner::master_page(master_page), layer)
     }
 
@@ -1072,21 +1071,22 @@ impl Edit {
         owner: crate::model::LayerOwner,
         from: &str,
         to: &str,
-    ) -> Result<()> {
+    ) -> FamilyResult<()> {
         self.stage_layer(crate::authoring::layer::Operation::Rename {
             owner,
             from: from.to_owned(),
             to: to.to_owned(),
         })
+        .map_err(PackageError::from)
     }
 
     /// Rename a global layer and its resolved shape references.
-    pub fn rename_global_layer(&mut self, from: &str, to: &str) -> Result<()> {
+    pub fn rename_global_layer(&mut self, from: &str, to: &str) -> FamilyResult<()> {
         self.rename_layer(crate::model::LayerOwner::master_styles(), from, to)
     }
 
     /// Rename a page-local layer and its resolved shape references.
-    pub fn rename_page_layer(&mut self, page: usize, from: &str, to: &str) -> Result<()> {
+    pub fn rename_page_layer(&mut self, page: usize, from: &str, to: &str) -> FamilyResult<()> {
         self.rename_layer(crate::model::LayerOwner::page(page), from, to)
     }
 
@@ -1096,7 +1096,7 @@ impl Edit {
         master_page: impl Into<String>,
         from: &str,
         to: &str,
-    ) -> Result<()> {
+    ) -> FamilyResult<()> {
         self.rename_layer(crate::model::LayerOwner::master_page(master_page), from, to)
     }
 
@@ -1105,7 +1105,7 @@ impl Edit {
         &mut self,
         owner: crate::model::LayerOwner,
         name: &str,
-    ) -> Result<crate::model::Layer> {
+    ) -> FamilyResult<crate::model::Layer> {
         self.remove_layer_with_replacement(owner, name, None)
     }
 
@@ -1116,7 +1116,7 @@ impl Edit {
         owner: crate::model::LayerOwner,
         name: &str,
         replacement: Option<&str>,
-    ) -> Result<crate::model::Layer> {
+    ) -> FamilyResult<crate::model::Layer> {
         let inventory = self.layers()?;
         let selected = inventory
             .sets()
@@ -1135,12 +1135,16 @@ impl Edit {
     }
 
     /// Remove a global layer without retargeting references.
-    pub fn remove_global_layer(&mut self, name: &str) -> Result<crate::model::Layer> {
+    pub fn remove_global_layer(&mut self, name: &str) -> FamilyResult<crate::model::Layer> {
         self.remove_layer(crate::model::LayerOwner::master_styles(), name)
     }
 
     /// Remove a page-local layer without retargeting references.
-    pub fn remove_page_layer(&mut self, page: usize, name: &str) -> Result<crate::model::Layer> {
+    pub fn remove_page_layer(
+        &mut self,
+        page: usize,
+        name: &str,
+    ) -> FamilyResult<crate::model::Layer> {
         self.remove_layer(crate::model::LayerOwner::page(page), name)
     }
 
@@ -1149,7 +1153,7 @@ impl Edit {
         &mut self,
         master_page: impl Into<String>,
         name: &str,
-    ) -> Result<crate::model::Layer> {
+    ) -> FamilyResult<crate::model::Layer> {
         self.remove_layer(crate::model::LayerOwner::master_page(master_page), name)
     }
 
@@ -1166,12 +1170,13 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error for invalid text, exhausted limits, or ambiguous retained bindings.
-    pub fn add(&mut self, title: &str, text: &str) -> Result<()> {
+    pub fn add(&mut self, title: &str, text: &str) -> FamilyResult<()> {
         Self::check_text(title, text)?;
         self.check_no_slide_order_change("slide insertion")?;
         self.check_structure_edit()?;
         if self.draft.slides().len() == MAX_SLIDES {
-            return invalid("ODP transaction exceeds the slide-count limit");
+            return invalid("ODP transaction exceeds the slide-count limit")
+                .map_err(PackageError::from);
         }
         let candidate = self.resource_candidate(0, text_resource(title, text)?)?;
         self.draft
@@ -1187,7 +1192,12 @@ impl Edit {
     ///
     /// Returns an error for an ambiguous selector, invalid text, exhausted limits, or retained
     /// declarations whose identity closure cannot be updated losslessly.
-    pub fn add_before<'a, S>(&mut self, selector: S, title: &str, text: &str) -> Result<Option<()>>
+    pub fn add_before<'a, S>(
+        &mut self,
+        selector: S,
+        title: &str,
+        text: &str,
+    ) -> FamilyResult<Option<()>>
     where
         S: Into<Selector<'a>>,
     {
@@ -1195,7 +1205,8 @@ impl Edit {
         self.check_no_slide_order_change("slide insertion")?;
         self.check_structure_edit()?;
         if self.draft.slides().len() == MAX_SLIDES {
-            return invalid("ODP transaction exceeds the slide-count limit");
+            return invalid("ODP transaction exceeds the slide-count limit")
+                .map_err(PackageError::from);
         }
         let Some(index) = select(self.draft.slides(), selector.into())? else {
             return Ok(None);
@@ -1215,7 +1226,12 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error for an ambiguous selector, invalid text, or a preservation-only page.
-    pub fn replace<'a, S>(&mut self, selector: S, title: &str, text: &str) -> Result<Option<()>>
+    pub fn replace<'a, S>(
+        &mut self,
+        selector: S,
+        title: &str,
+        text: &str,
+    ) -> FamilyResult<Option<()>>
     where
         S: Into<Selector<'a>>,
     {
@@ -1242,7 +1258,7 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error for an ambiguous selector or an unresolved page/declaration reference.
-    pub fn remove<'a, S>(&mut self, selector: S) -> Result<Option<Slide>>
+    pub fn remove<'a, S>(&mut self, selector: S) -> FamilyResult<Option<Slide>>
     where
         S: Into<Selector<'a>>,
     {
@@ -1281,14 +1297,18 @@ impl Edit {
     /// Returns an error for an ambiguous selector, an out-of-range destination,
     /// or a conflicting page-indexed operation. A missing selector returns
     /// `Ok(None)`. Moving to the current position is an exact no-op.
-    pub fn move_slide<'a, S>(&mut self, selector: S, position: SlidePosition) -> Result<Option<()>>
+    pub fn move_slide<'a, S>(
+        &mut self,
+        selector: S,
+        position: SlidePosition,
+    ) -> FamilyResult<Option<()>>
     where
         S: Into<Selector<'a>>,
     {
         if self.dependency_free_slide_copy_changed || self.dependency_free_slide_removal_changed {
             return unsupported(
                 "ODP slide move cannot be staged after a dependency-free blank-slide copy or removal",
-            );
+            ).map_err(PackageError::from);
         }
         let Some(from) = select(self.draft.slides(), selector.into())? else {
             return Ok(None);
@@ -1301,7 +1321,8 @@ impl Edit {
                 return invalid(format!(
                     "ODP slide move destination {index} exceeds slide count {}",
                     self.draft.slides().len()
-                ));
+                ))
+                .map_err(PackageError::from);
             },
         };
         if from == to {
@@ -1336,19 +1357,24 @@ impl Edit {
     /// page, any dependency-bearing page markup, a read-only source, or an
     /// exhausted slide, name, fragment, draft, or package bound. Refusal leaves
     /// the transaction unchanged.
-    pub fn copy_dependency_free_blank_slide<'a, S>(&mut self, selector: S) -> Result<Option<usize>>
+    pub fn copy_dependency_free_blank_slide<'a, S>(
+        &mut self,
+        selector: S,
+    ) -> FamilyResult<Option<usize>>
     where
         S: Into<Selector<'a>>,
     {
         if self.dependency_free_slide_copy_changed {
             return unsupported(
                 "ODP transaction already contains a dependency-free blank-slide copy",
-            );
+            )
+            .map_err(PackageError::from);
         }
         if self.slide_order_changed {
             return unsupported(
                 "ODP dependency-free blank-slide copy cannot be staged after a slide move",
-            );
+            )
+            .map_err(PackageError::from);
         }
         let Some(index) = select(self.draft.slides(), selector.into())? else {
             return Ok(None);
@@ -1356,10 +1382,11 @@ impl Edit {
         if self.changed || self.has_page_indexed_operations() {
             return unsupported(
                 "ODP dependency-free blank-slide copy cannot combine with slide or page-indexed operations",
-            );
+            ).map_err(PackageError::from);
         }
         if self.draft.slides().len() == MAX_SLIDES {
-            return invalid("ODP transaction exceeds the slide-count limit");
+            return invalid("ODP transaction exceeds the slide-count limit")
+                .map_err(PackageError::from);
         }
         let copy = self.draft.prepare_dependency_free_blank_slide_copy(index)?;
         let candidate = self.resource_candidate(0, copy.resource_bytes())?;
@@ -1394,19 +1421,21 @@ impl Edit {
         &mut self,
         source: &Package,
         selector: S,
-    ) -> Result<Option<usize>>
+    ) -> FamilyResult<Option<usize>>
     where
         S: Into<Selector<'a>>,
     {
         if self.dependency_free_slide_copy_changed {
             return unsupported(
                 "ODP transaction already contains a dependency-free blank-slide copy",
-            );
+            )
+            .map_err(PackageError::from);
         }
         if self.slide_order_changed {
             return unsupported(
                 "ODP foreign blank-slide transfer cannot be staged after a slide move",
-            );
+            )
+            .map_err(PackageError::from);
         }
         let Some(source_index) = select(source.slides()?, selector.into())? else {
             return Ok(None);
@@ -1414,15 +1443,17 @@ impl Edit {
         if self.dependency_free_slide_removal_changed {
             return unsupported(
                 "ODP foreign blank-slide transfer cannot be staged after a slide removal",
-            );
+            )
+            .map_err(PackageError::from);
         }
         if self.changed || self.has_page_indexed_operations() {
             return unsupported(
                 "ODP foreign blank-slide transfer cannot combine with slide or page-indexed operations",
-            );
+            ).map_err(PackageError::from);
         }
         if self.draft.slides().len() == MAX_SLIDES {
-            return invalid("ODP transaction exceeds the slide-count limit");
+            return invalid("ODP transaction exceeds the slide-count limit")
+                .map_err(PackageError::from);
         }
 
         let source_package = source.package.clone();
@@ -1435,7 +1466,7 @@ impl Edit {
         )
         .map(|_report| ())
         .map_err(|_error| {
-            Error::Refused(litchi_core::edit::Refusal::new(
+            CoreError::Refused(litchi_core::edit::Refusal::new(
                 litchi_core::edit::RefusalKind::UnsupportedContent,
                 "odp.authoring.edit",
                 "ODP foreign blank-slide transfer refuses unaudited donor XML",
@@ -1446,14 +1477,15 @@ impl Edit {
         {
             return unsupported(
                 "ODP foreign blank-slide transfer refuses donor settings or declarations",
-            );
+            )
+            .map_err(PackageError::from);
         }
         let source_pages = source_presentation.pages()?;
         let source_page = source_pages.page(source_index).ok_or_else(|| {
             invalid_error("ODP foreign blank-slide transfer donor page metadata is missing")
         })?;
         let source_name = source_page.name.as_deref().ok_or_else(|| {
-            Error::Refused(litchi_core::edit::Refusal::new(
+            CoreError::Refused(litchi_core::edit::Refusal::new(
                 litchi_core::edit::RefusalKind::UnsupportedContent,
                 "odp.authoring.edit",
                 "ODP foreign blank-slide transfer donor requires draw:name",
@@ -1463,7 +1495,7 @@ impl Edit {
             source_presentation.content_xml(),
         )?
         .ok_or_else(|| {
-            Error::Refused(litchi_core::edit::Refusal::new(
+            CoreError::Refused(litchi_core::edit::Refusal::new(
                 litchi_core::edit::RefusalKind::UnsupportedContent,
                 "odp.authoring.edit",
                 "ODP foreign blank-slide transfer requires retained donor content fragments",
@@ -1512,19 +1544,21 @@ impl Edit {
     pub fn remove_dependency_free_blank_slide<'a, S>(
         &mut self,
         selector: S,
-    ) -> Result<Option<Slide>>
+    ) -> FamilyResult<Option<Slide>>
     where
         S: Into<Selector<'a>>,
     {
         if self.dependency_free_slide_removal_changed {
             return unsupported(
                 "ODP transaction already contains a dependency-free blank-slide removal",
-            );
+            )
+            .map_err(PackageError::from);
         }
         if self.slide_order_changed || self.dependency_free_slide_copy_changed {
             return unsupported(
                 "ODP dependency-free blank-slide removal cannot follow a slide move or copy",
-            );
+            )
+            .map_err(PackageError::from);
         }
         let Some(index) = select(self.draft.slides(), selector.into())? else {
             return Ok(None);
@@ -1532,7 +1566,7 @@ impl Edit {
         if self.changed || self.has_page_indexed_operations() {
             return unsupported(
                 "ODP dependency-free blank-slide removal cannot combine with slide or page-indexed operations",
-            );
+            ).map_err(PackageError::from);
         }
         let removed_bytes = slide_resource(&self.draft.slides()[index])?;
         let candidate = self.resource_candidate(removed_bytes, 0)?;
@@ -1556,7 +1590,7 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error for an ambiguous selector, invalid shape, or preservation-only page.
-    pub fn add_shape<'a, S>(&mut self, selector: S, shape: Shape) -> Result<Option<()>>
+    pub fn add_shape<'a, S>(&mut self, selector: S, shape: Shape) -> FamilyResult<Option<()>>
     where
         S: Into<Selector<'a>>,
     {
@@ -1581,7 +1615,11 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error for an ambiguous selector or preservation-only page.
-    pub fn remove_shape<'a, S>(&mut self, selector: S, shape_index: usize) -> Result<Option<Shape>>
+    pub fn remove_shape<'a, S>(
+        &mut self,
+        selector: S,
+        shape_index: usize,
+    ) -> FamilyResult<Option<Shape>>
     where
         S: Into<Selector<'a>>,
     {
@@ -1606,7 +1644,7 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error for an ambiguous selector or preservation-only page.
-    pub fn clear<'a, S>(&mut self, selector: S) -> Result<Option<()>>
+    pub fn clear<'a, S>(&mut self, selector: S) -> FamilyResult<Option<()>>
     where
         S: Into<Selector<'a>>,
     {
@@ -1637,7 +1675,7 @@ impl Edit {
         path: &str,
         payload: &[u8],
         media_type: &str,
-    ) -> Result<Reference> {
+    ) -> FamilyResult<Reference> {
         crate::model::media::validate_package_media_path(path)?;
         let addition = path
             .len()
@@ -1673,11 +1711,12 @@ impl Edit {
     /// paths, media-type changes, referenced removals, signed/encrypted
     /// sources, or any invalid operation.  A failed batch leaves this
     /// transaction unchanged.
-    pub fn apply_media_changes(&mut self, changes: &[MediaChange]) -> Result<usize> {
+    pub fn apply_media_changes(&mut self, changes: &[MediaChange]) -> FamilyResult<usize> {
         if changes.len() > MAX_MEDIA_CHANGES {
             return invalid(format!(
                 "ODP media change batch exceeds {MAX_MEDIA_CHANGES} operations"
-            ));
+            ))
+            .map_err(PackageError::from);
         }
         let plan = self.draft.prepare_media_changes(changes)?;
         self.check_projected(self.resource_bytes, plan.staged_media_bytes)?;
@@ -1696,9 +1735,9 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error for malformed, ambiguous, or oversized content owners.
-    pub fn rich_content(&mut self) -> Result<crate::content::Inventory> {
+    pub fn rich_content(&mut self) -> FamilyResult<crate::content::Inventory> {
         let package = self.content_package()?;
-        crate::content::inventory(&package)
+        crate::content::inventory(&package).map_err(PackageError::from)
     }
 
     /// Add a named common rich-text box to an exact presentation page.
@@ -1709,7 +1748,11 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error for an invalid page, duplicate name, malformed package, or limit.
-    pub fn add_text_box<'a, P>(&mut self, page: P, text_box: &crate::content::TextBox) -> Result<()>
+    pub fn add_text_box<'a, P>(
+        &mut self,
+        page: P,
+        text_box: &crate::content::TextBox,
+    ) -> FamilyResult<()>
     where
         P: Into<crate::charts::Page<'a>>,
     {
@@ -1720,6 +1763,7 @@ impl Edit {
             name: text_box.name().to_string(),
             xml: text_box.xml()?,
         })
+        .map_err(PackageError::from)
     }
 
     /// Replace a named rich-text box, optionally changing its stable name.
@@ -1731,13 +1775,14 @@ impl Edit {
         &mut self,
         name: &str,
         text_box: &crate::content::TextBox,
-    ) -> Result<()> {
+    ) -> FamilyResult<()> {
         self.stage_content(crate::content::Operation::ReplaceObject {
             kind: crate::content::ObjectKind::TextBox,
             name: name.to_string(),
             new_name: text_box.name().to_string(),
             xml: text_box.xml()?,
         })
+        .map_err(PackageError::from)
     }
 
     /// Replace an arbitrary source-backed text-box/list story.
@@ -1749,13 +1794,14 @@ impl Edit {
         &mut self,
         name: &str,
         text_box: &crate::content::TextBoxModel,
-    ) -> Result<()> {
+    ) -> FamilyResult<()> {
         self.stage_content(crate::content::Operation::ReplaceObject {
             kind: crate::content::ObjectKind::TextBox,
             name: name.to_string(),
             new_name: text_box.name().to_string(),
             xml: text_box.xml().to_string(),
         })
+        .map_err(PackageError::from)
     }
 
     /// Atomically replace a bounded set of existing source-backed text boxes.
@@ -1776,17 +1822,18 @@ impl Edit {
     pub fn replace_text_box_models(
         &mut self,
         replacements: &[crate::content::TextBoxModelReplacement<'_>],
-    ) -> Result<usize> {
+    ) -> FamilyResult<usize> {
         if replacements.len() > crate::content::MAX_TEXT_BOX_MODEL_REPLACEMENTS {
             return invalid(format!(
                 "ODP text-box replacement count exceeds {}",
                 crate::content::MAX_TEXT_BOX_MODEL_REPLACEMENTS
-            ));
+            ))
+            .map_err(PackageError::from);
         }
         let mut owned = Vec::new();
         owned
             .try_reserve_exact(replacements.len())
-            .map_err(|source| Error::Allocation {
+            .map_err(|source| CoreError::Allocation {
                 resource: "ODP text-box batch replacements",
                 source,
             })?;
@@ -1797,6 +1844,7 @@ impl Edit {
                 .map(crate::content::OwnedTextBoxModelReplacement::from_borrowed),
         );
         self.stage_text_box_models(owned)
+            .map_err(PackageError::from)
     }
 
     /// The page index of this transaction's current `content.xml`.
@@ -1807,11 +1855,11 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error when the staged content cannot be read or indexed.
-    pub fn scene(&mut self) -> Result<crate::scene::Scene> {
+    pub fn scene(&mut self) -> FamilyResult<crate::scene::Scene> {
         let package = self.content_package()?;
         let content = String::from_utf8(package.get_file("content.xml")?)
             .map_err(|source| invalid_error(format!("ODP content.xml is not UTF-8: {source}")))?;
-        crate::scene::Scene::parse(&content)
+        crate::scene::Scene::parse(&content).map_err(PackageError::from)
     }
 
     /// Stage scene changes as checked byte splices of `content.xml`.
@@ -1830,7 +1878,7 @@ impl Edit {
     /// other markup references (removal and page renaming), markup the
     /// authored-XML audit refuses, or a result the presentation parser
     /// rejects. A refusal leaves the transaction unchanged.
-    pub fn splice_scene(&mut self, changes: &[crate::scene::Change]) -> Result<bool> {
+    pub fn splice_scene(&mut self, changes: &[crate::scene::Change]) -> FamilyResult<bool> {
         if changes.is_empty() {
             return Ok(false);
         }
@@ -1856,9 +1904,9 @@ impl Edit {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Unsupported`] when `metadata` changes any other
+    /// Returns [`CoreError::Unsupported`] when `metadata` changes any other
     /// field, and an error when the source metadata cannot be read.
-    pub fn set_metadata(&mut self, metadata: &litchi_core::Metadata) -> Result<bool> {
+    pub fn set_metadata(&mut self, metadata: &litchi_core::Metadata) -> FamilyResult<bool> {
         self.check_no_slide_order_change("metadata")?;
         let package = self.content_package()?;
         let Some(bytes) = crate::authoring::metadata::apply(&package, metadata)? else {
@@ -1878,9 +1926,9 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error when the staged metadata cannot be read.
-    pub fn metadata(&mut self) -> Result<litchi_core::Metadata> {
+    pub fn metadata(&mut self) -> FamilyResult<litchi_core::Metadata> {
         let package = self.content_package()?;
-        crate::authoring::metadata::read(&package)
+        crate::authoring::metadata::read(&package).map_err(PackageError::from)
     }
 
     /// Remove a named rich-text box.
@@ -1888,11 +1936,12 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error for a missing/ambiguous name or malformed package.
-    pub fn remove_text_box(&mut self, name: &str) -> Result<()> {
+    pub fn remove_text_box(&mut self, name: &str) -> FamilyResult<()> {
         self.stage_content(crate::content::Operation::RemoveObject {
             kind: crate::content::ObjectKind::TextBox,
             name: name.to_string(),
         })
+        .map_err(PackageError::from)
     }
 
     /// Add a typed rectangular table to an exact presentation page.
@@ -1900,7 +1949,7 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error for an invalid page, duplicate name, malformed package, or limit.
-    pub fn add_table<'a, P>(&mut self, page: P, table: &crate::content::Table) -> Result<()>
+    pub fn add_table<'a, P>(&mut self, page: P, table: &crate::content::Table) -> FamilyResult<()>
     where
         P: Into<crate::charts::Page<'a>>,
     {
@@ -1911,6 +1960,7 @@ impl Edit {
             name: table.name().to_string(),
             xml: table.xml()?,
         })
+        .map_err(PackageError::from)
     }
 
     /// Replace a named typed table, optionally changing its stable name.
@@ -1918,13 +1968,14 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error for a missing/ambiguous name, collision, malformed package, or limit.
-    pub fn replace_table(&mut self, name: &str, table: &crate::content::Table) -> Result<()> {
+    pub fn replace_table(&mut self, name: &str, table: &crate::content::Table) -> FamilyResult<()> {
         self.stage_content(crate::content::Operation::ReplaceObject {
             kind: crate::content::ObjectKind::Table,
             name: name.to_string(),
             new_name: table.name().to_string(),
             xml: table.xml()?,
         })
+        .map_err(PackageError::from)
     }
 
     /// Replace an arbitrary source-backed table, including spans, repeats, and formulas.
@@ -1936,13 +1987,14 @@ impl Edit {
         &mut self,
         name: &str,
         table: &crate::content::TableModel,
-    ) -> Result<()> {
+    ) -> FamilyResult<()> {
         self.stage_content(crate::content::Operation::ReplaceObject {
             kind: crate::content::ObjectKind::Table,
             name: name.to_string(),
             new_name: table.name().to_string(),
             xml: table.xml().to_string(),
         })
+        .map_err(PackageError::from)
     }
 
     /// Remove a named typed table.
@@ -1950,11 +2002,12 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error for a missing/ambiguous name or malformed package.
-    pub fn remove_table(&mut self, name: &str) -> Result<()> {
+    pub fn remove_table(&mut self, name: &str) -> FamilyResult<()> {
         self.stage_content(crate::content::Operation::RemoveObject {
             kind: crate::content::ObjectKind::Table,
             name: name.to_string(),
         })
+        .map_err(PackageError::from)
     }
 
     /// Add an inert typed form declaration and its visual control atomically.
@@ -1966,7 +2019,7 @@ impl Edit {
         &mut self,
         page: P,
         control: &crate::content::FormControl,
-    ) -> Result<()>
+    ) -> FamilyResult<()>
     where
         P: Into<crate::charts::Page<'a>>,
     {
@@ -1975,6 +2028,7 @@ impl Edit {
             page: page_index,
             control: control.clone(),
         })
+        .map_err(PackageError::from)
     }
 
     /// Replace an inert form declaration and visual control as one operation.
@@ -1986,11 +2040,12 @@ impl Edit {
         &mut self,
         name: &str,
         control: &crate::content::FormControl,
-    ) -> Result<()> {
+    ) -> FamilyResult<()> {
         self.stage_content(crate::content::Operation::ReplaceControl {
             name: name.to_string(),
             control: control.clone(),
         })
+        .map_err(PackageError::from)
     }
 
     /// Replace an arbitrary source-backed form declaration/control pair atomically.
@@ -2002,13 +2057,14 @@ impl Edit {
         &mut self,
         name: &str,
         control: &crate::content::FormControlModel,
-    ) -> Result<()> {
+    ) -> FamilyResult<()> {
         self.stage_content(crate::content::Operation::ReplaceControlModel {
             name: name.to_string(),
             new_name: control.name().to_string(),
             declaration_xml: control.declaration_xml().to_string(),
             visual_xml: control.visual_xml().to_string(),
         })
+        .map_err(PackageError::from)
     }
 
     /// Remove an inert form declaration and its visual control atomically.
@@ -2016,10 +2072,11 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error for a missing/ambiguous name or malformed package.
-    pub fn remove_form_control(&mut self, name: &str) -> Result<()> {
+    pub fn remove_form_control(&mut self, name: &str) -> FamilyResult<()> {
         self.stage_content(crate::content::Operation::RemoveControl {
             name: name.to_string(),
         })
+        .map_err(PackageError::from)
     }
 
     /// Transfer a dependency-closed rich-text box from another immutable deck.
@@ -2036,7 +2093,7 @@ impl Edit {
         source_name: &str,
         destination_page: P,
         destination_name: impl Into<String>,
-    ) -> Result<()>
+    ) -> FamilyResult<()>
     where
         P: Into<crate::charts::Page<'a>>,
     {
@@ -2047,6 +2104,7 @@ impl Edit {
             destination_name.into(),
             crate::content::ObjectKind::TextBox,
         )
+        .map_err(PackageError::from)
     }
 
     /// Transfer a dependency-closed rich-cell table from another immutable deck.
@@ -2060,7 +2118,7 @@ impl Edit {
         source_name: &str,
         destination_page: P,
         destination_name: impl Into<String>,
-    ) -> Result<()>
+    ) -> FamilyResult<()>
     where
         P: Into<crate::charts::Page<'a>>,
     {
@@ -2071,6 +2129,7 @@ impl Edit {
             destination_name.into(),
             crate::content::ObjectKind::Table,
         )
+        .map_err(PackageError::from)
     }
 
     /// Transfer an inert form declaration and its visual control from another deck.
@@ -2084,7 +2143,7 @@ impl Edit {
         source_name: &str,
         destination_page: P,
         destination_name: impl Into<String>,
-    ) -> Result<()>
+    ) -> FamilyResult<()>
     where
         P: Into<crate::charts::Page<'a>>,
     {
@@ -2096,7 +2155,7 @@ impl Edit {
             source_name,
             destination_name.into(),
         )?;
-        self.stage_content(operation)
+        self.stage_content(operation).map_err(PackageError::from)
     }
 
     /// Inspect the RDF metadata graphs in the current transaction draft.
@@ -2107,12 +2166,13 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error when a declared RDF part is malformed, dangling, or over budget.
-    pub fn rdf_graphs(&mut self) -> Result<&[crate::rdf::Graph]> {
+    pub fn rdf_graphs(&mut self) -> FamilyResult<&[crate::rdf::Graph]> {
         self.ensure_rdf()?;
         self.rdf
             .as_ref()
             .map(|draft| draft.graphs.as_slice())
             .ok_or_else(|| invalid_error("ODP RDF draft initialization failed"))
+            .map_err(PackageError::from)
     }
 
     /// Add one RDF metadata graph to this package transaction.
@@ -2127,7 +2187,7 @@ impl Edit {
         &mut self,
         preferred_path: Option<&str>,
         triples: &[crate::rdf::Triple],
-    ) -> Result<String> {
+    ) -> FamilyResult<String> {
         let package = self.rdf_package()?;
         let (bytes, path) = crate::rdf::add_graph(&package, preferred_path, triples)?;
         self.stage_rdf(
@@ -2145,7 +2205,11 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error for a missing graph, invalid triples, or a package limit.
-    pub fn replace_rdf_graph(&mut self, path: &str, triples: &[crate::rdf::Triple]) -> Result<()> {
+    pub fn replace_rdf_graph(
+        &mut self,
+        path: &str,
+        triples: &[crate::rdf::Triple],
+    ) -> FamilyResult<()> {
         let package = self.rdf_package()?;
         let bytes = crate::rdf::replace_graph(&package, path, triples)?;
         self.stage_rdf(
@@ -2155,6 +2219,7 @@ impl Edit {
                 triples: triples.to_vec(),
             },
         )
+        .map_err(PackageError::from)
     }
 
     /// Remove one RDF metadata graph after dependency validation.
@@ -2162,7 +2227,7 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error for a missing graph or an incoming graph reference.
-    pub fn remove_rdf_graph(&mut self, path: &str) -> Result<()> {
+    pub fn remove_rdf_graph(&mut self, path: &str) -> FamilyResult<()> {
         let package = self.rdf_package()?;
         let bytes = crate::rdf::remove_graph(&package, path)?;
         self.stage_rdf(
@@ -2171,6 +2236,7 @@ impl Edit {
                 path: path.to_string(),
             },
         )
+        .map_err(PackageError::from)
     }
 
     /// Append one RDF triple and return its checked projected index.
@@ -2178,7 +2244,11 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error for a missing graph, invalid triple, or graph limit.
-    pub fn add_rdf_triple(&mut self, path: &str, triple: &crate::rdf::Triple) -> Result<usize> {
+    pub fn add_rdf_triple(
+        &mut self,
+        path: &str,
+        triple: &crate::rdf::Triple,
+    ) -> FamilyResult<usize> {
         let package = self.rdf_package()?;
         let (bytes, index) = crate::rdf::add_triple(&package, path, triple)?;
         self.stage_rdf(
@@ -2202,7 +2272,7 @@ impl Edit {
         path: &str,
         index: usize,
         triple: &crate::rdf::Triple,
-    ) -> Result<()> {
+    ) -> FamilyResult<()> {
         let package = self.rdf_package()?;
         let bytes = crate::rdf::replace_triple(&package, path, index, triple)?;
         self.stage_rdf(
@@ -2213,6 +2283,7 @@ impl Edit {
                 triple: triple.clone(),
             },
         )
+        .map_err(PackageError::from)
     }
 
     /// Remove one RDF triple selected by checked zero-based position.
@@ -2220,7 +2291,7 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error for a missing graph or out-of-range position.
-    pub fn remove_rdf_triple(&mut self, path: &str, index: usize) -> Result<()> {
+    pub fn remove_rdf_triple(&mut self, path: &str, index: usize) -> FamilyResult<()> {
         let package = self.rdf_package()?;
         let bytes = crate::rdf::remove_triple(&package, path, index)?;
         self.stage_rdf(
@@ -2230,6 +2301,7 @@ impl Edit {
                 index,
             },
         )
+        .map_err(PackageError::from)
     }
 
     /// Move one RDF triple to another checked zero-based position within its subject.
@@ -2237,7 +2309,7 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error for a missing graph, out-of-range position, or subject mismatch.
-    pub fn move_rdf_triple(&mut self, path: &str, from: usize, to: usize) -> Result<()> {
+    pub fn move_rdf_triple(&mut self, path: &str, from: usize, to: usize) -> FamilyResult<()> {
         let package = self.rdf_package()?;
         let bytes = crate::rdf::move_triple(&package, path, from, to)?;
         self.stage_rdf(
@@ -2248,6 +2320,7 @@ impl Edit {
                 to,
             },
         )
+        .map_err(PackageError::from)
     }
 
     /// Inspect embedded charts in the current package transaction draft.
@@ -2255,12 +2328,13 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error when chart discovery encounters malformed or over-budget content.
-    pub fn charts(&mut self) -> Result<&[crate::charts::Chart]> {
+    pub fn charts(&mut self) -> FamilyResult<&[crate::charts::Chart]> {
         self.ensure_charts()?;
         self.charts
             .as_ref()
             .map(|draft| draft.charts.as_slice())
             .ok_or_else(|| invalid_error("ODP chart draft initialization failed"))
+            .map_err(PackageError::from)
     }
 
     /// Replace one embedded chart part selected by exact name or checked position.
@@ -2270,7 +2344,11 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error for a missing or ambiguous selector, malformed chart XML, or a limit.
-    pub fn replace_chart<'a, S>(&mut self, selector: S, part: crate::charts::Part) -> Result<()>
+    pub fn replace_chart<'a, S>(
+        &mut self,
+        selector: S,
+        part: crate::charts::Part,
+    ) -> FamilyResult<()>
     where
         S: Into<crate::charts::Selector<'a>>,
     {
@@ -2287,6 +2365,7 @@ impl Edit {
                 part,
             },
         )
+        .map_err(PackageError::from)
     }
 
     /// Replace one chart from the complete typed ODF chart authoring model.
@@ -2301,7 +2380,7 @@ impl Edit {
         &mut self,
         selector: S,
         definition: &crate::charts::Definition,
-    ) -> Result<()>
+    ) -> FamilyResult<()>
     where
         S: Into<crate::charts::Selector<'a>>,
     {
@@ -2317,7 +2396,7 @@ impl Edit {
         &mut self,
         selector: S,
         series: &crate::charts::SeriesSpec,
-    ) -> Result<()>
+    ) -> FamilyResult<()>
     where
         S: Into<crate::charts::Selector<'a>>,
     {
@@ -2340,7 +2419,7 @@ impl Edit {
         selector: S,
         series_index: usize,
         series: &crate::charts::SeriesSpec,
-    ) -> Result<()>
+    ) -> FamilyResult<()>
     where
         S: Into<crate::charts::Selector<'a>>,
     {
@@ -2358,7 +2437,11 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error for a missing/ambiguous chart, out-of-range series, malformed XML, or limit.
-    pub fn remove_chart_series<'a, S>(&mut self, selector: S, series_index: usize) -> Result<()>
+    pub fn remove_chart_series<'a, S>(
+        &mut self,
+        selector: S,
+        series_index: usize,
+    ) -> FamilyResult<()>
     where
         S: Into<crate::charts::Selector<'a>>,
     {
@@ -2385,7 +2468,7 @@ impl Edit {
         row: usize,
         column: usize,
         cell: &crate::charts::CachedCell,
-    ) -> Result<()>
+    ) -> FamilyResult<()>
     where
         S: Into<crate::charts::Selector<'a>>,
     {
@@ -2403,7 +2486,7 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error for a missing or ambiguous selector or malformed chart package content.
-    pub fn remove_chart<'a, S>(&mut self, selector: S) -> Result<crate::charts::Chart>
+    pub fn remove_chart<'a, S>(&mut self, selector: S) -> FamilyResult<crate::charts::Chart>
     where
         S: Into<crate::charts::Selector<'a>>,
     {
@@ -2434,7 +2517,7 @@ impl Edit {
         name: impl Into<String>,
         storage: crate::charts::Storage,
         part: crate::charts::Part,
-    ) -> Result<usize>
+    ) -> FamilyResult<usize>
     where
         P: Into<crate::charts::Page<'a>>,
     {
@@ -2473,7 +2556,7 @@ impl Edit {
         name: impl Into<String>,
         storage: crate::charts::Storage,
         definition: &crate::charts::Definition,
-    ) -> Result<usize>
+    ) -> FamilyResult<usize>
     where
         P: Into<crate::charts::Page<'a>>,
     {
@@ -2503,7 +2586,7 @@ impl Edit {
         destination_page: P,
         destination_name: impl Into<String>,
         storage: crate::charts::Storage,
-    ) -> Result<usize>
+    ) -> FamilyResult<usize>
     where
         S: Into<crate::charts::Selector<'a>>,
         P: Into<crate::charts::Page<'b>>,
@@ -2542,12 +2625,13 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error when `styles.xml` is missing, malformed, or over budget.
-    pub fn layouts(&mut self) -> Result<&crate::layout::Collection> {
+    pub fn layouts(&mut self) -> FamilyResult<&crate::layout::Collection> {
         self.ensure_design()?;
         self.design
             .as_ref()
             .map(|draft| &draft.layouts)
             .ok_or_else(|| invalid_error("ODP design draft initialization failed"))
+            .map_err(PackageError::from)
     }
 
     /// Inspect master pages in the current package draft.
@@ -2555,12 +2639,13 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error when `styles.xml` is missing, malformed, or over budget.
-    pub fn master_pages(&mut self) -> Result<&[crate::MasterPage]> {
+    pub fn master_pages(&mut self) -> FamilyResult<&[crate::MasterPage]> {
         self.ensure_design()?;
         self.design
             .as_ref()
             .map(|draft| draft.masters.as_slice())
             .ok_or_else(|| invalid_error("ODP design draft initialization failed"))
+            .map_err(PackageError::from)
     }
 
     /// Add one named presentation page layout.
@@ -2568,8 +2653,9 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error for an invalid or duplicate layout or malformed package dependencies.
-    pub fn add_layout(&mut self, layout: &crate::layout::Layout) -> Result<()> {
+    pub fn add_layout(&mut self, layout: &crate::layout::Layout) -> FamilyResult<()> {
         self.stage_design_operation(DesignOperation::AddLayout(layout.clone()))
+            .map_err(PackageError::from)
     }
 
     /// Replace one named presentation page layout.
@@ -2577,8 +2663,9 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error when the layout is invalid or does not exist.
-    pub fn replace_page_layout(&mut self, layout: &crate::layout::Layout) -> Result<()> {
+    pub fn replace_page_layout(&mut self, layout: &crate::layout::Layout) -> FamilyResult<()> {
         self.stage_design_operation(DesignOperation::ReplaceLayout(layout.clone()))
+            .map_err(PackageError::from)
     }
 
     /// Remove one layout and optionally retarget all modeled incoming references.
@@ -2586,11 +2673,16 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error when either name is invalid or the replacement does not exist.
-    pub fn remove_page_layout(&mut self, name: &str, replacement: Option<&str>) -> Result<()> {
+    pub fn remove_page_layout(
+        &mut self,
+        name: &str,
+        replacement: Option<&str>,
+    ) -> FamilyResult<()> {
         self.stage_design_operation(DesignOperation::RemoveLayout {
             name: name.to_string(),
             replacement: replacement.map(str::to_string),
         })
+        .map_err(PackageError::from)
     }
 
     /// Reorder every named presentation layout using an exact dependency-checked name list.
@@ -2598,8 +2690,9 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error when the list is incomplete, duplicated, or contains an unknown name.
-    pub fn reorder_layouts(&mut self, names: &[String]) -> Result<()> {
+    pub fn reorder_layouts(&mut self, names: &[String]) -> FamilyResult<()> {
         self.stage_design_operation(DesignOperation::ReorderLayouts(names.to_vec()))
+            .map_err(PackageError::from)
     }
 
     /// Add one named master page.
@@ -2607,8 +2700,9 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error for invalid XML, duplicate identity, or dangling dependencies.
-    pub fn add_master_page(&mut self, master: &crate::MasterPage) -> Result<()> {
+    pub fn add_master_page(&mut self, master: &crate::MasterPage) -> FamilyResult<()> {
         self.stage_design_operation(DesignOperation::AddMaster(master.clone()))
+            .map_err(PackageError::from)
     }
 
     /// Replace one named master page.
@@ -2616,8 +2710,9 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error for invalid XML, missing identity, or dangling dependencies.
-    pub fn replace_master_page(&mut self, master: &crate::MasterPage) -> Result<()> {
+    pub fn replace_master_page(&mut self, master: &crate::MasterPage) -> FamilyResult<()> {
         self.stage_design_operation(DesignOperation::ReplaceMaster(master.clone()))
+            .map_err(PackageError::from)
     }
 
     /// Remove one master page and optionally retarget modeled incoming references.
@@ -2625,11 +2720,16 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error when either name is invalid or the replacement does not exist.
-    pub fn remove_master_page(&mut self, name: &str, replacement: Option<&str>) -> Result<()> {
+    pub fn remove_master_page(
+        &mut self,
+        name: &str,
+        replacement: Option<&str>,
+    ) -> FamilyResult<()> {
         self.stage_design_operation(DesignOperation::RemoveMaster {
             name: name.to_string(),
             replacement: replacement.map(str::to_string),
         })
+        .map_err(PackageError::from)
     }
 
     /// Reorder every master page using an exact dependency-checked name list.
@@ -2637,8 +2737,9 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error when the list is incomplete, duplicated, or contains an unknown name.
-    pub fn reorder_master_pages(&mut self, names: &[String]) -> Result<()> {
+    pub fn reorder_master_pages(&mut self, names: &[String]) -> FamilyResult<()> {
         self.stage_design_operation(DesignOperation::ReorderMasters(names.to_vec()))
+            .map_err(PackageError::from)
     }
 
     /// Assign or clear a slide's master-page dependency by checked zero-based position.
@@ -2650,11 +2751,12 @@ impl Edit {
         &mut self,
         slide_index: usize,
         master_name: Option<&str>,
-    ) -> Result<()> {
+    ) -> FamilyResult<()> {
         self.stage_design_operation(DesignOperation::AssignSlideMaster {
             slide_index,
             name: master_name.map(str::to_string),
         })
+        .map_err(PackageError::from)
     }
 
     /// Assign or clear a slide's presentation-layout dependency by checked position.
@@ -2666,11 +2768,12 @@ impl Edit {
         &mut self,
         slide_index: usize,
         layout_name: Option<&str>,
-    ) -> Result<()> {
+    ) -> FamilyResult<()> {
         self.stage_design_operation(DesignOperation::AssignSlideLayout {
             slide_index,
             name: layout_name.map(str::to_string),
         })
+        .map_err(PackageError::from)
     }
 
     /// Inspect the singleton handout master in the current package draft.
@@ -2678,12 +2781,13 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error when `styles.xml` is missing, malformed, or over budget.
-    pub fn handout_master(&mut self) -> Result<Option<&crate::handout_master::Master>> {
+    pub fn handout_master(&mut self) -> FamilyResult<Option<&crate::handout_master::Master>> {
         self.ensure_design()?;
         self.design
             .as_ref()
             .map(|draft| draft.handout.as_ref())
             .ok_or_else(|| invalid_error("ODP design draft initialization failed"))
+            .map_err(PackageError::from)
     }
 
     /// Insert or replace the singleton handout master.
@@ -2691,8 +2795,12 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error for an invalid master or dangling layout references.
-    pub fn set_handout_master(&mut self, master: &crate::handout_master::Master) -> Result<()> {
+    pub fn set_handout_master(
+        &mut self,
+        master: &crate::handout_master::Master,
+    ) -> FamilyResult<()> {
         self.stage_design_operation(DesignOperation::SetHandout(master.clone()))
+            .map_err(PackageError::from)
     }
 
     /// Insert a handout master, failing if the draft already has one.
@@ -2700,9 +2808,12 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error when a handout master exists or the master is invalid.
-    pub fn add_handout_master(&mut self, master: &crate::handout_master::Master) -> Result<()> {
+    pub fn add_handout_master(
+        &mut self,
+        master: &crate::handout_master::Master,
+    ) -> FamilyResult<()> {
         if self.handout_master()?.is_some() {
-            return invalid("ODP package already has a handout master");
+            return invalid("ODP package already has a handout master").map_err(PackageError::from);
         }
         self.set_handout_master(master)
     }
@@ -2712,9 +2823,12 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error when no handout master exists or the master is invalid.
-    pub fn replace_handout_master(&mut self, master: &crate::handout_master::Master) -> Result<()> {
+    pub fn replace_handout_master(
+        &mut self,
+        master: &crate::handout_master::Master,
+    ) -> FamilyResult<()> {
         if self.handout_master()?.is_none() {
-            return invalid("ODP package has no handout master");
+            return invalid("ODP package has no handout master").map_err(PackageError::from);
         }
         self.set_handout_master(master)
     }
@@ -2724,8 +2838,9 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error when `styles.xml` is missing or malformed.
-    pub fn remove_handout_master(&mut self) -> Result<()> {
+    pub fn remove_handout_master(&mut self) -> FamilyResult<()> {
         self.stage_design_operation(DesignOperation::RemoveHandout)
+            .map_err(PackageError::from)
     }
 
     /// Inspect slide- and shape-anchored annotations in the current package draft.
@@ -2733,12 +2848,13 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error for malformed annotation XML, anchors, or resource limits.
-    pub fn annotations(&mut self) -> Result<&[crate::annotation::Info]> {
+    pub fn annotations(&mut self) -> FamilyResult<&[crate::annotation::Info]> {
         self.ensure_annotations()?;
         self.annotations
             .as_ref()
             .map(|draft| draft.annotations.as_slice())
             .ok_or_else(|| invalid_error("ODP annotation draft initialization failed"))
+            .map_err(PackageError::from)
     }
 
     /// Add an annotation at a checked page or uniquely named shape anchor.
@@ -2750,7 +2866,7 @@ impl Edit {
         &mut self,
         anchor: &crate::annotation::Anchor,
         annotation: &crate::annotation::Annotation,
-    ) -> Result<usize> {
+    ) -> FamilyResult<usize> {
         self.ensure_annotations()?;
         let current = self.annotation_package()?;
         let mut presentation = Presentation::from_owned_package(current)?;
@@ -2774,7 +2890,7 @@ impl Edit {
         &mut self,
         index: usize,
         annotation: &crate::annotation::Annotation,
-    ) -> Result<()> {
+    ) -> FamilyResult<()> {
         self.ensure_annotations()?;
         let current = self.annotation_package()?;
         let mut presentation = Presentation::from_owned_package(current)?;
@@ -2786,6 +2902,7 @@ impl Edit {
                 annotation: annotation.clone(),
             },
         )
+        .map_err(PackageError::from)
     }
 
     /// Remove one annotation selected by checked zero-based document order.
@@ -2793,7 +2910,7 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error when the position is out of range or package content is malformed.
-    pub fn remove_annotation(&mut self, index: usize) -> Result<()> {
+    pub fn remove_annotation(&mut self, index: usize) -> FamilyResult<()> {
         self.ensure_annotations()?;
         let current = self.annotation_package()?;
         let mut presentation = Presentation::from_owned_package(current)?;
@@ -2802,6 +2919,7 @@ impl Edit {
             OwnedPackage::from_bytes(presentation.to_bytes()?)?,
             AnnotationOperation::Remove { index },
         )
+        .map_err(PackageError::from)
     }
 
     /// Validate, serialize, reparse, and atomically publish the staged draft.
@@ -2811,11 +2929,11 @@ impl Edit {
     /// Returns an error if validation, bounded serialization, package parsing, or semantic
     /// readback fails. The source package is never changed. A changed write
     /// on a signed or encrypted source is refused when the edit starts.
-    pub fn commit(self) -> std::result::Result<Commit, PackageError> {
+    pub fn commit(self) -> Result<Commit, PackageError> {
         Ok(self.commit_core()?)
     }
 
-    pub(crate) fn commit_core(self) -> Result<Commit> {
+    pub(crate) fn commit_core(self) -> CoreResult<Commit> {
         let rdf_changed = self
             .rdf
             .as_ref()
@@ -3138,7 +3256,7 @@ impl Edit {
         })
     }
 
-    fn layer_package(&self) -> Result<OwnedPackage> {
+    fn layer_package(&self) -> CoreResult<OwnedPackage> {
         let mut package = self.layer_base_package()?;
         for operation in &self.layer_operations {
             package =
@@ -3147,7 +3265,7 @@ impl Edit {
         Ok(package)
     }
 
-    fn layer_base_package(&self) -> Result<OwnedPackage> {
+    fn layer_base_package(&self) -> CoreResult<OwnedPackage> {
         if self.changed {
             OwnedPackage::from_bytes(self.draft.to_bytes_bounded(MAX_PACKAGE_BYTES)?)
         } else {
@@ -3155,7 +3273,7 @@ impl Edit {
         }
     }
 
-    fn stage_layer(&mut self, operation: crate::authoring::layer::Operation) -> Result<()> {
+    fn stage_layer(&mut self, operation: crate::authoring::layer::Operation) -> CoreResult<()> {
         self.check_no_slide_order_change("drawing-layer")?;
         let baseline = self.layer_base_package()?;
         let package = self.layer_package()?;
@@ -3175,7 +3293,7 @@ impl Edit {
         Ok(())
     }
 
-    fn ensure_rdf(&mut self) -> Result<()> {
+    fn ensure_rdf(&mut self) -> CoreResult<()> {
         if self.rdf.is_none() {
             let package = self.source.package.clone();
             let graphs = crate::rdf::graphs(&package)?;
@@ -3189,7 +3307,7 @@ impl Edit {
         Ok(())
     }
 
-    fn rdf_package(&mut self) -> Result<OwnedPackage> {
+    fn rdf_package(&mut self) -> CoreResult<OwnedPackage> {
         self.ensure_rdf()?;
         self.rdf
             .as_ref()
@@ -3197,7 +3315,7 @@ impl Edit {
             .ok_or_else(|| invalid_error("ODP RDF draft initialization failed"))
     }
 
-    fn stage_rdf(&mut self, bytes: Vec<u8>, operation: RdfOperation) -> Result<()> {
+    fn stage_rdf(&mut self, bytes: Vec<u8>, operation: RdfOperation) -> CoreResult<()> {
         if bytes.len() > MAX_PACKAGE_BYTES {
             return invalid("ODP RDF transaction exceeds the 128 MiB package limit");
         }
@@ -3223,7 +3341,7 @@ impl Edit {
         Ok(())
     }
 
-    fn ensure_charts(&mut self) -> Result<()> {
+    fn ensure_charts(&mut self) -> CoreResult<()> {
         if self.charts.is_none() {
             let limits = crate::charts::Limits::default();
             let snapshot =
@@ -3240,7 +3358,7 @@ impl Edit {
         Ok(())
     }
 
-    fn chart_snapshot(&mut self) -> Result<crate::charts::Snapshot> {
+    fn chart_snapshot(&mut self) -> CoreResult<crate::charts::Snapshot> {
         self.ensure_charts()?;
         let (current_package, limits, operations) = self
             .charts
@@ -3270,7 +3388,7 @@ impl Edit {
         package: OwnedPackage,
         charts: Vec<crate::charts::Chart>,
         operation: ChartOperation,
-    ) -> Result<()> {
+    ) -> CoreResult<()> {
         self.check_no_slide_order_change("chart")?;
         if package.as_bytes().len() > MAX_PACKAGE_BYTES {
             return invalid("ODP chart transaction exceeds the 128 MiB package limit");
@@ -3294,7 +3412,7 @@ impl Edit {
         Ok(())
     }
 
-    fn ensure_design(&mut self) -> Result<()> {
+    fn ensure_design(&mut self) -> CoreResult<()> {
         if self.design.is_none() {
             let package = self.source.package.clone();
             let presentation = Presentation::from_owned_package(package.clone())?;
@@ -3318,7 +3436,7 @@ impl Edit {
         Ok(())
     }
 
-    fn stage_design_operation(&mut self, operation: DesignOperation) -> Result<()> {
+    fn stage_design_operation(&mut self, operation: DesignOperation) -> CoreResult<()> {
         self.check_no_slide_order_change("design")?;
         self.ensure_design()?;
         let current = self
@@ -3368,7 +3486,7 @@ impl Edit {
         Ok(())
     }
 
-    fn ensure_annotations(&mut self) -> Result<()> {
+    fn ensure_annotations(&mut self) -> CoreResult<()> {
         if self.annotations.is_none() {
             let package = self.source.package.clone();
             let presentation = Presentation::from_owned_package(package.clone())?;
@@ -3383,7 +3501,7 @@ impl Edit {
         Ok(())
     }
 
-    fn content_page_index(&mut self, page: crate::charts::Page<'_>) -> Result<usize> {
+    fn content_page_index(&mut self, page: crate::charts::Page<'_>) -> CoreResult<usize> {
         let package = self.content_package()?;
         let content = String::from_utf8(package.get_file("content.xml")?)
             .map_err(|source| invalid_error(format!("ODP content.xml is not UTF-8: {source}")))?;
@@ -3397,7 +3515,7 @@ impl Edit {
         destination_page: crate::charts::Page<'_>,
         destination_name: String,
         kind: crate::content::ObjectKind,
-    ) -> Result<()> {
+    ) -> CoreResult<()> {
         let page_index = self.content_page_index(destination_page)?;
         let source_presentation = source.presentation()?;
         let operation = crate::content::prepare_object_transfer(
@@ -3410,7 +3528,7 @@ impl Edit {
         self.stage_content(operation)
     }
 
-    fn content_bytes(&mut self) -> Result<Arc<Vec<u8>>> {
+    fn content_bytes(&mut self) -> CoreResult<Arc<Vec<u8>>> {
         if let Some(content) = &self.content {
             return Ok(Arc::clone(&content.bytes));
         }
@@ -3428,7 +3546,7 @@ impl Edit {
         Ok(bytes)
     }
 
-    fn content_package(&mut self) -> Result<OwnedPackage> {
+    fn content_package(&mut self) -> CoreResult<OwnedPackage> {
         self.content_bytes()?;
         self.content
             .as_ref()
@@ -3436,7 +3554,7 @@ impl Edit {
             .ok_or_else(|| invalid_error("ODP semantic-content draft initialization failed"))
     }
 
-    fn stage_content(&mut self, operation: crate::content::Operation) -> Result<()> {
+    fn stage_content(&mut self, operation: crate::content::Operation) -> CoreResult<()> {
         self.check_no_slide_order_change("rich-content")?;
         let package = self.content_package()?;
         let bytes = crate::content::apply(&package, &operation)?;
@@ -3459,7 +3577,7 @@ impl Edit {
         &mut self,
         bytes: Vec<u8>,
         operation: crate::content::Operation,
-    ) -> Result<()> {
+    ) -> CoreResult<()> {
         if bytes.len() > MAX_PACKAGE_BYTES {
             return invalid("ODP semantic-content transaction exceeds the 128 MiB package limit");
         }
@@ -3478,7 +3596,7 @@ impl Edit {
     fn stage_text_box_models(
         &mut self,
         replacements: Vec<crate::content::OwnedTextBoxModelReplacement>,
-    ) -> Result<usize> {
+    ) -> CoreResult<usize> {
         self.check_no_slide_order_change("rich-content")?;
         let package = self.content_package()?;
         let (bytes, changed) =
@@ -3507,7 +3625,7 @@ impl Edit {
         Ok(changed)
     }
 
-    fn annotation_package(&self) -> Result<OwnedPackage> {
+    fn annotation_package(&self) -> CoreResult<OwnedPackage> {
         self.annotations
             .as_ref()
             .map(|draft| draft.package.clone())
@@ -3518,7 +3636,7 @@ impl Edit {
         &mut self,
         package: OwnedPackage,
         operation: AnnotationOperation,
-    ) -> Result<()> {
+    ) -> CoreResult<()> {
         self.check_no_slide_order_change("annotation")?;
         let bytes = package.shared_bytes();
         if bytes.len() > MAX_PACKAGE_BYTES {
@@ -3545,7 +3663,7 @@ impl Edit {
         Ok(())
     }
 
-    fn check_text(title: &str, text: &str) -> Result<()> {
+    fn check_text(title: &str, text: &str) -> CoreResult<()> {
         let size = title
             .len()
             .checked_add(text.len())
@@ -3569,7 +3687,7 @@ impl Edit {
         Ok(())
     }
 
-    fn check_structure_edit(&self) -> Result<()> {
+    fn check_structure_edit(&self) -> CoreResult<()> {
         if self.draft.has_source_declarations() {
             return unsupported(
                 "ODP structural editing with retained header/footer declarations is not lossless",
@@ -3578,7 +3696,7 @@ impl Edit {
         Ok(())
     }
 
-    fn check_page_indexed_move_conflict(&self) -> Result<()> {
+    fn check_page_indexed_move_conflict(&self) -> CoreResult<()> {
         let conflict = self.has_page_indexed_operations();
         if conflict {
             return unsupported(
@@ -3608,7 +3726,7 @@ impl Edit {
                 .is_some_and(|draft| !draft.operations.is_empty())
     }
 
-    fn check_no_slide_order_change(&self, _operation: &str) -> Result<()> {
+    fn check_no_slide_order_change(&self, _operation: &str) -> CoreResult<()> {
         if self.slide_order_changed {
             return unsupported("ODP operation cannot be staged after a slide move");
         }
@@ -3625,7 +3743,7 @@ impl Edit {
         Ok(())
     }
 
-    fn check_slide_rewrite(&self, index: usize) -> Result<()> {
+    fn check_slide_rewrite(&self, index: usize) -> CoreResult<()> {
         if self.draft.retains_source_slide(index) {
             return unsupported(
                 "ODP retained slide contains XML that cannot yet be proven lossless under rewrite",
@@ -3634,13 +3752,13 @@ impl Edit {
         Ok(())
     }
 
-    fn resource_candidate(&self, removed: usize, added: usize) -> Result<usize> {
+    fn resource_candidate(&self, removed: usize, added: usize) -> CoreResult<usize> {
         let candidate = bounded_candidate(self.resource_bytes, removed, added, MAX_DRAFT_BYTES)?;
         self.check_projected(candidate, self.media_bytes)?;
         Ok(candidate)
     }
 
-    fn check_projected(&self, resource_bytes: usize, media_bytes: usize) -> Result<()> {
+    fn check_projected(&self, resource_bytes: usize, media_bytes: usize) -> CoreResult<()> {
         let _projected = projected_size(
             self.source.as_bytes().len(),
             self.source_resource_bytes,
@@ -3777,7 +3895,7 @@ impl Patch {
     ///
     /// Returns an error when `source` is not byte-for-byte identical to the patch source or
     /// its signature/encryption policy makes it read-only.
-    pub(crate) fn apply(&self, source: &Package) -> Result<Package> {
+    pub(crate) fn apply(&self, source: &Package) -> CoreResult<Package> {
         if !same_source(&self.before, source) {
             return invalid("stale ODP presentation patch source");
         }
@@ -3816,9 +3934,10 @@ impl Patch {
     /// # Errors
     ///
     /// Returns an error unless both patches accept the exact same source package.
-    pub fn plan_join(&self, other: &Self) -> Result<MergePlan> {
+    pub fn plan_join(&self, other: &Self) -> FamilyResult<MergePlan> {
         if !same_source(&self.before, &other.before) {
-            return invalid("ODP patch join requires an exact common source");
+            return invalid("ODP patch join requires an exact common source")
+                .map_err(PackageError::from);
         }
         let mut conflicts = Vec::new();
         for domain in self.domains.iter().copied() {
@@ -3846,7 +3965,7 @@ impl Patch {
     /// # Errors
     ///
     /// Returns an error unless both patches accept the exact same source package.
-    pub fn join(&self, other: &Self) -> Result<MergePlan> {
+    pub fn join(&self, other: &Self) -> FamilyResult<MergePlan> {
         self.plan_join(other)
     }
 
@@ -3861,10 +3980,11 @@ impl Patch {
     ///
     /// Returns an error for different sources, a reported conflict, or an RDF delta that cannot
     /// be replayed and verified over the other target.
-    pub fn join_snapshot(&self, other: &Self) -> Result<Package> {
+    pub fn join_snapshot(&self, other: &Self) -> FamilyResult<Package> {
         let plan = self.plan_join(other)?;
         if !plan.is_independent() {
-            return unsupported("ODP patch join requires resolution of semantic conflicts");
+            return unsupported("ODP patch join requires resolution of semantic conflicts")
+                .map_err(PackageError::from);
         }
         if self.is_noop() {
             return Ok(other.after.clone());
@@ -3879,9 +3999,10 @@ impl Patch {
         } else if other.domains.as_ref() == [Domain::Rdf] && !self.domains.contains(&Domain::Rdf) {
             (other, self)
         } else {
-            return unsupported("ODP independent join has no bounded semantic compositor");
+            return unsupported("ODP independent join has no bounded semantic compositor")
+                .map_err(PackageError::from);
         };
-        materialize_rdf_join(rdf_patch, target_patch)
+        materialize_rdf_join(rdf_patch, target_patch).map_err(PackageError::from)
     }
 
     /// Plan a conservative three-way merge rooted at an exact base snapshot.
@@ -3889,9 +4010,10 @@ impl Patch {
     /// # Errors
     ///
     /// Returns an error when either side was not authored against `base`.
-    pub fn plan_three_way(base: &Package, left: &Self, right: &Self) -> Result<MergePlan> {
+    pub fn plan_three_way(base: &Package, left: &Self, right: &Self) -> FamilyResult<MergePlan> {
         if !same_source(base, &left.before) || !same_source(base, &right.before) {
-            return invalid("ODP three-way merge patches do not share the supplied base");
+            return invalid("ODP three-way merge patches do not share the supplied base")
+                .map_err(PackageError::from);
         }
         left.plan_join(right)
     }
@@ -3901,7 +4023,7 @@ impl Patch {
     /// # Errors
     ///
     /// Returns an error when either side was not authored against `base`.
-    pub fn three_way(base: &Package, left: &Self, right: &Self) -> Result<MergePlan> {
+    pub fn three_way(base: &Package, left: &Self, right: &Self) -> FamilyResult<MergePlan> {
         Self::plan_three_way(base, left, right)
     }
 
@@ -3912,7 +4034,7 @@ impl Patch {
     ///
     /// Returns an error when either patch is not rooted at `base`, the planner reports a
     /// conflict, or the bounded semantic compositor cannot verify the merged package.
-    pub fn three_way_snapshot(base: &Package, left: &Self, right: &Self) -> Result<Package> {
+    pub fn three_way_snapshot(base: &Package, left: &Self, right: &Self) -> FamilyResult<Package> {
         Self::plan_three_way(base, left, right)?;
         left.join_snapshot(right)
     }
@@ -3925,7 +4047,7 @@ impl Patch {
     /// # Errors
     ///
     /// Returns an allocation or size error when the bounded envelope cannot be materialized.
-    pub fn to_durable_bytes(&self) -> Result<Vec<u8>> {
+    pub fn to_durable_bytes(&self) -> FamilyResult<Vec<u8>> {
         let before_len = self.before.as_bytes().len();
         let after_len = self.after.as_bytes().len();
         let capacity = DURABLE_PATCH_MAGIC
@@ -3939,12 +4061,13 @@ impl Patch {
             .and_then(|size| size.checked_add(64))
             .ok_or_else(|| invalid_error("ODP durable patch limit overflow"))?;
         if capacity > maximum {
-            return invalid("ODP durable patch exceeds its package-derived size limit");
+            return invalid("ODP durable patch exceeds its package-derived size limit")
+                .map_err(PackageError::from);
         }
         let mut output = Vec::new();
         output
             .try_reserve_exact(capacity)
-            .map_err(|source| Error::Allocation {
+            .map_err(|source| CoreError::Allocation {
                 resource: "ODP durable patch envelope",
                 source,
             })?;
@@ -3964,15 +4087,17 @@ impl Patch {
     ///
     /// Returns an error for a malformed version, unknown domain, oversized artifact, trailing
     /// bytes, or invalid ODP source/target package.
-    pub fn from_durable_bytes(bytes: &[u8]) -> Result<Self> {
+    pub fn from_durable_bytes(bytes: &[u8]) -> FamilyResult<Self> {
         let header_len = DURABLE_PATCH_MAGIC.len() + 2 + 1 + 8 + 8;
         if bytes.len() < header_len || &bytes[..DURABLE_PATCH_MAGIC.len()] != DURABLE_PATCH_MAGIC {
-            return invalid("invalid ODP durable patch magic or truncated header");
+            return invalid("invalid ODP durable patch magic or truncated header")
+                .map_err(PackageError::from);
         }
         let mut offset = DURABLE_PATCH_MAGIC.len();
         let version = read_u16(bytes, &mut offset)?;
         if version != DURABLE_PATCH_VERSION {
-            return invalid(format!("unsupported ODP durable patch version {version}"));
+            return invalid(format!("unsupported ODP durable patch version {version}"))
+                .map_err(PackageError::from);
         }
         let bits = *bytes
             .get(offset)
@@ -3982,14 +4107,16 @@ impl Patch {
         let before_len = read_len(bytes, &mut offset)?;
         let after_len = read_len(bytes, &mut offset)?;
         if before_len > MAX_PACKAGE_BYTES || after_len > MAX_PACKAGE_BYTES {
-            return invalid("ODP durable patch contains an oversized package");
+            return invalid("ODP durable patch contains an oversized package")
+                .map_err(PackageError::from);
         }
         let expected = offset
             .checked_add(before_len)
             .and_then(|size| size.checked_add(after_len))
             .ok_or_else(|| invalid_error("ODP durable patch length overflow"))?;
         if expected != bytes.len() {
-            return invalid("ODP durable patch length does not match its envelope");
+            return invalid("ODP durable patch length does not match its envelope")
+                .map_err(PackageError::from);
         }
         let before_end = offset + before_len;
         let before = Package::from_vec(bytes[offset..before_end].to_vec())?;
@@ -4017,12 +4144,13 @@ impl History {
     /// # Errors
     ///
     /// Returns an error for zero limits or a byte budget smaller than the root package.
-    pub fn new(initial: Package, max_entries: usize, max_bytes: usize) -> Result<Self> {
+    pub fn new(initial: Package, max_entries: usize, max_bytes: usize) -> FamilyResult<Self> {
         if max_entries == 0 || max_bytes == 0 {
-            return invalid("ODP history limits must be positive");
+            return invalid("ODP history limits must be positive").map_err(PackageError::from);
         }
         if initial.as_bytes().len() > max_bytes {
-            return invalid("ODP history byte budget cannot retain its initial snapshot");
+            return invalid("ODP history byte budget cannot retain its initial snapshot")
+                .map_err(PackageError::from);
         }
         let retained_bytes = initial.as_bytes().len();
         Ok(Self {
@@ -4048,16 +4176,17 @@ impl History {
     /// # Errors
     ///
     /// Returns an error for a stale commit or a target package larger than the byte budget.
-    pub fn record(&mut self, commit: &Commit) -> Result<()> {
+    pub fn record(&mut self, commit: &Commit) -> FamilyResult<()> {
         if !same_source(self.current(), &commit.patch.before) {
-            return invalid("ODP history commit source is not current");
+            return invalid("ODP history commit source is not current").map_err(PackageError::from);
         }
         if !commit.changed {
             return Ok(());
         }
         let target_bytes = commit.snapshot.as_bytes().len();
         if target_bytes > self.max_bytes {
-            return invalid("ODP history target exceeds the byte budget");
+            return invalid("ODP history target exceeds the byte budget")
+                .map_err(PackageError::from);
         }
         if self.cursor + 1 < self.entries.len() {
             for removed in self.entries.drain(self.cursor + 1..) {
@@ -4125,7 +4254,7 @@ impl History {
     ///
     /// Returns an error when the retained history exceeds the durable bound or a native limit
     /// cannot be represented in the envelope.
-    pub fn to_durable_bytes(&self) -> Result<Vec<u8>> {
+    pub fn to_durable_bytes(&self) -> FamilyResult<Vec<u8>> {
         let header_len = DURABLE_HISTORY_MAGIC.len() + 2 + (8 * 4);
         let capacity = self.entries.iter().try_fold(header_len, |size, snapshot| {
             size.checked_add(8)
@@ -4133,12 +4262,13 @@ impl History {
                 .ok_or_else(|| invalid_error("ODP durable history size overflow"))
         })?;
         if capacity > MAX_DURABLE_HISTORY_BYTES {
-            return invalid("ODP durable history exceeds the 512 MiB envelope limit");
+            return invalid("ODP durable history exceeds the 512 MiB envelope limit")
+                .map_err(PackageError::from);
         }
         let mut output = Vec::new();
         output
             .try_reserve_exact(capacity)
-            .map_err(|source| Error::Allocation {
+            .map_err(|source| CoreError::Allocation {
                 resource: "ODP durable history envelope",
                 source,
             })?;
@@ -4161,18 +4291,20 @@ impl History {
     ///
     /// Returns an error for malformed bounds, cursor/count inconsistencies, trailing bytes,
     /// oversized packages, budget violations, or invalid retained ODP artifacts.
-    pub fn from_durable_bytes(bytes: &[u8]) -> Result<Self> {
+    pub fn from_durable_bytes(bytes: &[u8]) -> FamilyResult<Self> {
         let header_len = DURABLE_HISTORY_MAGIC.len() + 2 + (8 * 4);
         if bytes.len() < header_len
             || bytes.len() > MAX_DURABLE_HISTORY_BYTES
             || &bytes[..DURABLE_HISTORY_MAGIC.len()] != DURABLE_HISTORY_MAGIC
         {
-            return invalid("invalid ODP durable history magic, size, or truncated header");
+            return invalid("invalid ODP durable history magic, size, or truncated header")
+                .map_err(PackageError::from);
         }
         let mut offset = DURABLE_HISTORY_MAGIC.len();
         let version = read_u16(bytes, &mut offset)?;
         if version != DURABLE_HISTORY_VERSION {
-            return invalid(format!("unsupported ODP durable history version {version}"));
+            return invalid(format!("unsupported ODP durable history version {version}"))
+                .map_err(PackageError::from);
         }
         let max_entries = read_len(bytes, &mut offset)?;
         let max_bytes = read_len(bytes, &mut offset)?;
@@ -4184,12 +4316,13 @@ impl History {
             || count > max_entries
             || cursor >= count
         {
-            return invalid("ODP durable history contains inconsistent bounds or cursor state");
+            return invalid("ODP durable history contains inconsistent bounds or cursor state")
+                .map_err(PackageError::from);
         }
         let mut entries = Vec::new();
         entries
             .try_reserve_exact(count)
-            .map_err(|source| Error::Allocation {
+            .map_err(|source| CoreError::Allocation {
                 resource: "ODP durable history entries",
                 source,
             })?;
@@ -4197,7 +4330,8 @@ impl History {
         for _ in 0..count {
             let length = read_len(bytes, &mut offset)?;
             if length > MAX_PACKAGE_BYTES {
-                return invalid("ODP durable history contains an oversized package");
+                return invalid("ODP durable history contains an oversized package")
+                    .map_err(PackageError::from);
             }
             let end = offset
                 .checked_add(length)
@@ -4214,7 +4348,8 @@ impl History {
         if offset != bytes.len() || retained_bytes > max_bytes {
             return invalid(
                 "ODP durable history length or byte budget does not match its envelope",
-            );
+            )
+            .map_err(PackageError::from);
         }
         Ok(Self {
             entries,
@@ -4226,7 +4361,7 @@ impl History {
     }
 }
 
-fn select(slides: &[Slide], selector: Selector<'_>) -> Result<Option<usize>> {
+fn select(slides: &[Slide], selector: Selector<'_>) -> CoreResult<Option<usize>> {
     match selector {
         Selector::Index(index) => Ok((index < slides.len()).then_some(index)),
         Selector::Title(title) => {
@@ -4262,7 +4397,7 @@ fn domain_bits(domains: &[Domain]) -> u8 {
     })
 }
 
-fn domains_from_bits(bits: u8) -> Result<Vec<Domain>> {
+fn domains_from_bits(bits: u8) -> CoreResult<Vec<Domain>> {
     if bits & !0b11_1111 != 0 {
         return invalid("ODP durable patch contains an unknown semantic domain");
     }
@@ -4282,7 +4417,7 @@ fn domains_from_bits(bits: u8) -> Result<Vec<Domain>> {
     Ok(domains)
 }
 
-fn read_u16(bytes: &[u8], offset: &mut usize) -> Result<u16> {
+fn read_u16(bytes: &[u8], offset: &mut usize) -> CoreResult<u16> {
     let end = offset
         .checked_add(2)
         .ok_or_else(|| invalid_error("ODP durable patch offset overflow"))?;
@@ -4293,7 +4428,7 @@ fn read_u16(bytes: &[u8], offset: &mut usize) -> Result<u16> {
     Ok(u16::from_le_bytes([value[0], value[1]]))
 }
 
-fn read_len(bytes: &[u8], offset: &mut usize) -> Result<usize> {
+fn read_len(bytes: &[u8], offset: &mut usize) -> CoreResult<usize> {
     let end = offset
         .checked_add(8)
         .ok_or_else(|| invalid_error("ODP durable patch offset overflow"))?;
@@ -4308,7 +4443,7 @@ fn read_len(bytes: &[u8], offset: &mut usize) -> Result<usize> {
         .map_err(|error| invalid_error(format!("ODP durable patch length is not native: {error}")))
 }
 
-fn write_len(output: &mut Vec<u8>, value: usize) -> Result<()> {
+fn write_len(output: &mut Vec<u8>, value: usize) -> CoreResult<()> {
     let encoded = u64::try_from(value).map_err(|source| {
         invalid_error(format!(
             "ODP durable envelope length is not representable: {source}"
@@ -4318,7 +4453,7 @@ fn write_len(output: &mut Vec<u8>, value: usize) -> Result<()> {
     Ok(())
 }
 
-fn ensure_editable_source(package: &OwnedPackage) -> Result<()> {
+fn ensure_editable_source(package: &OwnedPackage) -> CoreResult<()> {
     match package_security_policy(package)? {
         SecurityPolicy::Editable => Ok(()),
         SecurityPolicy::EncryptedReadOnly => unsupported(
@@ -4333,7 +4468,7 @@ fn ensure_editable_source(package: &OwnedPackage) -> Result<()> {
     }
 }
 
-fn package_security_policy(package: &OwnedPackage) -> Result<SecurityPolicy> {
+fn package_security_policy(package: &OwnedPackage) -> CoreResult<SecurityPolicy> {
     let archive = package.package()?;
     let encrypted =
         archive.manifest().has_encrypted_entries() || package.has_zip_encrypted_entries();
@@ -4349,7 +4484,7 @@ fn package_security_policy(package: &OwnedPackage) -> Result<SecurityPolicy> {
     })
 }
 
-fn materialize_rdf_join(rdf_patch: &Patch, target_patch: &Patch) -> Result<Package> {
+fn materialize_rdf_join(rdf_patch: &Patch, target_patch: &Patch) -> CoreResult<Package> {
     let base_package = rdf_patch.before.package.clone();
     let rdf_target_package = rdf_patch.after.package.clone();
     let base_graphs = crate::rdf::graphs(&base_package)?;
@@ -4418,7 +4553,7 @@ fn materialize_rdf_join(rdf_patch: &Patch, target_patch: &Patch) -> Result<Packa
     Ok(joined)
 }
 
-fn apply_rdf_operation(package: &OwnedPackage, operation: &RdfOperation) -> Result<Vec<u8>> {
+fn apply_rdf_operation(package: &OwnedPackage, operation: &RdfOperation) -> CoreResult<Vec<u8>> {
     match operation {
         RdfOperation::AddGraph { path, triples } => {
             let (bytes, actual_path) = crate::rdf::add_graph(package, Some(path), triples)?;
@@ -4452,7 +4587,7 @@ fn apply_chart_operation(
     package: &OwnedPackage,
     limits: crate::charts::Limits,
     operation: &ChartOperation,
-) -> Result<Vec<u8>> {
+) -> CoreResult<Vec<u8>> {
     let snapshot = crate::charts::Snapshot::from_owned_package(package.clone(), limits)?;
     let mut edit = snapshot.edit();
     match operation {
@@ -4484,7 +4619,10 @@ fn root_charts_equal(left: &[crate::charts::Chart], right: &[crate::charts::Char
         })
 }
 
-fn apply_design_operation(package: &OwnedPackage, operation: &DesignOperation) -> Result<Vec<u8>> {
+fn apply_design_operation(
+    package: &OwnedPackage,
+    operation: &DesignOperation,
+) -> CoreResult<Vec<u8>> {
     let mut presentation = Presentation::from_owned_package(package.clone())?;
     match operation {
         DesignOperation::AddLayout(layout) => presentation.add_layout(layout)?,
@@ -4536,7 +4674,7 @@ fn root_design_pages_equal(
 fn apply_annotation_operation(
     package: &OwnedPackage,
     operation: &AnnotationOperation,
-) -> Result<Vec<u8>> {
+) -> CoreResult<Vec<u8>> {
     let mut presentation = Presentation::from_owned_package(package.clone())?;
     match operation {
         AnnotationOperation::Add { anchor, annotation } => {
@@ -4563,7 +4701,12 @@ fn root_annotations_equal(
         })
 }
 
-fn bounded_candidate(current: usize, removed: usize, added: usize, limit: usize) -> Result<usize> {
+fn bounded_candidate(
+    current: usize,
+    removed: usize,
+    added: usize,
+    limit: usize,
+) -> CoreResult<usize> {
     let candidate = current
         .checked_sub(removed)
         .and_then(|value| value.checked_add(added))
@@ -4580,7 +4723,7 @@ fn projected_size(
     resource_bytes: usize,
     media_bytes: usize,
     limit: usize,
-) -> Result<usize> {
+) -> CoreResult<usize> {
     let growth = resource_bytes.saturating_sub(source_resource_bytes);
     let projected = source_bytes
         .checked_add(growth)
@@ -4592,25 +4735,25 @@ fn projected_size(
     Ok(projected)
 }
 
-fn try_owned_bytes(value: &[u8], resource: &'static str) -> Result<Vec<u8>> {
+fn try_owned_bytes(value: &[u8], resource: &'static str) -> CoreResult<Vec<u8>> {
     let mut owned = Vec::new();
     owned
         .try_reserve_exact(value.len())
-        .map_err(|source| Error::Allocation { resource, source })?;
+        .map_err(|source| CoreError::Allocation { resource, source })?;
     owned.extend_from_slice(value);
     Ok(owned)
 }
 
-fn try_owned_str(value: &str, resource: &'static str) -> Result<String> {
+fn try_owned_str(value: &str, resource: &'static str) -> CoreResult<String> {
     let mut owned = String::new();
     owned
         .try_reserve_exact(value.len())
-        .map_err(|source| Error::Allocation { resource, source })?;
+        .map_err(|source| CoreError::Allocation { resource, source })?;
     owned.push_str(value);
     Ok(owned)
 }
 
-fn editing_projection(presentation: &Presentation) -> Result<Editing> {
+fn editing_projection(presentation: &Presentation) -> CoreResult<Editing> {
     let slides = presentation.slides()?;
     if slides.len() > MAX_SLIDES {
         return invalid("ODP editing snapshot exceeds the slide-count limit");
@@ -4628,7 +4771,7 @@ fn editing_projection(presentation: &Presentation) -> Result<Editing> {
 fn check_input_bytes(
     length: usize,
     limits: litchi_odf_common::SourceLimits,
-) -> std::result::Result<(), PackageError> {
+) -> Result<(), PackageError> {
     let observed = u64::try_from(length).unwrap_or(u64::MAX);
     if observed > limits.max_input_bytes() {
         return Err(PackageError::Limit {
@@ -4640,11 +4783,11 @@ fn check_input_bytes(
     Ok(())
 }
 
-fn copy_input(source: &[u8]) -> Result<Vec<u8>> {
+fn copy_input(source: &[u8]) -> CoreResult<Vec<u8>> {
     let mut bytes = Vec::new();
     bytes
         .try_reserve_exact(source.len())
-        .map_err(|source| Error::Allocation {
+        .map_err(|source| CoreError::Allocation {
             resource: "ODP package bytes",
             source,
         })?;
@@ -4652,7 +4795,7 @@ fn copy_input(source: &[u8]) -> Result<Vec<u8>> {
     Ok(bytes)
 }
 
-fn slides_resource(slides: &[Slide]) -> Result<usize> {
+fn slides_resource(slides: &[Slide]) -> CoreResult<usize> {
     slides.iter().try_fold(0usize, |total, slide| {
         total
             .checked_add(slide_resource(slide)?)
@@ -4660,14 +4803,14 @@ fn slides_resource(slides: &[Slide]) -> Result<usize> {
     })
 }
 
-fn slide_resource(slide: &Slide) -> Result<usize> {
+fn slide_resource(slide: &Slide) -> CoreResult<usize> {
     let primary = slide_primary_resource(slide)?;
     primary
         .checked_add(slide.notes.as_ref().map_or(0, String::len))
         .ok_or_else(|| invalid_error("ODP slide resource size overflow"))
 }
 
-fn slide_primary_resource(slide: &Slide) -> Result<usize> {
+fn slide_primary_resource(slide: &Slide) -> CoreResult<usize> {
     slide_primary_text_resource(slide)?
         .checked_add(slide.shapes.iter().try_fold(0usize, |total, shape| {
             total
@@ -4677,23 +4820,25 @@ fn slide_primary_resource(slide: &Slide) -> Result<usize> {
         .ok_or_else(|| invalid_error("ODP slide resource size overflow"))
 }
 
-fn slide_primary_text_resource(slide: &Slide) -> Result<usize> {
+fn slide_primary_text_resource(slide: &Slide) -> CoreResult<usize> {
     text_resource(slide.title.as_deref().unwrap_or_default(), &slide.text)
 }
 
-fn text_resource(title: &str, text: &str) -> Result<usize> {
+fn text_resource(title: &str, text: &str) -> CoreResult<usize> {
     title
         .len()
         .checked_add(text.len())
         .ok_or_else(|| invalid_error("ODP text resource size overflow"))
 }
 
-fn shape_resource(root: &Shape) -> Result<usize> {
+fn shape_resource(root: &Shape) -> CoreResult<usize> {
     let mut stack = Vec::new();
-    stack.try_reserve(1).map_err(|source| Error::Allocation {
-        resource: "ODP shape resource stack",
-        source,
-    })?;
+    stack
+        .try_reserve(1)
+        .map_err(|source| CoreError::Allocation {
+            resource: "ODP shape resource stack",
+            source,
+        })?;
     stack.push(root);
     let mut total = 0usize;
     while let Some(shape) = stack.pop() {
@@ -4706,7 +4851,7 @@ fn shape_resource(root: &Shape) -> Result<usize> {
         }
         stack
             .try_reserve(shape.children().len())
-            .map_err(|source| Error::Allocation {
+            .map_err(|source| CoreError::Allocation {
                 resource: "ODP shape resource stack",
                 source,
             })?;
@@ -4715,7 +4860,7 @@ fn shape_resource(root: &Shape) -> Result<usize> {
     Ok(total)
 }
 
-fn validate_compact_xml_parts(package: &OwnedPackage, source: &OwnedPackage) -> Result<()> {
+fn validate_compact_xml_parts(package: &OwnedPackage, source: &OwnedPackage) -> CoreResult<()> {
     validate_compact_xml_parts_against(package, Some(source), true, &[])
 }
 
@@ -4725,21 +4870,21 @@ fn validate_compact_xml_parts_except(
     package: &OwnedPackage,
     source: &OwnedPackage,
     skip: &[&str],
-) -> Result<()> {
+) -> CoreResult<()> {
     validate_compact_xml_parts_against(package, Some(source), true, skip)
 }
 
 pub(crate) fn validate_raw_preserved_xml_parts(
     package: &OwnedPackage,
     source: &OwnedPackage,
-) -> Result<()> {
+) -> CoreResult<()> {
     validate_compact_xml_parts_against(package, Some(source), true, &[])
 }
 
 pub(crate) fn validate_raw_preserved_referenced_xml_parts(
     package: &OwnedPackage,
     source: &OwnedPackage,
-) -> Result<()> {
+) -> CoreResult<()> {
     validate_compact_xml_parts_against(package, Some(source), false, &[])
 }
 
@@ -4748,7 +4893,7 @@ fn validate_compact_xml_parts_against(
     source: Option<&OwnedPackage>,
     audit_core_parts: bool,
     skip: &[&str],
-) -> Result<()> {
+) -> CoreResult<()> {
     let mut part_count = 0usize;
     let mut aggregate_bytes = 0usize;
     for path in package.files()? {
@@ -4811,7 +4956,7 @@ fn validate_compact_xml_parts_against(
         let audit_payload = payload.strip_prefix(b"\xef\xbb\xbf").unwrap_or(&payload);
         let _report =
             audit::verify(audit_payload, limits).map_err(|audit_error| match audit_error {
-                audit::Error::NotCompact(_) => Error::Refused(litchi_core::edit::Refusal::new(
+                audit::Error::NotCompact(_) => CoreError::Refused(litchi_core::edit::Refusal::new(
                     litchi_core::edit::RefusalKind::UnsupportedOperation,
                     "odp.authoring.edit",
                     "ODP XML part is not compact",
@@ -4821,7 +4966,7 @@ fn validate_compact_xml_parts_against(
                 | audit::Error::Malformed { .. }
                 | audit::Error::Doctype { .. }
                 | audit::Error::Allocation
-                | _ => Error::InvalidFormat(format!(
+                | _ => CoreError::InvalidFormat(format!(
                     "ODP XML part '{path}' failed audit: {audit_error}"
                 )),
             })?;
@@ -4829,23 +4974,23 @@ fn validate_compact_xml_parts_against(
     Ok(())
 }
 
-fn invalid<T>(message: impl Into<String>) -> Result<T> {
+fn invalid<T>(message: impl Into<String>) -> CoreResult<T> {
     Err(invalid_error(message))
 }
 
-fn validate_package_size(length: usize) -> Result<()> {
+fn validate_package_size(length: usize) -> CoreResult<()> {
     if length > MAX_PACKAGE_BYTES {
         return invalid("ODP editing package exceeds the 128 MiB limit");
     }
     Ok(())
 }
 
-fn invalid_error(message: impl Into<String>) -> Error {
-    Error::InvalidFormat(message.into())
+fn invalid_error(message: impl Into<String>) -> CoreError {
+    CoreError::InvalidFormat(message.into())
 }
 
-fn unsupported<T>(reason: &'static str) -> Result<T> {
-    Err(Error::Refused(litchi_core::edit::Refusal::new(
+fn unsupported<T>(reason: &'static str) -> CoreResult<T> {
+    Err(CoreError::Refused(litchi_core::edit::Refusal::new(
         litchi_core::edit::RefusalKind::UnsupportedOperation,
         "odp.authoring.edit",
         reason,
@@ -4861,7 +5006,7 @@ mod tests {
     use litchi_core::Result;
 
     #[test]
-    fn path_ingress_input_limit_rejects_n_plus_one_before_indexing() -> Result<()> {
+    fn path_ingress_input_limit_rejects_n_plus_one_before_indexing() -> CoreResult<()> {
         let package = Builder::new().build()?;
         let file = tempfile::NamedTempFile::new()?;
         package.save(file.path())?;
@@ -4884,7 +5029,7 @@ mod tests {
         .unwrap_err();
         assert!(matches!(
             error,
-            litchi_odf_common::Error::Limit {
+            litchi_odf_common::CoreError::Limit {
                 kind: litchi_odf_common::LimitKind::Source(
                     litchi_odf_common::SourceLimitKind::InputBytes
                 ),
@@ -4895,7 +5040,7 @@ mod tests {
     }
 
     #[test]
-    fn aggregate_accounting_accepts_n_and_rejects_n_plus_one() -> Result<()> {
+    fn aggregate_accounting_accepts_n_and_rejects_n_plus_one() -> CoreResult<()> {
         assert_eq!(bounded_candidate(3, 0, 1, 4)?, 4);
         assert!(bounded_candidate(3, 0, 2, 4).is_err());
         assert_eq!(projected_size(3, 2, 2, 1, 4)?, 4);
@@ -4904,14 +5049,14 @@ mod tests {
     }
 
     #[test]
-    fn owned_package_size_gate_accepts_n_and_rejects_n_plus_one() -> Result<()> {
+    fn owned_package_size_gate_accepts_n_and_rejects_n_plus_one() -> CoreResult<()> {
         validate_package_size(MAX_PACKAGE_BYTES)?;
         assert!(validate_package_size(MAX_PACKAGE_BYTES + 1).is_err());
         Ok(())
     }
 
     #[test]
-    fn changed_slide_commit_reports_the_authored_audit_fast_path() -> Result<()> {
+    fn changed_slide_commit_reports_the_authored_audit_fast_path() -> CoreResult<()> {
         let mut builder = Builder::new();
         builder.add_slide_with_title("Original", "Body")?;
         let source = builder.build()?;
@@ -4923,7 +5068,7 @@ mod tests {
     }
 
     #[test]
-    fn later_rdf_rewrite_clears_the_serialization_audit_proof() -> Result<()> {
+    fn later_rdf_rewrite_clears_the_serialization_audit_proof() -> CoreResult<()> {
         let mut builder = Builder::new();
         builder.add_slide_with_title("Original", "Body")?;
         let source = builder.build()?;

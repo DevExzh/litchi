@@ -11,6 +11,7 @@ use quick_xml::XmlVersion;
 use quick_xml::events::{BytesEnd, BytesStart, BytesText, Event};
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::writer::Writer;
+use std::io::{self, Write};
 
 const OFFICE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const META_NAMESPACE_STR: &str = "urn:oasis:names:tc:opendocument:xmlns:meta:1.0";
@@ -30,6 +31,84 @@ const PATCH_INSERTION_ORDER: [PatchField; PATCH_FIELD_COUNT] = [
     PatchField::Creator,
     PatchField::ModificationDate,
 ];
+const METADATA_OUTPUT_SCOPE: &str = "ODF metadata output";
+
+#[derive(Debug)]
+struct MetadataOutputLimit {
+    observed: u64,
+    maximum: u64,
+}
+
+impl std::fmt::Display for MetadataOutputLimit {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            formatter,
+            "metadata output exceeds {} bytes (observed {})",
+            self.maximum, self.observed
+        )
+    }
+}
+
+impl std::error::Error for MetadataOutputLimit {}
+
+/// A fallible, output-admitted buffer for the retained metadata writer.
+///
+/// The XML reader's input ceiling is also the maximum metadata replacement
+/// output accepted by this low-level patcher. Keeping the bound on the writer
+/// prevents a changed value from growing an unbounded `Vec` while the source
+/// package is retained by its owner.
+struct BoundedMetadataWriter {
+    bytes: Vec<u8>,
+    maximum: usize,
+}
+
+impl BoundedMetadataWriter {
+    fn new(capacity: usize, maximum: usize) -> Result<Self> {
+        let capacity = capacity.min(maximum);
+        let mut bytes = Vec::new();
+        bytes
+            .try_reserve_exact(capacity)
+            .map_err(|source| Error::Allocation {
+                resource: METADATA_OUTPUT_SCOPE,
+                source,
+            })?;
+        Ok(Self { bytes, maximum })
+    }
+
+    fn into_inner(self) -> Vec<u8> {
+        self.bytes
+    }
+}
+
+impl Write for BoundedMetadataWriter {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        let observed = self.bytes.len().saturating_add(bytes.len());
+        if observed > self.maximum {
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
+                MetadataOutputLimit {
+                    observed: u64::try_from(observed).unwrap_or(u64::MAX),
+                    maximum: u64::try_from(self.maximum).unwrap_or(u64::MAX),
+                },
+            ));
+        }
+        self.bytes.try_reserve(bytes.len()).map_err(|source| {
+            io::Error::new(
+                io::ErrorKind::Other,
+                Error::Allocation {
+                    resource: METADATA_OUTPUT_SCOPE,
+                    source,
+                },
+            )
+        })?;
+        self.bytes.extend_from_slice(bytes);
+        Ok(bytes.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
 
 fn try_copy_string(value: &str, resource: &'static str) -> Result<String> {
     let mut output = String::new();
@@ -551,6 +630,53 @@ fn patch_field(namespace: KnownNamespace, local_name: &[u8]) -> Option<PatchFiel
     }
 }
 
+fn escaped_metadata_value_len(value: &str) -> Result<usize> {
+    value.as_bytes().iter().try_fold(0usize, |length, byte| {
+        let replacement = match byte {
+            b'&' => 5,
+            b'<' | b'>' => 4,
+            b'"' | b'\'' => 6,
+            _ => 1,
+        };
+        length
+            .checked_add(replacement)
+            .ok_or_else(|| Error::InvalidFormat("metadata output length overflow".to_string()))
+    })
+}
+
+fn metadata_output_limit(observed: usize, maximum: usize) -> Error {
+    Error::ResourceLimit(litchi_core::ResourceLimit {
+        resource: litchi_core::Resource::OutputBytes,
+        observed: u64::try_from(observed).unwrap_or(u64::MAX),
+        limit: u64::try_from(maximum).unwrap_or(u64::MAX),
+        scope: METADATA_OUTPUT_SCOPE.into(),
+    })
+}
+
+/// Admit all caller-owned replacement values before cloning the patch or
+/// allocating escaped XML. The bounded writer remains the final exact check
+/// because source elements can be replaced with a different number of values.
+fn admit_patch_values(patch: &MetaXmlPatch, maximum: usize) -> Result<()> {
+    let mut escaped = 0usize;
+    for field in PATCH_INSERTION_ORDER {
+        if let MetaFieldEdit::Set(values) = patch.edit(field) {
+            for value in values {
+                let length = escaped_metadata_value_len(value)?;
+                if length > maximum {
+                    return Err(metadata_output_limit(length, maximum));
+                }
+                escaped = escaped.checked_add(length).ok_or_else(|| {
+                    Error::InvalidFormat("metadata output length overflow".to_string())
+                })?;
+                if escaped > maximum {
+                    return Err(metadata_output_limit(escaped, maximum));
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Apply field-level edits to a retained source meta.xml.
 ///
 /// Elements and attributes not named by an edit are copied through unchanged
@@ -570,10 +696,12 @@ pub fn patch_meta_xml(
     patch: &MetaXmlPatch,
     limits: XmlStreamLimits,
 ) -> Result<Option<String>> {
+    let maximum = usize::try_from(limits.max_bytes()).unwrap_or(usize::MAX);
+    admit_patch_values(patch, maximum)?;
     let mut reader = ResolvedReader::from_xml(source, limits)
         .map_err(|error| map_resolved_reader_error(error, "XML parsing error in metadata"))?;
     let mut buffer = Vec::new();
-    let mut writer = Writer::new(Vec::with_capacity(source.len()));
+    let mut writer = Writer::new(BoundedMetadataWriter::new(source.len(), maximum)?);
     let mut edits = patch.clone();
     let mut consumed = [false; PATCH_FIELD_COUNT];
     let mut prefixes = MetaNamespacePrefixes::default();
@@ -697,15 +825,15 @@ pub fn patch_meta_xml(
     if !patched {
         return Ok(None);
     }
-    String::from_utf8(writer.into_inner())
+    String::from_utf8(writer.into_inner().into_inner())
         .map(Some)
         .map_err(|error| Error::InvalidFormat(format!("patched metadata is not UTF-8: {error}")))
 }
 
 /// Write elements for every `Set` edit that no source element consumed,
 /// following the ODF schema sequence for simple metadata.
-fn write_pending_insertions(
-    writer: &mut Writer<Vec<u8>>,
+fn write_pending_insertions<W: Write>(
+    writer: &mut Writer<W>,
     edits: &MetaXmlPatch,
     prefixes: &MetaNamespacePrefixes,
 ) -> Result<()> {
@@ -723,8 +851,8 @@ fn write_pending_insertions(
 
 /// Write a simple text element, declaring its namespace locally when the
 /// source document bound no prefix for it.
-fn write_text_element(
-    writer: &mut Writer<Vec<u8>>,
+fn write_text_element<W: Write>(
+    writer: &mut Writer<W>,
     name: &str,
     namespace_declaration: Option<&'static str>,
     value: &str,
@@ -741,7 +869,7 @@ fn write_text_element(
 }
 
 /// Write an already-escaped text node.
-fn write_text(writer: &mut Writer<Vec<u8>>, value: &str) -> Result<()> {
+fn write_text<W: Write>(writer: &mut Writer<W>, value: &str) -> Result<()> {
     write_event(
         writer,
         Event::Text(BytesText::from_escaped(escape_xml(value))),
@@ -749,8 +877,8 @@ fn write_text(writer: &mut Writer<Vec<u8>>, value: &str) -> Result<()> {
 }
 
 /// Write an event unchanged.
-fn write_event(writer: &mut Writer<Vec<u8>>, event: Event<'_>) -> Result<()> {
-    writer.write_event(event).map_err(metadata_xml_error)
+fn write_event<W: Write>(writer: &mut Writer<W>, event: Event<'_>) -> Result<()> {
+    writer.write_event(event).map_err(metadata_writer_error)
 }
 
 /// Skip events through the end tag of the element whose start tag was just
@@ -1020,6 +1148,19 @@ fn checked_depth_add(depth: usize) -> Result<usize> {
 
 fn metadata_xml_error(error: impl std::fmt::Display) -> Error {
     Error::InvalidFormat(format!("XML parsing error in metadata: {error}"))
+}
+
+fn metadata_writer_error(error: io::Error) -> Error {
+    if let Some(limit) = error
+        .get_ref()
+        .and_then(|source| source.downcast_ref::<MetadataOutputLimit>())
+    {
+        return metadata_output_limit(
+            usize::try_from(limit.observed).unwrap_or(usize::MAX),
+            usize::try_from(limit.maximum).unwrap_or(usize::MAX),
+        );
+    }
+    metadata_xml_error(error)
 }
 
 fn metadata_reader_error(error: crate::Error) -> Error {

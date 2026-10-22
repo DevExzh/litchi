@@ -12,8 +12,10 @@ use crate::{
     model::names::{Definition, Expression, Range, Scope},
     worksheet::{Cell, CellView, Sheet},
 };
-use litchi_core::{Error, Result};
+use litchi_core::{Error as CoreError, Result as CoreResult};
 use litchi_odf_common::rdf::Triple;
+
+type FamilyResult<T> = Result<T, litchi_odf_common::Error>;
 
 /// A builder draft over an existing spreadsheet.
 ///
@@ -57,17 +59,17 @@ impl Workbook {
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn set_metadata(&mut self, metadata: litchi_core::Metadata) -> Result<()> {
-        self.spreadsheet.publish_metadata(metadata)
+    pub fn set_metadata(&mut self, metadata: litchi_core::Metadata) -> FamilyResult<()> {
+        Ok(self.spreadsheet.publish_metadata(metadata)?)
     }
 
     /// Apply a short-lived metadata update transactionally.
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn update_metadata<F>(&mut self, update: F) -> Result<()>
+    pub fn update_metadata<F>(&mut self, update: F) -> FamilyResult<()>
     where
-        F: FnOnce(&mut litchi_core::Metadata) -> Result<()>,
+        F: FnOnce(&mut litchi_core::Metadata) -> CoreResult<()>,
     {
         let mut metadata = self.metadata().clone();
         update(&mut metadata)?;
@@ -78,26 +80,26 @@ impl Workbook {
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn clear_metadata(&mut self) -> Result<()> {
-        self.spreadsheet.remove_metadata()
+    pub fn clear_metadata(&mut self) -> FamilyResult<()> {
+        Ok(self.spreadsheet.remove_metadata()?)
     }
 
     /// Capture the standalone table-template catalog.
-    pub fn table_templates(&self) -> Result<crate::styles::table_template::Snapshot> {
+    pub fn table_templates(&self) -> FamilyResult<crate::styles::table_template::Snapshot> {
         self.spreadsheet.table_templates()
     }
 
     /// Stage and publish one source-checked table-template edit.
-    pub fn edit_table_templates<F>(&mut self, update: F) -> Result<()>
+    pub fn edit_table_templates<F>(&mut self, update: F) -> FamilyResult<()>
     where
-        F: FnOnce(&mut crate::styles::table_template::Edit) -> Result<()>,
+        F: FnOnce(&mut crate::styles::table_template::Edit) -> CoreResult<()>,
     {
-        self.spreadsheet.edit_table_templates(update)
+        Ok(self.spreadsheet.edit_table_templates(update)?)
     }
 
     /// Capture inert DDE source declarations and cached tables.
-    pub fn dde(&self) -> Result<crate::dde::Snapshot> {
-        self.spreadsheet.dde()
+    pub fn dde(&self) -> FamilyResult<crate::dde::Snapshot> {
+        Ok(self.spreadsheet.dde()?)
     }
 
     /// Capture DDE metadata under explicit limits and execution policy.
@@ -105,16 +107,16 @@ impl Workbook {
         &self,
         limits: crate::dde::Limits,
         context: &litchi_core::ExecutionContext,
-    ) -> Result<crate::dde::Snapshot> {
+    ) -> FamilyResult<crate::dde::Snapshot> {
         self.spreadsheet.dde_with(limits, context)
     }
 
     /// Publish a failure-atomic inert DDE metadata edit.
-    pub fn edit_dde<F>(&mut self, update: F) -> Result<()>
+    pub fn edit_dde<F>(&mut self, update: F) -> FamilyResult<()>
     where
-        F: FnOnce(&mut crate::dde::Edit) -> Result<()>,
+        F: FnOnce(&mut crate::dde::Edit) -> CoreResult<()>,
     {
-        self.spreadsheet.edit_dde(update)
+        Ok(self.spreadsheet.edit_dde(update)?)
     }
 
     /// Edit DDE metadata with explicit parsing, staging, and readback budgets.
@@ -124,30 +126,31 @@ impl Workbook {
         limits: crate::dde::Limits,
         context: &litchi_core::ExecutionContext,
         update: F,
-    ) -> Result<()>
+    ) -> FamilyResult<()>
     where
-        F: FnOnce(&mut crate::dde::Edit) -> Result<()>,
+        F: FnOnce(&mut crate::dde::Edit) -> CoreResult<()>,
     {
-        self.spreadsheet
-            .edit_dde_with_context(limits, context, update)
+        Ok(self
+            .spreadsheet
+            .edit_dde_with_context(limits, context, update)?)
     }
 
     /// Capture the inert, source-bound scenario metadata catalog.
-    pub fn scenarios(&self) -> Result<crate::scenario::Snapshot> {
-        self.spreadsheet.scenarios()
+    pub fn scenarios(&self) -> FamilyResult<crate::scenario::Snapshot> {
+        Ok(self.spreadsheet.scenarios()?)
     }
 
     /// Stage and publish one failure-atomic scenario metadata edit.
-    pub fn edit_scenarios<F>(&mut self, update: F) -> Result<()>
+    pub fn edit_scenarios<F>(&mut self, update: F) -> FamilyResult<()>
     where
-        F: FnOnce(&mut crate::scenario::Edit) -> Result<()>,
+        F: FnOnce(&mut crate::scenario::Edit) -> CoreResult<()>,
     {
-        self.spreadsheet.edit_scenarios(update)
+        Ok(self.spreadsheet.edit_scenarios(update)?)
     }
 
     /// Capture the source-backed sheet metadata catalog.
-    pub fn sheet_metadata(&self) -> Result<crate::sheet_metadata::Snapshot> {
-        self.spreadsheet.sheet_metadata()
+    pub fn sheet_metadata(&self) -> FamilyResult<crate::sheet_metadata::Snapshot> {
+        Ok(self.spreadsheet.sheet_metadata()?)
     }
 
     /// Capture sheet metadata under explicit finite limits and context.
@@ -155,16 +158,16 @@ impl Workbook {
         &self,
         limits: crate::sheet_metadata::Limits,
         context: &litchi_core::ExecutionContext,
-    ) -> Result<crate::sheet_metadata::Snapshot> {
-        self.spreadsheet.sheet_metadata_with(limits, context)
+    ) -> FamilyResult<crate::sheet_metadata::Snapshot> {
+        Ok(self.spreadsheet.sheet_metadata_with(limits, context)?)
     }
 
     /// Stage and publish one failure-atomic sheet metadata edit.
-    pub fn edit_sheet_metadata<F>(&mut self, update: F) -> Result<()>
+    pub fn edit_sheet_metadata<F>(&mut self, update: F) -> FamilyResult<()>
     where
-        F: FnOnce(&mut crate::sheet_metadata::Edit) -> Result<()>,
+        F: FnOnce(&mut crate::sheet_metadata::Edit) -> CoreResult<()>,
     {
-        self.spreadsheet.edit_sheet_metadata(update)
+        Ok(self.spreadsheet.edit_sheet_metadata(update)?)
     }
 
     /// Stage and publish sheet metadata under explicit limits and context.
@@ -178,12 +181,13 @@ impl Workbook {
         limits: crate::sheet_metadata::Limits,
         context: &litchi_core::ExecutionContext,
         update: F,
-    ) -> Result<()>
+    ) -> FamilyResult<()>
     where
-        F: FnOnce(&mut crate::sheet_metadata::Edit) -> Result<()>,
+        F: FnOnce(&mut crate::sheet_metadata::Edit) -> CoreResult<()>,
     {
-        self.spreadsheet
-            .edit_sheet_metadata_with_context(limits, context, update)
+        Ok(self
+            .spreadsheet
+            .edit_sheet_metadata_with_context(limits, context, update)?)
     }
 
     /// Borrow spreadsheet calculation settings, if present.
@@ -196,11 +200,14 @@ impl Workbook {
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn set_settings(&mut self, settings: Option<crate::settings::Settings>) -> Result<()> {
+    pub fn set_settings(
+        &mut self,
+        settings: Option<crate::settings::Settings>,
+    ) -> FamilyResult<()> {
         if let Some(settings) = &settings {
             settings.validate()?;
         }
-        self.spreadsheet.publish_settings(settings)
+        Ok(self.spreadsheet.publish_settings(settings)?)
     }
 
     /// Apply a typed calculation-settings update, creating the owner when it
@@ -208,9 +215,9 @@ impl Workbook {
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn update_settings<F>(&mut self, update: F) -> Result<()>
+    pub fn update_settings<F>(&mut self, update: F) -> FamilyResult<()>
     where
-        F: FnOnce(&mut crate::settings::Settings) -> Result<()>,
+        F: FnOnce(&mut crate::settings::Settings) -> CoreResult<()>,
     {
         let mut settings = self.settings().cloned().unwrap_or_default();
         update(&mut settings)?;
@@ -221,7 +228,7 @@ impl Workbook {
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn clear_settings(&mut self) -> Result<()> {
+    pub fn clear_settings(&mut self) -> FamilyResult<()> {
         self.set_settings(None)
     }
 
@@ -229,7 +236,7 @@ impl Workbook {
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn annotations(&self) -> Result<crate::annotations::Snapshot> {
+    pub fn annotations(&self) -> FamilyResult<crate::annotations::Snapshot> {
         self.spreadsheet.annotations()
     }
 
@@ -242,9 +249,9 @@ impl Workbook {
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn edit_annotations<F>(&mut self, edit: F) -> Result<()>
+    pub fn edit_annotations<F>(&mut self, edit: F) -> FamilyResult<()>
     where
-        F: FnOnce(&mut crate::annotations::Edit) -> Result<()>,
+        F: FnOnce(&mut crate::annotations::Edit) -> CoreResult<()>,
     {
         let snapshot = self.spreadsheet.annotations()?;
         let mut transaction = snapshot.edit();
@@ -268,7 +275,7 @@ impl Workbook {
     /// # Errors
     ///
     /// Returns an error when the retained package or worksheet graph is invalid.
-    pub fn worksheet_snapshot(&self) -> Result<crate::worksheet::Snapshot> {
+    pub fn worksheet_snapshot(&self) -> FamilyResult<crate::worksheet::Snapshot> {
         self.spreadsheet.worksheet_snapshot()
     }
 
@@ -278,9 +285,9 @@ impl Workbook {
     ///
     /// Returns an error when the closure, validation, compactness check, rebuild, or readback
     /// fails.
-    pub fn edit_worksheets<F>(&mut self, edit: F) -> Result<()>
+    pub fn edit_worksheets<F>(&mut self, edit: F) -> FamilyResult<()>
     where
-        F: FnOnce(&mut crate::worksheet::Edit) -> Result<()>,
+        F: FnOnce(&mut crate::worksheet::Edit) -> CoreResult<()>,
     {
         let snapshot = self.worksheet_snapshot()?;
         let mut transaction = snapshot.edit();
@@ -296,7 +303,7 @@ impl Workbook {
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn charts(&self) -> Result<crate::charts::Inventory<'_>> {
+    pub fn charts(&self) -> FamilyResult<crate::charts::Inventory<'_>> {
         self.spreadsheet.charts()
     }
 
@@ -304,7 +311,7 @@ impl Workbook {
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn chart_snapshot(&self) -> Result<crate::charts::Snapshot> {
+    pub fn chart_snapshot(&self) -> FamilyResult<crate::charts::Snapshot> {
         self.spreadsheet.chart_snapshot()
     }
 
@@ -315,9 +322,9 @@ impl Workbook {
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn edit_charts<F>(&mut self, edit: F) -> Result<()>
+    pub fn edit_charts<F>(&mut self, edit: F) -> FamilyResult<()>
     where
-        F: for<'source> FnOnce(&mut crate::charts::Editor<'_, 'source>) -> Result<()>,
+        F: for<'source> FnOnce(&mut crate::charts::Editor<'_, 'source>) -> CoreResult<()>,
     {
         let inventory = self.spreadsheet.charts()?;
         let mut transaction = inventory.transaction();
@@ -333,7 +340,7 @@ impl Workbook {
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn data_pilots(&self) -> Result<crate::data_pilot::Catalog<'_>> {
+    pub fn data_pilots(&self) -> FamilyResult<crate::data_pilot::Catalog<'_>> {
         self.spreadsheet.data_pilots()
     }
 
@@ -342,7 +349,7 @@ impl Workbook {
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn data_pilot_snapshot(&self) -> Result<crate::data_pilot::Snapshot> {
+    pub fn data_pilot_snapshot(&self) -> FamilyResult<crate::data_pilot::Snapshot> {
         self.spreadsheet.data_pilot_snapshot()
     }
 
@@ -353,9 +360,9 @@ impl Workbook {
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn edit_data_pilots<F>(&mut self, edit: F) -> Result<()>
+    pub fn edit_data_pilots<F>(&mut self, edit: F) -> FamilyResult<()>
     where
-        F: for<'source> FnOnce(&mut crate::data_pilot::Editor<'_, 'source>) -> Result<()>,
+        F: for<'source> FnOnce(&mut crate::data_pilot::Editor<'_, 'source>) -> CoreResult<()>,
     {
         let commit = {
             let catalog = self.spreadsheet.data_pilots()?;
@@ -372,27 +379,27 @@ impl Workbook {
     /// Discover inert database-range declarations in the current package.
     ///
     /// No database, query, refresh, or filter execution occurs.
-    pub fn database_ranges(&self) -> Result<crate::database_range::Catalog<'_>> {
+    pub fn database_ranges(&self) -> FamilyResult<crate::database_range::Catalog<'_>> {
         self.spreadsheet.database_ranges()
     }
 
     /// Capture an immutable, exact-source database-range snapshot.
-    pub fn database_range_snapshot(&self) -> Result<crate::database_range::Snapshot> {
+    pub fn database_range_snapshot(&self) -> FamilyResult<crate::database_range::Snapshot> {
         self.spreadsheet.database_range_snapshot()
     }
 
     /// Alias for [`Self::database_range_snapshot`].
-    pub fn database_ranges_snapshot(&self) -> Result<crate::database_range::Snapshot> {
+    pub fn database_ranges_snapshot(&self) -> FamilyResult<crate::database_range::Snapshot> {
         self.database_range_snapshot()
     }
 
     /// Clone-stage inert database-range CRUD and publish one atomic package
     /// edit.
-    pub fn edit_database_ranges<F>(&mut self, edit: F) -> Result<()>
+    pub fn edit_database_ranges<F>(&mut self, edit: F) -> FamilyResult<()>
     where
-        F: for<'source> FnOnce(&mut crate::database_range::Editor<'_, 'source>) -> Result<()>,
+        F: for<'source> FnOnce(&mut crate::database_range::Editor<'_, 'source>) -> CoreResult<()>,
     {
-        self.spreadsheet.edit_database_ranges(edit)
+        Ok(self.spreadsheet.edit_database_ranges(edit)?)
     }
 
     /// Find a worksheet by its exact ODF name.
@@ -411,37 +418,40 @@ impl Workbook {
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn set_sheets(&mut self, sheets: Vec<Sheet>) -> Result<()> {
-        self.spreadsheet.publish_sheets(sheets)
+    pub fn set_sheets(&mut self, sheets: Vec<Sheet>) -> FamilyResult<()> {
+        Ok(self.spreadsheet.publish_sheets(sheets)?)
     }
 
     /// Append one worksheet while preserving document order.
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn add_sheet(&mut self, sheet: Sheet) -> Result<()> {
-        self.edit_sheets(move |sheets| {
+    pub fn add_sheet(&mut self, sheet: Sheet) -> FamilyResult<()> {
+        Ok(self.edit_sheets(move |sheets| {
             sheets.push(sheet);
             Ok(())
-        })
+        })?)
     }
 
     /// Remove one worksheet by its exact ODF name.
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn remove_sheet(&mut self, name: &str) -> Result<Sheet> {
+    pub fn remove_sheet(&mut self, name: &str) -> FamilyResult<Sheet> {
         let mut removed = None;
         self.edit_sheets(|sheets| {
             let index = sheets
                 .iter()
                 .position(|sheet| sheet.name == name)
-                .ok_or_else(|| Error::InvalidFormat(format!("ODS sheet '{name}' was not found")))?;
+                .ok_or_else(|| {
+                    CoreError::InvalidFormat(format!("ODS sheet '{name}' was not found"))
+                })?;
             removed = Some(sheets.remove(index));
             Ok(())
         })?;
-        removed
-            .ok_or_else(|| Error::InvalidFormat("ODS sheet removal was not committed".to_string()))
+        Ok(removed.ok_or_else(|| {
+            CoreError::InvalidFormat("ODS sheet removal was not committed".to_string())
+        })?)
     }
 
     /// Atomically replace one logical cell in a named worksheet.
@@ -454,16 +464,16 @@ impl Workbook {
         row: usize,
         column: usize,
         cell: Cell,
-    ) -> Result<()> {
-        self.edit_sheet(sheet_name, |sheet| sheet.set_cell(row, column, cell))
+    ) -> FamilyResult<()> {
+        Ok(self.edit_sheet(sheet_name, |sheet| sheet.set_cell(row, column, cell))?)
     }
 
     /// Clear one logical cell while retaining its direct style, if any.
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn clear_cell(&mut self, sheet_name: &str, row: usize, column: usize) -> Result<()> {
-        self.edit_sheet(sheet_name, |sheet| sheet.clear_cell(row, column))
+    pub fn clear_cell(&mut self, sheet_name: &str, row: usize, column: usize) -> FamilyResult<()> {
+        Ok(self.edit_sheet(sheet_name, |sheet| sheet.clear_cell(row, column))?)
     }
 
     /// Set an inert formula on one logical cell.
@@ -476,11 +486,11 @@ impl Workbook {
         row: usize,
         column: usize,
         formula: impl Into<String>,
-    ) -> Result<()> {
+    ) -> FamilyResult<()> {
         let formula = formula.into();
-        self.edit_sheet(sheet_name, move |sheet| {
+        Ok(self.edit_sheet(sheet_name, move |sheet| {
             sheet.set_formula(row, column, formula)
-        })
+        })?)
     }
 
     /// Set a direct cell style reference on one logical cell.
@@ -493,16 +503,16 @@ impl Workbook {
         row: usize,
         column: usize,
         style_name: impl Into<String>,
-    ) -> Result<()> {
+    ) -> FamilyResult<()> {
         let style_name = style_name.into();
-        self.edit_sheet(sheet_name, move |sheet| {
+        Ok(self.edit_sheet(sheet_name, move |sheet| {
             sheet.set_cell_style(row, column, style_name)
-        })
+        })?)
     }
 
     /// Set or clear one worksheet's direct table title.
-    pub fn set_sheet_title(&mut self, sheet_name: &str, title: Option<String>) -> Result<()> {
-        self.edit_sheet(sheet_name, |sheet| sheet.set_title(title))
+    pub fn set_sheet_title(&mut self, sheet_name: &str, title: Option<String>) -> FamilyResult<()> {
+        Ok(self.edit_sheet(sheet_name, |sheet| sheet.set_title(title))?)
     }
 
     /// Set or clear one worksheet's direct table description.
@@ -510,28 +520,28 @@ impl Workbook {
         &mut self,
         sheet_name: &str,
         description: Option<String>,
-    ) -> Result<()> {
-        self.edit_sheet(sheet_name, |sheet| sheet.set_description(description))
+    ) -> FamilyResult<()> {
+        Ok(self.edit_sheet(sheet_name, |sheet| sheet.set_description(description))?)
     }
 
-    fn edit_sheets<F>(&mut self, operation: F) -> Result<()>
+    fn edit_sheets<F>(&mut self, operation: F) -> CoreResult<()>
     where
-        F: FnOnce(&mut Vec<Sheet>) -> Result<()>,
+        F: FnOnce(&mut Vec<Sheet>) -> CoreResult<()>,
     {
         let candidate = crate::worksheet::transaction::edit(self.spreadsheet.sheets(), operation)?;
         self.spreadsheet.publish_sheets(candidate)
     }
 
-    fn edit_sheet<F>(&mut self, sheet_name: &str, operation: F) -> Result<()>
+    fn edit_sheet<F>(&mut self, sheet_name: &str, operation: F) -> CoreResult<()>
     where
-        F: FnOnce(&mut Sheet) -> Result<()>,
+        F: FnOnce(&mut Sheet) -> CoreResult<()>,
     {
         self.edit_sheets(|sheets| {
             let sheet = sheets
                 .iter_mut()
                 .find(|sheet| sheet.name == sheet_name)
                 .ok_or_else(|| {
-                    Error::InvalidFormat(format!("ODS sheet '{sheet_name}' was not found"))
+                    CoreError::InvalidFormat(format!("ODS sheet '{sheet_name}' was not found"))
                 })?;
             operation(sheet)
         })
@@ -548,8 +558,8 @@ impl Workbook {
     /// # Errors
     ///
     /// Returns an error when the retained package cannot be reparsed.
-    pub fn definitions_snapshot(&self) -> Result<crate::definitions::Snapshot> {
-        self.spreadsheet.definitions_snapshot()
+    pub fn definitions_snapshot(&self) -> FamilyResult<crate::definitions::Snapshot> {
+        Ok(self.spreadsheet.definitions_snapshot()?)
     }
 
     /// Clone-stage ordered definition CRUD and publish it as one package edit.
@@ -560,9 +570,9 @@ impl Workbook {
     /// # Errors
     ///
     /// Returns an error when the closure, validation, compactness check, rebuild, or readback fails.
-    pub fn edit_definitions<F>(&mut self, edit: F) -> Result<()>
+    pub fn edit_definitions<F>(&mut self, edit: F) -> FamilyResult<()>
     where
-        F: FnOnce(&mut crate::definitions::Edit) -> Result<()>,
+        F: FnOnce(&mut crate::definitions::Edit) -> CoreResult<()>,
     {
         let snapshot = self.definitions_snapshot()?;
         let mut transaction = snapshot.edit();
@@ -578,32 +588,32 @@ impl Workbook {
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn add_range(&mut self, range: Range) -> Result<()> {
-        self.spreadsheet.add_range(range)
+    pub fn add_range(&mut self, range: Range) -> FamilyResult<()> {
+        Ok(self.spreadsheet.add_range(range)?)
     }
 
     /// Append a validated named expression atomically.
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn add_expression(&mut self, expression: Expression) -> Result<()> {
-        self.spreadsheet.add_expression(expression)
+    pub fn add_expression(&mut self, expression: Expression) -> FamilyResult<()> {
+        Ok(self.spreadsheet.add_expression(expression)?)
     }
 
     /// Append a validated named definition atomically.
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn add_definition(&mut self, definition: Definition) -> Result<()> {
-        self.spreadsheet.add_definition(definition)
+    pub fn add_definition(&mut self, definition: Definition) -> FamilyResult<()> {
+        Ok(self.spreadsheet.add_definition(definition)?)
     }
 
     /// Replace the complete ordered named-definition catalog atomically.
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn set_definitions(&mut self, definitions: Vec<Definition>) -> Result<()> {
-        self.spreadsheet.set_definitions(definitions)
+    pub fn set_definitions(&mut self, definitions: Vec<Definition>) -> FamilyResult<()> {
+        Ok(self.spreadsheet.set_definitions(definitions)?)
     }
 
     /// Find a named range in the current snapshot.
@@ -623,8 +633,12 @@ impl Workbook {
     /// # Errors
     ///
     /// Returns an error when the path, triples, compact XML, or rebuilt package is invalid.
-    pub fn add_rdf_graph(&mut self, path: Option<&str>, triples: &[Triple]) -> Result<String> {
-        self.spreadsheet.add_rdf_graph(path, triples)
+    pub fn add_rdf_graph(
+        &mut self,
+        path: Option<&str>,
+        triples: &[Triple],
+    ) -> FamilyResult<String> {
+        Ok(self.spreadsheet.add_rdf_graph(path, triples)?)
     }
 
     /// Capture RDF metadata as an immutable, exact-package snapshot.
@@ -632,8 +646,8 @@ impl Workbook {
     /// # Errors
     ///
     /// Returns an error when the package, manifest, or a declared graph is invalid.
-    pub fn rdf_snapshot(&self) -> Result<crate::metadata_graphs::Snapshot> {
-        self.spreadsheet.rdf_snapshot()
+    pub fn rdf_snapshot(&self) -> FamilyResult<crate::metadata_graphs::Snapshot> {
+        Ok(self.spreadsheet.rdf_snapshot()?)
     }
 
     /// Clone-stage RDF graph and triple CRUD and publish it as one package edit.
@@ -641,15 +655,16 @@ impl Workbook {
     /// # Errors
     ///
     /// Returns an error when the closure or a staged package rebuild fails.
-    pub fn edit_rdf<F>(&mut self, edit: F) -> Result<()>
+    pub fn edit_rdf<F>(&mut self, edit: F) -> FamilyResult<()>
     where
-        F: FnOnce(&mut crate::metadata_graphs::Edit) -> Result<()>,
+        F: FnOnce(&mut crate::metadata_graphs::Edit) -> CoreResult<()>,
     {
         let snapshot = self.rdf_snapshot()?;
         let mut transaction = snapshot.edit();
         edit(&mut transaction)?;
-        self.spreadsheet
-            .apply_rdf_patch(transaction.commit().patch())
+        Ok(self
+            .spreadsheet
+            .apply_rdf_patch(transaction.commit().patch())?)
     }
 
     /// Replace one complete RDF metadata graph.
@@ -657,8 +672,8 @@ impl Workbook {
     /// # Errors
     ///
     /// Returns an error when the graph, triples, compact XML, or rebuilt package is invalid.
-    pub fn replace_rdf_graph(&mut self, path: &str, triples: &[Triple]) -> Result<()> {
-        self.spreadsheet.replace_rdf_graph(path, triples)
+    pub fn replace_rdf_graph(&mut self, path: &str, triples: &[Triple]) -> FamilyResult<()> {
+        Ok(self.spreadsheet.replace_rdf_graph(path, triples)?)
     }
 
     /// Remove one unreferenced RDF metadata graph.
@@ -666,8 +681,8 @@ impl Workbook {
     /// # Errors
     ///
     /// Returns an error when the graph is missing, referenced, or package rebuilding fails.
-    pub fn remove_rdf_graph(&mut self, path: &str) -> Result<()> {
-        self.spreadsheet.remove_rdf_graph(path)
+    pub fn remove_rdf_graph(&mut self, path: &str) -> FamilyResult<()> {
+        Ok(self.spreadsheet.remove_rdf_graph(path)?)
     }
 
     /// Append one RDF triple and return its position in the graph.
@@ -675,8 +690,8 @@ impl Workbook {
     /// # Errors
     ///
     /// Returns an error when the graph is missing or package rebuilding fails.
-    pub fn add_rdf_triple(&mut self, path: &str, triple: &Triple) -> Result<usize> {
-        self.spreadsheet.add_rdf_triple(path, triple)
+    pub fn add_rdf_triple(&mut self, path: &str, triple: &Triple) -> FamilyResult<usize> {
+        Ok(self.spreadsheet.add_rdf_triple(path, triple)?)
     }
 
     /// Replace one RDF triple while preserving its description subject.
@@ -684,8 +699,13 @@ impl Workbook {
     /// # Errors
     ///
     /// Returns an error when the triple is missing or package rebuilding fails.
-    pub fn replace_rdf_triple(&mut self, path: &str, index: usize, triple: &Triple) -> Result<()> {
-        self.spreadsheet.replace_rdf_triple(path, index, triple)
+    pub fn replace_rdf_triple(
+        &mut self,
+        path: &str,
+        index: usize,
+        triple: &Triple,
+    ) -> FamilyResult<()> {
+        Ok(self.spreadsheet.replace_rdf_triple(path, index, triple)?)
     }
 
     /// Remove one RDF triple.
@@ -693,8 +713,8 @@ impl Workbook {
     /// # Errors
     ///
     /// Returns an error when the triple is missing or package rebuilding fails.
-    pub fn remove_rdf_triple(&mut self, path: &str, index: usize) -> Result<()> {
-        self.spreadsheet.remove_rdf_triple(path, index)
+    pub fn remove_rdf_triple(&mut self, path: &str, index: usize) -> FamilyResult<()> {
+        Ok(self.spreadsheet.remove_rdf_triple(path, index)?)
     }
 
     /// Move one RDF triple within its description.
@@ -702,8 +722,8 @@ impl Workbook {
     /// # Errors
     ///
     /// Returns an error when a position is invalid or package rebuilding fails.
-    pub fn move_rdf_triple(&mut self, path: &str, from: usize, to: usize) -> Result<()> {
-        self.spreadsheet.move_rdf_triple(path, from, to)
+    pub fn move_rdf_triple(&mut self, path: &str, from: usize, to: usize) -> FamilyResult<()> {
+        Ok(self.spreadsheet.move_rdf_triple(path, from, to)?)
     }
 
     /// Apply a short-lived protection transaction.
@@ -711,11 +731,11 @@ impl Workbook {
     /// # Errors
     ///
     /// Returns an error when the closure or package rebuilding fails.
-    pub fn update_protection<F>(&mut self, edit: F) -> Result<()>
+    pub fn update_protection<F>(&mut self, edit: F) -> FamilyResult<()>
     where
-        F: FnOnce(&mut crate::protection::Edit) -> Result<()>,
+        F: FnOnce(&mut crate::protection::Edit) -> CoreResult<()>,
     {
-        self.spreadsheet.update_protection(edit)
+        Ok(self.spreadsheet.update_protection(edit)?)
     }
 
     /// Apply a short-lived tracked-change transaction.
@@ -723,11 +743,11 @@ impl Workbook {
     /// # Errors
     ///
     /// Returns an error when the closure or package rebuilding fails.
-    pub fn update_tracked_changes<F>(&mut self, edit: F) -> Result<()>
+    pub fn update_tracked_changes<F>(&mut self, edit: F) -> FamilyResult<()>
     where
-        F: FnOnce(&mut crate::tracked_changes::Edit) -> Result<()>,
+        F: FnOnce(&mut crate::tracked_changes::Edit) -> CoreResult<()>,
     {
-        self.spreadsheet.update_tracked_changes(edit)
+        Ok(self.spreadsheet.update_tracked_changes(edit)?)
     }
 
     /// Publish the draft as an immutable [`crate::Package`].
@@ -735,7 +755,7 @@ impl Workbook {
     /// # Errors
     ///
     /// Returns an archive-validation failure.
-    pub fn build(self) -> std::result::Result<crate::Package, litchi_odf_common::Error> {
+    pub fn build(self) -> FamilyResult<crate::Package> {
         Ok(crate::Package::from_authored(
             self.spreadsheet.into_bytes(),
         )?)

@@ -8,6 +8,8 @@ use litchi_core::{Error, Metadata, Result};
 use litchi_odf_common::package::replace_content_xml_with_payload_verification;
 use litchi_odf_common::{Error as OdfError, XmlStreamLimits};
 
+type FamilyResult<T> = std::result::Result<T, OdfError>;
+
 impl Package {
     pub(crate) fn xml_limits_value(&self) -> XmlStreamLimits {
         self.xml_limits
@@ -219,7 +221,7 @@ impl Package {
     }
 
     /// Whether the package manifest contains password-encrypted entries.
-    pub fn is_encrypted(&self) -> Result<bool> {
+    pub fn is_encrypted(&self) -> FamilyResult<bool> {
         Ok(self.package.package()?.manifest().has_encrypted_entries())
     }
 
@@ -229,41 +231,41 @@ impl Package {
     }
 
     /// Return the mandatory `content.xml` part.
-    pub fn content_xml(&self) -> Result<String> {
-        decode_xml_part(
+    pub fn content_xml(&self) -> FamilyResult<String> {
+        Ok(decode_xml_part(
             self.package.get_file(constants::ODF_CONTENT)?,
             constants::ODF_CONTENT,
-        )
+        )?)
     }
 
     /// Return the optional `styles.xml` part.
-    pub fn styles_xml(&self) -> Result<Option<String>> {
-        self.optional_xml_part(constants::ODF_STYLES)
+    pub fn styles_xml(&self) -> FamilyResult<Option<String>> {
+        Ok(self.optional_xml_part(constants::ODF_STYLES)?)
     }
 
     /// Return the optional `settings.xml` part.
-    pub fn settings_xml(&self) -> Result<Option<String>> {
-        self.optional_xml_part(constants::ODF_SETTINGS)
+    pub fn settings_xml(&self) -> FamilyResult<Option<String>> {
+        Ok(self.optional_xml_part(constants::ODF_SETTINGS)?)
     }
 
     /// Parses the package settings part without evaluating any stored values.
-    pub fn settings(&self) -> Result<Option<crate::Settings>> {
+    pub fn settings(&self) -> FamilyResult<Option<crate::Settings>> {
         let Some(xml) = self.settings_xml()? else {
             return Ok(None);
         };
-        crate::settings::parse_package(&xml).map(Some)
+        Ok(crate::settings::parse_package(&xml).map(Some)?)
     }
 
     /// Extract common document metadata, or an empty value when `meta.xml` is absent.
-    pub fn metadata(&self) -> Result<Metadata> {
+    pub fn metadata(&self) -> FamilyResult<Metadata> {
         let Some(xml) = self.optional_xml_part(constants::ODF_META)? else {
             return Ok(Metadata::default());
         };
-        Meta::from_bytes(xml.as_bytes(), self.xml_limits)?.try_extract_metadata()
+        Ok(Meta::from_bytes(xml.as_bytes(), self.xml_limits)?.try_extract_metadata()?)
     }
 
     /// Extract the complete format-specific metadata model, if `meta.xml` exists.
-    pub fn odf_metadata(&self) -> Result<Option<crate::Metadata>> {
+    pub fn odf_metadata(&self) -> FamilyResult<Option<crate::Metadata>> {
         let Some(xml) = self.optional_xml_part(constants::ODF_META)? else {
             return Ok(None);
         };
@@ -283,59 +285,69 @@ impl Package {
     }
 
     /// List every path stored in the package.
-    pub fn files(&self) -> Result<Vec<String>> {
-        self.package.files()
+    pub fn files(&self) -> FamilyResult<Vec<String>> {
+        Ok(self.package.files()?)
     }
 
     /// Return whether a package path exists.
-    pub fn has_file(&self, path: &str) -> Result<bool> {
-        self.package.has_file(path)
+    pub fn has_file(&self, path: &str) -> FamilyResult<bool> {
+        Ok(self.package.has_file(path)?)
     }
 
     /// Extract an arbitrary package part without interpreting it.
-    pub fn get_file(&self, path: &str) -> Result<Vec<u8>> {
-        self.package.get_file(path)
+    pub fn get_file(&self, path: &str) -> FamilyResult<Vec<u8>> {
+        Ok(self.package.get_file(path)?)
     }
 
     /// List package paths that appear to contain embedded media.
-    pub fn media_files(&self) -> Result<Vec<String>> {
-        self.package.media_files()
+    pub fn media_files(&self) -> FamilyResult<Vec<String>> {
+        Ok(self.package.media_files()?)
     }
 
     /// Discover referenced, inline, missing, and inert linked images.
-    pub fn images(&self) -> Result<Vec<crate::Image>> {
+    pub fn images(&self) -> FamilyResult<Vec<crate::Image>> {
         let content = self.content_xml()?;
         let styles = self.styles_xml()?;
         let package = self.package.package()?;
-        crate::media::scan_package(&content, styles.as_deref(), &package)
+        Ok(crate::media::scan_package(
+            &content,
+            styles.as_deref(),
+            &package,
+        )?)
     }
 
     /// Inspect classic forms in content and styles without executing behavior.
-    pub fn forms(&self) -> Result<crate::form::Forms> {
+    pub fn forms(&self) -> FamilyResult<crate::form::Forms> {
         let content = self.content_xml()?;
         let styles = self.styles_xml()?;
         let mut parts = vec![(content.as_str(), crate::form::Part::Content)];
         if let Some(styles) = styles.as_deref() {
             parts.push((styles, crate::form::Part::Styles));
         }
-        crate::form::parse_form_parts(&parts)
+        Ok(crate::form::parse_form_parts(&parts)?)
     }
 
     /// Inspect in-content RDFa and inline `text:meta` values in content and
     /// styles without materializing unrelated package members.
-    pub fn in_content_metadata(&self) -> Result<crate::ContentMetadata> {
+    pub fn in_content_metadata(&self) -> FamilyResult<crate::ContentMetadata> {
         let content = self.content_xml()?;
         let styles = self.styles_xml()?;
         let mut parts = vec![(content.as_str(), crate::MetadataPart::Content)];
         if let Some(styles) = styles.as_deref() {
             parts.push((styles, crate::MetadataPart::Styles));
         }
-        crate::content_metadata::parse_parts_with_xml_limits(&parts, self.xml_limits)
+        Ok(crate::content_metadata::parse_parts_with_xml_limits(
+            &parts,
+            self.xml_limits,
+        )?)
     }
 
     /// Inspect inert XForms model declarations in `office:forms`.
-    pub fn xforms_models(&self) -> Result<Vec<crate::xforms::Model>> {
-        crate::xforms::parse_models_with_xml_limits(&self.content_xml()?, self.xml_limits)
+    pub fn xforms_models(&self) -> FamilyResult<Vec<crate::xforms::Model>> {
+        Ok(crate::xforms::parse_models_with_xml_limits(
+            &self.content_xml()?,
+            self.xml_limits,
+        )?)
     }
 
     /// Set or clear paragraph RDFa and atomically publish `content.xml`.
@@ -459,14 +471,17 @@ impl Package {
     }
 
     /// Inspect ordered ODF variable declarations in content and styles.
-    pub fn variable_declarations(&self) -> Result<crate::variable_declaration::Declarations> {
+    pub fn variable_declarations(&self) -> FamilyResult<crate::variable_declaration::Declarations> {
         let content = self.content_xml()?;
         let styles = self.styles_xml()?;
         let mut parts = vec![(content.as_str(), crate::variable_declaration::Part::Content)];
         if let Some(styles) = styles.as_deref() {
             parts.push((styles, crate::variable_declaration::Part::Styles));
         }
-        crate::variable_declaration::parse_parts_with_xml_limits(&parts, self.xml_limits)
+        Ok(crate::variable_declaration::parse_parts_with_xml_limits(
+            &parts,
+            self.xml_limits,
+        )?)
     }
 
     /// Atomically insert or replace one variable declaration container.
@@ -654,20 +669,24 @@ impl Package {
     }
 
     /// Discover package, inline, missing, and inert linked embedded objects.
-    pub fn embedded_objects(&self) -> Result<Vec<crate::Object>> {
+    pub fn embedded_objects(&self) -> FamilyResult<Vec<crate::Object>> {
         let content = self.content_xml()?;
         let styles = self.styles_xml()?;
         let package = self.package.package()?;
-        crate::embedded::scan_package(&content, styles.as_deref(), &package)
+        Ok(crate::embedded::scan_package(
+            &content,
+            styles.as_deref(),
+            &package,
+        )?)
     }
 
     /// Return bytes only for inline or verified package-contained images.
     /// Linked images remain inert and are never fetched.
-    pub fn image_bytes(&self, image: &crate::Image) -> Result<Option<Vec<u8>>> {
+    pub fn image_bytes(&self, image: &crate::Image) -> FamilyResult<Option<Vec<u8>>> {
         match &image.source {
             litchi_odf_common::media::Source::Inline { bytes, .. } => Ok(Some(bytes.clone())),
             litchi_odf_common::media::Source::PackagePart { path, .. } => {
-                self.package.get_file(path).map(Some)
+                Ok(Some(self.package.get_file(path)?))
             },
             _ => Ok(None),
         }

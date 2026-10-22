@@ -19,6 +19,7 @@ use crate::{
     transaction::{Commit, EnvelopeKind, Package},
 };
 use litchi_core::{Error, Result};
+use litchi_odf_common::Error as OdfError;
 use litchi_odf_common::{
     embedded::{Kind as ObjectKind, Source as ObjectSource, scan_package as scan_objects},
     media::{Source as ImageSource, scan_package as scan_images},
@@ -42,6 +43,8 @@ const MANIFEST_PATH: &str = "META-INF/manifest.xml";
 const MAX_CANDIDATES: usize = 256;
 const MAX_PACKAGE_ENTRIES: usize = 16_384;
 const MAX_REFERENCE_XML_BYTES: usize = 64 * 1024 * 1024;
+
+type FamilyResult<T> = std::result::Result<T, OdfError>;
 
 /// Maximum UTF-8 bytes accepted in one embedded-resource GC candidate path.
 ///
@@ -192,16 +195,19 @@ impl EmbeddedResourceGcPlan {
     /// Every untouched ZIP member is raw-copied. The manifest is changed by
     /// deleting only the planned `manifest:file-entry` byte spans. The result
     /// is fully reopened before a reversible package commit is returned.
-    pub fn apply(&self, source: &Package) -> Result<Commit> {
+    pub fn apply(&self, source: &Package) -> FamilyResult<Commit> {
         if source.as_bytes() != self.source.as_bytes() {
-            return invalid("ODT embedded-resource GC plan source does not match");
+            return Err(OdfError::patch_conflict(
+                "odt.package.resource_gc",
+                "the plan is not for the package being edited",
+            ));
         }
         if !self.is_applicable() {
-            return Err(Error::Refused(litchi_core::edit::Refusal::new(
+            return Err(OdfError::refused(
                 litchi_core::edit::RefusalKind::UnsupportedOperation,
                 "odt.package.resource_gc",
                 "ODT embedded-resource GC plan contains a typed refusal",
-            )));
+            ));
         }
         let package = source.document()?.transaction_package().clone();
         let bytes = self.apply_to_package(&package)?;
@@ -245,8 +251,8 @@ impl Package {
     pub fn plan_embedded_resource_gc(
         &self,
         candidates: &[EmbeddedResourceGcCandidate],
-    ) -> Result<EmbeddedResourceGcPlan> {
-        plan(self.clone(), candidates)
+    ) -> FamilyResult<EmbeddedResourceGcPlan> {
+        Ok(plan(self.clone(), candidates)?)
     }
 }
 

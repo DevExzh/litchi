@@ -17,13 +17,15 @@ use std::{
 use litchi_core::{
     BlobBundle, BlobLimits, CompositionLimits, ConflictSet, DiagnosticFingerprint,
     Error as CoreError, History as CoreHistory, HistoryLimits, JoinedSubEdits, MergeChoice,
-    Patch as CorePatch, PatchError, PatchLimits, PatchOperation, Result, Reversible,
+    Patch as CorePatch, PatchError, PatchLimits, PatchOperation, Result as CoreResult, Reversible,
     ReversibleOperation, SubEdit, SubEditConflict, SubEditJoinFailure, ThreeWayMergePlan,
 };
 /// The family error of package-level verbs, [`Edit::commit`] and
 /// [`Package::apply`]: typed limits plus the common-core payload.
 pub use litchi_odf_common::Error;
 use litchi_odf_common::Error as PackageError;
+
+type FamilyResult<T> = Result<T, PackageError>;
 pub use litchi_odf_common::{LimitKind, OpenOptions, XmlStreamLimits};
 use litchi_odf_common::{
     core::{PackageWriter, Profile, XmlSourcePart, XmlSplicePublication},
@@ -233,7 +235,7 @@ impl Package {
     }
 
     /// Adopt bytes a metadata commit published, under this package's limits.
-    pub(crate) fn adopt_metadata_bytes(&self, bytes: Vec<u8>) -> Result<Self> {
+    pub(crate) fn adopt_metadata_bytes(&self, bytes: Vec<u8>) -> CoreResult<Self> {
         Self::from_vec_with(bytes, self.limits, self.xml_limits)
     }
 
@@ -243,7 +245,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error only when the fixed minimal package cannot be built.
-    pub fn new() -> std::result::Result<Self, PackageError> {
+    pub fn new() -> FamilyResult<Self> {
         let mut builder = crate::Builder::new();
         builder.add_sheet(crate::Sheet::new("Sheet1")?)?;
         builder.build()
@@ -255,7 +257,7 @@ impl Package {
     ///
     /// Returns [`PackageError::Limit`] when a source dimension is exceeded and
     /// [`PackageError::Core`] for I/O, archive or family-validation failures.
-    pub fn open(path: impl AsRef<std::path::Path>) -> std::result::Result<Self, PackageError> {
+    pub fn open(path: impl AsRef<std::path::Path>) -> FamilyResult<Self> {
         Self::open_with_options(path, OpenOptions::new())
     }
 
@@ -267,7 +269,7 @@ impl Package {
     pub fn open_with_options(
         path: impl AsRef<std::path::Path>,
         options: OpenOptions,
-    ) -> std::result::Result<Self, PackageError> {
+    ) -> FamilyResult<Self> {
         Self::from_reader_with_options(std::fs::File::open(path)?, options)
     }
 
@@ -279,7 +281,7 @@ impl Package {
     pub fn open_with_password(
         path: impl AsRef<std::path::Path>,
         password: impl Into<String>,
-    ) -> std::result::Result<Self, PackageError> {
+    ) -> FamilyResult<Self> {
         Self::open_with_password_and_options(path, password, OpenOptions::new())
     }
 
@@ -292,7 +294,7 @@ impl Package {
         path: impl AsRef<std::path::Path>,
         password: impl Into<String>,
         options: OpenOptions,
-    ) -> std::result::Result<Self, PackageError> {
+    ) -> FamilyResult<Self> {
         let password = zeroize::Zeroizing::new(password.into());
         let owned = litchi_odf_common::OwnedPackage::from_reader_with_password_and_options(
             std::fs::File::open(path)?,
@@ -311,7 +313,7 @@ impl Package {
     /// # Errors
     ///
     /// As [`Self::open`].
-    pub fn from_bytes(bytes: &[u8]) -> std::result::Result<Self, PackageError> {
+    pub fn from_bytes(bytes: &[u8]) -> FamilyResult<Self> {
         Self::from_bytes_with_options(bytes, OpenOptions::new())
     }
 
@@ -320,10 +322,7 @@ impl Package {
     /// # Errors
     ///
     /// As [`Self::open`].
-    pub fn from_bytes_with_options(
-        bytes: &[u8],
-        options: OpenOptions,
-    ) -> std::result::Result<Self, PackageError> {
+    pub fn from_bytes_with_options(bytes: &[u8], options: OpenOptions) -> FamilyResult<Self> {
         let limits = options.source_limits_value();
         check_input_bytes(bytes.len(), limits)?;
         let bytes = copy_bytes(bytes)?;
@@ -354,7 +353,7 @@ impl Package {
     pub fn from_bytes_with_password(
         bytes: &[u8],
         password: impl Into<String>,
-    ) -> std::result::Result<Self, PackageError> {
+    ) -> FamilyResult<Self> {
         Self::from_bytes_with_password_and_options(bytes, password, OpenOptions::new())
     }
 
@@ -368,7 +367,7 @@ impl Package {
         bytes: &[u8],
         password: impl Into<String>,
         options: OpenOptions,
-    ) -> std::result::Result<Self, PackageError> {
+    ) -> FamilyResult<Self> {
         let password = zeroize::Zeroizing::new(password.into());
         let limits = options.source_limits_value();
         check_input_bytes(bytes.len(), limits)?;
@@ -389,7 +388,7 @@ impl Package {
     /// # Errors
     ///
     /// As [`Self::open`].
-    pub fn from_reader(reader: impl std::io::Read) -> std::result::Result<Self, PackageError> {
+    pub fn from_reader(reader: impl std::io::Read) -> FamilyResult<Self> {
         Self::from_reader_with_options(reader, OpenOptions::new())
     }
 
@@ -402,7 +401,7 @@ impl Package {
     pub fn from_reader_with_options(
         reader: impl std::io::Read,
         options: OpenOptions,
-    ) -> std::result::Result<Self, PackageError> {
+    ) -> FamilyResult<Self> {
         let owned = litchi_odf_common::OwnedPackage::from_reader_with_options(reader, options)?;
         Self::from_opened(
             Archive::from_owned_package_with_xml_limits(owned, options.xml_limits_value())?,
@@ -420,7 +419,7 @@ impl Package {
     /// prepared package is another family.
     pub fn from_prepared_package(
         prepared: litchi_odf_common::PreparedPackage,
-    ) -> std::result::Result<Self, PackageError> {
+    ) -> FamilyResult<Self> {
         Self::from_prepared_package_with_options(prepared, OpenOptions::new())
     }
 
@@ -434,7 +433,7 @@ impl Package {
     pub fn from_prepared_package_with_options(
         prepared: litchi_odf_common::PreparedPackage,
         options: OpenOptions,
-    ) -> std::result::Result<Self, PackageError> {
+    ) -> FamilyResult<Self> {
         if prepared.format() != litchi_core::detection::FileFormat::Ods {
             return Err(CoreError::UnexpectedFormat {
                 detected: prepared.format(),
@@ -452,7 +451,7 @@ impl Package {
         archive: Archive,
         credentialed: bool,
         options: OpenOptions,
-    ) -> std::result::Result<Self, PackageError> {
+    ) -> FamilyResult<Self> {
         let semantic = options.semantic_limits_value();
         if !semantic.is_default() {
             let reader = archive.package().package()?;
@@ -487,7 +486,7 @@ impl Package {
     pub(crate) fn from_materialized(
         owned: litchi_odf_common::OwnedPackage,
         options: OpenOptions,
-    ) -> Result<Self> {
+    ) -> CoreResult<Self> {
         Ok(Self::from_opened(
             Archive::from_owned_package_with_xml_limits(owned, options.xml_limits_value())?,
             true,
@@ -498,7 +497,7 @@ impl Package {
     /// Adopt complete bytes written by the crate's own authoring codecs. The
     /// archive is indexed and the family parts validated now; the projection
     /// is parsed on first use.
-    pub(crate) fn from_authored(bytes: Vec<u8>) -> Result<Self> {
+    pub(crate) fn from_authored(bytes: Vec<u8>) -> CoreResult<Self> {
         let source = Arc::new(bytes);
         let package = Arc::new(Archive::from_shared_bytes_with_xml_limits(
             Arc::clone(&source),
@@ -520,11 +519,15 @@ impl Package {
         source: Vec<u8>,
         limits: Limits,
         xml_limits: XmlStreamLimits,
-    ) -> Result<Self> {
+    ) -> CoreResult<Self> {
         Self::from_arc(Arc::new(source), limits, xml_limits)
     }
 
-    fn from_arc(source: Arc<Vec<u8>>, limits: Limits, xml_limits: XmlStreamLimits) -> Result<Self> {
+    fn from_arc(
+        source: Arc<Vec<u8>>,
+        limits: Limits,
+        xml_limits: XmlStreamLimits,
+    ) -> CoreResult<Self> {
         validate_package_size(source.len(), limits)?;
         let package = Archive::from_shared_bytes_with_xml_limits(Arc::clone(&source), xml_limits)?;
         validate_resource_count(&package, limits)?;
@@ -555,7 +558,7 @@ impl Package {
         package: Arc<Archive>,
         limits: Limits,
         xml_limits: XmlStreamLimits,
-    ) -> Result<Self> {
+    ) -> CoreResult<Self> {
         let source = package.shared_bytes_owner();
         validate_package_size(source.len(), limits)?;
         validate_resource_count(package.as_ref(), limits)?;
@@ -592,7 +595,7 @@ impl Package {
     ///
     /// Returns the parse failure of a freshly built package whose projection
     /// has not been parsed yet; opened and committed packages never fail.
-    pub fn workbook(&self) -> Result<crate::Workbook> {
+    pub fn workbook(&self) -> FamilyResult<crate::Workbook> {
         if let Some(workbook) = self.workbook.get() {
             return Ok(workbook.clone());
         }
@@ -606,7 +609,7 @@ impl Package {
     /// # Errors
     ///
     /// As [`Self::workbook`].
-    pub fn tolerance_report(&self) -> Result<litchi_odf_common::leniency::ToleranceReport> {
+    pub fn tolerance_report(&self) -> FamilyResult<litchi_odf_common::leniency::ToleranceReport> {
         Ok(self.workbook()?.tolerance_report().clone())
     }
 
@@ -618,7 +621,7 @@ impl Package {
     /// byte-identical to the patch source, or an error when the default
     /// security policy refuses a changed write on a signed, encrypted or
     /// protected source.
-    pub fn apply(&self, patch: &Patch) -> std::result::Result<Commit, PackageError> {
+    pub fn apply(&self, patch: &Patch) -> FamilyResult<Commit> {
         self.apply_with_security(patch, SecurityWritePolicy::default())
     }
 
@@ -632,7 +635,7 @@ impl Package {
         &self,
         patch: &Patch,
         policy: SecurityWritePolicy,
-    ) -> std::result::Result<Commit, PackageError> {
+    ) -> FamilyResult<Commit> {
         if !patch.is_applicable_to(self) {
             return Err(PackageError::patch_conflict(
                 "ods.apply",
@@ -651,7 +654,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns [`PackageError::Core`] carrying the I/O failure.
-    pub fn save(&self, path: impl AsRef<std::path::Path>) -> std::result::Result<(), PackageError> {
+    pub fn save(&self, path: impl AsRef<std::path::Path>) -> FamilyResult<()> {
         self.save_with_durability(path, litchi_core::Durability::Full)
     }
 
@@ -664,7 +667,7 @@ impl Package {
         &self,
         path: impl AsRef<std::path::Path>,
         durability: litchi_core::Durability,
-    ) -> std::result::Result<(), PackageError> {
+    ) -> FamilyResult<()> {
         litchi_odf_common::publish::save_bytes(path.as_ref(), self.as_bytes(), durability)
     }
 
@@ -673,7 +676,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns an allocation failure.
-    pub fn to_bytes(&self) -> std::result::Result<Vec<u8>, PackageError> {
+    pub fn to_bytes(&self) -> FamilyResult<Vec<u8>> {
         Ok(copy_bytes(self.as_bytes())?)
     }
 
@@ -682,10 +685,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns the stream's I/O failure.
-    pub fn write_to(
-        &self,
-        mut writer: impl std::io::Write,
-    ) -> std::result::Result<(), PackageError> {
+    pub fn write_to(&self, mut writer: impl std::io::Write) -> FamilyResult<()> {
         writer.write_all(self.as_bytes())?;
         Ok(())
     }
@@ -723,7 +723,7 @@ impl Package {
     ///
     /// Returns an error when the path is reserved, missing package metadata is malformed, or the
     /// resource exceeds the retained transfer bound.
-    pub fn resource(&self, path: &str) -> Result<Option<Resource>> {
+    pub fn resource(&self, path: &str) -> FamilyResult<Option<Resource>> {
         validate_resource_path(path)?;
         let package = Arc::clone(&self.package);
         if !package.package().has_file(path)? {
@@ -750,7 +750,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error when package security metadata is malformed.
-    pub fn security_capabilities(&self) -> Result<SecurityCapabilities> {
+    pub fn security_capabilities(&self) -> FamilyResult<SecurityCapabilities> {
         let package = Arc::clone(&self.package);
         let reader = package.package().package()?;
         let signed =
@@ -789,8 +789,11 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error for a missing/cyclic style or malformed package XML.
-    pub fn effective_cell_style(&self, name: &str) -> Result<EffectiveCellStyle> {
-        crate::advanced::resolve_package_cell_style(self.source.as_ref(), name)
+    pub fn effective_cell_style(&self, name: &str) -> FamilyResult<EffectiveCellStyle> {
+        Ok(crate::advanced::resolve_package_cell_style(
+            self.source.as_ref(),
+            name,
+        )?)
     }
 
     /// Resolve the data-style definition selected by an effective table-cell
@@ -802,18 +805,21 @@ impl Package {
     /// `None` means that the effective cell style has no data-style reference.
     /// A name shared by different families is reported as an ambiguity rather
     /// than being selected by an arbitrary precedence rule.
-    pub fn effective_cell_data_style(&self, name: &str) -> Result<Option<DataStyleDefinition>> {
+    pub fn effective_cell_data_style(
+        &self,
+        name: &str,
+    ) -> FamilyResult<Option<DataStyleDefinition>> {
         let effective = self.effective_cell_style(name)?;
         let Some(data_style) = effective.data_style.as_deref() else {
             return Ok(None);
         };
-        crate::advanced::resolve_effective_data_style(
+        Ok(crate::advanced::resolve_effective_data_style(
             self.package.content_xml(),
             self.package.styles_xml(),
             data_style,
             self.limits.package_bytes,
         )
-        .map(Some)
+        .map(Some)?)
     }
 
     /// Resolve one source-qualified data-style definition.
@@ -821,23 +827,23 @@ impl Package {
     /// Common styles are available for inspection but remain read-only in
     /// ordinary edits.  The selector always includes owner and family so a
     /// reused ODF name cannot silently resolve to the wrong root.
-    pub fn data_style(&self, selector: DataStyleSelector<'_>) -> Result<DataStyleDefinition> {
-        crate::advanced::resolve_data_style(
+    pub fn data_style(&self, selector: DataStyleSelector<'_>) -> FamilyResult<DataStyleDefinition> {
+        Ok(crate::advanced::resolve_data_style(
             self.package.content_xml(),
             self.package.styles_xml(),
             selector,
             self.limits.package_bytes,
-        )
+        )?)
     }
 
     /// Return the bounded source-qualified data-style catalog for one owner.
-    pub fn data_styles(&self, owner: DataStyleOwner) -> Result<Vec<DataStyleDefinition>> {
-        crate::advanced::data_style_catalog(
+    pub fn data_styles(&self, owner: DataStyleOwner) -> FamilyResult<Vec<DataStyleDefinition>> {
+        Ok(crate::advanced::data_style_catalog(
             self.package.content_xml(),
             self.package.styles_xml(),
             owner,
             self.limits.package_bytes,
-        )
+        )?)
     }
 
     /// Report whether terminal password encryption can publish this exact snapshot.
@@ -851,7 +857,7 @@ impl Package {
     pub fn encryption_write_capability(
         &self,
         signatures: SignatureWritePolicy,
-    ) -> Result<EncryptionWriteCapability> {
+    ) -> FamilyResult<EncryptionWriteCapability> {
         let package = Arc::clone(&self.package);
         let reader = package.package().package()?;
         if reader.manifest().has_encrypted_entries() {
@@ -878,7 +884,11 @@ impl Package {
     ///
     /// Returns an error for an empty/oversized password, encrypted or signed input, package
     /// bounds, or encrypted archive publication failure.
-    pub fn encrypt_to_bytes(&self, password: &str, profile: EncryptionProfile) -> Result<Vec<u8>> {
+    pub fn encrypt_to_bytes(
+        &self,
+        password: &str,
+        profile: EncryptionProfile,
+    ) -> FamilyResult<Vec<u8>> {
         self.encrypt_to_bytes_with_signatures(password, profile, SignatureWritePolicy::Refuse)
     }
 
@@ -895,9 +905,9 @@ impl Package {
         password: &str,
         profile: EncryptionProfile,
         signatures: SignatureWritePolicy,
-    ) -> Result<Vec<u8>> {
+    ) -> FamilyResult<Vec<u8>> {
         if password.is_empty() || password.len() > 4_096 {
-            return invalid("ODS encryption password must contain 1 through 4096 UTF-8 bytes");
+            return invalid("ODS encryption password must contain 1 through 4096 UTF-8 bytes")?;
         }
         match self.encryption_write_capability(signatures)? {
             EncryptionWriteCapability::Available => {},
@@ -906,14 +916,14 @@ impl Package {
             ) => {
                 return invalid(
                     "ODS terminal encryption refuses an already-encrypted source without a credential-retaining snapshot",
-                );
+                )?;
             },
             EncryptionWriteCapability::Refused(
                 EncryptionWriteRefusal::SignedSourceRequiresStripPolicy,
             ) => {
                 return invalid(
                     "ODS terminal encryption requires explicit stale-signature stripping",
-                );
+                )?;
             },
         }
         let package = Arc::clone(&self.package);
@@ -927,7 +937,7 @@ impl Package {
             }
         }
         writer.copy_auxiliary_files_from(package.package())?;
-        writer.finish_to_bounded_bytes()
+        Ok(writer.finish_to_bounded_bytes()?)
     }
 
     /// Begin one clone-staged unified package transaction under the default
@@ -937,7 +947,7 @@ impl Package {
     ///
     /// Returns an error when the package exceeds the transaction bounds or
     /// is encrypted (encrypted sources stay read-only exact no-ops).
-    pub fn edit(&self) -> std::result::Result<Edit, PackageError> {
+    pub fn edit(&self) -> FamilyResult<Edit> {
         self.edit_with_options(EditOptions::new())
     }
 
@@ -947,14 +957,11 @@ impl Package {
     /// # Errors
     ///
     /// As [`Self::edit`].
-    pub fn edit_with_options(
-        &self,
-        options: EditOptions,
-    ) -> std::result::Result<Edit, PackageError> {
+    pub fn edit_with_options(&self, options: EditOptions) -> FamilyResult<Edit> {
         Ok(self.edit_core(options.limits)?)
     }
 
-    pub(crate) fn edit_core(&self, limits: Limits) -> Result<Edit> {
+    pub(crate) fn edit_core(&self, limits: Limits) -> CoreResult<Edit> {
         validate_package_size(self.source.len(), limits)?;
         validate_resource_count(&self.package, limits)?;
         if self
@@ -1002,7 +1009,7 @@ impl Resource {
         path: impl Into<String>,
         media_type: impl Into<String>,
         bytes: impl Into<Vec<u8>>,
-    ) -> Result<Self> {
+    ) -> FamilyResult<Self> {
         let path = path.into();
         let media_type = media_type.into();
         validate_resource_path(&path)?;
@@ -1196,11 +1203,11 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error when the closure or worksheet publication fails.
-    pub fn worksheets<F>(&mut self, update: F) -> Result<()>
+    pub fn worksheets<F>(&mut self, update: F) -> FamilyResult<()>
     where
-        F: FnOnce(&mut crate::worksheet::Edit) -> Result<()>,
+        F: FnOnce(&mut crate::worksheet::Edit) -> CoreResult<()>,
     {
-        let outcome: Result<Option<(Arc<Archive>, Arc<Vec<u8>>, bool)>> = (|| {
+        let outcome: CoreResult<Option<(Arc<Archive>, Arc<Vec<u8>>, bool)>> = (|| {
             // The current candidate has already passed package validation at
             // the previous staging boundary.  Hand the immutable package
             // owner directly to the worksheet transaction; its semantic
@@ -1229,10 +1236,10 @@ impl Edit {
             return Ok(());
         };
         if provenance_spliced {
-            self.stage_package("worksheet.edit", "worksheets", package, candidate, true)
+            self.stage_package_family("worksheet.edit", "worksheets", package, candidate, true)
                 .map(|_| ())
         } else {
-            self.stage_package("worksheet.edit", "worksheets", package, candidate, false)
+            self.stage_package_family("worksheet.edit", "worksheets", package, candidate, false)
                 .map(|_| ())
         }
     }
@@ -1242,9 +1249,9 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error when the closure or definition publication fails.
-    pub fn definitions<F>(&mut self, update: F) -> Result<()>
+    pub fn definitions<F>(&mut self, update: F) -> FamilyResult<()>
     where
-        F: FnOnce(&mut crate::definitions::Edit) -> Result<()>,
+        F: FnOnce(&mut crate::definitions::Edit) -> CoreResult<()>,
     {
         let snapshot = crate::definitions::Snapshot::from_bytes_with_xml_limits(
             self.candidate.as_ref().clone(),
@@ -1253,7 +1260,7 @@ impl Edit {
         let mut edit = snapshot.edit();
         update(&mut edit)?;
         let commit = edit.commit()?;
-        self.stage(
+        self.stage_family(
             "definition.edit",
             "definitions",
             commit.snapshot().as_bytes().to_vec(),
@@ -1266,9 +1273,9 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error when the closure, annotation publication, or package rebuild fails.
-    pub fn annotations<F>(&mut self, update: F) -> Result<()>
+    pub fn annotations<F>(&mut self, update: F) -> FamilyResult<()>
     where
-        F: FnOnce(&mut crate::annotations::Edit) -> Result<()>,
+        F: FnOnce(&mut crate::annotations::Edit) -> CoreResult<()>,
     {
         let package = Arc::clone(&self.package);
         let snapshot = crate::annotations::Snapshot::parse(package.content_xml())?;
@@ -1282,7 +1289,7 @@ impl Edit {
         } else {
             self.candidate.as_ref().clone()
         };
-        self.stage("annotation.edit", "annotations", bytes)
+        self.stage_family("annotation.edit", "annotations", bytes)
             .map(|_| ())
     }
 
@@ -1297,14 +1304,14 @@ impl Edit {
     ///
     /// Returns an error for opaque ownership, broken binding closure, limits, allocation,
     /// provenance-splice failure, or typed package readback failure.
-    pub fn content_validations<F>(&mut self, update: F) -> Result<()>
+    pub fn content_validations<F>(&mut self, update: F) -> FamilyResult<()>
     where
         F: FnOnce(
             &mut crate::content_validation::Edit<'_, '_>,
         ) -> crate::content_validation::Result<()>,
     {
         let source = std::mem::replace(&mut self.candidate, Arc::new(Vec::new()));
-        let outcome: Result<Option<(Arc<Archive>, Arc<Vec<u8>>)>> = (|| {
+        let outcome: CoreResult<Option<(Arc<Archive>, Arc<Vec<u8>>)>> = (|| {
             let package = Arc::clone(&self.package);
             let snapshot = crate::content_validation::Snapshot::parse(package.content_xml())
                 .map_err(content_validation_error)?;
@@ -1322,7 +1329,7 @@ impl Edit {
         let Some((package, candidate)) = outcome? else {
             return Ok(());
         };
-        self.stage_package(
+        self.stage_package_family(
             "content-validation.edit",
             "content-validations",
             package,
@@ -1343,7 +1350,7 @@ impl Edit {
     ///
     /// Returns an error when the metadata change is unsupported or the
     /// patched `meta.xml` fails validation or the package bound.
-    pub fn set_metadata(&mut self, metadata: &litchi_core::Metadata) -> Result<()> {
+    pub fn set_metadata(&mut self, metadata: &litchi_core::Metadata) -> FamilyResult<()> {
         let package = Arc::clone(&self.package);
         let snapshot = package.metadata_snapshot()?;
         let mut transaction = snapshot.transaction();
@@ -1356,7 +1363,8 @@ impl Edit {
             .into_owned_xml()
             .ok_or_else(|| invalid_error("changed ODS metadata transaction produced no XML"))?;
         let bytes = package.replace_metadata_xml(Some(&xml))?.into_bytes();
-        self.stage("metadata.edit", "metadata", bytes).map(|_| ())
+        self.stage_family("metadata.edit", "metadata", bytes)
+            .map(|_| ())
     }
 
     /// Stage inert RDF graph and triple CRUD.
@@ -1364,9 +1372,9 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error when the closure or RDF package publication fails.
-    pub fn rdf<F>(&mut self, update: F) -> Result<()>
+    pub fn rdf<F>(&mut self, update: F) -> FamilyResult<()>
     where
-        F: FnOnce(&mut crate::metadata_graphs::Edit) -> Result<()>,
+        F: FnOnce(&mut crate::metadata_graphs::Edit) -> CoreResult<()>,
     {
         let snapshot = crate::metadata_graphs::Snapshot::from_bytes_with_xml_limits(
             self.candidate.as_ref().clone(),
@@ -1375,7 +1383,7 @@ impl Edit {
         let mut edit = snapshot.edit();
         update(&mut edit)?;
         let commit = edit.commit();
-        self.stage(
+        self.stage_family(
             "rdf.edit",
             "metadata-graphs",
             commit.snapshot().as_bytes().to_vec(),
@@ -1391,9 +1399,9 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error when the closure, protection publication, or package rebuild fails.
-    pub fn protection<F>(&mut self, update: F) -> Result<()>
+    pub fn protection<F>(&mut self, update: F) -> FamilyResult<()>
     where
-        F: FnOnce(&mut crate::protection::Edit) -> Result<()>,
+        F: FnOnce(&mut crate::protection::Edit) -> CoreResult<()>,
     {
         let package = Arc::clone(&self.package);
         let snapshot =
@@ -1408,7 +1416,7 @@ impl Edit {
         } else {
             self.candidate.as_ref().clone()
         };
-        self.stage("protection.edit", "protection", bytes)
+        self.stage_family("protection.edit", "protection", bytes)
             .map(|_| ())
     }
 
@@ -1417,9 +1425,9 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error when the closure or `DataPilot` package publication fails.
-    pub fn data_pilot<F>(&mut self, update: F) -> Result<()>
+    pub fn data_pilot<F>(&mut self, update: F) -> FamilyResult<()>
     where
-        F: FnOnce(&mut crate::data_pilot::Edit) -> Result<()>,
+        F: FnOnce(&mut crate::data_pilot::Edit) -> CoreResult<()>,
     {
         let snapshot = crate::data_pilot::Snapshot::from_bytes_with_xml_limits(
             self.candidate.as_ref().clone(),
@@ -1428,7 +1436,7 @@ impl Edit {
         let mut edit = snapshot.edit();
         update(&mut edit)?;
         let commit = edit.commit()?;
-        self.stage(
+        self.stage_family(
             "data-pilot.edit",
             "data-pilot",
             commit.snapshot().as_bytes().to_vec(),
@@ -1444,9 +1452,9 @@ impl Edit {
     ///
     /// Returns an error when the closure or database-range package
     /// publication fails.
-    pub fn database_ranges<F>(&mut self, update: F) -> Result<()>
+    pub fn database_ranges<F>(&mut self, update: F) -> FamilyResult<()>
     where
-        F: FnOnce(&mut crate::database_range::Edit) -> Result<()>,
+        F: FnOnce(&mut crate::database_range::Edit) -> CoreResult<()>,
     {
         let snapshot = crate::database_range::Snapshot::from_bytes_with_xml_limits(
             self.candidate.as_ref().clone(),
@@ -1455,7 +1463,7 @@ impl Edit {
         let mut edit = snapshot.edit();
         update(&mut edit)?;
         let commit = edit.commit()?;
-        self.stage(
+        self.stage_family(
             "database-range.edit",
             "database-ranges",
             commit.snapshot().as_bytes().to_vec(),
@@ -1470,9 +1478,9 @@ impl Edit {
     ///
     /// Returns an error when the closure, scenario validation or the
     /// `content.xml` publication fails.
-    pub fn scenarios<F>(&mut self, update: F) -> Result<()>
+    pub fn scenarios<F>(&mut self, update: F) -> FamilyResult<()>
     where
-        F: FnOnce(&mut crate::scenario::Edit) -> Result<()>,
+        F: FnOnce(&mut crate::scenario::Edit) -> CoreResult<()>,
     {
         let package = Arc::clone(&self.package);
         let snapshot =
@@ -1490,7 +1498,8 @@ impl Edit {
         let bytes = package
             .replace_content_xml(commit.snapshot().source_xml())?
             .into_bytes();
-        self.stage("scenario.edit", "scenarios", bytes).map(|_| ())
+        self.stage_family("scenario.edit", "scenarios", bytes)
+            .map(|_| ())
     }
 
     /// Stage table-template CRUD in `styles.xml`.
@@ -1499,9 +1508,9 @@ impl Edit {
     ///
     /// Returns an error when the closure, template validation or the
     /// `styles.xml` publication fails.
-    pub fn table_templates<F>(&mut self, update: F) -> Result<()>
+    pub fn table_templates<F>(&mut self, update: F) -> FamilyResult<()>
     where
-        F: FnOnce(&mut crate::styles::table_template::Edit) -> Result<()>,
+        F: FnOnce(&mut crate::styles::table_template::Edit) -> CoreResult<()>,
     {
         let package = Arc::clone(&self.package);
         let snapshot = crate::styles::table_template::Snapshot::from_source(package.styles_xml())?;
@@ -1514,7 +1523,7 @@ impl Edit {
         let bytes = package
             .replace_styles_xml(commit.snapshot().source_xml())?
             .into_bytes();
-        self.stage("table-template.edit", "table-templates", bytes)
+        self.stage_family("table-template.edit", "table-templates", bytes)
             .map(|_| ())
     }
 
@@ -1525,9 +1534,9 @@ impl Edit {
     ///
     /// Returns an error when the closure, DDE validation or the
     /// `content.xml` publication fails.
-    pub fn dde<F>(&mut self, update: F) -> Result<()>
+    pub fn dde<F>(&mut self, update: F) -> FamilyResult<()>
     where
-        F: FnOnce(&mut crate::dde::Edit) -> Result<()>,
+        F: FnOnce(&mut crate::dde::Edit) -> CoreResult<()>,
     {
         let context = crate::dde::default_context();
         let package = Arc::clone(&self.package);
@@ -1535,7 +1544,8 @@ impl Edit {
             package.content_xml(),
             crate::dde::Limits::default(),
             &context,
-        )?;
+        )
+        .map_err(CoreError::from)?;
         let mut edit = snapshot.edit();
         update(&mut edit)?;
         let commit = edit.commit(&context)?;
@@ -1545,7 +1555,7 @@ impl Edit {
         let bytes = package
             .replace_content_xml(commit.snapshot().source_xml())?
             .into_bytes();
-        self.stage("dde.edit", "dde", bytes).map(|_| ())
+        self.stage_family("dde.edit", "dde", bytes).map(|_| ())
     }
 
     /// Stage consolidation, label-range, cell range-source and detective
@@ -1555,9 +1565,9 @@ impl Edit {
     ///
     /// Returns an error when the closure, metadata validation or the
     /// `content.xml` publication fails.
-    pub fn sheet_metadata<F>(&mut self, update: F) -> Result<()>
+    pub fn sheet_metadata<F>(&mut self, update: F) -> FamilyResult<()>
     where
-        F: FnOnce(&mut crate::sheet_metadata::Edit) -> Result<()>,
+        F: FnOnce(&mut crate::sheet_metadata::Edit) -> CoreResult<()>,
     {
         let context = crate::sheet_metadata::default_context();
         let package = Arc::clone(&self.package);
@@ -1575,7 +1585,7 @@ impl Edit {
         let bytes = package
             .replace_content_xml(commit.snapshot().source_xml())?
             .into_bytes();
-        self.stage("sheet-metadata.edit", "sheet-metadata", bytes)
+        self.stage_family("sheet-metadata.edit", "sheet-metadata", bytes)
             .map(|_| ())
     }
 
@@ -1586,7 +1596,10 @@ impl Edit {
     ///
     /// Returns an error when the settings are invalid or the `content.xml`
     /// publication fails.
-    pub fn set_settings(&mut self, settings: Option<&crate::settings::Settings>) -> Result<()> {
+    pub fn set_settings(
+        &mut self,
+        settings: Option<&crate::settings::Settings>,
+    ) -> FamilyResult<()> {
         if let Some(settings) = settings {
             settings.validate()?;
         }
@@ -1594,7 +1607,8 @@ impl Edit {
             .package
             .replace_calculation_settings(settings)?
             .into_bytes();
-        self.stage("settings.set", "settings", bytes).map(|_| ())
+        self.stage_family("settings.set", "settings", bytes)
+            .map(|_| ())
     }
 
     /// Stage tracked-change graph CRUD and acceptance metadata.
@@ -1602,9 +1616,9 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error when the closure, tracked-change publication, or package rebuild fails.
-    pub fn tracked_changes<F>(&mut self, update: F) -> Result<()>
+    pub fn tracked_changes<F>(&mut self, update: F) -> FamilyResult<()>
     where
-        F: FnOnce(&mut crate::tracked_changes::Edit) -> Result<()>,
+        F: FnOnce(&mut crate::tracked_changes::Edit) -> CoreResult<()>,
     {
         let package = Arc::clone(&self.package);
         let snapshot = crate::tracked_changes::Snapshot::parse(package.content_xml())?;
@@ -1618,7 +1632,7 @@ impl Edit {
         } else {
             self.candidate.as_ref().clone()
         };
-        self.stage("tracked-change.edit", "tracked-changes", bytes)
+        self.stage_family("tracked-change.edit", "tracked-changes", bytes)
             .map(|_| ())
     }
 
@@ -1627,9 +1641,9 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error when the closure, compact chart XML, or chart publication is invalid.
-    pub fn charts<F>(&mut self, update: F) -> Result<()>
+    pub fn charts<F>(&mut self, update: F) -> FamilyResult<()>
     where
-        F: FnOnce(&mut crate::charts::Edit) -> Result<()>,
+        F: FnOnce(&mut crate::charts::Edit) -> CoreResult<()>,
     {
         let snapshot = crate::charts::Snapshot::from_bytes_with_xml_limits(
             self.candidate.as_ref().clone(),
@@ -1649,7 +1663,7 @@ impl Edit {
             }
         }
         let commit = edit.commit()?;
-        self.stage(
+        self.stage_family(
             "chart.edit",
             "charts",
             commit.snapshot().as_bytes().to_vec(),
@@ -1672,7 +1686,7 @@ impl Edit {
         row: usize,
         column: usize,
         rich: &RichText,
-    ) -> Result<()> {
+    ) -> FamilyResult<()> {
         let bytes = crate::advanced::set_rich_text(
             &self.candidate,
             sheet,
@@ -1681,7 +1695,7 @@ impl Edit {
             rich,
             self.before.limits.package_bytes,
         )?;
-        self.stage_spliced("cell.rich-text", &format!("{sheet}!R{row}C{column}"), bytes)
+        self.stage_spliced_family("cell.rich-text", &format!("{sheet}!R{row}C{column}"), bytes)
     }
 
     /// Set one inert formula through a fine-grained provenance splice.
@@ -1696,7 +1710,7 @@ impl Edit {
         row: usize,
         column: usize,
         formula: &str,
-    ) -> Result<()> {
+    ) -> FamilyResult<()> {
         let bytes = crate::advanced::set_cell_formula(
             &self.candidate,
             sheet,
@@ -1705,7 +1719,7 @@ impl Edit {
             formula,
             self.before.limits.package_bytes,
         )?;
-        self.stage_spliced("cell.formula", &format!("{sheet}!R{row}C{column}"), bytes)
+        self.stage_spliced_family("cell.formula", &format!("{sheet}!R{row}C{column}"), bytes)
     }
 
     /// Set a direct cell style reference through a fine-grained provenance splice.
@@ -1720,7 +1734,7 @@ impl Edit {
         row: usize,
         column: usize,
         style_name: &str,
-    ) -> Result<()> {
+    ) -> FamilyResult<()> {
         let bytes = crate::advanced::set_cell_style(
             &self.candidate,
             sheet,
@@ -1729,7 +1743,7 @@ impl Edit {
             style_name,
             self.before.limits.package_bytes,
         )?;
-        self.stage_spliced("cell.style", &format!("{sheet}!R{row}C{column}"), bytes)
+        self.stage_spliced_family("cell.style", &format!("{sheet}!R{row}C{column}"), bytes)
     }
 
     /// Append one compact row without rewriting existing Calc XML.
@@ -1737,14 +1751,14 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error for an unknown sheet, invalid row, package bound, or splice failure.
-    pub fn append_row(&mut self, sheet: &str, row: &crate::Row) -> Result<()> {
+    pub fn append_row(&mut self, sheet: &str, row: &crate::Row) -> FamilyResult<()> {
         let bytes = crate::advanced::append_row(
             &self.candidate,
             sheet,
             row,
             self.before.limits.package_bytes,
         )?;
-        self.stage_spliced("row.insert", sheet, bytes)
+        self.stage_spliced_family("row.insert", sheet, bytes)
     }
 
     /// Remove one checked physical non-repeated row.
@@ -1752,14 +1766,14 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error for an unknown sheet, out-of-range/repeated row, or splice failure.
-    pub fn remove_row(&mut self, sheet: &str, physical_position: usize) -> Result<()> {
+    pub fn remove_row(&mut self, sheet: &str, physical_position: usize) -> FamilyResult<()> {
         let bytes = crate::advanced::remove_row(
             &self.candidate,
             sheet,
             physical_position,
             self.before.limits.package_bytes,
         )?;
-        self.stage_spliced("row.remove", &format!("{sheet}#{physical_position}"), bytes)
+        self.stage_spliced_family("row.remove", &format!("{sheet}#{physical_position}"), bytes)
     }
 
     /// Atomically insert, remove, or move logical rows in one ordinary,
@@ -1780,7 +1794,11 @@ impl Edit {
     /// coordinates, an unsafe dependency owner, unsupported source structure,
     /// logical/physical/output bounds, or provenance publication failure. The
     /// edit remains unchanged after every refusal.
-    pub fn edit_logical_rows(&mut self, sheet: &str, edits: &[LogicalRowOperation]) -> Result<()> {
+    pub fn edit_logical_rows(
+        &mut self,
+        sheet: &str,
+        edits: &[LogicalRowOperation],
+    ) -> FamilyResult<()> {
         if edits.is_empty() {
             return Ok(());
         }
@@ -1790,7 +1808,7 @@ impl Edit {
             edits,
             self.before.limits.package_bytes,
         )?;
-        self.stage_spliced("row.logical-batch", sheet, bytes)
+        self.stage_spliced_family("row.logical-batch", sheet, bytes)
     }
 
     /// Append one compact structural column declaration.
@@ -1802,14 +1820,14 @@ impl Edit {
         &mut self,
         sheet: &str,
         column: &crate::model::structure::Column,
-    ) -> Result<()> {
+    ) -> FamilyResult<()> {
         let bytes = crate::advanced::append_column(
             &self.candidate,
             sheet,
             column,
             self.before.limits.package_bytes,
         )?;
-        self.stage_spliced("column.insert", sheet, bytes)
+        self.stage_spliced_family("column.insert", sheet, bytes)
     }
 
     /// Remove one checked physical non-repeated column declaration.
@@ -1817,14 +1835,14 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error for an unknown sheet, out-of-range/repeated column, or splice failure.
-    pub fn remove_column(&mut self, sheet: &str, physical_position: usize) -> Result<()> {
+    pub fn remove_column(&mut self, sheet: &str, physical_position: usize) -> FamilyResult<()> {
         let bytes = crate::advanced::remove_column(
             &self.candidate,
             sheet,
             physical_position,
             self.before.limits.package_bytes,
         )?;
-        self.stage_spliced(
+        self.stage_spliced_family(
             "column.remove",
             &format!("{sheet}#{physical_position}"),
             bytes,
@@ -1836,13 +1854,13 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error for an invalid sheet, package bound, or provenance splice failure.
-    pub fn append_sheet(&mut self, sheet: &crate::Sheet) -> Result<()> {
+    pub fn append_sheet(&mut self, sheet: &crate::Sheet) -> FamilyResult<()> {
         let bytes = crate::advanced::append_sheet(
             &self.candidate,
             sheet,
             self.before.limits.package_bytes,
         )?;
-        self.stage_spliced("sheet.insert", &sheet.name, bytes)
+        self.stage_spliced_family("sheet.insert", &sheet.name, bytes)
     }
 
     /// Remove one worksheet by exact name.
@@ -1850,13 +1868,13 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error for a missing/ambiguous sheet or provenance splice failure.
-    pub fn remove_sheet(&mut self, sheet: &str) -> Result<()> {
+    pub fn remove_sheet(&mut self, sheet: &str) -> FamilyResult<()> {
         let bytes = crate::advanced::remove_sheet(
             &self.candidate,
             sheet,
             self.before.limits.package_bytes,
         )?;
-        self.stage_spliced("sheet.remove", sheet, bytes)
+        self.stage_spliced_family("sheet.remove", sheet, bytes)
     }
 
     /// Move one complete, dependency-free worksheet to a checked final position.
@@ -1873,20 +1891,20 @@ impl Edit {
     /// Returns an error for a missing or duplicate selector, invalid position,
     /// unsupported dependency owner, source/output bound, or provenance splice
     /// failure. Every refusal leaves the edit unchanged.
-    pub fn move_sheet(&mut self, sheet: &str, position: SheetPosition) -> Result<()> {
+    pub fn move_sheet(&mut self, sheet: &str, position: SheetPosition) -> FamilyResult<()> {
         let package = Arc::clone(&self.package);
         let count = crate::Workbook::from_shared_package(package, self.before.xml_limits)?
             .sheets()
             .len();
         if count == 0 {
-            return invalid("ODS sheet move requires a non-empty workbook");
+            return invalid_family("ODS sheet move requires a non-empty workbook");
         }
         let final_position = match position {
             SheetPosition::First => 0,
             SheetPosition::Last => count - 1,
             SheetPosition::Index(index) if index < count => index,
             SheetPosition::Index(index) => {
-                return invalid(format!(
+                return invalid_family(format!(
                     "ODS sheet move destination {index} exceeds sheet count {count}"
                 ));
             },
@@ -1897,7 +1915,7 @@ impl Edit {
             final_position,
             self.before.limits.package_bytes,
         )?;
-        self.stage_spliced("sheet.move", sheet, bytes)
+        self.stage_spliced_family("sheet.move", sheet, bytes)
     }
 
     /// Copy one complete, dependency-free worksheet to a checked final position and name.
@@ -1921,20 +1939,20 @@ impl Edit {
         source_sheet: &str,
         destination_name: &str,
         position: SheetPosition,
-    ) -> Result<()> {
+    ) -> FamilyResult<()> {
         let package = Arc::clone(&self.package);
         let count = crate::Workbook::from_shared_package(package, self.before.xml_limits)?
             .sheets()
             .len();
         if count == 0 {
-            return invalid("ODS sheet copy requires a non-empty workbook");
+            return invalid_family("ODS sheet copy requires a non-empty workbook");
         }
         let final_position = match position {
             SheetPosition::First => 0,
             SheetPosition::Last => count,
             SheetPosition::Index(index) if index <= count => index,
             SheetPosition::Index(index) => {
-                return invalid(format!(
+                return invalid_family(format!(
                     "ODS sheet copy destination {index} exceeds final sheet count {}",
                     count + 1
                 ));
@@ -1949,7 +1967,7 @@ impl Edit {
         )?;
         let source_id = DiagnosticFingerprint::of(source_sheet.as_bytes()).as_hex();
         let destination_id = DiagnosticFingerprint::of(destination_name.as_bytes()).as_hex();
-        self.stage_spliced(
+        self.stage_spliced_family(
             "sheet.copy",
             &format!("sha256:{source_id}->sha256:{destination_id}@{final_position}"),
             bytes,
@@ -1976,7 +1994,7 @@ impl Edit {
         source_sheet: &str,
         destination_name: &str,
         position: SheetPosition,
-    ) -> Result<()> {
+    ) -> FamilyResult<()> {
         let bytes = crate::advanced::transfer_plain_scalar_sheet(
             &self.candidate,
             source.as_bytes(),
@@ -1993,7 +2011,7 @@ impl Edit {
             SheetPosition::Last => "last".to_string(),
             SheetPosition::Index(index) => format!("index:{index}"),
         };
-        self.stage_spliced(
+        self.stage_spliced_family(
             "sheet.transfer",
             &format!(
                 "source:{source_id}/sheet:{source_sheet_id}->sha256:{destination_id}@{position_id}"
@@ -2007,13 +2025,13 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error for an invalid/duplicate style, color, package bound, or splice failure.
-    pub fn put_cell_style(&mut self, style: &CellStyle) -> Result<()> {
+    pub fn put_cell_style(&mut self, style: &CellStyle) -> FamilyResult<()> {
         let bytes = crate::advanced::put_cell_style(
             &self.candidate,
             style,
             self.before.limits.package_bytes,
         )?;
-        self.stage_spliced("style.put", &style.name, bytes)
+        self.stage_spliced_family("style.put", &style.name, bytes)
     }
 
     /// Add a dependency-checked automatic number/text/cell style graph.
@@ -2022,13 +2040,13 @@ impl Edit {
     ///
     /// Returns an error for duplicate names, unresolved parent/data-style references, invalid
     /// properties, existing-name collisions, bounds, or splice failure.
-    pub fn put_style_graph(&mut self, graph: &StyleGraph) -> Result<()> {
+    pub fn put_style_graph(&mut self, graph: &StyleGraph) -> FamilyResult<()> {
         let bytes = crate::advanced::put_style_graph(
             &self.candidate,
             graph,
             self.before.limits.package_bytes,
         )?;
-        self.stage_spliced("style-graph.put", "automatic-styles", bytes)
+        self.stage_spliced_family("style-graph.put", "automatic-styles", bytes)
     }
 
     /// Replace every same-family automatic style named by a closed graph.
@@ -2039,26 +2057,26 @@ impl Edit {
     ///
     /// Returns an error for an invalid graph, absent/duplicate/mismatched nodes, bounds, or splice
     /// failure.
-    pub fn replace_style_graph(&mut self, graph: &StyleGraph) -> Result<()> {
+    pub fn replace_style_graph(&mut self, graph: &StyleGraph) -> FamilyResult<()> {
         let bytes = crate::advanced::replace_style_graph(
             &self.candidate,
             graph,
             self.before.limits.package_bytes,
         )?;
-        self.stage_spliced("style-graph.replace", "automatic-styles", bytes)
+        self.stage_spliced_family("style-graph.replace", "automatic-styles", bytes)
     }
 
     /// Add a dependency-checked graph containing the extended ODF number and
     /// data-style vocabulary.  Definitions are authored in the mutable
     /// `content.xml` automatic-style owner; common `styles.xml` definitions
     /// remain read-only.
-    pub fn put_extended_style_graph(&mut self, graph: &StyleGraphExtension) -> Result<()> {
+    pub fn put_extended_style_graph(&mut self, graph: &StyleGraphExtension) -> FamilyResult<()> {
         let bytes = crate::advanced::put_extended_style_graph(
             &self.candidate,
             graph,
             self.before.limits.package_bytes,
         )?;
-        self.stage_spliced("extended-style-graph.put", "automatic-styles", bytes)
+        self.stage_spliced_family("extended-style-graph.put", "automatic-styles", bytes)
     }
 
     /// Replace the source-qualified automatic data-style definitions in a
@@ -2072,14 +2090,14 @@ impl Edit {
         &mut self,
         selector: DataStyleSelector<'_>,
         graph: &StyleGraphExtension,
-    ) -> Result<()> {
+    ) -> FamilyResult<()> {
         let bytes = crate::advanced::replace_extended_style_graph(
             &self.candidate,
             selector,
             graph,
             self.before.limits.package_bytes,
         )?;
-        self.stage_spliced("extended-style-graph.replace", selector.name, bytes)
+        self.stage_spliced_family("extended-style-graph.replace", selector.name, bytes)
     }
 
     /// Patch only common metadata attributes on one source-qualified
@@ -2089,14 +2107,14 @@ impl Edit {
         &mut self,
         selector: DataStyleSelector<'_>,
         patch: &DataStyleAttributePatch,
-    ) -> Result<()> {
+    ) -> FamilyResult<()> {
         let bytes = crate::advanced::patch_data_style(
             &self.candidate,
             selector,
             patch,
             self.before.limits.package_bytes,
         )?;
-        self.stage_spliced("data-style.patch", selector.name, bytes)
+        self.stage_spliced_family("data-style.patch", selector.name, bytes)
     }
 
     /// Remove exact automatic-style names when no retained XML node references them.
@@ -2105,13 +2123,13 @@ impl Edit {
     ///
     /// Returns an error for duplicates, absent styles, retained references, bounds, or splice
     /// failure.
-    pub fn remove_automatic_styles(&mut self, names: &[String]) -> Result<()> {
+    pub fn remove_automatic_styles(&mut self, names: &[String]) -> FamilyResult<()> {
         let bytes = crate::advanced::remove_automatic_styles(
             &self.candidate,
             names,
             self.before.limits.package_bytes,
         )?;
-        self.stage_spliced("style-graph.remove", "automatic-styles", bytes)
+        self.stage_spliced_family("style-graph.remove", "automatic-styles", bytes)
     }
 
     /// Atomically add a style dependency graph and apply rich text to one cell.
@@ -2127,7 +2145,7 @@ impl Edit {
         column: usize,
         rich: &RichText,
         styles: &StyleGraph,
-    ) -> Result<()> {
+    ) -> FamilyResult<()> {
         let declared = styles
             .text_styles
             .iter()
@@ -2139,7 +2157,7 @@ impl Edit {
                 RichRun::Span { style_name, .. } if !declared.contains(style_name.as_str())
             )
         }) {
-            return invalid("ODS rich cell style dependency is unresolved");
+            return invalid_family("ODS rich cell style dependency is unresolved");
         }
         let mut candidate = self.clone();
         candidate.put_style_graph(styles)?;
@@ -2157,14 +2175,14 @@ impl Edit {
         &mut self,
         sheet: &str,
         formats: &[crate::model::conditional_format::Format],
-    ) -> Result<()> {
+    ) -> FamilyResult<()> {
         let bytes = crate::advanced::set_conditional_formats(
             &self.candidate,
             sheet,
             formats,
             self.before.limits.package_bytes,
         )?;
-        self.stage_spliced("conditional-format.edit", sheet, bytes)
+        self.stage_spliced_family("conditional-format.edit", sheet, bytes)
     }
 
     /// Add one conditional format to a sheet (record 0327); the formatting
@@ -2180,7 +2198,7 @@ impl Edit {
         sheet: &str,
         format: &crate::model::conditional_format::Format,
         style: &crate::advanced::sheet_features::FormatStyle,
-    ) -> Result<usize> {
+    ) -> FamilyResult<usize> {
         let (bytes, position) = crate::advanced::sheet_features::add_format(
             &self.candidate,
             sheet,
@@ -2204,7 +2222,7 @@ impl Edit {
         index: usize,
         format: &crate::model::conditional_format::Format,
         style: &crate::advanced::sheet_features::FormatStyle,
-    ) -> Result<()> {
+    ) -> FamilyResult<()> {
         let bytes = crate::advanced::sheet_features::set_format(
             &self.candidate,
             sheet,
@@ -2213,7 +2231,7 @@ impl Edit {
             style,
             self.before.limits.package_bytes,
         )?;
-        self.stage_feature("conditional-format.set", sheet, bytes)
+        Ok(self.stage_feature("conditional-format.set", sheet, bytes)?)
     }
 
     /// Remove the conditional format at `index` of a sheet (record 0327).
@@ -2221,14 +2239,14 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error for a missing format, bounds, or splice failure.
-    pub fn remove_sheet_format(&mut self, sheet: &str, index: usize) -> Result<()> {
+    pub fn remove_sheet_format(&mut self, sheet: &str, index: usize) -> FamilyResult<()> {
         let bytes = crate::advanced::sheet_features::remove_format(
             &self.candidate,
             sheet,
             index,
             self.before.limits.package_bytes,
         )?;
-        self.stage_feature("conditional-format.remove", sheet, bytes)
+        Ok(self.stage_feature("conditional-format.remove", sheet, bytes)?)
     }
 
     /// Add one content validation bound to cells of a sheet (record 0327);
@@ -2242,14 +2260,14 @@ impl Edit {
         &mut self,
         sheet: &str,
         spec: &crate::advanced::sheet_features::ValidationSpec,
-    ) -> Result<usize> {
+    ) -> FamilyResult<usize> {
         let (bytes, position) = crate::advanced::sheet_features::add_validation(
             &self.candidate,
             sheet,
             spec,
             self.before.limits.package_bytes,
         )?;
-        self.stage_spliced("content-validation.add", sheet, bytes)?;
+        self.stage_spliced_family("content-validation.add", sheet, bytes)?;
         Ok(position)
     }
 
@@ -2264,7 +2282,7 @@ impl Edit {
         sheet: &str,
         index: usize,
         spec: &crate::advanced::sheet_features::ValidationSpec,
-    ) -> Result<()> {
+    ) -> FamilyResult<()> {
         let bytes = crate::advanced::sheet_features::set_validation(
             &self.candidate,
             sheet,
@@ -2272,7 +2290,7 @@ impl Edit {
             spec,
             self.before.limits.package_bytes,
         )?;
-        self.stage_spliced("content-validation.set", sheet, bytes)
+        self.stage_spliced_family("content-validation.set", sheet, bytes)
     }
 
     /// Remove the validation at `index` of a sheet: its bindings, and its
@@ -2281,14 +2299,14 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error for a missing validation, bounds, or splice failure.
-    pub fn remove_sheet_validation(&mut self, sheet: &str, index: usize) -> Result<()> {
+    pub fn remove_sheet_validation(&mut self, sheet: &str, index: usize) -> FamilyResult<()> {
         let bytes = crate::advanced::sheet_features::remove_validation(
             &self.candidate,
             sheet,
             index,
             self.before.limits.package_bytes,
         )?;
-        self.stage_spliced("content-validation.remove", sheet, bytes)
+        self.stage_spliced_family("content-validation.remove", sheet, bytes)
     }
 
     /// Set (or, with `None`, remove) the auto-filter database range of a
@@ -2303,14 +2321,14 @@ impl Edit {
         &mut self,
         sheet: &str,
         range: Option<(u32, u32, u32, u32)>,
-    ) -> Result<()> {
+    ) -> FamilyResult<()> {
         let bytes = crate::advanced::sheet_features::set_auto_filter(
             &self.candidate,
             sheet,
             range,
             self.before.limits.package_bytes,
         )?;
-        self.stage_spliced("database-range.auto-filter", sheet, bytes)
+        self.stage_spliced_family("database-range.auto-filter", sheet, bytes)
     }
 
     /// Replace the manual page breaks of a sheet's rows (`rows`) or columns:
@@ -2320,7 +2338,12 @@ impl Edit {
     ///
     /// Returns an error for an index outside the sheet's written grid,
     /// bounds, or splice failure.
-    pub fn set_sheet_breaks(&mut self, sheet: &str, rows: bool, breaks: &[u32]) -> Result<()> {
+    pub fn set_sheet_breaks(
+        &mut self,
+        sheet: &str,
+        rows: bool,
+        breaks: &[u32],
+    ) -> FamilyResult<()> {
         let bytes = crate::advanced::sheet_features::set_breaks(
             &self.candidate,
             sheet,
@@ -2328,7 +2351,7 @@ impl Edit {
             breaks,
             self.before.limits.package_bytes,
         )?;
-        self.stage_spliced("page-break.set", sheet, bytes)
+        self.stage_spliced_family("page-break.set", sheet, bytes)
     }
 
     /// Add a cell-anchored custom shape, or a picture frame whose image is
@@ -2345,14 +2368,14 @@ impl Edit {
         sheet: &str,
         spec: &crate::advanced::sheet_features::DrawingSpec,
         resource: Option<(Resource, Collision)>,
-    ) -> Result<usize> {
+    ) -> FamilyResult<usize> {
         let mut candidate = self.clone();
         match (&spec.image, resource) {
             (Some(path), Some((resource, collision))) if *path == resource.path => {
                 candidate.put_resource(resource, collision)?;
             },
             (None, None) => {},
-            _ => return invalid("ODS drawing image and resource disagree"),
+            _ => return invalid_family("ODS drawing image and resource disagree"),
         }
         let (bytes, position) = crate::advanced::sheet_features::add_drawing(
             &candidate.candidate,
@@ -2378,7 +2401,7 @@ impl Edit {
         kind: crate::advanced::sheet_features::DrawingKind,
         index: usize,
         change: &crate::advanced::sheet_features::DrawingChange,
-    ) -> Result<()> {
+    ) -> FamilyResult<()> {
         let bytes = crate::advanced::sheet_features::set_drawing(
             &self.candidate,
             sheet,
@@ -2387,7 +2410,7 @@ impl Edit {
             change,
             self.before.limits.package_bytes,
         )?;
-        self.stage_spliced("drawing.set", sheet, bytes)
+        self.stage_spliced_family("drawing.set", sheet, bytes)
     }
 
     /// Remove the drawing at `index` among a sheet's drawings of `kind`, and
@@ -2401,7 +2424,7 @@ impl Edit {
         sheet: &str,
         kind: crate::advanced::sheet_features::DrawingKind,
         index: usize,
-    ) -> Result<()> {
+    ) -> FamilyResult<()> {
         let mut candidate = self.clone();
         let (bytes, image) = crate::advanced::sheet_features::remove_drawing(
             &candidate.candidate,
@@ -2431,14 +2454,14 @@ impl Edit {
         &mut self,
         sheet: &str,
         groups: &[crate::model::sparkline::Group],
-    ) -> Result<()> {
+    ) -> FamilyResult<()> {
         let bytes = crate::advanced::set_sparkline_groups(
             &self.candidate,
             sheet,
             groups,
             self.before.limits.package_bytes,
         )?;
-        self.stage_spliced("sparkline.edit", sheet, bytes)
+        self.stage_spliced_family("sparkline.edit", sheet, bytes)
     }
 
     /// Replace or remove the inert spreadsheet form-button catalog.
@@ -2446,13 +2469,13 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error for invalid controls, duplicate containers, bounds, or splice failure.
-    pub fn set_form_controls(&mut self, controls: &[FormControl]) -> Result<()> {
+    pub fn set_form_controls(&mut self, controls: &[FormControl]) -> FamilyResult<()> {
         let bytes = crate::advanced::set_forms(
             &self.candidate,
             controls,
             self.before.limits.package_bytes,
         )?;
-        self.stage_spliced("form.edit", "forms", bytes)
+        self.stage_spliced_family("form.edit", "forms", bytes)
     }
 
     /// Replace bound form controls and close every declared image dependency atomically.
@@ -2466,7 +2489,7 @@ impl Edit {
         controls: &[BoundFormControl],
         resources: Vec<Resource>,
         collision: Collision,
-    ) -> Result<()> {
+    ) -> FamilyResult<()> {
         let mut candidate = self.clone();
         let supplied = resources
             .iter()
@@ -2478,7 +2501,7 @@ impl Edit {
                 && !supplied.contains(path.as_str())
                 && !current.package().has_file(path)?
             {
-                return invalid(format!("ODS form image dependency '{path}' is unresolved"));
+                return invalid_family(format!("ODS form image dependency '{path}' is unresolved"));
             }
         }
         for resource in resources {
@@ -2507,7 +2530,7 @@ impl Edit {
         controls: &[RichFormControl],
         resources: Vec<Resource>,
         collision: Collision,
-    ) -> Result<()> {
+    ) -> FamilyResult<()> {
         let mut candidate = self.clone();
         let supplied = resources
             .iter()
@@ -2519,7 +2542,7 @@ impl Edit {
                 && !supplied.contains(path.as_str())
                 && !current.package().has_file(path)?
             {
-                return invalid(format!("ODS form image dependency '{path}' is unresolved"));
+                return invalid_family(format!("ODS form image dependency '{path}' is unresolved"));
             }
         }
         for resource in resources {
@@ -2550,9 +2573,9 @@ impl Edit {
         drawing: &Drawing,
         resource: Resource,
         collision: Collision,
-    ) -> Result<TransferDisposition> {
+    ) -> FamilyResult<TransferDisposition> {
         if drawing.resource_path != resource.path {
-            return invalid("ODS drawing dependency path differs from its resource");
+            return invalid_family("ODS drawing dependency path differs from its resource");
         }
         let mut candidate = self.clone();
         let disposition = candidate.put_resource(resource, collision)?;
@@ -2579,9 +2602,9 @@ impl Edit {
         frame: &DrawingFrame,
         resource: Resource,
         collision: Collision,
-    ) -> Result<TransferDisposition> {
+    ) -> FamilyResult<TransferDisposition> {
         if frame.resource_path != resource.path {
-            return invalid("ODS drawing-frame dependency path differs from its resource");
+            return invalid_family("ODS drawing-frame dependency path differs from its resource");
         }
         let mut candidate = self.clone();
         let disposition = candidate.put_resource(resource, collision)?;
@@ -2602,14 +2625,14 @@ impl Edit {
     ///
     /// Returns an error for invalid identity, duplicate names, geometry, rich text, bounds, or
     /// splice failure.
-    pub fn put_drawing_group(&mut self, sheet: &str, group: &DrawingGroup) -> Result<()> {
+    pub fn put_drawing_group(&mut self, sheet: &str, group: &DrawingGroup) -> FamilyResult<()> {
         let bytes = crate::advanced::put_drawing_group(
             &self.candidate,
             sheet,
             group,
             self.before.limits.package_bytes,
         )?;
-        self.stage_spliced("drawing-group.put", &group.name, bytes)
+        self.stage_spliced_family("drawing-group.put", &group.name, bytes)
     }
 
     /// Add a finite positioned rectangle, ellipse, or line with optional rich text.
@@ -2618,14 +2641,18 @@ impl Edit {
     ///
     /// Returns an error for invalid identity, duplicate names, geometry, rich text, bounds, or
     /// splice failure.
-    pub fn put_drawing_geometry(&mut self, sheet: &str, geometry: &DrawingGeometry) -> Result<()> {
+    pub fn put_drawing_geometry(
+        &mut self,
+        sheet: &str,
+        geometry: &DrawingGeometry,
+    ) -> FamilyResult<()> {
         let bytes = crate::advanced::put_drawing_geometry(
             &self.candidate,
             sheet,
             geometry,
             self.before.limits.package_bytes,
         )?;
-        self.stage_spliced("drawing-geometry.put", &geometry.name, bytes)
+        self.stage_spliced_family("drawing-geometry.put", &geometry.name, bytes)
     }
 
     /// Add a bounded positioned polygon or polyline with optional rich text.
@@ -2634,14 +2661,18 @@ impl Edit {
     ///
     /// Returns an error for invalid identity, view-box coordinates, geometry, rich text, bounds,
     /// duplicate names, or splice failure.
-    pub fn put_drawing_polygon(&mut self, sheet: &str, polygon: &DrawingPolygon) -> Result<()> {
+    pub fn put_drawing_polygon(
+        &mut self,
+        sheet: &str,
+        polygon: &DrawingPolygon,
+    ) -> FamilyResult<()> {
         let bytes = crate::advanced::put_drawing_polygon(
             &self.candidate,
             sheet,
             polygon,
             self.before.limits.package_bytes,
         )?;
-        self.stage_spliced("drawing-polygon.put", &polygon.name, bytes)
+        self.stage_spliced_family("drawing-polygon.put", &polygon.name, bytes)
     }
 
     /// Atomically add a package-backed chart drawing and compact chart content dependency.
@@ -2655,7 +2686,7 @@ impl Edit {
         sheet: &str,
         chart: &ChartObject,
         collision: Collision,
-    ) -> Result<TransferDisposition> {
+    ) -> FamilyResult<TransferDisposition> {
         let content_path = format!("{}/content.xml", chart.object_path);
         let resource = Resource::new(&content_path, "text/xml", chart.content_xml.as_bytes())?;
         let mut candidate = self.clone();
@@ -2689,7 +2720,7 @@ impl Edit {
             .iter()
             .all(|value| value.name() != Some(chart.name.as_str()))
         {
-            return invalid("ODS chart dependency failed typed readback");
+            return invalid_family("ODS chart dependency failed typed readback");
         }
         *self = candidate;
         Ok(disposition)
@@ -2708,7 +2739,7 @@ impl Edit {
         object_path: &str,
         definition: &crate::charts::Definition,
         collision: Collision,
-    ) -> Result<TransferDisposition> {
+    ) -> FamilyResult<TransferDisposition> {
         let part = crate::charts::Part::from_definition(definition)?;
         self.put_chart_object(
             sheet,
@@ -2738,7 +2769,7 @@ impl Edit {
         drawing_name: &str,
         destination_object_path: &str,
         collision: Collision,
-    ) -> Result<Vec<TransferDisposition>> {
+    ) -> FamilyResult<Vec<TransferDisposition>> {
         let source_content_path = format!("{source_object_path}/content.xml");
         let destination_content_path = format!("{destination_object_path}/content.xml");
         validate_resource_path(&source_content_path)?;
@@ -2803,7 +2834,7 @@ impl Edit {
         drawing_name: &str,
         destination_path: &str,
         collision: Collision,
-    ) -> Result<TransferDisposition> {
+    ) -> FamilyResult<TransferDisposition> {
         let source_resource = source.resource(source_path)?.ok_or_else(|| {
             invalid_error(format!(
                 "ODS drawing resource '{source_path}' was not found"
@@ -2836,7 +2867,7 @@ impl Edit {
         sheet: &str,
         drawing_name: &str,
         resource_path: &str,
-    ) -> Result<()> {
+    ) -> FamilyResult<()> {
         let mut candidate = self.clone();
         let bytes = crate::advanced::remove_drawing(
             &candidate.candidate,
@@ -2860,7 +2891,7 @@ impl Edit {
         &mut self,
         resource: Resource,
         collision: Collision,
-    ) -> Result<TransferDisposition> {
+    ) -> FamilyResult<TransferDisposition> {
         validate_resource_size(resource.bytes.len(), self.before.limits)?;
         let package = Arc::clone(&self.package);
         let existing = package.package().has_file(&resource.path)?;
@@ -2874,12 +2905,14 @@ impl Edit {
             let equivalent =
                 bytes.as_slice() == resource.as_bytes() && media_type == resource.media_type();
             match collision {
-                Collision::Reject => return invalid("ODS resource destination already exists"),
+                Collision::Reject => {
+                    return invalid_family("ODS resource destination already exists");
+                },
                 Collision::ReuseEquivalent if equivalent => {
                     return Ok(TransferDisposition::Reused);
                 },
                 Collision::ReuseEquivalent => {
-                    return invalid("ODS resource destination is not equivalent");
+                    return invalid_family("ODS resource destination is not equivalent");
                 },
                 Collision::Replace if equivalent => return Ok(TransferDisposition::Reused),
                 Collision::Replace => {},
@@ -2891,7 +2924,7 @@ impl Edit {
             &resource.path,
             self.before.limits,
         )?;
-        self.stage("resource.put", &resource.path, bytes)?;
+        self.stage_family("resource.put", &resource.path, bytes)?;
         Ok(if existing {
             TransferDisposition::Replaced
         } else {
@@ -2911,7 +2944,7 @@ impl Edit {
         source_path: &str,
         destination_path: &str,
         collision: Collision,
-    ) -> Result<TransferDisposition> {
+    ) -> FamilyResult<TransferDisposition> {
         let source_resource = source.resource(source_path)?.ok_or_else(|| {
             CoreError::InvalidFormat(format!(
                 "ODS transfer resource '{source_path}' was not found"
@@ -2931,15 +2964,16 @@ impl Edit {
     ///
     /// Returns an error when the path is absent, referenced by retained XML, reserved, or package
     /// rebuilding fails.
-    pub fn remove_resource(&mut self, path: &str) -> Result<()> {
+    pub fn remove_resource(&mut self, path: &str) -> FamilyResult<()> {
         validate_resource_path(path)?;
         let package = Arc::clone(&self.package);
         if !package.package().has_file(path)? {
-            return invalid(format!("ODS resource '{path}' was not found"));
+            return invalid_family(format!("ODS resource '{path}' was not found"));
         }
         refuse_referenced_removal(&package, path)?;
         let bytes = replace_resource(&package, None, path, self.before.limits)?;
-        self.stage("resource.remove", path, bytes).map(|_| ())
+        self.stage_family("resource.remove", path, bytes)
+            .map(|_| ())
     }
 
     /// Validate security policy, reopen the complete candidate, and publish one durable patch.
@@ -2951,7 +2985,7 @@ impl Edit {
     ///
     /// Returns an error for a security refusal, bound failure, malformed candidate, typed readback
     /// failure, noncompact authored XML, or durable-patch construction failure.
-    pub fn commit(self) -> std::result::Result<Commit, PackageError> {
+    pub fn commit(self) -> FamilyResult<Commit> {
         self.commit_with_security(SecurityWritePolicy::default())
     }
 
@@ -2961,14 +2995,11 @@ impl Edit {
     ///
     /// Returns an error when the selected policy refuses signed, encrypted, or protected input,
     /// or when bounds, compactness, readback, or durable patch construction fails.
-    pub fn commit_with_security(
-        self,
-        policy: SecurityWritePolicy,
-    ) -> std::result::Result<Commit, PackageError> {
+    pub fn commit_with_security(self, policy: SecurityWritePolicy) -> FamilyResult<Commit> {
         Ok(self.commit_core(policy)?)
     }
 
-    pub(crate) fn commit_core(self, policy: SecurityWritePolicy) -> Result<Commit> {
+    pub(crate) fn commit_core(self, policy: SecurityWritePolicy) -> CoreResult<Commit> {
         if self.candidate.as_slice() == self.before.as_bytes() || self.steps.is_empty() {
             let source: Arc<[u8]> = Arc::from(self.before.source.as_slice());
             let patch = Patch::build(Arc::clone(&source), source, Vec::new(), self.before.limits)?;
@@ -3004,11 +3035,20 @@ impl Edit {
         })
     }
 
-    fn stage(&mut self, op: &str, target: &str, candidate: Vec<u8>) -> Result<bool> {
+    fn stage(&mut self, op: &str, target: &str, candidate: Vec<u8>) -> CoreResult<bool> {
         self.stage_shared(op, target, Arc::new(candidate))
     }
 
-    fn stage_shared(&mut self, op: &str, target: &str, candidate: Arc<Vec<u8>>) -> Result<bool> {
+    fn stage_family(&mut self, op: &str, target: &str, candidate: Vec<u8>) -> FamilyResult<bool> {
+        Ok(self.stage(op, target, candidate)?)
+    }
+
+    fn stage_shared(
+        &mut self,
+        op: &str,
+        target: &str,
+        candidate: Arc<Vec<u8>>,
+    ) -> CoreResult<bool> {
         validate_package_size(candidate.len(), self.before.limits)?;
         let effects = changed_effects(&self.candidate, candidate.as_slice())?;
         if effects.is_empty() {
@@ -3040,7 +3080,7 @@ impl Edit {
         package: Arc<Archive>,
         candidate: Arc<Vec<u8>>,
         provenance_spliced: bool,
-    ) -> Result<bool> {
+    ) -> CoreResult<bool> {
         validate_package_size(candidate.len(), self.before.limits)?;
         let effects = changed_effects(&self.candidate, candidate.as_slice())?;
         if effects.is_empty() {
@@ -3068,16 +3108,36 @@ impl Edit {
         Ok(true)
     }
 
-    fn stage_spliced(&mut self, op: &str, target: &str, candidate: Vec<u8>) -> Result<()> {
+    fn stage_package_family(
+        &mut self,
+        op: &str,
+        target: &str,
+        package: Arc<Archive>,
+        candidate: Arc<Vec<u8>>,
+        provenance_spliced: bool,
+    ) -> FamilyResult<bool> {
+        Ok(self.stage_package(op, target, package, candidate, provenance_spliced)?)
+    }
+
+    fn stage_spliced(&mut self, op: &str, target: &str, candidate: Vec<u8>) -> CoreResult<()> {
         if self.stage(op, target, candidate)? {
             self.spliced_parts.insert("content.xml".to_string());
         }
         Ok(())
     }
 
+    fn stage_spliced_family(
+        &mut self,
+        op: &str,
+        target: &str,
+        candidate: Vec<u8>,
+    ) -> FamilyResult<()> {
+        Ok(self.stage_spliced(op, target, candidate)?)
+    }
+
     /// Stage a candidate whose `content.xml` and `styles.xml` changes are
     /// provenance splices.
-    fn stage_feature(&mut self, op: &str, target: &str, candidate: Vec<u8>) -> Result<()> {
+    fn stage_feature(&mut self, op: &str, target: &str, candidate: Vec<u8>) -> CoreResult<()> {
         if self.stage(op, target, candidate)? {
             self.spliced_parts.insert("content.xml".to_string());
             self.spliced_parts.insert("styles.xml".to_string());
@@ -3115,7 +3175,7 @@ impl Patch {
         target: Arc<[u8]>,
         mut steps: Vec<Step>,
         limits: Limits,
-    ) -> Result<Self> {
+    ) -> CoreResult<Self> {
         if steps.is_empty() {
             if source != target {
                 return invalid("ODS package changed without a semantic owner operation");
@@ -3218,8 +3278,8 @@ impl Patch {
     /// # Errors
     ///
     /// Returns an error when the configured output bound is exceeded.
-    pub fn to_deterministic_json(&self) -> Result<Vec<u8>> {
-        self.semantic.to_deterministic_json().map_err(patch_error)
+    pub fn to_deterministic_json(&self) -> FamilyResult<Vec<u8>> {
+        Ok(self.semantic.to_deterministic_json().map_err(patch_error)?)
     }
 
     /// Parse a canonical deterministic semantic envelope with explicit ODS limits.
@@ -3228,10 +3288,10 @@ impl Patch {
     ///
     /// Returns an error for noncanonical/untrusted JSON, wrong format vocabulary, malformed
     /// operations or blobs, package-bound failures, or mismatched fingerprints.
-    pub fn from_deterministic_json(bytes: &[u8], limits: Limits) -> Result<Self> {
+    pub fn from_deterministic_json(bytes: &[u8], limits: Limits) -> FamilyResult<Self> {
         let semantic = CorePatch::<Reversible>::from_deterministic_json(bytes, limits.patch)
             .map_err(patch_error)?;
-        Self::from_semantic(semantic, limits)
+        Ok(Self::from_semantic(semantic, limits)?)
     }
 
     /// Apply under an explicit signature/encryption write policy.
@@ -3244,7 +3304,7 @@ impl Patch {
         &self,
         snapshot: &Package,
         policy: SecurityWritePolicy,
-    ) -> Result<Commit> {
+    ) -> CoreResult<Commit> {
         if !self.is_applicable_to(snapshot) {
             return invalid("ODS unified patch source snapshot does not match");
         }
@@ -3283,7 +3343,7 @@ impl Patch {
     /// # Errors
     ///
     /// Returns a structured lineage, limit, semantic-overlap, or physical-overlap refusal.
-    pub fn join(&self, other: &Self) -> std::result::Result<Self, JoinError> {
+    pub fn join(&self, other: &Self) -> Result<Self, JoinError> {
         if self.limits != other.limits {
             return Err(JoinError {
                 failure: JoinFailure::DifferentLimits,
@@ -3305,9 +3365,9 @@ impl Patch {
     /// # Errors
     ///
     /// Returns an error when lineage, limits, or finite planning bounds differ.
-    pub fn three_way(left: &Self, right: &Self) -> Result<ThreeWayPlan> {
+    pub fn three_way(left: &Self, right: &Self) -> FamilyResult<ThreeWayPlan> {
         if left.limits != right.limits {
-            return invalid("ODS three-way branches use different finite bounds");
+            return invalid_family("ODS three-way branches use different finite bounds");
         }
         let mut left_branch = JoinedSubEdits::new(left.source.clone(), left.limits.composition);
         left_branch
@@ -3329,7 +3389,7 @@ impl Patch {
         })
     }
 
-    fn as_sub_edit(&self) -> Result<SubEdit<Arc<[u8]>, Branch>> {
+    fn as_sub_edit(&self) -> CoreResult<SubEdit<Arc<[u8]>, Branch>> {
         let id = self
             .semantic
             .fingerprint()
@@ -3349,7 +3409,7 @@ impl Patch {
         .map_err(|error| invalid_error(format!("ODS composition sub-edit failed: {error}")))
     }
 
-    fn from_semantic(semantic: CorePatch<Reversible>, limits: Limits) -> Result<Self> {
+    fn from_semantic(semantic: CorePatch<Reversible>, limits: Limits) -> CoreResult<Self> {
         if semantic.format() != FORMAT {
             return invalid("durable patch does not use the ODS document vocabulary");
         }
@@ -3520,7 +3580,7 @@ impl ThreeWayPlan {
     /// # Errors
     ///
     /// Returns an error while conflicts remain unresolved or merged package validation fails.
-    pub fn finish(mut self) -> Result<Patch> {
+    pub fn finish(mut self) -> FamilyResult<Patch> {
         let plan = self
             .plan
             .take()
@@ -3528,7 +3588,7 @@ impl ThreeWayPlan {
         let joined = plan.finish().map_err(|_plan| {
             invalid_error("ODS three-way conflicts require explicit resolution")
         })?;
-        joined_patch(joined, self.limits)
+        Ok(joined_patch(joined, self.limits)?)
     }
 }
 
@@ -3705,15 +3765,16 @@ impl History {
     /// # Errors
     ///
     /// Returns an error for stale lineage, serialization failure, or history-weight refusal.
-    pub fn record(&mut self, commit: Commit) -> Result<Vec<Package>> {
+    pub fn record(&mut self, commit: Commit) -> FamilyResult<Vec<Package>> {
         if !commit.patch.is_applicable_to(self.current()) {
-            return invalid("ODS history commit does not descend from the current snapshot");
+            return invalid_family("ODS history commit does not descend from the current snapshot");
         }
         let weight = u64::try_from(commit.patch.to_deterministic_json()?.len())
             .map_err(|_error| invalid_error("ODS history weight exceeds u64"))?;
-        self.inner
+        Ok(self
+            .inner
             .record(commit.snapshot, weight)
-            .map_err(patch_error)
+            .map_err(patch_error)?)
     }
 
     /// Move one retained transition backward.
@@ -3727,7 +3788,7 @@ impl History {
     }
 }
 
-fn changed_effects(source: &[u8], target: &[u8]) -> Result<Vec<String>> {
+fn changed_effects(source: &[u8], target: &[u8]) -> CoreResult<Vec<String>> {
     Ok(changed_package_files(source, target)?
         .into_iter()
         .map(|(path, _target)| format!("part:{path}"))
@@ -3738,8 +3799,12 @@ fn composition_error(failure: &SubEditJoinFailure) -> CoreError {
     invalid_error(format!("ODS composition was refused: {failure:?}"))
 }
 
-fn invalid<T>(message: impl Into<String>) -> Result<T> {
+fn invalid<T>(message: impl Into<String>) -> CoreResult<T> {
     Err(invalid_error(message))
+}
+
+fn invalid_family<T>(message: impl Into<String>) -> FamilyResult<T> {
+    Err(PackageError::from(invalid_error(message)))
 }
 
 fn invalid_error(message: impl Into<String>) -> CoreError {
@@ -3761,7 +3826,7 @@ fn is_xml_media_type(media_type: &str) -> bool {
         || media_type.ends_with("+xml")
 }
 
-fn joined_patch(joined: JoinedSubEdits<Arc<[u8]>, Branch>, limits: Limits) -> Result<Patch> {
+fn joined_patch(joined: JoinedSubEdits<Arc<[u8]>, Branch>, limits: Limits) -> CoreResult<Patch> {
     let source = joined.lineage().clone();
     let mut branches = joined
         .into_sub_edits()
@@ -3787,12 +3852,12 @@ fn joined_patch(joined: JoinedSubEdits<Arc<[u8]>, Branch>, limits: Limits) -> Re
     Patch::build(source, target, steps, limits)
 }
 
-fn merge_package_targets(source: &[u8], targets: &[&[u8]], limits: Limits) -> Result<Vec<u8>> {
+fn merge_package_targets(source: &[u8], targets: &[&[u8]], limits: Limits) -> CoreResult<Vec<u8>> {
     let base_files = package_files(source)?;
     let target_maps = targets
         .iter()
         .map(|target| package_files(target))
-        .collect::<Result<Vec<_>>>()?;
+        .collect::<CoreResult<Vec<_>>>()?;
     let mut paths = BTreeSet::new();
     paths.extend(base_files.keys().cloned());
     for target in &target_maps {
@@ -3825,7 +3890,7 @@ fn merge_package_targets(source: &[u8], targets: &[&[u8]], limits: Limits) -> Re
     rebuild_selected(source, &base_files, &selected, limits)
 }
 
-fn only_blob(bundle: &BlobBundle) -> Result<Vec<u8>> {
+fn only_blob(bundle: &BlobBundle) -> CoreResult<Vec<u8>> {
     if bundle.len() != 1 {
         return invalid("ODS durable patch must contain exactly one package blob per direction");
     }
@@ -3839,7 +3904,7 @@ fn only_blob(bundle: &BlobBundle) -> Result<Vec<u8>> {
         .ok_or_else(|| invalid_error("ODS durable patch package blob cannot be resolved"))
 }
 
-fn package_files(bytes: &[u8]) -> Result<BTreeMap<String, File>> {
+fn package_files(bytes: &[u8]) -> CoreResult<BTreeMap<String, File>> {
     let package = Archive::from_bytes(bytes.to_vec())?;
     let reader = package.package().package()?;
     let mut files = BTreeMap::new();
@@ -3858,7 +3923,7 @@ fn package_files(bytes: &[u8]) -> Result<BTreeMap<String, File>> {
     Ok(files)
 }
 
-fn changed_package_files(source: &[u8], target: &[u8]) -> Result<Vec<(String, Option<File>)>> {
+fn changed_package_files(source: &[u8], target: &[u8]) -> CoreResult<Vec<(String, Option<File>)>> {
     let raw_identical = raw_identical_members(source, target)
         .filter(|paths| paths.contains("META-INF/manifest.xml"));
     let source_package = Archive::from_bytes(source.to_vec())?;
@@ -3891,7 +3956,7 @@ fn changed_package_files(source: &[u8], target: &[u8]) -> Result<Vec<(String, Op
 fn package_file(
     package: &litchi_odf_common::core::package::Package<'_>,
     path: &str,
-) -> Result<Option<File>> {
+) -> CoreResult<Option<File>> {
     if !package.has_file(path) {
         return Ok(None);
     }
@@ -3916,7 +3981,7 @@ fn parse_steps(
     expected_source: &str,
     expected_target: &str,
     expected_direction: &str,
-) -> Result<Vec<Step>> {
+) -> CoreResult<Vec<Step>> {
     let mut steps = Vec::new();
     steps
         .try_reserve_exact(operations.len())
@@ -3951,7 +4016,7 @@ fn parse_steps(
                     .map(str::to_string)
                     .ok_or_else(|| invalid_error("durable ODS patch effect must be text"))
             })
-            .collect::<Result<Vec<_>>>()?;
+            .collect::<CoreResult<Vec<_>>>()?;
         if effects.is_empty()
             || effects.windows(2).any(|pair| pair[0] >= pair[1])
             || effects.iter().any(|effect| !effect.starts_with("part:"))
@@ -4048,7 +4113,7 @@ fn rebuild_selected(
     base: &BTreeMap<String, File>,
     selected: &BTreeMap<String, File>,
     limits: Limits,
-) -> Result<Vec<u8>> {
+) -> CoreResult<Vec<u8>> {
     for path in ["styles.xml", "meta.xml", "settings.xml"] {
         if base.get(path) != selected.get(path) {
             return invalid(format!(
@@ -4096,7 +4161,7 @@ fn rebuild_selected(
     Ok(bytes)
 }
 
-fn refuse_referenced_removal(package: &Archive, path: &str) -> Result<()> {
+fn refuse_referenced_removal(package: &Archive, path: &str) -> CoreResult<()> {
     for candidate in package.package().files()? {
         if candidate == path
             || matches!(candidate.as_str(), "mimetype" | "META-INF/manifest.xml")
@@ -4117,7 +4182,7 @@ fn refuse_referenced_removal(package: &Archive, path: &str) -> Result<()> {
     Ok(())
 }
 
-fn enforce_security_policy(snapshot: &Package, policy: SecurityWritePolicy) -> Result<()> {
+fn enforce_security_policy(snapshot: &Package, policy: SecurityWritePolicy) -> CoreResult<()> {
     let package = Arc::clone(&snapshot.package);
     let reader = package.package().package()?;
     if reader.manifest().has_encrypted_entries() {
@@ -4153,7 +4218,7 @@ fn replace_resource(
     resource: Option<&Resource>,
     path: &str,
     limits: Limits,
-) -> Result<Vec<u8>> {
+) -> CoreResult<Vec<u8>> {
     let additions = resource.map_or_else(Vec::new, |value| {
         vec![Addition {
             path: value.path.clone(),
@@ -4179,7 +4244,7 @@ fn semantic_operation(
     source_hash: &str,
     target_hash: &str,
     direction: &str,
-) -> Result<PatchOperation> {
+) -> CoreResult<PatchOperation> {
     let mut preconditions = BTreeMap::new();
     preconditions.insert("source_sha256".to_string(), json!(source_hash));
     preconditions.insert("target_sha256".to_string(), json!(target_hash));
@@ -4197,7 +4262,7 @@ fn validate_authored_parts(
     source: &[u8],
     target: &[u8],
     provenance_spliced: &BTreeSet<String>,
-) -> Result<()> {
+) -> CoreResult<()> {
     for (path, target_file) in changed_package_files(source, target)? {
         let Some(file) = target_file else {
             continue;
@@ -4229,7 +4294,7 @@ fn validate_authored_parts(
     .map_err(CoreError::from)
 }
 
-fn validate_media_type(media_type: &str) -> Result<()> {
+fn validate_media_type(media_type: &str) -> CoreResult<()> {
     if media_type.is_empty()
         || media_type.len() > 256
         || media_type.chars().any(char::is_control)
@@ -4241,10 +4306,7 @@ fn validate_media_type(media_type: &str) -> Result<()> {
     }
 }
 
-fn check_input_bytes(
-    length: usize,
-    limits: litchi_odf_common::SourceLimits,
-) -> std::result::Result<(), PackageError> {
+fn check_input_bytes(length: usize, limits: litchi_odf_common::SourceLimits) -> FamilyResult<()> {
     let observed = u64::try_from(length).unwrap_or(u64::MAX);
     if observed > limits.max_input_bytes() {
         return Err(PackageError::Limit {
@@ -4256,7 +4318,7 @@ fn check_input_bytes(
     Ok(())
 }
 
-fn copy_bytes(source: &[u8]) -> Result<Vec<u8>> {
+fn copy_bytes(source: &[u8]) -> CoreResult<Vec<u8>> {
     let mut bytes = Vec::new();
     bytes
         .try_reserve_exact(source.len())
@@ -4268,7 +4330,7 @@ fn copy_bytes(source: &[u8]) -> Result<Vec<u8>> {
     Ok(bytes)
 }
 
-fn validate_package_size(length: usize, limits: Limits) -> Result<()> {
+fn validate_package_size(length: usize, limits: Limits) -> CoreResult<()> {
     if length > limits.package_bytes {
         invalid(format!(
             "ODS package byte limit exceeded: observed {length}, limit {}",
@@ -4279,7 +4341,7 @@ fn validate_package_size(length: usize, limits: Limits) -> Result<()> {
     }
 }
 
-fn validate_resource_count(package: &Archive, limits: Limits) -> Result<()> {
+fn validate_resource_count(package: &Archive, limits: Limits) -> CoreResult<()> {
     let count = package
         .package()
         .files()?
@@ -4296,7 +4358,7 @@ fn validate_resource_count(package: &Archive, limits: Limits) -> Result<()> {
     }
 }
 
-fn validate_resource_path(path: &str) -> Result<()> {
+fn validate_resource_path(path: &str) -> CoreResult<()> {
     if path.is_empty()
         || path.len() > MAX_PATH_BYTES
         || path.starts_with('/')
@@ -4316,11 +4378,11 @@ fn validate_resource_path(path: &str) -> Result<()> {
     }
 }
 
-pub(crate) fn validate_detached_resource_path(path: &str) -> Result<()> {
+pub(crate) fn validate_detached_resource_path(path: &str) -> CoreResult<()> {
     validate_resource_path(path)
 }
 
-fn validate_resource_size(length: usize, limits: Limits) -> Result<()> {
+fn validate_resource_size(length: usize, limits: Limits) -> CoreResult<()> {
     if length > limits.resource_bytes {
         invalid(format!(
             "ODS resource byte limit exceeded: observed {length}, limit {}",
@@ -4331,7 +4393,7 @@ fn validate_resource_size(length: usize, limits: Limits) -> Result<()> {
     }
 }
 
-fn validate_xml_resource(media_type: &str, bytes: &[u8]) -> Result<()> {
+fn validate_xml_resource(media_type: &str, bytes: &[u8]) -> CoreResult<()> {
     validate_media_type(media_type)?;
     if is_xml_media_type(media_type) {
         litchi_odf_common::compact_xml::validate(

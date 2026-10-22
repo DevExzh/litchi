@@ -1,6 +1,7 @@
 //! Compact corpus and malformed-input hardening for the ODT parser facade.
 
-use litchi_core::Error;
+use litchi_core::Error as CoreError;
+use litchi_odf_common::Error;
 use litchi_odt::{Package, core::PackageWriter};
 mod support;
 
@@ -36,10 +37,7 @@ fn exercise_odt(content_xml: &[u8]) -> Option<Error> {
         Ok(bytes) => bytes,
         Err(error) => return Some(error),
     };
-    let document = match Package::from_bytes(&bytes)
-        .map_err(Error::from)
-        .and_then(|package| package.document())
-    {
+    let document = match Package::from_bytes(&bytes).and_then(|package| package.document()) {
         Ok(document) => document,
         Err(error) => return Some(error),
     };
@@ -57,7 +55,7 @@ fn exercise_odt(content_xml: &[u8]) -> Option<Error> {
         document.ruby_annotations().map(|_| ()),
     ] {
         if let Err(error) = result {
-            return Some(error);
+            return Some(Error::from(error));
         }
     }
     None
@@ -65,7 +63,7 @@ fn exercise_odt(content_xml: &[u8]) -> Option<Error> {
 
 fn assert_typed_error(content_xml: &[u8], case: &str) {
     match exercise_odt(content_xml) {
-        Some(Error::InvalidFormat(_)) => {},
+        Some(Error::Core(CoreError::InvalidFormat(_))) => {},
         Some(error) => panic!("{case} produced a non-format error: {error:?}"),
         None => panic!("{case} unexpectedly parsed"),
     }
@@ -101,26 +99,23 @@ fn corpus_xxe_probe_is_rejected_without_resolution() -> Result<(), Error> {
             ("meta.xml", META.as_bytes()),
         ],
     );
-    let document = match Package::from_bytes(&raw)
-        .map_err(Error::from)
-        .and_then(|package| package.document())
-    {
+    let document = match Package::from_bytes(&raw).and_then(|package| package.document()) {
         Ok(document) => document,
-        Err(Error::InvalidFormat(_)) => return Ok(()),
+        Err(Error::Core(CoreError::InvalidFormat(_))) => return Ok(()),
         Err(error) => panic!("open produced a non-format error: {error:?}"),
     };
     match document.text() {
-        Err(Error::InvalidFormat(_)) => {},
+        Err(CoreError::InvalidFormat(_)) => {},
         Err(error) => panic!("text produced a non-format error: {error:?}"),
         Ok(_) => panic!("XXE entity unexpectedly resolved in text"),
     }
     match document.paragraphs() {
-        Err(Error::InvalidFormat(_)) => {},
+        Err(CoreError::InvalidFormat(_)) => {},
         Err(error) => panic!("paragraphs produced a non-format error: {error:?}"),
         Ok(_) => panic!("XXE entity unexpectedly resolved in paragraphs"),
     }
     match document.forms() {
-        Err(Error::InvalidFormat(_)) => {},
+        Err(CoreError::InvalidFormat(_)) => {},
         Err(error) => panic!("forms produced a non-format error: {error:?}"),
         Ok(_) => panic!("DOCTYPE unexpectedly parsed in forms"),
     }

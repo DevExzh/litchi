@@ -156,7 +156,7 @@ impl Document {
 
     /// Inspect ordered ODF variable declarations without evaluating fields or formulas.
     pub fn variable_declarations(&self) -> Result<crate::variable_declaration::Declarations> {
-        self.package.variable_declarations()
+        Ok(self.package.variable_declarations()?)
     }
 
     pub fn text(&self) -> String {
@@ -164,11 +164,11 @@ impl Document {
     }
 
     pub fn metadata(&self) -> Result<Metadata> {
-        self.package.metadata()
+        Ok(self.package.metadata()?)
     }
 
     pub fn odf_metadata(&self) -> Result<Option<crate::Metadata>> {
-        self.package.odf_metadata()
+        Ok(self.package.odf_metadata()?)
     }
 
     pub fn as_bytes(&self) -> &[u8] {

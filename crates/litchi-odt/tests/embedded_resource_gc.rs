@@ -1,4 +1,4 @@
-use litchi_odf_common::package::raw_identical_members;
+use litchi_odf_common::{Error as OdfError, package::raw_identical_members};
 use litchi_odt::{
     Package,
     core::{OwnedPackage, PackageWriter, Profile},
@@ -210,7 +210,10 @@ fn stale_apply_exact_noop_and_durable_replay_are_source_checked() {
         .plan_embedded_resource_gc(&[Candidate::package_file("Pictures/orphan.png")])
         .unwrap();
     let foreign = snapshot(package("<text:p>foreign</text:p>", &[], &[]));
-    assert!(plan.apply(&foreign).is_err());
+    assert!(matches!(
+        plan.apply(&foreign),
+        Err(OdfError::PatchConflict { .. })
+    ));
 
     let commit = plan.apply(&source).unwrap();
     let durable = commit.patch().durable().unwrap();
@@ -220,14 +223,23 @@ fn stale_apply_exact_noop_and_durable_replay_are_source_checked() {
         decoded.apply(&source).unwrap().as_bytes(),
         commit.package().as_bytes()
     );
-    assert!(decoded.apply(&foreign).is_err());
+    assert!(matches!(
+        decoded.apply(&foreign),
+        Err(OdfError::PatchConflict { .. })
+    ));
     let decoded_inverse = decoded.inverse();
     assert_eq!(
         decoded_inverse.apply(commit.package()).unwrap().as_bytes(),
         bytes
     );
-    assert!(decoded_inverse.apply(&source).is_err());
-    assert!(decoded_inverse.apply(&foreign).is_err());
+    assert!(matches!(
+        decoded_inverse.apply(&source),
+        Err(OdfError::PatchConflict { .. })
+    ));
+    assert!(matches!(
+        decoded_inverse.apply(&foreign),
+        Err(OdfError::PatchConflict { .. })
+    ));
 
     let noop = source.plan_embedded_resource_gc(&[]).unwrap();
     let noop_commit = noop.apply(&source).unwrap();

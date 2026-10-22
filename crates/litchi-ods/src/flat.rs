@@ -23,6 +23,8 @@ pub use litchi_odf_common::Error;
 pub use litchi_odf_common::LimitKind;
 pub use litchi_odf_common::OpenOptions;
 
+type FamilyResult<T> = std::result::Result<T, Error>;
+
 /// A committed flat edit: the published workbook, its patch and diagnostics.
 pub type Commit = litchi_core::edit::Commit<Workbook, Patch>;
 
@@ -316,8 +318,8 @@ impl Workbook {
     pub fn sheet<'s, 'q>(
         &'s self,
         selector: impl Into<SheetSelector<'q>>,
-    ) -> Result<Option<&'s Sheet>> {
-        select(&self.state.sheets, selector.into())
+    ) -> FamilyResult<Option<&'s Sheet>> {
+        Ok(select(&self.state.sheets, selector.into())?)
     }
 
     ///
@@ -328,7 +330,7 @@ impl Workbook {
         selector: impl Into<SheetSelector<'q>>,
         row: usize,
         column: usize,
-    ) -> Result<Option<CellView<'_>>> {
+    ) -> FamilyResult<Option<CellView<'_>>> {
         Ok(self
             .sheet(selector)?
             .map(|sheet| sheet.cell_view(row, column)))
@@ -344,8 +346,8 @@ impl Workbook {
     ///
     /// # Errors
     /// Returns an error when the bounded projection cannot reserve its output.
-    pub fn text(&self) -> Result<String> {
-        crate::facade::source::project_text(&self.state.sheets)
+    pub fn text(&self) -> FamilyResult<String> {
+        Ok(crate::facade::source::project_text(&self.state.sheets)?)
     }
 
     #[must_use]
@@ -359,10 +361,14 @@ impl Workbook {
     ///
     /// Returns an error when the source XML has invalid or over-budget DDE
     /// metadata.
-    pub fn dde(&self) -> Result<crate::dde::Snapshot> {
-        crate::dde::Snapshot::parse(&self.state.source).map_err(|error| {
-            CoreError::InvalidFormat(format!("flat ODS DDE metadata inspection failed: {error}"))
-        })
+    pub fn dde(&self) -> FamilyResult<crate::dde::Snapshot> {
+        Ok(
+            crate::dde::Snapshot::parse(&self.state.source).map_err(|error| {
+                CoreError::InvalidFormat(format!(
+                    "flat ODS DDE metadata inspection failed: {error}"
+                ))
+            })?,
+        )
     }
 
     /// Inspects scenario declarations without applying their values.
@@ -371,19 +377,21 @@ impl Workbook {
     ///
     /// Returns an error when the source XML has invalid or over-budget
     /// scenario metadata.
-    pub fn scenarios(&self) -> Result<crate::scenario::Snapshot> {
-        crate::scenario::Snapshot::parse(&self.state.source).map_err(|error| {
-            CoreError::InvalidFormat(format!(
-                "flat ODS scenario metadata inspection failed: {error}"
-            ))
-        })
+    pub fn scenarios(&self) -> FamilyResult<crate::scenario::Snapshot> {
+        Ok(
+            crate::scenario::Snapshot::parse(&self.state.source).map_err(|error| {
+                CoreError::InvalidFormat(format!(
+                    "flat ODS scenario metadata inspection failed: {error}"
+                ))
+            })?,
+        )
     }
 
     /// Starts a detached, failure-atomic edit bound to this workbook.
     ///
     /// # Errors
     /// Returns an error when the staging buffer cannot be reserved.
-    pub fn edit(&self) -> std::result::Result<Edit, Error> {
+    pub fn edit(&self) -> FamilyResult<Edit> {
         Ok(self.edit_core()?)
     }
 
@@ -448,7 +456,7 @@ impl Edit {
         row: usize,
         column: usize,
         cell: Cell,
-    ) -> Result<Option<()>> {
+    ) -> FamilyResult<Option<()>> {
         let index = match selector.into() {
             SheetSelector::Index(index) => {
                 if index >= self.staged.len() {
@@ -467,9 +475,9 @@ impl Edit {
                     return Ok(None);
                 };
                 if matches.next().is_some() {
-                    return Err(invalid(format!(
+                    return Err(Error::from(invalid(format!(
                         "flat ODS sheet selector '{name}' is ambiguous"
-                    )));
+                    ))));
                 }
                 index
             },

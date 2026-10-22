@@ -3,9 +3,11 @@
 use crate::package::{
     ActiveContentStatus, Package, SecurityCapabilities, SecurityStatus, ShapeTransfer,
 };
-use litchi_core::{Metadata, Result};
+use litchi_core::Metadata;
 
 pub use crate::authoring::Builder;
+
+type FamilyResult<T> = Result<T, litchi_odf_common::Error>;
 
 /// Source-checked ODG package transactions, patches and history.
 ///
@@ -79,8 +81,10 @@ impl Drawing {
     pub fn page<'selector>(
         &self,
         selector: impl Into<crate::page::Selector<'selector>>,
-    ) -> Result<Option<&crate::page::Page>> {
-        self.package.page(selector)
+    ) -> FamilyResult<Option<&crate::page::Page>> {
+        self.package
+            .page(selector)
+            .map_err(litchi_odf_common::Error::from)
     }
 
     /// Returns global `styles.xml` drawing layers in source order.
@@ -118,8 +122,12 @@ impl Drawing {
     /// # Errors
     ///
     /// Returns an error when signature XML cannot be decoded safely.
-    pub fn digital_signatures(&self) -> Result<litchi_odf_common::signature::DigitalSignatures> {
-        self.package.digital_signatures()
+    pub fn digital_signatures(
+        &self,
+    ) -> FamilyResult<litchi_odf_common::signature::DigitalSignatures> {
+        self.package
+            .digital_signatures()
+            .map_err(litchi_odf_common::Error::from)
     }
 
     /// Verifies signature math without making a certificate trust decision.
@@ -129,8 +137,10 @@ impl Drawing {
     /// Returns an error when signature metadata or referenced bytes cannot be verified.
     pub fn verify_document_signatures(
         &self,
-    ) -> Result<Vec<litchi_odf_common::signature::SignatureVerification>> {
-        self.package.verify_document_signatures()
+    ) -> FamilyResult<Vec<litchi_odf_common::signature::SignatureVerification>> {
+        self.package
+            .verify_document_signatures()
+            .map_err(litchi_odf_common::Error::from)
     }
 
     /// Returns inert script, event, action, link, and embedded-object inventory.
@@ -144,8 +154,8 @@ impl Drawing {
     /// # Errors
     ///
     /// Returns an error when package member validation fails.
-    pub fn files(&self) -> Result<Vec<String>> {
-        self.package.files()
+    pub fn files(&self) -> FamilyResult<Vec<String>> {
+        self.package.files().map_err(litchi_odf_common::Error::from)
     }
 
     /// Returns package-local image resources referenced by drawing XML.
@@ -177,8 +187,10 @@ impl Drawing {
     /// # Errors
     ///
     /// Returns an error for an invalid or non-group selector.
-    pub fn group(&self, page: usize, shape: usize) -> Result<crate::group::Group> {
-        self.package.group(page, shape)
+    pub fn group(&self, page: usize, shape: usize) -> FamilyResult<crate::group::Group> {
+        self.package
+            .group(page, shape)
+            .map_err(litchi_odf_common::Error::from)
     }
 
     /// Reads one package-local resource without activating it.
@@ -186,8 +198,10 @@ impl Drawing {
     /// # Errors
     ///
     /// Returns an error for an invalid selector or unreadable member.
-    pub fn resource_bytes(&self, resource: usize) -> Result<Option<Vec<u8>>> {
-        self.package.resource_bytes(resource)
+    pub fn resource_bytes(&self, resource: usize) -> FamilyResult<Option<Vec<u8>>> {
+        self.package
+            .resource_bytes(resource)
+            .map_err(litchi_odf_common::Error::from)
     }
 
     /// Prepares a provenance-bound shape or complete group subtree for cross-drawing transfer.
@@ -195,7 +209,9 @@ impl Drawing {
     /// # Errors
     ///
     /// Returns an error for invalid selectors, noncompact source, or unreadable dependencies.
-    pub fn prepare_shape_transfer(&self, page: usize, shape: usize) -> Result<ShapeTransfer> {
-        self.package.prepare_shape_transfer(page, shape)
+    pub fn prepare_shape_transfer(&self, page: usize, shape: usize) -> FamilyResult<ShapeTransfer> {
+        self.package
+            .prepare_shape_transfer(page, shape)
+            .map_err(litchi_odf_common::Error::from)
     }
 }

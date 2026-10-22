@@ -515,3 +515,22 @@ fn keyword_lists_patch_one_element_per_keyword() {
         .unwrap();
     assert!(!patched.contains("meta:keyword"), "{patched}");
 }
+
+#[test]
+fn metadata_patch_admits_output_before_cloning_values() {
+    let xml = concat!(
+        r#"<office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" "#,
+        r#"xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0"><office:meta/></office:document-meta>"#,
+    );
+    let generator = "generator-value-that-exceeds-the-output-envelope";
+    let patch = MetaXmlPatch::preserve_all()
+        .with_generator_and_modification_date(generator, "2026-10-22T00:00:00Z".to_owned());
+    let limits =
+        XmlStreamLimits::new(u64::try_from(xml.len() + 8).unwrap(), 64, 256, 64, 256).unwrap();
+    let error = patch_meta_xml(xml, &patch, limits).unwrap_err();
+    assert!(matches!(
+        error,
+        litchi_core::Error::ResourceLimit(limit)
+            if limit.resource == litchi_core::Resource::OutputBytes
+    ));
+}

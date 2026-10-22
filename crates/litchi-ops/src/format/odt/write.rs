@@ -62,15 +62,26 @@ fn refusal(code: Code, message: &'static str) -> Error {
 }
 
 /// A leaf staging refusal: the caller's request, not the file, is at fault.
-pub(crate) fn staging_error(error: litchi_core::Error) -> Error {
-    core_error(error).caused_by_argument(Code::InvalidValue)
+pub(crate) fn staging_error(error: litchi_odf_common::Error) -> Error {
+    match error {
+        litchi_odf_common::Error::Core(error) => {
+            core_error(error).caused_by_argument(Code::InvalidValue)
+        },
+        litchi_odf_common::Error::Refused(_) => {
+            odf_error(error).caused_by_argument(Code::InvalidValue)
+        },
+        other => odf_error(other),
+    }
 }
 
 /// A text set's staging error: the refusal of content a text set can
 /// neither keep nor replace (record 0304) stays `unsupported_capability`.
-fn text_error(error: litchi_core::Error) -> Error {
+fn text_error(error: litchi_odf_common::Error) -> Error {
     match error {
-        litchi_core::Error::Unsupported(_) | litchi_core::Error::Refused(_) => core_error(error),
+        litchi_odf_common::Error::Core(
+            litchi_core::Error::Unsupported(_) | litchi_core::Error::Refused(_),
+        )
+        | litchi_odf_common::Error::Refused(_) => odf_error(error),
         other => staging_error(other),
     }
 }
@@ -859,7 +870,7 @@ fn set_metadata(file: &Odt, props: &Props<'_>, limits: &SemanticLimits) -> Resul
 /// A metadata staging refusal: the caller's value, not the file, is at fault.
 fn metadata_error(error: litchi_odf_common::Error) -> Error {
     match error {
-        litchi_odf_common::Error::Core(error) => staging_error(error),
+        litchi_odf_common::Error::Core(error) => staging_error(error.into()),
         other => odf_error(other),
     }
 }

@@ -19,6 +19,7 @@ use crate::{
     transaction::{Edit, EnvelopeKind, Package, Position},
 };
 use litchi_core::{BlobId, Error, Result};
+use litchi_odf_common::Error as OdfError;
 use litchi_odf_common::core::{AuthoredXmlFragment, XmlSourcePart, XmlSplicePublication};
 use litchi_odf_common::package::{
     MAX_CONTENT_REPLACEMENT_BYTES, raw_identical_members, replace_content_xml_spliced,
@@ -109,19 +110,24 @@ impl ParagraphTransferPlan {
     }
 
     /// Applies this plan to an edit whose source is the exact planned target.
-    pub fn apply(&self, edit: &mut Edit) -> Result<()> {
-        edit.stage_plain_paragraph_transfer(self).map(|_| ())
+    pub fn apply(&self, edit: &mut Edit) -> std::result::Result<(), OdfError> {
+        Ok(edit.stage_plain_paragraph_transfer(self).map(|_| ())?)
     }
 
-    pub(crate) fn validate_integrity(&self, destination: &Package) -> Result<()> {
+    pub(crate) fn validate_integrity(
+        &self,
+        destination: &Package,
+    ) -> std::result::Result<(), OdfError> {
         if BlobId::of(self.donor.as_bytes()).as_hex() != self.donor_fingerprint {
-            return Err(Error::InvalidFormat(
-                "ODT paragraph transfer donor changed after planning".to_string(),
+            return Err(OdfError::patch_conflict(
+                "odt.paragraph_transfer",
+                "the donor changed after planning",
             ));
         }
         if BlobId::of(destination.as_bytes()).as_hex() != self.destination_fingerprint {
-            return Err(Error::InvalidFormat(
-                "ODT paragraph transfer destination is stale or foreign".to_string(),
+            return Err(OdfError::patch_conflict(
+                "odt.paragraph_transfer",
+                "the destination is stale or foreign",
             ));
         }
         validate_positions_and_fragments(

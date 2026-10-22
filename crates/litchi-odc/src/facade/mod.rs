@@ -1,12 +1,16 @@
 //! Concise family entry points.
 
-use litchi_core::{Error, Metadata, Result};
+use litchi_core::{Error as CoreError, Metadata, Result as CoreResult};
 use litchi_odf_common::OpenOptions;
 use litchi_odf_common::chart::{ChartClass, Element, Legend, PlotArea, read};
 use std::{collections::BTreeSet, path::Path, sync::Arc};
 
 pub use crate::authoring::Builder;
 use crate::authoring::Definition;
+
+type FamilyResult<T> = Result<T, crate::Error>;
+
+macro_rules! family_invalid { ($($arg:tt)*) => { crate::Error::from(CoreError::InvalidFormat($($arg)*)) }; }
 
 enum StagedStyles {
     Replace(String),
@@ -26,7 +30,7 @@ struct State {
 }
 
 impl Chart {
-    fn from_package(package: crate::package::Snapshot) -> Result<Self> {
+    fn from_package(package: crate::package::Snapshot) -> CoreResult<Self> {
         let chart = read(
             package.content_xml(),
             package.limits().options().xml_limits_value(),
@@ -36,7 +40,7 @@ impl Chart {
 
     /// Decode complete package bytes produced or retained inside the crate
     /// under the retained chart limits (durable patches).
-    fn decode(bytes: Vec<u8>, limits: crate::Limits) -> Result<Self> {
+    fn decode(bytes: Vec<u8>, limits: crate::Limits) -> CoreResult<Self> {
         Self::from_package(crate::package::Snapshot::from_bytes_with_limits(
             bytes, limits,
         )?)
@@ -61,8 +65,8 @@ impl Chart {
     /// # Errors
     ///
     /// Returns an unsupported error when projection would discard content.
-    pub fn definition(&self) -> Result<Definition> {
-        crate::project::definition(self)
+    pub fn definition(&self) -> FamilyResult<Definition> {
+        crate::project::definition(self).map_err(crate::Error::from)
     }
 
     /// Return the typed root `chart:class` without normalizing its `QName`.
@@ -71,8 +75,8 @@ impl Chart {
     ///
     /// Returns an invalid-format error if the retained chart has no valid
     /// `chart:class` value.
-    pub fn class(&self) -> Result<ChartClass> {
-        self.0.chart.chart_class()
+    pub fn class(&self) -> FamilyResult<ChartClass> {
+        self.0.chart.chart_class().map_err(crate::Error::from)
     }
 
     #[must_use]
@@ -99,11 +103,12 @@ impl Chart {
         &self,
         style_name: &str,
         property: crate::ChartStyleProperty,
-    ) -> Result<Option<crate::ChartStyleValue>> {
+    ) -> FamilyResult<Option<crate::ChartStyleValue>> {
         let Some(styles) = self.styles_xml() else {
             return Ok(None);
         };
         crate::style_format::read_property(styles, style_name, property, self.limits())
+            .map_err(crate::Error::from)
     }
 
     /// Return the retained normative ODF package kind.
@@ -149,8 +154,8 @@ impl Chart {
     /// # Errors
     ///
     /// Returns an error if the package entries cannot be enumerated.
-    pub fn files(&self) -> Result<Vec<String>> {
-        self.0.package.files()
+    pub fn files(&self) -> FamilyResult<Vec<String>> {
+        self.0.package.files().map_err(crate::Error::from)
     }
 
     /// Return inert non-core package resources without fetching links.
@@ -176,8 +181,11 @@ impl Chart {
     /// # Errors
     ///
     /// Returns an error for an invalid selector or unreadable package member.
-    pub fn resource_bytes(&self, index: usize) -> Result<Vec<u8>> {
-        self.0.package.resource_bytes(index)
+    pub fn resource_bytes(&self, index: usize) -> FamilyResult<Vec<u8>> {
+        self.0
+            .package
+            .resource_bytes(index)
+            .map_err(crate::Error::from)
     }
 
     /// Starts a source-bound package chart transaction over this projection.
@@ -240,7 +248,7 @@ impl Package {
     }
 
     /// Adopt bytes a metadata commit published, under this chart's limits.
-    pub(crate) fn adopt_chart_bytes(&self, bytes: Vec<u8>) -> Result<Self> {
+    pub(crate) fn adopt_chart_bytes(&self, bytes: Vec<u8>) -> CoreResult<Self> {
         Self::from_snapshot(crate::package::Snapshot::from_bytes_with_limits(
             bytes,
             self.chart.limits(),
@@ -254,7 +262,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error only when the fixed minimal package cannot be built.
-    pub fn new() -> std::result::Result<Self, crate::Error> {
+    pub fn new() -> Result<Self, crate::Error> {
         Ok(Builder::new().build()?)
     }
 
@@ -265,7 +273,7 @@ impl Package {
     /// Returns [`crate::Error::Limit`] when a source or semantic dimension is
     /// exceeded and [`crate::Error::Core`] for I/O, archive or chart
     /// validation failures.
-    pub fn open(path: impl AsRef<Path>) -> std::result::Result<Self, crate::Error> {
+    pub fn open(path: impl AsRef<Path>) -> Result<Self, crate::Error> {
         Self::open_with_options(path, OpenOptions::new())
     }
 
@@ -277,7 +285,7 @@ impl Package {
     pub fn open_with_options(
         path: impl AsRef<Path>,
         options: OpenOptions,
-    ) -> std::result::Result<Self, crate::Error> {
+    ) -> Result<Self, crate::Error> {
         Self::from_reader_with_options(std::fs::File::open(path)?, options)
     }
 
@@ -286,7 +294,7 @@ impl Package {
     /// # Errors
     ///
     /// As [`Self::open`].
-    pub fn from_bytes(bytes: &[u8]) -> std::result::Result<Self, crate::Error> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, crate::Error> {
         Self::from_bytes_with_options(bytes, OpenOptions::new())
     }
 
@@ -298,7 +306,7 @@ impl Package {
     pub fn from_bytes_with_options(
         bytes: &[u8],
         options: OpenOptions,
-    ) -> std::result::Result<Self, crate::Error> {
+    ) -> Result<Self, crate::Error> {
         let limits = options.source_limits_value();
         let observed = u64::try_from(bytes.len()).unwrap_or(u64::MAX);
         if observed > limits.max_input_bytes() {
@@ -318,7 +326,7 @@ impl Package {
     /// # Errors
     ///
     /// As [`Self::open`].
-    pub fn from_reader(reader: impl std::io::Read) -> std::result::Result<Self, crate::Error> {
+    pub fn from_reader(reader: impl std::io::Read) -> Result<Self, crate::Error> {
         Self::from_reader_with_options(reader, OpenOptions::new())
     }
 
@@ -331,7 +339,7 @@ impl Package {
     pub fn from_reader_with_options(
         reader: impl std::io::Read,
         options: OpenOptions,
-    ) -> std::result::Result<Self, crate::Error> {
+    ) -> Result<Self, crate::Error> {
         let snapshot = crate::package::Snapshot::from_reader_with_options(reader, options)?;
         Self::from_opened(snapshot, options)
     }
@@ -341,12 +349,12 @@ impl Package {
     ///
     /// # Errors
     ///
-    /// Returns [`litchi_core::Error::UnexpectedFormat`] (as
+    /// Returns [`litchi_core::CoreError::UnexpectedFormat`] (as
     /// [`crate::Error::Core`]) when the prepared package is not a chart or
     /// chart template, and otherwise as [`Self::open`].
     pub fn from_prepared_package(
         prepared: litchi_odf_common::PreparedPackage,
-    ) -> std::result::Result<Self, crate::Error> {
+    ) -> Result<Self, crate::Error> {
         Self::from_prepared_package_with_options(prepared, OpenOptions::new())
     }
 
@@ -360,9 +368,9 @@ impl Package {
     pub fn from_prepared_package_with_options(
         prepared: litchi_odf_common::PreparedPackage,
         options: OpenOptions,
-    ) -> std::result::Result<Self, crate::Error> {
+    ) -> Result<Self, crate::Error> {
         if prepared.format() != litchi_core::detection::FileFormat::Odc {
-            return Err(Error::UnexpectedFormat {
+            return Err(CoreError::UnexpectedFormat {
                 detected: prepared.format(),
             }
             .into());
@@ -375,7 +383,7 @@ impl Package {
     fn from_opened(
         snapshot: crate::package::Snapshot,
         options: OpenOptions,
-    ) -> std::result::Result<Self, crate::Error> {
+    ) -> Result<Self, crate::Error> {
         let chart = Chart::from_package(snapshot)?;
         let semantic = options.semantic_limits_value();
         if !semantic.is_default() {
@@ -386,7 +394,7 @@ impl Package {
     }
 
     /// Adopt a validated snapshot written by the crate's own authoring codec.
-    pub(crate) fn from_snapshot(snapshot: crate::package::Snapshot) -> Result<Self> {
+    pub(crate) fn from_snapshot(snapshot: crate::package::Snapshot) -> CoreResult<Self> {
         Chart::from_package(snapshot).map(Self::from_chart)
     }
 
@@ -428,7 +436,7 @@ impl Package {
     ///
     /// Returns an error when this package is not byte-identical to the patch
     /// source.
-    pub fn apply(&self, patch: &Patch) -> std::result::Result<Commit, crate::Error> {
+    pub fn apply(&self, patch: &Patch) -> Result<Commit, crate::Error> {
         if !patch.is_applicable_to(self) {
             return Err(crate::Error::patch_conflict(
                 "odc.apply",
@@ -451,7 +459,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns [`crate::Error::Core`] carrying the I/O failure.
-    pub fn save(&self, path: impl AsRef<Path>) -> std::result::Result<(), crate::Error> {
+    pub fn save(&self, path: impl AsRef<Path>) -> Result<(), crate::Error> {
         self.save_with_durability(path, litchi_core::Durability::Full)
     }
 
@@ -464,7 +472,7 @@ impl Package {
         &self,
         path: impl AsRef<Path>,
         durability: litchi_core::Durability,
-    ) -> std::result::Result<(), crate::Error> {
+    ) -> Result<(), crate::Error> {
         litchi_odf_common::publish::save_bytes(path.as_ref(), self.as_bytes(), durability)
     }
 
@@ -473,7 +481,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns an allocation failure.
-    pub fn to_bytes(&self) -> std::result::Result<Vec<u8>, crate::Error> {
+    pub fn to_bytes(&self) -> Result<Vec<u8>, crate::Error> {
         Ok(copy_input(self.as_bytes())?)
     }
 
@@ -482,20 +490,17 @@ impl Package {
     /// # Errors
     ///
     /// Returns the stream's I/O failure.
-    pub fn write_to(
-        &self,
-        mut writer: impl std::io::Write,
-    ) -> std::result::Result<(), crate::Error> {
+    pub fn write_to(&self, mut writer: impl std::io::Write) -> Result<(), crate::Error> {
         writer.write_all(self.as_bytes())?;
         Ok(())
     }
 }
 
-fn copy_input(source: &[u8]) -> Result<Vec<u8>> {
+fn copy_input(source: &[u8]) -> CoreResult<Vec<u8>> {
     let mut bytes = Vec::new();
     bytes
         .try_reserve_exact(source.len())
-        .map_err(|source| Error::Allocation {
+        .map_err(|source| CoreError::Allocation {
             resource: "ODC package bytes",
             source,
         })?;
@@ -522,9 +527,9 @@ impl Edit<'_> {
     ///
     /// Returns an error when the selector is out of bounds or the update is
     /// outside the bounded, losslessly editable axis-name surface.
-    pub fn update_axis(&mut self, index: usize, update: crate::AxisUpdate) -> Result<()> {
+    pub fn update_axis(&mut self, index: usize, update: crate::AxisUpdate) -> FamilyResult<()> {
         if self.replacement.is_some() || self.typed_transaction.is_some() {
-            return Err(Error::InvalidFormat(
+            return Err(family_invalid!(
                 "an ODC typed chart edit is already staged".to_string(),
             ));
         }
@@ -547,9 +552,9 @@ impl Edit<'_> {
         target: crate::ExactTarget,
         attribute: crate::ExactAttribute,
         after: Option<String>,
-    ) -> Result<()> {
+    ) -> FamilyResult<()> {
         if self.replacement.is_some() || self.typed_transaction.is_some() {
-            return Err(Error::InvalidFormat(
+            return Err(family_invalid!(
                 "an ODC typed chart edit is already staged".to_string(),
             ));
         }
@@ -568,7 +573,7 @@ impl Edit<'_> {
     ///
     /// Returns an error when the detached definition violates the bounded
     /// typed chart invariants.
-    pub fn replace_chart(&mut self, definition: &Definition) -> Result<()> {
+    pub fn replace_chart(&mut self, definition: &Definition) -> FamilyResult<()> {
         crate::validation::validate_definition(definition, self.source.limits())?;
         self.replacement = Some(definition.clone());
         self.typed_transaction = None;
@@ -584,9 +589,9 @@ impl Edit<'_> {
     /// # Errors
     ///
     /// Returns an error after a flat axis edit or when projection is lossy.
-    pub fn definition_edit(&mut self) -> Result<&mut crate::definition::Edit> {
+    pub fn definition_edit(&mut self) -> FamilyResult<&mut crate::definition::Edit> {
         if self.flat_content_staged {
-            return Err(Error::InvalidFormat(
+            return Err(family_invalid!(
                 "ODC granular definition edits cannot follow a flat axis edit".into(),
             ));
         }
@@ -600,7 +605,7 @@ impl Edit<'_> {
         }
         self.typed_transaction
             .as_mut()
-            .ok_or_else(|| Error::InvalidFormat("ODC definition edit was not initialized".into()))
+            .ok_or_else(|| family_invalid!("ODC definition edit was not initialized".into()))
     }
 
     /// Insert an axis into the opened package chart.
@@ -608,8 +613,10 @@ impl Edit<'_> {
     /// # Errors
     ///
     /// Returns an error when projection or the insertion selector fails.
-    pub fn insert_axis(&mut self, index: usize, axis: crate::AxisSpec) -> Result<()> {
-        self.definition_edit()?.insert_axis(index, axis)
+    pub fn insert_axis(&mut self, index: usize, axis: crate::AxisSpec) -> FamilyResult<()> {
+        self.definition_edit()?
+            .insert_axis(index, axis)
+            .map_err(crate::Error::from)
     }
 
     /// Replace an axis in the opened package chart.
@@ -617,8 +624,10 @@ impl Edit<'_> {
     /// # Errors
     ///
     /// Returns an error when projection or the axis selector fails.
-    pub fn replace_axis(&mut self, index: usize, axis: crate::AxisSpec) -> Result<()> {
-        self.definition_edit()?.update_axis(index, axis)
+    pub fn replace_axis(&mut self, index: usize, axis: crate::AxisSpec) -> FamilyResult<()> {
+        self.definition_edit()?
+            .update_axis(index, axis)
+            .map_err(crate::Error::from)
     }
 
     /// Remove an axis from the opened package chart.
@@ -626,8 +635,10 @@ impl Edit<'_> {
     /// # Errors
     ///
     /// Returns an error when projection or the axis selector fails.
-    pub fn remove_axis(&mut self, index: usize) -> Result<crate::AxisSpec> {
-        self.definition_edit()?.remove_axis(index)
+    pub fn remove_axis(&mut self, index: usize) -> FamilyResult<crate::AxisSpec> {
+        self.definition_edit()?
+            .remove_axis(index)
+            .map_err(crate::Error::from)
     }
 
     /// Insert a series into the opened package chart.
@@ -635,8 +646,10 @@ impl Edit<'_> {
     /// # Errors
     ///
     /// Returns an error when projection or the insertion selector fails.
-    pub fn insert_series(&mut self, index: usize, series: crate::SeriesSpec) -> Result<()> {
-        self.definition_edit()?.insert_series(index, series)
+    pub fn insert_series(&mut self, index: usize, series: crate::SeriesSpec) -> FamilyResult<()> {
+        self.definition_edit()?
+            .insert_series(index, series)
+            .map_err(crate::Error::from)
     }
 
     /// Replace a series in the opened package chart.
@@ -644,8 +657,10 @@ impl Edit<'_> {
     /// # Errors
     ///
     /// Returns an error when projection or the series selector fails.
-    pub fn replace_series(&mut self, index: usize, series: crate::SeriesSpec) -> Result<()> {
-        self.definition_edit()?.update_series(index, series)
+    pub fn replace_series(&mut self, index: usize, series: crate::SeriesSpec) -> FamilyResult<()> {
+        self.definition_edit()?
+            .update_series(index, series)
+            .map_err(crate::Error::from)
     }
 
     /// Remove a series from the opened package chart.
@@ -653,8 +668,10 @@ impl Edit<'_> {
     /// # Errors
     ///
     /// Returns an error when projection or the series selector fails.
-    pub fn remove_series(&mut self, index: usize) -> Result<crate::SeriesSpec> {
-        self.definition_edit()?.remove_series(index)
+    pub fn remove_series(&mut self, index: usize) -> FamilyResult<crate::SeriesSpec> {
+        self.definition_edit()?
+            .remove_series(index)
+            .map_err(crate::Error::from)
     }
 
     /// Insert a data point into one opened-package series.
@@ -667,9 +684,10 @@ impl Edit<'_> {
         series: usize,
         index: usize,
         point: crate::DataPointSpec,
-    ) -> Result<()> {
+    ) -> FamilyResult<()> {
         self.definition_edit()?
             .insert_data_point(series, index, point)
+            .map_err(crate::Error::from)
     }
 
     /// Replace a data point in one opened-package series.
@@ -682,9 +700,10 @@ impl Edit<'_> {
         series: usize,
         index: usize,
         point: crate::DataPointSpec,
-    ) -> Result<()> {
+    ) -> FamilyResult<()> {
         self.definition_edit()?
             .update_data_point(series, index, point)
+            .map_err(crate::Error::from)
     }
 
     /// Remove a data point from one opened-package series.
@@ -696,8 +715,10 @@ impl Edit<'_> {
         &mut self,
         series: usize,
         index: usize,
-    ) -> Result<crate::DataPointSpec> {
-        self.definition_edit()?.remove_data_point(series, index)
+    ) -> FamilyResult<crate::DataPointSpec> {
+        self.definition_edit()?
+            .remove_data_point(series, index)
+            .map_err(crate::Error::from)
     }
 
     /// Set or remove a style reference at a typed opened-package site.
@@ -709,8 +730,10 @@ impl Edit<'_> {
         &mut self,
         target: crate::StyleTarget,
         style_name: Option<String>,
-    ) -> Result<()> {
-        self.definition_edit()?.set_style(target, style_name)
+    ) -> FamilyResult<()> {
+        self.definition_edit()?
+            .set_style(target, style_name)
+            .map_err(crate::Error::from)
     }
 
     /// Create, replace, or remove the opened chart's cached table.
@@ -718,7 +741,7 @@ impl Edit<'_> {
     /// # Errors
     ///
     /// Returns an error when lossless typed projection fails.
-    pub fn set_cached_table(&mut self, table: Option<crate::CachedTable>) -> Result<()> {
+    pub fn set_cached_table(&mut self, table: Option<crate::CachedTable>) -> FamilyResult<()> {
         self.definition_edit()?.set_cached_table(table);
         Ok(())
     }
@@ -746,18 +769,18 @@ impl Edit<'_> {
         style_name: impl Into<String>,
         property: crate::ChartStyleProperty,
         after: Option<crate::ChartStyleValue>,
-    ) -> Result<()> {
+    ) -> FamilyResult<()> {
         if self.staged_styles.is_some() {
-            return Err(Error::InvalidFormat(
+            return Err(family_invalid!(
                 "ODC chart style properties cannot follow a complete styles.xml replacement".into(),
             ));
         }
         let style_name = style_name.into();
         let styles = self.source.styles_xml().ok_or_else(|| {
-            Error::InvalidFormat("ODC chart style property requires styles.xml".into())
+            family_invalid!("ODC chart style property requires styles.xml".into())
         })?;
         if !crate::style_format::has_style(styles, &style_name, self.source.limits())? {
-            return Err(Error::InvalidFormat(
+            return Err(family_invalid!(
                 "ODC chart style selector is missing".into(),
             ));
         }
@@ -800,7 +823,7 @@ impl Edit<'_> {
         style_name: impl Into<String>,
         property: crate::ChartStyleProperty,
         after: Option<crate::ChartStyleValue>,
-    ) -> Result<()> {
+    ) -> FamilyResult<()> {
         self.update_chart_style_property(style_name, property, after)
     }
 
@@ -814,7 +837,7 @@ impl Edit<'_> {
         path: impl Into<String>,
         media_type: impl Into<String>,
         bytes: impl Into<Vec<u8>>,
-    ) -> Result<()> {
+    ) -> FamilyResult<()> {
         let resource_path = path.into();
         let resource_media_type = media_type.into();
         validate_media_type(&resource_media_type)?;
@@ -828,7 +851,7 @@ impl Edit<'_> {
                 .iter()
                 .any(|edit| edit.path == resource_path)
         {
-            return Err(Error::InvalidFormat(
+            return Err(family_invalid!(
                 "ODC resource path already exists in the transaction".into(),
             ));
         }
@@ -840,7 +863,7 @@ impl Edit<'_> {
         if self.source.resources().len().saturating_add(additions)
             >= self.source.limits().max_resources()
         {
-            return Err(Error::InvalidFormat(
+            return Err(family_invalid!(
                 "ODC resource count exceeds the caller-selected limit".into(),
             ));
         }
@@ -864,10 +887,11 @@ impl Edit<'_> {
         index: usize,
         media_type: impl Into<String>,
         bytes: impl Into<Vec<u8>>,
-    ) -> Result<()> {
+    ) -> FamilyResult<()> {
         let resource_media_type = media_type.into();
         validate_media_type(&resource_media_type)?;
         self.stage_existing_resource(index, Some(resource_media_type), Some(bytes.into()))
+            .map_err(crate::Error::from)
     }
 
     /// Remove one inventoried package-local resource.
@@ -875,8 +899,9 @@ impl Edit<'_> {
     /// # Errors
     ///
     /// Returns an error for an invalid selector.
-    pub fn remove_resource(&mut self, index: usize) -> Result<()> {
+    pub fn remove_resource(&mut self, index: usize) -> FamilyResult<()> {
         self.stage_existing_resource(index, None, None)
+            .map_err(crate::Error::from)
     }
 
     fn stage_existing_resource(
@@ -884,11 +909,10 @@ impl Edit<'_> {
         index: usize,
         after_media_type: Option<String>,
         after_bytes: Option<Vec<u8>>,
-    ) -> Result<()> {
-        let resource =
-            self.source.resources().get(index).ok_or_else(|| {
-                Error::InvalidFormat("ODC resource selector is out of bounds".into())
-            })?;
+    ) -> CoreResult<()> {
+        let resource = self.source.resources().get(index).ok_or_else(|| {
+            CoreError::InvalidFormat("ODC resource selector is out of bounds".into())
+        })?;
         let before_bytes = self.source.resource_bytes(index)?;
         if let Some(edit) = self
             .resource_edits
@@ -920,7 +944,7 @@ impl Edit<'_> {
     ///
     /// Returns an error when the source cannot be losslessly rewritten, when
     /// the package is signed, or when full reopen and typed readback fail.
-    pub fn commit(self) -> std::result::Result<Commit, crate::Error> {
+    pub fn commit(self) -> Result<Commit, crate::Error> {
         Ok(self.publish()?)
     }
 
@@ -928,7 +952,7 @@ impl Edit<'_> {
         clippy::too_many_lines,
         reason = "publication keeps content, styles, resources, and readback in one atomic boundary"
     )]
-    fn publish(mut self) -> Result<Commit> {
+    fn publish(mut self) -> CoreResult<Commit> {
         let mut definition_changes = Vec::new();
         if let Some(typed_transaction) = self.typed_transaction.take() {
             let definition_commit = typed_transaction.commit()?;
@@ -952,7 +976,7 @@ impl Edit<'_> {
         } else {
             std::str::from_utf8(content_commit.package().as_bytes())
                 .map_err(|_utf8_error| {
-                    Error::InvalidFormat("edited ODC content is not UTF-8".to_string())
+                    CoreError::InvalidFormat("edited ODC content is not UTF-8".to_string())
                 })?
                 .to_string()
         };
@@ -962,7 +986,7 @@ impl Edit<'_> {
             None
         } else {
             let source_styles = self.source.styles_xml().ok_or_else(|| {
-                Error::InvalidFormat("ODC chart style property requires styles.xml".into())
+                CoreError::InvalidFormat("ODC chart style property requires styles.xml".into())
             })?;
             Some(crate::style_format::apply_changes(
                 source_styles,
@@ -974,7 +998,7 @@ impl Edit<'_> {
             None
         } else {
             let source_styles = self.source.styles_xml().ok_or_else(|| {
-                Error::InvalidFormat("ODC chart style property requires styles.xml".into())
+                CoreError::InvalidFormat("ODC chart style property requires styles.xml".into())
             })?;
             Some(crate::style_format::source_splices(
                 source_styles,
@@ -988,7 +1012,7 @@ impl Edit<'_> {
             (None, Some(xml)) => Some(xml),
             (None, None) => self.source.styles_xml(),
             (Some(_), Some(_)) => {
-                return Err(Error::InvalidFormat(
+                return Err(CoreError::InvalidFormat(
                     "ODC chart style properties cannot combine with styles.xml replacement".into(),
                 ));
             },
@@ -1013,7 +1037,7 @@ impl Edit<'_> {
                 (None, None) => crate::package::StylesReplacement::Unchanged,
                 (None, Some(_xml)) => {
                     let splices = property_splices.as_deref().ok_or_else(|| {
-                        Error::InvalidFormat("ODC chart style splice is missing".into())
+                        CoreError::InvalidFormat("ODC chart style splice is missing".into())
                     })?;
                     crate::package::StylesReplacement::SourceSplice(splices)
                 },
@@ -1022,7 +1046,7 @@ impl Edit<'_> {
                 },
                 (Some(StagedStyles::Remove), None) => crate::package::StylesReplacement::Remove,
                 (Some(_), Some(_)) => {
-                    return Err(Error::InvalidFormat(
+                    return Err(CoreError::InvalidFormat(
                         "ODC chart style properties cannot combine with styles.xml replacement"
                             .into(),
                     ));
@@ -1047,7 +1071,7 @@ impl Edit<'_> {
         };
         if let Some(definition) = replacement.as_ref() {
             if snapshot.content_xml() != content || snapshot.class()? != definition.class {
-                return Err(Error::InvalidFormat(
+                return Err(CoreError::InvalidFormat(
                     "ODC chart replacement failed typed readback".to_string(),
                 ));
             }
@@ -1057,19 +1081,19 @@ impl Edit<'_> {
                     .plot_area()
                     .and_then(|plot_area| plot_area.axes().nth(change.index()))
                     .ok_or_else(|| {
-                        Error::InvalidFormat(
+                        CoreError::InvalidFormat(
                             "edited ODC axis disappeared during readback".to_string(),
                         )
                     })?;
                 if actual.name() != change.after() {
-                    return Err(Error::InvalidFormat(
+                    return Err(CoreError::InvalidFormat(
                         "ODC package edit failed semantic readback".to_string(),
                     ));
                 }
             }
         }
         if snapshot.styles_xml() != style_after {
-            return Err(Error::InvalidFormat(
+            return Err(CoreError::InvalidFormat(
                 "ODC styles edit failed package readback".into(),
             ));
         }
@@ -1081,7 +1105,7 @@ impl Edit<'_> {
                 .map(|index| snapshot.resource_bytes(index))
                 .transpose()?;
             if actual.as_deref() != edit.after_bytes.as_deref() {
-                return Err(Error::InvalidFormat(
+                return Err(CoreError::InvalidFormat(
                     "ODC resource edit failed byte readback".into(),
                 ));
             }
@@ -1210,9 +1234,9 @@ impl Patch {
     }
 
     /// Applies this patch only to its exact immutable source.
-    pub(crate) fn apply(&self, source: &Chart) -> Result<Chart> {
+    pub(crate) fn apply(&self, source: &Chart) -> CoreResult<Chart> {
         if self.source.as_bytes() != source.as_bytes() {
-            return Err(Error::InvalidFormat(
+            return Err(CoreError::InvalidFormat(
                 "ODC package patch source does not match its expected snapshot".to_string(),
             ));
         }
@@ -1255,34 +1279,34 @@ impl Patch {
     /// # Errors
     ///
     /// Returns an error for invalid framing, limits, or either package.
-    pub fn from_bytes(bytes: &[u8], options: OpenOptions) -> Result<Self> {
+    pub fn from_bytes(bytes: &[u8], options: OpenOptions) -> FamilyResult<Self> {
         let limits = crate::Limits::from_options(options);
         let header = Self::WIRE_MAGIC.len().saturating_add(16);
         if bytes.len() < header || !bytes.starts_with(Self::WIRE_MAGIC) {
-            return Err(Error::InvalidFormat("invalid ODC patch wire header".into()));
+            return Err(family_invalid!("invalid ODC patch wire header".into()));
         }
         let mut cursor = Self::WIRE_MAGIC.len();
         let source_len = read_wire_length(bytes, &mut cursor)?;
         let target_len = read_wire_length(bytes, &mut cursor)?;
         if source_len > limits.max_package_bytes() || target_len > limits.max_package_bytes() {
-            return Err(Error::InvalidFormat(
+            return Err(family_invalid!(
                 "ODC patch package exceeds caller-selected limits".into(),
             ));
         }
         let source_end = cursor
             .checked_add(source_len)
-            .ok_or_else(|| Error::InvalidFormat("ODC patch source length overflow".into()))?;
+            .ok_or_else(|| family_invalid!("ODC patch source length overflow".into()))?;
         let target_end = source_end
             .checked_add(target_len)
-            .ok_or_else(|| Error::InvalidFormat("ODC patch target length overflow".into()))?;
+            .ok_or_else(|| family_invalid!("ODC patch target length overflow".into()))?;
         if target_end != bytes.len() {
-            return Err(Error::InvalidFormat(
+            return Err(family_invalid!(
                 "ODC patch wire lengths do not match its payload".into(),
             ));
         }
         let source = Chart::decode(bytes[cursor..source_end].to_vec(), limits)?;
         let target = Chart::decode(bytes[source_end..target_end].to_vec(), limits)?;
-        patch_between(source, target)
+        patch_between(source, target).map_err(crate::Error::from)
     }
 
     /// Returns the semantic axis changes in transaction order.
@@ -1336,9 +1360,9 @@ impl Patch {
     /// # Errors
     ///
     /// Returns an error when the first target is not the second source.
-    pub fn compose(&self, next: &Self) -> Result<Self> {
+    pub fn compose(&self, next: &Self) -> FamilyResult<Self> {
         if self.target.as_bytes() != next.source.as_bytes() {
-            return Err(Error::InvalidFormat(
+            return Err(family_invalid!(
                 "ODC package patches are not contiguous".into(),
             ));
         }
@@ -1379,7 +1403,7 @@ impl Patch {
     ///
     /// Returns an error only when constructing or validating a conflict-free
     /// merged package fails.
-    pub fn join(&self, other: &Self) -> Result<PackageMerge> {
+    pub fn join(&self, other: &Self) -> FamilyResult<PackageMerge> {
         if self.source.as_bytes() != other.source.as_bytes() {
             return Ok(PackageMerge::new(
                 None,
@@ -1408,7 +1432,7 @@ impl Patch {
     ///
     /// Returns an error when reading resources or publishing a conflict-free
     /// transferred package fails.
-    pub fn transfer_to(&self, destination: &Package) -> Result<PackageMerge> {
+    pub fn transfer_to(&self, destination: &Package) -> FamilyResult<PackageMerge> {
         let destination = destination.chart();
         let mut conflicts = Vec::new();
         let mut edit = destination.edit();
@@ -1525,10 +1549,10 @@ impl History {
     /// # Errors
     ///
     /// Returns an error for a stale commit or exhausted retained history limit.
-    pub fn record(&mut self, commit: &Commit) -> Result<()> {
+    pub fn record(&mut self, commit: &Commit) -> FamilyResult<()> {
         let patch = commit.patch();
         if !patch.is_applicable_to(&self.current) {
-            return Err(Error::InvalidFormat(
+            return Err(family_invalid!(
                 "ODC history commit is not contiguous".into(),
             ));
         }
@@ -1536,7 +1560,7 @@ impl History {
             return Ok(());
         }
         if self.undo.len() >= self.current.chart().limits().max_history() {
-            return Err(Error::InvalidFormat(
+            return Err(family_invalid!(
                 "ODC package history exceeds the caller-selected limit".into(),
             ));
         }
@@ -1551,7 +1575,7 @@ impl History {
     /// # Errors
     ///
     /// Returns an error if retained history is internally non-contiguous.
-    pub fn undo(&mut self) -> Result<bool> {
+    pub fn undo(&mut self) -> FamilyResult<bool> {
         let Some(patch) = self.undo.pop() else {
             return Ok(false);
         };
@@ -1565,7 +1589,7 @@ impl History {
     /// # Errors
     ///
     /// Returns an error if retained history is internally non-contiguous.
-    pub fn redo(&mut self) -> Result<bool> {
+    pub fn redo(&mut self) -> FamilyResult<bool> {
         let Some(patch) = self.redo.pop() else {
             return Ok(false);
         };
@@ -1677,7 +1701,7 @@ fn merge_package_content(
     right: &Patch,
     edit: &mut Edit<'_>,
     conflicts: &mut Vec<crate::Conflict>,
-) -> Result<()> {
+) -> CoreResult<()> {
     if left.target.content_xml() == left.source.content_xml()
         && right.target.content_xml() == right.source.content_xml()
     {
@@ -1723,7 +1747,7 @@ fn merge_package_styles(
     right: &Patch,
     edit: &mut Edit<'_>,
     conflicts: &mut Vec<crate::Conflict>,
-) -> Result<()> {
+) -> CoreResult<()> {
     if style_property_only(left)? && style_property_only(right)? {
         let before_conflicts = conflicts.len();
         let merged = merge_style_property_changes(
@@ -1762,7 +1786,7 @@ fn transfer_package_content(
     destination: &Chart,
     edit: &mut Edit<'_>,
     conflicts: &mut Vec<crate::Conflict>,
-) -> Result<()> {
+) -> CoreResult<()> {
     if patch.target.content_xml() == patch.source.content_xml() {
         return Ok(());
     }
@@ -1798,7 +1822,7 @@ fn transfer_package_content(
 }
 
 fn flat_summary_matches(patch: &Patch) -> bool {
-    let replay = || -> Result<bool> {
+    let replay = || -> CoreResult<bool> {
         let source = patch.source.0.package.content_snapshot();
         let mut edit = source.edit();
         for change in &patch.changes {
@@ -1829,7 +1853,7 @@ fn merge_flat_content(
     right: &Patch,
     edit: &mut Edit<'_>,
     conflicts: &mut Vec<crate::Conflict>,
-) -> Result<()> {
+) -> CoreResult<()> {
     for left_change in &left.exact_changes {
         if let Some(right_change) = right.exact_changes.iter().find(|candidate| {
             candidate.target() == left_change.target()
@@ -1894,7 +1918,7 @@ fn transfer_flat_content(
     destination: &Chart,
     edit: &mut Edit<'_>,
     conflicts: &mut Vec<crate::Conflict>,
-) -> Result<()> {
+) -> CoreResult<()> {
     let destination_flat = destination.0.package.content_snapshot();
     for change in &patch.exact_changes {
         let Ok(current) = destination_flat.exact_value(change.target(), change.attribute()) else {
@@ -1976,7 +2000,7 @@ fn transfer_package_styles(
     destination: &Chart,
     edit: &mut Edit<'_>,
     conflicts: &mut Vec<crate::Conflict>,
-) -> Result<()> {
+) -> CoreResult<()> {
     if style_property_only(patch)? {
         if !patch.style_property_changes.is_empty() && destination.styles_xml().is_none() {
             conflicts.extend(
@@ -1988,9 +2012,9 @@ fn transfer_package_styles(
             return Ok(());
         }
         if !patch.style_property_changes.is_empty() {
-            let destination_styles = destination
-                .styles_xml()
-                .ok_or_else(|| Error::InvalidFormat("ODC destination styles are missing".into()))?;
+            let destination_styles = destination.styles_xml().ok_or_else(|| {
+                CoreError::InvalidFormat("ODC destination styles are missing".into())
+            })?;
             if !crate::style_format::can_host_changes(
                 destination_styles,
                 &patch.style_property_changes,
@@ -2035,7 +2059,7 @@ fn transfer_package_styles(
     Ok(())
 }
 
-fn style_property_only(patch: &Patch) -> Result<bool> {
+fn style_property_only(patch: &Patch) -> CoreResult<bool> {
     match (patch.source.styles_xml(), patch.target.styles_xml()) {
         (None, None) => Ok(true),
         (Some(before), Some(after)) => {
@@ -2066,12 +2090,12 @@ fn style_property_only(patch: &Patch) -> Result<bool> {
 fn normalize_style_property_changes(
     left: &[crate::ChartStylePropertyChange],
     right: &[crate::ChartStylePropertyChange],
-) -> Result<Vec<crate::ChartStylePropertyChange>> {
+) -> CoreResult<Vec<crate::ChartStylePropertyChange>> {
     let mut normalized: Vec<crate::ChartStylePropertyChange> = Vec::new();
     normalized
         .try_reserve(left.len().saturating_add(right.len()))
         .map_err(|error| {
-            Error::InvalidFormat(format!("ODC style compose allocation failed: {error}"))
+            CoreError::InvalidFormat(format!("ODC style compose allocation failed: {error}"))
         })?;
     for change in left.iter().chain(right) {
         let existing_index = normalized.iter().position(|candidate| {
@@ -2086,7 +2110,7 @@ fn normalize_style_property_changes(
         };
         let existing = &normalized[index];
         if existing.after() != change.before() {
-            return Err(Error::InvalidFormat(format!(
+            return Err(CoreError::InvalidFormat(format!(
                 "ODC composed chart style property '{}' is stale",
                 style_property_path(change)
             )));
@@ -2110,7 +2134,7 @@ fn normalize_style_property_changes(
 fn compose_style_property_changes(
     earlier: &Patch,
     later: &Patch,
-) -> Result<Vec<crate::ChartStylePropertyChange>> {
+) -> CoreResult<Vec<crate::ChartStylePropertyChange>> {
     let normalized = normalize_style_property_changes(
         &earlier.style_property_changes,
         &later.style_property_changes,
@@ -2151,12 +2175,12 @@ fn merge_style_property_changes(
     left: &[crate::ChartStylePropertyChange],
     right: &[crate::ChartStylePropertyChange],
     conflicts: &mut Vec<crate::Conflict>,
-) -> Result<Vec<crate::ChartStylePropertyChange>> {
+) -> CoreResult<Vec<crate::ChartStylePropertyChange>> {
     let mut merged = Vec::new();
     merged
         .try_reserve(left.len().saturating_add(right.len()))
         .map_err(|error| {
-            Error::InvalidFormat(format!("ODC style merge allocation failed: {error}"))
+            CoreError::InvalidFormat(format!("ODC style merge allocation failed: {error}"))
         })?;
     for change in left.iter().chain(right) {
         if let Some(existing) =
@@ -2190,7 +2214,7 @@ fn merge_package_resources(
     right: &Patch,
     edit: &mut Edit<'_>,
     conflicts: &mut Vec<crate::Conflict>,
-) -> Result<()> {
+) -> CoreResult<()> {
     let paths = left
         .source
         .resources()
@@ -2220,7 +2244,7 @@ fn transfer_package_resources(
     destination: &Chart,
     edit: &mut Edit<'_>,
     conflicts: &mut Vec<crate::Conflict>,
-) -> Result<()> {
+) -> CoreResult<()> {
     let paths = patch
         .source
         .resources()
@@ -2250,7 +2274,7 @@ fn stage_resource(
     source: &Chart,
     path: &str,
     value: Option<(Option<String>, Vec<u8>)>,
-) -> Result<()> {
+) -> CoreResult<()> {
     let source_index = source
         .resources()
         .iter()
@@ -2258,7 +2282,7 @@ fn stage_resource(
     match (source_index, value) {
         (Some(index), Some((optional_media_type, bytes))) => {
             let required_media_type = optional_media_type.ok_or_else(|| {
-                Error::InvalidFormat(format!(
+                CoreError::InvalidFormat(format!(
                     "ODC merged resource '{path}' has no manifest media type"
                 ))
             })?;
@@ -2267,7 +2291,7 @@ fn stage_resource(
         (Some(index), None) => edit.remove_resource(index)?,
         (None, Some((optional_media_type, bytes))) => {
             let required_media_type = optional_media_type.ok_or_else(|| {
-                Error::InvalidFormat(format!(
+                CoreError::InvalidFormat(format!(
                     "ODC merged resource '{path}' has no manifest media type"
                 ))
             })?;
@@ -2290,21 +2314,22 @@ fn merge_package_value<T: Clone + PartialEq>(base: &T, left: &T, right: &T) -> O
     }
 }
 
-fn read_wire_length(bytes: &[u8], cursor: &mut usize) -> Result<usize> {
+fn read_wire_length(bytes: &[u8], cursor: &mut usize) -> CoreResult<usize> {
     let end = cursor
         .checked_add(8)
-        .ok_or_else(|| Error::InvalidFormat("ODC patch length offset overflow".into()))?;
+        .ok_or_else(|| CoreError::InvalidFormat("ODC patch length offset overflow".into()))?;
     let raw: [u8; 8] = bytes
         .get(*cursor..end)
-        .ok_or_else(|| Error::InvalidFormat("ODC patch length is truncated".into()))?
+        .ok_or_else(|| CoreError::InvalidFormat("ODC patch length is truncated".into()))?
         .try_into()
-        .map_err(|error| Error::InvalidFormat(format!("invalid ODC patch length: {error}")))?;
+        .map_err(|error| CoreError::InvalidFormat(format!("invalid ODC patch length: {error}")))?;
     *cursor = end;
-    usize::try_from(u64::from_le_bytes(raw))
-        .map_err(|error| Error::InvalidFormat(format!("ODC patch length is too large: {error}")))
+    usize::try_from(u64::from_le_bytes(raw)).map_err(|error| {
+        CoreError::InvalidFormat(format!("ODC patch length is too large: {error}"))
+    })
 }
 
-fn patch_between(source: Chart, target: Chart) -> Result<Patch> {
+fn patch_between(source: Chart, target: Chart) -> CoreResult<Patch> {
     let before_axes = axis_states(&source);
     let after_axes = axis_states(&target);
     let changes = before_axes
@@ -2406,7 +2431,7 @@ fn resource_state(chart: &Chart, path: &str) -> Option<(Option<String>, Vec<u8>)
         })
 }
 
-fn validate_media_type(media_type: &str) -> Result<()> {
+fn validate_media_type(media_type: &str) -> CoreResult<()> {
     if media_type.is_empty()
         || media_type.len() > 1_024
         || !media_type.is_ascii()
@@ -2415,7 +2440,7 @@ fn validate_media_type(media_type: &str) -> Result<()> {
             .bytes()
             .any(|byte| byte.is_ascii_control() || byte.is_ascii_whitespace())
     {
-        return Err(Error::InvalidFormat(
+        return Err(CoreError::InvalidFormat(
             "ODC resource media type is invalid".into(),
         ));
     }

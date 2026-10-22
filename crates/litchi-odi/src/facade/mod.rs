@@ -1,7 +1,7 @@
 //! Concise family entry points: the immutable [`Package`] owner, its
 //! read-only [`Image`] projection, and the primary transaction family.
 
-use litchi_core::{Error, Metadata, Result};
+use litchi_core::{Error as CoreError, Metadata, Result};
 use litchi_odf_common::{
     SemanticLimitKind, compact_xml,
     core::{MetaXmlPatch, metadata::Metadata as OdfMetadata, patch_meta_xml},
@@ -10,6 +10,8 @@ use std::path::Path;
 
 pub use crate::authoring::Builder;
 use litchi_odf_common::{Error as PackageError, OpenOptions};
+
+type PackageResult<T> = std::result::Result<T, PackageError>;
 
 /// The immutable, cheap-to-clone ODI owner snapshot.
 ///
@@ -207,10 +209,9 @@ impl Package {
         options: OpenOptions,
     ) -> std::result::Result<Self, PackageError> {
         if prepared.format() != litchi_core::detection::FileFormat::Odi {
-            return Err(Error::UnexpectedFormat {
+            return Err(PackageError::from(CoreError::UnexpectedFormat {
                 detected: prepared.format(),
-            }
-            .into());
+            }));
         }
         Self::adopt(
             crate::package::Snapshot::from_owned_package_with_options(
@@ -281,7 +282,8 @@ impl Package {
     ///
     /// Returns an error when the sink fails.
     pub fn write_to(&self, mut sink: impl std::io::Write) -> std::result::Result<(), PackageError> {
-        sink.write_all(self.as_bytes()).map_err(Error::from)?;
+        sink.write_all(self.as_bytes())
+            .map_err(PackageError::from)?;
         Ok(())
     }
 
@@ -379,8 +381,8 @@ impl Image {
     /// # Errors
     ///
     /// Returns an error if the retained package member cannot be read.
-    pub fn meta_xml(&self) -> Result<Option<String>> {
-        self.package.meta_xml()
+    pub fn meta_xml(&self) -> PackageResult<Option<String>> {
+        self.package.meta_xml().map_err(PackageError::from)
     }
 
     /// Lists the file entries stored in the package.
@@ -388,8 +390,8 @@ impl Image {
     /// # Errors
     ///
     /// Returns an error if the package entries cannot be enumerated.
-    pub fn files(&self) -> Result<Vec<String>> {
-        self.package.files()
+    pub fn files(&self) -> PackageResult<Vec<String>> {
+        self.package.files().map_err(PackageError::from)
     }
 
     /// Returns the inert semantic frame inventory from `content.xml`.
@@ -452,15 +454,21 @@ impl Image {
     }
 
     /// Reads inert document and macro signature metadata without executing content.
-    pub fn digital_signatures(&self) -> Result<litchi_odf_common::signature::DigitalSignatures> {
-        self.package.digital_signatures()
+    pub fn digital_signatures(
+        &self,
+    ) -> PackageResult<litchi_odf_common::signature::DigitalSignatures> {
+        self.package
+            .digital_signatures()
+            .map_err(PackageError::from)
     }
 
     /// Verifies document-signature math without making a certificate trust decision.
     pub fn verify_document_signatures(
         &self,
-    ) -> Result<Vec<litchi_odf_common::signature::SignatureVerification>> {
-        self.package.verify_document_signatures()
+    ) -> PackageResult<Vec<litchi_odf_common::signature::SignatureVerification>> {
+        self.package
+            .verify_document_signatures()
+            .map_err(PackageError::from)
     }
 
     /// Classifies one style name/family dependency across content and styles.
@@ -468,13 +476,14 @@ impl Image {
         &self,
         name: &str,
         family: &str,
-    ) -> Result<crate::StyleDependencyState> {
+    ) -> PackageResult<crate::StyleDependencyState> {
         crate::semantic::inspect_style_dependency(
             self.content_xml(),
             self.styles_xml(),
             name,
             family,
         )
+        .map_err(PackageError::from)
     }
 
     /// Reads one inventoried package-local image resource.
@@ -483,22 +492,26 @@ impl Image {
     ///
     /// Returns an error when `index` is out of bounds or the archive member
     /// cannot be read. A referenced but absent member returns `Ok(None)`.
-    pub fn resource_bytes(&self, index: usize) -> Result<Option<Vec<u8>>> {
-        self.package.resource_bytes(index)
+    pub fn resource_bytes(&self, index: usize) -> PackageResult<Option<Vec<u8>>> {
+        self.package
+            .resource_bytes(index)
+            .map_err(PackageError::from)
     }
 
     /// Reads one safely named auxiliary package member without activating it.
-    pub fn member_bytes(&self, path: &str) -> Result<Option<Vec<u8>>> {
+    pub fn member_bytes(&self, path: &str) -> PackageResult<Option<Vec<u8>>> {
         validate_resource_path(path)?;
-        self.package.resource_file(path)
+        self.package.resource_file(path).map_err(PackageError::from)
     }
 
     /// Audits whether this exact package can enter changed-byte publication.
     ///
     /// The audit is inert: it does not verify signatures, decrypt content, or
     /// mutate bytes. Every independently detected blocker is returned.
-    pub fn rewrite_capability(&self) -> Result<crate::RewriteCapability> {
-        self.package.rewrite_capability()
+    pub fn rewrite_capability(&self) -> PackageResult<crate::RewriteCapability> {
+        self.package
+            .rewrite_capability()
+            .map_err(PackageError::from)
     }
 }
 
@@ -517,8 +530,8 @@ impl Edit<'_> {
     /// # Errors
     ///
     /// Returns an error if the lossless frame site is unavailable.
-    pub fn set_name(&mut self, name: Option<String>) -> Result<()> {
-        self.transaction.set_name(name)
+    pub fn set_name(&mut self, name: Option<String>) -> PackageResult<()> {
+        self.transaction.set_name(name).map_err(PackageError::from)
     }
 
     /// Stages a replacement for the document's linked or inline source.
@@ -526,8 +539,10 @@ impl Edit<'_> {
     /// # Errors
     ///
     /// Returns an error when changing source representation would be lossy.
-    pub fn set_image_source(&mut self, source: crate::source::Source) -> Result<()> {
-        self.transaction.set_image_source(source)
+    pub fn set_image_source(&mut self, source: crate::source::Source) -> PackageResult<()> {
+        self.transaction
+            .set_image_source(source)
+            .map_err(PackageError::from)
     }
 
     /// Stages a replacement for one frame's optional `draw:name`.
@@ -536,8 +551,10 @@ impl Edit<'_> {
     ///
     /// Returns an error for an invalid selector or an image without a
     /// losslessly editable `draw:frame` owner.
-    pub fn set_frame_name(&mut self, frame: usize, name: Option<String>) -> Result<()> {
-        self.transaction.set_frame_name(frame, name)
+    pub fn set_frame_name(&mut self, frame: usize, name: Option<String>) -> PackageResult<()> {
+        self.transaction
+            .set_frame_name(frame, name)
+            .map_err(PackageError::from)
     }
 
     /// Stages replacement of an existing linked URI or inline image payload.
@@ -547,83 +564,127 @@ impl Edit<'_> {
     /// # Errors
     ///
     /// Returns an error for an invalid selector or lossy source representation.
-    pub fn set_source(&mut self, frame: usize, source: crate::source::Source) -> Result<()> {
-        self.transaction.set_source(frame, source)
+    pub fn set_source(&mut self, frame: usize, source: crate::source::Source) -> PackageResult<()> {
+        self.transaction
+            .set_source(frame, source)
+            .map_err(PackageError::from)
     }
 
     /// Stages the optional stable XML identifier on `draw:frame`.
-    pub fn set_frame_xml_id(&mut self, frame: usize, value: Option<String>) -> Result<()> {
-        self.transaction.set_frame_xml_id(frame, value)
+    pub fn set_frame_xml_id(&mut self, frame: usize, value: Option<String>) -> PackageResult<()> {
+        self.transaction
+            .set_frame_xml_id(frame, value)
+            .map_err(PackageError::from)
     }
 
     /// Stages the optional accessible frame title.
-    pub fn set_frame_title(&mut self, frame: usize, value: Option<String>) -> Result<()> {
-        self.transaction.set_frame_title(frame, value)
+    pub fn set_frame_title(&mut self, frame: usize, value: Option<String>) -> PackageResult<()> {
+        self.transaction
+            .set_frame_title(frame, value)
+            .map_err(PackageError::from)
     }
 
     /// Stages the optional accessible frame description.
-    pub fn set_frame_description(&mut self, frame: usize, value: Option<String>) -> Result<()> {
-        self.transaction.set_frame_description(frame, value)
+    pub fn set_frame_description(
+        &mut self,
+        frame: usize,
+        value: Option<String>,
+    ) -> PackageResult<()> {
+        self.transaction
+            .set_frame_description(frame, value)
+            .map_err(PackageError::from)
     }
 
     /// Stages the optional declared image media type.
-    pub fn set_image_media_type(&mut self, frame: usize, value: Option<String>) -> Result<()> {
-        self.transaction.set_image_media_type(frame, value)
+    pub fn set_image_media_type(
+        &mut self,
+        frame: usize,
+        value: Option<String>,
+    ) -> PackageResult<()> {
+        self.transaction
+            .set_image_media_type(frame, value)
+            .map_err(PackageError::from)
     }
 
     /// Stages the optional stable XML identifier on `draw:image`.
-    pub fn set_image_xml_id(&mut self, frame: usize, value: Option<String>) -> Result<()> {
-        self.transaction.set_image_xml_id(frame, value)
+    pub fn set_image_xml_id(&mut self, frame: usize, value: Option<String>) -> PackageResult<()> {
+        self.transaction
+            .set_image_xml_id(frame, value)
+            .map_err(PackageError::from)
     }
 
     /// Stages the optional inert producer filter hint.
-    pub fn set_filter_name(&mut self, frame: usize, value: Option<String>) -> Result<()> {
-        self.transaction.set_filter_name(frame, value)
+    pub fn set_filter_name(&mut self, frame: usize, value: Option<String>) -> PackageResult<()> {
+        self.transaction
+            .set_filter_name(frame, value)
+            .map_err(PackageError::from)
     }
 
     /// Stages the optional image `XLink` type.
-    pub fn set_link_type(&mut self, frame: usize, value: Option<String>) -> Result<()> {
-        self.transaction.set_link_type(frame, value)
+    pub fn set_link_type(&mut self, frame: usize, value: Option<String>) -> PackageResult<()> {
+        self.transaction
+            .set_link_type(frame, value)
+            .map_err(PackageError::from)
     }
 
     /// Stages the optional image `XLink` presentation behavior.
-    pub fn set_show(&mut self, frame: usize, value: Option<String>) -> Result<()> {
-        self.transaction.set_show(frame, value)
+    pub fn set_show(&mut self, frame: usize, value: Option<String>) -> PackageResult<()> {
+        self.transaction
+            .set_show(frame, value)
+            .map_err(PackageError::from)
     }
 
     /// Stages the optional image `XLink` activation behavior.
-    pub fn set_actuate(&mut self, frame: usize, value: Option<String>) -> Result<()> {
-        self.transaction.set_actuate(frame, value)
+    pub fn set_actuate(&mut self, frame: usize, value: Option<String>) -> PackageResult<()> {
+        self.transaction
+            .set_actuate(frame, value)
+            .map_err(PackageError::from)
     }
 
     /// Stages the optional graphic style reference.
-    pub fn set_style_name(&mut self, frame: usize, value: Option<String>) -> Result<()> {
-        self.transaction.set_style_name(frame, value)
+    pub fn set_style_name(&mut self, frame: usize, value: Option<String>) -> PackageResult<()> {
+        self.transaction
+            .set_style_name(frame, value)
+            .map_err(PackageError::from)
     }
 
     /// Stages the optional paragraph style reference used by frame text.
-    pub fn set_text_style_name(&mut self, frame: usize, value: Option<String>) -> Result<()> {
-        self.transaction.set_text_style_name(frame, value)
+    pub fn set_text_style_name(
+        &mut self,
+        frame: usize,
+        value: Option<String>,
+    ) -> PackageResult<()> {
+        self.transaction
+            .set_text_style_name(frame, value)
+            .map_err(PackageError::from)
     }
 
     /// Stages the optional drawing layer name.
-    pub fn set_layer(&mut self, frame: usize, value: Option<String>) -> Result<()> {
-        self.transaction.set_layer(frame, value)
+    pub fn set_layer(&mut self, frame: usize, value: Option<String>) -> PackageResult<()> {
+        self.transaction
+            .set_layer(frame, value)
+            .map_err(PackageError::from)
     }
 
     /// Stages the optional non-negative stacking order.
-    pub fn set_z_index(&mut self, frame: usize, value: Option<u32>) -> Result<()> {
-        self.transaction.set_z_index(frame, value)
+    pub fn set_z_index(&mut self, frame: usize, value: Option<u32>) -> PackageResult<()> {
+        self.transaction
+            .set_z_index(frame, value)
+            .map_err(PackageError::from)
     }
 
     /// Stages the lexical drawing transform.
-    pub fn set_transform(&mut self, frame: usize, value: Option<String>) -> Result<()> {
-        self.transaction.set_transform(frame, value)
+    pub fn set_transform(&mut self, frame: usize, value: Option<String>) -> PackageResult<()> {
+        self.transaction
+            .set_transform(frame, value)
+            .map_err(PackageError::from)
     }
 
     /// Stages the optional text anchoring mode.
-    pub fn set_anchor_type(&mut self, frame: usize, value: Option<String>) -> Result<()> {
-        self.transaction.set_anchor_type(frame, value)
+    pub fn set_anchor_type(&mut self, frame: usize, value: Option<String>) -> PackageResult<()> {
+        self.transaction
+            .set_anchor_type(frame, value)
+            .map_err(PackageError::from)
     }
 
     /// Stages lexical frame position and size values.
@@ -634,8 +695,10 @@ impl Edit<'_> {
         y: Option<String>,
         width: Option<String>,
         height: Option<String>,
-    ) -> Result<()> {
-        self.transaction.set_geometry(frame, x, y, width, height)
+    ) -> PackageResult<()> {
+        self.transaction
+            .set_geometry(frame, x, y, width, height)
+            .map_err(PackageError::from)
     }
 
     /// Stages lexical relative frame width and height values.
@@ -644,8 +707,10 @@ impl Edit<'_> {
         frame: usize,
         width: Option<String>,
         height: Option<String>,
-    ) -> Result<()> {
-        self.transaction.set_relative_size(frame, width, height)
+    ) -> PackageResult<()> {
+        self.transaction
+            .set_relative_size(frame, width, height)
+            .map_err(PackageError::from)
     }
 
     /// Replaces, inserts, or removes the document frame's typed image map.
@@ -653,68 +718,88 @@ impl Edit<'_> {
         &mut self,
         frame: usize,
         value: Option<crate::map::ImageMap>,
-    ) -> Result<()> {
-        self.transaction.set_image_map(frame, value)
+    ) -> PackageResult<()> {
+        self.transaction
+            .set_image_map(frame, value)
+            .map_err(PackageError::from)
     }
 
     /// Replaces the lexical horizontal position.
-    pub fn set_x(&mut self, frame: usize, value: Option<String>) -> Result<()> {
-        self.transaction.set_x(frame, value)
+    pub fn set_x(&mut self, frame: usize, value: Option<String>) -> PackageResult<()> {
+        self.transaction
+            .set_x(frame, value)
+            .map_err(PackageError::from)
     }
 
     /// Replaces the lexical vertical position.
-    pub fn set_y(&mut self, frame: usize, value: Option<String>) -> Result<()> {
-        self.transaction.set_y(frame, value)
+    pub fn set_y(&mut self, frame: usize, value: Option<String>) -> PackageResult<()> {
+        self.transaction
+            .set_y(frame, value)
+            .map_err(PackageError::from)
     }
 
     /// Replaces the lexical width.
-    pub fn set_width(&mut self, frame: usize, value: Option<String>) -> Result<()> {
-        self.transaction.set_width(frame, value)
+    pub fn set_width(&mut self, frame: usize, value: Option<String>) -> PackageResult<()> {
+        self.transaction
+            .set_width(frame, value)
+            .map_err(PackageError::from)
     }
 
     /// Replaces the lexical height.
-    pub fn set_height(&mut self, frame: usize, value: Option<String>) -> Result<()> {
-        self.transaction.set_height(frame, value)
+    pub fn set_height(&mut self, frame: usize, value: Option<String>) -> PackageResult<()> {
+        self.transaction
+            .set_height(frame, value)
+            .map_err(PackageError::from)
     }
 
     /// Replaces the lexical relative width.
-    pub fn set_relative_width(&mut self, frame: usize, value: Option<String>) -> Result<()> {
-        self.transaction.set_relative_width(frame, value)
+    pub fn set_relative_width(&mut self, frame: usize, value: Option<String>) -> PackageResult<()> {
+        self.transaction
+            .set_relative_width(frame, value)
+            .map_err(PackageError::from)
     }
 
     /// Replaces the lexical relative height.
-    pub fn set_relative_height(&mut self, frame: usize, value: Option<String>) -> Result<()> {
-        self.transaction.set_relative_height(frame, value)
+    pub fn set_relative_height(
+        &mut self,
+        frame: usize,
+        value: Option<String>,
+    ) -> PackageResult<()> {
+        self.transaction
+            .set_relative_height(frame, value)
+            .map_err(PackageError::from)
     }
 
     /// Replaces the optional `draw:copy-of` frame reference.
-    pub fn set_copy_of(&mut self, frame: usize, value: Option<String>) -> Result<()> {
-        self.transaction.set_copy_of(frame, value)
+    pub fn set_copy_of(&mut self, frame: usize, value: Option<String>) -> PackageResult<()> {
+        self.transaction
+            .set_copy_of(frame, value)
+            .map_err(PackageError::from)
     }
 
     /// Stages the document title while preserving every unedited metadata node.
-    pub fn set_title(&mut self, value: Option<String>) -> Result<()> {
+    pub fn set_title(&mut self, value: Option<String>) -> PackageResult<()> {
         self.metadata_mut()?.after.title = value;
         self.remove_metadata_noop();
         Ok(())
     }
 
     /// Stages the document author while preserving every unedited metadata node.
-    pub fn set_author(&mut self, value: Option<String>) -> Result<()> {
+    pub fn set_author(&mut self, value: Option<String>) -> PackageResult<()> {
         self.metadata_mut()?.after.author = value;
         self.remove_metadata_noop();
         Ok(())
     }
 
     /// Stages the document subject while preserving every unedited metadata node.
-    pub fn set_subject(&mut self, value: Option<String>) -> Result<()> {
+    pub fn set_subject(&mut self, value: Option<String>) -> PackageResult<()> {
         self.metadata_mut()?.after.subject = value;
         self.remove_metadata_noop();
         Ok(())
     }
 
     /// Stages the document description while preserving every unedited metadata node.
-    pub fn set_description(&mut self, value: Option<String>) -> Result<()> {
+    pub fn set_description(&mut self, value: Option<String>) -> PackageResult<()> {
         self.metadata_mut()?.after.description = value;
         self.remove_metadata_noop();
         Ok(())
@@ -722,7 +807,7 @@ impl Edit<'_> {
 
     /// Stages the keyword list, one `meta:keyword` each; an empty list
     /// removes them.
-    pub fn set_keywords(&mut self, keywords: Vec<String>) -> Result<()> {
+    pub fn set_keywords(&mut self, keywords: Vec<String>) -> PackageResult<()> {
         self.metadata_mut()?.after.keywords = keywords;
         self.remove_metadata_noop();
         Ok(())
@@ -732,10 +817,10 @@ impl Edit<'_> {
     ///
     /// The supplied XML is treated as newly authored and must pass the shared
     /// compact publication boundary before it is staged.
-    pub fn set_styles_xml(&mut self, value: Option<String>) -> Result<()> {
+    pub fn set_styles_xml(&mut self, value: Option<String>) -> PackageResult<()> {
         if let Some(xml) = &value {
             compact_xml::validate(xml.as_bytes(), compact_xml::Limits::default())
-                .map_err(Error::from)?;
+                .map_err(CoreError::from)?;
         }
         let before = self.source.image.styles_xml().map(str::to_owned);
         if before == value {
@@ -760,9 +845,10 @@ impl Edit<'_> {
         resource: usize,
         media_type: String,
         bytes: Vec<u8>,
-    ) -> Result<()> {
-        validate_media_type(&media_type)?;
+    ) -> PackageResult<()> {
+        validate_media_type(&media_type).map_err(PackageError::from)?;
         self.stage_resource(resource, Some(media_type), Some(bytes))
+            .map_err(PackageError::from)
     }
 
     /// Removes one existing package-local image member while preserving its
@@ -771,21 +857,29 @@ impl Edit<'_> {
     /// # Errors
     ///
     /// Returns an error for an invalid selector.
-    pub fn remove_resource(&mut self, resource: usize) -> Result<()> {
+    pub fn remove_resource(&mut self, resource: usize) -> PackageResult<()> {
         self.stage_resource(resource, None, None)
+            .map_err(PackageError::from)
     }
 
     /// Adds or replaces an auxiliary package member by safe path.
-    pub fn put_member(&mut self, path: String, media_type: String, bytes: Vec<u8>) -> Result<()> {
-        validate_resource_path(&path)?;
-        validate_media_type(&media_type)?;
+    pub fn put_member(
+        &mut self,
+        path: String,
+        media_type: String,
+        bytes: Vec<u8>,
+    ) -> PackageResult<()> {
+        validate_resource_path(&path).map_err(PackageError::from)?;
+        validate_media_type(&media_type).map_err(PackageError::from)?;
         self.stage_member(path, Some(media_type), Some(bytes))
+            .map_err(PackageError::from)
     }
 
     /// Removes an auxiliary package member by safe path.
-    pub fn remove_member(&mut self, path: String) -> Result<()> {
-        validate_resource_path(&path)?;
+    pub fn remove_member(&mut self, path: String) -> PackageResult<()> {
+        validate_resource_path(&path).map_err(PackageError::from)?;
         self.stage_member(path, None, None)
+            .map_err(PackageError::from)
     }
 
     /// Atomically validates, rebuilds, and publishes the package edit.
@@ -832,7 +926,7 @@ impl Edit<'_> {
             self.source.clone()
         } else {
             let xml = std::str::from_utf8(content.package().as_bytes()).map_err(|error| {
-                Error::InvalidFormat(format!("ODI edited content.xml is not UTF-8: {error}"))
+                CoreError::InvalidFormat(format!("ODI edited content.xml is not UTF-8: {error}"))
             })?;
             let replacements = resource_edits
                 .iter()
@@ -858,10 +952,10 @@ impl Edit<'_> {
         };
         for change in &changes {
             let actual = snapshot.image.frames().get(change.frame()).ok_or_else(|| {
-                Error::InvalidFormat("ODI edited frame disappeared during readback".to_string())
+                CoreError::InvalidFormat("ODI edited frame disappeared during readback".to_string())
             })?;
             if actual != change.after() {
-                return Err(Error::InvalidFormat(
+                return Err(CoreError::InvalidFormat(
                     "ODI package edit failed semantic readback".to_string(),
                 ));
             }
@@ -874,7 +968,7 @@ impl Edit<'_> {
                 .as_deref()
                 != change.after_bytes.as_deref()
             {
-                return Err(Error::InvalidFormat(
+                return Err(CoreError::InvalidFormat(
                     "ODI package resource edit failed byte readback".to_string(),
                 ));
             }
@@ -888,7 +982,7 @@ impl Edit<'_> {
                     .and_then(crate::resource::Node::media_type)
                     != Some(after_media_type)
             {
-                return Err(Error::InvalidFormat(
+                return Err(CoreError::InvalidFormat(
                     "ODI package resource edit failed media-type readback".to_string(),
                 ));
             }
@@ -896,14 +990,14 @@ impl Edit<'_> {
         if let Some(change) = &metadata_change
             && MetadataFields::from(snapshot.image.metadata()) != change.after
         {
-            return Err(Error::InvalidFormat(
+            return Err(CoreError::InvalidFormat(
                 "ODI package metadata edit failed semantic readback".to_string(),
             ));
         }
         if let Some(change) = &style_change
             && snapshot.image.styles_xml() != change.after.as_deref()
         {
-            return Err(Error::InvalidFormat(
+            return Err(CoreError::InvalidFormat(
                 "ODI styles.xml edit failed semantic readback".to_string(),
             ));
         }
@@ -938,7 +1032,7 @@ impl Edit<'_> {
         after_bytes: Option<Vec<u8>>,
     ) -> Result<()> {
         let selected = self.source.image.resources().get(resource).ok_or_else(|| {
-            Error::InvalidFormat("ODI resource selector is out of bounds".to_string())
+            CoreError::InvalidFormat("ODI resource selector is out of bounds".to_string())
         })?;
         let before_bytes = self.source.image.resource_bytes(resource)?;
         let before_media_type = selected.media_type().map(str::to_owned);
@@ -1017,7 +1111,7 @@ impl Edit<'_> {
 
     fn metadata_mut(&mut self) -> Result<&mut MetadataEdit> {
         if self.source.image.metadata().is_none() {
-            return Err(Error::InvalidFormat(
+            return Err(CoreError::InvalidFormat(
                 "ODI metadata editing requires an existing meta.xml part".to_string(),
             ));
         }
@@ -1028,9 +1122,9 @@ impl Edit<'_> {
                 after: before,
             });
         }
-        self.metadata
-            .as_mut()
-            .ok_or_else(|| Error::InvalidFormat("ODI metadata edit state disappeared".to_string()))
+        self.metadata.as_mut().ok_or_else(|| {
+            CoreError::InvalidFormat("ODI metadata edit state disappeared".to_string())
+        })
     }
 
     fn remove_metadata_noop(&mut self) {
@@ -1183,7 +1277,7 @@ impl Patch {
     /// (public route: [`Package::apply`]).
     pub(crate) fn apply(&self, source: &Package) -> Result<Package> {
         if !self.is_applicable_to(source) {
-            return Err(Error::InvalidFormat(
+            return Err(CoreError::InvalidFormat(
                 "ODI package patch source does not match its expected snapshot".to_string(),
             ));
         }
@@ -1365,7 +1459,9 @@ impl MetadataChange {
 
 fn patch_metadata(source: &Image, values: &MetadataFields) -> Result<String> {
     let source_xml = source.meta_xml()?.ok_or_else(|| {
-        Error::InvalidFormat("ODI metadata editing requires an existing meta.xml part".to_string())
+        CoreError::InvalidFormat(
+            "ODI metadata editing requires an existing meta.xml part".to_string(),
+        )
     })?;
     let parsed = OdfMetadata::from_xml(&source_xml, source.package.xml_limits_value())?;
     let mut target = Metadata::from(parsed.clone());
@@ -1376,7 +1472,9 @@ fn patch_metadata(source: &Image, values: &MetadataFields) -> Result<String> {
     target.keywords.clone_from(&values.keywords);
     let patch = MetaXmlPatch::preserve_all().diff_simple_fields(&parsed, &target);
     patch_meta_xml(&source_xml, &patch, source.package.xml_limits_value())?.ok_or_else(|| {
-        Error::InvalidFormat("ODI metadata editing requires an office:meta container".to_string())
+        CoreError::InvalidFormat(
+            "ODI metadata editing requires an office:meta container".to_string(),
+        )
     })
 }
 
@@ -1449,7 +1547,7 @@ fn validate_media_type(media_type: &str) -> Result<()> {
             .any(|byte| byte.is_ascii_whitespace() || byte.is_ascii_control())
         || !media_type.contains('/')
     {
-        return Err(Error::InvalidFormat(
+        return Err(CoreError::InvalidFormat(
             "ODI resource media type is invalid".to_string(),
         ));
     }
@@ -1478,7 +1576,7 @@ fn validate_resource_path(path: &str) -> Result<()> {
             .is_some_and(|name| name.contains("signatures"))
         || reserved
     {
-        return Err(Error::InvalidFormat(
+        return Err(CoreError::InvalidFormat(
             "ODI auxiliary resource path is unsafe or reserved".to_string(),
         ));
     }

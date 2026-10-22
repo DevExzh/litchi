@@ -1,4 +1,5 @@
-use litchi_odf_common::package::raw_identical_members;
+use litchi_core::edit::RefusalKind;
+use litchi_odf_common::{Error as OdfError, package::raw_identical_members};
 use litchi_odt::{
     Package,
     transaction::{DurablePatch, Position, SealedPatch},
@@ -328,6 +329,20 @@ fn transfer_joins_as_a_deterministic_isolation_conflict() {
         .unwrap();
     joined.join("replace", replacement).unwrap();
     assert!(joined.join("transfer", transfer).is_err());
+
+    let mut mixed = target.edit();
+    plan.apply(&mut mixed).unwrap();
+    mixed
+        .replace_paragraph(Position::new(0), "changed")
+        .unwrap();
+    let error = match mixed.commit() {
+        Ok(_) => panic!("a mixed transfer edit must be refused before publication"),
+        Err(error) => error,
+    };
+    assert!(matches!(
+        error,
+        OdfError::Refused(refusal) if refusal.kind() == RefusalKind::UnsupportedOperation
+    ));
 
     let mut mixed = target.edit();
     plan.apply(&mut mixed).unwrap();

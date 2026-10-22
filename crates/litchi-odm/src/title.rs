@@ -12,6 +12,8 @@ use std::sync::Arc;
 
 use crate::Package;
 
+type FamilyResult<T> = std::result::Result<T, Error>;
+
 /// Whether a commit changed the package bytes.
 pub use litchi_core::edit::Diagnostics;
 /// The family error: typed limits, refusals and patch conflicts plus the
@@ -55,7 +57,7 @@ impl<'source> Edit<'source> {
     ///
     /// Returns an error when the value is too large or cannot be represented
     /// as XML 1.0 text.
-    pub fn set(&mut self, value: impl Into<String>) -> Result<()> {
+    pub fn set(&mut self, value: impl Into<String>) -> FamilyResult<()> {
         let title = value.into();
         validate_title(&title)?;
         self.after = Some(title);

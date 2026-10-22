@@ -3,15 +3,15 @@
 //! Each verb records one operation that the commit applies, in staging
 //! order, to its working document; consecutive verbs share that document.
 
-use super::{Edit, OperationResult};
-use litchi_core::{Position, Result};
+use super::{Edit, FamilyResult, OperationResult};
+use litchi_core::Position;
 
 impl Edit {
     /// Add a heading to the end of the document.
     ///
     /// Staged: the operation applies when [`Edit::commit`] runs, in staging
     /// order, and reports its errors there.
-    pub fn add_heading(&mut self, text: impl Into<String>, level: u8) -> Result<&mut Self> {
+    pub fn add_heading(&mut self, text: impl Into<String>, level: u8) -> FamilyResult<&mut Self> {
         let text: String = text.into();
         self.document_operation(move |document| {
             document
@@ -28,7 +28,7 @@ impl Edit {
         &mut self,
         href: impl Into<String>,
         text: impl Into<String>,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let href: String = href.into();
         let text: String = text.into();
         self.document_operation(move |document| {
@@ -42,7 +42,10 @@ impl Edit {
     ///
     /// Staged: the operation applies when [`Edit::commit`] runs, in staging
     /// order, and reports its errors there.
-    pub fn add_hyperlink_element(&mut self, hyperlink: crate::Hyperlink) -> Result<&mut Self> {
+    pub fn add_hyperlink_element(
+        &mut self,
+        hyperlink: crate::Hyperlink,
+    ) -> FamilyResult<&mut Self> {
         self.document_operation(move |document| {
             document
                 .add_hyperlink_element(hyperlink.clone())
@@ -54,7 +57,7 @@ impl Edit {
     ///
     /// Staged: the operation applies when [`Edit::commit`] runs, in staging
     /// order, and reports its errors there.
-    pub fn add_list(&mut self, list: crate::elements::text::List) -> Result<&mut Self> {
+    pub fn add_list(&mut self, list: crate::elements::text::List) -> FamilyResult<&mut Self> {
         self.document_operation(move |document| {
             document
                 .add_list(list.clone())
@@ -70,7 +73,7 @@ impl Edit {
         &mut self,
         name: impl Into<String>,
         page_layout_name: impl Into<String>,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let name: String = name.into();
         let page_layout_name: String = page_layout_name.into();
         self.document_operation_at(format!("/styles/master-page/{name}"), move |document| {
@@ -84,7 +87,7 @@ impl Edit {
     ///
     /// Staged: the operation applies when [`Edit::commit`] runs, in staging
     /// order, and reports its errors there.
-    pub fn add_paragraph(&mut self, text: impl Into<String>) -> Result<&mut Self> {
+    pub fn add_paragraph(&mut self, text: impl Into<String>) -> FamilyResult<&mut Self> {
         let text: String = text.into();
         self.document_operation(move |document| {
             document.add_paragraph(&text).map(|_| OperationResult::Unit)
@@ -95,7 +98,7 @@ impl Edit {
     ///
     /// Staged: the operation applies when [`Edit::commit`] runs, in staging
     /// order, and reports its errors there.
-    pub fn add_section(&mut self, section: &crate::Section) -> Result<&mut Self> {
+    pub fn add_section(&mut self, section: &crate::Section) -> FamilyResult<&mut Self> {
         let section = section.clone();
         self.document_operation(move |document| {
             document
@@ -108,7 +111,7 @@ impl Edit {
     ///
     /// Staged: the operation applies when [`Edit::commit`] runs, in staging
     /// order, and reports its errors there.
-    pub fn add_table(&mut self, table: crate::elements::table::Table) -> Result<&mut Self> {
+    pub fn add_table(&mut self, table: crate::elements::table::Table) -> FamilyResult<&mut Self> {
         self.document_operation(move |document| {
             document
                 .add_table(table.clone())
@@ -120,7 +123,7 @@ impl Edit {
     ///
     /// Staged: the operation applies when [`Edit::commit`] runs, in staging
     /// order, and reports its errors there.
-    pub fn add_tracked_change(&mut self, change: crate::TrackChange) -> Result<&mut Self> {
+    pub fn add_tracked_change(&mut self, change: crate::TrackChange) -> FamilyResult<&mut Self> {
         self.document_operation(move |document| {
             document
                 .add_tracked_change(change.clone())
@@ -132,7 +135,7 @@ impl Edit {
     ///
     /// Staged: the operation applies when [`Edit::commit`] runs, in staging
     /// order, and reports its errors there.
-    pub fn append_line_break_at(&mut self, paragraph: Position) -> Result<&mut Self> {
+    pub fn append_line_break_at(&mut self, paragraph: Position) -> FamilyResult<&mut Self> {
         self.document_operation(move |document| {
             document
                 .append_line_break_at(paragraph)
@@ -144,7 +147,7 @@ impl Edit {
     ///
     /// Staged: the operation applies when [`Edit::commit`] runs, in staging
     /// order, and reports its errors there.
-    pub fn clear_bibliography_configuration(&mut self) -> Result<&mut Self> {
+    pub fn clear_bibliography_configuration(&mut self) -> FamilyResult<&mut Self> {
         self.document_operation(move |document| {
             document
                 .clear_bibliography_configuration()
@@ -156,7 +159,7 @@ impl Edit {
     ///
     /// Staged: the operation applies when [`Edit::commit`] runs, in staging
     /// order, and reports its errors there.
-    pub fn clear_content(&mut self) -> Result<&mut Self> {
+    pub fn clear_content(&mut self) -> FamilyResult<&mut Self> {
         self.document_operation(move |document| {
             document.clear_content();
             Ok(OperationResult::Unit)
@@ -167,7 +170,7 @@ impl Edit {
     ///
     /// Staged: the operation applies when [`Edit::commit`] runs, in staging
     /// order, and reports its errors there.
-    pub fn clear_content_font_face_declarations(&mut self) -> Result<&mut Self> {
+    pub fn clear_content_font_face_declarations(&mut self) -> FamilyResult<&mut Self> {
         self.document_operation(move |document| {
             document
                 .clear_content_font_face_declarations()
@@ -183,7 +186,7 @@ impl Edit {
         &mut self,
         master_page_name: impl Into<String>,
         kind: crate::header_footer::Kind,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let master_page_name: String = master_page_name.into();
         self.document_operation_at(
             format!("/styles/master-page/{master_page_name}"),
@@ -199,7 +202,7 @@ impl Edit {
     ///
     /// Staged: the operation applies when [`Edit::commit`] runs, in staging
     /// order, and reports its errors there.
-    pub fn clear_line_numbering_configuration(&mut self) -> Result<&mut Self> {
+    pub fn clear_line_numbering_configuration(&mut self) -> FamilyResult<&mut Self> {
         self.document_operation(move |document| {
             document
                 .clear_line_numbering_configuration()
@@ -214,7 +217,7 @@ impl Edit {
     pub fn clear_notes_configuration(
         &mut self,
         note_class: crate::notes_configuration::Class,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         self.document_operation(move |document| {
             document
                 .clear_notes_configuration(note_class)
@@ -226,7 +229,7 @@ impl Edit {
     ///
     /// Staged: the operation applies when [`Edit::commit`] runs, in staging
     /// order, and reports its errors there.
-    pub fn clear_paragraphs(&mut self) -> Result<&mut Self> {
+    pub fn clear_paragraphs(&mut self) -> FamilyResult<&mut Self> {
         self.document_operation(move |document| {
             document.clear_paragraphs();
             Ok(OperationResult::Unit)
@@ -237,7 +240,7 @@ impl Edit {
     ///
     /// Staged: the operation applies when [`Edit::commit`] runs, in staging
     /// order, and reports its errors there.
-    pub fn clear_sections(&mut self) -> Result<&mut Self> {
+    pub fn clear_sections(&mut self) -> FamilyResult<&mut Self> {
         self.document_operation(move |document| {
             document.clear_sections().map(|_| OperationResult::Unit)
         })
@@ -247,7 +250,7 @@ impl Edit {
     ///
     /// Staged: the operation applies when [`Edit::commit`] runs, in staging
     /// order, and reports its errors there.
-    pub fn clear_styles_font_face_declarations(&mut self) -> Result<&mut Self> {
+    pub fn clear_styles_font_face_declarations(&mut self) -> FamilyResult<&mut Self> {
         self.document_operation(move |document| {
             document
                 .clear_styles_font_face_declarations()
@@ -259,7 +262,7 @@ impl Edit {
     ///
     /// Staged: the operation applies when [`Edit::commit`] runs, in staging
     /// order, and reports its errors there.
-    pub fn clear_tables(&mut self) -> Result<&mut Self> {
+    pub fn clear_tables(&mut self) -> FamilyResult<&mut Self> {
         self.document_operation(move |document| {
             document.clear_tables();
             Ok(OperationResult::Unit)
@@ -270,7 +273,7 @@ impl Edit {
     ///
     /// Staged: the operation applies when [`Edit::commit`] runs, in staging
     /// order, and reports its errors there.
-    pub fn clear_tracked_changes(&mut self) -> Result<&mut Self> {
+    pub fn clear_tracked_changes(&mut self) -> FamilyResult<&mut Self> {
         self.document_operation(move |document| {
             document
                 .clear_tracked_changes()
@@ -286,7 +289,7 @@ impl Edit {
         &mut self,
         paragraph_index: usize,
         target: &crate::BookmarkTarget,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let target = target.clone();
         self.document_operation(move |document| {
             document
@@ -303,7 +306,7 @@ impl Edit {
         &mut self,
         owner_index: usize,
         property: &crate::form::Property,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let property = property.clone();
         self.document_operation(move |document| {
             document
@@ -320,7 +323,7 @@ impl Edit {
         &mut self,
         form_index: usize,
         control: &crate::form::GenericFormControl,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let control = control.clone();
         self.document_operation(move |document| {
             document
@@ -337,7 +340,7 @@ impl Edit {
         &mut self,
         form_index: usize,
         control: &crate::form::GridControl,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let control = control.clone();
         self.document_operation(move |document| {
             document
@@ -359,7 +362,7 @@ impl Edit {
         width: &crate::frame::Length,
         height: &crate::frame::Length,
         anchor: crate::frame::Anchor,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let image: Vec<u8> = image.into();
         let width = width.clone();
         let height = height.clone();
@@ -378,7 +381,7 @@ impl Edit {
         &mut self,
         form_index: usize,
         control: &crate::form::ImageFrameControl,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let control = control.clone();
         self.document_operation(move |document| {
             document
@@ -395,7 +398,7 @@ impl Edit {
         &mut self,
         form_index: usize,
         control: &crate::form::InteractiveControl,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let control = control.clone();
         self.document_operation(move |document| {
             document
@@ -408,7 +411,10 @@ impl Edit {
     ///
     /// Staged: the operation applies when [`Edit::commit`] runs, in staging
     /// order, and reports its errors there.
-    pub fn insert_master_page(&mut self, page: &crate::header_footer::Master) -> Result<&mut Self> {
+    pub fn insert_master_page(
+        &mut self,
+        page: &crate::header_footer::Master,
+    ) -> FamilyResult<&mut Self> {
         let page = page.clone();
         self.document_operation_at(
             format!("/styles/master-page/{}", page.name),
@@ -428,7 +434,7 @@ impl Edit {
         &mut self,
         position: Position,
         text: impl Into<String>,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let text: String = text.into();
         self.document_operation(move |document| {
             document
@@ -445,7 +451,7 @@ impl Edit {
         &mut self,
         form_index: usize,
         control: &crate::form::PasswordFileControl,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let control = control.clone();
         self.document_operation(move |document| {
             document
@@ -462,7 +468,7 @@ impl Edit {
         &mut self,
         paragraph_index: usize,
         mark: &crate::ReferenceMark,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let mark = mark.clone();
         self.document_operation(move |document| {
             document
@@ -479,7 +485,7 @@ impl Edit {
         &mut self,
         form_index: usize,
         control: &crate::form::SelectionControl,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let control = control.clone();
         self.document_operation(move |document| {
             document
@@ -501,7 +507,7 @@ impl Edit {
         width: &crate::frame::Length,
         height: &crate::frame::Length,
         anchor: crate::frame::Anchor,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let text: String = text.into();
         let width = width.clone();
         let height = height.clone();
@@ -520,7 +526,7 @@ impl Edit {
         &mut self,
         form_index: usize,
         control: &crate::form::TextControl,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let control = control.clone();
         self.document_operation(move |document| {
             document
@@ -533,7 +539,7 @@ impl Edit {
     ///
     /// Staged: the operation applies when [`Edit::commit`] runs, in staging
     /// order, and reports its errors there.
-    pub fn insert_text_index(&mut self, index: &crate::TextIndex) -> Result<&mut Self> {
+    pub fn insert_text_index(&mut self, index: &crate::TextIndex) -> FamilyResult<&mut Self> {
         let index = index.clone();
         self.document_operation(move |document| {
             document
@@ -550,7 +556,7 @@ impl Edit {
         &mut self,
         paragraph_index: usize,
         mark: &crate::TextIndexMark,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let mark = mark.clone();
         self.document_operation(move |document| {
             document
@@ -567,7 +573,7 @@ impl Edit {
         &mut self,
         paragraph: Position,
         value: &crate::TextMeta,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let value = value.clone();
         self.document_operation(move |document| {
             document
@@ -584,7 +590,7 @@ impl Edit {
         &mut self,
         form_index: usize,
         control: &crate::form::TypedValueControl,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let control = control.clone();
         self.document_operation(move |document| {
             document
@@ -601,7 +607,7 @@ impl Edit {
         &mut self,
         form_index: usize,
         control: &crate::form::ValueRangeControl,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let control = control.clone();
         self.document_operation(move |document| {
             document
@@ -618,7 +624,7 @@ impl Edit {
         &mut self,
         form_index: usize,
         control: &crate::form::VisualControl,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let control = control.clone();
         self.document_operation(move |document| {
             document
@@ -631,7 +637,7 @@ impl Edit {
     ///
     /// Staged: the operation applies when [`Edit::commit`] runs, in staging
     /// order, and reports its errors there.
-    pub fn insert_xforms_model(&mut self, model: &crate::xforms::Model) -> Result<&mut Self> {
+    pub fn insert_xforms_model(&mut self, model: &crate::xforms::Model) -> FamilyResult<&mut Self> {
         let model = model.clone();
         self.document_operation(move |document| {
             document
@@ -649,7 +655,7 @@ impl Edit {
         change_id: impl Into<String>,
         start: crate::Position,
         end: crate::Position,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let change_id: String = change_id.into();
         self.document_operation(move |document| {
             document
@@ -666,7 +672,7 @@ impl Edit {
         &mut self,
         change_id: impl Into<String>,
         position: crate::Position,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let change_id: String = change_id.into();
         self.document_operation(move |document| {
             document
@@ -679,7 +685,7 @@ impl Edit {
     ///
     /// Staged: the operation applies when [`Edit::commit`] runs, in staging
     /// order, and reports its errors there.
-    pub fn remove_bookmark_target(&mut self, target_index: usize) -> Result<&mut Self> {
+    pub fn remove_bookmark_target(&mut self, target_index: usize) -> FamilyResult<&mut Self> {
         self.document_operation(move |document| {
             document
                 .remove_bookmark_target(target_index)
@@ -691,7 +697,7 @@ impl Edit {
     ///
     /// Staged: the operation applies when [`Edit::commit`] runs, in staging
     /// order, and reports its errors there.
-    pub fn remove_form_property(&mut self, property_index: usize) -> Result<&mut Self> {
+    pub fn remove_form_property(&mut self, property_index: usize) -> FamilyResult<&mut Self> {
         self.document_operation(move |document| {
             document
                 .remove_form_property(property_index)
@@ -703,7 +709,7 @@ impl Edit {
     ///
     /// Staged: the operation applies when [`Edit::commit`] runs, in staging
     /// order, and reports its errors there.
-    pub fn remove_generic_form_control(&mut self, control_index: usize) -> Result<&mut Self> {
+    pub fn remove_generic_form_control(&mut self, control_index: usize) -> FamilyResult<&mut Self> {
         self.document_operation(move |document| {
             document
                 .remove_generic_form_control(control_index)
@@ -715,7 +721,7 @@ impl Edit {
     ///
     /// Staged: the operation applies when [`Edit::commit`] runs, in staging
     /// order, and reports its errors there.
-    pub fn remove_grid_control(&mut self, control_index: usize) -> Result<&mut Self> {
+    pub fn remove_grid_control(&mut self, control_index: usize) -> FamilyResult<&mut Self> {
         self.document_operation(move |document| {
             document
                 .remove_grid_control(control_index)
@@ -727,7 +733,7 @@ impl Edit {
     ///
     /// Staged: the operation applies when [`Edit::commit`] runs, in staging
     /// order, and reports its errors there.
-    pub fn remove_image_frame_control(&mut self, control_index: usize) -> Result<&mut Self> {
+    pub fn remove_image_frame_control(&mut self, control_index: usize) -> FamilyResult<&mut Self> {
         self.document_operation(move |document| {
             document
                 .remove_image_frame_control(control_index)
@@ -739,7 +745,7 @@ impl Edit {
     ///
     /// Staged: the operation applies when [`Edit::commit`] runs, in staging
     /// order, and reports its errors there.
-    pub fn remove_interactive_control(&mut self, control_index: usize) -> Result<&mut Self> {
+    pub fn remove_interactive_control(&mut self, control_index: usize) -> FamilyResult<&mut Self> {
         self.document_operation(move |document| {
             document
                 .remove_interactive_control(control_index)
@@ -751,7 +757,7 @@ impl Edit {
     ///
     /// Staged: the operation applies when [`Edit::commit`] runs, in staging
     /// order, and reports its errors there.
-    pub fn remove_master_page(&mut self, name: impl Into<String>) -> Result<&mut Self> {
+    pub fn remove_master_page(&mut self, name: impl Into<String>) -> FamilyResult<&mut Self> {
         let name: String = name.into();
         self.document_operation_at(format!("/styles/master-page/{name}"), move |document| {
             document
@@ -764,7 +770,7 @@ impl Edit {
     ///
     /// Staged: the operation applies when [`Edit::commit`] runs, in staging
     /// order, and reports its errors there.
-    pub fn remove_outline_style(&mut self, name: impl Into<String>) -> Result<&mut Self> {
+    pub fn remove_outline_style(&mut self, name: impl Into<String>) -> FamilyResult<&mut Self> {
         let name: String = name.into();
         self.document_operation(move |document| {
             document
@@ -777,7 +783,7 @@ impl Edit {
     ///
     /// Staged: the operation applies when [`Edit::commit`] runs, in staging
     /// order, and reports its errors there.
-    pub fn remove_paragraph_at(&mut self, position: Position) -> Result<&mut Self> {
+    pub fn remove_paragraph_at(&mut self, position: Position) -> FamilyResult<&mut Self> {
         self.document_operation(move |document| {
             document
                 .remove_paragraph_at(position)
@@ -789,7 +795,10 @@ impl Edit {
     ///
     /// Staged: the operation applies when [`Edit::commit`] runs, in staging
     /// order, and reports its errors there.
-    pub fn remove_password_file_control(&mut self, control_index: usize) -> Result<&mut Self> {
+    pub fn remove_password_file_control(
+        &mut self,
+        control_index: usize,
+    ) -> FamilyResult<&mut Self> {
         self.document_operation(move |document| {
             document
                 .remove_password_file_control(control_index)
@@ -801,7 +810,7 @@ impl Edit {
     ///
     /// Staged: the operation applies when [`Edit::commit`] runs, in staging
     /// order, and reports its errors there.
-    pub fn remove_reference_mark(&mut self, mark_index: usize) -> Result<&mut Self> {
+    pub fn remove_reference_mark(&mut self, mark_index: usize) -> FamilyResult<&mut Self> {
         self.document_operation(move |document| {
             document
                 .remove_reference_mark(mark_index)
@@ -813,7 +822,7 @@ impl Edit {
     ///
     /// Staged: the operation applies when [`Edit::commit`] runs, in staging
     /// order, and reports its errors there.
-    pub fn remove_section(&mut self, name: impl Into<String>) -> Result<&mut Self> {
+    pub fn remove_section(&mut self, name: impl Into<String>) -> FamilyResult<&mut Self> {
         let name: String = name.into();
         self.document_operation(move |document| {
             document
@@ -826,7 +835,7 @@ impl Edit {
     ///
     /// Staged: the operation applies when [`Edit::commit`] runs, in staging
     /// order, and reports its errors there.
-    pub fn remove_selection_control(&mut self, control_index: usize) -> Result<&mut Self> {
+    pub fn remove_selection_control(&mut self, control_index: usize) -> FamilyResult<&mut Self> {
         self.document_operation(move |document| {
             document
                 .remove_selection_control(control_index)
@@ -838,7 +847,7 @@ impl Edit {
     ///
     /// Staged: the operation applies when [`Edit::commit`] runs, in staging
     /// order, and reports its errors there.
-    pub fn remove_table(&mut self, index: usize) -> Result<&mut Self> {
+    pub fn remove_table(&mut self, index: usize) -> FamilyResult<&mut Self> {
         self.document_operation(move |document| {
             document.remove_table(index).map(|_| OperationResult::Unit)
         })
@@ -848,7 +857,7 @@ impl Edit {
     ///
     /// Staged: the operation applies when [`Edit::commit`] runs, in staging
     /// order, and reports its errors there.
-    pub fn remove_text_control(&mut self, control_index: usize) -> Result<&mut Self> {
+    pub fn remove_text_control(&mut self, control_index: usize) -> FamilyResult<&mut Self> {
         self.document_operation(move |document| {
             document
                 .remove_text_control(control_index)
@@ -860,7 +869,7 @@ impl Edit {
     ///
     /// Staged: the operation applies when [`Edit::commit`] runs, in staging
     /// order, and reports its errors there.
-    pub fn remove_text_index(&mut self, name: impl Into<String>) -> Result<&mut Self> {
+    pub fn remove_text_index(&mut self, name: impl Into<String>) -> FamilyResult<&mut Self> {
         let name: String = name.into();
         self.document_operation(move |document| {
             document
@@ -873,7 +882,7 @@ impl Edit {
     ///
     /// Staged: the operation applies when [`Edit::commit`] runs, in staging
     /// order, and reports its errors there.
-    pub fn remove_text_index_mark(&mut self, mark_index: usize) -> Result<&mut Self> {
+    pub fn remove_text_index_mark(&mut self, mark_index: usize) -> FamilyResult<&mut Self> {
         self.document_operation(move |document| {
             document
                 .remove_text_index_mark(mark_index)
@@ -885,7 +894,7 @@ impl Edit {
     ///
     /// Staged: the operation applies when [`Edit::commit`] runs, in staging
     /// order, and reports its errors there.
-    pub fn remove_text_meta(&mut self, position: Position) -> Result<&mut Self> {
+    pub fn remove_text_meta(&mut self, position: Position) -> FamilyResult<&mut Self> {
         self.document_operation(move |document| {
             document
                 .remove_text_meta(position)
@@ -897,7 +906,7 @@ impl Edit {
     ///
     /// Staged: the operation applies when [`Edit::commit`] runs, in staging
     /// order, and reports its errors there.
-    pub fn remove_typed_value_control(&mut self, control_index: usize) -> Result<&mut Self> {
+    pub fn remove_typed_value_control(&mut self, control_index: usize) -> FamilyResult<&mut Self> {
         self.document_operation(move |document| {
             document
                 .remove_typed_value_control(control_index)
@@ -909,7 +918,7 @@ impl Edit {
     ///
     /// Staged: the operation applies when [`Edit::commit`] runs, in staging
     /// order, and reports its errors there.
-    pub fn remove_value_range_control(&mut self, control_index: usize) -> Result<&mut Self> {
+    pub fn remove_value_range_control(&mut self, control_index: usize) -> FamilyResult<&mut Self> {
         self.document_operation(move |document| {
             document
                 .remove_value_range_control(control_index)
@@ -926,7 +935,7 @@ impl Edit {
         part: crate::variable_declaration::Part,
         scope: &crate::variable_declaration::Scope,
         kind: crate::variable_declaration::Kind,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let scope = scope.clone();
         self.document_operation(move |document| {
             document
@@ -939,7 +948,7 @@ impl Edit {
     ///
     /// Staged: the operation applies when [`Edit::commit`] runs, in staging
     /// order, and reports its errors there.
-    pub fn remove_visual_control(&mut self, control_index: usize) -> Result<&mut Self> {
+    pub fn remove_visual_control(&mut self, control_index: usize) -> FamilyResult<&mut Self> {
         self.document_operation(move |document| {
             document
                 .remove_visual_control(control_index)
@@ -951,7 +960,7 @@ impl Edit {
     ///
     /// Staged: the operation applies when [`Edit::commit`] runs, in staging
     /// order, and reports its errors there.
-    pub fn remove_xforms_model(&mut self, position: Position) -> Result<&mut Self> {
+    pub fn remove_xforms_model(&mut self, position: Position) -> FamilyResult<&mut Self> {
         self.document_operation(move |document| {
             document
                 .remove_xforms_model(position)
@@ -967,7 +976,7 @@ impl Edit {
         &mut self,
         target_index: usize,
         replacement: &crate::BookmarkTarget,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let replacement = replacement.clone();
         self.document_operation(move |document| {
             document
@@ -984,7 +993,7 @@ impl Edit {
         &mut self,
         property_index: usize,
         replacement: &crate::form::Property,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let replacement = replacement.clone();
         self.document_operation(move |document| {
             document
@@ -1001,7 +1010,7 @@ impl Edit {
         &mut self,
         control_index: usize,
         replacement: &crate::form::GenericFormControl,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let replacement = replacement.clone();
         self.document_operation(move |document| {
             document
@@ -1018,7 +1027,7 @@ impl Edit {
         &mut self,
         control_index: usize,
         replacement: &crate::form::GridControl,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let replacement = replacement.clone();
         self.document_operation(move |document| {
             document
@@ -1035,7 +1044,7 @@ impl Edit {
         &mut self,
         control_index: usize,
         replacement: &crate::form::ImageFrameControl,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let replacement = replacement.clone();
         self.document_operation(move |document| {
             document
@@ -1052,7 +1061,7 @@ impl Edit {
         &mut self,
         control_index: usize,
         replacement: &crate::form::InteractiveControl,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let replacement = replacement.clone();
         self.document_operation(move |document| {
             document
@@ -1069,7 +1078,7 @@ impl Edit {
         &mut self,
         name: impl Into<String>,
         page: &crate::header_footer::Master,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let name: String = name.into();
         let page = page.clone();
         self.document_operation_at(format!("/styles/master-page/{name}"), move |document| {
@@ -1087,7 +1096,7 @@ impl Edit {
         &mut self,
         position: Position,
         text: impl Into<String>,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let text: String = text.into();
         self.document_operation(move |document| {
             document
@@ -1104,7 +1113,7 @@ impl Edit {
         &mut self,
         control_index: usize,
         replacement: &crate::form::PasswordFileControl,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let replacement = replacement.clone();
         self.document_operation(move |document| {
             document
@@ -1121,7 +1130,7 @@ impl Edit {
         &mut self,
         mark_index: usize,
         replacement: &crate::ReferenceMark,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let replacement = replacement.clone();
         self.document_operation(move |document| {
             document
@@ -1138,7 +1147,7 @@ impl Edit {
         &mut self,
         control_index: usize,
         replacement: &crate::form::SelectionControl,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let replacement = replacement.clone();
         self.document_operation(move |document| {
             document
@@ -1155,7 +1164,7 @@ impl Edit {
         &mut self,
         control_index: usize,
         replacement: &crate::form::TextControl,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let replacement = replacement.clone();
         self.document_operation(move |document| {
             document
@@ -1172,7 +1181,7 @@ impl Edit {
         &mut self,
         name: impl Into<String>,
         replacement: &crate::TextIndex,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let name: String = name.into();
         let replacement = replacement.clone();
         self.document_operation(move |document| {
@@ -1190,7 +1199,7 @@ impl Edit {
         &mut self,
         mark_index: usize,
         replacement: &crate::TextIndexMark,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let replacement = replacement.clone();
         self.document_operation(move |document| {
             document
@@ -1207,7 +1216,7 @@ impl Edit {
         &mut self,
         position: Position,
         value: &crate::TextMeta,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let value = value.clone();
         self.document_operation(move |document| {
             document
@@ -1224,7 +1233,7 @@ impl Edit {
         &mut self,
         control_index: usize,
         replacement: &crate::form::TypedValueControl,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let replacement = replacement.clone();
         self.document_operation(move |document| {
             document
@@ -1241,7 +1250,7 @@ impl Edit {
         &mut self,
         control_index: usize,
         replacement: &crate::form::ValueRangeControl,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let replacement = replacement.clone();
         self.document_operation(move |document| {
             document
@@ -1258,7 +1267,7 @@ impl Edit {
         &mut self,
         control_index: usize,
         replacement: &crate::form::VisualControl,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let replacement = replacement.clone();
         self.document_operation(move |document| {
             document
@@ -1275,7 +1284,7 @@ impl Edit {
         &mut self,
         position: Position,
         model: &crate::xforms::Model,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let model = model.clone();
         self.document_operation(move |document| {
             document
@@ -1291,7 +1300,7 @@ impl Edit {
     pub fn set_bibliography_configuration(
         &mut self,
         configuration: &crate::bibliography_configuration::Configuration,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let configuration = configuration.clone();
         self.document_operation(move |document| {
             document
@@ -1308,7 +1317,7 @@ impl Edit {
         &mut self,
         name: impl Into<String>,
         value: &crate::RdfaAttributes,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let name: String = name.into();
         let value = value.clone();
         self.document_operation(move |document| {
@@ -1325,7 +1334,7 @@ impl Edit {
     pub fn set_content_font_face_declarations(
         &mut self,
         declarations: &crate::font_face::Declarations,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let declarations = declarations.clone();
         self.document_operation(move |document| {
             document
@@ -1343,7 +1352,7 @@ impl Edit {
         master_page_name: impl Into<String>,
         kind: crate::header_footer::Kind,
         text: impl Into<String>,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let master_page_name: String = master_page_name.into();
         let text: String = text.into();
         self.document_operation_at(
@@ -1365,7 +1374,7 @@ impl Edit {
         master_page_name: impl Into<String>,
         kind: crate::header_footer::Kind,
         xml: impl Into<String>,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let master_page_name: String = master_page_name.into();
         let xml: String = xml.into();
         self.document_operation_at(
@@ -1385,7 +1394,7 @@ impl Edit {
     pub fn set_line_numbering_configuration(
         &mut self,
         configuration: &crate::line_numbering::Configuration,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let configuration = configuration.clone();
         self.document_operation(move |document| {
             document
@@ -1401,7 +1410,7 @@ impl Edit {
     pub fn set_list_level_label_alignment(
         &mut self,
         item: &crate::list_label_alignment::Style,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let item = item.clone();
         self.document_operation(move |document| {
             document
@@ -1414,7 +1423,7 @@ impl Edit {
     ///
     /// Staged: the operation applies when [`Edit::commit`] runs, in staging
     /// order, and reports its errors there.
-    pub fn set_mimetype(&mut self, mimetype: impl Into<String>) -> Result<&mut Self> {
+    pub fn set_mimetype(&mut self, mimetype: impl Into<String>) -> FamilyResult<&mut Self> {
         let mimetype: String = mimetype.into();
         self.document_operation(move |document| {
             document.set_mimetype(mimetype.clone());
@@ -1429,7 +1438,7 @@ impl Edit {
     pub fn set_notes_configuration(
         &mut self,
         configuration: &crate::notes_configuration::Configuration,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let configuration = configuration.clone();
         self.document_operation(move |document| {
             document
@@ -1445,7 +1454,7 @@ impl Edit {
     pub fn set_notes_configurations(
         &mut self,
         configurations: &crate::notes_configuration::Configurations,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let configurations = configurations.clone();
         self.document_operation(move |document| {
             document
@@ -1458,7 +1467,10 @@ impl Edit {
     ///
     /// Staged: the operation applies when [`Edit::commit`] runs, in staging
     /// order, and reports its errors there.
-    pub fn set_outline_style(&mut self, style: &crate::outline_style::Style) -> Result<&mut Self> {
+    pub fn set_outline_style(
+        &mut self,
+        style: &crate::outline_style::Style,
+    ) -> FamilyResult<&mut Self> {
         let style = style.clone();
         self.document_operation(move |document| {
             document
@@ -1475,7 +1487,7 @@ impl Edit {
         &mut self,
         page_layout_name: impl Into<String>,
         columns: &crate::style::columns::Columns,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let page_layout_name: String = page_layout_name.into();
         let columns = columns.clone();
         self.document_operation_at(
@@ -1496,7 +1508,7 @@ impl Edit {
         &mut self,
         page_layout_name: impl Into<String>,
         separator: &crate::footnote_separator::Separator,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let page_layout_name: String = page_layout_name.into();
         let separator = separator.clone();
         self.document_operation_at(
@@ -1518,7 +1530,7 @@ impl Edit {
         page_layout_name: impl Into<String>,
         region: crate::header_footer::properties::Region,
         properties: &crate::header_footer::properties::StyleProperties,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let page_layout_name: String = page_layout_name.into();
         let properties = properties.clone();
         self.document_operation_at(
@@ -1543,7 +1555,7 @@ impl Edit {
         &mut self,
         page_layout_name: impl Into<String>,
         page_layout_xml: impl Into<String>,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let page_layout_name: String = page_layout_name.into();
         let page_layout_xml: String = page_layout_xml.into();
         self.document_operation_at(
@@ -1563,7 +1575,7 @@ impl Edit {
     pub fn set_page_sequence(
         &mut self,
         sequence: Option<&crate::page_sequence::Sequence>,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let sequence = sequence.cloned();
         self.document_operation(move |document| {
             document
@@ -1580,7 +1592,7 @@ impl Edit {
         &mut self,
         position: Position,
         value: &crate::RdfaAttributes,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let value = value.clone();
         self.document_operation(move |document| {
             document
@@ -1596,7 +1608,7 @@ impl Edit {
     pub fn set_paragraph_style_drop_cap(
         &mut self,
         style: &crate::style::paragraph::drop_cap::Style,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let style = style.clone();
         self.document_operation(move |document| {
             document
@@ -1612,7 +1624,7 @@ impl Edit {
     pub fn set_styles_font_face_declarations(
         &mut self,
         declarations: &crate::font_face::Declarations,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let declarations = declarations.clone();
         self.document_operation(move |document| {
             document
@@ -1628,7 +1640,7 @@ impl Edit {
     pub fn set_table_row_style_properties(
         &mut self,
         style: &crate::style::table::row::Style,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let style = style.clone();
         self.document_operation(move |document| {
             document
@@ -1644,7 +1656,7 @@ impl Edit {
     pub fn set_table_style_properties(
         &mut self,
         style: &crate::style::table::table::Style,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let style = style.clone();
         self.document_operation(move |document| {
             document
@@ -1661,7 +1673,7 @@ impl Edit {
         &mut self,
         position: Position,
         value: &crate::RdfaAttributes,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let value = value.clone();
         self.document_operation(move |document| {
             document
@@ -1674,7 +1686,10 @@ impl Edit {
     ///
     /// Staged: the operation applies when [`Edit::commit`] runs, in staging
     /// order, and reports its errors there.
-    pub fn set_tracked_changes(&mut self, tracked: crate::TrackedChanges) -> Result<&mut Self> {
+    pub fn set_tracked_changes(
+        &mut self,
+        tracked: crate::TrackedChanges,
+    ) -> FamilyResult<&mut Self> {
         self.document_operation(move |document| {
             document
                 .set_tracked_changes(tracked.clone())
@@ -1689,7 +1704,7 @@ impl Edit {
     pub fn set_variable_declaration_group(
         &mut self,
         group: &crate::variable_declaration::Group,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let group = group.clone();
         self.document_operation(move |document| {
             document
@@ -1702,7 +1717,10 @@ impl Edit {
     ///
     /// Staged: the operation applies when [`Edit::commit`] runs, in staging
     /// order, and reports its errors there.
-    pub fn unmark_tracked_change(&mut self, change_id: impl Into<String>) -> Result<&mut Self> {
+    pub fn unmark_tracked_change(
+        &mut self,
+        change_id: impl Into<String>,
+    ) -> FamilyResult<&mut Self> {
         let change_id: String = change_id.into();
         self.document_operation(move |document| {
             document
@@ -1715,7 +1733,7 @@ impl Edit {
     ///
     /// Staged: the operation applies when [`Edit::commit`] runs, in staging
     /// order, and reports its errors there.
-    pub fn unwrap_section(&mut self, name: impl Into<String>) -> Result<&mut Self> {
+    pub fn unwrap_section(&mut self, name: impl Into<String>) -> FamilyResult<&mut Self> {
         let name: String = name.into();
         self.document_operation(move |document| {
             document
@@ -1732,7 +1750,7 @@ impl Edit {
         &mut self,
         name: impl Into<String>,
         replacement: &crate::Section,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let name: String = name.into();
         let replacement = replacement.clone();
         self.document_operation(move |document| {
@@ -1750,7 +1768,7 @@ impl Edit {
         &mut self,
         id: impl Into<String>,
         replacement: crate::TrackChange,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let id: String = id.into();
         self.document_operation(move |document| {
             document
@@ -1768,7 +1786,7 @@ impl Edit {
         paragraph_index: usize,
         range: std::ops::Range<usize>,
         annotation: &crate::ruby_family::Annotation,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let annotation = annotation.clone();
         self.document_operation(move |document| {
             document
@@ -1786,7 +1804,7 @@ impl Edit {
         section: &crate::Section,
         start: crate::Block,
         end: crate::Block,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let section = section.clone();
         self.document_operation(move |document| {
             document
@@ -1802,7 +1820,7 @@ impl Edit {
     pub fn insert_section_layout(
         &mut self,
         section: &crate::header_footer::SectionLayout,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let section = section.clone();
         self.document_operation_at(
             format!("/styles/section/{}", section.name()),
@@ -1821,7 +1839,7 @@ impl Edit {
     pub fn replace_section_layout(
         &mut self,
         section: &crate::header_footer::SectionLayout,
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let section = section.clone();
         self.document_operation_at(
             format!("/styles/section/{}", section.name()),
@@ -1837,7 +1855,7 @@ impl Edit {
     ///
     /// Staged: the operation applies when [`Edit::commit`] runs, in staging
     /// order, and reports its errors there.
-    pub fn remove_section_layout(&mut self, name: impl Into<String>) -> Result<&mut Self> {
+    pub fn remove_section_layout(&mut self, name: impl Into<String>) -> FamilyResult<&mut Self> {
         let name: String = name.into();
         self.document_operation_at(format!("/styles/section/{name}"), move |document| {
             document
@@ -1858,7 +1876,7 @@ impl Edit {
         &mut self,
         transfer: &crate::header_footer::Transfer,
         available: &[&str],
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let transfer = transfer.clone();
         let available: Vec<String> = available.iter().map(|href| (*href).to_owned()).collect();
         self.document_operation_at(
@@ -1886,7 +1904,7 @@ impl Edit {
         &mut self,
         transfer: &crate::header_footer::SectionTransfer,
         available: &[&str],
-    ) -> Result<&mut Self> {
+    ) -> FamilyResult<&mut Self> {
         let transfer = transfer.clone();
         let available: Vec<String> = available.iter().map(|href| (*href).to_owned()).collect();
         self.document_operation_at(

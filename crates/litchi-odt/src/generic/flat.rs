@@ -20,12 +20,14 @@ use litchi_core::{
     ExecutionLimits, Limits as BudgetLimits, Metadata, Reservation, Resource, ResourceLimit,
     Result,
 };
-use litchi_odf_common::{OpenOptions, SemanticLimitKind, XmlStreamLimits};
+use litchi_odf_common::{Error as OdfError, OpenOptions, SemanticLimitKind, XmlStreamLimits};
 use std::cell::Cell;
 use std::io::Read;
 use std::mem::size_of;
 use std::num::{NonZeroU64, NonZeroUsize};
 use std::path::Path;
+
+type FamilyResult<T> = std::result::Result<T, OdfError>;
 
 /// Default maximum encoded size for a generic flat OpenDocument snapshot.
 pub(super) const DEFAULT_MAX_FLAT_DOCUMENT_BYTES: u64 = 256 * 1024 * 1024;
@@ -271,20 +273,20 @@ impl FlatDocument {
     }
 
     /// Parses the optional flat-document `office:settings` inventory.
-    pub fn settings(&self) -> Result<crate::Settings> {
-        crate::settings::parse_flat(self.xml())
+    pub fn settings(&self) -> FamilyResult<crate::Settings> {
+        Ok(crate::settings::parse_flat(self.xml())?)
     }
 
     /// Open and validate a flat `OpenDocument` XML file.
-    pub fn open(path: impl AsRef<Path>) -> Result<Self> {
+    pub fn open(path: impl AsRef<Path>) -> FamilyResult<Self> {
         let file = std::fs::File::open(path)?;
-        Self::from_reader(file)
+        Ok(Self::from_reader(file)?)
     }
 
     /// Open and validate a flat `OpenDocument` XML file under `options`.
-    pub fn open_with_options(path: impl AsRef<Path>, options: OpenOptions) -> Result<Self> {
+    pub fn open_with_options(path: impl AsRef<Path>, options: OpenOptions) -> FamilyResult<Self> {
         let file = std::fs::File::open(path)?;
-        Self::from_reader_with_options(file, options)
+        Ok(Self::from_reader_with_options(file, options)?)
     }
 
     /// Open and validate a flat `OpenDocument` XML file under `options` and a
@@ -293,24 +295,29 @@ impl FlatDocument {
         path: impl AsRef<Path>,
         options: OpenOptions,
         context: ExecutionContext,
-    ) -> Result<Self> {
+    ) -> FamilyResult<Self> {
         let file = std::fs::File::open(path)?;
-        Self::from_reader_with_execution_context(file, options, context)
+        Ok(Self::from_reader_with_execution_context(
+            file, options, context,
+        )?)
     }
 
     /// Read and validate a flat `OpenDocument` XML stream.
-    pub fn from_reader(reader: impl Read) -> Result<Self> {
-        Self::from_reader_with_limit(reader, DEFAULT_MAX_FLAT_DOCUMENT_BYTES)
+    pub fn from_reader(reader: impl Read) -> FamilyResult<Self> {
+        Ok(Self::from_reader_with_limit(
+            reader,
+            DEFAULT_MAX_FLAT_DOCUMENT_BYTES,
+        )?)
     }
 
     /// Read and validate a flat `OpenDocument` XML stream under `options`.
-    pub fn from_reader_with_options(reader: impl Read, options: OpenOptions) -> Result<Self> {
-        Self::from_reader_with_limit_and_context_and_xml_limits(
+    pub fn from_reader_with_options(reader: impl Read, options: OpenOptions) -> FamilyResult<Self> {
+        Ok(Self::from_reader_with_limit_and_context_and_xml_limits(
             reader,
             options_maximum(options),
             default_flat_execution_context()?,
             options.xml_limits_value(),
-        )
+        )?)
     }
 
     /// Read and validate a flat `OpenDocument` XML stream under `options` and
@@ -319,13 +326,13 @@ impl FlatDocument {
         reader: impl Read,
         options: OpenOptions,
         context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_reader_with_limit_and_context_and_xml_limits(
+    ) -> FamilyResult<Self> {
+        Ok(Self::from_reader_with_limit_and_context_and_xml_limits(
             reader,
             options_maximum(options),
             context,
             options.xml_limits_value(),
-        )
+        )?)
     }
 
     /// Read and validate a flat `OpenDocument` XML stream under a finite
@@ -380,18 +387,21 @@ impl FlatDocument {
     }
 
     /// Validate flat `OpenDocument` XML from owned bytes.
-    pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        Self::from_bytes_with_limit(bytes, DEFAULT_MAX_FLAT_DOCUMENT_BYTES)
+    pub fn from_bytes(bytes: Vec<u8>) -> FamilyResult<Self> {
+        Ok(Self::from_bytes_with_limit(
+            bytes,
+            DEFAULT_MAX_FLAT_DOCUMENT_BYTES,
+        )?)
     }
 
     /// Validate flat `OpenDocument` XML from owned bytes under `options`.
-    pub fn from_bytes_with_options(bytes: Vec<u8>, options: OpenOptions) -> Result<Self> {
-        Self::from_bytes_with_limit_and_context_and_xml_limits(
+    pub fn from_bytes_with_options(bytes: Vec<u8>, options: OpenOptions) -> FamilyResult<Self> {
+        Ok(Self::from_bytes_with_limit_and_context_and_xml_limits(
             bytes,
             options_maximum(options),
             default_flat_execution_context()?,
             options.xml_limits_value(),
-        )
+        )?)
     }
 
     /// Validate owned flat `OpenDocument` XML under `options` and a
@@ -404,13 +414,13 @@ impl FlatDocument {
         bytes: Vec<u8>,
         options: OpenOptions,
         context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_bytes_with_limit_and_context_and_xml_limits(
+    ) -> FamilyResult<Self> {
+        Ok(Self::from_bytes_with_limit_and_context_and_xml_limits(
             bytes,
             options_maximum(options),
             context,
             options.xml_limits_value(),
-        )
+        )?)
     }
 
     /// Validate flat `OpenDocument` XML from owned bytes under an explicit
@@ -580,7 +590,7 @@ impl FlatDocument {
     ///
     /// Returns an execution error when `context` cannot reserve the
     /// retained source.
-    pub fn with_execution_context(&self, context: ExecutionContext) -> Result<Self> {
+    pub fn with_execution_context(&self, context: ExecutionContext) -> FamilyResult<Self> {
         context.check().map_err(map_execution_error)?;
         let source_memory = context
             .reserve(
@@ -654,36 +664,42 @@ impl FlatDocument {
     }
 
     /// Extract common document metadata from the combined XML document.
-    pub fn metadata(&self) -> Result<Metadata> {
-        Meta::from_bytes(self.xml.as_bytes(), self.xml_limits)?.try_extract_metadata()
+    pub fn metadata(&self) -> FamilyResult<Metadata> {
+        Ok(Meta::from_bytes(self.xml.as_bytes(), self.xml_limits)?.try_extract_metadata()?)
     }
 
     /// Extract the complete format-specific metadata model.
-    pub fn odf_metadata(&self) -> Result<crate::Metadata> {
-        Meta::from_bytes(self.xml.as_bytes(), self.xml_limits)?.odf_metadata()
+    pub fn odf_metadata(&self) -> FamilyResult<crate::Metadata> {
+        Ok(Meta::from_bytes(self.xml.as_bytes(), self.xml_limits)?.odf_metadata()?)
     }
 
     /// Discover inline and inert linked images in the flat document.
-    pub fn images(&self) -> Result<Vec<crate::Image>> {
-        crate::media::scan_flat(&self.xml)
+    pub fn images(&self) -> FamilyResult<Vec<crate::Image>> {
+        Ok(crate::media::scan_flat(&self.xml)?)
     }
 
     /// Inspect classic forms without executing bindings, events, or external resources.
-    pub fn forms(&self) -> Result<crate::form::Forms> {
-        crate::form::parse_form_parts(&[(self.xml(), crate::form::Part::Flat)])
+    pub fn forms(&self) -> FamilyResult<crate::form::Forms> {
+        Ok(crate::form::parse_form_parts(&[(
+            self.xml(),
+            crate::form::Part::Flat,
+        )])?)
     }
 
     /// Inspect in-content RDFa and inline `text:meta` values in the flat XML.
-    pub fn in_content_metadata(&self) -> Result<crate::ContentMetadata> {
-        crate::content_metadata::parse_parts_with_xml_limits(
+    pub fn in_content_metadata(&self) -> FamilyResult<crate::ContentMetadata> {
+        Ok(crate::content_metadata::parse_parts_with_xml_limits(
             &[(self.xml(), crate::MetadataPart::Content)],
             self.xml_limits,
-        )
+        )?)
     }
 
     /// Inspect inert XForms model declarations in the flat XML.
-    pub fn xforms_models(&self) -> Result<Vec<crate::xforms::Model>> {
-        crate::xforms::parse_models_with_xml_limits(self.xml(), self.xml_limits)
+    pub fn xforms_models(&self) -> FamilyResult<Vec<crate::xforms::Model>> {
+        Ok(crate::xforms::parse_models_with_xml_limits(
+            self.xml(),
+            self.xml_limits,
+        )?)
     }
 
     /// Set or clear RDFa on one paragraph in the flat XML.
@@ -915,16 +931,16 @@ impl FlatDocument {
     }
 
     /// Inspect ordered ODF variable declarations without evaluating fields or formulas.
-    pub fn variable_declarations(&self) -> Result<crate::variable_declaration::Declarations> {
-        crate::variable_declaration::parse_parts_with_xml_limits(
+    pub fn variable_declarations(&self) -> FamilyResult<crate::variable_declaration::Declarations> {
+        Ok(crate::variable_declaration::parse_parts_with_xml_limits(
             &[(self.xml(), crate::variable_declaration::Part::Flat)],
             self.xml_limits,
-        )
+        )?)
     }
 
     /// Return the unnamed fallback page layout, when one is declared.
-    pub fn default_page_layout(&self) -> Result<Option<crate::page_layout::PageLayout>> {
-        crate::page_layout::parse_default_page_layout(self.xml())
+    pub fn default_page_layout(&self) -> FamilyResult<Option<crate::page_layout::PageLayout>> {
+        Ok(crate::page_layout::parse_default_page_layout(self.xml())?)
     }
 
     /// Atomically insert or replace one variable declaration container.
@@ -1036,8 +1052,8 @@ impl FlatDocument {
     }
 
     /// Discover inert inline and linked embedded objects.
-    pub fn embedded_objects(&self) -> Result<Vec<crate::Object>> {
-        crate::embedded::scan_flat(&self.xml)
+    pub fn embedded_objects(&self) -> FamilyResult<Vec<crate::Object>> {
+        Ok(crate::embedded::scan_flat(&self.xml)?)
     }
 
     /// Return the exact original bytes.
@@ -1059,13 +1075,13 @@ impl FlatDocument {
     ///
     /// Unix and Windows use a same-directory temporary and atomic replacement;
     /// other targets return [`CoreError::Unsupported`].
-    pub fn save(&self, path: impl AsRef<Path>) -> Result<()> {
-        self.save_with_execution_context_and_scopes(
+    pub fn save(&self, path: impl AsRef<Path>) -> FamilyResult<()> {
+        Ok(self.save_with_execution_context_and_scopes(
             path,
             self.execution_context.clone(),
             "flat OpenDocument output",
             "flat OpenDocument symbolic-link or non-file destination",
-        )
+        )?)
     }
 
     /// Save the flat document with a caller-supplied cancellation and resource
@@ -1079,13 +1095,13 @@ impl FlatDocument {
         &self,
         path: impl AsRef<Path>,
         context: ExecutionContext,
-    ) -> Result<()> {
-        self.save_with_execution_context_and_scopes(
+    ) -> FamilyResult<()> {
+        Ok(self.save_with_execution_context_and_scopes(
             path,
             context,
             "flat OpenDocument output",
             "flat OpenDocument symbolic-link or non-file destination",
-        )
+        )?)
     }
 
     pub(crate) fn save_with_attached_context_and_scopes(

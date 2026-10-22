@@ -439,9 +439,7 @@ fn mutated_namespace_or_control_cannot_satisfy_the_independent_oracle() {
     );
     assert_ne!(mutated_namespace, xml);
     let namespace_package = repack_with_content(&output, mutated_namespace.as_bytes());
-    match litchi_odt::Package::from_bytes(&namespace_package)
-        .map_err(Error::from)
-        .and_then(|package| package.document())
+    match litchi_odt::Package::from_bytes(&namespace_package).and_then(|package| package.document())
     {
         Err(_) => {},
         Ok(document) => {
@@ -461,10 +459,7 @@ fn mutated_namespace_or_control_cannot_satisfy_the_independent_oracle() {
     let mutated_control = xml.replacen("<text:line-break/>", "<text:tab/>", 1);
     assert_ne!(mutated_control, xml);
     let control_package = repack_with_content(&output, mutated_control.as_bytes());
-    match litchi_odt::Package::from_bytes(&control_package)
-        .map_err(Error::from)
-        .and_then(|package| package.document())
-    {
+    match litchi_odt::Package::from_bytes(&control_package).and_then(|package| package.document()) {
         Err(_) => {},
         Ok(document) => {
             let actual = document
