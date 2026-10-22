@@ -234,13 +234,98 @@ keynote-full. The five tool unit-test modules are `test_officecli_corpus`,
 The full `cargo test -p litchi-ops --all-features` suite outside the iWork
 targets did not run here.
 
+## Retained-admission repair evidence
+
+The matched-v5 table above is historical evidence for candidate `536d7fdcca`
+and remains unchanged. The first repair source commit `846a0fea0b` cached the
+exact wire preflight and neutral `ArchiveInfo` totals produced by `Archive::parse`.
+Commit `7c2562d992` then removed the repeated minimal `MessageInfo` metadata
+walk from the `ArchiveInfo` constructor path. Commit `4fe1e56411` reuses the
+single canonical-header probe already required to prove that a public
+`archive_info` value still matches its retained source header. It reapplies the
+cached neutral dimensions and the exact raw-wire dimensions under the caller's
+current profile; profiles that tighten sequence-sensitive message or metadata
+budgets still use the full validator. The cache is private provenance from
+parsing. Public metadata mutation is detected by the canonical comparison,
+payload mutation is checked against the current message bytes, and every
+metadata rewrite clears both caches. Unknown fields and noncanonical spellings
+remain publishable only when the complete canonical comparison matches.
+
+Commit `2e8b10c098` adds the retained-cache test
+`retained_admission_rechecks_public_mutations_and_strict_dimensions`. It
+checks each non-zero cached header dimension at one below its admitted value,
+then mutates a public message type and payload and verifies the resulting
+`HeaderFields` and `MessageBytes` observations. This is a test-only follow-up
+to `4fe1e56411`; the release-path source measured below is exactly the latter.
+The focused core suite now has 77 passing tests.
+
+The fresh matched-v10 build compares base `ddf2ac8ae2` with candidate
+`4fe1e56411`. It uses the committed
+`docs/unified-ops/results/0361fb/constructor-qualify.py` builder, the same
+probe and lock, release LTO, panic abort and `N=2,000`/`12,000` callgrind legs.
+The external build manifest is 74,295 bytes, SHA-256
+`391fe5bd7e8f2cb4abcfa42aec632e7261b2cc07a4f378806bf2b05a10046e24`; the
+allocation manifest is 51,114 bytes, SHA-256
+`bb0e37d2698de7ce761ab74d69d285fb01719391ef825429ba87c46542556653`.
+The reduced callgrind summary is 2,735 bytes, SHA-256
+`7db6407574a9d48b183d63f64b3972dcad1a755d18d51be6bdd05652b09d8bbf`.
+All artifacts and binaries remain under the external
+`constructor-0361f-coordinator/matched-v10` directory.
+
+The values below are raw Ir at 2,000 and 12,000 iterations; Ir/op is their
+difference divided by 10,000. Output SHA-256 and checksums match within every
+row; the retained output digest is
+`7bc9a96f894c2361619db11643c80373d56202f07e376de6930ecdadce0146af`.
+
+| Route | Base Ir (2k → 12k) | Candidate Ir (2k → 12k) | Ir/op base → candidate | Ratio |
+|---|---:|---:|---:|---:|
+| archive_info | 1,594,977 → 2,105,018 | 3,120,540 → 11,530,584 | 51.0041 → 841.0044 | 16.4890 |
+| retained_validate | 19,762,856 → 110,432,902 | 20,178,043 → 113,148,089 | 9,067.0046 → 9,297.0046 | 1.0254 |
+| retained_encoded_len | 32,904,451 → 189,294,488 | 20,502,140 → 115,092,175 | 15,639.0037 → 9,459.0035 | 0.6048 |
+| retained_encode | 95,458,816 → 564,609,013 | 81,837,579 → 483,092,464 | 46,915.0197 → 40,125.4885 | 0.8553 |
+| retained_validate_tight | 21,233,054 → 112,573,100 | 21,640,646 → 115,290,692 | 9,134.0046 → 9,365.0046 | 1.0253 |
+| retained_encode_tight | 95,153,987 → 556,097,040 | 83,338,006 → 485,462,539 | 46,094.3053 → 40,212.4533 | 0.8724 |
+
+The archive-info constructor remains a separate mandatory-admission cost: its
+ratio is 16.489× after the minimal-path repair because the base does no
+neutral admission. It is not used to waive a retained-path regression. The
+retained validation return is now 1.025× for both ordinary and exact profiles;
+encoded length and both publication routes are below the base instruction
+count. No native timing is qualified or accepted.
+
+The v10 counting legs report zero retained bytes after each route. For 100
+operations, ordinary retained validation changes from 395,600 requested bytes
+and 1,900 calls (peak 3,956) to 5,200 bytes and 100 calls (peak 52). Tight
+validation has the same counts. Retained publication changes from 2,042,600
+bytes and 5,700 calls (peak 14,326) to 1,652,200 bytes and 3,900 calls, with
+the same peak. The archive-info constructor allocates zero bytes on both
+endpoints in this fixture.
+
+The inline cache's object-size cost was measured with the external layout probe
+(`layout.rs`, 5,195 bytes, SHA-256
+`e93944a5a6ab2100503c4053066266b5689ebe31e392929a7b26c4d66fd5aa21`) by
+cloning prepared retained and non-retained objects and holding the clones.
+Peak, live and requested bytes are equal in these held sets; allocation calls
+are shown in parentheses.
+
+| Clone count | Non-retained heap base → candidate | Retained heap base → candidate |
+|---:|---:|---:|
+| 1 | 10,344 → 10,552 (19 → 19) | 10,812 → 11,020 (21 → 21) |
+| 8 | 82,752 → 84,416 (145 → 145) | 86,496 → 88,160 (161 → 161) |
+| 32 | 331,008 → 337,664 (577 → 577) | 345,984 → 352,640 (641 → 641) |
+| 128 | 1,324,032 → 1,350,656 (2,305 → 2,305) | 1,383,936 → 1,410,560 (2,561 → 2,561) |
+
+`size_of::<ArchiveObject>()` is 136 bytes on the base and 344 bytes on the
+candidate, an additional 208 bytes per object. The held-clone slopes increase
+by exactly 208 bytes per clone for both provenance states; the cache adds no
+allocation call. The repair therefore returns retained operation work while
+making the per-object inline memory cost explicit.
+
 ## Left open
 
-- **Constructor performance repair:** make retained-header admission cheaper,
-  for example by caching the canonical-length or comparison result per header,
-  or by reusing the ingress admission report. Cut the cost of the
-  constructor admission. Then rerun matched-v6 with the protected runner in a
-  coordinator-scheduled quiet window.
+- **Protected native qualification of the repaired constructor routes:** the
+  matched-v10 source counts are returned, but a quiet host window is still
+  required before accepting native timing.
 - **Protected native qualification of the owner routes:** needs a quiet host
   window.
 - **`NativePopUpError::Limit`/`NativeReplyError::Limit`:** carry the kind and
