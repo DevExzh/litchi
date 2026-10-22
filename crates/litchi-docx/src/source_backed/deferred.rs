@@ -44,8 +44,12 @@ impl Deferred {
         let mut bytes = Vec::new();
         (self.publish)(&mut bytes).map_err(|error| match error {
             Error::Opc(error) => error,
-            other => litchi_opc::OpcError::SourceBackedOverlayUnavailable {
-                reason: format!("materializing a committed source-backed package: {other}"),
+            _ => litchi_opc::OpcError::SourceBackedOverlayUnavailable {
+                // The OPC boundary cannot carry a document-family error
+                // without exposing its content-bearing display text. Keep
+                // this refusal fixed and content-free; typed OPC failures
+                // already pass through the branch above.
+                reason: "materializing a committed source-backed package failed".into(),
             },
         })?;
         // Preserve a managed recipient's execution context when the deferred
@@ -222,8 +226,17 @@ impl Package {
         Ok(next)
     }
 
-    /// Whether `self` and `other` are shares of one package (the same
-    /// source, caches and pending output).
+    /// Whether `self` and `other` are shares of one package (the same source,
+    /// caches, pending output, and execution context).
+    ///
+    /// The cache identity is minted by [`Package::with_execution`]. Package
+    /// clones and [`Package::with_semantic_limits`] retain it, while every
+    /// physical-source, execution-context, effective-topology, and deferred
+    /// publication boundary calls `with_execution` and therefore gets a new
+    /// identity. This makes the identity a proof for the same-owner replay
+    /// fast path; equal bytes alone are deliberately insufficient for that
+    /// path because an independent recipient must be rebuilt under its own
+    /// policy and context.
     pub(crate) fn same_owner(&self, other: &Self) -> bool {
         Arc::ptr_eq(&self.paragraph_index_cache, &other.paragraph_index_cache)
     }
@@ -350,18 +363,39 @@ macro_rules! source_family {
             package: &crate::source_backed::Package,
             patch: &Patch,
         ) -> std::result::Result<Commit, $error> {
+            // The same-owner branch below bypasses artifact authentication;
+            // retain the source freshness fence that the publishing path
+            // would otherwise perform before it can share an owner.
+            package.check_source()?;
             // The package that writes exactly the patch's before artifact (a
             // share of it, or a reopened copy of its bytes) gets the exact
             // after package: an inverse restores the original artifact.
-            if let Some((before, after)) = &patch.restore
-                && package.semantic_limits() == before.semantic_limits()
-                && package.same_artifact(before)?
-            {
-                return Ok(Commit::new(
-                    package.restored(after)?,
-                    patch.clone(),
-                    ($report)(&patch.change),
-                ));
+            if let Some((before, after)) = &patch.restore {
+                let same_semantic_limits = package.semantic_limits() == before.semantic_limits();
+                // same_owner is the package-local provenance proof. Package
+                // clones and semantic-limit projections retain the cache;
+                // every physical, execution, effective-topology, and
+                // deferred boundary goes through with_execution and mints a
+                // fresh cache. Reuse the committed owner only under that
+                // proof, so an ordinary same-owner inverse does not hash or
+                // materialize its artifact again.
+                if same_semantic_limits
+                    && package.same_owner(before)
+                    && after.semantic_limits() == package.semantic_limits()
+                {
+                    return Ok(Commit::new(
+                        after.clone(),
+                        patch.clone(),
+                        ($report)(&patch.change),
+                    ));
+                }
+                if same_semantic_limits && package.same_artifact(before)? {
+                    return Ok(Commit::new(
+                        package.restored(after)?,
+                        patch.clone(),
+                        ($report)(&patch.change),
+                    ));
+                }
             }
             commit_change(package, patch.change.clone())
         }
@@ -369,3 +403,47 @@ macro_rules! source_family {
 }
 
 pub(crate) use source_family;
+
+#[cfg(test)]
+mod tests {
+    use super::Package;
+    use crate::source_backed::story_text;
+    use litchi_core::Position;
+    use litchi_opc::constants::content_type as ct;
+    use litchi_opc::constants::relationship_type as rt;
+    use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter};
+
+    fn package() -> Package {
+        let mut archive = OpcPackage::new();
+        archive
+            .try_add_part(Box::new(BlobPart::new(
+                PackURI::new("/word/document.xml").unwrap(),
+                ct::WML_DOCUMENT_MAIN.to_owned(),
+                br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>before</w:t></w:r></w:p></w:body></w:document>"#.to_vec(),
+            )))
+            .unwrap();
+        archive.relate_to("word/document.xml", rt::OFFICE_DOCUMENT);
+        Package::from_bytes(&PackageWriter::to_bytes(&archive).unwrap()).unwrap()
+    }
+
+    #[test]
+    fn same_owner_restore_does_not_materialize_or_hash_deferred_output() {
+        let package = package();
+        let mut edit = package.edit_story_text(story_text::Selector::Main).unwrap();
+        edit.replace_paragraph_text(Position::new(0), "after")
+            .unwrap();
+        let commit = edit.commit().unwrap();
+        let inverse = commit.patch().inverse();
+
+        let deferred = commit
+            .package()
+            .deferred
+            .as_ref()
+            .expect("a source-backed edit publishes a deferred owner");
+        assert!(deferred.materialized.get().is_none());
+
+        let restored = commit.package().apply_story_text(&inverse).unwrap();
+        assert!(deferred.materialized.get().is_none());
+        assert!(restored.package().deferred.is_none());
+    }
+}

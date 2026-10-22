@@ -126,13 +126,26 @@ impl Package {
         // A package writing exactly the commit's before artifact (a share of
         // it, or a reopened copy of its bytes) gets the commit's exact after
         // package, so the inverse of a commit restores the source archive.
-        if let Some((before, after)) = patch.restore()
-            && self.semantic_limits() == before.semantic_limits()
-            && self
-                .same_artifact(before)
-                .map_err(crate::document::Error::from)?
-        {
-            return self.restored(after).map_err(crate::document::Error::from);
+        if let Some((before, after)) = patch.restore() {
+            let same_semantic_limits = self.semantic_limits() == before.semantic_limits();
+            // The cache identity is preserved only by package clones and
+            // semantic-limit projections. Every physical/context/effective
+            // boundary mints a new identity in with_execution, so this is the
+            // only restored replay path that may share the committed owner
+            // without rehashing or rematerializing it.
+            if same_semantic_limits
+                && self.same_owner(before)
+                && after.semantic_limits() == self.semantic_limits()
+            {
+                return Ok(after.clone());
+            }
+            if same_semantic_limits
+                && self
+                    .same_artifact(before)
+                    .map_err(crate::document::Error::from)?
+            {
+                return self.restored(after).map_err(crate::document::Error::from);
+            }
         }
         let result = (|| {
             let (name, current) = self.main_document_snapshot_with_before(
