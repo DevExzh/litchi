@@ -148,14 +148,52 @@ fn parses_collection_settings_and_rejects_reserved_fields() {
     data.extend_from_slice(&240u32.to_le_bytes());
     data.extend_from_slice(&0u32.to_le_bytes());
     data.extend_from_slice(&3u32.to_le_bytes());
-    let (settings, count) = parse_collection_settings(&data, false).unwrap();
+    let (settings, count) =
+        parse_collection_settings(&data, false, crate::raw::Limits::DEFAULT).unwrap();
     assert_eq!(settings.prompt_x, 120);
     assert_eq!(settings.prompt_y, 240);
     assert!(settings.input_prompts_disabled);
     assert_eq!(count, 3);
 
     data[0] = 2;
-    assert!(parse_collection_settings(&data, false).is_err());
+    assert!(parse_collection_settings(&data, false, crate::raw::Limits::DEFAULT).is_err());
+}
+
+#[test]
+fn raw_limits_bound_collection_and_list_payloads() {
+    let mut settings = Vec::new();
+    settings.extend_from_slice(&0u16.to_le_bytes());
+    settings.extend_from_slice(&120u32.to_le_bytes());
+    settings.extend_from_slice(&240u32.to_le_bytes());
+    settings.extend_from_slice(&0u32.to_le_bytes());
+    settings.extend_from_slice(&3u32.to_le_bytes());
+    assert!(
+        parse_collection_settings(&settings, false, crate::raw::Limits::new(settings.len(), 8),)
+            .is_ok()
+    );
+    assert!(matches!(
+        parse_collection_settings(
+            &settings,
+            false,
+            crate::raw::Limits::new(settings.len() - 1, 8),
+        ),
+        Err(Error::Wire(crate::raw::Error::PayloadLimit { .. }))
+    ));
+
+    let mut list = 1u32.to_le_bytes().to_vec();
+    list.extend_from_slice(b"x\0");
+    assert_eq!(
+        parse_dval_list(&list, crate::raw::Limits::new(list.len(), 1)).unwrap(),
+        "x"
+    );
+    assert!(matches!(
+        parse_dval_list(&list, crate::raw::Limits::new(list.len(), 0)),
+        Err(Error::Wire(crate::raw::Error::StringLimit { .. }))
+    ));
+    assert!(matches!(
+        parse_dval_list(&list, crate::raw::Limits::new(list.len() - 1, 1),),
+        Err(Error::Wire(crate::raw::Error::PayloadLimit { .. }))
+    ));
 }
 
 #[test]

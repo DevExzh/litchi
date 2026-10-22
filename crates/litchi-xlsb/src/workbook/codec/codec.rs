@@ -86,6 +86,7 @@ impl Workbook {
             &self.formula_context,
             catalog_position,
             self.styles.cell_xfs.len(),
+            self.raw_limits,
             self.leniency,
         )?;
         worksheet.set_scenarios(crate::package::scenarios::parse_worksheet(blob)?);
@@ -222,6 +223,7 @@ impl Workbook {
         formula_context: &Context,
         sheet_index: usize,
         cell_xf_count: usize,
+        raw_limits: crate::raw::Limits,
         leniency: crate::leniency::Leniency,
     ) -> Result<Worksheet> {
         let mut worksheet = Worksheet::new(name);
@@ -232,6 +234,7 @@ impl Workbook {
             shared_strings,
             &formula_context,
             cell_xf_count,
+            raw_limits,
             leniency,
         )?;
 

@@ -50,8 +50,15 @@ fn propagates_opaque_formula_status_through_cells_reader() {
     let expected_rgce = formula.rgce.clone();
     let context = Context::default();
     let iter = Stream::new(std::io::Cursor::new(bool_formula_worksheet(&formula)));
-    let mut reader =
-        CellsReader::new(iter, &[], &context, 1, crate::leniency::Leniency::Strict).unwrap();
+    let mut reader = CellsReader::new(
+        iter,
+        &[],
+        &context,
+        1,
+        crate::raw::Limits::DEFAULT,
+        crate::leniency::Leniency::Strict,
+    )
+    .unwrap();
 
     let cell = reader.next_cell().unwrap().unwrap();
     assert_eq!(
@@ -70,8 +77,15 @@ fn propagates_missing_group_definition_as_structural_error() {
     let formula = ParsedFormula::exp(0, 0).unwrap();
     let context = Context::default();
     let iter = Stream::new(std::io::Cursor::new(bool_formula_worksheet(&formula)));
-    let mut reader =
-        CellsReader::new(iter, &[], &context, 1, crate::leniency::Leniency::Strict).unwrap();
+    let mut reader = CellsReader::new(
+        iter,
+        &[],
+        &context,
+        1,
+        crate::raw::Limits::DEFAULT,
+        crate::leniency::Leniency::Strict,
+    )
+    .unwrap();
 
     assert!(matches!(reader.next_cell(), Err(Error::InvalidFormula(_))));
 }
@@ -188,6 +202,7 @@ fn parses_iso_sheet_protection_metadata_and_matching_flags() {
         &[],
         &formula_context,
         1,
+        crate::raw::Limits::DEFAULT,
         crate::leniency::Leniency::Strict,
     )
     .unwrap();
@@ -206,6 +221,7 @@ fn reads_inline_rich_string_cells() {
         &[],
         &formula_context,
         1,
+        crate::raw::Limits::DEFAULT,
         crate::leniency::Leniency::Strict,
     )
     .unwrap();
@@ -267,6 +283,7 @@ fn rejects_a_validation_collection_with_a_mismatched_count() {
         &[],
         &formula_context,
         1,
+        crate::raw::Limits::DEFAULT,
         crate::leniency::Leniency::Strict,
     )
     .unwrap();
@@ -300,6 +317,7 @@ fn rejects_conditional_formatting_with_a_mismatched_rule_count() {
         &[],
         &formula_context,
         1,
+        crate::raw::Limits::DEFAULT,
         crate::leniency::Leniency::Strict,
     )
     .unwrap();
@@ -435,6 +453,7 @@ fn reads_office_2013_conditional_formatting_visualizations() {
         &[],
         &formula_context,
         1,
+        crate::raw::Limits::DEFAULT,
         crate::leniency::Leniency::Strict,
     )
     .unwrap();
@@ -495,6 +514,7 @@ fn rejects_incomplete_color_scale_collection() {
         &[],
         &formula_context,
         1,
+        crate::raw::Limits::DEFAULT,
         crate::leniency::Leniency::Strict,
     )
     .unwrap();

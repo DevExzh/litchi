@@ -55,6 +55,7 @@ where
     pub(super) shared_strings: &'a [SharedString],
     pub(super) formula_context: &'a Context,
     pub(super) cell_xf_count: usize,
+    pub(super) raw_limits: crate::raw::Limits,
     pub(super) dimensions: Dimensions,
     pub(super) current_row: u32,
     pub(super) last_row: Option<u32>,

@@ -44,6 +44,7 @@ where
         shared_strings: &'a [SharedString],
         formula_context: &'a Context,
         cell_xf_count: usize,
+        raw_limits: crate::raw::Limits,
         leniency: Leniency,
     ) -> Result<Self> {
         let mut buf = Vec::with_capacity(1024);
@@ -97,6 +98,7 @@ where
             shared_strings,
             formula_context,
             cell_xf_count,
+            raw_limits,
             dimensions,
             current_row: 0,
             last_row: None,
@@ -581,7 +583,7 @@ where
                 },
                 kind::MERGE_CELL => {
                     // BrtMergeCell - single merged cell
-                    if let Ok(merged) = MergedCell::parse(&self.buf) {
+                    if let Ok(merged) = MergedCell::parse(&self.buf, self.raw_limits) {
                         self.merged_cells.push(merged);
                     }
                 },
@@ -646,7 +648,8 @@ where
                             val: "duplicate collection",
                         });
                     }
-                    let (settings, count) = parse_collection_settings(&self.buf, false)?;
+                    let (settings, count) =
+                        parse_collection_settings(&self.buf, false, self.raw_limits)?;
                     self.data_validation_settings = Some(settings);
                     self.consume_classic_data_validations(count)?;
                 },
@@ -657,7 +660,8 @@ where
                             val: "duplicate collection",
                         });
                     }
-                    let (settings, count) = parse_collection_settings(&self.buf, true)?;
+                    let (settings, count) =
+                        parse_collection_settings(&self.buf, true, self.raw_limits)?;
                     self.data_validation14_settings = Some(settings);
                     self.consume_extension_data_validations(count)?;
                 },
@@ -766,7 +770,7 @@ where
 
             if typ == kind::MERGE_CELL {
                 // BrtMergeCell
-                if let Ok(merged) = MergedCell::parse(&self.buf) {
+                if let Ok(merged) = MergedCell::parse(&self.buf, self.raw_limits) {
                     self.merged_cells.push(merged);
                 }
             }

@@ -89,7 +89,11 @@ struct Collection {
     end: Range<usize>,
 }
 
-fn collection(bytes: &[u8], layout: &SheetLayout) -> Result<Option<Collection>> {
+fn collection(
+    bytes: &[u8],
+    layout: &SheetLayout,
+    raw_limits: crate::raw::Limits,
+) -> Result<Option<Collection>> {
     let mut units = layout.units_of(kind::BEGIN_D_VALS);
     let Some(unit) = units.next() else {
         return Ok(None);
@@ -100,7 +104,7 @@ fn collection(bytes: &[u8], layout: &SheetLayout) -> Result<Option<Collection>> 
         ));
     }
     let base = unit.span.start;
-    let mut records = Records::new(&bytes[unit.span.clone()], crate::raw::Limits::DEFAULT);
+    let mut records = Records::new(&bytes[unit.span.clone()], raw_limits);
     let header = records
         .next()
         .transpose()?
@@ -163,7 +167,7 @@ impl Edit {
         let worksheet = self.staged.worksheet(sheet)?;
         let bytes = self.staged.blob(&worksheet)?;
         let layout = SheetLayout::scan(bytes)?;
-        let current = collection(bytes, &layout)?;
+        let current = collection(bytes, &layout, self.staged.raw_limits())?;
         let mut items: Vec<Vec<u8>> = current
             .as_ref()
             .map(|collection| {
@@ -247,7 +251,7 @@ impl Edit {
     /// Office 2013 record kind, an invalid range list or formula), more
     /// than [`MAX_VALIDATIONS`], or a changed edit of a signed workbook.
     pub fn add(&mut self, sheet: usize, validation: Validation) -> Result<usize> {
-        let encoded = encode(&validation)?;
+        let encoded = encode(&validation, self.staged.raw_limits())?;
         let index = self.validations(sheet)?.len();
         self.publish(sheet, Change::Add(encoded))?;
         Ok(index)
@@ -260,7 +264,7 @@ impl Edit {
     ///
     /// The errors of [`Self::add`], and an error for a missing position.
     pub fn set(&mut self, sheet: usize, index: usize, validation: Validation) -> Result<bool> {
-        let encoded = encode(&validation)?;
+        let encoded = encode(&validation, self.staged.raw_limits())?;
         self.publish(sheet, Change::Set(index, encoded))
     }
 
@@ -297,13 +301,13 @@ pub(crate) fn classic(validations: Vec<Validation>) -> Vec<Validation> {
         .collect()
 }
 
-fn encode(validation: &Validation) -> Result<Vec<u8>> {
+fn encode(validation: &Validation, limits: crate::raw::Limits) -> Result<Vec<u8>> {
     if validation.record_kind != RecordKind::Classic {
         return Err(invalid(
             "only classic validations are authored; BrtDVal14 records are kept as they are",
         ));
     }
-    crate::writer::data_validation::encode_classic_records(validation)
+    crate::writer::data_validation::encode_classic_records(validation, limits)
 }
 
 #[cfg(test)]

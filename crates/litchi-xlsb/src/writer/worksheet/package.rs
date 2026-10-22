@@ -86,6 +86,7 @@ impl Worksheet {
                 &self.data_validations,
                 self.data_validation_settings,
                 self.data_validation14_settings,
+                writer.limits(),
             )?;
         }
 

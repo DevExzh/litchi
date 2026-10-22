@@ -6876,7 +6876,7 @@ fn encode_operation(operation: &Operation, output: &mut Vec<u8>) -> Result<()> {
             push_usize(output, *catalog_position)?;
             push_usize(output, ranges.len())?;
             for range in ranges.iter() {
-                output.extend_from_slice(&range.serialize());
+                output.extend_from_slice(&range.serialize(RawLimits::DEFAULT)?);
             }
         },
     }
@@ -7150,11 +7150,10 @@ fn decode_operation(data: &[u8], offset: &mut usize) -> Result<Operation> {
                     source,
                 })?;
             for _ in 0..count {
-                ranges.push(crate::merged_cells::MergedCell::parse(read_slice(
-                    data,
-                    offset,
-                    crate::merged_cells::LEN,
-                )?)?);
+                ranges.push(crate::merged_cells::MergedCell::parse(
+                    read_slice(data, offset, crate::merged_cells::LEN)?,
+                    RawLimits::DEFAULT,
+                )?);
             }
             Ok(Operation::SetMergedRanges {
                 catalog_position,

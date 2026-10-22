@@ -370,7 +370,7 @@ where
                             val: "consecutive list overrides",
                         });
                     }
-                    pending_list = Some(parse_dval_list(&self.buf)?);
+                    pending_list = Some(parse_dval_list(&self.buf, self.raw_limits)?);
                 },
                 kind::D_VAL => {
                     let location = u32::try_from(self.data_validations.len()).unwrap_or(u32::MAX);
@@ -378,6 +378,7 @@ where
                         &self.buf,
                         pending_list.take(),
                         self.formula_context,
+                        self.raw_limits,
                         &mut Tolerance::recording(&mut self.tolerance),
                         location,
                     )?;
@@ -429,6 +430,7 @@ where
                         .push(Validation::parse_extension14_with(
                             &self.buf,
                             self.formula_context,
+                            self.raw_limits,
                             &mut Tolerance::recording(&mut self.tolerance),
                             location,
                         )?);

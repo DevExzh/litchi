@@ -64,7 +64,7 @@ pub(crate) fn read(
     let layout = SheetLayout::scan_with_limits(bytes, raw_limits)?;
     let (validations, formats) = if select.intersects(FeatureSet::VALIDATIONS | FeatureSet::FORMATS)
     {
-        let pass = crate::part_edit::feature_pass(bytes, context, sheet, leniency)?;
+        let pass = crate::part_edit::feature_pass(bytes, context, sheet, raw_limits, leniency)?;
         (
             if select.contains(FeatureSet::VALIDATIONS) {
                 crate::data_validation::edit::classic(pass.validations)

@@ -1822,6 +1822,7 @@ impl SourceBackedWorksheet {
             &inputs.formula_context,
             inputs.workbook_position,
             inputs.cell_xf_count,
+            self.inner.raw_limits,
             self.inner.leniency,
         )?;
         worksheet.set_scenarios(crate::package::scenarios::parse_worksheet(

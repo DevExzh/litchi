@@ -33,6 +33,12 @@ impl<W: Write> Encoder<W> {
         }
     }
 
+    /// Return the finite policy used for every record and scalar write.
+    #[must_use]
+    pub const fn limits(&self) -> Limits {
+        self.limits
+    }
+
     /// Write one complete record.
     pub fn write_record(&mut self, kind: Kind, payload: &[u8]) -> Result<()> {
         self.limits.validate()?;

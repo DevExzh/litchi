@@ -1259,6 +1259,7 @@ pub(crate) fn feature_pass(
     bytes: &[u8],
     context: &crate::package::formula::Context,
     sheet: usize,
+    raw_limits: crate::raw::Limits,
     leniency: crate::leniency::Leniency,
 ) -> Result<FeaturePass> {
     let context = context.for_sheet(sheet);
@@ -1268,6 +1269,7 @@ pub(crate) fn feature_pass(
         &[],
         &context,
         usize::MAX,
+        raw_limits,
         leniency,
     )?;
     reader.skip_to_features()?;
@@ -1286,6 +1288,7 @@ impl Staged {
             self.blob(name)?,
             &workbook.formula_context,
             sheet,
+            workbook.raw_limits_value(),
             workbook.leniency(),
         )
     }

@@ -697,7 +697,7 @@ impl Worksheet {
         writer.write_record(kind::BEGIN_MERGE_CELLS, &header)?;
 
         for merged in &self.merged_cells {
-            let data = merged.serialize();
+            let data = merged.serialize(writer.limits())?;
             writer.write_record(kind::MERGE_CELL, &data)?;
         }
 

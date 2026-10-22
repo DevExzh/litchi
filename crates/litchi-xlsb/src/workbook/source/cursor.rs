@@ -271,6 +271,7 @@ impl SourceBackedWorksheet {
                 inputs.shared_strings.as_slice(),
                 &context,
                 inputs.cell_xf_count,
+                self.inner.raw_limits,
                 self.inner.leniency,
             )?;
             for _ in 0..streaming.read {
