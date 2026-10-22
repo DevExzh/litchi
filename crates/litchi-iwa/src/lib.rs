@@ -230,6 +230,10 @@ pub enum Error {
         observed: SourceVersion,
     },
 
+    /// A package patch was made against a different immutable snapshot.
+    #[error("iWork package patch source does not match")]
+    PatchConflict,
+
     #[error(transparent)]
     IwaCore(#[from] IwaCoreError),
 

@@ -33,7 +33,7 @@ fn entry_store_error(error: PackageEntryStoreError) -> Error {
 
 fn package_patch_error(error: PackageEntryStoreError) -> Error {
     if matches!(error, PackageEntryStoreError::PatchSourceMismatch) {
-        Error::InvalidFormat("iWork package patch source does not match".to_owned())
+        Error::PatchConflict
     } else {
         entry_store_error(error)
     }
@@ -78,6 +78,7 @@ fn clone_error(error: &Error) -> Error {
             expected: *expected,
             observed: *observed,
         },
+        Error::PatchConflict => Error::PatchConflict,
         Error::IwaCore(error) => Error::IwaCore(error.clone()),
         Error::IwaCommon(error) => Error::IwaCommon(error.clone()),
         Error::ChartData(error) => Error::ChartData(*error),
@@ -2237,7 +2238,7 @@ mod tests {
         let mut stale = Package::new();
         stale.insert_entry("Data/original", b"different".to_vec())?;
         let error = stale.snapshot().apply(commit.patch()).unwrap_err();
-        assert!(error.to_string().contains("patch source does not match"));
+        assert!(matches!(error, Error::PatchConflict));
         Ok(())
     }
 
