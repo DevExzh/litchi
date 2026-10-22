@@ -135,10 +135,14 @@ pub mod raw {
             Self { snapshot }
         }
 
-        /// Admit XML under the required finite policy before scanning it.
-        pub fn from_xml(xml: impl Into<Vec<u8>>, limits: Limits) -> Result<Self> {
+        /// Admit owned XML under the required finite policy before scanning it.
+        ///
+        /// Taking ownership keeps admission bounded without an implicit copy;
+        /// callers that start with borrowed bytes choose whether and when to
+        /// allocate before calling this constructor.
+        pub fn from_xml(xml: Vec<u8>, limits: Limits) -> Result<Self> {
             Ok(Self {
-                snapshot: record::Snapshot::from_raw_xml(xml.into(), limits)?,
+                snapshot: record::Snapshot::from_raw_xml(xml, limits)?,
             })
         }
 
@@ -190,14 +194,14 @@ pub mod raw {
         /// Apply a copy patch to this tree after exact content and freshness
         /// validation.
         pub fn apply_copy(&mut self, patch: &Patch) -> Result<()> {
-            self.snapshot = patch.0.apply(&self.snapshot)?;
+            self.snapshot = patch.0.apply_raw(&self.snapshot)?;
             Ok(())
         }
 
         /// Apply a removal patch to this tree after exact content and
         /// freshness validation.
         pub fn apply_removal(&mut self, patch: &RemovalPatch) -> Result<()> {
-            self.snapshot = patch.0.apply(&self.snapshot)?;
+            self.snapshot = patch.0.apply_raw(&self.snapshot)?;
             Ok(())
         }
 

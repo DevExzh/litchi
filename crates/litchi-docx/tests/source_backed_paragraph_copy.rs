@@ -4,7 +4,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use litchi_core::{OwnedSource, Position, ReadAt};
 use litchi_docx::source_backed::paragraph_copy::raw::{
-    Error, Limits, Patch, Refusal, RemovalPatch, Tree,
+    Error, LimitKind, Limits, Patch, Refusal, RemovalPatch, Tree,
 };
 use litchi_docx::{Package, source_backed};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
@@ -83,11 +83,100 @@ fn raw_tree_copy_and_removal_are_bounded_reversible_and_streamable() {
         .copy_plain_paragraph(Position::new(0), Position::new(2))
         .unwrap();
     assert_eq!(copy.effect_report().copied_paragraphs, 1);
+    let copied_xml = copy_tree.xml_bytes().to_vec();
     let copy_wire = copy.to_bytes(limits).unwrap();
     let decoded_copy = Patch::from_bytes(&copy_wire, limits).unwrap();
     assert_eq!(copy_tree.paragraph_count(), 3);
     copy_tree.apply_copy(&decoded_copy.inverse()).unwrap();
     assert_eq!(copy_tree.xml_bytes(), source);
+
+    let mut reopened_after = Tree::from_xml(copied_xml.clone(), limits).unwrap();
+    reopened_after.apply_copy(&decoded_copy.inverse()).unwrap();
+    assert_eq!(reopened_after.xml_bytes(), source);
+
+    let mut reopened_source = Tree::from_xml(source.clone(), limits).unwrap();
+    reopened_source.apply_copy(&decoded_copy).unwrap();
+    assert_eq!(reopened_source.xml_bytes(), copied_xml);
+
+    let second = reopened_source
+        .copy_plain_paragraph(Position::new(1), Position::new(0))
+        .unwrap();
+    let second_xml = reopened_source.xml_bytes().to_vec();
+    let second_wire = second.to_bytes(limits).unwrap();
+    let decoded_second = Patch::from_bytes(&second_wire, limits).unwrap();
+    let mut reopened_first = Tree::from_xml(copied_xml.clone(), limits).unwrap();
+    reopened_first.apply_copy(&decoded_second).unwrap();
+    assert_eq!(reopened_first.xml_bytes(), second_xml);
+    let mut reopened_second = Tree::from_xml(second_xml.clone(), limits).unwrap();
+    reopened_second
+        .apply_copy(&decoded_second.inverse())
+        .unwrap();
+    reopened_second.apply_copy(&decoded_copy.inverse()).unwrap();
+    assert_eq!(reopened_second.xml_bytes(), source);
+
+    let mut changed_copy_base = Tree::from_xml(document(&["alpha", "changed"]), limits).unwrap();
+    assert!(matches!(
+        changed_copy_base.apply_copy(&decoded_copy),
+        Err(Error::PatchConflict)
+    ));
+
+    let xml_limited = Limits::new(
+        copied_xml.len() - 1,
+        limits.max_paragraphs(),
+        limits.max_events(),
+        limits.max_depth(),
+        copied_xml.len(),
+        limits.max_durable_bytes(),
+    )
+    .unwrap();
+    let mut xml_limited_tree = Tree::from_xml(source.clone(), xml_limited).unwrap();
+    assert!(matches!(
+        xml_limited_tree.apply_copy(&decoded_copy),
+        Err(Error::Limit {
+            kind: LimitKind::XmlBytes,
+            ..
+        })
+    ));
+    assert_eq!(xml_limited_tree.xml_bytes(), source);
+
+    let output_limited = Limits::new(
+        copied_xml.len(),
+        limits.max_paragraphs(),
+        limits.max_events(),
+        limits.max_depth(),
+        copied_xml.len() - 1,
+        limits.max_durable_bytes(),
+    )
+    .unwrap();
+    let mut output_limited_tree = Tree::from_xml(source.clone(), output_limited).unwrap();
+    assert!(matches!(
+        output_limited_tree.apply_copy(&decoded_copy),
+        Err(Error::Limit {
+            kind: LimitKind::OutputBytes,
+            ..
+        })
+    ));
+    assert_eq!(output_limited_tree.xml_bytes(), source);
+
+    let paragraph_limited = Limits::new(
+        copied_xml.len(),
+        2,
+        limits.max_events(),
+        limits.max_depth(),
+        copied_xml.len(),
+        limits.max_durable_bytes(),
+    )
+    .unwrap();
+    let mut paragraph_limited_tree = Tree::from_xml(source.clone(), paragraph_limited).unwrap();
+    assert!(matches!(
+        paragraph_limited_tree.apply_copy(&decoded_copy),
+        Err(Error::Limit {
+            kind: LimitKind::Paragraphs,
+            ..
+        })
+    ));
+    assert_eq!(paragraph_limited_tree.xml_bytes(), source);
+
     let before_failed_output = copy_tree.xml_bytes().to_vec();
     assert!(matches!(
         copy_tree.copy_plain_paragraph(Position::new(2), Position::new(0)),
@@ -99,7 +188,7 @@ fn raw_tree_copy_and_removal_are_bounded_reversible_and_streamable() {
     assert!(matches!(
         copy_tree.write_to(&mut refused_output, output_limits),
         Err(Error::Limit {
-            kind: source_backed::paragraph_copy::raw::LimitKind::OutputBytes,
+            kind: LimitKind::OutputBytes,
             ..
         })
     ));
@@ -113,12 +202,30 @@ fn raw_tree_copy_and_removal_are_bounded_reversible_and_streamable() {
         .remove_plain_paragraph(Position::new(0))
         .unwrap();
     assert_eq!(removal.effect_report().removed_paragraphs, 1);
+    let removed_xml = removal_tree.xml_bytes().to_vec();
     let removal_wire = removal.to_bytes(limits).unwrap();
     let decoded_removal = RemovalPatch::from_bytes(&removal_wire, limits).unwrap();
     removal_tree
         .apply_removal(&decoded_removal.inverse())
         .unwrap();
     assert_eq!(removal_tree.xml_bytes(), source);
+
+    let mut reopened_removed = Tree::from_xml(removed_xml.clone(), limits).unwrap();
+    reopened_removed
+        .apply_removal(&decoded_removal.inverse())
+        .unwrap();
+    assert_eq!(reopened_removed.xml_bytes(), source);
+    let mut reopened_removal_source = Tree::from_xml(source.clone(), limits).unwrap();
+    reopened_removal_source
+        .apply_removal(&decoded_removal)
+        .unwrap();
+    assert_eq!(reopened_removal_source.xml_bytes(), removed_xml);
+
+    let mut changed_removal_base = Tree::from_xml(document(&["alpha", "changed"]), limits).unwrap();
+    assert!(matches!(
+        changed_removal_base.apply_removal(&decoded_removal),
+        Err(Error::PatchConflict)
+    ));
 }
 
 fn payload_range(zip: &[u8], name: &str) -> std::ops::Range<usize> {
@@ -271,7 +378,7 @@ fn durable_forward_inverse_are_canonical_and_reject_whole_artifact_staleness() {
     assert!(matches!(
         commit.patch().durable().unwrap().to_bytes(caller_limits),
         Err(Error::Limit {
-            kind: source_backed::paragraph_copy::raw::LimitKind::DurablePatchBytes,
+            kind: LimitKind::DurablePatchBytes,
             ..
         })
     ));
@@ -390,7 +497,7 @@ fn positions_operation_count_and_resource_limits_are_failure_atomic() {
     assert!(matches!(
         edit.copy_plain_paragraph(Position::new(0), Position::new(1)),
         Err(Error::Limit {
-            kind: source_backed::paragraph_copy::raw::LimitKind::Operations,
+            kind: LimitKind::Operations,
             ..
         })
     ));
@@ -404,7 +511,7 @@ fn positions_operation_count_and_resource_limits_are_failure_atomic() {
             )
             .edit_plain_paragraph_copy(),
         Err(Error::Limit {
-            kind: source_backed::paragraph_copy::raw::LimitKind::Paragraphs,
+            kind: LimitKind::Paragraphs,
             ..
         })
     ));
@@ -417,7 +524,7 @@ fn positions_operation_count_and_resource_limits_are_failure_atomic() {
     assert!(matches!(
         edit.copy_plain_paragraph(Position::new(0), Position::new(0)),
         Err(Error::Limit {
-            kind: source_backed::paragraph_copy::raw::LimitKind::OutputBytes,
+            kind: LimitKind::OutputBytes,
             ..
         })
     ));
@@ -435,7 +542,7 @@ fn positions_operation_count_and_resource_limits_are_failure_atomic() {
     assert!(matches!(
         edit.commit().unwrap().patch().to_bytes(Limits::default()),
         Err(Error::Limit {
-            kind: source_backed::paragraph_copy::raw::LimitKind::DurablePatchBytes,
+            kind: LimitKind::DurablePatchBytes,
             ..
         })
     ));

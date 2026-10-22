@@ -21,12 +21,14 @@ edit family contract, while detached XML work keeps a focused raw codec.
   `&self`-based bounded `to_bytes` and `write_to` outputs.
 
 The raw codec preserves the existing exact XML fragment behavior, refusal and
-typed limit errors, no-op and inverse semantics, whole-source freshness checks,
-and retained OPC members. Tree mutation replaces its model only after the
-operation succeeds. Output checks both the caller policy and the admission
-policy before allocation or writing; `write_to` streams the admitted bytes
-without an additional full XML clone. The raw wrapper adds no retained XML
-copy beyond the existing Arc-backed record representation.
+typed limit errors, no-op and inverse semantics, content freshness checks, and
+retained OPC members. Package-family replay retains whole-artifact freshness;
+raw tree replay is authorized by the recorded XML bytes. Tree mutation replaces
+its model only after the operation succeeds. Output checks both the caller
+policy and the admission policy before allocation or writing; `write_to`
+streams the admitted bytes without an additional full XML clone. The raw
+wrapper adds no retained XML copy beyond the existing Arc-backed record
+representation.
 
 All DOCX integration tests and the performance harness consumers were migrated
 in this slice. Raw types are used only for detached XML and durable wire

@@ -348,13 +348,36 @@ impl Snapshot {
 
     fn with_xml(&self, xml: Vec<u8>) -> Result<Self> {
         let layout = scan_document(&xml, self.limits)?;
-        Ok(Self {
+        Ok(self.with_xml_layout(xml, layout))
+    }
+
+    fn with_xml_layout(&self, xml: Vec<u8>, layout: Layout) -> Self {
+        Self {
             xml: Arc::new(xml),
             layout,
             source_version: self.source_version,
             artifact_fingerprint: self.artifact_fingerprint,
             limits: self.limits,
-        })
+        }
+    }
+
+    fn output_layout(&self, xml: &[u8]) -> Result<Layout> {
+        check_limit(
+            LimitKind::OutputBytes,
+            self.limits.max_output_bytes,
+            xml.len(),
+        )?;
+        scan_document(xml, self.limits)
+    }
+
+    fn apply_output(&self, xml: &[u8], resource: &'static str) -> Result<Self> {
+        let layout = self.output_layout(xml)?;
+        let copied = checked_clone(xml, resource)?;
+        Ok(self.with_xml_layout(copied, layout))
+    }
+
+    fn content_matches(&self, before: &[u8]) -> bool {
+        self.xml.as_slice() == before
     }
 }
 
@@ -502,7 +525,17 @@ impl Patch {
         {
             return Err(Error::PatchConflict);
         }
-        source.with_xml(checked_clone(self.after.as_slice(), "patch application")?)
+        source.apply_output(self.after.as_slice(), "patch application")
+    }
+
+    /// Apply a detached XML patch by its recorded content identity. Raw trees
+    /// do not own a package-wide artifact fingerprint, so a reopened tree
+    /// with matching before bytes is an authorized recipient.
+    pub(crate) fn apply_raw(&self, source: &Snapshot) -> Result<Snapshot> {
+        if !source.content_matches(self.before.as_slice()) {
+            return Err(Error::PatchConflict);
+        }
+        source.apply_output(self.after.as_slice(), "raw patch application")
     }
 
     /// Return the exact patch that restores the input bytes.
@@ -819,10 +852,15 @@ impl RemovalPatch {
         {
             return Err(Error::PatchConflict);
         }
-        source.with_xml(checked_clone(
-            self.after.as_slice(),
-            "removal patch application",
-        )?)
+        source.apply_output(self.after.as_slice(), "removal patch application")
+    }
+
+    /// Apply a detached XML removal patch by its recorded content identity.
+    pub(crate) fn apply_raw(&self, source: &Snapshot) -> Result<Snapshot> {
+        if !source.content_matches(self.before.as_slice()) {
+            return Err(Error::PatchConflict);
+        }
+        source.apply_output(self.after.as_slice(), "raw removal patch application")
     }
 
     /// Return the exact patch that restores the input bytes.
