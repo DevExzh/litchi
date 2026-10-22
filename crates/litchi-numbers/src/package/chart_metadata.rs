@@ -57,6 +57,8 @@ pub enum LimitKind {
     RetainedBytes,
     /// Native references inspected by the selector.
     References,
+    /// Compressed IWA member bytes inspected by the rooted owner.
+    CompressedBytes,
 }
 
 impl fmt::Display for LimitKind {
@@ -71,6 +73,7 @@ impl fmt::Display for LimitKind {
             Self::Allocations => "allocations",
             Self::RetainedBytes => "retained bytes",
             Self::References => "references",
+            Self::CompressedBytes => "compressed bytes",
         })
     }
 }
@@ -480,5 +483,6 @@ const fn map_limit_kind(kind: chart_arrangement::LimitKind) -> LimitKind {
         chart_arrangement::LimitKind::Allocations => LimitKind::Allocations,
         chart_arrangement::LimitKind::RetainedBytes => LimitKind::RetainedBytes,
         chart_arrangement::LimitKind::References => LimitKind::References,
+        chart_arrangement::LimitKind::CompressedBytes => LimitKind::CompressedBytes,
     }
 }

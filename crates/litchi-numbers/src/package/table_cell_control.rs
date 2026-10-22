@@ -582,6 +582,10 @@ fn rewrite(
             crate::package::table_cell_pop_up_menu::Refusal::UnsupportedSource,
         ));
     }
+    let snappy_limits = catalog
+        .limits()
+        .snappy_limits()
+        .map_err(|_| Error::InvalidSource { path })?;
     // Charge the complete source ZIP and native archive before the scalar
     // owner clones any archive or stages a list candidate.  The native helper
     // returns a conservative private-candidate bound; its exact serialized
@@ -599,8 +603,8 @@ fn rewrite(
     )?;
     for member in &native_output.members {
         if member.archive_bytes.len() > native_bound.archive_bytes
-            || SnappyStream::maximum_compressed_len(member.archive_bytes.len(), Default::default())
-                .map_err(|_| Error::Verification)?
+            || SnappyStream::maximum_compressed_len(member.archive_bytes.len(), snappy_limits)
+                .map_err(|error| popup::map_core_error(error, path))?
                 > native_bound.compressed_bytes
         {
             return Err(Error::Limit {
@@ -611,8 +615,8 @@ fn rewrite(
             });
         }
         let maximum_compressed =
-            SnappyStream::maximum_compressed_len(member.archive_bytes.len(), Default::default())
-                .map_err(|_| Error::Verification)?;
+            SnappyStream::maximum_compressed_len(member.archive_bytes.len(), snappy_limits)
+                .map_err(|error| popup::map_core_error(error, path))?;
         budget.charge_compressed_bytes(maximum_compressed, path)?;
     }
     let metadata_bytes = popup::rewrite_component_save_tokens(
@@ -633,8 +637,8 @@ fn rewrite(
         .members
         .iter()
         .map(|member| {
-            SnappyStream::compress(&member.archive_bytes, Default::default())
-                .map_err(|_| Error::Verification)
+            SnappyStream::compress(&member.archive_bytes, snappy_limits)
+                .map_err(|error| popup::map_core_error(error, path))
         })
         .collect::<Result<Vec<_>, _>>()?;
     let mut changed_names = native_output

@@ -357,7 +357,8 @@ pub(crate) fn with_identity(source: &[u8], identity: Identity) -> crate::Result<
         ));
     };
     decoded[*offset..*offset + needle.len()].copy_from_slice(version.as_bytes());
-    let metadata = SnappyStream::compress(&decoded, Default::default())
+    let snappy_limits = limits.snappy_limits()?;
+    let metadata = SnappyStream::compress(&decoded, snappy_limits)
         .map_err(|error| crate::Error::Archive(litchi_iwa_archive::Error::Iwa(error)))?;
 
     let edits = [

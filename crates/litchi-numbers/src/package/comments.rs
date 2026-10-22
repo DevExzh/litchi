@@ -400,6 +400,8 @@ pub enum LimitKind {
     TextBytes,
     /// Native references inspected.
     References,
+    /// Compressed IWA member bytes inspected or emitted.
+    CompressedBytes,
 }
 
 /// Failure from a selector-first Numbers comment operation.
@@ -3225,14 +3227,12 @@ fn prepare_metadata_token_entry(
         .limits()
         .effective_archive_limits()
         .map_err(|_| Error::InvalidSource { path })?;
-    let stream = SnappyStream::decompress(
-        entry.data(),
-        physical
-            .limits()
-            .snappy_limits()
-            .map_err(|_| Error::InvalidSource { path })?,
-    )
-    .map_err(|_| Error::InvalidSource { path })?;
+    let snappy_limits = physical
+        .limits()
+        .snappy_limits()
+        .map_err(|_| Error::InvalidSource { path })?;
+    let stream = SnappyStream::decompress(entry.data(), snappy_limits)
+    .map_err(|error| map_core_error(error, path))?;
     let mut archive = Archive::parse(stream.as_bytes(), archive_limits)
         .map_err(|_| Error::InvalidSource { path })?;
     archive
@@ -3254,8 +3254,8 @@ fn prepare_metadata_token_entry(
     let bytes = archive
         .to_bytes(archive_limits)
         .map_err(|_| Error::InvalidSource { path })?;
-    let compressed = SnappyStream::compress(&bytes, Default::default())
-        .map_err(|_| Error::InvalidSource { path })?;
+    let compressed = SnappyStream::compress(&bytes, snappy_limits)
+        .map_err(|error| map_core_error(error, path))?;
     Ok((super::metadata::ENTRY_NAME.to_owned(), compressed))
 }
 
@@ -3292,14 +3292,12 @@ fn rewrite_archives(
             .limits()
             .effective_archive_limits()
             .map_err(|_| Error::InvalidSource { path })?;
-        let stream = SnappyStream::decompress(
-            entry.data(),
-            physical
-                .limits()
-                .snappy_limits()
-                .map_err(|_| Error::InvalidSource { path })?,
-        )
-        .map_err(|_| Error::InvalidSource { path })?;
+        let snappy_limits = physical
+            .limits()
+            .snappy_limits()
+            .map_err(|_| Error::InvalidSource { path })?;
+        let stream = SnappyStream::decompress(entry.data(), snappy_limits)
+        .map_err(|error| map_core_error(error, path))?;
         let mut archive = Archive::parse(stream.as_bytes(), archive_limits)
             .map_err(|_| Error::InvalidSource { path })?;
         archive
@@ -3353,8 +3351,8 @@ fn rewrite_archives(
         let rewritten = archive
             .to_bytes(archive_limits)
             .map_err(|_| Error::InvalidSource { path })?;
-        let compressed = SnappyStream::compress(&rewritten, Default::default())
-            .map_err(|_| Error::InvalidSource { path })?;
+        let compressed = SnappyStream::compress(&rewritten, snappy_limits)
+            .map_err(|error| map_core_error(error, path))?;
         outputs.try_reserve(1).map_err(|_| Error::Allocation {
             amount: outputs.len().saturating_add(1),
             path,
@@ -3439,6 +3437,51 @@ fn map_wire_error(error: litchi_iwa_common::Error, path: Path) -> Error {
             path,
         },
         litchi_iwa_common::Error::Allocation { amount, .. } => Error::Allocation { amount, path },
+        _ => Error::InvalidSource { path },
+    }
+}
+
+/// Preserve the physical Snappy resource dimension at the semantic comment
+/// boundary.  Compression limits are distinct from decoded payload bytes:
+/// the former cover the encoded member, while the latter cover the archive
+/// that Snappy exposes to the comment codec.
+pub(super) fn map_core_error(error: litchi_iwa_core::Error, path: Path) -> Error {
+    match error {
+        litchi_iwa_core::Error::Limit {
+            kind,
+            observed,
+            maximum,
+        } => Error::Limit {
+            kind: match kind {
+                litchi_iwa_core::LimitKind::SnappyCompressedChunkBytes
+                | litchi_iwa_core::LimitKind::SnappyCompressedStreamBytes => {
+                    LimitKind::CompressedBytes
+                },
+                litchi_iwa_core::LimitKind::HeaderFields => LimitKind::WireFields,
+                litchi_iwa_core::LimitKind::HeaderNesting
+                | litchi_iwa_core::LimitKind::Objects
+                | litchi_iwa_core::LimitKind::Messages
+                | litchi_iwa_core::LimitKind::MessagesPerObject
+                | litchi_iwa_core::LimitKind::MetadataItems
+                | litchi_iwa_core::LimitKind::SnappyFrames => LimitKind::References,
+                litchi_iwa_core::LimitKind::ArchiveBytes
+                | litchi_iwa_core::LimitKind::ObjectBytes
+                | litchi_iwa_core::LimitKind::MessageBytes
+                | litchi_iwa_core::LimitKind::HeaderBytes
+                | litchi_iwa_core::LimitKind::HeaderMemoryBytes
+                | litchi_iwa_core::LimitKind::SnappyChunkBytes
+                | litchi_iwa_core::LimitKind::SnappyStreamBytes => LimitKind::WireBytes,
+            },
+            observed,
+            maximum,
+            path,
+        },
+        litchi_iwa_core::Error::Allocation { requested, .. } => {
+            Error::Allocation {
+                amount: requested,
+                path,
+            }
+        },
         _ => Error::InvalidSource { path },
     }
 }
@@ -5420,7 +5463,7 @@ mod tests {
     use super::{
         ArchiveMutation, CensusBudget, Comment, CommentAuthor, CommentOwnershipCensus,
         CommentReply, CommentStorageFact, CommentTimestamp, Error, LimitKind, MessageRoute, Path,
-        WireLimits, cell_ranges, census_alias_checks,
+        WireLimits, cell_ranges, census_alias_checks, map_core_error,
     };
 
     #[test]
@@ -5460,6 +5503,39 @@ mod tests {
 
         assert_eq!(scan_work, 4);
         assert_eq!(ranges, vec![Some(0..3), None, Some(3..8), None]);
+    }
+
+    #[test]
+    fn snappy_failures_keep_compressed_and_allocation_kinds() {
+        assert_eq!(
+            map_core_error(
+                litchi_iwa_core::Error::Limit {
+                    kind: litchi_iwa_core::LimitKind::SnappyCompressedStreamBytes,
+                    observed: 9,
+                    maximum: 8,
+                },
+                Path::Package,
+            ),
+            Error::Limit {
+                kind: LimitKind::CompressedBytes,
+                observed: 9,
+                maximum: 8,
+                path: Path::Package,
+            }
+        );
+        assert_eq!(
+            map_core_error(
+                litchi_iwa_core::Error::Allocation {
+                    resource: "test",
+                    requested: 12,
+                },
+                Path::Package,
+            ),
+            Error::Allocation {
+                amount: 12,
+                path: Path::Package,
+            }
+        );
     }
 
     #[test]

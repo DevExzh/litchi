@@ -2225,6 +2225,10 @@ fn rewrite_metadata_entry(
         .limits()
         .effective_archive_limits()
         .map_err(map_archive_error)?;
+    let snappy_limits = source_catalog
+        .limits()
+        .snappy_limits()
+        .map_err(map_archive_error)?;
     let mut archive = Archive::parse(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
     let object = archive
         .objects
@@ -2248,8 +2252,7 @@ fn rewrite_metadata_entry(
         )
         .map_err(map_core_error)?;
     let rewritten = archive.to_bytes(archive_limits).map_err(map_core_error)?;
-    let compressed =
-        SnappyStream::compress(&rewritten, Default::default()).map_err(map_core_error)?;
+    let compressed = SnappyStream::compress(&rewritten, snappy_limits).map_err(map_core_error)?;
     Ok(OwnedEntryEdit {
         name: PACKAGE_METADATA_ENTRY,
         data: compressed,
@@ -2266,6 +2269,7 @@ fn rewrite_names(
     // allocating any rewritten native component payload.
     metadata_route(source)?;
     let physical_limits = source_catalog.limits();
+    let snappy_limits = physical_limits.snappy_limits().map_err(map_archive_error)?;
     let archive_limits = physical_limits
         .effective_archive_limits()
         .map_err(map_archive_error)?;
@@ -2312,7 +2316,7 @@ fn rewrite_names(
         let rewritten = archive.to_bytes(archive_limits).map_err(map_core_error)?;
         drop(archive);
         let compressed =
-            SnappyStream::compress(&rewritten, Default::default()).map_err(map_core_error)?;
+            SnappyStream::compress(&rewritten, snappy_limits).map_err(map_core_error)?;
         drop(rewritten);
         rewritten_entries.push(OwnedEntryEdit {
             name: component_name,

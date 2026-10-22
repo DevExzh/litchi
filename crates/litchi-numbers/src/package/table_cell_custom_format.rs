@@ -535,6 +535,10 @@ fn rewrite(
         return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     let source_owner = source_catalog.__source_owner();
+    let snappy_limits = source_catalog
+        .limits()
+        .snappy_limits()
+        .map_err(|_| Error::Verification)?;
     let mut budget = popup::TransactionBudget::for_cell_control(source);
     budget.charge_package_source(source_catalog, native_path(path))?;
     let target = popup::resolve_cell(
@@ -583,8 +587,10 @@ fn rewrite(
             });
         }
         let maximum =
-            SnappyStream::maximum_compressed_len(member.archive_bytes.len(), Default::default())
-                .map_err(|_| Error::Verification)?;
+            SnappyStream::maximum_compressed_len(member.archive_bytes.len(), snappy_limits)
+                .map_err(|error| {
+                    map_popup_error(popup::map_core_error(error, native_path(path)))
+                })?;
         if maximum > native_bound.compressed_bytes {
             return Err(Error::Limit {
                 kind: LimitKind::CompressedBytes,
@@ -627,11 +633,11 @@ fn rewrite(
             path,
         })?;
     for member in &native_output.members {
-        let compressed = SnappyStream::compress(&member.archive_bytes, Default::default())
-            .map_err(|_| Error::Verification)?;
+        let compressed = SnappyStream::compress(&member.archive_bytes, snappy_limits)
+            .map_err(|error| map_popup_error(popup::map_core_error(error, native_path(path))))?;
         if compressed.len()
-            > SnappyStream::maximum_compressed_len(member.archive_bytes.len(), Default::default())
-                .map_err(|_| Error::Verification)?
+            > SnappyStream::maximum_compressed_len(member.archive_bytes.len(), snappy_limits)
+                .map_err(|error| map_popup_error(popup::map_core_error(error, native_path(path))))?
         {
             return Err(Error::Verification);
         }

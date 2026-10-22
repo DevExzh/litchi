@@ -713,6 +713,7 @@ fn rewrite_lock_state(
         return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     let physical_limits = source_catalog.limits();
+    let snappy_limits = physical_limits.snappy_limits().map_err(map_archive_error)?;
     let archive_limits = physical_limits
         .effective_archive_limits()
         .map_err(map_archive_error)?;
@@ -773,8 +774,7 @@ fn rewrite_lock_state(
         .map_err(map_core_error)?;
     let rewritten = archive.to_bytes(archive_limits).map_err(map_core_error)?;
     drop(archive);
-    let compressed =
-        SnappyStream::compress(&rewritten, Default::default()).map_err(map_core_error)?;
+    let compressed = SnappyStream::compress(&rewritten, snappy_limits).map_err(map_core_error)?;
     drop(rewritten);
     let output = source_catalog
         .package()

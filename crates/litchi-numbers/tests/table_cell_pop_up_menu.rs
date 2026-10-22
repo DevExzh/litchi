@@ -1913,6 +1913,123 @@ fn popup_public_physical_and_semantic_limits_fail_before_publication() -> TestRe
         .commit()?;
     let target_bytes = target.package().exact_bytes();
     assert!(target_bytes.len() > source.len());
+
+    // The retained physical profile also supplies the Snappy compressed
+    // stream ceiling and the component chunk size.  First obtain the exact
+    // output under that retained profile, then admit it at exactly the
+    // largest encoded member and repeat one byte below that ceiling.  The
+    // latter must fail as a typed physical refusal and leave the snapshot
+    // untouched.
+    let profile_limits = litchi_numbers::SourceLimits::builder()
+        .max_input_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_input_bytes())
+        .and_then(|b| b.max_members(litchi_numbers::SourceLimits::MAXIMUM.max_members()))
+        .and_then(|b| b.max_entry_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_entry_bytes()))
+        .and_then(|b| {
+            b.max_aggregate_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_aggregate_bytes())
+        })
+        .and_then(|b| {
+            b.max_component_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_component_bytes())
+        })
+        .and_then(|b| b.build())?;
+    let profile_package = Package::from_bytes_with_options(
+        &source,
+        litchi_numbers::OpenOptions::new()
+            .source_limits(profile_limits)
+            .semantic_limits(litchi_numbers::SemanticLimits::DEFAULT),
+    )?;
+    let profile_target_bytes = profile_package
+        .edit_table_cell_pop_up_menu_format(
+            SheetSelector::index(0),
+            TableSelector::index(0),
+            At::new(0, 0),
+        )?
+        .set(menu.clone())
+        .commit()?
+        .package()
+        .exact_bytes();
+    let source_catalog = Catalog::from_bytes(&source, Default::default())?;
+    let profile_target_catalog = Catalog::from_bytes(&profile_target_bytes, Default::default())?;
+    let source_max_entry = source_catalog
+        .iter()
+        .map(|entry| entry.data().len())
+        .max()
+        .ok_or_else(|| io::Error::other("source has no entries"))?;
+    let profile_target_max_entry = profile_target_catalog
+        .iter()
+        .map(|entry| entry.data().len())
+        .max()
+        .ok_or_else(|| io::Error::other("profile target has no entries"))?;
+    assert!(profile_target_max_entry > source_max_entry);
+    let profile_target_max_entry = u64::try_from(profile_target_max_entry)?;
+    let exact_snappy_limits = litchi_numbers::SourceLimits::builder()
+        .max_input_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_input_bytes())
+        .and_then(|b| b.max_members(litchi_numbers::SourceLimits::MAXIMUM.max_members()))
+        .and_then(|b| b.max_entry_bytes(profile_target_max_entry))
+        .and_then(|b| {
+            b.max_aggregate_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_aggregate_bytes())
+        })
+        .and_then(|b| {
+            b.max_component_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_component_bytes())
+        })
+        .and_then(|b| b.build())?;
+    let exact_snappy_package = Package::from_bytes_with_options(
+        &source,
+        litchi_numbers::OpenOptions::new()
+            .source_limits(exact_snappy_limits)
+            .semantic_limits(litchi_numbers::SemanticLimits::DEFAULT),
+    )?;
+    let exact_snappy_commit = exact_snappy_package
+        .edit_table_cell_pop_up_menu_format(
+            SheetSelector::index(0),
+            TableSelector::index(0),
+            At::new(0, 0),
+        )?
+        .set(menu.clone())
+        .commit()?;
+    let exact_bytes = exact_snappy_commit.package().exact_bytes();
+    let exact_catalog = Catalog::from_bytes(&exact_bytes, Default::default())?;
+    assert_eq!(
+        exact_catalog.iter().map(|entry| entry.data().len()).max(),
+        usize::try_from(profile_target_max_entry).ok()
+    );
+    assert_eq!(
+        exact_snappy_commit.package().exact_bytes(),
+        profile_target_bytes
+    );
+
+    let one_under_snappy_limits = litchi_numbers::SourceLimits::builder()
+        .max_input_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_input_bytes())
+        .and_then(|b| b.max_members(litchi_numbers::SourceLimits::MAXIMUM.max_members()))
+        .and_then(|b| b.max_entry_bytes(profile_target_max_entry - 1))
+        .and_then(|b| {
+            b.max_aggregate_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_aggregate_bytes())
+        })
+        .and_then(|b| {
+            b.max_component_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_component_bytes())
+        })
+        .and_then(|b| b.build())?;
+    let one_under_package = Package::from_bytes_with_options(
+        &source,
+        litchi_numbers::OpenOptions::new()
+            .source_limits(one_under_snappy_limits)
+            .semantic_limits(litchi_numbers::SemanticLimits::DEFAULT),
+    )?;
+    let one_under_before = one_under_package.exact_bytes();
+    let one_under_error = one_under_package
+        .edit_table_cell_pop_up_menu_format(
+            SheetSelector::index(0),
+            TableSelector::index(0),
+            At::new(0, 0),
+        )?
+        .set(menu.clone())
+        .commit()
+        .expect_err("one byte below the encoded member ceiling must refuse");
+    assert!(
+        format!("{one_under_error:?}").contains("CompressedBytes"),
+        "expected typed compressed-budget refusal, got {one_under_error:?}"
+    );
+    assert_eq!(one_under_package.exact_bytes(), one_under_before);
+
     let exact_output_limits = litchi_numbers::SourceLimits::builder()
         .max_input_bytes(u64::try_from(target_bytes.len())?)
         .and_then(|b| b.max_members(litchi_numbers::SourceLimits::MAXIMUM.max_members()))

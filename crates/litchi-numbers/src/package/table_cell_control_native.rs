@@ -409,8 +409,12 @@ pub(super) fn preflight_copy_on_write_scalar_control(
     let archive_bytes = graph_archive_bound
         .saturating_add(graph_member_bound)
         .saturating_add(64 * 1024);
-    let compressed_bytes = SnappyStream::maximum_compressed_len(archive_bytes, Default::default())
+    let snappy_limits = physical
+        .limits()
+        .snappy_limits()
         .map_err(|_| Error::InvalidSource { path })?;
+    let compressed_bytes = SnappyStream::maximum_compressed_len(archive_bytes, snappy_limits)
+        .map_err(|error| popup::map_core_error(error, path))?;
     // These are operation-local private staging reservations.  The exact
     // prepared list requirements are charged by `apply_list_mutation`'s
     // resource-aware wrapper below; this allowance covers archive COW, tile
