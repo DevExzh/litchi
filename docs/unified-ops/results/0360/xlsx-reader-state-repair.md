@@ -2,7 +2,9 @@
 
 This is the current W4 source-reader repair receipt. It is allocator and
 instruction-count evidence only; no native latency or ABBA acceptance is
-claimed. The candidate source is the pre-W4 integration commit
+claimed. The candidate source is commit
+`2676dd5d533d3553b4fa7210530dab98d0ad1abd`, based on the pre-W4 integration
+commit
 `f75bf4cb98c3c68eb1912d7d75963f1f126e7f35` plus the five-file source diff
 whose SHA-256 is
 `9f9d11e9ac160e0dac881a95053891b00626e60e78bfbd08c3032061e6b09826`.
@@ -72,6 +74,15 @@ history is 3,862,834 bytes / 34,887 calls, and independent verification is
 Managed is 23,338,368 bytes / 27,616 calls, with 3,862,538 retained bytes
 and 102,515,744 verification bytes. Custom is 23,351,936 bytes / 27,232
 calls, with 3,862,962 retained bytes and 102,700,588 verification bytes.
+
+For complete phase accounting, the current profile rows are:
+
+| profile | owner bytes / calls; live / peak | retained bytes / calls; live / peak | verification bytes / calls; live / peak |
+| --- | --- | --- | --- |
+| default | 23,347,840 / 27,168; 141,687 / 593,449 | 3,862,834 / 34,887; 137,519 / 427,929 | 102,692,396 / 73,454; 141,687 / 593,449 |
+| managed | 23,338,368 / 27,616; 138,543 / 589,421 | 3,862,538 / 34,901; 138,287 / 427,929 | 102,515,744 / 73,312; 138,543 / 589,421 |
+| custom | 23,351,936 / 27,232; 141,687 / 593,577 | 3,862,962 / 34,889; 137,519 / 427,929 | 102,700,588 / 73,582; 141,687 / 593,577 |
+| e63 default | 23,346,752 / 27,808; 167,953 / 606,577 | 4,834,958 / 46,730; 167,697 / 427,929 | 103,381,056 / 104,576; 167,953 / 606,577 |
 
 The default current owner leaves 141,687 live bytes and reaches a 593,449-byte
 peak, versus 167,953 live and 606,577 peak for e63. Retained-history live
