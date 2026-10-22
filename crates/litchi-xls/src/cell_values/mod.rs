@@ -938,8 +938,12 @@ impl Snapshot {
             reason = "the unit tests drive the record-level publishers; Package and source_backed are the public routes"
         )
     )]
-    fn retag_source_version(self, source_version: SourceVersion) -> Self {
+    fn retag_source_version(mut self, source_version: SourceVersion) -> Self {
         if self.inner.source_version == source_version {
+            return self;
+        }
+        if let Some(inner) = Arc::get_mut(&mut self.inner) {
+            inner.source_version = source_version;
             return self;
         }
         let inner = &self.inner;

@@ -9,7 +9,10 @@ use litchi_cfb::{
     OleFile, OleFileLimits, OleWriter, OutputProgress, OverlaySourceMode, SharedOleFile,
 };
 use std::io::Write;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{
+    atomic::{AtomicU64, Ordering},
+    Arc,
+};
 
 fn package() -> Vec<u8> {
     let mut writer = crate::Builder::new();
@@ -1053,6 +1056,27 @@ fn source_backed_numeric_noop_reuses_identity_and_fingerprint() {
     );
     assert_eq!(commit.diagnostics().splice_count(), 0);
     assert_eq!(commit.diagnostics().replacement_bytes(), 0);
+}
+
+#[test]
+fn retag_source_version_reuses_unique_inner_and_copies_shared_inner() {
+    let source = Snapshot::from_bytes(package(), Limits::default()).unwrap();
+    let unique_inner = Arc::as_ptr(&source.inner);
+    let unique_version = SourceVersion::new(0x554e_4951, 1);
+    let retagged = source.retag_source_version(unique_version);
+    assert_eq!(Arc::as_ptr(&retagged.inner), unique_inner);
+    assert_eq!(retagged.source_version(), unique_version);
+
+    let shared = retagged.clone();
+    let shared_inner = Arc::as_ptr(&retagged.inner);
+    let copied_version = SourceVersion::new(0x5348_4152, 1);
+    let copied = retagged.retag_source_version(copied_version);
+    assert_ne!(Arc::as_ptr(&copied.inner), shared_inner);
+    assert_eq!(copied.source_version(), copied_version);
+    assert_eq!(shared.source_version(), unique_version);
+    assert_eq!(copied.bytes(), shared.bytes());
+    assert_eq!(copied.inner.limits, shared.inner.limits);
+    assert_eq!(copied.inner.cfb_limits, shared.inner.cfb_limits);
 }
 
 #[test]
