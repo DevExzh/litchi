@@ -1399,7 +1399,17 @@ impl ArchiveObject {
     }
 
     fn validate_payloads(&self, limits: Limits) -> Result<()> {
-        let header_length = archive_info_encoded_len(&self.archive_info)?;
+        let header_length = if self.original_header.is_some() {
+            // Admission precedes the wire-length conversion used to choose
+            // the retained header, including for mutated oversized payloads.
+            for message in &self.messages {
+                check_message_length(message.data.len(), limits)?;
+            }
+            let canonical_length = canonical_archive_info_length_for_object(self)?;
+            retained_header_length_for_object(self, canonical_length, limits)?
+        } else {
+            archive_info_encoded_len(&self.archive_info)?
+        };
         self.validate_payloads_with_header_length(limits, header_length)
     }
 
@@ -7712,7 +7722,8 @@ fn encoded_archive_len_preflight(objects: &[ArchiveObject], limits: Limits) -> R
 
         let canonical_header_length = canonical_archive_info_length_for_object(object)?;
         check_header_length(canonical_header_length, limits)?;
-        let header_length = retained_header_length_for_object(object, canonical_header_length)?;
+        let header_length =
+            retained_header_length_for_object(object, canonical_header_length, limits)?;
         check_header_length(header_length, limits)?;
 
         let mut payload_length = 0usize;
@@ -7755,6 +7766,7 @@ fn canonical_archive_info_length_for_object(object: &ArchiveObject) -> Result<us
 fn retained_header_length_for_object(
     object: &ArchiveObject,
     canonical_length: usize,
+    limits: Limits,
 ) -> Result<usize> {
     let Some((original, original_canonical)) = object
         .original_header
@@ -7773,11 +7785,53 @@ fn retained_header_length_for_object(
             "ArchiveInfo preflight length mismatch",
         ));
     }
-    Ok(if canonical_matches {
-        original.len()
+    if canonical_matches {
+        admit_retained_header(original, limits)?;
+        Ok(original.len())
     } else {
-        canonical_length
-    })
+        Ok(canonical_length)
+    }
+}
+
+fn admit_retained_header(original: &[u8], limits: Limits) -> Result<()> {
+    check_header_length(original.len(), limits)?;
+    // This private buffer was parsed or rewritten through the header codec.
+    // Every field needs at least a tag and a value/length byte, and the known
+    // schema descends at most ArchiveInfo -> MessageInfo -> FieldInfo ->
+    // FieldPath. Unknown length-delimited fields are opaque to that codec.
+    let fields_bound = original.len() / 2;
+    // Bound every charge in field_memory_charge by its disjoint wire bytes:
+    // message allocations use their tag/length bytes, while packed scalars
+    // and opaque fields use their payload bytes. The deliberately generous
+    // coefficient avoids a second wire walk for ordinary retained headers.
+    // Tight profiles fall back to the exact preflight rather than refusing
+    // on this upper bound or reporting a fabricated observed count.
+    const MEMORY_PER_BYTE: usize = 2
+        * (size_of::<MessageInfo>()
+            + size_of::<archive_codec::FieldInfo>()
+            + size_of::<FieldInfo>()
+            + size_of::<archive_codec::FieldPath>()
+            + size_of::<FieldPath>()
+            + size_of::<&[u8]>()
+            + size_of::<[usize; 6]>()
+            + size_of::<u64>())
+        + 1;
+    if fields_bound <= limits.max_header_fields()
+        && limits.max_header_nesting() >= 3
+        && fields_bound <= limits.max_messages_per_object()
+        && original
+            .len()
+            .checked_mul(2)
+            .is_some_and(|items| items <= limits.max_metadata_items())
+        && original
+            .len()
+            .checked_mul(MEMORY_PER_BYTE)
+            .is_some_and(|bytes| bytes <= limits.max_header_memory_bytes())
+    {
+        return Ok(());
+    }
+    preflight_header(original, HeaderKind::ArchiveInfo, limits)?;
+    Ok(())
 }
 
 fn emit_canonical_archive_info(
@@ -8480,6 +8534,7 @@ where
             object.original_canonical_header.as_deref(),
         ) {
             (Some(original), Some(canonical)) if canonical == canonical_header.as_slice() => {
+                admit_retained_header(original, limits)?;
                 original
             },
             _ => canonical_header.as_slice(),

@@ -63,3 +63,10 @@ Their calibration, warmup and incomplete block output remain unqualified;
 both ended runners retain their original `running` manifests. The refreshed
 inventory includes all four attempts, and engineering holds were released
 after the fourth interruption. No latency acceptance is claimed.
+
+## Required retained-header follow-up
+
+[0361fb](0361fb-retained-header-admission.md) reproduces and repairs admission
+of retained unknown header fields under stricter limits. Its validation passes,
+but requires a fresh matched build. The v4 evidence above remains attached to
+`c2972b860c` and does not qualify the later source.

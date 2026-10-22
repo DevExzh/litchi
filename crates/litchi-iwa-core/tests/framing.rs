@@ -701,6 +701,107 @@ fn missing_required_field_info_path_is_rejected_before_publication() {
 }
 
 #[test]
+fn retained_unknown_header_obeys_stricter_field_limits() -> Result<(), Error> {
+    // One identifier and two unknown scalar fields; the decoded model has
+    // only the identifier, but exact publication retains all three records.
+    let source = [6, 0x08, 1, 0x20, 0, 0x20, 0];
+    let archive = Archive::parse(&source, ArchiveLimits::default())?;
+    let exact = ArchiveLimits::default().with_header_fields(3)?;
+    assert_eq!(archive.to_bytes(exact)?, source);
+    let strict = ArchiveLimits::default().with_header_fields(1)?;
+    assert!(matches!(
+        Archive::parse(&source, strict),
+        Err(Error::Limit {
+            kind: LimitKind::HeaderFields,
+            observed: 2,
+            maximum: 1,
+        })
+    ));
+    let results = [
+        archive.objects[0].validate(strict),
+        archive.validate(strict),
+        archive.encoded_len(strict).map(|_| ()),
+        archive.to_bytes(strict).map(|_| ()),
+    ];
+    assert_eq!(
+        results.map(|result| matches!(
+            result,
+            Err(Error::Limit {
+                kind: LimitKind::HeaderFields,
+                observed: 2,
+                maximum: 1,
+            })
+        )),
+        [true; 4],
+        "object/archive validation and encoded/publication admission must include retained fields"
+    );
+    let mut changed = archive;
+    changed.objects[0].archive_info.identifier = Some(2);
+    // The existing canonical-publication rule discards the old header when
+    // its model no longer matches. Unused provenance must not consume the
+    // new output's field budget.
+    assert_eq!(changed.to_bytes(strict)?, [2, 0x08, 2]);
+    Ok(())
+}
+
+#[test]
+fn retained_header_resource_admission_matches_fresh_ingress() -> Result<(), Error> {
+    let source = [6, 0x08, 1, 0x20, 0, 0x20, 0];
+    let archive = Archive::parse(&source, ArchiveLimits::default())?;
+    let memory = match Archive::parse(
+        &source,
+        ArchiveLimits::default().with_header_memory_bytes(1)?,
+    ) {
+        Err(Error::Limit {
+            kind: LimitKind::HeaderMemoryBytes,
+            observed,
+            ..
+        }) => observed,
+        result => panic!("expected a retained header memory charge: {result:?}"),
+    };
+    let profiles = [
+        (
+            LimitKind::HeaderBytes,
+            6,
+            ArchiveLimits::default().with_header_bytes(5)?,
+            ArchiveLimits::default().with_header_bytes(6)?,
+        ),
+        (
+            LimitKind::ObjectBytes,
+            source.len(),
+            ArchiveLimits::default().with_object_bytes(source.len() - 1)?,
+            ArchiveLimits::default().with_object_bytes(source.len())?,
+        ),
+        (
+            LimitKind::HeaderMemoryBytes,
+            memory,
+            ArchiveLimits::default().with_header_memory_bytes(memory - 1)?,
+            ArchiveLimits::default().with_header_memory_bytes(memory)?,
+        ),
+    ];
+    for (kind, expected, below, exact) in profiles {
+        archive.objects[0].validate(exact)?;
+        archive.validate(exact)?;
+        assert_eq!(archive.encoded_len(exact)?, source.len());
+        assert_eq!(archive.to_bytes(exact)?, source);
+        for result in [
+            archive.objects[0].validate(below),
+            archive.validate(below),
+            archive.encoded_len(below).map(|_| ()),
+            archive.to_bytes(below).map(|_| ()),
+        ] {
+            assert!(matches!(result, Err(Error::Limit {
+                kind: actual,
+                observed,
+                maximum,
+            }) if actual == kind && observed == expected && maximum == expected - 1));
+        }
+    }
+    assert_eq!(archive.to_bytes(ArchiveLimits::default())?, source);
+    Ok(())
+}
+
+#[test]
 fn unknown_and_noncanonical_header_bytes_round_trip_byte_for_byte() -> Result<(), Error> {
     let archive = Archive {
         objects: vec![ArchiveObject::new(
