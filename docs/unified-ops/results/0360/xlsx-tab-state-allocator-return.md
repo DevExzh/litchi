@@ -299,3 +299,57 @@ the preserve-overlay and zlib workspace lifetime seen during replay. A further
 repair must identify and reduce those live objects while retaining exact
 artifact authentication, recipient limits, and the public projection's
 read-only capabilities.
+
+## Deferred endpoint and snapshot sharing (5e0672b53c)
+
+Commit `5e0672b53c870eb567bc9cd39d4ab0ed7959c56b` shares one exact restore
+endpoint between adjacent deferred patch records and caches the immutable
+tab-state source closure for repeated edits on one source owner. The endpoint
+cache preserves the existing weak owner fast path, exact before/after artifact
+authentication, source-version checks, recipient limits, and deferred
+publisher streaming. The snapshot cache is read-only and is populated from
+the already admitted catalog proof; no output or source ceiling is changed.
+The source validation passed `source_backed_tab_state` (15 tests),
+`source_backed_defined_names` (7 tests), and all-target/all-feature
+warning-denied Clippy for `litchi-xlsx`.
+
+The protected candidate binary is outside the repository at
+`/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/protected/endpoint-cache/xlsx_tab_state_history_alloc` (10,425,736 bytes, SHA-256
+`f6dcafed3330cafac233a38f9678ac976320586efb5d8b652bc8c27888b708d0`). It
+was built with the capped W4 environment using
+`cargo build --locked --release --features allocator-metrics --manifest-path tools/perf-baseline/Cargo.toml --bin xlsx_tab_state_history_alloc`, with `CARGO_BUILD_JOBS=2` and a distinct target directory. The shared `Cargo.lock` SHA-256 is
+`aa4300aff7f76cb467a2a6bc5896e706b3f5b506feed1d16b45f7422a0a9ba23`; the
+benchmark manifest SHA-256 is
+`52e349415b12b80765e810f47b4f6ac2e76cc092566eb257efc463e07d25fc2f`.
+
+The count-only pair used the same two-defined-name fixture, 64 retained
+steps, two warmups, and exact 64/64 forward and inverse checks. The receipt is
+outside the repository at
+`/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/allocator-endpoint-cache-v1`.
+The e63 JSON SHA-256 is
+`509453270b20147fbc034a02e0d1842abf5f60b1bc9d61e00c9c050f37cdc098`; the
+candidate JSON SHA-256 is
+`f6b8eaa5222c7092c92615d5888c630b83e0199fbb5e1c120b71f5ed0e54f598`.
+Fixture and forward/inverse output hashes are identical between the pair.
+
+| interval | e63 | 5e0672b53c | change vs e63 |
+| --- | ---: | ---: | ---: |
+| retained history allocated bytes | 4,834,958 | 3,887,975 | -946,983 (-19.59%) |
+| retained history allocation calls | 46,730 | 35,129 | -11,601 (-24.83%) |
+| retained history live bytes after | 167,697 | 136,291 | -31,406 |
+| retained history peak live after | 427,929 | 427,929 | unchanged |
+| independent replay allocated bytes | 103,381,056 | 102,867,500 | -513,556 (-0.50%) |
+| independent replay allocation calls | 104,576 | 73,582 | -30,994 (-29.64%) |
+| independent replay live bytes after | 167,953 | 140,459 | -27,494 |
+| independent replay peak live after | 606,577 | 594,117 | -12,460 (-2.05%) |
+| source-owner admission allocated bytes | 23,346,752 | 24,427,744 | +1,080,992 (+4.63%) |
+| source-owner admission allocation calls | 27,808 | 38,592 | +10,784 (+38.78%) |
+
+The endpoint and snapshot changes materially improve retained history and
+replay memory while preserving exact output. The owner-admission interval is
+still returned: it creates a fresh source owner for each one-shot edit, so the
+first version of the snapshot cache retained a full parsed closure after that
+edit was dropped. A follow-up is being prepared to arm the cache only after a
+second successful use, preserving the repeated-history benefit without
+retaining a one-shot admission snapshot. No native latency, RSS, or final W4
+performance acceptance is claimed from this count-only result.
