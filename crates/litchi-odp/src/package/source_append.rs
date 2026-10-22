@@ -130,6 +130,8 @@ pub enum Error {
         expected: SourceVersion,
         /// Source identity and revision observed during the operation.
         observed: SourceVersion,
+        /// Sink progress observed when the source became stale.
+        progress: SourceContentPublicationProgress,
     },
     /// A patch was applied to a presentation it was not made on.
     PatchConflict {
@@ -147,9 +149,13 @@ impl fmt::Display for Error {
             Self::SourceMember(error) => error.fmt(formatter),
             Self::Plan(error) => error.fmt(formatter),
             Self::Publication(error) => error.fmt(formatter),
-            Self::SourceChanged { expected, observed } => write!(
+            Self::SourceChanged {
+                expected,
+                observed,
+                progress,
+            } => write!(
                 formatter,
-                "ODP source changed (expected {expected:?}, observed {observed:?})"
+                "ODP source changed (expected {expected:?}, observed {observed:?}, {progress:?})"
             ),
             Self::PatchConflict { operation, reason } => {
                 write!(formatter, "ODP patch conflict in {operation}: {reason}")
@@ -179,8 +185,8 @@ impl Error {
             Self::Publication(error) => Some(error.progress()),
             Self::Invalid(_)
             | Self::SourceMember(_)
-            | Self::SourceChanged { .. }
             | Self::PatchConflict { .. } => None,
+            Self::SourceChanged { progress, .. } => Some(*progress),
         }
     }
 }
@@ -192,13 +198,18 @@ fn invalid(message: impl Into<String>) -> Error {
 fn source_error(error: CoreError) -> Error {
     match error {
         CoreError::SourceChanged { expected, observed } => {
-            Error::SourceChanged { expected, observed }
+            Error::SourceChanged {
+                expected,
+                observed,
+                progress: SourceContentPublicationProgress::Untouched,
+            }
         },
         other => Error::Invalid(other),
     }
 }
 
 fn publication_error(error: SourceContentPublicationError) -> Error {
+    let progress = error.progress();
     match error {
         SourceContentPublicationError::SourceChanged {
             expected, observed, ..
@@ -207,7 +218,11 @@ fn publication_error(error: SourceContentPublicationError) -> Error {
         | SourceContentPublicationError::Source {
             source: CoreError::SourceChanged { expected, observed },
             ..
-        } => Error::SourceChanged { expected, observed },
+        } => Error::SourceChanged {
+            expected,
+            observed,
+            progress,
+        },
         other => Error::Plan(other),
     }
 }
@@ -217,7 +232,14 @@ fn source_member_error(error: SourceMemberReaderError<CoreError>) -> Error {
         SourceMemberReaderError::Core {
             error: CoreError::SourceChanged { expected, observed },
             ..
-        } => Error::SourceChanged { expected, observed },
+        }
+        | SourceMemberReaderError::Callback(CoreError::SourceChanged { expected, observed }) => {
+            Error::SourceChanged {
+                expected,
+                observed,
+                progress: SourceContentPublicationProgress::Untouched,
+            }
+        },
         other => Error::SourceMember(other),
     }
 }
@@ -2144,6 +2166,38 @@ mod tests {
             owner.edit_tail_append("later", "body").unwrap().prepare(),
             Err(Error::SourceChanged { .. })
         ));
+    }
+
+    #[test]
+    fn stale_publication_preserves_before_and_after_progress() {
+        let expected = SourceVersion::new(0x100, 1);
+        let observed = SourceVersion::new(0x100, 2);
+        let before = publication_error(SourceContentPublicationError::SourceChanged {
+            expected,
+            observed,
+            progress: SourceContentPublicationProgress::Untouched,
+        });
+        assert_eq!(
+            before.progress(),
+            Some(SourceContentPublicationProgress::Untouched)
+        );
+
+        let after = publication_error(SourceContentPublicationError::Source {
+            progress: SourceContentPublicationProgress::Complete { bytes: 17 },
+            source: CoreError::SourceChanged { expected, observed },
+        });
+        assert_eq!(
+            after.progress(),
+            Some(SourceContentPublicationProgress::Complete { bytes: 17 })
+        );
+
+        let callback = source_member_error(SourceMemberReaderError::Callback(
+            CoreError::SourceChanged { expected, observed },
+        ));
+        assert_eq!(
+            callback.progress(),
+            Some(SourceContentPublicationProgress::Untouched)
+        );
     }
 
     #[test]

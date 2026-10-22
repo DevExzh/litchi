@@ -35,9 +35,9 @@ sources, and unsupported content remain their existing typed errors.
 ## ODP tail-append source wrapper
 
 `crates/litchi-odp/src/package/source_append.rs` has a format-owned
-`Error::SourceChanged { expected, observed }` variant.  Its display is limited
-to opaque source-version tokens, it has no underlying error source or output
-progress, and helper conversions preserve freshness from:
+`Error::SourceChanged { expected, observed, progress }` variant.  Its display
+is limited to opaque source-version tokens and progress, it has no underlying
+error source, and helper conversions preserve freshness from:
 
 * `check_source`, `effective`, `source_version`, and
   `member_materialized_size` during apply, prepare, and commit;
@@ -47,7 +47,32 @@ progress, and helper conversions preserve freshness from:
 Patch-structure and byte-proof failures continue to use the existing
 `Error::PatchConflict { operation, reason }`.  The source-append unit test uses
 a bounded `ReadAt` adapter with a revision counter and verifies that a changed
-source is reported as `SourceChanged` by both replay and preparation.
+source is reported as `SourceChanged` by both replay and preparation.  A
+focused regression also verifies `Untouched` progress for a stale-before-output
+failure, `Complete` progress for a stale-after-output failure, and freshness
+retention for a callback-scoped source-member error.
+
+## Validation receipt
+
+The isolated worktree was `/home/zhuhe/code/litchi-worktrees/uo2-replay-error-audit`
+at `273aa07748674cc67b6d6a229d9f8b7248e38762` before this progress fix.  The
+focused lane reused
+`/home/zhuhe/code/litchi-worktrees/.coord/zip-gate-repair/target`, ran with one
+Cargo job and one test thread, and remained below 1 GiB.  Results:
+
+* ODT `embedded_resource_gc`: 12 passed;
+* ODG `package_semantics`: 24 passed;
+* ODM `advanced_transactions` and `capability_transactions`: 9 and 8 passed;
+* ODB `advanced_transactions`: 20 passed;
+* ODI `semantic_planning`: 14 passed;
+* ODF Formula `fifth_wave`: 5 passed; and
+* ODP source-append progress regression: 1 passed.
+
+Strict `cargo clippy --lib -- -D warnings` passed for ODT, ODG, ODM, ODB,
+ODI, ODF Formula, and ODP.  Broader all-target checks were limited by absent
+corpus fixtures in this intentionally partial audit checkout; the affected
+integration targets above were run after temporarily restoring only their
+small tracked fixtures, which were removed before commit.
 
 ## False positives and boundaries
 
