@@ -77,3 +77,15 @@ candidate allocator SHA-256 is
 `6073d882dfc470e085a4bc3bc4ea7ab1965be1c390e0ff76038047f784425903`.
 Native timing is still pending a coordinator quiet window; no performance
 acceptance is claimed before that paired run.
+
+After the final narrow policy correction, the affected consumer matrix was
+rerun against the same source tree. A combined all-target/all-feature check
+passed for `litchi-doc`, `litchi-ppt`, `litchi-xls`, and `litchi-imgconv`.
+Their corresponding all-target/all-feature test commands all exited
+successfully, as did the 104-test ODraw suite. The consumer rerun found no
+additional migration or policy gap: every remaining `Limits::default()` in
+these paths is an explicit host-selected policy or test/fixture setup, while
+raw ODraw entry points continue to require a `Limits` argument. The target
+used for this rerun was
+`/home/zhuhe/code/litchi-worktrees/.coord/uo2-w8-odraw-limits-target` and was
+7.0 GB after completion; no generated artifact was added to the repository.
