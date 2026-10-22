@@ -20,6 +20,7 @@ use std::io::Read;
 use std::ops::ControlFlow;
 #[cfg(any(unix, windows))]
 use std::path::Path;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, OnceLock, PoisonError};
 
 #[cfg(any(unix, windows))]
@@ -85,13 +86,18 @@ fn check_execution(context: Option<&ExecutionContext>) -> Result<()> {
     })
 }
 
-struct SourceSheetData {
+pub(crate) struct SourceSheetData {
     position: usize,
-    name: String,
+    pub(crate) name: String,
     name_key: Box<str>,
-    kind: WorksheetKind,
-    visibility: Visibility,
-    part_uri: PackURI,
+    pub(crate) kind: WorksheetKind,
+    pub(crate) visibility: Visibility,
+    pub(crate) part_uri: PackURI,
+    /// The validated workbook catalog coordinates retained for the tab-state
+    /// source closure. Keeping these values avoids reparsing the same
+    /// workbook XML when an already admitted read-only owner starts an edit.
+    pub(crate) sheet_id: u32,
+    pub(crate) relationship_id: Box<str>,
     /// Repairs made by the first successful parse of this worksheet's grid.
     ///
     /// The parsed grid itself lives in the workbook's evictable semantic
@@ -129,6 +135,15 @@ pub(crate) struct SourceInner {
     /// source-backed edit does not mutate that closure, so repeated edits can
     /// share its parsed graph, relationships and source payload metadata.
     pub(crate) tab_state_snapshot: OnceLock<Arc<crate::tab_state::Snapshot>>,
+    /// The first edit on an owner is commonly a one-shot admission probe. Do
+    /// not retain its snapshot solely because the edit was dropped; arm the
+    /// immutable cache after the first successful snapshot load so repeated
+    /// edits still share the closure without adding one to every new owner.
+    pub(crate) tab_state_snapshot_seen: AtomicBool,
+    /// The source-backed tab graph is already admitted by the workbook open.
+    /// Keep its exact validation lazy for the edit path, while sharing the
+    /// resulting graph across snapshots once a commit needs it.
+    pub(crate) tab_state_graph: OnceLock<Arc<crate::tab_state::GraphBinding>>,
     /// One shared package handle for exact replay endpoints. Keeping this
     /// lazy leaves ordinary read-only opens allocation-free while letting a
     /// retained patch refer to one package owner per source lineage instead
@@ -157,8 +172,8 @@ pub(crate) struct SourceInner {
     style_lineage: Arc<crate::style::StyleLineage>,
     flavor: Flavor,
     date_system: DateSystem,
-    active_sheet: Option<usize>,
-    sheets: Box<[Arc<SourceSheetData>]>,
+    pub(crate) active_sheet: Option<usize>,
+    pub(crate) sheets: Arc<[Arc<SourceSheetData>]>,
     /// Sheet positions sorted by their canonical, case-insensitive names.
     ///
     /// The mandatory workbook catalog rejects duplicate canonical names, so a
@@ -458,11 +473,13 @@ impl SourceBackedWorkbook {
                 kind: part.kind,
                 visibility: codec::visibility(sheet.visibility),
                 part_uri: part.uri,
+                sheet_id: sheet.sheet_id,
+                relationship_id: sheet.relationship_id.into_boxed_str(),
                 tolerance: OnceLock::new(),
                 build: Mutex::new(()),
             }));
         }
-        let sheets = sheets.into_boxed_slice();
+        let sheets: Arc<[Arc<SourceSheetData>]> = sheets.into_boxed_slice().into();
         let mut sheet_name_order = Vec::new();
         sheet_name_order
             .try_reserve_exact(sheets.len())
@@ -497,6 +514,8 @@ impl SourceBackedWorkbook {
                 package,
                 restore_endpoint: OnceLock::new(),
                 tab_state_snapshot: OnceLock::new(),
+                tab_state_snapshot_seen: AtomicBool::new(false),
+                tab_state_graph: OnceLock::new(),
                 package_handle: OnceLock::new(),
                 merge_source_states: Mutex::new(HashMap::new()),
                 execution,
@@ -574,6 +593,16 @@ impl SourceBackedWorkbook {
 
     pub(crate) fn tab_state_snapshot(&self) -> &OnceLock<Arc<crate::tab_state::Snapshot>> {
         &self.current().tab_state_snapshot
+    }
+
+    pub(crate) fn tab_state_source_owner(&self) -> Arc<SourceInner> {
+        Arc::clone(self.current())
+    }
+
+    pub(crate) fn tab_state_snapshot_should_cache(&self) -> bool {
+        self.current()
+            .tab_state_snapshot_seen
+            .swap(true, Ordering::AcqRel)
     }
 
     /// Content-free diagnostics of the workbook's semantic cache.
@@ -1555,6 +1584,26 @@ fn map_selected_mce_error(error: MceError) -> Error {
 }
 
 impl SourceInner {
+    pub(crate) fn tab_state_graph(
+        &self,
+        owner: std::sync::Weak<SourceInner>,
+    ) -> Arc<crate::tab_state::GraphBinding> {
+        Arc::clone(self.tab_state_graph.get_or_init(|| {
+            Arc::new(crate::tab_state::GraphBinding::source(
+                owner,
+                Arc::clone(&self.sheets),
+            ))
+        }))
+    }
+
+    pub(crate) fn tab_state_package(&self) -> &SourceBackedPackage {
+        &self.package
+    }
+
+    pub(crate) fn tab_state_catalog_is_clean(&self) -> bool {
+        self.tolerance.is_clean()
+    }
+
     pub(crate) fn source_limits(&self) -> Arc<SourceLimits> {
         Arc::clone(
             self.source_limits

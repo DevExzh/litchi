@@ -298,21 +298,29 @@ impl SourceBackedWorkbook {
     pub fn edit_tab_state_with_options(&self, options: EditOptions) -> Result<Edit> {
         let view = self.view()?;
         let package = view.edit_package()?;
-        // `Snapshot::load_source_backed_with_catalog` used to perform this
-        // freshness check on every edit. Keep the same source fence when a
-        // cached immutable closure is reused.
-        package.source_version()?;
+        let source_owner = view.tab_state_source_owner();
         let shared_catalog = view.shared_catalog_proof();
         let snapshot_cache = view.tab_state_snapshot();
         let before = match snapshot_cache.get() {
-            Some(snapshot) => Arc::clone(snapshot),
+            Some(snapshot) => {
+                // The source-owner loader performs this freshness check while
+                // creating the closure. Keep the same source fence when a
+                // cached immutable closure is reused.
+                package.source_version()?;
+                Arc::clone(snapshot)
+            },
             None => {
-                let snapshot = Arc::new(Snapshot::load_source_backed_with_catalog(
+                let snapshot = Arc::new(Snapshot::load_source_backed_from_owner(
                     package,
+                    source_owner,
                     Arc::new(()),
                     shared_catalog,
                 )?);
-                Arc::clone(snapshot_cache.get_or_init(|| snapshot))
+                if view.tab_state_snapshot_should_cache() {
+                    Arc::clone(snapshot_cache.get_or_init(|| snapshot))
+                } else {
+                    snapshot
+                }
             },
         };
         Edit::new(

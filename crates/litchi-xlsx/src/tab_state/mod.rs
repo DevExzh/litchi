@@ -9,4 +9,5 @@ mod snapshot;
 pub mod source;
 
 pub(crate) use patch::Patch;
+pub(crate) use snapshot::GraphBinding;
 pub use snapshot::{Snapshot, Tab};

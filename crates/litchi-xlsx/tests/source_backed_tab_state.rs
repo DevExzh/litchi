@@ -17,7 +17,9 @@ use litchi_opc::{
     BlobPart, OpcError, OpcPackage, PackURI, PackageWriter, SourceCacheLimits, TargetMode,
 };
 use litchi_xlsx::tab_state::source::{Commit, EditOptions, Limits};
-use litchi_xlsx::{Error, Package, SourceBackedWorkbook, SourceLimits, Visibility, WorksheetKind};
+use litchi_xlsx::{
+    Error, Leniency, Package, SourceBackedWorkbook, SourceLimits, Visibility, WorksheetKind,
+};
 use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
 
 const TRANSITIONAL: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
@@ -523,6 +525,20 @@ fn staged_activation_can_return_to_source_and_noop_activation_does_not_pin_reloc
 }
 
 #[test]
+fn source_snapshot_public_accessors_survive_owner_drop() {
+    let snapshot = {
+        let editor = open_editor(fixture(Fixture::default()));
+        let edit = editor.edit_tab_state().unwrap();
+        edit.before().clone()
+    };
+
+    assert_eq!(snapshot.tabs().len(), 3);
+    assert_eq!(snapshot.active_tab().unwrap().name(), "One");
+    assert!(!snapshot.workbook_xml().is_empty());
+    assert!(!snapshot.workbook_source_arc().unwrap().is_empty());
+}
+
+#[test]
 fn tab_state_xml_audit_limits_are_configurable_and_typed() {
     let bytes = fixture(Fixture::default());
     let xml_bytes = Limits::new().with_max_xml_bytes(1).unwrap();
@@ -994,6 +1010,27 @@ fn malformed_duplicate_external_and_retargeted_sheet_relationships_are_refused()
         replay_patch(&mut touched_relationship, commit.patch()),
         Err(Error::PatchConflict { .. })
     ));
+}
+
+#[test]
+fn source_tab_edit_keeps_strict_catalog_recheck_after_open_repair() {
+    let mut package = OpcPackage::from_bytes(&fixture(Fixture::default())).unwrap();
+    let workbook = package.get_part_mut(&PackURI::new(MAIN).unwrap()).unwrap();
+    let mut workbook_xml = workbook.blob().to_vec();
+    let replaced = workbook_xml
+        .windows(b"activeTab=\"0\"".len())
+        .position(|window| window == b"activeTab=\"0\"");
+    let offset = replaced.expect("fixture workbook view has an active tab");
+    workbook_xml[offset..offset + b"activeTab=\"0\"".len()].copy_from_slice(b"activeTab=\"9\"");
+    workbook.set_blob(workbook_xml);
+    let bytes = PackageWriter::to_bytes(&package).unwrap();
+    let source = SourceBackedWorkbook::from_read_at_with_options(
+        Arc::new(VersionedSource::new(bytes)),
+        litchi_xlsx::OpenOptions::new().leniency(Leniency::Strict),
+    )
+    .unwrap();
+    assert!(!source.tolerance_report().is_clean());
+    assert!(source.edit_tab_state().is_err());
 }
 
 #[test]
