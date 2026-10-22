@@ -63,7 +63,7 @@ fn limits() -> XmlStreamLimits {
 }
 
 fn reader<'a>(source: &'a str) -> litchi_core::Result<ResolvedReader<'a>> {
-    ResolvedReader::from_xml(source, limits())
+    Ok(ResolvedReader::from_xml(source, limits())?)
 }
 
 #[derive(Debug)]
@@ -561,7 +561,7 @@ fn active_namespace_bytes_are_bounded_before_resolver_growth() {
     source.push_str("/>");
 
     let error = first_error(&source);
-    assert!(error.contains("active namespace") || error.contains("namespace byte"));
+    assert!(error.contains("raw_xml_namespace_bytes") || error.contains("namespace byte"));
     assert!(
         error.len() <= 4096,
         "active-scope error appeared to retain an input payload: {} bytes",
@@ -602,11 +602,11 @@ fn retained_policy_reports_namespace_scope_as_a_typed_dimension() -> litchi_core
         .expect_err("the retained scope policy must reach event reads");
     assert!(matches!(
         &error,
-        litchi_core::Error::ResourceLimit(limit)
-            if limit.resource == litchi_core::Resource::Depth
-                && limit.scope.as_ref() == "ODF raw XML namespace scope depth"
-                && limit.observed == 2
-                && limit.limit == 1
+        OdfError::Limit {
+            kind: LimitKind::RawXml(RawXmlLimitKind::NamespaceScopeDepth),
+            observed: 2,
+            maximum: 1,
+        }
     ));
 
     let mut replay = ResolvedReader::from_xml("<root><child/></root>", strict)?;
@@ -615,7 +615,7 @@ fn retained_policy_reports_namespace_scope_as_a_typed_dimension() -> litchi_core
         .read_resolved_event()
         .expect_err("an independent reader must retain the same policy");
     assert!(matches!(
-        OdfError::from(replay_error),
+        replay_error,
         OdfError::Limit {
             kind: LimitKind::RawXml(RawXmlLimitKind::NamespaceScopeDepth),
             observed: 2,
@@ -644,7 +644,7 @@ fn retained_policy_preserves_raw_depth_and_declaration_kinds() -> litchi_core::R
         .read_resolved_event()
         .expect_err("the retained depth policy must reach event reads");
     assert!(matches!(
-        OdfError::from(depth_error),
+        depth_error,
         OdfError::Limit {
             kind: LimitKind::RawXml(RawXmlLimitKind::Depth),
             observed: 2,
@@ -670,7 +670,7 @@ fn retained_policy_preserves_raw_depth_and_declaration_kinds() -> litchi_core::R
         .read_resolved_event()
         .expect_err("the retained declaration policy must reach event reads");
     assert!(matches!(
-        OdfError::from(declaration_error),
+        declaration_error,
         OdfError::Limit {
             kind: LimitKind::RawXml(RawXmlLimitKind::NamespaceDeclarations),
             observed: 2,

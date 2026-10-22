@@ -7,15 +7,18 @@
 //! keeps the original event bytes and source positions while applying the
 //! same resolver operations to normalized declaration values.
 
-use litchi_core::{Error, Resource, ResourceLimit, Result};
+use crate::Error;
+use crate::limits::{LimitKind, RawXmlLimitKind};
 use quick_xml::{
     events::{BytesStart, Event},
     name::{Namespace, NamespaceResolver, PrefixDeclaration, ResolveResult},
     reader::Reader,
 };
-use std::{io, sync::Arc};
+use std::io;
 
 use super::stream_xml::XmlStreamLimits;
+
+type Result<T> = std::result::Result<T, Error>;
 
 /// A source-backed XML reader that resolves namespace declarations after XML
 /// attribute-value normalization.
@@ -45,10 +48,14 @@ pub struct ResolvedReader<'a> {
 /// failures must not be flattened into a generic invalid-format message by a
 /// family codec that consumes this reader.
 #[must_use]
-pub fn map_resolved_reader_error(error: Error, context: &'static str) -> Error {
-    match error {
-        Error::InvalidFormat(message) => Error::InvalidFormat(format!("{context}: {message}")),
-        Error::ParseError(message) => Error::ParseError(format!("{context}: {message}")),
+pub fn map_resolved_reader_error(error: Error, context: &'static str) -> litchi_core::Error {
+    match litchi_core::Error::from(error) {
+        litchi_core::Error::InvalidFormat(message) => {
+            litchi_core::Error::InvalidFormat(format!("{context}: {message}"))
+        },
+        litchi_core::Error::ParseError(message) => {
+            litchi_core::Error::ParseError(format!("{context}: {message}"))
+        },
         other => other,
     }
 }
@@ -233,18 +240,18 @@ impl<'a> ResolvedReader<'a> {
                 self.limits.max_namespace_scope_depth() as u64,
             ));
         }
-        self.scope_bindings
-            .try_reserve(1)
-            .map_err(|source| Error::Allocation {
+        self.scope_bindings.try_reserve(1).map_err(|source| {
+            Error::from(litchi_core::Error::Allocation {
                 resource: "ODF namespace scope",
                 source,
-            })?;
-        self.scope_bytes
-            .try_reserve(1)
-            .map_err(|source| Error::Allocation {
+            })
+        })?;
+        self.scope_bytes.try_reserve(1).map_err(|source| {
+            Error::from(litchi_core::Error::Allocation {
                 resource: "ODF namespace scope bytes",
                 source,
-            })?;
+            })
+        })?;
         let next_level = self.resolver.level().checked_add(1).ok_or_else(|| {
             limit_error(
                 RawXmlDimension::NamespaceScopeDepth,
@@ -262,9 +269,9 @@ impl<'a> ResolvedReader<'a> {
                 Ok(attribute) => attribute,
                 Err(_error) if !self.check_attribute_errors => break,
                 Err(error) => {
-                    return Err(Error::InvalidFormat(format!(
+                    return Err(Error::from(litchi_core::Error::InvalidFormat(format!(
                         "XML attribute parsing error: {error}"
-                    )));
+                    ))));
                 },
             };
             let observed_attributes = self.attributes.saturating_add(1);
@@ -292,9 +299,9 @@ impl<'a> ResolvedReader<'a> {
                 PrefixDeclaration::Default => None,
                 PrefixDeclaration::Named(value) => {
                     if value.is_empty() {
-                        return Err(Error::InvalidFormat(
+                        return Err(Error::from(litchi_core::Error::InvalidFormat(
                             "ODF namespace declaration has an empty prefix".to_string(),
-                        ));
+                        )));
                     }
                     if value.len() > self.limits.max_namespace_prefix_bytes() {
                         return Err(limit_error(
@@ -382,7 +389,9 @@ impl<'a> ResolvedReader<'a> {
             self.resolver
                 .add(prefix, Namespace(normalized.as_bytes()))
                 .map_err(|error| {
-                    Error::InvalidFormat(format!("ODF namespace declaration: {error}"))
+                    Error::from(litchi_core::Error::InvalidFormat(format!(
+                        "ODF namespace declaration: {error}"
+                    )))
                 })?;
         }
         self.active_bindings += declarations;
@@ -418,44 +427,41 @@ enum RawXmlDimension {
 }
 
 fn limit_error(dimension: RawXmlDimension, observed: u64, maximum: u64) -> Error {
-    let scope = match dimension {
-        RawXmlDimension::InputBytes => "ODF raw XML input bytes",
-        RawXmlDimension::Depth => "ODF raw XML depth",
-        RawXmlDimension::Events => "ODF raw XML events",
-        RawXmlDimension::Attributes => "ODF raw XML attributes",
-        RawXmlDimension::TokenBytes => "ODF raw XML token bytes",
-        RawXmlDimension::NamespaceScopeDepth => "ODF raw XML namespace scope depth",
-        RawXmlDimension::NamespaceDeclarations => "ODF raw XML namespace declarations",
-        RawXmlDimension::NamespaceBindings => "ODF raw XML namespace bindings",
-        RawXmlDimension::NamespaceBytes => "ODF raw XML namespace bytes",
-        RawXmlDimension::NamespacePrefixBytes => "ODF raw XML namespace prefix bytes",
-    };
-    Error::ResourceLimit(ResourceLimit {
-        resource: match dimension {
-            RawXmlDimension::InputBytes => Resource::InputBytes,
-            RawXmlDimension::Depth | RawXmlDimension::NamespaceScopeDepth => Resource::Depth,
-            RawXmlDimension::Events
-            | RawXmlDimension::Attributes
-            | RawXmlDimension::NamespaceDeclarations
-            | RawXmlDimension::NamespaceBindings => Resource::Objects,
-            RawXmlDimension::TokenBytes
-            | RawXmlDimension::NamespaceBytes
-            | RawXmlDimension::NamespacePrefixBytes => Resource::Memory,
-        },
+    Error::Limit {
+        kind: LimitKind::RawXml(dimension.kind()),
         observed,
-        limit: maximum,
-        scope: Arc::from(scope),
-    })
+        maximum,
+    }
+}
+
+impl RawXmlDimension {
+    const fn kind(self) -> RawXmlLimitKind {
+        match self {
+            Self::InputBytes => RawXmlLimitKind::InputBytes,
+            Self::Depth => RawXmlLimitKind::Depth,
+            Self::Events => RawXmlLimitKind::Events,
+            Self::Attributes => RawXmlLimitKind::Attributes,
+            Self::TokenBytes => RawXmlLimitKind::TokenBytes,
+            Self::NamespaceScopeDepth => RawXmlLimitKind::NamespaceScopeDepth,
+            Self::NamespaceDeclarations => RawXmlLimitKind::NamespaceDeclarations,
+            Self::NamespaceBindings => RawXmlLimitKind::NamespaceBindings,
+            Self::NamespaceBytes => RawXmlLimitKind::NamespaceBytes,
+            Self::NamespacePrefixBytes => RawXmlLimitKind::NamespacePrefixBytes,
+        }
+    }
 }
 
 fn map_reader_error(error: quick_xml::Error) -> Error {
     match error {
-        quick_xml::Error::Io(source) => {
-            Error::Io(io::Error::new(source.kind(), source.to_string()))
-        },
-        quick_xml::Error::Encoding(source) => {
-            Error::InvalidFormat(format!("XML encoding error: {source}"))
-        },
-        other => Error::InvalidFormat(format!("XML parsing error: {other}")),
+        quick_xml::Error::Io(source) => Error::from(litchi_core::Error::Io(io::Error::new(
+            source.kind(),
+            source.to_string(),
+        ))),
+        quick_xml::Error::Encoding(source) => Error::from(litchi_core::Error::InvalidFormat(
+            format!("XML encoding error: {source}"),
+        )),
+        other => Error::from(litchi_core::Error::InvalidFormat(format!(
+            "XML parsing error: {other}"
+        ))),
     }
 }

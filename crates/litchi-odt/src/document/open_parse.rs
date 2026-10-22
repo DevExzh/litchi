@@ -56,7 +56,7 @@ use litchi_odf_common::{ResolvedReader, XmlStreamLimits, map_resolved_reader_err
 
 const OFFICE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 
-fn map_odt_reader_error(error: Error) -> Error {
+fn map_odt_reader_error(error: litchi_odf_common::Error) -> Error {
     let error = map_resolved_reader_error(error, "invalid ODT content.xml");
     match error {
         Error::InvalidFormat(message) => Error::InvalidFormat(message.replacen(

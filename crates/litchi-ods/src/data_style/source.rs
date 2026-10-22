@@ -3354,7 +3354,7 @@ fn checked_position(reader: &ResolvedReader<'_>) -> Result<usize> {
         .map_err(|_| invalid_error("ODS data-style XML position exceeds usize"))
 }
 
-fn xml_error(error: Error) -> Error {
+fn xml_error(error: litchi_odf_common::Error) -> Error {
     litchi_odf_common::map_resolved_reader_error(error, "ODS data-style XML parsing error")
 }
 
