@@ -632,9 +632,26 @@ fn patches_reject_foreign_and_stale_snapshots_and_cancel_before_output() {
     let foreign = open(&source)
         .story_text_snapshot(story_text::Selector::Main)
         .unwrap();
+    let foreign_applied = patch.apply(&foreign).unwrap();
+    assert_eq!(
+        foreign_applied.paragraph_text(0).unwrap().as_deref(),
+        Some("changed")
+    );
+
+    let changed_package = open(&source)
+        .apply_story_text(&patch.clone().into())
+        .unwrap();
+    let mut changed_bytes = Vec::new();
+    changed_package
+        .package()
+        .write_to(&mut changed_bytes)
+        .unwrap();
+    let changed = open(&changed_bytes)
+        .story_text_snapshot(story_text::Selector::Main)
+        .unwrap();
     assert!(matches!(
-        patch.apply(&foreign),
-        Err(story_text::Error::ForeignSource)
+        patch.apply(&changed),
+        Err(story_text::Error::PatchConflict)
     ));
 
     let (_budget, cancellation, package) = managed_open(source);
@@ -646,4 +663,71 @@ fn patches_reject_foreign_and_stale_snapshots_and_cancel_before_output() {
             .is_err()
     );
     assert!(output.is_empty());
+}
+
+#[test]
+fn raw_story_replay_reopens_matches_and_chains_under_recipient_limits() {
+    let source = fixture();
+    let author = open(&source);
+    let snapshot = author
+        .story_text_snapshot(story_text::Selector::Header(0))
+        .unwrap();
+    let mut tree = snapshot.raw_tree(snapshot.limits_value()).unwrap();
+    tree.replace_paragraph_text(Position::new(0), "first raw change")
+        .unwrap();
+    let patch = tree.patch().unwrap();
+
+    let recipient_limits =
+        story_text::Limits::new(16 * 1024, 128, 10_000, 64, 16 * 1024, 16, 4096).unwrap();
+    let recipient = open(&source)
+        .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(recipient_limits))
+        .story_text_snapshot(story_text::Selector::Header(0))
+        .unwrap();
+    assert_ne!(snapshot.limits_value(), recipient.limits_value());
+
+    let first = patch.apply(&recipient).unwrap();
+    assert_eq!(first.limits_value(), recipient.limits_value());
+    assert_eq!(
+        first.paragraph_text(0).unwrap().as_deref(),
+        Some("first raw change")
+    );
+
+    let restrictive_limits =
+        story_text::Limits::new(16 * 1024, 128, 10_000, 64, 1, 16, 4096).unwrap();
+    let restrictive = open(&source)
+        .with_semantic_limits(
+            litchi_docx::SemanticLimits::default().story_text(restrictive_limits),
+        )
+        .story_text_snapshot(story_text::Selector::Header(0))
+        .unwrap();
+    assert!(matches!(
+        patch.apply(&restrictive),
+        Err(story_text::Error::Limit {
+            kind: story_text::LimitKind::OutputBytes,
+            ..
+        })
+    ));
+
+    let restored = patch.inverse().apply(&first).unwrap();
+    assert_eq!(restored.part_fingerprint(), recipient.part_fingerprint());
+    assert_eq!(
+        restored.paragraph_text(0).unwrap().as_deref(),
+        Some("header")
+    );
+
+    let mut second_tree = first.raw_tree(first.limits_value()).unwrap();
+    second_tree
+        .replace_paragraph_text(Position::new(0), "second raw change")
+        .unwrap();
+    let second_patch = second_tree.patch().unwrap();
+    let second = second_patch.apply(&first).unwrap();
+    assert_eq!(
+        second.paragraph_text(0).unwrap().as_deref(),
+        Some("second raw change")
+    );
+    let second_restored = second_patch.inverse().apply(&second).unwrap();
+    assert_eq!(
+        second_restored.paragraph_text(0).unwrap().as_deref(),
+        Some("first raw change")
+    );
 }

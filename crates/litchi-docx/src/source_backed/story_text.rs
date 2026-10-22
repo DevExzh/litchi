@@ -283,9 +283,6 @@ pub enum Error {
     /// A patch was applied to a source with different selected-part bytes.
     #[error("source-backed story text patch source is stale")]
     PatchConflict,
-    /// A patch was applied to a package lineage other than its source.
-    #[error("source-backed story text patch belongs to a different source lineage")]
-    ForeignSource,
     /// A patch was applied to a different selected story or package topology.
     #[error("source-backed story text patch conflicts with the selected story topology")]
     TopologyConflict,
@@ -335,9 +332,6 @@ pub enum Error {
         /// Direct paragraph index within that entry.
         paragraph_index: usize,
     },
-    /// A publication inverse was applied to a foreign complete artifact.
-    #[error("source-backed story text publication conflicts with the complete source artifact")]
-    ArtifactConflict,
     /// A bounded allocation failed before publication began.
     #[error("source-backed story text allocation failed for {resource}: {source}")]
     Allocation {
@@ -1170,19 +1164,74 @@ impl Patch {
     /// part and before bytes, from any source (record 0355a: a package
     /// replay reads the snapshot it applies to).
     pub(crate) fn apply_content(&self, source: &Snapshot) -> Result<Snapshot> {
-        if source.selector != self.before.selector
-            || !same_part_name(&source.partname, &self.before.partname)
-        {
-            return Err(Error::TopologyConflict);
-        }
-        if source.raw_bytes() != self.before.raw_bytes() {
-            return Err(Error::PatchConflict);
-        }
+        self.check_content(source)?;
         Ok(if self.is_noop() {
             source.clone()
         } else {
             self.after.clone()
         })
+    }
+
+    fn check_content(&self, source: &Snapshot) -> Result<()> {
+        if source.selector != self.before.selector
+            || !same_part_name(&source.partname, &self.before.partname)
+        {
+            return Err(Error::TopologyConflict);
+        }
+        if !same_content(
+            source.raw_bytes(),
+            self.before.raw_bytes(),
+            self.before.part_fingerprint,
+        ) {
+            return Err(Error::PatchConflict);
+        }
+        Ok(())
+    }
+
+    /// Replay this raw patch on an independently opened matching snapshot.
+    ///
+    /// Raw codec replay is scoped to the selected XML member. The owning
+    /// package family performs its separate complete-artifact and source
+    /// freshness checks before publication. The returned snapshot is
+    /// admitted under the recipient policy and carries the recipient source
+    /// identity, so a subsequent raw edit cannot inherit the author's fence.
+    pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
+        self.check_content(source)?;
+        self.rebased_target(source)
+    }
+
+    fn rebased_target(&self, source: &Snapshot) -> Result<Snapshot> {
+        if self.is_noop() {
+            return Ok(source.clone());
+        }
+        let bytes = self.after.raw_bytes();
+        if bytes.len() > source.limits.max_output_bytes {
+            return Err(Error::Limit {
+                kind: LimitKind::OutputBytes,
+                actual: bytes.len(),
+                maximum: source.limits.max_output_bytes,
+            });
+        }
+        let layout = scan_selected_story(
+            bytes,
+            &source.selector,
+            Some(source.layout.word_namespace.as_ref()),
+            source.limits,
+            source.execution.as_ref(),
+        )?;
+        let mut target = self.after.clone();
+        target.selector = source.selector.clone();
+        target.partname = source.partname.clone();
+        target.layout = layout;
+        target.transaction = None;
+        target.envelope = None;
+        target.source_version = source.source_version;
+        target.source_lineage = source.source_lineage.clone();
+        target.part_fingerprint = digest(bytes);
+        target.artifact_fingerprint = source.artifact_fingerprint;
+        target.limits = source.limits;
+        target.execution = source.execution.clone();
+        Ok(target)
     }
 
     pub(crate) fn limits(&self) -> Limits {
@@ -1191,31 +1240,6 @@ impl Patch {
 
     pub(crate) fn selector(&self) -> Selector {
         self.before.selector.clone()
-    }
-
-    /// Apply only to an equivalent selected-story source snapshot.
-    pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
-        if source.selector != self.before.selector
-            || !same_part_name(&source.partname, &self.before.partname)
-        {
-            return Err(Error::TopologyConflict);
-        }
-        if source.source_lineage != self.before.source_lineage {
-            return Err(Error::ForeignSource);
-        }
-        if source.source_version != self.before.source_version {
-            return Err(Error::PatchConflict);
-        }
-        if source.part_fingerprint != self.before.part_fingerprint
-            || source.raw_bytes() != self.before.raw_bytes()
-        {
-            return Err(Error::PatchConflict);
-        }
-        Ok(if self.is_noop() {
-            source.clone()
-        } else {
-            self.after.clone()
-        })
     }
 }
 
@@ -1280,6 +1304,14 @@ pub mod raw {
                 after: target,
             })
         }
+
+        /// Replay a selected-story patch against this model's source.
+        ///
+        /// The returned snapshot is a raw projection; no package is
+        /// published and no source lineage is required.
+        pub fn apply(&self, patch: &Patch) -> Result<Snapshot> {
+            patch.apply(self.source())
+        }
     }
 
     /// A mutable raw glossary-entry batch model.
@@ -1332,6 +1364,14 @@ pub mod raw {
                 before: self.inner.source().clone(),
                 after: target,
             })
+        }
+
+        /// Replay a glossary batch patch against this model's source.
+        ///
+        /// The returned snapshot is a raw projection; no package is
+        /// published and no source lineage is required.
+        pub fn apply(&self, patch: &GlossaryBatchPatch) -> Result<GlossaryBatchSnapshot> {
+            patch.apply(self.source())
         }
     }
 }
@@ -4590,6 +4630,10 @@ fn same_part_name(left: &PackURI, right: &PackURI) -> bool {
     left.as_str().eq_ignore_ascii_case(right.as_str())
 }
 
+fn same_content(actual: &[u8], expected: &[u8], expected_fingerprint: [u8; 32]) -> bool {
+    actual.len() == expected.len() && digest(actual) == expected_fingerprint && actual == expected
+}
+
 #[derive(Debug)]
 struct StoryOutputLimit {
     attempted: usize,
@@ -5063,14 +5107,7 @@ impl GlossaryBatchPatch {
         &self,
         source: &GlossaryBatchSnapshot,
     ) -> Result<GlossaryBatchSnapshot> {
-        if self.before.selector != source.selector
-            || !same_part_name(&self.before.partname, &source.partname)
-        {
-            return Err(Error::TopologyConflict);
-        }
-        if source.raw_bytes() != self.before.raw_bytes() {
-            return Err(Error::PatchConflict);
-        }
+        self.check_content(source)?;
         Ok(if self.is_noop() {
             source.clone()
         } else {
@@ -5078,28 +5115,85 @@ impl GlossaryBatchPatch {
         })
     }
 
-    pub fn apply(&self, source: &GlossaryBatchSnapshot) -> Result<GlossaryBatchSnapshot> {
+    fn check_content(&self, source: &GlossaryBatchSnapshot) -> Result<()> {
         if self.before.selector != source.selector
             || !same_part_name(&self.before.partname, &source.partname)
         {
             return Err(Error::TopologyConflict);
         }
-        if source.source_lineage != self.before.source_lineage {
-            return Err(Error::ForeignSource);
-        }
-        if source.source_version != self.before.source_version {
+        if !same_content(
+            source.raw_bytes(),
+            self.before.raw_bytes(),
+            self.before.part_fingerprint,
+        ) {
             return Err(Error::PatchConflict);
         }
-        if source.part_fingerprint != self.before.part_fingerprint
-            || source.raw_bytes() != self.before.raw_bytes()
-        {
-            return Err(Error::PatchConflict);
+        Ok(())
+    }
+
+    /// Replay this raw glossary patch on an independently opened matching
+    /// batch snapshot. Replay is scoped to the selected glossary XML part;
+    /// package publication performs complete-artifact and source-freshness
+    /// checks separately.
+    pub fn apply(&self, source: &GlossaryBatchSnapshot) -> Result<GlossaryBatchSnapshot> {
+        self.check_content(source)?;
+        self.rebased_target(source)
+    }
+
+    fn rebased_target(&self, source: &GlossaryBatchSnapshot) -> Result<GlossaryBatchSnapshot> {
+        if self.is_noop() {
+            return Ok(source.clone());
         }
-        Ok(if self.is_noop() {
-            source.clone()
-        } else {
-            self.after.clone()
-        })
+        let bytes = self.after.raw_bytes();
+        if bytes.len() > source.limits.max_output_bytes {
+            return Err(Error::Limit {
+                kind: LimitKind::GlossaryBatchOutputBytes,
+                actual: bytes.len(),
+                maximum: source.limits.max_output_bytes,
+            });
+        }
+        let expected_word_namespace = source
+            .entries
+            .first()
+            .map(|entry| entry.layout.word_namespace.as_ref());
+        let layouts = scan_glossary_many(
+            bytes,
+            &source.selector.selectors,
+            expected_word_namespace,
+            source.limits,
+            source.execution.as_ref(),
+        )?;
+        if layouts.len() != source.entries.len() {
+            return Err(Error::TopologyConflict);
+        }
+        let mut entries = Vec::new();
+        entries
+            .try_reserve_exact(layouts.len())
+            .map_err(|source| Error::Allocation {
+                resource: "glossary raw replay entries",
+                source,
+            })?;
+        for (selector_index, layout) in layouts.into_iter().enumerate() {
+            entries.push(GlossaryBatchEntry {
+                selector_index,
+                layout,
+            });
+        }
+        entries.sort_unstable_by_key(|entry| entry.layout.root_start_end);
+        for (canonical_index, entry) in entries.iter_mut().enumerate() {
+            entry.selector_index = canonical_index;
+        }
+        let mut target = self.after.clone();
+        target.selector = source.selector.clone();
+        target.entries = entries;
+        target.partname = source.partname.clone();
+        target.source_version = source.source_version;
+        target.source_lineage = source.source_lineage.clone();
+        target.part_fingerprint = digest(bytes);
+        target.artifact_fingerprint = source.artifact_fingerprint;
+        target.limits = source.limits;
+        target.execution = source.execution.clone();
+        Ok(target)
     }
 }
 

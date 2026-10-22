@@ -924,7 +924,7 @@ fn secondary_story_cannot_own_a_word_story_relationship() {
 }
 
 #[test]
-fn secondary_patches_reject_stale_and_foreign_snapshots() {
+fn secondary_patches_reject_stale_and_accept_matching_copies() {
     let source = fixture(Dialect::Transitional, Mutation::Valid);
     let package = open(&source);
     let snapshot = package
@@ -941,10 +941,11 @@ fn secondary_patches_reject_stale_and_foreign_snapshots() {
     let foreign = open(&source)
         .story_text_snapshot(story_text::Selector::footnote(41))
         .unwrap();
-    assert!(matches!(
-        patch.apply(&foreign),
-        Err(story_text::Error::ForeignSource)
-    ));
+    let applied = patch.apply(&foreign).unwrap();
+    assert_eq!(
+        applied.paragraph_text(0).unwrap().as_deref(),
+        Some("changed")
+    );
 }
 
 fn managed_open(bytes: Vec<u8>) -> (Budget, CancellationSource, source_backed::Package) {

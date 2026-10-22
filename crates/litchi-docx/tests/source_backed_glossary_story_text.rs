@@ -751,6 +751,51 @@ fn raw_glossary_tree_caches_projection_and_invalidates_after_mutation() {
 }
 
 #[test]
+fn raw_glossary_replay_reopens_matches_and_chains_edits() {
+    let source = fixture(Dialect::Transitional, Mutation::BatchThreeEntries);
+    let author = open(&source);
+    let snapshot = author
+        .glossary_text_batch_snapshot(glossary_triplet())
+        .unwrap();
+    let mut tree = snapshot.raw_tree(snapshot.limits_value()).unwrap();
+    tree.replace_paragraph_text(0, Position::new(0), "first raw glossary")
+        .unwrap();
+    let patch = tree.patch().unwrap();
+
+    let recipient = open(&source)
+        .glossary_text_batch_snapshot(glossary_triplet())
+        .unwrap();
+    let first = patch.apply(&recipient).unwrap();
+    assert_eq!(
+        first.paragraph_text(0, 0).unwrap().as_deref(),
+        Some("first raw glossary")
+    );
+
+    let restored = patch.inverse().apply(&first).unwrap();
+    assert_eq!(restored.part_fingerprint(), recipient.part_fingerprint());
+    assert_eq!(
+        restored.paragraph_text(0, 0).unwrap().as_deref(),
+        Some("target")
+    );
+
+    let mut second_tree = first.raw_tree(first.limits_value()).unwrap();
+    second_tree
+        .replace_paragraph_text(1, Position::new(0), "second raw glossary")
+        .unwrap();
+    let second_patch = second_tree.patch().unwrap();
+    let second = second_patch.apply(&first).unwrap();
+    assert_eq!(
+        second.paragraph_text(1, 0).unwrap().as_deref(),
+        Some("second raw glossary")
+    );
+    let second_restored = second_patch.inverse().apply(&second).unwrap();
+    assert_eq!(
+        second_restored.paragraph_text(0, 0).unwrap().as_deref(),
+        Some("first raw glossary")
+    );
+}
+
+#[test]
 fn glossary_topology_and_dialect_boundaries_refuse_before_editing() {
     for (mutation, expected) in [
         (Mutation::WrongContentType, "invalid DOCX content type"),
@@ -1065,7 +1110,7 @@ impl litchi_core::ReadAt for VersionedSource {
 }
 
 #[test]
-fn glossary_source_mutation_and_foreign_patch_are_rejected() {
+fn glossary_source_mutation_is_rejected_and_matching_copy_is_accepted() {
     let source = fixture(Dialect::Transitional, Mutation::Valid);
     let versioned = Arc::new(VersionedSource {
         bytes: source.clone(),
@@ -1092,7 +1137,8 @@ fn glossary_source_mutation_and_foreign_patch_are_rejected() {
     );
     assert!(refused.is_empty());
     let foreign = open(&source).story_text_snapshot(alpha_by_name()).unwrap();
-    assert!(patch.apply(&foreign).is_err());
+    let applied = patch.apply(&foreign).unwrap();
+    assert_eq!(applied.extract_text().unwrap(), "changed");
 }
 
 #[test]
@@ -1517,7 +1563,7 @@ fn glossary_batch_rejects_repeated_targets_and_aggregate_limits() {
 }
 
 #[test]
-fn glossary_batch_rejects_stale_foreign_managed_cancelled_signed_and_sink_paths() {
+fn glossary_batch_rejects_stale_managed_cancelled_signed_and_sink_paths_and_accepts_matching_copy() {
     let source = batch_source();
     let versioned = Arc::new(VersionedSource {
         bytes: source.clone(),
@@ -1548,7 +1594,8 @@ fn glossary_batch_rejects_stale_foreign_managed_cancelled_signed_and_sink_paths(
     let foreign = open(&source)
         .glossary_text_batch_snapshot(glossary_triplet())
         .unwrap();
-    assert!(patch.apply(&foreign).is_err());
+    let applied = patch.apply(&foreign).unwrap();
+    assert_eq!(applied.extract_text(0).unwrap().as_deref(), Some("changed"));
 
     let managed = source_backed::Package::from_read_at_with_options(
         Arc::new(OwnedSource::new(source.clone())),
