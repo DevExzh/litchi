@@ -201,7 +201,7 @@ impl SourceInner {
             return Ok(0);
         };
         let part = self.package.part(uri)?;
-        if let Some(count) = self.reader().differential_format_count.get() {
+        if let Some(count) = self.dependencies().differential_format_count.get() {
             self.execution_check()?;
             self.package.source_version()?;
             return Ok(*count);
@@ -211,7 +211,7 @@ impl SourceInner {
             crate::conditional_formatting::parse_differential_formats(data.as_bytes())?.len();
         self.execution_check()?;
         self.package.source_version()?;
-        let _publish_result = self.reader().differential_format_count.set(count);
+        let _publish_result = self.dependencies().differential_format_count.set(count);
         Ok(count)
     }
 }
@@ -402,7 +402,7 @@ impl SourceWorksheet {
         self.owner.execution_check()?;
         self.owner.package.source_version()?;
         let weight = blocks.weight_bytes();
-        match self.owner.values.publish(
+        match self.owner.reader().values.publish(
             self.data.position,
             Cached::Blocks(Arc::new(blocks)),
             weight,
@@ -417,6 +417,7 @@ impl SourceWorksheet {
     fn cached_blocks(&self, record_miss: bool) -> Option<Arc<Blocks>> {
         match self
             .owner
+            .reader()
             .values
             .get(self.data.position, Axis::Blocks, record_miss)?
         {

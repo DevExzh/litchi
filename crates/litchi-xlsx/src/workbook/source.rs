@@ -165,20 +165,41 @@ pub(crate) struct SourceCatalogProof {
     pub(crate) limits: Arc<SourceLimits>,
 }
 
+/// Caches used by the common worksheet and style readers.
+///
+/// Workbook catalog admission does not need any of these caches. The first
+/// worksheet or style read initializes one bounded per-owner state allocation;
+/// a catalog-only edit therefore does not pay for reader state. The less
+/// common shared-string and conditional-format state lives in
+/// [`DependencyState`] so ordinary cell/style reads retain this compact
+/// allocation.
+struct ReaderState {
+    values: values::ValueCache,
+    styles: OnceLock<raw::styles::Catalog>,
+    formats: crate::style::cell_format::FormatCache,
+}
+
+impl ReaderState {
+    fn new() -> Self {
+        Self {
+            values: values::ValueCache::new(),
+            styles: OnceLock::new(),
+            formats: crate::style::cell_format::FormatCache::new(),
+        }
+    }
+}
+
 /// Caches used only by shared-string and conditional-format readers.
 ///
-/// Workbook catalog admission and the ordinary worksheet/style readers keep
-/// their small, frequently used state inline. The less common shared-string
-/// and conditional-format readers remain behind one lazy allocation, so a
-/// read-only owner that only performs catalog or cell/style work does not pay
-/// for their storage.
-struct ReaderState {
+/// Keeping these less common caches separate means the ordinary cell/style
+/// path does not retain their state in its first lazy allocation.
+struct DependencyState {
     shared_strings: OnceLock<Box<[Text]>>,
     shared_strings_tolerance: OnceLock<ToleranceReport>,
     differential_format_count: OnceLock<usize>,
 }
 
-impl ReaderState {
+impl DependencyState {
     fn new() -> Self {
         Self {
             shared_strings: OnceLock::new(),
@@ -307,18 +328,18 @@ pub(crate) struct SourceInner {
     _catalog_data: Option<PartData>,
     shared_strings_uri: Option<PackURI>,
     styles_uri: Option<PackURI>,
-    /// These reader values were historically part of the lazy reader state.
-    /// Keep them inline so the first worksheet/style read does not move their
-    /// allocation from open into the cold read. Shared-string and
-    /// conditional-format state remains lazy in [`Self::reader`].
+    /// Style identity remains part of the owner lineage. The worksheet/style
+    /// caches themselves live in [`Self::reader`] so catalog-only source edits
+    /// do not allocate them.
     style_lineage: Arc<crate::style::StyleLineage>,
-    values: values::ValueCache,
-    styles: OnceLock<raw::styles::Catalog>,
-    formats: crate::style::cell_format::FormatCache,
-    /// Worksheet/style caches are cold until a reader needs them. The box is
-    /// deliberate: an inline `OnceLock<ReaderState>` would retain the whole
-    /// reader state in every source owner even when no worksheet is read.
+    /// All worksheet/style and dependency caches are cold until a reader
+    /// needs them. The box is deliberate: an inline `OnceLock<ReaderState>`
+    /// would retain the whole reader state in every source owner even when no
+    /// worksheet is read.
     reader: OnceLock<Box<ReaderState>>,
+    /// Shared-string and conditional-format caches are less common than the
+    /// worksheet/style path, so keep their state in a second lazy allocation.
+    dependencies: OnceLock<Box<DependencyState>>,
     flavor: Flavor,
     date_system: DateSystem,
     pub(crate) active_sheet: Option<usize>,
@@ -699,10 +720,8 @@ impl SourceBackedWorkbook {
                 shared_strings_uri,
                 styles_uri,
                 style_lineage: Arc::new(crate::style::StyleLineage),
-                values: values::ValueCache::new(),
-                styles: OnceLock::new(),
-                formats: crate::style::cell_format::FormatCache::new(),
                 reader: OnceLock::new(),
+                dependencies: OnceLock::new(),
                 flavor,
                 date_system: if catalog.uses_1904_date_system {
                     DateSystem::Excel1904
@@ -737,7 +756,9 @@ impl SourceBackedWorkbook {
     pub fn tolerance_report(&self) -> ToleranceReport {
         let inner = self.current();
         let mut report = inner.tolerance.clone();
-        if let Some(strings) = inner.reader().shared_strings_tolerance.get() {
+        if let Some(dependencies) = inner.dependencies.get()
+            && let Some(strings) = dependencies.shared_strings_tolerance.get()
+        {
             report.append(strings);
         }
         for sheet in inner.sheets.iter() {
@@ -788,7 +809,12 @@ impl SourceBackedWorkbook {
     /// [`Self::cache_diagnostics`].
     #[must_use]
     pub fn semantic_cache_diagnostics(&self) -> CacheDiagnostics {
-        self.current().values.diagnostics()
+        self.current()
+            .reader
+            .get()
+            .map_or_else(values::ValueCache::empty_diagnostics, |reader| {
+                reader.values.diagnostics()
+            })
     }
 
     /// Release every parsed worksheet value the semantic cache retains that
@@ -797,7 +823,10 @@ impl SourceBackedWorkbook {
     /// Reads are unaffected apart from cost: a released value is parsed
     /// again from the same source snapshot when a read next needs it.
     pub fn trim_semantic_cache(&self) -> usize {
-        self.current().values.trim_clean()
+        self.current()
+            .reader
+            .get()
+            .map_or(0, |reader| reader.values.trim_clean())
     }
 
     /// Workbook flavor derived from the mandatory workbook catalog.
@@ -1542,7 +1571,7 @@ impl SourceWorksheet {
         self.owner.package.source_version()?;
         let _publish_result = self.data.tolerance.set(parsed.tolerance_report().clone());
         let weight = parsed.weight_bytes();
-        let store = match self.owner.values.publish(
+        let store = match self.owner.reader().values.publish(
             self.data.position,
             values::Cached::Grid(Arc::new(parsed)),
             weight,
@@ -1589,6 +1618,7 @@ impl SourceWorksheet {
     fn cached_grid(&self, record_miss: bool) -> Option<Arc<Store>> {
         match self
             .owner
+            .reader()
             .values
             .get(self.data.position, values::Axis::Grid, record_miss)?
         {
@@ -1604,6 +1634,7 @@ impl SourceWorksheet {
         self.grid.get().is_some()
             || self
                 .owner
+                .reader()
                 .values
                 .holds(self.data.position, values::Axis::Grid)
     }
@@ -1842,6 +1873,12 @@ impl SourceInner {
             .as_ref()
     }
 
+    fn dependencies(&self) -> &DependencyState {
+        self.dependencies
+            .get_or_init(|| Box::new(DependencyState::new()))
+            .as_ref()
+    }
+
     pub(crate) fn package_handle(&self) -> Arc<SourceBackedPackage> {
         Arc::clone(
             self.package_handle
@@ -1994,7 +2031,8 @@ impl SourceInner {
         let Some(uri) = self.shared_strings_uri.as_ref() else {
             return Ok(None);
         };
-        if let Some(strings) = self.reader().shared_strings.get() {
+        let dependencies = self.dependencies();
+        if let Some(strings) = dependencies.shared_strings.get() {
             let _part = self.package.part(uri)?;
             self.execution_check()?;
             self.package.source_version()?;
@@ -2008,10 +2046,9 @@ impl SourceInner {
         self.package.source_version()?;
         // The report is published first, so a published table always has
         // its report; a racing parse of the same bytes reports the same.
-        let reader = self.reader();
-        let _publish_result = reader.shared_strings_tolerance.set(tolerance);
-        let _publish_result = reader.shared_strings.set(parsed);
-        reader
+        let _publish_result = dependencies.shared_strings_tolerance.set(tolerance);
+        let _publish_result = dependencies.shared_strings.set(parsed);
+        dependencies
             .shared_strings
             .get()
             .map(|strings| Some(strings.as_ref()))
@@ -2025,7 +2062,7 @@ impl SourceInner {
         let Some(uri) = self.styles_uri.as_ref() else {
             return Ok(0);
         };
-        if let Some(styles) = self.styles.get() {
+        if let Some(styles) = self.reader().styles.get() {
             let _part = self.package.part(uri)?;
             self.execution_check()?;
             self.package.source_version()?;
@@ -2036,8 +2073,10 @@ impl SourceInner {
         let parsed = raw::styles::parse(data.as_bytes())?;
         self.execution_check()?;
         self.package.source_version()?;
-        let _publish_result = self.styles.set(parsed);
-        self.styles
+        let reader = self.reader();
+        let _publish_result = reader.styles.set(parsed);
+        reader
+            .styles
             .get()
             .map(raw::styles::Catalog::len)
             .ok_or_else(|| {
@@ -3323,16 +3362,16 @@ mod tests {
             ));
         }
 
+        fn styles_cached(workbook: &SourceBackedWorkbook) -> bool {
+            workbook.inner.reader().styles.get().is_some()
+        }
+
         fn shared_strings_cached(workbook: &SourceBackedWorkbook) -> bool {
             workbook
                 .inner
-                .reader
+                .dependencies
                 .get()
-                .map_or(false, |reader| reader.shared_strings.get().is_some())
-        }
-
-        fn styles_cached(workbook: &SourceBackedWorkbook) -> bool {
-            workbook.inner.styles.get().is_some()
+                .is_some_and(|dependencies| dependencies.shared_strings.get().is_some())
         }
 
         #[test]
@@ -3349,7 +3388,15 @@ mod tests {
 
             assert_text(sheet.cell("A1").unwrap(), "plain");
             assert!(!sheet.store_resident());
-            assert!(!shared_strings_cached(&workbook));
+            assert!(
+                workbook
+                    .inner
+                    .dependencies
+                    .get()
+                    .map_or(true, |dependencies| {
+                        dependencies.shared_strings.get().is_none()
+                    })
+            );
             assert!(!styles_cached(&workbook));
             let after = workbook.cache_diagnostics();
             assert_eq!(after.cold_loads, cold.cold_loads);
@@ -3394,7 +3441,15 @@ mod tests {
             let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
             assert_text(sheet.cell("A1").unwrap(), "rich text");
             assert!(!sheet.store_resident());
-            assert!(!shared_strings_cached(&workbook));
+            assert!(
+                workbook
+                    .inner
+                    .dependencies
+                    .get()
+                    .map_or(true, |dependencies| {
+                        dependencies.shared_strings.get().is_none()
+                    })
+            );
 
             let rich = dependency_xlsx(
                 &worksheet(r#"<c r="A1" t="s"><v>0</v></c>"#),
@@ -3482,7 +3537,15 @@ mod tests {
             let cold = workbook.cache_diagnostics();
             assert!(sheet.cell("A1").is_err());
             assert!(!sheet.store_resident());
-            assert!(!shared_strings_cached(&workbook));
+            assert!(
+                workbook
+                    .inner
+                    .dependencies
+                    .get()
+                    .map_or(true, |dependencies| {
+                        dependencies.shared_strings.get().is_none()
+                    })
+            );
             assert_eq!(
                 workbook.cache_diagnostics().successful_loads,
                 cold.successful_loads
@@ -3526,7 +3589,15 @@ mod tests {
             let cold = workbook.cache_diagnostics();
             assert!(sheet.cell("A1").is_err());
             assert!(!sheet.store_resident());
-            assert!(!shared_strings_cached(&workbook));
+            assert!(
+                workbook
+                    .inner
+                    .dependencies
+                    .get()
+                    .map_or(true, |dependencies| {
+                        dependencies.shared_strings.get().is_none()
+                    })
+            );
             assert_eq!(
                 workbook.cache_diagnostics().successful_loads,
                 cold.successful_loads
@@ -3617,7 +3688,15 @@ mod tests {
             assert_text(sheet.cell("A1").unwrap(), "repeat");
             assert!(source.first_body_marker_reads.load(Ordering::SeqCst) > first_reads);
             assert!(!sheet.store_resident());
-            assert!(!shared_strings_cached(&workbook));
+            assert!(
+                workbook
+                    .inner
+                    .dependencies
+                    .get()
+                    .map_or(true, |dependencies| {
+                        dependencies.shared_strings.get().is_none()
+                    })
+            );
             assert!(!styles_cached(&workbook));
             assert_eq!(
                 workbook.cache_diagnostics().successful_loads,
@@ -3897,11 +3976,13 @@ mod tests {
             assert!(
                 workbook
                     .inner
-                    .reader
+                    .dependencies
                     .get()
-                    .map_or(true, |reader| reader.shared_strings.get().is_none())
+                    .map_or(true, |dependencies| {
+                        dependencies.shared_strings.get().is_none()
+                    })
             );
-            assert!(!workbook.inner.styles.get().is_some());
+            assert!(!workbook.inner.reader().styles.get().is_some());
             let after = workbook.cache_diagnostics();
             assert_eq!(after.cold_loads, before.cold_loads);
             assert_eq!(after.successful_loads, before.successful_loads);
@@ -4025,9 +4106,11 @@ mod tests {
             assert!(
                 workbook
                     .inner
-                    .reader
+                    .dependencies
                     .get()
-                    .map_or(true, |reader| reader.shared_strings.get().is_none())
+                    .map_or(true, |dependencies| {
+                        dependencies.shared_strings.get().is_none()
+                    })
             );
             assert_eq!(
                 workbook.cache_diagnostics().successful_loads,
@@ -4280,11 +4363,13 @@ mod tests {
             assert!(
                 workbook
                     .inner
-                    .reader
+                    .dependencies
                     .get()
-                    .map_or(true, |reader| reader.shared_strings.get().is_none())
+                    .map_or(true, |dependencies| {
+                        dependencies.shared_strings.get().is_none()
+                    })
             );
-            assert!(!workbook.inner.styles.get().is_some());
+            assert!(!workbook.inner.reader().styles.get().is_some());
             assert_no_part_cache_admission(before, workbook.cache_diagnostics());
 
             sheet.stored_extent().unwrap();
@@ -4316,11 +4401,13 @@ mod tests {
             assert!(
                 workbook
                     .inner
-                    .reader
+                    .dependencies
                     .get()
-                    .map_or(true, |reader| reader.shared_strings.get().is_none())
+                    .map_or(true, |dependencies| {
+                        dependencies.shared_strings.get().is_none()
+                    })
             );
-            assert!(!workbook.inner.styles.get().is_some());
+            assert!(!workbook.inner.reader().styles.get().is_some());
             assert_no_part_cache_admission(before, workbook.cache_diagnostics());
 
             sheet.stored_extent().unwrap();
@@ -4360,11 +4447,13 @@ mod tests {
             assert!(
                 workbook
                     .inner
-                    .reader
+                    .dependencies
                     .get()
-                    .map_or(true, |reader| reader.shared_strings.get().is_none())
+                    .map_or(true, |dependencies| {
+                        dependencies.shared_strings.get().is_none()
+                    })
             );
-            assert!(!workbook.inner.styles.get().is_some());
+            assert!(!workbook.inner.reader().styles.get().is_some());
             assert_no_part_cache_admission(before, workbook.cache_diagnostics());
 
             sheet.stored_extent().unwrap();
@@ -4433,11 +4522,13 @@ mod tests {
             assert!(
                 workbook
                     .inner
-                    .reader
+                    .dependencies
                     .get()
-                    .map_or(true, |reader| reader.shared_strings.get().is_none())
+                    .map_or(true, |dependencies| {
+                        dependencies.shared_strings.get().is_none()
+                    })
             );
-            assert!(!workbook.inner.styles.get().is_some());
+            assert!(!workbook.inner.reader().styles.get().is_some());
             assert_no_part_cache_admission(before, workbook.cache_diagnostics());
         }
 
@@ -4546,11 +4637,13 @@ mod tests {
             assert!(
                 workbook
                     .inner
-                    .reader
+                    .dependencies
                     .get()
-                    .map_or(true, |reader| reader.shared_strings.get().is_none())
+                    .map_or(true, |dependencies| {
+                        dependencies.shared_strings.get().is_none()
+                    })
             );
-            assert!(!workbook.inner.styles.get().is_some());
+            assert!(!workbook.inner.reader().styles.get().is_some());
             assert_no_part_cache_admission(before, workbook.cache_diagnostics());
         }
 
@@ -4588,11 +4681,13 @@ mod tests {
             assert!(
                 workbook
                     .inner
-                    .reader
+                    .dependencies
                     .get()
-                    .map_or(true, |reader| reader.shared_strings.get().is_none())
+                    .map_or(true, |dependencies| {
+                        dependencies.shared_strings.get().is_none()
+                    })
             );
-            assert!(!workbook.inner.styles.get().is_some());
+            assert!(!workbook.inner.reader().styles.get().is_some());
             assert_no_part_cache_admission(before, workbook.cache_diagnostics());
 
             sheet.stored_extent().unwrap();
@@ -4646,11 +4741,13 @@ mod tests {
             assert!(
                 workbook
                     .inner
-                    .reader
+                    .dependencies
                     .get()
-                    .map_or(true, |reader| reader.shared_strings.get().is_none())
+                    .map_or(true, |dependencies| {
+                        dependencies.shared_strings.get().is_none()
+                    })
             );
-            assert!(!workbook.inner.styles.get().is_some());
+            assert!(!workbook.inner.reader().styles.get().is_some());
             assert_no_part_cache_admission(before, workbook.cache_diagnostics());
 
             sheet.stored_extent().unwrap();
