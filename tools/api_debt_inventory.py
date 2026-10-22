@@ -12,6 +12,8 @@ gate sees. Each row names one public item that a migration wave must change:
   *Transaction or exposing rollback/is_changed/snapshot (items 15-16);
 - commit_snapshot, into_workbook, is_changed, rollback, transaction_type;
 - edit_output: artifact output on an Edit instead of its committed Package;
+- commit_return: Edit::commit does not return Result of its family's Commit;
+- replay_return: an owner replay has no verified Result<Commit> return rule;
 - unsafe_edit: an `UnsafeEdit` error variant (item 17);
 - exhaustive_error: a public Error enum missing #[non_exhaustive] (item 17);
 - with_limits: a public `with_limits` or `*_with_limits` entry point (items 18-19).
@@ -37,7 +39,7 @@ import check_api_glossary as gate  # noqa: E402
 
 OWNERS = {"Package", "Workbook", "Document", "Presentation", "Drawing", "Chart",
           "Spreadsheet", "Image", "Database", "Formula", "FlatDrawing",
-          "FlatPresentation", "MutableDocument"}
+          "FlatPresentation", "FlatDocument", "FlatSpreadsheet", "MutableDocument", "File"}
 CORE_COMMIT = ("litchi_core", "edit", "Commit")
 CORE_COMMIT_METHODS = frozenset({"package", "into_package", "patch", "diagnostics", "into_parts"})
 DRAFT_NAMES = {"Reader", "Workbook", "Spreadsheet", "Presentation", "Document"}
@@ -101,12 +103,36 @@ def target_family(method: str) -> str:
     return f"{name}::Edit via Package::edit_{name}() / apply_{name}(&Patch)"
 
 
-def rows(document, crate: str):
+def rows(document, crate: str, result_rules=None):
     surface = Inventory(document, crate)
+    return_types = gate.ReturnTypes(surface)
+    if result_rules is None:
+        result_rules = [rule for profile in gate.checked_policy(gate.read_json(gate.POLICY))
+                        if profile["package"].replace("-", "_") == crate
+                        for rule in profile.get("result_methods", [])]
+    verified_results = set()
+    for rule in result_rules:
+        path = tuple(rule["method"].split("::"))
+        args = [return_types.raw_type_at(tuple(arg.split("::")))
+                for arg in rule.get("type_args", [])]
+        if (return_types.is_commit(tuple(rule["ok"].split("::")))
+                and not any(arg is None for arg in args)
+                and return_types.matches_result(path, tuple(rule["ok"].split("::")), args)
+                and return_types.matches_owner(path, tuple(rule["ok"].split("::")), args)):
+            verified_results.add(path)
     methods: dict[tuple[str, ...], set[str]] = {}
     for path in surface.items.values():
         if len(path) > 1:
             methods.setdefault(path[:-1], set()).add(path[-1])
+    replay_paths = {}
+    for path, kind in surface.exports.items():
+        if (kind == "function" and len(path) > 1 and path[-2] in OWNERS
+                and (path[-1] == "apply" or path[-1].startswith("apply_"))
+                and "builder" not in path[:-1]):
+            item_id = surface.item_ids[path]
+            previous = replay_paths.get(item_id)
+            if previous is None or (len(path), path) < (len(previous), previous):
+                replay_paths[item_id] = path
     for item_id, path in sorted(surface.items.items(), key=lambda item: item[1]):
         item = surface.index[item_id]
         kind = next(iter(item.get("inner") or {"none": None}))
@@ -137,6 +163,19 @@ def rows(document, crate: str):
             if (not draft and owner.endswith(("Edit", "Transaction", "Editor"))
                     and gate.is_edit_output(name)):
                 yield "edit_output", text, receiver, "commit().package() owns artifact output"
+            if not draft and owner == "Edit" and name == "commit":
+                expected = path[:-2] + ("Commit",)
+                if (surface.exports.get(expected) in gate.TYPE_KINDS
+                        and (not return_types.is_commit(expected)
+                             or not return_types.matches_result(path, expected))):
+                    yield "commit_return", text, receiver, "Result<" + "::".join(expected) + ">"
+            replay_path = replay_paths.get(item_id)
+            if replay_path is not None and replay_path not in verified_results:
+                payload = return_types.result_payload(return_types.method_output(replay_path))
+                detail = ("returns owner" if payload is not None
+                          and payload == return_types.type_at(replay_path[:-1])
+                          else "return contract unverified")
+                yield "replay_return", "::".join(replay_path), detail, "register and satisfy Result<family::Commit> in result_methods"
         elif kind in ("struct", "enum", "type_alias"):
             if (kind == "enum" and name == "Error"
                     and not {"non_exhaustive", "#[non_exhaustive]"}.intersection(item.get("attrs", []))):
@@ -180,7 +219,9 @@ def main(argv=None) -> int:
     print("crate\tcategory\tpath\tdetail\ttarget")
     for path in args.json:
         document = gate.read_json(path)
-        crate = path.stem
+        # Captures may be renamed by profile or source revision. The crate
+        # identity belongs to the rustdoc graph, not the artifact filename.
+        crate = document["index"][str(document["root"])]["name"]
         for row in rows(document, crate):
             print(crate.replace("_", "-"), *row, sep="\t")
     return 0
