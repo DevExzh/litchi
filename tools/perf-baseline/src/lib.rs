@@ -20236,10 +20236,9 @@ fn verify_pptx_cross_copy_refusal_gates(
         );
     let borrowed_provenance_refusal_verified = matches!(
         borrowed_result,
-        Err(litchi_pptx::Error::SlideCopyPlan {
-            kind: litchi_pptx::SlideCopyRefusal::UnknownPhysicalMember,
-            ..
-        })
+        Err(litchi_pptx::Error::Refused(refusal))
+            if refusal.kind()
+                == litchi_pptx::SlideCopyRefusal::UnknownPhysicalMember.kind()
     );
 
     let mut stale_destination =

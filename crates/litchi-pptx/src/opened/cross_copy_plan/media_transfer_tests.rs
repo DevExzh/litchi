@@ -425,10 +425,9 @@ fn an_svg_picture_is_still_refused_before_any_encoding_is_chosen() -> Result<()>
     let destination = Package::from_reader(std::io::Cursor::new(authored("destination", 2)?))?;
     assert!(matches!(
         plan_copy(&source, &destination),
-        Err(Error::SlideCopyPlan {
-            kind: crate::SlideCopyRefusal::UnknownSemanticSurface,
-            ..
-        })
+        Err(
+            Error::Refused(refusal) if refusal.kind() == crate::SlideCopyRefusal::UnknownSemanticSurface.kind(),
+        )
     ));
     Ok(())
 }
@@ -749,17 +748,11 @@ fn legacy_lpcp0003_patches_are_refused_by_name() -> Result<()> {
             crate::cross_slide_copy::Patch::from_bytes(bytes, super::Limits::default()),
         ] {
             let error = parsed.expect_err("a legacy patch is refused");
-            assert!(
-                matches!(
-                    error,
-                    Error::DurablePatchRevisionFormat {
-                        found: DurablePatchFormat::CrossSlideCopyV3,
-                        expected: DurablePatchFormat::CrossSlideCopyV4,
-                    }
-                ),
-                "{label}: {error:?}"
+            assert!(matches!(error, Error::PatchConflict), "{label}: {error:?}");
+            assert_eq!(
+                error.to_string(),
+                "PPTX patch base does not match the target package"
             );
-            assert!(error.to_string().contains("LPCP0003"));
         }
     }
 
@@ -1351,10 +1344,7 @@ fn a_transferring_copy_is_refused_by_a_destination_with_a_caller_defined_part() 
     let caller_defined = |error: &Error| {
         matches!(
             error,
-            Error::SlideCopyPlan {
-                kind: crate::SlideCopyRefusal::CallerDefinedPart,
-                ..
-            }
+            Error::Refused(refusal) if refusal.kind() == crate::SlideCopyRefusal::CallerDefinedPart.kind()
         )
     };
     let error = custom

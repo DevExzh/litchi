@@ -72,7 +72,7 @@ pub enum SlideCopyRefusal {
 /// encodes copied image members, which the header now records; `LPCP0003`
 /// carries no such field, so it is superseded by `LPCP0004` and refused by
 /// name rather than read implicitly as either encoding. See
-/// [`Error::DurablePatchRevisionFormat`].
+/// [`Error::PatchConflict`].
 ///
 /// This enum never carries attacker-supplied bytes: an unrecognized magic is
 /// not classified here at all and keeps the existing
@@ -317,50 +317,6 @@ impl std::fmt::Display for ShapeTransferRefusal {
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum Error {
-    /// A whole-slide removal prerequisite was classified and refused without mutation.
-    #[error("unsupported PresentationML slide removal plan ({kind}): {detail}")]
-    SlideRemovalPlan {
-        /// Machine-readable refusal family.
-        kind: SlideRemovalRefusal,
-        /// Bounded human-readable source context.
-        detail: String,
-    },
-
-    /// A source-backed slide-order prerequisite was classified and refused
-    /// without mutation.
-    #[error("unsupported PresentationML slide-order edit ({kind}): {detail}")]
-    SlideOrderPlan {
-        /// Machine-readable refusal family.
-        kind: SlideOrderRefusal,
-        /// Bounded human-readable source context.
-        detail: String,
-    },
-
-    /// A whole-slide copy prerequisite was classified and refused without mutation.
-    #[error("unsupported PresentationML slide copy plan ({kind}): {detail}")]
-    SlideCopyPlan {
-        /// Machine-readable refusal family.
-        kind: SlideCopyRefusal,
-        /// Bounded human-readable source context.
-        detail: String,
-    },
-
-    /// A common-shape transfer was classified and refused before publication.
-    #[error("unsupported PresentationML shape transfer ({kind}): {detail}")]
-    ShapeTransfer {
-        /// Machine-readable refusal family.
-        kind: ShapeTransferRefusal,
-        /// Bounded human-readable source context.
-        detail: String,
-    },
-
-    /// One atomic shape-text batch selected the same semantic shape twice.
-    #[error("shape-text batch selects shape index {index} more than once")]
-    DuplicateShapeTextSelection {
-        /// Repeated zero-based pre-order shape index.
-        index: usize,
-    },
-
     /// Filesystem access or atomic output replacement failed.
     #[error("PPTX I/O error: {0}")]
     Io(#[from] std::io::Error),
@@ -595,24 +551,6 @@ pub enum Error {
         policy: crate::OpenPolicy,
     },
 
-    /// A durable patch carries a superseded revision proof: a complete-package
-    /// revision from a superseded algebra, or serialized-archive revisions of
-    /// a superseded candidate encoding.
-    ///
-    /// Refused while parsing the durable header, before any package is read or
-    /// mutated, so no caller ever holds a patch whose public revision
-    /// accessors return values no current application can reproduce.
-    #[error(
-        "PresentationML durable patch carries the superseded revision proof of format {found}; \
-         this build reads {expected}. Re-plan the edit against the source package."
-    )]
-    DurablePatchRevisionFormat {
-        /// Recognized but superseded durable format found in the input.
-        found: DurablePatchFormat,
-        /// Durable format this build reads for that patch family.
-        expected: DurablePatchFormat,
-    },
-
     /// Managed package encryption or decryption failed.
     #[cfg(feature = "encryption")]
     #[error("PPTX package encryption error: {0}")]
@@ -672,6 +610,134 @@ impl Error {
     /// A broken internal invariant.
     pub(crate) const fn internal(operation: &'static str, reason: &'static str) -> Self {
         Self::Internal { operation, reason }
+    }
+
+    /// A whole-slide removal refusal with a stable operation and reason.
+    pub(crate) const fn slide_removal_refused(kind: SlideRemovalRefusal) -> Self {
+        let reason = match kind {
+            SlideRemovalRefusal::SignedPackage => "the package is signed",
+            SlideRemovalRefusal::MacroEnabledPackage => {
+                "macro infrastructure is outside dependency-free slide removal"
+            },
+            SlideRemovalRefusal::ProtectedPresentation => {
+                "the presentation has an active modify-password verifier"
+            },
+            SlideRemovalRefusal::MarkupCompatibility => {
+                "slide removal cannot preserve markup-compatibility content"
+            },
+            SlideRemovalRefusal::UnknownSemanticSurface => {
+                "slide removal cannot preserve an unsupported semantic surface"
+            },
+            SlideRemovalRefusal::SharedOwner => "the selected slide has a shared owner",
+            SlideRemovalRefusal::UnsupportedRelationship => {
+                "the selected slide has an unsupported relationship"
+            },
+            SlideRemovalRefusal::AmbiguousTopology => "the selected slide has ambiguous topology",
+            SlideRemovalRefusal::UnknownPhysicalMember => {
+                "the package contains an unknown physical member"
+            },
+            SlideRemovalRefusal::FinalSlide => "a presentation must retain at least one slide",
+        };
+        Self::refused(kind.kind(), "slide_removal", reason)
+    }
+
+    /// A source-backed slide-order refusal with a stable operation and reason.
+    /// Ambiguous bindings are malformed source data, so they retain the
+    /// corrupt-file route rather than becoming a well-formed refusal.
+    pub(crate) fn slide_order_refused(kind: SlideOrderRefusal) -> Self {
+        match kind {
+            SlideOrderRefusal::AmbiguousBindings => {
+                Self::Invalid("slide-order bindings are ambiguous".to_owned())
+            },
+            _ => Self::refused(
+                kind.kind(),
+                "slide_order",
+                match kind {
+                    SlideOrderRefusal::ModifyVerifier => {
+                        "the presentation has an active modify-password verifier"
+                    },
+                    SlideOrderRefusal::MarkupCompatibility => {
+                        "slide order cannot preserve markup-compatibility content"
+                    },
+                    SlideOrderRefusal::Sections => {
+                        "slide order cannot preserve presentation sections"
+                    },
+                    SlideOrderRefusal::ViewProperties => {
+                        "slide order cannot preserve presentation view properties"
+                    },
+                    SlideOrderRefusal::PresentationProperties => {
+                        "slide order cannot preserve presentation properties"
+                    },
+                    SlideOrderRefusal::PositionalOwner => {
+                        "slide order cannot preserve positional metadata"
+                    },
+                    SlideOrderRefusal::AmbiguousBindings => "slide-order bindings are ambiguous",
+                },
+            ),
+        }
+    }
+
+    /// A whole-slide copy refusal with a stable operation and reason.
+    pub(crate) const fn slide_copy_refused(kind: SlideCopyRefusal) -> Self {
+        let reason = match kind {
+            SlideCopyRefusal::SignedPackage => {
+                "the selected slide cannot be copied losslessly because the package is signed"
+            },
+            SlideCopyRefusal::ProtectedPresentation => {
+                "the selected slide cannot be copied losslessly because the presentation is protected"
+            },
+            SlideCopyRefusal::MarkupCompatibility => {
+                "the selected slide cannot be copied losslessly because it contains markup-compatibility content"
+            },
+            SlideCopyRefusal::UnknownSemanticSurface => {
+                "the selected slide cannot be copied losslessly because its semantic surface is unsupported"
+            },
+            SlideCopyRefusal::SharedOwner => {
+                "the selected slide cannot be copied losslessly because it has a shared owner"
+            },
+            SlideCopyRefusal::UnsupportedRelationship => {
+                "the selected slide cannot be copied losslessly because it has an unsupported relationship"
+            },
+            SlideCopyRefusal::DependencyCycle => {
+                "the selected slide cannot be copied losslessly because its dependency graph has a cycle"
+            },
+            SlideCopyRefusal::AmbiguousTopology => {
+                "the selected slide cannot be copied losslessly because its topology is ambiguous"
+            },
+            SlideCopyRefusal::GlobalTableStyle => {
+                "the selected slide cannot be copied losslessly because it uses a presentation-global table style"
+            },
+            SlideCopyRefusal::UnknownPhysicalMember => {
+                "the selected slide cannot be copied losslessly because the package has an unknown physical member"
+            },
+            SlideCopyRefusal::CallerDefinedPart => {
+                "the selected slide cannot be copied losslessly because the destination has caller-defined parts"
+            },
+        };
+        Self::refused(kind.kind(), "slide_copy", reason)
+    }
+
+    /// A shape-transfer refusal with a stable operation and reason.
+    pub(crate) const fn shape_transfer_refused(kind: ShapeTransferRefusal) -> Self {
+        let reason = match kind {
+            ShapeTransferRefusal::NestedShape => {
+                "the selected shape is nested inside another shape"
+            },
+            ShapeTransferRefusal::ContentPart => "the selected shape is a content part",
+            ShapeTransferRefusal::UnknownExtensionShape => {
+                "the selected shape has an unknown extension"
+            },
+            ShapeTransferRefusal::UnclassifiedGraphicFrame => {
+                "the selected graphic frame is not classified"
+            },
+            ShapeTransferRefusal::MissingIdentity => {
+                "the selected shape has no non-visual identity"
+            },
+            ShapeTransferRefusal::UnresolvedConnectorEndpoint => {
+                "the selected connector endpoint is unresolved"
+            },
+        };
+        Self::refused(kind.kind(), "shape_transfer", reason)
     }
 
     /// The refusal this error carries, when it is one.

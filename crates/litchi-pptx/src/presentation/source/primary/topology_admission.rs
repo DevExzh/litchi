@@ -192,11 +192,8 @@ fn validate_inner(
     Ok(())
 }
 
-fn refuse<T>(kind: SlideRemovalRefusal, detail: &str) -> Result<T> {
-    Err(Error::SlideRemovalPlan {
-        kind,
-        detail: detail.to_owned(),
-    })
+fn refuse<T>(kind: SlideRemovalRefusal, _detail: &str) -> Result<T> {
+    Err(Error::slide_removal_refused(kind))
 }
 
 /// Add the typed edges of a restored slide before installing its exact XML

@@ -205,7 +205,7 @@ fn an_exact_no_op_patch_rejects_a_different_property_owner() {
     changed.apply(&mut different).unwrap();
     assert!(matches!(
         no_op.apply(&mut different),
-        Err(Error::Conflict(_))
+        Err(Error::PatchConflict)
     ));
 
     let mut exact = source.clone();
@@ -253,7 +253,7 @@ fn composed_no_op_scopes_are_checked_instead_of_dropped() {
     app_patch.apply(&mut different).unwrap();
     assert!(matches!(
         no_op_then_changed.apply(&mut different),
-        Err(Error::Conflict(_))
+        Err(Error::PatchConflict)
     ));
 
     // The same exact owner remains composable, while a different property
@@ -261,7 +261,7 @@ fn composed_no_op_scopes_are_checked_instead_of_dropped() {
     assert!(no_op.compose(&no_op).unwrap().is_noop());
     assert!(matches!(
         no_op.compose(&changed_no_op),
-        Err(Error::Conflict(_))
+        Err(Error::PatchConflict)
     ));
 
     // The inverse composition of a changed patch has no complete scope, so
@@ -274,7 +274,7 @@ fn composed_no_op_scopes_are_checked_instead_of_dropped() {
     changed.apply(&mut after).unwrap();
     assert!(matches!(
         round_trip.apply(&mut after),
-        Err(Error::Conflict(_))
+        Err(Error::PatchConflict)
     ));
 
     // A partial cancellation scope remains useful when followed by a
@@ -299,7 +299,7 @@ fn composed_no_op_scopes_are_checked_instead_of_dropped() {
     changed.apply(&mut wrong).unwrap();
     assert!(matches!(
         disjoint.apply(&mut wrong),
-        Err(Error::Conflict(_))
+        Err(Error::PatchConflict)
     ));
 }
 
@@ -370,7 +370,7 @@ fn composed_no_op_scope_authenticates_absent_property_families() {
     assert_eq!(recreated.iter_parts().count(), 0);
     assert!(matches!(
         no_op.compose(&changed_no_op),
-        Err(Error::Conflict(_))
+        Err(Error::PatchConflict)
     ));
 }
 
@@ -402,13 +402,13 @@ fn composed_creation_authenticates_its_actual_relationship_id() {
         .unwrap();
     assert!(matches!(
         composed.apply(&mut occupied),
-        Err(Error::Conflict(_))
+        Err(Error::PatchConflict)
     ));
 
     let occupied_source = source_backed(&occupied);
     assert!(matches!(
         composed.prepare_source_backed(&occupied_source),
-        Err(Error::Conflict(_))
+        Err(Error::PatchConflict)
     ));
 }
 
@@ -588,7 +588,7 @@ fn a_stale_patch_conflicts_without_mutation() {
     let before = bytes(&package, "/docProps/core.xml");
     assert!(matches!(
         second.apply(&mut package),
-        Err(Error::Conflict(_))
+        Err(Error::PatchConflict)
     ));
     assert_eq!(bytes(&package, "/docProps/core.xml"), before);
 }
@@ -624,7 +624,7 @@ fn composed_patches_apply_as_their_sequence_and_an_inverse_composes_to_a_no_op()
     );
     assert!(first.compose(&first.inverse()).unwrap().is_noop());
     // A patch that does not continue the first one is refused.
-    assert!(matches!(first.compose(&first), Err(Error::Conflict(_))));
+    assert!(matches!(first.compose(&first), Err(Error::PatchConflict)));
 }
 
 #[test]
@@ -668,7 +668,7 @@ fn a_patch_prepares_over_a_source_backed_package_without_materializing_it() {
     let changed = source_backed(&owning);
     assert!(matches!(
         patch.prepare_source_backed(&changed),
-        Err(Error::Conflict(_))
+        Err(Error::PatchConflict)
     ));
     let mut exact = Vec::new();
     super::Patch::default()

@@ -579,7 +579,23 @@ fn late_invalid_chunks_and_cross_chunk_duplicates_are_atomic() {
     let mut edit = Package::from_bytes(&before).unwrap().edit().unwrap();
     assert!(matches!(
         edit.set_shape_text_chunks(0_usize, &[&duplicate_left, &duplicate_right]),
-        Err(Error::DuplicateShapeTextSelection { index: 0 })
+        Err(Error::Refused(refusal))
+            if refusal.kind() == litchi_core::edit::RefusalKind::InvalidValue
+                && refusal.operation() == "set_shape_text"
+    ));
+    assert_eq!(
+        edit.commit().unwrap().into_package().to_bytes().unwrap(),
+        before
+    );
+
+    let duplicate_left = [ShapePropertiesReplacement::new(Position::new(0)).with_text("left")];
+    let duplicate_right = [ShapePropertiesReplacement::new(Position::new(0)).with_text("right")];
+    let mut edit = Package::from_bytes(&before).unwrap().edit().unwrap();
+    assert!(matches!(
+        edit.set_shape_property_chunks(0_usize, &[&duplicate_left, &duplicate_right]),
+        Err(Error::Refused(refusal))
+            if refusal.kind() == litchi_core::edit::RefusalKind::InvalidValue
+                && refusal.operation() == "set_shape_properties"
     ));
     assert_eq!(
         edit.commit().unwrap().into_package().to_bytes().unwrap(),

@@ -25,7 +25,7 @@ use quick_xml::reader::NsReader;
 
 use super::source::SourceBackedPresentationEditor;
 use crate::opened::{validate_removal_presentation_owner, validate_removal_slide_surface};
-use crate::{Error, Result, SlideCopyRefusal, SlideOrderRefusal, SlideRemovalRefusal};
+use crate::{Error, Result, SlideRemovalRefusal};
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 const MCE_NAMESPACE: &[u8] = b"http://schemas.openxmlformats.org/markup-compatibility/2006";
@@ -813,60 +813,24 @@ fn reject_mce(xml: &[u8], package: &SourceBackedPackage) -> Result<()> {
 
 fn map_copy_refusal(value: Result<()>) -> Result<()> {
     match value {
-        Ok(()) => Ok(()),
-        Err(Error::SlideCopyPlan { kind, detail }) => {
-            let kind = match kind {
-                SlideCopyRefusal::SignedPackage => SlideRemovalRefusal::SignedPackage,
-                SlideCopyRefusal::ProtectedPresentation => {
-                    SlideRemovalRefusal::ProtectedPresentation
-                },
-                SlideCopyRefusal::MarkupCompatibility => SlideRemovalRefusal::MarkupCompatibility,
-                SlideCopyRefusal::UnknownSemanticSurface => {
-                    SlideRemovalRefusal::UnknownSemanticSurface
-                },
-                SlideCopyRefusal::SharedOwner | SlideCopyRefusal::GlobalTableStyle => {
-                    SlideRemovalRefusal::SharedOwner
-                },
-                SlideCopyRefusal::UnknownPhysicalMember => {
-                    SlideRemovalRefusal::UnknownPhysicalMember
-                },
-                SlideCopyRefusal::UnsupportedRelationship => {
-                    SlideRemovalRefusal::UnsupportedRelationship
-                },
-                SlideCopyRefusal::DependencyCycle | SlideCopyRefusal::AmbiguousTopology => {
-                    SlideRemovalRefusal::AmbiguousTopology
-                },
-                SlideCopyRefusal::CallerDefinedPart => SlideRemovalRefusal::UnknownSemanticSurface,
-            };
-            refusal(kind, detail)
-        },
-        Err(error) => Err(error),
+        Err(Error::Refused(refusal)) if refusal.operation() == "slide_copy" => Err(Error::refused(
+            refusal.kind(),
+            "slide_removal",
+            refusal.reason(),
+        )),
+        other => other,
     }
 }
 
 fn map_order_refusal(value: Result<()>) -> Result<()> {
     match value {
-        Ok(()) => Ok(()),
-        Err(Error::SlideOrderPlan { kind, detail }) => {
-            let kind = match kind {
-                SlideOrderRefusal::MarkupCompatibility => SlideRemovalRefusal::MarkupCompatibility,
-                SlideOrderRefusal::Sections
-                | SlideOrderRefusal::ViewProperties
-                | SlideOrderRefusal::PresentationProperties
-                | SlideOrderRefusal::PositionalOwner => SlideRemovalRefusal::SharedOwner,
-                SlideOrderRefusal::AmbiguousBindings | SlideOrderRefusal::ModifyVerifier => {
-                    SlideRemovalRefusal::UnknownSemanticSurface
-                },
-            };
-            refusal(kind, detail)
-        },
-        Err(error) => Err(error),
+        Err(Error::Refused(refusal)) if refusal.operation() == "slide_order" => Err(
+            Error::refused(refusal.kind(), "slide_removal", refusal.reason()),
+        ),
+        other => other,
     }
 }
 
-fn refusal<T>(kind: SlideRemovalRefusal, detail: impl Into<String>) -> Result<T> {
-    Err(Error::SlideRemovalPlan {
-        kind,
-        detail: detail.into(),
-    })
+fn refusal<T>(kind: SlideRemovalRefusal, _detail: impl Into<String>) -> Result<T> {
+    Err(Error::slide_removal_refused(kind))
 }

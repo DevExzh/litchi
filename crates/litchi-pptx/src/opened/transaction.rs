@@ -447,10 +447,9 @@ impl Edit {
         plan: &crate::cross_slide_copy::Plan,
     ) -> Result<()> {
         if !source.physical_source_provenance || !self.source.physical_source_provenance {
-            return Err(Error::SlideCopyPlan {
-                kind: crate::SlideCopyRefusal::UnknownPhysicalMember,
-                detail: "cross-slide physical authorization requires source-preserving package ingress (use Package::open, from_reader, or their *_with_options forms)".to_owned(),
-            });
+            return Err(Error::slide_copy_refused(
+                crate::SlideCopyRefusal::UnknownPhysicalMember,
+            ));
         }
         source.ensure_plain_mutation("stage_cross_slide_copy")?;
         self.source
@@ -2995,11 +2994,8 @@ fn insert_transfer_shape_id(
     }
 }
 
-fn shape_transfer_refusal(kind: crate::ShapeTransferRefusal, detail: impl Into<String>) -> Error {
-    Error::ShapeTransfer {
-        kind,
-        detail: detail.into(),
-    }
+fn shape_transfer_refusal(kind: crate::ShapeTransferRefusal, _detail: impl Into<String>) -> Error {
+    Error::shape_transfer_refused(kind)
 }
 
 fn plan_shape_identity_transfer(

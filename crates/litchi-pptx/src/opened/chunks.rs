@@ -381,10 +381,7 @@ mod tests {
         let chunks = [&first[..], &second[..]];
         let error = stage_shape_text_chunks(&slide(), &chunks, 128, 1 << 20)
             .expect_err("duplicate selectors must be rejected globally");
-        assert!(matches!(
-            error,
-            Error::DuplicateShapeTextSelection { index: 0 }
-        ));
+        assert!(matches!(error, Error::Refused(_)));
     }
 
     #[test]

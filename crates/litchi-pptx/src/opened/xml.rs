@@ -1401,7 +1401,11 @@ pub(super) fn stage_shape_texts_admitted(
         let shape = scene.shape(replacement.selector())?;
         let index = shape.common().index();
         if !selected.insert(index) {
-            return Err(Error::DuplicateShapeTextSelection { index });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::InvalidValue,
+                "set_shape_text",
+                "a shape is selected more than once",
+            ));
         }
         let current = shape.common().text().ok_or(Error::refused(
             litchi_core::edit::RefusalKind::UnsupportedTarget,
@@ -2366,12 +2370,9 @@ fn write_remapped_shape_start(
                 .shape_ids
                 .get(&connected_id)
                 .ok_or_else(|| {
-                    Error::ShapeTransfer {
-                        kind: crate::ShapeTransferRefusal::UnresolvedConnectorEndpoint,
-                        detail: format!(
-                            "connector endpoint {connected_id} lies outside the planned transfer closure"
-                        ),
-                    }
+                    Error::shape_transfer_refused(
+                        crate::ShapeTransferRefusal::UnresolvedConnectorEndpoint,
+                    )
                 })?
                 .to_string()
         } else {

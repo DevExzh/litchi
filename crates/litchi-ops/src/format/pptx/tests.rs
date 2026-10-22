@@ -885,10 +885,9 @@ fn unknown_presentation_properties_extension_remains_refused() {
     assert_eq!(error.code(), Code::UnsupportedCapability);
     assert!(matches!(
         error.leaf(),
-        Source::Pptx(pptx::Error::SlideOrderPlan {
-            kind: pptx::SlideOrderRefusal::PresentationProperties,
-            ..
-        })
+        Source::Pptx(pptx::Error::Refused(refusal))
+            if refusal.kind() == pptx::SlideOrderRefusal::PresentationProperties.kind()
+                && refusal.operation() == "slide_order"
     ));
 }
 

@@ -562,10 +562,8 @@ fn verify_dependency_refusal(corpus: &Corpus) -> Result<bool, Box<dyn StdError>>
     let refusal = transaction.remove_slide(DEPENDENCY_SLIDE_POSITION);
     let typed_refusal = matches!(
         refusal,
-        Err(Error::SlideRemovalPlan {
-            kind: SlideRemovalRefusal::UnsupportedRelationship,
-            ..
-        })
+        Err(Error::Refused(refusal))
+            if refusal.kind() == SlideRemovalRefusal::UnsupportedRelationship.kind()
     );
     let staging_names = transaction
         .slides()
@@ -596,19 +594,15 @@ fn verify_refusal_gates(
     let one_slide = Package::from_reader(std::io::Cursor::new(build_plain_archive(1, "sole")?))?;
     let one_slide_verified = matches!(
         one_slide.opened_presentation()?.plan_slide_removal(0),
-        Err(Error::SlideRemovalPlan {
-            kind: SlideRemovalRefusal::FinalSlide,
-            ..
-        })
+        Err(Error::Refused(refusal))
+            if refusal.kind() == SlideRemovalRefusal::FinalSlide.kind()
     );
 
     let unknown = Package::from_reader(std::io::Cursor::new(add_unknown_member(&corpus.archive)?))?;
     let unknown_verified = matches!(
         unknown.opened_presentation()?.plan_slide_removal(0),
-        Err(Error::SlideRemovalPlan {
-            kind: SlideRemovalRefusal::UnknownPhysicalMember,
-            ..
-        })
+        Err(Error::Refused(refusal))
+            if refusal.kind() == SlideRemovalRefusal::UnknownPhysicalMember.kind()
     );
 
     let dependency_verified = verify_dependency_refusal(corpus)?;
@@ -616,20 +610,16 @@ fn verify_refusal_gates(
     let mce = Package::from_reader(std::io::Cursor::new(add_mce_marker(&corpus.archive)?))?;
     let mce_verified = matches!(
         mce.opened_presentation()?.plan_slide_removal(0),
-        Err(Error::SlideRemovalPlan {
-            kind: SlideRemovalRefusal::MarkupCompatibility,
-            ..
-        })
+        Err(Error::Refused(refusal))
+            if refusal.kind() == SlideRemovalRefusal::MarkupCompatibility.kind()
     );
 
     let signed =
         Package::from_reader(std::io::Cursor::new(add_signature_marker(&corpus.archive)?))?;
     let signed_verified = matches!(
         signed.opened_presentation()?.plan_slide_removal(0),
-        Err(Error::SlideRemovalPlan {
-            kind: SlideRemovalRefusal::SignedPackage,
-            ..
-        })
+        Err(Error::Refused(refusal))
+            if refusal.kind() == SlideRemovalRefusal::SignedPackage.kind()
     );
 
     let limits =

@@ -1346,7 +1346,8 @@ impl Classify for litchi_docx::metadata::Error {
                 litchi_ooxml_common::properties::Error::Invalid(_) => Code::InvalidValue,
                 litchi_ooxml_common::properties::Error::Limit { .. } => Code::LimitExceeded,
                 litchi_ooxml_common::properties::Error::Signed => Code::DocumentProtected,
-                litchi_ooxml_common::properties::Error::Conflict(_) => Code::ValidationError,
+                litchi_ooxml_common::properties::Error::PatchConflict => Code::InvalidInput,
+                litchi_ooxml_common::properties::Error::Internal(_) => Code::InternalError,
                 _ => Code::CorruptFile,
             }),
             _ => Class::of(Code::InternalError),
@@ -1369,6 +1370,17 @@ impl Classify for litchi_pptx::Error {
             Self::Io(error) => error.classify(),
             // A patch for another base: the caller supplied it (record 0351).
             Self::PatchConflict => Class::of(Code::InvalidInput),
+            Self::Refused(refusal)
+                if refusal.operation() == "slide_removal"
+                    && refusal.reason() == "the package is signed"
+                    && refusal.kind() == litchi_core::edit::RefusalKind::Protected => {
+                Class::suggest(Code::DocumentProtected, SIGNED_SUGGESTION)
+            },
+            Self::Refused(refusal)
+                if refusal.operation() == "slide_removal"
+                    && refusal.kind() == litchi_core::edit::RefusalKind::InvalidValue => {
+                Class::of(Code::InvalidArgument)
+            },
             Self::Refused(refusal) => refusal.classify(),
             Self::UnsupportedOpenPolicy { .. } => Class::of(Code::InvalidArgument),
             Self::EditLimit { .. } => Class::of(Code::LimitExceeded),
@@ -1395,24 +1407,6 @@ impl Classify for litchi_pptx::Error {
             Self::NameNotFound(_) | Self::SlideNameNotFound(_) | Self::SlideLayoutNameNotFound(_) | Self::FontNotFound(_) => {
                 Class::of(Code::NotFound)
             },
-            // The typed refusals classify by kind (record 0351); ambiguous
-            // slide bindings are a malformed source, and removing the final
-            // slide is the argument error every format reports for it.
-            Self::SlideOrderPlan { kind, .. } => match kind {
-                litchi_pptx::SlideOrderRefusal::AmbiguousBindings => Class::of(Code::CorruptFile),
-                _ => kind.kind().classify(),
-            },
-            Self::SlideRemovalPlan { kind, .. } => match kind {
-                litchi_pptx::SlideRemovalRefusal::SignedPackage => {
-                    Class::suggest(Code::DocumentProtected, SIGNED_SUGGESTION)
-                },
-                litchi_pptx::SlideRemovalRefusal::FinalSlide => {
-                    Class::of(Code::InvalidArgument)
-                },
-                _ => kind.kind().classify(),
-            },
-            Self::SlideCopyPlan { kind, .. } => kind.kind().classify(),
-            Self::ShapeTransfer { kind, .. } => kind.kind().classify(),
             Self::Allocation { .. }
             | Self::CapacityOverflow { .. }
             | Self::Internal { .. } => Class::of(Code::InternalError),

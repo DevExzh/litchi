@@ -424,13 +424,9 @@ fn build_copy_candidate(
                 {
                     reused_layout
                 } else {
-                    mapping
-                        .get(&source_target)
-                        .ok_or_else(|| Error::SlideCopyPlan {
-                            kind: SlideCopyRefusal::AmbiguousTopology,
-                            detail: "an internal copied relationship escaped the planned closure"
-                                .to_owned(),
-                        })?
+                    mapping.get(&source_target).ok_or_else(|| {
+                        Error::slide_copy_refused(SlideCopyRefusal::AmbiguousTopology)
+                    })?
                 };
                 (
                     copied_target.relative_ref(planned.target.base_uri()),
@@ -643,10 +639,8 @@ pub(super) fn collect_owned_closure(
         }
         edges.insert(name, outgoing);
     }
-    let reused_layout = reused_layout.ok_or_else(|| Error::SlideCopyPlan {
-        kind: SlideCopyRefusal::AmbiguousTopology,
-        detail: "the selected slide does not have exactly one reusable layout".to_owned(),
-    })?;
+    let reused_layout = reused_layout
+        .ok_or_else(|| Error::slide_copy_refused(SlideCopyRefusal::AmbiguousTopology))?;
     Ok((
         owned,
         edges,
@@ -1352,10 +1346,7 @@ pub(super) fn next_relationship_id(relationships: &litchi_opc::Relationships) ->
         if value == candidate {
             candidate = candidate
                 .checked_add(1)
-                .ok_or_else(|| Error::SlideCopyPlan {
-                    kind: SlideCopyRefusal::AmbiguousTopology,
-                    detail: "the presentation relationship-ID space is exhausted".to_owned(),
-                })?;
+                .ok_or_else(|| Error::slide_copy_refused(SlideCopyRefusal::AmbiguousTopology))?;
         } else if value > candidate {
             break;
         }
@@ -1376,9 +1367,6 @@ fn try_copy_string(value: &str, resource: &'static str) -> Result<String> {
     Ok(output)
 }
 
-fn refusal<T>(kind: SlideCopyRefusal, detail: impl Into<String>) -> Result<T> {
-    Err(Error::SlideCopyPlan {
-        kind,
-        detail: detail.into(),
-    })
+fn refusal<T>(kind: SlideCopyRefusal, _detail: impl Into<String>) -> Result<T> {
+    Err(Error::slide_copy_refused(kind))
 }

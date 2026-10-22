@@ -257,10 +257,9 @@ impl Package {
 
     fn require_physical_provenance(&self, source: &Self) -> Result<()> {
         if !source.physical_source_provenance || !self.physical_source_provenance {
-            return Err(Error::SlideCopyPlan {
-                kind: crate::SlideCopyRefusal::UnknownPhysicalMember,
-                detail: "cross-slide physical authorization requires source-preserving package ingress (use Package::open, from_reader, or their *_with_options forms)".to_owned(),
-            });
+            return Err(Error::slide_copy_refused(
+                crate::SlideCopyRefusal::UnknownPhysicalMember,
+            ));
         }
         source.ensure_plain_mutation("copy_slide")?;
         self.ensure_plain_mutation("copy_slide")

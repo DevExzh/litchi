@@ -164,7 +164,7 @@ impl Package {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Conflict`] when this package is not the patch's
+    /// Returns [`Error::PatchConflict`] when this package is not the patch's
     /// before state and [`Error::Signed`] for a changed patch of a signed
     /// package.
     pub fn apply_metadata(&self, patch: &Patch) -> Result<Commit> {
@@ -228,7 +228,7 @@ mod tests {
         assert_eq!(restored.metadata().unwrap(), package.metadata().unwrap());
         assert!(matches!(
             package.apply_metadata(&patch.inverse()),
-            Err(Error::Conflict(_))
+            Err(Error::PatchConflict)
         ));
     }
 

@@ -646,7 +646,7 @@ impl Patch {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::DurablePatchRevisionFormat`] for a patch serialized
+    /// Returns [`Error::PatchConflict`] for a patch serialized
     /// under the superseded `LPCP0002` or `LPCP0003` format, and an error for
     /// malformed, trailing, or unbounded input.
     pub fn from_bytes(bytes: &[u8], limits: Limits) -> Result<Self> {
@@ -666,10 +666,7 @@ impl Patch {
         for superseded in SUPERSEDED_PATCH_FORMATS {
             let magic = superseded.magic();
             if bytes.get(..magic.len()) == Some(magic.as_slice()) {
-                return Err(Error::DurablePatchRevisionFormat {
-                    found: superseded,
-                    expected: PATCH_FORMAT,
-                });
+                return Err(Error::PatchConflict);
             }
         }
         let mut input = WireInput::new(bytes);
@@ -1838,13 +1835,9 @@ fn build_candidate(
                 {
                     destination_layout
                 } else {
-                    mapping
-                        .get(&source_target)
-                        .ok_or_else(|| Error::SlideCopyPlan {
-                            kind: SlideCopyRefusal::AmbiguousTopology,
-                            detail: "a copied internal relationship escaped the owned closure"
-                                .to_owned(),
-                        })?
+                    mapping.get(&source_target).ok_or_else(|| {
+                        Error::slide_copy_refused(SlideCopyRefusal::AmbiguousTopology)
+                    })?
                 };
                 (
                     target_part.relative_ref(planned.target.base_uri()),
@@ -2138,10 +2131,7 @@ fn selected_layout(package: &OpcPackage, slide: &dyn Part) -> Result<PackURI> {
         crate::parts::validate_content_type(package.get_part(&target)?, ct::PML_SLIDE_LAYOUT)?;
         selected = Some(target);
     }
-    selected.ok_or_else(|| Error::SlideCopyPlan {
-        kind: SlideCopyRefusal::AmbiguousTopology,
-        detail: "a slide has no reusable layout relationship".to_owned(),
-    })
+    selected.ok_or_else(|| Error::slide_copy_refused(SlideCopyRefusal::AmbiguousTopology))
 }
 
 #[derive(Clone, Copy)]
@@ -2492,10 +2482,7 @@ fn single_inheritance_target(
         }
         target = Some(relationship.target_partname()?);
     }
-    let target = target.ok_or_else(|| Error::SlideCopyPlan {
-        kind: SlideCopyRefusal::SharedOwner,
-        detail: format!("the inherited part has no {label} relationship"),
-    })?;
+    let target = target.ok_or_else(|| Error::slide_copy_refused(SlideCopyRefusal::SharedOwner))?;
     let target_part = package.get_part(&target)?;
     if target_part.content_type() != expected_content_type {
         return refusal(
@@ -2512,11 +2499,7 @@ fn find_slide_by_part(snapshot: &Snapshot, part: &PackURI) -> Result<Slide> {
         .iter()
         .find(|slide| slide.part_name == *part)
         .cloned()
-        .ok_or_else(|| Error::SlideCopyPlan {
-            kind: SlideCopyRefusal::SharedOwner,
-            detail: "the durable cross-slide patch source slide is not presentation-owned"
-                .to_owned(),
-        })
+        .ok_or_else(|| Error::slide_copy_refused(SlideCopyRefusal::SharedOwner))
 }
 
 fn reject_slide_name_collisions(
@@ -3187,11 +3170,8 @@ fn parse_part_name_text(value: String) -> Result<PackURI> {
     PackURI::new(value).map_err(Error::Invalid)
 }
 
-fn refusal<T>(kind: SlideCopyRefusal, detail: impl Into<String>) -> Result<T> {
-    Err(Error::SlideCopyPlan {
-        kind,
-        detail: detail.into(),
-    })
+fn refusal<T>(kind: SlideCopyRefusal, _detail: impl Into<String>) -> Result<T> {
+    Err(Error::slide_copy_refused(kind))
 }
 
 struct WireInput<'a> {

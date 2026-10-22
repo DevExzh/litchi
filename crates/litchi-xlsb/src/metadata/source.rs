@@ -312,7 +312,7 @@ impl SourceBackedWorkbook {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Conflict`] for a different content base,
+    /// Returns [`Error::PatchConflict`] for a different content base,
     /// [`Error::Signed`] for a changed signed source, and the source and
     /// property decoding errors of the patch.
     pub fn apply_metadata(&self, patch: &Patch) -> Result<Commit> {

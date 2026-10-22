@@ -356,9 +356,8 @@ fn fold(name: &str) -> String {
     name.to_ascii_lowercase()
 }
 
-fn refusal<T>(detail: &str) -> Result<T> {
-    Err(Error::SlideRemovalPlan {
-        kind: SlideRemovalRefusal::AmbiguousTopology,
-        detail: detail.to_owned(),
-    })
+fn refusal<T>(_detail: &str) -> Result<T> {
+    Err(Error::slide_removal_refused(
+        SlideRemovalRefusal::AmbiguousTopology,
+    ))
 }

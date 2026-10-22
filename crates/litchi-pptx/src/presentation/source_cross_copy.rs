@@ -1114,9 +1114,8 @@ fn prepare(
                 } else {
                     let source_chart_part = source.inner.package.part(&source_chart_uri).map_err(
                         |error| match error {
-                            litchi_opc::OpcError::PartNotFound(_) => Error::SlideCopyPlan {
-                                kind: SlideCopyRefusal::AmbiguousTopology,
-                                detail: "embedded chart target part is missing".into(),
+                            litchi_opc::OpcError::PartNotFound(_) => {
+                                Error::slide_copy_refused(SlideCopyRefusal::AmbiguousTopology)
                             },
                             other => Error::Opc(other),
                         },
@@ -1191,9 +1190,8 @@ fn prepare(
                     .package
                     .part(&source_image_uri)
                     .map_err(|error| match error {
-                        litchi_opc::OpcError::PartNotFound(_) => Error::SlideCopyPlan {
-                            kind: SlideCopyRefusal::AmbiguousTopology,
-                            detail: "embedded image target part is missing".into(),
+                        litchi_opc::OpcError::PartNotFound(_) => {
+                            Error::slide_copy_refused(SlideCopyRefusal::AmbiguousTopology)
                         },
                         other => Error::Opc(other),
                     })?;
@@ -1332,10 +1330,7 @@ fn prepare(
         execution_context,
     )?;
     let source_name = crate::namespace::presentation_name(source_slide_data.as_bytes())?
-        .ok_or_else(|| Error::SlideCopyPlan {
-            kind: SlideCopyRefusal::AmbiguousTopology,
-            detail: "source slide common data is missing".into(),
-        })?;
+        .ok_or_else(|| Error::slide_copy_refused(SlideCopyRefusal::AmbiguousTopology))?;
     if !source_name.is_empty() && names.contains(&normalize_name(&source_name)?) {
         return refusal(
             SlideCopyRefusal::AmbiguousTopology,
@@ -2787,11 +2782,9 @@ fn direct_embedded_images(
                             );
                         }
                     }
-                    let relationship_id =
-                        chart_relationship_id.ok_or_else(|| Error::SlideCopyPlan {
-                            kind: SlideCopyRefusal::UnknownSemanticSurface,
-                            detail: "source slide chart host has no chart relationship".into(),
-                        })?;
+                    let relationship_id = chart_relationship_id.ok_or_else(|| {
+                        Error::slide_copy_refused(SlideCopyRefusal::UnknownSemanticSurface)
+                    })?;
                     let relationship_key = chart_relationship_key
                         .as_deref()
                         .ok_or_else(|| invalid("source slide chart relationship key is missing"))?;
@@ -2954,12 +2947,9 @@ fn direct_embedded_images(
                             }
                         }
                     }
-                    let relationship_id =
-                        blip_relationship_id.ok_or_else(|| Error::SlideCopyPlan {
-                            kind: SlideCopyRefusal::UnknownSemanticSurface,
-                            detail: "source slide picture has no embedded image relationship"
-                                .into(),
-                        })?;
+                    let relationship_id = blip_relationship_id.ok_or_else(|| {
+                        Error::slide_copy_refused(SlideCopyRefusal::UnknownSemanticSurface)
+                    })?;
                     let relationship_key = blip_relationship_key
                         .as_deref()
                         .ok_or_else(|| invalid("source slide image relationship key is missing"))?;
@@ -3184,10 +3174,7 @@ fn embed_attribute_range(
             .checked_add(1)
             .ok_or_else(|| invalid("source slide image attribute offset overflow"))?;
     }
-    found.ok_or_else(|| Error::SlideCopyPlan {
-        kind: SlideCopyRefusal::UnknownSemanticSurface,
-        detail: "source slide picture embed attribute range is missing".into(),
-    })
+    found.ok_or_else(|| Error::slide_copy_refused(SlideCopyRefusal::UnknownSemanticSurface))
 }
 
 const EMBED_ATTRIBUTE_EXECUTION_CHECK_STRIDE: usize = 64;
@@ -3468,10 +3455,7 @@ fn mapped_relationship_id<'a>(
             found = Some(relationship.target_relationship_id.as_str());
         }
     }
-    found.ok_or_else(|| Error::SlideCopyPlan {
-        kind: SlideCopyRefusal::AmbiguousTopology,
-        detail: "source slide relationship mapping is missing".into(),
-    })
+    found.ok_or_else(|| Error::slide_copy_refused(SlideCopyRefusal::AmbiguousTopology))
 }
 
 fn rewritten_embedded_xml_len(
@@ -4355,9 +4339,8 @@ fn validate_presentation_slide_bindings(
             );
         }
         let target_part = package.part(&target).map_err(|error| match error {
-            litchi_opc::OpcError::PartNotFound(_) => Error::SlideCopyPlan {
-                kind: SlideCopyRefusal::AmbiguousTopology,
-                detail: format!("{context} slide relationship target is missing"),
+            litchi_opc::OpcError::PartNotFound(_) => {
+                Error::slide_copy_refused(SlideCopyRefusal::AmbiguousTopology)
             },
             other => Error::Opc(other),
         })?;
@@ -4391,10 +4374,7 @@ fn allocate_slide_id(
         if used_id == candidate {
             candidate = candidate
                 .checked_add(1)
-                .ok_or_else(|| Error::SlideCopyPlan {
-                    kind: SlideCopyRefusal::AmbiguousTopology,
-                    detail: "slide ID space is exhausted".into(),
-                })?;
+                .ok_or_else(|| Error::slide_copy_refused(SlideCopyRefusal::AmbiguousTopology))?;
         } else if used_id > candidate {
             break;
         }
@@ -4525,10 +4505,7 @@ fn allocate_media_uri(
         .rsplit('/')
         .next()
         .filter(|name| !name.is_empty())
-        .ok_or_else(|| Error::SlideCopyPlan {
-            kind: SlideCopyRefusal::AmbiguousTopology,
-            detail: "embedded image target has no media member name".into(),
-        })?;
+        .ok_or_else(|| Error::slide_copy_refused(SlideCopyRefusal::AmbiguousTopology))?;
     let (stem, extension) = source_name.rsplit_once('.').unwrap_or((source_name, ""));
     let maximum = physical_names
         .len()
@@ -4742,10 +4719,9 @@ fn assigned_relationship_id<'a>(
                 .ok_or_else(|| invalid("prepared target relationship ID is missing"));
         }
     }
-    Err(Error::SlideCopyPlan {
-        kind: SlideCopyRefusal::AmbiguousTopology,
-        detail: "prepared source relationship ID is missing".into(),
-    })
+    Err(Error::slide_copy_refused(
+        SlideCopyRefusal::AmbiguousTopology,
+    ))
 }
 
 fn folded_ascii_name(value: &str, resource: &'static str) -> Result<String> {
@@ -4793,12 +4769,8 @@ fn destination_names(
             });
         }
         let data = view.data()?;
-        let name = crate::namespace::presentation_name(data.as_bytes())?.ok_or_else(|| {
-            Error::SlideCopyPlan {
-                kind: SlideCopyRefusal::AmbiguousTopology,
-                detail: "destination slide common data is missing".into(),
-            }
-        })?;
+        let name = crate::namespace::presentation_name(data.as_bytes())?
+            .ok_or_else(|| Error::slide_copy_refused(SlideCopyRefusal::AmbiguousTopology))?;
         // An absent or empty optional name is not a shared slide identity.
         // Position, native slide ID, relationship and source checks identify it.
         if !name.is_empty() && !names.insert(normalize_name(&name)?) {
@@ -6165,11 +6137,8 @@ fn map_execution_error(error: ExecutionError) -> Error {
 fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
 }
-fn refusal<T>(kind: SlideCopyRefusal, detail: impl Into<String>) -> Result<T> {
-    Err(Error::SlideCopyPlan {
-        kind,
-        detail: detail.into(),
-    })
+fn refusal<T>(kind: SlideCopyRefusal, _detail: impl Into<String>) -> Result<T> {
+    Err(Error::slide_copy_refused(kind))
 }
 
 struct SourceCheckedWriter<W> {
@@ -6263,10 +6232,9 @@ mod tests {
         let xml = br#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:foreign="http://purl.oclc.org/ooxml/markup-compatibility/2006"><p:cSld><p:spTree><foreign:wrapper><p:pic/></foreign:wrapper></p:spTree></p:cSld></p:sld>"#;
         assert!(matches!(
             validate_source_slide_xml(xml, "foreign MCE wrapper", None),
-            Err(Error::SlideCopyPlan {
-                kind: SlideCopyRefusal::UnknownSemanticSurface,
-                ..
-            })
+            Err(
+                Error::Refused(refusal) if refusal.kind() == SlideCopyRefusal::UnknownSemanticSurface.kind(),
+            )
         ));
     }
 

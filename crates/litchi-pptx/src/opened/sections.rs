@@ -346,11 +346,8 @@ fn push_member(
     Ok(())
 }
 
-fn refusal(detail: &str) -> Error {
-    Error::SlideOrderPlan {
-        kind: SlideOrderRefusal::Sections,
-        detail: detail.to_owned(),
-    }
+fn refusal(_detail: &str) -> Error {
+    Error::slide_order_refused(SlideOrderRefusal::Sections)
 }
 
 /// Place the slide `order[position]` in a section, as `PowerPoint` does

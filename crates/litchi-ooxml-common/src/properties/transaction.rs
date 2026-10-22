@@ -97,9 +97,13 @@ pub enum Error {
     /// A changed edit of a signed package needs the signature removed first.
     #[error("a changed metadata edit of a signed package requires removing the signature first")]
     Signed,
-    /// The patch does not match the package's current property parts.
-    #[error("the metadata patch does not match the package: {0}")]
-    Conflict(String),
+    /// A patch or staged composition does not match the recipient base.
+    #[error("OOXML metadata patch base does not match the recipient")]
+    PatchConflict,
+    /// The transaction found an invariant that its own validation should have
+    /// guaranteed.
+    #[error("OOXML metadata transaction invariant failed: {0}")]
+    Internal(&'static str),
     /// Another package, graph or XML failure.
     #[error(transparent)]
     Package(crate::Error),
@@ -1319,7 +1323,7 @@ impl Patch {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Conflict`] naming the first family whose state
+    /// Returns [`Error::PatchConflict`] when the first family whose state
     /// differs, and the graph errors of the family inspections.
     pub fn check(&self, package: &OpcPackage) -> Result<()> {
         for change in self.check_changes() {
@@ -1389,18 +1393,18 @@ impl Patch {
                 },
                 (Some(_), None) => {
                     if !candidate.remove_part(&change.part) {
-                        return Err(Error::Conflict(change.part.to_string()));
+                        return Err(Error::Internal(
+                            "metadata part disappeared after validation",
+                        ));
                     }
                     if candidate
                         .rels_mut()
                         .remove(&change.relationship_id)
                         .is_none()
                     {
-                        return Err(Error::Conflict(format!(
-                            "{} relationship '{}' disappeared during removal",
-                            change.family.label(),
-                            change.relationship_id
-                        )));
+                        return Err(Error::Internal(
+                            "metadata relationship disappeared after validation",
+                        ));
                     }
                 },
                 (None, Some(after)) => {
@@ -1435,7 +1439,7 @@ impl Patch {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Conflict`] when `next` does not continue this patch,
+    /// Returns [`Error::PatchConflict`] when `next` does not continue this patch,
     /// or when one family is removed and then created again under another
     /// part or relationship (one [`Change`] keeps one relationship).
     pub fn compose(&self, next: &Self) -> Result<Self> {
@@ -1465,20 +1469,14 @@ impl Patch {
                 (Some(change), None) | (None, Some(change)) => change.clone(),
                 (Some(first), Some(second)) => {
                     if first.after != second.before {
-                        return Err(Error::Conflict(format!(
-                            "the second {} change does not start from the first one's result",
-                            family.label()
-                        )));
+                        return Err(Error::PatchConflict);
                     }
                     if first.part != second.part
                         || first.relationship_id != second.relationship_id
                         || first.relationship_type != second.relationship_type
                         || first.relationship_target != second.relationship_target
                     {
-                        return Err(Error::Conflict(format!(
-                            "the {} part moved between the composed changes",
-                            family.label()
-                        )));
+                        return Err(Error::PatchConflict);
                     }
                     Change {
                         before: first.before.clone(),
@@ -1651,15 +1649,13 @@ fn check_scope_transition(
     scope: &[Change],
     changes: &[Change],
     after: bool,
-    side: &str,
+    _side: &str,
 ) -> Result<()> {
     let complete = scope_is_complete(scope);
     for change in changes {
         let Some(expected) = scope.iter().find(|scoped| scoped.family == change.family) else {
             if complete {
-                return Err(Error::Conflict(format!(
-                    "the {side} patch has a family absent from the complete property scope"
-                )));
+                return Err(Error::PatchConflict);
             }
             // A partial cancellation scope authenticates only the families it
             // retained. A disjoint changed family still carries its own
@@ -1674,10 +1670,7 @@ fn check_scope_transition(
                     change.before.as_deref()
                 })
         {
-            return Err(Error::Conflict(format!(
-                "the {side} patch does not continue the complete {} state",
-                change.family.label()
-            )));
+            return Err(Error::PatchConflict);
         }
     }
     Ok(())
@@ -1692,9 +1685,7 @@ fn check_scope_overlap(first: &[Change], second: &[Change]) -> Result<()> {
             || first.before != second.before
             || first.after != second.after
         {
-            return Err(Error::Conflict(
-                "the composed patches do not share the same intermediate property state".to_owned(),
-            ));
+            return Err(Error::PatchConflict);
         }
     }
     Ok(())
@@ -1802,12 +1793,7 @@ fn check_change<P: PackageMetadata>(
     (part, relationship_id): (Option<PackURI>, Option<String>),
     bytes: Option<&[u8]>,
 ) -> Result<()> {
-    let stale = || {
-        Error::Conflict(format!(
-            "the package's {} part is not the patch's before state",
-            change.family.label()
-        ))
-    };
+    let stale = || Error::PatchConflict;
     let relationships = package.package_relationships();
     match &change.before {
         Some(before) => {

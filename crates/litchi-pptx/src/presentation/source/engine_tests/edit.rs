@@ -918,7 +918,7 @@ fn batch_preflight_is_atomic_and_duplicate_identity_is_typed() {
             ShapeTextReplacement::named("Title", "first"),
             ShapeTextReplacement::at(0, "second"),
         ]),
-        Err(Error::DuplicateShapeTextSelection { index: 0 })
+        Err(Error::Refused(_))
     ));
     assert!(
         edit.set_shape_texts(&[
@@ -2307,10 +2307,9 @@ fn source_slide_order_rejects_limits_malformed_mce_and_invalid_owners() {
     let mut edit = editor.edit_slide_order().unwrap();
     assert!(matches!(
         edit.move_slide(Position::new(0), Position::new(2)),
-        Err(Error::SlideOrderPlan {
-            kind: SlideOrderRefusal::MarkupCompatibility,
-            ..
-        })
+        Err(
+            Error::Refused(refusal) if refusal.kind() == SlideOrderRefusal::MarkupCompatibility.kind(),
+        )
     ));
 
     let additional = multi_fixture_with_presentation_suffix(3, false, "<p:sldIdLst/>");
@@ -2376,10 +2375,7 @@ fn source_slide_order_rejects_limits_malformed_mce_and_invalid_owners() {
     output.clear();
     assert!(matches!(
         editor.publish_slide_order_commit_to_stream(&mut output, &commit),
-        Err(Error::SlideOrderPlan {
-            kind: SlideOrderRefusal::ViewProperties,
-            ..
-        })
+        Err(Error::Refused(refusal) if refusal.kind() == SlideOrderRefusal::ViewProperties.kind())
     ));
     assert!(output.is_empty());
 
@@ -2396,10 +2392,9 @@ fn source_slide_order_rejects_limits_malformed_mce_and_invalid_owners() {
     output.clear();
     assert!(matches!(
         editor.publish_slide_order_commit_to_stream(&mut output, &commit),
-        Err(Error::SlideOrderPlan {
-            kind: SlideOrderRefusal::PresentationProperties,
-            ..
-        })
+        Err(
+            Error::Refused(refusal) if refusal.kind() == SlideOrderRefusal::PresentationProperties.kind(),
+        )
     ));
     assert!(output.is_empty());
 }
