@@ -324,8 +324,7 @@ impl SourceBackedWorkbook {
         // options whose source profile differs from that package's admitted
         // profile. Materialization follows the package lineage, so preserve
         // the retained policy while carrying the other facade options over.
-        let mut options = self.inner.options.clone();
-        options.source_limits = *lineage_limits;
+        let options = self.inner.owner_options.to_open_options(*lineage_limits);
         let view = Self::from_read_at_with_options_and_shared_catalog(
             Arc::new(litchi_core::OwnedSource::new(bytes)),
             options,
@@ -405,7 +404,7 @@ impl SourceBackedWorkbook {
     /// ([`crate::OpenOptions::semantic_limits`]).
     #[must_use]
     pub fn semantic_limits(&self) -> &crate::SemanticLimits {
-        &self.inner.options.semantic_limits
+        &self.inner.owner_options.semantic_limits
     }
 
     /// The indexed package every source-backed edit reads: the reopened

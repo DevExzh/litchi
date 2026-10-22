@@ -31,8 +31,8 @@ use litchi_core::{
 use litchi_ooxml_common::mce::{Capabilities, Error as MceError, StreamError, StreamLimits};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{
-    PackURI, PartData, PartView, SourceBackedPackage, SourceCacheDiagnostics, SourceLimits,
-    VerifiedDecodedReaderError,
+    PackURI, PartData, PartView, SourceBackedPackage, SourceCacheDiagnostics, SourceCacheLimits,
+    SourceLimits, VerifiedDecodedReaderError,
 };
 use litchi_sheet::{Area, At, Cell as Address, Rect};
 
@@ -124,6 +124,55 @@ pub(crate) struct SourceCatalogProof {
     pub(crate) limits: Arc<SourceLimits>,
 }
 
+/// The source-backed policy that is meaningful after the OPC package has
+/// already admitted its physical source limits.
+///
+/// `OpenOptions` also carries the 192-byte `SourceLimits` value. The package
+/// owns that value, so retaining a complete `OpenOptions` in every immutable
+/// source owner duplicates the physical ingress policy in each owner and in
+/// every reopened history step. Keep the facade policies here and rebuild the
+/// public options value only at a deferred materialization boundary.
+#[derive(Clone)]
+struct SourceOwnerOptions {
+    leniency: crate::Leniency,
+    semantic_limits: crate::SemanticLimits,
+    #[cfg(feature = "encryption")]
+    encryption_limits: crate::encryption::Limits,
+    cache_limits: Option<SourceCacheLimits>,
+    execution_context: Option<ExecutionContext>,
+}
+
+impl SourceOwnerOptions {
+    fn from_open_options(options: &crate::OpenOptions) -> Self {
+        Self {
+            leniency: options.leniency,
+            semantic_limits: options.semantic_limits,
+            #[cfg(feature = "encryption")]
+            encryption_limits: options.encryption_limits,
+            cache_limits: options.cache_limits,
+            execution_context: options.execution_context.clone(),
+        }
+    }
+
+    fn to_open_options(&self, source_limits: SourceLimits) -> crate::OpenOptions {
+        let mut options = crate::OpenOptions::new()
+            .source_limits(source_limits)
+            .leniency(self.leniency)
+            .semantic_limits(self.semantic_limits);
+        #[cfg(feature = "encryption")]
+        {
+            options = options.encryption_limits(self.encryption_limits);
+        }
+        if let Some(cache_limits) = self.cache_limits {
+            options = options.cache_limits(cache_limits);
+        }
+        if let Some(execution_context) = self.execution_context.clone() {
+            options = options.execution_context(execution_context);
+        }
+        options
+    }
+}
+
 pub(crate) struct SourceInner {
     package: SourceBackedPackage,
     /// One exact replay endpoint shared by every patch that observes this
@@ -200,7 +249,7 @@ pub(crate) struct SourceInner {
     differential_format_count: OnceLock<usize>,
     /// The ingress policies this workbook was opened with; a committed
     /// workbook reopens its output under them.
-    options: crate::OpenOptions,
+    owner_options: SourceOwnerOptions,
 }
 
 /// Read-only XLSX catalog and worksheet access over a positional source.
@@ -508,6 +557,7 @@ impl SourceBackedWorkbook {
             let _ = source_limits.set(Arc::clone(&shared.limits));
             let _ = catalog_proof.set(shared);
         }
+        let owner_options = SourceOwnerOptions::from_open_options(&options);
 
         Ok(Self {
             inner: Arc::new(SourceInner {
@@ -542,7 +592,7 @@ impl SourceBackedWorkbook {
                 catalog_proof,
                 values: values::ValueCache::new(),
                 differential_format_count: OnceLock::new(),
-                options,
+                owner_options,
             }),
             pending: None,
         })
@@ -912,7 +962,7 @@ impl SourceWorksheet {
         let package = &self.owner.package;
         let limits = self
             .owner
-            .options
+            .owner_options
             .semantic_limits
             .form_controls_value()
             .unwrap_or_else(|| {
