@@ -1240,6 +1240,7 @@ impl Snapshot {
             structural_index: StructuralChangeIndex::default(),
             tab_change: None,
             layout_changes: Vec::new(),
+            source_strings: OnceLock::new(),
         }
     }
 
@@ -1825,6 +1826,75 @@ pub(crate) struct Edit {
     tab_change: Option<Box<tabs::TabChange>>,
     /// Row and column layout transitions, one per row or column.
     layout_changes: Vec<layout::LayoutChange>,
+    /// Lazily built membership index of the source SST, shared by clones.
+    source_strings: OnceLock<Arc<SourceStringIndex>>,
+}
+
+/// Hash index of one immutable source SST, for exact text membership.
+///
+/// Entries are `(hash, index)` pairs sorted by hash; a lookup compares the
+/// candidate text with every source string of an equal hash, so collisions
+/// cost a comparison and never a wrong answer.  Small tables are scanned
+/// directly and build no index.
+#[derive(Debug, Default)]
+struct SourceStringIndex {
+    entries: Vec<(u64, u32)>,
+}
+
+impl SourceStringIndex {
+    /// Tables at or below this size are scanned without an index.
+    const SCAN_LIMIT: usize = 32;
+
+    fn hash(text: &str) -> u64 {
+        use std::hash::{BuildHasher, BuildHasherDefault};
+        BuildHasherDefault::<std::collections::hash_map::DefaultHasher>::default().hash_one(text)
+    }
+
+    fn new(strings: &[String]) -> Arc<Self> {
+        if strings.len() <= Self::SCAN_LIMIT {
+            return Arc::default();
+        }
+        let mut entries = Vec::new();
+        // The source table was admitted under the snapshot's limits; an
+        // index that cannot be retained falls back to scanning.
+        if entries.try_reserve_exact(strings.len()).is_err() {
+            return Arc::default();
+        }
+        for (index, text) in strings.iter().enumerate() {
+            let Ok(index) = u32::try_from(index) else {
+                return Arc::default();
+            };
+            entries.push((Self::hash(text), index));
+        }
+        entries.sort_unstable();
+        Arc::new(Self { entries })
+    }
+
+    /// Counts the occurrences of `text` in `strings`, stopping at `limit`.
+    fn count_at_most(&self, strings: &[String], text: &str, limit: usize) -> usize {
+        if self.entries.is_empty() {
+            return strings
+                .iter()
+                .filter(|candidate| candidate.as_str() == text)
+                .take(limit)
+                .count();
+        }
+        let hash = Self::hash(text);
+        let start = self
+            .entries
+            .partition_point(|(candidate, _)| *candidate < hash);
+        self.entries[start..]
+            .iter()
+            .take_while(|(candidate, _)| *candidate == hash)
+            .filter(|(_, index)| {
+                usize::try_from(*index)
+                    .ok()
+                    .and_then(|index| strings.get(index))
+                    .is_some_and(|candidate| candidate.as_str() == text)
+            })
+            .take(limit)
+            .count()
+    }
 }
 
 /// One exact cell targeted differently by independently prepared transactions.
@@ -2599,19 +2669,16 @@ impl Edit {
         value: Value,
     ) -> Result<()> {
         // A missing text stages an SST resource before the cell operation;
-        // use a candidate only for that multi-stage path so a later overlap
+        // that multi-stage path rolls the resource back on a later refusal
+        // (every other staging step checks before it pushes), so an overlap
         // refusal cannot leave the resource behind. Fixed-width and
-        // structural-only edits are already failure-atomic and keep their
-        // fast path allocation-free.
+        // structural-only edits are already failure-atomic.
         let needs_candidate = match &value {
             Value::Text(text) => !self.has_shared_string(text),
             _ => false,
         };
         if needs_candidate {
-            let mut staged = self.clone();
-            staged.set_value_in_place(selector, reference, value)?;
-            *self = staged;
-            Ok(())
+            self.with_resource_rollback(|edit| edit.set_value_in_place(selector, reference, value))
         } else {
             self.set_value_in_place(selector, reference, value)
         }
@@ -2673,11 +2740,9 @@ impl Edit {
             Value::Text(text) if !self.has_shared_string(text) => Some(text.clone()),
             _ => None,
         };
-        let mut shared_strings = self.effective_shared_strings();
-        if let Some(text) = &missing_text {
-            shared_strings.push(text.clone());
-        }
-        match target_storage(source_cell.storage, &value, &shared_strings) {
+        // The value's text is present once the missing resource is staged.
+        let text_present = |text: &str| missing_text.is_some() || self.has_shared_string(text);
+        match target_storage(source_cell.storage, &value, text_present) {
             Ok(target) => {
                 if let Some(text) = missing_text {
                     self.stage_resource(ResourceChange::SharedString { text, insert: true })?;
@@ -2695,7 +2760,7 @@ impl Edit {
                 // the record and row-block closure atomically.  Formula
                 // records stay on the dependency-checked cache path and are
                 // never silently converted into ordinary scalar cells.
-                let target = storage_for_new_value(&value, &shared_strings).map_err(|_| error)?;
+                let target = storage_for_new_value(&value, text_present).map_err(|_| error)?;
                 if let Some(text) = missing_text {
                     self.stage_resource(ResourceChange::SharedString { text, insert: true })?;
                 }
@@ -3021,10 +3086,9 @@ impl Edit {
             _ => false,
         };
         if needs_candidate {
-            let mut staged = self.clone();
-            staged.insert_cell_with_style_in_place(selector, reference, value, style)?;
-            *self = staged;
-            Ok(())
+            self.with_resource_rollback(|edit| {
+                edit.insert_cell_with_style_in_place(selector, reference, value, style)
+            })
         } else {
             self.insert_cell_with_style_in_place(selector, reference, value, style)
         }
@@ -3058,8 +3122,7 @@ impl Edit {
                 insert: true,
             })?;
         }
-        let shared_strings = self.effective_shared_strings();
-        let storage = storage_for_new_value(&value, &shared_strings)?;
+        let storage = storage_for_new_value(&value, |text| self.has_shared_string(text))?;
         self.stage_structural(StructuralChange::Cell {
             sheet,
             reference,
@@ -3312,10 +3375,73 @@ impl Edit {
         Ok(index)
     }
 
+    /// Runs one multi-stage operation whose only staging before its final
+    /// fallible step is SST resources; on failure the resources it staged
+    /// are dropped, leaving the edit exactly as before.
+    ///
+    /// Every staging step checks its refusals before it pushes, so the
+    /// resource tail is the only state a failed operation can have changed.
+    /// This replaces cloning the whole edit per new text, which made each
+    /// text insertion O(staged changes).
+    fn with_resource_rollback(
+        &mut self,
+        stage: impl FnOnce(&mut Self) -> Result<()>,
+    ) -> Result<()> {
+        let resources = self.resource_changes.len();
+        let (changes, structural) = (self.changes.len(), self.structural_changes.len());
+        let result = stage(self);
+        if result.is_err() {
+            debug_assert_eq!(
+                (self.changes.len(), self.structural_changes.len()),
+                (changes, structural),
+                "a failed staging step pushed a cell change"
+            );
+            self.resource_changes.truncate(resources);
+        }
+        result
+    }
+
+    /// Whether `text` is present in the effective SST.
+    ///
+    /// This is the membership of [`Self::effective_shared_strings`] without
+    /// materializing it: a staged insertion of `text` makes it present, and
+    /// otherwise it is present while the source holds more occurrences than
+    /// the staged removals of the same text (each removal drops one source
+    /// occurrence).  The source occurrences come from a per-edit hash index,
+    /// so a text insertion costs O(staged resources) instead of cloning the
+    /// source table and fingerprinting every staged string.
     fn has_shared_string(&self, text: &str) -> bool {
-        self.effective_shared_strings()
-            .iter()
-            .any(|candidate| candidate == text)
+        let mut removed = 0_usize;
+        for change in &self.resource_changes {
+            match change {
+                ResourceChange::SharedString {
+                    text: candidate,
+                    insert,
+                }
+                | ResourceChange::RichSharedString {
+                    text: candidate,
+                    insert,
+                    ..
+                } if candidate == text => {
+                    if *insert {
+                        return true;
+                    }
+                    removed = removed.saturating_add(1);
+                },
+                ResourceChange::SharedString { .. }
+                | ResourceChange::RichSharedString { .. }
+                | ResourceChange::ExtendedFormat { .. }
+                | ResourceChange::FormulaCell { .. } => {},
+            }
+        }
+        self.source_strings
+            .get_or_init(|| SourceStringIndex::new(&self.source.inner.shared_strings))
+            .count_at_most(
+                &self.source.inner.shared_strings,
+                text,
+                removed.saturating_add(1),
+            )
+            > removed
     }
 
     fn has_rich_shared_string(
@@ -3486,11 +3612,7 @@ impl Edit {
                     ));
                 }
                 if *insert {
-                    structural::certify_sst_insertion(
-                        &self.source,
-                        &self.resource_changes,
-                        &change,
-                    )?;
+                    structural::certify_sst_insertion(&change)?;
                 }
             },
             ResourceChange::RichSharedString {
@@ -3515,11 +3637,7 @@ impl Edit {
                         ));
                     }
                     validate_rich_text(self, text, formatting_runs)?;
-                    structural::certify_sst_insertion(
-                        &self.source,
-                        &self.resource_changes,
-                        &change,
-                    )?;
+                    structural::certify_sst_insertion(&change)?;
                 }
             },
             ResourceChange::ExtendedFormat {
@@ -7435,8 +7553,9 @@ fn apply_fixed_semantic(
             value,
         );
     }
-    let shared_strings = transaction.effective_shared_strings();
-    let represented = target_storage(cell.storage, &value, &shared_strings)?;
+    let represented = target_storage(cell.storage, &value, |text| {
+        transaction.has_shared_string(text)
+    })?;
     if represented != storage {
         return Err(Error::InvalidData(
             "cell patch target storage disagrees with its value".into(),
@@ -7546,8 +7665,8 @@ fn apply_structural_cell_semantic(
                     insert: true,
                 })?;
             }
-            let shared_strings = transaction.effective_shared_strings();
-            if storage_for_new_value(&value, &shared_strings)? != storage {
+            if storage_for_new_value(&value, |text| transaction.has_shared_string(text))? != storage
+            {
                 return Err(Error::InvalidData(
                     "structural cell storage disagrees with its value".into(),
                 ));
@@ -7600,11 +7719,10 @@ fn apply_structural_cell_semantic(
                     insert: true,
                 })?;
             }
-            let shared_strings = transaction.effective_shared_strings();
             let represented = if storage == Storage::MulRk {
                 matches!(&value, Value::Number(number) if encode_rk(*number).is_some())
             } else {
-                storage_for_new_value(&value, &shared_strings)
+                storage_for_new_value(&value, |text| transaction.has_shared_string(text))
                     .map(|candidate| candidate == storage)
                     .unwrap_or(false)
             };
@@ -9076,7 +9194,11 @@ fn valid_xnum(value: f64) -> bool {
     value.is_normal() || (value == 0.0 && value.is_sign_positive())
 }
 
-fn target_storage(source: Storage, value: &Value, shared_strings: &[String]) -> Result<Storage> {
+fn target_storage(
+    source: Storage,
+    value: &Value,
+    text_present: impl Fn(&str) -> bool,
+) -> Result<Storage> {
     let target = match (source, value) {
         (Storage::Number, Value::Number(number)) if valid_xnum(*number) => Storage::Number,
         (Storage::Rk | Storage::MulRk, Value::Number(number)) if encode_rk(*number).is_some() => {
@@ -9085,9 +9207,7 @@ fn target_storage(source: Storage, value: &Value, shared_strings: &[String]) -> 
         (Storage::LabelSst, Value::Number(number)) if encode_rk(*number).is_some() => Storage::Rk,
         (Storage::BoolErr, Value::Boolean(_) | Value::Error(_)) => Storage::BoolErr,
         (Storage::Blank, Value::Blank) => Storage::Blank,
-        (Storage::LabelSst | Storage::Rk, Value::Text(text))
-            if shared_strings.iter().any(|candidate| candidate == text) =>
-        {
+        (Storage::LabelSst | Storage::Rk, Value::Text(text)) if text_present(text) => {
             Storage::LabelSst
         },
         (Storage::Formula, Value::FormulaCache(cache)) if valid_formula_cache(cache) => {
@@ -9104,14 +9224,12 @@ fn target_storage(source: Storage, value: &Value, shared_strings: &[String]) -> 
     Ok(target)
 }
 
-fn storage_for_new_value(value: &Value, shared_strings: &[String]) -> Result<Storage> {
+fn storage_for_new_value(value: &Value, text_present: impl Fn(&str) -> bool) -> Result<Storage> {
     match value {
         Value::Number(number) if valid_xnum(*number) => Ok(Storage::Number),
         Value::Boolean(_) | Value::Error(_) => Ok(Storage::BoolErr),
         Value::Blank => Ok(Storage::Blank),
-        Value::Text(text) if shared_strings.iter().any(|candidate| candidate == text) => {
-            Ok(Storage::LabelSst)
-        },
+        Value::Text(text) if text_present(text) => Ok(Storage::LabelSst),
         Value::Text(_) => Err(Error::Internal(
             "new BIFF8 text is absent from the effective workbook SST",
         )),

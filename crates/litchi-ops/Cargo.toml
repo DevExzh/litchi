@@ -188,6 +188,11 @@ required-features = ["xlsx", "xlsb", "xls", "eval"]
 name              = "m4_bench"
 required-features = ["xlsx", "xlsb", "xls", "eval"]
 
+# XLS CSV-import scaling across row counts (record 0359fa).
+[[example]]
+name              = "xls_import_scaling"
+required-features = ["xls"]
+
 # Sheet-trait static-dispatch measurements: evaluation and per-cell reads (record 0353).
 [[example]]
 name              = "sheet_dispatch_bench"

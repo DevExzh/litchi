@@ -97,7 +97,7 @@ pub(super) fn apply(
                     ))
         })
         .collect();
-    inserted_resources.sort_by_key(|resource| super::resource_target(resource));
+    inserted_resources.sort_by_cached_key(|resource| super::resource_target(resource));
     for resource in inserted_resources {
         apply_resource(&mut workbook, resource)?;
     }
@@ -158,7 +158,8 @@ pub(super) fn apply(
                     ))
         })
         .collect();
-    removed_resources.sort_by_key(|resource| std::cmp::Reverse(super::resource_target(resource)));
+    removed_resources
+        .sort_by_cached_key(|resource| std::cmp::Reverse(super::resource_target(resource)));
     for resource in removed_resources {
         apply_resource(&mut workbook, resource)?;
     }
@@ -812,7 +813,7 @@ fn effective_sst_entries(
                 | super::ResourceChange::RichSharedString { insert: true, .. }
         )
     }));
-    inserted.sort_by_key(|resource| super::resource_target(resource));
+    inserted.sort_by_cached_key(|resource| super::resource_target(resource));
     for resource in inserted {
         let (text, properties) = match resource {
             super::ResourceChange::SharedString { text, .. } => (text, None),
@@ -962,66 +963,26 @@ pub(super) fn validate_sheet_name(name: &str) -> Result<()> {
     }
 }
 
-pub(super) fn certify_sst_insertion(
-    source: &super::Snapshot,
-    staged: &[super::ResourceChange],
-    candidate: &super::ResourceChange,
-) -> Result<()> {
-    let mut workbook = Vec::new();
-    workbook
-        .try_reserve_exact(source.inner.workbook_stream.len())
-        .map_err(|_error| Error::Allocation("certifying SST resource insertion"))?;
-    workbook.extend_from_slice(&source.inner.workbook_stream);
-    let insertion_count = staged
-        .iter()
-        .chain(std::iter::once(candidate))
-        .filter(|resource| {
-            matches!(
-                resource,
-                super::ResourceChange::SharedString { insert: true, .. }
-                    | super::ResourceChange::RichSharedString { insert: true, .. }
-            )
-        })
-        .count();
-    let mut resources = Vec::new();
-    resources
-        .try_reserve_exact(insertion_count)
-        .map_err(|_error| Error::Allocation("certifying SST resource insertion"))?;
-    resources.extend(
-        staged
-            .iter()
-            .chain(std::iter::once(candidate))
-            .filter(|resource| {
-                matches!(
-                    resource,
-                    super::ResourceChange::SharedString { insert: true, .. }
-                        | super::ResourceChange::RichSharedString { insert: true, .. }
-                )
-            }),
-    );
-    resources.sort_by_key(|resource| super::resource_target(resource));
-    if !workbook_globals(&workbook)?
-        .iter()
-        .any(|record| record.kind == super::SST)
-    {
-        for resource in resources {
-            let (text, formatting_runs) = match resource {
-                super::ResourceChange::SharedString { text, .. } => (text.as_str(), &[][..]),
-                super::ResourceChange::RichSharedString {
-                    text,
-                    formatting_runs,
-                    ..
-                } => (text.as_str(), formatting_runs.as_slice()),
-                _ => continue,
-            };
-            encode_sst_tail_records(text, formatting_runs)?;
-        }
-        return Ok(());
-    }
-    for resource in resources {
-        apply_resource(&mut workbook, resource)?;
-    }
-    Ok(())
+pub(super) fn certify_sst_insertion(candidate: &super::ResourceChange) -> Result<()> {
+    // Commit publishes every staged SST resource through
+    // `compact_shared_strings`, which re-encodes the whole table and its
+    // ExtSST and re-checks the source SST family.  The only refusal that
+    // depends on the candidate alone is its own encoding; checking it here
+    // keeps the refusal at the staging call, in O(text) rather than by
+    // re-applying every staged insertion to a copy of the workbook.
+    let (text, formatting_runs) = match candidate {
+        super::ResourceChange::SharedString { text, .. } => (text.as_str(), &[][..]),
+        super::ResourceChange::RichSharedString {
+            text,
+            formatting_runs,
+            ..
+        } => (text.as_str(), formatting_runs.as_slice()),
+        super::ResourceChange::ExtendedFormat { .. }
+        | super::ResourceChange::FormulaCell { .. } => {
+            return Ok(());
+        },
+    };
+    encode_sst_tail_records(text, formatting_runs).map(drop)
 }
 
 fn operation_sheet(change: &StructuralChange) -> usize {
@@ -2629,7 +2590,7 @@ fn rebuild_sheet(
             matches!(resource, super::ResourceChange::FormulaCell { sheet: owner, .. } if *owner == sheet)
         })
         .collect();
-    formula_resources.sort_by_key(|resource| super::resource_target(resource));
+    formula_resources.sort_by_cached_key(|resource| super::resource_target(resource));
     // Authored Formula removals vacate their cells before cell operations
     // run, and insertions follow them, so a scalar and an authored Formula
     // can replace each other at one coordinate in either direction.
