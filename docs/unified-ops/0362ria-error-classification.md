@@ -31,8 +31,16 @@ candidate mismatch in `IncompleteOutput` after accepted bytes. The common
 classifier preserves that distinction at
 `crates/litchi-ops/src/error.rs:1198-1205`.
 
-DOCX's nine public recorded-base and authorization conflicts now map to
-`invalid_input` at `crates/litchi-ops/src/error.rs:1294-1303`:
+The following paragraph records the pre-0362rga repair state and is retained
+for engineering history. It is superseded by 0362rga and the current
+canonical error contract: base mismatches use the shared `PatchConflict`, and
+unsupported document-variable preservation uses
+`Refused(UnsupportedContent)`. None of the former variant names below is
+public in the current DOCX API.
+
+Before 0362rga, DOCX's nine public recorded-base and authorization conflicts
+were listed as mapping to `invalid_input` at
+`crates/litchi-ops/src/error.rs:1294-1303`:
 
 `ExternalHyperlinkDetachmentConflict`, `ExternalHyperlinkRedactionConflict`,
 `DocumentVariablesConflict`, `SectionLayoutStaleSource`,
@@ -40,11 +48,12 @@ DOCX's nine public recorded-base and authorization conflicts now map to
 `SectionLayoutFingerprintConflict`, `SectionLayoutPolicyConflict`, and
 `SectionLayoutAuthorizationConflict`.
 
-`DocumentVariablesPreservation` remains `corrupt_file`; the redaction audit is
-deferred and this repair changes no redaction or sanitization behavior. The
-classifier tests cover all nine conflicts, current and original proof
-mismatches, source-version mutation, and the preserved safety classification at
-`crates/litchi-ops/src/error/tests.rs:336-382`.
+At that historical point, `DocumentVariablesPreservation` remained
+`corrupt_file`; the redaction audit was deferred. The 0362rga repair supersedes
+that classification for the current implementation: document-variable markup
+that cannot be preserved is `Refused(UnsupportedContent)`, while recorded-base
+mismatches are `PatchConflict` and classify as `invalid_input`. The historical
+classifier tests remain evidence of the pre-0362rga state.
 
 The iWork facade adapters now preserve source freshness in
 `crates/litchi-ops/src/format/iwork/error.rs:375-403`:
