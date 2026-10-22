@@ -97,3 +97,64 @@ capped environment from `.coord/w8-file/env.sh`, with
   added to the repository. The final source tip is the commit carrying this
   record and the changes above; the coordinator should record its hash when
   integrating it.
+
+## Reproducible affected-suite receipt (2026-10-22)
+
+The earlier focused receipts did not retain the complete affected-suite
+output. This section records a new capped run with its output kept outside the
+checkout. The aggregate run used production replay source `51120e13bf` (the
+later commits in this branch add only focused PPTX coverage and the typed hash
+sink guard):
+
+```text
+source /home/zhuhe/code/litchi-worktrees/.coord/w8-file/env.sh
+CARGO_BUILD_JOBS=2 RUST_TEST_THREADS=2 \
+  cargo test -p litchi-cfb -p litchi-xls -p litchi-rtf -p litchi-odp -p litchi-pptx \
+  --offline --locked
+```
+
+The command exited `0`. Its 429 `test result:` lines contain 6,303 passed,
+zero failed and seven ignored tests. The external raw log is
+`/home/zhuhe/code/litchi-worktrees/.coord/w8-replay-validation-20261022-run2.log`
+(623,025 bytes,
+SHA-256 `469fe3f33051e7dd6b2bdce34dc8dffdf8ddd4b2e2ddc3c6f9db53612759a830`);
+the explicit exit receipt is the adjacent
+`w8-replay-validation-20261022-run2.exit` containing `0`.
+
+The focused PPTX recipient-policy test was added at source `55d4795feb` and
+passed one test with exit `0`; it uses an independently opened recipient whose
+`max_input_bytes` is exactly the admitted source length. Its external log is
+`/home/zhuhe/code/litchi-worktrees/.coord/w8-pptx-recipient-policy-20261022.log`
+(530 bytes, SHA-256
+`746d7712c4784571e4bcc539c405acf3941117215348dc2a4047f6ccb81a21e3`). The
+full PPTX library suite at that source passed 1,278 tests with one ignored;
+its log is
+`/home/zhuhe/code/litchi-worktrees/.coord/w8-pptx-final-20261022.log`
+(131,716 bytes, SHA-256
+`9319241316460ec2a1d8c519cc9563787d6eb4082701c5c891ec76ddc13de26b`).
+
+The focused cross-copy coverage includes
+`cross_slide_copy_family_publishes_a_source_backed_package` (same-owner
+identity, independent equal-content replay, strict recipient policy, exact
+inverse, and changed-recipient conflict),
+`source_backed_cross_copy_refuses_stale_foreign_and_same_source_plans`,
+`source_backed_cross_copy_reports_source_change_during_output_with_exact_progress`,
+and `source_backed_cross_copy_refuses_limits_and_cancellation_before_output`.
+The final PPTX source tip is `a1b479f025`; its typed replay-length overflow
+test passed separately with exit `0` in
+`/home/zhuhe/code/litchi-worktrees/.coord/w8-pptx-overflow-20261022.log`
+(517 bytes, SHA-256
+`468ad6dd3ca7dbaaf376584eb6d0ac488411cc2a44422c12131e8168a2d78442`). The
+test seeds the sink at `u64::MAX`, verifies the typed overflow source, and
+verifies that neither the digest nor the byte counter advances on failure.
+The sink's ordinary input-length conversion and checked addition therefore
+cannot silently wrap; the content proof remains the `(u64 length, SHA-256)`
+pair required by 0355a §1.
+
+All runs used the capped environment above, whose target was
+`/home/zhuhe/code/litchi-worktrees/uo2-w8-file/target`; it measured 6.4 GiB
+after completion. The lockfile used by the runs is 139,521 bytes with
+SHA-256 `2c10b15dfc669fffc555913731171ccd507691659d3226c77a162ecafc3d2b72`.
+The source commits in this validation slice are `ebfc35fc31`, `d100f18016`,
+`5fbed7708a`, `cdc2696e89`, `f965b0f9c1`, `51120e13bf`, `55d4795feb`, and
+`a1b479f025`; no native performance qualification is claimed here.
