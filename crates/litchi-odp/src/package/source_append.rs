@@ -1774,6 +1774,7 @@ mod tests {
     use litchi_core::{OwnedSource, ReadAt};
     use litchi_odf_common::constants::ODF_PRESENTATION;
     use litchi_odf_common::core::{OwnedPackage, PackageWriter};
+    use soapberry_zip::office::StreamingArchiveWriter;
 
     use super::super::Presentation;
 
@@ -1783,9 +1784,13 @@ mod tests {
         "urn:oasis:names:tc:opendocument:xmlns:presentation:1.0";
 
     fn source_package(content: &str) -> Arc<dyn ReadAt> {
-        let mut writer = PackageWriter::new();
-        writer.set_mimetype(ODF_PRESENTATION).unwrap();
-        writer.add_file(ODF_CONTENT, content.as_bytes()).unwrap();
+        let mut writer = StreamingArchiveWriter::new();
+        writer
+            .write_stored("mimetype", ODF_PRESENTATION.as_bytes())
+            .unwrap();
+        writer
+            .write_deflated(ODF_CONTENT, content.as_bytes())
+            .unwrap();
         Arc::new(OwnedSource::new(writer.finish_to_bytes().unwrap()))
     }
 
