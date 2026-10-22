@@ -28,7 +28,7 @@
 use super::{AutoFilter, encode_range, read_layout};
 use crate::package::Package;
 use crate::package::error::Result;
-use crate::part_edit::{Rank, SheetLayout, Staged, family, record, splice};
+use crate::part_edit::{Rank, SheetLayout, Staged, family, record_with_limits, splice};
 use crate::raw::{Records, kind};
 
 family!("auto-filter");
@@ -87,7 +87,12 @@ impl Edit {
     pub fn auto_filter(&self, sheet: usize) -> Result<Option<AutoFilter>> {
         let worksheet = self.staged.worksheet(sheet)?;
         let bytes = self.staged.blob(&worksheet)?;
-        read_layout(bytes, &SheetLayout::scan(bytes)?)
+        let limits = self.staged.raw_limits();
+        read_layout(
+            bytes,
+            &SheetLayout::scan_with_limits(bytes, limits)?,
+            limits,
+        )
     }
 
     /// Replace (`Some`, keeping the filter columns still inside the range),
@@ -101,23 +106,29 @@ impl Edit {
     pub fn set_auto_filter(&mut self, sheet: usize, value: Option<AutoFilter>) -> Result<bool> {
         let worksheet = self.staged.worksheet(sheet)?;
         let bytes = self.staged.blob(&worksheet)?;
-        let layout = SheetLayout::scan(bytes)?;
+        let limits = self.staged.raw_limits();
+        let layout = SheetLayout::scan_with_limits(bytes, limits)?;
         let unit = layout.units_of(kind::BEGIN_A_FILTER).next().cloned();
-        let current = read_layout(bytes, &layout)?;
+        let current = read_layout(bytes, &layout, limits)?;
         if current == value {
             return Ok(false);
         }
         let replacement = match value {
             None => Vec::new(),
             Some(range) => {
-                let mut out = record(kind::BEGIN_A_FILTER, &encode_range(range)?)?;
+                let mut out = record_with_limits(
+                    kind::BEGIN_A_FILTER,
+                    &encode_range(range, limits)?,
+                    limits,
+                )?;
                 if let Some(unit) = &unit {
                     out.extend(columns_inside(
                         &bytes[unit.span.clone()],
                         range.last_column - range.first_column,
+                        limits,
                     )?);
                 }
-                out.extend(record(kind::END_A_FILTER, &[])?);
+                out.extend(record_with_limits(kind::END_A_FILTER, &[], limits)?);
                 out
             },
         };
@@ -144,9 +155,9 @@ impl Edit {
 
 /// The filter-column collections of an auto-filter unit whose column index
 /// (`dwCol`) is at most `last`, with their exact bytes.
-fn columns_inside(unit: &[u8], last: u32) -> Result<Vec<u8>> {
+fn columns_inside(unit: &[u8], last: u32, limits: crate::raw::Limits) -> Result<Vec<u8>> {
     let mut out = Vec::new();
-    let mut records = Records::new(unit, crate::raw::Limits::DEFAULT);
+    let mut records = Records::new(unit, limits);
     let _header = records.next().transpose()?;
     let mut keep = false;
     let mut depth = 0usize;
@@ -183,6 +194,26 @@ fn columns_inside(unit: &[u8], last: u32) -> Result<Vec<u8>> {
 mod tests {
     use crate::Package;
     use crate::auto_filter::AutoFilter;
+    use crate::raw::Limits;
+
+    #[test]
+    fn fixed_range_payload_obeys_the_required_raw_limit() {
+        let range = AutoFilter {
+            first_row: 0,
+            last_row: 4,
+            first_column: 0,
+            last_column: 1,
+        };
+        let error = super::encode_range(range, Limits::new(15, 64)).unwrap_err();
+        assert!(matches!(
+            error,
+            crate::package::error::Error::Wire(crate::raw::Error::PayloadLimit {
+                length: 16,
+                limit: 15,
+                ..
+            })
+        ));
+    }
 
     #[test]
     fn set_move_remove_replay() {

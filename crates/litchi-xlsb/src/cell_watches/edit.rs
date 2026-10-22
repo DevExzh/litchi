@@ -66,7 +66,7 @@ impl Edit {
 
     fn snapshot(&self, sheet: usize) -> Result<worksheet::Snapshot> {
         let uri = self.staged.worksheet(sheet)?;
-        worksheet::read(self.staged.blob(&uri)?)
+        worksheet::read(self.staged.blob(&uri)?, self.staged.raw_limits())
     }
 
     /// The staged watches of the worksheet at complete-catalog position
@@ -95,7 +95,7 @@ impl Edit {
         operation: impl FnOnce(&mut worksheet::Edit) -> Result<T>,
     ) -> Result<T> {
         let uri = self.staged.worksheet(sheet)?;
-        let mut draft = worksheet::read(self.staged.blob(&uri)?)?.edit();
+        let mut draft = worksheet::read(self.staged.blob(&uri)?, self.staged.raw_limits())?.edit();
         let value = operation(&mut draft)?;
         let commit = draft.commit()?;
         let after = commit.patch().after().to_vec();

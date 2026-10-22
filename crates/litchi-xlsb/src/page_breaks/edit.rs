@@ -88,7 +88,12 @@ impl Edit {
     pub fn page_breaks(&self, sheet: usize) -> Result<PageBreaks> {
         let worksheet = self.staged.worksheet(sheet)?;
         let bytes = self.staged.blob(&worksheet)?;
-        read_layout(bytes, &SheetLayout::scan(bytes)?)
+        let limits = self.staged.raw_limits();
+        read_layout(
+            bytes,
+            &SheetLayout::scan_with_limits(bytes, limits)?,
+            limits,
+        )
     }
 
     /// Replace the page breaks of a worksheet. A direction whose breaks are
@@ -103,7 +108,12 @@ impl Edit {
     pub fn set_page_breaks(&mut self, sheet: usize, breaks: &PageBreaks) -> Result<bool> {
         let worksheet = self.staged.worksheet(sheet)?;
         let mut bytes = self.staged.blob(&worksheet)?.to_vec();
-        let current = read_layout(&bytes, &SheetLayout::scan(&bytes)?)?;
+        let limits = self.staged.raw_limits();
+        let current = read_layout(
+            &bytes,
+            &SheetLayout::scan_with_limits(&bytes, limits)?,
+            limits,
+        )?;
         for (row, wanted, held) in [
             (true, &breaks.rows, &current.rows),
             (false, &breaks.columns, &current.columns),
@@ -111,8 +121,8 @@ impl Edit {
             if wanted == held {
                 continue;
             }
-            let encoded = encode(wanted, row)?;
-            let layout = SheetLayout::scan(&bytes)?;
+            let encoded = encode(wanted, row, limits)?;
+            let layout = SheetLayout::scan_with_limits(&bytes, limits)?;
             let (begin, rank) = if row {
                 (kind::BEGIN_RW_BRK, Rank::RowBreaks)
             } else {
@@ -144,6 +154,20 @@ impl Edit {
 mod tests {
     use crate::Package;
     use crate::page_breaks::{Break, PageBreaks};
+    use crate::raw::Limits;
+
+    #[test]
+    fn fixed_break_payload_obeys_the_required_raw_limit() {
+        let error = super::encode(&[Break::row(4)], true, Limits::new(19, 64)).unwrap_err();
+        assert!(matches!(
+            error,
+            crate::package::error::Error::Wire(crate::raw::Error::PayloadLimit {
+                length: 20,
+                limit: 19,
+                ..
+            })
+        ));
+    }
 
     #[test]
     fn set_replace_remove_and_replay() {

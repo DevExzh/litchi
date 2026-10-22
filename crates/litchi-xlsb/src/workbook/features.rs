@@ -28,6 +28,7 @@ impl Workbook {
             sheet,
             self.leniency,
             select,
+            self.raw_limits,
         )
     }
 

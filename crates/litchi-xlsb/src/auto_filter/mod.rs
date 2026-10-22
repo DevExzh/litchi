@@ -17,11 +17,19 @@ pub mod edit;
 /// # Errors
 ///
 /// Returns an error for a malformed stream or filter range.
-pub fn read(worksheet: &[u8]) -> Result<Option<AutoFilter>> {
-    read_layout(worksheet, &SheetLayout::scan(worksheet)?)
+pub fn read(worksheet: &[u8], limits: crate::raw::Limits) -> Result<Option<AutoFilter>> {
+    read_layout(
+        worksheet,
+        &SheetLayout::scan_with_limits(worksheet, limits)?,
+        limits,
+    )
 }
 
-pub(crate) fn read_layout(worksheet: &[u8], layout: &SheetLayout) -> Result<Option<AutoFilter>> {
+pub(crate) fn read_layout(
+    worksheet: &[u8],
+    layout: &SheetLayout,
+    limits: crate::raw::Limits,
+) -> Result<Option<AutoFilter>> {
     let mut units = layout.units_of(kind::BEGIN_A_FILTER);
     let Some(unit) = units.next() else {
         return Ok(None);
@@ -29,7 +37,7 @@ pub(crate) fn read_layout(worksheet: &[u8], layout: &SheetLayout) -> Result<Opti
     if units.next().is_some() {
         return Err(invalid("a worksheet has more than one auto-filter"));
     }
-    let header = Records::new(&worksheet[unit.span.clone()], crate::raw::Limits::DEFAULT)
+    let header = Records::new(&worksheet[unit.span.clone()], limits)
         .next()
         .transpose()?
         .ok_or_else(|| invalid("an empty auto-filter collection"))?;
@@ -71,8 +79,16 @@ fn check(filter: AutoFilter) -> Result<()> {
     Ok(())
 }
 
-pub(crate) fn encode_range(filter: AutoFilter) -> Result<Vec<u8>> {
+pub(crate) fn encode_range(filter: AutoFilter, limits: crate::raw::Limits) -> Result<Vec<u8>> {
     check(filter)?;
+    limits.validate()?;
+    if 16 > limits.payload() {
+        return Err(Error::Wire(crate::raw::Error::PayloadLimit {
+            length: 16,
+            limit: limits.payload(),
+            offset: 0,
+        }));
+    }
     let mut payload = Vec::with_capacity(16);
     for field in [
         filter.first_row,

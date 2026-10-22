@@ -17,6 +17,7 @@ use std::sync::Arc;
 pub struct Snapshot {
     parsed: Parsed,
     watches: Watches,
+    limits: crate::raw::Limits,
 }
 
 impl Snapshot {
@@ -70,6 +71,7 @@ impl Snapshot {
             items: self.parsed.items.clone(),
             collection: self.parsed.watch_block.is_some(),
             phonetic: self.parsed.phonetic,
+            limits: self.limits,
         }
     }
 
@@ -78,6 +80,12 @@ impl Snapshot {
     #[must_use]
     pub fn source_bytes(&self) -> &[u8] {
         &self.parsed.source
+    }
+
+    /// Return the raw policy retained by this worksheet snapshot.
+    #[must_use]
+    pub const fn limits(&self) -> crate::raw::Limits {
+        self.limits
     }
 }
 
@@ -96,6 +104,7 @@ pub(crate) struct Edit {
     items: Vec<Item>,
     collection: bool,
     phonetic: Option<Info>,
+    limits: crate::raw::Limits,
 }
 
 impl Edit {
@@ -167,11 +176,17 @@ impl Edit {
     /// Validate the draft and return its reversible stream patch.
     pub(crate) fn commit(self) -> Result<Commit> {
         Watches::new(watches_from_items(&self.items))?;
-        let bytes = render(&self.parsed, &self.items, self.collection, self.phonetic)?;
+        let bytes = render(
+            &self.parsed,
+            &self.items,
+            self.collection,
+            self.phonetic,
+            self.limits,
+        )?;
         let after = if bytes.as_slice() == self.parsed.source.as_ref() {
             Arc::clone(&self.parsed.source)
         } else {
-            codec::parse_stream(&bytes)?;
+            codec::parse_stream(&bytes, self.limits)?;
             Arc::from(bytes)
         };
         Ok(Commit {
@@ -246,10 +261,14 @@ impl Patch {
 }
 
 /// Parse one complete BIFF12 worksheet stream.
-pub fn read(data: &[u8]) -> Result<Snapshot> {
-    let parsed = codec::parse_stream(data)?;
+pub fn read(data: &[u8], limits: crate::raw::Limits) -> Result<Snapshot> {
+    let parsed = codec::parse_stream(data, limits)?;
     let watches = Watches::new(watches_from_items(&parsed.items))?;
-    Ok(Snapshot { parsed, watches })
+    Ok(Snapshot {
+        parsed,
+        watches,
+        limits,
+    })
 }
 
 fn watches_from_items(items: &[Item]) -> Vec<Watch> {
@@ -267,6 +286,7 @@ fn render(
     items: &[Item],
     collection: bool,
     phonetic: Option<Info>,
+    limits: crate::raw::Limits,
 ) -> Result<Vec<u8>> {
     validation::watches(&Watches::new(watches_from_items(items))?)?;
     let mut output = Vec::with_capacity(parsed.source.len());
@@ -277,14 +297,15 @@ fn render(
     while index < parsed.records.len() {
         if index == parsed.end_sheet_index {
             if existing_block.is_none() && (collection || !items.is_empty()) {
-                append_watch_block(&mut output, parsed, items)?;
+                append_watch_block(&mut output, parsed, items, limits)?;
                 watch_inserted = true;
             }
             if parsed.phonetic_index.is_none() && !phonetic_inserted {
                 if let Some(value) = phonetic {
                     output.extend_from_slice(&codec::encode_record(
                         kind::PHONETIC_INFO,
-                        &codec::write_phonetic(value)?,
+                        &codec::write_phonetic(value, limits)?,
+                        limits,
                     )?);
                     phonetic_inserted = true;
                 }
@@ -295,7 +316,7 @@ fn render(
             && index == begin
         {
             if collection {
-                append_watch_block(&mut output, parsed, items)?;
+                append_watch_block(&mut output, parsed, items, limits)?;
             }
             index = end.saturating_add(1);
             continue;
@@ -305,7 +326,8 @@ fn render(
             if let Some(value) = phonetic {
                 output.extend_from_slice(&codec::encode_record(
                     kind::PHONETIC_INFO,
-                    &codec::write_phonetic(value)?,
+                    &codec::write_phonetic(value, limits)?,
+                    limits,
                 )?);
             }
             index = index.saturating_add(1);
@@ -333,13 +355,23 @@ fn render(
     Ok(output)
 }
 
-fn append_watch_block(output: &mut Vec<u8>, parsed: &Parsed, items: &[Item]) -> Result<()> {
-    output.extend_from_slice(&codec::encode_record(kind::BEGIN_CELL_WATCHES, &[])?);
+fn append_watch_block(
+    output: &mut Vec<u8>,
+    parsed: &Parsed,
+    items: &[Item],
+    limits: crate::raw::Limits,
+) -> Result<()> {
+    output.extend_from_slice(&codec::encode_record(
+        kind::BEGIN_CELL_WATCHES,
+        &[],
+        limits,
+    )?);
     for item in items {
         match item {
             Item::Watch(watch) => output.extend_from_slice(&codec::encode_record(
                 kind::CELL_WATCH,
-                &codec::write_watch(*watch)?,
+                &codec::write_watch(*watch, limits)?,
+                limits,
             )?),
             Item::Unknown(index) => {
                 let span = parsed.records.get(*index).ok_or_else(|| {
@@ -352,6 +384,6 @@ fn append_watch_block(output: &mut Vec<u8>, parsed: &Parsed, items: &[Item]) -> 
             },
         }
     }
-    output.extend_from_slice(&codec::encode_record(kind::END_CELL_WATCHES, &[])?);
+    output.extend_from_slice(&codec::encode_record(kind::END_CELL_WATCHES, &[], limits)?);
     Ok(())
 }

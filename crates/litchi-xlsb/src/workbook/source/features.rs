@@ -48,6 +48,7 @@ impl SourceBackedWorksheet {
                 self.metadata().workbook_position,
                 self.inner.leniency,
                 select,
+                self.inner.raw_limits,
             )
         })
     }

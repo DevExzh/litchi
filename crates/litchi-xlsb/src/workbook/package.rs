@@ -225,7 +225,7 @@ impl Workbook {
     /// zero-based worksheet index.
     pub fn cell_watches(&self, worksheet_index: usize) -> Result<cell_watches::Snapshot> {
         let uri = self.worksheet_uri(worksheet_index)?;
-        cell_watches::workbook::read(&self.package, &uri)
+        cell_watches::workbook::read(&self.package, &uri, self.raw_limits)
     }
 
     /// Read the typed cell-watch and phonetic snapshot selected by worksheet

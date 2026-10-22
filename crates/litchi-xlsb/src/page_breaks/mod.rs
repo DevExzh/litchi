@@ -78,12 +78,16 @@ pub struct PageBreaks {
 /// # Errors
 ///
 /// Returns an error for a malformed stream or break collection.
-pub fn read(worksheet: &[u8]) -> Result<PageBreaks> {
-    let layout = SheetLayout::scan(worksheet)?;
-    read_layout(worksheet, &layout)
+pub fn read(worksheet: &[u8], limits: crate::raw::Limits) -> Result<PageBreaks> {
+    let layout = SheetLayout::scan_with_limits(worksheet, limits)?;
+    read_layout(worksheet, &layout, limits)
 }
 
-pub(crate) fn read_layout(worksheet: &[u8], layout: &SheetLayout) -> Result<PageBreaks> {
+pub(crate) fn read_layout(
+    worksheet: &[u8],
+    layout: &SheetLayout,
+    limits: crate::raw::Limits,
+) -> Result<PageBreaks> {
     let collection = |begin: Kind, row: bool| -> Result<Vec<Break>> {
         let mut units = layout.units_of(begin);
         let Some(unit) = units.next() else {
@@ -94,7 +98,7 @@ pub(crate) fn read_layout(worksheet: &[u8], layout: &SheetLayout) -> Result<Page
                 "a worksheet has more than one page-break collection",
             ));
         }
-        parse(&worksheet[unit.span.clone()], unit, row)
+        parse(&worksheet[unit.span.clone()], unit, row, limits)
     };
     Ok(PageBreaks {
         rows: collection(kind::BEGIN_RW_BRK, true)?,
@@ -102,13 +106,13 @@ pub(crate) fn read_layout(worksheet: &[u8], layout: &SheetLayout) -> Result<Page
     })
 }
 
-fn parse(bytes: &[u8], unit: &Unit, row: bool) -> Result<Vec<Break>> {
+fn parse(bytes: &[u8], unit: &Unit, row: bool, limits: crate::raw::Limits) -> Result<Vec<Break>> {
     let end = if row {
         kind::END_RW_BRK
     } else {
         kind::END_COL_BRK
     };
-    let mut records = Records::new(bytes, crate::raw::Limits::DEFAULT);
+    let mut records = Records::new(bytes, limits);
     let header = records
         .next()
         .transpose()?
@@ -154,7 +158,8 @@ fn u32_at(bytes: &[u8], offset: usize) -> u32 {
 }
 
 /// Validate and encode one collection; an empty list encodes nothing.
-pub(crate) fn encode(breaks: &[Break], row: bool) -> Result<Vec<u8>> {
+pub(crate) fn encode(breaks: &[Break], row: bool, limits: crate::raw::Limits) -> Result<Vec<u8>> {
+    limits.validate()?;
     if breaks.is_empty() {
         return Ok(Vec::new());
     }
@@ -191,7 +196,7 @@ pub(crate) fn encode(breaks: &[Break], row: bool) -> Result<Vec<u8>> {
     let mut header = Vec::with_capacity(8);
     header.extend_from_slice(&count.to_le_bytes());
     header.extend_from_slice(&count.to_le_bytes());
-    let mut out = crate::part_edit::record(begin, &header)?;
+    let mut out = crate::part_edit::record_with_limits(begin, &header, limits)?;
     for item in breaks {
         let mut payload = Vec::with_capacity(20);
         for field in [
@@ -203,8 +208,12 @@ pub(crate) fn encode(breaks: &[Break], row: bool) -> Result<Vec<u8>> {
         ] {
             payload.extend_from_slice(&field.to_le_bytes());
         }
-        out.extend(crate::part_edit::record(kind::BRK, &payload)?);
+        out.extend(crate::part_edit::record_with_limits(
+            kind::BRK,
+            &payload,
+            limits,
+        )?);
     }
-    out.extend(crate::part_edit::record(end, &[])?);
+    out.extend(crate::part_edit::record_with_limits(end, &[], limits)?);
     Ok(out)
 }

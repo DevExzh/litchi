@@ -16,14 +16,18 @@ pub struct Sheet {
 }
 
 /// Read one worksheet's cell-watch and phonetic owner.
-pub fn read(package: &OpcPackage, worksheet: &PackURI) -> Result<Snapshot> {
+pub fn read(
+    package: &OpcPackage,
+    worksheet: &PackURI,
+    limits: crate::raw::Limits,
+) -> Result<Snapshot> {
     let part = package.get_part(worksheet)?;
     require_worksheet(part)?;
-    worksheet::read(part.blob())
+    worksheet::read(part.blob(), limits)
 }
 
 /// Read every worksheet in deterministic part-name order.
-pub fn load(package: &OpcPackage) -> Result<Vec<Sheet>> {
+pub fn load(package: &OpcPackage, limits: crate::raw::Limits) -> Result<Vec<Sheet>> {
     let mut parts: Vec<PackURI> = package
         .iter_parts()
         .filter(|part| part.content_type() == WORKSHEET_CONTENT_TYPE)
@@ -33,7 +37,7 @@ pub fn load(package: &OpcPackage) -> Result<Vec<Sheet>> {
     parts
         .into_iter()
         .map(|part_name| {
-            let snapshot = read(package, &part_name)?;
+            let snapshot = read(package, &part_name, limits)?;
             Ok(Sheet {
                 part_name: part_name.to_string(),
                 snapshot,
