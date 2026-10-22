@@ -12,8 +12,9 @@
 mutators remain crate-private because the format-owned Pages, Numbers, and
 Keynote editors are the public staging surface. A package edit now publishes
 `litchi_core::edit::Commit<Package, Patch>` with the shared
-`litchi_core::edit::Diagnostics`; the package patch is the source-checked
-ordered-entry patch owned by `litchi-iwa-package`.
+`litchi_core::edit::Diagnostics`; `litchi_iwa::Patch` is the direct canonical
+re-export of the source-checked ordered-entry patch owned by
+`litchi-iwa-package`.
 
 `Package::apply(&Patch)` validates the package, checks the patch against the
 complete ordered entry content, and returns the new package, patch, and
@@ -26,10 +27,12 @@ layer has no reassembly proof for an arbitrary patch.
 The previous public `Snapshot::apply`, `Snapshot::edit_with`, and local
 snapshot-publishing `Commit<T>` are removed. They exposed a second owner and a
 commit accessor for a snapshot rather than the package required by the
-contract. Internal codec adapters retain a crate-private copy-on-write
-`Package::edit_with` solely to stage raw package entries while publishing the
-same shared triad. This keeps raw codec capability available without adding a
-public mutable owner or a second publication vocabulary.
+contract. Raw package capability is preserved by the public
+`Package::edit() -> Edit` family: `Edit` exposes the bounded entry and archive
+operations, and `Edit::commit()` publishes the same shared triad. Dropping an
+edit discards its copy-on-write candidate, while `Package::apply(&Patch)` is
+the replay family. There is no generic callback publication wrapper or
+compatibility patch spelling.
 
 The stale-base path is crate-owned `Error::PatchConflict` with its fixed
 content-free reason. `SourceChanged` remains a separate source freshness error.
@@ -42,7 +45,7 @@ future adapter at that boundary must classify these errors as required by
 
 Package tests now exercise clone-based copy-on-write reads, package-level
 triad replay and inverse replay, no-op byte preservation, stale conflict
-classification, callback/final-validation discard, indexed reads, and
+classification, dropped/final-validation edit discard, indexed reads, and
 streaming output. Existing format editors continue to use the crate-private
 raw mutation seam and retain their prior entry ordering, archive validation,
 source retention, and bounded output behavior.

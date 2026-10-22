@@ -13,7 +13,7 @@ use crate::{Error, Result};
 use litchi_core::edit::{Commit as SharedCommit, Diagnostics};
 use litchi_core::ReadAt;
 use litchi_iwa_archive::package::{
-    GetOrInsertError, PackageEntry, PackageEntryStoreError, PackagePatch, PackageState, ParseError,
+    GetOrInsertError, PackageEntry, PackageEntryStoreError, PackageState, ParseError, Patch,
     is_legacy_operation_storage,
 };
 
@@ -124,11 +124,21 @@ pub struct Package {
     source: Option<Arc<[u8]>>,
 }
 
-/// The reversible package-entry patch produced by an iWork package edit.
-pub type Patch = PackagePatch;
-
 /// The shared package/patch/diagnostics result of an iWork package edit.
 pub type Commit = SharedCommit<Package, Patch>;
+
+/// A copy-on-write raw package edit.
+///
+/// The package owner remains immutable while this value is staged. Entry and
+/// archive operations are explicit methods on the edit, and dropping the edit
+/// discards its candidate. [`Edit::commit`] validates and publishes the
+/// candidate through the shared package/patch/diagnostics triad.
+#[must_use = "an edit must be committed to publish its candidate"]
+#[derive(Debug)]
+pub struct Edit {
+    source: Package,
+    candidate: Package,
+}
 
 /// Resource ceilings applied while ingesting one iWork package.
 ///
@@ -646,25 +656,17 @@ impl Package {
         ))
     }
 
-    /// Stage a raw package edit for crate-internal codec adapters.
+    /// Start an explicit raw package edit.
     ///
-    /// The host package has no public raw mutators: format-owned editors are
-    /// the public staging surface. Internal adapters retain this bounded
-    /// copy-on-write seam so they can publish the same package/patch/
-    /// diagnostics triad without exposing a second mutable owner API.
-    pub(crate) fn edit_with<F>(&self, edit: F) -> Result<Commit>
-    where
-        F: FnOnce(&mut Package) -> Result<()>,
-    {
-        let mut candidate = self.clone();
-        edit(&mut candidate)?;
-        candidate.validate_state()?;
-        let patch = self.state.patch_to(&candidate.state);
-        Ok(SharedCommit::new(
-            candidate,
-            patch.clone(),
-            Diagnostics::new(!patch.is_empty()),
-        ))
+    /// The owner is never mutated. The returned copy-on-write edit owns the
+    /// candidate and can be discarded without changing this package. Use
+    /// [`Edit::commit`] to publish a validated package and its reversible
+    /// source-checked patch.
+    pub fn edit(&self) -> Edit {
+        Edit {
+            source: self.clone(),
+            candidate: self.clone(),
+        }
     }
 
     pub fn entry_names(&self) -> impl Iterator<Item = &str> {
@@ -1127,6 +1129,136 @@ impl Package {
     fn mark_mutated(&mut self) {
         self.mutation_revision = self.mutation_revision.wrapping_add(1);
         self.source = None;
+    }
+}
+
+impl Edit {
+    /// Return the package resource profile used by this edit.
+    pub const fn limits(&self) -> PackageLimits {
+        self.candidate.limits()
+    }
+
+    /// Return the number of package members currently staged.
+    pub fn len(&self) -> usize {
+        self.candidate.len()
+    }
+
+    /// Return whether no package members are currently staged.
+    pub fn is_empty(&self) -> bool {
+        self.candidate.is_empty()
+    }
+
+    /// Enumerate staged package members in preserved order.
+    pub fn entry_names(&self) -> impl Iterator<Item = &str> {
+        self.candidate.entry_names()
+    }
+
+    /// Enumerate staged IWA component members in preserved order.
+    pub fn iwa_entry_names(&self) -> impl Iterator<Item = &str> {
+        self.candidate.iwa_entry_names()
+    }
+
+    /// Locate the staged calculation-engine component.
+    pub fn calculation_engine_entry_name(&self) -> Result<Option<&str>> {
+        self.candidate.calculation_engine_entry_name()
+    }
+
+    /// Return whether a staged package member exists.
+    pub fn contains_entry(&self, name: &str) -> bool {
+        self.candidate.contains_entry(name)
+    }
+
+    /// Borrow a staged package member without copying it.
+    pub fn entry(&self, name: &str) -> Option<&[u8]> {
+        self.candidate.entry(name)
+    }
+
+    /// Parse a staged compressed `.iwa` package member.
+    pub fn archive(&self, name: &str) -> Result<Archive> {
+        self.candidate.archive(name)
+    }
+
+    /// Create or replace a staged raw package member.
+    pub fn insert_entry(
+        &mut self,
+        name: impl Into<String>,
+        data: Vec<u8>,
+    ) -> Result<Option<Vec<u8>>> {
+        self.candidate.insert_entry(name, data)
+    }
+
+    /// Delete a staged raw package member.
+    pub fn remove_entry(&mut self, name: &str) -> Option<Vec<u8>> {
+        self.candidate.remove_entry(name)
+    }
+
+    /// Serialize and replace a staged parsed `.iwa` package member.
+    pub fn replace_archive(
+        &mut self,
+        name: &str,
+        archive: &Archive,
+    ) -> Result<Option<Vec<u8>>> {
+        self.candidate.replace_archive(name, archive)
+    }
+
+    /// Serialize and insert a staged IWA component before an existing member.
+    pub fn insert_archive_before(
+        &mut self,
+        name: &str,
+        archive: &Archive,
+        before: &str,
+    ) -> Result<()> {
+        self.candidate.insert_archive_before(name, archive, before)
+    }
+
+    /// Parse, mutate, validate, and replace one staged IWA component.
+    pub fn update_archive<F>(&mut self, name: &str, update: F) -> Result<()>
+    where
+        F: FnOnce(&mut Archive) -> Result<()>,
+    {
+        self.candidate.update_archive(name, update)
+    }
+
+    /// Validate the staged package without serializing it.
+    pub fn validate(&self) -> Result<()> {
+        self.candidate.validate()
+    }
+
+    /// Encode the staged package as a ZIP.
+    pub fn to_bytes(&self) -> Result<Vec<u8>> {
+        self.candidate.to_bytes()
+    }
+
+    /// Stream the staged package as a ZIP to a caller-owned sink.
+    pub fn write_to<W: Write>(&self, sink: W) -> Result<()> {
+        self.candidate.write_to(sink)
+    }
+
+    /// Atomically save the staged package to a regular file.
+    pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<()> {
+        self.candidate.save(path)
+    }
+
+    /// Discard all staged operations and restore the source package.
+    pub fn reset(&mut self) {
+        self.candidate = self.source.clone();
+    }
+
+    #[cfg(test)]
+    fn candidate_mut(&mut self) -> &mut Package {
+        &mut self.candidate
+    }
+
+    /// Validate and publish the staged package.
+    pub fn commit(self) -> Result<Commit> {
+        let Self { source, candidate } = self;
+        candidate.validate_state()?;
+        let patch = source.state.patch_to(&candidate.state);
+        Ok(SharedCommit::new(
+            candidate,
+            patch.clone(),
+            Diagnostics::new(!patch.is_empty()),
+        ))
     }
 }
 
@@ -2009,18 +2141,17 @@ mod tests {
     }
 
     #[test]
-    fn package_edit_with_publishes_a_validated_commit() -> crate::Result<()> {
+    fn package_edit_publishes_a_validated_commit() -> crate::Result<()> {
         let mut package = Package::new();
         package.insert_entry("Data/original", b"original".to_vec())?;
         let source = package.clone();
 
-        let commit = source.edit_with(|edit| {
-            edit.insert_entry("Data/changed", b"changed".to_vec())?;
-            Ok(())
-        })?;
+        let mut edit = source.edit();
+        edit.insert_entry("Data/changed", b"changed".to_vec())?;
+        let commit = edit.commit()?;
 
         assert!(commit.diagnostics().changed());
-        assert_eq!(commit.patch().version(), PackagePatch::VERSION);
+        assert_eq!(commit.patch().version(), Patch::VERSION);
         assert_eq!(commit.patch().len(), 1);
         let change = &commit.patch().changes()[0];
         assert_eq!(change.name(), "Data/changed");
@@ -2060,7 +2191,7 @@ mod tests {
 
         let source = Package::from_bytes(&bytes)?;
         assert!(source.source.is_some());
-        let commit = source.edit_with(|_| Ok(()))?;
+        let commit = source.edit().commit()?;
         assert!(commit.patch().is_empty());
         assert!(!commit.diagnostics().changed());
 
@@ -2090,10 +2221,9 @@ mod tests {
         ));
         assert_eq!(reverted.package().to_bytes()?, bytes);
 
-        let changed = source.edit_with(|edit| {
-            edit.insert_entry("Data/changed", b"changed".to_vec())?;
-            Ok(())
-        })?;
+        let mut edit = source.edit();
+        edit.insert_entry("Data/changed", b"changed".to_vec())?;
+        let changed = edit.commit()?;
         assert!(!changed.patch().is_empty());
         assert!(source.apply(changed.patch())?.package().source.is_none());
         Ok(())
@@ -2104,10 +2234,9 @@ mod tests {
         let mut package = Package::new();
         package.insert_entry("Data/original", b"original".to_vec())?;
         let source = package.clone();
-        let commit = source.edit_with(|edit| {
-            edit.insert_entry("Data/changed", b"changed".to_vec())?;
-            Ok(())
-        })?;
+        let mut edit = source.edit();
+        edit.insert_entry("Data/changed", b"changed".to_vec())?;
+        let commit = edit.commit()?;
 
         let mut stale = Package::new();
         stale.insert_entry("Data/original", b"different".to_vec())?;
@@ -2117,24 +2246,21 @@ mod tests {
     }
 
     #[test]
-    fn package_edit_with_discards_callback_failures() -> crate::Result<()> {
+    fn package_edit_discards_staged_candidates_when_dropped() -> crate::Result<()> {
         let mut package = Package::new();
         package.insert_entry("Data/original", b"original".to_vec())?;
         let source = package.clone();
 
-        let error = source.edit_with(|edit| -> crate::Result<()> {
-            edit.insert_entry("Data/changed", b"changed".to_vec())?;
-            Err(Error::InvalidFormat("reject staged edit".to_owned()))
-        });
-
-        assert!(error.is_err());
+        let mut edit = source.edit();
+        edit.insert_entry("Data/changed", b"changed".to_vec())?;
+        drop(edit);
         assert_eq!(source.len(), 1);
         assert_eq!(source.entry("Data/changed"), None);
         Ok(())
     }
 
     #[test]
-    fn package_edit_with_discards_candidates_that_fail_final_validation() {
+    fn package_edit_discards_candidates_that_fail_final_validation() {
         let limits = PackageLimits::new(1, 4, 4).unwrap();
         let mut package = empty_package_with_limits(limits);
         package
@@ -2142,10 +2268,9 @@ mod tests {
             .unwrap();
         let source = package.clone();
 
-        let error = source.edit_with(|edit| {
-            edit.entry_mut("Data/asset").unwrap().push(5);
-            Ok(())
-        });
+        let mut edit = source.edit();
+        edit.candidate_mut().entry_mut("Data/asset").unwrap().push(5);
+        let error = edit.commit();
 
         assert!(error.unwrap_err().to_string().contains("member"));
         assert_eq!(source.entry("Data/asset"), Some([1, 2, 3, 4].as_slice()));
