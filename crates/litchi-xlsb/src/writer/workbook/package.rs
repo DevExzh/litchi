@@ -379,12 +379,14 @@ impl Builder {
 
         // Write workbook structure
         let mut workbook_data = Vec::new();
-        let mut writer = Encoder::new(&mut workbook_data, crate::raw::Limits::DEFAULT);
+        let raw_limits = crate::raw::Limits::DEFAULT;
+        let mut writer = Encoder::new(&mut workbook_data, raw_limits);
         self.write_workbook(
             &mut writer,
             formula_sheet_ranges,
             &pivot_cache_rel_ids,
             &external_link_rel_ids,
+            raw_limits,
         )?;
         workbook_part.set_blob(workbook_data);
 

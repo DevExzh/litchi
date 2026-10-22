@@ -31,8 +31,8 @@ const MAX_MACRO_DESCRIPTION_UNITS: usize = 32_767;
 /// This standalone function cannot report repairs, so it also rejects the
 /// reserved flag bits and trailing bytes an opened workbook repairs and
 /// records; see [`crate::leniency`].
-pub fn parse(data: &[u8]) -> Result<Definition> {
-    parse_with(data, 0, Tolerance::refusing())
+pub fn parse(data: &[u8], limits: Limits) -> Result<Definition> {
+    parse_with(data, 0, Tolerance::refusing(), limits)
 }
 
 /// Parse one `BrtName` payload, masking reserved flag bits and ignoring
@@ -42,12 +42,21 @@ pub(crate) fn parse_with(
     data: &[u8],
     ordinal: u32,
     mut tolerance: Tolerance<'_>,
+    limits: Limits,
 ) -> Result<Definition> {
+    limits.validate()?;
     if data.len() > MAX_RECORD_BYTES {
         return Err(Error::InvalidLength {
             expected: MAX_RECORD_BYTES,
             found: data.len(),
         });
+    }
+    if data.len() > limits.payload() {
+        return Err(Error::Wire(crate::raw::Error::PayloadLimit {
+            length: data.len(),
+            limit: limits.payload(),
+            offset: 0,
+        }));
     }
     if data.len() < 13 {
         return Err(Error::InvalidLength {
@@ -56,8 +65,11 @@ pub(crate) fn parse_with(
         });
     }
 
-    let limits = Limits::new(MAX_RECORD_BYTES, MAX_WIDE_STRING_UNITS);
-    let mut cursor = Cursor::new(data, "BrtName", limits);
+    let parse_limits = Limits::new(
+        MAX_RECORD_BYTES.min(limits.payload()),
+        MAX_WIDE_STRING_UNITS.min(limits.string_units()),
+    );
+    let mut cursor = Cursor::new(data, "BrtName", parse_limits);
     let mut flags = cursor.read_u32()?;
     // MS-XLSB 2.4.647: the 14 reserved bits MUST be 0 and MUST be ignored.
     if flags & NAME_RESERVED_FLAGS != 0 {
@@ -159,13 +171,18 @@ pub(crate) fn parse_with(
 
 impl Definition {
     /// Parse one complete `BrtName` payload.
-    pub fn parse(data: &[u8]) -> Result<Self> {
-        parse(data)
+    pub fn parse(data: &[u8], limits: Limits) -> Result<Self> {
+        parse(data, limits)
     }
 
     /// Parse one `BrtName` payload, recording repairs through `tolerance`.
-    pub(crate) fn parse_with(data: &[u8], ordinal: u32, tolerance: Tolerance<'_>) -> Result<Self> {
-        parse_with(data, ordinal, tolerance)
+    pub(crate) fn parse_with(
+        data: &[u8],
+        ordinal: u32,
+        tolerance: Tolerance<'_>,
+        limits: Limits,
+    ) -> Result<Self> {
+        parse_with(data, ordinal, tolerance, limits)
     }
 
     /// Create a 3D area formula token stream for a workbook-local range.

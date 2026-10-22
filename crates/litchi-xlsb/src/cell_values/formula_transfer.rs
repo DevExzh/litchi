@@ -183,12 +183,13 @@ fn defined_names(workbook: &Workbook) -> Result<Vec<NameIdentity>> {
     let workbook_uri = workbook.package.main_document_part()?.partname().clone();
     let source = workbook.package.get_part(&workbook_uri)?.blob();
     let mut names = Vec::new();
-    for item in Records::new(source, crate::raw::Limits::DEFAULT) {
+    let raw_limits = workbook.raw_limits_value();
+    for item in Records::new(source, raw_limits) {
         let record = item?;
         if record.kind() != kind::NAME {
             continue;
         }
-        let definition = crate::named_ranges::parse(record.payload())?;
+        let definition = crate::named_ranges::parse(record.payload(), raw_limits)?;
         let scope = definition
             .sheet_id
             .map(|sheet| {

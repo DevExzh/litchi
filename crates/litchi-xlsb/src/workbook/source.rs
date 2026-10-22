@@ -1357,8 +1357,11 @@ impl SourceBackedWorkbook {
     pub fn defined_name_entries(&self) -> Result<Vec<crate::named_ranges::Entry>> {
         let _ = preflight_package(&self.inner.package)?;
         let data = self.inner.package.main_document_part()?.data()?;
-        let entries =
-            crate::named_ranges::read_entries(data.as_bytes(), &self.inner.formula_context);
+        let entries = crate::named_ranges::read_entries(
+            data.as_bytes(),
+            &self.inner.formula_context,
+            self.inner.raw_limits,
+        );
         postflight_package(&self.inner.package)?;
         entries
     }

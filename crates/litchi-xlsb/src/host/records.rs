@@ -635,8 +635,8 @@ impl NameRecord {
         dead_code,
         reason = "retained for BIFF12 codec completeness and staged host integration"
     )]
-    pub fn parse(data: &[u8]) -> Result<Self> {
-        let named_range = Definition::parse(data)?;
+    pub fn parse(data: &[u8], limits: Limits) -> Result<Self> {
+        let named_range = Definition::parse(data, limits)?;
 
         Ok(NameRecord {
             name: named_range.name,

@@ -17,7 +17,11 @@ use std::io::Write;
 
 impl Builder {
     /// Write workbook-level defined names (BrtName records).
-    fn write_named_ranges<W: Write>(&self, writer: &mut Encoder<W>) -> Result<()> {
+    fn write_named_ranges<W: Write>(
+        &self,
+        writer: &mut Encoder<W>,
+        limits: crate::raw::Limits,
+    ) -> Result<()> {
         for named_range in &self.named_ranges {
             if named_range.function {
                 return Err(Error::refused(
@@ -45,7 +49,7 @@ impl Builder {
                 rgcb: Vec::new(),
             };
             let mut data = Vec::new();
-            let mut temp_writer = Encoder::new(&mut data, crate::raw::Limits::DEFAULT);
+            let mut temp_writer = Encoder::new(&mut data, limits);
 
             let mut flags = 0u32;
             if named_range.hidden {
@@ -92,6 +96,7 @@ impl Builder {
         formula_sheet_ranges: &[(u32, u32)],
         pivot_cache_rel_ids: &[(u32, String)],
         external_link_rel_ids: &[String],
+        raw_limits: crate::raw::Limits,
     ) -> Result<()> {
         // BrtBeginBook
         writer.write_record(kind::BEGIN_BOOK, &[])?;
@@ -119,7 +124,7 @@ impl Builder {
         self.write_externals(writer, formula_sheet_ranges, external_link_rel_ids)?;
 
         // Defined names (named ranges), if any.
-        self.write_named_ranges(writer)?;
+        self.write_named_ranges(writer, raw_limits)?;
 
         // Basic calculation properties describing recalc behavior and
         // numerical tolerance. This is tiny and follows the spec example

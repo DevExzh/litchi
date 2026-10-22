@@ -238,6 +238,7 @@ impl Workbook {
                         record.payload(),
                         u32::try_from(defined_names.len()).unwrap_or(u32::MAX),
                         Tolerance::recording(report),
+                        raw_limits,
                     )?;
                     if named_range
                         .sheet_id

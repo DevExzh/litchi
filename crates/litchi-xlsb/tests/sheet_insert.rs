@@ -309,7 +309,9 @@ fn named_range_scopes(package: &Package) -> Vec<(String, u32)> {
             let record = item.expect("workbook record");
             (record.kind() == kind::NAME).then(|| {
                 let scope = u32::from_le_bytes(record.payload()[5..9].try_into().unwrap());
-                let definition = NamedRange::parse(record.payload()).expect("BrtName");
+                let definition =
+                    NamedRange::parse(record.payload(), litchi_xlsb::raw::Limits::DEFAULT)
+                        .expect("BrtName");
                 (definition.name, scope)
             })
         })

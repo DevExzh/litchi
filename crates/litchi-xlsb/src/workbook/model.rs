@@ -204,7 +204,7 @@ impl Workbook {
         &self,
     ) -> crate::package::error::Result<Vec<crate::named_ranges::Entry>> {
         let part = self.package.main_document_part()?;
-        crate::named_ranges::read_entries(part.blob(), &self.formula_context)
+        crate::named_ranges::read_entries(part.blob(), &self.formula_context, self.raw_limits)
     }
 
     /// The worksheet ordinal of a complete-catalog position, when that tab is

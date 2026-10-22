@@ -3005,7 +3005,12 @@ fn insert_sheet(workbook: &mut Workbook, position: usize, name: &str, state: Sta
 
     let workbook_uri = workbook.package.main_document_part()?.partname().clone();
     let workbook_source = workbook.package.get_part(&workbook_uri)?.blob().to_vec();
-    let catalog = collect_bundle_records(&workbook_source, catalog_len, workbook.leniency())?;
+    let catalog = collect_bundle_records(
+        &workbook_source,
+        catalog_len,
+        workbook.leniency(),
+        workbook.raw_limits_value(),
+    )?;
     let tab_id = allocate_tab_id(&catalog)?;
     let (worksheet_uri, binary_index_uri) = allocate_worksheet_uris(&workbook.package)?;
     let (worksheet_bytes, binary_index_bytes) = authored_blank_worksheet(name)?;
@@ -3168,6 +3173,7 @@ fn collect_bundle_records(
     source: &[u8],
     catalog_len: usize,
     leniency: crate::leniency::Leniency,
+    raw_limits: crate::raw::Limits,
 ) -> Result<Vec<crate::package::records::BundleSheetRecord>> {
     let mut records = Vec::new();
     records
@@ -3179,7 +3185,7 @@ fn collect_bundle_records(
     let mut open = false;
     let mut seen = false;
     let mut closed = false;
-    for item in Records::new(source, crate::raw::Limits::DEFAULT) {
+    for item in Records::new(source, raw_limits) {
         let record = item?;
         match record.kind() {
             kind::BEGIN_BUNDLE_SHS => {
@@ -3734,8 +3740,12 @@ fn apply_sheet_removal(workbook: &mut Workbook, positions: &[usize]) -> Result<b
 
     let workbook_uri = workbook.package.main_document_part()?.partname().clone();
     let workbook_source = workbook.package.get_part(&workbook_uri)?.blob().to_vec();
-    let bundle_records =
-        collect_bundle_records(&workbook_source, catalog_len, workbook.leniency())?;
+    let bundle_records = collect_bundle_records(
+        &workbook_source,
+        catalog_len,
+        workbook.leniency(),
+        workbook.raw_limits_value(),
+    )?;
     let selected_rel_ids = bundle_records
         .iter()
         .enumerate()
@@ -3784,6 +3794,7 @@ fn apply_sheet_removal(workbook: &mut Workbook, positions: &[usize]) -> Result<b
         catalog_len,
         &workbook.formula_context,
         &bundle_records,
+        workbook.raw_limits_value(),
     )?;
     let tabs = workbook.sheets().collect::<Vec<_>>();
     let titles = tabs
@@ -4400,12 +4411,13 @@ fn rewrite_workbook_remove(
     catalog_len: usize,
     context: &crate::package::formula::Context,
     bundle_records: &[crate::package::records::BundleSheetRecord],
+    raw_limits: crate::raw::Limits,
 ) -> Result<Vec<u8>> {
     let mut bundle_count = 0usize;
     let mut bundle_open = false;
     let mut saw_collection = false;
     let mut closed = false;
-    for item in Records::new(source, crate::raw::Limits::DEFAULT) {
+    for item in Records::new(source, raw_limits) {
         let record = item?;
         match record.kind() {
             kind::BEGIN_BUNDLE_SHS => {
@@ -4494,7 +4506,7 @@ fn rewrite_workbook_remove(
         })?;
     let mut bundle_index = 0usize;
     let mut open = false;
-    for item in Records::new(source, crate::raw::Limits::DEFAULT) {
+    for item in Records::new(source, raw_limits) {
         let record = item?;
         let raw = record_bytes(source, &record)?;
         match record.kind() {
@@ -4523,6 +4535,7 @@ fn rewrite_workbook_remove(
                     catalog_len,
                     context,
                     bundle_records,
+                    raw_limits,
                 )?;
                 output.extend_from_slice(&rewritten);
             },
@@ -4538,8 +4551,9 @@ fn rewrite_workbook_record_remove(
     catalog_len: usize,
     context: &crate::package::formula::Context,
     bundle_records: &[crate::package::records::BundleSheetRecord],
+    raw_limits: crate::raw::Limits,
 ) -> Result<Vec<u8>> {
-    let (header, header_len) = Header::parse(raw, RawLimits::DEFAULT)?;
+    let (header, header_len) = Header::parse(raw, raw_limits)?;
     let payload = raw.get(header_len..).ok_or(Error::InvalidLength {
         expected: header_len,
         found: raw.len(),
@@ -4590,7 +4604,7 @@ fn rewrite_workbook_record_remove(
             }
         },
         kind::NAME => {
-            reject_name_formula_dependencies(payload, removed, context)?;
+            reject_name_formula_dependencies(payload, removed, context, raw_limits)?;
             if payload.len() < 9 {
                 return Err(Error::InvalidLength {
                     expected: 9,
@@ -4649,8 +4663,10 @@ fn reject_name_formula_dependencies(
     payload: &[u8],
     removed: &[bool],
     context: &crate::package::formula::Context,
+    raw_limits: crate::raw::Limits,
 ) -> Result<()> {
-    let definition = crate::named_ranges::parse(payload).map_err(map_named_range_error)?;
+    let definition =
+        crate::named_ranges::parse(payload, raw_limits).map_err(map_named_range_error)?;
     let Some(formula) = definition.formula.as_deref() else {
         return Ok(());
     };
