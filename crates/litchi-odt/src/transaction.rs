@@ -254,8 +254,25 @@ impl Package {
     pub fn from_prepared_package(
         prepared: crate::core::PreparedPackage,
     ) -> std::result::Result<Self, PackageError> {
-        let document = Document::from_prepared_package(prepared)?;
-        Ok(Self::from_parsed(document))
+        Self::from_prepared_package_with_options(prepared, OpenOptions::new())
+    }
+
+    /// Adopt a prepared package under the semantic limits in `options`.
+    /// Its source limits were applied when the archive was prepared.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::from_prepared_package`], plus a typed semantic limit failure.
+    pub fn from_prepared_package_with_options(
+        prepared: crate::core::PreparedPackage,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, PackageError> {
+        if prepared.format() != litchi_core::FileFormat::Odt {
+            return Err(PackageError::Core(litchi_core::Error::UnexpectedFormat {
+                detected: prepared.format(),
+            }));
+        }
+        Self::from_owned_package_with_options(prepared.into_package(), options)
     }
 
     /// Adopt a prepared package of any ODF text-body family — ODT, an
@@ -272,13 +289,25 @@ impl Package {
     pub fn from_prepared_text_package(
         prepared: crate::core::PreparedPackage,
     ) -> std::result::Result<Self, PackageError> {
+        Self::from_prepared_text_package_with_options(prepared, OpenOptions::new())
+    }
+
+    /// Adopt a prepared text-family package under the semantic limits in
+    /// `options`, reusing the archive and its already-applied source policy.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::from_prepared_text_package`], plus a typed semantic limit failure.
+    pub fn from_prepared_text_package_with_options(
+        prepared: crate::core::PreparedPackage,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, PackageError> {
         use litchi_core::detection::FileFormat;
         match prepared.format() {
-            FileFormat::Odt => Self::from_prepared_package(prepared),
-            FileFormat::Oth | FileFormat::Odm => Self::from_owned_package_with_options(
-                prepared.into_package(),
-                OpenOptions::default(),
-            ),
+            FileFormat::Odt => Self::from_prepared_package_with_options(prepared, options),
+            FileFormat::Oth | FileFormat::Odm => {
+                Self::from_owned_package_with_options(prepared.into_package(), options)
+            },
             detected => Err(PackageError::Core(litchi_core::Error::UnexpectedFormat {
                 detected,
             })),

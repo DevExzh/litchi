@@ -118,8 +118,10 @@ impl Ods {
     /// Every in-memory route uses this, including the one the facade served
     /// by turning a prepared package back into bytes and parsing them again
     /// (`DetectedFormat::Ods`).
-    pub(crate) fn from_prepared(prepared: PreparedPackage, _options: &OpenOptions) -> Result<Self> {
-        let package = Package::from_prepared_package(prepared).map_err(odf_error)?;
+    pub(crate) fn from_prepared(prepared: PreparedPackage, options: &OpenOptions) -> Result<Self> {
+        let package =
+            Package::from_prepared_package_with_options(prepared, options.odf_open_options())
+                .map_err(odf_error)?;
         Self::from_package(package, None)
     }
 
@@ -146,21 +148,9 @@ impl Ods {
 
     /// Parses a flat single-XML spreadsheet detection recognized.
     pub(crate) fn from_flat(bytes: Vec<u8>, options: &OpenOptions) -> Result<Self> {
-        if let Some(maximum) = options.max_input_bytes {
-            let maximum = usize::try_from(maximum).unwrap_or(usize::MAX);
-            if maximum < bytes.len() {
-                return Err(Error::from(litchi_core::Error::ResourceLimit(
-                    litchi_core::ResourceLimit {
-                        resource: litchi_core::Resource::InputBytes,
-                        observed: u64::try_from(bytes.len()).unwrap_or(u64::MAX),
-                        limit: u64::try_from(maximum).unwrap_or(u64::MAX),
-                        scope: Arc::from("flat ODS input"),
-                    },
-                ))
-                .with_format(FileFormat::Ods));
-            }
-        }
-        let flat = litchi_ods::flat::Workbook::from_bytes(&bytes).map_err(odf_error)?;
+        let flat =
+            litchi_ods::flat::Workbook::from_bytes_with_options(&bytes, options.odf_open_options())
+                .map_err(odf_error)?;
         Ok(Self::from_owner(OdsOwner::Flat(flat), None))
     }
 

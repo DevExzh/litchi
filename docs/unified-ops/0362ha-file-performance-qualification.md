@@ -182,8 +182,7 @@ formatting pass. The public prepared-open example imports its new required
 SourceLimits type. [The receipt](results/0362ha/odf-owner-validation.json) keeps
 all failed attempts and successful checks with source and log hashes.
 
-This remains an integration candidate. The broader ODF ownership review must
-verify and repair semantic-policy propagation through prepared and flat byte
-projections: several legacy adapter constructors ignore the provided options.
-That review, the corpus/error disposition checks, matched performance, W4/W4b
-integration and final workspace gate remain required.
+This remains an integration candidate. The prepared/flat semantic-policy
+propagation repair is recorded in [0362hc](0362hc-odf-semantic-options.md).
+The remaining raw policy review, corpus/error disposition checks, matched
+performance, W4/W4b integration and final workspace gate remain required.

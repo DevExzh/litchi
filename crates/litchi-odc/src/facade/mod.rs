@@ -344,13 +344,26 @@ impl Package {
     pub fn from_prepared_package(
         prepared: litchi_odf_common::PreparedPackage,
     ) -> std::result::Result<Self, crate::Error> {
+        Self::from_prepared_package_with_options(prepared, OpenOptions::new())
+    }
+
+    /// Adopt a prepared package under the semantic limits in `options`.
+    /// The source limits were applied when the archive was prepared; its
+    /// existing index and source allocation are reused.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::from_prepared_package`], plus a typed semantic limit failure.
+    pub fn from_prepared_package_with_options(
+        prepared: litchi_odf_common::PreparedPackage,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, crate::Error> {
         if prepared.format() != litchi_core::detection::FileFormat::Odc {
             return Err(Error::UnexpectedFormat {
                 detected: prepared.format(),
             }
             .into());
         }
-        let options = OpenOptions::new();
         let snapshot =
             crate::package::Snapshot::from_owned_with_options(prepared.into_package(), options)?;
         Self::from_opened(snapshot, options)

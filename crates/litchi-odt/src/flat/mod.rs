@@ -84,6 +84,19 @@ impl Limits {
             options,
         }
     }
+
+    fn input_exceeded(self, observed: usize) -> CoreError {
+        let semantic = self.options.semantic_limits_value();
+        if let Err(error) = semantic.check_core(SemanticLimitKind::ContentBytes, observed) {
+            return error;
+        }
+        resource_limit_error(
+            Resource::InputBytes,
+            observed,
+            self.max_document_bytes,
+            "flat ODT input",
+        )
+    }
 }
 
 impl Default for Limits {
@@ -161,7 +174,13 @@ impl Document {
                 "flat ODT input",
             )
         })?;
-        let document = FlatDocument::from_reader_with_limit(reader, maximum)?;
+        let document =
+            FlatDocument::from_reader_with_limit(reader, maximum).map_err(|error| match error {
+                CoreError::ResourceLimit(limit) if limit.resource == Resource::InputBytes => {
+                    limits.input_exceeded(usize::try_from(limit.observed).unwrap_or(usize::MAX))
+                },
+                other => other,
+            })?;
         if document.family() != Family::Text {
             return invalid("flat document is not an OpenDocument Text document");
         }
@@ -195,25 +214,14 @@ impl Document {
     ) -> std::result::Result<Self, Error> {
         let limits = Limits::from_options(options);
         if bytes.len() > limits.max_document_bytes {
-            return Err(resource_limit_error(
-                Resource::InputBytes,
-                bytes.len(),
-                limits.max_document_bytes,
-                "flat ODT input",
-            )
-            .into());
+            return Err(limits.input_exceeded(bytes.len()).into());
         }
         Ok(Self::from_bytes_with_limits(bytes.to_vec(), limits)?)
     }
 
     pub(crate) fn from_bytes_with_limits(bytes: Vec<u8>, limits: Limits) -> Result<Self> {
         if bytes.len() > limits.max_document_bytes {
-            return Err(resource_limit_error(
-                Resource::InputBytes,
-                bytes.len(),
-                limits.max_document_bytes,
-                "flat ODT input",
-            ));
+            return Err(limits.input_exceeded(bytes.len()));
         }
         let maximum = u64::try_from(limits.max_document_bytes).map_err(|_error| {
             resource_limit_error(

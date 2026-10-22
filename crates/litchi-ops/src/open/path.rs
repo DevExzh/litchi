@@ -559,10 +559,18 @@ mod zip {
                 )?;
                 let file = match litchi_odf_common::detect::prepared_or_original(
                     bytes,
-                    litchi_odf_common::SourceLimits::default(),
+                    options.odf_open_options().source_limits_value(),
                 ) {
                     Ok(prepared) => super::super::odf_from_prepared(prepared, options)?,
-                    Err(_) => return Err(super::super::not_enabled(other)),
+                    Err(bytes) => {
+                        litchi_odf_common::OwnedPackage::from_bytes_with_options(
+                            bytes,
+                            options.odf_open_options(),
+                        )
+                        .map_err(litchi_odf_common::Error::from)
+                        .map_err(|error| crate::Error::from(error).with_format(other))?;
+                        return Err(super::super::not_enabled(other));
+                    },
                 };
                 Ok(super::super::attach_origin(
                     file,

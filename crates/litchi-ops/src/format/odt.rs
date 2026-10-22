@@ -127,12 +127,18 @@ impl Odt {
     /// Adopts the package detection prepared (`DetectedFormat::Odt`) without
     /// a second ZIP index. The ODF limits were applied when the package was
     /// prepared.
-    pub(crate) fn from_prepared(prepared: PreparedPackage, _options: &OpenOptions) -> Result<Self> {
+    pub(crate) fn from_prepared(prepared: PreparedPackage, options: &OpenOptions) -> Result<Self> {
         let format = prepared.format();
         let package = if format == FileFormat::Odt {
-            litchi_odt::Package::from_prepared_package(prepared)
+            litchi_odt::Package::from_prepared_package_with_options(
+                prepared,
+                options.odf_open_options(),
+            )
         } else {
-            litchi_odt::Package::from_prepared_text_package(prepared)
+            litchi_odt::Package::from_prepared_text_package_with_options(
+                prepared,
+                options.odf_open_options(),
+            )
         }
         .map_err(|error| odf_error(error).with_format(format))?;
         Self::from_package(package, None, format)
@@ -163,26 +169,7 @@ impl Odt {
     /// recognized. Reads go through the leaf's packaged projection of the
     /// flat parts; publication writes the flat bytes (record 0292).
     pub(crate) fn from_flat(bytes: Vec<u8>, options: &OpenOptions) -> Result<Self> {
-        let mut flat_options = litchi_odt::OpenOptions::new();
-        if let Some(maximum) = options.max_input_bytes {
-            if usize::try_from(maximum).unwrap_or(usize::MAX) < bytes.len() {
-                return Err(core_error(litchi_core::Error::ResourceLimit(
-                    litchi_core::ResourceLimit {
-                        resource: litchi_core::Resource::InputBytes,
-                        observed: u64::try_from(bytes.len()).unwrap_or(u64::MAX),
-                        limit: maximum,
-                        scope: Arc::from("flat ODT input"),
-                    },
-                )));
-            }
-            let limits = litchi_odt::SourceLimits::builder()
-                .max_input_bytes(
-                    maximum.clamp(1, litchi_odt::SourceLimits::MAXIMUM.max_input_bytes()),
-                )
-                .and_then(litchi_odt::SourceLimitsBuilder::build)
-                .map_err(odf_error)?;
-            flat_options = flat_options.source_limits(limits);
-        }
+        let flat_options = options.odf_open_options();
         let flat = litchi_odt::flat::Document::from_bytes_with_options(&bytes, flat_options)
             .map_err(odf_error)?;
         Self::from_flat_document(flat, None)

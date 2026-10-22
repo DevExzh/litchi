@@ -194,29 +194,49 @@ pub(crate) fn core_error(error: litchi_core::Error, format: FileFormat) -> Error
 
 impl OdfTree {
     /// Adopt the package detection prepared, without a second ZIP index.
-    pub(crate) fn from_prepared(prepared: PreparedPackage, _options: &OpenOptions) -> Result<Self> {
+    pub(crate) fn from_prepared(prepared: PreparedPackage, options: &OpenOptions) -> Result<Self> {
         let format = prepared.format();
         let error = |error| odf_error(error, format);
         let owner = match format {
             #[cfg(feature = "odg")]
-            FileFormat::Odg => {
-                Owner::Odg(litchi_odg::Package::from_prepared_package(prepared).map_err(error)?)
-            },
+            FileFormat::Odg => Owner::Odg(
+                litchi_odg::Package::from_prepared_package_with_options(
+                    prepared,
+                    options.odf_open_options(),
+                )
+                .map_err(error)?,
+            ),
             #[cfg(feature = "odc")]
-            FileFormat::Odc => {
-                Owner::Odc(litchi_odc::Package::from_prepared_package(prepared).map_err(error)?)
-            },
+            FileFormat::Odc => Owner::Odc(
+                litchi_odc::Package::from_prepared_package_with_options(
+                    prepared,
+                    options.odf_open_options(),
+                )
+                .map_err(error)?,
+            ),
             #[cfg(feature = "odi")]
-            FileFormat::Odi => {
-                Owner::Odi(litchi_odi::Package::from_prepared_package(prepared).map_err(error)?)
-            },
+            FileFormat::Odi => Owner::Odi(
+                litchi_odi::Package::from_prepared_package_with_options(
+                    prepared,
+                    options.odf_open_options(),
+                )
+                .map_err(error)?,
+            ),
             #[cfg(feature = "odb")]
-            FileFormat::Odb => {
-                Owner::Odb(litchi_odb::Package::from_prepared_package(prepared).map_err(error)?)
-            },
+            FileFormat::Odb => Owner::Odb(
+                litchi_odb::Package::from_prepared_package_with_options(
+                    prepared,
+                    options.odf_open_options(),
+                )
+                .map_err(error)?,
+            ),
             #[cfg(feature = "odf-formula")]
             FileFormat::Odf => Owner::Formula(
-                litchi_odf_formula::Package::from_prepared_package(prepared).map_err(error)?,
+                litchi_odf_formula::Package::from_prepared_package_with_options(
+                    prepared,
+                    options.odf_open_options(),
+                )
+                .map_err(error)?,
             ),
             other => {
                 let _ = (prepared, error);
@@ -243,26 +263,21 @@ impl OdfTree {
     #[cfg(feature = "odg")]
     pub(crate) fn from_flat(bytes: Vec<u8>, options: &OpenOptions) -> Result<Self> {
         let format = FileFormat::Odg;
-        if let Some(maximum) = options.max_input_bytes
-            && u64::try_from(bytes.len()).unwrap_or(u64::MAX) > maximum
-        {
-            return Err(core_error(
-                litchi_core::Error::ResourceLimit(litchi_core::ResourceLimit {
-                    resource: litchi_core::Resource::InputBytes,
-                    observed: u64::try_from(bytes.len()).unwrap_or(u64::MAX),
-                    limit: maximum,
-                    scope: Arc::from("flat ODG input"),
-                }),
-                format,
-            ));
-        }
         let parts = litchi_odf_common::flat::Parts::split(&bytes)
             .map_err(|error| core_error(error, format))?;
         let package = parts
             .to_bytes()
             .map_err(|error| core_error(error, format))
             .and_then(|zip| {
-                litchi_odg::Package::from_bytes(&zip).map_err(|error| odf_error(error, format))
+                // The input limit applies to the original flat source. The
+                // generated ZIP is an internal projection; semantic policy
+                // still applies to every parsed drawing part and object.
+                litchi_odg::Package::from_bytes_with_options(
+                    &zip,
+                    litchi_odf_common::OpenOptions::new()
+                        .semantic_limits(options.odf_open_options().semantic_limits_value()),
+                )
+                .map_err(|error| odf_error(error, format))
             })?;
         let owner = Owner::Odg(package);
         let tree = owner.tree()?;

@@ -107,7 +107,11 @@ pub(crate) fn core_error(error: litchi_core::Error) -> Error {
 impl Odp {
     /// Adopts the package detection prepared without a second ZIP index.
     pub(crate) fn from_prepared(prepared: PreparedPackage, options: &OpenOptions) -> Result<Self> {
-        let package = litchi_odp::Package::from_prepared_package(prepared).map_err(odf_error)?;
+        let package = litchi_odp::Package::from_prepared_package_with_options(
+            prepared,
+            options.odf_open_options(),
+        )
+        .map_err(odf_error)?;
         Self::from_package(package, None, options.odf_open_options())
     }
 
@@ -126,7 +130,11 @@ impl Odp {
 
     /// Adopts a flat (single XML) presentation for reads.
     pub(crate) fn from_flat(bytes: Vec<u8>, options: &OpenOptions) -> Result<Self> {
-        let flat = litchi_odp::flat::Presentation::from_bytes(&bytes).map_err(odf_error)?;
+        let flat = litchi_odp::flat::Presentation::from_bytes_with_options(
+            &bytes,
+            options.odf_open_options(),
+        )
+        .map_err(odf_error)?;
         Ok(Self::from_owner(
             OdpOwner::Flat(flat),
             None,
@@ -243,7 +251,9 @@ impl Odp {
             let bytes = parts
                 .merge_package(flat.as_bytes(), package.as_bytes())
                 .map_err(core_error)?;
-            let flat = litchi_odp::flat::Presentation::from_bytes(&bytes).map_err(odf_error)?;
+            let flat =
+                litchi_odp::flat::Presentation::from_bytes_with_options(&bytes, flat.options())
+                    .map_err(odf_error)?;
             let next = Self::from_owner(
                 OdpOwner::Flat(flat),
                 self.0.origin.clone(),
