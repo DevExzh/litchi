@@ -49,6 +49,34 @@ fn canonical_parts_replay_and_inverse_preserve_source() {
 }
 
 #[test]
+fn repeated_replay_keeps_owned_changes_after_source_patch_drop() {
+    let source = Package::from_bytes(SOURCE).unwrap();
+    let mut edit = source.edit();
+    edit.replace_paragraph_text(Position::new(0), "replacement")
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    let expected = commit.package().to_bytes().unwrap();
+    let (_published, patch) = commit.into_parts();
+
+    let first = source.apply(&patch).unwrap();
+    let second = source.apply(&patch).unwrap();
+    drop(patch);
+
+    assert_eq!(first.package().to_bytes().unwrap(), expected);
+    assert_eq!(second.package().to_bytes().unwrap(), expected);
+    assert_eq!(
+        first
+            .package()
+            .apply(&first.patch().inverse())
+            .unwrap()
+            .into_package()
+            .to_bytes()
+            .unwrap(),
+        SOURCE
+    );
+}
+
+#[test]
 fn exact_noop_replay_keeps_recipient_owner_and_policy() {
     let source = Package::from_bytes(SOURCE).unwrap();
     let commit = source.edit().commit().unwrap();

@@ -1,11 +1,11 @@
 # 0359re — RTF replay shared change storage
 
 - Date: 2026-10-22.
-- Status: source repair recorded; final build, heap qualification and native
-  timing remain open.
-- Source base: `b0eb83e41e`.
-- Final source in this commit has not been rebuilt because the coordinator's
-  host-wide Cargo hold is active.
+- Status: final source measured for focused tests, allocation and callgrind
+  attribution; clean-window native timing remains open.
+- Source commit: `f75941fc7d`.
+- Final release binary SHA-256:
+  `6d47549df0be90cee8f5830685fc18d108824b1c68d0db8d84f800697b01bb52`.
 
 The replay facade must return an owned `Commit` containing its own reversible
 `Patch`. The old implementation copied `self.changes` for every replay. This
@@ -31,18 +31,21 @@ durable conversion keep their existing behavior.
 
 The final source uses `Arc::from(&changes[..])`, which removes the intermediate
 Vec/Box conversion from the promotion path. Rust's slice conversion still
-allocates an Arc buffer and clones each `Change`; this source edit has not yet
-been measured. The measured prototype used the equivalent
-`to_vec().into_boxed_slice()` bridge and is reported below, without treating it
-as the final candidate result.
+allocates an Arc buffer and clones each `Change`. The final measurement below
+shows that this removes one of the prototype's four promotion allocations.
 
-## Measured prototype
+## Final-source measurement
 
-The prototype binary was built before the Cargo hold from the same probe and
-has SHA-256
-`74cfeddc1fef9669bca6a2faea89a4a3a96f2fbfc84e7545b3a2d98a81f4ed91`. It was
-compared with the original 0359b binary
-`4693bd12232d92a61ef2f437de2d623e345a106288d5d0a5c5638cf27677420` using the
+The final binary was built with one Cargo job, no incremental compilation,
+release debug information disabled, a 20 GiB systemd memory cap, and a
+`TMPDIR` under `/home/zhuhe`. The command was:
+
+```text
+CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/rtf-refusals/target-replay-arc CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_RELEASE_DEBUG=0 LITCHI_MEM_MAX=20G TMPDIR=/home/zhuhe/.cache/rtf-refusal-perf cargo build --release -p litchi-rtf --example refusal_contract_bench
+```
+
+It was compared with the original 0359b binary
+`4693bd12232d92a61ef2f437de2d623e345a106288d5d0a5c5638cf27677420a` using the
 fixed external executable path, CPU 7, `MemoryMax=20G`, and A-B-B-A heaptrack
 captures. Compiler processes were active, so these are allocation-attribution
 receipts and not native qualification.
@@ -50,29 +53,44 @@ receipts and not native qualification.
 | Route set | Allocations | Temporary | Peak heap | Leaked |
 | --- | ---: | ---: | ---: | ---: |
 | original, runs 1 and 2 | 177,971 | 1,258 | 3.57 MiB | 544 B |
-| storage prototype, runs 1 and 2 | 177,975 | 1,258 | 3.57 MiB | 544 B |
+| final source, runs 1 and 2 | 177,974 | 1,258 | 3.57 MiB | 544 B |
 
-The four additional allocation calls are all on the first
+The final source has three additional allocation calls, all on the first
 `ChangeStorage::to_shared` promotion edge. The replay route made 3,400 calls;
-the first promotion contributed 1,191 inclusive Ir and the remaining 3,399
-replays reused the cached Arc. The heap diff has no peak or leak change.
+callgrind reports one `to_shared` call at 1,008 inclusive Ir, with the
+remaining 3,399 replays reusing the cached Arc. The heap diff has no peak or
+leak change. The previous prototype used the Vec/Box bridge and measured four
+additional calls and 1,191 inclusive Ir for that promotion.
 
-Callgrind used the same protected old and prototype binaries. Whole-program
-Ir was 626,297,809 and 626,297,658 for the old runs, versus 624,865,766 and
-624,866,831 for the storage runs. Inclusive `Package::apply` fell from
-1,679,600 Ir (3,400 calls) to 511,281 Ir; `Edit::commit_staged` changed from
-347,723,593 to 347,842,333 Ir. These deterministic instruction results are
-diagnostic and do not replace native timing.
+The final callgrind A-B-B-A runs used the same fixed path and CPU. Whole-program
+Ir was 627,542,591 and 627,541,901 for the original runs, versus 624,872,284
+and 624,871,461 for the final runs. The final median is 2,670,374 Ir lower
+than the original median. Against the prior current API binary, final
+`Package::apply` is 511,098 Ir for 3,400 calls versus 1,679,600; the final
+`to_shared` body is 1,008 Ir for one call versus the prototype's 1,191.
+`Edit::commit_staged` is 347,843,299 Ir versus 347,723,593, and
+`Commit::new` is 24,847 versus 24,709. The final `Commit` drop is 12,968,314
+versus 13,382,208, while Arc drop is 25,400,592 versus 25,398,727. These
+deterministic instruction results are diagnostic and do not replace native
+timing.
+
+The final binary exits successfully on all eight probe routes. The focused
+exact-source tests passed: destination splice (9), paragraph lifecycle (16),
+native run format (5), and canonical primary replay (4), including repeated
+replay after dropping the source patch owner. No error, output or inverse
+assertion changed.
 
 The external receipts are under
 `/home/zhuhe/code/litchi-worktrees/.coord/rtf-refusals/`:
 
-- `heap-repair-storage-20261022/`, whose four compressed captures are 18,737
-  to 18,989 bytes;
-- `callgrind-repair-storage-20261022/`, whose four callgrind files are below
-  1 MiB.
+- `heap-repair-final-20261022/`, whose four compressed captures are 18,654 to
+  19,293 bytes;
+- `callgrind-repair-final-20261022/`, whose four callgrind files are below
+  137 KiB;
+- `heap-repair-storage-20261022/` and `callgrind-repair-storage-20261022/`,
+  which retain the earlier four-allocation prototype receipts.
 
 Their SHA-256 values are retained in the coordinator scratch area and in the
-commit record below. The final source still requires a release rebuild and a
-new matched original-to-candidate heap run. The five-block clean-window native
-runner also remains required; no timing or performance acceptance is claimed.
+commit record below. Every final heap capture was rejected for native use
+because compiler processes were observed. The five-block clean-window native
+runner remains required; no native timing or performance acceptance is claimed.
