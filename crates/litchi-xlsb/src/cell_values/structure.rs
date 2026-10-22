@@ -1639,6 +1639,7 @@ impl Patch {
         // an equal-content image whose actual resources fit this owner. Keep
         // the owned OPC path here: it preserves the exact source/provenance
         // publication bytes used by the original package commit path.
+        admit_archive_input_before_copy(self.after.as_ref(), limits)?;
         let candidate = litchi_opc::OpcPackage::from_vec_with_limits(self.after.to_vec(), limits)?;
         let workbook = package.project_candidate(candidate)?;
         validate_all_worksheets(&workbook)?;
@@ -1647,11 +1648,7 @@ impl Patch {
 
     pub(crate) fn apply_to_package(&self, package: &crate::Package) -> Result<crate::Package> {
         if package.to_bytes()?.as_slice() != self.before.as_ref() {
-            return Err(Error::refused(
-                litchi_core::edit::RefusalKind::UnsupportedContent,
-                "edit",
-                "workbook patch source is stale",
-            ));
+            return Err(Error::PatchConflict { part: "workbook" });
         }
         if self.is_noop() {
             return Ok(package.clone());
@@ -1694,11 +1691,7 @@ impl Patch {
     pub(crate) fn apply(&self, workbook: &mut Workbook) -> Result<()> {
         let package = crate::Package::from_workbook(workbook);
         if workbook_bytes(workbook)?.as_slice() != self.before.as_ref() {
-            return Err(Error::refused(
-                litchi_core::edit::RefusalKind::UnsupportedContent,
-                "edit",
-                "workbook patch source is stale",
-            ));
+            return Err(Error::PatchConflict { part: "workbook" });
         }
         if self.is_noop() {
             return Ok(());
@@ -2215,11 +2208,9 @@ impl History {
                 .map(|entry| Arc::clone(&entry.after))
         };
         if expected.is_some_and(|source| source.as_ref() != patch.before.as_ref()) {
-            return Err(Error::refused(
-                litchi_core::edit::RefusalKind::UnsupportedContent,
-                "edit",
-                "workbook history patch does not continue its exact source tip",
-            ));
+            return Err(Error::PatchConflict {
+                part: "workbook history",
+            });
         }
         while self.entries.len() > self.cursor {
             if let Some(removed) = self.entries.pop() {
@@ -2324,10 +2315,30 @@ fn replay_package(
         // before publication. This also establishes the precise archive
         // lineage used by later edits/applications. The semantic workbook is
         // already validated by replay; do not parse that projection again.
+        admit_archive_input_before_copy(&bytes, limits)?;
         workbook.package = litchi_opc::OpcPackage::from_vec_with_limits(bytes.clone(), limits)?;
         workbook.into_package()
     };
     Ok((bytes, package))
+}
+
+/// Check the recipient's physical input ceiling before cloning an exact
+/// after-image into an owned OPC package. `from_vec_with_limits` repeats this
+/// check while validating the archive, but doing it here keeps an oversized
+/// patch from allocating its second whole-image buffer first.
+fn admit_archive_input_before_copy(bytes: &[u8], limits: litchi_opc::SourceLimits) -> Result<()> {
+    let observed = u64::try_from(bytes.len()).map_err(|_error| Error::CapacityOverflow {
+        resource: "workbook archive input bytes",
+    })?;
+    let maximum = limits.max_input_bytes();
+    if observed > maximum {
+        return Err(Error::Opc(litchi_opc::OpcError::Limit {
+            kind: litchi_opc::SourceLimitKind::InputBytes,
+            observed,
+            maximum,
+        }));
+    }
+    Ok(())
 }
 
 fn canonicalize_legacy_operations(

@@ -581,10 +581,9 @@ impl Patch {
         if source.source.as_ref() != self.before.as_ref()
             || source.valid_external_sheets != self.before_external_sheets
         {
-            return Err(invalid(
-                "WEBEXTENSIONS patch",
-                "source snapshot does not match the patch base",
-            ));
+            return Err(Error::PatchConflict {
+                part: "web extension bindings",
+            });
         }
         if self.is_noop() {
             return Ok(source.clone());
@@ -599,10 +598,9 @@ impl Patch {
     /// Apply to exact source bytes and return the resulting record stream.
     pub fn apply_bytes(&self, source: &[u8]) -> Result<Vec<u8>> {
         if source != self.before.as_ref() {
-            return Err(invalid(
-                "WEBEXTENSIONS patch",
-                "source bytes do not match the patch base",
-            ));
+            return Err(Error::PatchConflict {
+                part: "web extension bindings",
+            });
         }
         if !self.is_noop() {
             Snapshot::from_source(

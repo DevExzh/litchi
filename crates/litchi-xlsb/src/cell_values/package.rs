@@ -875,11 +875,9 @@ impl Patch {
         validate_limits(self.transfer_limits)?;
         let source = serialize_package(package, self.transfer_limits.bytes())?;
         if source.as_slice() != self.before.as_ref() {
-            return Err(Error::refused(
-                litchi_core::edit::RefusalKind::UnsupportedContent,
-                "edit_cell_values",
-                "cell-values package patch source is stale",
-            ));
+            return Err(Error::PatchConflict {
+                part: "cell values",
+            });
         }
         if self.is_noop() {
             return Ok(package.clone());

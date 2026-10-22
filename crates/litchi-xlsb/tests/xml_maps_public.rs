@@ -2263,7 +2263,15 @@ fn stale_content_type_relationship_and_topology_are_failure_atomic() {
             Ok(())
         })
         .unwrap();
-    assert_failed_apply(&mut content_type, &commit, "content type");
+    let content_type_before = physical_state(&content_type);
+    let content_type_error = content_type.publish_xml_maps(&commit).unwrap_err();
+    assert!(matches!(
+        content_type_error,
+        PackageError::InvalidContentType {
+            expected: "application/xml"
+        }
+    ));
+    assert_eq!(physical_state(&content_type), content_type_before);
 
     let mut relationship = open(valid_package());
     relationship
@@ -3151,7 +3159,10 @@ fn assert_failed_apply(
 ) {
     let before = physical_state(workbook);
     let error = workbook.publish_xml_maps(commit).unwrap_err();
-    assert_error_contains(error, context, "stale patch");
+    assert!(
+        matches!(error, PackageError::PatchConflict { .. }),
+        "{context}: expected a typed patch conflict, found {error:?}"
+    );
     assert_eq!(physical_state(workbook), before);
 }
 

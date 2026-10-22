@@ -52,7 +52,7 @@ impl Patch {
     ) -> Result<Snapshot> {
         let current = Snapshot::read_for_worksheets(package, worksheets, self.before.limits())?;
         if !current.same_source(&self.before) {
-            return Err(invalid("XML Maps patch source is stale"));
+            return Err(Error::PatchConflict { part: "XML Maps" });
         }
         Ok(current)
     }

@@ -1402,10 +1402,13 @@ fn three_way_history_and_adversarial_envelope_remain_atomic() {
 
     target.apply_structure(&merged).expect("apply merge");
     assert_eq!(target.worksheet_names(), &["Merged".to_string()]);
-    assert!(
-        target.apply_structure(&merged).is_err(),
-        "stale reapply must fail"
-    );
+    let error = target
+        .apply_structure(&merged)
+        .expect_err("stale reapply must fail");
+    assert!(matches!(
+        error,
+        PackageError::PatchConflict { part: "workbook" }
+    ));
 
     let mut history = History::new(TransferLimits::DEFAULT).expect("history");
     history.push(merged).expect("retain patch");

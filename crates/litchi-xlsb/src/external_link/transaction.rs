@@ -487,9 +487,7 @@ pub fn read(data: &[u8], limits: ExternalLinkLimits) -> Result<Snapshot> {
 /// validating the result under `limits`.
 pub fn apply(data: &[u8], patch: &Patch, limits: ExternalLinkLimits) -> Result<Vec<u8>> {
     if data != patch.before.as_slice() {
-        return Err(invalid(
-            "external-link patch source snapshot does not match",
-        ));
+        return Err(Error::PatchConflict);
     }
     let validated = Snapshot::read(&patch.after, limits)?;
     drop(validated);

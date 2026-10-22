@@ -939,13 +939,14 @@ fn rename_patch_inverse_restores_exact_source_and_rejects_stale_source() {
     assert_eq!(restored.to_bytes().unwrap(), source_bytes);
 
     let stale = package_with_corrupted_model_source(source.clone());
-    assert!(
-        stale
-            .apply_data_model(commit.patch())
-            .map(litchi_core::edit::Commit::into_package)
-            .is_err(),
-        "stale source must be refused"
-    );
+    let error = stale
+        .apply_data_model(commit.patch())
+        .map(litchi_core::edit::Commit::into_package)
+        .expect_err("stale source must be refused");
+    assert!(matches!(
+        error,
+        litchi_xlsb::package::PackageError::PatchConflict { part: "data model" }
+    ));
     assert_eq!(
         stale.to_bytes().unwrap(),
         package_with_corrupted_model_source(source)

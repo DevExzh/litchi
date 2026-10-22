@@ -57,6 +57,9 @@ pub enum Error {
         /// Configured maximum.
         maximum: usize,
     },
+    /// A patch was applied to a different source stream.
+    #[error("external-link patch conflicts with its source")]
+    PatchConflict,
 }
 
 pub(crate) const MAX_COLLECTION_ITEMS: usize = 65_535;

@@ -257,7 +257,9 @@ fn explicit_unsigning_requires_a_fresh_plan_and_allows_reversible_edits() {
         .expect_err("signed source plan is stale after unsigning");
     assert!(matches!(
         error,
-        litchi_xlsb::volatile_dependencies::Error::InvalidFormat(_)
+        litchi_xlsb::volatile_dependencies::Error::PatchConflict {
+            part: "volatile dependencies"
+        }
     ));
 
     let before = unsigned.to_bytes().expect("unsigned source bytes");

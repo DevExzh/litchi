@@ -11,7 +11,8 @@ use std::io::Cursor;
 use litchi_core::FileFormat;
 use litchi_core::selector::{Path as SelectorPath, Query, Scope};
 use litchi_ops::capabilities::Capabilities;
-use litchi_ops::transaction::SemanticLimits;
+use litchi_ops::error::Source;
+use litchi_ops::transaction::{Error as TransactionError, SemanticLimits};
 use litchi_ops::{
     BatchItem, BatchMode, Code, File, ItemResult, OpenOptions, PropValue, Props, SourceMode, props,
 };
@@ -743,14 +744,15 @@ fn cell_transactions_replay_inverse_and_reject_foreign_snapshots() {
         );
 
         let foreign = open_owner(&original_bytes, eager);
-        assert_eq!(
-            commit
-                .patch()
-                .apply(&foreign)
-                .expect_err("foreign owner must be refused")
-                .code(),
-            Code::InvalidInput
-        );
+        let error = commit
+            .patch()
+            .apply(&foreign)
+            .expect_err("foreign owner must be refused");
+        assert_eq!(error.code(), Code::InvalidInput);
+        assert!(matches!(
+            error.leaf(),
+            Source::Transaction(TransactionError::PatchConflict)
+        ));
     }
 }
 

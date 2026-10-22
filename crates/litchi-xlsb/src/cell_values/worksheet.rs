@@ -1456,11 +1456,9 @@ impl Patch {
     /// Returns an error when `source` does not equal this patch's before image.
     pub fn apply(&self, source: &[u8]) -> Result<Vec<u8>> {
         if source != self.before.as_ref() {
-            return Err(Error::refused(
-                litchi_core::edit::RefusalKind::UnsupportedContent,
-                "edit_cell_values",
-                "cell-value patch source snapshot does not match",
-            ));
+            return Err(Error::PatchConflict {
+                part: "cell-value worksheet",
+            });
         }
         Ok(self.after.to_vec())
     }
@@ -1492,11 +1490,9 @@ impl Patch {
     /// exact source or bounded semantic readback fails.
     pub fn compose(&self, next: &Self) -> Result<Self> {
         if self.after != next.before {
-            return Err(Error::refused(
-                litchi_core::edit::RefusalKind::UnsupportedContent,
-                "edit_cell_values",
-                "cell patch composition source is stale",
-            ));
+            return Err(Error::PatchConflict {
+                part: "cell-value composition",
+            });
         }
         patch_from_images(
             Arc::clone(&self.before),
@@ -1514,11 +1510,9 @@ impl Patch {
     /// or failed bounded readback.
     pub fn compose_disjoint(&self, other: &Self) -> Result<Self> {
         if self.before != other.before {
-            return Err(Error::refused(
-                litchi_core::edit::RefusalKind::UnsupportedContent,
-                "edit_cell_values",
-                "disjoint cell patches do not share an exact base",
-            ));
+            return Err(Error::PatchConflict {
+                part: "cell-value composition",
+            });
         }
         let left = self
             .changes
@@ -1810,11 +1804,9 @@ impl History {
                 .map(|entry| &entry.after)
         };
         if expected_source.is_some_and(|source| source != &patch.before) {
-            return Err(Error::refused(
-                litchi_core::edit::RefusalKind::UnsupportedContent,
-                "edit_cell_values",
-                "cell history patch does not continue its exact source tip",
-            ));
+            return Err(Error::PatchConflict {
+                part: "cell-value history",
+            });
         }
         while self.entries.len() > self.cursor {
             if let Some(removed) = self.entries.pop() {

@@ -276,12 +276,10 @@ fn workbook_edits_are_source_checked_and_reversible() {
         .apply(&changed, ExternalLinkLimits::DEFAULT)
         .unwrap();
     assert_eq!(restored, source);
-    assert!(
-        commit
-            .patch()
-            .apply(b"stale", ExternalLinkLimits::DEFAULT)
-            .is_err()
-    );
+    assert!(matches!(
+        commit.patch().apply(b"stale", ExternalLinkLimits::DEFAULT),
+        Err(Error::PatchConflict)
+    ));
 }
 
 #[test]
@@ -1055,7 +1053,10 @@ fn external_link_apply_with_limits_is_fallible_and_accepts_exact_patch_bytes() {
         .build()
         .unwrap();
     assert_eq!(apply(patch.before(), patch, exact).unwrap(), patch.after());
-    assert!(apply(b"stale", patch, exact).is_err());
+    assert!(matches!(
+        apply(b"stale", patch, exact),
+        Err(Error::PatchConflict)
+    ));
 
     let one_below = ExternalLinkLimits::builder()
         .max_part_bytes(maximum - 1)

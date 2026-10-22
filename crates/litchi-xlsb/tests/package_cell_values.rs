@@ -168,13 +168,16 @@ fn package_cell_patch_rejects_stale_sources_including_noop_patches() {
         .map(litchi_xlsb::cell_values::Commit::into_package)
         .expect("changed package");
 
-    assert!(
-        changed_package
-            .apply_cell_values(changed.patch())
-            .map(litchi_xlsb::cell_values::Commit::into_package)
-            .is_err(),
-        "a changed patch must reject its already-published destination"
-    );
+    let error = changed_package
+        .apply_cell_values(changed.patch())
+        .map(litchi_xlsb::cell_values::Commit::into_package)
+        .expect_err("a changed patch must reject its already-published destination");
+    assert!(matches!(
+        error,
+        litchi_xlsb::package::PackageError::PatchConflict {
+            part: "cell values"
+        }
+    ));
 
     let noop = source
         .edit_cell_values(0)
@@ -184,13 +187,16 @@ fn package_cell_patch_rejects_stale_sources_including_noop_patches() {
         .expect("no-op package commit");
     assert!(!noop.diagnostics().changed());
     assert!(noop.patch().is_noop());
-    assert!(
-        changed_package
-            .apply_cell_values(noop.patch())
-            .map(litchi_xlsb::cell_values::Commit::into_package)
-            .is_err(),
-        "even a no-op patch is source-checked against its exact package image"
-    );
+    let error = changed_package
+        .apply_cell_values(noop.patch())
+        .map(litchi_xlsb::cell_values::Commit::into_package)
+        .expect_err("even a no-op patch is source-checked against its exact package image");
+    assert!(matches!(
+        error,
+        litchi_xlsb::package::PackageError::PatchConflict {
+            part: "cell values"
+        }
+    ));
 }
 
 #[test]

@@ -409,7 +409,7 @@ impl OwnerPatch {
     pub(crate) fn apply(&self, package: &mut OpcPackage) -> Result<OwnerSnapshot> {
         let current = read_owner(package, self.before.limits)?;
         if !current.same_source(&self.before) {
-            return Err(invalid("Theme owner patch source is stale"));
+            return Err(Error::PatchConflict { part: "theme" });
         }
         if self.is_empty() {
             return Ok(current);

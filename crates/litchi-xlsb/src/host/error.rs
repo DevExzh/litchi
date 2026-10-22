@@ -121,7 +121,8 @@ pub enum Error {
     Opc(litchi_opc::OpcError),
     /// Cooperative cancellation or caller execution-budget refusal.
     Execution(litchi_core::ExecutionError),
-    /// A source-checked Custom Data patch was applied to a different closure.
+    /// A source-checked patch was applied to a different owner closure or
+    /// byte image.
     PatchConflict {
         /// Human-readable closure name.
         part: &'static str,
@@ -573,6 +574,9 @@ impl From<crate::external_link::Error> for Error {
                 resource,
                 actual,
                 maximum,
+            },
+            crate::external_link::Error::PatchConflict => Self::PatchConflict {
+                part: "external links",
             },
         }
     }

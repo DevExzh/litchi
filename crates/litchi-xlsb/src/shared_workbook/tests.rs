@@ -97,7 +97,11 @@ fn user_crud_and_stale_patches_are_source_checked_and_atomic() {
     let applied = apply(&mut package, commit.patch()).unwrap();
     assert_eq!(applied.users().unwrap().users[0].name, "Alicia");
     let before_stale_apply = owner_image(&package);
-    assert!(apply(&mut package, commit.patch()).is_err());
+    let error = apply(&mut package, commit.patch()).expect_err("stale patch");
+    assert!(matches!(
+        error,
+        crate::package::PackageError::PatchConflict { .. }
+    ));
     assert_eq!(owner_image(&package), before_stale_apply);
 
     let mut invalid = start_edit(&package);
