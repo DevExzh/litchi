@@ -53,3 +53,25 @@ The baseline and candidate compile the same probe; only constructor-signature
 adapters differ. The earlier 0361f scripts remain unchanged so their historical
 artifact hashes can still be verified. New build and measurement receipts
 will be attached after execution; adding the harness does not qualify latency.
+
+## Fresh build and allocation results
+
+The protected `matched-v5` build compares repair `536d7fdcca` with the original
+`ddf2ac8ae2` baseline, using the same probe, resolved dependency lock, toolchain,
+release LTO and panic settings. Both native and counting binaries reproduce
+all eight preflight files exactly. All four counting legs agree for all
+15 routes; requested bytes, calls, peak and retained bytes stay at or below
+the baseline. These are allocation observations, not native latency results.
+
+For 100 retained-header operations, ordinary validation drops from 1,900 calls
+and 395,600 requested bytes to 100 calls and 5,200 bytes. Validation at the exact
+field ceiling uses 200 calls and 6,800 bytes. Ordinary publication drops from
+5,700 calls and 2,042,600 bytes to 3,900 calls and 1,652,200 bytes; tight-profile
+publication uses 4,100 calls and 1,655,400 bytes. Publication peak stays 14,326
+bytes. Encoded-length admission allocates nothing on either revision. Every
+route retains zero additional bytes after its measured operations.
+
+[The verified evidence receipt](results/0361fb/evidence.json) contains the
+complete reduced per-route counts and protected source/binary/command identities.
+External sources and binaries remain outside Git. No v5 native attempt has run;
+the four interrupted v4 attempts remain attached to their earlier source.
