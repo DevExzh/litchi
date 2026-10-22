@@ -31,7 +31,7 @@ use super::super::authoring::{
     HorizontalRelativeFrom, ImageDimensions, ImageType, Placement, Point, Style, VerticalAlignment,
     VerticalPosition, VerticalRelativeFrom, WrapMode,
 };
-use super::{Destination, EditOptions, Patch, SemanticIntent};
+use super::{Commit, Destination, Diagnostics, EditOptions, Patch, SemanticIntent};
 use crate::ink::Limits;
 use crate::package::story::{self, StoryKind};
 use crate::{Error, Package, Result};
@@ -221,9 +221,7 @@ impl Patch {
 }
 
 impl Package {
-    /// Apply one durable typed Ink edit; returns the [`super::Commit`]
-    /// holding the new package, the exact in-memory [`Patch`] it applied and
-    /// its diagnostics (an exact no-op publishes this package unchanged).
+    /// Apply one durable typed Ink edit and return its package, patch and diagnostics.
     ///
     /// Forward operations replay through [`super::Edit`].  Inverse operations
     /// first rebuild a private source from their exact closure, replay the
@@ -234,12 +232,18 @@ impl Package {
     ///
     /// Returns an error for a stale source, an unsupported durable vocabulary
     /// or a replay the edit refuses.
-    pub fn apply_durable_ink<Mode>(&self, patch: &CorePatch<Mode>) -> Result<super::Commit> {
-        self.apply_durable_ink_with_options(patch, EditOptions::default())
+    pub fn apply_durable_ink<Mode>(&self, patch: &CorePatch<Mode>) -> Result<Commit> {
+        self.apply_durable_ink_with_options(
+            patch,
+            EditOptions {
+                inventory: self.semantic_limits().ink_value(),
+                ..EditOptions::default()
+            },
+        )
     }
 
     /// Apply a durable Ink edit with explicit replay and reconstruction
-    /// bounds; returns the [`super::Commit`].
+    /// bounds, returning its package, checked in-memory patch and diagnostics.
     ///
     /// # Errors
     ///
@@ -248,19 +252,8 @@ impl Package {
         &self,
         patch: &CorePatch<Mode>,
         options: EditOptions,
-    ) -> Result<super::Commit> {
-        let planned = self.plan_durable_ink(patch, options)?;
-        self.apply_ink(&planned)
-    }
-
-    /// Verify one durable Ink edit against this package and resolve it to the
-    /// exact in-memory patch it publishes.
-    fn plan_durable_ink<Mode>(
-        &self,
-        patch: &CorePatch<Mode>,
-        limits: EditOptions,
-    ) -> Result<Patch> {
-        let limits = limits.validate()?;
+    ) -> Result<Commit> {
+        let limits = options.validate()?;
         let fingerprint_bounds = FingerprintBounds::from_edit_limits(limits);
         self.ensure_story_opc_current("apply_durable_ink_patch")?;
         if patch.format() != FORMAT_NAME {
@@ -278,25 +271,30 @@ impl Package {
         // no-op or stale-source check from walking an unbounded package before
         // the caller's EditOptions have had a chance to refuse it.
         let source_edit = self.edit_ink_with_options(limits)?;
-        let source_artifact =
-            package_fingerprint_with_bounds(self.opc_package(), fingerprint_bounds)
-                .map_err(|error| invalid_durable(error.to_string()))?;
-        if text_precondition(operation, "artifact_sha256")? != source_artifact {
-            return Err(invalid_durable("Ink durable source is stale"));
+        if operation.op == NOOP {
+            let source_artifact = checked_source_artifact(self, operation, fingerprint_bounds)?;
+            if operation.preconditions.len() != 3
+                || text_precondition(operation, "kind")? != "noop"
+                || text_precondition(operation, "target_sha256")? != source_artifact
+                || !patch.blobs().is_empty()
+            {
+                return Err(invalid_durable("invalid Ink durable no-op"));
+            }
+            let planned = source_edit.plan()?;
+            return Ok(Commit::new(
+                self.clone(),
+                planned.patch,
+                Diagnostics::new(false),
+            ));
         }
+        // Changed replay constructs its own checked patch. Release the source
+        // admission state before fingerprinting/reconstruction, as it is not
+        // part of that proof and need not increase retained memory.
+        drop(source_edit);
+        let source_artifact = checked_source_artifact(self, operation, fingerprint_bounds)?;
         let target_artifact = text_precondition(operation, "target_sha256")?;
         let kind = text_precondition(operation, "kind")?;
         match operation.op.as_str() {
-            NOOP => {
-                if operation.preconditions.len() != 3
-                    || kind != "noop"
-                    || target_artifact != source_artifact
-                    || !patch.blobs().is_empty()
-                {
-                    return Err(invalid_durable("invalid Ink durable no-op"));
-                }
-                Ok(source_edit.plan()?.patch)
-            },
             EDIT => {
                 if operation.preconditions.len() != 4 {
                     return Err(invalid_durable("invalid Ink durable edit"));
@@ -316,7 +314,7 @@ impl Package {
                 if generated != target_artifact {
                     return Err(invalid_durable("Ink durable typed replay target mismatch"));
                 }
-                Ok(commit.patch)
+                self.apply_ink(commit.patch())
             },
             RESTORE => {
                 if operation.preconditions.len() != 4 {
@@ -361,11 +359,27 @@ impl Package {
                         "Ink durable restore forward replay mismatch",
                     ));
                 }
-                Ok(commit.patch.inverse())
+                self.apply_ink(&commit.patch().inverse())
             },
             _ => Err(invalid_durable("unsupported Ink durable operation")),
         }
     }
+}
+
+fn checked_source_artifact(
+    package: &Package,
+    operation: &PatchOperation,
+    bounds: FingerprintBounds,
+) -> Result<String> {
+    let artifact = package_fingerprint_with_bounds(package.opc_package(), bounds)
+        .map_err(|error| invalid_durable(error.to_string()))?;
+    if text_precondition(operation, "artifact_sha256")? != artifact {
+        return Err(Error::conflict(
+            "apply_durable_ink",
+            "the package does not hold the durable Ink patch source",
+        ));
+    }
+    Ok(artifact)
 }
 
 fn replay_intents(
@@ -2980,7 +2994,8 @@ mod tests {
     #[test]
     fn inverse_restore_replays_intent_before_publishing_forged_story() {
         let (patch, durable) = make_patch();
-        let target = Package::from_opc_package(patch.after.package.clone()).expect("target");
+        let target =
+            Package::from_opc_package(patch.after.package.as_ref().clone()).expect("target");
         let forged_source = tamper_story(&patch.before.package);
         let intent_id = durable.operations()[0].preconditions["intent_sha256"]
             .as_str()
@@ -3047,7 +3062,8 @@ mod tests {
             limits(),
         )
         .expect("forged patch parses");
-        let source = Package::from_opc_package(patch.before.package.clone()).expect("source");
+        let source =
+            Package::from_opc_package(patch.before.package.as_ref().clone()).expect("source");
         let before = package_fingerprint(source.opc_package()).expect("source fingerprint");
         assert!(source.apply_durable_ink(&forged).is_err());
         assert_eq!(
@@ -3059,7 +3075,8 @@ mod tests {
     #[test]
     fn inverse_restore_rebuilds_source_content_types_from_exact_proof() {
         let (initial, _) = make_patch();
-        let source = Package::from_opc_package(initial.after.package.clone()).expect("source");
+        let source =
+            Package::from_opc_package(initial.after.package.as_ref().clone()).expect("source");
         let mut edit = source.edit_ink().expect("Ink edit");
         edit.replace(
             Position::new(0),
@@ -3069,8 +3086,8 @@ mod tests {
         .expect("replace");
         let commit = edit.commit().expect("commit");
         let durable = commit.patch().to_durable(limits()).expect("durable");
-        let target =
-            Package::from_opc_package(commit.patch().after.package.clone()).expect("target");
+        let target = Package::from_opc_package(commit.patch().after.package.as_ref().clone())
+            .expect("target");
 
         let target = target
             .apply_durable_ink(&durable.inverse())

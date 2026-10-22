@@ -119,6 +119,30 @@ fn base_source_with_unrelated_relationship() -> Vec<u8> {
     PackageWriter::to_bytes(&opc).unwrap()
 }
 
+#[test]
+fn patches_keep_their_source_after_the_owner_and_sibling_edit_are_dropped() {
+    let original = PackageWriter::to_bytes(&source(false, false)).unwrap();
+    let (noop, changed) = {
+        let package = Package::from_reader(Cursor::new(&original)).unwrap();
+        let noop = noop_patch(&package);
+        let changed = removal_patch(&package);
+        assert_eq!(package.ink().unwrap().annotations().len(), 1);
+        (noop, changed)
+    };
+    let copy = Package::from_reader(Cursor::new(&original)).unwrap();
+    let mut unchanged = copy.apply_ink(&noop).unwrap().into_package();
+    assert_eq!(save(&mut unchanged), original);
+    let mut target = copy.apply_ink(&changed).unwrap().into_package();
+    assert!(target.ink().unwrap().annotations().is_empty());
+    assert!(target.apply_ink(&noop).is_err());
+    let mut restored = target.apply_ink(&changed.inverse()).unwrap().into_package();
+    assert_eq!(save(&mut restored), original);
+    assert_eq!(copy.ink().unwrap().annotations().len(), 1);
+    // Publishing an unrelated result cannot mutate the graph retained by either patch.
+    let _ = save(&mut target);
+    assert!(copy.apply_ink(&noop.inverse()).is_ok());
+}
+
 fn assert_source_guard_rejects(variant: Vec<u8>, patch: &litchi_docx::ink::Patch) {
     let mut package = Package::from_reader(Cursor::new(&variant)).unwrap();
     let before = members(&save(&mut package));

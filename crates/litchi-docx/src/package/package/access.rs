@@ -41,6 +41,11 @@ impl Package {
         &self.opc
     }
 
+    /// Retain the immutable graph without cloning its part and relationship maps.
+    pub(crate) fn shared_opc_package(&self) -> std::sync::Arc<OpcPackage> {
+        self.opc.shared()
+    }
+
     /// Return whether this document contains package signatures.
     #[must_use]
     #[inline]

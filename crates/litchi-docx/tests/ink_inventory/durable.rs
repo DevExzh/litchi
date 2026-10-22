@@ -650,6 +650,142 @@ fn durable_base_profiles_and_dialects_roundtrip_deterministically() {
 }
 
 #[test]
+fn durable_default_replay_retains_owner_ink_policy() {
+    let original = PackageWriter::to_bytes(&source(false, false)).unwrap();
+    let package = Package::from_reader(Cursor::new(&original)).unwrap();
+    let noop = durable_patch(&package.edit_ink().unwrap().commit().unwrap());
+    let limits = Limits {
+        max_payload_bytes: INK.len() - 1,
+        ..Limits::default()
+    };
+    let constrained = Package::from_bytes_with_options(
+        &original,
+        litchi_docx::OpenOptions::default()
+            .semantic_limits(litchi_docx::SemanticLimits::default().ink(limits)),
+    )
+    .unwrap();
+    assert!(matches!(
+        constrained.apply_durable_ink(&noop),
+        Err(Error::InkLimit {
+            kind: litchi_docx::ink::LimitKind::PayloadBytes,
+            actual,
+            maximum,
+        }) if actual == INK.len() && maximum == INK.len() - 1
+    ));
+    let exact = Package::from_bytes_with_options(
+        &original,
+        litchi_docx::OpenOptions::default().semantic_limits(
+            litchi_docx::SemanticLimits::default().ink(Limits {
+                max_payload_bytes: INK.len(),
+                ..limits
+            }),
+        ),
+    )
+    .unwrap();
+    assert!(
+        !exact
+            .apply_durable_ink(&noop)
+            .unwrap()
+            .diagnostics()
+            .changed()
+    );
+    assert_eq!(save(&mut constrained.clone()), original);
+}
+
+#[test]
+fn durable_stale_source_is_a_patch_conflict() {
+    let original = PackageWriter::to_bytes(&source(false, false)).unwrap();
+    let package = Package::from_reader(Cursor::new(&original)).unwrap();
+    let noop = durable_patch(&package.edit_ink().unwrap().commit().unwrap());
+    let stale = rewrite_member(&original, "word/_rels/document.xml.rels", lexical_comment);
+    let changed = Package::from_reader(Cursor::new(&stale)).unwrap();
+    assert!(matches!(
+        changed.apply_durable_ink(&noop),
+        Err(Error::PatchConflict { .. })
+    ));
+    assert_eq!(save(&mut changed.clone()), stale);
+}
+
+#[test]
+fn durable_replay_returns_reversible_commit_for_changed_inverse_and_noop() {
+    let original = PackageWriter::to_bytes(&source(false, false)).unwrap();
+    let package = Package::from_reader(Cursor::new(&original)).unwrap();
+    let mut edit = package.edit_ink().unwrap();
+    edit.insert(
+        Destination::main(Position::new(0)),
+        prepared(),
+        Style::Base(BaseProfile::InkContent),
+    )
+    .unwrap();
+    let authored = edit.commit().unwrap();
+    let durable = durable_patch(&authored);
+    let forward: litchi_docx::ink::Commit = package.apply_durable_ink(&durable).unwrap();
+    assert!(forward.diagnostics().changed());
+    assert!(!forward.patch().is_noop());
+    let target_bytes = save(&mut forward.package().clone());
+    assert_eq!(
+        members(&target_bytes),
+        members(&save(&mut authored.into_package()))
+    );
+    assert_eq!(members(&save(&mut package.clone())), members(&original));
+
+    let copy = Package::from_reader(Cursor::new(&original)).unwrap();
+    let replayed = copy.apply_ink(forward.patch()).unwrap();
+    assert_eq!(
+        members(&save(&mut replayed.into_package())),
+        members(&target_bytes)
+    );
+    let restored = forward
+        .package()
+        .apply_ink(&forward.patch().inverse())
+        .unwrap();
+    assert_eq!(
+        members(&save(&mut restored.into_package())),
+        members(&original)
+    );
+
+    let reopened = Package::from_reader(Cursor::new(&target_bytes)).unwrap();
+    let inverse: litchi_docx::ink::Commit = reopened
+        .apply_durable_ink_with_options(&durable.inverse(), EditOptions::default())
+        .unwrap();
+    assert!(inverse.diagnostics().changed());
+    assert!(!inverse.patch().is_noop());
+    assert_eq!(
+        members(&save(&mut inverse.package().clone())),
+        members(&original)
+    );
+    let target_copy = Package::from_reader(Cursor::new(&target_bytes)).unwrap();
+    let replayed = target_copy.apply_ink(inverse.patch()).unwrap();
+    assert_eq!(
+        members(&save(&mut replayed.into_package())),
+        members(&original)
+    );
+    let restored = inverse
+        .package()
+        .apply_ink(&inverse.patch().inverse())
+        .unwrap();
+    assert_eq!(
+        members(&save(&mut restored.into_package())),
+        members(&target_bytes)
+    );
+
+    let noop = durable_patch(&package.edit_ink().unwrap().commit().unwrap());
+    let applied: litchi_docx::ink::Commit = package.apply_durable_ink(&noop).unwrap();
+    assert!(!applied.diagnostics().changed());
+    assert!(applied.patch().is_noop());
+    let replayed = copy.apply_ink(applied.patch()).unwrap();
+    assert!(!replayed.diagnostics().changed());
+    assert_eq!(
+        save(&mut applied.into_package()),
+        save(&mut package.clone())
+    );
+    assert_eq!(
+        members(&save(&mut replayed.into_package())),
+        members(&original)
+    );
+}
+
+#[test]
 fn durable_replacement_keeps_same_trace_count_and_restores_legacy_inkml_exactly() {
     let original = PackageWriter::to_bytes(&source(false, false)).unwrap();
     let package = Package::from_reader(Cursor::new(&original)).unwrap();

@@ -77,3 +77,16 @@ That removes the inverse Box allocation and the unfiltered Clippy failure
 recorded by 0362ua. The worker's final source passes 2,270 all-target tests,
 87 focused tail/index tests and strict all-feature Clippy; combined validation
 is still required and is not inferred from that standalone result.
+
+Durable-Ink integration through `f97f0eef7a` reconciles the two Commit
+implementations. It keeps the source-owner sharing from `76148455d5`, retained
+Ink policy, early source admission and source lifetime checks, and all existing
+no-op patch/diagnostic assertions. Both owner replay methods now register their
+`ink::Commit` result in the glossary. Fresh minimal/full DOCX captures pass
+42/43 result contracts with rustdoc warnings denied. The combined source passes
+144 Ink, tail-append and paragraph-copy tests, plus unfiltered all-target,
+all-feature Clippy for DOCX, ops and XLSB. This also closes the combined-source
+TailChange Clippy failure retained in 0362ua. Receipts and external capture
+hashes are in `results/0362u/ink-integration.json`. The six-route matched
+allocation repair remains recorded in 0362lc; native timing and full assembly
+acceptance remain required.

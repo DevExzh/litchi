@@ -532,6 +532,14 @@
           "ok": "litchi_docx::document::Commit"
         },
         {
+          "method": "litchi_docx::Package::apply_durable_ink",
+          "ok": "litchi_docx::ink::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_durable_ink_with_options",
+          "ok": "litchi_docx::ink::Commit"
+        },
+        {
           "method": "litchi_docx::Package::apply_fonts",
           "ok": "litchi_docx::font::Commit"
         },
@@ -1084,6 +1092,14 @@
         {
           "method": "litchi_docx::Package::apply_durable_document",
           "ok": "litchi_docx::document::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_durable_ink",
+          "ok": "litchi_docx::ink::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_durable_ink_with_options",
+          "ok": "litchi_docx::ink::Commit"
         },
         {
           "method": "litchi_docx::Package::apply_fonts",

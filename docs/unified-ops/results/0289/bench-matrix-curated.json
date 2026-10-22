@@ -2934,6 +2934,18 @@
   {
    "record": "0362ua",
    "reason": "XLSB refusal-kind and failure-atomicity validation only; no changed success path or paired performance measurement."
+  },
+  {
+   "record": "0362l",
+   "reason": "Durable-Ink native before/after candidate and validation receipts, not a leaf-versus-facade pair. Initial allocation regressions were returned in 0362la; replacement allocation evidence is in 0362lc and native timing remains required."
+  },
+  {
+   "record": "0362lb",
+   "reason": "Durable-Ink graph ownership allocation repair compared with native source references, not a leaf-versus-facade pair. Allocation evidence is superseded by 0362lc; no native timing acceptance."
+  },
+  {
+   "record": "0362lc",
+   "reason": "Durable-Ink source ownership validation and six native before/after allocation comparisons, not a leaf-versus-facade pair. The record has zero qualified native timing blocks; integrated native qualification remains required."
   }
  ]
 }

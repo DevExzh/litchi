@@ -32,29 +32,20 @@ const MAX_RELATIONSHIP_XML_BYTES: usize = 8 * 1024 * 1024;
 
 /// Package graph and exact publication-token binding for stale candidates.
 ///
-/// Names, content types and relationship fields retain semantic ownership.
-/// Content addresses additionally bind lexical XML and relationship-member
-/// presence, including owners untouched by an edit. Part payloads are guarded
-/// separately by the transaction's immutable package state.
+/// The transaction's immutable package owns typed graph metadata. This binding
+/// retains exact lexical XML and relationship-member presence, including owners
+/// untouched by an edit. Matching compares both proofs; part payloads are
+/// guarded separately by the transaction's immutable package state.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Binding {
     content_types: BlobId,
-    root: OwnerBinding,
+    root: RelationshipTokenBinding,
     parts: Vec<PartBinding>,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-struct OwnerBinding {
-    owner: PackURI,
-    relationships: Vec<RelationshipBinding>,
-    token: RelationshipTokenBinding,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct PartBinding {
     part: PackURI,
-    content_type: String,
-    relationships: Vec<RelationshipBinding>,
     token: RelationshipTokenBinding,
 }
 
@@ -83,11 +74,8 @@ impl Binding {
         charge_token_bytes(&mut token_bytes, content_types.bytes().len(), limits)?;
         let content_types = BlobId::of(content_types.bytes());
         let root_owner = root_uri()?;
-        let root = OwnerBinding {
-            token: capture_token(package, &root_owner, &mut token_bytes, limits)?,
-            owner: root_owner,
-            relationships: capture_relationships(package.rels())?,
-        };
+        let root = capture_token(package, &root_owner, &mut token_bytes, limits)?;
+        validate_relationship_targets(package.rels())?;
         let mut parts = Vec::new();
         parts
             .try_reserve_exact(package.part_count())
@@ -96,10 +84,9 @@ impl Binding {
                 source,
             })?;
         for part in package.iter_parts() {
+            validate_relationship_targets(part.rels())?;
             parts.push(PartBinding {
                 part: part.partname().clone(),
-                content_type: clone_text(part.content_type(), "DOCX Ink graph content types")?,
-                relationships: capture_relationships(part.rels())?,
                 token: capture_token(package, part.partname(), &mut token_bytes, limits)?,
             });
         }
@@ -112,9 +99,51 @@ impl Binding {
     }
 
     /// Compare the complete current graph to this source binding.
-    pub(crate) fn matches(&self, package: &OpcPackage, limits: Limits) -> Result<bool> {
-        Ok(*self == Self::capture(package, limits)?)
+    pub(crate) fn matches(
+        &self,
+        expected: &OpcPackage,
+        package: &OpcPackage,
+        limits: Limits,
+    ) -> Result<bool> {
+        // Admit the entire candidate before reporting a conflict, preserving
+        // resource and malformed-graph errors even when tokens already differ.
+        if *self != Self::capture(package, limits)?
+            || !same_relationship_values(expected.rels(), package.rels())
+        {
+            return Ok(false);
+        }
+        Ok(expected.iter_parts().all(|part| {
+            package
+                .part_metadata(part.partname())
+                .is_some_and(|current| {
+                    // OPC lookup permits case-insensitive fallback; the graph proof
+                    // still requires the exact stored spelling.
+                    current.partname().as_str() == part.partname().as_str()
+                        && current.content_type() == part.content_type()
+                        && same_relationship_values(part.rels(), current.rels())
+                })
+        }))
     }
+}
+
+fn validate_relationship_targets(relationships: &Relationships) -> Result<()> {
+    for relationship in relationships.iter() {
+        if !relationship.is_external() {
+            relationship.target_partname()?;
+        }
+    }
+    Ok(())
+}
+
+fn same_relationship_values(expected: &Relationships, actual: &Relationships) -> bool {
+    expected.len() == actual.len()
+        && expected.iter().all(|relationship| {
+            actual.get(relationship.r_id()).is_some_and(|current| {
+                current.reltype() == relationship.reltype()
+                    && current.target_ref() == relationship.target_ref()
+                    && current.target_mode() == relationship.target_mode()
+            })
+        })
 }
 
 fn capture_token(
