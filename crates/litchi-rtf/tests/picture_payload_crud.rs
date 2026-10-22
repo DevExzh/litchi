@@ -106,6 +106,7 @@ fn no_op_shares_snapshot_and_patch_inverse_is_exact_and_source_checked() {
             .package()
             .apply(&commit.patch().inverse())
             .unwrap()
+            .into_package()
             .to_bytes()
             .unwrap(),
         source.to_bytes().unwrap()
@@ -130,7 +131,7 @@ fn batch_is_atomic_bounded_and_updates_only_selected_pictures() {
     assert_eq!(commit.package().pictures()[0].data(), PNG_C);
     assert_eq!(commit.package().pictures()[1].data(), PNG_A);
     let durable = commit.patch().to_durable(durable_limits(2)).unwrap();
-    let applied = source.apply_durable(&durable).unwrap();
+    let applied = source.apply_durable(&durable).unwrap().into_package();
     assert_eq!(
         applied.to_bytes().unwrap(),
         commit.package().to_bytes().unwrap()
@@ -139,6 +140,7 @@ fn batch_is_atomic_bounded_and_updates_only_selected_pictures() {
         applied
             .apply_durable(&durable.inverse())
             .unwrap()
+            .into_package()
             .to_bytes()
             .unwrap(),
         source.to_bytes().unwrap()
@@ -463,12 +465,15 @@ fn durable_patch_is_deterministic_exactly_reversible_and_stale_checked() {
             &first, limits,
         )
         .unwrap();
-    let applied = source.apply_durable(&decoded).unwrap();
+    let applied = source.apply_durable(&decoded).unwrap().into_package();
     assert_eq!(
         applied.to_bytes().unwrap(),
         commit.package().to_bytes().unwrap()
     );
-    let restored = applied.apply_durable(&decoded.inverse()).unwrap();
+    let restored = applied
+        .apply_durable(&decoded.inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(restored.to_bytes().unwrap(), source.to_bytes().unwrap());
 
     let stale = Package::parse(

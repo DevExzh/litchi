@@ -14714,6 +14714,18 @@ impl Patch {
         Ok(Package::from_bytes_with_options(bytes, source.options())?)
     }
 
+    /// Apply this patch and retain the published owner, patch, and diagnostics
+    /// as the facade replay commit.
+    pub(crate) fn apply_commit(&self, source: &Package) -> Result<Commit, Error> {
+        let snapshot = self.apply(source)?;
+        Ok(Commit::new(
+            source.clone(),
+            snapshot,
+            self.changes.len(),
+            self.changes.to_vec(),
+        ))
+    }
+
     /// Whether this patch preserves the exact source artifact.
     #[must_use]
     pub fn is_noop(&self) -> bool {
@@ -14890,14 +14902,15 @@ impl Patch {
             let exact_replay_error = || litchi_core::patch::PatchError::InvalidText {
                 field: "RTF paragraph lifecycle durable replay is not byte-exact",
             };
-            let applied =
+            let applied_commit =
                 apply_durable(&self.before, &durable).map_err(|_error| exact_replay_error())?;
+            let applied = applied_commit.package();
             if applied.source_bytes() != Some(after) {
                 return Err(exact_replay_error());
             }
-            let restored = apply_durable(&applied, &durable.inverse())
+            let restored_commit = apply_durable(applied, &durable.inverse())
                 .map_err(|_error| exact_replay_error())?;
-            if restored.source_bytes() != Some(before) {
+            if restored_commit.package().source_bytes() != Some(before) {
                 return Err(exact_replay_error());
             }
         }
@@ -15440,7 +15453,10 @@ fn durable_operation(
 pub(crate) fn apply_durable<Mode>(
     source: &Package,
     patch: &litchi_core::patch::Patch<Mode>,
-) -> Result<Package, Error> {
+) -> Result<litchi_core::edit::Commit<Package, litchi_core::patch::Patch<Mode>>, Error>
+where
+    Mode: Clone,
+{
     if patch.format() != "litchi-rtf" {
         return Err(Error::DurablePatch(
             "unsupported durable patch format".to_string(),
@@ -15452,7 +15468,7 @@ pub(crate) fn apply_durable<Mode>(
                 "empty patch has an unreferenced blob bundle".to_string(),
             ));
         }
-        return Ok(source.clone());
+        return Ok(durable_commit(source, patch, source.clone()));
     }
     if !patch.blobs().is_empty() {
         return Err(Error::DurablePatch(
@@ -15474,7 +15490,9 @@ pub(crate) fn apply_durable<Mode>(
                 "picture payload operations cannot compose with other RTF vocabularies".to_string(),
             ));
         }
-        return picture_payload::apply_durable_patch(source, patch.operations(), &source_hash);
+        let snapshot =
+            picture_payload::apply_durable_patch(source, patch.operations(), &source_hash)?;
+        return Ok(durable_commit(source, patch, snapshot));
     }
     let picture_removal_count = patch
         .operations()
@@ -15487,11 +15505,9 @@ pub(crate) fn apply_durable<Mode>(
                 "picture removal operations cannot compose with other RTF vocabularies".to_string(),
             ));
         }
-        return picture_payload::apply_durable_removal_patch(
-            source,
-            patch.operations(),
-            &source_hash,
-        );
+        let snapshot =
+            picture_payload::apply_durable_removal_patch(source, patch.operations(), &source_hash)?;
+        return Ok(durable_commit(source, patch, snapshot));
     }
     let picture_insertion_count = patch
         .operations()
@@ -15505,11 +15521,12 @@ pub(crate) fn apply_durable<Mode>(
                     .to_string(),
             ));
         }
-        return picture_payload::apply_durable_insertion_patch(
+        let snapshot = picture_payload::apply_durable_insertion_patch(
             source,
             patch.operations(),
             &source_hash,
-        );
+        )?;
+        return Ok(durable_commit(source, patch, snapshot));
     }
     // A durable operation may be admitted under a caller-selected patch
     // bound larger than the ordinary edit default.  Bind replay to the
@@ -16293,7 +16310,19 @@ pub(crate) fn apply_durable<Mode>(
             return Err(Error::StalePrecondition("durable paragraph result differs"));
         }
     }
-    Ok(snapshot)
+    Ok(durable_commit(source, patch, snapshot))
+}
+
+fn durable_commit<Mode>(
+    source: &Package,
+    patch: &litchi_core::patch::Patch<Mode>,
+    snapshot: Package,
+) -> litchi_core::edit::Commit<Package, litchi_core::patch::Patch<Mode>>
+where
+    Mode: Clone,
+{
+    let diagnostics = litchi_core::edit::Diagnostics::new(!same_artifact(source, &snapshot));
+    litchi_core::edit::Commit::new(snapshot, patch.clone(), diagnostics)
 }
 
 fn is_root_transfer_vocabulary(vocabulary: &str) -> bool {

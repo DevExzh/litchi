@@ -352,6 +352,7 @@ fn native_run_insertion_has_exact_inverse_history_and_durable_refusal() {
             .package()
             .apply(&commit.patch().inverse())
             .unwrap()
+            .into_package()
             .to_bytes()
             .unwrap(),
         source_bytes

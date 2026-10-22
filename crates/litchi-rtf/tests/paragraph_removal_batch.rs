@@ -46,6 +46,7 @@ fn batch_positions_are_relative_to_the_original_snapshot() {
         source
             .apply(commit.patch())
             .unwrap()
+            .into_package()
             .same_snapshot(commit.package())
     );
     assert!(
@@ -53,6 +54,7 @@ fn batch_positions_are_relative_to_the_original_snapshot() {
             .package()
             .apply(&commit.patch().inverse())
             .unwrap()
+            .into_package()
             .same_snapshot(&source)
     );
 }

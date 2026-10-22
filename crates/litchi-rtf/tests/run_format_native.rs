@@ -209,7 +209,11 @@ fn native_run_format_noop_and_inverse_preserve_exact_source_bytes() {
         .unwrap();
     let changed = changed_edit.commit().unwrap();
     assert!(changed.diagnostics().changed());
-    let restored = changed.package().apply(&changed.patch().inverse()).unwrap();
+    let restored = changed
+        .package()
+        .apply(&changed.patch().inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(restored.to_bytes().unwrap(), source_bytes);
 
     let mut history = History::new(source.clone(), HistoryLimits::new(2, 1024 * 1024));

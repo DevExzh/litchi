@@ -255,12 +255,15 @@ fn paragraph_batch_is_durable_reversible_and_source_checked() {
         .unwrap();
     let commit = edit.commit().unwrap();
     let durable = commit.patch().to_durable(durable_limits(2)).unwrap();
-    let applied = source.apply_durable(&durable).unwrap();
+    let applied = source.apply_durable(&durable).unwrap().into_package();
     assert_eq!(
         applied.to_bytes().unwrap(),
         commit.package().to_bytes().unwrap()
     );
-    let restored = applied.apply_durable(&durable.inverse()).unwrap();
+    let restored = applied
+        .apply_durable(&durable.inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(restored.to_bytes().unwrap(), source.to_bytes().unwrap());
 
     let foreign = Package::parse(r"{\rtf1\ansi Foreign\par Source}").unwrap();

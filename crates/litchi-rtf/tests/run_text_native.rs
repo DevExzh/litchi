@@ -227,6 +227,7 @@ fn native_run_text_noop_inverse_history_and_durable_refusal_are_exact() {
             .package()
             .apply(&changed.patch().inverse())
             .unwrap()
+            .into_package()
             .to_bytes()
             .unwrap(),
         source_bytes
@@ -367,6 +368,7 @@ fn native_run_text_replacement_projects_opaque_anchors_across_utf8_runs() {
             .package()
             .apply(&commit.patch().inverse())
             .unwrap()
+            .into_package()
             .to_bytes()
             .unwrap(),
         source_bytes
@@ -430,6 +432,7 @@ fn native_run_text_removal_projects_opaque_anchors_through_terminal_empty_paragr
             .package()
             .apply(&commit.patch().inverse())
             .unwrap()
+            .into_package()
             .to_bytes()
             .unwrap(),
         source_bytes

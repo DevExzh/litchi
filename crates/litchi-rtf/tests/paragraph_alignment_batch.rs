@@ -159,7 +159,11 @@ fn alignment_batch_composes_with_non_structural_text_and_inverse_is_exact() {
         alignments(commit.package()),
         [Alignment::Center, Alignment::Left, Alignment::Justify,]
     );
-    let restored = commit.package().apply(&commit.patch().inverse()).unwrap();
+    let restored = commit
+        .package()
+        .apply(&commit.patch().inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(restored.to_bytes().unwrap(), source.to_bytes().unwrap());
 }
 

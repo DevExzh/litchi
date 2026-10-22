@@ -110,6 +110,7 @@ fn first_middle_last_batch_preserves_text_runs_and_unrelated_paragraph_propertie
             .package()
             .apply(&commit.patch().inverse())
             .unwrap()
+            .into_package()
             .to_bytes()
             .unwrap(),
         source.to_bytes().unwrap()
@@ -390,7 +391,11 @@ fn durable_layout_patch_is_deterministic_reversible_and_stale_checked() {
     ])
     .unwrap();
     let commit = edit.commit().unwrap();
-    let restored = commit.package().apply(&commit.patch().inverse()).unwrap();
+    let restored = commit
+        .package()
+        .apply(&commit.patch().inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(
         restored.to_bytes().unwrap(),
         source.to_bytes().unwrap(),
@@ -491,6 +496,7 @@ fn source_bound_frame_layout_crud_is_reversible_and_source_checked() {
             .package()
             .apply(&created.patch().inverse())
             .unwrap()
+            .into_package()
             .to_bytes()
             .unwrap(),
         source.to_bytes().unwrap()
@@ -528,6 +534,7 @@ fn source_bound_frame_layout_crud_is_reversible_and_source_checked() {
             .package()
             .apply(&removed.patch().inverse())
             .unwrap()
+            .into_package()
             .to_bytes()
             .unwrap(),
         updated.package().to_bytes().unwrap()
@@ -594,6 +601,7 @@ fn frame_layout_batch_validation_and_unknown_source_spans_are_atomic() {
             .package()
             .apply(&unknown_commit.patch().inverse())
             .unwrap()
+            .into_package()
             .to_bytes()
             .unwrap(),
         unknown_before
@@ -650,6 +658,7 @@ fn frame_layout_preserves_zero_width_bookmark_events() {
             .package()
             .apply(&commit.patch().inverse())
             .unwrap()
+            .into_package()
             .to_bytes()
             .unwrap(),
         source.to_bytes().unwrap()
@@ -683,6 +692,7 @@ fn frame_layout_does_not_duplicate_leading_zero_width_bookmark_events() {
             .package()
             .apply(&commit.patch().inverse())
             .unwrap()
+            .into_package()
             .to_bytes()
             .unwrap(),
         before
@@ -737,6 +747,7 @@ fn frame_layout_preserves_leading_body_opaque_destination() {
             .package()
             .apply(&committed.patch().inverse())
             .unwrap()
+            .into_package()
             .to_bytes()
             .unwrap(),
         before

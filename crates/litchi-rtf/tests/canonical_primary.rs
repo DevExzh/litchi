@@ -22,11 +22,21 @@ fn canonical_parts_replay_and_inverse_preserve_source() {
     assert_eq!(commit.package().text(), "replacement");
     let (package, patch) = commit.into_parts();
     assert_eq!(
-        source.apply(&patch).unwrap().to_bytes().unwrap(),
+        source
+            .apply(&patch)
+            .unwrap()
+            .into_package()
+            .to_bytes()
+            .unwrap(),
         package.to_bytes().unwrap()
     );
     assert_eq!(
-        package.apply(&patch.inverse()).unwrap().to_bytes().unwrap(),
+        package
+            .apply(&patch.inverse())
+            .unwrap()
+            .into_package()
+            .to_bytes()
+            .unwrap(),
         SOURCE
     );
     assert_eq!(source.to_bytes().unwrap(), SOURCE);
@@ -51,7 +61,7 @@ fn exact_noop_replay_keeps_recipient_owner_and_policy() {
         .unwrap();
     let recipient =
         Package::from_bytes_with_options(SOURCE, OpenOptions::new().source_limits(limits)).unwrap();
-    let replay = recipient.apply(commit.patch()).unwrap();
+    let replay = recipient.apply(commit.patch()).unwrap().into_package();
     assert!(recipient.same_snapshot(&replay));
     assert_eq!(replay.source_limits(), limits);
     assert!(source.same_snapshot(&commit.into_package()));
@@ -86,7 +96,7 @@ fn replay_admits_candidate_under_recipient_policy() {
         .unwrap();
     let recipient =
         Package::from_bytes_with_options(SOURCE, OpenOptions::new().source_limits(limits)).unwrap();
-    let replay = recipient.apply(commit.patch()).unwrap();
+    let replay = recipient.apply(commit.patch()).unwrap().into_package();
     assert_eq!(replay.source_limits(), limits);
     assert_eq!(replay.text(), "a much longer replacement");
 }

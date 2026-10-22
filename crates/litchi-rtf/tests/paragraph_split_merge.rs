@@ -43,9 +43,15 @@ fn split_is_lossless_durable_reversible_and_sequential() {
     assert_eq!(streamed, expected);
 
     let durable = commit.patch().to_durable(durable_limits(1)).unwrap();
-    let applied = source.apply_durable(&durable).unwrap();
+    let applied_commit = source.apply_durable(&durable).unwrap();
+    assert!(applied_commit.diagnostics().changed());
+    assert_eq!(applied_commit.patch().format(), "litchi-rtf");
+    let applied = applied_commit.into_package();
     assert_eq!(applied.to_bytes().unwrap(), expected);
-    let restored = applied.apply_durable(&durable.inverse()).unwrap();
+    let restored = applied
+        .apply_durable(&durable.inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(restored.to_bytes().unwrap(), source_bytes);
 
     let foreign = Package::parse(r"{\rtf1\ansi Foreign\par Source}").unwrap();
@@ -62,11 +68,15 @@ fn split_is_lossless_durable_reversible_and_sequential() {
         .patch()
         .to_durable(durable_limits(1))
         .unwrap();
-    let leading_applied = leading_empty.apply_durable(&leading_durable).unwrap();
+    let leading_applied = leading_empty
+        .apply_durable(&leading_durable)
+        .unwrap()
+        .into_package();
     assert_eq!(
         leading_applied
             .apply_durable(&leading_durable.inverse())
             .unwrap()
+            .into_package()
             .to_bytes()
             .unwrap(),
         leading_empty.to_bytes().unwrap()
@@ -128,9 +138,12 @@ fn merge_removes_only_the_adjacent_boundary() {
     assert_eq!(commit.package().to_bytes().unwrap(), expected);
 
     let durable = commit.patch().to_durable(durable_limits(1)).unwrap();
-    let applied = source.apply_durable(&durable).unwrap();
+    let applied = source.apply_durable(&durable).unwrap().into_package();
     assert_eq!(applied.to_bytes().unwrap(), expected);
-    let restored = applied.apply_durable(&durable.inverse()).unwrap();
+    let restored = applied
+        .apply_durable(&durable.inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(restored.to_bytes().unwrap(), source_bytes);
 
     let mut non_adjacent = source.edit();
@@ -159,9 +172,12 @@ fn merge_preserves_exact_boundary_bytes_in_durable_inverse() {
     assert_eq!(commit.package().to_bytes().unwrap(), expected);
 
     let durable = commit.patch().to_durable(durable_limits(1)).unwrap();
-    let applied = source.apply_durable(&durable).unwrap();
+    let applied = source.apply_durable(&durable).unwrap().into_package();
     assert_eq!(applied.to_bytes().unwrap(), expected);
-    let restored = applied.apply_durable(&durable.inverse()).unwrap();
+    let restored = applied
+        .apply_durable(&durable.inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(restored.to_bytes().unwrap(), source_bytes);
 
     let mut forged_merge = durable.operations()[0].clone();
