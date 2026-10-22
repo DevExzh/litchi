@@ -66,7 +66,7 @@ impl Document {
         // ingress. Media is optional, so a source without a usable Data tree
         // remains a valid document.
         let (media_limits, package_limits) = media_profiles(limits)?;
-        let media_manager = MediaManager::open_and_package_limits(
+        let media_manager = MediaManager::open_with_limits_and_package_limits(
             path_ref,
             media_limits,
             package_limits,
@@ -114,7 +114,7 @@ impl Document {
         let application = detect_bundle_application(&bundle).unwrap_or(Application::Common);
 
         let (media_limits, package_limits) = media_profiles(limits)?;
-        let media_manager = MediaManager::from_bytes_and_package_limits(
+        let media_manager = MediaManager::from_bytes_with_limits_and_package_limits(
             bytes,
             media_limits,
             package_limits,
