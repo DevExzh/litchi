@@ -69,11 +69,12 @@ not an “accepted” API exception.
 
 ## Confirmed debt in the owned ODF family (W6)
 
-### `SourceMemberReaderError` has six pure public aliases
+### `SourceMemberReaderError` aliases removed in 0362rda
 
-`crates/litchi-odf-common/src/core/package.rs:123-191` exposes the canonical
-accessors `core`, `callback`, `into_core` and `into_callback`. It additionally
-publishes these six methods whose documentation calls them aliases:
+Before 0362rda, `crates/litchi-odf-common/src/core/package.rs:123-191`
+exposed the canonical accessors `core`, `callback`, `into_core` and
+`into_callback`, plus these six methods whose documentation called them
+aliases:
 
 | Alias | Canonical method |
 |---|---|
@@ -84,12 +85,12 @@ publishes these six methods whose documentation calls them aliases:
 | `into_error` | `into_core` |
 | `into_callback_error` | `into_callback` |
 
-The type is re-exported from `litchi-odf-common` (`src/lib.rs:35-37`) and is
+The type is re-exported from `litchi-odf-common` (`src/lib.rs:35-37`) and was
 therefore part of every ODF leaf's shared public API. A workspace search found
-no consumer call to these six methods; the existing source-member test matches
-the canonical enum variants. The atomic change is to remove the six methods,
-keep the four canonical accessors, and update the public API check. This is an
-ODF change, not a generic ZIP exception.
+no consumer call to the six methods; the existing source-member test matches
+the canonical enum variants. 0362rda removes the six methods, keeps the four
+canonical accessors, and registers the exact-method bans in the ODF common API
+profile. This is an ODF change, not a generic ZIP exception.
 
 ### The public ODF archive codec has an unbounded constructor path
 
@@ -135,7 +136,8 @@ raw limits shape rather than left as a second spelling.
 
 ### ODF writer limits: canonical re-export versus an owned wrapper
 
-`crates/litchi-odf-common/src/core/writer.rs:222-227` publicly defines
+Before 0362rda, `crates/litchi-odf-common/src/core/writer.rs:222-227`
+publicly defined
 
 ```rust
 pub use soapberry_zip::office::StreamingArchiveLimits as PackageWriterLimits;
@@ -154,16 +156,16 @@ the ODF re-export (`writer.rs:222-227`). It is `Copy`, so an owned newtype would
 not allocate, but it would add field conversions, builders/accessors and another
 public vocabulary without adding an ODF dimension.
 
-The zero-cost canonical choice is therefore to re-export
-`StreamingArchiveLimits` without renaming it and migrate the ODF consumers to
-that one name. This is the same kind of canonical sharing that 0351 permits for
-ODF `OpenOptions`; it is not a retained compatibility alias. An ODF-owned
-wrapper remains an option only if the owner deliberately adds semantics that
-the transport type cannot express. Production streaming consumers are in the
-ODF common writer and in `litchi-odt/src/streaming.rs`,
-`litchi-ods/src/streaming.rs` and `litchi-odp/src/streaming.rs`. A search finds
-ten source/test files naming `PackageWriterLimits` and fifteen files naming
-`with_writer_and_limits`.
+The zero-cost canonical choice landed in 0362rda: the ODF core module now
+re-exports `StreamingArchiveLimits` without renaming it, and every ODF
+consumer uses that one name. This is the same kind of canonical sharing that
+0351 permits for ODF `OpenOptions`; it is not a retained compatibility alias.
+An ODF-owned wrapper remains an option only if the owner deliberately adds
+semantics that the transport type cannot express. Before the migration,
+production streaming consumers were in the ODF common writer and in
+`litchi-odt/src/streaming.rs`, `litchi-ods/src/streaming.rs` and
+`litchi-odp/src/streaming.rs`; the search found ten source/test files naming
+`PackageWriterLimits` and fifteen files naming `with_writer_and_limits`.
 
 There is a separate, factual foreign-error leak. The public ODF
 `PackageWriterError` has `Archive(soapberry_zip::Error)` and
@@ -330,13 +332,13 @@ do not by themselves expand the current ODF owner scope.
 
 ## Atomic lane proposal and required evidence
 
-1. **W6 ODF raw/alias lane:** remove the six source-member aliases; make
-   archive/manifest limits caller-selected and required; canonicalize the
-   writer limit re-export (an unchanged `StreamingArchiveLimits` re-export is
-   sufficient unless ODF adds distinct semantics); decide the writer error
-   boundary and default policy; migrate the named ODF and ops callers; run ODF
-   round-trip/parser-hardening, streaming and facade tests; measure memory and
-   output performance.
+1. **W6 ODF raw/alias lane:** 0362rda removes the six source-member aliases,
+   canonicalizes the writer limit re-export and migrates every named ODF
+   consumer. The remaining lane work is to make archive/manifest limits
+   caller-selected where the public raw/codec contract requires it, decide the
+   writer error boundary and default policy, then run ODF
+   round-trip/parser-hardening, streaming and facade tests and measure memory
+   and output performance.
 2. **W5 domain alias lane:** remove the two `Revision::fingerprint`
    methods and `ole1::Snapshot`; migrate all consumers and glossary rows with
    no CFB/ZIP exception.

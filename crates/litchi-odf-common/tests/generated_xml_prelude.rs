@@ -9,7 +9,7 @@
 use litchi_core::Error;
 use litchi_odf_common::core::{
     GeneratedXmlEnvelope, GeneratedXmlLimitResource as Resource, GeneratedXmlLimits,
-    GeneratedXmlReport, PackageWriter, PackageWriterError, PackageWriterLimits,
+    GeneratedXmlReport, PackageWriter, PackageWriterError, StreamingArchiveLimits,
 };
 use soapberry_zip::office::ArchiveReader;
 use std::cell::{Cell, RefCell};
@@ -396,9 +396,9 @@ fn composed_prelude_limits_are_inclusive_and_one_under() {
 
 #[test]
 fn archive_admission_refusal_does_not_pull_a_prelude_fragment() {
-    let limits = PackageWriterLimits {
+    let limits = StreamingArchiveLimits {
         max_entries: 1,
-        ..PackageWriterLimits::default()
+        ..StreamingArchiveLimits::default()
     };
     let accepted = Rc::new(RefCell::new(Vec::new()));
     let mut writer =

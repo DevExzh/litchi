@@ -130,18 +130,6 @@ impl<E> SourceMemberReaderError<E> {
         }
     }
 
-    /// Alias for [`Self::core`].
-    #[must_use]
-    pub fn core_error(&self) -> Option<&Error> {
-        self.core()
-    }
-
-    /// Alias for [`Self::core`] using the conventional `error` name.
-    #[must_use]
-    pub fn error(&self) -> Option<&Error> {
-        self.core()
-    }
-
     /// Return the callback failure, including one retained by a primary
     /// source or archive failure.
     #[must_use]
@@ -152,12 +140,6 @@ impl<E> SourceMemberReaderError<E> {
         }
     }
 
-    /// Alias for [`Self::callback`].
-    #[must_use]
-    pub fn callback_error(&self) -> Option<&E> {
-        self.callback()
-    }
-
     /// Extract the primary common-core error, if present.
     pub fn into_core(self) -> Option<Error> {
         match self {
@@ -166,27 +148,12 @@ impl<E> SourceMemberReaderError<E> {
         }
     }
 
-    /// Alias for [`Self::into_core`].
-    pub fn into_core_error(self) -> Option<Error> {
-        self.into_core()
-    }
-
-    /// Alias for [`Self::into_core`] using the conventional `error` name.
-    pub fn into_error(self) -> Option<Error> {
-        self.into_core()
-    }
-
     /// Extract the callback failure, if one was returned.
     pub fn into_callback(self) -> Option<E> {
         match self {
             Self::Core { callback_error, .. } => callback_error,
             Self::Callback(error) => Some(error),
         }
-    }
-
-    /// Alias for [`Self::into_callback`].
-    pub fn into_callback_error(self) -> Option<E> {
-        self.into_callback()
     }
 }
 
