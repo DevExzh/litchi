@@ -1197,6 +1197,7 @@ impl Patch {
     /// identity, so a subsequent raw edit cannot inherit the author's fence.
     pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
         self.check_content(source)?;
+        source.check_execution()?;
         self.rebased_target(source)
     }
 
@@ -5137,6 +5138,7 @@ impl GlossaryBatchPatch {
     /// checks separately.
     pub fn apply(&self, source: &GlossaryBatchSnapshot) -> Result<GlossaryBatchSnapshot> {
         self.check_content(source)?;
+        source.check_execution()?;
         self.rebased_target(source)
     }
 
