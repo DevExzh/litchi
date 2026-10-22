@@ -675,6 +675,53 @@ fn source_backed_commit_exact_noop_unknown_stream_and_atomic_save() {
     assert_eq!(read_value(&saved, 0, 0).author(), "Author 9");
 }
 
+fn source_backed_bytes(workbook: &litchi_xls::SourceBackedWorkbook) -> Vec<u8> {
+    let mut output = Vec::new();
+    workbook.write_to(&mut output).unwrap();
+    output
+}
+
+#[test]
+fn source_backed_replay_matches_independent_content_and_preserves_inverse() {
+    let source = authored(1);
+    let snapshot = Snapshot::from_bytes(source.clone()).unwrap();
+    let mut edit = source_workbook(&source).edit_comments().unwrap();
+    edit.replace(
+        Selector::Position(Position::new(0)),
+        Reference::new(0, 1).unwrap(),
+        Value::new("Author 9", "text 9").unwrap(),
+    )
+    .unwrap();
+    let commit = edit.commit().unwrap();
+    let target = source_backed_bytes(commit.package());
+
+    // The recipient is a separately opened equal-content owner with a
+    // stricter, explicitly retained input policy. Content authentication must
+    // accept it without borrowing the originating owner's context.
+    let strict = litchi_xls::SourceBackedWorkbook::from_read_at_with_options(
+        std::sync::Arc::new(litchi_core::OwnedSource::new(source.clone())),
+        litchi_xls::SourceBackedOptions::new().limits(
+            litchi_xls::SourceBackedLimits::default()
+                .with_max_input_bytes(u64::try_from(source.len()).unwrap()),
+        ),
+    )
+    .unwrap();
+    let applied = strict.apply_comments(commit.patch()).unwrap();
+    assert_eq!(source_backed_bytes(applied.package()), target);
+
+    let target_owner = source_workbook(&target);
+    let restored = target_owner
+        .apply_comments(&commit.patch().inverse())
+        .unwrap();
+    assert_eq!(source_backed_bytes(restored.package()), snapshot.bytes());
+
+    let wrong = source_workbook(&authored(2));
+    assert!(matches!(
+        wrong.apply_comments(commit.patch()),
+        Err(litchi_xls::Error::PatchConflict { .. })
+    ));
+}
+
 struct ShortSink {
     bytes: Vec<u8>,
     maximum: usize,

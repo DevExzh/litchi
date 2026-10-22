@@ -21,7 +21,8 @@ use crate::records::{
 use crate::{SheetKind, SheetVisibility, raw::Reader};
 use litchi_biff::{Limits as BiffLimits, RecordRef, Records as BiffRecords};
 use litchi_cfb::{
-    OleError, SharedOleFile, SharedOleFileLimits, SharedOleStreamCursor, StreamChainHint,
+    ArtifactFingerprint, OleError, SharedOleFile, SharedOleFileLimits, SharedOleStreamCursor,
+    StreamChainHint, ValidatedOverlayPlan,
 };
 #[cfg(any(unix, windows))]
 use litchi_core::FileSource;
@@ -486,7 +487,7 @@ struct SourceInner {
     cursor_checks: Box<[std::sync::OnceLock<cursor::Check>]>,
     /// The checked overlay plan a committed source-backed family edit
     /// (`crate::source_backed`) writes; reads go through its composed source.
-    pending: Option<Arc<litchi_cfb::ValidatedOverlayPlan>>,
+    pending: Option<Arc<ValidatedOverlayPlan>>,
 }
 
 impl SourceInner {
@@ -1303,7 +1304,7 @@ impl SourceBackedWorkbook {
     /// The workbook a source-backed family commit publishes: opened under
     /// this workbook's options over the composed source of `plan`, writing
     /// `plan` on output. Nothing is written here.
-    pub(crate) fn committed(&self, plan: litchi_cfb::ValidatedOverlayPlan) -> Result<Self> {
+    pub(crate) fn committed(&self, plan: ValidatedOverlayPlan) -> Result<Self> {
         if plan.is_noop() {
             return Ok(self.clone());
         }
@@ -1321,6 +1322,67 @@ impl SourceBackedWorkbook {
     /// Whether two handles are shares of one opened (or committed) workbook.
     pub(crate) fn same_workbook(&self, other: &Self) -> bool {
         Arc::ptr_eq(&self.inner, &other.inner)
+    }
+
+    /// Authenticate the exact artifact this owner would publish without
+    /// retaining a second workbook buffer. The identity includes the complete
+    /// artifact length and SHA-256 digest. Committed owners stream their
+    /// checked overlay; opened owners use the CFB identity scan bracketed by
+    /// the owner source fences.
+    pub(crate) fn replay_identity(&self) -> crate::Result<(u64, ArtifactFingerprint)> {
+        self.ensure_current()
+            .map_err(crate::source_backed::workbook_error)?;
+        let identity = match &self.inner.pending {
+            Some(plan) => {
+                let mut sink = io::sink();
+                let fingerprint = plan
+                    .write_to(&mut sink)
+                    .map_err(crate::source_backed::overlay_error)?
+                    .target_fingerprint();
+                (plan.operation_shape().source_bytes, fingerprint)
+            },
+            None => {
+                let first = self
+                    .inner
+                    .cfb
+                    .caller_bracketed_identity_fingerprint()
+                    .map_err(crate::source_backed::overlay_error)?;
+                let second = self
+                    .inner
+                    .cfb
+                    .caller_bracketed_identity_fingerprint()
+                    .map_err(crate::source_backed::overlay_error)?;
+                if first != second {
+                    return Err(Error::Io(io::Error::other(
+                        "source changed during source-backed replay",
+                    )));
+                }
+                (self.inner.cfb.file_size(), first)
+            },
+        };
+        self.ensure_current()
+            .map_err(crate::source_backed::workbook_error)?;
+        Ok(identity)
+    }
+
+    pub(crate) fn pending_plan(&self) -> Option<&ValidatedOverlayPlan> {
+        self.inner.pending.as_deref()
+    }
+
+    /// Rebase a source-backed overlay onto this workbook's source and policy.
+    pub(crate) fn rebase_plan(
+        &self,
+        plan: &ValidatedOverlayPlan,
+        inverse: bool,
+    ) -> crate::Result<Self> {
+        let plan = if inverse {
+            plan.inverse_rebased_to(&self.inner.cfb)
+        } else {
+            plan.rebase_to(&self.inner.cfb)
+        }
+        .map_err(crate::source_backed::overlay_error)?;
+        self.committed(plan)
+            .map_err(crate::source_backed::workbook_error)
     }
 
     /// Streams this workbook's exact bytes: the source for an opened

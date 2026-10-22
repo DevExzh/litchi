@@ -934,6 +934,132 @@ impl ValidatedOverlayPlan {
         self.target_fingerprint
     }
 
+    /// Rebind this checked overlay to an independently opened source with the
+    /// same complete artifact content. The physical spans and their target
+    /// fingerprint remain valid because the recipient bytes are authenticated
+    /// before the plan is returned.
+    pub fn rebase_to(&self, recipient: &SharedOleFile) -> Result<Self, OverlayError> {
+        recipient.check_source_version()?;
+        let source = recipient.plan_source_snapshot();
+        source.ensure_length()?;
+        if source.length != self.source.length {
+            return Err(unavailable(
+                "overlay recipient length differs from the recorded source",
+            ));
+        }
+        let (source_fingerprint, target_fingerprint) = fingerprints(&source, &self.spans)?;
+        if source_fingerprint != self.source_fingerprint {
+            return Err(OverlayError::SourceFingerprintChanged {
+                expected: self.source_fingerprint,
+                observed: source_fingerprint,
+            });
+        }
+        if target_fingerprint != self.target_fingerprint {
+            return Err(OverlayError::TargetFingerprintChanged {
+                expected: self.target_fingerprint,
+                observed: target_fingerprint,
+            });
+        }
+        if !source.source_is_owned_immutable {
+            let (observed_source, observed_target) = fingerprints(&source, &self.spans)?;
+            if observed_source != source_fingerprint {
+                return Err(OverlayError::SourceFingerprintChanged {
+                    expected: source_fingerprint,
+                    observed: observed_source,
+                });
+            }
+            if observed_target != target_fingerprint {
+                return Err(OverlayError::TargetFingerprintChanged {
+                    expected: target_fingerprint,
+                    observed: observed_target,
+                });
+            }
+        }
+        Ok(Self {
+            source,
+            spans: self.spans.clone(),
+            source_fingerprint,
+            target_fingerprint,
+        })
+    }
+
+    /// Build the exact inverse overlay on an independently opened target.
+    /// Original bytes are retained only for the changed physical spans, so
+    /// inverse replay does not materialize either complete workbook.
+    pub fn inverse_rebased_to(&self, recipient: &SharedOleFile) -> Result<Self, OverlayError> {
+        self.preflight_fingerprints()?;
+        let mut inverse_spans = Vec::new();
+        inverse_spans
+            .try_reserve_exact(self.spans.len())
+            .map_err(|source| OverlayError::Allocation {
+                resource: "CFB inverse overlay spans",
+                source,
+            })?;
+        for span in &self.spans {
+            let length = span.len();
+            let mut original = Vec::new();
+            original
+                .try_reserve_exact(length)
+                .map_err(|source| OverlayError::Allocation {
+                    resource: "CFB inverse overlay bytes",
+                    source,
+                })?;
+            original.resize(length, 0);
+            self.source.read_exact(span.offset, &mut original)?;
+            inverse_spans.push(PhysicalSpan {
+                offset: span.offset,
+                replacement: Arc::from(original.into_boxed_slice()),
+                replacement_range: 0..length,
+            });
+        }
+        if !self.source.source_is_owned_immutable {
+            self.preflight_fingerprints()?;
+        }
+
+        recipient.check_source_version()?;
+        let source = recipient.plan_source_snapshot();
+        source.ensure_length()?;
+        if source.length != self.source.length {
+            return Err(unavailable(
+                "overlay inverse recipient length differs from the recorded target",
+            ));
+        }
+        let (source_fingerprint, target_fingerprint) = fingerprints(&source, &inverse_spans)?;
+        if source_fingerprint != self.target_fingerprint {
+            return Err(OverlayError::SourceFingerprintChanged {
+                expected: self.target_fingerprint,
+                observed: source_fingerprint,
+            });
+        }
+        if target_fingerprint != self.source_fingerprint {
+            return Err(OverlayError::TargetFingerprintChanged {
+                expected: self.source_fingerprint,
+                observed: target_fingerprint,
+            });
+        }
+        if !source.source_is_owned_immutable {
+            let (observed_source, observed_target) = fingerprints(&source, &inverse_spans)?;
+            if observed_source != source_fingerprint {
+                return Err(OverlayError::SourceFingerprintChanged {
+                    expected: source_fingerprint,
+                    observed: observed_source,
+                });
+            }
+            if observed_target != target_fingerprint {
+                return Err(OverlayError::TargetFingerprintChanged {
+                    expected: target_fingerprint,
+                    observed: observed_target,
+                });
+            }
+        }
+        Ok(Self {
+            source,
+            spans: inverse_spans,
+            source_fingerprint,
+            target_fingerprint,
+        })
+    }
+
     /// Returns a checked, read-only positional view of the composed target.
     ///
     /// Planning has already reopened the complete candidate through the normal

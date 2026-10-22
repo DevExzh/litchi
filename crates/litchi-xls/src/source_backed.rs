@@ -21,12 +21,37 @@
 //! work on the committed workbook.
 //!
 //! A family [`cells::Patch`] (likewise `comments::Patch`,
-//! `sheet_visibility::Patch`) is an exact pair: it replays onto a share of the
-//! workbook it was committed on, its inverse onto a share of the commit's
-//! workbook (restoring the source workbook), and refuses any other workbook
+//! `sheet_visibility::Patch`) is an exact pair: it replays onto the recorded
+//! source content, including an independently opened equal-content workbook,
+//! and its inverse onto the recorded target content. Other content is refused
 //! with [`crate::Error::PatchConflict`].
 
 use crate::SourceBackedWorkbook;
+use std::io;
+
+pub(crate) fn overlay_error(error: litchi_cfb::OverlayError) -> crate::Error {
+    match error {
+        litchi_cfb::OverlayError::Ole(error) => crate::Error::Cfb(error),
+        litchi_cfb::OverlayError::Io(error) => crate::Error::Io(error),
+        litchi_cfb::OverlayError::SourceChanged { .. }
+        | litchi_cfb::OverlayError::SourceFingerprintChanged { .. }
+        | litchi_cfb::OverlayError::TargetFingerprintChanged { .. } => {
+            crate::Error::Io(io::Error::new(
+                io::ErrorKind::Other,
+                "source changed during source-backed replay",
+            ))
+        },
+        litchi_cfb::OverlayError::PreconditionFailed { .. } => crate::Error::PatchConflict {
+            operation: "source-backed replay",
+            reason: "the recipient content differs from the recorded patch",
+        },
+        litchi_cfb::OverlayError::Allocation { resource, .. } => crate::Error::Allocation(resource),
+        litchi_cfb::OverlayError::Unavailable { reason } => crate::Error::InvalidData(reason),
+        litchi_cfb::OverlayError::IncompleteOutput { source, .. } => overlay_error(*source),
+        litchi_cfb::OverlayError::Committed { source } => crate::Error::Io(source),
+        _ => crate::Error::Internal("source-backed overlay replay failed"),
+    }
+}
 
 /// Declare a source-backed family's `Patch`, `Commit`, `LimitKind` and the
 /// shared publication and replay helpers over its `Diagnostics`.
@@ -101,17 +126,38 @@ macro_rules! source_family {
         }
 
         fn replay(workbook: &crate::SourceBackedWorkbook, patch: &Patch) -> crate::Result<Commit> {
-            if !workbook.same_workbook(&patch.before) {
+            if workbook.same_workbook(&patch.before) {
+                return Ok(Commit::new(
+                    patch.after.clone(),
+                    patch.clone(),
+                    patch.diagnostics,
+                ));
+            }
+            if workbook.replay_identity()? != patch.before.replay_identity()? {
                 return Err(crate::Error::PatchConflict {
                     operation: $operation,
-                    reason: "the patch was made from another workbook",
+                    reason: "the patch recipient has different workbook content",
                 });
             }
-            Ok(Commit::new(
-                patch.after.clone(),
-                patch.clone(),
-                patch.diagnostics,
-            ))
+            if !patch.diagnostics.changed() {
+                return Ok(Commit::new(
+                    workbook.clone(),
+                    patch.clone(),
+                    patch.diagnostics,
+                ));
+            }
+            let (plan, inverse) = if let Some(plan) = patch.after.pending_plan() {
+                (plan, false)
+            } else if let Some(plan) = patch.before.pending_plan() {
+                (plan, true)
+            } else {
+                return Err(crate::Error::PatchConflict {
+                    operation: $operation,
+                    reason: "the patch has no source-backed publication plan",
+                });
+            };
+            let after = workbook.rebase_plan(plan, inverse)?;
+            Ok(Commit::new(after, patch.clone(), patch.diagnostics))
         }
     };
 }
@@ -168,6 +214,9 @@ pub(crate) fn workbook_error(error: crate::SourceBackedError) -> crate::Error {
         crate::SourceBackedError::Parse(error) => error,
         crate::SourceBackedError::Cfb(error) => crate::Error::Cfb(error),
         crate::SourceBackedError::Io(error) => crate::Error::Io(error),
+        crate::SourceBackedError::SourceChanged { .. } => crate::Error::Io(io::Error::other(
+            "source changed during source-backed replay",
+        )),
         _ => crate::Error::Internal("the committed source-backed workbook could not be reopened"),
     }
 }
