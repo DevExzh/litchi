@@ -14,6 +14,11 @@ uses the same generic path; the main-document owner path had the same bypass.
 - `restored` now retains the recipient package's semantic limits and physical
   read limits, and rejects a restored artifact whose length exceeds the
   recipient input ceiling before installing deferred output.
+- A restored owner is rebuilt even when either endpoint is already deferred or
+  effective; cloning a producer's deferred owner would leak its execution
+  context. First materialization of a managed deferred artifact now reopens
+  the moved bytes with the retained recipient execution context, while the
+  unmanaged path keeps the existing zero-copy owned-vector admission.
 - The generic source-backed replay fast path and the main-document owner fast
   path require equal semantic policy with the recorded `before` package. A
   recipient with narrower semantic policy goes through `Change::publish`,

@@ -11,7 +11,8 @@
 use std::io::Write;
 use std::sync::{Arc, OnceLock};
 
-use litchi_opc::{SourceBackedPackage, SourceLimitKind, SourceLimits};
+use litchi_core::OwnedSource;
+use litchi_opc::{SourceBackedPackage, SourceLimitKind, SourceLimits, SourceReadPolicy};
 
 use super::Package;
 use crate::{Error, Result};
@@ -47,7 +48,22 @@ impl Deferred {
                 reason: format!("materializing a committed source-backed package: {other}"),
             },
         })?;
-        let package = SourceBackedPackage::from_vec_with_limits(bytes, self.limits)?;
+        // Preserve a managed recipient's execution context when the deferred
+        // artifact is first admitted. The owned-vector constructor is the
+        // zero-copy unmanaged path; reopening the same moved bytes through the
+        // explicit context constructor keeps cancellation, work and output
+        // accounting attached to the recipient for later exact restoration.
+        let package = match self.base.execution_context() {
+            Some(context) =>
+                SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_source_read_policy_and_execution_context(
+                    Arc::new(OwnedSource::new(bytes)),
+                    self.limits,
+                    Default::default(),
+                    SourceReadPolicy::exact(),
+                    context,
+                )?,
+            None => SourceBackedPackage::from_vec_with_limits(bytes, self.limits)?,
+        };
         Ok(self.materialized.get_or_init(|| package))
     }
 
@@ -155,18 +171,18 @@ impl Package {
         Ok(self.output_artifact()? == other.output_artifact()?)
     }
 
-    /// The package that restores `after` over `self`, a package writing
-    /// exactly `before`'s artifact (record 0355a).
+    /// The package that restores `after` over `self`, writing the exact
+    /// artifact admitted from `after` (record 0355a).
     ///
-    /// A share of `before` gets `after` itself. A reopened copy of an
-    /// opened archive restoring an opened archive streams the original
-    /// artifact through `self`'s execution context: output is charged to
-    /// it, and both artifacts are authenticated again as they are written
-    /// (`SourceArtifactMismatch` before any byte otherwise).
-    pub(crate) fn restored(&self, before: &Self, after: &Self) -> Result<Self> {
-        if self.same_owner(before) || !self.is_opened() || !after.is_opened() {
-            return Ok(after.clone());
-        }
+    /// A matching recipient streams the original artifact through `self`'s
+    /// execution context: output is charged to it, and both artifacts are
+    /// authenticated again as they are written (`SourceArtifactMismatch`
+    /// before any byte otherwise).
+    pub(crate) fn restored(&self, after: &Self) -> Result<Self> {
+        // Rebuild the deferred owner from the recipient even when either
+        // endpoint is already deferred or effective. Cloning `after` here
+        // would retain its producer execution context, source limits and
+        // semantic policy, bypassing the recipient boundary.
         let current = self.physical_source()?.clone();
         let recipient_read_limits = current.read_limits();
         let original = after.physical_source()?.source_artifact();
@@ -204,11 +220,6 @@ impl Package {
             fingerprint: OnceLock::from((proof.original_len, proof.original_sha256.into_sha256())),
         }));
         Ok(next)
-    }
-
-    /// Whether the package writes its opened source archive unchanged.
-    fn is_opened(&self) -> bool {
-        self.effective.is_none() && self.deferred.is_none()
     }
 
     /// Whether `self` and `other` are shares of one package (the same
@@ -347,7 +358,7 @@ macro_rules! source_family {
                 && package.same_artifact(before)?
             {
                 return Ok(Commit::new(
-                    package.restored(before, after)?,
+                    package.restored(after)?,
                     patch.clone(),
                     ($report)(&patch.change),
                 ));

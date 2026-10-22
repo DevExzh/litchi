@@ -132,9 +132,7 @@ impl Package {
                 .same_artifact(before)
                 .map_err(crate::document::Error::from)?
         {
-            return self
-                .restored(before, after)
-                .map_err(crate::document::Error::from);
+            return self.restored(after).map_err(crate::document::Error::from);
         }
         let result = (|| {
             let (name, current) = self.main_document_snapshot_with_before(
