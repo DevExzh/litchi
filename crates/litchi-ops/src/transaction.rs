@@ -452,7 +452,13 @@ impl File {
             let identity = Arc::new(());
             let mut edit = Edit {
                 identity: Arc::clone(&identity),
-                current: self.clone(),
+                // Coalescers operate on the format leaf.  A signed facade
+                // keeps the same signed disposition on that leaf, while the
+                // outer wrapper is restored by the no-op collapse below.
+                // Keeping the facade variant here would bypass every leaf
+                // coalescer and reject a cancelled edit before its final
+                // content comparison.
+                current: transaction_owner(self),
                 steps: Vec::new(),
                 limits,
                 failure: None,
@@ -4001,6 +4007,22 @@ fn admit(file: &File) -> Result<()> {
         _ => check_source(file),
     }
 }
+
+/// Return the format owner used while staging an explicit transaction.
+///
+/// The signed facade is a read-only wrapper around a format leaf.  The leaf
+/// keeps its signed disposition, so it still enforces source freshness and
+/// the final changed-publication fence.  Staging against that leaf lets the
+/// format coalescer see a cancellation (change followed by restoration),
+/// while [`File::edit`] returns the original facade when the complete
+/// transaction is a no-op.
+fn transaction_owner(file: &File) -> File {
+    match file {
+        File::Signed(signed) => signed.file().clone(),
+        _ => file.clone(),
+    }
+}
+
 fn check_source(file: &File) -> Result<()> {
     // Source freshness wins over the protected-state classification.  The
     // leaf checks below deliberately validate the retained owner without

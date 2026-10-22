@@ -49,6 +49,8 @@ pub(crate) struct Plan {
     anchor: Option<litchi_ppt::Anchor>,
     changed: bool,
     staged_bytes: usize,
+    /// Original shape text retained for a signed cancellation proof.
+    original_text: Option<String>,
 }
 
 impl Plan {
@@ -89,6 +91,7 @@ pub(crate) struct Run {
     max_expanded_targets: usize,
     limits: SemanticLimits,
     scene: Option<SceneCache>,
+    allow_repeated: bool,
 }
 
 const NATIVE_MAX_OPERATIONS: usize = litchi_ppt::package::edit::MAX_OPERATIONS;
@@ -97,8 +100,8 @@ impl Run {
     /// Start a source-checked native edit and preflight the retained snapshot
     /// lower bound before the native editor captures its before image.
     pub(crate) fn new(base: &Ppt, limits: &SemanticLimits) -> Result<Self> {
-        base.check_source()?;
-        let package = base.editable_package()?;
+        base.check_source_for_write()?;
+        let package = base.editable_package_for_write()?;
         let before_bytes =
             usize::try_from(package.shared_ole_file().file_size()).unwrap_or(usize::MAX);
         let minimum = before_bytes.saturating_add(size_of::<litchi_ppt::Patch>());
@@ -106,7 +109,7 @@ impl Run {
             return Err(snapshot_limit(minimum, limits.max_snapshot_bytes()));
         }
         let edit = package.edit().map_err(native_edit_error)?;
-        base.check_source()?;
+        base.check_source_for_write()?;
         Ok(Self {
             base: base.clone(),
             source: package,
@@ -120,6 +123,7 @@ impl Run {
             max_expanded_targets: limits.max_expanded_targets(),
             limits: *limits,
             scene: None,
+            allow_repeated: base.signature() == crate::format::signature::Signature::Signed,
         })
     }
 
@@ -143,6 +147,7 @@ impl Run {
     /// Close the run before a repeated native target or any aggregate limit.
     pub(crate) fn requires_barrier(&self, plan: &Plan, _limits: &SemanticLimits) -> bool {
         self.seen.contains(&plan.key())
+            && !(self.allow_repeated && plan.text.is_some() && plan.anchor.is_none())
             || self
                 .target_count
                 .checked_add(1)
@@ -166,7 +171,7 @@ impl Run {
             )
             .with_format(FileFormat::Ppt));
         }
-        self.base.check_source()?;
+        self.base.check_source_for_write()?;
         self.items
             .try_reserve(1)
             .map_err(|source| TransactionError::Allocation { source })?;
@@ -184,7 +189,7 @@ impl Run {
             .native_operations
             .saturating_add(plan.native_operations());
         self.items.push(Item { plan, index });
-        self.base.check_source()?;
+        self.base.check_source_for_write()?;
         Ok(changed)
     }
 
@@ -198,20 +203,57 @@ impl Run {
             mut edit,
             items,
             limits,
+            allow_repeated: _,
             ..
         } = self;
-        base.check_source()?;
+        let logical_noop = logical_noop(&items);
+        base.check_source_for_write()?;
         let result = (|| {
             stage_all(&mut edit, &items)?;
             let native = edit.commit().map_err(native_edit_error)?;
             super::finish_commit(&base, native, &limits)
-        })();
-        let freshness = base.check_source();
+        })()
+        .map(|mut commit| {
+            if logical_noop {
+                commit.after = base.clone();
+            }
+            commit
+        });
+        let freshness = base.check_source_for_write();
         match freshness.and(result) {
             Ok(commit) => Ok((commit.before.clone(), commit)),
             Err(error) => Err(locate_failure(&base, &source, &items, error)),
         }
     }
+}
+
+/// Compare the final direct text assignment for each shape with the text read
+/// from the immutable run base.  Geometry and mixed plans intentionally fail
+/// this proof until their complete native state is retained in the plan.
+fn logical_noop(items: &[Item]) -> bool {
+    let mut originals = std::collections::HashMap::<(usize, usize), String>::new();
+    let mut finals = std::collections::HashMap::<(usize, usize), String>::new();
+    for item in items {
+        let plan = &item.plan;
+        let Some(original) = plan.original_text.as_ref() else {
+            return false;
+        };
+        if plan.anchor.is_some() {
+            return false;
+        }
+        let key = plan.key();
+        originals
+            .entry((key.0, key.1))
+            .or_insert_with(|| original.clone());
+        let Some(text) = plan.text.as_ref() else {
+            return false;
+        };
+        finals.insert((key.0, key.1), text.clone());
+    }
+    !finals.is_empty()
+        && finals
+            .into_iter()
+            .all(|(key, value)| originals.get(&key) == Some(&value))
 }
 
 /// Admit one direct shape path. `None` is a deliberate barrier signal: the
@@ -319,6 +361,11 @@ pub(crate) fn shape_plan(
     } else {
         false
     };
+    let original_text = values
+        .text
+        .as_ref()
+        .map(|_| shape.text().map_err(Error::from))
+        .transpose()?;
     let text = values.text;
     let anchor = if has_geometry {
         let source = Arc::clone(&cached.source);
@@ -342,6 +389,7 @@ pub(crate) fn shape_plan(
         anchor,
         changed,
         staged_bytes,
+        original_text,
     }))
 }
 
@@ -387,7 +435,10 @@ fn direct_path(path: &Path<'_>) -> Option<(usize, DirectKind, usize)> {
 }
 
 fn stage_all(edit: &mut litchi_ppt::package::edit::Edit, items: &[Item]) -> Result<()> {
-    let text_only = items.iter().all(|item| item.plan.anchor.is_none());
+    let text_only = items.iter().all(|item| item.plan.anchor.is_none()) && {
+        let mut targets = HashSet::new();
+        items.iter().all(|item| targets.insert(item.plan.key()))
+    };
     if text_only {
         let mut replacements = Vec::new();
         replacements
@@ -474,7 +525,7 @@ fn locate_failure(base: &Ppt, source: &litchi_ppt::Package, items: &[Item], erro
             },
         }
     }
-    base.check_source()
+    base.check_source_for_write()
         .map(|_| failure.with_item(items[high - 1].index))
         .unwrap_or_else(|freshness| freshness.with_item(first.index))
 }

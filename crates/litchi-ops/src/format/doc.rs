@@ -134,6 +134,13 @@ impl Doc {
         Ok(())
     }
 
+    /// Check retained-source freshness for a mutation that may still prove an
+    /// exact signed no-op. A changed native result is rejected at publish,
+    /// after the editor establishes whether the request changed bytes.
+    pub(crate) fn check_source_for_write(&self) -> Result<()> {
+        self.check_source()
+    }
+
     /// Whether two handles point at the same retained source snapshot.  Byte
     /// equality is intentionally insufficient for transaction history: a
     /// separately opened document with identical bytes is still foreign.
@@ -369,6 +376,33 @@ impl Doc {
             return Ok(None);
         };
         if self.0.signature() == Signature::RemovalAuthorized {
+            let bytes = signature::unsign_compound_file(
+                package.to_bytes()?,
+                litchi_sign::cfb::Format::Doc,
+            )?;
+            return Ok(Some(litchi_doc::Package::from_bytes_with_options(
+                &bytes,
+                litchi_doc::OpenOptions::default()
+                    .source_limits(package.source_limits())
+                    .leniency(package.leniency()),
+            )?));
+        }
+        Ok(Some(package.clone()))
+    }
+
+    /// Return the retained native owner for a setter that may prove an exact
+    /// signed no-op. Removal-authorized handles still explicitly remove the
+    /// signature before publishing; a signed handle keeps its original
+    /// compound source until a changed result is refused.
+    pub(crate) fn editable_package_for_write(&self) -> Result<Option<litchi_doc::Package>> {
+        self.check_source_for_write()?;
+        let DocSource::Retained(package) = &self.0.source else {
+            return Ok(None);
+        };
+        if matches!(
+            self.0.signature(),
+            Signature::Signed | Signature::RemovalAuthorized
+        ) {
             let bytes = signature::unsign_compound_file(
                 package.to_bytes()?,
                 litchi_sign::cfb::Format::Doc,

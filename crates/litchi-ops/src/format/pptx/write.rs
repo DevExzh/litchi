@@ -190,11 +190,26 @@ impl Pptx {
         props: impl IntoProps<'v>,
         limits: &SemanticLimits,
     ) -> Result<Commit> {
-        self.check_source()?;
+        if self.signature() == crate::format::signature::Signature::Signed {
+            self.check_source_for_replay()?;
+        } else {
+            self.check_source()?;
+        }
         let result = (|| self.set_inner(target, Props::from_props(props)?, limits))()
             .map_err(|error| error.with_format(FileFormat::Pptx));
-        self.check_source()?;
-        result
+        if self.signature() == crate::format::signature::Signature::Signed {
+            self.check_source_for_replay()?;
+            result.and_then(|commit| {
+                if commit.after.same_snapshot(self) {
+                    Ok(commit)
+                } else {
+                    Err(Error::signed(FileFormat::Pptx))
+                }
+            })
+        } else {
+            self.check_source()?;
+            result
+        }
     }
     fn set_inner(
         &self,
@@ -388,7 +403,11 @@ impl Pptx {
         }
         targets.sort_unstable_by_key(|target| (target.slide, target.position));
         let body_edits = body_edits(&targets, text, &values.format)?;
-        let source = self.editable_owner()?;
+        let source = if self.signature() == crate::format::signature::Signature::Signed {
+            self.editable_owner_for_write()?
+        } else {
+            self.editable_owner()?
+        };
         let mut operations = 0;
         let (target, proof, changed) = match &source {
             Editable::Source(package) => {

@@ -134,14 +134,17 @@ impl Xlsb {
     /// Publish one leaf feature commit: the new package (or this handle for
     /// an exact no-op) and the history images.
     fn publish(&self, package: xlsb::Package, retained: usize, parts: usize) -> Result<Commit> {
-        self.check_source()?;
+        self.check_source_for_replay()?;
+        if parts != 0 && self.signature() == super::Signature::Signed {
+            return Err(Error::signed(FileFormat::Xlsb));
+        }
         let after_file = if parts == 0 {
             None
         } else {
             Some(self.adopt_package(package)?)
         };
         let after = after_file.clone().unwrap_or_else(|| self.clone());
-        self.check_source()?;
+        self.check_source_for_replay()?;
         Ok(Commit::from_feature(
             after,
             Images {
@@ -462,7 +465,7 @@ impl Xlsb {
             return Ok(None);
         };
         let sheet = node.sheet_position();
-        let editor = self.editor()?;
+        let editor = self.editor_for_write()?;
         let commit = match &feature.data {
             Data::Comment(note) => {
                 let mut edit = editor.edit_comments().map_err(native)?;
@@ -539,7 +542,7 @@ impl Xlsb {
                 return Err(error(Code::MissingProperty, "a note needs a ref").with_property("ref"));
             },
         };
-        let editor = self.editor()?;
+        let editor = self.editor_for_write()?;
         let mut edit = editor.edit_comments().map_err(native)?;
         let index = edit
             .add(
@@ -575,7 +578,7 @@ impl Xlsb {
                 CommentKey::AnchoredTo => {},
             }
         }
-        let editor = self.editor()?;
+        let editor = self.editor_for_write()?;
         let mut edit = editor.edit_comments().map_err(native)?;
         if cell != (note.row, note.col) {
             if edit
@@ -676,7 +679,7 @@ impl Xlsb {
             error(Code::MissingProperty, "a hyperlink needs a ref").with_property("ref")
         })?;
         let link = hyperlink(&reference, location, url, display, tooltip)?;
-        let editor = self.editor()?;
+        let editor = self.editor_for_write()?;
         let mut edit = editor.edit_hyperlinks().map_err(native)?;
         // As XLSX's `put_hyperlink`: a link on the same cells is replaced.
         let existing = edit
@@ -726,7 +729,7 @@ impl Xlsb {
             }
         }
         let replacement = hyperlink(&reference, location, url, display, tooltip)?;
-        let editor = self.editor()?;
+        let editor = self.editor_for_write()?;
         let mut edit = editor.edit_hyperlinks().map_err(native)?;
         edit.set(sheet, feature.index as usize, replacement)
             .map_err(authored)?;
@@ -1115,7 +1118,7 @@ impl Xlsb {
             flip_h,
             flip_v,
         };
-        let editor = self.editor()?;
+        let editor = self.editor_for_write()?;
         let mut edit = editor.edit_drawings().map_err(native)?;
         let index = edit.add_picture(parent.sheet, &spec).map_err(authored)?;
         let commit = publish!(self, edit.commit().map_err(native)?)?;
@@ -1267,7 +1270,7 @@ impl Xlsb {
             ),
         };
         let _: &Font = &spec.font;
-        let editor = self.editor()?;
+        let editor = self.editor_for_write()?;
         let mut edit = editor.edit_drawings().map_err(native)?;
         let index = edit.add_shape(parent.sheet, &spec).map_err(authored)?;
         let commit = publish!(self, edit.commit().map_err(native)?)?;
@@ -1347,7 +1350,7 @@ impl Xlsb {
         } else {
             ElementKind::Shape
         };
-        let editor = self.editor()?;
+        let editor = self.editor_for_write()?;
         let mut edit = editor.edit_drawings().map_err(native)?;
         edit.set(sheet, kind, feature.index as usize, &change)
             .map_err(authored)?;
@@ -2105,7 +2108,7 @@ impl Xlsb {
             Some(ranges) => ranges,
             None => cf_ranges("ref", parent.reference.as_deref().unwrap_or("A1:A10"))?,
         };
-        let editor = self.editor()?;
+        let editor = self.editor_for_write()?;
         let mut edit = editor.edit_conditional_formats().map_err(native)?;
         let worksheet_formats = editor
             .workbook()
@@ -2178,7 +2181,7 @@ impl Xlsb {
                 }
             }
         }
-        let editor = self.editor()?;
+        let editor = self.editor_for_write()?;
         let mut edit = editor.edit_conditional_formats().map_err(native)?;
         if !style_is_empty(&request.style) {
             let first = format
@@ -2387,7 +2390,7 @@ impl Xlsb {
         validation.show_error_message = true;
         validation.show_input_message = true;
         apply_validation(&mut validation, props, Operation::Add)?;
-        let editor = self.editor()?;
+        let editor = self.editor_for_write()?;
         let mut edit = editor.edit_data_validations().map_err(native)?;
         let existing = edit.validations(parent.sheet).map_err(native)?;
         let added = rects(&validation.cell_ranges);
@@ -2418,7 +2421,7 @@ impl Xlsb {
         };
         let mut validation = (**current).clone();
         apply_validation(&mut validation, props, Operation::Set)?;
-        let editor = self.editor()?;
+        let editor = self.editor_for_write()?;
         let mut edit = editor.edit_data_validations().map_err(native)?;
         let existing = edit.validations(sheet).map_err(native)?;
         let changed = rects(&validation.cell_ranges);
@@ -2466,7 +2469,7 @@ impl Xlsb {
         }
         let range = range.ok_or_else(|| missing("range", "an auto-filter needs a range"))?;
         let filter = filter_range("range", &range)?;
-        let editor = self.editor()?;
+        let editor = self.editor_for_write()?;
         let mut edit = editor.edit_auto_filter().map_err(native)?;
         edit.set_auto_filter(parent.sheet, Some(filter))
             .map_err(authored)?;
@@ -2475,7 +2478,7 @@ impl Xlsb {
     }
 
     fn set_autofilter(&self, sheet: usize, props: &Props<'_>) -> Result<Commit> {
-        let editor = self.editor()?;
+        let editor = self.editor_for_write()?;
         let mut edit = editor.edit_auto_filter().map_err(native)?;
         let mut filter = edit
             .auto_filter(sheet)
@@ -2537,7 +2540,7 @@ impl Xlsb {
         kind: Kind,
         breaks: Vec<xlsb::page_breaks::Break>,
     ) -> Result<Commit> {
-        let editor = self.editor()?;
+        let editor = self.editor_for_write()?;
         let mut edit = editor.edit_page_breaks().map_err(native)?;
         let mut all = edit.page_breaks(sheet).map_err(native)?;
         if kind == Kind::RowBreak {

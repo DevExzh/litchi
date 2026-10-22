@@ -33,7 +33,7 @@ use litchi_core::Position;
 use litchi_core::selector::{Path, Predicate};
 use litchi_pptx::opened::{TextAssignment, TextTarget};
 use litchi_pptx::shape::owned::{Handle, Scene};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 /// One direct shape or placeholder assignment admitted for a coalesced run.
@@ -49,6 +49,8 @@ pub(crate) struct Plan {
     /// staging; `changed` is then unknown until the commit.
     reported: bool,
     staged_bytes: usize,
+    /// Original direct-shape text used to prove a signed cancellation.
+    original_text: Option<String>,
     /// Whether the target is a text body of the slide's notes page (record
     /// 0346), which a separate native call edits.
     notes: bool,
@@ -244,6 +246,7 @@ pub(crate) struct Run {
     /// scene alive makes each additional ordinal path a cheap indexed lookup;
     /// replacing it when the slide changes bounds derived-cache retention.
     scene: Option<(usize, CachedScene)>,
+    allow_repeated: bool,
 }
 
 impl Pptx {
@@ -257,18 +260,22 @@ impl Pptx {
         props: &Props<'_>,
         limits: &SemanticLimits,
     ) -> Result<Option<Plan>> {
-        self.check_source()?;
+        self.check_source_for_write()?;
         let mut scene = None;
         let result = shape_plan(self, target, props, limits, &mut scene);
-        self.check_source().and(result)
+        self.check_source_for_write().and(result)
     }
 }
 
 impl Run {
     /// Start one native edit and its bounded direct-path resolution cache.
     pub(crate) fn new(base: &Pptx, limits: &SemanticLimits) -> Result<Self> {
-        base.check_source()?;
-        let source = base.editable_owner()?;
+        base.check_source_for_write()?;
+        let source = if base.signature() == crate::format::signature::Signature::Signed {
+            base.editable_owner_for_write()?
+        } else {
+            base.editable_owner()?
+        };
         let edit = match &source {
             Editable::Eager(package) => match base.take_spare_edit(package) {
                 Some(edit) => NativeEdit::Eager(edit),
@@ -276,7 +283,7 @@ impl Run {
             },
             Editable::Source(_) => new_native_edit(&source)?,
         };
-        base.check_source()?;
+        base.check_source_for_write()?;
         Ok(Self {
             base: base.clone(),
             source,
@@ -288,6 +295,7 @@ impl Run {
             max_staged_bytes: limits.max_staged_bytes(),
             max_expanded_targets: limits.max_expanded_targets(),
             scene: None,
+            allow_repeated: base.signature() == crate::format::signature::Signature::Signed,
         })
     }
 
@@ -300,9 +308,9 @@ impl Run {
         props: &Props<'_>,
         limits: &SemanticLimits,
     ) -> Result<Option<Plan>> {
-        self.base.check_source()?;
+        self.base.check_source_for_write()?;
         let result = shape_plan(&self.base, target, props, limits, &mut self.scene);
-        self.base.check_source().and(result)
+        self.base.check_source_for_write().and(result)
     }
 
     pub(crate) fn first_index(&self) -> Option<usize> {
@@ -329,6 +337,9 @@ impl Run {
     /// aggregate setters instead of reparsing the same slide per command.
     /// Whether `plan` touches text an earlier plan of the run touches.
     fn overlaps(&self, plan: &Plan) -> bool {
+        if self.allow_repeated && plan.text.is_some() && plan.format.is_none() && !plan.notes {
+            return false;
+        }
         let scope = plan.scope();
         self.seen
             .get(&plan.key())
@@ -352,7 +363,7 @@ impl Run {
             )
             .with_format(FileFormat::Pptx));
         }
-        self.base.check_source()?;
+        self.base.check_source_for_write()?;
         self.items
             .try_reserve(1)
             .map_err(|source| TransactionError::Allocation { source })?;
@@ -367,7 +378,7 @@ impl Run {
         self.staged_bytes = self.staged_bytes.saturating_add(charge);
         self.target_count = self.target_count.saturating_add(1);
         self.items.push(Item { plan, index });
-        self.base.check_source()?;
+        self.base.check_source_for_write()?;
         Ok(changed)
     }
 
@@ -387,19 +398,52 @@ impl Run {
             items,
             ..
         } = self;
-        base.check_source()?;
+        let logical_noop = logical_noop(&items);
+        base.check_source_for_write()?;
         let result = (|| {
             let mut changes = Vec::new();
             let operations = stage_all(&mut edit, &items, &mut changes)?;
-            let (after, commit) = commit_native(&base, source, edit, operations)?;
+            let (mut after, mut commit) = commit_native(&base, source, edit, operations)?;
+            if logical_noop {
+                after = base.clone();
+                commit.after = base.clone();
+            }
             Ok((after, commit, changes))
         })();
-        let freshness = base.check_source();
+        let freshness = base.check_source_for_write();
         match freshness.and(result) {
             Ok(value) => Ok(value),
             Err(error) => Err(locate_failure(&base, &items, error)),
         }
     }
+}
+
+/// Compare each direct shape text plan's final assignment with the immutable
+/// base. Rich formatting, table cells and geometry do not enter this proof;
+/// their plans retain no complete original state and therefore remain a real
+/// commit if the native editor reports a rewrite.
+fn logical_noop(items: &[Item]) -> bool {
+    let mut originals = std::collections::HashMap::<(usize, usize, bool), String>::new();
+    let mut finals = std::collections::HashMap::<(usize, usize, bool), String>::new();
+    for item in items {
+        let plan = &item.plan;
+        let Some(original) = plan.original_text.as_ref() else {
+            return false;
+        };
+        if plan.format.is_some() || plan.notes {
+            return false;
+        }
+        let key = plan.key();
+        originals.entry(key).or_insert_with(|| original.clone());
+        let Some(text) = plan.text.as_ref() else {
+            return false;
+        };
+        finals.insert(key, text.clone());
+    }
+    !finals.is_empty()
+        && finals
+            .into_iter()
+            .all(|(key, value)| originals.get(&key) == Some(&value))
 }
 
 /// The path and payload admission shared by the one-shot and run planners.
@@ -533,6 +577,10 @@ fn shape_plan(
     {
         changed = true;
     }
+    let original_text = values
+        .text
+        .as_ref()
+        .and_then(|_| common.text().map(str::to_owned));
     Ok(Some(Plan {
         target: Target {
             slot: true,
@@ -545,6 +593,7 @@ fn shape_plan(
         changed,
         reported: false,
         staged_bytes,
+        original_text,
         notes: false,
     }))
 }
@@ -719,6 +768,7 @@ fn format_plan(
         changed,
         reported: false,
         staged_bytes,
+        original_text: None,
         notes: false,
     }))
 }
@@ -998,6 +1048,7 @@ fn story_plan(
         changed,
         reported: true,
         staged_bytes,
+        original_text: None,
         notes,
     }))
 }
@@ -1189,6 +1240,15 @@ fn stage_all(
             && left.plan.format.is_some() == right.plan.format.is_some()
             && left.plan.notes == right.plan.notes
     }) {
+        let mut targets = HashSet::new();
+        let duplicate = run.iter().any(|item| !targets.insert(item.plan.key()));
+        if duplicate {
+            for item in run {
+                stage_one(edit, &item.plan)?;
+                operations = operations.saturating_add(1);
+            }
+            continue;
+        }
         if run[0].plan.notes {
             operations = operations.saturating_add(stage_notes(
                 edit,
@@ -1590,7 +1650,11 @@ fn locate_failure(base: &Pptx, items: &[Item], error: Error) -> Error {
     ) {
         return error.with_item(first.index);
     }
-    let source = match base.editable_owner() {
+    let source = match if base.signature() == crate::format::signature::Signature::Signed {
+        base.editable_owner_for_write()
+    } else {
+        base.editable_owner()
+    } {
         Ok(source) => source,
         Err(error) => return error.with_item(first.index),
     };

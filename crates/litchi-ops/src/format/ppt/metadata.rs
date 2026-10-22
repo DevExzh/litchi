@@ -41,12 +41,15 @@ impl Ppt {
             }
             .into());
         }
-        let package = self.editable_package()?;
+        let package = self.editable_package_for_write()?;
         let mut edit = package.edit_metadata()?;
         let operations = ole_metadata::apply(edit.properties_mut(), props, FileFormat::Ppt)?;
         let commit = edit.commit()?;
         let changed = commit.diagnostics().changed();
         let (package, patch) = commit.into_parts();
+        if changed && self.signature() == super::Signature::Signed {
+            return Err(super::signature::refusal(FileFormat::Ppt));
+        }
         let snapshot_bytes =
             ole_metadata::snapshot_bytes(patch.before_bytes(), patch.after_bytes());
         if snapshot_bytes > limits.max_snapshot_bytes() {
@@ -57,7 +60,7 @@ impl Ppt {
             }
             .into());
         }
-        self.check_source()?;
+        self.check_source_for_write()?;
         Ok(WriteCommit {
             before: self.clone(),
             after: if changed {

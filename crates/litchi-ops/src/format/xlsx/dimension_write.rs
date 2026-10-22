@@ -84,7 +84,7 @@ pub(crate) fn try_set_dimensions(
         return Ok(None);
     }
 
-    file.check_source()?;
+    file.check_source_for_replay()?;
     let result = (|| {
         let Some(resolved) = resolve_targets(file, target, limits)? else {
             return Ok(None);
@@ -107,7 +107,7 @@ pub(crate) fn try_set_dimensions(
         };
         check_target_count(resolved.targets.len(), charge, limits)?;
 
-        let source = file.editor()?;
+        let source = file.editor_for_write()?;
         let mut edit = source.edit().map_err(native_error)?;
         match assignments {
             DimensionAssignments::Row(assignments) => {
@@ -120,7 +120,7 @@ pub(crate) fn try_set_dimensions(
         let native = edit.commit().map_err(native_error)?;
         Commit::from_native(file, source, native).map(Some)
     })();
-    file.check_source()?;
+    file.check_source_for_replay()?;
     result
 }
 
@@ -197,7 +197,7 @@ fn resolve_targets(
         }
         append_target(&mut targets, &mut seen, target, limits)?;
     }
-    file.check_source()?;
+    file.check_source_for_replay()?;
     if !matched {
         return Err(Error::new(
             Code::ZeroMatches,

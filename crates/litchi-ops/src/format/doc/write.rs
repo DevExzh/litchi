@@ -9,7 +9,7 @@
 //! closes the run first).  Queries and any other property remain barriers
 //! and use the ordinary isolated setter.
 
-use litchi_core::Position;
+use litchi_core::{FileFormat, Position};
 use litchi_doc::Edit;
 use litchi_doc::body_text::{CharacterProperty, TextTarget};
 
@@ -106,13 +106,13 @@ impl Doc {
 
 impl Run {
     pub(crate) fn new(base: &Doc, limits: &SemanticLimits) -> Result<Self> {
-        base.check_source()?;
-        let package = base.editable_package()?.ok_or_else(|| {
+        base.check_source_for_write()?;
+        let package = base.editable_package_for_write()?.ok_or_else(|| {
             Error::new(
                 Code::UnsupportedCapability,
                 "the DOC document was opened without retaining its source for editing",
             )
-            .with_format(litchi_core::FileFormat::Doc)
+            .with_format(FileFormat::Doc)
             .with_suggestion("reopen the document with source retention enabled")
         })?;
         let edit = package
@@ -134,7 +134,7 @@ impl Run {
         target: &TargetArg<'_>,
         props: &Props<'_>,
     ) -> Result<Option<Plan>> {
-        self.base.check_source()?;
+        self.base.check_source_for_write()?;
         let plan = if let (Some(spelling), Some((last, position))) = (spelling, &self.last_target)
             && last.as_ref() == spelling
         {
@@ -190,7 +190,7 @@ impl Run {
         index: usize,
         spelling: Option<&str>,
     ) -> Result<bool> {
-        self.base.check_source()?;
+        self.base.check_source_for_write()?;
         let changed = match &plan.change {
             Change::Text(text) => {
                 let prior = self
@@ -210,7 +210,7 @@ impl Run {
                             Code::PathNotFound,
                             "the DOC paragraph is outside the main story",
                         )
-                        .with_format(litchi_core::FileFormat::Doc)
+                        .with_format(FileFormat::Doc)
                     })?;
                 let changed = prior != text;
                 self.edit.replace_paragraph(plan.position, text)?;
@@ -247,7 +247,7 @@ impl Run {
                 !holds
             },
         };
-        self.base.check_source()?;
+        self.base.check_source_for_write()?;
         self.items
             .try_reserve(1)
             .map_err(|source| crate::transaction::Error::Allocation { source })?;
@@ -268,20 +268,26 @@ impl Run {
         let Self {
             base, edit, items, ..
         } = self;
-        base.check_source()?;
+        base.check_source_for_write()?;
         let operations = items.len();
         let before = base.clone();
         let commit = edit.commit()?;
-        base.check_source()?;
+        base.check_source_for_write()?;
         let changed = commit.diagnostics().changed();
+        // A native DOC edit may rewrite the compound stream even when a
+        // sequence of paragraph assignments returns every touched value to
+        // its original state.  Signed transactions must publish the exact
+        // retained source in that case; compare the final authored values
+        // against the immutable base rather than relying on stream bytes.
+        let logical_noop = logical_noop(&base, &items)?;
         let (package, patch) = commit.into_parts();
         let snapshot_bytes = super::patch_snapshot_bytes(&patch);
-        let after = if changed {
+        let after = if changed && !logical_noop {
             base.with_package(package)
         } else {
             base.clone()
         };
-        base.check_source()?;
+        base.check_source_for_write()?;
         Ok(WriteCommit {
             before,
             after,
@@ -290,4 +296,43 @@ impl Run {
             snapshot_bytes,
         })
     }
+}
+
+/// Whether every coalesced paragraph assignment leaves the base's authored
+/// value unchanged.  This proof is deliberately limited to the properties
+/// admitted by [`Run::plan`]; unsupported or mixed families never enter this
+/// run and therefore cannot be mistaken for a no-op.
+fn logical_noop(base: &Doc, items: &[Item]) -> Result<bool> {
+    use std::collections::HashMap;
+
+    let mut final_text = HashMap::<Position, String>::new();
+    let mut final_toggles = HashMap::<(Position, CharacterProperty), (bool, bool)>::new();
+    for item in items {
+        match &item.change {
+            Change::Text(text) => {
+                final_text.insert(item.position, text.clone());
+            },
+            Change::Toggle {
+                property,
+                enabled,
+                holds,
+            } => {
+                final_toggles
+                    .entry((item.position, *property))
+                    .and_modify(|entry| entry.0 = *enabled)
+                    .or_insert((*enabled, *holds));
+            },
+        }
+    }
+    for (position, text) in final_text {
+        let Some(original) = base.body_paragraph_at(position)? else {
+            return Ok(false);
+        };
+        if original != text {
+            return Ok(false);
+        }
+    }
+    Ok(final_toggles
+        .into_values()
+        .all(|(enabled, originally_holds)| enabled == originally_holds))
 }

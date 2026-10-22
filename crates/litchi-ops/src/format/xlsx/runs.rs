@@ -609,13 +609,13 @@ impl Xlsx {
         read: Option<xlsx::RichText>,
         change: impl FnOnce(&mut xlsx::RichText) -> Result<()>,
     ) -> Result<Commit> {
-        let source = self.editor()?;
+        let source = self.editor_for_write()?;
         let mut rich = match read {
             Some(rich) => rich,
             None => editable_runs(&source, sheet, at)?,
         };
         change(&mut rich)?;
-        self.check_source()?;
+        self.check_source_for_replay()?;
         let mut edit = source.edit().map_err(super::write::native_error)?;
         let mut worksheet = edit
             .sheet(sheet)

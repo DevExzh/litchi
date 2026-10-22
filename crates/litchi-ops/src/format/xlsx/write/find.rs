@@ -36,11 +36,11 @@ impl Xlsx {
         spec: &Spec<'_>,
         limits: &SemanticLimits,
     ) -> Result<(Commit, usize)> {
-        self.check_source()?;
+        self.check_source_for_replay()?;
         let result = self
             .find_inner(target, spec, limits)
             .map_err(|error| error.with_format(FileFormat::Xlsx));
-        self.check_source()?;
+        self.check_source_for_replay()?;
         result
     }
 
@@ -70,7 +70,7 @@ impl Xlsx {
             );
         };
         let scopes = scopes(self, target)?;
-        let source = self.editor()?;
+        let source = self.editor_for_write()?;
         let workbook = source.workbook();
         let matcher = spec.matcher();
         let mut matches = 0usize;

@@ -255,6 +255,22 @@ impl Xlsb {
         Ok(())
     }
 
+    /// Admit a setter that may prove an exact signed no-op. Changed commits
+    /// are rejected after native staging; source retention and freshness are
+    /// still checked before target/property admission.
+    pub(crate) fn admit_edit_for_write(&self) -> Result<()> {
+        self.check_source_for_replay()?;
+        if !self.0.retain_source {
+            return Err(Error::new(
+                Code::UnsupportedCapability,
+                "the workbook was opened without retaining its source for editing",
+            )
+            .with_format(FileFormat::Xlsb)
+            .with_suggestion("reopen with `OpenOptions::retain_source(true)` to edit"));
+        }
+        Ok(())
+    }
+
     /// The one-shot unified worksheet and cell-property setter.
     pub(crate) fn set<'p, 'v>(
         &self,
@@ -275,10 +291,20 @@ impl Xlsb {
         props: impl crate::props::IntoProps<'v>,
         limits: &crate::transaction::SemanticLimits,
     ) -> Result<write::Commit> {
-        self.check_source()?;
+        self.check_source_for_replay()?;
         let result = write::set_with_limits(self, target, props, limits);
-        self.check_source()?;
-        result
+        self.check_source_for_replay()?;
+        if self.signature() == Signature::Signed {
+            result.and_then(|commit| {
+                if commit.is_noop() {
+                    Ok(commit)
+                } else {
+                    Err(Error::signed(FileFormat::Xlsb))
+                }
+            })
+        } else {
+            result
+        }
     }
 
     /// Add one worksheet tab under the unified structural contract.
@@ -607,10 +633,35 @@ impl Xlsb {
     /// [`Code::UnsupportedCapability`] when the handle was opened with
     /// [`OpenOptions::retain_source`] `false`; [`Code::IoError`] when the
     /// file changed; and the XLSB error of a failed materialization.
+    #[cfg_attr(
+        not(test),
+        expect(
+            dead_code,
+            reason = "native callers retain the strict signed editor guard"
+        )
+    )]
     pub(crate) fn editor(&self) -> Result<XlsbEditor<'_>> {
         if self.0.signature() == Signature::Signed {
             return Err(signature::refusal(FileFormat::Xlsb));
         }
+        self.editor_after_source_check(false)
+    }
+
+    /// Build a native editor for a setter that may prove an exact signed
+    /// no-op. The caller rejects a changed native commit before publication.
+    pub(crate) fn editor_for_write(&self) -> Result<XlsbEditor<'_>> {
+        if self.0.signature() == Signature::Signed && !self.0.retain_source {
+            return Err(Error::new(
+                Code::UnsupportedCapability,
+                "the workbook was opened without retaining its source for editing",
+            )
+            .with_format(FileFormat::Xlsb)
+            .with_suggestion("reopen with `OpenOptions::retain_source(true)` to edit"));
+        }
+        self.editor_after_source_check(self.0.signature() == Signature::Signed)
+    }
+
+    fn editor_after_source_check(&self, allow_signed: bool) -> Result<XlsbEditor<'_>> {
         if !self.0.retain_source {
             return Err(Error::new(
                 Code::UnsupportedCapability,
@@ -619,7 +670,15 @@ impl Xlsb {
             .with_format(FileFormat::Xlsb)
             .with_suggestion("reopen with `OpenOptions::retain_source(true)` to edit"));
         }
-        if self.0.signature() == Signature::RemovalAuthorized {
+        if allow_signed {
+            self.check_source_for_replay()?;
+        } else {
+            self.check_source()?;
+        }
+        if matches!(
+            self.0.signature(),
+            Signature::Signed | Signature::RemovalAuthorized
+        ) {
             return self
                 .unsigned_package()
                 .map(|package| XlsbEditor::Materialized(Box::new(package)));

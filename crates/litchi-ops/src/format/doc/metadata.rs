@@ -37,7 +37,7 @@ impl Doc {
             }
             .into());
         }
-        let Some(package) = self.editable_package()? else {
+        let Some(package) = self.editable_package_for_write()? else {
             return Err(Error::new(
                 Code::UnsupportedCapability,
                 "the DOC document was opened without retaining its source for editing",
@@ -50,6 +50,9 @@ impl Doc {
         let commit = edit.commit()?;
         let changed = commit.diagnostics().changed();
         let (package, patch) = commit.into_parts();
+        if changed && self.signature() == super::Signature::Signed {
+            return Err(super::signature::refusal(FileFormat::Doc));
+        }
         let snapshot_bytes =
             ole_metadata::snapshot_bytes(patch.before_bytes(), patch.after_bytes());
         if snapshot_bytes > limits.max_snapshot_bytes() {
@@ -60,7 +63,7 @@ impl Doc {
             }
             .into());
         }
-        self.check_source()?;
+        self.check_source_for_write()?;
         Ok(WriteCommit {
             before: self.clone(),
             after: if changed {

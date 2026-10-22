@@ -409,6 +409,17 @@ impl Pptx {
         self.check_source_for_replay()
     }
 
+    /// Check the owner for a mutation that may still prove an exact signed
+    /// no-op.  The native editor is allowed to stage that proof, while its
+    /// changed result remains refused at the commit fence.
+    pub(crate) fn check_source_for_write(&self) -> Result<()> {
+        if self.signature() == Signature::Signed {
+            self.check_source_for_replay()
+        } else {
+            self.check_source()
+        }
+    }
+
     /// Check retained source freshness and the protection policy that is
     /// independent of the signature disposition. Exact no-op patch replay
     /// uses this after proving the recipient bytes match the patch base.
@@ -1056,10 +1067,29 @@ impl Pptx {
         if self.0.signature() == Signature::Signed {
             return Err(signature::refusal(FileFormat::Pptx));
         }
+        self.editable_owner_after_source_check(false)
+    }
+
+    /// Acquire the retained owner for a setter that may prove an exact
+    /// signed no-op. A changed result is rejected by the setter commit fence;
+    /// this helper only lets the native editor establish whether the request
+    /// changed the package at all.
+    pub(crate) fn editable_owner_for_write(&self) -> Result<Editable> {
+        if self.0.signature() == Signature::Signed && !self.0.retain_source {
+            return Err(source_not_retained());
+        }
+        self.editable_owner_after_source_check(self.0.signature() == Signature::Signed)
+    }
+
+    fn editable_owner_after_source_check(&self, allow_signed: bool) -> Result<Editable> {
         if !self.0.retain_source {
             return Err(source_not_retained());
         }
-        self.check_source()?;
+        if allow_signed {
+            self.check_source_for_replay()?;
+        } else {
+            self.check_source()?;
+        }
         if self.0.signature() == Signature::RemovalAuthorized {
             return self.promote_unsigned().map(Editable::Eager);
         }

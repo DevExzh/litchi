@@ -107,7 +107,7 @@ impl Xlsb {
         }
         // Stage on the workbook itself: no copy into a package first
         // (record 0281).
-        let editor = self.editor()?;
+        let editor = self.editor_for_write()?;
         let (target, patch, metadata) = commit(
             editor.edit_metadata(),
             |value| assignments.apply(value),
@@ -120,7 +120,7 @@ impl Xlsb {
             let after = self.adopt_metadata(target, metadata)?;
             (after.clone(), Some(after))
         };
-        self.check_source()?;
+        self.check_source_for_replay()?;
         Ok(Commit::from_metadata(
             after,
             Images {
@@ -141,7 +141,7 @@ impl Xlsb {
         source: &super::source::SourceWorkbook,
         assignments: &Assignments,
     ) -> Result<Commit> {
-        self.check_source()?;
+        self.check_source_for_replay()?;
         let mut edit = source.workbook().edit_metadata().map_err(native)?;
         edit.update(|value| assignments.apply(value))
             .map_err(native)?;
@@ -168,7 +168,7 @@ impl Xlsb {
             .with_signature(self.signature());
             (after.clone(), Some(after))
         };
-        self.check_source()?;
+        self.check_source_for_replay()?;
         Ok(Commit::from_metadata(
             after,
             Images {

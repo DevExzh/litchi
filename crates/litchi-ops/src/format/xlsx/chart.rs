@@ -734,7 +734,7 @@ impl Xlsx {
             );
         }
         let anchor = xlsx::chart::Anchor::new(origin[0], origin[1], to_col, to_row);
-        let source = self.editor()?;
+        let source = self.editor_for_write()?;
         let name = match name.or_else(|| spec.title().map(str::to_owned)) {
             Some(name) => name,
             // Counting reads the sheet's drawing: only for an unnamed chart.
@@ -796,7 +796,7 @@ impl Xlsx {
         if first_row != last_row && first_column != last_column {
             return Err(invalid("the series range is one row or one column"));
         }
-        let package = self.editor()?;
+        let package = self.editor_for_write()?;
         let workbook = package.workbook();
         let worksheet = workbook
             .sheet(sheet_name.as_str())?
@@ -853,7 +853,7 @@ impl Xlsx {
             .replace('$', "")
             .parse::<xlsx::Rect>()
             .map_err(|_| invalid("dataRange is not an A1 range"))?;
-        let package = self.editor()?;
+        let package = self.editor_for_write()?;
         let workbook = package.workbook();
         let worksheet = workbook
             .sheet(sheet_name.as_str())?
@@ -1047,7 +1047,7 @@ impl Xlsx {
             }
         }
         let sheet = node.sheet_position();
-        let source = self.editor()?;
+        let source = self.editor_for_write()?;
         let mut native = source.edit_charts()?;
         if geometry.iter().any(Option::is_some) {
             let current = self
@@ -1107,7 +1107,7 @@ impl Xlsx {
             return Ok(None);
         };
         let sheet = node.sheet_position();
-        let source = self.editor()?;
+        let source = self.editor_for_write()?;
         let mut native = source.edit_charts()?;
         native.remove(sheet, item.chart as usize)?;
         let target = native.commit()?.into_package();

@@ -45,7 +45,7 @@ impl Xlsx {
         // Admit the owning editor first.  This keeps retention, signatures and
         // encryption policy ahead of authored property conversion, matching
         // the cell and DOCX write adapters.
-        let source = self.editor()?;
+        let source = self.editor_for_write()?;
         // The element kind first (record 0269, finding X1): a kind the
         // workbook cannot add is `unsupported_element` whatever its parent;
         // an addable kind under the wrong parent is `unsupported_type`.
@@ -135,7 +135,7 @@ impl Xlsx {
         if let Some(commit) = self.try_remove_feature(&target)? {
             return Ok(commit);
         }
-        let source = self.editor()?;
+        let source = self.editor_for_write()?;
         let positions = super::sheet_write::resolve_sheet_targets(self, &target, limits)?
             .ok_or_else(unsupported_removal_target)?;
         check_removal_limits(positions.len(), limits)?;
@@ -164,7 +164,7 @@ impl Xlsx {
     }
 
     fn move_inner<'p, 'q>(&self, path: PathArg<'p>, placement: Placement<'q>) -> Result<Commit> {
-        let source = self.editor()?;
+        let source = self.editor_for_write()?;
         let node = resolve_path(self, &path)?;
         let source_position = sheet_position(&node)?;
         let destination = move_destination(self, &placement)?;
@@ -198,7 +198,7 @@ impl Xlsx {
     }
 
     fn swap_inner<'p, 'q>(&self, left: PathArg<'p>, right: PathArg<'q>) -> Result<Commit> {
-        let source = self.editor()?;
+        let source = self.editor_for_write()?;
         let left = sheet_position(&resolve_path(self, &left)?)?;
         let right = sheet_position(&resolve_path(self, &right)?)?;
         self.check_source()?;

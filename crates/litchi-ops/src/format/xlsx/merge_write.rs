@@ -93,7 +93,7 @@ pub(crate) fn try_set_merge(
         return Ok(None);
     }
 
-    file.check_source()?;
+    file.check_source_for_replay()?;
     let result = (|| {
         let assignment = admit_merge(props, limits)?;
         let resolved = resolve_targets(file, target, &assignment.mode, limits)?;
@@ -135,19 +135,19 @@ pub(crate) fn try_set_merge(
         // The native editor performs the protected-sheet, unknown-content,
         // formula, and compatibility checks.  Every merge and any companion
         // cell write is staged in that one transaction.
-        let source = file.editor()?;
+        let source = file.editor_for_write()?;
         let mut edit = source.edit().map_err(native_error)?;
         apply_merge_targets(&mut edit, &resolved.targets, assignment.mode.adds())?;
         if let Some(cells) = prepared_cells {
             cells.apply(&mut edit)?;
         }
         if let Some(assignments) = sheet_assignments {
-            apply_sheet_assignments(&mut edit, &resolved.sheet_positions, &assignments)?;
+            apply_sheet_assignments(file, &mut edit, &resolved.sheet_positions, &assignments)?;
         }
         let native = edit.commit().map_err(native_error)?;
         Commit::from_native(file, source, native).map(Some)
     })();
-    file.check_source()?;
+    file.check_source_for_replay()?;
     result
 }
 
@@ -348,7 +348,7 @@ fn resolve_targets<'a>(
                 .with_format(FileFormat::Xlsx),
         );
     }
-    file.check_source()?;
+    file.check_source_for_replay()?;
     resolved.targets.sort_unstable_by_key(|target| {
         let start = target.range.start();
         let end = target.range.end();
@@ -677,10 +677,12 @@ fn apply_merge_targets(
 }
 
 fn apply_sheet_assignments(
+    file: &Xlsx,
     edit: &mut xlsx::workbook::Edit,
     positions: &[usize],
     assignments: &SheetAssignments,
 ) -> Result<()> {
+    let names = file.worksheet_names()?;
     for &position in positions {
         let Some(mut tab) = edit.tab(position).map_err(native_error)? else {
             return Err(Error::new(
@@ -689,7 +691,11 @@ fn apply_sheet_assignments(
             )
             .with_format(FileFormat::Xlsx));
         };
-        if let Some(name) = assignments.name.as_ref() {
+        if let Some(name) = assignments.name.as_ref()
+            && names
+                .get(position)
+                .is_none_or(|current| current.as_str() != name.as_str())
+        {
             tab.rename(name.clone()).map_err(native_error)?;
         }
         if let Some(hidden) = assignments.hidden {

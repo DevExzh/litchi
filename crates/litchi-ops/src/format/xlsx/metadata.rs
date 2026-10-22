@@ -59,7 +59,7 @@ impl Xlsx {
     }
 
     fn set_metadata(&self, assignments: &Assignments) -> Result<Commit> {
-        let source = self.editor()?;
+        let source = self.editor_for_write()?;
         let (target, metadata, changed) =
             commit(&source, |value| assignments.apply(value), Some(assignments))?;
         let after = if changed {
@@ -67,7 +67,7 @@ impl Xlsx {
         } else {
             self.clone()
         };
-        self.check_source()?;
+        self.check_source_for_replay()?;
         Ok(Commit::from_metadata(after, source, target))
     }
 

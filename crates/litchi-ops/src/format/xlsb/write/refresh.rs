@@ -93,7 +93,7 @@ pub(crate) fn refresh(
             })?;
         let native_limits =
             TransferLimits::new(image_budget, limits.max_expanded_targets(), 1, image_budget);
-        let mut package = package_from_editor(handle.editor()?);
+        let mut package = package_from_editor(handle.editor_for_write()?);
         let mut patches = Vec::new();
         for (sheet, caches) in planned {
             let Some(mut edit) = package

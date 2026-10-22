@@ -103,7 +103,7 @@ pub(crate) fn set_with_limits<'p, 'v>(
     props: impl IntoProps<'v>,
     limits: &SemanticLimits,
 ) -> Result<WriteCommit> {
-    file.admit_edit()?;
+    file.admit_edit_for_write()?;
     let props = Props::from_props(props)?;
 
     // `/metadata` names the document properties unless the call carries a
@@ -119,7 +119,7 @@ pub(crate) fn set_with_limits<'p, 'v>(
     } else {
         set_cells_with_limits(file, target, &props, limits)
     };
-    file.check_source()?;
+    file.check_source_for_write()?;
     result
 }
 
@@ -131,7 +131,7 @@ pub(crate) fn remove_with_limits(
     target: TargetArg<'_>,
     limits: &SemanticLimits,
 ) -> Result<WriteCommit> {
-    file.admit_edit()?;
+    file.admit_edit_for_write()?;
     if let Some(commit) = file.try_remove_feature(&target, limits)? {
         return Ok(commit);
     }
@@ -166,7 +166,10 @@ pub(crate) fn remove_with_limits(
         .with_format(FileFormat::Xls));
     }
 
-    let mut edit = file.editable_package()?.edit().map_err(native_edit_error)?;
+    let mut edit = file
+        .editable_package_for_write()?
+        .edit()
+        .map_err(native_edit_error)?;
     for target in targets {
         if target.present {
             edit.remove_cell(
@@ -218,7 +221,17 @@ fn set_sheet_with_limits(
 
     let SheetAssignment::Name(name) = assignment;
     super::structure::validate_sheet_name(file, Some(position), &name)?;
-    let mut edit = file.editable_package()?.edit().map_err(native_edit_error)?;
+    if file
+        .worksheet_names()?
+        .get(position)
+        .is_some_and(|current| current == &name)
+    {
+        return no_op(file, limits);
+    }
+    let mut edit = file
+        .editable_package_for_write()?
+        .edit()
+        .map_err(native_edit_error)?;
     edit.rename_sheet(Selector::Position(Position::new(position)), &name)
         .map_err(native_edit_error)?;
     let native = edit.commit().map_err(native_edit_error)?;
@@ -252,7 +265,10 @@ fn set_cells_with_limits(
     if let CellAssignment::Format(change) = &plan.assignment {
         // Formatting rewrites only the cell's XF reference, so formula cells
         // and absent coordinates are admitted alike.
-        let mut edit = file.editable_package()?.edit().map_err(native_edit_error)?;
+        let mut edit = file
+            .editable_package_for_write()?
+            .edit()
+            .map_err(native_edit_error)?;
         for target in targets {
             edit.set_cell_format(
                 Selector::Position(Position::new(target.sheet)),
@@ -281,7 +297,10 @@ fn set_cells_with_limits(
         .with_property(property));
     }
 
-    let mut edit = file.editable_package()?.edit().map_err(native_edit_error)?;
+    let mut edit = file
+        .editable_package_for_write()?
+        .edit()
+        .map_err(native_edit_error)?;
     if let CellAssignment::Formula(expression) = &plan.assignment {
         // Each coordinate is written once: an absent cell gains a Formula,
         // and a scalar cell is replaced with one keeping its XF.
@@ -902,7 +921,7 @@ pub(super) fn finish_commit(
     fallback_operations: usize,
     limits: &SemanticLimits,
 ) -> Result<WriteCommit> {
-    file.check_source()?;
+    file.check_source_for_write()?;
     let changed = native.diagnostics().changed();
     let operations =
         native
@@ -927,7 +946,7 @@ pub(super) fn finish_commit(
     } else {
         file.clone()
     };
-    file.check_source()?;
+    file.check_source_for_write()?;
     Ok(WriteCommit {
         before: file.clone(),
         after,
@@ -939,7 +958,7 @@ pub(super) fn finish_commit(
 
 fn no_op(file: &Xls, limits: &SemanticLimits) -> Result<WriteCommit> {
     let native = file
-        .editable_package()?
+        .editable_package_for_write()?
         .edit()
         .map_err(native_edit_error)?
         .commit()
@@ -1137,6 +1156,9 @@ pub(crate) mod coalesce {
         action: Action,
         staged_bytes: usize,
         changed: bool,
+        /// The authored scalar before this run.  Retaining it lets a signed
+        /// run prove a cancellation without comparing reserialized BIFF.
+        original: Option<NativeValue>,
     }
 
     impl Plan {
@@ -1164,6 +1186,7 @@ pub(crate) mod coalesce {
         staged_bytes: usize,
         max_staged_bytes: usize,
         limits: SemanticLimits,
+        allow_repeated: bool,
     }
 
     impl Xls {
@@ -1213,8 +1236,23 @@ pub(crate) mod coalesce {
                 ) {
                     return Ok(None);
                 }
-                let Some((target, current)) = direct_target(self, target, limits, source)? else {
+                let spelling = target;
+                let Some((target, current)) = direct_target(self, spelling, limits, source)? else {
                     return Ok(None);
+                };
+                // A coalesced signed run resolves each command through its
+                // staged native edit so later commands see earlier values.
+                // The cancellation proof must retain the value from the
+                // original package, however; otherwise a changed-then-restored
+                // cell would compare against the changed intermediate value
+                // and lose the exact signed no-op route.
+                let original = if source.is_some() {
+                    let Some((_, original)) = direct_target(self, spelling, limits, None)? else {
+                        return Ok(None);
+                    };
+                    original
+                } else {
+                    current.clone()
                 };
                 // Formula cells are deliberately left to the ordinary setter,
                 // which reports the dependency-aware unsupported capability.
@@ -1253,6 +1291,7 @@ pub(crate) mod coalesce {
                     action,
                     staged_bytes: admitted.staged_bytes,
                     changed,
+                    original,
                 }))
             })();
             self.check_outside_run(source).and(result)
@@ -1300,8 +1339,17 @@ pub(crate) mod coalesce {
                 if step.cell_ref().is_none() {
                     return Ok(None);
                 }
-                let Some((target, _)) = direct_target(self, target, limits, source)? else {
+                let spelling = target;
+                let Some((target, current)) = direct_target(self, spelling, limits, source)? else {
                     return Ok(None);
+                };
+                let original = if source.is_some() {
+                    let Some((_, original)) = direct_target(self, spelling, limits, None)? else {
+                        return Ok(None);
+                    };
+                    original
+                } else {
+                    current.clone()
                 };
                 if target.formula {
                     return Ok(None);
@@ -1324,6 +1372,7 @@ pub(crate) mod coalesce {
                     target,
                     staged_bytes: WRITE_ENTRY_OVERHEAD,
                     changed: target.present,
+                    original,
                 }))
             })();
             self.check_outside_run(source).and(result)
@@ -1332,10 +1381,10 @@ pub(crate) mod coalesce {
 
     impl Run {
         pub(crate) fn new(base: &Xls, limits: &SemanticLimits) -> Result<Self> {
-            base.check_source()?;
-            let source = base.editable_package()?;
+            base.check_source_for_write()?;
+            let source = base.editable_package_for_write()?;
             let edit = source.edit().map_err(native_edit_error)?;
-            base.check_source()?;
+            base.check_source_for_write()?;
             Ok(Self {
                 base: base.clone(),
                 source,
@@ -1345,6 +1394,7 @@ pub(crate) mod coalesce {
                 staged_bytes: 0,
                 max_staged_bytes: limits.max_staged_bytes(),
                 limits: *limits,
+                allow_repeated: base.signature() == crate::format::signature::Signature::Signed,
             })
         }
 
@@ -1372,7 +1422,11 @@ pub(crate) mod coalesce {
         }
 
         pub(crate) fn requires_barrier(&self, plan: &Plan, limits: &SemanticLimits) -> bool {
-            self.seen.contains(&plan.key())
+            // A signed cancellation may repeat an originally stored cell
+            // even after an intermediate remove made the staged target
+            // absent. Original absence stays a barrier so insertion is never
+            // mistaken for restoring a missing coordinate.
+            (self.seen.contains(&plan.key()) && !(self.allow_repeated && plan.original.is_some()))
                 || self
                     .staged_bytes
                     .checked_add(plan.charge())
@@ -1380,7 +1434,8 @@ pub(crate) mod coalesce {
         }
 
         pub(crate) fn stage(&mut self, plan: Plan, index: usize) -> Result<bool> {
-            if self.seen.contains(&plan.key())
+            if (self.seen.contains(&plan.key())
+                && !(self.allow_repeated && plan.original.is_some()))
                 || self
                     .staged_bytes
                     .checked_add(plan.charge())
@@ -1448,19 +1503,49 @@ pub(crate) mod coalesce {
                 edit,
                 items,
                 limits,
+                allow_repeated: _,
                 ..
             } = self;
-            base.check_source()?;
+            let logical_noop = logical_noop(&items);
+            base.check_source_for_write()?;
             let result = edit
                 .commit()
                 .map_err(native_edit_error)
-                .and_then(|native| finish_commit(&base, native, items.len(), &limits));
-            let freshness = base.check_source();
+                .and_then(|native| finish_commit(&base, native, items.len(), &limits))
+                .map(|mut commit| {
+                    if logical_noop {
+                        commit.after = base.clone();
+                    }
+                    commit
+                });
+            let freshness = base.check_source_for_write();
             match freshness.and(result) {
                 Ok(commit) => Ok((base, commit)),
                 Err(error) => Err(locate_failure(&base, &source, &items, error)),
             }
         }
+    }
+
+    fn logical_noop(items: &[Item]) -> bool {
+        let mut final_values = std::collections::HashMap::<CellTarget, Option<NativeValue>>::new();
+        let mut originals = std::collections::HashMap::<CellTarget, Option<NativeValue>>::new();
+        for item in items {
+            let plan = &item.plan;
+            originals
+                .entry(plan.key())
+                .or_insert_with(|| plan.original.clone());
+            let final_value = match &plan.action {
+                Action::Set(value) => Some(value.clone()),
+                Action::Clear if plan.target.present => Some(NativeValue::Blank),
+                Action::Remove if plan.target.present => None,
+                Action::Clear | Action::Remove | Action::Noop => plan.original.clone(),
+            };
+            final_values.insert(plan.key(), final_value);
+        }
+        !final_values.is_empty()
+            && final_values
+                .into_iter()
+                .all(|(key, value)| originals.get(&key) == Some(&value))
     }
 
     fn apply_item(edit: &mut litchi_xls::package::edit::Edit, item: &Item) -> Result<()> {
@@ -1494,13 +1579,13 @@ pub(crate) mod coalesce {
     }
 
     fn replay(base: &Xls, source: &Package, items: &[Item]) -> Result<Package> {
-        base.check_source()?;
+        base.check_source_for_write()?;
         let mut edit = source.edit().map_err(native_edit_error)?;
         for item in items {
             apply_item(&mut edit, item).map_err(|error| error.with_item(item.index))?;
         }
         let package = edit.commit().map_err(native_edit_error)?.into_package();
-        base.check_source()?;
+        base.check_source_for_write()?;
         Ok(package)
     }
 

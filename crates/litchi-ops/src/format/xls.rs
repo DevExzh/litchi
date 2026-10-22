@@ -94,6 +94,16 @@ impl Xls {
         Ok(())
     }
 
+    /// Admit a native edit that may still prove an exact signed no-op. A
+    /// changed package is rejected by the publication fence.
+    pub(crate) fn admit_edit_for_write(&self) -> Result<()> {
+        self.check_source_for_write()?;
+        if self.is_encrypted() {
+            return Err(litchi_xls::package::Error::EncryptionPolicy.into());
+        }
+        Ok(())
+    }
+
     /// Return the native package that may receive one immutable edit.
     ///
     /// An explicitly authorized signature removal starts from an unsigned
@@ -102,6 +112,28 @@ impl Xls {
     pub(crate) fn editable_package(&self) -> Result<Package> {
         self.admit_edit()?;
         if self.signature() == Signature::RemovalAuthorized {
+            let bytes = signature::unsign_compound_file(
+                self.owner().source_bytes()?,
+                litchi_sign::cfb::Format::Xls,
+            )?;
+            return Ok(litchi_xls::raw::package_from_replacement_bytes(
+                self.owner(),
+                bytes,
+            )?);
+        }
+        Ok(self.owner().clone())
+    }
+
+    /// Return the retained package for a setter that may prove an exact
+    /// signed no-op. Removal-authorized handles use an explicit unsigned
+    /// replacement; signed handles keep their original package until the
+    /// publication fence sees whether the native patch changed.
+    pub(crate) fn editable_package_for_write(&self) -> Result<Package> {
+        self.admit_edit_for_write()?;
+        if matches!(
+            self.signature(),
+            Signature::Signed | Signature::RemovalAuthorized
+        ) {
             let bytes = signature::unsign_compound_file(
                 self.owner().source_bytes()?,
                 litchi_sign::cfb::Format::Xls,
@@ -149,10 +181,20 @@ impl Xls {
         props: impl crate::props::IntoProps<'v>,
         limits: &crate::transaction::SemanticLimits,
     ) -> Result<WriteCommit> {
-        self.check_source()?;
+        self.check_source_for_write()?;
         let result = write::set_with_limits(self, target, props, limits);
-        self.check_source()?;
-        result
+        self.check_source_for_write()?;
+        self.enforce_signed_noop(result)
+    }
+
+    fn enforce_signed_noop(&self, result: Result<WriteCommit>) -> Result<WriteCommit> {
+        result.and_then(|commit| {
+            if self.signature() != Signature::Signed || commit.after.same_snapshot(self) {
+                Ok(commit)
+            } else {
+                Err(signature::refusal(FileFormat::Xls))
+            }
+        })
     }
 
     /// Remove stored cells selected by a path or scoped query.
@@ -224,6 +266,12 @@ impl Xls {
             }
         }
         Ok(())
+    }
+
+    /// Source freshness for a mutation that may still prove an exact signed
+    /// no-op. Changed native results are rejected at publication.
+    pub(crate) fn check_source_for_write(&self) -> Result<()> {
+        self.check_source()
     }
 
     pub(crate) fn date_1904(&self) -> Result<bool> {

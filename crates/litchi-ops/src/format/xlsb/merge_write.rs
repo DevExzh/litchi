@@ -73,7 +73,7 @@ pub(super) fn set_merges_with_limits(
         return Ok(None);
     };
     let targets = resolve_ranges(file, target, limits)?;
-    let editor = file.editor()?;
+    let editor = file.editor_for_write()?;
     let package = package_from_editor(editor);
     let native_limits = litchi_xlsb::cell_values::TransferLimits::new(
         limits.max_snapshot_bytes(),
@@ -185,7 +185,7 @@ fn resolve_ranges(
                 .with_format(FileFormat::Xlsb),
         );
     }
-    file.check_source()?;
+    file.check_source_for_replay()?;
     Ok(targets)
 }
 

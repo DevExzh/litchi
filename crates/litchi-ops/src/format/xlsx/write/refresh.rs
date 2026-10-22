@@ -32,7 +32,7 @@ pub(crate) fn refresh(
     let names = file.workbook()?.worksheet_names()?;
     handle.check_source()?;
     let result = (|| {
-        let source = handle.editor()?;
+        let source = handle.editor_for_write()?;
         let mut edit = source.edit().map_err(native_error)?;
         let mut fields: Vec<Field> = Vec::with_capacity(report.formulas().len());
         let mut writes = 0usize;

@@ -78,7 +78,7 @@ pub(crate) fn import(
             })?;
         let native_limits =
             TransferLimits::new(image_budget, limits.max_expanded_targets(), 1, image_budget);
-        let package = package_from_editor(file.editor()?);
+        let package = package_from_editor(file.editor_for_write()?);
         let mut edit = package
             .edit_cell_values_with_options(
                 NativeSelector::from(sheet),

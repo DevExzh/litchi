@@ -26,7 +26,7 @@ pub(crate) fn merge(
 ) -> Result<(Option<Commit>, Summary)> {
     file.check_source()?;
     let result = (|| {
-        let source = file.editor()?;
+        let source = file.editor_for_write()?;
         let workbook = source.workbook();
         let mut planner = Planner::new(record, options, limits);
         // (worksheet position, address, new text)

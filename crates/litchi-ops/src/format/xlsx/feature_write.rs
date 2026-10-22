@@ -321,7 +321,7 @@ impl Xlsx {
             return Ok(None);
         };
         let sheet = node.sheet_position();
-        let source = self.editor()?;
+        let source = self.editor_for_write()?;
         let (target, changed) = match &feature.data {
             Data::Comment(note) => {
                 let mut edit = source.edit_comments()?;
@@ -593,7 +593,7 @@ impl Xlsx {
                 return Err(error(Code::MissingProperty, "a note needs a ref").with_property("ref"));
             },
         };
-        let source = self.editor()?;
+        let source = self.editor_for_write()?;
         let mut edit = source.edit_comments()?;
         let author = author.as_deref().unwrap_or("Author");
         let runs = match runs {
@@ -654,7 +654,7 @@ impl Xlsx {
             None if text == note.text && !note.runs.is_empty() => Some(note.runs.clone()),
             None => None,
         };
-        let source = self.editor()?;
+        let source = self.editor_for_write()?;
         let mut edit = source.edit_comments()?;
         if reference != note.reference {
             if edit
@@ -800,7 +800,7 @@ impl Xlsx {
         let link =
             xlsx::hyperlinks::Hyperlink::new(reference.clone(), location, url, display, tooltip)
                 .map_err(|error| authored(error).with_property("url"))?;
-        let source = self.editor()?;
+        let source = self.editor_for_write()?;
         let mut edit = source.edit()?;
         edit.put_hyperlink(parent.sheet, link).map_err(authored)?;
         let native = edit.commit()?;
@@ -844,7 +844,7 @@ impl Xlsx {
         let replacement =
             xlsx::hyperlinks::Hyperlink::new(new_reference, location, url, display, tooltip)
                 .map_err(|error| authored(error).with_property("url"))?;
-        let source = self.editor()?;
+        let source = self.editor_for_write()?;
         let mut edit = source.edit()?;
         if replacement.reference() != link.reference() {
             edit.remove_hyperlink(sheet, link.reference().clone())?;
@@ -1297,7 +1297,7 @@ impl Xlsx {
             flip_h,
             flip_v,
         };
-        let source = self.editor()?;
+        let source = self.editor_for_write()?;
         let mut edit = source.edit_drawings()?;
         let index = edit.add_picture(parent.sheet, &spec).map_err(authored)?;
         let commit = edit.commit()?;
@@ -1451,7 +1451,7 @@ impl Xlsx {
             ),
         };
         let _: &Font = &spec.font;
-        let source = self.editor()?;
+        let source = self.editor_for_write()?;
         let mut edit = source.edit_drawings()?;
         let index = edit.add_shape(parent.sheet, &spec).map_err(authored)?;
         let commit = edit.commit()?;
@@ -1551,7 +1551,7 @@ impl Xlsx {
         } else {
             ElementKind::Shape
         };
-        let source = self.editor()?;
+        let source = self.editor_for_write()?;
         let mut edit = source.edit_drawings()?;
         // A `src`-only set leaves the anchor alone: no anchor rewrite.
         if image.is_none() || change != Change::default() {
@@ -2219,7 +2219,7 @@ impl Xlsx {
             Some(ranges) => ranges,
             None => cf_ranges("ref", parent.reference.as_deref().unwrap_or("A1:A10"))?,
         };
-        let source = self.editor()?;
+        let source = self.editor_for_write()?;
         let mut edit = source.edit_conditional_formats()?;
         let mut formats = edit.formats(parent.sheet)?;
         let priority = formats
@@ -2255,7 +2255,7 @@ impl Xlsx {
 
     fn set_cf(&self, sheet: usize, feature: &Feature, props: &Props<'_>) -> Result<Commit> {
         let request = cf_request(Operation::Set, props)?;
-        let source = self.editor()?;
+        let source = self.editor_for_write()?;
         let mut edit = source.edit_conditional_formats()?;
         let mut formats = edit.formats(sheet)?;
         let format = formats
@@ -2525,7 +2525,7 @@ impl Xlsx {
         validation.set_show_error_message(true);
         validation.set_show_input_message(true);
         apply_validation(&mut validation, props, Operation::Add)?;
-        let source = self.editor()?;
+        let source = self.editor_for_write()?;
         let mut edit = source.edit_data_validations()?;
         let mut collections = edit.validations(parent.sheet)?;
         let added = rects(validation.sqref());
@@ -2570,7 +2570,7 @@ impl Xlsx {
     }
 
     fn set_validation(&self, sheet: usize, feature: &Feature, props: &Props<'_>) -> Result<Commit> {
-        let source = self.editor()?;
+        let source = self.editor_for_write()?;
         let mut edit = source.edit_data_validations()?;
         let mut collections = edit.validations(sheet)?;
         let (collection, item) = locate(&collections, feature.index)?;
@@ -2872,7 +2872,7 @@ impl Xlsx {
         let range = range.ok_or_else(|| missing("range", "an auto-filter needs a range"))?;
         let mut definition = filter_range("range", &range)?;
         definition.columns = filter_columns(criteria)?;
-        let source = self.editor()?;
+        let source = self.editor_for_write()?;
         let mut edit = source.edit_auto_filter()?;
         edit.set_auto_filter(parent.sheet, Some(definition))
             .map_err(authored)?;
@@ -2883,7 +2883,7 @@ impl Xlsx {
     }
 
     fn set_autofilter(&self, sheet: usize, props: &Props<'_>) -> Result<Commit> {
-        let source = self.editor()?;
+        let source = self.editor_for_write()?;
         let mut edit = source.edit_auto_filter()?;
         let mut definition = edit
             .auto_filter(sheet)?
@@ -3024,7 +3024,7 @@ impl Xlsx {
         }
         let index = breaks.partition_point(|held| held.id() < item.id());
         breaks.insert(index, item);
-        let source = self.editor()?;
+        let source = self.editor_for_write()?;
         let commit = self.publish_breaks(source, parent.sheet, kind, breaks)?;
         Ok((
             commit,
@@ -3050,7 +3050,7 @@ impl Xlsx {
         }
         let index = breaks.partition_point(|held| held.id() < item.id());
         breaks.insert(index, item);
-        let source = self.editor()?;
+        let source = self.editor_for_write()?;
         self.publish_breaks(source, sheet, feature.kind, breaks)
     }
 }

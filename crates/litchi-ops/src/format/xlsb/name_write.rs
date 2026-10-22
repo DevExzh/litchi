@@ -120,7 +120,7 @@ fn sheet_position(file: &Xlsb, name: &str, property: &'static str) -> Result<usi
 }
 
 fn edit(file: &Xlsb, limits: &SemanticLimits) -> Result<litchi_xlsb::cell_values::structure::Edit> {
-    let package = package_from_editor(file.editor()?);
+    let package = package_from_editor(file.editor_for_write()?);
     let native_limits = litchi_xlsb::cell_values::TransferLimits::new(
         limits.max_snapshot_bytes(),
         limits.max_expanded_targets(),

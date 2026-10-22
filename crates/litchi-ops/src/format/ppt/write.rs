@@ -170,7 +170,7 @@ pub(crate) fn set_with_limits<'p, 'v>(
     props: impl IntoProps<'v>,
     limits: &SemanticLimits,
 ) -> Result<WriteCommit> {
-    file.admit_edit()?;
+    file.admit_edit_for_write()?;
     let props = Props::from_props(props)?;
     if crate::format::ole_metadata::is_target(&target) {
         return file.set_metadata(&props, limits);
@@ -181,7 +181,7 @@ pub(crate) fn set_with_limits<'p, 'v>(
     }
     let plans = build_plans(nodes, &props, limits)?;
     let native = stage_plans(file, plans, limits)?;
-    file.check_source()?;
+    file.check_source_for_write()?;
     finish_commit(file, native, limits)
 }
 
@@ -197,7 +197,7 @@ pub(crate) fn remove_with_limits(
     target: TargetArg<'_>,
     limits: &SemanticLimits,
 ) -> Result<WriteCommit> {
-    file.admit_edit()?;
+    file.admit_edit_for_write()?;
     let nodes = resolve_remove_nodes(file, &target, limits)?;
     if nodes
         .first()
@@ -236,7 +236,7 @@ pub(crate) fn remove_with_limits(
         }
         Ok(())
     })?;
-    file.check_source()?;
+    file.check_source_for_write()?;
     finish_commit(file, native, limits)
 }
 
@@ -254,7 +254,7 @@ pub(crate) fn add_with_limits(
     node: crate::NewNode<'_>,
     limits: &SemanticLimits,
 ) -> Result<(WriteCommit, crate::path::Path<'static>)> {
-    file.admit_edit()?;
+    file.admit_edit_for_write()?;
     let parent = crate::path::resolve::get(&Nav::new(file), &parent)?;
     if node.kind().eq_ignore_ascii_case("comment") {
         return elements::add_comment(file, &parent, &node, limits);
@@ -338,7 +338,7 @@ pub(crate) fn add_with_limits(
     let native = stage_structural(file, 1, limits, move |edit| {
         edit.insert_slide(Position::new(position))
     })?;
-    file.check_source()?;
+    file.check_source_for_write()?;
     let commit = finish_commit(file, native, limits)?;
     Ok((
         commit,
@@ -358,7 +358,7 @@ pub(crate) fn move_to_with_limits<'p, 'q>(
     placement: Placement<'q>,
     limits: &SemanticLimits,
 ) -> Result<WriteCommit> {
-    file.admit_edit()?;
+    file.admit_edit_for_write()?;
     let from = resolve_slide_path(file, &path)?;
     let count = file.slide_count()?;
     let destination = move_destination(file, from, count, &placement)?;
@@ -369,7 +369,7 @@ pub(crate) fn move_to_with_limits<'p, 'q>(
         }
         Ok(())
     })?;
-    file.check_source()?;
+    file.check_source_for_write()?;
     finish_commit(file, native, limits)
 }
 
@@ -385,7 +385,7 @@ pub(crate) fn swap_with_limits<'p, 'q>(
     right: PathArg<'q>,
     limits: &SemanticLimits,
 ) -> Result<WriteCommit> {
-    file.admit_edit()?;
+    file.admit_edit_for_write()?;
     let left = resolve_slide_path(file, &left)?;
     let right = resolve_slide_path(file, &right)?;
     let operations = if left == right {
@@ -408,7 +408,7 @@ pub(crate) fn swap_with_limits<'p, 'q>(
         }
         Ok(())
     })?;
-    file.check_source()?;
+    file.check_source_for_write()?;
     finish_commit(file, native, limits)
 }
 
@@ -438,7 +438,7 @@ fn resolve_nodes<'f>(
     } else {
         return Err(empty_target());
     }
-    file.check_source()?;
+    file.check_source_for_write()?;
     if nodes.is_empty() {
         return Err(
             Error::new(Code::ZeroMatches, "mutation selector matched no element")
@@ -486,7 +486,7 @@ fn resolve_remove_nodes<'f>(
     } else {
         return Err(empty_target());
     }
-    file.check_source()?;
+    file.check_source_for_write()?;
     if nodes.is_empty() {
         return Err(
             Error::new(Code::ZeroMatches, "mutation selector matched no slide")
@@ -1261,7 +1261,7 @@ where
             maximum,
         }));
     }
-    let package = file.editable_package()?;
+    let package = file.editable_package_for_write()?;
     // The before image alone is a lower bound; reject before the native edit
     // captures it. The complete before/after charge is checked after commit.
     let before_bytes = usize::try_from(package.shared_ole_file().file_size()).unwrap_or(usize::MAX);
@@ -1296,7 +1296,7 @@ fn stage_plans(
             maximum,
         }));
     }
-    let package = file.editable_package()?;
+    let package = file.editable_package_for_write()?;
     // The before image alone is a lower bound; reject before the native edit
     // captures it. The complete before/after charge is checked after commit.
     let before_bytes = usize::try_from(package.shared_ole_file().file_size()).unwrap_or(usize::MAX);
@@ -1368,7 +1368,7 @@ fn finish_commit(
     native: litchi_ppt::Commit,
     limits: &SemanticLimits,
 ) -> Result<WriteCommit> {
-    file.check_source()?;
+    file.check_source_for_write()?;
     let changed = !native.patch().is_noop();
     let operations = native.patch().operation_count().max(usize::from(changed));
     if 1 > limits.max_operations() {
@@ -1388,7 +1388,7 @@ fn finish_commit(
     } else {
         file.clone()
     };
-    file.check_source()?;
+    file.check_source_for_write()?;
     Ok(WriteCommit {
         before: file.clone(),
         after,

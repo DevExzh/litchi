@@ -1,10 +1,10 @@
 # 0362w — signed exact no-op replay through `File`
 
 - Date: 2026-10-22.
-- Status: the signed replay and DOCX setter slice are implemented on
-  `uo2/signed-replay`; the remaining format setter routes are queued for the
-  follow-up repair, and coordinator integration and the workspace gate remain
-  pending.
+- Status: signed replay and logical setter/cancellation handling are implemented
+  on `uo2/signed-replay`; coordinator integration and the workspace gate remain
+  pending. The focused validation build is intentionally deferred while the
+  coordinator holds new targets for disk pressure.
 - Scope: the unified `litchi_ops::transaction::Patch::apply` admission path
   and the signed replay coverage shared by the format matrix.
 
@@ -46,23 +46,26 @@ retains the old owner. The current implementation creates signed no-op
 patches from signed `File` endpoints and fingerprints every endpoint in its
 actual publication state.
 
-The authoring matrix has one explicit logical setter proof in this slice:
-DOCX paragraph text can be set to its current value through the signed leaf,
-the outer `File::Signed` transaction, and the one-shot `File::set`; all three
-retain the original signed bytes, while a changed value returns
-`document_protected`. The empty closure remains format-neutral. The same-value
-setter routes for PPTX, XLSX, XLSB and the legacy signed leaves still require
-the follow-up repair; their existing editor guards are not accepted as
-exceptions to the exact no-op rule. No setter is treated as a no-op by
-skipping target/property admission, and no unsigned candidate is used to
-restore a signature.
+The authoring matrix now retains the original signed bytes for supported
+same-value setters and for edits whose final plan cancels its intermediate
+changes. DOCX, PPTX, XLSX, XLSB, XLS and the legacy PPT leaf compare the final
+native values with the values read from the original signed owner before
+collapsing a native rewrite. A final real change, an absent cell populated with
+the native default, a formula/error cell without a complete scalar proof, or an
+invalid intermediate operation remains a signed refusal. The empty closure
+remains format-neutral. No setter is treated as a no-op by skipping
+target/property admission, and no unsigned candidate is used to restore a
+signature.
 
 The tests cover:
 
 - exact no-op replay through both a signed leaf and `File::Signed`, preserving
   the fixture bytes and signature state;
-- a supported DOCX setter through the leaf, outer transaction and one-shot
-  facade, with changed setter refusals;
+- supported same-value setters through the leaf, outer transaction and
+  one-shot facade, with changed setter refusals;
+- cancellation followed by a real change, which must remain refused;
+- an absent spreadsheet cell assigned the native default, which must remain a
+  signed change rather than matching a missing original;
 - a different signed DOCX recipient returning `invalid_input`;
 - independently reopened unsigned and `RemovalAuthorized` no-op endpoints
   matching each other while both conflict with a signed recipient;
@@ -74,7 +77,9 @@ The tests cover:
   unsigned authorized no-op negatives for every signed format route;
 - locked and unlocked-encrypted recipient protection remaining intact.
 
-Validation on the capped one-job target used no external fixtures:
+The earlier signed replay slice was validated on the capped one-job target
+with no external fixtures. This follow-up's focused build and tests are still
+pending the coordinator's disk-pressure hold:
 
 ```text
 cargo fmt --all -- --check
@@ -91,5 +96,5 @@ cargo test -p litchi-ops --lib --all-features \
   every_signed_input_follows_the_explicit_signature_policy
 ```
 
-All commands passed. No native timing or performance qualification is claimed
-in this record.
+No new build or native timing/performance qualification is claimed in this
+record.

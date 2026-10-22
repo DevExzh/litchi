@@ -498,7 +498,7 @@ fn limit(kind: LimitKind, observed: usize, maximum: usize) -> Result<()> {
 impl Doc {
     /// The retained native owner, or the typed refusal for a released one.
     fn edit_source(&self) -> Result<litchi_doc::Package> {
-        self.editable_package()?.ok_or_else(|| {
+        self.editable_package_for_write()?.ok_or_else(|| {
             Error::new(
                 Code::UnsupportedCapability,
                 "the DOC document was opened without retaining its source for editing",
@@ -525,6 +525,9 @@ impl Doc {
         let commit = edit.commit()?;
         let changed = commit.diagnostics().changed();
         let (package, patch) = commit.into_parts();
+        if changed && self.signature() == super::Signature::Signed {
+            return Err(super::signature::refusal(FileFormat::Doc));
+        }
         let snapshot_bytes = super::patch_snapshot_bytes(&patch);
         limit(
             LimitKind::SnapshotBytes,
@@ -551,7 +554,7 @@ impl Doc {
         props: impl IntoProps<'v>,
         limits: &SemanticLimits,
     ) -> Result<WriteCommit> {
-        self.check_source()?;
+        self.check_source_for_write()?;
         let result = (|| -> Result<WriteCommit> {
             let props = Props::from_props(props)?;
             if crate::format::ole_metadata::is_target(&target) {
@@ -631,7 +634,7 @@ impl Doc {
             }
             self.publish(edit, operations, limits)
         })();
-        self.check_source()?;
+        self.check_source_for_write()?;
         result
     }
 

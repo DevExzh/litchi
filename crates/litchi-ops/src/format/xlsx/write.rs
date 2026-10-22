@@ -42,7 +42,7 @@ impl Commit {
         source: xlsx::Package,
         native: xlsx::workbook::Commit,
     ) -> Result<Self> {
-        base.check_source()?;
+        base.check_source_for_replay()?;
         let result = (|| {
             let (target, native_patch) = native.into_parts();
             let changed = !source.same_content(&target).map_err(native_error)?;
@@ -58,7 +58,7 @@ impl Commit {
                 native_patch,
             })
         })();
-        base.check_source()?;
+        base.check_source_for_replay()?;
         result
     }
 
@@ -86,6 +86,10 @@ impl Commit {
     /// Consume the result for the format-neutral one-shot setter.
     pub(crate) fn into_file(self) -> Xlsx {
         self.after_xlsx
+    }
+
+    pub(super) fn is_noop_for(&self, base: &Xlsx) -> bool {
+        self.after_xlsx.same_snapshot(base)
     }
 
     /// The handle after the operation.
@@ -234,10 +238,28 @@ impl Xlsx {
         props: impl IntoProps<'v>,
         limits: &SemanticLimits,
     ) -> Result<Commit> {
-        self.check_source()?;
+        if self.signature() == super::Signature::Signed {
+            self.check_source_for_replay()?;
+        } else {
+            self.check_source_for_replay()?;
+        }
         let result = self.set_inner(target, props, limits);
-        self.check_source()?;
-        result
+        if self.signature() == super::Signature::Signed {
+            self.check_source_for_replay()?;
+        } else {
+            self.check_source_for_replay()?;
+        }
+        if self.signature() == super::Signature::Signed {
+            result.and_then(|commit| {
+                if commit.is_noop_for(self) {
+                    Ok(commit)
+                } else {
+                    Err(Error::signed(FileFormat::Xlsx))
+                }
+            })
+        } else {
+            result
+        }
     }
 
     fn set_inner<'p, 'v>(
@@ -280,7 +302,7 @@ impl Xlsx {
         // Even an empty property list must honor signed, retained-source and
         // encrypted edit policy.  Native empty commits return the original
         // unified handle below, preserving exact source bytes on a no-op.
-        let source = self.editor()?;
+        let source = self.editor_for_write()?;
         let mut edit = source.edit().map_err(native_error)?;
         cells.apply(&mut edit)?;
         let native = edit.commit().map_err(native_error)?;
@@ -322,7 +344,7 @@ impl Xlsx {
         } else {
             Some(PreparedCells::new(self, target, props, limits)?)
         };
-        let source = self.editor()?;
+        let source = self.editor_for_write()?;
         let mut edit = source.edit().map_err(native_error)?;
         if let Some(cells) = &cells {
             cells.apply(&mut edit)?;
@@ -425,7 +447,7 @@ fn admit_targets(
         );
     };
 
-    file.check_source()?;
+    file.check_source_for_replay()?;
     if !matched {
         return Err(Error::new(
             Code::ZeroMatches,
@@ -2938,7 +2960,7 @@ pub(crate) mod coalesce {
     use crate::transaction::{Error as TransactionError, SemanticLimits};
     use litchi_core::FileFormat;
     use litchi_xlsx as xlsx;
-    use std::collections::HashSet;
+    use std::collections::{HashMap, HashSet};
 
     /// One admitted direct cell payload assignment.
     pub(crate) struct Plan {
@@ -2975,8 +2997,11 @@ pub(crate) mod coalesce {
         edit: xlsx::workbook::Edit,
         items: Vec<Item>,
         seen: HashSet<CellTarget>,
+        initial: HashMap<CellTarget, xlsx::State>,
+        final_states: HashMap<CellTarget, xlsx::State>,
         staged_bytes: usize,
         max_staged_bytes: usize,
+        allow_repeated: bool,
     }
 
     impl Xlsx {
@@ -2989,7 +3014,7 @@ pub(crate) mod coalesce {
             props: &Props<'_>,
             limits: &SemanticLimits,
         ) -> Result<Option<Plan>> {
-            self.check_source()?;
+            self.check_source_for_replay()?;
             let result = (|| {
                 let Some(path) = target.path() else {
                     return Ok(None);
@@ -3069,7 +3094,9 @@ pub(crate) mod coalesce {
                 // against that owner so a retained source does not stream
                 // the worksheet again for each command in this run.
                 let prepared = match &self.0.owner {
-                    super::super::XlsxOwner::Source(_) => Some(self.adopt_workbook(self.editor()?)),
+                    super::super::XlsxOwner::Source(_) => {
+                        Some(self.adopt_workbook(self.editor_for_write()?))
+                    },
                     _ => None,
                 };
                 let resolved = prepared.as_ref().unwrap_or(self);
@@ -3084,7 +3111,7 @@ pub(crate) mod coalesce {
                     staged_bytes,
                 }))
             })();
-            let freshness = self.check_source();
+            let freshness = self.check_source_for_replay();
             freshness.and(result)
         }
     }
@@ -3092,10 +3119,10 @@ pub(crate) mod coalesce {
     impl Run {
         /// Promote/admit the native source once for this run.
         pub(crate) fn new(base: &Xlsx, limits: &SemanticLimits) -> Result<Self> {
-            base.check_source()?;
-            let source = base.editor()?;
+            base.check_source_for_replay()?;
+            let source = base.editor_for_write()?;
             let edit = source.edit().map_err(native_error)?;
-            base.check_source()?;
+            base.check_source_for_replay()?;
             Ok(Self {
                 base: base.clone(),
                 resolution: base.adopt_workbook(source.clone()),
@@ -3103,8 +3130,11 @@ pub(crate) mod coalesce {
                 edit,
                 items: Vec::new(),
                 seen: HashSet::new(),
+                initial: HashMap::new(),
+                final_states: HashMap::new(),
                 staged_bytes: 0,
                 max_staged_bytes: limits.max_staged_bytes(),
+                allow_repeated: base.signature() == crate::format::signature::Signature::Signed,
             })
         }
 
@@ -3116,9 +3146,9 @@ pub(crate) mod coalesce {
             props: &Props<'_>,
             limits: &SemanticLimits,
         ) -> Result<Option<Plan>> {
-            self.base.check_source()?;
+            self.base.check_source_for_replay()?;
             let result = self.resolution.cell_plan(target, props, limits);
-            self.base.check_source()?;
+            self.base.check_source_for_replay()?;
             result
         }
 
@@ -3132,7 +3162,7 @@ pub(crate) mod coalesce {
         /// cumulative staged-byte boundary.  The plan itself has already
         /// passed the per-cell admission bound.
         pub(crate) fn requires_barrier(&self, plan: &Plan, limits: &SemanticLimits) -> bool {
-            self.seen.contains(&plan.key())
+            self.seen.contains(&plan.key()) && !self.allow_repeated
                 || self
                     .staged_bytes
                     .checked_add(plan.charge())
@@ -3146,7 +3176,7 @@ pub(crate) mod coalesce {
         /// refusal, because staging after it would make changed attribution
         /// ambiguous.
         pub(crate) fn stage(&mut self, plan: Plan, index: usize) -> Result<bool> {
-            if self.seen.contains(&plan.key())
+            if self.seen.contains(&plan.key()) && !self.allow_repeated
                 || self
                     .staged_bytes
                     .checked_add(plan.charge())
@@ -3158,7 +3188,7 @@ pub(crate) mod coalesce {
                 )
                 .with_format(FileFormat::Xlsx));
             }
-            self.base.check_source()?;
+            self.base.check_source_for_replay()?;
             self.items
                 .try_reserve(1)
                 .map_err(|source| TransactionError::Allocation { source })?;
@@ -3171,7 +3201,7 @@ pub(crate) mod coalesce {
                 self.staged_bytes = self.staged_bytes.saturating_add(plan.charge());
                 self.items.push(Item { plan, index });
             });
-            let freshness = self.base.check_source();
+            let freshness = self.base.check_source_for_replay();
             freshness.and(result)
         }
 
@@ -3188,6 +3218,8 @@ pub(crate) mod coalesce {
                     .with_format(FileFormat::Xlsx)
                 })?;
             let before = worksheet.state(plan.target.address).map_err(native_error)?;
+            let key = plan.key();
+            self.initial.entry(key).or_insert_with(|| before.clone());
             match &plan.operation {
                 CellOperation::Set(content) => worksheet
                     .set(plan.target.address, content.clone())
@@ -3200,6 +3232,7 @@ pub(crate) mod coalesce {
                 },
             };
             let after = worksheet.state(plan.target.address).map_err(native_error)?;
+            self.final_states.insert(key, after.clone());
             Ok(before != after)
         }
 
@@ -3212,14 +3245,29 @@ pub(crate) mod coalesce {
                 source,
                 edit,
                 items,
+                initial,
+                final_states,
+                allow_repeated: _,
                 ..
             } = self;
-            base.check_source()?;
+            let logical_noop = !initial.is_empty()
+                && initial
+                    .iter()
+                    .all(|(key, before)| final_states.get(key) == Some(before));
+            base.check_source_for_replay()?;
             let result = edit
                 .commit()
                 .map_err(native_error)
-                .and_then(|native| make_commit(&base, &source, native));
-            let freshness = base.check_source();
+                .and_then(|native| make_commit(&base, &source, native))
+                .map(|(after, mut commit)| {
+                    if logical_noop {
+                        commit.after_xlsx = base.clone();
+                        (base.clone(), commit)
+                    } else {
+                        (after, commit)
+                    }
+                });
+            let freshness = base.check_source_for_replay();
             match freshness.and(result) {
                 Ok(commit) => Ok(commit),
                 Err(error) => Err(locate_failure(&base, &source, &items, error)),
@@ -3237,7 +3285,7 @@ pub(crate) mod coalesce {
     }
 
     fn replay(base: &Xlsx, source: &xlsx::Package, items: &[Item]) -> Result<xlsx::Package> {
-        base.check_source()?;
+        base.check_source_for_replay()?;
         let mut edit = source.clone().edit().map_err(native_error)?;
         for item in items {
             stage_replay(&mut edit, &item.plan).map_err(|error| error.with_item(item.index))?;
@@ -3246,7 +3294,7 @@ pub(crate) mod coalesce {
             let (target, _) = commit.into_parts();
             target
         });
-        let freshness = base.check_source();
+        let freshness = base.check_source_for_replay();
         freshness.and(result)
     }
 

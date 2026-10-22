@@ -236,6 +236,13 @@ impl Xlsx {
         self.0.owner.ensure_current()
     }
 
+    /// Check only retained-source freshness for a setter that may establish
+    /// an exact signed no-op. Signature and encryption policy are applied by
+    /// the native editor and the final byte-identity fence.
+    pub(crate) fn check_source_for_replay(&self) -> Result<()> {
+        self.0.owner.ensure_current()
+    }
+
     /// Admit an edit without publishing one. The transaction coordinator uses
     /// the same signature, retention and leaf encryption policy as the write
     /// adapter before it begins a multi-step edit.
@@ -583,8 +590,27 @@ impl Xlsx {
         if self.0.signature() == Signature::Signed {
             return Err(signature::refusal(FileFormat::Xlsx));
         }
+        self.editor_after_source_check(false)
+    }
+
+    /// Build a native editor for a setter that may prove an exact signed
+    /// no-op. Changed commits are rejected by the setter/commit fence; the
+    /// signed package is kept intact while the native edit is staged.
+    pub(crate) fn editor_for_write(&self) -> Result<xlsx::Package> {
+        if self.0.signature() == Signature::Signed && !self.0.retain_source {
+            return Err(source_released());
+        }
+        self.editor_after_source_check(self.0.signature() == Signature::Signed)
+    }
+
+    fn editor_after_source_check(&self, allow_signed: bool) -> Result<xlsx::Package> {
         if !self.0.retain_source {
             return Err(source_released());
+        }
+        if allow_signed {
+            self.check_source_for_replay()?;
+        } else {
+            self.check_source()?;
         }
         match self.0.signature() {
             Signature::RemovalAuthorized => self.unsigned_workbook(),
@@ -592,6 +618,7 @@ impl Xlsx {
                 XlsxOwner::Source(workbook) => self.promote_source(workbook),
                 XlsxOwner::Eager(workbook) => Ok(workbook.clone()),
             },
+            Signature::Signed if allow_signed => self.unsigned_workbook(),
             Signature::Signed => unreachable!("signed handles return before source fencing"),
         }
     }
