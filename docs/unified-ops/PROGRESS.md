@@ -2069,3 +2069,44 @@ See [0063](0063-source-pptx-modern-comments.md).
   candidates, final inventory/glossary, corpus dispositions and the final
   combined gate remain required. The user authorized additional parallel
   workers; builds remain capped. Nothing has been pushed.
+
+- Coordinator checkpoint (2026-10-22, legacy/ODF assembly and replay review):
+  The integration branch reaches `bf529cb322`. It contains the detector and
+  resave-lock repairs `557577e512`, ZIP integration `532cd8634b`, and W5/ODF
+  through `8d1199f45e`. Record 0362uc preserves all three failed all-features
+  harness attempts and the passing repairs: current XLSX adapters take
+  precedence over legacy adapters, and the XLSB CRUD driver uses the fixed
+  error reason. The locked workspace all-target/all-feature check, locked
+  harness and native-resave checks, benchmark matrix and crate boundaries
+  pass. The ZIP integration passes 657 tests with two existing ignored tests;
+  the detector facade passes all 20 doctests. These remain assembly receipts,
+  not final trunk or native-performance acceptance.
+
+  DOCX SVG cleanup `135a7b6e63` is being validated in that assembly. Variables
+  reach `5200fb8743`, with a further borrowed/owned input-policy review open.
+  Standalone document, section, story/glossary, paragraph-copy and
+  redaction/sanitize/hyperlink API migrations have separate workers. Public
+  raw codec capabilities must remain available without renamed snapshot
+  publication or additional per-operation copies. The fresh full-feature
+  SVG capture passes both policy checks; a separate minimal-feature capture
+  and the final combined inventory remain required.
+
+  XLSB `89146628f3` re-admits durable content under the recipient's actual
+  raw limits rather than rejecting a wider producer profile. Review found
+  additional stale-base error paths; 0360el is repairing these and checking
+  byte admission before copying replay images. Separate ODF and legacy
+  reviews are repairing public replay/freshness classifications. Substrate
+  scope record 0362rd is an audit proposal, not an exemption or completed
+  migration.
+
+  Signed replay candidate `7e7cfe421c` was returned: an unsigned endpoint
+  cannot be promoted to signed merely because it retains old source bytes.
+  The repair must construct and replay an actual signed no-op while preserving
+  independently reopened unsigned equivalence. ODP candidate `bd7a095a56`
+  reduces cold heap but retains a semantic reread/allocation regression;
+  0362ya records it without acceptance. The iWork object-size and constructor
+  costs, W4 admission residual, DOC body-toggle work and RTF refusal cost
+  remain open. Record 0359r rejects the measured packed-Refusal experiment.
+  Final semantic integration tests, native qualification, corpus dispositions,
+  inventory/glossary closure and the complete assembled gate remain required.
+  Nothing has been pushed.
