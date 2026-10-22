@@ -1918,6 +1918,216 @@ fn odf_refusals_classify_by_kind_and_patch_conflicts_are_invalid_input() {
     assert_eq!(OdfError::Signed.classify().code, Code::DocumentProtected);
 }
 
+#[cfg(feature = "odp")]
+#[test]
+fn odp_source_append_public_errors_classify_stale_and_patch_bases() {
+    use litchi_core::SourceVersion;
+    use litchi_odf_common::SourceContentPublicationProgress;
+    use litchi_odp::tail_append::Error as AppendError;
+
+    let stale = Error::from(AppendError::SourceChanged {
+        expected: SourceVersion::new(0x100, 1),
+        observed: SourceVersion::new(0x100, 2),
+        progress: SourceContentPublicationProgress::Complete { bytes: 17 },
+        source: None,
+    });
+    assert_eq!(stale.code(), Code::IoError);
+    assert!(matches!(
+        stale.leaf(),
+        Source::OdpTailAppend(AppendError::SourceChanged { .. })
+    ));
+
+    let conflict = Error::from(AppendError::PatchConflict {
+        operation: "odp.tail_append.apply",
+        reason: "recorded base differs",
+    });
+    assert_eq!(conflict.code(), Code::InvalidInput);
+    assert!(matches!(
+        conflict.leaf(),
+        Source::OdpTailAppend(AppendError::PatchConflict { .. })
+    ));
+}
+
+#[cfg(feature = "odp")]
+#[test]
+fn odp_source_publication_errors_keep_typed_progress_through_facade() {
+    use super::Classify as _;
+    use litchi_core::SourceVersion;
+    use litchi_odf_common::{
+        Error as OdfError, SourceContentPublicationError, SourceContentPublicationProgress,
+    };
+
+    let expected = SourceVersion::new(0x200, 1);
+    let observed = SourceVersion::new(0x200, 2);
+    let source_error = OdfError::from(SourceContentPublicationError::SourceChanged {
+        expected,
+        observed,
+        progress: SourceContentPublicationProgress::Complete { bytes: 23 },
+    });
+    assert_eq!(source_error.classify().code, Code::IoError);
+    let unified = Error::from(source_error);
+    assert_eq!(unified.code(), Code::IoError);
+    assert!(matches!(
+        unified.leaf(),
+        Source::Odf(OdfError::SourceContentPublication(_))
+    ));
+}
+
+#[cfg(feature = "odp")]
+#[test]
+fn odp_archive_replay_prefers_typed_stale_callback_over_content_fault() {
+    use litchi_core::SourceVersion;
+    use litchi_odf_common::{
+        Error as OdfError, SourceContentInsertionCallbackError, SourceContentInsertionError,
+        SourceContentPublicationError, SourceContentPublicationProgress, SourceMemberReaderError,
+    };
+    use soapberry_zip::{ErrorKind, ReplayPass, ReplayProgress, ReplayPublicationError};
+
+    let expected = SourceVersion::new(0x300, 1);
+    let observed = SourceVersion::new(0x300, 2);
+    let stale_callback = || {
+        SourceContentInsertionCallbackError::Member(Box::new(SourceMemberReaderError::Core {
+            error: litchi_core::Error::SourceChanged { expected, observed },
+            callback_error: Some(SourceContentInsertionCallbackError::Verification {
+                what: "secondary proof",
+            }),
+        }))
+    };
+    let replay = ReplayPublicationError::Archive {
+        pass: ReplayPass::Emit,
+        source: soapberry_zip::Error::from(ErrorKind::InvalidInput {
+            msg: "malformed archive member".to_string(),
+        }),
+        callback_error: Some(stale_callback()),
+        progress: ReplayProgress::Complete { bytes: 19 },
+    };
+    let odf = OdfError::from(SourceContentInsertionError::Replay {
+        progress: SourceContentPublicationProgress::Complete { bytes: 19 },
+        source: replay,
+    });
+
+    let unified = Error::from(odf);
+    assert_eq!(unified.code(), Code::IoError);
+    assert!(matches!(
+        unified.leaf(),
+        Source::Odf(OdfError::SourceContentInsertion(_))
+    ));
+
+    let archive_with_cancelled_callback = ReplayPublicationError::Archive {
+        pass: ReplayPass::Emit,
+        source: soapberry_zip::Error::from(ErrorKind::InvalidInput {
+            msg: "malformed archive member".to_string(),
+        }),
+        callback_error: Some(SourceContentInsertionCallbackError::Cancelled),
+        progress: ReplayProgress::Untouched,
+    };
+    let cancelled = Error::from(OdfError::from(SourceContentInsertionError::Replay {
+        progress: SourceContentPublicationProgress::Untouched,
+        source: archive_with_cancelled_callback,
+    }));
+    assert_eq!(cancelled.code(), Code::CorruptFile);
+
+    let transport = Error::from(OdfError::from(SourceContentInsertionError::Transport {
+        progress: SourceContentPublicationProgress::Complete { bytes: 19 },
+        publication: SourceContentPublicationError::Unsupported {
+            reason: "unsupported test source".to_string(),
+        },
+        replay: Box::new(ReplayPublicationError::Callback {
+            pass: ReplayPass::Emit,
+            source: stale_callback(),
+            progress: ReplayProgress::Complete { bytes: 19 },
+        }),
+    }));
+    assert_eq!(transport.code(), Code::IoError);
+}
+
+#[cfg(feature = "odp")]
+#[test]
+fn odp_public_source_replay_classifies_actual_stale_and_conflicting_inputs() {
+    use std::io;
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    use litchi_core::{OwnedSource, ReadAt};
+    use litchi_odf_common::constants::{ODF_CONTENT, ODF_PRESENTATION};
+    use litchi_odf_common::core::PackageWriter;
+    use litchi_odp::SourceBackedPresentation;
+
+    const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
+    const DRAW: &str = "urn:oasis:names:tc:opendocument:xmlns:drawing:1.0";
+
+    fn package_bytes(page_name: &str) -> Vec<u8> {
+        let content = format!(
+            r#"<office:document-content xmlns:office="{OFFICE}" xmlns:draw="{DRAW}"><office:body><office:presentation><draw:page draw:name="{page_name}"/></office:presentation></office:body></office:document-content>"#
+        );
+        let mut writer = PackageWriter::new();
+        writer.set_mimetype(ODF_PRESENTATION).unwrap();
+        writer.add_file(ODF_CONTENT, content.as_bytes()).unwrap();
+        writer.finish_to_bytes().unwrap()
+    }
+
+    struct VersionedSource {
+        bytes: Vec<u8>,
+        revision: AtomicU64,
+    }
+
+    impl ReadAt for VersionedSource {
+        fn len(&self) -> io::Result<u64> {
+            u64::try_from(self.bytes.len())
+                .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "length overflow"))
+        }
+
+        fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
+            let offset = usize::try_from(offset)
+                .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "offset overflow"))?;
+            if offset >= self.bytes.len() {
+                return Ok(0);
+            }
+            let count = output.len().min(self.bytes.len() - offset);
+            output[..count].copy_from_slice(&self.bytes[offset..offset + count]);
+            Ok(count)
+        }
+
+        fn version(&self) -> io::Result<SourceVersion> {
+            Ok(SourceVersion::new(
+                0x4f44_505f_6661_6365,
+                self.revision.load(Ordering::Relaxed),
+            ))
+        }
+    }
+
+    let source = Arc::new(VersionedSource {
+        bytes: package_bytes("page1"),
+        revision: AtomicU64::new(0),
+    });
+    let owner = SourceBackedPresentation::from_read_at(source.clone()).unwrap();
+    let commit = owner
+        .edit_tail_append("title", "body")
+        .unwrap()
+        .commit()
+        .unwrap();
+
+    source.revision.fetch_add(1, Ordering::Relaxed);
+    let stale_leaf = match owner.apply_tail_append(commit.patch()) {
+        Ok(_) => panic!("a changed source must reject the replay"),
+        Err(error) => error,
+    };
+    let stale = Error::from(stale_leaf);
+    assert_eq!(stale.code(), Code::IoError);
+    assert!(matches!(stale.leaf(), Source::OdpTailAppend(_)));
+
+    let conflicting = SourceBackedPresentation::from_read_at(Arc::new(OwnedSource::new(
+        package_bytes("other-page"),
+    )))
+    .unwrap();
+    let conflict_leaf = match conflicting.apply_tail_append(commit.patch()) {
+        Ok(_) => panic!("a different recipient must reject the patch"),
+        Err(error) => error,
+    };
+    let conflict = Error::from(conflict_leaf);
+    assert_eq!(conflict.code(), Code::InvalidInput);
+    assert!(matches!(conflict.leaf(), Source::OdpTailAppend(_)));
+}
+
 // Record 0351 (W1): DOCX refusals classify by kind alone, a patch made for
 // another base is the caller's input, and a broken invariant is internal.
 #[cfg(feature = "docx")]

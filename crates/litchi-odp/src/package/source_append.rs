@@ -34,10 +34,11 @@ use litchi_core::{
     CancellationToken, Error as CoreError, ExecutionError, Resource, Result, SourceVersion,
 };
 use litchi_odf_common::{
+    Error as OdfError,
     constants::ODF_CONTENT,
     core::source_publication::{
-        SourceContentInsertionError, SourceContentInsertionPlan, SourceContentScanError,
-        scan_source_content,
+        SourceContentInsertionCallbackError, SourceContentInsertionError,
+        SourceContentInsertionPlan, SourceContentScanError, scan_source_content,
     },
     core::{
         AuthoredXmlFragment, SourceBackedPackage, SourceContentPublicationError,
@@ -124,6 +125,18 @@ pub enum Error {
     /// The common insertion owner reported a typed sink/source failure after
     /// or during publication.
     Publication(SourceContentInsertionError),
+    /// The positional source changed after the append captured its proof.
+    SourceChanged {
+        /// Source identity and revision captured before the operation.
+        expected: SourceVersion,
+        /// Source identity and revision observed during the operation.
+        observed: SourceVersion,
+        /// Sink progress observed when the source became stale.
+        progress: SourceContentPublicationProgress,
+        /// The typed reader or publication diagnostic retained below the
+        /// freshness classification.
+        source: Option<Box<SourceChangedSource>>,
+    },
     /// A patch was applied to a presentation it was not made on.
     PatchConflict {
         /// The replay operation that detected the conflict.
@@ -133,6 +146,43 @@ pub enum Error {
     },
 }
 
+/// Typed diagnostic retained by [`Error::SourceChanged`].
+#[derive(Debug)]
+#[non_exhaustive]
+pub enum SourceChangedSource {
+    /// The common core freshness error observed before source publication.
+    Core(CoreError),
+    /// The verified source-member reader that observed the stale source.
+    SourceMember(SourceMemberReaderError<CoreError>),
+    /// The common source-content publication failure that observed it.
+    Publication(SourceContentPublicationError),
+    /// The common source-content insertion failure that observed it, keeping
+    /// replay and callback diagnostics on the effective/read path.
+    Insertion(SourceContentInsertionError),
+}
+
+impl fmt::Display for SourceChangedSource {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Core(error) => error.fmt(formatter),
+            Self::SourceMember(error) => error.fmt(formatter),
+            Self::Publication(error) => error.fmt(formatter),
+            Self::Insertion(error) => error.fmt(formatter),
+        }
+    }
+}
+
+impl std::error::Error for SourceChangedSource {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Core(error) => Some(error),
+            Self::SourceMember(error) => Some(error),
+            Self::Publication(error) => Some(error),
+            Self::Insertion(error) => Some(error),
+        }
+    }
+}
+
 impl fmt::Display for Error {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -140,6 +190,15 @@ impl fmt::Display for Error {
             Self::SourceMember(error) => error.fmt(formatter),
             Self::Plan(error) => error.fmt(formatter),
             Self::Publication(error) => error.fmt(formatter),
+            Self::SourceChanged {
+                expected,
+                observed,
+                progress,
+                ..
+            } => write!(
+                formatter,
+                "ODP source changed (expected {expected:?}, observed {observed:?}, {progress:?})"
+            ),
             Self::PatchConflict { operation, reason } => {
                 write!(formatter, "ODP patch conflict in {operation}: {reason}")
             },
@@ -154,7 +213,11 @@ impl std::error::Error for Error {
             Self::SourceMember(error) => Some(error),
             Self::Plan(error) => Some(error),
             Self::Publication(error) => Some(error),
-            Self::PatchConflict { .. } => None,
+            Self::SourceChanged {
+                source: Some(source),
+                ..
+            } => Some(source.as_ref()),
+            Self::SourceChanged { source: None, .. } | Self::PatchConflict { .. } => None,
         }
     }
 }
@@ -167,12 +230,167 @@ impl Error {
             Self::Plan(error) => Some(error.progress()),
             Self::Publication(error) => Some(error.progress()),
             Self::Invalid(_) | Self::SourceMember(_) | Self::PatchConflict { .. } => None,
+            Self::SourceChanged { progress, .. } => Some(*progress),
         }
     }
 }
 
 fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(CoreError::InvalidFormat(message.into()))
+}
+
+fn source_error(error: CoreError) -> Error {
+    match error {
+        error @ CoreError::SourceChanged { expected, observed } => Error::SourceChanged {
+            expected,
+            observed,
+            progress: SourceContentPublicationProgress::Untouched,
+            source: Some(Box::new(SourceChangedSource::Core(error))),
+        },
+        other => Error::Invalid(other),
+    }
+}
+
+fn odf_error(error: OdfError) -> Error {
+    match error {
+        OdfError::Core(error) => source_error(error),
+        OdfError::SourceContentPublication(error) => publication_error(*error),
+        OdfError::SourceContentInsertion(error) => insertion_error(*error),
+        other => Error::Invalid(CoreError::from(other)),
+    }
+}
+
+fn publication_error(error: SourceContentPublicationError) -> Error {
+    let progress = error.progress();
+    match error {
+        error @ SourceContentPublicationError::SourceChanged {
+            expected, observed, ..
+        }
+        | error @ SourceContentPublicationError::Core(CoreError::SourceChanged {
+            expected,
+            observed,
+        })
+        | error @ SourceContentPublicationError::Source {
+            source: CoreError::SourceChanged { expected, observed },
+            ..
+        } => Error::SourceChanged {
+            expected,
+            observed,
+            progress,
+            source: Some(Box::new(SourceChangedSource::Publication(error))),
+        },
+        other => Error::Plan(other),
+    }
+}
+
+fn insertion_error(error: SourceContentInsertionError) -> Error {
+    let progress = error.progress();
+    let Some((expected, observed)) = insertion_source_changed(&error) else {
+        return Error::Publication(error);
+    };
+    Error::SourceChanged {
+        expected,
+        observed,
+        progress,
+        source: Some(Box::new(SourceChangedSource::Insertion(error))),
+    }
+}
+
+fn insertion_source_changed(
+    error: &SourceContentInsertionError,
+) -> Option<(SourceVersion, SourceVersion)> {
+    match error {
+        SourceContentInsertionError::Publication { source, .. } => {
+            publication_source_changed(source)
+        },
+        SourceContentInsertionError::Replay { source, .. } => replay_source_changed(source),
+        SourceContentInsertionError::Transport {
+            publication,
+            replay,
+            ..
+        } => publication_source_changed(publication).or_else(|| replay_source_changed(replay)),
+        _ => None,
+    }
+}
+
+fn publication_source_changed(
+    error: &SourceContentPublicationError,
+) -> Option<(SourceVersion, SourceVersion)> {
+    match error {
+        SourceContentPublicationError::SourceChanged {
+            expected, observed, ..
+        }
+        | SourceContentPublicationError::Core(CoreError::SourceChanged { expected, observed })
+        | SourceContentPublicationError::Source {
+            source: CoreError::SourceChanged { expected, observed },
+            ..
+        } => Some((*expected, *observed)),
+        _ => None,
+    }
+}
+
+fn replay_source_changed(
+    error: &soapberry_zip::ReplayPublicationError<SourceContentInsertionCallbackError>,
+) -> Option<(SourceVersion, SourceVersion)> {
+    use soapberry_zip::ReplayPublicationError;
+
+    match error {
+        ReplayPublicationError::Archive { callback_error, .. }
+        | ReplayPublicationError::Limit { callback_error, .. }
+        | ReplayPublicationError::Sink { callback_error, .. } => {
+            callback_error.as_ref().and_then(callback_source_changed)
+        },
+        ReplayPublicationError::Callback { source, .. } => callback_source_changed(source),
+        ReplayPublicationError::NonDeterministic { .. } => None,
+        _ => None,
+    }
+}
+
+fn callback_source_changed(
+    error: &SourceContentInsertionCallbackError,
+) -> Option<(SourceVersion, SourceVersion)> {
+    match error {
+        SourceContentInsertionCallbackError::Member(error) => match error.as_ref() {
+            SourceMemberReaderError::Core {
+                error,
+                callback_error,
+            } => core_source_changed(error)
+                .or_else(|| callback_error.as_ref().and_then(callback_source_changed)),
+            SourceMemberReaderError::Callback(error) => callback_source_changed(error),
+            _ => None,
+        },
+        SourceContentInsertionCallbackError::Io(_)
+        | SourceContentInsertionCallbackError::Cancelled
+        | SourceContentInsertionCallbackError::Execution(_)
+        | SourceContentInsertionCallbackError::Verification { .. } => None,
+        _ => None,
+    }
+}
+
+fn core_source_changed(error: &CoreError) -> Option<(SourceVersion, SourceVersion)> {
+    match error {
+        CoreError::SourceChanged { expected, observed } => Some((*expected, *observed)),
+        _ => None,
+    }
+}
+
+fn source_member_error(error: SourceMemberReaderError<CoreError>) -> Error {
+    match error {
+        error @ SourceMemberReaderError::Core {
+            error: CoreError::SourceChanged { expected, observed },
+            ..
+        }
+        | error @ SourceMemberReaderError::Callback(CoreError::SourceChanged {
+            expected,
+            observed,
+        }) => Error::SourceChanged {
+            expected,
+            observed,
+            progress: SourceContentPublicationProgress::Untouched,
+            source: Some(Box::new(SourceChangedSource::SourceMember(error))),
+        },
+        other => Error::SourceMember(other),
+    }
 }
 
 fn check_plan_options(options: &SourceContentPublicationOptions) -> std::result::Result<(), Error> {
@@ -480,7 +698,7 @@ impl SourceBackedPresentation {
     /// source proof captured by the patch.
     pub fn apply_tail_append(&self, patch: &Patch) -> std::result::Result<Commit, Error> {
         if self.same_share(&patch.before) {
-            self.check_source().map_err(Error::Invalid)?;
+            self.check_source().map_err(source_error)?;
             return Ok(Commit::new(
                 patch.after.share(),
                 patch.clone(),
@@ -498,8 +716,8 @@ fn rebase_patch(
     recipient: &SourceBackedPresentation,
     patch: &Patch,
 ) -> std::result::Result<Commit, Error> {
-    recipient.check_source().map_err(Error::Invalid)?;
-    let base = recipient.effective().map_err(Error::Invalid)?;
+    recipient.check_source().map_err(source_error)?;
+    let base = recipient.effective_with_odf_error().map_err(odf_error)?;
     let expected = &patch.before_proof;
     let package = Arc::clone(&base.package);
     let facts = scan_source(&package, patch.limits, &patch.options)?;
@@ -558,7 +776,7 @@ fn rebase_patch(
         &patch.options,
         |_event, _tracker| Ok(()),
     )
-    .map_err(Error::Plan)?;
+    .map_err(publication_error)?;
     if common.source_content_sha256() != patch.source_content_sha256
         || common.target_content_sha256() != patch.target_content_sha256
         || common.source_content_length() != expected.content_bytes
@@ -577,7 +795,7 @@ fn rebase_patch(
         after: Arc::new(package.share()),
         ..patch.clone()
     };
-    recipient.check_source().map_err(Error::Invalid)?;
+    recipient.check_source().map_err(source_error)?;
     Ok(Commit::new(
         package,
         rebased,
@@ -629,13 +847,13 @@ impl<'a> Edit<'a> {
             limits,
             options,
         } = self;
-        let base = source.effective().map_err(Error::Invalid)?;
+        let base = source.effective_with_odf_error().map_err(odf_error)?;
         let package = Arc::clone(&base.package);
         check_plan_options(&options)?;
-        let source_version = package.source_version().map_err(Error::Invalid)?;
+        let source_version = package.source_version().map_err(source_error)?;
         let content_bytes = package
             .member_materialized_size(ODF_CONTENT)
-            .map_err(Error::Invalid)?
+            .map_err(source_error)?
             .ok_or_else(|| invalid("ODP package has no content.xml"))?;
         if content_bytes > limits.max_content_xml_bytes {
             return Err(invalid("ODP content.xml exceeds the source append limit"));
@@ -695,7 +913,7 @@ impl<'a> Edit<'a> {
             &options,
             |event, tracker| validator.observe(event, tracker),
         )
-        .map_err(Error::Plan)?;
+        .map_err(publication_error)?;
 
         Ok(Plan {
             source,
@@ -811,7 +1029,7 @@ impl Plan<'_> {
             limits,
             proof,
         } = self;
-        let base = source.effective().map_err(Error::Invalid)?;
+        let base = source.effective_with_odf_error().map_err(odf_error)?;
         let source_content_sha256 = common.source_content_sha256();
         let target_content_sha256 = common.target_content_sha256();
         let fragment: Arc<[u8]> = Arc::from(common.authored_fragment_bytes());
@@ -908,8 +1126,8 @@ fn scan_source(
         },
     )
     .map_err(|error| match error {
-        SourceContentScanError::Publication(error) => Error::Plan(error),
-        SourceContentScanError::SourceMember(error) => Error::SourceMember(error),
+        SourceContentScanError::Publication(error) => publication_error(error),
+        SourceContentScanError::SourceMember(error) => source_member_error(error),
         _ => Error::Invalid(CoreError::InvalidFormat(
             "unknown source-content scan failure".to_string(),
         )),
@@ -1753,8 +1971,11 @@ fn append_encoded_paragraph(
 mod tests {
     use super::*;
     use litchi_core::{OwnedSource, ReadAt};
+    use litchi_odf_common::Error as OdfError;
     use litchi_odf_common::constants::ODF_PRESENTATION;
     use litchi_odf_common::core::{OwnedPackage, PackageWriter};
+    use std::io;
+    use std::sync::atomic::{AtomicU64, Ordering};
 
     use super::super::Presentation;
 
@@ -1763,11 +1984,59 @@ mod tests {
     const PRESENTATION_NAMESPACE_UTF8: &str =
         "urn:oasis:names:tc:opendocument:xmlns:presentation:1.0";
 
-    fn source_package(content: &str) -> Arc<dyn ReadAt> {
+    fn source_package_bytes(content: &str) -> Vec<u8> {
         let mut writer = PackageWriter::new();
         writer.set_mimetype(ODF_PRESENTATION).unwrap();
         writer.add_file(ODF_CONTENT, content.as_bytes()).unwrap();
-        Arc::new(OwnedSource::new(writer.finish_to_bytes().unwrap()))
+        writer.finish_to_bytes().unwrap()
+    }
+
+    fn source_package(content: &str) -> Arc<dyn ReadAt> {
+        Arc::new(OwnedSource::new(source_package_bytes(content)))
+    }
+
+    struct VersionedSource {
+        bytes: Arc<Vec<u8>>,
+        revision: AtomicU64,
+    }
+
+    impl VersionedSource {
+        fn new(bytes: Vec<u8>) -> Self {
+            Self {
+                bytes: Arc::new(bytes),
+                revision: AtomicU64::new(0),
+            }
+        }
+
+        fn bump(&self) {
+            self.revision.fetch_add(1, Ordering::Relaxed);
+        }
+    }
+
+    impl ReadAt for VersionedSource {
+        fn len(&self) -> io::Result<u64> {
+            u64::try_from(self.bytes.len())
+                .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "source length overflow"))
+        }
+
+        fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
+            let offset = usize::try_from(offset).map_err(|_| {
+                io::Error::new(io::ErrorKind::InvalidInput, "source offset overflow")
+            })?;
+            if offset >= self.bytes.len() {
+                return Ok(0);
+            }
+            let count = output.len().min(self.bytes.len() - offset);
+            output[..count].copy_from_slice(&self.bytes[offset..offset + count]);
+            Ok(count)
+        }
+
+        fn version(&self) -> io::Result<SourceVersion> {
+            Ok(SourceVersion::new(
+                0x4f44_505f_7461_696c,
+                self.revision.load(Ordering::Relaxed),
+            ))
+        }
     }
 
     #[test]
@@ -2023,6 +2292,225 @@ mod tests {
         assert!(matches!(
             chained.package().apply_tail_append(commit.patch()),
             Err(Error::PatchConflict { .. })
+        ));
+    }
+
+    #[test]
+    fn stale_source_is_reported_separately_from_patch_conflict() {
+        let content = format!(
+            r#"<office:document-content xmlns:office="{OFFICE_NAMESPACE_UTF8}" xmlns:draw="{DRAW_NAMESPACE_UTF8}"><office:body><office:presentation><draw:page draw:name="page1"/></office:presentation></office:body></office:document-content>"#,
+        );
+        let source = Arc::new(VersionedSource::new(source_package_bytes(&content)));
+        let owner = SourceBackedPresentation::from_read_at(source.clone()).unwrap();
+        let commit = owner
+            .edit_tail_append("title", "body")
+            .unwrap()
+            .commit()
+            .unwrap();
+
+        source.bump();
+        assert!(matches!(
+            owner.apply_tail_append(commit.patch()),
+            Err(Error::SourceChanged { .. })
+        ));
+        assert!(matches!(
+            owner.edit_tail_append("later", "body").unwrap().prepare(),
+            Err(Error::SourceChanged { .. })
+        ));
+    }
+
+    #[cfg(any(unix, windows))]
+    #[test]
+    fn stale_save_retains_insertion_progress_and_source_diagnostic() {
+        let content = format!(
+            r#"<office:document-content xmlns:office="{OFFICE_NAMESPACE_UTF8}" xmlns:draw="{DRAW_NAMESPACE_UTF8}"><office:body><office:presentation><draw:page draw:name="page1"/></office:presentation></office:body></office:document-content>"#,
+        );
+        let source = Arc::new(VersionedSource::new(source_package_bytes(&content)));
+        let owner = SourceBackedPresentation::from_read_at(source.clone()).unwrap();
+        let committed = owner
+            .edit_tail_append("title", "body")
+            .unwrap()
+            .commit()
+            .unwrap();
+        source.bump();
+
+        let directory = tempfile::tempdir().unwrap();
+        let error = committed
+            .package()
+            .save_with_durability(
+                directory.path().join("stale.odp"),
+                litchi_core::Durability::NoSync,
+            )
+            .unwrap_err();
+        let OdfError::SourceContentInsertion(error) = error else {
+            panic!("stale save must retain insertion error, got {error:?}");
+        };
+        assert_eq!(
+            error.progress(),
+            SourceContentPublicationProgress::Untouched
+        );
+        assert!(matches!(
+            error.as_ref(),
+            SourceContentInsertionError::Publication {
+                source: SourceContentPublicationError::SourceChanged { .. },
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn effective_odf_conversion_retains_replay_progress_and_callback_diagnostic() {
+        use soapberry_zip::{ReplayPass, ReplayProgress, ReplayPublicationError};
+
+        let expected = SourceVersion::new(0x301, 1);
+        let observed = SourceVersion::new(0x301, 2);
+        let insertion = SourceContentInsertionError::Replay {
+            progress: SourceContentPublicationProgress::Complete { bytes: 29 },
+            source: ReplayPublicationError::Callback {
+                pass: ReplayPass::Emit,
+                source: SourceContentInsertionCallbackError::Member(Box::new(
+                    SourceMemberReaderError::Core {
+                        error: CoreError::SourceChanged { expected, observed },
+                        callback_error: Some(SourceContentInsertionCallbackError::Verification {
+                            what: "callback verification failed",
+                        }),
+                    },
+                )),
+                progress: ReplayProgress::Complete { bytes: 29 },
+            },
+        };
+        let error = odf_error(OdfError::from(insertion));
+
+        assert_eq!(
+            error.progress(),
+            Some(SourceContentPublicationProgress::Complete { bytes: 29 })
+        );
+        assert!(matches!(
+            &error,
+            Error::SourceChanged {
+                expected: actual_expected,
+                observed: actual_observed,
+                source: Some(source),
+                ..
+            } if *actual_expected == expected
+                && *actual_observed == observed
+                && matches!(
+                    source.as_ref(),
+                    SourceChangedSource::Insertion(SourceContentInsertionError::Replay {
+                        source: ReplayPublicationError::Callback {
+                            source: SourceContentInsertionCallbackError::Member(member),
+                            ..
+                        },
+                        ..
+                    }) if matches!(
+                        member.as_ref(),
+                        SourceMemberReaderError::Core {
+                            callback_error: Some(
+                                SourceContentInsertionCallbackError::Verification { what: message },
+                            ),
+                            ..
+                        } if *message == "callback verification failed"
+                    )
+                )
+        ));
+    }
+
+    #[test]
+    fn stale_publication_preserves_before_and_after_progress() {
+        let expected = SourceVersion::new(0x100, 1);
+        let observed = SourceVersion::new(0x100, 2);
+        let before = publication_error(SourceContentPublicationError::SourceChanged {
+            expected,
+            observed,
+            progress: SourceContentPublicationProgress::Untouched,
+        });
+        assert_eq!(
+            before.progress(),
+            Some(SourceContentPublicationProgress::Untouched)
+        );
+
+        let after = publication_error(SourceContentPublicationError::Source {
+            progress: SourceContentPublicationProgress::Complete { bytes: 17 },
+            source: CoreError::SourceChanged { expected, observed },
+        });
+        assert_eq!(
+            after.progress(),
+            Some(SourceContentPublicationProgress::Complete { bytes: 17 })
+        );
+
+        let callback = source_member_error(SourceMemberReaderError::Callback(
+            CoreError::SourceChanged { expected, observed },
+        ));
+        assert_eq!(
+            callback.progress(),
+            Some(SourceContentPublicationProgress::Untouched)
+        );
+    }
+
+    #[test]
+    fn stale_source_retains_core_diagnostic() {
+        let expected = SourceVersion::new(0x300, 1);
+        let observed = SourceVersion::new(0x300, 2);
+        let error = source_error(CoreError::SourceChanged { expected, observed });
+
+        assert!(matches!(
+            &error,
+            Error::SourceChanged {
+                source: Some(source),
+                ..
+            } if matches!(
+                source.as_ref(),
+                SourceChangedSource::Core(CoreError::SourceChanged {
+                    expected: retained_expected,
+                    observed: retained_observed,
+                }) if *retained_expected == expected && *retained_observed == observed
+            )
+        ));
+        assert!(matches!(
+            std::error::Error::source(&error)
+                .and_then(|source| source.downcast_ref::<SourceChangedSource>()),
+            Some(SourceChangedSource::Core(CoreError::SourceChanged { .. }))
+        ));
+    }
+
+    #[test]
+    fn stale_verification_retains_secondary_callback_failure() {
+        let expected = SourceVersion::new(0x200, 1);
+        let observed = SourceVersion::new(0x200, 2);
+        let error = source_member_error(SourceMemberReaderError::Core {
+            error: CoreError::SourceChanged { expected, observed },
+            callback_error: Some(CoreError::InvalidFormat(
+                "callback verification failed".to_string(),
+            )),
+        });
+
+        assert_eq!(
+            error.progress(),
+            Some(SourceContentPublicationProgress::Untouched)
+        );
+        assert!(matches!(
+            &error,
+            Error::SourceChanged {
+                source: Some(source),
+                ..
+            } if matches!(
+                source.as_ref(),
+                SourceChangedSource::SourceMember(SourceMemberReaderError::Core {
+                    error: CoreError::SourceChanged { .. },
+                    callback_error: Some(CoreError::InvalidFormat(message)),
+                }) if message == "callback verification failed"
+            )
+        ));
+
+        let retained = std::error::Error::source(&error)
+            .and_then(|source| source.downcast_ref::<SourceChangedSource>())
+            .expect("stale source keeps its typed reader diagnostic");
+        assert!(matches!(
+            retained,
+            SourceChangedSource::SourceMember(SourceMemberReaderError::Core {
+                callback_error: Some(CoreError::InvalidFormat(message)),
+                ..
+            }) if message == "callback verification failed"
         ));
     }
 

@@ -4,7 +4,10 @@ use crate::{
     Commit, Edit, FrameChange, Image, MetadataFields, Package, ResourceChange, frame::Frame,
     map::ImageMap, source::Source,
 };
-use litchi_core::{Error, Result};
+use litchi_core::{
+    Error, Result,
+    edit::{Refusal, RefusalKind},
+};
 use quick_xml::{
     XmlVersion,
     events::Event,
@@ -665,16 +668,22 @@ impl SemanticPatch {
 
     /// Applies only to the exact flat source and reparses the target bytes.
     pub fn apply_flat(&self, source: &crate::flat::Image) -> Result<crate::flat::Image> {
-        if self.kind != ArtifactKind::Flat || self.source.as_slice() != source.as_bytes() {
-            return Err(invalid("stale or wrong-kind ODI semantic patch source"));
+        if self.kind != ArtifactKind::Flat {
+            return Err(wrong_artifact_kind("odi.semantic.apply_flat"));
+        }
+        if self.source.as_slice() != source.as_bytes() {
+            return Err(Error::PatchConflict);
         }
         crate::flat::Image::from_flat_bytes(self.target.as_ref().clone(), source.bounds())
     }
 
     /// Applies only to the exact package source and reparses the target bytes.
     pub fn apply_package(&self, source: &Package) -> Result<Package> {
-        if self.kind != ArtifactKind::Package || self.source.as_slice() != source.as_bytes() {
-            return Err(invalid("stale or wrong-kind ODI semantic patch source"));
+        if self.kind != ArtifactKind::Package {
+            return Err(wrong_artifact_kind("odi.semantic.apply_package"));
+        }
+        if self.source.as_slice() != source.as_bytes() {
+            return Err(Error::PatchConflict);
         }
         Package::from_vec(self.target.as_ref().clone())
     }
@@ -2232,6 +2241,14 @@ fn artifact_conflict(kind: ConflictKind) -> Conflict {
 
 fn invalid(message: impl Into<String>) -> Error {
     Error::InvalidFormat(message.into())
+}
+
+fn wrong_artifact_kind(operation: &'static str) -> Error {
+    Error::Refused(Refusal::new(
+        RefusalKind::UnsupportedContent,
+        operation,
+        "the semantic patch targets another ODI artifact kind",
+    ))
 }
 
 fn copy_patch_bytes(bytes: &[u8], resource: &'static str) -> Result<Vec<u8>> {

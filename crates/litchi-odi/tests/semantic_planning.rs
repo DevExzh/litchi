@@ -9,6 +9,7 @@ use litchi_odi::{
     map::{Area, ImageMap},
     source::Source,
 };
+use litchi_core::{Error as CoreError, edit::RefusalKind};
 
 const FLAT: &str = concat!(
     r#"<?xml version="1.0" encoding="UTF-8"?><office:document xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0" office:mimetype="application/vnd.oasis.opendocument.image"><office:meta><dc:title>Before</dc:title><meta:user-defined meta:name="opaque">keep</meta:user-defined></office:meta><office:body><office:image>"#,
@@ -300,7 +301,10 @@ fn semantic_patch_is_deterministic_exact_reopenable_and_transferable() {
         source.as_bytes()
     );
     let stale = FlatImage::from_bytes(FLAT.replace("gr1", "other").as_bytes()).unwrap();
-    assert!(patch.apply_flat(&stale).is_err());
+    assert!(matches!(
+        patch.apply_flat(&stale),
+        Err(CoreError::PatchConflict)
+    ));
 
     let package_source = {
         let package_without_styles = package();
@@ -308,6 +312,11 @@ fn semantic_patch_is_deterministic_exact_reopenable_and_transferable() {
         style_setup.set_styles_xml(Some(STYLES.into())).unwrap();
         style_setup.commit().unwrap().package().clone()
     };
+    assert!(matches!(
+        patch.apply_package(&package_source),
+        Err(CoreError::Refused(refusal))
+            if refusal.kind() == RefusalKind::UnsupportedContent
+    ));
     let transfer = patch.plan_package(&package_source);
     assert!(transfer.is_conflict_free());
     let package_commit = transfer
@@ -539,6 +548,10 @@ fn package_metadata_and_resource_crud_have_transferable_inverse_patches() {
         patch.apply_package(&source).unwrap().as_bytes(),
         commit.package().as_bytes()
     );
+    assert!(matches!(
+        patch.apply_package(commit.package()),
+        Err(CoreError::PatchConflict)
+    ));
     assert_eq!(
         patch
             .inverse()

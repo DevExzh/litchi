@@ -1212,7 +1212,7 @@ impl Package {
         active_content_policy: ActiveContentWritePolicy,
     ) -> Result<Package> {
         if !joined.lineage().matches(self) {
-            return invalid("joined ODG edits do not match the exact source snapshot");
+            return Err(Error::PatchConflict);
         }
         let mut current = self.clone();
         for edit in joined.into_sub_edits() {
@@ -4930,7 +4930,7 @@ impl Patch {
     /// Returns an error unless this target is byte-identical to `next`'s source.
     pub fn then(&self, next: &Self) -> Result<Self> {
         if self.target.as_bytes() != next.source.as_bytes() {
-            return invalid("ODG patch composition lineage does not match");
+            return Err(Error::PatchConflict);
         }
         let mut changes = self.changes.clone();
         changes.extend_from_slice(&next.changes);
@@ -5693,7 +5693,7 @@ fn apply_durable_patch(
                 != Some(source_fingerprint.as_str())
         })
     {
-        return invalid("ODG durable patch source does not match");
+        return Err(Error::PatchConflict);
     }
     let mut current = source.clone();
     for operation in patch.operations() {

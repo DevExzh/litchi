@@ -11,6 +11,7 @@ use litchi_odf_formula::{
     ContentSymbol, DependencyConflictKind, Element, History, NodePath, OpaqueStarMath, Package,
     StarMathVersion, codec,
 };
+use litchi_core::Error as CoreError;
 use soapberry_zip::office::StreamingArchiveWriter;
 
 const NS: &str = "http://www.w3.org/1998/Math/MathML";
@@ -257,6 +258,11 @@ fn deterministic_merge_transfer_and_history_properties_reopen_and_reverse() {
         history
             .push(second_patch.clone())
             .expect("second history link");
+        assert!(matches!(
+            history.push(second_patch.clone()),
+            Err(CoreError::PatchConflict)
+        ));
+        assert!(matches!(history.apply(&target), Err(CoreError::PatchConflict)));
         let durable = history.to_bytes().expect("history bytes");
         let decoded = History::from_bytes(&durable).expect("history reopen");
         let applied = decoded.apply(&base).expect("history apply");

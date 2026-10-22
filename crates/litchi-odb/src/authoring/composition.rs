@@ -71,7 +71,7 @@ impl Patch {
             .map(|edit| edit.payload().source.clone())
             .ok_or_else(|| Error::InvalidFormat("ODB composition has no sub-edits".to_string()))?;
         if joined.lineage() != &lineage(&source) {
-            return invalid("ODB composition source lineage changed");
+            return Err(Error::PatchConflict);
         }
         let base = source.database.content_xml();
         let mut hunks = Vec::new();
@@ -82,7 +82,7 @@ impl Patch {
         for (ordinal, edit) in joined.sub_edits().enumerate() {
             let patch = edit.payload();
             if patch.source.as_bytes() != source.as_bytes() {
-                return invalid("ODB composition patch source is stale");
+                return Err(Error::PatchConflict);
             }
             merge_package_delta(
                 patch

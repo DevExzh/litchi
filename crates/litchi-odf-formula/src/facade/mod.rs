@@ -1040,9 +1040,7 @@ impl Patch {
     /// Apply this patch only to its byte-exact immutable source.
     pub(crate) fn apply(&self, source: &Package) -> Result<Package> {
         if !self.is_applicable_to(source) {
-            return Err(Error::InvalidFormat(
-                "Formula patch source does not match its expected package".to_string(),
-            ));
+            return Err(Error::PatchConflict);
         }
         Ok(Package::from_formula(
             self.target
@@ -1336,7 +1334,7 @@ impl History {
         if let Some(previous) = self.patches.last()
             && previous.target.as_bytes() != patch.source.as_bytes()
         {
-            return Err(invalid("Formula history patch does not continue its tip"));
+            return Err(Error::PatchConflict);
         }
         self.patches.push(patch);
         Ok(())

@@ -1324,9 +1324,7 @@ impl History {
     /// Returns an error for stale lineage, size overflow, or exceeded bounds.
     pub fn record(&mut self, commit: &Commit) -> Result<Vec<Package>> {
         if !commit.patch.is_applicable_to(self.current()) {
-            return Err(invalid(
-                "ODM history commit source does not match current state",
-            ));
+            return Err(CoreError::PatchConflict);
         }
         let weight = u64::try_from(commit.patch.before.len())
             .ok()
@@ -1421,7 +1419,7 @@ impl DurablePatch {
     pub fn apply(&self, source: &Package) -> Result<Package> {
         let inverse = self.inner.inverse();
         if source.as_bytes() != durable_direction(&inverse)?.target_bytes {
-            return Err(invalid("ODM durable patch source does not match"));
+            return Err(CoreError::PatchConflict);
         }
         master_from_target(&self.inner)
     }
@@ -1479,7 +1477,7 @@ impl SealedPatch {
     pub fn apply(&self, source: &Package) -> Result<Package> {
         let direction = durable_direction(&self.inner)?;
         if BlobId::of(source.as_bytes()).as_hex() != direction.source_id {
-            return Err(invalid("ODM durable patch source does not match"));
+            return Err(CoreError::PatchConflict);
         }
         Package::from_vec(copy_bytes(direction.target_bytes)?)
     }
