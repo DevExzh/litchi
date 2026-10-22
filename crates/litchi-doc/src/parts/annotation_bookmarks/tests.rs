@@ -178,6 +178,11 @@ fn protected_package_allows_noop_but_requires_explicit_authorization_for_metadat
     assert!(committed.snapshot().value().is_some());
     assert!(matches!(
         committed.package_patch().apply(&original),
+        Err(PackageError::ProtectionDenied(_))
+    ));
+    let changed = committed.snapshot().finish().unwrap();
+    assert!(matches!(
+        committed.package_patch().apply(&changed),
         Err(PackageError::PatchConflict)
     ));
     assert_eq!(
@@ -185,7 +190,7 @@ fn protected_package_allows_noop_but_requires_explicit_authorization_for_metadat
             .package_patch()
             .apply_with_policy(&original, policy)
             .unwrap(),
-        committed.snapshot().finish().unwrap()
+        changed
     );
 }
 
