@@ -284,6 +284,32 @@ impl PackURI {
         result
     }
 
+    /// Return the byte length of [`Self::relative_ref`] without allocating it.
+    ///
+    /// Callers that admit a relationship target under a byte budget can use
+    /// this before constructing the target string. The calculation follows
+    /// [`Self::relative_ref`] exactly and only borrows the URI segments.
+    #[must_use]
+    pub fn relative_ref_len(&self, base_uri: &str) -> usize {
+        if base_uri == "/" {
+            return self.membername().len();
+        }
+
+        let from_parts = base_uri.split('/').filter(|part| !part.is_empty());
+        let to_parts = self.uri.split('/').filter(|part| !part.is_empty());
+        let common = from_parts
+            .clone()
+            .zip(to_parts.clone())
+            .take_while(|(from, to)| from == to)
+            .count();
+        let parent_segments = from_parts.count().saturating_sub(common);
+        let target_length = to_parts.clone().skip(common).map(str::len).sum::<usize>();
+        parent_segments
+            .saturating_mul(3)
+            .saturating_add(target_length)
+            .saturating_add(to_parts.skip(common).count().saturating_sub(1))
+    }
+
     /// Get the `PackURI` of the .rels part corresponding to this `PackURI`.
     ///
     /// For example, "/word/_rels/document.xml.rels" for "/word/document.xml".
@@ -588,5 +614,18 @@ mod tests {
 
         let root = PackURI::new("/").unwrap();
         assert_eq!(root.membername(), "");
+    }
+
+    #[test]
+    fn relative_ref_len_matches_the_allocating_writer() {
+        for (uri, base) in [
+            ("/word/document.xml", "/word"),
+            ("/word/styles/styles.xml", "/word"),
+            ("/word/embeddings/data.bin", "/word/charts"),
+            ("/xl/workbook.xml", "/"),
+        ] {
+            let uri = PackURI::new(uri).unwrap();
+            assert_eq!(uri.relative_ref_len(base), uri.relative_ref(base).len());
+        }
     }
 }

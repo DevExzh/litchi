@@ -14,6 +14,7 @@ current-api = ["current-owner-api", "current-property-api"]
 current-owner-api = []
 current-property-api = []
 allocator-metrics = []
+xlsx-raw-candidate = []
 ordinary-save-process-metrics = []
 # Enables the W5 OLE probe's isolated counting allocator.  Native timing
 # binaries leave this feature disabled so their allocator and output paths are

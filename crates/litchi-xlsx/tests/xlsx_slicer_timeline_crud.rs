@@ -1,5 +1,5 @@
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
-use litchi_opc::{BlobPart, OpcPackage, PackURI, Part};
+use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, SourceLimits};
 use litchi_xlsx::slicer::{self, Definition, Slicer};
 use litchi_xlsx::timeline::{CacheDefinition, FilterType, Level, Range, State, View};
 
@@ -33,10 +33,13 @@ fn package() -> (OpcPackage, PackURI) {
 }
 
 fn slicer_cache(name: &str, source: &str) -> Definition {
-    slicer::read(
-        format!(r#"<slicerCacheDefinition xmlns="{X14}" name="{name}" sourceName="{source}"><data><tabular pivotCacheId="5"><items count="2"><i x="1"/><i x="0" s="1"/></items></tabular></data></slicerCacheDefinition>"#).as_bytes(),
+    slicer::read(slicer_cache_xml(name, source).as_bytes()).unwrap()
+}
+
+fn slicer_cache_xml(name: &str, source: &str) -> String {
+    format!(
+        r#"<slicerCacheDefinition xmlns="{X14}" name="{name}" sourceName="{source}"><data><tabular pivotCacheId="5"><items count="2"><i x="1"/><i x="0" s="1"/></items></tabular></data></slicerCacheDefinition>"#
     )
-    .unwrap()
 }
 
 fn timeline_cache(name: &str, source: &str) -> CacheDefinition {
@@ -76,6 +79,449 @@ fn timeline(name: &str, cache: &str) -> View {
         style: Some("TimelineStyleLight1".into()),
         extension_list: None,
     }
+}
+
+#[test]
+fn raw_slicer_insert_preserves_identity_replay_inverse_and_untouched_bytes() {
+    let (mut package, worksheet) = package();
+    let unrelated = PackURI::new("/xl/unrelated.bin").unwrap();
+    package.add_part(Box::new(BlobPart::new(
+        unrelated.clone(),
+        "application/octet-stream".into(),
+        b"unchanged physical payload".to_vec(),
+    )));
+    let before_workbook = package
+        .get_part(&PackURI::new("/xl/workbook.xml").unwrap())
+        .unwrap()
+        .blob()
+        .to_vec();
+    let before_worksheet = package.get_part(&worksheet).unwrap().blob().to_vec();
+    let before_unrelated = package.get_part(&unrelated).unwrap().blob().to_vec();
+    let source = litchi_xlsx::Package::from_opc(package).unwrap();
+    let limits = SourceLimits::builder()
+        .max_relationship_target_bytes(29)
+        .unwrap()
+        .build()
+        .unwrap();
+    let tight_limits = SourceLimits::builder()
+        .max_total_part_bytes(1)
+        .unwrap()
+        .build()
+        .unwrap();
+    let mut limited = source
+        .edit_slicers_with_options(slicer::EditOptions::default().limits(tight_limits))
+        .unwrap();
+    assert!(
+        limited
+            .insert_cache(slicer::raw::Cache {
+                relationship_id: "rIdRejectedSlicerCache".into(),
+                part_name: "/xl/slicerCaches/rejected.xml".into(),
+                definition: slicer_cache("RejectedCache", "State"),
+            },)
+            .is_err()
+    );
+    assert!(limited.cache("RejectedCache").unwrap().is_none());
+    let existing_max = before_workbook
+        .len()
+        .max(before_worksheet.len())
+        .max(before_unrelated.len());
+    let part_limited = SourceLimits::builder()
+        .max_part_bytes((existing_max + 1) as u64)
+        .unwrap()
+        .build()
+        .unwrap();
+    let mut writer_limited = source
+        .edit_slicers_with_options(slicer::EditOptions::default().limits(part_limited))
+        .unwrap();
+    assert!(
+        writer_limited
+            .insert_cache(slicer::raw::Cache {
+                relationship_id: "rIdRejectedWriter".into(),
+                part_name: "/xl/slicerCaches/rejected-writer.xml".into(),
+                definition: slicer_cache("RejectedWriter", "State"),
+            },)
+            .is_err()
+    );
+    assert!(writer_limited.cache("RejectedWriter").unwrap().is_none());
+    let mut edit = source
+        .edit_slicers_with_options(slicer::EditOptions::default().limits(limits))
+        .unwrap();
+    edit.insert_cache(slicer::raw::Cache {
+        relationship_id: "rIdNativeSlicerCache".into(),
+        part_name: "/xl/slicerCaches/native-cache.xml".into(),
+        definition: slicer::raw::parse_cache(
+            slicer_cache_xml("NativeCache", "State").as_bytes(),
+            &limits,
+        )
+        .unwrap(),
+    })
+    .unwrap();
+    edit.insert_part(
+        &worksheet,
+        slicer::raw::Part {
+            relationship_id: "rIdNativeSlicer".into(),
+            part_name: "/xl/slicers/native.xml".into(),
+            slicers: slicer::raw::parse_part(
+                format!(r#"<x14:slicers xmlns:x14="{X14}"><x14:slicer name="NativeView" cache="NativeCache" rowHeight="228600"/></x14:slicers>"#).as_bytes(),
+                &limits,
+            )
+            .unwrap(),
+        },
+    )
+    .unwrap();
+    let commit = edit.commit().unwrap();
+    assert!(commit.diagnostics().changed());
+    let patch = commit.patch().clone();
+    let after = commit.into_package();
+    let after_opc = after.clone().into_plain_opc();
+    let workbook = after_opc
+        .get_part(&PackURI::new("/xl/workbook.xml").unwrap())
+        .unwrap();
+    let cache_relationship = workbook.rels().get("rIdNativeSlicerCache").unwrap();
+    assert_eq!(
+        cache_relationship.target_partname().unwrap().as_str(),
+        "/xl/slicerCaches/native-cache.xml"
+    );
+    let worksheet_part = after_opc.get_part(&worksheet).unwrap();
+    let slicer_relationship = worksheet_part.rels().get("rIdNativeSlicer").unwrap();
+    assert_eq!(
+        slicer_relationship.target_partname().unwrap().as_str(),
+        "/xl/slicers/native.xml"
+    );
+    assert_eq!(
+        after_opc
+            .get_part(&PackURI::new("/xl/slicerCaches/native-cache.xml").unwrap())
+            .unwrap()
+            .content_type(),
+        slicer::CACHE_CONTENT_TYPE
+    );
+    assert_eq!(
+        after_opc
+            .get_part(&PackURI::new("/xl/slicers/native.xml").unwrap())
+            .unwrap()
+            .content_type(),
+        "application/vnd.ms-excel.slicer+xml"
+    );
+    assert!(
+        std::str::from_utf8(workbook.blob())
+            .unwrap()
+            .contains("urn:unrelated")
+    );
+    assert!(
+        std::str::from_utf8(worksheet_part.blob())
+            .unwrap()
+            .contains("urn:sheet-unrelated")
+    );
+    assert_eq!(
+        after_opc.get_part(&unrelated).unwrap().blob(),
+        before_unrelated.as_slice()
+    );
+
+    let replayed = source.apply_slicers(&patch).unwrap().into_package();
+    assert!(replayed.same_content(&after).unwrap());
+    let restored = after
+        .apply_slicers(&patch.inverse())
+        .unwrap()
+        .into_package();
+    let restored_opc = restored.into_plain_opc();
+    assert_eq!(
+        restored_opc
+            .get_part(&PackURI::new("/xl/workbook.xml").unwrap())
+            .unwrap()
+            .blob(),
+        before_workbook.as_slice()
+    );
+    assert_eq!(
+        restored_opc.get_part(&worksheet).unwrap().blob(),
+        before_worksheet.as_slice()
+    );
+    assert_eq!(
+        restored_opc.get_part(&unrelated).unwrap().blob(),
+        before_unrelated.as_slice()
+    );
+
+    let noop = source.edit_slicers().unwrap().commit().unwrap();
+    assert!(noop.patch().is_noop());
+    assert!(!noop.diagnostics().changed());
+}
+
+#[test]
+fn raw_timeline_insert_preserves_identity_replay_inverse_and_untouched_bytes() {
+    let (mut package, worksheet) = package();
+    let unrelated = PackURI::new("/xl/unrelated.bin").unwrap();
+    package.add_part(Box::new(BlobPart::new(
+        unrelated.clone(),
+        "application/octet-stream".into(),
+        b"unchanged physical payload".to_vec(),
+    )));
+    let before_workbook = package
+        .get_part(&PackURI::new("/xl/workbook.xml").unwrap())
+        .unwrap()
+        .blob()
+        .to_vec();
+    let before_worksheet = package.get_part(&worksheet).unwrap().blob().to_vec();
+    let before_unrelated = package.get_part(&unrelated).unwrap().blob().to_vec();
+    let source = litchi_xlsx::Package::from_opc(package).unwrap();
+    let limits = SourceLimits::builder()
+        .max_relationship_target_bytes(31)
+        .unwrap()
+        .build()
+        .unwrap();
+    let tight_limits = SourceLimits::builder()
+        .max_total_part_bytes(1)
+        .unwrap()
+        .build()
+        .unwrap();
+    let rejected = litchi_xlsx::timeline::raw::Cache {
+        relationship_id: "rIdRejectedTimelineCache".into(),
+        part_name: "/xl/timelineCaches/rejected.xml".into(),
+        definition: timeline_cache("RejectedTimelineCache", "Date"),
+    };
+    let mut limited = source
+        .edit_timelines_with_options(
+            litchi_xlsx::timeline::EditOptions::default().limits(tight_limits),
+        )
+        .unwrap();
+    assert!(limited.insert_caches(&[rejected]).is_err());
+    let mut edit = source
+        .edit_timelines_with_options(litchi_xlsx::timeline::EditOptions::default().limits(limits))
+        .unwrap();
+    let cache_value = timeline_cache("NativeTimelineCache", "Date");
+    let cache_xml = litchi_xlsx::timeline::codec::write_cache(&cache_value).unwrap();
+    edit.insert_caches(&[litchi_xlsx::timeline::raw::Cache {
+        relationship_id: "rIdNativeTimelineCache".into(),
+        part_name: "/xl/timelineCaches/native-cache.xml".into(),
+        definition: litchi_xlsx::timeline::raw::parse_cache(&cache_xml, &limits).unwrap(),
+    }])
+    .unwrap();
+    let views_value = litchi_xlsx::timeline::Views {
+        timelines: vec![timeline("NativeTimeline", "NativeTimelineCache")],
+    };
+    let views_xml = litchi_xlsx::timeline::codec::write_views(&views_value).unwrap();
+    edit.insert_part(litchi_xlsx::timeline::raw::Part {
+        worksheet_part_name: worksheet.to_string(),
+        relationship_id: "rIdNativeTimeline".into(),
+        part_name: "/xl/timelines/native.xml".into(),
+        timelines: litchi_xlsx::timeline::raw::parse_part(&views_xml, &limits).unwrap(),
+    })
+    .unwrap();
+    let commit = edit.commit().unwrap();
+    assert!(commit.diagnostics().changed());
+    let patch = commit.patch().clone();
+    let after = commit.into_package();
+    let after_opc = after.clone().into_plain_opc();
+    let worksheet_part = after_opc.get_part(&worksheet).unwrap();
+    let relationship = worksheet_part.rels().get("rIdNativeTimeline").unwrap();
+    assert_eq!(
+        relationship.target_partname().unwrap().as_str(),
+        "/xl/timelines/native.xml"
+    );
+    let workbook = after_opc
+        .get_part(&PackURI::new("/xl/workbook.xml").unwrap())
+        .unwrap();
+    let cache_relationship = workbook.rels().get("rIdNativeTimelineCache").unwrap();
+    assert_eq!(
+        cache_relationship.target_partname().unwrap().as_str(),
+        "/xl/timelineCaches/native-cache.xml"
+    );
+    assert!(
+        std::str::from_utf8(workbook.blob())
+            .unwrap()
+            .contains("urn:unrelated")
+    );
+    assert!(
+        std::str::from_utf8(worksheet_part.blob())
+            .unwrap()
+            .contains("urn:sheet-unrelated")
+    );
+    assert_eq!(
+        after_opc.get_part(&unrelated).unwrap().blob(),
+        before_unrelated.as_slice()
+    );
+
+    let replayed = source.apply_timelines(&patch).unwrap().into_package();
+    assert!(replayed.same_content(&after).unwrap());
+    let restored = after
+        .apply_timelines(&patch.inverse())
+        .unwrap()
+        .into_package();
+    let restored_opc = restored.into_plain_opc();
+    assert_eq!(
+        restored_opc
+            .get_part(&PackURI::new("/xl/workbook.xml").unwrap())
+            .unwrap()
+            .blob(),
+        before_workbook.as_slice()
+    );
+    assert_eq!(
+        restored_opc.get_part(&worksheet).unwrap().blob(),
+        before_worksheet.as_slice()
+    );
+    assert_eq!(
+        restored_opc.get_part(&unrelated).unwrap().blob(),
+        before_unrelated.as_slice()
+    );
+
+    let noop = source.edit_timelines().unwrap().commit().unwrap();
+    assert!(noop.patch().is_noop());
+    assert!(!noop.diagnostics().changed());
+}
+
+#[test]
+fn raw_identity_admission_uses_archive_member_spelling_and_global_relationship_budget() {
+    let (package, _) = package();
+    let source = litchi_xlsx::Package::from_opc(package).unwrap();
+    let target =
+        PackURI::new("/xl/slicerCaches/member-name-that-is-longer-than-existing-rels.xml").unwrap();
+    let member_limit = target.membername().len() as u64;
+    let value = || slicer::raw::Cache {
+        relationship_id: "rIdMemberName".into(),
+        part_name: target.to_string(),
+        definition: slicer_cache("MemberName", "State"),
+    };
+
+    // The absolute URI is one byte longer than the archive member spelling;
+    // a limit equal to the member must still admit this valid OPC path.
+    let mut valid = source
+        .edit_slicers_with_options(
+            slicer::EditOptions::default().limits(
+                SourceLimits::builder()
+                    .max_archive_member_name_bytes(member_limit)
+                    .unwrap()
+                    .build()
+                    .unwrap(),
+            ),
+        )
+        .unwrap();
+    valid.insert_cache(value()).unwrap();
+
+    let mut rejected = source
+        .edit_slicers_with_options(
+            slicer::EditOptions::default().limits(
+                SourceLimits::builder()
+                    .max_archive_member_name_bytes(member_limit - 1)
+                    .unwrap()
+                    .build()
+                    .unwrap(),
+            ),
+        )
+        .unwrap();
+    assert!(rejected.insert_cache(value()).is_err());
+
+    // The root-to-workbook and workbook-to-sheet edges already consume the
+    // two-edge policy. Admission must include other owners when charging the
+    // new workbook relationship.
+    let mut aggregate = source
+        .edit_slicers_with_options(
+            slicer::EditOptions::default().limits(
+                SourceLimits::builder()
+                    .max_total_relationships(2)
+                    .unwrap()
+                    .build()
+                    .unwrap(),
+            ),
+        )
+        .unwrap();
+    assert!(aggregate.insert_cache(value()).is_err());
+}
+
+#[test]
+fn raw_batch_admission_rejects_invalid_and_duplicate_ids_before_staging() {
+    let (package, _) = package();
+    let source = litchi_xlsx::Package::from_opc(package).unwrap();
+
+    let valid = litchi_xlsx::timeline::raw::Cache {
+        relationship_id: "rIdValidTimeline".into(),
+        part_name: "/xl/timelineCaches/valid.xml".into(),
+        definition: timeline_cache("ValidTimelineCache", "Date"),
+    };
+    let invalid = litchi_xlsx::timeline::raw::Cache {
+        relationship_id: "r:id-invalid".into(),
+        part_name: "/xl/timelineCaches/invalid.xml".into(),
+        definition: timeline_cache("InvalidTimelineCache", "Date"),
+    };
+    let mut invalid_edit = source.edit_timelines().unwrap();
+    assert!(
+        invalid_edit
+            .insert_caches(&[valid.clone(), invalid])
+            .is_err()
+    );
+    assert!(invalid_edit.cache("ValidTimelineCache").unwrap().is_none());
+
+    let duplicate = litchi_xlsx::timeline::raw::Cache {
+        relationship_id: valid.relationship_id.clone(),
+        part_name: "/xl/timelineCaches/duplicate.xml".into(),
+        definition: timeline_cache("DuplicateTimelineCache", "Date"),
+    };
+    let mut duplicate_edit = source.edit_timelines().unwrap();
+    assert!(duplicate_edit.insert_caches(&[valid, duplicate]).is_err());
+    assert!(
+        duplicate_edit
+            .cache("ValidTimelineCache")
+            .unwrap()
+            .is_none()
+    );
+    assert!(
+        duplicate_edit
+            .cache("DuplicateTimelineCache")
+            .unwrap()
+            .is_none()
+    );
+}
+
+#[test]
+fn raw_relationship_budget_charges_an_unrelated_owner_and_preserves_it() {
+    let (mut package, _) = package();
+    let unrelated = PackURI::new("/xl/unrelated.xml").unwrap();
+    let mut unrelated_part = BlobPart::new(
+        unrelated.clone(),
+        "application/octet-stream".into(),
+        b"unrelated owner payload".to_vec(),
+    );
+    unrelated_part.rels_mut().add_relationship(
+        rt::WORKSHEET.into(),
+        "worksheets/sheet1.xml".into(),
+        "rIdUnrelatedOwner".into(),
+        false,
+    );
+    package.add_part(Box::new(unrelated_part));
+    let source = litchi_xlsx::Package::from_opc(package).unwrap();
+    let value = || slicer::raw::Cache {
+        relationship_id: "rIdLedgerCache".into(),
+        part_name: "/xl/slicerCaches/ledger.xml".into(),
+        definition: slicer_cache("LedgerCache", "State"),
+    };
+
+    // The package root, workbook and unrelated owner already consume three
+    // relationship slots. The insertion must account for all owners.
+    let tight = SourceLimits::builder()
+        .max_total_relationships(3)
+        .unwrap()
+        .build()
+        .unwrap();
+    let mut rejected = source
+        .edit_slicers_with_options(slicer::EditOptions::default().limits(tight))
+        .unwrap();
+    assert!(rejected.insert_cache(value()).is_err());
+    assert!(rejected.cache("LedgerCache").unwrap().is_none());
+
+    let admitted = SourceLimits::builder()
+        .max_total_relationships(4)
+        .unwrap()
+        .build()
+        .unwrap();
+    let mut edit = source
+        .edit_slicers_with_options(slicer::EditOptions::default().limits(admitted))
+        .unwrap();
+    edit.insert_cache(value()).unwrap();
+    let after = edit.commit().unwrap().into_package().into_plain_opc();
+    let relationship = after
+        .get_part(&unrelated)
+        .unwrap()
+        .rels()
+        .get("rIdUnrelatedOwner")
+        .unwrap();
+    assert_eq!(relationship.target_ref(), "worksheets/sheet1.xml");
 }
 
 #[test]

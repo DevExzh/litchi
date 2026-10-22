@@ -15,6 +15,7 @@ pub mod source;
 #[cfg(test)]
 mod tests;
 
+pub(crate) use codec::write_auto_filter_fragment_limited;
 pub use codec::{parse_auto_filter_fragment, write_auto_filter_fragment};
 pub use model::{
     Calendar, Color, Column, Condition, Custom, Customs, DateGroup, Definition, Dynamic,

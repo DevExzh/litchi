@@ -23,5 +23,14 @@ pub fn part(value: &Part) -> Result<()> {
 
 /// Validate all feature-owned OPC edges and orphan rules.
 pub fn graph(package: &OpcPackage) -> Result<()> {
-    super::package::validate_graph(package)
+    let limits = package.read_limits();
+    graph_with_limits(package, &limits)
+}
+
+/// Validate the slicer graph under the package policy tightened for one edit.
+pub(crate) fn graph_with_limits(
+    package: &OpcPackage,
+    limits: &litchi_opc::SourceLimits,
+) -> Result<()> {
+    super::package::validate_graph_with_limits(package, limits)
 }

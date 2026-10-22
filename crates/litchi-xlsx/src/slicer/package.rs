@@ -2,7 +2,7 @@
 
 use super::model::{Cache, Part};
 use crate::error::Result;
-use litchi_opc::{OpcPackage, PackURI};
+use litchi_opc::{OpcPackage, PackURI, SourceLimits};
 
 /// Load and validate all workbook-owned slicer caches.
 pub fn load_caches(package: &OpcPackage) -> Result<Vec<Cache>> {
@@ -16,7 +16,15 @@ pub fn load_parts(package: &OpcPackage, worksheet: &PackURI) -> Result<Vec<Part>
 
 /// Validate every slicer cache and worksheet slicers graph in the package.
 pub fn validate_graph(package: &OpcPackage) -> Result<()> {
-    load_caches(package)?;
+    let limits = package.read_limits();
+    validate_graph_with_limits(package, &limits)
+}
+
+pub(crate) fn validate_graph_with_limits(
+    package: &OpcPackage,
+    limits: &SourceLimits,
+) -> Result<()> {
+    crate::slicer_cache::package::load_slicer_caches_limited(package, limits)?;
     crate::slicer_cache::views::validate_package_graph(package)?;
     let worksheets: Vec<PackURI> = package
         .iter_parts()
@@ -24,7 +32,7 @@ pub fn validate_graph(package: &OpcPackage) -> Result<()> {
         .map(|part| part.partname().clone())
         .collect();
     for worksheet in worksheets {
-        load_parts(package, &worksheet)?;
+        crate::slicer_cache::views::load_slicer_parts_limited(package, &worksheet, limits)?;
     }
     Ok(())
 }

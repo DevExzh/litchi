@@ -21,5 +21,15 @@ pub fn part(value: &Part) -> Result<()> {
 
 /// Validate all timeline package edges and orphan rules.
 pub fn graph(package: &OpcPackage, workbook: &PackURI) -> Result<()> {
-    super::package::validate_graph(package, workbook)
+    let limits = package.read_limits();
+    graph_with_limits(package, workbook, &limits)
+}
+
+/// Validate the timeline graph under the package policy tightened for one edit.
+pub(crate) fn graph_with_limits(
+    package: &OpcPackage,
+    workbook: &PackURI,
+    limits: &litchi_opc::SourceLimits,
+) -> Result<()> {
+    super::package::validate_graph_with_limits(package, workbook, limits)
 }

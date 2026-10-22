@@ -42,6 +42,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Some(selector) if selector == std::ffi::OsStr::new("docx-owned-attribution") => {
             litchi_perf_baseline::docx_owned_attribution::run_from_args(args)
         },
+        Some(selector) if selector == std::ffi::OsStr::new("xlsx-raw-identity") => {
+            litchi_perf_baseline::xlsx_raw_identity::run_from_args(args)
+        },
         Some(selector) if selector == std::ffi::OsStr::new("pptx-pair-lifecycle") => {
             litchi_perf_baseline::pptx_pair_lifecycle::run_from_args(args)
         },

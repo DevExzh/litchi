@@ -17,20 +17,51 @@
 //! ([`crate::Package::unsign`]) to edit a signed workbook.
 
 use super::model::{Cache, CacheDefinition, Part, View};
+use super::raw;
 use crate::Package;
 use crate::error::Result;
 use crate::part_edit::{Staged, family};
-use litchi_opc::{OpcPackage, PackURI};
+use litchi_opc::{OpcPackage, PackURI, SourceLimits};
+use std::collections::HashSet;
 
 family!("timeline");
 
 pub use crate::opc::LimitKind;
+
+/// Configuration for one timeline edit.
+///
+/// The package's retained source policy remains authoritative. A supplied
+/// policy can only tighten that policy for this edit.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct EditOptions {
+    limits: Option<SourceLimits>,
+}
+
+impl EditOptions {
+    /// Tighten this edit's source policy.
+    #[must_use]
+    pub const fn limits(mut self, limits: SourceLimits) -> Self {
+        self.limits = Some(limits);
+        self
+    }
+
+    /// Return the optional per-edit policy.
+    #[must_use]
+    pub const fn limits_value(self) -> Option<SourceLimits> {
+        self.limits
+    }
+}
 
 /// A staged timeline edit of one [`Package`]. Dropping it discards it.
 #[derive(Debug, Clone)]
 pub struct Edit {
     staged: Staged,
     workbook: PackURI,
+    limits: SourceLimits,
+    /// The current staged graph has passed `graph_with_limits`. Every public
+    /// replacement goes through `apply`/`apply_raw`, and `reset` returns to
+    /// the already validated source graph.
+    graph_validated: bool,
 }
 
 impl Package {
@@ -41,10 +72,24 @@ impl Package {
     /// Returns the encryption-policy error for a package whose mutations are
     /// refused, and the validation errors of the timeline graph.
     pub fn edit_timelines(&self) -> Result<Edit> {
+        self.edit_timelines_with_options(EditOptions::default())
+    }
+
+    /// Start a timeline edit with an optional tighter source policy.
+    pub fn edit_timelines_with_options(&self, options: EditOptions) -> Result<Edit> {
         let staged = Staged::new(self, "edit_timelines")?;
         let workbook = staged.opc().main_document_part()?.partname().clone();
-        super::validation::graph(staged.opc(), &workbook)?;
-        Ok(Edit { staged, workbook })
+        let limits = staged
+            .opc()
+            .read_limits()
+            .min(options.limits.unwrap_or_else(|| staged.opc().read_limits()));
+        super::validation::graph_with_limits(staged.opc(), &workbook, &limits)?;
+        Ok(Edit {
+            staged,
+            workbook,
+            limits,
+            graph_validated: true,
+        })
     }
 
     /// Apply a timeline patch to a new package; this one is unchanged. An
@@ -84,6 +129,52 @@ impl Edit {
         self.apply(|candidate| crate::slicer_cache::crud::add_timeline_cache(candidate, definition))
     }
 
+    /// Insert a complete workbook View Cache set with caller-selected native
+    /// relationship IDs and part names.
+    ///
+    /// This is the raw identity escape for the timeline edit family. The
+    /// complete candidate graph is checked against `limits`, and publication
+    /// still happens only through [`Self::commit`].
+    pub fn insert_caches(&mut self, values: &[raw::Cache]) -> Result<()> {
+        let limits = self.limits;
+        crate::raw::check_limit(
+            litchi_opc::SourceLimitKind::RelationshipsPerPart,
+            values.len() as u64,
+            limits.max_relationships_per_part() as u64,
+        )?;
+        crate::raw::check_new_part_count(self.staged.opc(), values.len(), &limits)?;
+        let mut ids = HashSet::with_capacity(values.len());
+        let mut targets = HashSet::<String>::with_capacity(values.len());
+        for value in values {
+            let uri = raw::validate_cache_identity(value, self.workbook.base_uri(), &limits)?;
+            if !ids.insert(value.relationship_id.as_str()) {
+                return Err(crate::error::invalid(
+                    "duplicate View Cache relationship ID",
+                ));
+            }
+            if !targets.insert(uri.to_string()) {
+                return Err(crate::error::invalid("duplicate View Cache part name"));
+            }
+            crate::raw::check_new_relationship_identity(
+                self.staged.opc(),
+                &self.workbook,
+                &value.relationship_id,
+                &uri,
+            )?;
+        }
+        let prepared = values
+            .iter()
+            .cloned()
+            .map(|value| raw::prepare_cache(value, self.workbook.base_uri(), &limits))
+            .collect::<Result<Vec<_>>>()?;
+        let workbook = self.workbook.clone();
+        self.apply_raw(&limits, move |candidate| {
+            crate::timelines::store_timeline_caches_prepared_limited(
+                candidate, &workbook, &prepared, &limits,
+            )
+        })
+    }
+
     pub fn update_cache<F>(&mut self, name: &str, update: F) -> Result<bool>
     where
         F: FnOnce(&mut CacheDefinition),
@@ -114,6 +205,27 @@ impl Edit {
         let worksheet = worksheet.clone();
         self.apply(move |candidate| {
             crate::slicer_cache::crud::add_timeline(candidate, &worksheet, view)
+        })
+    }
+
+    /// Insert a worksheet Timelines part with its caller-selected worksheet,
+    /// relationship ID and part name.
+    pub fn insert_part(&mut self, value: raw::Part) -> Result<()> {
+        let limits = self.limits;
+        crate::raw::check_new_part_count(self.staged.opc(), 1, &limits)?;
+        let (uri, worksheet) = raw::validate_part_identity(&value, &limits)?;
+        crate::raw::check_new_relationship_identity(
+            self.staged.opc(),
+            &worksheet,
+            &value.relationship_id,
+            &uri,
+        )?;
+        let prepared = raw::prepare_part(value, &limits)?;
+        let workbook = self.workbook.clone();
+        self.apply_raw(&limits, move |candidate| {
+            crate::timelines::store_worksheet_timelines_prepared_limited(
+                candidate, &workbook, &prepared, &limits,
+            )
         })
     }
 
@@ -167,6 +279,7 @@ impl Edit {
     /// Discard every staged change.
     pub fn reset(&mut self) {
         self.staged.reset();
+        self.graph_validated = true;
     }
 
     /// Validate the staged timeline graph and publish it to a new package.
@@ -178,16 +291,38 @@ impl Edit {
     /// signed package and the workbook validation errors of the staged
     /// package.
     pub fn commit(self) -> Result<Commit> {
-        super::validation::graph(self.staged.opc(), &self.workbook)?;
+        if !self.graph_validated {
+            super::validation::graph_with_limits(self.staged.opc(), &self.workbook, &self.limits)?;
+        }
         Ok(Commit::new(self.staged.commit()?))
     }
 
     fn apply<T>(&mut self, operation: impl FnOnce(&mut OpcPackage) -> Result<T>) -> Result<T> {
         let workbook = &self.workbook;
-        self.staged.update(|candidate| {
+        let limits = self.limits;
+        self.graph_validated = false;
+        let value = self.staged.update(|candidate| {
             let value = operation(candidate)?;
-            super::validation::graph(candidate, workbook)?;
+            super::validation::graph_with_limits(candidate, workbook, &limits)?;
             Ok(value)
-        })
+        })?;
+        self.graph_validated = true;
+        Ok(value)
+    }
+
+    fn apply_raw<T>(
+        &mut self,
+        limits: &SourceLimits,
+        operation: impl FnOnce(&mut OpcPackage) -> Result<T>,
+    ) -> Result<T> {
+        let workbook = &self.workbook;
+        self.graph_validated = false;
+        let value = self.staged.update(|candidate| {
+            let value = operation(candidate)?;
+            super::validation::graph_with_limits(candidate, workbook, limits)?;
+            Ok(value)
+        })?;
+        self.graph_validated = true;
+        Ok(value)
     }
 }

@@ -8,9 +8,10 @@ pub mod codec;
 mod edit;
 pub mod model;
 pub mod package;
+pub mod raw;
 pub mod validation;
 
-pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
+pub use edit::{Commit, Diagnostics, Edit, EditOptions, Error, LimitKind, Patch};
 pub use model::{
     Cache, CacheDefinition, CachePivotTable, FilterType, Level, OpaqueXml, Part, PivotFilter,
     Range, State, View, Views,
