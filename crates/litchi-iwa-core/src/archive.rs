@@ -73,6 +73,105 @@ enum HeaderNode {
     FieldPath,
 }
 
+/// Exact resource totals collected while a retained ArchiveInfo header is
+/// admitted.  The raw header is immutable private provenance after parsing;
+/// retaining these totals lets later callers apply a different `Limits`
+/// profile without walking the same wire tree again.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct HeaderAdmission {
+    preflight: WirePreflight,
+    message_infos: usize,
+    decoded_memory: usize,
+    metadata_items: usize,
+}
+
+/// Exact resource totals for the decoded neutral ArchiveInfo projection.
+/// These are separate from the wire totals because constructor limits account
+/// owned metadata while parser limits also account unknown source fields.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct ArchiveInfoAdmission {
+    header_length: usize,
+    header_fields: usize,
+    header_nesting: usize,
+    header_memory: usize,
+    metadata_items: usize,
+    message_count: usize,
+}
+
+impl ArchiveInfoAdmission {
+    fn check(self, limits: Limits) -> Result<()> {
+        if self.message_count > limits.max_messages_per_object() {
+            return Err(limit(
+                LimitKind::MessagesPerObject,
+                self.message_count,
+                limits.max_messages_per_object(),
+            ));
+        }
+        check_constructor_header(
+            self.header_length,
+            self.header_fields,
+            self.header_nesting,
+            self.header_memory,
+            self.metadata_items,
+            limits,
+        )
+    }
+}
+
+impl HeaderAdmission {
+    fn check(self, header_length: usize, limits: Limits) -> Result<()> {
+        check_header_length(header_length, limits)?;
+
+        let scanned_bytes = limits
+            .max_header_bytes()
+            .saturating_mul(4)
+            .min(WireLimits::MAX_INPUT_BYTES);
+        if self.preflight.scanned_bytes() > scanned_bytes {
+            return Err(limit(
+                LimitKind::HeaderBytes,
+                self.preflight.scanned_bytes(),
+                scanned_bytes,
+            ));
+        }
+        if self.preflight.fields() > limits.max_header_fields() {
+            return Err(limit(
+                LimitKind::HeaderFields,
+                self.preflight.fields(),
+                limits.max_header_fields(),
+            ));
+        }
+        if self.preflight.max_depth() > limits.max_header_nesting() {
+            return Err(limit(
+                LimitKind::HeaderNesting,
+                self.preflight.max_depth(),
+                limits.max_header_nesting(),
+            ));
+        }
+        if self.message_infos > limits.max_messages_per_object() {
+            return Err(limit(
+                LimitKind::MessagesPerObject,
+                self.message_infos,
+                limits.max_messages_per_object(),
+            ));
+        }
+        if self.decoded_memory > limits.max_header_memory_bytes() {
+            return Err(limit(
+                LimitKind::HeaderMemoryBytes,
+                self.decoded_memory,
+                limits.max_header_memory_bytes(),
+            ));
+        }
+        if self.metadata_items > limits.max_metadata_items() {
+            return Err(limit(
+                LimitKind::MetadataItems,
+                self.metadata_items,
+                limits.max_metadata_items(),
+            ));
+        }
+        Ok(())
+    }
+}
+
 /// Schema-neutral path to a field nested inside an archive payload.
 ///
 /// An empty component list is valid on the wire. Required `FieldInfo.path`
@@ -514,6 +613,23 @@ impl ArchiveInfo {
         let limits = limits.validate()?;
         check_header_length(data.len(), limits)?;
         let preflight = preflight_header(data, HeaderKind::ArchiveInfo, limits)?;
+        Self::decode_with_preflight(data, limits, preflight)
+    }
+
+    fn decode_with_preflight(
+        data: &[u8],
+        limits: Limits,
+        preflight: WirePreflight,
+    ) -> Result<Self> {
+        Self::decode_with_preflight_and_admission(data, limits, preflight)
+            .map(|(archive_info, _admission)| archive_info)
+    }
+
+    fn decode_with_preflight_and_admission(
+        data: &[u8],
+        limits: Limits,
+        preflight: WirePreflight,
+    ) -> Result<(Self, ArchiveInfoAdmission)> {
         let decoded =
             archive_codec::decode_archive_info(data, buffa_decode_options(preflight, limits))
                 .map_err(|error| {
@@ -524,8 +640,8 @@ impl ArchiveInfo {
                     )
                 })?;
         let archive_info = archive_info_from_codec(decoded)?;
-        archive_info.validate(limits)?;
-        Ok(archive_info)
+        let admission = check_archive_info_constructor(&archive_info, limits)?;
+        Ok((archive_info, admission))
     }
 
     /// Construct metadata for an object from its raw payload metadata.
@@ -549,8 +665,8 @@ impl ArchiveInfo {
             message_infos,
             should_merge: None,
         };
-        let header_length = check_archive_info_constructor(&value, limits)?;
-        Ok((value, header_length))
+        let admission = check_archive_info_constructor(&value, limits)?;
+        Ok((value, admission.header_length))
     }
 
     fn validate(&self, limits: Limits) -> Result<()> {
@@ -938,7 +1054,10 @@ fn minimal_message_info_memory() -> Result<usize> {
         .ok_or_else(|| Error::invalid_archive(0, "message metadata memory overflow"))
 }
 
-fn check_archive_info_constructor(info: &ArchiveInfo, limits: Limits) -> Result<usize> {
+fn check_archive_info_constructor(
+    info: &ArchiveInfo,
+    limits: Limits,
+) -> Result<ArchiveInfoAdmission> {
     if info.identifier.is_none() {
         return Err(Error::invalid_archive(
             0,
@@ -993,7 +1112,14 @@ fn check_archive_info_constructor(info: &ArchiveInfo, limits: Limits) -> Result<
         metadata_items,
         limits,
     )?;
-    Ok(header_length)
+    Ok(ArchiveInfoAdmission {
+        header_length,
+        header_fields,
+        header_nesting,
+        header_memory,
+        metadata_items,
+        message_count,
+    })
 }
 
 #[inline]
@@ -1013,7 +1139,10 @@ fn is_minimal_message_info(info: &MessageInfo) -> bool {
 /// entering the general metadata encoder. The generic path remains the
 /// authority for any caller-mutated `MessageInfo`.
 #[inline]
-fn check_minimal_archive_info_constructor(info: &ArchiveInfo, limits: Limits) -> Result<usize> {
+fn check_minimal_archive_info_constructor(
+    info: &ArchiveInfo,
+    limits: Limits,
+) -> Result<ArchiveInfoAdmission> {
     let identifier = info
         .identifier
         .ok_or_else(|| Error::invalid_archive(0, "object is missing its archive identifier"))?;
@@ -1057,7 +1186,14 @@ fn check_minimal_archive_info_constructor(info: &ArchiveInfo, limits: Limits) ->
         metadata_items,
         limits,
     )?;
-    Ok(header_length)
+    Ok(ArchiveInfoAdmission {
+        header_length,
+        header_fields,
+        header_nesting,
+        header_memory,
+        metadata_items,
+        message_count,
+    })
 }
 
 fn minimal_message_info_encoded_length(type_: u32, length: u32) -> Result<usize> {
@@ -1235,7 +1371,7 @@ pub struct RawMessage {
 }
 
 /// One object within a decompressed IWA archive stream.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct ArchiveObject {
     pub archive_info: ArchiveInfo,
     pub messages: Vec<RawMessage>,
@@ -1268,6 +1404,27 @@ pub struct ArchiveObject {
     /// Canonical encoding paired with `original_header` for a non-canonical
     /// source header. Both fields are absent for a canonical source header.
     original_canonical_header: Option<Box<[u8]>>,
+    /// Exact wire admission totals paired with a parsed retained header.
+    /// Rewritten or test-constructed raw headers leave this absent and take
+    /// the validating fallback path.
+    original_header_admission: Option<HeaderAdmission>,
+    /// Neutral metadata totals and the profile under which they were parsed.
+    /// This permits retained objects to reapply header-only tighter profiles
+    /// without rewalking every decoded metadata collection.
+    archive_info_admission: Option<(ArchiveInfoAdmission, Limits)>,
+}
+
+impl PartialEq for ArchiveObject {
+    fn eq(&self, other: &Self) -> bool {
+        self.archive_info == other.archive_info
+            && self.messages == other.messages
+            && self.header_offset == other.header_offset
+            && self.header_length == other.header_length
+            && self.data_offset == other.data_offset
+            && self.data_length == other.data_length
+            && self.original_header == other.original_header
+            && self.original_canonical_header == other.original_canonical_header
+    }
 }
 
 impl ArchiveObject {
@@ -1298,6 +1455,8 @@ impl ArchiveObject {
             data_length: 0,
             original_header: None,
             original_canonical_header: None,
+            original_header_admission: None,
+            archive_info_admission: None,
         };
         // `preflight_archive_object_constructor` has already admitted the
         // complete neutral header before metadata allocation. Validate only
@@ -1441,6 +1600,8 @@ impl ArchiveObject {
             data_length: 0,
             original_header: retained_header,
             original_canonical_header: retained_canonical,
+            original_header_admission: None,
+            archive_info_admission: None,
         };
         cloned.validate(limits)?;
         Ok(cloned)
@@ -1461,8 +1622,41 @@ impl ArchiveObject {
                 "message metadata and payload counts differ",
             ));
         }
-        self.archive_info.validate(limits)?;
+        if !self.validate_cached_archive_info(limits)? {
+            self.archive_info.validate(limits)?;
+        }
         self.validate_payloads(limits)
+    }
+
+    /// Reuse parsed neutral admission only after proving that the current
+    /// metadata still emits the paired canonical header. Profiles that tighten
+    /// sequence-sensitive message or metadata budgets use the full validator,
+    /// preserving its first-failure precedence.
+    fn validate_cached_archive_info(&self, limits: Limits) -> Result<bool> {
+        let Some((admission, admitted_limits)) = self.archive_info_admission else {
+            return Ok(false);
+        };
+        if self.original_header.is_none() || self.original_canonical_header.is_none() {
+            return Ok(false);
+        }
+        if limits.max_message_bytes() < admitted_limits.max_message_bytes()
+            || limits.max_metadata_items() < admitted_limits.max_metadata_items()
+        {
+            return Ok(false);
+        }
+        let Some(original_canonical) = self.original_canonical_header.as_deref() else {
+            return Ok(false);
+        };
+        let mut probe = CanonicalHeaderProbe::new(Some(original_canonical));
+        if emit_canonical_archive_info(&mut probe, self).is_err() {
+            return Ok(false);
+        }
+        let (header_length, canonical_matches) = probe.finish();
+        if !canonical_matches || header_length != admission.header_length {
+            return Ok(false);
+        }
+        admission.check(limits)?;
+        Ok(true)
     }
 
     fn validate_payloads(&self, limits: Limits) -> Result<()> {
@@ -1472,8 +1666,7 @@ impl ArchiveObject {
             for message in &self.messages {
                 check_message_length(message.data.len(), limits)?;
             }
-            let canonical_length = canonical_archive_info_length_for_object(self)?;
-            retained_header_length_for_object(self, canonical_length, limits)?
+            retained_header_length_for_object(self, limits)?.1
         } else {
             archive_info_encoded_len(&self.archive_info)?
         };
@@ -1777,9 +1970,13 @@ impl ArchiveObject {
         if retained_source_header && rewritten_header != canonical_after {
             self.original_header = Some(rewritten_header.into_boxed_slice());
             self.original_canonical_header = Some(canonical_after.into_boxed_slice());
+            self.original_header_admission = None;
+            self.archive_info_admission = None;
         } else {
             self.original_header = None;
             self.original_canonical_header = None;
+            self.original_header_admission = None;
+            self.archive_info_admission = None;
         }
         Ok(old)
     }
@@ -1966,6 +2163,8 @@ impl ArchiveObject {
         self.archive_info = rewritten_info;
         self.original_header = original_header;
         self.original_canonical_header = original_canonical_header;
+        self.original_header_admission = None;
+        self.archive_info_admission = None;
         Ok(old)
     }
 
@@ -2151,6 +2350,8 @@ impl ArchiveObject {
         self.archive_info = rewritten_info;
         self.original_header = original_header;
         self.original_canonical_header = original_canonical_header;
+        self.original_header_admission = None;
+        self.archive_info_admission = None;
         Ok(old)
     }
 
@@ -2292,6 +2493,8 @@ impl ArchiveObject {
         self.archive_info = rewritten_info;
         self.original_header = original_header;
         self.original_canonical_header = original_canonical_header;
+        self.original_header_admission = None;
+        self.archive_info_admission = None;
         Ok(old)
     }
 
@@ -2434,6 +2637,8 @@ impl ArchiveObject {
         self.archive_info = rewritten_info;
         self.original_header = original_header;
         self.original_canonical_header = original_canonical_header;
+        self.original_header_admission = None;
+        self.archive_info_admission = None;
         Ok(old)
     }
 
@@ -2662,6 +2867,8 @@ impl ArchiveObject {
         self.archive_info = rewritten_info;
         self.original_header = original_header;
         self.original_canonical_header = original_canonical_header;
+        self.original_header_admission = None;
+        self.archive_info_admission = None;
         Ok(old)
     }
 
@@ -2802,7 +3009,14 @@ impl Archive {
             let header = data.get(cursor..header_end).ok_or_else(|| {
                 Error::invalid_archive(object_start, "truncated ArchiveInfo header")
             })?;
-            let archive_info = ArchiveInfo::decode(header, limits)?;
+            let header_admission =
+                preflight_header_with_admission(header, HeaderKind::ArchiveInfo, limits)?;
+            let (archive_info, archive_info_admission) =
+                ArchiveInfo::decode_with_preflight_and_admission(
+                    header,
+                    limits,
+                    header_admission.preflight,
+                )?;
             if let Some(identifiers) = discarded_identifiers.as_mut() {
                 let identifier = archive_info.identifier.ok_or_else(|| {
                     Error::invalid_archive(object_start, "object is missing its archive identifier")
@@ -2819,16 +3033,21 @@ impl Archive {
             }
             let selected = selected_identifier
                 .is_none_or(|identifier| archive_info.identifier == Some(identifier));
-            let (original_header, original_canonical_header) = if selected {
-                let canonical_header = encode_archive_info(&archive_info, limits)?;
-                if header == canonical_header.as_slice() {
-                    (None, None)
+            let (original_header, original_canonical_header, original_header_admission) =
+                if selected {
+                    let canonical_header = encode_archive_info(&archive_info, limits)?;
+                    if header == canonical_header.as_slice() {
+                        (None, None, None)
+                    } else {
+                        (
+                            Some(header.into()),
+                            Some(canonical_header.into()),
+                            Some(header_admission),
+                        )
+                    }
                 } else {
-                    (Some(header.into()), Some(canonical_header.into()))
-                }
-            } else {
-                (None, None)
-            };
+                    (None, None, None)
+                };
             cursor = header_end;
             add_limited(
                 &mut total_messages,
@@ -2908,6 +3127,8 @@ impl Archive {
                     })?,
                     original_header,
                     original_canonical_header,
+                    original_header_admission,
+                    archive_info_admission: Some((archive_info_admission, limits)),
                 });
             } else {
                 cursor = payload_end;
@@ -7787,10 +8008,9 @@ fn encoded_archive_len_preflight(objects: &[ArchiveObject], limits: Limits) -> R
             limits.max_messages(),
         )?;
 
-        let canonical_header_length = canonical_archive_info_length_for_object(object)?;
+        let (canonical_header_length, header_length) =
+            retained_header_length_for_object(object, limits)?;
         check_header_length(canonical_header_length, limits)?;
-        let header_length =
-            retained_header_length_for_object(object, canonical_header_length, limits)?;
         check_header_length(header_length, limits)?;
 
         let mut payload_length = 0usize;
@@ -7832,36 +8052,37 @@ fn canonical_archive_info_length_for_object(object: &ArchiveObject) -> Result<us
 
 fn retained_header_length_for_object(
     object: &ArchiveObject,
-    canonical_length: usize,
     limits: Limits,
-) -> Result<usize> {
+) -> Result<(usize, usize)> {
     let Some((original, original_canonical)) = object
         .original_header
         .as_deref()
         .zip(object.original_canonical_header.as_deref())
     else {
-        return Ok(canonical_length);
+        let canonical_length = canonical_archive_info_length_for_object(object)?;
+        return Ok((canonical_length, canonical_length));
     };
 
     let mut probe = CanonicalHeaderProbe::new(Some(original_canonical));
     emit_canonical_archive_info(&mut probe, object)?;
     let (emitted_length, canonical_matches) = probe.finish();
-    if emitted_length != canonical_length {
-        return Err(Error::invalid_archive(
-            0,
-            "ArchiveInfo preflight length mismatch",
-        ));
-    }
     if canonical_matches {
-        admit_retained_header(original, limits)?;
-        Ok(original.len())
+        admit_retained_header(original, limits, object.original_header_admission)?;
+        Ok((emitted_length, original.len()))
     } else {
-        Ok(canonical_length)
+        Ok((emitted_length, emitted_length))
     }
 }
 
-fn admit_retained_header(original: &[u8], limits: Limits) -> Result<()> {
+fn admit_retained_header(
+    original: &[u8],
+    limits: Limits,
+    admission: Option<HeaderAdmission>,
+) -> Result<()> {
     check_header_length(original.len(), limits)?;
+    if let Some(admission) = admission {
+        return admission.check(original.len(), limits);
+    }
     // This private buffer was parsed or rewritten through the header codec.
     // Every field needs at least a tag and a value/length byte, and the known
     // schema descends at most ArchiveInfo -> MessageInfo -> FieldInfo ->
@@ -8243,6 +8464,14 @@ fn buffa_decode_options(preflight: WirePreflight, limits: Limits) -> archive_cod
 }
 
 fn preflight_header(data: &[u8], header: HeaderKind, limits: Limits) -> Result<WirePreflight> {
+    preflight_header_with_admission(data, header, limits).map(|admission| admission.preflight)
+}
+
+fn preflight_header_with_admission(
+    data: &[u8],
+    header: HeaderKind,
+    limits: Limits,
+) -> Result<HeaderAdmission> {
     let root = match header {
         HeaderKind::ArchiveInfo => HeaderNode::ArchiveInfo,
         HeaderKind::MessageInfo => HeaderNode::MessageInfo,
@@ -8303,7 +8532,12 @@ fn preflight_header(data: &[u8], header: HeaderKind, limits: Limits) -> Result<W
             limits.max_metadata_items(),
         ));
     }
-    Ok(preflight)
+    Ok(HeaderAdmission {
+        preflight,
+        message_infos: message_infos.get(),
+        decoded_memory: decoded_memory.get(),
+        metadata_items: metadata_items.get(),
+    })
 }
 
 fn header_has_unknown_reference_metadata(data: &[u8], limits: Limits) -> Result<bool> {
@@ -8601,7 +8835,7 @@ where
             object.original_canonical_header.as_deref(),
         ) {
             (Some(original), Some(canonical)) if canonical == canonical_header.as_slice() => {
-                admit_retained_header(original, limits)?;
+                admit_retained_header(original, limits, object.original_header_admission)?;
                 original
             },
             _ => canonical_header.as_slice(),
