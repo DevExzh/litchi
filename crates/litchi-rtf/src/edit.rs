@@ -25,6 +25,7 @@ use std::fmt;
 use std::io::{self, Write as _};
 use std::num::NonZeroU16;
 use std::ops::Range;
+use std::sync::{Arc, OnceLock};
 
 mod composition;
 mod destination_splice;
@@ -2518,16 +2519,36 @@ impl Edit {
         span: TextSpan,
         underline: UnderlineStyle,
     ) -> Result<&mut Self, Error> {
-        self.ensure_body_compatible()?;
-        self.ensure_operation_room()?;
-        if self
-            .operations
-            .iter()
-            .any(|operation| matches!(operation, Operation::ParagraphLayout { .. }))
-        {
-            return Err(Error::unsupported_operation(
-                "paragraph-layout updates cannot compose with body text or character changes",
-            ));
+        // With no staged operation, the compatibility and paragraph-layout
+        // scans are vacuous. Keep the operation-limit check first, then reject
+        // only the two empty positions whose UTF-8 boundary is proven without
+        // materializing the lazy text projection.
+        if self.operations.is_empty() {
+            self.ensure_operation_room()?;
+            if span.is_empty() {
+                if span.start == 0 {
+                    return Err(Error::unsupported_source(
+                        "underline edits require non-empty text within one paragraph",
+                    ));
+                }
+                if span.start == self.source.raw().retained_text_len() {
+                    return Err(Error::unsupported_source(
+                        "underline edits require non-empty text within one paragraph",
+                    ));
+                }
+            }
+        } else {
+            self.ensure_body_compatible()?;
+            self.ensure_operation_room()?;
+            if self
+                .operations
+                .iter()
+                .any(|operation| matches!(operation, Operation::ParagraphLayout { .. }))
+            {
+                return Err(Error::unsupported_operation(
+                    "paragraph-layout updates cannot compose with body text or character changes",
+                ));
+            }
         }
         let body = self.source.text();
         validate_span(body, span)?;
@@ -13450,6 +13471,43 @@ fn write_baseline(output: &mut BoundedVec, baseline: CharacterBaseline) -> Resul
     }
 }
 
+#[derive(Clone)]
+enum ChangeStorage {
+    Owned(Box<[Change]>),
+    Shared(Arc<[Change]>),
+}
+
+impl ChangeStorage {
+    fn from_vec(changes: Vec<Change>) -> Self {
+        Self::Owned(changes.into_boxed_slice())
+    }
+
+    fn to_shared(&self) -> Arc<[Change]> {
+        // `apply` borrows the source patch but returns an owned commit. The
+        // returned patch therefore needs an owner that remains valid after
+        // this patch is dropped. The cached Arc is shared by every replay
+        // commit; only the first replay copies the owned descriptors.
+        match self {
+            Self::Owned(changes) => Arc::from(&changes[..]),
+            Self::Shared(changes) => changes.clone(),
+        }
+    }
+
+    fn len(&self) -> usize {
+        match self {
+            Self::Owned(changes) => changes.len(),
+            Self::Shared(changes) => changes.len(),
+        }
+    }
+
+    fn iter(&self) -> std::slice::Iter<'_, Change> {
+        match self {
+            Self::Owned(changes) => changes.iter(),
+            Self::Shared(changes) => changes.iter(),
+        }
+    }
+}
+
 /// Result of an atomically validated RTF edit.
 pub struct Commit {
     snapshot: Package,
@@ -13469,11 +13527,33 @@ impl Commit {
             patch: Patch {
                 before,
                 after: snapshot.clone(),
-                changes: semantic_delta.into_boxed_slice(),
+                changes: ChangeStorage::from_vec(semantic_delta),
+                shared_changes: OnceLock::new(),
             },
             snapshot,
             diagnostics: Diagnostics {
                 operation_count,
+                changed,
+            },
+        }
+    }
+
+    fn from_replay(source: &Package, snapshot: Package, patch: &Patch) -> Self {
+        let changed = !same_artifact(source, &snapshot);
+        let changes = patch
+            .shared_changes
+            .get_or_init(|| patch.changes.to_shared())
+            .clone();
+        Self {
+            patch: Patch {
+                before: source.clone(),
+                after: snapshot.clone(),
+                changes: ChangeStorage::Shared(changes),
+                shared_changes: OnceLock::new(),
+            },
+            snapshot,
+            diagnostics: Diagnostics {
+                operation_count: patch.changes.len(),
                 changed,
             },
         }
@@ -14686,11 +14766,22 @@ fn same_artifact(left: &Package, right: &Package) -> bool {
 }
 
 /// In-memory exact-source patch with a durable shared semantic projection.
-#[derive(Clone)]
 pub struct Patch {
     before: Package,
     after: Package,
-    changes: Box<[Change]>,
+    changes: ChangeStorage,
+    shared_changes: OnceLock<Arc<[Change]>>,
+}
+
+impl Clone for Patch {
+    fn clone(&self) -> Self {
+        Self {
+            before: self.before.clone(),
+            after: self.after.clone(),
+            changes: self.changes.clone(),
+            shared_changes: OnceLock::new(),
+        }
+    }
 }
 
 impl Patch {
@@ -14718,12 +14809,7 @@ impl Patch {
     /// as the facade replay commit.
     pub(crate) fn apply_commit(&self, source: &Package) -> Result<Commit, Error> {
         let snapshot = self.apply(source)?;
-        Ok(Commit::new(
-            source.clone(),
-            snapshot,
-            self.changes.len(),
-            self.changes.to_vec(),
-        ))
+        Ok(Commit::from_replay(source, snapshot, self))
     }
 
     /// Whether this patch preserves the exact source artifact.
@@ -14738,7 +14824,10 @@ impl Patch {
         Self {
             before: self.after.clone(),
             after: self.before.clone(),
-            changes: self.changes.iter().rev().map(Change::inverse).collect(),
+            changes: ChangeStorage::from_vec(
+                self.changes.iter().rev().map(Change::inverse).collect(),
+            ),
+            shared_changes: OnceLock::new(),
         }
     }
 

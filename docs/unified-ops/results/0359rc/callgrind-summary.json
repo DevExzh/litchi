@@ -1,0 +1,102 @@
+{
+  "record": "0359rc",
+  "status": "candidate-unaccepted-native-open",
+  "source_commit": "68f976eb00",
+  "profiler": {
+    "tool": "valgrind callgrind",
+    "version": "3.26.0",
+    "events": "Ir",
+    "cpu": 7,
+    "command": "TMPDIR=<external-tmp> taskset -c 7 valgrind --tool=callgrind --dump-instr=yes --collect-jumps=yes --callgrind-out-file=<external-profile> <binary> [mode]"
+  },
+  "probe": {
+    "successful_probe_sha256": "c2f7ec5c3f121cabf3b143bd459cbed9dbfebe08a17e0ef7eca1520331a3a618",
+    "cold_success_calls": 34,
+    "warm_success_calls": 34000,
+    "refusal_calls": 34000,
+    "repeat_order": ["current-r1", "fast-r1", "current-r2", "fast-r2"]
+  },
+  "cold_success_inclusive": {
+    "current": {
+      "whole_ir": 2639304,
+      "main_ir": 2343392,
+      "main_to_parse_internal": 674232,
+      "main_to_success": 1599750,
+      "success_to_commit_staged": 1538068,
+      "success_to_underline_for_span": 8840,
+      "commit_to_from_bytes": 1044644,
+      "tree_parse_internal": 1678246,
+      "tree_parse_string": 1525554,
+      "parser_parse": 666820,
+      "parse_group": 483352,
+      "tokenize_with_spans": 413362,
+      "raw_vec_finish_grow": 225466
+    },
+    "candidate": {
+      "whole_ir": 2658402,
+      "main_ir": 2362468,
+      "main_to_parse_internal": 699272,
+      "main_to_success": 1593580,
+      "success_to_commit_staged": 1532624,
+      "success_to_underline_for_span": 8840,
+      "commit_to_from_bytes": 1039026,
+      "tree_parse_internal": 1695953,
+      "tree_parse_string": 1542435,
+      "parser_parse": 681279,
+      "parse_group": 497980,
+      "tokenize_with_spans": 414794,
+      "raw_vec_finish_grow": 240247
+    }
+  },
+  "cold_nested_edges": [
+    {"edge": "parse_group -> RawVec::grow_one", "calls": 68, "current": 20158, "candidate": 36169},
+    {"edge": "RawVec::grow_one -> RawVecInner::finish_grow", "calls": 272, "current": 47024, "candidate": 61431},
+    {"edge": "RawVecInner::finish_grow -> realloc", "calls": 374, "current": 145088, "candidate": 153848},
+    {"edge": "realloc -> _int_realloc", "calls": 375, "current": 125615, "candidate": 133913},
+    {"edge": "malloc -> __memcpy_avx_unaligned_erms", "calls_current": 299, "calls_candidate": 311, "current": 10221, "candidate": 18905}
+  ],
+  "same_path_identity_control": {
+    "fixed_executable_path": "/home/zhuhe/code/litchi-worktrees/.coord/rtf-refusals/same-path-20261022/underline_route_probe",
+    "current_binary_sha256": "7e39b866316d370d1051d9052784df360f4a2676a2c5d610e182eff979b1dbb0",
+    "candidate_binary_sha256": "672f38ba61e0c6422beaa79810acb07d2c0caaff5651299a502835645df4e4ae",
+    "argv0_environment_cpu_matched": true,
+    "all_four_profiles_identical": true,
+    "metrics": {
+      "whole_ir": 2657559,
+      "main_ir": 2361674,
+      "tree_parse_internal": 1695137,
+      "tree_parse_string": 1542435,
+      "parser_parse": 681279,
+      "parse_group": 497980,
+      "raw_vec_finish_grow": 240247,
+      "success": 1593170,
+      "commit_staged": 1532214,
+      "hashbrown_raw_table_drop": 5508
+    },
+    "profile_artifacts": [
+      {"name": "same-current-r1.callgrind", "size": 442474, "sha256": "501726679a0aa4f17aaa96ff94e939eae1987c92236c3926b083015f6337be22"},
+      {"name": "same-fast-r1.callgrind", "size": 442322, "sha256": "2879dc0c865203aa5aec52d8a31ef6f562399921f08d3b455e64d9454af69391"},
+      {"name": "same-current-r2.callgrind", "size": 442474, "sha256": "4496c6eca88257470b1d32d9bc30b7e22624361e641a16fde374224291e915a2"},
+      {"name": "same-fast-r2.callgrind", "size": 442322, "sha256": "a99d6731723e183383a53e5d95b19a311592c69564dfa6b72a30fe8b81070895"}
+    ],
+    "allocated_size_followup": "not_needed_delta_disappeared_under_control"
+  },
+  "warm_success_inclusive": {
+    "current": {"whole_ir": 1581012112, "main_ir": 1580716501, "main_to_success": 1580556062, "success_to_commit_staged": 1524866086, "success_to_underline_for_span": 8840000, "commit_to_from_bytes": 1035875428, "package_text": 7310377},
+    "candidate": {"whole_ir": 1576402637, "main_ir": 1576107027, "main_to_success": 1575946609, "success_to_commit_staged": 1520256516, "success_to_underline_for_span": 8840000, "commit_to_from_bytes": 1034342970, "package_text": 7310209}
+  },
+  "refusal_inclusive": {
+    "current": {"whole_ir": 627438721, "main_ir": 627140674, "set_text_underline": 1496000, "commit_staged": 347859241, "package_text": 2206446, "package_apply": 1679600, "replace_text": 1489647, "tail_commit": 127067737},
+    "candidate": {"whole_ir": 626418455, "main_ir": 626120384, "set_text_underline": 476000, "commit_staged": 347858413, "package_text": 2206446, "package_apply": 1679600, "replace_text": 1489647, "tail_commit": 127068219},
+    "set_text_underline_calls": 34000
+  },
+  "normal_direct_ir": {
+    "replace_text": {"current": 569279, "candidate": 569279},
+    "commit": {"current": 268167, "candidate": 268167},
+    "commit_staged": {"current": 3553967, "candidate": 3553967},
+    "tail_append_commit": {"current": 14892, "candidate": 14892},
+    "to_bytes": {"current": 2652, "candidate": 2652},
+    "apply": {"current": 1159400, "candidate": 1159400}
+  },
+  "native_qualification": {"run": false, "waived": false, "reason": "owner must schedule isolated native A-B-B-A and paired heaptrack"}
+}

@@ -1,0 +1,47 @@
+{
+  "record": "0359r",
+  "status": "checkfree",
+  "decision": "reject-packed-refusal",
+  "experiment": {
+    "base": "532cd8634b786827f1a3191f21ce6bc4889a2e69",
+    "normal_source": "uo2/w8-rtf-replay@5909588b9958171cc29c2f43a366d2c506dd567e",
+    "temporary_change": "#[repr(C, packed)] on litchi_core::edit::Refusal",
+    "implementation_landed": false
+  },
+  "layout": {
+    "Refusal": {"normal": [40, 8], "packed": [33, 1]},
+    "litchi_core::Error": {"normal": [48, 8], "packed": [48, 8]},
+    "litchi_core::sheet::Error": {"normal": [40, 8], "packed": [40, 8]},
+    "litchi_rtf::edit::Error": {"normal": [48, 8], "packed": [40, 8]},
+    "Result<&mut edit::Edit, edit::Error>": {"normal": [48, 8], "packed": [40, 8]},
+    "litchi_rtf::tail_append::Error": {"normal": [48, 8], "packed": [40, 8]},
+    "Result<&mut tail_append::Edit, tail_append::Error>": {"normal": [48, 8], "packed": [40, 8]}
+  },
+  "assembly": {
+    "symbol": "litchi_rtf::edit::Edit::set_text_underline",
+    "normal": {"bytes": 416, "instructions": 111},
+    "packed": {"bytes": 528, "instructions": 132},
+    "normal_binary": {"size": 4139552, "sha256": "410c67b99fa00d4e79b01da04a24e846a18765fda226941e42af50655415fe73"},
+    "packed_binary": {"size": 4152000, "sha256": "356cc7997e6daefa4c0f24df54b46baf83a0b4a5bc46eb931558c233bbcf1f75"},
+    "normal_disassembly": {"path": "/home/zhuhe/rtf-unpacked-set-text-underline.asm", "size": 5104, "sha256": "dab78f9c42c14cacfb10a95e971623b01fad27af33e3def22593841f21883d3b"},
+    "packed_disassembly": {"path": "/home/zhuhe/rtf-packed-set-text-underline.asm", "size": 5775, "sha256": "ec6dce209b6a8a2bcfb3674bb585a8c5923f46586d03757ae614e0082bd100cf"}
+  },
+  "validation": {
+    "core_tests": "cargo test --offline -p litchi-core --lib",
+    "core_tests_result": "252 passed",
+    "cold_constructor_experiment": {
+      "change": "edit::Error and tail_append::Error private refusal constructors #[cold] #[inline(never)]",
+      "rtf_lib_tests": "380 passed",
+      "normal_set_text_underline": {"bytes": 1248, "instructions": 312},
+      "cold_set_text_underline": {"bytes": 1392, "instructions": 352},
+      "normal_binary": {"size": 4139552, "sha256": "410c67b99fa00d4e79b01da04a24e846a18765fda226941e42af50655415fe73"},
+      "cold_binary": {"size": 4165728, "sha256": "b75f5726d84b126883baa927fad69b1ea26f7257419542b8e419723aaf6e2c3f"},
+      "normal_disassembly": {"path": "/home/zhuhe/rtf-success-normal-set.asm", "size": 13917, "sha256": "293eca3966e8d194fe4e72eb78b4c8fcd00f3e88d9ab287a8d0aeeaf8db7989f"},
+      "cold_disassembly": {"path": "/home/zhuhe/rtf-success-cold-set.asm", "size": 15351, "sha256": "cddb993ff0c2438e07510831f982a3a878a736aea945f67446c9bd504e8132d7"},
+      "native_timing": "not run; host busy",
+      "implementation_landed": false
+    },
+    "native_timing": "not run; host busy and experiment rejected by static evidence",
+    "heap_change": "none observed in 0359b; no source allocation was added"
+  }
+}
