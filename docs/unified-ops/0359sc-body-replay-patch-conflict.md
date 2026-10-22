@@ -19,3 +19,16 @@ Parser and structural failures remain `Invalid`/`Corrupted`, and the source
 package remains unchanged after a rejected replay. The source-only change was
 formatted and audited without borrowing a build target; the coordinator should
 run the focused DOC and facade tests on the warmed integration cache.
+
+The public host-path audit also found that `litchi_doc::raw::Reader` exposes
+the DataSpaces owner directly: `write_data_spaces_patch` returns
+`litchi_crypto::spaces::Error`, so a stale recipient remains the typed
+`Error::PatchConflict` and is not flattened into a corrupt-file result. No
+PPT, XLS, unified `File`, or `litchi-ops` route consumes this owner, so no
+facade classifier is added. The OOXML adapter's string mapping is used only
+by metadata inspection and construction paths, which cannot call
+`Patch::apply`; `PatchConflict` therefore cannot reach that mapping. The
+public DataSpaces error is `#[non_exhaustive]`, matching the touched shared
+OLE error boundary. Raw `PackagePatch` and property-set routes retain their
+typed `ProtectionDenied`; canonical DOC edit families map it to
+`Refused(Protected)` or `Refused(UnknownProtection)`.
