@@ -916,8 +916,11 @@ impl Snapshot {
     ) -> Result<Self> {
         let limits = package.limits_value();
         let cfb_limits = package.cfb_limits_value();
-        let workbook_path = [vec!["Workbook".to_string()], vec!["Book".to_string()]]
+        // Allocate only the selected path: BIFF8 packages name the stream
+        // `Workbook`, and only a BIFF5-style package falls back to `Book`.
+        let workbook_path = ["Workbook", "Book"]
             .into_iter()
+            .map(|name| vec![name.to_string()])
             .find(|path| package.stream(path).is_some())
             .ok_or_else(|| {
                 Error::InvalidData("XLS package has no Workbook or Book stream".into())
