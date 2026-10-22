@@ -41,3 +41,17 @@ crate-owned error. No limit or graph proof is removed.
 [consumer-v2.json](results/0362uf/consumer-v2.json) preserves the command,
 log size/hash and stop. The performance-harness check did not run. Both
 consumer checks and the affected semantic suites still require completion.
+
+## DOCX compilation correction
+
+The next locked workspace check ran on
+`0befb112d96d2409e6f40c9abfeb4813665905ad`, progressed past the XLSX library,
+and stopped in DOCX. A missing comma between two `concat!` documentation
+literals expanded into errors for thirteen source families. A redundant
+`super::` qualification in the effective-artifact memo also violated the
+workspace lint policy. The correction adds the comma and uses the imported
+type name, without changing runtime behavior.
+
+[consumer-v3.json](results/0362uf/consumer-v3.json) retains the complete stop
+receipt. The harness group was not reached; consumer and semantic validation
+remain pending.

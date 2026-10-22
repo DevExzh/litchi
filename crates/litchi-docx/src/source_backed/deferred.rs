@@ -300,7 +300,7 @@ macro_rules! source_family {
                     "exact before and after state of what it changed. Replay it with the ",
                     "family's `Package::apply_*` onto a package holding the before state; ",
                     "[`Patch::inverse`] restores it. The inverse of a commit applied to that ",
-                    "commit's own package restores the exact source artifact; a family that "
+                    "commit's own package restores the exact source artifact; a family that ",
                     "is forward-only may refuse an inverse on another package."
                 )]
         #[derive(Clone)]

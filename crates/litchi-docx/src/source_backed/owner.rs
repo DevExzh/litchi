@@ -45,7 +45,7 @@ impl Package {
                 Self::with_execution(self.physical_source()?.clone(), self.execution.clone())?
                     .with_semantic_limits(self.semantic_limits().clone());
             owner.effective = Some(topology.clone());
-            owner.artifact_fingerprint = Some(super::ArtifactFingerprintMemo::effective());
+            owner.artifact_fingerprint = Some(ArtifactFingerprintMemo::effective());
             Ok(owner)
         })();
         self.check_source()?;
