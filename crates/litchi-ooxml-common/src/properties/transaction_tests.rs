@@ -323,9 +323,8 @@ fn composed_no_op_scope_authenticates_absent_property_families() {
         bytes(&composed_package, "/docProps/core.xml"),
         bytes(&expected, "/docProps/core.xml")
     );
-    // The untouched absent families keep distinct synthetic IDs. The
-    // inverse therefore accepts the created core relationship while still
-    // proving that the app and custom IDs are free.
+    // The untouched absent families retain diagnostic placeholders, but replay
+    // authenticates their actual absence independently of those IDs.
     assert!(composed.inverse().apply(&mut composed_package).unwrap());
     assert_eq!(composed_package.iter_parts().count(), 0);
 

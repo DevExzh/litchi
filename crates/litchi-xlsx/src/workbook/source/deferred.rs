@@ -307,10 +307,7 @@ impl SourceBackedWorkbook {
         let lineage_limits = self.inner.source_limits();
         let shared_catalog = match pending.catalog.as_ref() {
             None => self.inner.catalog_proof(),
-            Some(catalog)
-                if Arc::ptr_eq(&catalog.defined_names, &self.inner.defined_names)
-                    || catalog.defined_names.as_ref() == self.inner.defined_names.as_ref() =>
-            {
+            Some(catalog) if catalog.defined_names.as_ref() == self.inner.defined_names_slice() => {
                 self.inner.catalog_proof()
             },
             Some(catalog) => Arc::new(SourceCatalogProof {
@@ -324,12 +321,15 @@ impl SourceBackedWorkbook {
         // options whose source profile differs from that package's admitted
         // profile. Materialization follows the package lineage, so preserve
         // the retained policy while carrying the other facade options over.
-        let mut options = self.inner.options.clone();
-        options.source_limits = *lineage_limits;
+        let options = self
+            .inner
+            .owner_options_ref()
+            .to_open_options(*lineage_limits);
         let view = Self::from_read_at_with_options_and_shared_catalog(
             Arc::new(litchi_core::OwnedSource::new(bytes)),
             options,
             Some(shared_catalog),
+            Some(self.inner.owner_options()),
         )?;
         Ok(pending.materialized.get_or_init(|| view))
     }
@@ -405,7 +405,7 @@ impl SourceBackedWorkbook {
     /// ([`crate::OpenOptions::semantic_limits`]).
     #[must_use]
     pub fn semantic_limits(&self) -> &crate::SemanticLimits {
-        &self.inner.options.semantic_limits
+        self.inner.owner_options_ref().semantic_limits()
     }
 
     /// The indexed package every source-backed edit reads: the reopened

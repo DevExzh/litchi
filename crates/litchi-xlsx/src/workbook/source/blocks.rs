@@ -201,7 +201,7 @@ impl SourceInner {
             return Ok(0);
         };
         let part = self.package.part(uri)?;
-        if let Some(count) = self.differential_format_count.get() {
+        if let Some(count) = self.dependencies().differential_format_count.get() {
             self.execution_check()?;
             self.package.source_version()?;
             return Ok(*count);
@@ -211,7 +211,7 @@ impl SourceInner {
             crate::conditional_formatting::parse_differential_formats(data.as_bytes())?.len();
         self.execution_check()?;
         self.package.source_version()?;
-        let _publish_result = self.differential_format_count.set(count);
+        let _publish_result = self.dependencies().differential_format_count.set(count);
         Ok(count)
     }
 }
@@ -320,7 +320,7 @@ impl SourceWorksheet {
     pub fn comments(&self) -> Result<Option<crate::workbook::comments::Comments>> {
         if self.data.kind != WorksheetKind::Worksheet {
             return Err(Error::NotWorksheet {
-                sheet: self.data.name.clone(),
+                sheet: self.data.name().to_owned(),
             });
         }
         let value = crate::workbook::comments::package::load_from_source(
@@ -336,7 +336,7 @@ impl SourceWorksheet {
     pub fn threaded_comments(&self) -> Result<Option<crate::threaded_comments::Comments>> {
         if self.data.kind != WorksheetKind::Worksheet {
             return Err(Error::NotWorksheet {
-                sheet: self.data.name.clone(),
+                sheet: self.data.name().to_owned(),
             });
         }
         let value = crate::threaded_comments::package::source_comments(
@@ -377,7 +377,7 @@ impl SourceWorksheet {
         self.owner.execution_check()?;
         if self.data.kind != WorksheetKind::Worksheet {
             return Err(Error::NotWorksheet {
-                sheet: self.data.name.clone(),
+                sheet: self.data.name().to_owned(),
             });
         }
         // Resolving the part checks the captured source version even when the
@@ -402,7 +402,7 @@ impl SourceWorksheet {
         self.owner.execution_check()?;
         self.owner.package.source_version()?;
         let weight = blocks.weight_bytes();
-        match self.owner.values.publish(
+        match self.owner.values().publish(
             self.data.position,
             Cached::Blocks(Arc::new(blocks)),
             weight,
@@ -417,7 +417,7 @@ impl SourceWorksheet {
     fn cached_blocks(&self, record_miss: bool) -> Option<Arc<Blocks>> {
         match self
             .owner
-            .values
+            .values()
             .get(self.data.position, Axis::Blocks, record_miss)?
         {
             Cached::Blocks(blocks) => Some(blocks),

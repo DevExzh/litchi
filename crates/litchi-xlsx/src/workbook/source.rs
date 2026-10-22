@@ -31,8 +31,8 @@ use litchi_core::{
 use litchi_ooxml_common::mce::{Capabilities, Error as MceError, StreamError, StreamLimits};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{
-    PackURI, PartData, PartView, SourceBackedPackage, SourceCacheDiagnostics, SourceLimits,
-    VerifiedDecodedReaderError,
+    PackURI, PartData, PartView, SourceBackedPackage, SourceCacheDiagnostics, SourceCacheLimits,
+    SourceLimits, VerifiedDecodedReaderError,
 };
 use litchi_sheet::{Area, At, Cell as Address, Rect};
 
@@ -88,8 +88,10 @@ fn check_execution(context: Option<&ExecutionContext>) -> Result<()> {
 
 pub(crate) struct SourceSheetData {
     position: usize,
-    pub(crate) name: String,
-    name_key: Box<str>,
+    /// The sheet name, its canonical case-insensitive key and the workbook
+    /// relationship ID, in one allocation; `name_len` and `name_key_len`
+    /// split them.
+    keys: Box<str>,
     pub(crate) kind: WorksheetKind,
     pub(crate) visibility: Visibility,
     pub(crate) part_uri: PackURI,
@@ -97,7 +99,9 @@ pub(crate) struct SourceSheetData {
     /// source closure. Keeping these values avoids reparsing the same
     /// workbook XML when an already admitted read-only owner starts an edit.
     pub(crate) sheet_id: u32,
-    pub(crate) relationship_id: Box<str>,
+    name_key_len: u16,
+    /// Sheet names are at most 31 characters, so at most 124 UTF-8 bytes.
+    name_len: u8,
     /// Repairs made by the first successful parse of this worksheet's grid.
     ///
     /// The parsed grid itself lives in the workbook's evictable semantic
@@ -112,6 +116,43 @@ pub(crate) struct SourceSheetData {
 }
 
 impl SourceSheetData {
+    /// Build the combined name, name-key and relationship-ID storage.
+    fn keys(name: &str, relationship_id: &str) -> Result<(Box<str>, u8, u16)> {
+        let bound = || Error::Invalid("worksheet name exceeds its storage bound".into());
+        let name_len = u8::try_from(name.len()).map_err(|_overflow| bound())?;
+        let mut keys = if name.is_ascii() {
+            let mut keys = String::with_capacity(2 * name.len() + relationship_id.len());
+            keys.push_str(name);
+            keys.extend(name.chars().map(|character| character.to_ascii_lowercase()));
+            keys
+        } else {
+            let key = crate::sheet::key(name);
+            let mut keys = String::with_capacity(name.len() + key.len() + relationship_id.len());
+            keys.push_str(name);
+            keys.push_str(&key);
+            keys
+        };
+        let name_key_len = u16::try_from(keys.len() - name.len()).map_err(|_overflow| bound())?;
+        keys.push_str(relationship_id);
+        Ok((keys.into_boxed_str(), name_len, name_key_len))
+    }
+
+    /// The sheet name.
+    pub(crate) fn name(&self) -> &str {
+        &self.keys[..usize::from(self.name_len)]
+    }
+
+    /// The canonical case-insensitive key of the sheet name.
+    pub(crate) fn name_key(&self) -> &str {
+        let start = usize::from(self.name_len);
+        &self.keys[start..start + usize::from(self.name_key_len)]
+    }
+
+    /// The workbook relationship ID of this sheet.
+    pub(crate) fn relationship_id(&self) -> &str {
+        &self.keys[usize::from(self.name_len) + usize::from(self.name_key_len)..]
+    }
+
     fn lock_build(&self) -> MutexGuard<'_, ()> {
         // The guarded value is empty, so a poisoned lock carries no state.
         self.build.lock().unwrap_or_else(PoisonError::into_inner)
@@ -122,6 +163,105 @@ impl SourceSheetData {
 pub(crate) struct SourceCatalogProof {
     pub(crate) defined_names: Arc<[raw::DefinedName]>,
     pub(crate) limits: Arc<SourceLimits>,
+}
+
+/// Caches used only by shared-string and conditional-format readers.
+///
+/// Keeping these less common caches separate means the ordinary cell/style
+/// path does not retain their state in its first lazy allocation.
+struct DependencyState {
+    shared_strings: OnceLock<Box<[Text]>>,
+    shared_strings_tolerance: OnceLock<ToleranceReport>,
+    differential_format_count: OnceLock<usize>,
+}
+
+impl DependencyState {
+    fn new() -> Self {
+        Self {
+            shared_strings: OnceLock::new(),
+            shared_strings_tolerance: OnceLock::new(),
+            differential_format_count: OnceLock::new(),
+        }
+    }
+}
+
+/// The source-backed policy that is meaningful after the OPC package has
+/// already admitted its physical source limits.
+///
+/// `OpenOptions` also carries the 192-byte `SourceLimits` value. The package
+/// owns that value, so retaining a complete `OpenOptions` in every immutable
+/// source owner duplicates the physical ingress policy in each owner and in
+/// every reopened history step. Keep the facade policies here and rebuild the
+/// public options value only at a deferred materialization boundary.
+#[derive(Clone)]
+struct SourceOwnerOptions {
+    leniency: crate::Leniency,
+    /// Default semantic budgets need no per-owner storage. Customized
+    /// budgets are shared only when a deferred owner actually needs them.
+    semantic_limits: Option<Arc<crate::SemanticLimits>>,
+    #[cfg(feature = "encryption")]
+    encryption_limits: crate::encryption::Limits,
+    cache_limits: Option<SourceCacheLimits>,
+    execution_context: Option<Arc<ExecutionContext>>,
+}
+
+impl SourceOwnerOptions {
+    fn from_open_options(options: &crate::OpenOptions) -> Self {
+        Self {
+            leniency: options.leniency,
+            semantic_limits: (options.semantic_limits != crate::SemanticLimits::default())
+                .then(|| Arc::new(options.semantic_limits)),
+            #[cfg(feature = "encryption")]
+            encryption_limits: options.encryption_limits,
+            cache_limits: options.cache_limits,
+            execution_context: options
+                .execution_context
+                .as_ref()
+                .map(|context| Arc::new(context.clone())),
+        }
+    }
+
+    fn to_open_options(&self, source_limits: SourceLimits) -> crate::OpenOptions {
+        let mut options = crate::OpenOptions::new()
+            .source_limits(source_limits)
+            .leniency(self.leniency)
+            .semantic_limits(*self.semantic_limits());
+        #[cfg(feature = "encryption")]
+        {
+            options = options.encryption_limits(self.encryption_limits);
+        }
+        if let Some(cache_limits) = self.cache_limits {
+            options = options.cache_limits(cache_limits);
+        }
+        if let Some(execution_context) = self.execution_context.as_deref() {
+            options = options.execution_context(execution_context.clone());
+        }
+        options
+    }
+
+    fn semantic_limits(&self) -> &crate::SemanticLimits {
+        static DEFAULT: OnceLock<crate::SemanticLimits> = OnceLock::new();
+        self.semantic_limits
+            .as_deref()
+            .unwrap_or_else(|| DEFAULT.get_or_init(crate::SemanticLimits::default))
+    }
+
+    fn is_default(&self) -> bool {
+        self.leniency == crate::Leniency::default()
+            && self.semantic_limits.is_none()
+            && self.cache_limits.is_none()
+            && self.execution_context.is_none()
+            && {
+                #[cfg(feature = "encryption")]
+                {
+                    self.encryption_limits == crate::encryption::Limits::default()
+                }
+                #[cfg(not(feature = "encryption"))]
+                {
+                    true
+                }
+            }
+    }
 }
 
 pub(crate) struct SourceInner {
@@ -153,8 +293,9 @@ pub(crate) struct SourceInner {
     /// backed edits repeatedly reopen one worksheet from the same immutable
     /// owner; sharing its workbook and relationship metadata keeps retained
     /// patch history compact without sharing rewritten worksheet bytes.
-    merge_source_states: Mutex<HashMap<PackURI, Arc<crate::merge::source::SourceStateShared>>>,
-    execution: Option<ExecutionContext>,
+    merge_source_states:
+        OnceLock<Box<Mutex<HashMap<PackURI, Arc<crate::merge::source::SourceStateShared>>>>>,
+    execution: Option<Arc<ExecutionContext>>,
     // Keep the mandatory workbook payload pinned for managed facades. Besides
     // avoiding a second root extraction, this makes an exact managed budget
     // boundary meaningful: the selected worksheet cannot evict the root while
@@ -162,18 +303,21 @@ pub(crate) struct SourceInner {
     // the historical finite-cache behavior and do not pin this payload.
     _catalog_data: Option<PartData>,
     shared_strings_uri: Option<PackURI>,
-    shared_strings: OnceLock<Box<[Text]>>,
-    /// Repairs made while the shared-string table was parsed; published
-    /// before the table itself (see `crate::leniency`).
-    shared_strings_tolerance: OnceLock<ToleranceReport>,
     styles_uri: Option<PackURI>,
+    /// Style identity remains part of the owner lineage. The common worksheet
+    /// and style caches stay inline so their first reads do not allocate a
+    /// separate reader-state box; less common dependency caches remain lazy.
+    style_lineage: Arc<crate::style::StyleLineage>,
+    values: values::ValueCache,
     styles: OnceLock<raw::styles::Catalog>,
     formats: crate::style::cell_format::FormatCache,
-    style_lineage: Arc<crate::style::StyleLineage>,
+    /// Shared-string and conditional-format caches are less common than the
+    /// worksheet/style path, so keep their state in a second lazy allocation.
+    dependencies: OnceLock<Box<DependencyState>>,
     flavor: Flavor,
     date_system: DateSystem,
     pub(crate) active_sheet: Option<usize>,
-    pub(crate) sheets: Arc<[Arc<SourceSheetData>]>,
+    pub(crate) sheets: Box<[Arc<SourceSheetData>]>,
     /// Sheet positions sorted by their canonical, case-insensitive names.
     ///
     /// The mandatory workbook catalog rejects duplicate canonical names, so a
@@ -183,8 +327,14 @@ pub(crate) struct SourceInner {
     /// Repairs made while the workbook catalog was parsed at open time.
     tolerance: ToleranceReport,
     /// Defined names parsed with the mandatory workbook catalog at open.
-    /// Source-backed snapshots share this immutable catalog.
-    defined_names: Arc<[raw::DefinedName]>,
+    ///
+    /// An ordinary owner keeps the parsed catalogue as a boxed slice (no
+    /// shared-ownership header on the cold open path). An owner reopened
+    /// with a shared catalog proof stores `None` and borrows the proof's
+    /// slice, so every proof-backed owner of a lineage reads one shared copy;
+    /// [`Self::catalog_proof`] copies an ordinary owner's names at most once,
+    /// when that owner first starts a deferred lineage.
+    defined_names: Option<Box<[raw::DefinedName]>>,
     /// Lazily shared ingress policy for source-backed snapshots. Keeping this
     /// on the immutable lineage avoids copying all policy fields into every
     /// retained before/after snapshot while leaving ordinary opens lazy.
@@ -193,14 +343,9 @@ pub(crate) struct SourceInner {
     /// source lineage. It groups the unchanged defined-name catalog and its
     /// ingress policy behind one retained handle.
     catalog_proof: OnceLock<Arc<SourceCatalogProof>>,
-    /// Weighted clean-value cache of parsed worksheet values.
-    values: values::ValueCache,
-    /// Number of differential formats in the styles part, parsed once for
-    /// conditional-format reads.
-    differential_format_count: OnceLock<usize>,
     /// The ingress policies this workbook was opened with; a committed
     /// workbook reopens its output under them.
-    options: crate::OpenOptions,
+    owner_options: Option<Arc<SourceOwnerOptions>>,
 }
 
 /// Read-only XLSX catalog and worksheet access over a positional source.
@@ -336,17 +481,25 @@ impl SourceBackedWorkbook {
         source: Arc<dyn ReadAt>,
         options: crate::OpenOptions,
     ) -> Result<Self> {
-        Self::from_read_at_with_options_and_shared_catalog(source, options, None)
+        Self::from_read_at_with_options_and_shared_catalog(source, options, None, None)
     }
 
     fn from_read_at_with_options_and_shared_catalog(
         source: Arc<dyn ReadAt>,
         options: crate::OpenOptions,
         shared_catalog: Option<Arc<SourceCatalogProof>>,
+        shared_owner_options: Option<Arc<SourceOwnerOptions>>,
     ) -> Result<Self> {
         let limits = options.source_limits;
         let cache_limits = options.cache_limits.unwrap_or_default();
-        let package = match options.execution_context.clone() {
+        let owner_options = shared_owner_options.or_else(|| {
+            let owner_options = SourceOwnerOptions::from_open_options(&options);
+            (!owner_options.is_default()).then(|| Arc::new(owner_options))
+        });
+        let execution = owner_options
+            .as_ref()
+            .and_then(|owner_options| owner_options.execution_context.as_deref().cloned());
+        let package = match execution {
             Some(context) => {
                 SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
                     source,
@@ -361,7 +514,12 @@ impl SourceBackedWorkbook {
                 cache_limits,
             )?,
         };
-        Self::open_source_backed_package_with_shared_catalog(package, options, shared_catalog)
+        Self::open_source_backed_package_with_shared_catalog(
+            package,
+            options,
+            shared_catalog,
+            owner_options,
+        )
     }
 
     /// Open an XLSX package from a sequential reader with the default
@@ -383,7 +541,12 @@ impl SourceBackedWorkbook {
         reader: R,
         options: crate::OpenOptions,
     ) -> Result<Self> {
-        let package = SourceBackedPackage::from_reader_with_limits(reader, options.source_limits)?;
+        let package = SourceBackedPackage::from_reader_with_source_options(
+            reader,
+            options.source_limits,
+            options.cache_limits.unwrap_or_default(),
+            options.execution_context.clone(),
+        )?;
         Self::open_source_backed_package(package, options)
     }
 
@@ -407,13 +570,14 @@ impl SourceBackedWorkbook {
         package: SourceBackedPackage,
         options: crate::OpenOptions,
     ) -> Result<Self> {
-        Self::open_source_backed_package_with_shared_catalog(package, options, None)
+        Self::open_source_backed_package_with_shared_catalog(package, options, None, None)
     }
 
     fn open_source_backed_package_with_shared_catalog(
         package: SourceBackedPackage,
         options: crate::OpenOptions,
         shared_catalog: Option<Arc<SourceCatalogProof>>,
+        shared_owner_options: Option<Arc<SourceOwnerOptions>>,
     ) -> Result<Self> {
         let execution = options.execution_context.clone();
         let leniency = options.leniency;
@@ -457,29 +621,31 @@ impl SourceBackedWorkbook {
                         "reopened workbook changed its defined-name catalog",
                     ));
                 }
-                Arc::clone(&shared.defined_names)
+                None
             },
-            None => Arc::from(catalog.defined_names.into_boxed_slice()),
+            None => Some(catalog.defined_names.into_boxed_slice()),
         };
         let mut sheets = Vec::new();
         sheets
             .try_reserve_exact(catalog.sheets.len())
             .map_err(|source| allocation("source-backed workbook sheets", source))?;
         for (position, (sheet, part)) in catalog.sheets.into_iter().zip(sheet_parts).enumerate() {
+            let (keys, name_len, name_key_len) =
+                SourceSheetData::keys(&sheet.name, &sheet.relationship_id)?;
             sheets.push(Arc::new(SourceSheetData {
                 position,
-                name_key: crate::sheet::key(&sheet.name),
-                name: sheet.name,
+                keys,
+                name_len,
+                name_key_len,
                 kind: part.kind,
                 visibility: codec::visibility(sheet.visibility),
                 part_uri: part.uri,
                 sheet_id: sheet.sheet_id,
-                relationship_id: sheet.relationship_id.into_boxed_str(),
                 tolerance: OnceLock::new(),
                 build: Mutex::new(()),
             }));
         }
-        let sheets: Arc<[Arc<SourceSheetData>]> = sheets.into_boxed_slice().into();
+        let sheets = sheets.into_boxed_slice();
         let mut sheet_name_order = Vec::new();
         sheet_name_order
             .try_reserve_exact(sheets.len())
@@ -489,9 +655,8 @@ impl SourceBackedWorkbook {
         }
         sheet_name_order.sort_unstable_by(|left, right| {
             sheets[*left]
-                .name_key
-                .as_ref()
-                .cmp(sheets[*right].name_key.as_ref())
+                .name_key()
+                .cmp(sheets[*right].name_key())
                 .then_with(|| left.cmp(right))
         });
         let sheet_name_order = sheet_name_order.into_boxed_slice();
@@ -508,6 +673,10 @@ impl SourceBackedWorkbook {
             let _ = source_limits.set(Arc::clone(&shared.limits));
             let _ = catalog_proof.set(shared);
         }
+        let owner_options = shared_owner_options.or_else(|| {
+            let owner_options = SourceOwnerOptions::from_open_options(&options);
+            (!owner_options.is_default()).then(|| Arc::new(owner_options))
+        });
 
         Ok(Self {
             inner: Arc::new(SourceInner {
@@ -517,16 +686,18 @@ impl SourceBackedWorkbook {
                 tab_state_snapshot_seen: AtomicBool::new(false),
                 tab_state_graph: OnceLock::new(),
                 package_handle: OnceLock::new(),
-                merge_source_states: Mutex::new(HashMap::new()),
-                execution,
+                merge_source_states: OnceLock::new(),
+                execution: owner_options
+                    .as_ref()
+                    .and_then(|owner_options| owner_options.execution_context.clone()),
                 _catalog_data: retain_catalog.then_some(catalog_bytes),
                 shared_strings_uri,
-                shared_strings: OnceLock::new(),
-                shared_strings_tolerance: OnceLock::new(),
                 styles_uri,
+                style_lineage: Arc::new(crate::style::StyleLineage),
+                values: values::ValueCache::new(),
                 styles: OnceLock::new(),
                 formats: crate::style::cell_format::FormatCache::new(),
-                style_lineage: Arc::new(crate::style::StyleLineage),
+                dependencies: OnceLock::new(),
                 flavor,
                 date_system: if catalog.uses_1904_date_system {
                     DateSystem::Excel1904
@@ -540,9 +711,7 @@ impl SourceBackedWorkbook {
                 defined_names,
                 source_limits,
                 catalog_proof,
-                values: values::ValueCache::new(),
-                differential_format_count: OnceLock::new(),
-                options,
+                owner_options,
             }),
             pending: None,
         })
@@ -563,7 +732,9 @@ impl SourceBackedWorkbook {
     pub fn tolerance_report(&self) -> ToleranceReport {
         let inner = self.current();
         let mut report = inner.tolerance.clone();
-        if let Some(strings) = inner.shared_strings_tolerance.get() {
+        if let Some(dependencies) = inner.dependencies.get()
+            && let Some(strings) = dependencies.shared_strings_tolerance.get()
+        {
             report.append(strings);
         }
         for sheet in inner.sheets.iter() {
@@ -583,7 +754,7 @@ impl SourceBackedWorkbook {
     pub fn defined_names(&self) -> &[raw::DefinedName] {
         match self.pending_catalog() {
             Some(catalog) => &catalog.defined_names,
-            None => &self.current().defined_names,
+            None => self.current().defined_names_slice(),
         }
     }
 
@@ -733,10 +904,7 @@ impl SourceBackedWorkbook {
     /// and validates that output before replacing the base projection.
     #[must_use]
     pub fn sheet_names(&self) -> impl ExactSizeIterator<Item = &str> + DoubleEndedIterator + '_ {
-        self.current()
-            .sheets
-            .iter()
-            .map(|sheet| sheet.name.as_str())
+        self.current().sheets.iter().map(|sheet| sheet.name())
     }
 
     /// The catalog position of the active sheet, if the catalog contains one;
@@ -773,10 +941,7 @@ impl SourceBackedWorkbook {
                 self.inner
                     .sheet_name_order
                     .binary_search_by(|&position| {
-                        self.inner.sheets[position]
-                            .name_key
-                            .as_ref()
-                            .cmp(key.as_ref())
+                        self.inner.sheets[position].name_key().cmp(key.as_ref())
                     })
                     .ok()
                     .and_then(|order| self.inner.sheets.get(self.inner.sheet_name_order[order]))
@@ -840,7 +1005,7 @@ impl SourceWorksheet {
     /// Developer-facing sheet name.
     #[must_use]
     pub fn name(&self) -> &str {
-        &self.data.name
+        self.data.name()
     }
 
     /// Checked zero-based workbook position.
@@ -861,7 +1026,7 @@ impl SourceWorksheet {
     pub fn chart_count(&self) -> Result<usize> {
         if self.data.kind != WorksheetKind::Worksheet {
             return Err(Error::NotWorksheet {
-                sheet: self.data.name.clone(),
+                sheet: self.data.name().to_owned(),
             });
         }
         crate::chart::edit::source_chart_count(&self.owner.package, &self.data.part_uri)
@@ -872,7 +1037,7 @@ impl SourceWorksheet {
     pub fn chart_xml(&self, index: usize) -> Result<Option<Vec<u8>>> {
         if self.data.kind != WorksheetKind::Worksheet {
             return Err(Error::NotWorksheet {
-                sheet: self.data.name.clone(),
+                sheet: self.data.name().to_owned(),
             });
         }
         crate::chart::edit::source_chart_xml(&self.owner.package, &self.data.part_uri, index)
@@ -884,7 +1049,7 @@ impl SourceWorksheet {
     pub fn chart_anchor(&self, index: usize) -> Result<Option<crate::chart::Anchor>> {
         if self.data.kind != WorksheetKind::Worksheet {
             return Err(Error::NotWorksheet {
-                sheet: self.data.name.clone(),
+                sheet: self.data.name().to_owned(),
             });
         }
         crate::chart::edit::source_chart_anchor(&self.owner.package, &self.data.part_uri, index)
@@ -896,7 +1061,7 @@ impl SourceWorksheet {
     pub fn drawing_elements(&self) -> Result<Vec<crate::drawing::edit::Element>> {
         if self.data.kind != WorksheetKind::Worksheet {
             return Err(Error::NotWorksheet {
-                sheet: self.data.name.clone(),
+                sheet: self.data.name().to_owned(),
             });
         }
         crate::drawing::edit::source_elements(&self.owner.package, &self.data.part_uri)
@@ -906,14 +1071,14 @@ impl SourceWorksheet {
     pub fn form_controls(&self) -> Result<crate::form_control::FormControlCollection> {
         if self.data.kind != WorksheetKind::Worksheet {
             return Err(Error::NotWorksheet {
-                sheet: self.data.name.clone(),
+                sheet: self.data.name().to_owned(),
             });
         }
         let package = &self.owner.package;
         let limits = self
             .owner
-            .options
-            .semantic_limits
+            .owner_options_ref()
+            .semantic_limits()
             .form_controls_value()
             .unwrap_or_else(|| {
                 crate::form_control::OwnerLimits::from_read_limits(package.read_limits())
@@ -1347,7 +1512,7 @@ impl SourceWorksheet {
         self.owner.execution_check()?;
         if self.data.kind != WorksheetKind::Worksheet {
             return Err(Error::NotWorksheet {
-                sheet: self.data.name.clone(),
+                sheet: self.data.name().to_owned(),
             });
         }
         // `SourceBackedPackage::part` checks the captured source version even
@@ -1374,7 +1539,7 @@ impl SourceWorksheet {
         self.owner.package.source_version()?;
         let _publish_result = self.data.tolerance.set(parsed.tolerance_report().clone());
         let weight = parsed.weight_bytes();
-        let store = match self.owner.values.publish(
+        let store = match self.owner.values().publish(
             self.data.position,
             values::Cached::Grid(Arc::new(parsed)),
             weight,
@@ -1421,7 +1586,7 @@ impl SourceWorksheet {
     fn cached_grid(&self, record_miss: bool) -> Option<Arc<Store>> {
         match self
             .owner
-            .values
+            .values()
             .get(self.data.position, values::Axis::Grid, record_miss)?
         {
             values::Cached::Grid(store) => Some(store),
@@ -1436,7 +1601,7 @@ impl SourceWorksheet {
         self.grid.get().is_some()
             || self
                 .owner
-                .values
+                .values()
                 .holds(self.data.position, values::Axis::Grid)
     }
 }
@@ -1584,6 +1749,40 @@ fn map_selected_mce_error(error: MceError) -> Error {
 }
 
 impl SourceInner {
+    fn default_owner_options() -> &'static Arc<SourceOwnerOptions> {
+        static DEFAULT: OnceLock<Arc<SourceOwnerOptions>> = OnceLock::new();
+        DEFAULT.get_or_init(|| {
+            Arc::new(SourceOwnerOptions::from_open_options(
+                &crate::OpenOptions::default(),
+            ))
+        })
+    }
+
+    fn owner_options_ref(&self) -> &SourceOwnerOptions {
+        self.owner_options
+            .as_deref()
+            .unwrap_or_else(|| Self::default_owner_options().as_ref())
+    }
+
+    fn owner_options(&self) -> Arc<SourceOwnerOptions> {
+        self.owner_options
+            .clone()
+            .unwrap_or_else(|| Arc::clone(Self::default_owner_options()))
+    }
+
+    fn defined_names_slice(&self) -> &[raw::DefinedName] {
+        match &self.defined_names {
+            Some(names) => names,
+            // A proof-backed owner is constructed with its catalog proof set.
+            None => self
+                .catalog_proof
+                .get()
+                .expect("proof-backed source owner must retain its catalog proof")
+                .defined_names
+                .as_ref(),
+        }
+    }
+
     pub(crate) fn tab_state_graph(
         &self,
         owner: std::sync::Weak<SourceInner>,
@@ -1591,7 +1790,7 @@ impl SourceInner {
         Arc::clone(self.tab_state_graph.get_or_init(|| {
             Arc::new(crate::tab_state::GraphBinding::source(
                 owner,
-                Arc::clone(&self.sheets),
+                Arc::from(self.sheets.clone()),
             ))
         }))
     }
@@ -1611,13 +1810,37 @@ impl SourceInner {
         )
     }
 
+    /// The catalog proof, when this owner already holds one (a proof-backed
+    /// reopen, or an owner whose proof an earlier edit captured).
+    pub(crate) fn catalog_proof_if_ready(&self) -> Option<Arc<SourceCatalogProof>> {
+        self.catalog_proof.get().cloned()
+    }
+
+    /// Whether this owner's package was admitted under `limits`.
+    pub(crate) fn admitted_under(&self, limits: &SourceLimits) -> bool {
+        match self.source_limits.get() {
+            Some(admitted) => **admitted == *limits,
+            None => self.package.read_limits() == *limits,
+        }
+    }
+
     pub(crate) fn catalog_proof(&self) -> Arc<SourceCatalogProof> {
         Arc::clone(self.catalog_proof.get_or_init(|| {
             Arc::new(SourceCatalogProof {
-                defined_names: Arc::clone(&self.defined_names),
+                defined_names: Arc::from(self.defined_names_slice()),
                 limits: self.source_limits(),
             })
         }))
+    }
+
+    fn values(&self) -> &values::ValueCache {
+        &self.values
+    }
+
+    fn dependencies(&self) -> &DependencyState {
+        self.dependencies
+            .get_or_init(|| Box::new(DependencyState::new()))
+            .as_ref()
     }
 
     pub(crate) fn package_handle(&self) -> Arc<SourceBackedPackage> {
@@ -1631,11 +1854,13 @@ impl SourceInner {
         &self,
         worksheet_uri: &PackURI,
     ) -> Option<Arc<crate::merge::source::SourceStateShared>> {
-        self.merge_source_states
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .get(worksheet_uri)
-            .cloned()
+        self.merge_source_states.get().and_then(|states| {
+            states
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .get(worksheet_uri)
+                .cloned()
+        })
     }
 
     pub(crate) fn cache_merge_source_state(
@@ -1645,6 +1870,7 @@ impl SourceInner {
     ) -> Arc<crate::merge::source::SourceStateShared> {
         let mut states = self
             .merge_source_states
+            .get_or_init(|| Box::new(Mutex::new(HashMap::new())))
             .lock()
             .unwrap_or_else(PoisonError::into_inner);
         Arc::clone(states.entry(worksheet_uri).or_insert(state))
@@ -1659,7 +1885,7 @@ impl SourceInner {
         // Constructors that create both layers retain the same logical
         // context in each handle; checking the optional facade handle as well
         // also covers callers that supply a distinct policy at this boundary.
-        check_execution(self.execution.as_ref())
+        check_execution(self.execution.as_deref())
     }
 
     fn stream_shared_strings_dependency(
@@ -1769,7 +1995,8 @@ impl SourceInner {
         let Some(uri) = self.shared_strings_uri.as_ref() else {
             return Ok(None);
         };
-        if let Some(strings) = self.shared_strings.get() {
+        let dependencies = self.dependencies();
+        if let Some(strings) = dependencies.shared_strings.get() {
             let _part = self.package.part(uri)?;
             self.execution_check()?;
             self.package.source_version()?;
@@ -1783,9 +2010,10 @@ impl SourceInner {
         self.package.source_version()?;
         // The report is published first, so a published table always has
         // its report; a racing parse of the same bytes reports the same.
-        let _publish_result = self.shared_strings_tolerance.set(tolerance);
-        let _publish_result = self.shared_strings.set(parsed);
-        self.shared_strings
+        let _publish_result = dependencies.shared_strings_tolerance.set(tolerance);
+        let _publish_result = dependencies.shared_strings.set(parsed);
+        dependencies
+            .shared_strings
             .get()
             .map(|strings| Some(strings.as_ref()))
             .ok_or_else(|| {
@@ -1961,7 +2189,7 @@ fn require_content_type(sheet: &raw::Sheet, actual: &str, expected: &str) -> Res
 
 #[cfg(test)]
 mod tests {
-    use std::io;
+    use std::io::{self, Cursor, Read};
     use std::num::{NonZeroU64, NonZeroUsize};
     use std::sync::Arc;
     use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
@@ -1971,7 +2199,9 @@ mod tests {
         ReadAt, Resource, SourceVersion,
     };
     use litchi_opc::constants::content_type as ct;
-    use litchi_opc::{OpcError, OpcPackage, PackURI, SourceBackedPackage, SourceCacheLimits};
+    use litchi_opc::{
+        OpcError, OpcPackage, PackURI, SourceBackedPackage, SourceCacheLimits, SourceLimitKind,
+    };
     use soapberry_zip::office::StreamingArchiveWriter;
 
     use super::{SourceBackedWorkbook, SourceCellView};
@@ -1988,6 +2218,43 @@ mod tests {
         first_body_marker_reads: AtomicUsize,
         second_body_marker_reads: AtomicUsize,
         revision: AtomicU64,
+    }
+
+    struct CountingReader {
+        inner: Cursor<Vec<u8>>,
+        reads: Arc<AtomicUsize>,
+        bytes_read: Arc<AtomicUsize>,
+    }
+
+    impl CountingReader {
+        fn new(bytes: Vec<u8>, reads: Arc<AtomicUsize>) -> Self {
+            Self {
+                inner: Cursor::new(bytes),
+                reads,
+                bytes_read: Arc::new(AtomicUsize::new(0)),
+            }
+        }
+
+        fn with_byte_counter(
+            bytes: Vec<u8>,
+            reads: Arc<AtomicUsize>,
+            bytes_read: Arc<AtomicUsize>,
+        ) -> Self {
+            Self {
+                inner: Cursor::new(bytes),
+                reads,
+                bytes_read,
+            }
+        }
+    }
+
+    impl Read for CountingReader {
+        fn read(&mut self, output: &mut [u8]) -> io::Result<usize> {
+            self.reads.fetch_add(1, Ordering::SeqCst);
+            let read = self.inner.read(output)?;
+            self.bytes_read.fetch_add(read, Ordering::SeqCst);
+            Ok(read)
+        }
     }
 
     impl CountingSource {
@@ -2283,6 +2550,139 @@ mod tests {
             first_reads_before_cached_query,
             "a retained semantic worksheet must not reload evicted PartData"
         );
+    }
+
+    #[test]
+    fn sequential_reader_preserves_deferred_cache_options() {
+        let cache_limits = SourceCacheLimits::new(256 * 1024, 1).unwrap();
+        let workbook = SourceBackedWorkbook::from_reader_with_options(
+            Cursor::new(source_backed_xlsx()),
+            crate::OpenOptions::new().cache_limits(cache_limits),
+        )
+        .unwrap();
+
+        let first = workbook.sheet("First").unwrap().unwrap();
+        assert!(first.stored_extent().unwrap().is_some());
+        assert!(first.cell("A1").is_ok());
+        let second = workbook.sheet("Second").unwrap().unwrap();
+        assert!(second.stored_extent().unwrap().is_some());
+        assert!(second.cell("A1").is_ok());
+        assert!(
+            workbook.cache_diagnostics().evictions > 0,
+            "the sequential-reader path must retain the caller's one-entry cache policy"
+        );
+    }
+
+    #[test]
+    fn sequential_reader_retains_cancellation_after_open() {
+        let archive = source_backed_xlsx();
+        let reads = Arc::new(AtomicUsize::new(0));
+        let bytes_read = Arc::new(AtomicUsize::new(0));
+        let reader = CountingReader::with_byte_counter(
+            archive.clone(),
+            Arc::clone(&reads),
+            Arc::clone(&bytes_read),
+        );
+        let (budget, cancellation_source, context) = managed_context(u64::MAX);
+        let workbook = SourceBackedWorkbook::from_reader_with_options(
+            reader,
+            crate::OpenOptions::new()
+                .cache_limits(SourceCacheLimits::new(256 * 1024, 1).unwrap())
+                .execution_context(context),
+        )
+        .unwrap();
+
+        // Catalog access succeeds after the sequential reader has completed,
+        // while the worksheet body remains deferred. Cancellation must still
+        // be observed by that later read through the retained OPC context.
+        assert_eq!(workbook.len(), 2);
+        assert_eq!(bytes_read.load(Ordering::SeqCst), archive.len());
+        let first = workbook.sheet("First").unwrap().unwrap();
+        let reads_before_cancel = reads.load(Ordering::SeqCst);
+        cancellation_source.cancel();
+        assert!(matches!(
+            first.stored_extent(),
+            Err(Error::Package(OpcError::Cancelled))
+        ));
+        assert_eq!(reads.load(Ordering::SeqCst), reads_before_cancel);
+        drop(first);
+        drop(workbook);
+        assert_eq!(budget.used(Resource::Memory), 0);
+    }
+
+    #[test]
+    fn sequential_reader_enforces_exact_and_over_source_input_limits() {
+        let archive = source_backed_xlsx();
+        let exact = SourceLimits::builder()
+            .max_input_bytes(archive.len() as u64)
+            .unwrap()
+            .build()
+            .unwrap();
+        let workbook = SourceBackedWorkbook::from_reader_with_options(
+            Cursor::new(archive.clone()),
+            crate::OpenOptions::new().source_limits(exact),
+        )
+        .unwrap();
+        assert_eq!(workbook.len(), 2);
+
+        let maximum = archive.len() - 1;
+        let under = SourceLimits::builder()
+            .max_input_bytes(maximum as u64)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(matches!(
+            SourceBackedWorkbook::from_reader_with_options(
+                Cursor::new(archive),
+                crate::OpenOptions::new().source_limits(under),
+            ),
+            Err(Error::Package(OpcError::Limit {
+                kind: SourceLimitKind::InputBytes,
+                observed,
+                maximum: configured,
+            })) if observed == maximum as u64 + 1 && configured == maximum as u64
+        ));
+    }
+
+    #[test]
+    fn sequential_reader_cache_options_survive_committed_owner_reopen() {
+        let cache_limits = SourceCacheLimits::new(256 * 1024, 1).unwrap();
+        let workbook = SourceBackedWorkbook::from_reader_with_options(
+            Cursor::new(source_backed_xlsx()),
+            crate::OpenOptions::new().cache_limits(cache_limits),
+        )
+        .unwrap();
+        let mut edit = workbook.edit_tab_state().unwrap();
+        assert!(edit.hide("First").unwrap());
+        let commit = edit.commit().unwrap();
+
+        let committed = commit.package();
+        let first = committed.sheet("First").unwrap().unwrap();
+        assert!(first.stored_extent().unwrap().is_some());
+        let second = committed.sheet("Second").unwrap().unwrap();
+        assert!(second.stored_extent().unwrap().is_some());
+        assert!(
+            committed.cache_diagnostics().evictions > 0,
+            "a committed sequential owner must retain its custom one-entry cache policy"
+        );
+    }
+
+    #[test]
+    fn sequential_reader_checks_cancellation_before_ingestion() {
+        let reads = Arc::new(AtomicUsize::new(0));
+        let reader = CountingReader::new(source_backed_xlsx(), Arc::clone(&reads));
+        let (budget, cancellation_source, context) = managed_context(u64::MAX);
+        cancellation_source.cancel();
+
+        assert!(matches!(
+            SourceBackedWorkbook::from_reader_with_options(
+                reader,
+                crate::OpenOptions::new().execution_context(context),
+            ),
+            Err(Error::Package(OpcError::Cancelled))
+        ));
+        assert_eq!(reads.load(Ordering::SeqCst), 0);
+        assert_eq!(budget.used(Resource::Memory), 0);
     }
 
     #[test]
@@ -2924,6 +3324,18 @@ mod tests {
             ));
         }
 
+        fn styles_cached(workbook: &SourceBackedWorkbook) -> bool {
+            workbook.inner.styles.get().is_some()
+        }
+
+        fn shared_strings_cached(workbook: &SourceBackedWorkbook) -> bool {
+            workbook
+                .inner
+                .dependencies
+                .get()
+                .is_some_and(|dependencies| dependencies.shared_strings.get().is_some())
+        }
+
         #[test]
         fn plain_shared_string_and_style_stream_0364_avoids_materialization() {
             let bytes = dependency_xlsx(
@@ -2938,8 +3350,16 @@ mod tests {
 
             assert_text(sheet.cell("A1").unwrap(), "plain");
             assert!(!sheet.store_resident());
-            assert!(workbook.inner.shared_strings.get().is_none());
-            assert!(workbook.inner.styles.get().is_none());
+            assert!(
+                workbook
+                    .inner
+                    .dependencies
+                    .get()
+                    .map_or(true, |dependencies| {
+                        dependencies.shared_strings.get().is_none()
+                    })
+            );
+            assert!(!styles_cached(&workbook));
             let after = workbook.cache_diagnostics();
             assert_eq!(after.cold_loads, cold.cold_loads);
             assert_eq!(after.successful_loads, cold.successful_loads);
@@ -2983,7 +3403,15 @@ mod tests {
             let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
             assert_text(sheet.cell("A1").unwrap(), "rich text");
             assert!(!sheet.store_resident());
-            assert!(workbook.inner.shared_strings.get().is_none());
+            assert!(
+                workbook
+                    .inner
+                    .dependencies
+                    .get()
+                    .map_or(true, |dependencies| {
+                        dependencies.shared_strings.get().is_none()
+                    })
+            );
 
             let rich = dependency_xlsx(
                 &worksheet(r#"<c r="A1" t="s"><v>0</v></c>"#),
@@ -2994,7 +3422,7 @@ mod tests {
             let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
             assert_text(sheet.cell("A1").unwrap(), "rich text");
             assert!(sheet.store_resident());
-            assert!(workbook.inner.shared_strings.get().is_some());
+            assert!(shared_strings_cached(&workbook));
         }
 
         #[test]
@@ -3071,7 +3499,15 @@ mod tests {
             let cold = workbook.cache_diagnostics();
             assert!(sheet.cell("A1").is_err());
             assert!(!sheet.store_resident());
-            assert!(workbook.inner.shared_strings.get().is_none());
+            assert!(
+                workbook
+                    .inner
+                    .dependencies
+                    .get()
+                    .map_or(true, |dependencies| {
+                        dependencies.shared_strings.get().is_none()
+                    })
+            );
             assert_eq!(
                 workbook.cache_diagnostics().successful_loads,
                 cold.successful_loads
@@ -3090,7 +3526,7 @@ mod tests {
             let cold = workbook.cache_diagnostics();
             assert!(sheet.cell("A1").is_err());
             assert!(!sheet.store_resident());
-            assert!(workbook.inner.styles.get().is_none());
+            assert!(!styles_cached(&workbook));
             assert_eq!(
                 workbook.cache_diagnostics().successful_loads,
                 cold.successful_loads
@@ -3115,7 +3551,15 @@ mod tests {
             let cold = workbook.cache_diagnostics();
             assert!(sheet.cell("A1").is_err());
             assert!(!sheet.store_resident());
-            assert!(workbook.inner.shared_strings.get().is_none());
+            assert!(
+                workbook
+                    .inner
+                    .dependencies
+                    .get()
+                    .map_or(true, |dependencies| {
+                        dependencies.shared_strings.get().is_none()
+                    })
+            );
             assert_eq!(
                 workbook.cache_diagnostics().successful_loads,
                 cold.successful_loads
@@ -3137,7 +3581,7 @@ mod tests {
             let cold = workbook.cache_diagnostics();
             assert!(sheet.cell("A1").is_err());
             assert!(!sheet.store_resident());
-            assert!(workbook.inner.styles.get().is_none());
+            assert!(!styles_cached(&workbook));
             assert_eq!(
                 workbook.cache_diagnostics().successful_loads,
                 cold.successful_loads
@@ -3206,8 +3650,16 @@ mod tests {
             assert_text(sheet.cell("A1").unwrap(), "repeat");
             assert!(source.first_body_marker_reads.load(Ordering::SeqCst) > first_reads);
             assert!(!sheet.store_resident());
-            assert!(workbook.inner.shared_strings.get().is_none());
-            assert!(workbook.inner.styles.get().is_none());
+            assert!(
+                workbook
+                    .inner
+                    .dependencies
+                    .get()
+                    .map_or(true, |dependencies| {
+                        dependencies.shared_strings.get().is_none()
+                    })
+            );
+            assert!(!styles_cached(&workbook));
             assert_eq!(
                 workbook.cache_diagnostics().successful_loads,
                 cold.successful_loads
@@ -3231,8 +3683,8 @@ mod tests {
             let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
             assert_text(sheet.cell("A1").unwrap(), "rich text");
             assert!(sheet.store_resident());
-            assert!(workbook.inner.shared_strings.get().is_some());
-            assert!(workbook.inner.styles.get().is_some());
+            assert!(shared_strings_cached(&workbook));
+            assert!(styles_cached(&workbook));
 
             let shared_uri = workbook.inner.shared_strings_uri.as_ref().unwrap().clone();
             let styles_uri = workbook.inner.styles_uri.as_ref().unwrap().clone();
@@ -3483,8 +3935,16 @@ mod tests {
                 Cell::Value(Value::Text(value)) if value.as_str() == "one"
             ));
             assert!(!sheet.store_resident());
-            assert!(workbook.inner.shared_strings.get().is_none());
-            assert!(workbook.inner.styles.get().is_none());
+            assert!(
+                workbook
+                    .inner
+                    .dependencies
+                    .get()
+                    .map_or(true, |dependencies| {
+                        dependencies.shared_strings.get().is_none()
+                    })
+            );
+            assert!(!workbook.inner.styles.get().is_some());
             let after = workbook.cache_diagnostics();
             assert_eq!(after.cold_loads, before.cold_loads);
             assert_eq!(after.successful_loads, before.successful_loads);
@@ -3605,7 +4065,15 @@ mod tests {
             assert!(result.is_err());
             assert_eq!(callbacks, 0);
             assert!(!sheet.store_resident());
-            assert!(workbook.inner.shared_strings.get().is_none());
+            assert!(
+                workbook
+                    .inner
+                    .dependencies
+                    .get()
+                    .map_or(true, |dependencies| {
+                        dependencies.shared_strings.get().is_none()
+                    })
+            );
             assert_eq!(
                 workbook.cache_diagnostics().successful_loads,
                 before.successful_loads
@@ -3854,8 +4322,16 @@ mod tests {
                     if value.as_str() == "42.25"
             ));
             assert!(!sheet.store_resident());
-            assert!(workbook.inner.shared_strings.get().is_none());
-            assert!(workbook.inner.styles.get().is_none());
+            assert!(
+                workbook
+                    .inner
+                    .dependencies
+                    .get()
+                    .map_or(true, |dependencies| {
+                        dependencies.shared_strings.get().is_none()
+                    })
+            );
+            assert!(!workbook.inner.styles.get().is_some());
             assert_no_part_cache_admission(before, workbook.cache_diagnostics());
 
             sheet.stored_extent().unwrap();
@@ -3884,8 +4360,16 @@ mod tests {
                 ]
             );
             assert!(!sheet.store_resident());
-            assert!(workbook.inner.shared_strings.get().is_none());
-            assert!(workbook.inner.styles.get().is_none());
+            assert!(
+                workbook
+                    .inner
+                    .dependencies
+                    .get()
+                    .map_or(true, |dependencies| {
+                        dependencies.shared_strings.get().is_none()
+                    })
+            );
+            assert!(!workbook.inner.styles.get().is_some());
             assert_no_part_cache_admission(before, workbook.cache_diagnostics());
 
             sheet.stored_extent().unwrap();
@@ -3922,8 +4406,16 @@ mod tests {
                 ]
             );
             assert!(!sheet.store_resident());
-            assert!(workbook.inner.shared_strings.get().is_none());
-            assert!(workbook.inner.styles.get().is_none());
+            assert!(
+                workbook
+                    .inner
+                    .dependencies
+                    .get()
+                    .map_or(true, |dependencies| {
+                        dependencies.shared_strings.get().is_none()
+                    })
+            );
+            assert!(!workbook.inner.styles.get().is_some());
             assert_no_part_cache_admission(before, workbook.cache_diagnostics());
 
             sheet.stored_extent().unwrap();
@@ -3989,8 +4481,16 @@ mod tests {
             assert!(result.is_err());
             assert_eq!(callbacks, 0);
             assert!(!sheet.store_resident());
-            assert!(workbook.inner.shared_strings.get().is_none());
-            assert!(workbook.inner.styles.get().is_none());
+            assert!(
+                workbook
+                    .inner
+                    .dependencies
+                    .get()
+                    .map_or(true, |dependencies| {
+                        dependencies.shared_strings.get().is_none()
+                    })
+            );
+            assert!(!workbook.inner.styles.get().is_some());
             assert_no_part_cache_admission(before, workbook.cache_diagnostics());
         }
 
@@ -4096,8 +4596,16 @@ mod tests {
             assert!(result.is_err());
             assert!(callbacks.is_empty());
             assert!(!sheet.store_resident());
-            assert!(workbook.inner.shared_strings.get().is_none());
-            assert!(workbook.inner.styles.get().is_none());
+            assert!(
+                workbook
+                    .inner
+                    .dependencies
+                    .get()
+                    .map_or(true, |dependencies| {
+                        dependencies.shared_strings.get().is_none()
+                    })
+            );
+            assert!(!workbook.inner.styles.get().is_some());
             assert_no_part_cache_admission(before, workbook.cache_diagnostics());
         }
 
@@ -4132,8 +4640,16 @@ mod tests {
             assert!(matches!(&cold[3], SourceCellView::Missing));
             assert!(matches!(&cold[4], SourceCellView::Stored(Cell::Empty)));
             assert!(!sheet.store_resident());
-            assert!(workbook.inner.shared_strings.get().is_none());
-            assert!(workbook.inner.styles.get().is_none());
+            assert!(
+                workbook
+                    .inner
+                    .dependencies
+                    .get()
+                    .map_or(true, |dependencies| {
+                        dependencies.shared_strings.get().is_none()
+                    })
+            );
+            assert!(!workbook.inner.styles.get().is_some());
             assert_no_part_cache_admission(before, workbook.cache_diagnostics());
 
             sheet.stored_extent().unwrap();
@@ -4184,8 +4700,16 @@ mod tests {
             assert_eq!(count, expected.len());
             assert_eq!(visited, expected);
             assert!(!sheet.store_resident());
-            assert!(workbook.inner.shared_strings.get().is_none());
-            assert!(workbook.inner.styles.get().is_none());
+            assert!(
+                workbook
+                    .inner
+                    .dependencies
+                    .get()
+                    .map_or(true, |dependencies| {
+                        dependencies.shared_strings.get().is_none()
+                    })
+            );
+            assert!(!workbook.inner.styles.get().is_some());
             assert_no_part_cache_admission(before, workbook.cache_diagnostics());
 
             sheet.stored_extent().unwrap();

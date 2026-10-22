@@ -7367,6 +7367,39 @@ impl SourceBackedPackage {
         Self::from_vec_with_limits(read_limited(reader, limits)?, limits)
     }
 
+    /// Open a source-backed package from a sequential reader with explicit
+    /// source and deferred-cache policies.
+    ///
+    /// The reader is consumed once with `limits` enforced during ingestion.
+    /// When `execution_context` is present it is checked before ingestion and
+    /// is retained by the positional owner for mandatory-open and deferred
+    /// payload checks. The bounded byte vector is moved into the owned source
+    /// without a second copy; `cache_limits` governs the deferred payload
+    /// cache just as it does for positional-source opens.
+    ///
+    /// This is the raw OPC physical constructor. Format facades should expose
+    /// their canonical `OpenOptions` entry point and pass its required source
+    /// limits and optional policies here; callers must not use this helper as
+    /// a second format-level API.
+    pub fn from_reader_with_source_options<R: Read>(
+        reader: R,
+        limits: SourceLimits,
+        cache_limits: SourceCacheLimits,
+        execution_context: Option<ExecutionContext>,
+    ) -> Result<Self> {
+        if let Some(context) = execution_context.as_ref() {
+            context.check().map_err(map_execution_error)?;
+        }
+        let source = Arc::new(OwnedSource::new(read_limited(reader, limits)?));
+        Self::from_read_at_inner(
+            SourceInput::Owned(source),
+            limits,
+            cache_limits,
+            execution_context,
+            SourceReadPolicy::exact(),
+        )
+    }
+
     /// Open a source-backed package with the standard bounded read policy.
     ///
     /// The input vector is moved into the source owner. Ordinary part payloads
