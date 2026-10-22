@@ -355,9 +355,10 @@ pub(crate) fn prepare_package_budget(
             mode: litchi_opc::TargetMode::Internal,
         });
     }
+    let owner_plan = package.plan_source_relationships_with_limits(owner, *limits)?;
     let source = package.source_relationships_with_limits(owner, *limits)?;
     let plan = source.plan_edit(&edits, &[], *limits)?;
-    let budget = package_budget(package, owner, plan, limits)?;
+    let budget = package_budget(package, owner, owner_plan, limits)?;
     let relationship_parts = budget
         .relationship_parts
         .saturating_sub(usize::from(budget.owner_plan.member_present()))
@@ -469,7 +470,9 @@ fn package_budget(
     let mut part_bytes = 0u64;
     let mut owner_plan_seen = false;
 
-    let mut add = |candidate: &litchi_opc::PackURI, payload_len: Option<usize>| {
+    let mut add = |candidate: &litchi_opc::PackURI,
+                   payload_len: Option<usize>|
+     -> crate::Result<()> {
         let plan = if candidate == owner {
             owner_plan_seen = true;
             owner_plan

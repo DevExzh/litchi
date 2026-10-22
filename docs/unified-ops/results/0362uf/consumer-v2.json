@@ -1,0 +1,24 @@
+{
+  "source": "c48e382321a619e43e0972fe595874e4f8fcb6e1",
+  "checks": [
+    {
+      "command": [
+        "cargo",
+        "check",
+        "--offline",
+        "--locked",
+        "--workspace",
+        "--all-targets",
+        "--all-features"
+      ],
+      "exit": 101,
+      "seconds": 496.8342840479454,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/api-assembly-consumers-v2/check-0.log",
+      "bytes": 9633,
+      "sha256": "2325b7a70560926c013b579008587c5f3cdb6e549b92eb4230bca71344c61e44",
+      "target_bytes_before": 18982781886,
+      "completed_test_executables_pruned": []
+    }
+  ],
+  "note": "Workspace check stopped at XLSX raw relationship ledger type errors. Original owner metrics and proposed edit metrics must remain distinct."
+}

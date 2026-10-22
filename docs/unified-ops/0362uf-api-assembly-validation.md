@@ -26,3 +26,18 @@ recipient-policy retention and enforcement. This issue remains open, alongside
 signed logical no-op leaf correctness, raw OPC/helper migrations, all returned
 performance qualifications, corpus dispositions, final inventory/glossary, and
 the complete assembled gate. Only the comprehensive redaction audit is deferred.
+
+## First compiled assembly check
+
+After the offline lock refresh and RTF source merge, the check ran on
+`c48e382321a619e43e0972fe595874e4f8fcb6e1`. It stopped in the XLSX raw
+admission helper: the proposed relationship edit plan was passed where the
+package budget requires the original owner's source metrics, and the
+aggregate closure's error type was ambiguous. The correction prepares the
+original metrics once for the budget pass and keeps the proposed edit plan
+for subtract-before/add-after accounting. It explicitly types the closure's
+crate-owned error. No limit or graph proof is removed.
+
+[consumer-v2.json](results/0362uf/consumer-v2.json) preserves the command,
+log size/hash and stop. The performance-harness check did not run. Both
+consumer checks and the affected semantic suites still require completion.
