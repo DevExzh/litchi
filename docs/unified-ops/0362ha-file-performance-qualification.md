@@ -161,3 +161,29 @@ warnings denied pass. The [repair receipt](results/0362ha/odf-isolation-validati
 retains the failed run and exact successful commands/log hashes. This closes
 the isolation regression only; owner-policy error propagation, probe repairs,
 matched performance and final integration remain required.
+
+## ODF owner error propagation
+
+A focused boundary test reproduced a second defect: owned ODT input one byte
+over its selected source ceiling returned `unsupported_format`. Owner opens
+now use bounded neutral format probes, then admit the selected ODF owner
+under its own policy. Failed preparation recovers the original allocation and
+asks the limited ODF owner for its typed failure; successful preparation still
+transfers the existing index. Flat ODF input admission reports the same typed
+input dimension and actual counts. Recognized malformed ODF rejected on this
+fallback now reports the owner error rather than an unknown-format result.
+Raw public detection still uses its required caller-supplied SourceLimits.
+
+Exact/one-under ODT input and member ceilings, flat ODT input boundaries, and
+ordinary/polyglot DOCX isolation pass. The full ops suite passed 962 tests,
+followed by the additional DOCX isolation regression; all 217 documentation
+tests, all-feature and ODT-only all-target Clippy, no-format compilation and
+formatting pass. The public prepared-open example imports its new required
+SourceLimits type. [The receipt](results/0362ha/odf-owner-validation.json) keeps
+all failed attempts and successful checks with source and log hashes.
+
+This remains an integration candidate. The broader ODF ownership review must
+verify and repair semantic-policy propagation through prepared and flat byte
+projections: several legacy adapter constructors ignore the provided options.
+That review, the corpus/error disposition checks, matched performance, W4/W4b
+integration and final workspace gate remain required.

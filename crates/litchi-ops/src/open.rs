@@ -259,7 +259,7 @@ pub fn open_bytes_with_tail<T: ZipTail>(
 ///
 /// ```no_run
 /// use litchi_ops::OpenOptions;
-/// use litchi_ops::detect::detect_and_prepare;
+/// use litchi_ops::detect::{detect_and_prepare, SourceLimits};
 ///
 /// # fn main() -> litchi_ops::Result<()> {
 /// if let Some(detection) = detect_and_prepare("report.docx", &SourceLimits::default()) {

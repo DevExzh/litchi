@@ -766,6 +766,33 @@ mod docx {
 
     #[cfg(feature = "odt")]
     #[test]
+    fn owned_docx_bytes_do_not_use_odf_limits() {
+        let bytes = minimal_docx(
+            br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>OPC precedence</w:t></w:r></w:p></w:body></w:document>"#,
+        );
+        let polyglot = odt::add_member(
+            &bytes,
+            "mimetype",
+            b"application/vnd.oasis.opendocument.text",
+        );
+        let limits = litchi_odf_common::SourceLimits::builder()
+            .max_input_bytes(1)
+            .unwrap()
+            .max_members(1)
+            .unwrap()
+            .build()
+            .unwrap();
+        let options = OpenOptions::new()
+            .odf_options(litchi_odf_common::OpenOptions::new().source_limits(limits));
+        for input in [bytes, polyglot] {
+            let file = crate::open_bytes_with(input, &options).expect("DOCX uses OPC limits");
+            assert!(matches!(file, File::Docx(_)));
+            assert_eq!(file.text().unwrap(), "OPC precedence");
+        }
+    }
+
+    #[cfg(feature = "odt")]
+    #[test]
     fn owned_odt_bytes_do_not_hide_malformed_ooxml_catalog() {
         let bytes = odt::add_member(
             &odt::minimal_odt(),
@@ -1465,6 +1492,94 @@ mod odt {
     use super::*;
     use std::io::Read as _;
 
+    const FLAT_ODT: &[u8] = br#"<?xml version="1.0" encoding="UTF-8"?>
+<office:document
+  xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+  xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
+  office:version="1.3"
+  office:mimetype="application/vnd.oasis.opendocument.text">
+  <office:body><office:text><text:h>Title</text:h><text:p>Hello flat text</text:p></office:text></office:body>
+</office:document>"#;
+
+    #[test]
+    fn owned_odt_source_limits_remain_typed() {
+        use litchi_odf_common::{LimitKind, SourceLimitKind, SourceLimits};
+
+        let bytes = minimal_odt();
+        let length = u64::try_from(bytes.len()).unwrap();
+        let members =
+            u64::try_from(zip::ZipArchive::new(Cursor::new(&bytes)).unwrap().len()).unwrap();
+        for (kind, observed) in [
+            (SourceLimitKind::InputBytes, length),
+            (SourceLimitKind::Members, members),
+        ] {
+            for maximum in [observed, observed - 1] {
+                let limits = match kind {
+                    SourceLimitKind::InputBytes => SourceLimits::builder().max_input_bytes(maximum),
+                    SourceLimitKind::Members => {
+                        SourceLimits::builder().max_members(usize::try_from(maximum).unwrap())
+                    },
+                    _ => unreachable!(),
+                }
+                .unwrap()
+                .build()
+                .unwrap();
+                let options = crate::OpenOptions::new()
+                    .odf_options(litchi_odf_common::OpenOptions::new().source_limits(limits));
+                let result = crate::open_bytes_with(bytes.clone(), &options);
+                if maximum == observed {
+                    assert_eq!(result.unwrap().text().unwrap(), "Source-backed ODT");
+                } else {
+                    let error = result.expect_err("the selected source ceiling is enforced");
+                    assert_eq!(error.code(), Code::LimitExceeded, "{error:?}");
+                    assert!(
+                        matches!(
+                            error.leaf(),
+                            crate::error::Source::Odf(litchi_odf_common::Error::Limit {
+                                kind: actual_kind,
+                                observed: actual_observed,
+                                maximum: actual_maximum,
+                            }) if *actual_kind == LimitKind::Source(kind)
+                                && *actual_observed == observed && *actual_maximum == maximum
+                        ),
+                        "{error:?}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn flat_odt_source_limits_remain_typed() {
+        let length = u64::try_from(FLAT_ODT.len()).unwrap();
+        for maximum in [length, length - 1] {
+            let limits = litchi_odf_common::SourceLimits::builder()
+                .max_input_bytes(maximum)
+                .unwrap()
+                .build()
+                .unwrap();
+            let options = crate::OpenOptions::new()
+                .odf_options(litchi_odf_common::OpenOptions::new().source_limits(limits));
+            let result = crate::open_bytes_with(FLAT_ODT.to_vec(), &options);
+            if maximum == length {
+                assert_eq!(result.unwrap().to_bytes().unwrap(), FLAT_ODT);
+            } else {
+                let error = result.expect_err("the selected flat input ceiling is enforced");
+                assert_eq!(error.code(), Code::LimitExceeded, "{error:?}");
+                assert!(
+                    matches!(error.leaf(),
+                        crate::error::Source::Odf(litchi_odf_common::Error::Limit {
+                            kind: litchi_odf_common::LimitKind::Source(
+                                litchi_odf_common::SourceLimitKind::InputBytes),
+                            observed, maximum: actual_maximum,
+                        }) if *observed == length && *actual_maximum == maximum
+                    ),
+                    "{error:?}"
+                );
+            }
+        }
+    }
+
     pub(super) fn minimal_odt() -> Vec<u8> {
         let mut builder = litchi_odt::Builder::new();
         builder.add_paragraph("Source-backed ODT").unwrap();
@@ -1721,14 +1836,6 @@ mod odt {
 
     #[test]
     fn flat_odt_opens_through_its_read_projection() {
-        const FLAT_ODT: &[u8] = br#"<?xml version="1.0" encoding="UTF-8"?>
-<office:document
-  xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
-  xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
-  office:version="1.3"
-  office:mimetype="application/vnd.oasis.opendocument.text">
-  <office:body><office:text><text:h>Title</text:h><text:p>Hello flat text</text:p></office:text></office:body>
-</office:document>"#;
         // Record 0292: flat ODT reads through the leaf's packaged projection
         // and publishes its flat bytes.
         let file = crate::open_bytes(FLAT_ODT.to_vec()).expect("flat ODT opens");

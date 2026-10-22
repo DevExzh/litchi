@@ -38,10 +38,22 @@ pub(super) fn open<T: ZipTail>(
 
     #[cfg(any(feature = "odt", feature = "ods", feature = "odp", odf_objects))]
     if let Some(format) =
-        litchi_odf_common::detect::flat(&bytes, detection_limits.odf_detect_limits())
+        litchi_odf_common::detect::flat(&bytes, litchi_odf_common::detect::Limits::default())
             .ok()
             .flatten()
     {
+        let maximum = detection_limits.odf().max_input_bytes();
+        let observed = u64::try_from(bytes.len()).unwrap_or(u64::MAX);
+        if observed > maximum {
+            return Err(Error::from(litchi_odf_common::Error::Limit {
+                kind: litchi_odf_common::LimitKind::Source(
+                    litchi_odf_common::SourceLimitKind::InputBytes,
+                ),
+                observed,
+                maximum,
+            })
+            .with_format(format));
+        }
         #[cfg(feature = "ods")]
         if format == FileFormat::Ods {
             return Ok(File::Ods(crate::format::ods::Ods::from_flat(
@@ -115,15 +127,18 @@ fn zip<T: ZipTail>(
     tail: &T,
 ) -> Result<File> {
     #[cfg(any(feature = "odt", feature = "ods", feature = "odp", odf_objects))]
-    let odf =
-        litchi_odf_common::detect::packaged_mime(&bytes, detection_limits.odf_detect_limits())
-            .ok()
-            .flatten();
+    let odf = litchi_odf_common::detect::packaged_mime(
+        &bytes,
+        litchi_odf_common::detect::Limits::default(),
+    )
+    .ok()
+    .flatten();
     #[cfg(any(feature = "odt", feature = "ods", feature = "odp", odf_objects))]
     if odf.is_some()
         && litchi_odf_common::detect::packaged_has_ooxml_catalog(
             &bytes,
-            detection_limits.odf_catalog_limits(),
+            litchi_odf_common::detect::CatalogProbeLimits::default()
+                .with_neutral_input_budget(super::NEUTRAL_MAX_INPUT_BYTES),
         ) == Some(false)
     {
         return zip_fallback(bytes, options, detection_limits, tail);
@@ -234,7 +249,28 @@ pub(super) fn zip_fallback<T: ZipTail>(
     let bytes = match litchi_odf_common::detect::prepared_or_original(bytes, detection_limits.odf())
     {
         Ok(prepared) => return super::odf_from_prepared(prepared, options),
-        Err(bytes) => bytes,
+        Err(bytes) => {
+            // Preparation returns ownership on rejection. Once the bounded
+            // MIME probe identifies ODF, let its ordinary owner report the
+            // typed source failure instead of turning it into an unknown
+            // format. Successful preparation still transfers its one index.
+            match litchi_odf_common::detect::packaged_mime(
+                &bytes,
+                litchi_odf_common::detect::Limits::default(),
+            )
+            .ok()
+            .flatten()
+            {
+                Some(format) => litchi_odf_common::OwnedPackage::from_bytes_with_options(
+                    bytes,
+                    litchi_odf_common::OpenOptions::new().source_limits(detection_limits.odf()),
+                )
+                .map_err(litchi_odf_common::Error::from)
+                .map_err(|error| Error::from(error).with_format(format))?
+                .into_inner(),
+                None => bytes,
+            }
+        },
     };
     #[cfg(not(any(feature = "odt", feature = "ods", feature = "odp", odf_objects)))]
     let _ = (options, detection_limits);
