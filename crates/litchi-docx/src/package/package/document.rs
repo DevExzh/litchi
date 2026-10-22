@@ -72,13 +72,15 @@ impl Package {
 
     fn artifact_fingerprint(&self) -> Result<[u8; 32], crate::document::Error> {
         let current = self.opc.weak();
-        if let Some((cached, fingerprint)) = self
+        let generation = self.opc.generation();
+        if let Some((cached, cached_generation, fingerprint)) = self
             .artifact_fingerprint
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .as_ref()
             && cached.strong_count() != 0
             && cached.ptr_eq(&current)
+            && *cached_generation == generation
         {
             return Ok(*fingerprint);
         }
@@ -92,7 +94,8 @@ impl Package {
         *self
             .artifact_fingerprint
             .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner) = Some((current, fingerprint));
+            .unwrap_or_else(std::sync::PoisonError::into_inner) =
+            Some((current, generation, fingerprint));
         Ok(fingerprint)
     }
 

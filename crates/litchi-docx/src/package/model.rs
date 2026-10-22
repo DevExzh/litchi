@@ -152,10 +152,10 @@ pub struct Package {
     /// bytes; the weak reference keeps nothing alive.
     pub(super) main_admission: std::sync::Arc<std::sync::Mutex<std::sync::Weak<Vec<u8>>>>,
     /// Complete-package fingerprint memo keyed by the immutable OPC graph
-    /// allocation. A graph edit replaces that allocation, so an old digest
-    /// can never be reused for a changed package.
+    /// allocation and its mutation generation. The generation also catches
+    /// unique-owner in-place edits where the allocation is retained.
     pub(super) artifact_fingerprint:
-        std::sync::Arc<std::sync::Mutex<Option<(std::sync::Weak<OpcPackage>, [u8; 32])>>>,
+        std::sync::Arc<std::sync::Mutex<Option<(std::sync::Weak<OpcPackage>, u64, [u8; 32])>>>,
     /// Authoritative, mutation-tracked core properties.
     pub(super) properties: Shared<Slot>,
     /// Custom document properties
@@ -169,27 +169,40 @@ pub struct Package {
 }
 
 /// Shared immutable state; legacy mutations detach before writing.
-pub(super) struct Shared<T>(std::sync::Arc<T>);
+pub(super) struct Shared<T> {
+    value: std::sync::Arc<T>,
+    generation: std::sync::Arc<std::sync::atomic::AtomicU64>,
+}
 
 impl<T> Clone for Shared<T> {
     fn clone(&self) -> Self {
-        Self(std::sync::Arc::clone(&self.0))
+        Self {
+            value: std::sync::Arc::clone(&self.value),
+            generation: std::sync::Arc::clone(&self.generation),
+        }
     }
 }
 
 impl<T> Shared<T> {
     pub(super) fn shared(&self) -> std::sync::Arc<T> {
-        std::sync::Arc::clone(&self.0)
+        std::sync::Arc::clone(&self.value)
     }
 
     pub(super) fn weak(&self) -> std::sync::Weak<T> {
-        std::sync::Arc::downgrade(&self.0)
+        std::sync::Arc::downgrade(&self.value)
+    }
+
+    pub(super) fn generation(&self) -> u64 {
+        self.generation.load(std::sync::atomic::Ordering::Relaxed)
     }
 }
 
 impl<T> From<T> for Shared<T> {
     fn from(value: T) -> Self {
-        Self(std::sync::Arc::new(value))
+        Self {
+            value: std::sync::Arc::new(value),
+            generation: std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0)),
+        }
     }
 }
 
@@ -197,13 +210,15 @@ impl<T> std::ops::Deref for Shared<T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        &self.value
     }
 }
 
 impl<T: Clone> std::ops::DerefMut for Shared<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        std::sync::Arc::make_mut(&mut self.0)
+        self.generation
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        std::sync::Arc::make_mut(&mut self.value)
     }
 }
 
