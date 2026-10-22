@@ -1,0 +1,104 @@
+{
+  "schema": "litchi.w8.odf-isolation.v1",
+  "parent": "8c4ccb269f",
+  "status": "ODF/OPC policy isolation repaired; broader owner-policy review and W8 qualification remain open",
+  "source": {
+    "path": "crates/litchi-ops/src/detect/mod.rs",
+    "bytes": 10721,
+    "sha256": "25e9cd3f5ee4cfc4064b045eb9a8a9ffe72eaf2701c5868ec7e25b6c8203187c"
+  },
+  "initial_full_ops_tests": {
+    "command": [
+      "cargo",
+      "test",
+      "--offline",
+      "--locked",
+      "-p",
+      "litchi-ops",
+      "--all-features",
+      "--lib"
+    ],
+    "exit": 101,
+    "passed": 958,
+    "failed": 2,
+    "log": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/final-v3/check-2.log",
+    "bytes": 83933,
+    "sha256": "47d0499b37b8f6b0e22e29875ccbcc16ef7d252e33e1cff5444b22eb70e47bc3"
+  },
+  "checks": [
+    {
+      "command": [
+        "cargo",
+        "fmt",
+        "-p",
+        "litchi-ops",
+        "--",
+        "--check"
+      ],
+      "exit": 0,
+      "seconds": 2.5367362489923835,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/odf-isolation-v1/check-0.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "litchi-ops",
+        "--all-features",
+        "--lib"
+      ],
+      "exit": 0,
+      "seconds": 50.65725422697142,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/odf-isolation-v1/check-1.log",
+      "bytes": 76570,
+      "sha256": "f1a9a19210e30d152d40a34f5bf7fac12f6d6050e6dc6168659d06df3450a06c"
+    },
+    {
+      "command": [
+        "cargo",
+        "clippy",
+        "--offline",
+        "--locked",
+        "-p",
+        "litchi-ops",
+        "--no-default-features",
+        "--features",
+        "odt",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0,
+      "seconds": 36.853829259984195,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/odf-isolation-v1/check-2.log",
+      "bytes": 2467,
+      "sha256": "97134504bf5f0b289facc33ec856d4b7be6f3d33e01b0bfc95063080afcdcca3"
+    },
+    {
+      "command": [
+        "cargo",
+        "clippy",
+        "--offline",
+        "--locked",
+        "-p",
+        "litchi-ops",
+        "--all-features",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0,
+      "seconds": 285.75806604803074,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/odf-isolation-v1/check-3.log",
+      "bytes": 6294,
+      "sha256": "19471eaa069d42568ace9ce82e17a36e9eeade64320d43eb59042c0087e9b129"
+    }
+  ]
+}

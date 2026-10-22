@@ -149,3 +149,15 @@ compares one semantic marker rather than the owner's exact published bytes
 before and after staging. These must be corrected and validated on the actual
 Part A API before this protocol can establish performance acceptance. The
 historical and superseded receipts remain attached to their source versions.
+
+## ODF detector policy isolation repair
+
+The first complete candidate library run finished with 958 passing tests and
+two failures: ordinary ODT/ODS inputs were rejected by unrelated OPC input or
+member ceilings. The ODF catalog probe now takes its own ODF policy; its
+feature guard also permits ODF-only builds. All 960 ops library tests,
+formatting, ODT-only all-target Clippy and all-feature all-target Clippy with
+warnings denied pass. The [repair receipt](results/0362ha/odf-isolation-validation.json)
+retains the failed run and exact successful commands/log hashes. This closes
+the isolation regression only; owner-policy error propagation, probe repairs,
+matched performance and final integration remain required.

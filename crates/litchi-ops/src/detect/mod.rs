@@ -167,12 +167,11 @@ impl SourceLimits {
         litchi_odf_common::detect::Limits::new(self.odf().max_input_bytes())
     }
 
-    #[cfg(all(
-        any(feature = "odt", feature = "ods", feature = "odp", odf_objects),
-        any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")
-    ))]
+    #[cfg(any(feature = "odt", feature = "ods", feature = "odp", odf_objects))]
     pub(crate) fn odf_catalog_limits(&self) -> litchi_odf_common::detect::CatalogProbeLimits {
-        let limits = self.ooxml();
+        // This probe establishes that an ODF candidate has no OPC catalog.
+        // OPC-only ceilings cannot reject an ordinary OpenDocument package.
+        let limits = self.odf();
         litchi_odf_common::detect::CatalogProbeLimits::new(
             limits.max_input_bytes(),
             limits.max_members(),
