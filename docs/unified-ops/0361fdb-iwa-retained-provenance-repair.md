@@ -222,3 +222,37 @@ level. Measured v11 targets and all external receipts were retained.
 
 The staged-change size and binary checks were run before commit; no tracked
 performance/report file reached 1 MiB and no `/binaries/` path was staged.
+
+## 0361fdc v16 matched constructor return
+
+The v16 protected-binary probe measures the total constructor route with the
+collection work inside every iteration. The reduced receipt is
+[`constructor-v16-push-admission.json`](results/0361fd/constructor-v16-push-admission.json).
+It records source commit `cad8523c0c`, the candidate probe source after caching
+`message_count()`, and the protected baseline/candidate binary hashes. The raw
+callgrind captures remain outside the repository under
+`/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/count-callgrind-v16`.
+
+Callgrind uses `(Ir at 12,000 - Ir at 2,000) / 10,000`. `archive_info` is the
+original generic `Vec<MessageInfo>` route compared with `push(MessageInfo)`;
+`archive_info_e2e` compares the same total construction with `push_new`.
+Both routes produced identical output bytes and SHA-256 digests for base and
+candidate at every completed message count. The semantic checks include public
+length/version mutation invalidation and the minimal-prefix to nonminimal
+transition, so the lower work is not obtained by trusting mutable fields.
+
+| Route | Messages | Base Ir/op | Candidate Ir/op | Candidate/base |
+|---|---:|---:|---:|---:|
+| `archive_info` (`push`) | 1 | 51.0 | 794.0 | 15.567 |
+| `archive_info` (`push`) | 8 | 51.0 | 2,390.5 | 46.868 |
+| `archive_info` (`push`) | 32 | 51.0 | 7,325.5 | 143.620 |
+| `archive_info` (`push`) | 128 | 51.0 | 26,397.0 | 517.553 |
+| `archive_info_e2e` (`push_new`) | 1 | 1,061.0 | 1,730.0 | 1.631 |
+| `archive_info_e2e` (`push_new`) | 8 | 2,172.0 | 4,472.0 | 2.059 |
+| `archive_info_e2e` (`push_new`) | 32 | 10,328.0 | 18,435.0 | 1.785 |
+| `archive_info_e2e` (`push_new`) | 128 | 51,538.0 | 81,828.0 | 1.588 |
+
+The generic end-to-end route (`archive_info_generic_e2e`) was not run because
+another build reduced free space below the 12,000,000,000-byte decimal floor;
+its v16 result remains pending. These deterministic rows are returned for
+constructor repair and do not qualify native latency or memory.
