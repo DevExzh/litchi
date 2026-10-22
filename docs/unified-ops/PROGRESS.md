@@ -2220,3 +2220,36 @@ See [0063](0063-source-pptx-modern-comments.md).
   corpus dispositions, inventory/glossary closure and the complete assembled
   gate remain required. Only the comprehensive redaction audit is deferred.
   Nothing has been pushed.
+
+- Coordinator checkpoint (2026-10-22, replay checks complete and API assembly):
+  Record 0362ue now records all seven passing combined groups on
+  `c2122e2678`: 1,578 tests pass, with three existing ignored tests; strict
+  all-target/all-feature DOC/OLE/crypto/ops Clippy and the locked all-feature
+  performance harness check also pass. Receipt `eaae26801b` names that exact
+  source; it does not validate newer branches.
+
+  The assembly reaches `b588c1a65f`, integrating the canonical ODF names,
+  typed ODF replay/progress and public error boundaries, PPTX classifications,
+  DOCX document/story/section/redaction raw models, and IWA primary edits.
+  DOCX section and redaction facade consumers are migrated in their respective
+  local merge commits. These newer changes still require combined validation.
+  Further reviewed XLSX raw/reader-state, XLSB admitted-reader and consuming
+  DOC handoff repairs are queued for that validation snapshot.
+
+  Signed cancellation candidate `f3c5accd86` is returned: restoring the
+  endpoint alone leaves a changed native leaf patch, and unsigned coalescers
+  acquire unnecessary original-value tracking. The repair must produce a
+  genuine signed no-op patch, cover DOCX and invalid intermediate edits, and
+  keep ordinary unsigned costs unchanged. Required OPC raw constructor policy
+  and DOCX raw helper migrations remain active engineering work.
+
+  Independent iWork review identifies a constructor benchmark mismatch:
+  historical Vec construction was compared with new incremental collection
+  admission. The large direct ratios are not same-operation regression
+  evidence. Equivalent raw-constructor and full lifecycle qualification are
+  still required, alongside safe admission-ledger optimization. XLSX reader
+  evidence distinguishes requested bytes from lower live/peak heap and fewer
+  allocation calls; native qualification remains open. DOC, RTF and ODP
+  performance returns, corpus dispositions, final inventory/glossary closure
+  and the complete assembled gate remain required. Only the comprehensive
+  redaction audit is deferred. Nothing has been pushed.
