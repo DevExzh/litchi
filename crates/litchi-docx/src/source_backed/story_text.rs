@@ -879,7 +879,15 @@ impl Snapshot {
             base.envelope = Some(envelope);
             DocumentSnapshot::from_xml(document_xml)?
         } else {
-            let document_xml = checked_vec_clone(self.raw_bytes(), "story transaction XML")?;
+            let source_bytes = self.raw_bytes();
+            if source_bytes.len() > self.limits.max_output_bytes {
+                return Err(Error::Limit {
+                    kind: LimitKind::TransactionXml,
+                    actual: source_bytes.len(),
+                    maximum: self.limits.max_output_bytes,
+                });
+            }
+            let document_xml = checked_vec_clone(source_bytes, "story transaction XML")?;
             DocumentSnapshot::from_xml(document_xml)?
         };
         base.transaction = Some(transaction.clone());
@@ -1124,8 +1132,9 @@ impl Edit {
     }
 }
 
-/// A reversible selected-story patch bound to one source lineage, revision,
-/// selected part, and exact selected-part bytes.
+/// A reversible selected-story patch carrying the selected-part identity and
+/// exact before and after bytes. Owner publication adds its complete-artifact
+/// and source-freshness proof; raw replay matches the selected content.
 #[derive(Clone)]
 pub struct Patch {
     before: Snapshot,
@@ -1133,7 +1142,7 @@ pub struct Patch {
 }
 
 impl Patch {
-    /// Borrow the exact source snapshot required by this patch.
+    /// Borrow the before snapshot represented by this patch.
     #[must_use]
     pub const fn source(&self) -> &Snapshot {
         &self.before
@@ -1234,10 +1243,6 @@ impl Patch {
         target.limits = source.limits;
         target.execution = source.execution.clone();
         Ok(target)
-    }
-
-    pub(crate) fn limits(&self) -> Limits {
-        self.before.limits
     }
 
     pub(crate) fn selector(&self) -> Selector {
@@ -1398,14 +1403,15 @@ impl Package {
     pub(crate) fn story_text_target(&self, patch: &Patch) -> Result<(PackURI, Arc<Vec<u8>>)> {
         self.trim_clean_paragraph_index_for_operation();
         self.physical_package()?.check_execution()?;
-        let current = capture(self, patch.selector(), patch.limits())?;
+        let recipient_limits = self.semantic_limits.story_text_value();
+        let current = capture(self, patch.selector(), recipient_limits)?;
         let target = patch.apply_content(&current)?;
         story_replacement(
             self,
             patch.is_noop(),
             &current.partname,
             target.raw_bytes(),
-            patch.limits(),
+            recipient_limits,
             LimitKind::OutputBytes,
             "story publication replacement",
         )
@@ -5078,8 +5084,9 @@ impl GlossaryBatchEdit {
     }
 }
 
-/// A reversible source-bound patch for a glossary Part containing a bounded
-/// set of selected entries.
+/// A reversible patch for a glossary Part containing a bounded set of selected
+/// entries. Owner publication adds its complete-artifact and source-freshness
+/// proof; raw replay matches the selected content.
 #[derive(Clone)]
 pub struct GlossaryBatchPatch {
     before: GlossaryBatchSnapshot,
@@ -5087,7 +5094,7 @@ pub struct GlossaryBatchPatch {
 }
 
 impl GlossaryBatchPatch {
-    /// Borrow the exact batch source required by this patch.
+    /// Borrow the before batch snapshot represented by this patch.
     #[must_use]
     pub const fn source(&self) -> &GlossaryBatchSnapshot {
         &self.before
@@ -5239,15 +5246,19 @@ impl Package {
     ) -> Result<(PackURI, Arc<Vec<u8>>)> {
         self.trim_clean_paragraph_index_for_operation();
         self.physical_package()?.check_execution()?;
-        let current =
-            capture_glossary_batch(self, patch.before.selector.clone(), patch.before.limits)?;
+        let recipient_limits = self.semantic_limits.story_text_value();
+        let current = capture_glossary_batch(
+            self,
+            patch.before.selector.clone(),
+            recipient_limits,
+        )?;
         let target = patch.apply_content(&current)?;
         story_replacement(
             self,
             patch.is_noop(),
             &current.partname,
             target.raw_bytes(),
-            patch.before.limits,
+            recipient_limits,
             LimitKind::GlossaryBatchOutputBytes,
             "glossary batch publication replacement",
         )

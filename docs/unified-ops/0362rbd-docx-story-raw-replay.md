@@ -21,9 +21,14 @@ edit on a reopened raw model.
 
 The crate-private owner publication helper retains its existing fast path: it
 performs the same content proof, then uses the already admitted target bytes.
-Only standalone raw replay performs the recipient layout re-admission. The
+Only standalone raw replay performs target layout re-admission. The
 owner package still performs its complete-artifact, source-freshness,
-security, and output publication checks.
+security, and output publication checks. Owner publication now captures and
+checks the current story under the recipient package's retained story limits,
+including the final output check; a raw patch authored under broader limits
+cannot widen a narrower recipient package. The main-story raw edit also
+checks the admitted source length before cloning its transaction XML, so a
+tight output policy refuses before allocation.
 
 The old public `ForeignSource` and `ArtifactConflict` variants were removed.
 Stale selected content is `PatchConflict`; topology and source-freshness
@@ -33,9 +38,10 @@ the enclosing owner family admits it.
 
 Focused coverage adds independent matching-copy forward/inverse chains for
 story text and glossary batches, a stricter recipient-limit story route with
-an explicit output-ceiling refusal, and changed-content refusal. Existing
-owner tests continue to cover complete artifact publication and exact inverse
-restoration.
+an explicit output-ceiling refusal, broad-producer/narrow-recipient raw and
+owner replay routes, changed-content refusal, and cancellation before raw
+content comparison for changed and no-op patches. Existing owner tests
+continue to cover complete artifact publication and exact inverse restoration.
 
 The focused command was run before the final owner-fast-path factoring; its
 terminal output is retained outside the repository. The factoring only moves

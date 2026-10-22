@@ -796,6 +796,80 @@ fn raw_glossary_replay_reopens_matches_and_chains_edits() {
 }
 
 #[test]
+fn glossary_replay_uses_recipient_limits_for_broad_raw_patches() {
+    let source = batch_source();
+    let producer_limits = story_text::Limits::new(
+        128 * 1024,
+        8,
+        10_000,
+        64,
+        128 * 1024,
+        8,
+        128 * 1024,
+    )
+    .unwrap()
+    .with_secondary_entry_limits(3, 16 * 1024, 256)
+    .unwrap();
+    let producer = open(&source)
+        .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(producer_limits));
+    let snapshot = producer
+        .glossary_text_batch_snapshot(glossary_triplet())
+        .unwrap();
+    let mut tree = snapshot.raw_tree(snapshot.limits_value()).unwrap();
+    let glossary_bytes = part(&source, "/word/glossary/document.xml").len();
+    tree.replace_paragraph_text(0, Position::new(0), "wide".repeat(glossary_bytes))
+        .unwrap();
+    let patch = tree.patch().unwrap();
+
+    let accepted_limits = story_text::Limits::new(128 * 1024, 8, 10_000, 64, 64 * 1024, 8, 128 * 1024)
+        .unwrap()
+        .with_secondary_entry_limits(3, 16 * 1024, 256)
+        .unwrap();
+    let accepted = open(&source)
+        .with_semantic_limits(
+            litchi_docx::SemanticLimits::default().story_text(accepted_limits),
+        )
+        .glossary_text_batch_snapshot(glossary_triplet())
+        .unwrap();
+    let accepted_target = patch.apply(&accepted).unwrap();
+    assert_eq!(accepted_target.limits_value(), accepted_limits);
+
+    let narrow_limits = story_text::Limits::new(
+        128 * 1024,
+        8,
+        10_000,
+        64,
+        glossary_bytes,
+        8,
+        128 * 1024,
+    )
+    .unwrap()
+    .with_secondary_entry_limits(3, 16 * 1024, 256)
+    .unwrap();
+    let narrow = open(&source).with_semantic_limits(
+        litchi_docx::SemanticLimits::default().story_text(narrow_limits),
+    );
+    let narrow_snapshot = narrow
+        .glossary_text_batch_snapshot(glossary_triplet())
+        .unwrap();
+    assert!(matches!(
+        patch.apply(&narrow_snapshot),
+        Err(story_text::Error::Limit {
+            kind: story_text::LimitKind::GlossaryBatchOutputBytes,
+            ..
+        })
+    ));
+    let package_patch = patch.clone().into();
+    assert!(matches!(
+        narrow.apply_glossary_text_batch(&package_patch),
+        Err(story_text::Error::Limit {
+            kind: story_text::LimitKind::GlossaryBatchOutputBytes,
+            ..
+        })
+    ));
+}
+
+#[test]
 fn glossary_topology_and_dialect_boundaries_refuse_before_editing() {
     for (mutation, expected) in [
         (Mutation::WrongContentType, "invalid DOCX content type"),

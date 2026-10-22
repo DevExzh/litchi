@@ -638,6 +638,16 @@ fn patches_accept_matching_copy_and_reject_stale_snapshots_and_cancel_before_out
         Some("changed")
     );
 
+    let tight_limits = story_text::Limits::new(16 * 1024, 128, 10_000, 64, 1, 16, 4096)
+        .unwrap();
+    assert!(matches!(
+        snapshot.raw_tree(tight_limits),
+        Err(story_text::Error::Limit {
+            kind: story_text::LimitKind::TransactionXml,
+            ..
+        })
+    ));
+
     let changed_package = open(&source)
         .apply_story_text(&patch.clone().into())
         .unwrap();
@@ -751,4 +761,55 @@ fn raw_story_replay_reopens_matches_and_chains_under_recipient_limits() {
         second_restored.paragraph_text(0).unwrap().as_deref(),
         Some("first raw change")
     );
+}
+
+#[test]
+fn story_replay_uses_recipient_limits_for_broad_raw_patches() {
+    let source = fixture();
+    let producer_limits = story_text::Limits::new(128 * 1024, 128, 10_000, 64, 128 * 1024, 16, 4096)
+        .unwrap();
+    let producer = open(&source)
+        .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(producer_limits));
+    let snapshot = producer
+        .story_text_snapshot(story_text::Selector::Main)
+        .unwrap();
+    let mut tree = snapshot.raw_tree(snapshot.limits_value()).unwrap();
+    tree.replace_paragraph_text(Position::new(0), "broad producer patch")
+        .unwrap();
+    let patch = tree.patch().unwrap();
+
+    let accepted_limits = story_text::Limits::new(16 * 1024, 128, 10_000, 64, 1024, 16, 4096)
+        .unwrap();
+    let accepted = open(&source)
+        .with_semantic_limits(
+            litchi_docx::SemanticLimits::default().story_text(accepted_limits),
+        )
+        .story_text_snapshot(story_text::Selector::Main)
+        .unwrap();
+    let accepted_target = patch.apply(&accepted).unwrap();
+    assert_eq!(accepted_target.limits_value(), accepted_limits);
+
+    let narrow_limits = story_text::Limits::new(16 * 1024, 128, 10_000, 64, 1, 16, 4096)
+        .unwrap();
+    let narrow = open(&source).with_semantic_limits(
+        litchi_docx::SemanticLimits::default().story_text(narrow_limits),
+    );
+    let narrow_snapshot = narrow
+        .story_text_snapshot(story_text::Selector::Main)
+        .unwrap();
+    assert!(matches!(
+        patch.apply(&narrow_snapshot),
+        Err(story_text::Error::Limit {
+            kind: story_text::LimitKind::OutputBytes,
+            ..
+        })
+    ));
+    let package_patch = patch.clone().into();
+    assert!(matches!(
+        narrow.apply_story_text(&package_patch),
+        Err(story_text::Error::Limit {
+            kind: story_text::LimitKind::OutputBytes,
+            ..
+        })
+    ));
 }
