@@ -154,3 +154,106 @@ failed before any child launch. Its host/error files are retained under
 `/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/final-source-family-20261021-v1/page_margin`.
 No native timing was run after the allocator return, and no performance result
 from this candidate is accepted.
+
+## Deferred catalog-policy proof sharing (3dddbaf8cb)
+
+This is a returned allocator and heap-attribution result, not a performance
+acceptance. It was measured with the same two-defined-name fixture, 64 retained
+steps, two warmups, and exact 64/64 forward and inverse checks. The count-only
+run used two protected release binaries sequentially; it makes no latency, RSS,
+or native source-family claim.
+
+| item | e63 baseline | 3dddbaf8cb candidate |
+| --- | --- | --- |
+| source | `e63a1fe3534bcaaae2ce367339f7f8275877baef` | `3dddbaf8cb8ec3b6844109cce0f1b568061fc357` |
+| protected binary | `/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/protected/e63/xlsx_tab_state_history_alloc` | `/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/protected/3dd/xlsx_tab_state_history_alloc` |
+| binary SHA-256 | `c9efeaf4c70f9e91bc0052abdda2f31cc434cfc1e25b4252b2cc5ef3f46a7fd0` | `6d52f150fbd1b6fb5ea91ad84293b34d7091181986b21555a873c6a923297a5c` |
+| JSON receipt SHA-256 | `509453270b20147fbc034a02e0d1842abf5f60b1bc9d61e00c9c050f37cdc098` | `08ad27c2c1c3e82ba61d67598318dcbeebb8f197c7c0b774522a8ed3c7a686eb` |
+| receipt directory | `/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/allocator-14370-v1` | `/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/allocator-3dd-v1` |
+
+Both binaries were built with `cargo build --locked --release
+--features allocator-metrics --manifest-path tools/perf-baseline/Cargo.toml
+--bin xlsx_tab_state_history_alloc`, `CARGO_BUILD_JOBS=2`, and the capped W4
+environment. The shared `Cargo.lock` SHA-256 is
+`aa4300aff7f76cb467a2a6bc5896e706b3f5b506feed1d16b45f7422a0a9ba23`; the
+benchmark manifest SHA-256 is
+`52e349415b12b80765e810f47b4f6ac2e76cc092566eb257efc463e07d25fc2f`.
+
+| interval | e63 | 3dddbaf8cb | change vs e63 |
+| --- | ---: | ---: | ---: |
+| retained history allocated bytes | 4,834,958 | 4,885,827 | +50,869 (+1.05%) |
+| retained history allocation calls | 46,730 | 46,863 | +133 (+0.28%) |
+| retained history live bytes after | 167,697 | 228,433 | +60,736 |
+| retained history peak live after | 427,929 | 427,929 | unchanged |
+| independent replay allocated bytes | 103,381,056 | 102,861,356 | -519,700 (-0.50%) |
+| independent replay live bytes after | 167,953 | 232,601 | +64,648 |
+| independent replay peak live after | 606,577 | 686,195 | +79,618 (+13.13%) |
+| source-owner admission allocated bytes | 23,346,752 | 24,410,208 | +1,063,456 (+4.56%) |
+
+The matched heap profiles are outside the repository at
+`/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/heaptrack-3dd-v1` and
+`/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/heaptrack-14370-v1`. They
+attribute the retained difference to the deferred family endpoint rather than
+to the OPC rewrite itself: the `raw::catalog_edit::package::rewrite` stacks are
+identical (17.57 KiB over 32 hide calls and 17.09 KiB over 32 show calls),
+while 3dd adds 9.22 KiB over 32 calls for each hide/show route through
+`tab_state::source::commit_change -> Edit::commit`. The extra live state is
+therefore in publication/deferred-owner bookkeeping; removing that state would
+remove exact endpoint authentication or recipient policy unless a replacement
+proof is demonstrated.
+
+The replay peak has a separate route attribution. Both revisions allocate the
+same 380.03 KiB of zlib workspace over 64 writes. e63 reaches it through
+`PackageWriter::to_bytes` and its direct writer; 3dd reaches it through
+`RestoreEndpoint::output_artifact`, `SourceBackedPackage`'s preserve overlay
+writer, and `soapberry_zip::preserve::generated_entry`. The 32.77 KiB zeroed
+allocation group is also present in both routes. The 3dd route keeps the
+preserve index/overlay and the zlib workspace live while the deferred endpoint
+is authenticated and hashed, accounting for the +79,618-byte verification peak.
+This is a lifetime difference in the exact-output path, not evidence that the
+zlib buffer can be removed; source freshness, content binding, and recipient
+limits must remain enforced.
+
+The owner-admission difference is likewise concrete. e63 admits a
+`SourceBackedEditor` from `SourceBackedPackage::source_catalog`; 3dd admits
+the public `SourceBackedWorkbook` projection after the same OPC catalog read.
+The latter additionally parses the workbook catalog, validates the sheet graph,
+shared strings and styles, and constructs `SourceSheetData`, sheet-name order,
+and `SourceInner` caches. The current measured sizes are
+`SourceBackedPackage=384`, `SourceBackedWorkbook=16`, `SourceInner=1784`,
+`SourceCatalogProof=24`, `Catalog=32`, `Deferred=128`,
+`RestoreEndpoint=160`, exact endpoint pair `Option=328`, `Patch=336`, and
+`SourceArtifact=152` bytes. These sizes show why the observed roughly-288-byte
+per-endpoint delta cannot be assigned to one standalone allocation: the
+endpoint is a small inline handle over Arc-backed package, publisher, catalog,
+and source state, and the remaining difference is in their live ownership
+graph. The profile did not show an unbounded duplicate catalog proof.
+
+The facts needed before the first edit differ by family. A tab-state edit must
+have the source execution/version check, workbook main part and content type,
+recipient `read_limits`, parsed sheets/active position/defined names, the
+workbook and sheet relationship/content-type closure, semantic tab projection,
+and the exact touched `PartState`. A defined-name edit needs only the source
+execution/version check, workbook main part/XML, and `raw::parse_catalog` under
+the recipient policy; it does not need sheet bodies, sheet handles, or the
+semantic sheet projection. The public `SourceBackedWorkbook` read-only API
+currently promises sheet names, active position, selectors, and validated graph,
+shared-string, and style behavior at open, so its broader `SourceInner`
+projection cannot be deleted as an optimization without changing that API.
+The admitted OPC package already shares content-types, package relationships,
+parts, and source limits, but it does not contain parsed XLSX sheet metadata.
+
+A future repair can therefore defer the unused workbook projection for an
+edit-only path, or share it from an already admitted source owner, but it must
+keep the current guard-before-parse ordering. Shared catalog proofs may be
+reused only when the recipient `SourceLimits` are equal; a stricter recipient
+must reparse and revalidate under its own limits. Names changed by an edit must
+produce a new proof while retaining the lineage policy. These constraints are
+also covered by the focused stricter-recipient test and the deferred lineage
+policy test; no policy or capability is waived here.
+
+The source validation for 3dd passed the focused defined-name and tab-state
+suites, the private deferred-policy test, full `litchi-xlsx` library tests,
+all-feature warning-denied Clippy, and formatting. The allocator receipt has
+exact forward/inverse output checks, but the positive live/peak and admission
+deltas remain returned work for a later repair and native acceptance run.
