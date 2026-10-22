@@ -1819,3 +1819,26 @@ See [0063](0063-source-pptx-modern-comments.md).
   This closes the queued §16.4 update without changing the historical
   measurement records. Remaining implementation, performance and final
   integration work stays open.
+
+- Coordinator checkpoint (2026-10-22, after the ingress review): the W8 Part A
+  candidate now includes `8d6abdab69`, applying semantic options through all
+  ten prepared ODF owners and four flat families. Validation passes 2,752
+  affected library tests (965 File tests), the full 1,768-test ODS suite,
+  299 doctests, consumer compilation, Clippy, feature builds, selected
+  glossary profiles, boundaries and tracked disposition checks. The totals
+  overlap and are not a distinct-test sum. The candidate remains unmerged
+  and unqualified for native performance. The repaired File harness is
+  being integrated from `dd1052e06d`; its worker-source 109-route untimed
+  receipt is retained separately from the coordinator-source validation.
+  W4's `5e0672b53c` repair reduces retained history and replay peak memory
+  below its original baseline; source-owner admission still allocates more
+  and remains under repair. Numbers retained Snappy policy verification is
+  committed through `5232e9bcdb`, Pages/Keynote through `eaade0241d`, and
+  footnote validation through `660205a29c`. ODraw's final consumer checks
+  are recorded in `80ccd68391`; W5's retag optimization is awaiting fresh
+  allocation comparison. These branches are not accepted by this checkpoint.
+  Constructor evidence through `2f8fa9534b` retains four interrupted v4
+  native attempts with zero qualified blocks, including the worker-overlap
+  correction and the later unrelated host test. Required flat ODF raw
+  limits, remaining wave integration, native qualification, the complete
+  inventory and final gate stay open. Nothing has been pushed.
