@@ -8403,6 +8403,17 @@ impl SourceBackedPackage {
         self.cache.context().cloned()
     }
 
+    /// Return the finite payload-cache policy admitted with this package.
+    ///
+    /// The policy belongs to the opened package rather than to a facade that
+    /// happens to consume it.  A facade that reopens a published artifact
+    /// must carry this value forward so an externally supplied package does
+    /// not silently fall back to the OPC default cache.
+    #[must_use]
+    pub fn cache_limits(&self) -> SourceCacheLimits {
+        self.cache.limits
+    }
+
     /// Return the exact process-local source identity and revision captured at
     /// open after verifying that the positional source is still current.
     pub fn source_version(&self) -> Result<SourceVersion> {

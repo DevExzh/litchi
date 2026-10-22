@@ -192,7 +192,10 @@ impl DependencyState {
 /// owns that value, so retaining a complete `OpenOptions` in every immutable
 /// source owner duplicates the physical ingress policy in each owner and in
 /// every reopened history step. Keep the facade policies here and rebuild the
-/// public options value only at a deferred materialization boundary.
+/// public options value only at a deferred materialization boundary. Package
+/// cache and execution policy are retained separately from an optional facade
+/// context: an external package remains authoritative for its own cache and
+/// budget, while a facade context adds a second cancellation/budget fence.
 #[derive(Clone)]
 struct SourceOwnerOptions {
     leniency: crate::Leniency,
@@ -202,11 +205,21 @@ struct SourceOwnerOptions {
     #[cfg(feature = "encryption")]
     encryption_limits: crate::encryption::Limits,
     cache_limits: Option<SourceCacheLimits>,
-    execution_context: Option<Arc<ExecutionContext>>,
+    /// The execution context that owns the OPC package cache and publication
+    /// budget. This is the package's policy, not a facade override.
+    package_execution_context: Option<Arc<ExecutionContext>>,
+    /// An optional facade-level context supplied alongside an already-opened
+    /// package. It remains an additional fence when the package has its own
+    /// managed context.
+    facade_execution_context: Option<Arc<ExecutionContext>>,
 }
 
 impl SourceOwnerOptions {
     fn from_open_options(options: &crate::OpenOptions) -> Self {
+        let execution_context = options
+            .execution_context
+            .as_ref()
+            .map(|context| Arc::new(context.clone()));
         Self {
             leniency: options.leniency,
             semantic_limits: (options.semantic_limits != crate::SemanticLimits::default())
@@ -214,14 +227,29 @@ impl SourceOwnerOptions {
             #[cfg(feature = "encryption")]
             encryption_limits: options.encryption_limits,
             cache_limits: options.cache_limits,
-            execution_context: options
-                .execution_context
-                .as_ref()
-                .map(|context| Arc::new(context.clone())),
+            package_execution_context: execution_context.clone(),
+            facade_execution_context: execution_context,
         }
     }
 
+    fn from_source_backed_package(
+        package: &SourceBackedPackage,
+        options: &crate::OpenOptions,
+    ) -> Self {
+        let mut owner_options = Self::from_open_options(options);
+        let cache_limits = package.cache_limits();
+        owner_options.cache_limits =
+            (cache_limits != SourceCacheLimits::default()).then_some(cache_limits);
+        owner_options.package_execution_context =
+            package.execution_context().map(|context| Arc::new(context));
+        owner_options
+    }
+
     fn to_open_options(&self, source_limits: SourceLimits) -> crate::OpenOptions {
+        // `package_execution_context` is supplied separately through
+        // `shared_owner_options` when the reopened package is constructed.
+        // The public options value carries only the facade context so it
+        // cannot replace the package's own cache/budget policy.
         let mut options = crate::OpenOptions::new()
             .source_limits(source_limits)
             .leniency(self.leniency)
@@ -233,7 +261,7 @@ impl SourceOwnerOptions {
         if let Some(cache_limits) = self.cache_limits {
             options = options.cache_limits(cache_limits);
         }
-        if let Some(execution_context) = self.execution_context.as_deref() {
+        if let Some(execution_context) = self.facade_execution_context.as_deref() {
             options = options.execution_context(execution_context.clone());
         }
         options
@@ -250,7 +278,8 @@ impl SourceOwnerOptions {
         self.leniency == crate::Leniency::default()
             && self.semantic_limits.is_none()
             && self.cache_limits.is_none()
-            && self.execution_context.is_none()
+            && self.package_execution_context.is_none()
+            && self.facade_execution_context.is_none()
             && {
                 #[cfg(feature = "encryption")]
                 {
@@ -491,14 +520,17 @@ impl SourceBackedWorkbook {
         shared_owner_options: Option<Arc<SourceOwnerOptions>>,
     ) -> Result<Self> {
         let limits = options.source_limits;
-        let cache_limits = options.cache_limits.unwrap_or_default();
+        let cache_limits = match shared_owner_options.as_ref() {
+            Some(owner_options) => owner_options.cache_limits.unwrap_or_default(),
+            None => options.cache_limits.unwrap_or_default(),
+        };
         let owner_options = shared_owner_options.or_else(|| {
             let owner_options = SourceOwnerOptions::from_open_options(&options);
             (!owner_options.is_default()).then(|| Arc::new(owner_options))
         });
         let execution = owner_options
             .as_ref()
-            .and_then(|owner_options| owner_options.execution_context.as_deref().cloned());
+            .and_then(|owner_options| owner_options.package_execution_context.as_deref().cloned());
         let package = match execution {
             Some(context) => {
                 SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
@@ -541,13 +573,15 @@ impl SourceBackedWorkbook {
         reader: R,
         options: crate::OpenOptions,
     ) -> Result<Self> {
+        let owner_options = SourceOwnerOptions::from_open_options(&options);
+        let owner_options = (!owner_options.is_default()).then(|| Arc::new(owner_options));
         let package = SourceBackedPackage::from_reader_with_source_options(
             reader,
             options.source_limits,
             options.cache_limits.unwrap_or_default(),
             options.execution_context.clone(),
         )?;
-        Self::open_source_backed_package(package, options)
+        Self::open_source_backed_package_with_shared_catalog(package, options, None, owner_options)
     }
 
     /// Build the read-only XLSX facade from a validated deferred OPC package.
@@ -556,9 +590,11 @@ impl SourceBackedWorkbook {
     }
 
     /// [`Self::from_source_backed_package`] under explicit policies. The
-    /// package keeps its own source and cache limits; `options` contributes
-    /// the leniency, the semantic limits and an optional facade execution
-    /// context.
+    /// package keeps its source, cache limits and package execution context;
+    /// `options` contributes the leniency, semantic limits and an optional
+    /// facade execution context. When both contexts are present, both are
+    /// checked and the package context continues to govern OPC cache and
+    /// publication admission.
     pub fn from_source_backed_package_with_options(
         package: SourceBackedPackage,
         options: crate::OpenOptions,
@@ -579,9 +615,10 @@ impl SourceBackedWorkbook {
         shared_catalog: Option<Arc<SourceCatalogProof>>,
         shared_owner_options: Option<Arc<SourceOwnerOptions>>,
     ) -> Result<Self> {
-        let execution = options.execution_context.clone();
+        let facade_execution = options.execution_context.clone();
         let leniency = options.leniency;
-        check_execution(execution.as_ref())?;
+        package.check_execution()?;
+        check_execution(facade_execution.as_ref())?;
         if let Some(shared) = shared_catalog.as_ref()
             && package.read_limits() != *shared.limits
         {
@@ -589,7 +626,8 @@ impl SourceBackedWorkbook {
                 "reopened workbook changed its source-backed policy",
             ));
         }
-        let retain_catalog = execution.is_some() || package.cache_diagnostics().budget_managed;
+        let retain_catalog =
+            facade_execution.is_some() || package.cache_diagnostics().budget_managed;
         let workbook = package.main_document_part()?;
         let flavor = codec::flavor(workbook.content_type()).ok_or_else(|| {
             invalid(format!(
@@ -606,12 +644,15 @@ impl SourceBackedWorkbook {
         let catalog_bytes = workbook.data()?;
         let catalog =
             raw::parse_catalog_repairing(catalog_bytes.as_bytes(), leniency, &mut tolerance)?;
-        check_execution(execution.as_ref())?;
+        package.check_execution()?;
+        check_execution(facade_execution.as_ref())?;
         let sheet_parts = validate_sheet_graph(&package, &workbook, &catalog.sheets)?;
-        check_execution(execution.as_ref())?;
+        package.check_execution()?;
+        check_execution(facade_execution.as_ref())?;
         let shared_strings_uri = validate_shared_strings(&package, &workbook)?;
         let styles_uri = validate_styles(&package, &workbook)?;
-        check_execution(execution.as_ref())?;
+        package.check_execution()?;
+        check_execution(facade_execution.as_ref())?;
 
         let active_sheet = (!catalog.sheets.is_empty()).then_some(catalog.active_sheet_index);
         let defined_names = match shared_catalog.as_ref() {
@@ -665,7 +706,8 @@ impl SourceBackedWorkbook {
         // allocated. Do not publish a facade whose catalog was assembled from
         // a stale positional snapshot. This also covers an empty sheet list.
         package.source_version()?;
-        check_execution(execution.as_ref())?;
+        package.check_execution()?;
+        check_execution(facade_execution.as_ref())?;
 
         let source_limits = OnceLock::new();
         let catalog_proof = OnceLock::new();
@@ -674,7 +716,7 @@ impl SourceBackedWorkbook {
             let _ = catalog_proof.set(shared);
         }
         let owner_options = shared_owner_options.or_else(|| {
-            let owner_options = SourceOwnerOptions::from_open_options(&options);
+            let owner_options = SourceOwnerOptions::from_source_backed_package(&package, &options);
             (!owner_options.is_default()).then(|| Arc::new(owner_options))
         });
 
@@ -689,7 +731,7 @@ impl SourceBackedWorkbook {
                 merge_source_states: OnceLock::new(),
                 execution: owner_options
                     .as_ref()
-                    .and_then(|owner_options| owner_options.execution_context.clone()),
+                    .and_then(|owner_options| owner_options.facade_execution_context.clone()),
                 _catalog_data: retain_catalog.then_some(catalog_bytes),
                 shared_strings_uri,
                 styles_uri,
@@ -2913,6 +2955,184 @@ mod tests {
         );
         drop(first);
         drop(workbook);
+        assert_eq!(budget.used(Resource::Memory), 0);
+    }
+
+    #[test]
+    fn externally_opened_package_preserves_custom_cache_after_commit() {
+        let source = Arc::new(CountingSource::new(source_backed_xlsx()));
+        let cache_limits = SourceCacheLimits::new(256 * 1024, 1).unwrap();
+        let package =
+            SourceBackedPackage::from_read_at_with_cache_limits(source, cache_limits).unwrap();
+        // A facade option cannot replace the cache policy already admitted by
+        // an externally supplied package. Use the OPC default here so a
+        // regression would visibly widen the one-entry cache.
+        let workbook = SourceBackedWorkbook::from_source_backed_package_with_options(
+            package,
+            crate::OpenOptions::new().cache_limits(SourceCacheLimits::default()),
+        )
+        .unwrap();
+        let mut edit = workbook.edit_tab_state().unwrap();
+        assert!(edit.hide("First").unwrap());
+        let commit = edit.commit().unwrap();
+        let committed = commit.package();
+
+        assert_eq!(
+            committed.source_backed_package().unwrap().cache_limits(),
+            cache_limits,
+            "materialization must retain the externally admitted cache policy"
+        );
+        assert!(
+            committed
+                .sheet("First")
+                .unwrap()
+                .unwrap()
+                .stored_extent()
+                .unwrap()
+                .is_some()
+        );
+        assert!(
+            committed
+                .sheet("Second")
+                .unwrap()
+                .unwrap()
+                .stored_extent()
+                .unwrap()
+                .is_some()
+        );
+        assert!(
+            committed.cache_diagnostics().evictions > 0,
+            "a committed external package must retain its one-entry cache"
+        );
+    }
+
+    #[test]
+    fn externally_opened_managed_package_context_survives_commit() {
+        let source = Arc::new(CountingSource::new(source_backed_xlsx()));
+        let (budget, cancellation_source, context) = managed_context(u64::MAX);
+        let package =
+            SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
+                source,
+                SourceLimits::default(),
+                SourceCacheLimits::new(256 * 1024, 4).unwrap(),
+                context,
+            )
+            .unwrap();
+        let workbook = SourceBackedWorkbook::from_source_backed_package(package).unwrap();
+        let mut edit = workbook.edit_tab_state().unwrap();
+        assert!(edit.hide("First").unwrap());
+        let commit = edit.commit().unwrap();
+        let committed = commit.package();
+
+        assert!(
+            committed
+                .source_backed_package()
+                .unwrap()
+                .execution_context()
+                .is_some()
+        );
+        let first = committed.sheet("First").unwrap().unwrap();
+        assert!(first.stored_extent().unwrap().is_some());
+        cancellation_source.cancel();
+        assert!(matches!(
+            first.stored_extent(),
+            Err(Error::Package(OpcError::Cancelled))
+        ));
+
+        drop(first);
+        drop(workbook);
+        drop(commit);
+        assert_eq!(budget.used(Resource::Memory), 0);
+    }
+
+    #[test]
+    fn external_package_and_facade_contexts_both_survive_commit() {
+        let source = Arc::new(CountingSource::new(source_backed_xlsx()));
+        let (package_budget, _package_cancellation, package_context) = managed_context(u64::MAX);
+        let package =
+            SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
+                source,
+                SourceLimits::default(),
+                SourceCacheLimits::new(256 * 1024, 4).unwrap(),
+                package_context,
+            )
+            .unwrap();
+        let (facade_budget, facade_cancellation, facade_context) = managed_context(u64::MAX);
+        let workbook = SourceBackedWorkbook::from_source_backed_package_with_options(
+            package,
+            crate::OpenOptions::new().execution_context(facade_context),
+        )
+        .unwrap();
+        let mut edit = workbook.edit_tab_state().unwrap();
+        assert!(edit.hide("First").unwrap());
+        let commit = edit.commit().unwrap();
+        let committed = commit.package();
+        let first = committed.sheet("First").unwrap().unwrap();
+        assert!(first.stored_extent().unwrap().is_some());
+
+        facade_cancellation.cancel();
+        assert!(matches!(
+            first.stored_extent(),
+            Err(Error::Package(OpcError::Cancelled))
+        ));
+        drop(first);
+        drop(workbook);
+        drop(commit);
+        assert_eq!(package_budget.used(Resource::Memory), 0);
+        assert_eq!(facade_budget.used(Resource::Memory), 0);
+    }
+
+    #[test]
+    fn cancelled_facade_fences_uncached_deferred_view_and_write() {
+        let source = Arc::new(CountingSource::new(source_backed_xlsx()));
+        let package = SourceBackedPackage::from_read_at_with_cache_limits(
+            source,
+            SourceCacheLimits::new(256 * 1024, 4).unwrap(),
+        )
+        .unwrap();
+        let (budget, cancellation_source, context) = managed_context(u64::MAX);
+        let workbook = SourceBackedWorkbook::from_source_backed_package_with_options(
+            package,
+            crate::OpenOptions::new().execution_context(context),
+        )
+        .unwrap();
+        let mut edit = workbook.edit_tab_state().unwrap();
+        assert!(edit.hide("First").unwrap());
+        let commit = edit.commit().unwrap();
+        let committed = commit.package();
+        assert!(
+            committed
+                .pending
+                .as_ref()
+                .is_some_and(|pending| pending.materialized().is_none()),
+            "the regression must exercise the uncached deferred publication path"
+        );
+
+        cancellation_source.cancel();
+        assert!(matches!(
+            committed.sheet("First"),
+            Err(Error::Package(OpcError::Cancelled))
+        ));
+        assert!(
+            committed
+                .pending
+                .as_ref()
+                .is_some_and(|pending| pending.materialized().is_none()),
+            "a cancelled view must not publish or cache an output"
+        );
+
+        let mut output = Vec::new();
+        assert!(matches!(
+            committed.write_to(&mut output),
+            Err(Error::Package(OpcError::Cancelled))
+        ));
+        assert!(
+            output.is_empty(),
+            "cancelled publication must not touch the sink"
+        );
+
+        drop(workbook);
+        drop(commit);
         assert_eq!(budget.used(Resource::Memory), 0);
     }
 
