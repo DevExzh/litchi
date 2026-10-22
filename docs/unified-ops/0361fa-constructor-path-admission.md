@@ -28,5 +28,11 @@ with their sizes and hashes.
 
 This source is a repair candidate, not accepted constructor performance.
 The earlier allocation evidence and two interrupted native attempts remain
-attached to their original 0361f source. Both protected endpoints must be
-rebuilt from the committed source before this candidate is measured.
+attached to their original 0361f source. The fresh `matched-v4` build compares
+`c2972b860c` with the original `ddf2ac8ae2` reference under identical release
+settings and resolved dependencies. All four binary preflights reproduce the
+six exact fixture/output files. Four allocation legs per route agree; every
+requested/peak/retained count matches the preceding candidate and stays at or
+below the reference. [The build and allocation receipt](results/0361fa/evidence.json)
+retains source, binary, dependency and command identities. Native latency
+remains unqualified; no timing from the allocation processes is accepted.
