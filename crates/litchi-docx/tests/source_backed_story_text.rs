@@ -241,6 +241,72 @@ fn selected_story_edit_publishes_one_part_and_restores_exact_source() {
 }
 
 #[test]
+fn selected_story_replays_on_independent_matching_copies_and_chains_edits() {
+    let source = fixture();
+    let package = open(&source);
+    let snapshot = package
+        .story_text_snapshot(StorySelector::Header(0))
+        .unwrap();
+    let mut edit = snapshot.raw_tree(snapshot.limits_value()).unwrap();
+    edit.replace_paragraph_text(Position::new(0), "first change")
+        .unwrap();
+    let patch = edit.patch().unwrap();
+
+    // The patch records the selected story's content, so a separately opened
+    // package with the same bytes is an eligible recipient.
+    let first = open(&source)
+        .apply_story_text(&patch.clone().into())
+        .unwrap();
+    let mut first_bytes = Vec::new();
+    first.package().write_to(&mut first_bytes).unwrap();
+    assert_eq!(
+        open(&first_bytes)
+            .story_text_snapshot(StorySelector::Header(0))
+            .unwrap()
+            .paragraph_text(0)
+            .unwrap()
+            .as_deref(),
+        Some("first change")
+    );
+
+    // A second raw edit can be authored from that independently published
+    // copy, and its inverse restores the exact first publication bytes.
+    let second_source = open(&first_bytes);
+    let second_snapshot = second_source
+        .story_text_snapshot(StorySelector::Header(0))
+        .unwrap();
+    let mut second_edit = second_snapshot
+        .raw_tree(second_snapshot.limits_value())
+        .unwrap();
+    second_edit
+        .replace_paragraph_text(Position::new(0), "second change")
+        .unwrap();
+    let second = second_source
+        .apply_story_text(&second_edit.patch().unwrap().into())
+        .unwrap();
+    let mut second_bytes = Vec::new();
+    second.package().write_to(&mut second_bytes).unwrap();
+    assert_eq!(
+        open(&second_bytes)
+            .story_text_snapshot(StorySelector::Header(0))
+            .unwrap()
+            .paragraph_text(0)
+            .unwrap()
+            .as_deref(),
+        Some("second change")
+    );
+
+    let mut restored = Vec::new();
+    open(&second_bytes)
+        .apply_story_text(&second.patch().inverse())
+        .unwrap()
+        .package()
+        .write_to(&mut restored)
+        .unwrap();
+    assert_eq!(restored, first_bytes);
+}
+
+#[test]
 fn selected_story_noop_copies_the_complete_source_byte_for_byte() {
     let source = fixture();
     let package = open(&source);
@@ -262,9 +328,7 @@ fn selected_story_noop_copies_the_complete_source_byte_for_byte() {
 #[test]
 fn raw_story_tree_caches_projection_and_invalidates_after_mutation() {
     let package = open(&fixture());
-    let snapshot = package
-        .story_text_snapshot(StorySelector::Header(0))
-        .unwrap();
+    let snapshot = package.story_text_snapshot(StorySelector::Main).unwrap();
     let mut tree = snapshot.raw_tree(snapshot.limits_value()).unwrap();
 
     let first = tree.projected().unwrap();

@@ -1091,22 +1091,13 @@ impl Edit {
 
     fn target(&self) -> Result<Snapshot> {
         self.base.check_execution()?;
-        // The document transaction commit intentionally compacts changed
-        // main-document XML. Collection stories use an envelope, however:
-        // their projected snapshot already contains the exact raw paragraph
-        // range replacements produced by the validated transaction. Reusing
-        // that projection avoids normalizing unrelated bytes inside the
-        // selected entry while preserving the outer source splice.
-        let transaction_snapshot = if self.base.envelope.is_some() {
-            self.projected.projected().clone()
-        } else {
-            self.projected
-                .try_clone()
-                .map_err(Error::DocumentEdit)?
-                .commit()?
-                .snapshot()
-                .clone()
-        };
+        // The staged transaction has already validated every replacement and
+        // `with_transaction_snapshot` below performs the selected-story
+        // admission again.  Reusing its projected snapshot keeps raw output
+        // source-preserving and avoids cloning the complete transaction just
+        // to call its consuming owner commit.  The owner family still uses
+        // `finish`, which consumes the transaction at publication time.
+        let transaction_snapshot = self.projected.projected().clone();
         self.base.check_execution()?;
         let target = self.base.with_transaction_snapshot(transaction_snapshot)?;
         Ok(target)
