@@ -724,7 +724,12 @@ impl ArchiveInfo {
     /// archive validation concern. The supplied limits admit the complete
     /// neutral header before this record is published.
     pub fn new(identifier: u64, message_infos: Vec<MessageInfo>, limits: Limits) -> Result<Self> {
-        let limits = limits.validate()?;
+        let default_limits = limits == Limits::default();
+        let limits = if default_limits {
+            limits
+        } else {
+            limits.validate()?
+        };
         let value = Self {
             identifier: Some(identifier),
             message_infos,
@@ -736,7 +741,7 @@ impl ArchiveInfo {
         // only caller-controlled resource dimension left is each payload
         // length, which is checked before this certificate is used. Strict or
         // non-minimal profiles retain the exact admission path below.
-        if limits == Limits::default() && default_archive_info_bounds_are_safe(&value) {
+        if default_limits && default_archive_info_bounds_are_safe(&value.message_infos) {
             return Ok(value);
         }
         check_archive_info_constructor(&value, limits)?;
@@ -749,20 +754,19 @@ impl ArchiveInfo {
 }
 
 #[inline]
-fn default_archive_info_bounds_are_safe(info: &ArchiveInfo) -> bool {
-    info.identifier.is_some()
-        && info.should_merge.is_none()
-        && info.message_infos.len() <= Limits::MAX_MESSAGES_PER_OBJECT
-        && info.message_infos.iter().all(|message_info| {
-            message_info.versions.len() == DEFAULT_MESSAGE_VERSIONS.len()
-                && message_info.field_infos.is_empty()
-                && message_info.object_references.is_empty()
-                && message_info.data_references.is_empty()
-                && message_info.base_message_index.is_none()
-                && message_info.diff_merge_version.is_empty()
-                && message_info.diff_field_path.is_none()
-                && message_info.fields_to_remove.is_empty()
-                && message_info.diff_read_version.is_empty()
+fn default_archive_info_bounds_are_safe(message_infos: &[MessageInfo]) -> bool {
+    message_infos.len() <= Limits::MAX_MESSAGES_PER_OBJECT
+        && message_infos.iter().all(|message_info| {
+            let shape = (message_info.versions.len() ^ DEFAULT_MESSAGE_VERSIONS.len())
+                | message_info.field_infos.len()
+                | message_info.object_references.len()
+                | message_info.data_references.len()
+                | usize::from(message_info.base_message_index.is_some())
+                | message_info.diff_merge_version.len()
+                | usize::from(message_info.diff_field_path.is_some())
+                | message_info.fields_to_remove.len()
+                | message_info.diff_read_version.len();
+            shape == 0
                 && usize::try_from(message_info.length)
                     .is_ok_and(|length| length <= Limits::MAX_MESSAGE_BYTES)
         })
