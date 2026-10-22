@@ -25,7 +25,7 @@ use litchi_odf_common::core::source_publication::{
 };
 use litchi_odf_common::core::{
     Meta, SourceBackedPackage, SourceContentPublicationError, SourceContentPublicationOptions,
-    SourceContentPublicationReport, private::ContentDocumentValidator,
+    SourceContentPublicationReport, SourceMemberReaderError, private::ContentDocumentValidator,
 };
 use litchi_odf_common::{Error as OdfError, OpenOptions};
 use zeroize::Zeroizing;
@@ -256,17 +256,15 @@ fn validate_source_content(package: &SourceBackedPackage) -> Result<(u64, bool)>
 
     match streamed {
         Ok((bytes, doctype)) => Ok((bytes, doctype)),
-        Err(litchi_odf_common::core::SourceMemberReaderError::Callback(
-            StreamProbeError::BodyMissing,
-        )) => validate_materialized_content(package),
-        Err(litchi_odf_common::core::SourceMemberReaderError::Callback(
-            StreamProbeError::Invalid(error),
-        )) => Err(error),
-        Err(litchi_odf_common::core::SourceMemberReaderError::Core {
+        Err(SourceMemberReaderError::Callback(StreamProbeError::BodyMissing)) => {
+            validate_materialized_content(package)
+        },
+        Err(SourceMemberReaderError::Callback(StreamProbeError::Invalid(error))) => Err(error),
+        Err(SourceMemberReaderError::Core {
             error,
             callback_error: _,
         }) if encrypted_member_cannot_stream(&error) => validate_materialized_content(package),
-        Err(litchi_odf_common::core::SourceMemberReaderError::Core { error, .. }) => Err(error),
+        Err(SourceMemberReaderError::Core { error, .. }) => Err(error),
         Err(_) => Err(Error::InvalidFormat(
             "ODP content.xml source validation failed".to_string(),
         )),
@@ -304,15 +302,11 @@ fn validate_source_styles(package: &SourceBackedPackage) -> Result<()> {
 
     match streamed {
         Ok(()) => Ok(()),
-        Err(litchi_odf_common::core::SourceMemberReaderError::Callback(
-            StreamProbeError::Invalid(error),
-        )) => Err(error),
-        Err(litchi_odf_common::core::SourceMemberReaderError::Callback(
-            StreamProbeError::BodyMissing,
-        )) => Err(Error::InvalidFormat(
-            "ODP styles.xml validation failed".to_string(),
-        )),
-        Err(litchi_odf_common::core::SourceMemberReaderError::Core {
+        Err(SourceMemberReaderError::Callback(StreamProbeError::Invalid(error))) => Err(error),
+        Err(SourceMemberReaderError::Callback(StreamProbeError::BodyMissing)) => Err(
+            Error::InvalidFormat("ODP styles.xml validation failed".to_string()),
+        ),
+        Err(SourceMemberReaderError::Core {
             error,
             callback_error: _,
         }) if encrypted_member_cannot_stream(&error) => {
@@ -321,7 +315,7 @@ fn validate_source_styles(package: &SourceBackedPackage) -> Result<()> {
             })?;
             Ok(())
         },
-        Err(litchi_odf_common::core::SourceMemberReaderError::Core { error, .. }) => Err(error),
+        Err(SourceMemberReaderError::Core { error, .. }) => Err(error),
         Err(_) => Err(Error::InvalidFormat(
             "ODP styles.xml source validation failed".to_string(),
         )),
@@ -712,11 +706,21 @@ impl SourceBackedPresentation {
         &self,
     ) -> Result<(Vec<Slide>, litchi_odf_common::leniency::ToleranceReport)> {
         self.check_source()?;
-        let result = (|| {
-            let content_xml = self.read_content_xml()?;
-            let styles_xml = self.read_styles_xml()?;
-            Parser::parse_slides_with_report(&content_xml, styles_xml.as_deref())
-        })();
+        let styles_xml = self.read_styles_xml()?;
+        let result = match self
+            .package
+            .with_verified_member_reader("content.xml", |reader| {
+                Parser::parse_slides_with_report_from_reader(reader, styles_xml.as_deref())
+            }) {
+            Ok(result) => Ok(result),
+            Err(SourceMemberReaderError::Core { error, .. })
+                if encrypted_member_cannot_stream(&error) =>
+            {
+                let content_xml = self.read_content_xml()?;
+                Parser::parse_slides_with_report(&content_xml, styles_xml.as_deref())
+            },
+            Err(error) => Err(source_reader_error(error)),
+        };
         let observed = self.source.version()?;
         ensure_current(self.source_version, observed)?;
         result
@@ -950,11 +954,26 @@ impl SourceBackedPresentation {
 
     fn slide_uncached(&self, index: usize) -> Result<Option<Slide>> {
         self.check_source()?;
-        let result = (|| {
-            let content_xml = self.read_content_xml()?;
-            let styles_xml = self.read_styles_xml()?;
-            Parser::parse_slide_with_styles_at(&content_xml, styles_xml.as_deref(), index)
-        })();
+        let styles_xml = self.read_styles_xml()?;
+        let result = match self
+            .package
+            .with_verified_member_reader("content.xml", |reader| {
+                Parser::parse_slide_with_styles_at_recording_from_reader(
+                    reader,
+                    styles_xml.as_deref(),
+                    index,
+                    &mut litchi_odf_common::leniency::ToleranceReport::default(),
+                )
+            }) {
+            Ok(result) => Ok(result),
+            Err(SourceMemberReaderError::Core { error, .. })
+                if encrypted_member_cannot_stream(&error) =>
+            {
+                let content_xml = self.read_content_xml()?;
+                Parser::parse_slide_with_styles_at(&content_xml, styles_xml.as_deref(), index)
+            },
+            Err(error) => Err(source_reader_error(error)),
+        };
         let observed = self.source.version()?;
         ensure_current(self.source_version, observed)?;
         result
@@ -1097,16 +1116,32 @@ impl SourceBackedPresentation {
                 source,
                 progress: TextOutputReport::default(),
             })?;
-        let content_xml = self
-            .read_content_xml()
-            .map_err(|source| TextOutputError::Document {
-                source,
-                progress: TextOutputReport::default(),
-            })?;
         let paragraph_separator = options.paragraph_separator();
         let mut writer = SequentialTextWriter::new(output, options);
-        let result = Parser::write_slides_text_to(&content_xml, &mut writer, paragraph_separator);
+        let result = self
+            .package
+            .with_verified_member_reader("content.xml", |reader| {
+                Parser::write_slides_text_from_reader(reader, &mut writer, paragraph_separator)
+            });
         let progress = writer.progress();
+        let result = match result {
+            Ok(()) => Ok(()),
+            Err(SourceMemberReaderError::Callback(error)) => Err(error),
+            Err(SourceMemberReaderError::Core {
+                error,
+                callback_error,
+            }) => Err(TextOutputError::Document {
+                source: error,
+                progress: callback_error
+                    .as_ref()
+                    .map(TextOutputError::progress)
+                    .unwrap_or(progress),
+            }),
+            Err(_) => Err(TextOutputError::Document {
+                source: Error::InvalidFormat("ODP content.xml source text read failed".to_string()),
+                progress,
+            }),
+        };
         if let Err(source) = self.check_source() {
             return Err(TextOutputError::Document { source, progress });
         }
@@ -1242,6 +1277,15 @@ fn ensure_current(expected: SourceVersion, observed: SourceVersion) -> Result<()
         Ok(())
     } else {
         Err(Error::SourceChanged { expected, observed })
+    }
+}
+
+fn source_reader_error(error: SourceMemberReaderError<Error>) -> Error {
+    match error {
+        SourceMemberReaderError::Core { error, .. } | SourceMemberReaderError::Callback(error) => {
+            error
+        },
+        _ => Error::InvalidFormat("ODP content.xml source read failed".to_string()),
     }
 }
 
