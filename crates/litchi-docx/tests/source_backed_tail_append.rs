@@ -31,8 +31,9 @@ use litchi_opc::{OpcError, PackURI, SourceBackedPackage};
 use soapberry_zip::ZipArchive;
 use soapberry_zip::office::StreamingArchiveWriter;
 
+use litchi_docx::source_backed::tail_append::EditOptions;
 use litchi_docx::source_backed::tail_append::{Error as TailAppendError, Refusal};
-use litchi_docx::source_backed::{TailAppendLimits, TailAppendOptions, TailAppendPlan};
+use litchi_docx::source_backed::{TailAppendLimits, TailAppendPlan};
 
 /// Record 0355a: a tail-append plan commits to a new source-backed package;
 /// writing that package publishes the splice. This keeps the plan-level
@@ -879,7 +880,7 @@ fn append_plan<'a>(
 ) -> TailAppendPlan<'a> {
     package
         .tail_append_plain_paragraph(text)
-        .with_limits(limits(source_xml_bytes))
+        .with_options(EditOptions::new(limits(source_xml_bytes)))
         .prepare()
         .expect("tail append plan must prepare")
 }
@@ -1075,7 +1076,7 @@ fn explicit_noop_is_exact_and_reversible_without_a_generated_paragraph() {
     let package = bounded_package(source_archive.clone());
     let plan = package
         .tail_append_noop()
-        .with_limits(limits(source_xml.len()))
+        .with_options(EditOptions::new(limits(source_xml.len())))
         .prepare()
         .expect("explicit no-op must prepare");
     assert!(plan.is_noop());
@@ -1104,8 +1105,8 @@ fn cancellation_is_checked_before_preparation_and_before_publication_output() {
     let mut output = Vec::new();
     let result = package
         .tail_append_plain_paragraph("tail")
-        .with_limits(limits(source_xml.len()))
-        .with_options(TailAppendOptions::default().with_cancellation_token(&cancellation))
+        .with_options(EditOptions::new(limits(source_xml.len())))
+        .with_options(EditOptions::default().with_cancellation_token(&cancellation))
         .prepare()
         .and_then(|plan| plan.write_to(&mut output));
     assert!(result.is_err());
@@ -1118,8 +1119,8 @@ fn cancellation_is_checked_before_preparation_and_before_publication_output() {
     let (cancel_source, cancellation) = CancellationSource::pair();
     let plan = package
         .tail_append_plain_paragraph("tail")
-        .with_limits(limits(source_xml.len()))
-        .with_options(TailAppendOptions::default().with_cancellation_token(&cancellation))
+        .with_options(EditOptions::new(limits(source_xml.len())))
+        .with_options(EditOptions::default().with_cancellation_token(&cancellation))
         .prepare()
         .expect("uncancelled plan must prepare");
     cancel_source.cancel();
@@ -1167,7 +1168,7 @@ fn authored_text_uses_xml_space_and_rejects_streaming_writer_control_rules() {
         let mut output = Vec::new();
         let result = package
             .tail_append_plain_paragraph(invalid)
-            .with_limits(limits(source_xml.len()))
+            .with_options(EditOptions::new(limits(source_xml.len())))
             .prepare()
             .and_then(|plan| plan.write_to(&mut output));
         assert!(
@@ -1204,7 +1205,7 @@ fn many_xml_space_paragraphs_use_the_aggregate_attribute_budget() {
 
     let plan = package
         .tail_append_plain_paragraph("tail")
-        .with_limits(policy)
+        .with_options(EditOptions::new(policy))
         .prepare()
         .expect("many small attributed paragraphs must fit aggregate audit limits");
     let source_proof = plan.source_proof();
@@ -1370,7 +1371,7 @@ fn opaque_section_namespace_attribute_and_event_policy_refuses_before_output() {
         let mut output = Vec::new();
         let result = package
             .tail_append_plain_paragraph("tail")
-            .with_limits(limits(xml.len()))
+            .with_options(EditOptions::new(limits(xml.len())))
             .prepare()
             .and_then(|plan| plan.write_to(&mut output));
         assert!(result.is_err(), "opaque {label} must be refused");
@@ -1414,7 +1415,7 @@ fn assert_refused_with_text(xml: Vec<u8>, topology: Topology, text: &str) {
     let mut output = Vec::new();
     let result = package
         .tail_append_plain_paragraph(text)
-        .with_limits(limits(xml.len()))
+        .with_options(EditOptions::new(limits(xml.len())))
         .prepare()
         .and_then(|plan| plan.write_to(&mut output));
     assert!(result.is_err(), "fixture must be refused: {topology:?}");
@@ -1487,7 +1488,7 @@ fn xml_declaration_and_encoding_grammar_refuse_before_publication() {
         let mut output = Vec::new();
         package
             .tail_append_plain_paragraph("tail")
-            .with_limits(limits(xml.len()))
+            .with_options(EditOptions::new(limits(xml.len())))
             .prepare()
             .and_then(|plan| plan.write_to(&mut output))
             .expect("XML 1.0 standalone yes/no declarations are admitted");
@@ -1525,7 +1526,7 @@ fn topology_refusals_keep_their_public_reason_and_emit_no_prefix() {
         let mut output = Vec::new();
         let result = package
             .tail_append_plain_paragraph("tail")
-            .with_limits(limits(xml.len()))
+            .with_options(EditOptions::new(limits(xml.len())))
             .prepare()
             .and_then(|plan| plan.write_to(&mut output));
         match result {
@@ -1587,7 +1588,7 @@ fn settings_protection_flags_honor_explicit_on_and_off_values() {
             let mut output = Vec::new();
             let result = package
                 .tail_append_plain_paragraph("tail")
-                .with_limits(limits(source_xml.len()))
+                .with_options(EditOptions::new(limits(source_xml.len())))
                 .prepare()
                 .and_then(|plan| plan.write_to(&mut output));
             if refused {
@@ -1626,7 +1627,7 @@ fn supported_settings_mce_fallback_is_admitted_at_exact_source_limit() {
         let mut output = Vec::new();
         package
             .tail_append_plain_paragraph("tail")
-            .with_limits(limits(source_xml.len()))
+            .with_options(EditOptions::new(limits(source_xml.len())))
             .prepare()
             .and_then(|plan| plan.write_to(&mut output))
             .expect("unsupported Choice must select the valid MCE fallback");
@@ -1645,7 +1646,7 @@ fn supported_settings_mce_fallback_is_admitted_at_exact_source_limit() {
             u64::try_from(settings.len()).expect("settings fixture length fits u64");
         bounded_package(source_archive.clone())
             .tail_append_plain_paragraph("tail")
-            .with_limits(exact_limits)
+            .with_options(EditOptions::new(exact_limits))
             .prepare()
             .and_then(|plan| plan.write_to(&mut exact_output))
             .expect("scoped namespace output fits the exact source-size ceiling");
@@ -1659,7 +1660,7 @@ fn supported_settings_mce_fallback_is_admitted_at_exact_source_limit() {
         exact_limits.max_settings_xml_bytes -= 1;
         let result = bounded_package(source_archive)
             .tail_append_plain_paragraph("tail")
-            .with_limits(exact_limits)
+            .with_options(EditOptions::new(exact_limits))
             .prepare()
             .and_then(|plan| plan.write_to(&mut output_limited));
         assert!(
@@ -1701,7 +1702,7 @@ fn settings_mce_must_understand_unknown_namespace_refuses_before_publication() {
         let mut output = Vec::new();
         let result = package
             .tail_append_plain_paragraph("tail")
-            .with_limits(limits(source_xml.len()))
+            .with_options(EditOptions::new(limits(source_xml.len())))
             .prepare()
             .and_then(|plan| plan.write_to(&mut output));
         assert!(
@@ -1759,7 +1760,7 @@ fn settings_relationship_closure_is_checked_without_staging_relationships() {
         let mut output = Vec::new();
         package
             .tail_append_plain_paragraph("tail")
-            .with_limits(limits(source_xml.len()))
+            .with_options(EditOptions::new(limits(source_xml.len())))
             .prepare()
             .and_then(|plan| plan.write_to(&mut output))
             .expect("valid mail-merge relationship closure must be admitted");
@@ -1833,7 +1834,7 @@ fn settings_relationship_closure_is_checked_without_staging_relationships() {
             let mut output = Vec::new();
             let result = package
                 .tail_append_plain_paragraph("tail")
-                .with_limits(limits(source_xml.len()))
+                .with_options(EditOptions::new(limits(source_xml.len())))
                 .prepare()
                 .and_then(|plan| plan.write_to(&mut output));
             assert!(
@@ -1864,7 +1865,7 @@ fn empty_settings_root_is_admitted_in_both_word_dialects() {
         let mut output = Vec::new();
         package
             .tail_append_plain_paragraph("tail")
-            .with_limits(limits(source_xml.len()))
+            .with_options(EditOptions::new(limits(source_xml.len())))
             .prepare()
             .and_then(|plan| plan.write_to(&mut output))
             .expect("a self-closing settings root must be a valid empty settings part");
@@ -1893,7 +1894,7 @@ fn settings_xml_declaration_inside_root_refuses_before_publication() {
         let mut output = Vec::new();
         let result = package
             .tail_append_plain_paragraph("tail")
-            .with_limits(limits(source_xml.len()))
+            .with_options(EditOptions::new(limits(source_xml.len())))
             .prepare()
             .and_then(|plan| plan.write_to(&mut output));
         assert!(
@@ -1924,7 +1925,10 @@ fn inherited_settings_namespace_copies_hit_the_workspace_ceiling() {
         let mut small_output = Vec::new();
         small_package
             .tail_append_plain_paragraph("tail")
-            .with_limits(adversarial_settings_limits(source_xml.len(), 4096))
+            .with_options(EditOptions::new(adversarial_settings_limits(
+                source_xml.len(),
+                4096,
+            )))
             .prepare()
             .and_then(|plan| plan.write_to(&mut small_output))
             .expect("one extension with long inherited namespaces fits the workspace envelope");
@@ -1943,7 +1947,10 @@ fn inherited_settings_namespace_copies_hit_the_workspace_ceiling() {
         let mut large_output = Vec::new();
         let result = large_package
             .tail_append_plain_paragraph("tail")
-            .with_limits(adversarial_settings_limits(source_xml.len(), 4096))
+            .with_options(EditOptions::new(adversarial_settings_limits(
+                source_xml.len(),
+                4096,
+            )))
             .prepare()
             .and_then(|plan| plan.write_to(&mut large_output));
         match result {
@@ -1977,7 +1984,10 @@ fn nested_long_mce_directives_account_for_decoded_expanded_names() {
         let mut small_output = Vec::new();
         small_package
             .tail_append_plain_paragraph("tail")
-            .with_limits(adversarial_settings_limits(source_xml.len(), 4096))
+            .with_options(EditOptions::new(adversarial_settings_limits(
+                source_xml.len(),
+                4096,
+            )))
             .prepare()
             .and_then(|plan| plan.write_to(&mut small_output))
             .expect("small nested MCE directive fixture must remain admitted");
@@ -1996,7 +2006,10 @@ fn nested_long_mce_directives_account_for_decoded_expanded_names() {
         let mut large_output = Vec::new();
         let result = large_package
             .tail_append_plain_paragraph("tail")
-            .with_limits(adversarial_settings_limits(source_xml.len(), 4096))
+            .with_options(EditOptions::new(adversarial_settings_limits(
+                source_xml.len(),
+                4096,
+            )))
             .prepare()
             .and_then(|plan| plan.write_to(&mut large_output));
         match result {
@@ -2078,7 +2091,7 @@ fn settings_scalar_duplicates_and_malformed_on_off_values_refuse_before_output()
             let mut output = Vec::new();
             let result = package
                 .tail_append_plain_paragraph("tail")
-                .with_limits(limits(source_xml.len()))
+                .with_options(EditOptions::new(limits(source_xml.len())))
                 .prepare()
                 .and_then(|plan| plan.write_to(&mut output));
             let complete_parser_error = matches!(&result, Err(TailAppendError::Document(_)));
@@ -2138,7 +2151,7 @@ fn repeated_protection_and_tracking_elements_refuse_before_output() {
             let mut output = Vec::new();
             let result = package
                 .tail_append_plain_paragraph("tail")
-                .with_limits(limits(source_xml.len()))
+                .with_options(EditOptions::new(limits(source_xml.len())))
                 .prepare()
                 .and_then(|plan| plan.write_to(&mut output));
             assert!(
@@ -2217,7 +2230,7 @@ fn malformed_mail_merge_schema_refuses_before_output() {
             let mut output = Vec::new();
             let result = package
                 .tail_append_plain_paragraph("tail")
-                .with_limits(limits(source_xml.len()))
+                .with_options(EditOptions::new(limits(source_xml.len())))
                 .prepare()
                 .and_then(|plan| plan.write_to(&mut output));
             assert!(
@@ -2241,7 +2254,7 @@ fn append_and_source_limits_are_checked_before_output() {
     let mut output = Vec::new();
     let result = package
         .tail_append_plain_paragraph("text exceeds limit")
-        .with_limits(too_small_text)
+        .with_options(EditOptions::new(too_small_text))
         .prepare()
         .and_then(|plan| plan.write_to(&mut output));
     assert!(result.is_err());
@@ -2252,7 +2265,7 @@ fn append_and_source_limits_are_checked_before_output() {
     let mut output = Vec::new();
     let result = package
         .tail_append_plain_paragraph("tail")
-        .with_limits(too_small_source)
+        .with_options(EditOptions::new(too_small_source))
         .prepare()
         .and_then(|plan| plan.write_to(&mut output));
     assert!(result.is_err());
@@ -2270,7 +2283,7 @@ fn one_large_token_is_rejected_by_the_token_ceiling_before_output() {
     let mut output = Vec::new();
     let result = package
         .tail_append_plain_paragraph("tail")
-        .with_limits(token_limited)
+        .with_options(EditOptions::new(token_limited))
         .prepare()
         .and_then(|plan| plan.write_to(&mut output));
     assert!(result.is_err());
@@ -2379,7 +2392,7 @@ fn managed_prepare_charges_semantic_memory_and_releases_plan_workspace() {
 
     let plan = package
         .tail_append_plain_paragraph("tail")
-        .with_limits(limits(source_xml.len()))
+        .with_options(EditOptions::new(limits(source_xml.len())))
         .prepare()
         .expect("managed semantic passes must prepare");
     assert!(
@@ -2406,7 +2419,7 @@ fn managed_memory_limit_refuses_before_archive_output() {
     let mut output = Vec::new();
     let result = package
         .tail_append_plain_paragraph("tail")
-        .with_limits(limits(source_xml.len()))
+        .with_options(EditOptions::new(limits(source_xml.len())))
         .prepare()
         .and_then(|plan| plan.write_to(&mut output));
     let resource = match result {
@@ -2437,7 +2450,7 @@ fn managed_work_limit_exhaustion_refuses_before_archive_output() {
     let mut output = Vec::new();
     let result = package
         .tail_append_plain_paragraph("tail")
-        .with_limits(limits(source_xml.len()))
+        .with_options(EditOptions::new(limits(source_xml.len())))
         .prepare()
         .and_then(|plan| plan.write_to(&mut output));
     let resource = match result {
@@ -2463,7 +2476,7 @@ fn managed_cancellation_during_short_publication_is_typed_after_a_prefix() {
         managed_package(source_archive, 8 * 1024 * 1024, u64::MAX);
     let plan = package
         .tail_append_plain_paragraph("tail")
-        .with_limits(limits(source_xml.len()))
+        .with_options(EditOptions::new(limits(source_xml.len())))
         .prepare()
         .expect("managed publication plan must prepare");
     let mut sink = CancelOnShortWriteSink {
@@ -2501,8 +2514,8 @@ fn options_cancellation_during_short_publication_is_typed_after_a_prefix() {
     let (cancellation_source, cancellation) = CancellationSource::pair();
     let plan = package
         .tail_append_plain_paragraph("tail")
-        .with_limits(limits(source_xml.len()))
-        .with_options(TailAppendOptions::default().with_cancellation_token(&cancellation))
+        .with_options(EditOptions::new(limits(source_xml.len())))
+        .with_options(EditOptions::default().with_cancellation_token(&cancellation))
         .prepare()
         .expect("options-only cancellation plan must prepare");
     let mut sink = CancelOnShortWriteSink {

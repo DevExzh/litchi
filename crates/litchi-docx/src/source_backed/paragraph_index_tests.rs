@@ -176,7 +176,7 @@ fn delayed_managed_tail_append_publishes_after_clean_index_warm() {
     let (budget, _cancellation_source, package) = managed_package_with_memory(8 << 20);
     let plan = package
         .tail_append_plain_paragraph("tail")
-        .with_limits(tail_append::Limits::new(
+        .with_options(tail_append::EditOptions::new(
             4096,
             1024,
             4096,

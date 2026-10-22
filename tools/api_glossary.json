@@ -11358,6 +11358,29 @@
         {
           "method": "litchi_rtf::source_backed::Package::apply_tail_append",
           "ok": "litchi_rtf::source_backed::tail_append::Commit"
+        },
+        {
+          "method": "litchi_rtf::Package::apply",
+          "ok": "litchi_rtf::edit::Commit"
+        },
+        {
+          "method": "litchi_rtf::Package::apply_external_reference_redaction",
+          "ok": "litchi_rtf::redact::Commit"
+        },
+        {
+          "method": "litchi_rtf::Package::apply_durable",
+          "ok": "litchi_core::edit::Commit",
+          "type_args": [
+            "litchi_rtf::Package",
+            {
+              "path": "litchi_core::patch::Patch",
+              "type_args": [
+                {
+                  "generic": "Mode"
+                }
+              ]
+            }
+          ]
         }
       ]
     },

@@ -1554,19 +1554,20 @@ fn validate_durable_branch(
         }
         validate_durable_operation_shape(source, operation)?;
     }
-    let target = source
+    let target_commit = source
         .apply_durable(patch)
         .map_err(CompositionError::Edit)?;
+    let target = target_commit.package();
     let inverse = patch.inverse();
     durable_domain(inverse.operations())?;
     validate_durable_inverse_pairs(patch.operations(), inverse.operations())?;
     for operation in inverse.operations() {
-        validate_durable_operation_shape(&target, operation)?;
+        validate_durable_operation_shape(target, operation)?;
     }
-    let restored = target
+    let restored_commit = target
         .apply_durable(&inverse)
         .map_err(CompositionError::Edit)?;
-    verify_durable_inverse_semantics(source, &restored, patch.operations())?;
+    verify_durable_inverse_semantics(source, restored_commit.package(), patch.operations())?;
     let mut operations = Vec::new();
     operations
         .try_reserve(patch.operations().len())

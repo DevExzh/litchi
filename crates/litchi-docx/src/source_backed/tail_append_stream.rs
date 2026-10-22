@@ -1469,7 +1469,7 @@ impl AuthoredInput for ResolvedInput {
 }
 
 /// An edit consuming either a deterministic event source or a one-shot producer.
-pub struct ParagraphStreamEdit<'package, S = ()> {
+pub(crate) struct ParagraphStreamEdit<'package, S = ()> {
     package: &'package Package,
     input: Arc<dyn AuthoredInput>,
     limits: ParagraphStreamLimits,
@@ -1488,39 +1488,22 @@ impl<S> fmt::Debug for ParagraphStreamEdit<'_, S> {
 }
 
 impl<'package, S> ParagraphStreamEdit<'package, S> {
-    /// Replace the finite stream policy before preparation.
-    #[must_use]
-    pub fn with_limits(mut self, limits: ParagraphStreamLimits) -> Self {
-        self.limits = limits;
-        self
-    }
-
     /// Attach an additional cooperative cancellation token.
     #[must_use]
-    pub fn with_cancellation_token(mut self, token: &CancellationToken) -> Self {
+    pub(crate) fn with_cancellation_token(mut self, token: &CancellationToken) -> Self {
         self.cancellation = Some(token.clone());
         self
     }
 
     /// Return the selected finite stream policy.
     #[must_use]
-    pub const fn limits(&self) -> ParagraphStreamLimits {
+    pub(crate) const fn limits(&self) -> ParagraphStreamLimits {
         self.limits
     }
 
     /// Prepare source, authored, candidate, and OPC proofs without touching a sink.
-    pub fn prepare(self) -> Result<ParagraphStreamPlan<'package>> {
+    pub(crate) fn prepare(self) -> Result<ParagraphStreamPlan<'package>> {
         prepare_stream(self)
-    }
-
-    /// Prepare and commit the stream append as a new source-backed package
-    /// (record 0355a); writing that package streams the append.
-    ///
-    /// # Errors
-    ///
-    /// Returns the errors of [`Self::prepare`].
-    pub fn commit(self) -> Result<super::paragraph_stream::Commit> {
-        self.prepare()?.commit()
     }
 }
 
@@ -1734,11 +1717,11 @@ impl Package {
         &self,
         source: S,
         limits: ParagraphStreamLimits,
-    ) -> ParagraphStreamEdit<'_, S>
+    ) -> super::paragraph_stream::Edit<'_, S>
     where
         S: ReplayableParagraphSource + 'static,
     {
-        ParagraphStreamEdit {
+        super::paragraph_stream::Edit::from_inner(ParagraphStreamEdit {
             package: self,
             input: Arc::new(DeterministicInput {
                 source: Arc::new(source),
@@ -1747,7 +1730,7 @@ impl Package {
             cancellation: None,
             expected: None,
             marker: PhantomData,
-        }
+        })
     }
 
     /// Start a stream append whose producer runs once into an explicit replay store.
@@ -1756,23 +1739,25 @@ impl Package {
         producer: P,
         replay: R,
         limits: ParagraphStreamLimits,
-    ) -> Result<ParagraphStreamEdit<'_, R::Handle>, Error>
+    ) -> Result<super::paragraph_stream::Edit<'_, R::Handle>, Error>
     where
         P: OneShotParagraphProducer + 'static,
         R: AuthoredReplayStore + 'static,
         R::Handle: 'static,
     {
         limits.validate()?;
-        Ok(ParagraphStreamEdit {
-            package: self,
-            input: Arc::new(ProducerInput {
-                producer_and_store: Mutex::new(Some((producer, replay))),
-            }),
-            limits,
-            cancellation: None,
-            expected: None,
-            marker: PhantomData,
-        })
+        Ok(super::paragraph_stream::Edit::from_inner(
+            ParagraphStreamEdit {
+                package: self,
+                input: Arc::new(ProducerInput {
+                    producer_and_store: Mutex::new(Some((producer, replay))),
+                }),
+                limits,
+                cancellation: None,
+                expected: None,
+                marker: PhantomData,
+            },
+        ))
     }
 
     /// Reopen and apply a durable forward patch through an explicit authored
@@ -1814,15 +1799,15 @@ impl Package {
             expected: expected.authored,
             expected_reference,
         });
-        let make_edit = || -> ParagraphStreamEdit<'_, ()> {
-            ParagraphStreamEdit {
+        let make_edit = || -> super::paragraph_stream::Edit<'_, ()> {
+            super::paragraph_stream::Edit::from_inner(ParagraphStreamEdit {
                 package: self,
                 input: Arc::clone(&replay_input),
                 limits,
                 cancellation: None,
                 expected: Some(expected.clone()),
                 marker: PhantomData,
-            }
+            })
         };
         let plan = make_edit().prepare()?;
         ensure_current_archive(self, source_archive)?;
@@ -2480,15 +2465,15 @@ impl Package {
         input: Arc<dyn AuthoredInput>,
         limits: ParagraphStreamLimits,
         expected: Option<PatchExpectations>,
-    ) -> ParagraphStreamEdit<'_, ()> {
-        ParagraphStreamEdit {
+    ) -> super::paragraph_stream::Edit<'_, ()> {
+        super::paragraph_stream::Edit::from_inner(ParagraphStreamEdit {
             package: self,
             input,
             limits,
             cancellation: None,
             expected,
             marker: PhantomData,
-        }
+        })
     }
 }
 /// The bounded resources of a paragraph-stream append, carried by [`Error::Limit`] and [`AuthoredReplayError::Limit`] (record 0355a).

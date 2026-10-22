@@ -283,17 +283,35 @@ impl Default for Limits {
     }
 }
 
-/// Additional cooperative cancellation policy for an edit.
+/// Additional policy for a tail-append edit.
 ///
-/// Configure execution budgets on the source-backed [`Package`]. Its context
-/// governs semantic scanning, fragment storage, and OPC publication together.
+/// The source-backed [`Package`] supplies the execution authority. The edit
+/// options select a required source policy and may add a cooperative
+/// cancellation token; they do not replace the package execution authority.
 #[derive(Debug, Clone, Default)]
-pub struct Options {
+pub struct EditOptions {
+    limits: Option<Limits>,
     execution: Option<ExecutionContext>,
     cancellation: Option<CancellationToken>,
 }
 
-impl Options {
+impl EditOptions {
+    /// Select an explicit policy for a package edit.
+    #[must_use]
+    pub const fn new(limits: Limits) -> Self {
+        Self {
+            limits: Some(limits),
+            execution: None,
+            cancellation: None,
+        }
+    }
+
+    /// Return the optional policy override carried by these options.
+    #[must_use]
+    pub const fn limits_value(&self) -> Option<Limits> {
+        self.limits
+    }
+
     /// Attach an additional token checked at main-story and settings preflight
     /// parser events, owning settings-validation boundaries, and publication
     /// sink callbacks. The package's execution context also controls
@@ -359,20 +377,16 @@ pub struct Edit<'package, 'text> {
     package: &'package Package,
     text: Option<Cow<'text, str>>,
     limits: Limits,
-    options: Options,
+    options: EditOptions,
 }
 
 impl<'package, 'text> Edit<'package, 'text> {
-    /// Replace the edit's finite policy before preparation.
+    /// Apply an explicit policy and any cooperative cancellation options.
     #[must_use]
-    pub fn with_limits(mut self, limits: Limits) -> Self {
-        self.limits = limits;
-        self
-    }
-
-    /// Attach additional cooperative cancellation options.
-    #[must_use]
-    pub fn with_options(mut self, options: Options) -> Self {
+    pub fn with_options(mut self, options: EditOptions) -> Self {
+        if let Some(limits) = options.limits_value() {
+            self.limits = limits;
+        }
         self.options = options;
         self
     }
@@ -383,9 +397,8 @@ impl<'package, 'text> Edit<'package, 'text> {
     }
 
     /// Alias for [`Self::prepare`] with explicit options.
-    pub fn prepare_with_options(mut self, options: Options) -> Result<Plan<'package>> {
-        self.options = options;
-        self.prepare()
+    pub fn prepare_with_options(self, options: EditOptions) -> Result<Plan<'package>> {
+        self.with_options(options).prepare()
     }
 
     /// Prepare and commit the append as a new source-backed package
@@ -403,7 +416,7 @@ impl<'package, 'text> Edit<'package, 'text> {
     /// # Errors
     ///
     /// As [`Self::commit`].
-    pub fn commit_with_options(self, options: Options) -> Result<Commit> {
+    pub fn commit_with_options(self, options: EditOptions) -> Result<Commit> {
         self.prepare_with_options(options)?.commit()
     }
 }
@@ -417,7 +430,7 @@ pub struct Plan<'package> {
     source: SourceProof,
     candidate: CandidateProof,
     limits: Limits,
-    options: Options,
+    options: EditOptions,
 }
 
 impl<'package> Plan<'package> {
@@ -478,7 +491,7 @@ impl<'package> Plan<'package> {
 pub(crate) struct PreparedTail {
     base: Package,
     splice: SourcePartSplicePlan<'static>,
-    options: Options,
+    options: EditOptions,
 }
 
 impl PreparedTail {
@@ -494,7 +507,7 @@ pub(crate) enum TailChange {
     Forward {
         text: Option<String>,
         limits: Limits,
-        options: Options,
+        options: EditOptions,
         noop: bool,
         prepared: Option<Arc<PreparedTail>>,
     },
@@ -587,7 +600,7 @@ impl Package {
             package: self,
             text: Some(text.into()),
             limits: self.semantic_limits().tail_append_value(),
-            options: Options::default(),
+            options: EditOptions::default(),
         }
     }
 
@@ -610,7 +623,7 @@ impl Package {
             package: self,
             text: None,
             limits: Limits::default(),
-            options: Options::default(),
+            options: EditOptions::default(),
         }
     }
 }
@@ -774,7 +787,7 @@ fn prepare_edit<'package, 'text>(mut edit: Edit<'package, 'text>) -> Result<Plan
     })
 }
 
-fn effective_options(package: &Package, requested: &Options) -> Result<Options> {
+fn effective_options(package: &Package, requested: &EditOptions) -> Result<EditOptions> {
     let mut options = requested.clone();
     // One source-owned execution authority covers both format and package
     // work. An edit cannot replace or bypass its hierarchical budget.
@@ -786,7 +799,7 @@ fn prepare_noop(
     package: &Package,
     source_version: SourceVersion,
     limits: Limits,
-    options: Options,
+    options: EditOptions,
 ) -> Result<Plan<'_>> {
     let main = package
         .physical_package()?
@@ -866,7 +879,7 @@ fn prepare_noop(
 
 fn publish_splice(
     splice: SourcePartSplicePlan<'_>,
-    options: &Options,
+    options: &EditOptions,
     writer: &mut dyn Write,
 ) -> Result<()> {
     check_options(options)?;
@@ -942,7 +955,7 @@ impl<W: Write> Write for PublicationCheckedWriter<W> {
     }
 }
 
-fn check_options(options: &Options) -> Result<()> {
+fn check_options(options: &EditOptions) -> Result<()> {
     if let Some(context) = options.execution.as_ref() {
         context.check().map_err(Error::Execution)?;
     }
@@ -1327,7 +1340,8 @@ pub(super) fn validate_topology(
     context: Option<&ExecutionContext>,
     cancellation: Option<&CancellationToken>,
 ) -> Result<()> {
-    check_options(&Options {
+    check_options(&EditOptions {
+        limits: None,
         execution: context.cloned(),
         cancellation: cancellation.cloned(),
     })?;
@@ -1732,7 +1746,8 @@ fn inspect_root_dialect(
                 .map_err(Error::Execution)
         })
         .transpose()?;
-    check_options(&Options {
+    check_options(&EditOptions {
+        limits: None,
         execution: context.cloned(),
         cancellation: cancellation.cloned(),
     })?;
@@ -2031,7 +2046,8 @@ fn guard_settings_xml(
                 .map_err(Error::Execution)
         })
         .transpose()?;
-    check_options(&Options {
+    check_options(&EditOptions {
+        limits: None,
         execution: context.cloned(),
         cancellation: cancellation.cloned(),
     })?;

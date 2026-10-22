@@ -6,6 +6,7 @@
 //! stages an [`Edit`]; its commit returns a new source-backed package whose
 //! write streams the append from the source and the authored replay.
 
+use std::fmt;
 use std::sync::Arc;
 
 use crate::source_backed::Package;
@@ -14,8 +15,55 @@ use crate::source_backed::tail_append_stream::{
     self as stream, AuthoredInput, ParagraphStreamLimits, ParagraphStreamPlan, PatchExpectations,
     PreparedStream,
 };
+use litchi_core::CancellationToken;
 
-pub use crate::source_backed::tail_append_stream::ParagraphStreamEdit as Edit;
+/// The focused edit for the authored paragraph-stream family.
+///
+/// The lower-level stream engine remains an implementation detail of this
+/// module. Callers select its required policy when starting the package edit;
+/// an edit cannot silently replace that policy after staging has begun.
+pub struct Edit<'package, S = ()> {
+    inner: stream::ParagraphStreamEdit<'package, S>,
+}
+
+impl<S> fmt::Debug for Edit<'_, S> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("Edit")
+            .field("limits", &self.limits())
+            .finish_non_exhaustive()
+    }
+}
+
+impl<'package, S> Edit<'package, S> {
+    pub(crate) fn from_inner(inner: stream::ParagraphStreamEdit<'package, S>) -> Self {
+        Self { inner }
+    }
+
+    /// Attach an additional cooperative cancellation token.
+    #[must_use]
+    pub fn with_cancellation_token(mut self, token: &CancellationToken) -> Self {
+        self.inner = self.inner.with_cancellation_token(token);
+        self
+    }
+
+    /// Return the required stream policy selected at edit creation.
+    #[must_use]
+    pub const fn limits(&self) -> ParagraphStreamLimits {
+        self.inner.limits()
+    }
+
+    /// Prepare source, authored, candidate, and OPC proofs without touching a
+    /// publication sink.
+    pub fn prepare(self) -> Result<ParagraphStreamPlan<'package>, Error> {
+        self.inner.prepare()
+    }
+
+    /// Prepare and commit the stream append as a new source-backed package.
+    pub fn commit(self) -> Result<Commit, Error> {
+        self.prepare()?.commit()
+    }
+}
 
 /// The prepared append (with what replaying it needs), or its restore-only
 /// inverse.

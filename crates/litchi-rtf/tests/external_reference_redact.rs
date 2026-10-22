@@ -63,9 +63,12 @@ fn inventories_exact_top_level_groups_and_redacts_forward_only() {
             .any(|window| window == b"\\ansi Body")
     );
 
-    let replayed = source
+    let replayed_commit = source
         .apply_external_reference_redaction(commit.patch())
         .unwrap();
+    assert!(replayed_commit.diagnostics().is_complete());
+    assert_eq!(replayed_commit.patch().format(), "litchi-rtf");
+    let replayed = replayed_commit.into_package();
     assert_eq!(replayed.to_bytes().unwrap(), output);
     assert!(
         matches!(commit.patch().operations().first(), Some(operation) if operation.op == "external-reference.remove")
@@ -447,7 +450,10 @@ fn zero_operation_patch_has_no_cross_document_authority_and_is_exact_noop() {
         litchi_core::patch::BlobBundle::new(limits.blobs()),
     )
     .unwrap();
-    let applied = foreign.apply_external_reference_redaction(&patch).unwrap();
+    let applied = foreign
+        .apply_external_reference_redaction(&patch)
+        .unwrap()
+        .into_package();
     assert_eq!(applied.to_bytes().unwrap(), foreign.to_bytes().unwrap());
     assert_eq!(applied.text(), foreign.text());
     assert!(source.apply_external_reference_redaction(&patch).is_ok());

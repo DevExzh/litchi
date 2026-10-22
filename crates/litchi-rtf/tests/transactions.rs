@@ -93,6 +93,7 @@ fn ordinary_positioning_crud_preserves_other_facets_and_round_trips() {
             .package()
             .apply(&commit.patch().inverse())
             .unwrap()
+            .into_package()
             .same_snapshot(&source)
     );
 }
@@ -125,7 +126,11 @@ fn ordinary_positioning_crud_switches_expansion_units_and_supports_explicit_rese
         litchi_rtf::CharacterExpansion::QuarterPoints(4)
     );
 
-    let quarter_inverse = quarter.package().apply(&quarter.patch().inverse()).unwrap();
+    let quarter_inverse = quarter
+        .package()
+        .apply(&quarter.patch().inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(
         quarter_inverse.to_bytes().unwrap(),
         source.to_bytes().unwrap()
@@ -154,7 +159,11 @@ fn ordinary_positioning_crud_switches_expansion_units_and_supports_explicit_rese
         litchi_rtf::CharacterExpansion::Twips(-15)
     );
 
-    let twips_inverse = twips.package().apply(&twips.patch().inverse()).unwrap();
+    let twips_inverse = twips
+        .package()
+        .apply(&twips.patch().inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(
         twips_inverse.to_bytes().unwrap(),
         quarter_document.to_bytes().unwrap()
@@ -182,7 +191,11 @@ fn ordinary_positioning_crud_switches_expansion_units_and_supports_explicit_rese
             .expansion(),
         litchi_rtf::CharacterExpansion::None
     );
-    let reset_inverse = reset.package().apply(&reset.patch().inverse()).unwrap();
+    let reset_inverse = reset
+        .package()
+        .apply(&reset.patch().inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(
         reset_inverse.to_bytes().unwrap(),
         twips_document.to_bytes().unwrap()
@@ -222,7 +235,8 @@ fn ordinary_positioning_resets_emit_legacy_controls_and_restore_exact_bytes() {
     let scale_inverse = scale_commit
         .package()
         .apply(&scale_commit.patch().inverse())
-        .unwrap();
+        .unwrap()
+        .into_package();
     assert_eq!(
         scale_inverse.to_bytes().unwrap(),
         scale_source.to_bytes().unwrap()
@@ -254,7 +268,8 @@ fn ordinary_positioning_resets_emit_legacy_controls_and_restore_exact_bytes() {
     let kerning_inverse = kerning_commit
         .package()
         .apply(&kerning_commit.patch().inverse())
-        .unwrap();
+        .unwrap()
+        .into_package();
     assert_eq!(
         kerning_inverse.to_bytes().unwrap(),
         kerning_source.to_bytes().unwrap()
@@ -386,9 +401,13 @@ fn body_text_commit_is_atomic_reversible_and_source_checked() {
     assert!(commit.diagnostics().changed());
     assert_eq!(commit.diagnostics().operation_count(), 1);
 
-    let applied = source.apply(commit.patch()).unwrap();
+    let applied = source.apply(commit.patch()).unwrap().into_package();
     assert!(applied.same_snapshot(commit.package()));
-    let restored = commit.package().apply(&commit.patch().inverse()).unwrap();
+    let restored = commit
+        .package()
+        .apply(&commit.patch().inverse())
+        .unwrap()
+        .into_package();
     assert!(restored.same_snapshot(&source));
 
     let other = Package::parse(r"{\rtf1\ansi Other}").unwrap();
@@ -549,6 +568,7 @@ fn paragraph_text_edit_is_checked_local_and_reversible() {
             .package()
             .apply(&commit.patch().inverse())
             .unwrap()
+            .into_package()
             .same_snapshot(&source)
     );
 }
@@ -591,12 +611,15 @@ fn durable_multi_operation_patch_is_deterministic_reversible_and_source_checked(
             durable_limits(3),
         )
         .unwrap();
-    let applied = source.apply_durable(&decoded).unwrap();
+    let applied = source.apply_durable(&decoded).unwrap().into_package();
     assert_eq!(
         applied.to_bytes().unwrap(),
         commit.package().to_bytes().unwrap()
     );
-    let restored = applied.apply_durable(&decoded.inverse()).unwrap();
+    let restored = applied
+        .apply_durable(&decoded.inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(restored.text(), source.text());
     assert_eq!(
         restored
@@ -694,6 +717,7 @@ fn no_op_patch_is_empty_durable_and_history_is_budgeted() {
         source
             .apply_durable(&durable)
             .unwrap()
+            .into_package()
             .same_snapshot(&source)
     );
 
@@ -723,9 +747,12 @@ fn bold_property_and_paragraph_structure_have_durable_semantics() {
     assert!(!runs[1].format().bold());
 
     let durable = formatted.patch().to_durable(durable_limits(1)).unwrap();
-    let applied = source.apply_durable(&durable).unwrap();
+    let applied = source.apply_durable(&durable).unwrap().into_package();
     assert!(applied.body().runs().next().unwrap().format().bold());
-    let restored = applied.apply_durable(&durable.inverse()).unwrap();
+    let restored = applied
+        .apply_durable(&durable.inverse())
+        .unwrap()
+        .into_package();
     assert!(!restored.body().runs().next().unwrap().format().bold());
 
     let mut structure = source.edit();
@@ -735,12 +762,16 @@ fn bold_property_and_paragraph_structure_have_durable_semantics() {
     let inserted = structure.commit().unwrap();
     assert_eq!(inserted.package().text(), "Alpha\nInserted\nBeta");
     let structural_patch = inserted.patch().to_durable(durable_limits(1)).unwrap();
-    let structurally_applied = source.apply_durable(&structural_patch).unwrap();
+    let structurally_applied = source
+        .apply_durable(&structural_patch)
+        .unwrap()
+        .into_package();
     assert_eq!(structurally_applied.text(), "Alpha\nInserted\nBeta");
     assert_eq!(
         structurally_applied
             .apply_durable(&structural_patch.inverse())
             .unwrap()
+            .into_package()
             .text(),
         source.text()
     );
@@ -768,7 +799,7 @@ fn multiple_paragraph_insertions_have_target_relative_durable_inverses() {
         .collect::<Vec<_>>();
     assert_eq!(targets, ["body:paragraph:0", "body:paragraph:1"]);
 
-    let applied = source.apply_durable(&durable).unwrap();
+    let applied = source.apply_durable(&durable).unwrap().into_package();
     assert_eq!(
         applied.to_bytes().unwrap(),
         commit.package().to_bytes().unwrap()
@@ -785,7 +816,7 @@ fn multiple_paragraph_insertions_have_target_relative_durable_inverses() {
         .collect::<Vec<_>>();
     assert_eq!(targets, ["body:paragraph:2", "body:paragraph:0"]);
 
-    let restored = applied.apply_durable(&inverse).unwrap();
+    let restored = applied.apply_durable(&inverse).unwrap().into_package();
     assert_eq!(restored.to_bytes().unwrap(), source.to_bytes().unwrap());
 }
 
@@ -816,6 +847,7 @@ fn italic_property_is_bounded_batch_reversible_and_durable() {
             .package()
             .apply(&formatted.patch().inverse())
             .unwrap()
+            .into_package()
             .to_bytes()
             .unwrap(),
         source.to_bytes().unwrap()
@@ -851,12 +883,15 @@ fn italic_property_is_bounded_batch_reversible_and_durable() {
             durable_limits(2),
         )
         .unwrap();
-    let applied = source.apply_durable(&decoded).unwrap();
+    let applied = source.apply_durable(&decoded).unwrap().into_package();
     assert_eq!(
         applied.to_bytes().unwrap(),
         formatted.package().to_bytes().unwrap()
     );
-    let restored = applied.apply_durable(&decoded.inverse()).unwrap();
+    let restored = applied
+        .apply_durable(&decoded.inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(restored.text(), source.text());
     assert!(restored.body().runs().all(|run| !run.format().italic()));
 
@@ -1045,7 +1080,11 @@ fn underline_edit_preserves_uniform_body_character_baseline_and_inverse() {
             .underline(),
         UnderlineStyle::Single
     );
-    let restored = commit.package().apply(&commit.patch().inverse()).unwrap();
+    let restored = commit
+        .package()
+        .apply(&commit.patch().inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(
         restored.to_bytes().unwrap(),
         source.to_bytes().unwrap(),
@@ -1096,7 +1135,11 @@ fn underline_property_supports_exact_styles_and_inverse() {
                 .underline(),
             style
         );
-        let restored = commit.package().apply(&commit.patch().inverse()).unwrap();
+        let restored = commit
+            .package()
+            .apply(&commit.patch().inverse())
+            .unwrap()
+            .into_package();
         assert!(
             restored
                 .body()
@@ -1164,12 +1207,15 @@ fn underline_property_refuses_mixed_structure_transport_and_stale_durable_state(
         durable.operations()[0].value,
         Value::String("double".to_string())
     );
-    let applied = source.apply_durable(&durable).unwrap();
+    let applied = source.apply_durable(&durable).unwrap().into_package();
     assert_eq!(
         applied.body().runs().next().unwrap().format().underline(),
         UnderlineStyle::Double
     );
-    let restored = applied.apply_durable(&durable.inverse()).unwrap();
+    let restored = applied
+        .apply_durable(&durable.inverse())
+        .unwrap()
+        .into_package();
     assert!(
         restored
             .body()
@@ -1300,7 +1346,11 @@ fn strike_edit_preserves_double_strike_and_creates_later_run_boundary() {
             .format()
             .strike()
     );
-    let restored = commit.package().apply(&commit.patch().inverse()).unwrap();
+    let restored = commit
+        .package()
+        .apply(&commit.patch().inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(restored.to_bytes().unwrap(), source.to_bytes().unwrap());
 }
 
@@ -1348,9 +1398,12 @@ fn strike_property_refuses_mixed_structure_transport_and_stale_durable_state() {
         Value::Bool(false)
     );
     assert_eq!(durable.operations()[0].value, Value::Bool(true));
-    let applied = source.apply_durable(&durable).unwrap();
+    let applied = source.apply_durable(&durable).unwrap().into_package();
     assert!(applied.body().runs().all(|run| run.format().strike()));
-    let restored = applied.apply_durable(&durable.inverse()).unwrap();
+    let restored = applied
+        .apply_durable(&durable.inverse())
+        .unwrap()
+        .into_package();
     assert!(restored.body().runs().all(|run| !run.format().strike()));
     Package::from_bytes(&restored.to_bytes().unwrap()).unwrap();
 
@@ -1431,7 +1484,8 @@ fn hidden_edit_is_noop_when_state_is_already_hidden_or_visible() {
     let restored = hidden_commit
         .package()
         .apply(&hidden_commit.patch().inverse())
-        .unwrap();
+        .unwrap()
+        .into_package();
     assert!(restored.body().runs().all(|run| !run.format().hidden()));
 }
 
@@ -1463,7 +1517,11 @@ fn hidden_property_preserves_run_boundaries_and_refuses_mixed_structure_transpor
         .collect::<String>();
     assert!(hidden_text.contains("Beta"));
     assert!(visible_text.contains("Alpha"));
-    let restored = commit.package().apply(&commit.patch().inverse()).unwrap();
+    let restored = commit
+        .package()
+        .apply(&commit.patch().inverse())
+        .unwrap()
+        .into_package();
     assert!(restored.body().runs().all(|run| !run.format().hidden()));
 
     let mixed = Package::parse(r"{\rtf1\ansi {\v Alpha} Beta}").unwrap();
@@ -1504,9 +1562,12 @@ fn hidden_property_preserves_run_boundaries_and_refuses_mixed_structure_transpor
         Value::Bool(false)
     );
     assert_eq!(durable.operations()[0].value, Value::Bool(true));
-    let applied = source.apply_durable(&durable).unwrap();
+    let applied = source.apply_durable(&durable).unwrap().into_package();
     assert!(applied.body().runs().any(|run| run.format().hidden()));
-    let restored = applied.apply_durable(&durable.inverse()).unwrap();
+    let restored = applied
+        .apply_durable(&durable.inverse())
+        .unwrap()
+        .into_package();
     assert!(restored.body().runs().all(|run| !run.format().hidden()));
     Package::from_bytes(&restored.to_bytes().unwrap()).unwrap();
 
@@ -1588,7 +1649,11 @@ fn small_caps_property_preserves_all_caps_and_run_boundaries() {
     assert!(small_caps_text.contains("Beta"));
     assert!(reopened.body().runs().all(|run| run.format().all_caps()));
 
-    let restored = commit.package().apply(&commit.patch().inverse()).unwrap();
+    let restored = commit
+        .package()
+        .apply(&commit.patch().inverse())
+        .unwrap()
+        .into_package();
     assert!(restored.body().runs().all(|run| !run.format().small_caps()));
     Package::from_bytes(&restored.to_bytes().unwrap()).unwrap();
 }
@@ -1645,9 +1710,12 @@ fn small_caps_property_refuses_mixed_structure_transport_and_stale_durable_state
         Value::Bool(false)
     );
     assert_eq!(durable.operations()[0].value, Value::Bool(true));
-    let applied = source.apply_durable(&durable).unwrap();
+    let applied = source.apply_durable(&durable).unwrap().into_package();
     assert!(applied.body().runs().any(|run| run.format().small_caps()));
-    let restored = applied.apply_durable(&durable.inverse()).unwrap();
+    let restored = applied
+        .apply_durable(&durable.inverse())
+        .unwrap()
+        .into_package();
     assert!(restored.body().runs().all(|run| !run.format().small_caps()));
     Package::from_bytes(&restored.to_bytes().unwrap()).unwrap();
 
@@ -1734,7 +1802,11 @@ fn all_caps_property_preserves_small_caps_and_both_control_boundaries() {
     assert!(all_caps_text.contains("Beta"));
     assert!(!all_caps_text.contains("Alpha"));
 
-    let restored = commit.package().apply(&commit.patch().inverse()).unwrap();
+    let restored = commit
+        .package()
+        .apply(&commit.patch().inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(restored.text(), source.text());
     assert!(restored.body().runs().all(|run| run.format().small_caps()));
     assert!(restored.body().runs().all(|run| !run.format().all_caps()));
@@ -1789,9 +1861,12 @@ fn all_caps_property_refuses_mixed_structure_transport_and_stale_durable_state()
         Value::Bool(false)
     );
     assert_eq!(durable.operations()[0].value, Value::Bool(true));
-    let applied = source.apply_durable(&durable).unwrap();
+    let applied = source.apply_durable(&durable).unwrap().into_package();
     assert!(applied.body().runs().any(|run| run.format().all_caps()));
-    let restored = applied.apply_durable(&durable.inverse()).unwrap();
+    let restored = applied
+        .apply_durable(&durable.inverse())
+        .unwrap()
+        .into_package();
     assert!(restored.body().runs().all(|run| !run.format().all_caps()));
     Package::from_bytes(&restored.to_bytes().unwrap()).unwrap();
 
@@ -1876,7 +1951,11 @@ fn double_strike_property_preserves_single_strike_and_both_control_boundaries() 
     assert!(double_strike_text.contains("Beta"));
     assert!(!double_strike_text.contains("Alpha"));
 
-    let restored = commit.package().apply(&commit.patch().inverse()).unwrap();
+    let restored = commit
+        .package()
+        .apply(&commit.patch().inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(restored.text(), source.text());
     assert!(restored.body().runs().all(|run| run.format().strike()));
     assert!(
@@ -1933,14 +2012,17 @@ fn double_strike_property_refuses_mixed_structure_transport_and_stale_durable_st
         Value::Bool(false)
     );
     assert_eq!(durable.operations()[0].value, Value::Bool(true));
-    let applied = source.apply_durable(&durable).unwrap();
+    let applied = source.apply_durable(&durable).unwrap().into_package();
     assert!(
         applied
             .body()
             .runs()
             .any(|run| run.format().double_strike())
     );
-    let restored = applied.apply_durable(&durable.inverse()).unwrap();
+    let restored = applied
+        .apply_durable(&durable.inverse())
+        .unwrap()
+        .into_package();
     assert!(
         restored
             .body()
@@ -2156,12 +2238,15 @@ fn retained_destinations_are_multi_operation_durable_and_reversible() {
     assert_eq!(source.tables()[0].rows()[0].cells()[0].text(), "A");
 
     let durable = commit.patch().to_durable(durable_limits(3)).unwrap();
-    let applied = source.apply_durable(&durable).unwrap();
+    let applied = source.apply_durable(&durable).unwrap().into_package();
     assert_eq!(
         applied.to_bytes().unwrap(),
         commit.package().to_bytes().unwrap()
     );
-    let restored = applied.apply_durable(&durable.inverse()).unwrap();
+    let restored = applied
+        .apply_durable(&durable.inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(restored.tables()[0].rows()[0].cells()[0].text(), "A");
     assert_eq!(restored.sections()[0].headers_footers[0].text(), "Head");
 }
@@ -2193,9 +2278,12 @@ fn note_and_annotation_text_are_durable_historical_mergeable_and_reopen() {
     assert!(!reopened.annotations()[0].has_reference);
 
     let durable = commit.patch().to_durable(durable_limits(2)).unwrap();
-    let applied = source.apply_durable(&durable).unwrap();
+    let applied = source.apply_durable(&durable).unwrap().into_package();
     assert_eq!(applied.to_bytes().unwrap(), bytes);
-    let restored = applied.apply_durable(&durable.inverse()).unwrap();
+    let restored = applied
+        .apply_durable(&durable.inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(restored.notes()[0].content, "Old note");
     assert_eq!(restored.annotations()[0].text, "Old comment");
 
@@ -2295,9 +2383,12 @@ fn genuine_libreoffice_shape_text_is_durable_mergeable_transferable_and_reopens(
     assert_eq!(reopened.shapes()[0].geometry, original.geometry);
 
     let durable = commit.patch().to_durable(durable_limits(1)).unwrap();
-    let applied = source.apply_durable(&durable).unwrap();
+    let applied = source.apply_durable(&durable).unwrap().into_package();
     assert_eq!(applied.to_bytes().unwrap(), output);
-    let restored = applied.apply_durable(&durable.inverse()).unwrap();
+    let restored = applied
+        .apply_durable(&durable.inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(restored.shapes()[0].text, original.text);
 
     let mut history = History::new(source.clone(), HistoryLimits::new(2, 1024 * 1024));
@@ -2338,11 +2429,15 @@ fn genuine_libreoffice_shape_text_is_durable_mergeable_transferable_and_reopens(
     let transferred_reopen = Package::from_bytes(&transferred_output).unwrap();
     assert_eq!(transferred_reopen.shapes()[0].geometry, original.geometry);
     let transfer_durable = transferred.patch().to_durable(durable_limits(1)).unwrap();
-    let transfer_applied = target.apply_durable(&transfer_durable).unwrap();
+    let transfer_applied = target
+        .apply_durable(&transfer_durable)
+        .unwrap()
+        .into_package();
     assert_eq!(transfer_applied.to_bytes().unwrap(), transferred_output);
     let transfer_restored = transfer_applied
         .apply_durable(&transfer_durable.inverse())
-        .unwrap();
+        .unwrap()
+        .into_package();
     assert!(transfer_restored.shapes().is_empty());
     assert_eq!(transfer_restored.text(), target.text());
 }
@@ -2537,7 +2632,11 @@ fn font_size_property_preserves_boundaries_defaults_and_inverse_semantics() {
     assert!(size_23_text.contains("Beta"));
     assert!(size_24_text.contains("Alpha"));
 
-    let restored = commit.package().apply(&commit.patch().inverse()).unwrap();
+    let restored = commit
+        .package()
+        .apply(&commit.patch().inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(restored.text(), source.text());
     assert!(
         restored
@@ -2631,14 +2730,17 @@ fn font_size_property_refuses_mixed_transport_and_malformed_durable_values() {
         durable.operations()[0].value,
         Value::Number(Number::from(23_u64))
     );
-    let applied = source.apply_durable(&durable).unwrap();
+    let applied = source.apply_durable(&durable).unwrap().into_package();
     assert!(
         applied
             .body()
             .runs()
             .any(|run| run.format().size().get() == 23)
     );
-    let restored = applied.apply_durable(&durable.inverse()).unwrap();
+    let restored = applied
+        .apply_durable(&durable.inverse())
+        .unwrap()
+        .into_package();
     assert!(
         restored
             .body()
@@ -2755,7 +2857,11 @@ fn baseline_property_covers_all_states_reopen_noop_and_inverse() {
             reopened.body().runs().next().unwrap().format().baseline(),
             baseline
         );
-        let restored = commit.package().apply(&commit.patch().inverse()).unwrap();
+        let restored = commit
+            .package()
+            .apply(&commit.patch().inverse())
+            .unwrap()
+            .into_package();
         assert_eq!(restored.to_bytes().unwrap(), source.to_bytes().unwrap());
     }
 }
@@ -2805,6 +2911,7 @@ fn baseline_property_respects_ungrouped_legacy_control_boundaries() {
                 .package()
                 .apply(&commit.patch().inverse())
                 .unwrap()
+                .into_package()
                 .to_bytes()
                 .unwrap(),
             source.to_bytes().unwrap()
@@ -2856,6 +2963,7 @@ fn baseline_property_preserves_unrelated_formatting_and_refuses_mixed_structure_
             .package()
             .apply(&commit.patch().inverse())
             .unwrap()
+            .into_package()
             .to_bytes()
             .unwrap(),
         source.to_bytes().unwrap()
@@ -2989,7 +3097,11 @@ fn outline_property_handles_ungrouped_later_run_boundaries_and_preserves_facets(
         assert!(format.hidden());
     }
 
-    let restored = commit.package().apply(&commit.patch().inverse()).unwrap();
+    let restored = commit
+        .package()
+        .apply(&commit.patch().inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(restored.text(), source.text());
     let reopened_restored = Package::from_bytes(&restored.to_bytes().unwrap()).unwrap();
     let restored_alpha = reopened_restored
@@ -3083,9 +3195,12 @@ fn outline_property_has_durable_schema_replay_stale_and_malformed_value_guards()
         durable_limits(1),
     )
     .unwrap();
-    let applied = source.apply_durable(&decoded).unwrap();
+    let applied = source.apply_durable(&decoded).unwrap().into_package();
     assert!(applied.body().runs().all(|run| run.format().outline()));
-    let restored = applied.apply_durable(&decoded.inverse()).unwrap();
+    let restored = applied
+        .apply_durable(&decoded.inverse())
+        .unwrap()
+        .into_package();
     assert!(restored.body().runs().all(|run| !run.format().outline()));
 
     let stale_source = {
@@ -3165,12 +3280,15 @@ fn baseline_property_has_durable_schema_replay_stale_and_malformed_value_guards(
         durable_limits(1),
     )
     .unwrap();
-    let applied = source.apply_durable(&decoded).unwrap();
+    let applied = source.apply_durable(&decoded).unwrap().into_package();
     assert_eq!(
         applied.body().runs().next().unwrap().format().baseline(),
         CharacterBaseline::RaisedHalfPoints(8)
     );
-    let restored = applied.apply_durable(&decoded.inverse()).unwrap();
+    let restored = applied
+        .apply_durable(&decoded.inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(
         restored.body().runs().next().unwrap().format().baseline(),
         CharacterBaseline::Normal
@@ -3275,6 +3393,7 @@ fn character_property_edits_preserve_paragraph_formatting() {
             .package()
             .apply(&commit.patch().inverse())
             .unwrap()
+            .into_package()
             .to_bytes()
             .unwrap(),
         exact

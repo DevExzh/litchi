@@ -259,12 +259,14 @@ fn source_bound_metadata_edits_are_atomic_reversible_and_library_generated()
     assert!(
         source
             .apply(commit.patch())?
+            .into_package()
             .same_snapshot(commit.package())
     );
     assert!(
         commit
             .package()
             .apply(&commit.patch().inverse())?
+            .into_package()
             .same_snapshot(&source)
     );
     let foreign = Package::parse(r#"{\rtf1\ansi other}"#)?;

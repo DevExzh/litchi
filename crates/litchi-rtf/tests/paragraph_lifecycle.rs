@@ -94,7 +94,11 @@ fn positioned_insert_preserves_empty_paragraphs_and_terminal_boundaries() {
                 commit.package(),
                 &expected.iter().map(String::as_str).collect::<Vec<_>>(),
             );
-            let restored = commit.package().apply(&commit.patch().inverse()).unwrap();
+            let restored = commit
+                .package()
+                .apply(&commit.patch().inverse())
+                .unwrap()
+                .into_package();
             assert_eq!(restored.to_bytes().unwrap(), source.to_bytes().unwrap());
             let source_bound = (source.text() == "A\n\nB" && position == 1)
                 || (source.text() == "A\nB\n" && position == count);
@@ -109,12 +113,15 @@ fn positioned_insert_preserves_empty_paragraphs_and_terminal_boundaries() {
                 ));
             } else if !value.is_empty() {
                 let durable = commit.patch().to_durable(durable_limits()).unwrap();
-                let applied = source.apply_durable(&durable).unwrap();
+                let applied = source.apply_durable(&durable).unwrap().into_package();
                 assert_eq!(
                     applied.to_bytes().unwrap(),
                     commit.package().to_bytes().unwrap()
                 );
-                let restored = applied.apply_durable(&durable.inverse()).unwrap();
+                let restored = applied
+                    .apply_durable(&durable.inverse())
+                    .unwrap()
+                    .into_package();
                 assert_eq!(restored.to_bytes().unwrap(), source.to_bytes().unwrap());
             }
         }
@@ -132,12 +139,15 @@ fn positioned_insert_into_an_empty_story_creates_a_real_empty_paragraph() {
     assert_eq!(commit.package().paragraph_count(), 1);
     assert_complete_reopen(commit.package(), &[""]);
     let durable = commit.patch().to_durable(durable_limits()).unwrap();
-    let applied = source.apply_durable(&durable).unwrap();
+    let applied = source.apply_durable(&durable).unwrap().into_package();
     assert_eq!(
         applied.to_bytes().unwrap(),
         commit.package().to_bytes().unwrap()
     );
-    let restored = applied.apply_durable(&durable.inverse()).unwrap();
+    let restored = applied
+        .apply_durable(&durable.inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(restored.to_bytes().unwrap(), source.to_bytes().unwrap());
 }
 
@@ -171,6 +181,7 @@ fn remove_first_middle_and_last_are_exact_reversible_and_reopen() {
             source
                 .apply(commit.patch())
                 .unwrap()
+                .into_package()
                 .same_snapshot(commit.package())
         );
         assert!(
@@ -178,17 +189,21 @@ fn remove_first_middle_and_last_are_exact_reversible_and_reopen() {
                 .package()
                 .apply(&commit.patch().inverse())
                 .unwrap()
+                .into_package()
                 .same_snapshot(&source)
         );
 
         if position == 0 {
             let durable = commit.patch().to_durable(durable_limits()).unwrap();
-            let removed = source.apply_durable(&durable).unwrap();
+            let removed = source.apply_durable(&durable).unwrap().into_package();
             assert_eq!(
                 removed.to_bytes().unwrap(),
                 commit.package().to_bytes().unwrap()
             );
-            let restored = removed.apply_durable(&durable.inverse()).unwrap();
+            let restored = removed
+                .apply_durable(&durable.inverse())
+                .unwrap()
+                .into_package();
             assert_eq!(restored.to_bytes().unwrap(), source.to_bytes().unwrap());
         }
 
@@ -222,9 +237,12 @@ fn removing_the_only_paragraph_yields_an_empty_story_and_durable_inverse_restore
             durable_limits(),
         )
         .unwrap();
-    let removed = source.apply_durable(&decoded).unwrap();
+    let removed = source.apply_durable(&decoded).unwrap().into_package();
     assert_eq!(removed.text(), "");
-    let restored = removed.apply_durable(&decoded.inverse()).unwrap();
+    let restored = removed
+        .apply_durable(&decoded.inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(restored.to_bytes().unwrap(), source.to_bytes().unwrap());
     assert_complete_reopen(&restored, &["Only"]);
 }
@@ -254,12 +272,15 @@ fn move_uses_final_list_positions_in_both_directions_and_same_position_is_exact_
             .unwrap()
             .contains("paragraph.move")
     );
-    let moved = source.apply_durable(&durable).unwrap();
+    let moved = source.apply_durable(&durable).unwrap().into_package();
     assert_eq!(
         moved.to_bytes().unwrap(),
         forward.package().to_bytes().unwrap()
     );
-    let restored = moved.apply_durable(&durable.inverse()).unwrap();
+    let restored = moved
+        .apply_durable(&durable.inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(restored.to_bytes().unwrap(), source.to_bytes().unwrap());
     let foreign = Package::parse(r"{\rtf1\ansi Foreign\par Source}").unwrap();
     assert!(matches!(
@@ -297,7 +318,11 @@ fn swap_is_one_atomic_native_lifecycle_operation_with_exact_inverse() {
     assert_eq!(commit.diagnostics().operation_count(), 1);
     assert!(commit.diagnostics().changed());
     assert_complete_reopen(commit.package(), &["Fourth", "Second", "Third", "First"]);
-    let restored = commit.package().apply(&commit.patch().inverse()).unwrap();
+    let restored = commit
+        .package()
+        .apply(&commit.patch().inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(restored.to_bytes().unwrap(), source.to_bytes().unwrap());
     assert!(matches!(
         commit.patch().to_durable(durable_limits()),
@@ -327,7 +352,11 @@ fn swap_preserves_empty_terminal_and_decoded_unicode_paragraphs() {
             commit.package(),
             &reordered.iter().map(String::as_str).collect::<Vec<_>>(),
         );
-        let restored = commit.package().apply(&commit.patch().inverse()).unwrap();
+        let restored = commit
+            .package()
+            .apply(&commit.patch().inverse())
+            .unwrap()
+            .into_package();
         assert_eq!(restored.to_bytes().unwrap(), source.to_bytes().unwrap());
         assert!(matches!(
             commit.patch().to_durable(durable_limits()),
@@ -386,7 +415,11 @@ fn moving_empty_paragraphs_preserves_tail_and_terminal_boundaries() {
                     field: "RTF paragraph moves involving empty or terminal-boundary paragraphs are source-bound"
                 })
             ));
-            let restored = commit.package().apply(&commit.patch().inverse()).unwrap();
+            let restored = commit
+                .package()
+                .apply(&commit.patch().inverse())
+                .unwrap()
+                .into_package();
             assert_eq!(restored.to_bytes().unwrap(), source.to_bytes().unwrap());
         }
     }

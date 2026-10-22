@@ -26851,11 +26851,11 @@ fn verify_semantic_rtf_lifecycle_commit(
     let reopened = litchi_rtf::Package::from_bytes(expected_bytes)?;
     verify_semantic_rtf_lifecycle_projection(&reopened, expected_projection)?;
 
-    let applied = source.apply(commit.patch())?;
+    let applied = source.apply(commit.patch())?.into_package();
     if applied.to_bytes()? != expected_bytes {
         return Err("semantic RTF lifecycle patch replay differs from publication".into());
     }
-    let restored = applied.apply(&commit.patch().inverse())?;
+    let restored = applied.apply(&commit.patch().inverse())?.into_package();
     if restored.to_bytes()? != source.to_bytes()? {
         return Err("semantic RTF lifecycle inverse did not restore exact source bytes".into());
     }
@@ -26867,11 +26867,13 @@ fn verify_semantic_rtf_lifecycle_commit(
         litchi_core::patch::Patch::<litchi_core::patch::Reversible>::from_deterministic_json(
             &encoded, limits,
         )?;
-    let durable_applied = source.apply_durable(&decoded)?;
+    let durable_applied = source.apply_durable(&decoded)?.into_package();
     if durable_applied.to_bytes()? != expected_bytes {
         return Err("semantic RTF durable lifecycle replay differs from publication".into());
     }
-    let durable_restored = durable_applied.apply_durable(&decoded.inverse())?;
+    let durable_restored = durable_applied
+        .apply_durable(&decoded.inverse())?
+        .into_package();
     if durable_restored.to_bytes()? != source.to_bytes()? {
         return Err("semantic RTF durable inverse did not restore exact source bytes".into());
     }
@@ -32517,11 +32519,11 @@ fn run_semantic_rtf(
                     verify_semantic_rtf(&reopened, shape, variant, expected_updates)?;
                 }
                 if let Some(commit) = commit {
-                    let applied = document.apply(commit.patch())?;
+                    let applied = document.apply(commit.patch())?.into_package();
                     if applied.to_bytes()? != sink.bytes {
                         return Err("semantic RTF patch replay differs from publication".into());
                     }
-                    let restored = applied.apply(&commit.patch().inverse())?;
+                    let restored = applied.apply(&commit.patch().inverse())?.into_package();
                     if restored.to_bytes()? != corpus.archive {
                         return Err(
                             "semantic RTF inverse did not restore exact source bytes".into()
@@ -32799,9 +32801,11 @@ fn verify_rtf_paragraph_split_merge_gates(
         return Err("RTF paragraph split/merge exact no-op gate failed".into());
     }
 
-    let volatile_forward = source.apply(commit.patch())?;
+    let volatile_forward = source.apply(commit.patch())?.into_package();
     let volatile_forward_verified = volatile_forward.to_bytes()? == expectation.expected_output;
-    let volatile_inverse = volatile_forward.apply(&commit.patch().inverse())?;
+    let volatile_inverse = volatile_forward
+        .apply(&commit.patch().inverse())?
+        .into_package();
     let volatile_inverse_verified = volatile_inverse.to_bytes()? == corpus.archive;
 
     let durable = commit.patch().to_durable(limits)?;
@@ -32810,9 +32814,11 @@ fn verify_rtf_paragraph_split_merge_gates(
         litchi_core::patch::Patch::<litchi_core::patch::Reversible>::from_deterministic_json(
             &encoded, limits,
         )?;
-    let durable_forward = source.apply_durable(&decoded)?;
+    let durable_forward = source.apply_durable(&decoded)?.into_package();
     let durable_forward_verified = durable_forward.to_bytes()? == expectation.expected_output;
-    let durable_inverse = durable_forward.apply_durable(&decoded.inverse())?;
+    let durable_inverse = durable_forward
+        .apply_durable(&decoded.inverse())?
+        .into_package();
     let durable_inverse_verified = durable_inverse.to_bytes()? == corpus.archive;
     let durable_deterministic_verified = decoded.to_deterministic_json()? == encoded;
 
@@ -33467,13 +33473,17 @@ fn verify_rtf_picture_crud_gates(
             &durable_json,
             durable_limits,
         )?;
-    let volatile_forward = source.apply(commit.patch())?;
+    let volatile_forward = source.apply(commit.patch())?.into_package();
     let volatile_forward_verified = volatile_forward.to_bytes()? == expected_output;
-    let volatile_inverse = volatile_forward.apply(&commit.patch().inverse())?;
+    let volatile_inverse = volatile_forward
+        .apply(&commit.patch().inverse())?
+        .into_package();
     let volatile_inverse_verified = volatile_inverse.to_bytes()? == corpus.archive;
-    let forward = source.apply_durable(&decoded)?;
+    let forward = source.apply_durable(&decoded)?.into_package();
     let durable_forward_verified = forward.to_bytes()? == expected_output;
-    let inverse = forward.apply_durable(&decoded.inverse())?;
+    let inverse = forward
+        .apply_durable(&decoded.inverse())?
+        .into_package();
     let durable_inverse_verified = inverse.to_bytes()? == corpus.archive;
     if !volatile_forward_verified
         || !volatile_inverse_verified

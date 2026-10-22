@@ -53,7 +53,7 @@ fn a_field_instruction_set_splices_the_fldinst_text_only() {
         256 * 1024,
     );
     let durable = commit.patch().to_durable(limits).unwrap();
-    let replayed = source.apply_durable(&durable).unwrap();
+    let replayed = source.apply_durable(&durable).unwrap().into_package();
     assert_eq!(bytes(&replayed), bytes(after));
 }
 

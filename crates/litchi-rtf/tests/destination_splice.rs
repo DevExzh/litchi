@@ -149,7 +149,11 @@ fn inverse_patch_restores_exact_source_bytes() {
         .unwrap();
     edit.set_note_text(0, "New note").unwrap();
     let commit = edit.commit().unwrap();
-    let restored = commit.package().apply(&commit.patch().inverse()).unwrap();
+    let restored = commit
+        .package()
+        .apply(&commit.patch().inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(restored.to_bytes().unwrap(), MIXED.as_bytes());
 }
 

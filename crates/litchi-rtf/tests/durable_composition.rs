@@ -87,7 +87,7 @@ fn durable_composition_replays_outline_and_composes_disjoint_or_rejects_overlap(
     disjoint.join(outline.clone()).unwrap();
     disjoint.join(underline).unwrap();
     let combined = disjoint.finish().unwrap();
-    let formatted = source.apply_durable(&combined).unwrap();
+    let formatted = source.apply_durable(&combined).unwrap().into_package();
     assert!(
         formatted
             .body()
@@ -118,7 +118,10 @@ fn durable_composition_replays_outline_and_composes_disjoint_or_rejects_overlap(
             .outline()
     );
 
-    let restored = formatted.apply_durable(&combined.inverse()).unwrap();
+    let restored = formatted
+        .apply_durable(&combined.inverse())
+        .unwrap()
+        .into_package();
     assert!(restored.body().runs().all(|run| !run.format().outline()));
     assert!(
         restored
@@ -156,9 +159,12 @@ fn disjoint_durable_join_replays_and_derives_combined_inverse() {
     composition.join(first).unwrap();
     composition.join(second).unwrap();
     let combined = composition.finish().unwrap();
-    let target = source.apply_durable(&combined).unwrap();
+    let target = source.apply_durable(&combined).unwrap().into_package();
     assert_eq!(target.text(), "Alpha Bravo");
-    let restored = target.apply_durable(&combined.inverse()).unwrap();
+    let restored = target
+        .apply_durable(&combined.inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(restored.to_bytes().unwrap(), source.to_bytes().unwrap());
 }
 
@@ -201,7 +207,7 @@ fn durable_join_is_order_independent_and_rejects_unequal_character_overlap() {
     let mut character = DurableComposition::new(&source, limits(8));
     character.join(bold.clone()).unwrap();
     let formatting = character.finish().unwrap();
-    let formatted = source.apply_durable(&formatting).unwrap();
+    let formatted = source.apply_durable(&formatting).unwrap().into_package();
     let inverse = formatting.inverse();
     let formatted_bytes = formatted.to_bytes().unwrap();
     let formatted_hash = litchi_core::patch::BlobId::of(&formatted_bytes).as_hex();
@@ -212,7 +218,7 @@ fn durable_join_is_order_independent_and_rejects_unequal_character_overlap() {
             .and_then(serde_json::Value::as_str)
             == Some(formatted_hash.as_str())
     }));
-    let restored = formatted.apply_durable(&inverse).unwrap();
+    let restored = formatted.apply_durable(&inverse).unwrap().into_package();
     assert_eq!(restored.text(), source.text());
     assert!(restored.body().runs().all(|run| !run.format().bold()));
 
@@ -242,7 +248,7 @@ fn durable_composition_replays_and_inverts_exact_underline_styles() {
     let mut composition = DurableComposition::new(&source, limits(8));
     composition.join(branch).unwrap();
     let combined = composition.finish().unwrap();
-    let formatted = source.apply_durable(&combined).unwrap();
+    let formatted = source.apply_durable(&combined).unwrap().into_package();
     assert_eq!(
         formatted
             .body()
@@ -253,7 +259,10 @@ fn durable_composition_replays_and_inverts_exact_underline_styles() {
             .underline(),
         UnderlineStyle::DoubleWave
     );
-    let restored = formatted.apply_durable(&combined.inverse()).unwrap();
+    let restored = formatted
+        .apply_durable(&combined.inverse())
+        .unwrap()
+        .into_package();
     assert!(
         restored
             .body()
@@ -306,7 +315,7 @@ fn durable_composition_replays_strike_and_composes_disjoint_or_rejects_overlap()
     disjoint.join(strike.clone()).unwrap();
     disjoint.join(underline.clone()).unwrap();
     let combined = disjoint.finish().unwrap();
-    let formatted = source.apply_durable(&combined).unwrap();
+    let formatted = source.apply_durable(&combined).unwrap().into_package();
     assert!(
         formatted
             .body()
@@ -326,7 +335,10 @@ fn durable_composition_replays_strike_and_composes_disjoint_or_rejects_overlap()
             .underline(),
         UnderlineStyle::Single
     );
-    let restored = formatted.apply_durable(&combined.inverse()).unwrap();
+    let restored = formatted
+        .apply_durable(&combined.inverse())
+        .unwrap()
+        .into_package();
     assert!(restored.body().runs().all(|run| !run.format().strike()));
     assert!(
         restored
@@ -380,7 +392,7 @@ fn durable_composition_replays_hidden_and_composes_disjoint_or_rejects_overlap()
     disjoint.join(hidden.clone()).unwrap();
     disjoint.join(underline).unwrap();
     let combined = disjoint.finish().unwrap();
-    let formatted = source.apply_durable(&combined).unwrap();
+    let formatted = source.apply_durable(&combined).unwrap().into_package();
     assert!(
         formatted
             .body()
@@ -400,7 +412,10 @@ fn durable_composition_replays_hidden_and_composes_disjoint_or_rejects_overlap()
             .underline(),
         UnderlineStyle::Single
     );
-    let restored = formatted.apply_durable(&combined.inverse()).unwrap();
+    let restored = formatted
+        .apply_durable(&combined.inverse())
+        .unwrap()
+        .into_package();
     assert!(restored.body().runs().all(|run| !run.format().hidden()));
     assert!(
         restored
@@ -454,7 +469,7 @@ fn durable_composition_replays_small_caps_and_composes_disjoint_or_rejects_overl
     disjoint.join(small_caps.clone()).unwrap();
     disjoint.join(underline).unwrap();
     let combined = disjoint.finish().unwrap();
-    let formatted = source.apply_durable(&combined).unwrap();
+    let formatted = source.apply_durable(&combined).unwrap().into_package();
     assert!(
         formatted
             .body()
@@ -474,7 +489,10 @@ fn durable_composition_replays_small_caps_and_composes_disjoint_or_rejects_overl
             .underline(),
         UnderlineStyle::Single
     );
-    let restored = formatted.apply_durable(&combined.inverse()).unwrap();
+    let restored = formatted
+        .apply_durable(&combined.inverse())
+        .unwrap()
+        .into_package();
     assert!(restored.body().runs().all(|run| !run.format().small_caps()));
     assert!(
         restored
@@ -528,7 +546,7 @@ fn durable_composition_replays_all_caps_and_composes_disjoint_or_rejects_overlap
     disjoint.join(all_caps.clone()).unwrap();
     disjoint.join(underline).unwrap();
     let combined = disjoint.finish().unwrap();
-    let formatted = source.apply_durable(&combined).unwrap();
+    let formatted = source.apply_durable(&combined).unwrap().into_package();
     let all_caps_text = formatted
         .body()
         .runs()
@@ -547,7 +565,10 @@ fn durable_composition_replays_all_caps_and_composes_disjoint_or_rejects_overlap
     let reopened = Package::from_bytes(&formatted.to_bytes().unwrap()).unwrap();
     assert_eq!(reopened.text(), source.text());
 
-    let restored = formatted.apply_durable(&combined.inverse()).unwrap();
+    let restored = formatted
+        .apply_durable(&combined.inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(restored.text(), source.text());
     assert!(restored.body().runs().all(|run| !run.format().all_caps()));
     assert!(
@@ -606,7 +627,7 @@ fn durable_composition_replays_double_strike_and_composes_disjoint_or_rejects_ov
     disjoint.join(double_strike.clone()).unwrap();
     disjoint.join(underline).unwrap();
     let combined = disjoint.finish().unwrap();
-    let formatted = source.apply_durable(&combined).unwrap();
+    let formatted = source.apply_durable(&combined).unwrap().into_package();
     let double_strike_text = formatted
         .body()
         .runs()
@@ -633,7 +654,10 @@ fn durable_composition_replays_double_strike_and_composes_disjoint_or_rejects_ov
     let reopened = Package::from_bytes(&formatted.to_bytes().unwrap()).unwrap();
     assert_eq!(reopened.text(), source.text());
 
-    let restored = formatted.apply_durable(&combined.inverse()).unwrap();
+    let restored = formatted
+        .apply_durable(&combined.inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(restored.text(), source.text());
     assert!(restored.body().runs().all(|run| run.format().strike()));
     assert!(
@@ -730,9 +754,12 @@ fn durable_inverse_projects_formatting_through_longer_and_shorter_replacements()
         let mut composition = DurableComposition::new(&source, limits(8));
         composition.join(patch).unwrap();
         let combined = composition.finish().unwrap();
-        let target = source.apply_durable(&combined).unwrap();
+        let target = source.apply_durable(&combined).unwrap().into_package();
         assert_eq!(target.text(), expected_text);
-        let restored = target.apply_durable(&combined.inverse()).unwrap();
+        let restored = target
+            .apply_durable(&combined.inverse())
+            .unwrap()
+            .into_package();
         assert_eq!(restored.text(), source.text());
         if bold {
             assert!(restored.body().runs().all(|run| !run.format().bold()));
@@ -756,7 +783,7 @@ fn durable_three_way_requires_explicit_choice_and_refuses_stale_or_foreign() {
     plan = *plan.finish().unwrap_err();
     plan.resolve(MergeResolution::Right);
     let merged = plan.finish().unwrap().finish().unwrap();
-    let result = source.apply_durable(&merged).unwrap();
+    let result = source.apply_durable(&merged).unwrap().into_package();
     assert_eq!(result.text(), "Right Second");
 
     let foreign = Package::parse(r"{\rtf1\ansi Foreign}").unwrap();
@@ -795,9 +822,12 @@ fn durable_replay_uses_the_exact_patch_operation_limit() {
         .patch()
         .to_durable(limits(OPERATION_COUNT))
         .unwrap();
-    let target = source.apply_durable(&patch).unwrap();
+    let target = source.apply_durable(&patch).unwrap().into_package();
     assert_eq!(target.text(), "b".repeat(OPERATION_COUNT));
-    let restored = target.apply_durable(&patch.inverse()).unwrap();
+    let restored = target
+        .apply_durable(&patch.inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(restored.to_bytes().unwrap(), source.to_bytes().unwrap());
 }
 
@@ -843,7 +873,7 @@ fn empty_body_boundary_group_still_compares_alignment_conflicts() {
     plan = *plan.finish().unwrap_err();
     plan.resolve(MergeResolution::Left);
     let merged = plan.finish().unwrap().finish().unwrap();
-    let result = source.apply_durable(&merged).unwrap();
+    let result = source.apply_durable(&merged).unwrap().into_package();
     assert_eq!(result.text(), "FirstInserted Second");
     assert_eq!(
         result
@@ -900,7 +930,7 @@ fn durable_positioning_schema_replays_inverses_and_rejects_stale_or_malformed() 
     );
     assert_eq!(durable.operations()[2].value, serde_json::json!(8));
 
-    let formatted = source.apply_durable(&durable).unwrap();
+    let formatted = source.apply_durable(&durable).unwrap().into_package();
     let first = formatted
         .body()
         .runs()
@@ -958,7 +988,10 @@ fn durable_positioning_schema_replays_inverses_and_rejects_stale_or_malformed() 
         8
     );
 
-    let restored = formatted.apply_durable(&durable.inverse()).unwrap();
+    let restored = formatted
+        .apply_durable(&durable.inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(restored.text(), source.text());
     assert!(restored.body().runs().all(|run| {
         run.format().expansion() == litchi_rtf::CharacterExpansion::None
@@ -1101,7 +1134,7 @@ fn durable_composition_replays_disjoint_positioning_and_rejects_overlap() {
     composition.join(scale).unwrap();
     composition.join(kerning).unwrap();
     let combined = composition.finish().unwrap();
-    let formatted = source.apply_durable(&combined).unwrap();
+    let formatted = source.apply_durable(&combined).unwrap().into_package();
     let first = formatted
         .body()
         .runs()
@@ -1129,7 +1162,10 @@ fn durable_composition_replays_disjoint_positioning_and_rejects_overlap() {
     assert_eq!(third.format().kerning_half_points(), 8);
     assert_eq!(third.format().baseline(), CharacterBaseline::Superscript);
 
-    let restored = formatted.apply_durable(&combined.inverse()).unwrap();
+    let restored = formatted
+        .apply_durable(&combined.inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(restored.text(), source.text());
     assert!(restored.body().runs().all(|run| {
         run.format().expansion() == litchi_rtf::CharacterExpansion::None
@@ -1187,7 +1223,7 @@ fn durable_composition_replays_font_size_with_disjoint_facets_and_rejects_overla
     composition.join(size.clone()).unwrap();
     composition.join(underline.clone()).unwrap();
     let combined = composition.finish().unwrap();
-    let formatted = source.apply_durable(&combined).unwrap();
+    let formatted = source.apply_durable(&combined).unwrap().into_package();
     let size_text = formatted
         .body()
         .runs()
@@ -1205,7 +1241,10 @@ fn durable_composition_replays_font_size_with_disjoint_facets_and_rejects_overla
     let reopened = Package::from_bytes(&formatted.to_bytes().unwrap()).unwrap();
     assert_eq!(reopened.text(), source.text());
 
-    let restored = formatted.apply_durable(&combined.inverse()).unwrap();
+    let restored = formatted
+        .apply_durable(&combined.inverse())
+        .unwrap()
+        .into_package();
     assert!(
         restored
             .body()
@@ -1266,7 +1305,7 @@ fn durable_composition_replays_baseline_and_rejects_overlapping_baseline_edits()
     disjoint.join(baseline.clone()).unwrap();
     disjoint.join(underline).unwrap();
     let combined = disjoint.finish().unwrap();
-    let formatted = source.apply_durable(&combined).unwrap();
+    let formatted = source.apply_durable(&combined).unwrap().into_package();
     assert_eq!(
         formatted
             .body()
@@ -1309,7 +1348,10 @@ fn durable_composition_replays_baseline_and_rejects_overlapping_baseline_edits()
             .underline(),
         UnderlineStyle::Single
     );
-    let restored = formatted.apply_durable(&combined.inverse()).unwrap();
+    let restored = formatted
+        .apply_durable(&combined.inverse())
+        .unwrap()
+        .into_package();
     assert!(
         restored
             .body()

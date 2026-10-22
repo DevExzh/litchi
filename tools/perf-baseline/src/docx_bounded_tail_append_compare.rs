@@ -36,7 +36,8 @@ use litchi_docx::source_backed::paragraph_copy::Limits as CopyLimits;
 // this import narrow so the benchmark does not reach into OPC internals.
 use litchi_docx::Package as OwnedDocxPackage;
 use litchi_docx::source_backed::tail_append::{
-    CandidateProof as TailAppendCandidateProof, Limits as TailAppendLimits,
+    CandidateProof as TailAppendCandidateProof, EditOptions as TailAppendEditOptions,
+    Limits as TailAppendLimits,
     SourceProof as TailAppendSourceProof,
 };
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
@@ -1047,7 +1048,10 @@ fn bounded_noop_oracle(source_archive_bytes: &[u8], limits: TailAppendLimits) ->
     let package = litchi_docx::source_backed::Package::from_read_at(Arc::new(OwnedSource::new(
         source_archive_bytes.to_vec(),
     )))?;
-    let plan = package.tail_append_noop().with_limits(limits).prepare()?;
+    let plan = package
+        .tail_append_noop()
+        .with_options(TailAppendEditOptions::new(limits))
+        .prepare()?;
     if !plan.is_noop() {
         return Ok(false);
     }

@@ -1,0 +1,48 @@
+{
+  "source_parents": [
+    "b1b4d9594a",
+    "5909588b99"
+  ],
+  "resolution": "Direction::Append uses span length; removal uses zero inserted bytes.",
+  "checks": [
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "litchi-rtf",
+        "--all-features",
+        "--test",
+        "logical_tail_append",
+        "--test",
+        "canonical_primary",
+        "--test",
+        "durable_composition",
+        "--test",
+        "external_reference_redact"
+      ],
+      "exit": 0,
+      "seconds": 11.289644206990488,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/assembly-rtf-v1/check-0.log",
+      "bytes": 6021,
+      "sha256": "ba6c865dc30f9e7f354c0e571c9151438d350c68828af283dd168dd6da5cff1d"
+    },
+    {
+      "command": [
+        "python3",
+        "tools/check_api_glossary.py",
+        "--profile",
+        "rtf-minimal",
+        "--json",
+        "/home/zhuhe/code/litchi-worktrees/.coord/w8-rtf-tail-litchi_rtf-rustdoc.json"
+      ],
+      "exit": 0,
+      "seconds": 1.8843197129899636,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/assembly-rtf-v1/check-1.log",
+      "bytes": 154,
+      "sha256": "7d6e4d59417fa762be2e667491389974ac9ffaeeea80f2db79e46b1397cafcd4"
+    }
+  ]
+}

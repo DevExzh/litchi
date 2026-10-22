@@ -789,10 +789,7 @@ fn build_patch(
 }
 
 /// Apply a previously sealed forward-only external-reference patch.
-pub(crate) fn apply_forward(
-    source: &Package,
-    patch: &Patch<ForwardOnly>,
-) -> Result<Package, Error> {
+pub(crate) fn apply_forward(source: &Package, patch: &Patch<ForwardOnly>) -> Result<Commit, Error> {
     if patch.format() != REDACTION_FORMAT {
         return Err(Error::DurablePatch(
             "external-reference patch format is not litchi-rtf".to_string(),
@@ -812,7 +809,14 @@ pub(crate) fn apply_forward(
     }
     let snapshot = Snapshot::from_package(source)?;
     if patch.operations().is_empty() {
-        return Ok(source.clone());
+        return Ok(Commit::new(
+            source.clone(),
+            patch.clone(),
+            Diagnostics {
+                removed_references: 0,
+                unsupported: snapshot.unsupported.clone(),
+            },
+        ));
     }
     let source_bytes = source.source_bytes().ok_or(Error::unsupported_source(
         "RTF source bytes are unavailable",
@@ -928,9 +932,9 @@ pub(crate) fn apply_forward(
             "external-reference redaction has unsupported remaining surfaces",
         ));
     }
-    let (candidate, _diagnostics) =
+    let (candidate, diagnostics) =
         rewrite_candidate(source, &selected, mode, &snapshot.unsupported)?;
-    Ok(candidate)
+    Ok(Commit::new(candidate, patch.clone(), diagnostics))
 }
 
 fn allocation(resource: &'static str, requested: usize) -> Error {

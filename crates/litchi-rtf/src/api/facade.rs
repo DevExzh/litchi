@@ -574,8 +574,11 @@ impl Package {
     ///
     /// # Errors
     /// Returns an error for a source conflict or candidate admission failure.
-    pub fn apply(&self, patch: &crate::edit::Patch) -> Result<Self, crate::edit::Error> {
-        patch.apply(self)
+    pub fn apply(
+        &self,
+        patch: &crate::edit::Patch,
+    ) -> Result<crate::edit::Commit, crate::edit::Error> {
+        patch.apply_commit(self)
     }
 
     /// Apply an exact-source logical-tail patch under this package's open policy.
@@ -597,7 +600,10 @@ impl Package {
     pub fn apply_durable<Mode>(
         &self,
         patch: &litchi_core::patch::Patch<Mode>,
-    ) -> Result<Self, crate::edit::Error> {
+    ) -> Result<litchi_core::edit::Commit<Self, litchi_core::patch::Patch<Mode>>, crate::edit::Error>
+    where
+        Mode: Clone,
+    {
         crate::edit::apply_durable(self, patch)
     }
 
@@ -605,16 +611,15 @@ impl Package {
     ///
     /// This is separate from ordinary reversible edit replay.  The operation
     /// is source/artifact checked, candidate-parsed, and visible-text checked;
-    /// no inverse or repair certification is provided.  The returned value is
-    /// an ordinary [`Package`]; replay does not carry the [`crate::redact::Diagnostics`]
-    /// captured when the patch was planned.  In particular, a best-effort
-    /// patch can only replay its source-bound removals: callers must capture a
-    /// fresh [`Self::external_reference_redaction_snapshot`] and inspect its
-    /// unsupported surfaces before treating the replay as complete.
+    /// no inverse or repair certification is provided. The returned commit
+    /// carries the forward-only patch and the [`crate::redact::Diagnostics`]
+    /// captured while replaying it. In particular, callers must inspect the
+    /// diagnostics of a best-effort commit before treating the replay as
+    /// complete.
     pub fn apply_external_reference_redaction(
         &self,
         patch: &litchi_core::patch::Patch<litchi_core::patch::ForwardOnly>,
-    ) -> Result<Self, crate::edit::Error> {
+    ) -> Result<crate::redact::Commit, crate::edit::Error> {
         crate::redact::apply_forward(self, patch)
     }
 }

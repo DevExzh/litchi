@@ -78,6 +78,7 @@ fn source_relative_batch_is_atomic_and_exactly_reversible() {
             .package()
             .apply(&commit.patch().inverse())
             .unwrap()
+            .into_package()
             .to_bytes()
             .unwrap(),
         input.as_bytes()
@@ -91,9 +92,12 @@ fn source_relative_batch_is_atomic_and_exactly_reversible() {
             &encoded, limits,
         )
         .unwrap();
-    let removed = document.apply_durable(&decoded).unwrap();
+    let removed = document.apply_durable(&decoded).unwrap().into_package();
     assert_eq!(removed.to_bytes().unwrap(), expected.as_bytes());
-    let restored = removed.apply_durable(&decoded.inverse()).unwrap();
+    let restored = removed
+        .apply_durable(&decoded.inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(restored.to_bytes().unwrap(), input.as_bytes());
 }
 
@@ -107,7 +111,11 @@ fn adjacent_batch_restores_original_group_order_at_one_collapsed_offset() {
     assert!(commit.package().pictures().is_empty());
 
     let durable = commit.patch().to_durable(durable_limits(3)).unwrap();
-    let restored = commit.package().apply_durable(&durable.inverse()).unwrap();
+    let restored = commit
+        .package()
+        .apply_durable(&durable.inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(restored.to_bytes().unwrap(), input.as_bytes());
 }
 
@@ -281,7 +289,11 @@ fn removes_groups_whose_payload_format_payload_edits_refuse() {
     assert_eq!(commit.package().text(), document.text());
 
     let durable = commit.patch().to_durable(durable_limits(2)).unwrap();
-    let restored = commit.package().apply_durable(&durable.inverse()).unwrap();
+    let restored = commit
+        .package()
+        .apply_durable(&durable.inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(restored.to_bytes().unwrap(), input.as_bytes());
 
     let mut payload = document.edit();

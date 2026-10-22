@@ -60,3 +60,12 @@ exactly; the assembled glossary retains the newer DOCX/PPTX/RTF registrations
 and all W4/File profiles. Curated matrix exclusions are the union of both
 parents, without overwriting a conflicting disposition. All 40 return-checker
 tests and `unified_bench_matrix.py --check` pass after this resolution.
+
+RTF integration through `5909588b99` includes the focused DOCX edit-surface
+cleanup from 0362r. The tail-patch conflict retains both the new borrowed span
+and the coordinator's direction-aware diagnostics: removal replay inserts
+zero bytes. All 63 logical-tail, primary, durable-composition and redaction
+tests pass, including forward/inverse/no-op diagnostic assertions. All five
+RTF result rules now register in the assembled policy and pass against the
+worker's fresh unchanged public-surface capture. The command receipts are in
+`results/0362u/rtf-integration.json`; full combined checks remain required.
