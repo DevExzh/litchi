@@ -266,3 +266,99 @@ that record inspection while retaining exact aggregate admission, but still
 returns a 1.59–2.06× instruction count in this probe. These are constructor
 returns for repair review; no native latency or memory qualification is
 claimed, and the quiet-host native run remains separate.
+
+
+## 0361fdc v17/v18 fair raw constructor reclassification
+
+The default-profile admission ledger repair is committed in `93b025031f`. It
+keeps the exact current payload length and message count in the collection
+ledger, while `push(MessageInfo)` still checks every current public field and
+length. Mutable collection access still discards the certificate. The v17
+callgrind run below is retained as evidence for that repair, but its direct
+`archive_info` ratio compares two different operations: candidate collection
+`with_capacity` plus `push` against the historical base `ArchiveInfo::new` over
+a raw `Vec`. The endpoint ratio is therefore a collection-cost diagnostic,
+not a same-operation regression.
+
+The fair v18 probe adds `archive_info_raw` and `archive_info_raw_e2e` to both
+endpoints. Both call `ArchiveInfo::new(identifier, Vec<MessageInfo>, limits)`
+(the base adapter uses its pre-limits signature) with the same fixture and
+message counts. Collection `push` and `push_new` remain separately reported
+in v17; they are not silently substituted for the raw baseline.
+
+### v17 ledger evidence
+
+The probe source was `91f5cdac...` / `1b7f55f8...`, the base/candidate binaries
+were `858bc0ca...` / `b8bfda6d...`, and the 48 `.out` captures are outside the
+repository at
+`/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/count-callgrind-v17-ledger`.
+The sorted capture digest is
+`e97b087cd9c0ad86ded97883ec60e6540b909ae97aa7969b7e7f3a499c2fcd34` and the
+captures occupy 5,201,998 bytes. The complete reduced receipt is
+[`constructor-v18-fair-raw.json`](results/0361fd/constructor-v18-fair-raw.json).
+
+| Route | Messages | Base Ir/op | Candidate Ir/op | Candidate/base |
+|---|---:|---:|---:|---:|
+| `archive_info` | 1 | 51.0050 | 792.0055 | 15.5280 |
+| `archive_info` | 8 | 51.0050 | 2374.5040 | 46.5543 |
+| `archive_info` | 32 | 51.0061 | 7261.5050 | 142.3654 |
+| `archive_info` | 128 | 51.0035 | 26141.0036 | 512.5335 |
+| `archive_info_e2e` | 1 | 1061.0055 | 1672.0040 | 1.5759 |
+| `archive_info_e2e` | 8 | 2172.0040 | 4421.0050 | 2.0354 |
+| `archive_info_e2e` | 32 | 10328.0061 | 18408.0040 | 1.7823 |
+| `archive_info_e2e` | 128 | 51538.0040 | 81897.0051 | 1.5891 |
+| `archive_info_generic_e2e` | 1 | 1064.0055 | 1992.0036 | 1.8722 |
+| `archive_info_generic_e2e` | 8 | 2175.0040 | 5988.0046 | 2.7531 |
+| `archive_info_generic_e2e` | 32 | 10331.0061 | 23536.0040 | 2.2782 |
+| `archive_info_generic_e2e` | 128 | 51541.0040 | 100775.0051 | 1.9552 |
+
+Here `archive_info` is collection `push(MessageInfo)`, `archive_info_e2e`
+is collection `push_new`, and `archive_info_generic_e2e` includes metadata
+vector assembly plus collection `push(MessageInfo)`. The collection routes
+retain exact output bytes and SHA-256. Their ratios are reported as
+operation-specific evidence. The direct `archive_info` endpoint
+reaches 512.5335× at 128 messages because the historical raw constructor is
+constant while the bounded collection admission inspects the caller's public
+records. That number is not used as a fair raw-constructor comparison.
+
+### v18 fair raw evidence
+
+The rebuilt probe sources are
+`1758a437d86228a15da691053b85f95548c2614557cd39e47070470c03cc0812` (base)
+and `f125ce58ace22bbe0da15834f2847e53f48e493b63596efd8c1e505339be7185`
+(candidate). The release binaries are
+`0fc6c951fbce366b6e4cae0eed9ae38851617dfc07bade1267634a75c36e2cb9` and
+`32345cdd8a17ba0fb98697bcc72db6cb15f87bbeb952da4e586f5d901a2ec6e0`.
+The 32 `.out` captures are outside the repository at
+`/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/count-callgrind-v18-raw`;
+the sorted capture digest is
+`789b3f55b095e0283498962bacbd20261b2636eb442ff205757501abcf3aa812` and
+the captures occupy 3,449,352 bytes.
+
+| Route | Messages | Base Ir/op | Candidate Ir/op | Candidate/base |
+|---|---:|---:|---:|---:|
+| `archive_info_raw` | 1 | 45.0050 | 136.0050 | 3.0220 |
+| `archive_info_raw` | 8 | 45.0050 | 283.0040 | 6.2883 |
+| `archive_info_raw` | 32 | 45.0061 | 787.0055 | 17.4866 |
+| `archive_info_raw` | 128 | 45.0017 | 2803.0051 | 62.2866 |
+| `archive_info_raw_e2e` | 1 | 1056.0055 | 1342.0055 | 1.2708 |
+| `archive_info_raw_e2e` | 8 | 2167.0040 | 3860.0050 | 1.7813 |
+| `archive_info_raw_e2e` | 32 | 10323.0061 | 17055.0050 | 1.6521 |
+| `archive_info_raw_e2e` | 128 | 51533.0040 | 77376.0051 | 1.5015 |
+
+`archive_info_raw` times a prebuilt `Vec<MessageInfo>` and the raw constructor;
+`archive_info_raw_e2e` assembles the metadata vector and calls the same raw
+constructor inside every measured iteration. Every fair row produced matching
+checksums, serialized output lengths and output SHA-256 on both endpoints.
+The direct raw route still measures 3.0220×, 6.2883×, 17.4866× and 62.2866× at
+1, 8, 32 and 128 messages. This is the cost of current public-record
+admission relative to the historical unchecked move and remains a returned
+performance issue. The equivalent full metadata-assembly lifecycle measures
+1.2708×, 1.7813×, 1.6521× and 1.5015×. These are the corrected lifecycle
+comparisons; they do not waive the regression or claim native qualification.
+
+The expected archive is parsed, validated and encoded before timing, and its
+exact bytes are checked for every row. Serialization is therefore semantic
+validation for this deterministic probe, not a timed native latency claim.
+Native latency, heap and allocation qualification remain pending until a quiet
+host is available.
