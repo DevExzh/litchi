@@ -14,6 +14,7 @@ use litchi_core::Position;
 use litchi_doc::Package;
 use litchi_doc::body_text::{Error, Refusal, Snapshot, TransactionLimits};
 use litchi_doc::builder::Builder;
+use litchi_doc::package::Error as PackageError;
 use litchi_doc::parts::fib::FileInformationBlock;
 use litchi_doc::tracked_revision::{RevisionKind, RevisionMetadata};
 use litchi_doc::writer::{CharacterFormatting, ParagraphFormatting};
@@ -311,6 +312,16 @@ fn changed_dofr_patch_requires_the_complete_source_owner() {
     )
     .expect("foreign source");
     let foreign_patch = changed_frame_patch(&source, 1);
+    let mismatched =
+        Snapshot::open(doc_with_dofr(0, false), Limits::default()).expect("mismatched Dofr source");
+    let mismatched_records = mismatched
+        .dofr_records()
+        .expect("mismatched Dofr read")
+        .expect("mismatched Dofr records");
+    assert!(matches!(
+        foreign_patch.apply(&mismatched_records),
+        Err(PackageError::PatchConflict)
+    ));
     let mut edit = foreign.edit().expect("foreign edit");
 
     assert!(matches!(
@@ -341,6 +352,20 @@ fn reopened_identical_source_with_different_limits_accepts_dofr_patch() {
     assert_eq!(reopened.bytes(), source.bytes());
 
     let patch = changed_frame_patch(&source, 1);
+    let source_records = source
+        .dofr_records()
+        .expect("Dofr read")
+        .expect("Dofr records");
+    let reopened_records = reopened
+        .dofr_records()
+        .expect("reopened Dofr read")
+        .expect("reopened Dofr records");
+    let applied = patch
+        .apply(&reopened_records)
+        .expect("same-content raw patch");
+    assert_eq!(applied.bytes(), patch.replacement_bytes());
+    assert_eq!(source_records.bytes(), patch.source_bytes());
+
     let mut edit = reopened.edit().expect("reopened edit");
     assert!(edit.apply_dofr_patch(&patch).expect("same-source patch"));
     let committed = edit.commit().expect("reopened commit");

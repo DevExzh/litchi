@@ -299,11 +299,11 @@ impl Patch<'_> {
     ///
     /// Returns an error if `source` differs from the recorded source or the
     /// replacement cannot be cloned.
-    pub fn apply(&self, source: &Section) -> Result<Section, OleError> {
+    pub fn apply(&self, source: &Section) -> Result<Section, crate::Error> {
         if source != self.source {
-            return Err(invalid("SummaryInformation patch source does not match"));
+            return Err(crate::Error::PatchConflict);
         }
-        try_clone_property_set(&self.replacement)
+        try_clone_property_set(&self.replacement).map_err(crate::Error::from)
     }
 
     /// Reverts the replacement only when given the exact forward result.
@@ -312,13 +312,11 @@ impl Patch<'_> {
     ///
     /// Returns an error if `replacement` differs from the recorded replacement
     /// or the source cannot be cloned.
-    pub fn revert(&self, replacement: &Section) -> Result<Section, OleError> {
+    pub fn revert(&self, replacement: &Section) -> Result<Section, crate::Error> {
         if replacement != &self.replacement {
-            return Err(invalid(
-                "SummaryInformation patch replacement does not match",
-            ));
+            return Err(crate::Error::PatchConflict);
         }
-        try_clone_property_set(self.source)
+        try_clone_property_set(self.source).map_err(crate::Error::from)
     }
 
     /// Returns the original source section.

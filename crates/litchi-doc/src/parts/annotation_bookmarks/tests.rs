@@ -118,7 +118,7 @@ fn transaction_is_atomic_and_reversible() {
     );
     assert!(matches!(
         commit.patch().apply(&Snapshot::empty()),
-        Err(TransactionError::Conflict)
+        Err(TransactionError::PatchConflict)
     ));
 }
 
@@ -176,7 +176,10 @@ fn protected_package_allows_noop_but_requires_explicit_authorization_for_metadat
     let committed = editor.set(sample()).unwrap();
     assert!(!committed.patch().is_noop());
     assert!(committed.snapshot().value().is_some());
-    assert!(committed.package_patch().apply(&original).is_err());
+    assert!(matches!(
+        committed.package_patch().apply(&original),
+        Err(PackageError::PatchConflict)
+    ));
     assert_eq!(
         committed
             .package_patch()

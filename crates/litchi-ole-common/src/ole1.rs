@@ -1252,11 +1252,9 @@ impl Patch {
     }
 
     /// Applies this patch only to its exact source snapshot.
-    pub fn apply(&self, source: &ObjectSnapshot) -> Result<ObjectSnapshot, OleError> {
+    pub fn apply(&self, source: &ObjectSnapshot) -> Result<ObjectSnapshot, crate::Error> {
         if source.revision != self.base || source.bytes() != self.before.bytes() {
-            return Err(OleError::InvalidFormat(
-                "OLE1 patch source does not match its exact base".into(),
-            ));
+            return Err(crate::Error::PatchConflict);
         }
         if self.is_noop() {
             return Ok(source.clone());

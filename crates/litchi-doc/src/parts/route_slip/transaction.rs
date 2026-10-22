@@ -56,8 +56,8 @@ pub enum Error {
     Protected(Protection),
     /// The candidate metadata violates the strict MS-DOC codec constraints.
     Invalid(PackageError),
-    /// The transaction was created from a different snapshot.
-    Conflict,
+    /// The patch was created from a different snapshot.
+    PatchConflict,
 }
 
 impl fmt::Display for Error {
@@ -68,7 +68,7 @@ impl fmt::Display for Error {
                 write!(f, "route-slip metadata is protected by {protection:?}")
             },
             Self::Invalid(error) => error.fmt(f),
-            Self::Conflict => f.write_str("route-slip transaction snapshot conflict"),
+            Self::PatchConflict => f.write_str("route-slip transaction snapshot conflict"),
         }
     }
 }
@@ -240,7 +240,7 @@ impl Patch {
     /// Applies this patch only to its expected source snapshot.
     pub fn apply(&self, source: &Snapshot) -> Result<Snapshot, Error> {
         if source != &self.before {
-            return Err(Error::Conflict);
+            return Err(Error::PatchConflict);
         }
         Ok(self.after.clone())
     }

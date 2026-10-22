@@ -652,7 +652,7 @@ impl Patch {
         policy: ProtectionPolicy,
     ) -> TxResult<Snapshot> {
         if source.fingerprint() != self.before.fingerprint() || source != &self.before {
-            return Err(Error::Conflict);
+            return Err(Error::PatchConflict);
         }
         if source != &self.after {
             policy
@@ -680,14 +680,14 @@ pub enum Error {
     /// The candidate violates a DOC, MS-OSHARED, or fixed-topology invariant.
     Invalid(PackageError),
     /// The patch was applied to a different source snapshot.
-    Conflict,
+    PatchConflict,
 }
 
 impl std::fmt::Display for Error {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Invalid(error) => error.fmt(formatter),
-            Self::Conflict => formatter.write_str("smart-tag transaction source conflict"),
+            Self::PatchConflict => formatter.write_str("smart-tag transaction source conflict"),
         }
     }
 }

@@ -1594,6 +1594,7 @@ impl Classify for litchi_doc::Error {
             Self::Object(error) => error.classify(),
             Self::Io(error) => error.classify(),
             Self::Ole(error) => error.classify(),
+            Self::PatchConflict => Class::of(Code::InvalidInput),
             Self::Limit { .. } => Class::of(Code::LimitExceeded),
             Self::InvalidLimit { .. } => Class::of(Code::InvalidArgument),
             Self::PasswordRequired => Class::suggest(Code::DocumentProtected, PASSWORD_SUGGESTION),

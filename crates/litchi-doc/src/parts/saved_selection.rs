@@ -906,7 +906,7 @@ impl Patch {
     /// Apply this patch to a matching parsed record.
     pub fn apply(&self, source: &SavedSelection) -> Result<SavedSelection> {
         if source.source != self.source {
-            return Err(corrupted("Selsf patch source does not match the record"));
+            return Err(PackageError::PatchConflict);
         }
         SavedSelection::parse_bytes(&self.replacement)
             .map(|selection| selection.with_optional_owner(source.owner.clone()))
@@ -915,9 +915,7 @@ impl Patch {
     /// Revert this patch from a matching post-edit record.
     pub fn revert(&self, replacement: &SavedSelection) -> Result<SavedSelection> {
         if replacement.source != self.replacement {
-            return Err(corrupted(
-                "Selsf patch replacement does not match the record",
-            ));
+            return Err(PackageError::PatchConflict);
         }
         SavedSelection::parse_bytes(&self.source)
             .map(|selection| selection.with_optional_owner(replacement.owner.clone()))
@@ -932,9 +930,7 @@ impl Patch {
     ) -> Result<(usize, usize)> {
         let (start, end) = table_range(fib, table_stream.len())?;
         if table_stream[start..end] != self.source {
-            return Err(corrupted(
-                "Selsf patch source does not match the table stream",
-            ));
+            return Err(PackageError::PatchConflict);
         }
         Ok((start, end))
     }
@@ -965,9 +961,7 @@ impl Patch {
     ) -> Result<()> {
         let (start, end) = table_range(fib, table_stream.len())?;
         if table_stream[start..end] != self.replacement {
-            return Err(corrupted(
-                "Selsf patch replacement does not match the table stream",
-            ));
+            return Err(PackageError::PatchConflict);
         }
         table_stream[start..end].copy_from_slice(&self.source);
         Ok(())

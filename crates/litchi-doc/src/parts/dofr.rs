@@ -837,9 +837,7 @@ impl Patch {
     ) -> Result<(usize, usize)> {
         let (start, end) = table_range(fib, table_stream.len())?;
         if table_stream[start..end] != self.source {
-            return Err(corrupted(
-                "RgDofr patch source does not match the table stream",
-            ));
+            return Err(PackageError::PatchConflict);
         }
         Ok((start, end))
     }
@@ -847,7 +845,7 @@ impl Patch {
     /// Apply this patch to a matching parsed array.
     pub fn apply(&self, source: &DofrArray) -> Result<DofrArray> {
         if source.source != self.source {
-            return Err(corrupted("RgDofr patch source does not match the array"));
+            return Err(PackageError::PatchConflict);
         }
         DofrArray::parse_bytes(&self.replacement)
             .map(|array| array.with_optional_owner(source.owner.clone()))
@@ -856,9 +854,7 @@ impl Patch {
     /// Revert this patch from a matching post-edit array.
     pub fn revert(&self, replacement: &DofrArray) -> Result<DofrArray> {
         if replacement.source != self.replacement {
-            return Err(corrupted(
-                "RgDofr patch replacement does not match the array",
-            ));
+            return Err(PackageError::PatchConflict);
         }
         DofrArray::parse_bytes(&self.source)
             .map(|array| array.with_optional_owner(replacement.owner.clone()))
@@ -883,9 +879,7 @@ impl Patch {
     ) -> Result<()> {
         let (start, end) = table_range(fib, table_stream.len())?;
         if table_stream[start..end] != self.replacement {
-            return Err(corrupted(
-                "RgDofr patch replacement does not match the table stream",
-            ));
+            return Err(PackageError::PatchConflict);
         }
         table_stream[start..end].copy_from_slice(&self.source);
         Ok(())

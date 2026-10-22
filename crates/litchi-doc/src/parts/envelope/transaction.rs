@@ -119,7 +119,7 @@ impl Patch {
     /// Apply this patch only to its exact source snapshot.
     pub fn apply(&self, source: &Snapshot) -> Result<Snapshot, Error> {
         if source != &self.before {
-            return Err(Error::Conflict);
+            return Err(Error::PatchConflict);
         }
         Ok(self.after.clone())
     }
@@ -212,7 +212,7 @@ pub enum Error {
     /// The candidate violates a bounded `[MS-DOC]`/`[MS-OSHARED]` invariant.
     Invalid(PackageError),
     /// The patch or package transaction was created from a different snapshot.
-    Conflict,
+    PatchConflict,
     /// A message-only operation requires a present envelope.
     Missing,
     /// A message-only operation was requested for an unknown CLSID.
@@ -223,7 +223,7 @@ impl fmt::Display for Error {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Invalid(error) => error.fmt(formatter),
-            Self::Conflict => formatter.write_str("envelope transaction snapshot conflict"),
+            Self::PatchConflict => formatter.write_str("envelope transaction snapshot conflict"),
             Self::Missing => formatter.write_str("MsoEnvelope FIB range is absent"),
             Self::Unsupported => {
                 formatter.write_str("the envelope CLSID does not select a supported message")

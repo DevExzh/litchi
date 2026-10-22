@@ -9,6 +9,7 @@
 use litchi_core::Position;
 use litchi_doc::body_text::{Error, Projection, Refusal, Snapshot};
 use litchi_doc::builder::Builder;
+use litchi_doc::package::Error as PackageError;
 use litchi_doc::parts::fib::FileInformationBlock;
 use litchi_doc::{SavedSelection, SelectionGeometry, SelectionStyle, raw::Reader};
 use litchi_ole_common::object::{
@@ -368,12 +369,37 @@ fn body_saved_selection_edit_is_source_bound_reversible_and_atomic() {
     ));
 
     let reopened = Snapshot::open(source_bytes, Limits::default()).expect("reopened source");
+    let reopened_selection = reopened
+        .saved_selection()
+        .expect("reopened saved-selection read")
+        .expect("reopened saved-selection");
+    let raw_applied = patch
+        .apply(&reopened_selection)
+        .expect("same-content raw patch");
+    assert_eq!(raw_applied.cp_anchor(), 1);
+
     let mut reopened_edit = reopened.edit().expect("reopened edit");
     assert!(
         reopened_edit
             .apply_saved_selection_patch(&patch)
             .expect("identical reopened source accepts patch")
     );
+
+    let mut mismatched_record = source_record.clone();
+    set_cps(&mut mismatched_record, 4, 9, 5);
+    let mismatched = Snapshot::open(
+        document_with_selsf_body("different", &mismatched_record, 36),
+        Limits::default(),
+    )
+    .expect("mismatched selection source");
+    let mismatched_selection = mismatched
+        .saved_selection()
+        .expect("mismatched saved-selection read")
+        .expect("mismatched saved-selection");
+    assert!(matches!(
+        patch.apply(&mismatched_selection),
+        Err(PackageError::PatchConflict)
+    ));
 
     let foreign = Snapshot::open(
         document_with_selsf_body("different", &source_record, 36),

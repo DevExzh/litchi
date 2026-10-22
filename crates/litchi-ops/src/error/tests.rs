@@ -2232,3 +2232,35 @@ fn shared_object_errors_keep_codes_through_host_and_core_conversions() {
         Code::IoError
     );
 }
+
+#[cfg(feature = "doc")]
+#[test]
+fn legacy_raw_replay_categories_reach_the_facade_unchanged() {
+    // Raw OLE/property-set parse failures remain malformed input.  A stale
+    // package patch uses the shared typed conflict and is caller input, while
+    // an actual positional source change remains an I/O condition.
+    assert_code(
+        litchi_cfb::OleError::InvalidFormat("malformed property set".into()),
+        Code::CorruptFile,
+    );
+    assert_code(
+        litchi_doc::Error::Ole(litchi_cfb::OleError::InvalidFormat(
+            "malformed property set".into(),
+        )),
+        Code::CorruptFile,
+    );
+    assert_code(
+        litchi_doc::Error::from(litchi_ole_common::Error::PatchConflict),
+        Code::InvalidInput,
+    );
+    assert_code(litchi_doc::Error::PatchConflict, Code::InvalidInput);
+    assert_code(
+        litchi_doc::Error::from(litchi_ole_common::Error::Cfb(
+            litchi_cfb::OleError::SourceChanged {
+                expected: SourceVersion::new(3, 1),
+                observed: SourceVersion::new(3, 2),
+            },
+        )),
+        Code::IoError,
+    );
+}

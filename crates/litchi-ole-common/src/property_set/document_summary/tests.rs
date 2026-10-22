@@ -137,11 +137,24 @@ fn patch_requires_the_exact_source_and_failed_edits_are_transactional() {
         commit.package().property(CATEGORY)
     );
 
+    // Reopening an equal section must preserve replay capability even though
+    // it is a distinct owner allocation.
+    let reparsed_stream =
+        Stream::parse(&Stream::new(original.clone()).to_bytes().unwrap()).unwrap();
+    let reparsed = Snapshot::from_stream(&reparsed_stream).unwrap();
+    assert_eq!(
+        patch.apply(reparsed.section()).unwrap().property(CATEGORY),
+        commit.package().property(CATEGORY)
+    );
+
     let mut different_source = original.clone();
     different_source
         .add(CATEGORY, Value::Lpstr("Other".into()))
         .unwrap();
-    assert!(patch.apply(&different_source).is_err());
+    assert!(matches!(
+        patch.apply(&different_source),
+        Err(crate::Error::PatchConflict)
+    ));
 }
 
 #[test]

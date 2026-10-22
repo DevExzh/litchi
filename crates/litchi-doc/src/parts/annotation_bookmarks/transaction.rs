@@ -110,7 +110,7 @@ impl Patch {
     /// Apply only to the exact source snapshot.
     pub fn apply(&self, source: &Snapshot) -> Result<Snapshot, Error> {
         if source != &self.before {
-            return Err(Error::Conflict);
+            return Err(Error::PatchConflict);
         }
         Ok(self.after.clone())
     }
@@ -187,8 +187,8 @@ impl Edit {
 pub enum Error {
     /// The candidate violates an MS-DOC invariant.
     Invalid(PackageError),
-    /// The transaction was created from a different snapshot.
-    Conflict,
+    /// The patch was created from a different snapshot.
+    PatchConflict,
     /// An entry operation requires a present table.
     Missing,
 }
@@ -197,7 +197,7 @@ impl fmt::Display for Error {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Invalid(error) => error.fmt(formatter),
-            Self::Conflict => {
+            Self::PatchConflict => {
                 formatter.write_str("annotation-bookmark transaction snapshot conflict")
             },
             Self::Missing => formatter.write_str("SttbfAtnBkmk table is absent"),

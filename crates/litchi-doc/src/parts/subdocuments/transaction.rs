@@ -485,7 +485,7 @@ impl Patch {
     /// Applies this semantic patch only to the exact source snapshot.
     pub fn apply(&self, source: &Snapshot) -> Result<Snapshot, Error> {
         if source != &self.before {
-            return Err(Error::Conflict);
+            return Err(Error::PatchConflict);
         }
         Ok(self.after.clone())
     }
@@ -550,7 +550,7 @@ pub enum Error {
     /// A selector could not be resolved.
     Selection(SelectionError),
     /// The patch was applied to a different semantic snapshot.
-    Conflict,
+    PatchConflict,
     /// The requested operation would require a package/FIB writer outside
     /// this bounded owner.
     Unsupported(&'static str),
@@ -563,7 +563,7 @@ impl fmt::Display for Error {
         match self {
             Self::Invalid(error) => error.fmt(formatter),
             Self::Selection(error) => error.fmt(formatter),
-            Self::Conflict => formatter.write_str("subdocument transaction snapshot conflict"),
+            Self::PatchConflict => formatter.write_str("subdocument transaction snapshot conflict"),
             Self::Unsupported(message) => formatter.write_str(message),
             Self::Patch(error) => error.fmt(formatter),
         }
