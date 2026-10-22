@@ -257,3 +257,45 @@ suites, the private deferred-policy test, full `litchi-xlsx` library tests,
 all-feature warning-denied Clippy, and formatting. The allocator receipt has
 exact forward/inverse output checks, but the positive live/peak and admission
 deltas remain returned work for a later repair and native acceptance run.
+
+## Catalog-endpoint deduplication follow-up (913ed0f3bd)
+
+Commit `913ed0f3bd` removes the duplicate `Catalog` value from each deferred
+restore endpoint. Equal-policy replay now borrows the still-live pending
+owner's catalog proof; if that owner has been dropped, the immutable publisher
+reconstructs the catalog under the recipient package's limits. A stricter
+recipient always takes the latter path. The focused owner-drop replay test
+passed, preserving exact forward and inverse bytes and recipient-policy
+validation.
+
+The protected release allocator binary is outside the repository at
+`/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/protected/913e/xlsx_tab_state_history_alloc`
+(10,470,200 bytes, SHA-256
+`fc7e3184e6dccbca758ae069810d692664c082479d820ada232975bd3e5424ac`). It was
+built from `913ed0f3bd` with the locked perf-baseline manifest, allocator
+features, two jobs, and a distinct target directory. The matching e63 binary
+and the 913e binary ran the same 64-history/2-warmup count-only driver against
+the same fixture; the receipt is outside the repository at
+`/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/allocator-913e-v1`.
+The e63 JSON SHA-256 is
+`509453270b20147fbc034a02e0d1842abf5f60b1bc9d61e00c9c050f37cdc098`; the 913e
+JSON SHA-256 is
+`08ad27c2c1c3e82ba61d67598318dcbeebb8f197c7c0b774522a8ed3c7a686eb`.
+Both runs reported 64 exact forward and 64 exact inverse checks, with equal
+fixture and output hashes. The deduplication did not change the measured
+retained-history or admission deltas:
+
+| interval | e63 | 913e | change vs e63 |
+| --- | ---: | ---: | ---: |
+| retained history live bytes after | 167,697 | 228,433 | +60,736 |
+| retained history peak live after | 427,929 | 427,929 | unchanged |
+| independent replay live bytes after | 167,953 | 232,601 | +64,648 |
+| independent replay peak live after | 606,577 | 686,195 | +79,618 (+13.13%) |
+| source-owner admission allocated bytes | 23,346,752 | 24,410,208 | +1,063,456 (+4.56%) |
+
+This candidate remains returned. The catalog handle removal is safe and
+correct, but it does not explain the retained endpoint/source-owner graph or
+the preserve-overlay and zlib workspace lifetime seen during replay. A further
+repair must identify and reduce those live objects while retaining exact
+artifact authentication, recipient limits, and the public projection's
+read-only capabilities.
