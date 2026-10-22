@@ -101,7 +101,12 @@ The ODP facade now registers `tail_append::Error` as a leaf source and
 classifies its `SourceChanged` and `PatchConflict` variants as `io_error` and
 `invalid_input`.  A public source-backed open/edit/commit/replay regression
 exercises both outcomes against a revisioned `ReadAt` source and an unrelated
-recipient, rather than constructing only the leaf variants.
+recipient, rather than constructing only the leaf variants.  Its common
+publication classifier also checks an exact typed `SourceChanged` callback
+before classifying an archive content fault, sink, or transport wrapper; an
+arbitrary callback error does not replace the primary archive or sink code.
+The facade regression constructs an archive content fault with a retained stale
+callback and verifies that the ODF wrapper still reports `io_error`.
 
 ## Validation receipt
 

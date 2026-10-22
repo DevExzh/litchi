@@ -1925,6 +1925,46 @@ fn odp_source_publication_errors_keep_typed_progress_through_facade() {
 
 #[cfg(feature = "odp")]
 #[test]
+fn odp_archive_replay_prefers_typed_stale_callback_over_content_fault() {
+    use litchi_core::SourceVersion;
+    use litchi_odf_common::{
+        Error as OdfError, SourceContentInsertionCallbackError, SourceContentInsertionError,
+        SourceMemberReaderError,
+    };
+    use soapberry_zip::{ErrorKind, ReplayPass, ReplayProgress, ReplayPublicationError};
+
+    let expected = SourceVersion::new(0x300, 1);
+    let observed = SourceVersion::new(0x300, 2);
+    let callback =
+        SourceContentInsertionCallbackError::Member(Box::new(SourceMemberReaderError::Core {
+            error: litchi_core::Error::SourceChanged { expected, observed },
+            callback_error: Some(SourceContentInsertionCallbackError::Verification {
+                what: "secondary proof",
+            }),
+        }));
+    let replay = ReplayPublicationError::Archive {
+        pass: ReplayPass::Emit,
+        source: soapberry_zip::Error::from(ErrorKind::InvalidInput {
+            msg: "malformed archive member".to_string(),
+        }),
+        callback_error: Some(callback),
+        progress: ReplayProgress::Complete { bytes: 19 },
+    };
+    let odf = OdfError::from(SourceContentInsertionError::Replay {
+        progress: litchi_odf_common::SourceContentPublicationProgress::Complete { bytes: 19 },
+        source: replay,
+    });
+
+    let unified = Error::from(odf);
+    assert_eq!(unified.code(), Code::IoError);
+    assert!(matches!(
+        unified.leaf(),
+        Source::Odf(OdfError::SourceContentInsertion(_))
+    ));
+}
+
+#[cfg(feature = "odp")]
+#[test]
 fn odp_public_source_replay_classifies_actual_stale_and_conflicting_inputs() {
     use std::io;
     use std::sync::atomic::{AtomicU64, Ordering};

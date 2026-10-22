@@ -2068,15 +2068,19 @@ fn classify_source_insertion(error: &litchi_odf_common::SourceContentInsertionEr
             replay,
             ..
         } => {
-            let publication = classify_source_publication(publication);
-            if publication.code == Code::IoError {
-                publication
+            let publication_class = classify_source_publication(publication);
+            if publication_source_changed(publication) {
+                publication_class
             } else {
-                let replay = classify_replay(replay);
-                if replay.code == Code::IoError {
-                    replay
+                let replay_class = classify_replay(replay);
+                if replay_source_changed(replay) {
+                    replay_class
+                } else if publication_class.code == Code::IoError {
+                    publication_class
+                } else if replay_class.code == Code::IoError {
+                    replay_class
                 } else {
-                    publication
+                    publication_class
                 }
             }
         },
@@ -2117,13 +2121,13 @@ fn classify_replay(
             callback_error,
             ..
         } => {
-            let archive = classify_zip_error(source);
-            if archive.code == Code::CorruptFile {
-                archive
-            } else if let Some(callback) = callback_error {
+            if let Some(callback) = callback_error
+                .as_ref()
+                .filter(|callback| callback_source_changed(callback))
+            {
                 classify_callback(callback)
             } else {
-                archive
+                classify_zip_error(source)
             }
         },
         ReplayPublicationError::Callback { source, .. } => classify_callback(source),
@@ -2133,17 +2137,75 @@ fn classify_replay(
             callback_error,
             ..
         } => {
-            let sink = source.classify();
-            if sink.code == Code::IoError {
-                sink
-            } else if let Some(callback) = callback_error {
+            if let Some(callback) = callback_error
+                .as_ref()
+                .filter(|callback| callback_source_changed(callback))
+            {
                 classify_callback(callback)
             } else {
-                sink
+                source.classify()
             }
         },
         ReplayPublicationError::NonDeterministic { .. } => Class::of(Code::InternalError),
         _ => Class::of(Code::InternalError),
+    }
+}
+
+#[cfg(any(feature = "odt", feature = "ods", feature = "odp", odf_objects))]
+fn publication_source_changed(error: &litchi_odf_common::SourceContentPublicationError) -> bool {
+    use litchi_odf_common::SourceContentPublicationError as Publication;
+
+    matches!(
+        error,
+        Publication::SourceChanged { .. }
+            | Publication::Core(litchi_core::Error::SourceChanged { .. })
+            | Publication::Source {
+                source: litchi_core::Error::SourceChanged { .. },
+                ..
+            }
+    )
+}
+
+#[cfg(any(feature = "odt", feature = "ods", feature = "odp", odf_objects))]
+fn replay_source_changed(
+    error: &soapberry_zip::ReplayPublicationError<
+        litchi_odf_common::SourceContentInsertionCallbackError,
+    >,
+) -> bool {
+    use soapberry_zip::ReplayPublicationError;
+
+    match error {
+        ReplayPublicationError::Archive { callback_error, .. }
+        | ReplayPublicationError::Sink { callback_error, .. } => {
+            callback_error.as_ref().is_some_and(callback_source_changed)
+        },
+        ReplayPublicationError::Callback { source, .. } => callback_source_changed(source),
+        ReplayPublicationError::Limit { .. } | ReplayPublicationError::NonDeterministic { .. } => {
+            false
+        },
+        _ => false,
+    }
+}
+
+#[cfg(any(feature = "odt", feature = "ods", feature = "odp", odf_objects))]
+fn callback_source_changed(error: &litchi_odf_common::SourceContentInsertionCallbackError) -> bool {
+    use litchi_odf_common::SourceMemberReaderError;
+
+    match error {
+        litchi_odf_common::SourceContentInsertionCallbackError::Member(error) => {
+            match error.as_ref() {
+                SourceMemberReaderError::Core { error, .. } => {
+                    matches!(error, litchi_core::Error::SourceChanged { .. })
+                },
+                SourceMemberReaderError::Callback(error) => callback_source_changed(error),
+                _ => false,
+            }
+        },
+        litchi_odf_common::SourceContentInsertionCallbackError::Io(_)
+        | litchi_odf_common::SourceContentInsertionCallbackError::Cancelled
+        | litchi_odf_common::SourceContentInsertionCallbackError::Execution(_)
+        | litchi_odf_common::SourceContentInsertionCallbackError::Verification { .. } => false,
+        _ => false,
     }
 }
 
