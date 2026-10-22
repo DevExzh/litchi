@@ -24,6 +24,7 @@ use litchi_iwa_protos::{
 };
 use sha1::{Digest as _, Sha1};
 
+use super::snappy_failure::SnappyFailure;
 use super::{Package, PhysicalSource};
 use crate::slide::audio::creation::{
     Commit as SlideAudioCreationCommit, Diagnostics as SlideAudioCreationDiagnostics,
@@ -2429,10 +2430,9 @@ pub(super) fn serialize_component(
         return Err(SlideAudioCreationError::InvalidSource);
     }
     let compressed_bound = SnappyStream::maximum_compressed_len(bytes.len(), snappy_limits)
-        .map_err(|_| SlideAudioCreationError::InvalidSource)?;
+        .map_err(map_snappy_error)?;
     budget.charge_allocations(compressed_bound)?;
-    let compressed = SnappyStream::compress(&bytes, snappy_limits)
-        .map_err(|_| SlideAudioCreationError::InvalidSource)?;
+    let compressed = SnappyStream::compress(&bytes, snappy_limits).map_err(map_snappy_error)?;
     if compressed.len() > snappy_limits.max_compressed_stream() {
         return Err(SlideAudioCreationError::Limit {
             kind: SlideAudioCreationLimitKind::EntryBytes,
@@ -2569,5 +2569,31 @@ fn limit(
         kind,
         observed: u64::try_from(observed).unwrap_or(u64::MAX),
         maximum: u64::try_from(maximum).unwrap_or(u64::MAX),
+    }
+}
+
+/// Preserve a retained Snappy encoder refusal as a typed owner failure
+/// (see [`SnappyFailure`]).
+pub(super) fn map_snappy_error(error: litchi_iwa_core::Error) -> SlideAudioCreationError {
+    match SnappyFailure::from(error) {
+        SnappyFailure::CompressedBytes { observed, maximum } => SlideAudioCreationError::Limit {
+            kind: SlideAudioCreationLimitKind::EntryBytes,
+            observed,
+            maximum,
+        },
+        SnappyFailure::DecodedBytes { observed, maximum } => SlideAudioCreationError::Limit {
+            kind: SlideAudioCreationLimitKind::EntryBytes,
+            observed,
+            maximum,
+        },
+        SnappyFailure::Work { observed, maximum } => SlideAudioCreationError::Limit {
+            kind: SlideAudioCreationLimitKind::WireWork,
+            observed,
+            maximum,
+        },
+        SnappyFailure::Allocation { requested } => {
+            SlideAudioCreationError::Allocation { amount: requested }
+        },
+        SnappyFailure::Invalid => SlideAudioCreationError::InvalidSource,
     }
 }

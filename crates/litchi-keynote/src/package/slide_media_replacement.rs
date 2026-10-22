@@ -32,6 +32,7 @@ use litchi_iwa_protos::{keynote_media_codec, package_metadata_media_codec as met
 use sha1::{Digest, Sha1};
 use thiserror::Error as ThisError;
 
+use super::snappy_failure::SnappyFailure;
 use super::{MOVIE_MESSAGE_TYPE, Package, PhysicalSource, SLIDE_MESSAGE_TYPE, SemanticPath};
 use crate::{MovieKind, MovieSelector, SlideSelector};
 
@@ -2263,14 +2264,46 @@ fn rewrite_metadata_entry(
     if serialized.len() != serialized_capacity {
         return Err(Error::Verification);
     }
-    let compressed_capacity = SnappyStream::maximum_compressed_len(serialized.len(), snappy_limits)
+    // `snappy_limits` is tightened to the source stream for decoding. The
+    // rewritten member may grow, so the encoder uses the package's retained
+    // profile: the caller-selected decoded and compressed-entry ceilings.
+    let output_snappy_limits = package
+        .limits()
+        .snappy_limits()
         .map_err(|_| Error::InvalidSource)?;
+    let compressed_capacity =
+        SnappyStream::maximum_compressed_len(serialized.len(), output_snappy_limits)
+            .map_err(map_snappy_error)?;
     budget.wire_work(compressed_capacity)?;
     budget.allocation(compressed_capacity)?;
     let compressed =
-        SnappyStream::compress(&serialized, snappy_limits).map_err(|_| Error::InvalidSource)?;
+        SnappyStream::compress(&serialized, output_snappy_limits).map_err(map_snappy_error)?;
     if compressed.len() > compressed_capacity {
         return Err(Error::Verification);
     }
     Ok(compressed)
+}
+
+/// Preserve a retained Snappy encoder refusal as a typed owner failure
+/// (see [`SnappyFailure`]).
+fn map_snappy_error(error: litchi_iwa_core::Error) -> Error {
+    match SnappyFailure::from(error) {
+        SnappyFailure::CompressedBytes { observed, maximum } => Error::Limit {
+            kind: LimitKind::EntryBytes,
+            observed,
+            maximum,
+        },
+        SnappyFailure::DecodedBytes { observed, maximum } => Error::Limit {
+            kind: LimitKind::EntryBytes,
+            observed,
+            maximum,
+        },
+        SnappyFailure::Work { observed, maximum } => Error::Limit {
+            kind: LimitKind::WireWork,
+            observed,
+            maximum,
+        },
+        SnappyFailure::Allocation { requested } => Error::Allocation { amount: requested },
+        SnappyFailure::Invalid => Error::InvalidSource,
+    }
 }

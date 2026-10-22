@@ -628,12 +628,12 @@ pub(in crate::package) fn plan_and_rewrite_media(
         .snappy_limits()
         .map_err(|_| SlideAudioCreationError::InvalidSource)?;
     let compressed_max = SnappyStream::maximum_compressed_len(serialized.len(), snappy_limits)
-        .map_err(|_| SlideAudioCreationError::InvalidSource)?;
+        .map_err(super::map_snappy_error)?;
     budget.charge_output(compressed_max)?;
     budget.charge_total(compressed_max)?;
     budget.charge_allocations(compressed_max)?;
-    let compressed = SnappyStream::compress(&serialized, snappy_limits)
-        .map_err(|_| SlideAudioCreationError::InvalidSource)?;
+    let compressed =
+        SnappyStream::compress(&serialized, snappy_limits).map_err(super::map_snappy_error)?;
     budget.charge_entry_bytes(compressed.len())?;
 
     drop(data_additions);
