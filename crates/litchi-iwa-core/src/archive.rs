@@ -1624,50 +1624,60 @@ impl ArchiveObject {
                 "message metadata and payload counts differ",
             ));
         }
-        if !self.validate_cached_archive_info(limits)? {
+        let cached_header_length = self.validate_cached_archive_info(limits)?;
+        if cached_header_length.is_none() {
             self.archive_info.validate(limits)?;
         }
-        self.validate_payloads(limits)
+        self.validate_payloads(limits, cached_header_length)
     }
 
     /// Reuse parsed neutral admission only after proving that the current
     /// metadata still emits the paired canonical header. Profiles that tighten
     /// sequence-sensitive message or metadata budgets use the full validator,
     /// preserving its first-failure precedence.
-    fn validate_cached_archive_info(&self, limits: Limits) -> Result<bool> {
+    fn validate_cached_archive_info(&self, limits: Limits) -> Result<Option<usize>> {
         let Some((admission, admitted_limits)) = self.archive_info_admission else {
-            return Ok(false);
+            return Ok(None);
         };
         if self.original_header.is_none() || self.original_canonical_header.is_none() {
-            return Ok(false);
+            return Ok(None);
         }
         if limits.max_message_bytes() < admitted_limits.max_message_bytes()
             || limits.max_metadata_items() < admitted_limits.max_metadata_items()
         {
-            return Ok(false);
+            return Ok(None);
         }
         let Some(original_canonical) = self.original_canonical_header.as_deref() else {
-            return Ok(false);
+            return Ok(None);
         };
         let mut probe = CanonicalHeaderProbe::new(Some(original_canonical));
         if emit_canonical_archive_info(&mut probe, self).is_err() {
-            return Ok(false);
+            return Ok(None);
         }
         let (header_length, canonical_matches) = probe.finish();
         if !canonical_matches || header_length != admission.header_length {
-            return Ok(false);
+            return Ok(None);
         }
         admission.check(limits)?;
-        Ok(true)
+        Ok(self.original_header.as_deref().map(<[u8]>::len))
     }
 
-    fn validate_payloads(&self, limits: Limits) -> Result<()> {
-        let header_length = if self.original_header.is_some() {
+    fn validate_payloads(&self, limits: Limits, cached_header_length: Option<usize>) -> Result<()> {
+        let header_length = if let Some(header_length) = cached_header_length {
             // Admission precedes the wire-length conversion used to choose
             // the retained header, including for mutated oversized payloads.
             for message in &self.messages {
                 check_message_length(message.data.len(), limits)?;
             }
+            admit_retained_header(
+                self.original_header
+                    .as_deref()
+                    .expect("cached retained header is present"),
+                limits,
+                self.original_header_admission,
+            )?;
+            header_length
+        } else if self.original_header.is_some() {
             retained_header_length_for_object(self, limits)?.1
         } else {
             archive_info_encoded_len(&self.archive_info)?
