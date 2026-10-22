@@ -311,6 +311,22 @@ fn detect_format_smart_without_ooxml<T: ZipTail>(
 ) -> Option<DetectedFormat> {
     use litchi_core::detection::simd_utils::check_office_signatures;
 
+    // The iWork-only build still receives the required source policy through
+    // the public detector, but its ZIP tail owns the only format-specific
+    // probe. Keep the parameter in the shared helper signature without
+    // tripping the workspace's deny-unused profile in that feature set.
+    #[cfg(not(any(
+        feature = "odt",
+        feature = "ods",
+        feature = "odp",
+        odf_objects,
+        feature = "rtf",
+        feature = "doc",
+        feature = "ppt",
+        feature = "xls"
+    )))]
+    let _ = limits;
+
     #[cfg(not(any(feature = "pages", feature = "keynote", feature = "numbers")))]
     let _ = tail;
 

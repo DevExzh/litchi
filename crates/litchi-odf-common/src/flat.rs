@@ -26,6 +26,7 @@ use std::sync::Arc;
 
 use quick_xml::Reader;
 use quick_xml::events::Event;
+use sha2::{Digest, Sha256};
 
 use crate::core::{PackageWriter, PackageWriterLimits};
 use crate::{Error, LimitKind, OpenOptions, SemanticLimitKind, SemanticLimits, SourceLimits};
@@ -177,7 +178,12 @@ impl Limits {
         )
     }
 
-    fn projection_options(self) -> OpenOptions {
+    /// Options for parsing the synthetic package emitted by [`Parts::to_bytes`].
+    ///
+    /// The package is an internal projection of an already admitted flat
+    /// source, so its physical source ceiling is the hard scratch ceiling;
+    /// the caller's semantic policy remains attached.
+    pub const fn projection_options(self) -> OpenOptions {
         OpenOptions::new()
             .source_limits(SourceLimits::MAXIMUM)
             .semantic_limits(self.semantic)
@@ -208,6 +214,13 @@ pub struct Parts {
     settings: Option<Part>,
     /// The flat document's length, which [`Parts::merge`] checks.
     length: usize,
+    /// A content proof for the exact source whose ranges are retained below.
+    /// Keeping the digest avoids retaining a second full flat source while
+    /// still rejecting a same-length foreign source at merge time.
+    source_digest: [u8; 32],
+    /// The greatest XML nesting depth admitted while splitting the source.
+    /// Output paths reuse this proof when a caller supplies a tighter policy.
+    depth: usize,
     /// Where the flat root's content starts (after its start tag), for a
     /// part an edit creates.
     root_inner: usize,
@@ -218,6 +231,7 @@ struct TopLevel<'a> {
     root: &'a str,
     root_end: usize,
     children: Vec<(&'a [u8], Range<usize>)>,
+    max_depth: usize,
 }
 
 /// A fallibly growing sink for the synthetic ZIP projection.
@@ -259,7 +273,11 @@ impl io::Write for BoundedBytes {
             let doubled = self.bytes.capacity().saturating_mul(2).max(1);
             let capacity = doubled.max(length).min(self.limit);
             self.bytes
-                .try_reserve_exact(capacity.saturating_sub(self.bytes.capacity()))
+                // `try_reserve_exact` takes additional bytes relative to
+                // `len`, not relative to the existing capacity.  Reserving
+                // from capacity can leave the next extend infallibly growing
+                // beyond this bounded sink's limit when there is slack.
+                .try_reserve_exact(capacity.saturating_sub(self.bytes.len()))
                 .map_err(|error| io::Error::other(format!("flat ODF ZIP allocation: {error}")))?;
         }
         self.bytes.extend_from_slice(bytes);
@@ -276,6 +294,7 @@ fn top_level(xml: &str, limits: Limits) -> Result<TopLevel<'_>> {
     let mut reader = Reader::from_str(xml);
     reader.config_mut().check_end_names = true;
     let mut depth = 0usize;
+    let mut max_depth = 0usize;
     let mut root: Option<(&str, usize)> = None;
     let mut children = Vec::new();
     let mut open_child: Option<(usize, &[u8])> = None;
@@ -298,12 +317,20 @@ fn top_level(xml: &str, limits: Limits) -> Result<TopLevel<'_>> {
                     ))
                 })?;
                 limits.check_depth(next_depth)?;
+                max_depth = max_depth.max(next_depth);
                 depth = next_depth;
             },
             Event::Empty(element) => {
                 if depth == 0 {
                     return Err(invalid("the flat ODF root element is empty"));
                 }
+                let next_depth = depth.checked_add(1).ok_or_else(|| {
+                    Error::Core(CoreError::InvalidFormat(
+                        "flat ODF XML nesting depth overflow".to_string(),
+                    ))
+                })?;
+                limits.check_depth(next_depth)?;
+                max_depth = max_depth.max(next_depth);
                 if depth == 1 {
                     Limits::check_children(children.len().saturating_add(1), xml.len())?;
                     children
@@ -336,6 +363,7 @@ fn top_level(xml: &str, limits: Limits) -> Result<TopLevel<'_>> {
         root,
         root_end,
         children,
+        max_depth,
     })
 }
 
@@ -432,6 +460,8 @@ impl Parts {
                 .transpose()?,
             mimetype,
             length: xml.len(),
+            source_digest: Sha256::digest(xml).into(),
+            depth: scanned.max_depth,
             root_inner: scanned.root_end + bom,
         })
     }
@@ -476,6 +506,9 @@ impl Parts {
     ///
     /// Returns an error when the package writer refuses a part.
     pub fn to_bytes(&self, limits: &Limits) -> Result<Vec<u8>> {
+        limits.check_source_bytes(self.length)?;
+        limits.check_content_bytes(self.length)?;
+        limits.check_depth(self.depth)?;
         limits
             .semantic
             .check_usize(SemanticLimitKind::ContentBytes, self.content.xml.len())?;
@@ -523,7 +556,8 @@ impl Parts {
     ///
     /// # Errors
     ///
-    /// Returns an error when `flat` is not the split source, and
+    /// Returns [`Error::PatchConflict`] when `flat` is not the split source,
+    /// including a same-length source with different bytes, and
     /// a typed refusal when an edited part's root start tag changed,
     /// it gained or lost top-level children, a part disappeared, or two
     /// parts changed one shared child differently.
@@ -538,11 +572,13 @@ impl Parts {
     ) -> Result<Vec<u8>> {
         limits.check_source_bytes(flat.len())?;
         limits.check_content_bytes(flat.len())?;
-        if flat.len() != self.length {
-            return Err(invalid(
+        if flat.len() != self.length || Sha256::digest(flat).as_slice() != self.source_digest {
+            return Err(Error::patch_conflict(
+                "odf-common.flat.merge",
                 "the flat document is not the one these parts were split from",
             ));
         }
+        limits.check_depth(self.depth)?;
         let mut replacements: Vec<(Range<usize>, String)> = Vec::new();
         for (kind, before, after) in [
             (
@@ -909,6 +945,7 @@ mod tests {
     use crate::limits::{
         LimitKind, SemanticLimitKind, SemanticLimits, SourceLimitKind, SourceLimits,
     };
+    use std::io::Write as _;
 
     const FLAT: &str = concat!(
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n",
@@ -1030,6 +1067,20 @@ mod tests {
                 .merge(b"short", Some(&one), None, None, None, &limits)
                 .is_err()
         );
+
+        let foreign = FLAT.replace("Hello", "Jello");
+        assert_eq!(foreign.len(), FLAT.len());
+        assert!(matches!(
+            parts.merge(
+                foreign.as_bytes(),
+                Some(parts.content_xml()),
+                None,
+                None,
+                None,
+                &limits,
+            ),
+            Err(Error::PatchConflict { .. })
+        ));
     }
 
     #[test]
@@ -1187,5 +1238,61 @@ mod tests {
                 ..
             }
         ));
+
+        let tight = Limits::new(
+            SourceLimits::DEFAULT,
+            SemanticLimits::builder()
+                .max_depth(2)
+                .unwrap()
+                .build()
+                .unwrap(),
+        );
+        // The source was admitted under the loose profile.  Every output
+        // route must still recheck its retained proof under the recipient's
+        // tighter policy, including unchanged edits.
+        assert!(parts.to_bytes(&tight).is_err());
+        assert!(
+            parts
+                .merge(FLAT.as_bytes(), None, None, None, None, &tight)
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn empty_elements_are_checked_at_their_attempted_depth() {
+        let flat = concat!(
+            "<office:document xmlns:office=\"urn:oasis:names:tc:opendocument:xmlns:office:1.0\" ",
+            "office:mimetype=\"application/vnd.oasis.opendocument.text\">",
+            "<office:body><office:text/></office:body>",
+            "</office:document>",
+        );
+        let limits = Limits::new(
+            SourceLimits::DEFAULT,
+            SemanticLimits::builder()
+                .max_depth(2)
+                .unwrap()
+                .build()
+                .unwrap(),
+        );
+        assert!(matches!(
+            Parts::split(flat.as_bytes(), &limits),
+            Err(Error::Limit {
+                kind: LimitKind::Semantic(SemanticLimitKind::Depth),
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn bounded_zip_sink_reserves_from_length_when_capacity_has_slack() {
+        let mut sink = super::BoundedBytes {
+            bytes: Vec::with_capacity(64),
+            limit: 256,
+        };
+        sink.write_all(b"seed").unwrap();
+        let payload = vec![b'x'; 196];
+        sink.write_all(&payload).unwrap();
+        assert_eq!(sink.bytes.len(), 200);
+        assert!(sink.bytes.capacity() <= sink.limit);
     }
 }

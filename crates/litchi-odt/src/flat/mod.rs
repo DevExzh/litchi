@@ -254,7 +254,10 @@ impl Document {
     pub fn to_package(&self) -> std::result::Result<crate::Package, Error> {
         let limits = litchi_odf_common::flat::Limits::from_options(self.options());
         let parts = litchi_odf_common::flat::Parts::split(self.inner.xml().as_bytes(), &limits)?;
-        crate::Package::from_bytes_with_options(&parts.to_bytes(&limits)?, self.options())
+        crate::Package::from_bytes_with_options(
+            &parts.to_bytes(&limits)?,
+            limits.projection_options(),
+        )
     }
 
     /// This document with an edit of its packaged projection

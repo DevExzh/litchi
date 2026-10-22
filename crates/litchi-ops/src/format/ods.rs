@@ -412,7 +412,7 @@ impl Ods {
                 let bytes = parts.to_bytes(&flat_limits).map_err(odf_error)?;
                 // The flat reader admitted the document; a projection the
                 // packaged reader refuses is a gap of the edit.
-                Package::from_bytes(&bytes).map_err(|error| {
+                Package::from_bytes_with_options(&bytes, flat_limits.projection_options()).map_err(|error| {
                     odf_error(error)
                         .caused_by_argument(Code::UnsupportedCapability)
                         .with_suggestion(

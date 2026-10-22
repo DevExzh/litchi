@@ -278,12 +278,8 @@ impl OdfTree {
                 // The input limit applies to the original flat source. The
                 // generated ZIP is an internal projection; semantic policy
                 // still applies to every parsed drawing part and object.
-                litchi_odg::Package::from_bytes_with_options(
-                    &zip,
-                    litchi_odf_common::OpenOptions::new()
-                        .semantic_limits(options.odf_open_options().semantic_limits_value()),
-                )
-                .map_err(|error| odf_error(error, format))
+                litchi_odg::Package::from_bytes_with_options(&zip, flat_limits.projection_options())
+                    .map_err(|error| odf_error(error, format))
             })?;
         let owner = Owner::Odg(package);
         let tree = owner.tree()?;

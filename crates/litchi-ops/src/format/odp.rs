@@ -490,9 +490,11 @@ impl Odp {
                 // The flat reader admitted the document; a projection the
                 // packaged reader refuses is a gap of the edit, not a
                 // corrupt file.
-                let package =
-                    litchi_odp::Package::from_bytes_with_options(&bytes, self.0.odf_options)
-                        .map_err(|error| self.flat_refusal(odf_error(error)))?;
+                let package = litchi_odp::Package::from_bytes_with_options(
+                    &bytes,
+                    flat_limits.projection_options(),
+                )
+                .map_err(|error| self.flat_refusal(odf_error(error)))?;
                 Ok(self.0.materialized.get_or_init(|| package))
             },
         }
