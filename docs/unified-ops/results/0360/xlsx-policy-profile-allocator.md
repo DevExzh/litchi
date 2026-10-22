@@ -73,5 +73,15 @@ The +64 calls are the expected one lazy reader-state allocation per owner; the
 corresponding byte total decreases by 128 bytes per route. JSON reports and
 binary hashes are in
 `/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/allocator-reader-state-repair-reader-profiles`.
-A matched instruction-counter run is still required before any performance
-acceptance decision.
+A matched Callgrind run used the protected reader binaries with the same
+`--iterations 64 --warmups 2` command and recorded `Ir` only. e63 collected
+211,989,617 instructions; the candidate collected 212,237,885, a difference
+of 248,268 instructions (1.001171x, +0.1171%). The extra instructions are a
+small deterministic cost alongside the +64 calls per route; this remains
+returned evidence for coordinator review, not a native performance acceptance
+claim. Callgrind outputs are external at
+`/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/reader-callgrind-v1`:
+`callgrind-e63.out` SHA-256
+`7ba7608cfdeb367bec33ce9197ccc4f943b0f63b2a781f462612aac2e5694d96` and
+`callgrind-current.out` SHA-256
+`e53d121bbf0dee9bc1345ed179f74989a711e84305ae13661c22eb3f9c0b6532`.
