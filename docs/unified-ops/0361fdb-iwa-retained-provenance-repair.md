@@ -225,8 +225,9 @@ performance/report file reached 1 MiB and no `/binaries/` path was staged.
 
 ## 0361fdc v16 matched constructor return
 
-The v16 protected-binary probe measures the total constructor route with the
-collection work inside every iteration. The reduced receipt is
+The v16 protected-binary probe measures the complete constructor and collection
+admission work inside every iteration, and records the serialized output
+for each matched fixture. The reduced receipt is
 [`constructor-v16-push-admission.json`](results/0361fd/constructor-v16-push-admission.json).
 It records source commit `cad8523c0c`, the candidate probe source after caching
 `message_count()`, and the protected baseline/candidate binary hashes. The raw
@@ -235,11 +236,13 @@ callgrind captures remain outside the repository under
 
 Callgrind uses `(Ir at 12,000 - Ir at 2,000) / 10,000`. `archive_info` is the
 original generic `Vec<MessageInfo>` route compared with `push(MessageInfo)`;
-`archive_info_e2e` compares the same total construction with `push_new`.
-Both routes produced identical output bytes and SHA-256 digests for base and
-candidate at every completed message count. The semantic checks include public
-length/version mutation invalidation and the minimal-prefix to nonminimal
-transition, so the lower work is not obtained by trusting mutable fields.
+`archive_info_e2e` compares the same total construction with `push_new`; and
+`archive_info_generic_e2e` includes metadata `Vec` assembly followed by the
+generic `push(MessageInfo)` route. Every route produced identical serialized
+output bytes and SHA-256 digests for base and candidate at all four message
+counts. The semantic checks include public length/version mutation invalidation
+and the minimal-prefix to nonminimal transition, so the lower work is not
+obtained by trusting mutable fields.
 
 | Route | Messages | Base Ir/op | Candidate Ir/op | Candidate/base |
 |---|---:|---:|---:|---:|
@@ -251,8 +254,15 @@ transition, so the lower work is not obtained by trusting mutable fields.
 | `archive_info_e2e` (`push_new`) | 8 | 2,172.0 | 4,472.0 | 2.059 |
 | `archive_info_e2e` (`push_new`) | 32 | 10,328.0 | 18,435.0 | 1.785 |
 | `archive_info_e2e` (`push_new`) | 128 | 51,538.0 | 81,828.0 | 1.588 |
+| `archive_info_generic_e2e` (`push`) | 1 | 1,064.0 | 1,982.0 | 1.863 |
+| `archive_info_generic_e2e` (`push`) | 8 | 2,175.0 | 5,992.0 | 2.755 |
+| `archive_info_generic_e2e` (`push`) | 32 | 10,331.0 | 23,600.0 | 2.284 |
+| `archive_info_generic_e2e` (`push`) | 128 | 51,541.0 | 101,031.0 | 1.960 |
 
-The generic end-to-end route (`archive_info_generic_e2e`) was not run because
-another build reduced free space below the 12,000,000,000-byte decimal floor;
-its v16 result remains pending. These deterministic rows are returned for
-constructor repair and do not qualify native latency or memory.
+The generic collection route remains the largest deterministic return: its
+per-message admission slope is required to inspect each current public record
+when callers provide an ordinary mutable `Vec<MessageInfo>`. `push_new` avoids
+that record inspection while retaining exact aggregate admission, but still
+returns a 1.59–2.06× instruction count in this probe. These are constructor
+returns for repair review; no native latency or memory qualification is
+claimed, and the quiet-host native run remains separate.
