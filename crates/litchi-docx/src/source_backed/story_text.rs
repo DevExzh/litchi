@@ -609,6 +609,13 @@ struct Envelope {
 #[derive(Clone)]
 enum Payload {
     Owned(Arc<Vec<u8>>),
+    /// A validated view into the transaction XML.  Main-story projections
+    /// already own the complete document buffer; retaining its range avoids
+    /// copying that buffer merely to construct the raw story snapshot.
+    OwnedRange {
+        bytes: Arc<Vec<u8>>,
+        range: Range,
+    },
     Managed(PartData),
 }
 
@@ -616,6 +623,7 @@ impl Payload {
     fn as_bytes(&self) -> &[u8] {
         match self {
             Self::Owned(bytes) => bytes.as_slice(),
+            Self::OwnedRange { bytes, range } => &bytes[range.start..range.end],
             Self::Managed(data) => data.as_bytes(),
         }
     }
@@ -914,7 +922,7 @@ impl Snapshot {
     }
 
     fn with_transaction_snapshot(&self, transaction: DocumentSnapshot) -> Result<Self> {
-        let (raw, envelope) = if let Some(envelope) = self.envelope {
+        let (payload, envelope) = if let Some(envelope) = self.envelope {
             let wrapped = transaction.shared_xml().map_err(Error::DocumentEdit)?;
             let wrapped_end = wrapped
                 .len()
@@ -969,21 +977,22 @@ impl Snapshot {
             raw.extend_from_slice(before);
             raw.extend_from_slice(inner);
             raw.extend_from_slice(after);
-            (raw, Some(envelope))
+            (Payload::Owned(Arc::new(raw)), Some(envelope))
         } else {
-            (
-                checked_story_output_clone(
-                    transaction
-                        .shared_xml()
-                        .map_err(Error::DocumentEdit)?
-                        .as_ref(),
-                    &self.limits,
-                    LimitKind::TransactionXml,
-                )?,
-                None,
-            )
+            let bytes = transaction.shared_xml().map_err(Error::DocumentEdit)?;
+            if bytes.len() > self.limits.max_output_bytes {
+                return Err(Error::Limit {
+                    kind: LimitKind::TransactionXml,
+                    actual: bytes.len(),
+                    maximum: self.limits.max_output_bytes,
+                });
+            }
+            let range = Range {
+                start: 0,
+                end: bytes.len(),
+            };
+            (Payload::OwnedRange { bytes, range }, None)
         };
-        let payload = Payload::Owned(Arc::new(raw));
         let layout = scan_selected_story(
             payload.as_bytes(),
             &self.selector,
@@ -4571,21 +4580,6 @@ fn checked_string_clone(value: &str, resource: &'static str) -> Result<String> {
         .map_err(|source| Error::Allocation { resource, source })?;
     copy.push_str(value);
     Ok(copy)
-}
-
-fn checked_story_output_clone(
-    bytes: &[u8],
-    limits: &Limits,
-    resource: LimitKind,
-) -> Result<Vec<u8>> {
-    if bytes.len() > limits.max_output_bytes {
-        return Err(Error::Limit {
-            kind: resource,
-            actual: bytes.len(),
-            maximum: limits.max_output_bytes,
-        });
-    }
-    checked_vec_clone(bytes, resource.as_str())
 }
 
 fn digest(bytes: &[u8]) -> [u8; 32] {
