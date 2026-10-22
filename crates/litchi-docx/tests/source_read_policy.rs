@@ -22,6 +22,7 @@ use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits as CoreLimits,
     OwnedSource, ReadAt, Resource, SourceVersion,
 };
+use litchi_docx::source_backed::tail_append::EditOptions;
 use litchi_docx::{Package, SourceLimits, source_backed};
 use litchi_opc::SourceCacheLimits;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
@@ -218,7 +219,7 @@ fn managed_read_ahead_supports_semantic_read_then_releases_before_docx_publicati
     );
     let plan = package
         .tail_append_plain_paragraph("tail")
-        .with_limits(append_limits())
+        .with_options(EditOptions::new(append_limits()))
         .prepare()
         .expect("simple DOCX append must prepare");
     assert!(!plan.is_noop(), "the append must be a real edit");

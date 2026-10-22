@@ -4,7 +4,7 @@ use std::io::Cursor;
 
 use libfuzzer_sys::fuzz_target;
 use litchi_docx::SourceLimits;
-use litchi_docx::source_backed::{Package, tail_append::Limits};
+use litchi_docx::source_backed::{Package, tail_append::{EditOptions, Limits}};
 
 fn read_limits() -> SourceLimits {
     SourceLimits::builder()
@@ -63,7 +63,7 @@ fuzz_target!(|data: &[u8]| {
         max_output_bytes: 256 * 1024,
         max_token_bytes: 8192,
     };
-    if let Ok(plan) = package.tail_append_noop().with_limits(limits).prepare() {
+    if let Ok(plan) = package.tail_append_noop().with_options(EditOptions::new(limits)).prepare() {
         let mut output = Vec::new();
         if let Ok(publication) = plan.write_to(&mut output) {
             assert!(publication.is_noop());
@@ -72,7 +72,7 @@ fuzz_target!(|data: &[u8]| {
     }
     let Ok(plan) = package
         .tail_append_plain_paragraph("fuzz <&> café")
-        .with_limits(limits)
+        .with_options(EditOptions::new(limits))
         .prepare()
     else {
         return;

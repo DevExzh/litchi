@@ -56,9 +56,9 @@ pub use svg_lifecycle::{
 };
 
 pub use tail_append::{
-    CandidateProof as TailAppendCandidateProof, Commit as TailAppendCommit, Edit as TailAppendEdit,
-    Error as TailAppendError, Limits as TailAppendLimits, Options as TailAppendOptions,
-    Plan as TailAppendPlan, Refusal as TailAppendRefusal, SourceProof as TailAppendSourceProof,
+    CandidateProof as TailAppendCandidateProof, Commit as TailAppendCommit,
+    Error as TailAppendError, Limits as TailAppendLimits, Plan as TailAppendPlan,
+    Refusal as TailAppendRefusal, SourceProof as TailAppendSourceProof,
 };
 
 pub use tail_append_stream::{
@@ -72,8 +72,8 @@ pub use tail_append_stream::{
     MemoryReplayStore as TailAppendStreamMemoryReplayStore,
     OneShotParagraphProducer as TailAppendStreamOneShotProducer,
     ParagraphCursor as TailAppendStreamCursor, ParagraphEventSink as TailAppendStreamEventSink,
-    ParagraphStreamEdit as TailAppendStreamEdit, ParagraphStreamLimits as TailAppendStreamLimits,
-    ParagraphStreamPlan as TailAppendStreamPlan, PlainParagraphEvent as TailAppendStreamEvent,
+    ParagraphStreamLimits as TailAppendStreamLimits, ParagraphStreamPlan as TailAppendStreamPlan,
+    PlainParagraphEvent as TailAppendStreamEvent,
     ReplayableParagraphSource as TailAppendStreamSource,
 };
 

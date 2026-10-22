@@ -383,6 +383,22 @@ fn limits(source_xml_bytes: usize) -> ParagraphStreamLimits {
     stream
 }
 
+#[test]
+fn package_stream_edit_uses_the_focused_public_type() {
+    let source_xml = source_xml(false, 0);
+    let package = open_package(archive(&source_xml, false, Compression::Store));
+    let edit: source_backed::paragraph_stream::Edit<'_, EventSource> = package
+        .tail_append_plain_paragraphs(
+            EventSource::new(vec![
+                EventData::Start,
+                EventData::Text("focused".to_owned()),
+                EventData::End,
+            ]),
+            limits(source_xml.len()),
+        );
+    assert_eq!(edit.limits(), limits(source_xml.len()));
+}
+
 fn managed_context(memory: u64, output: u64) -> (Budget, ExecutionContext) {
     let (budget, _cancellation_source, context) =
         managed_context_with_objects(memory, output, u64::MAX);
