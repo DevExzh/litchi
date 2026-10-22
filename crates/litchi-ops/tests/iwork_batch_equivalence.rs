@@ -115,7 +115,7 @@ fn closure(file: &File, sets: &[Set]) -> Outcome {
         Ok(())
     });
     match edited {
-        Ok(commit) => publish(&commit.file),
+        Ok(commit) => publish(commit.file()),
         Err(error) => refused(&error, None),
     }
 }
@@ -135,7 +135,7 @@ fn batch(file: &File, sets: &[Set]) -> Outcome {
         })
         .collect();
     match file.batch(items, BatchMode::Atomic) {
-        Ok(commit) => publish(&commit.file),
+        Ok(commit) => publish(commit.file()),
         Err(error) => refused(&error, None),
     }
 }

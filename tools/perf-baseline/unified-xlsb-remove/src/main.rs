@@ -257,9 +257,9 @@ fn unified_once(
                 transaction.remove(target)?;
                 Ok(())
             })?;
-            let diagnostics = commit.diagnostics;
+            let diagnostics = *commit.diagnostics();
             Ok((
-                commit.file,
+                commit.into_file(),
                 UnifiedStats {
                     changed: diagnostics.changed(),
                     operations: diagnostics.operations(),
@@ -273,7 +273,7 @@ fn unified_once(
                 return Err("command batch received direct targets".into());
             };
             let commit = file.batch(items, BatchMode::Atomic)?;
-            let diagnostics = commit.diagnostics;
+            let diagnostics = *commit.diagnostics();
             if !diagnostics.changed() || diagnostics.commits() != 1 {
                 return Err(format!(
                     "command batch did not coalesce one changed native commit: changed={}, operations={}, commits={}, leaf_operations={}",
@@ -285,7 +285,7 @@ fn unified_once(
                 .into());
             }
             Ok((
-                commit.file,
+                commit.into_file(),
                 UnifiedStats {
                     changed: diagnostics.changed(),
                     operations: diagnostics.operations(),

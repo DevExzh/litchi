@@ -210,7 +210,11 @@ fn prepared_relative_path_retains_absolute_origin_through_an_edit() {
         let origin = directory.path().join(format!("prepared-{eager}.docx"));
         std::fs::write(&origin, fixture()).expect("write prepared source");
         let relative = origin.strip_prefix(&cwd).expect("relative origin");
-        let detection = litchi_ops::detect::detect_and_prepare(relative).expect("prepare path");
+        let detection = litchi_ops::detect::detect_and_prepare(
+            relative,
+            &litchi_ops::detect::SourceLimits::default(),
+        )
+        .expect("prepare path");
         let options = if eager {
             OpenOptions::new().source_mode(SourceMode::Eager)
         } else {

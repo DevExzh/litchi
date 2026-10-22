@@ -77,7 +77,7 @@ mod doc {
         // Without a clock, DATE needs one; the others still compute.
         let report = file.refresh(&Options::new()).unwrap();
         let statuses: Vec<(String, Status)> = report
-            .value
+            .value()
             .fields()
             .iter()
             .map(|field| (field.kind().to_owned(), field.status()))
@@ -92,9 +92,9 @@ mod doc {
             ]
         );
         let commit = file.refresh(&clock()).unwrap();
-        assert_eq!(commit.value.refreshed(), 3);
-        assert_eq!(commit.diagnostics.commits(), 1);
-        let after = open_bytes(commit.file.to_bytes().unwrap()).unwrap();
+        assert_eq!(commit.value().refreshed(), 3);
+        assert_eq!(commit.diagnostics().commits(), 1);
+        let after = open_bytes(commit.file().to_bytes().unwrap()).unwrap();
         // The paragraph text shows the field: instruction and result.
         assert!(text(&after, "/body/p[1]").ends_with("\u{14}2026-10-15\u{15}"));
         assert!(text(&after, "/body/p[2]").ends_with("\u{14}7\u{15}"));
@@ -106,11 +106,11 @@ mod doc {
         // The new DATE result has one word where the old had two: NUMWORDS
         // changes once more, then every result is current, an exact no-op.
         let again = after.refresh(&clock()).unwrap();
-        assert_eq!(again.value.refreshed(), 1);
-        let current = again.file.refresh(&clock()).unwrap();
-        assert!(current.patch.is_noop(), "{:?}", current.value);
-        assert_eq!(current.value.count(Status::Unchanged), 3);
-        let restored = commit.patch.inverse().apply(&commit.file).unwrap();
+        assert_eq!(again.value().refreshed(), 1);
+        let current = again.file().refresh(&clock()).unwrap();
+        assert!(current.patch().is_noop(), "{:?}", current.value());
+        assert_eq!(current.value().count(Status::Unchanged), 3);
+        let restored = commit.patch().inverse().apply(commit.file()).unwrap();
         assert_eq!(restored.to_bytes().unwrap(), file.to_bytes().unwrap());
     }
 }
@@ -147,7 +147,7 @@ mod odt {
         let file = fixture();
         // The stored title is current: nothing to write.
         let report = file.refresh(&clock()).unwrap();
-        assert!(report.patch.is_noop());
+        assert!(report.patch().is_noop());
         let expected = [
             ("DATE".to_owned(), Status::Locked),
             ("TIME".to_owned(), Status::Locked),
@@ -155,7 +155,7 @@ mod odt {
             ("PAGE-NUMBER".to_owned(), Status::NeedsLayout),
             ("PAGE-COUNT".to_owned(), Status::NeedsLayout),
         ];
-        let found = statuses(&report.value);
+        let found = statuses(report.value());
         for entry in &expected {
             assert!(found.contains(entry), "{entry:?} in {found:?}");
         }
@@ -164,13 +164,13 @@ mod odt {
             .set("/metadata", props! { "title" => "Rapport" })
             .unwrap();
         let commit = retitled.refresh(&clock()).unwrap();
-        assert_eq!(commit.value.refreshed(), 1);
-        let after = open_bytes(commit.file.to_bytes().unwrap()).unwrap();
+        assert_eq!(commit.value().refreshed(), 1);
+        let after = open_bytes(commit.file().to_bytes().unwrap()).unwrap();
         let text = after.view(litchi_ops::view::Mode::Text).unwrap();
         assert!(text.contains("Rapport"), "{text}");
         assert!(!text.contains("Intitulé"), "{text}");
-        assert!(after.refresh(&clock()).unwrap().patch.is_noop());
-        let restored = commit.patch.inverse().apply(&commit.file).unwrap();
+        assert!(after.refresh(&clock()).unwrap().patch().is_noop());
+        let restored = commit.patch().inverse().apply(commit.file()).unwrap();
         assert_eq!(restored.to_bytes().unwrap(), retitled.to_bytes().unwrap());
     }
 }
@@ -238,18 +238,18 @@ mod odp {
         let file = deck();
         assert_eq!(text(&file, "/slide[2]/shape[1]"), "Slide 9 of 9: old");
         let commit = file.refresh(&clock()).unwrap();
-        assert_eq!(commit.value.refreshed(), 6, "{:?}", commit.value);
-        assert_eq!(commit.diagnostics.commits(), 1);
-        let after = open_bytes(commit.file.to_bytes().unwrap()).unwrap();
+        assert_eq!(commit.value().refreshed(), 6, "{:?}", commit.value());
+        assert_eq!(commit.diagnostics().commits(), 1);
+        let after = open_bytes(commit.file().to_bytes().unwrap()).unwrap();
         assert_eq!(text(&after, "/slide[1]/shape[1]"), "Slide 1 of 2: Deck");
         assert_eq!(text(&after, "/slide[2]/shape[1]"), "Slide 2 of 2: Deck");
-        assert!(after.refresh(&clock()).unwrap().patch.is_noop());
+        assert!(after.refresh(&clock()).unwrap().patch().is_noop());
         // Moving a slide makes its page number stale again.
         let moved = after.swap("/slide[1]", "/slide[2]").unwrap();
         let again = moved.refresh(&Options::new()).unwrap();
-        assert_eq!(again.value.refreshed(), 2);
+        assert_eq!(again.value().refreshed(), 2);
         assert_eq!(
-            text(&again.file, "/slide[1]/shape[1]"),
+            text(again.file(), "/slide[1]/shape[1]"),
             "Slide 1 of 2: Deck"
         );
     }

@@ -239,8 +239,12 @@ mod enabled {
         let commit = file
             .batch(items.iter().cloned(), BatchMode::Atomic)
             .expect("unified batch");
-        assert_eq!(commit.diagnostics.commits(), 1, "one coalesced leaf commit");
-        commit.file
+        assert_eq!(
+            commit.diagnostics().commits(),
+            1,
+            "one coalesced leaf commit"
+        );
+        commit.into_file()
     }
 
     pub(super) fn run() {

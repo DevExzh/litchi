@@ -112,8 +112,8 @@ fn an_unchanged_set_is_an_exact_no_op() {
     let commit = file
         .edit(|tx| tx.set("/sheet1/A2", props! { "value" => 1 }))
         .must();
-    assert!(!commit.diagnostics.changed());
-    assert_eq!(commit.file.to_bytes().must(), before);
+    assert!(!commit.diagnostics().changed());
+    assert_eq!(commit.file().to_bytes().must(), before);
 }
 
 #[test]
@@ -426,12 +426,12 @@ fn batches_coalesce_cell_sets_into_one_leaf_commit() {
             Ok(())
         })
         .must();
-    assert_eq!(commit.diagnostics.operations(), 200);
-    assert_eq!(commit.diagnostics.commits(), 1);
-    let edited = reopen(&commit.file);
+    assert_eq!(commit.diagnostics().operations(), 200);
+    assert_eq!(commit.diagnostics().commits(), 1);
+    let edited = reopen(commit.file());
     assert_eq!(text(&edited, "/sheet1/H200"), "200");
     // The reversible patch restores the input exactly.
-    let restored = commit.patch.inverse().apply(&commit.file).must();
+    let restored = commit.patch().inverse().apply(commit.file()).must();
     assert_eq!(restored.to_bytes().must(), file.to_bytes().must());
 
     // A repeated coordinate closes the run and observes the earlier value.
@@ -443,8 +443,8 @@ fn batches_coalesce_cell_sets_into_one_leaf_commit() {
             Ok(())
         })
         .must();
-    assert_eq!(commit.diagnostics.commits(), 2);
-    let edited = &commit.file;
+    assert_eq!(commit.diagnostics().commits(), 2);
+    let edited = commit.file();
     assert_eq!(
         json(edited, "/sheet1/H1")["format"]["formula"],
         "of:=[.A2]*2"
@@ -476,7 +476,7 @@ fn atomic_batches_leave_the_input_untouched_on_failure() {
     assert_eq!(error.item(), Some(1));
     assert_eq!(file.to_bytes().must(), before);
     let report = file.batch(items, BatchMode::BestEffort).must();
-    assert_eq!(text(&report.file, "/sheet1/A1"), "changed");
+    assert_eq!(text(report.file(), "/sheet1/A1"), "changed");
 }
 
 #[test]

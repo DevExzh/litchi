@@ -147,15 +147,15 @@ fn warn_skips_the_other_root_keys_and_writes_the_metadata() {
             .apply_with(&item, &warn)
             .unwrap_or_else(|error| panic!("{format:?}: {error}"));
         let skipped: Vec<_> = commit
-            .value
+            .value()
             .warnings
             .iter()
             .map(|warning| warning.property())
             .collect();
         assert_eq!(skipped, [Some("theme.color.dk1")], "{format:?}");
-        assert_eq!(metadata(&commit.file).title.as_deref(), Some("T"));
-        assert_eq!(metadata(&commit.file).author.as_deref(), Some("Jane"));
-        assert!(commit.diagnostics.changed(), "{format:?}");
+        assert_eq!(metadata(commit.file()).title.as_deref(), Some("T"));
+        assert_eq!(metadata(commit.file()).author.as_deref(), Some("Jane"));
+        assert!(commit.diagnostics().changed(), "{format:?}");
     }
 }
 
@@ -170,13 +170,13 @@ fn transactions_replay_and_invert_root_sets() {
                 Ok(())
             })
             .unwrap_or_else(|error| panic!("{format:?}: {error}"));
-        assert!(!commit.patch.is_noop(), "{format:?}");
-        let after = commit.file.clone();
+        assert!(!commit.patch().is_noop(), "{format:?}");
+        let after = commit.file().clone();
         assert_eq!(metadata(&after).title.as_deref(), Some("In a transaction"));
         assert_eq!(metadata(&after).author.as_deref(), Some("Ada"));
-        let replayed = commit.patch.apply(&file).expect("replay");
+        let replayed = commit.patch().apply(&file).expect("replay");
         assert_eq!(metadata(&replayed).author.as_deref(), Some("Ada"));
-        let restored = commit.patch.inverse().apply(&after).expect("inverse");
+        let restored = commit.patch().inverse().apply(&after).expect("inverse");
         assert_eq!(metadata(&restored).title, None, "{format:?}");
         // An equal value is a no-op transaction.
         let same = after
@@ -185,7 +185,7 @@ fn transactions_replay_and_invert_root_sets() {
                 Ok(())
             })
             .expect("no-op");
-        assert!(same.patch.is_noop(), "{format:?}");
+        assert!(same.patch().is_noop(), "{format:?}");
     }
 }
 
@@ -266,14 +266,18 @@ fn docx_root_writes_application_and_custom_properties() {
             Ok(())
         })
         .expect("custom");
-    assert!(!commit.patch.is_noop());
+    assert!(!commit.patch().is_noop());
     assert_eq!(
-        root_value(&commit.file, "extended.company").as_deref(),
+        root_value(commit.file(), "extended.company").as_deref(),
         Some("Acme")
     );
-    let restored = commit.patch.inverse().apply(&commit.file).expect("inverse");
+    let restored = commit
+        .patch()
+        .inverse()
+        .apply(commit.file())
+        .expect("inverse");
     assert_eq!(restored.to_bytes().expect("bytes"), before);
-    let replayed = commit.patch.apply(&file).expect("replay");
+    let replayed = commit.patch().apply(&file).expect("replay");
     assert_eq!(
         root_value(&replayed, "extended.company").as_deref(),
         Some("Acme")

@@ -171,21 +171,24 @@ fn notes_text_set_round_trips_with_exact_history_and_noops() {
         let commit = source
             .edit(|edit| edit.set("/slide[1]/notes", props! { "text" => "New notes" }))
             .expect("notes write");
-        assert!(commit.diagnostics.changed());
-        assert_eq!(text(&commit.file, "/slide[1]/notes"), "New notes");
+        assert!(commit.diagnostics().changed());
+        assert_eq!(text(commit.file(), "/slide[1]/notes"), "New notes");
         assert_eq!(
-            text(&commit.file, "/slide[2]/notes"),
+            text(commit.file(), "/slide[2]/notes"),
             text(&source, "/slide[2]/notes")
         );
         assert_eq!(
-            text(&eager(&commit.file.to_bytes().unwrap()), "/slide[1]/notes"),
+            text(
+                &eager(&commit.file().to_bytes().unwrap()),
+                "/slide[1]/notes"
+            ),
             "New notes"
         );
         assert_eq!(
             commit
-                .patch
+                .patch()
                 .inverse()
-                .apply(&commit.file)
+                .apply(commit.file())
                 .expect("inverse")
                 .to_bytes()
                 .unwrap(),
@@ -197,9 +200,9 @@ fn notes_text_set_round_trips_with_exact_history_and_noops() {
         let noop = source
             .edit(|edit| edit.set("/slide[2]/notes", props! { "text" => unchanged.as_str() }))
             .expect("equal notes");
-        assert!(noop.patch.is_noop());
-        assert!(!noop.diagnostics.changed());
-        assert_eq!(noop.file.to_bytes().unwrap(), before);
+        assert!(noop.patch().is_noop());
+        assert!(!noop.diagnostics().changed());
+        assert_eq!(noop.file().to_bytes().unwrap(), before);
 
         // Every notes page of a query in one native edit.
         let all = source
@@ -238,7 +241,7 @@ fn paragraph_text_set_rewrites_only_the_selected_paragraph() {
                 BatchMode::Atomic,
             )
             .expect("paragraph batch");
-        assert_eq!(text(&both.file, "/slide[1]/shape[2]"), "One\rTwo");
+        assert_eq!(text(both.file(), "/slide[1]/shape[2]"), "One\rTwo");
     });
 }
 
@@ -278,7 +281,7 @@ fn protected_and_invalid_text_writes_are_typed_refusals() {
                 edit.set("/slide[1]/notes", props! { "text" => "a" })?;
                 edit.set("/slide[1]/shape[1]", props! { "text" => "b" })
             })
-            .map(|commit| text(&commit.file, "/slide[1]/notes"))
+            .map(|commit| text(commit.file(), "/slide[1]/notes"))
             .expect("notes and shape in one transaction"),
         "a"
     );

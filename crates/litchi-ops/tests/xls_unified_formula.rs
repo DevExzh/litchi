@@ -193,19 +193,19 @@ fn ranges_broadcast_one_formula_in_one_native_commit() {
     let commit = owner
         .edit(|tx| tx.set("/Data/C1:D2", props! { "formula" => "1+1" }))
         .unwrap();
-    assert_eq!(commit.diagnostics.operations(), 1);
+    assert_eq!(commit.diagnostics().operations(), 1);
     for cell in ["C1", "C2", "D1", "D2"] {
         assert_eq!(
-            property(&commit.file, &format!("/Data/{cell}"), "formula").as_deref(),
+            property(commit.file(), &format!("/Data/{cell}"), "formula").as_deref(),
             Some("(1+1)"),
             "{cell}"
         );
     }
     assert_eq!(
         commit
-            .patch
+            .patch()
             .inverse()
-            .apply(&commit.file)
+            .apply(commit.file())
             .unwrap()
             .to_bytes()
             .unwrap(),

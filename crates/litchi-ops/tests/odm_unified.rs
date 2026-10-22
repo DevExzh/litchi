@@ -91,7 +91,7 @@ fn an_unchanged_value_is_an_exact_no_op() {
         .set("/body/section[1]", props! { "name" => name.as_str() })
         .expect("set");
     assert_eq!(file.to_bytes().unwrap(), before);
-    let file = file.edit(|_| Ok(())).expect("empty edit").file;
+    let file = file.edit(|_| Ok(())).expect("empty edit").into_file();
     assert_eq!(file.to_bytes().unwrap(), before);
 }
 

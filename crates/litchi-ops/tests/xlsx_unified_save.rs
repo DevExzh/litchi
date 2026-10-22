@@ -632,7 +632,9 @@ fn prepared_eager_open_retains_the_exact_source_archive() {
     let directory = tempfile::tempdir().expect("prepared fixture directory");
     let path = directory.path().join("prepared.xlsx");
     std::fs::write(&path, &bytes).expect("write prepared fixture");
-    let prepared = litchi_ops::detect::detect_and_prepare(&path).expect("prepare workbook");
+    let prepared =
+        litchi_ops::detect::detect_and_prepare(&path, &litchi_ops::detect::SourceLimits::default())
+            .expect("prepare workbook");
     let file = litchi_ops::open_prepared_with(
         prepared,
         &OpenOptions::new().source_mode(SourceMode::Eager),

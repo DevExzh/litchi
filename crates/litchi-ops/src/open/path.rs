@@ -334,6 +334,7 @@ mod zip {
         options: &OpenOptions,
         tail: &T,
     ) -> Result<File> {
+        let detection_limits = options.detection_limits();
         // 1. An ordinary ODF package: an ODF `mimetype` and no OPC catalog.
         #[cfg(any(feature = "odt", feature = "ods", feature = "odp", odf_objects))]
         let odf = {
@@ -458,7 +459,7 @@ mod zip {
             version,
             super::super::input_ceiling(options),
         )?;
-        let file = super::super::bytes::zip_fallback(bytes, options, tail)?;
+        let file = super::super::bytes::zip_fallback(bytes, options, &detection_limits, tail)?;
         // An iWork package saves back to its path (record 0296).
         #[cfg(feature = "iwork-adapter")]
         if file.iwork().is_some() {

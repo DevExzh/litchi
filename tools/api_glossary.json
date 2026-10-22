@@ -9034,6 +9034,12 @@
           "name": "paragraph_text",
           "scope": "litchi_ops::format::rtf::Node",
           "replacement": "Node::text for paragraph and run text"
+        },
+        {
+          "name": "_with_limits",
+          "scope": "litchi_ops",
+          "replacement": "configure a File transaction through EditOptions (`edit_with_options`, `batch_with_options`, `import_with_options`, `merge_with_options`, `refresh_with_options`); detection takes the OpenOptions it would be opened with and record parsers take their limits as a required argument (record 0351 §2.5, record 0362)",
+          "match": "suffix"
         }
       ],
       "families": []
@@ -12162,6 +12168,12 @@
           "scope": "litchi_ops::OpenOptions",
           "replacement": "use OpenOptions::odf_options(litchi_odf_common::OpenOptions) (ADR 0034 §5)",
           "recursive": false
+        },
+        {
+          "name": "_with_limits",
+          "scope": "litchi_ops",
+          "replacement": "configure a File transaction through EditOptions (`edit_with_options`, `batch_with_options`, `import_with_options`, `merge_with_options`, `refresh_with_options`); detection takes the OpenOptions it would be opened with and record parsers take their limits as a required argument (record 0351 §2.5, record 0362)",
+          "match": "suffix"
         }
       ],
       "families": []
@@ -14630,6 +14642,98 @@
           "scope": "litchi_ops::format::iwork::Iwork",
           "replacement": "compare with `File::same_content` or the commit's patch (ADR 0034, record 0296)",
           "recursive": false
+        },
+        {
+          "name": "_with_limits",
+          "scope": "litchi_ops",
+          "replacement": "configure a File transaction through EditOptions (`edit_with_options`, `batch_with_options`, `import_with_options`, `merge_with_options`, `refresh_with_options`); detection takes the OpenOptions it would be opened with and record parsers take their limits as a required argument (record 0351 §2.5, record 0362)",
+          "match": "suffix"
+        }
+      ],
+      "families": []
+    },
+    {
+      "id": "ops-all",
+      "package": "litchi-ops",
+      "default_features": false,
+      "features": [
+        "doc",
+        "docx",
+        "encryption",
+        "eval",
+        "formula",
+        "iwork-adapter",
+        "keynote",
+        "markdown",
+        "numbers",
+        "odb",
+        "odc",
+        "odf-formula",
+        "odf-objects",
+        "odg",
+        "odi",
+        "odm",
+        "odp",
+        "ods",
+        "odt",
+        "opc",
+        "oth",
+        "pages",
+        "ppt",
+        "pptx",
+        "rtf",
+        "test-support",
+        "xls",
+        "xlsb",
+        "xlsx",
+        "yaml"
+      ],
+      "banned_names": [
+        {
+          "name": "_with_limits",
+          "scope": "litchi_ops",
+          "replacement": "configure a File transaction through EditOptions (`edit_with_options`, `batch_with_options`, `import_with_options`, `merge_with_options`, `refresh_with_options`); detection takes the OpenOptions it would be opened with and record parsers take their limits as a required argument (record 0351 §2.5, record 0362)",
+          "match": "suffix"
+        },
+        {
+          "name": "from_json_with_limits",
+          "scope": "litchi_ops::merge::Data",
+          "replacement": "`Data::from_json(source, &SemanticLimits)` (record 0362)",
+          "recursive": false
+        },
+        {
+          "name": "from_csv_with",
+          "scope": "litchi_ops::merge::Data",
+          "replacement": "`Data::from_csv(source, &import::Options, &SemanticLimits)` (record 0362)",
+          "recursive": false
+        },
+        {
+          "name": "detect_ooxml_format",
+          "scope": "litchi_ops::detect::ooxml",
+          "replacement": "`detect_zip_format(bytes, &SourceLimits)`; one name per probe (record 0362)",
+          "recursive": false
+        },
+        {
+          "name": "detect_ooxml_format_from_bytes",
+          "scope": "litchi_ops::detect::ooxml",
+          "replacement": "`detect_zip_format(bytes, &SourceLimits)`; one name per probe (record 0362)",
+          "recursive": false
+        },
+        {
+          "name": "detect_format_smart_with_limits_and_tail",
+          "scope": "litchi_ops::detect",
+          "replacement": "`detect_format_smart_with_tail(bytes, &OpenOptions, tail)` (record 0362)"
+        },
+        {
+          "name": "detect_and_prepare_with_limits_and_tail",
+          "scope": "litchi_ops::detect",
+          "replacement": "`detect_and_prepare_with_tail(path, &OpenOptions, tail)` (record 0362)"
+        },
+        {
+          "name": "limits",
+          "scope": "litchi_ops::batch::Options",
+          "replacement": "`Options::edit_options(EditOptions)` (record 0362)",
+          "recursive": false
         }
       ],
       "families": []
@@ -14657,6 +14761,12 @@
           "name": "CellRange",
           "scope": "litchi",
           "replacement": "use litchi::numbers::Area; grid coordinates are `At`/`Area` (ADR 0034 §8, record 0352)"
+        },
+        {
+          "name": "_with_limits",
+          "scope": "litchi",
+          "replacement": "configure a File transaction through EditOptions (`edit_with_options`, `batch_with_options`, `import_with_options`, `merge_with_options`, `refresh_with_options`); detection takes the OpenOptions it would be opened with and record parsers take their limits as a required argument (record 0351 §2.5, record 0362)",
+          "match": "suffix"
         }
       ],
       "families": [],
@@ -14754,6 +14864,12 @@
           "name": "formats",
           "scope": "litchi::sheet",
           "replacement": "the format modules `delimited`, `sylk`, `dif`, `fixed_width` (record 0354)"
+        },
+        {
+          "name": "_with_limits",
+          "scope": "litchi",
+          "replacement": "configure a File transaction through EditOptions (`edit_with_options`, `batch_with_options`, `import_with_options`, `merge_with_options`, `refresh_with_options`); detection takes the OpenOptions it would be opened with and record parsers take their limits as a required argument (record 0351 §2.5, record 0362)",
+          "match": "suffix"
         }
       ],
       "families": [],

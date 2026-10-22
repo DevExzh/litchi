@@ -96,25 +96,25 @@ fn mixed_edits_are_sequential_reversible_and_identity_bound() {
             edit.remove("/body/p[3]")
         })
         .unwrap();
-    assert_eq!(paragraphs(&commit.file), ["First", "changed"]);
-    assert_eq!(commit.diagnostics.operations(), 3);
-    assert!(commit.diagnostics.changed());
+    assert_eq!(paragraphs(commit.file()), ["First", "changed"]);
+    assert_eq!(commit.diagnostics().operations(), 3);
+    assert!(commit.diagnostics().changed());
     assert_eq!(
-        commit.patch.apply(&source).unwrap().to_bytes().unwrap(),
-        commit.file.to_bytes().unwrap()
+        commit.patch().apply(&source).unwrap().to_bytes().unwrap(),
+        commit.file().to_bytes().unwrap()
     );
     assert_eq!(
         commit
-            .patch
+            .patch()
             .inverse()
-            .apply(&commit.file)
+            .apply(commit.file())
             .unwrap()
             .to_bytes()
             .unwrap(),
         INPUT
     );
     assert!(matches!(
-        commit.patch.apply(&file()).unwrap_err().leaf(),
+        commit.patch().apply(&file()).unwrap_err().leaf(),
         Source::Transaction(Error::PatchConflict)
     ));
 }
@@ -134,9 +134,9 @@ fn atomic_and_best_effort_batches_keep_sequential_addressing() {
         Some(1)
     );
     let best = source.batch(items(), BatchMode::BestEffort).unwrap();
-    assert_eq!(paragraphs(&best.file), ["First", "Fourth"]);
+    assert_eq!(paragraphs(best.file()), ["First", "Fourth"]);
     assert!(
-        matches!(&best.results[1], litchi_ops::ItemResult::Failed(error) if error.item() == Some(1))
+        matches!(&best.results()[1], litchi_ops::ItemResult::Failed(error) if error.item() == Some(1))
     );
     assert_eq!(source.to_bytes().unwrap(), INPUT);
 }
@@ -179,7 +179,10 @@ fn expansion_operation_and_snapshot_limits_are_typed_and_atomic() {
         ),
     ] {
         let error = source
-            .edit_with_limits(&limits, |edit| edit.remove(query("p")))
+            .edit_with_options(
+                litchi_ops::EditOptions::new().semantic_limits(limits),
+                |edit| edit.remove(query("p")),
+            )
             .unwrap_err();
         assert_eq!(error.code(), Code::LimitExceeded);
         assert!(

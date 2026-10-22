@@ -112,13 +112,16 @@ fn metadata_path_sets_removes_and_reverts() {
                 Ok::<_, litchi_ops::Error>(())
             })
             .unwrap();
-        assert!(commit.diagnostics.changed());
-        assert_eq!(properties(&commit.file).subject.as_deref(), Some("Subject"));
+        assert!(commit.diagnostics().changed());
         assert_eq!(
-            properties(&commit.file).category.as_deref(),
+            properties(commit.file()).subject.as_deref(),
+            Some("Subject")
+        );
+        assert_eq!(
+            properties(commit.file()).category.as_deref(),
             Some("Finance")
         );
-        let restored = commit.patch.inverse().apply(&commit.file).unwrap();
+        let restored = commit.patch().inverse().apply(commit.file()).unwrap();
         assert_eq!(restored.to_bytes().unwrap(), original, "{format:?}");
 
         // Refusals are typed and leave the source untouched.
@@ -151,9 +154,9 @@ fn doc_metadata_and_text_edits_share_one_history() {
             Ok::<_, litchi_ops::Error>(())
         })
         .unwrap();
-    assert_eq!(properties(&commit.file).title.as_deref(), Some("Mixed"));
-    assert!(commit.file.text().unwrap().contains("Body again"));
-    let restored = commit.patch.inverse().apply(&commit.file).unwrap();
+    assert_eq!(properties(commit.file()).title.as_deref(), Some("Mixed"));
+    assert!(commit.file().text().unwrap().contains("Body again"));
+    let restored = commit.patch().inverse().apply(commit.file()).unwrap();
     assert_eq!(restored.to_bytes().unwrap(), original);
 }
 

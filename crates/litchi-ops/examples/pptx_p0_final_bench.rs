@@ -280,7 +280,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let unified = || {
                     file.batch(items.clone(), BatchMode::Atomic)
                         .expect("batch")
-                        .file
+                        .into_file()
                 };
                 let same = same_parts(&leaf_bytes()?, &unified().to_bytes()?);
                 // A handle memoizes the table a batch reads (record 0346):
@@ -307,7 +307,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         drop(black_box(
                             file.batch(items.clone(), BatchMode::Atomic)
                                 .expect("batch")
-                                .file,
+                                .into_file(),
                         ));
                     }),
                 );
@@ -393,7 +393,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let unified = || {
                 file.batch(items.clone(), BatchMode::Atomic)
                     .expect("batch")
-                    .file
+                    .into_file()
             };
             let same = same_parts(&leaf_bytes()?, &unified().to_bytes()?);
             report(
@@ -480,7 +480,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let unified = || {
             file.batch(items.clone(), BatchMode::Atomic)
                 .expect("batch")
-                .file
+                .into_file()
         };
         let same = same_parts(&leaf_once()?.to_bytes()?, &unified().to_bytes()?);
         // A handle memoizes the notes body a batch reads (record 0348): the
@@ -501,7 +501,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     drop(black_box(
                         file.batch(items.clone(), BatchMode::Atomic)
                             .expect("batch")
-                            .file,
+                            .into_file(),
                     ));
                 },
             ),

@@ -3,7 +3,7 @@
 use super::{BatchItem, BatchMode, Options, Unsupported};
 use crate::path::Path;
 use crate::transaction::{
-    Commit, Diagnostics, Edit, Error as TransactionError, LimitKind, Patch, SemanticLimits,
+    Commit, Diagnostics, Edit, EditOptions, Error as TransactionError, LimitKind, Patch,
 };
 use crate::{Code, Error, File, NewNode, Placement, Props, Result};
 use litchi_core::Position;
@@ -45,7 +45,7 @@ impl Applied {
     /// item.path = Some("/Sheet1".into());
     /// item.props = Some(Props::new().with("find", "draft").with("replace", "final"));
     /// let commit = file.apply(&item)?;
-    /// assert_eq!(commit.value.matched(), Some(2));
+    /// assert_eq!(commit.value().matched(), Some(2));
     /// # }
     /// # Ok::<(), litchi_ops::Error>(())
     /// ```
@@ -86,16 +86,52 @@ pub enum ItemResult {
 }
 
 /// An immutable batch result. Publication remains an explicit save operation.
-#[non_exhaustive]
+///
+/// The accessors are those of [`Commit`](crate::transaction::Commit), with
+/// the per-item [`Self::results`] as the commit's value.
 pub struct BatchCommit {
+    file: File,
+    patch: Patch,
+    diagnostics: Diagnostics,
+    results: Vec<ItemResult>,
+}
+impl BatchCommit {
     /// The final file; the caller's input remains unchanged.
-    pub file: File,
+    #[must_use]
+    pub const fn file(&self) -> &File {
+        &self.file
+    }
+    /// Take the final file, dropping the patch and the results.
+    #[must_use]
+    pub fn into_file(self) -> File {
+        self.file
+    }
     /// Owner-bound, process-local reversible history.
-    pub patch: Patch,
+    #[must_use]
+    pub const fn patch(&self) -> &Patch {
+        &self.patch
+    }
     /// Aggregate facts for successful mutations; metadata is not a mutation.
-    pub diagnostics: Diagnostics,
+    #[must_use]
+    pub const fn diagnostics(&self) -> &Diagnostics {
+        &self.diagnostics
+    }
     /// One outcome per input item, with no renumbering after failures or meta.
-    pub results: Vec<ItemResult>,
+    #[must_use]
+    pub fn results(&self) -> &[ItemResult] {
+        &self.results
+    }
+    /// Take the per-item outcomes, dropping the file and the patch.
+    #[must_use]
+    pub fn into_results(self) -> Vec<ItemResult> {
+        self.results
+    }
+    /// Take the file, the patch and the per-item outcomes; the diagnostics
+    /// are `Copy` and stay readable through [`Self::diagnostics`].
+    #[must_use]
+    pub fn into_parts(self) -> (File, Patch, Vec<ItemResult>) {
+        (self.file, self.patch, self.results)
+    }
 }
 impl fmt::Debug for BatchCommit {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -146,9 +182,9 @@ impl File {
     /// assert_eq!(file.apply(&item).unwrap_err().code(), Code::UnsupportedProperty);
     /// // OfficeCLI's behaviour applies the value and reports the rest.
     /// let commit = file.apply_with(&item, &Options::new().unsupported(Unsupported::Warn))?;
-    /// assert!(commit.diagnostics.changed());
-    /// assert_eq!(commit.value.warnings.len(), 1);
-    /// assert_eq!(commit.value.warnings[0].property(), Some("sparkle"));
+    /// assert!(commit.diagnostics().changed());
+    /// assert_eq!(commit.value().warnings.len(), 1);
+    /// assert_eq!(commit.value().warnings[0].property(), Some("sparkle"));
     /// # }
     /// # Ok::<(), litchi_ops::Error>(())
     /// ```
@@ -170,7 +206,7 @@ impl File {
         options: &Options,
     ) -> Result<Commit<Applied>> {
         let unsupported = options.unsupported;
-        self.edit_with_limits(&options.limits, |edit| {
+        self.edit_with_options(options.edit, |edit| {
             apply_item(edit, &item.into(), unsupported, 0).map_err(|error| error.with_item(0))
         })
     }
@@ -197,7 +233,7 @@ impl File {
     /// Native [`Self::set`] keeps its native text semantics. Remaining command
     /// policy gaps are reported by [`Self::capabilities`].
     ///
-    /// Uses default [`SemanticLimits`]. The operation count also bounds all
+    /// Uses default [`EditOptions`]. The operation count also bounds all
     /// input items, including metadata and failures. Results never trust an
     /// iterator's size hint. The input handle is unchanged on every path.
     ///
@@ -210,10 +246,10 @@ impl File {
     /// let items = batch::from_bytes(br#"[
     ///   {"command":"add","parent":"/body","type":"paragraph","props":{"text":"Hello"}},
     ///   {"command":"set","path":"/body/p[1]/r[1]","props":{"bold":true}}
-    /// ]"#)?;
+    /// ]"#, &batch::SourceLimits::default())?;
     /// let commit = file.batch(items, BatchMode::Atomic)?;
-    /// assert_eq!(commit.results.len(), 2);
-    /// assert!(commit.diagnostics.changed());
+    /// assert_eq!(commit.results().len(), 2);
+    /// assert!(commit.diagnostics().changed());
     /// # }
     /// # Ok::<(), litchi_ops::Error>(())
     /// ```
@@ -228,7 +264,7 @@ impl File {
         I: IntoIterator,
         I::Item: Into<BatchItem<'i>>,
     {
-        self.batch_with_limits(items, mode, &SemanticLimits::default())
+        self.batch_with_options(items, mode, EditOptions::default())
     }
 
     /// [`Self::batch`] with explicit operation, retained-snapshot and XLSX
@@ -243,17 +279,17 @@ impl File {
     /// As [`Self::batch`]. Exceeding the total item bound discards all candidates
     /// even in best-effort mode, so an unbounded failing iterator cannot escape
     /// the resource bound. At most one excess item is requested to detect it.
-    pub fn batch_with_limits<'i, I>(
+    pub fn batch_with_options<'i, I>(
         &self,
         items: I,
         mode: BatchMode,
-        limits: &SemanticLimits,
+        options: EditOptions,
     ) -> Result<BatchCommit>
     where
         I: IntoIterator,
         I::Item: Into<BatchItem<'i>>,
     {
-        self.batch_with(items, &Options::new().mode(mode).limits(*limits))
+        self.batch_with(items, &Options::new().mode(mode).edit_options(options))
     }
 
     /// [`Self::batch`] with command-channel options: the batch mode, the
@@ -279,17 +315,17 @@ impl File {
     /// let items = batch::from_bytes(br#"[
     ///   {"command":"set","path":"/Sheet1/A1","props":{"value":"Q1","sparkle":"yes"}},
     ///   {"command":"set","path":"/Sheet1/A2","props":{"value":"Q2"}}
-    /// ]"#)?;
+    /// ]"#, &batch::SourceLimits::default())?;
     /// let options = Options::new().unsupported(Unsupported::Warn);
     /// let commit = file.batch_with(&items, &options)?;
-    /// let ItemResult::Applied(first) = &commit.results[0] else { unreachable!() };
+    /// let ItemResult::Applied(first) = &commit.results()[0] else { unreachable!() };
     /// assert_eq!(first.warnings[0].item(), Some(0));
     /// # }
     /// # Ok::<(), litchi_ops::Error>(())
     /// ```
     ///
     /// # Errors
-    /// As [`Self::batch_with_limits`].
+    /// As [`Self::batch_with_options`].
     pub fn batch_with<'i, I>(&self, items: I, options: &Options) -> Result<BatchCommit>
     where
         I: IntoIterator,
@@ -298,10 +334,11 @@ impl File {
         let Options {
             mode,
             unsupported,
-            ref limits,
+            edit: edit_options,
         } = *options;
+        let limits = edit_options.semantic_limits_value();
         let coalesce = mode == BatchMode::Atomic;
-        let commit = self.edit_with_limits(limits, |edit| {
+        let commit = self.edit_with_options(edit_options, |edit| {
             let mut results = Vec::new();
             for (index, item) in items.into_iter().enumerate() {
                 if index >= limits.max_operations() {
@@ -405,11 +442,13 @@ impl File {
             }
             Ok(results)
         })?;
+        let diagnostics = *commit.diagnostics();
+        let (file, patch, results) = commit.into_parts();
         Ok(BatchCommit {
-            file: commit.file,
-            patch: commit.patch,
-            diagnostics: commit.diagnostics,
-            results: commit.value,
+            file,
+            patch,
+            diagnostics,
+            results,
         })
     }
 }

@@ -194,7 +194,7 @@ mod probe {
                     Ok(())
                 })
                 .expect("edit");
-            black_box(commit.file);
+            black_box(commit.file());
         });
 
         let bytes = ods(100, 10);
@@ -225,7 +225,7 @@ mod probe {
                     Ok(())
                 })
                 .expect("edit");
-            black_box(commit.file);
+            black_box(commit.file());
         });
 
         let bytes = odp(20);

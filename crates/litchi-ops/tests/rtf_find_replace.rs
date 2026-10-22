@@ -14,7 +14,7 @@ fn find(file: &File, path: &str, props: Props<'_>) -> litchi_ops::Result<(File, 
     item.path = Some(path.into());
     item.props = Some(props);
     let commit = file.apply(&item)?;
-    Ok((commit.file, commit.value.matched()))
+    Ok((commit.file().clone(), commit.value().matched()))
 }
 
 fn text(file: &File, path: &str) -> String {

@@ -336,14 +336,14 @@ fn write(
 ) -> Result<u8> {
     let file = litchi_ops::open(path)?;
     let commit = file.apply_with(item, options)?;
-    let warned = !commit.value.warnings.is_empty();
+    let warned = !commit.value().warnings.is_empty();
     if !json {
-        render::warnings(&commit.value.warnings);
+        render::warnings(&commit.value().warnings);
     }
-    let changed = commit.diagnostics.changed();
-    let saved = publish(&commit.file, changed, output)?;
+    let changed = commit.diagnostics().changed();
+    let saved = publish(commit.file(), changed, output)?;
     let report = Report {
-        results: vec![ItemJson::applied(0, &commit.value)],
+        results: vec![ItemJson::applied(0, commit.value())],
         summary: Summary {
             total: 1,
             executed: 1,
@@ -393,7 +393,7 @@ fn payload(args: &cli::Batch, limits: &SourceLimits) -> Result<Vec<u8>> {
 fn batch(args: &cli::Batch, json: bool, out: &mut impl Write) -> Result<u8> {
     let limits = SourceLimits::default();
     let bytes = payload(args, &limits)?;
-    let items = litchi_ops::batch::from_bytes_with_limits(&bytes, &limits)?;
+    let items = litchi_ops::batch::from_bytes(&bytes, &limits)?;
     let mode = if args.best_effort {
         BatchMode::BestEffort
     } else {
@@ -426,7 +426,7 @@ fn batch(args: &cli::Batch, json: bool, out: &mut impl Write) -> Result<u8> {
         },
     };
     let mut warned = false;
-    for result in &commit.results {
+    for result in commit.results() {
         if let ItemResult::Applied(applied) = result {
             warned |= !applied.warnings.is_empty();
             if !json {
@@ -434,10 +434,10 @@ fn batch(args: &cli::Batch, json: bool, out: &mut impl Write) -> Result<u8> {
             }
         }
     }
-    let changed = commit.diagnostics.changed();
-    let saved = publish(&commit.file, changed, &args.output)?;
+    let changed = commit.diagnostics().changed();
+    let saved = publish(commit.file(), changed, &args.output)?;
     let results: Vec<ItemJson<'_>> = commit
-        .results
+        .results()
         .iter()
         .enumerate()
         .map(|(index, result)| ItemJson::of(index, result, items.get(index)))

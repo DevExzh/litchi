@@ -134,13 +134,9 @@ pub(crate) fn merge(args: &Merge, json: bool, out: &mut impl Write) -> Result<u8
         _ => DataFormat::Json,
     });
     let data = match format {
-        DataFormat::Json => Data::from_json_with_limits(&source, &limits)?,
-        DataFormat::Csv => {
-            Data::from_csv_with(&source, &litchi_ops::import::Options::csv(), &limits)?
-        },
-        DataFormat::Tsv => {
-            Data::from_csv_with(&source, &litchi_ops::import::Options::tsv(), &limits)?
-        },
+        DataFormat::Json => Data::from_json(&source, &limits)?,
+        DataFormat::Csv => Data::from_csv(&source, &litchi_ops::import::Options::csv(), &limits)?,
+        DataFormat::Tsv => Data::from_csv(&source, &litchi_ops::import::Options::tsv(), &limits)?,
     };
     if data.is_empty() {
         return Err(Error::new(
@@ -183,13 +179,14 @@ pub(crate) fn merge(args: &Merge, json: bool, out: &mut impl Write) -> Result<u8
         .with_suggestion("pass --force to replace it"));
     }
     let template = litchi_ops::open(&args.template)?;
+    let edit_options = litchi_ops::EditOptions::new().semantic_limits(limits);
     let mut results = Vec::with_capacity(data.len());
     for (record, path) in data.records().iter().zip(&paths) {
-        let commit = template.merge_with_limits(record, &options, &limits)?;
+        let commit = template.merge_with_options(record, &options, edit_options)?;
         let saved = commit
-            .file
+            .file()
             .save_with(SaveTo::Path(path), &SaveOptions::new().overwrite(overwrite))?;
-        results.push((saved.path, commit.value));
+        results.push((saved.path, commit.into_value()));
     }
     if json {
         let mut outputs: Vec<Json> = results

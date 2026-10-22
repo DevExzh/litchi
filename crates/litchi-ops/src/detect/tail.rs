@@ -70,6 +70,7 @@ mod tests {
 
     use litchi_core::detection::FileFormat;
 
+    use super::super::SourceLimits;
     use super::super::functions::{
         detect_file_format_from_bytes_with_tail, detect_format_from_reader_with_tail,
     };
@@ -120,9 +121,11 @@ mod tests {
     /// The classification and tail-call count of the byte and reader paths.
     fn classify(bytes: &[u8]) -> [(Option<FileFormat>, usize); 2] {
         let tail = RecordingTail::default();
-        let from_bytes = detect_file_format_from_bytes_with_tail(bytes, &tail);
+        let limits = SourceLimits::default();
+        let from_bytes = detect_file_format_from_bytes_with_tail(bytes, &limits, &tail);
         let byte_calls = tail.calls.replace(0);
-        let from_reader = detect_format_from_reader_with_tail(&mut Cursor::new(bytes), &tail);
+        let from_reader =
+            detect_format_from_reader_with_tail(&mut Cursor::new(bytes), &limits, &tail);
         [(from_bytes, byte_calls), (from_reader, tail.calls.get())]
     }
 
@@ -171,7 +174,11 @@ mod tests {
         }
 
         let tail = RecordingTail::default();
-        let detected = super::super::detected::detect_format_smart_with_tail(docx(), &tail);
+        let detected = super::super::detected::detect_format_smart_with_tail(
+            docx(),
+            &SourceLimits::default(),
+            &tail,
+        );
         assert!(matches!(detected, Some(DetectedFormat::Docx(_))));
         assert_eq!(tail.calls.get(), 0);
     }
@@ -186,8 +193,8 @@ mod tests {
             .build()
             .unwrap();
         let tail = RecordingTail::default();
-        let detected =
-            super::super::detected::detect_format_smart_with_limits_and_tail(bytes, limits, &tail);
+        let limits = SourceLimits::default().ooxml_source_limits(limits);
+        let detected = super::super::detected::detect_ooxml_smart(bytes, &limits, &tail);
         assert!(detected.is_none());
         assert_eq!(tail.calls.get(), 0);
     }

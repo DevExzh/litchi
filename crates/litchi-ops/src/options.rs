@@ -349,6 +349,65 @@ impl OpenOptions {
     pub(crate) fn odf_open_options(&self) -> litchi_odf_common::OpenOptions {
         self.odf_options.unwrap_or_default()
     }
+
+    /// Convert the owner-specific ingress settings to the limits required by
+    /// the raw detection probes. This is kept private so public raw callers
+    /// cannot accidentally recover an `OpenOptions` exception.
+    #[cfg(any(
+        feature = "doc",
+        feature = "docx",
+        feature = "ppt",
+        feature = "pptx",
+        feature = "xls",
+        feature = "xlsx",
+        feature = "xlsb",
+        feature = "rtf",
+        feature = "odt",
+        feature = "ods",
+        feature = "odp",
+        feature = "pages",
+        feature = "keynote",
+        feature = "numbers",
+        odf_objects
+    ))]
+    pub(crate) fn detection_limits(&self) -> crate::detect::SourceLimits {
+        let mut limits = crate::detect::SourceLimits::new();
+        if let Some(maximum) = self.max_input_bytes {
+            limits = limits.max_input_bytes(maximum);
+        }
+
+        #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
+        if let Some(source_limits) = self.ooxml_limits {
+            limits = limits.ooxml_source_limits(source_limits);
+        }
+
+        #[cfg(any(feature = "odt", feature = "ods", feature = "odp"))]
+        if let Some(options) = self.odf_options {
+            limits = limits.odf_source_limits(options.source_limits_value());
+        }
+
+        #[cfg(feature = "rtf")]
+        if let Some(options) = self.rtf_options {
+            limits = limits.rtf_source_limits(options.source_limits_value());
+        }
+
+        #[cfg(any(feature = "doc", feature = "ppt", feature = "xls"))]
+        {
+            // A format-specific DOC or PPT ceiling must not reject another
+            // CFB format before classification. Owner admission applies that
+            // format's policy after detection; only the common source ceiling
+            // applies to every CFB candidate here.
+            let cfb_input = self.max_input_bytes;
+            if let Some(value) = cfb_input {
+                let value = value.min(litchi_cfb::OleFileLimits::MAX_INPUT_BYTES);
+                if let Ok(source_limits) = litchi_cfb::OleFileLimits::new(value) {
+                    limits = limits.cfb_source_limits(source_limits);
+                }
+            }
+        }
+
+        limits
+    }
 }
 
 impl Default for OpenOptions {
@@ -509,6 +568,27 @@ mod tests {
         let doc = DocOptions::new().leniency(litchi_doc::Leniency::TolerateStylesheetDefects);
         let options = OpenOptions::new().doc(doc);
         assert_eq!(options.doc, Some(doc));
+    }
+
+    #[cfg(all(feature = "doc", feature = "ppt"))]
+    #[test]
+    fn doc_source_ceiling_does_not_reject_ppt_detection() {
+        let mut builder = litchi_ppt::writer::Builder::new();
+        builder.add_slide().unwrap();
+        let bytes = builder.build().unwrap().to_bytes().unwrap();
+        let doc = litchi_doc::SourceLimits::builder()
+            .max_input_bytes(bytes.len() - 1)
+            .unwrap()
+            .build()
+            .unwrap();
+        let options = OpenOptions::new().doc(DocOptions::new().source_limits(doc));
+        assert_eq!(
+            crate::detect::detect_format_smart(bytes.clone(), &options.detection_limits())
+                .map(|value| value.format()),
+            Some(litchi_core::detection::FileFormat::Ppt),
+        );
+        let common = options.max_input_bytes((bytes.len() - 1) as u64);
+        assert!(crate::detect::detect_format_smart(bytes, &common.detection_limits()).is_none());
     }
 
     #[cfg(feature = "ppt")]

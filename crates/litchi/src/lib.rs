@@ -234,25 +234,23 @@ pub mod common {
 
     // Re-export the smart-detection entry points beside the core vocabulary.
     #[cfg(litchi_unified)]
-    pub use crate::detection_smart::{detect_file_format, detect_file_format_from_bytes};
+    pub use crate::detection_smart::{
+        SourceLimits, detect_file_format, detect_file_format_from_bytes,
+    };
 
     /// Detection re-exports — merges `litchi-core`'s signature detection with
     /// the umbrella's smart-detection entry points.
     pub mod detection {
-        #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
-        pub use crate::detection_smart::detect_format_smart_with_limits;
         #[cfg(litchi_unified)]
         pub use crate::detection_smart::{
-            DetectedFormat, detect_file_format, detect_file_format_from_bytes,
+            DetectedFormat, SourceLimits, detect_file_format, detect_file_format_from_bytes,
             detect_format_from_reader, detect_format_smart,
         };
         #[cfg(all(
             any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"),
             any(unix, windows)
         ))]
-        pub use crate::detection_smart::{
-            PreparedDetection, detect_and_prepare, detect_and_prepare_with_limits,
-        };
+        pub use crate::detection_smart::{PreparedDetection, detect_and_prepare};
         pub use litchi_core::detection::*;
     }
 }
@@ -629,11 +627,11 @@ pub use litchi_ops::WorkbookView;
 #[cfg(litchi_unified)]
 pub use litchi_ops::{
     Added, Applied, BatchCommit, BatchItem, BatchMode, Code, Conformance, CreateOptions,
-    EncryptionKind, Error, Family, File, Flavor, IntoNode, IntoPlacement, IntoProps, IntoTarget,
-    ItemResult, Key, Locked, NewNode, OpenOptions, Overwrite, Placement, PropValue, Props, Result,
-    SaveOptions, SaveTo, Saved, SignatureOrigin, Signed, SourceMode, TargetArg, batch,
-    capabilities, compat, create, create_with, error, format, import, merge, new_node, node, path,
-    placement, props, query, raw, refresh, schema, target, transaction, view,
+    EditOptions, EncryptionKind, Error, Family, File, Flavor, IntoNode, IntoPlacement, IntoProps,
+    IntoTarget, ItemResult, Key, Locked, NewNode, OpenOptions, Overwrite, Placement, PropValue,
+    Props, Result, SaveOptions, SaveTo, Saved, SignatureOrigin, Signed, SourceMode, TargetArg,
+    batch, capabilities, compat, create, create_with, error, format, import, merge, new_node, node,
+    path, placement, props, query, raw, refresh, schema, target, transaction, view,
 };
 #[cfg(all(
     any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"),
@@ -660,9 +658,7 @@ pub use common::{detect_file_format, detect_file_format_from_bytes};
     any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"),
     any(unix, windows)
 ))]
-pub use common::detection::{
-    PreparedDetection, detect_and_prepare, detect_and_prepare_with_limits,
-};
+pub use common::detection::{PreparedDetection, detect_and_prepare};
 
 #[cfg(all(
     test,

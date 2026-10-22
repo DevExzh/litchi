@@ -98,7 +98,7 @@ fn closure(file: &File, sets: &[Set]) -> Outcome {
         }
         Ok(())
     }) {
-        Ok(commit) => publish(&commit.file),
+        Ok(commit) => publish(commit.file()),
         Err(error) => admission(&error),
     }
 }
@@ -123,7 +123,7 @@ fn batch(file: &File, sets: &[Set]) -> Outcome {
         })
         .collect();
     match file.batch(items, BatchMode::Atomic) {
-        Ok(commit) => publish(&commit.file),
+        Ok(commit) => publish(commit.file()),
         Err(error) => admission(&error),
     }
 }

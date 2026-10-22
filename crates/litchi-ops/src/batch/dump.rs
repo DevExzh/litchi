@@ -44,8 +44,8 @@ use crate::{Code, Error, File, PropValue, Props, Result};
 /// assert!(dump.warnings().is_empty());
 ///
 /// let replay = litchi_ops::create(FileFormat::Docx)?.batch(dump.items(), BatchMode::Atomic)?;
-/// assert_eq!(replay.file.text()?, file.text()?);
-/// assert_eq!(replay.file.dump()?.items(), dump.items());
+/// assert_eq!(replay.file().text()?, file.text()?);
+/// assert_eq!(replay.file().dump()?.items(), dump.items());
 /// # }
 /// # Ok::<(), litchi_ops::Error>(())
 /// ```

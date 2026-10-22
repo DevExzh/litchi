@@ -7,7 +7,8 @@ fn rejected_odf_probe_preserves_the_pages_source_for_lower_precedence_detection(
     let pointer = bytes.as_ptr();
     let capacity = bytes.capacity();
 
-    let detected = super::detect_format_smart(bytes).expect("Pages fixture should be detected");
+    let detected = super::detect_format_smart(bytes, &super::SourceLimits::default())
+        .expect("Pages fixture should be detected");
     let super::DetectedFormat::Pages(retained) = detected else {
         panic!("ODF rejection must continue to Pages detection");
     };
@@ -73,11 +74,12 @@ mod iwork_is_classified_last {
     /// The format each facade entry point reports, with the reader's cursor
     /// checked for restoration.
     fn facade_formats(bytes: &[u8]) -> Vec<Option<FileFormat>> {
-        let mut formats = vec![detect_file_format_from_bytes(bytes)];
+        let limits = crate::detection_smart::SourceLimits::default();
+        let mut formats = vec![detect_file_format_from_bytes(bytes, &limits)];
 
         let mut reader = Cursor::new(bytes.to_vec());
         reader.seek(SeekFrom::Start(3)).unwrap();
-        formats.push(detect_format_from_reader(&mut reader));
+        formats.push(detect_format_from_reader(&mut reader, &limits));
         assert_eq!(
             reader.stream_position().unwrap(),
             3,
@@ -87,15 +89,18 @@ mod iwork_is_classified_last {
         let mut file = tempfile::NamedTempFile::new().unwrap();
         file.write_all(bytes).unwrap();
         file.flush().unwrap();
-        formats.push(detect_file_format(file.path()));
+        formats.push(detect_file_format(file.path(), &limits));
         #[cfg(all(
             any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"),
             any(unix, windows)
         ))]
-        formats
-            .push(super::super::detect_and_prepare(file.path()).map(|detected| detected.format()));
+        formats.push(
+            super::super::detect_and_prepare(file.path(), &limits)
+                .map(|detected| detected.format()),
+        );
 
-        formats.push(detect_format_smart(bytes.to_vec()).map(|detected| detected.format()));
+        formats
+            .push(detect_format_smart(bytes.to_vec(), &limits).map(|detected| detected.format()));
         formats
     }
 
@@ -106,21 +111,36 @@ mod iwork_is_classified_last {
             assert_eq!(format, Some(FileFormat::Pages));
         }
         assert!(matches!(
-            detect_format_smart(PAGES.to_vec()),
+            detect_format_smart(
+                PAGES.to_vec(),
+                &crate::detection_smart::SourceLimits::default(),
+            ),
             Some(DetectedFormat::Pages(_))
         ));
 
         // The ops coordinator itself is iWork-free: without the facade tail
         // the same package is unrecognized.
         assert_eq!(
-            litchi_ops::detect::detect_file_format_from_bytes(PAGES),
+            litchi_ops::detect::detect_file_format_from_bytes(
+                PAGES,
+                &litchi_ops::detect::SourceLimits::default(),
+            ),
             None
         );
         assert_eq!(
-            litchi_ops::detect::detect_format_from_reader(&mut Cursor::new(PAGES)),
+            litchi_ops::detect::detect_format_from_reader(
+                &mut Cursor::new(PAGES),
+                &litchi_ops::detect::SourceLimits::default(),
+            ),
             None
         );
-        assert!(litchi_ops::detect::detect_format_smart(PAGES.to_vec()).is_none());
+        assert!(
+            litchi_ops::detect::detect_format_smart(
+                PAGES.to_vec(),
+                &litchi_ops::detect::SourceLimits::default(),
+            )
+            .is_none()
+        );
     }
 
     #[cfg(feature = "docx")]

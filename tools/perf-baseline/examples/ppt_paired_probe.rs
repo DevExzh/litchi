@@ -402,13 +402,16 @@ fn batch(rounds: usize) -> Result<Vec<String>> {
             Ok(package)
         };
         let unified_leg = || -> Result<litchi::File> {
-            let commit = unified.edit_with_limits(&limits, |edit| {
-                for (path, text) in paths.iter().zip(&texts) {
-                    edit.set(path, litchi_ops::props! { "text" => text.as_str() })?;
-                }
-                Ok(())
-            })?;
-            Ok(commit.file)
+            let commit = unified.edit_with_options(
+                litchi_ops::EditOptions::new().semantic_limits(limits),
+                |edit| {
+                    for (path, text) in paths.iter().zip(&texts) {
+                        edit.set(path, litchi_ops::props! { "text" => text.as_str() })?;
+                    }
+                    Ok(())
+                },
+            )?;
+            Ok(commit.into_file())
         };
         if native_leg()?.to_bytes()? != unified_leg()?.to_bytes()? {
             return Err("batch legs publish different bytes".into());
@@ -524,12 +527,15 @@ fn main() -> Result<()> {
                 .max_expanded_targets(1 << 20)?
                 .build()?;
             for _ in 0..rounds {
-                let commit = unified.edit_with_limits(&limits, |edit| {
-                    for (path, text) in paths.iter().zip(&texts) {
-                        edit.set(path, litchi_ops::props! { "text" => text.as_str() })?;
-                    }
-                    Ok(())
-                })?;
+                let commit = unified.edit_with_options(
+                    litchi_ops::EditOptions::new().semantic_limits(limits),
+                    |edit| {
+                        for (path, text) in paths.iter().zip(&texts) {
+                            edit.set(path, litchi_ops::props! { "text" => text.as_str() })?;
+                        }
+                        Ok(())
+                    },
+                )?;
                 drop(commit);
             }
             Vec::new()

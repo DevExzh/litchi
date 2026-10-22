@@ -192,6 +192,7 @@ pub use schema::schema;
 pub use signed::{SignatureOrigin, Signed};
 pub use target::{IntoTarget, TargetArg};
 pub use tolerance::ToleranceReport;
+pub use transaction::EditOptions;
 #[cfg(any(feature = "doc", feature = "docx", feature = "rtf", feature = "odt"))]
 pub use view::DocumentView;
 #[cfg(any(feature = "ppt", feature = "pptx", feature = "odp"))]

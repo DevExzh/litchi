@@ -54,7 +54,7 @@ fn find(file: &File, target: &str, pattern: &str, replacement: &str) -> (File, u
             .with("replace", replacement),
     );
     let commit = file.apply(&item).unwrap();
-    (commit.file, commit.value.matched().unwrap())
+    (commit.file().clone(), commit.value().matched().unwrap())
 }
 
 /// The value of format property `key` of the node at `path`.
@@ -131,18 +131,18 @@ mod doc {
         let commit = file
             .merge(&record(&[("name", "Ada")]), &Options::new())
             .unwrap();
-        assert_eq!(commit.value.replacements(), 1);
-        let after = reopen(&commit.file);
+        assert_eq!(commit.value().replacements(), 1);
+        let after = reopen(commit.file());
         assert_eq!(text(&after, "/body/p[1]"), "Dear Ada, hello world");
         let none = file
             .merge(&record(&[("other", "x")]), &Options::new())
             .unwrap();
-        assert!(none.patch.is_noop());
-        assert_eq!(none.value.unresolved(), ["name"]);
+        assert!(none.patch().is_noop());
+        assert_eq!(none.value().unresolved(), ["name"]);
         let empty = file
             .merge(&Record::new(), &Options::new().missing(Missing::Empty))
             .unwrap();
-        assert_eq!(text(&empty.file, "/body/p[1]"), "Dear , hello world");
+        assert_eq!(text(empty.file(), "/body/p[1]"), "Dear , hello world");
     }
 }
 
@@ -166,11 +166,11 @@ mod rtf {
         let commit = file
             .merge(&record(&[("name", "Ada")]), &Options::new())
             .unwrap();
-        assert_eq!(commit.value.replacements(), 1);
-        let after = reopen(&commit.file);
+        assert_eq!(commit.value().replacements(), 1);
+        let after = reopen(commit.file());
         assert_eq!(text(&after, "/body/p[1]"), "Dear Ada, hello");
         let none = file.merge(&Record::new(), &Options::new()).unwrap();
-        assert!(none.patch.is_noop());
+        assert!(none.patch().is_noop());
         let error = file
             .merge(&record(&[("name", "a\nb")]), &Options::new())
             .unwrap_err();
@@ -240,9 +240,9 @@ mod ppt {
         let commit = deck
             .merge(&record(&[("who", "Ada")]), &Options::new())
             .unwrap();
-        assert_eq!(commit.value.replacements(), 1);
+        assert_eq!(commit.value().replacements(), 1);
         assert_eq!(
-            text(&reopen(&commit.file), "/slide[1]/notes"),
+            text(&reopen(commit.file()), "/slide[1]/notes"),
             "Notes for Ada"
         );
         let error = deck
@@ -268,7 +268,8 @@ fn workbook(format: FileFormat) -> File {
         Ok(())
     })
     .unwrap()
-    .file
+    .file()
+    .clone()
 }
 
 #[cfg(any(feature = "xlsb", feature = "xls", feature = "ods"))]
@@ -305,13 +306,13 @@ fn spreadsheet_find_and_merge(format: FileFormat) {
             &Options::new(),
         )
         .unwrap();
-    assert_eq!(commit.value.replacements(), 2);
-    let merged = reopen(&commit.file);
+    assert_eq!(commit.value().replacements(), 2);
+    let merged = reopen(commit.file());
     assert_eq!(text(&merged, "/Sheet1/A1"), "Dear Ada, hello");
     assert_eq!(text(&merged, "/Second/A1"), "hello from Paris");
     let none = file.merge(&Record::new(), &Options::new()).unwrap();
-    assert!(none.patch.is_noop());
-    assert_eq!(none.value.unresolved(), ["city", "name"]);
+    assert!(none.patch().is_noop());
+    assert_eq!(none.value().unresolved(), ["city", "name"]);
 }
 
 #[cfg(feature = "xlsb")]
@@ -340,11 +341,11 @@ fn xls_merge_chains_native_edits() {
             &litchi_ops::import::Options::csv(),
         )
         .unwrap()
-        .file;
+        .into_file();
     let commit = file.merge(&record(&[("k", "v")]), &Options::new()).unwrap();
-    assert_eq!(commit.value.replacements(), 1_500);
-    assert!(commit.diagnostics.commits() >= 2);
-    let after = reopen(&commit.file);
+    assert_eq!(commit.value().replacements(), 1_500);
+    assert!(commit.diagnostics().commits() >= 2);
+    let after = reopen(commit.file());
     assert_eq!(text(&after, "/Sheet1/A1"), "v");
     assert_eq!(text(&after, "/Sheet1/A1500"), "v");
     let (found, matched) = find(&after, "/", "v", "w");
@@ -446,12 +447,12 @@ fn odt_find_and_merge(format: FileFormat) {
     let commit = file
         .merge(&record(&[("name", "Ada\nLovelace")]), &Options::new())
         .unwrap();
-    assert_eq!(commit.value.replacements(), 1);
-    let merged = reopen(&commit.file);
+    assert_eq!(commit.value().replacements(), 1);
+    let merged = reopen(commit.file());
     assert_eq!(text(&merged, "/body/p[1]/r[1]"), "Dear Ada\nLovelace");
     assert_eq!(text(&merged, "/body/p[1]/r[2]"), ", hello  world");
     let none = file.merge(&Record::new(), &Options::new()).unwrap();
-    assert!(none.patch.is_noop());
+    assert!(none.patch().is_noop());
 }
 
 #[cfg(feature = "odt")]
@@ -526,15 +527,15 @@ fn odp_find_and_merge() {
     let commit = file
         .merge(&record(&[("name", "Ada")]), &Options::new())
         .unwrap();
-    assert_eq!(commit.value.replacements(), 1);
+    assert_eq!(commit.value().replacements(), 1);
     assert_eq!(
-        text(&reopen(&commit.file), "/slide[1]/shape[1]"),
+        text(&reopen(commit.file()), "/slide[1]/shape[1]"),
         "Dear Ada\nhello world"
     );
     assert!(
         file.merge(&Record::new(), &Options::new())
             .unwrap()
-            .patch
+            .patch()
             .is_noop()
     );
 }

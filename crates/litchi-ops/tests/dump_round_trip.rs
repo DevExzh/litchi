@@ -135,7 +135,7 @@ fn replay(format: FileFormat, items: &[litchi_ops::BatchItem<'static>]) -> Resul
     let mut file = litchi_ops::create(format).unwrap();
     for chunk in items.chunks(64) {
         file = match file.batch(chunk, BatchMode::Atomic) {
-            Ok(commit) => commit.file,
+            Ok(commit) => commit.file().clone(),
             Err(error) => {
                 let item = error
                     .item()
@@ -215,7 +215,7 @@ fn built_presentation_round_trips() {
         .unwrap()
         .batch(&items, BatchMode::Atomic)
         .unwrap()
-        .file;
+        .into_file();
     match round_trip(&deck) {
         Outcome::Exact { items, warnings } => {
             assert!(items > 6);

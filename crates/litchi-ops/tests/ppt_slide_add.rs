@@ -105,14 +105,14 @@ fn slide_add_composes_in_edits_and_batches_with_exact_history() {
             edit.move_to("/slide[1]", Placement::End)
         })
         .expect("transaction");
-    let titles = previews(&commit.file);
+    let titles = previews(commit.file());
     assert_eq!(titles.last().map(String::as_str), Some("(untitled)"));
     assert_eq!(titles[0], "Retitled");
     assert_eq!(
         commit
-            .patch
+            .patch()
             .inverse()
-            .apply(&commit.file)
+            .apply(commit.file())
             .unwrap()
             .to_bytes()
             .unwrap(),
@@ -125,7 +125,7 @@ fn slide_add_composes_in_edits_and_batches_with_exact_history() {
     let batch = source
         .batch([add.clone(), add], BatchMode::Atomic)
         .expect("batch insertion");
-    assert_eq!(previews(&batch.file).len(), previews(&source).len() + 2);
+    assert_eq!(previews(batch.file()).len(), previews(&source).len() + 2);
 }
 
 #[test]

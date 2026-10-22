@@ -52,12 +52,15 @@ fn run_text_and_format_publish_once_with_exact_native_bytes_and_inverse() {
         .build()
         .unwrap();
     let changed = source
-        .edit_with_limits(&limits, |edit| {
-            edit.set(
-                "/body/p[1]/r[2]",
-                props! {"text"=>value,"bold"=>true,"size"=>"14pt","underline"=>"double"},
-            )
-        })
+        .edit_with_options(
+            litchi_ops::EditOptions::new().semantic_limits(limits),
+            |edit| {
+                edit.set(
+                    "/body/p[1]/r[2]",
+                    props! {"text"=>value,"bold"=>true,"size"=>"14pt","underline"=>"double"},
+                )
+            },
+        )
         .unwrap();
     let native = litchi_rtf::Package::from_bytes(INPUT).unwrap();
     let mut edit = native.edit();
@@ -73,11 +76,11 @@ fn run_text_and_format_publish_once_with_exact_native_bytes_and_inverse() {
             .with_underline(litchi_rtf::text::Underline::Double),
     )])
     .unwrap();
-    let bytes = changed.file.to_bytes().unwrap();
+    let bytes = changed.file().to_bytes().unwrap();
     assert_eq!(bytes, edit.commit().unwrap().package().to_bytes().unwrap());
-    assert_eq!(text(&changed.file, "/body/p[1]/r[2]"), value);
+    assert_eq!(text(changed.file(), "/body/p[1]/r[2]"), value);
     assert_eq!(
-        text(&changed.file, "/body/p[1]"),
+        text(changed.file(), "/body/p[1]"),
         format!("Plain{value}Bold")
     );
     for (key, expected) in [
@@ -88,11 +91,11 @@ fn run_text_and_format_publish_once_with_exact_native_bytes_and_inverse() {
         ("font", "Example Sans"),
         ("color", "#FF0000"),
     ] {
-        assert_eq!(property(&changed.file, "/body/p[1]/r[2]", key), expected);
+        assert_eq!(property(changed.file(), "/body/p[1]/r[2]", key), expected);
     }
-    assert_eq!(text(&changed.file, "/body/p[1]/r[1]"), "Plain");
-    assert_eq!(text(&changed.file, "/body/p[1]/r[3]"), "Bold");
-    assert_eq!(property(&changed.file, "/body/p[1]", "align"), "right");
+    assert_eq!(text(changed.file(), "/body/p[1]/r[1]"), "Plain");
+    assert_eq!(text(changed.file(), "/body/p[1]/r[3]"), "Bold");
+    assert_eq!(property(changed.file(), "/body/p[1]", "align"), "right");
     assert!(
         bytes
             .windows(b"Keep title".len())
@@ -104,14 +107,14 @@ fn run_text_and_format_publish_once_with_exact_native_bytes_and_inverse() {
             .any(|b| b == b"Keep header")
     );
     assert_eq!(
-        changed.patch.apply(&source).unwrap().to_bytes().unwrap(),
+        changed.patch().apply(&source).unwrap().to_bytes().unwrap(),
         bytes
     );
     assert_eq!(
         changed
-            .patch
+            .patch()
             .inverse()
-            .apply(&changed.file)
+            .apply(changed.file())
             .unwrap()
             .to_bytes()
             .unwrap(),
@@ -219,9 +222,10 @@ fn run_text_bounds_reject_before_publication_and_compound_cost_is_one_target() {
         ),
     ] {
         let error = source
-            .edit_with_limits(&limits, |edit| {
-                edit.set(query("r"), props! {"text"=>"replacement","bold"=>true})
-            })
+            .edit_with_options(
+                litchi_ops::EditOptions::new().semantic_limits(limits),
+                |edit| edit.set(query("r"), props! {"text"=>"replacement","bold"=>true}),
+            )
             .unwrap_err();
         assert!(
             matches!(error.leaf(), Source::Transaction(Error::Limit{kind:actual,..}) if *actual==kind)
@@ -268,19 +272,19 @@ fn atomic_and_best_effort_batches_keep_run_text_history_and_query_visibility() {
     assert!(source.batch(commands(), BatchMode::Atomic).is_err());
     assert_eq!(source.to_bytes().unwrap(), INPUT);
     let changed = source.batch(commands(), BatchMode::BestEffort).unwrap();
-    assert_eq!(text(&changed.file, "/body/p[1]/r[2]"), "new");
+    assert_eq!(text(changed.file(), "/body/p[1]/r[2]"), "new");
     let changed = source
         .edit(|edit| {
             edit.set("/body/p[1]/r[2]", props! {"text"=>"new"})?;
             edit.set(query("r[text=new]"), props! {"bold"=>true})
         })
         .unwrap();
-    assert_eq!(property(&changed.file, "/body/p[1]/r[2]", "bold"), "true");
+    assert_eq!(property(changed.file(), "/body/p[1]/r[2]", "bold"), "true");
     assert_eq!(
         changed
-            .patch
+            .patch()
             .inverse()
-            .apply(&changed.file)
+            .apply(changed.file())
             .unwrap()
             .to_bytes()
             .unwrap(),
@@ -401,7 +405,7 @@ fn run_text_fanout_projects_opaque_anchors_and_preserves_exact_history() {
                 )
             })
             .unwrap();
-        let bytes = commit.file.to_bytes().unwrap();
+        let bytes = commit.file().to_bytes().unwrap();
         let reopened = open_bytes(bytes.as_slice()).unwrap();
         assert_eq!(text(&reopened, "/body/p[1]"), replacement.repeat(2));
         assert_eq!(text(&reopened, "/body/p[2]"), "Tail");
@@ -420,14 +424,14 @@ fn run_text_fanout_projects_opaque_anchors_and_preserves_exact_history() {
                 .collect::<Vec<_>>()
         );
         assert_eq!(
-            commit.patch.apply(&source).unwrap().to_bytes().unwrap(),
+            commit.patch().apply(&source).unwrap().to_bytes().unwrap(),
             bytes
         );
         assert_eq!(
             commit
-                .patch
+                .patch()
                 .inverse()
-                .apply(&commit.file)
+                .apply(commit.file())
                 .unwrap()
                 .to_bytes()
                 .unwrap(),

@@ -45,11 +45,11 @@ mod docx {
         let edit = file
             .edit(|tx| tx.set(LINK, props! { "url" => "https://example.test/new" }))
             .unwrap()
-            .file;
+            .into_file();
         let mut item = BatchItem::new("set");
         item.path = Some(LINK.into());
         item.props = Some(Props::new().with("url", "https://example.test/new"));
-        let batch = file.batch([item], BatchMode::Atomic).unwrap().file;
+        let batch = file.batch([item], BatchMode::Atomic).unwrap().into_file();
         for changed in [&set, &edit, &batch] {
             assert_eq!(url(changed), "https://example.test/new");
         }
@@ -79,7 +79,7 @@ mod docx {
         let edit = file
             .edit(|tx| tx.set("/body/p[1]/chart[1]", props! { "title" => "Sales" }))
             .unwrap()
-            .file;
+            .into_file();
         assert_eq!(edit.to_bytes().unwrap(), set.to_bytes().unwrap());
     }
 }
@@ -106,7 +106,7 @@ mod doc {
         let edit = file
             .edit(|tx| tx.set("/body/p[1]/r[1]", props! { "text" => "Run" }))
             .unwrap()
-            .file;
+            .into_file();
         assert_eq!(edit.to_bytes().unwrap(), set.to_bytes().unwrap());
     }
 }

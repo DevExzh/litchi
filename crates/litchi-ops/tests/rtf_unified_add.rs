@@ -100,17 +100,17 @@ fn empty_owner_and_empty_paragraphs_are_real_structural_insertions() {
         let commit = source
             .edit(|edit| edit.add("/body", NewNode::new("p").at(placement)))
             .unwrap();
-        assert!(commit.diagnostics.changed());
-        assert_eq!(paragraphs(&commit.file), expected);
+        assert!(commit.diagnostics().changed());
+        assert_eq!(paragraphs(commit.file()), expected);
         assert_eq!(
-            paragraphs(&open_bytes(commit.file.to_bytes().unwrap()).unwrap()),
+            paragraphs(&open_bytes(commit.file().to_bytes().unwrap()).unwrap()),
             expected
         );
         assert_eq!(
             commit
-                .patch
+                .patch()
                 .inverse()
-                .apply(&commit.file)
+                .apply(commit.file())
                 .unwrap()
                 .to_bytes()
                 .unwrap(),
@@ -164,17 +164,17 @@ fn add_set_move_remove_resolve_sequentially_and_undo_exactly() {
             edit.remove("/body/p[1]")
         })
         .unwrap();
-    assert_eq!(paragraphs(&commit.file), ["changed"]);
-    assert_eq!(commit.diagnostics.operations(), 5);
+    assert_eq!(paragraphs(commit.file()), ["changed"]);
+    assert_eq!(commit.diagnostics().operations(), 5);
     assert_eq!(
-        commit.patch.apply(&source).unwrap().to_bytes().unwrap(),
-        commit.file.to_bytes().unwrap()
+        commit.patch().apply(&source).unwrap().to_bytes().unwrap(),
+        commit.file().to_bytes().unwrap()
     );
     assert_eq!(
         commit
-            .patch
+            .patch()
             .inverse()
-            .apply(&commit.file)
+            .apply(commit.file())
             .unwrap()
             .to_bytes()
             .unwrap(),
@@ -182,7 +182,7 @@ fn add_set_move_remove_resolve_sequentially_and_undo_exactly() {
     );
     assert!(matches!(
         commit
-            .patch
+            .patch()
             .apply(&create(FileFormat::Rtf).unwrap())
             .unwrap_err()
             .leaf(),
@@ -213,12 +213,12 @@ fn batches_keep_created_paths_and_attribute_failure() {
     );
     let best = source.batch(items(), BatchMode::BestEffort).unwrap();
     assert_eq!(
-        paragraphs(&best.file),
+        paragraphs(best.file()),
         ["First", "Second", "Third", "new", "last"]
     );
-    assert!(matches!(&best.results[1], litchi_ops::ItemResult::Failed(e) if e.item() == Some(1)));
+    assert!(matches!(&best.results()[1], litchi_ops::ItemResult::Failed(e) if e.item() == Some(1)));
     for (index, path) in [(0, "/body/p[4]"), (2, "/body/p[5]")] {
-        let litchi_ops::ItemResult::Applied(applied) = &best.results[index] else {
+        let litchi_ops::ItemResult::Applied(ref applied) = best.results()[index] else {
             panic!("addition should succeed");
         };
         assert_eq!(applied.path.as_ref().unwrap().to_string(), path);
@@ -270,9 +270,10 @@ fn typed_limits_and_protection_are_preserved() {
         ),
     ] {
         let error = source
-            .edit_with_limits(&limits, |edit| {
-                edit.add("/body", NewNode::new("p").prop("text", "new"))
-            })
+            .edit_with_options(
+                litchi_ops::EditOptions::new().semantic_limits(limits),
+                |edit| edit.add("/body", NewNode::new("p").prop("text", "new")),
+            )
             .unwrap_err();
         assert!(
             matches!(error.leaf(), Source::Transaction(Error::Limit {kind: actual, ..}) if *actual == kind),

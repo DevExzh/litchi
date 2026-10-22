@@ -669,7 +669,7 @@ let commit = source.edit(|edit| {
     edit.move_to("/slide[1]", Placement::End)?;
     edit.remove("/slide[1]")
 })?;
-commit.file.save_as("revised.ppt")?;
+commit.file().save_as("revised.ppt")?;
 ```
 
 PPT edits retain native dependency checks and reversible history. Slide/shape

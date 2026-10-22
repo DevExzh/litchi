@@ -243,11 +243,11 @@ fn distinct_direct_sheet_states_coalesce_for_closure_and_atomic_json() {
                 edit.set(THIRD, props! { "hidden" => true })
             })
             .expect("coalesce direct worksheet states");
-        assert!(closure.diagnostics.changed());
-        assert_eq!(closure.diagnostics.operations(), 2);
-        assert_eq!(closure.diagnostics.commits(), 1);
-        assert_eq!(closure.diagnostics.leaf_operations(), 2);
-        let closure_bytes = closure.file.to_bytes().expect("publish closure states");
+        assert!(closure.diagnostics().changed());
+        assert_eq!(closure.diagnostics().operations(), 2);
+        assert_eq!(closure.diagnostics().commits(), 1);
+        assert_eq!(closure.diagnostics().leaf_operations(), 2);
+        let closure_bytes = closure.file().to_bytes().expect("publish closure states");
         assert_eq!(closure_bytes, sequential_bytes);
         assert_view_parity(&closure_bytes, &sequential_bytes, 4);
         assert_eq!(
@@ -256,9 +256,9 @@ fn distinct_direct_sheet_states_coalesce_for_closure_and_atomic_json() {
         );
         assert_eq!(
             closure
-                .patch
+                .patch()
                 .inverse()
-                .apply(&closure.file)
+                .apply(closure.file())
                 .expect("apply inverse")
                 .to_bytes()
                 .expect("publish inverse"),
@@ -274,11 +274,11 @@ fn distinct_direct_sheet_states_coalesce_for_closure_and_atomic_json() {
                 BatchMode::Atomic,
             )
             .expect("coalesce atomic JSON states");
-        assert_all_applied_changed(&batch.results);
-        assert_eq!(batch.diagnostics.operations(), 2);
-        assert_eq!(batch.diagnostics.commits(), 1);
-        assert_eq!(batch.diagnostics.leaf_operations(), 2);
-        let batch_bytes = batch.file.to_bytes().expect("publish JSON states");
+        assert_all_applied_changed(batch.results());
+        assert_eq!(batch.diagnostics().operations(), 2);
+        assert_eq!(batch.diagnostics().commits(), 1);
+        assert_eq!(batch.diagnostics().leaf_operations(), 2);
+        let batch_bytes = batch.file().to_bytes().expect("publish JSON states");
         assert_eq!(batch_bytes, sequential_bytes);
         assert_view_parity(&batch_bytes, &sequential_bytes, 4);
     }
@@ -303,9 +303,9 @@ fn hiding_the_active_tab_forces_a_run_boundary_before_the_next_hide() {
                 edit.set(SECOND, props! { "visibility" => "hidden" })
             })
             .expect("active hide must flush before the next hide");
-        assert_eq!(commit.diagnostics.operations(), 2);
-        assert_eq!(commit.diagnostics.commits(), 2);
-        let bytes = commit.file.to_bytes().expect("publish active hides");
+        assert_eq!(commit.diagnostics().operations(), 2);
+        assert_eq!(commit.diagnostics().commits(), 2);
+        let bytes = commit.file().to_bytes().expect("publish active hides");
         assert_eq!(bytes, sequential_bytes);
         assert_view_parity(&bytes, &sequential_bytes, 4);
         assert_eq!(
@@ -324,10 +324,10 @@ fn hiding_the_active_tab_forces_a_run_boundary_before_the_next_hide() {
                 BatchMode::Atomic,
             )
             .expect("atomic JSON active hides");
-        assert_all_applied_changed(&batch.results);
-        assert_eq!(batch.diagnostics.commits(), 2);
+        assert_all_applied_changed(batch.results());
+        assert_eq!(batch.diagnostics().commits(), 2);
         assert_eq!(
-            batch.file.to_bytes().expect("publish JSON active hides"),
+            batch.file().to_bytes().expect("publish JSON active hides"),
             bytes
         );
     }
@@ -371,15 +371,15 @@ fn exact_sheet_state_noops_report_false_changed_and_preserve_bytes() {
                 BatchMode::Atomic,
             )
             .expect("exact visibility no-op batch");
-        assert_eq!(commit.results.len(), 2);
+        assert_eq!(commit.results().len(), 2);
         assert!(
-            commit.results.iter().all(|result| {
+            commit.results().iter().all(|result| {
                 matches!(result, ItemResult::Applied(applied) if !applied.changed)
             })
         );
-        assert!(!commit.diagnostics.changed());
-        assert!(commit.patch.is_noop());
-        assert_eq!(commit.file.to_bytes().expect("publish no-op"), before);
+        assert!(!commit.diagnostics().changed());
+        assert!(commit.patch().is_noop());
+        assert_eq!(commit.file().to_bytes().expect("publish no-op"), before);
     }
 }
 
@@ -405,17 +405,17 @@ fn mixed_hide_reveal_and_same_sheet_barriers_preserve_sequential_result() {
                 edit.set(SECOND, props! { "visibility" => "visible" })
             })
             .expect("mixed hide/reveal transaction");
-        assert_eq!(commit.diagnostics.operations(), 3);
-        assert_eq!(commit.diagnostics.commits(), 2);
-        let bytes = commit.file.to_bytes().expect("publish mixed states");
+        assert_eq!(commit.diagnostics().operations(), 3);
+        assert_eq!(commit.diagnostics().commits(), 2);
+        let bytes = commit.file().to_bytes().expect("publish mixed states");
         assert_eq!(bytes, sequential_bytes);
         assert_view_parity(&bytes, &sequential_bytes, 4);
         assert_eq!(
-            sheet_property(&commit.file, SECOND, "visibility").as_deref(),
+            sheet_property(commit.file(), SECOND, "visibility").as_deref(),
             None
         );
         assert_eq!(
-            sheet_property(&commit.file, THIRD, "visibility").as_deref(),
+            sheet_property(commit.file(), THIRD, "visibility").as_deref(),
             Some("hidden")
         );
 
@@ -429,9 +429,9 @@ fn mixed_hide_reveal_and_same_sheet_barriers_preserve_sequential_result() {
                 BatchMode::Atomic,
             )
             .expect("mixed JSON hide/reveal transaction");
-        assert_eq!(batch.diagnostics.commits(), 2);
+        assert_eq!(batch.diagnostics().commits(), 2);
         assert_eq!(
-            batch.file.to_bytes().expect("publish mixed JSON states"),
+            batch.file().to_bytes().expect("publish mixed JSON states"),
             bytes
         );
     }
@@ -450,14 +450,14 @@ fn name_combined_and_query_sets_are_flush_barriers_and_queries_see_staged_state(
                 )
             })
             .expect("query should resolve staged rename");
-        assert_eq!(renamed.diagnostics.operations(), 2);
-        assert_eq!(renamed.diagnostics.commits(), 2);
+        assert_eq!(renamed.diagnostics().operations(), 2);
+        assert_eq!(renamed.diagnostics().commits(), 2);
         assert_eq!(
-            sheet_property(&renamed.file, FIRST, "name").as_deref(),
+            sheet_property(renamed.file(), FIRST, "name").as_deref(),
             Some("Input")
         );
         assert_eq!(
-            sheet_property(&renamed.file, FIRST, "visibility").as_deref(),
+            sheet_property(renamed.file(), FIRST, "visibility").as_deref(),
             Some("hidden")
         );
 
@@ -470,14 +470,14 @@ fn name_combined_and_query_sets_are_flush_barriers_and_queries_see_staged_state(
                 )
             })
             .expect("query should resolve staged visibility");
-        assert_eq!(observed.diagnostics.operations(), 2);
-        assert_eq!(observed.diagnostics.commits(), 2);
+        assert_eq!(observed.diagnostics().operations(), 2);
+        assert_eq!(observed.diagnostics().commits(), 2);
         assert_eq!(
-            sheet_property(&observed.file, FIRST, "name").as_deref(),
+            sheet_property(observed.file(), FIRST, "name").as_deref(),
             Some("Hidden")
         );
         assert_eq!(
-            sheet_property(&observed.file, FIRST, "visibility").as_deref(),
+            sheet_property(observed.file(), FIRST, "visibility").as_deref(),
             Some("hidden")
         );
 
@@ -493,14 +493,14 @@ fn name_combined_and_query_sets_are_flush_barriers_and_queries_see_staged_state(
                 edit.set(SECOND, props! { "visibility" => "hidden" })
             })
             .expect("combined sheet properties are a barrier");
-        assert_eq!(combined.diagnostics.operations(), 2);
-        assert_eq!(combined.diagnostics.commits(), 2);
+        assert_eq!(combined.diagnostics().operations(), 2);
+        assert_eq!(combined.diagnostics().commits(), 2);
         assert_eq!(
-            sheet_property(&combined.file, FIRST, "name").as_deref(),
+            sheet_property(combined.file(), FIRST, "name").as_deref(),
             Some("Combined")
         );
         assert_eq!(
-            sheet_property(&combined.file, SECOND, "visibility").as_deref(),
+            sheet_property(combined.file(), SECOND, "visibility").as_deref(),
             Some("hidden")
         );
     }
@@ -520,26 +520,26 @@ fn empty_and_cell_commands_close_sheet_state_runs() {
                 edit.set("/sheet[3]", props! { "visibility" => "hidden" })
             })
             .expect("empty and cell barriers");
-        assert_eq!(commit.diagnostics.operations(), 6);
-        assert_eq!(commit.diagnostics.commits(), 6);
+        assert_eq!(commit.diagnostics().operations(), 6);
+        assert_eq!(commit.diagnostics().commits(), 6);
         assert_eq!(
-            sheet_property(&commit.file, FIRST, "visibility").as_deref(),
+            sheet_property(commit.file(), FIRST, "visibility").as_deref(),
             Some("hidden")
         );
         assert_eq!(
-            sheet_property(&commit.file, SECOND, "visibility").as_deref(),
+            sheet_property(commit.file(), SECOND, "visibility").as_deref(),
             Some("hidden")
         );
         assert_eq!(
-            cell_text(&commit.file, "/sheet[2]/A1").as_deref(),
+            cell_text(commit.file(), "/sheet[2]/A1").as_deref(),
             Some("changed")
         );
         assert_eq!(
-            sheet_property(&commit.file, THIRD, "visibility").as_deref(),
+            sheet_property(commit.file(), THIRD, "visibility").as_deref(),
             Some("hidden")
         );
         assert_eq!(
-            sheet_property(&commit.file, FOURTH, "visibility").as_deref(),
+            sheet_property(commit.file(), FOURTH, "visibility").as_deref(),
             Some("hidden")
         );
     }
@@ -583,10 +583,13 @@ fn transaction_quotas_distinguish_one_coalesced_patch_from_two_barrier_patches()
             .build()
             .expect("operation profile");
         let operation_error = source
-            .edit_with_limits(&operation_limits, |edit| {
-                edit.set(FIRST, props! { "visibility" => "hidden" })?;
-                edit.set(SECOND, props! { "visibility" => "hidden" })
-            })
+            .edit_with_options(
+                litchi_ops::EditOptions::new().semantic_limits(operation_limits),
+                |edit| {
+                    edit.set(FIRST, props! { "visibility" => "hidden" })?;
+                    edit.set(SECOND, props! { "visibility" => "hidden" })
+                },
+            )
             .expect_err("operation limit");
         assert_eq!(operation_error.code(), Code::LimitExceeded);
         assert_eq!(operation_error.item(), Some(1));
@@ -598,12 +601,15 @@ fn transaction_quotas_distinguish_one_coalesced_patch_from_two_barrier_patches()
             .build()
             .expect("expanded-target profile");
         let target_error = source
-            .edit_with_limits(&target_limits, |edit| {
-                edit.set(
-                    scoped_sheet_query("sheet[name!=Tail]"),
-                    props! { "visibility" => "hidden" },
-                )
-            })
+            .edit_with_options(
+                litchi_ops::EditOptions::new().semantic_limits(target_limits),
+                |edit| {
+                    edit.set(
+                        scoped_sheet_query("sheet[name!=Tail]"),
+                        props! { "visibility" => "hidden" },
+                    )
+                },
+            )
             .expect_err("expanded target limit");
         assert_eq!(target_error.code(), Code::LimitExceeded);
         assert_eq!(source.to_bytes().expect("source unchanged"), before);
@@ -614,9 +620,10 @@ fn transaction_quotas_distinguish_one_coalesced_patch_from_two_barrier_patches()
             .build()
             .expect("staged-byte profile");
         let staged_error = source
-            .edit_with_limits(&staged_limits, |edit| {
-                edit.set(FIRST, props! { "visibility" => "hidden" })
-            })
+            .edit_with_options(
+                litchi_ops::EditOptions::new().semantic_limits(staged_limits),
+                |edit| edit.set(FIRST, props! { "visibility" => "hidden" }),
+            )
             .expect_err("staged-byte limit");
         assert_eq!(staged_error.code(), Code::LimitExceeded);
         assert_eq!(source.to_bytes().expect("source unchanged"), before);
@@ -627,7 +634,7 @@ fn transaction_quotas_distinguish_one_coalesced_patch_from_two_barrier_patches()
                 edit.set(THIRD, props! { "visibility" => "hidden" })
             })
             .expect("measure coalesced snapshot");
-        let budget = coalesced.diagnostics.snapshot_bytes();
+        let budget = coalesced.diagnostics().snapshot_bytes();
         assert!(budget > 0);
         let one_patch_limits = SemanticLimits::builder()
             .max_snapshot_bytes(budget)
@@ -635,18 +642,24 @@ fn transaction_quotas_distinguish_one_coalesced_patch_from_two_barrier_patches()
             .build()
             .expect("one-patch profile");
         let accepted = source
-            .edit_with_limits(&one_patch_limits, |edit| {
-                edit.set(SECOND, props! { "visibility" => "hidden" })?;
-                edit.set(THIRD, props! { "visibility" => "hidden" })
-            })
+            .edit_with_options(
+                litchi_ops::EditOptions::new().semantic_limits(one_patch_limits),
+                |edit| {
+                    edit.set(SECOND, props! { "visibility" => "hidden" })?;
+                    edit.set(THIRD, props! { "visibility" => "hidden" })
+                },
+            )
             .expect("coalesced patch fits measured snapshot budget");
-        assert_eq!(accepted.diagnostics.commits(), 1);
+        assert_eq!(accepted.diagnostics().commits(), 1);
 
         let barrier_error = source
-            .edit_with_limits(&one_patch_limits, |edit| {
-                edit.set(SECOND, props! { "visibility" => "hidden" })?;
-                edit.set(THIRD, props! { "visibility" => "veryHidden" })
-            })
+            .edit_with_options(
+                litchi_ops::EditOptions::new().semantic_limits(one_patch_limits),
+                |edit| {
+                    edit.set(SECOND, props! { "visibility" => "hidden" })?;
+                    edit.set(THIRD, props! { "visibility" => "veryHidden" })
+                },
+            )
             .expect_err("two barrier patches exceed one-patch budget");
         assert_eq!(barrier_error.code(), Code::LimitExceeded);
         assert_eq!(source.to_bytes().expect("source unchanged"), before);
@@ -660,21 +673,21 @@ fn one_thousand_distinct_direct_state_commands_fit_default_limits() {
     let commit = source
         .batch(commands, BatchMode::Atomic)
         .expect("one thousand non-active sheet commands");
-    assert_eq!(commit.results.len(), 1_000);
-    assert_all_applied_changed(&commit.results);
-    assert_eq!(commit.diagnostics.operations(), 1_000);
-    assert_eq!(commit.diagnostics.commits(), 1);
-    assert_eq!(commit.diagnostics.leaf_operations(), 1_000);
+    assert_eq!(commit.results().len(), 1_000);
+    assert_all_applied_changed(commit.results());
+    assert_eq!(commit.diagnostics().operations(), 1_000);
+    assert_eq!(commit.diagnostics().commits(), 1);
+    assert_eq!(commit.diagnostics().leaf_operations(), 1_000);
     assert_eq!(
-        sheet_property(&commit.file, "/sheet[1]", "visibility"),
+        sheet_property(commit.file(), "/sheet[1]", "visibility"),
         None
     );
     assert_eq!(
-        sheet_property(&commit.file, "/sheet[2]", "visibility").as_deref(),
+        sheet_property(commit.file(), "/sheet[2]", "visibility").as_deref(),
         Some("hidden")
     );
     assert_eq!(
-        sheet_property(&commit.file, "/sheet[1001]", "visibility").as_deref(),
+        sheet_property(commit.file(), "/sheet[1001]", "visibility").as_deref(),
         Some("hidden")
     );
 }
@@ -698,10 +711,10 @@ fn revealing_a_tab_replans_the_following_hide_after_the_state_barrier() {
             })
             .expect("replan against published reveal");
         assert_eq!(
-            commit.file.to_bytes().unwrap(),
+            commit.file().to_bytes().unwrap(),
             sequential.to_bytes().unwrap()
         );
-        assert_eq!(commit.diagnostics.commits(), 2);
+        assert_eq!(commit.diagnostics().commits(), 2);
     }
 }
 
@@ -722,9 +735,9 @@ fn best_effort_failure_discards_its_sheet_run_and_later_commands_continue() {
             )
             .expect("isolate last-visible failure");
         assert!(
-            matches!(&batch.results[2], ItemResult::Failed(error) if error.code() == Code::InvalidArgument && error.item() == Some(2))
+            matches!(&batch.results()[2], ItemResult::Failed(error) if error.code() == Code::InvalidArgument && error.item() == Some(2))
         );
-        assert!(matches!(&batch.results[3], ItemResult::Applied(applied) if applied.changed));
+        assert!(matches!(&batch.results()[3], ItemResult::Applied(applied) if applied.changed));
         let sequential = source
             .set(SECOND, props! { "hidden" => true })
             .unwrap()
@@ -733,7 +746,7 @@ fn best_effort_failure_discards_its_sheet_run_and_later_commands_continue() {
             .set(SECOND, props! { "hidden" => false })
             .unwrap();
         assert_eq!(
-            batch.file.to_bytes().unwrap(),
+            batch.file().to_bytes().unwrap(),
             sequential.to_bytes().unwrap()
         );
         assert_eq!(source.to_bytes().unwrap(), bytes);

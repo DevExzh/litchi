@@ -120,7 +120,7 @@ mod odt {
                 Ok(())
             })
             .expect("flat transaction");
-        let reopened = open_bytes(committed.file.to_bytes().unwrap()).expect("reopen");
+        let reopened = open_bytes(committed.file().to_bytes().unwrap()).expect("reopen");
         assert_eq!(text(&reopened, &path).as_deref(), Some("one"));
         assert_eq!(
             reopened
@@ -130,7 +130,7 @@ mod odt {
             Some("Flat".to_owned())
         );
         assert!(
-            String::from_utf8(committed.file.to_bytes().unwrap())
+            String::from_utf8(committed.file().to_bytes().unwrap())
                 .unwrap()
                 .starts_with("<?xml")
         );

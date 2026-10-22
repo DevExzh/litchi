@@ -463,9 +463,9 @@ mod enabled {
             })
             .expect("unified File::edit");
         UnifiedRun {
-            file: commit.file,
-            commits: commit.diagnostics.commits(),
-            operations: commit.diagnostics.operations(),
+            commits: commit.diagnostics().commits(),
+            operations: commit.diagnostics().operations(),
+            file: commit.into_file(),
         }
     }
 
@@ -475,9 +475,9 @@ mod enabled {
             .batch(items, BatchMode::Atomic)
             .expect("unified File::batch");
         UnifiedRun {
-            file: commit.file,
-            commits: commit.diagnostics.commits(),
-            operations: commit.diagnostics.operations(),
+            commits: commit.diagnostics().commits(),
+            operations: commit.diagnostics().operations(),
+            file: commit.into_file(),
         }
     }
 

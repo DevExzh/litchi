@@ -50,7 +50,9 @@ fn open_source_package(bytes: Vec<u8>) -> Pptx {
 
 #[cfg(any(unix, windows))]
 fn open_prepared(path: &Path) -> Pptx {
-    let detection = crate::detect::detect_and_prepare(path).expect("detected");
+    let detection =
+        crate::detect::detect_and_prepare(path, &crate::detect::SourceLimits::default())
+            .expect("detected");
     match crate::open_prepared_with(detection, &options()).expect("prepared route") {
         crate::File::Pptx(pptx) => pptx,
         other => panic!("{} opened as {other:?}", path.display()),
@@ -58,7 +60,9 @@ fn open_prepared(path: &Path) -> Pptx {
 }
 
 fn open_eager(bytes: Vec<u8>) -> Pptx {
-    match crate::detect::detect_format_smart(bytes).expect("detected") {
+    match crate::detect::detect_format_smart(bytes, &crate::detect::SourceLimits::default())
+        .expect("detected")
+    {
         crate::detect::DetectedFormat::Pptx(package) => {
             Pptx::from_opc_package(package, &options()).expect("eager route")
         },

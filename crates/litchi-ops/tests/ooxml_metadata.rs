@@ -119,15 +119,15 @@ fn transactions_replay_and_invert_metadata_sets() {
                 Ok(())
             })
             .expect("transaction");
-        assert!(!commit.patch.is_noop(), "{format:?}");
-        let after = commit.file.clone();
+        assert!(!commit.patch().is_noop(), "{format:?}");
+        let after = commit.file().clone();
         assert_eq!(metadata(&after).title.as_deref(), Some("In a transaction"));
-        let replayed = commit.patch.apply(&file).expect("replay");
+        let replayed = commit.patch().apply(&file).expect("replay");
         assert_eq!(
             metadata(&replayed).title.as_deref(),
             Some("In a transaction")
         );
-        let restored = commit.patch.inverse().apply(&after).expect("inverse");
+        let restored = commit.patch().inverse().apply(&after).expect("inverse");
         assert_eq!(metadata(&restored).title, None);
     }
 }

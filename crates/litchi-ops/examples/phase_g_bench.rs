@@ -66,7 +66,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
                 Ok(())
             })?
-            .file;
+            .file()
+            .clone();
         let docx = litchi_ops::open_bytes(docx.to_bytes()?)?;
         let paths: Vec<String> = (1..=1000).map(|n| format!("/body/p[{n}]/r[1]")).collect();
         report(
@@ -97,7 +98,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
                 Ok(())
             })?
-            .file;
+            .file()
+            .clone();
         let doc = litchi_ops::open_bytes(doc.to_bytes()?)?;
         let paths: Vec<String> = (1..=200).map(|n| format!("/body/p[{n}]")).collect();
         report(

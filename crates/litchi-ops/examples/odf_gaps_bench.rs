@@ -149,9 +149,9 @@ mod bench {
                 .expect("unified")
             };
             let commit = unified_once();
-            assert_eq!(commit.diagnostics.commits(), 1);
+            assert_eq!(commit.diagnostics().commits(), 1);
             assert_eq!(
-                commit.file.to_bytes().expect("bytes"),
+                commit.file().to_bytes().expect("bytes"),
                 leaf_once().as_bytes(),
                 "ODG batch outputs differ"
             );
@@ -211,9 +211,9 @@ mod bench {
                 .expect("unified")
             };
             let commit = unified_once();
-            assert_eq!(commit.diagnostics.commits(), 1);
+            assert_eq!(commit.diagnostics().commits(), 1);
             assert_eq!(
-                commit.file.to_bytes().expect("bytes"),
+                commit.file().to_bytes().expect("bytes"),
                 leaf_once().as_bytes(),
                 "ODB batch outputs differ"
             );
@@ -270,9 +270,9 @@ mod bench {
                 .expect("unified")
             };
             let commit = unified_once();
-            assert_eq!(commit.diagnostics.commits(), 1);
+            assert_eq!(commit.diagnostics().commits(), 1);
             assert_eq!(
-                commit.file.to_bytes().expect("bytes"),
+                commit.file().to_bytes().expect("bytes"),
                 leaf_once().as_bytes(),
                 "formula batch outputs differ"
             );

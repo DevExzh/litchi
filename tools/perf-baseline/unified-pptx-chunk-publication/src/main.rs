@@ -234,30 +234,30 @@ fn unified_once(file: &File, commands: Vec<BatchItem<'static>>) -> Result<litchi
 }
 
 fn validate_batch(commit: &litchi_ops::BatchCommit, count: usize) -> Result<()> {
-    if commit.results.len() != count || commit.diagnostics.operations() != count {
+    if commit.results().len() != count || commit.diagnostics().operations() != count {
         return Err(format!(
             "unified batch accounting mismatch: results={}, operations={}, expected={count}",
-            commit.results.len(),
-            commit.diagnostics.operations()
+            commit.results().len(),
+            commit.diagnostics().operations()
         )
         .into());
     }
-    if commit.results.iter().any(
+    if commit.results().iter().any(
         |result| !matches!(result, litchi_ops::ItemResult::Applied(applied) if applied.changed),
     ) {
         return Err("unified batch did not apply every direct shape command".into());
     }
-    if !commit.diagnostics.changed() {
+    if !commit.diagnostics().changed() {
         return Err("unified batch produced an unchanged archive".into());
     }
     // These workloads intentionally contain one homogeneous direct shape-set
     // family.  A batch that cannot coalesce that family would turn the 1k/10k
     // measurement into a per-command commit benchmark and would miss the
     // atomic linear-scaling contract this route is meant to exercise.
-    if commit.diagnostics.commits() != 1 {
+    if commit.diagnostics().commits() != 1 {
         return Err(format!(
             "homogeneous PPTX command batch did not coalesce to one native commit: {}",
-            commit.diagnostics.commits()
+            commit.diagnostics().commits()
         )
         .into());
     }
@@ -352,7 +352,7 @@ fn measure(
     let unified_warm = unified_once(&unified, warm_commands)
         .map_err(|error| format!("unified warm-up batch: {error}"))?;
     validate_batch(&unified_warm, count)?;
-    let unified_output = unified_warm.file.to_bytes()?;
+    let unified_output = unified_warm.file().to_bytes()?;
     let equivalence = verify_equivalence(&native_output, &unified_output)?;
     drop((native_warm, unified_warm));
 
@@ -390,9 +390,9 @@ fn measure(
                 black_box(&output);
                 unified_ns.push(elapsed);
                 validate_batch(&output, count)?;
-                unified_commits.get_or_insert(output.diagnostics.commits());
-                unified_leaf_operations.get_or_insert(output.diagnostics.leaf_operations());
-                unified_snapshot_bytes.get_or_insert(output.diagnostics.snapshot_bytes());
+                unified_commits.get_or_insert(output.diagnostics().commits());
+                unified_leaf_operations.get_or_insert(output.diagnostics().leaf_operations());
+                unified_snapshot_bytes.get_or_insert(output.diagnostics().snapshot_bytes());
                 drop(output);
             }
         }

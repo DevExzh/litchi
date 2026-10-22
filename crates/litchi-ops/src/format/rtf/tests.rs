@@ -11,7 +11,7 @@ fn fixture(relative: &str) -> PathBuf {
 
 /// The facade's byte route: smart detection, then the RTF arm.
 fn open_detected(bytes: Vec<u8>) -> Rtf {
-    match detect_format_smart(bytes) {
+    match detect_format_smart(bytes, &crate::detect::SourceLimits::default()) {
         Some(DetectedFormat::Rtf(bytes)) => {
             Rtf::from_bytes(bytes, &OpenOptions::default()).expect("open detected RTF")
         },

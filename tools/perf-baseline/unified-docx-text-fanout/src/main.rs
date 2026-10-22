@@ -107,9 +107,9 @@ fn measure<T, H>(
     }
     let oracle = oracle?;
     let candidate = candidate?;
-    if bytes(&oracle, input.len())? != candidate.file.to_bytes()?
-        || candidate.diagnostics.leaf_operations() != input.len()
-        || candidate.diagnostics.operations() != 1
+    if bytes(&oracle, input.len())? != candidate.file().to_bytes()?
+        || candidate.diagnostics().leaf_operations() != input.len()
+        || candidate.diagnostics().operations() != 1
     {
         return Err("output or operation count mismatch".into());
     }

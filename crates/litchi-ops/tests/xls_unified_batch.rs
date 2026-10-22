@@ -276,50 +276,61 @@ fn distinct_direct_sets_and_removals_share_one_native_commit() {
             })
             .expect("coalesced mixed XLS edit");
 
-        assert!(commit.diagnostics.changed());
-        assert_eq!(commit.diagnostics.operations(), 5);
-        assert_eq!(commit.diagnostics.commits(), 1);
-        assert_eq!(cell_text(&commit.file, A1).as_deref(), Some("changed"));
-        assert_eq!(cell_text(&commit.file, B1).as_deref(), Some("7.25"));
-        assert_eq!(cell_text(&commit.file, C1).as_deref(), Some(""));
+        assert!(commit.diagnostics().changed());
+        assert_eq!(commit.diagnostics().operations(), 5);
+        assert_eq!(commit.diagnostics().commits(), 1);
+        assert_eq!(cell_text(commit.file(), A1).as_deref(), Some("changed"));
+        assert_eq!(cell_text(commit.file(), B1).as_deref(), Some("7.25"));
+        assert_eq!(cell_text(commit.file(), C1).as_deref(), Some(""));
         assert_eq!(
-            cell_text(&commit.file, A2).as_deref(),
+            cell_text(commit.file(), A2).as_deref(),
             Some("second changed")
         );
-        assert_eq!(cell_text(&commit.file, B2).as_deref(), Some(""));
-        assert_eq!(cell_text(&commit.file, D1).as_deref(), Some("6"));
+        assert_eq!(cell_text(commit.file(), B2).as_deref(), Some(""));
+        assert_eq!(cell_text(commit.file(), D1).as_deref(), Some("6"));
         assert_eq!(
-            cell_text(&commit.file, ARCHIVE_A1).as_deref(),
+            cell_text(commit.file(), ARCHIVE_A1).as_deref(),
             Some("untouched")
         );
         assert_eq!(original.to_bytes().expect("publish source"), before);
 
         assert_eq!(
             commit
-                .patch
+                .patch()
                 .apply(&original)
                 .expect("replay coalesced edit")
                 .to_bytes()
                 .expect("publish replay"),
-            commit.file.to_bytes().expect("publish target")
+            commit.file().to_bytes().expect("publish target")
         );
         assert_eq!(
             commit
-                .patch
+                .patch()
                 .inverse()
-                .apply(&commit.file)
+                .apply(commit.file())
                 .expect("inverse coalesced edit")
                 .to_bytes()
                 .expect("publish inverse"),
             before
         );
 
+        // Record 0362: a separately opened copy of the base takes the patch;
+        // other content is refused.
         let foreign = open_owner(&before, eager);
         assert_eq!(
             commit
-                .patch
+                .patch()
                 .apply(&foreign)
-                .expect_err("foreign snapshot must be refused")
+                .expect("a byte-identical copy takes the patch")
+                .to_bytes()
+                .expect("publish replay"),
+            commit.file().to_bytes().expect("publish commit")
+        );
+        assert_eq!(
+            commit
+                .patch()
+                .apply(commit.file())
+                .expect_err("other content must be refused")
                 .code(),
             Code::InvalidInput
         );
@@ -346,24 +357,24 @@ fn one_thousand_distinct_direct_operations_do_not_escape_the_native_run() {
             })
             .expect("coalesced thousand-operation edit");
 
-        assert!(commit.diagnostics.changed());
-        assert_eq!(commit.diagnostics.operations(), 1_000);
-        assert_eq!(commit.diagnostics.leaf_operations(), 1_000);
-        assert_eq!(commit.diagnostics.commits(), 1);
+        assert!(commit.diagnostics().changed());
+        assert_eq!(commit.diagnostics().operations(), 1_000);
+        assert_eq!(commit.diagnostics().leaf_operations(), 1_000);
+        assert_eq!(commit.diagnostics().commits(), 1);
         assert_eq!(
-            cell_text(&commit.file, "/sheet[1]/A1").as_deref(),
+            cell_text(commit.file(), "/sheet[1]/A1").as_deref(),
             Some("1001")
         );
         assert_eq!(
-            cell_text(&commit.file, "/sheet[1]/A500").as_deref(),
+            cell_text(commit.file(), "/sheet[1]/A500").as_deref(),
             Some("1500")
         );
         assert_eq!(
-            cell_text(&commit.file, "/sheet[1]/A501").as_deref(),
+            cell_text(commit.file(), "/sheet[1]/A501").as_deref(),
             Some("")
         );
         assert_eq!(
-            cell_text(&commit.file, "/sheet[1]/A1000").as_deref(),
+            cell_text(commit.file(), "/sheet[1]/A1000").as_deref(),
             Some("")
         );
         assert_eq!(
@@ -385,14 +396,14 @@ fn repeated_coordinates_close_runs_and_preserve_last_value() {
                 Ok::<_, litchi_ops::Error>(())
             })
             .expect("repeated-coordinate edit");
-        assert_eq!(commit.diagnostics.operations(), 3);
+        assert_eq!(commit.diagnostics().operations(), 3);
         assert_eq!(
-            commit.diagnostics.commits(),
+            commit.diagnostics().commits(),
             2,
             "a repeated coordinate is a native-run barrier"
         );
-        assert_eq!(cell_text(&commit.file, A1).as_deref(), Some("last"));
-        assert_eq!(cell_text(&commit.file, B1).as_deref(), Some("11"));
+        assert_eq!(cell_text(commit.file(), A1).as_deref(), Some("last"));
+        assert_eq!(cell_text(commit.file(), B1).as_deref(), Some("11"));
 
         let removed = original
             .edit(|transaction| {
@@ -401,9 +412,9 @@ fn repeated_coordinates_close_runs_and_preserve_last_value() {
                 Ok::<_, litchi_ops::Error>(())
             })
             .expect("repeated removal edit");
-        assert_eq!(removed.diagnostics.operations(), 2);
-        assert!(removed.diagnostics.commits() >= 1);
-        assert_eq!(cell_text(&removed.file, A1).as_deref(), Some(""));
+        assert_eq!(removed.diagnostics().operations(), 2);
+        assert!(removed.diagnostics().commits() >= 1);
+        assert_eq!(cell_text(removed.file(), A1).as_deref(), Some(""));
     }
 }
 
@@ -419,8 +430,8 @@ fn reads_queries_ranges_and_renames_are_native_run_barriers() {
                 Ok::<_, litchi_ops::Error>(())
             })
             .expect("read barrier edit");
-        assert_eq!(read.diagnostics.commits(), 2);
-        assert_eq!(cell_text(&read.file, B1).as_deref(), Some("9"));
+        assert_eq!(read.diagnostics().commits(), 2);
+        assert_eq!(cell_text(read.file(), B1).as_deref(), Some("9"));
 
         let range = original
             .edit(|transaction| {
@@ -430,9 +441,9 @@ fn reads_queries_ranges_and_renames_are_native_run_barriers() {
                 Ok::<_, litchi_ops::Error>(())
             })
             .expect("range barrier edit");
-        assert_eq!(range.diagnostics.commits(), 3);
-        assert_eq!(cell_text(&range.file, B1).as_deref(), Some("8"));
-        assert_eq!(cell_text(&range.file, C1).as_deref(), Some("8"));
+        assert_eq!(range.diagnostics().commits(), 3);
+        assert_eq!(cell_text(range.file(), B1).as_deref(), Some("8"));
+        assert_eq!(cell_text(range.file(), C1).as_deref(), Some("8"));
 
         let query = workbook_cell_query("cell[value=2.5]");
         let queried = original
@@ -443,8 +454,8 @@ fn reads_queries_ranges_and_renames_are_native_run_barriers() {
                 Ok::<_, litchi_ops::Error>(())
             })
             .expect("query barrier edit");
-        assert_eq!(queried.diagnostics.commits(), 3);
-        assert_eq!(cell_text(&queried.file, B1).as_deref(), Some("12"));
+        assert_eq!(queried.diagnostics().commits(), 3);
+        assert_eq!(cell_text(queried.file(), B1).as_deref(), Some("12"));
 
         let renamed = original
             .edit(|transaction| {
@@ -454,14 +465,14 @@ fn reads_queries_ranges_and_renames_are_native_run_barriers() {
                 Ok::<_, litchi_ops::Error>(())
             })
             .expect("rename barrier edit");
-        assert_eq!(renamed.diagnostics.commits(), 3);
+        assert_eq!(renamed.diagnostics().commits(), 3);
         assert_eq!(
-            cell_text(&renamed.file, "/sheet[1]/B1").as_deref(),
+            cell_text(renamed.file(), "/sheet[1]/B1").as_deref(),
             Some("13")
         );
         assert_eq!(
             renamed
-                .file
+                .file()
                 .get("/sheet[1]")
                 .expect("resolve renamed sheet")
                 .view()
@@ -508,26 +519,26 @@ fn atomic_and_best_effort_batches_attribute_formula_admission_failures() {
             )
             .expect("best-effort batch");
         assert!(matches!(
-            &best_effort.results[0],
+            &best_effort.results()[0],
             ItemResult::Applied(applied) if applied.changed
         ));
         assert!(matches!(
-            &best_effort.results[1],
+            &best_effort.results()[1],
             ItemResult::Failed(error)
                 if error.item() == Some(1) && error.code() == Code::UnsupportedCapability
         ));
         assert!(matches!(
-            &best_effort.results[2],
+            &best_effort.results()[2],
             ItemResult::Applied(applied) if applied.changed
         ));
-        assert_eq!(cell_text(&best_effort.file, A1).as_deref(), Some("kept"));
-        assert_eq!(cell_text(&best_effort.file, B1).as_deref(), Some("9"));
-        assert_eq!(cell_text(&best_effort.file, D1).as_deref(), Some("6"));
+        assert_eq!(cell_text(best_effort.file(), A1).as_deref(), Some("kept"));
+        assert_eq!(cell_text(best_effort.file(), B1).as_deref(), Some("9"));
+        assert_eq!(cell_text(best_effort.file(), D1).as_deref(), Some("6"));
         assert_eq!(
             best_effort
-                .patch
+                .patch()
                 .inverse()
-                .apply(&best_effort.file)
+                .apply(best_effort.file())
                 .expect("inverse best-effort batch")
                 .to_bytes()
                 .expect("publish inverse batch"),
@@ -557,7 +568,7 @@ fn atomic_batch_reports_each_scalar_noop_before_changed_items() {
             )
             .expect("mixed no-op and changed atomic batch");
         let changed = commit
-            .results
+            .results()
             .iter()
             .map(|result| match result {
                 ItemResult::Applied(applied) => applied.changed,
@@ -568,13 +579,16 @@ fn atomic_batch_reports_each_scalar_noop_before_changed_items() {
             changed,
             [false, false, false, false, false, false, true, true]
         );
-        assert!(commit.diagnostics.changed());
-        assert_eq!(commit.diagnostics.operations(), 8);
-        assert!(commit.diagnostics.commits() >= 1);
-        assert_eq!(cell_text(&commit.file, A1).as_deref(), Some("changed"));
-        assert_eq!(cell_text(&commit.file, B1).as_deref(), Some(""));
-        assert_eq!(cell_text(&commit.file, C1).as_deref(), Some("TRUE"));
-        assert_eq!(cell_text(&commit.file, "/sheet[1]/C2").as_deref(), Some(""));
+        assert!(commit.diagnostics().changed());
+        assert_eq!(commit.diagnostics().operations(), 8);
+        assert!(commit.diagnostics().commits() >= 1);
+        assert_eq!(cell_text(commit.file(), A1).as_deref(), Some("changed"));
+        assert_eq!(cell_text(commit.file(), B1).as_deref(), Some(""));
+        assert_eq!(cell_text(commit.file(), C1).as_deref(), Some("TRUE"));
+        assert_eq!(
+            cell_text(commit.file(), "/sheet[1]/C2").as_deref(),
+            Some("")
+        );
         assert_eq!(
             original.to_bytes().expect("publish unchanged source"),
             before
@@ -612,24 +626,24 @@ fn deferred_rich_sst_dependency_failure_keeps_the_original_wire_index() {
             )
             .expect("best-effort rich dependency batch");
         assert!(matches!(
-            &best_effort.results[0],
+            &best_effort.results()[0],
             ItemResult::Applied(applied) if applied.changed
         ));
         assert!(matches!(
-            &best_effort.results[1],
+            &best_effort.results()[1],
             ItemResult::Failed(error)
                 if error.item() == Some(1) && error.code() == Code::UnsupportedCapability
         ));
         assert!(matches!(
-            &best_effort.results[2],
+            &best_effort.results()[2],
             ItemResult::Applied(applied) if applied.changed
         ));
-        assert_eq!(cell_text(&best_effort.file, B1).as_deref(), Some("3"));
+        assert_eq!(cell_text(best_effort.file(), B1).as_deref(), Some("3"));
         assert_eq!(
-            cell_text(&best_effort.file, "/sheet[1]/C1").as_deref(),
+            cell_text(best_effort.file(), "/sheet[1]/C1").as_deref(),
             Some("4")
         );
-        assert_eq!(cell_text(&best_effort.file, A1).as_deref(), Some("rich"));
+        assert_eq!(cell_text(best_effort.file(), A1).as_deref(), Some("rich"));
     }
 }
 
@@ -643,12 +657,15 @@ fn operation_and_target_budgets_cannot_be_bypassed_by_coalescing() {
         .build()
         .expect("build operation limit");
     let operation_error = original
-        .edit_with_limits(&operation_limits, |transaction| {
-            transaction.set(A1, props! { "value" => 1 })?;
-            transaction.set(B1, props! { "value" => 2 })?;
-            transaction.set(C1, props! { "value" => 3 })?;
-            Ok::<_, litchi_ops::Error>(())
-        })
+        .edit_with_options(
+            litchi_ops::EditOptions::new().semantic_limits(operation_limits),
+            |transaction| {
+                transaction.set(A1, props! { "value" => 1 })?;
+                transaction.set(B1, props! { "value" => 2 })?;
+                transaction.set(C1, props! { "value" => 3 })?;
+                Ok::<_, litchi_ops::Error>(())
+            },
+        )
         .expect_err("operation limit must count staged commands");
     assert_eq!(operation_error.code(), Code::LimitExceeded);
     assert_eq!(operation_error.item(), Some(2));
@@ -668,11 +685,14 @@ fn operation_and_target_budgets_cannot_be_bypassed_by_coalescing() {
         .build()
         .expect("build staged byte limit");
     let staged_error = original
-        .edit_with_limits(&staged_limits, |transaction| {
-            transaction.set(A1, props! { "value" => "staged" })?;
-            transaction.set(B1, props! { "value" => "also staged" })?;
-            Ok::<_, litchi_ops::Error>(())
-        })
+        .edit_with_options(
+            litchi_ops::EditOptions::new().semantic_limits(staged_limits),
+            |transaction| {
+                transaction.set(A1, props! { "value" => "staged" })?;
+                transaction.set(B1, props! { "value" => "also staged" })?;
+                Ok::<_, litchi_ops::Error>(())
+            },
+        )
         .expect_err("staged byte budget must close or refuse a native run");
     assert_eq!(staged_error.code(), Code::LimitExceeded);
     assert_eq!(
@@ -683,16 +703,17 @@ fn operation_and_target_budgets_cannot_be_bypassed_by_coalescing() {
     let probe = original
         .edit(|transaction| transaction.set(A1, props! { "value" => "probe" }))
         .expect("measure retained snapshot charge");
-    assert!(probe.diagnostics.snapshot_bytes() > 0);
+    assert!(probe.diagnostics().snapshot_bytes() > 0);
     let snapshot_limits = SemanticLimits::builder()
-        .max_snapshot_bytes(probe.diagnostics.snapshot_bytes() - 1)
+        .max_snapshot_bytes(probe.diagnostics().snapshot_bytes() - 1)
         .expect("snapshot byte limit")
         .build()
         .expect("build snapshot byte limit");
     let snapshot_error = original
-        .edit_with_limits(&snapshot_limits, |transaction| {
-            transaction.set(A1, props! { "value" => "snapshot" })
-        })
+        .edit_with_options(
+            litchi_ops::EditOptions::new().semantic_limits(snapshot_limits),
+            |transaction| transaction.set(A1, props! { "value" => "snapshot" }),
+        )
         .expect_err("retained snapshot budget must be enforced");
     assert_eq!(snapshot_error.code(), Code::LimitExceeded);
     assert_eq!(
@@ -706,9 +727,10 @@ fn operation_and_target_budgets_cannot_be_bypassed_by_coalescing() {
         .build()
         .expect("build target limit");
     let target_error = original
-        .edit_with_limits(&target_limits, |transaction| {
-            transaction.set("Data!A1:C2", props! { "value" => "too many" })
-        })
+        .edit_with_options(
+            litchi_ops::EditOptions::new().semantic_limits(target_limits),
+            |transaction| transaction.set("Data!A1:C2", props! { "value" => "too many" }),
+        )
         .expect_err("range target limit must be enforced");
     assert_eq!(target_error.code(), Code::LimitExceeded);
     assert_eq!(
@@ -729,10 +751,10 @@ fn an_all_noop_edit_collapses_to_the_original_snapshot() {
                 Ok::<_, litchi_ops::Error>(())
             })
             .expect("no-op edit");
-        assert!(!commit.diagnostics.changed());
-        assert!(commit.patch.is_noop());
+        assert!(!commit.diagnostics().changed());
+        assert!(commit.patch().is_noop());
         assert_eq!(
-            commit.file.to_bytes().expect("publish no-op result"),
+            commit.file().to_bytes().expect("publish no-op result"),
             before
         );
         assert_eq!(original.to_bytes().expect("publish no-op source"), before);
@@ -859,19 +881,19 @@ fn native_staging_limit_closes_runs_without_limiting_the_public_batch() {
                     Ok::<_, litchi_ops::Error>(())
                 })
                 .expect("bounded native runs cover the complete public batch");
-            assert_eq!(commit.diagnostics.operations(), COUNT);
-            assert_eq!(commit.diagnostics.commits(), 2);
+            assert_eq!(commit.diagnostics().operations(), COUNT);
+            assert_eq!(commit.diagnostics().commits(), 2);
             let expected = if remove { "" } else { "-1" };
-            assert_eq!(cell_text(&commit.file, A1).as_deref(), Some(expected));
+            assert_eq!(cell_text(commit.file(), A1).as_deref(), Some(expected));
             assert_eq!(
-                cell_text(&commit.file, "/sheet[1]/A4100").as_deref(),
+                cell_text(commit.file(), "/sheet[1]/A4100").as_deref(),
                 Some(expected)
             );
             assert_eq!(
                 commit
-                    .patch
+                    .patch()
                     .inverse()
-                    .apply(&commit.file)
+                    .apply(commit.file())
                     .unwrap()
                     .to_bytes()
                     .unwrap(),
@@ -893,20 +915,23 @@ fn mutation_budget_does_not_count_native_string_resource_operations() {
     for eager in [false, true] {
         let original = open_owner(&bytes, eager);
         let commit = original
-            .edit_with_limits(&limits, |transaction| {
-                transaction.set("/sheet[1]/A1", props! { "value" => "first new string" })?;
-                transaction.set("/sheet[1]/A2", props! { "value" => "second new string" })?;
-                Ok::<_, litchi_ops::Error>(())
-            })
+            .edit_with_options(
+                litchi_ops::EditOptions::new().semantic_limits(limits),
+                |transaction| {
+                    transaction.set("/sheet[1]/A1", props! { "value" => "first new string" })?;
+                    transaction.set("/sheet[1]/A2", props! { "value" => "second new string" })?;
+                    Ok::<_, litchi_ops::Error>(())
+                },
+            )
             .expect("two calls may stage multiple native resource operations");
-        assert_eq!(commit.diagnostics.operations(), 2);
-        assert_eq!(commit.diagnostics.commits(), 1);
+        assert_eq!(commit.diagnostics().operations(), 2);
+        assert_eq!(commit.diagnostics().commits(), 1);
         assert_eq!(
-            cell_text(&commit.file, A1).as_deref(),
+            cell_text(commit.file(), A1).as_deref(),
             Some("first new string")
         );
         assert_eq!(
-            cell_text(&commit.file, A2).as_deref(),
+            cell_text(commit.file(), A2).as_deref(),
             Some("second new string")
         );
     }

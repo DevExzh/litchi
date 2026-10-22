@@ -327,29 +327,29 @@ fn worksheet_name_transactions_replay_inverse_and_collapse_noops() {
                 edit.set(SECOND, props! { "name" => "Archive 2026" })
             })
             .expect("stage worksheet renames");
-        assert!(commit.diagnostics.changed());
+        assert!(commit.diagnostics().changed());
         assert_eq!(
-            sheet_property(&commit.file, FIRST, "name").as_deref(),
+            sheet_property(commit.file(), FIRST, "name").as_deref(),
             Some("Input")
         );
         assert_eq!(
-            sheet_property(&commit.file, SECOND, "name").as_deref(),
+            sheet_property(commit.file(), SECOND, "name").as_deref(),
             Some("Archive 2026")
         );
         assert_eq!(
             commit
-                .patch
+                .patch()
                 .apply(&original)
                 .expect("replay patch")
                 .to_bytes()
                 .unwrap(),
-            commit.file.to_bytes().unwrap()
+            commit.file().to_bytes().unwrap()
         );
         assert_eq!(
             commit
-                .patch
+                .patch()
                 .inverse()
-                .apply(&commit.file)
+                .apply(commit.file())
                 .expect("apply inverse patch")
                 .to_bytes()
                 .unwrap(),
@@ -359,9 +359,9 @@ fn worksheet_name_transactions_replay_inverse_and_collapse_noops() {
         let noop = original
             .edit(|edit| edit.set(FIRST, props! { "name" => "Data" }))
             .expect("stage same worksheet name");
-        assert!(!noop.diagnostics.changed());
-        assert!(noop.patch.is_noop());
-        assert_eq!(noop.file.to_bytes().unwrap(), before);
+        assert!(!noop.diagnostics().changed());
+        assert!(noop.patch().is_noop());
+        assert_eq!(noop.file().to_bytes().unwrap(), before);
     }
 }
 
@@ -385,20 +385,20 @@ fn worksheet_name_batches_keep_atomic_and_best_effort_boundaries() {
             .batch(commands(), BatchMode::BestEffort)
             .expect("best-effort duplicate name");
         assert!(matches!(
-            &best_effort.results[0],
+            &best_effort.results()[0],
             ItemResult::Applied(applied) if applied.changed
         ));
         assert!(matches!(
-            &best_effort.results[1],
+            &best_effort.results()[1],
             ItemResult::Failed(error)
                 if error.item() == Some(1) && error.code() == Code::DuplicateName
         ));
         assert_eq!(
-            sheet_property(&best_effort.file, FIRST, "name").as_deref(),
+            sheet_property(best_effort.file(), FIRST, "name").as_deref(),
             Some("Input")
         );
         assert_eq!(
-            sheet_property(&best_effort.file, SECOND, "name").as_deref(),
+            sheet_property(best_effort.file(), SECOND, "name").as_deref(),
             Some("Archive")
         );
         assert_eq!(original.to_bytes().unwrap(), before);
@@ -527,10 +527,13 @@ fn transaction_operation_and_snapshot_limits_leave_xlsb_input_unchanged() {
             .build()
             .expect("operation profile");
         let operation_error = original
-            .edit_with_limits(&operation_limits, |edit| {
-                edit.set(FIRST, props! { "name" => "Input" })?;
-                edit.set(SECOND, props! { "name" => "Archive 2026" })
-            })
+            .edit_with_options(
+                litchi_ops::EditOptions::new().semantic_limits(operation_limits),
+                |edit| {
+                    edit.set(FIRST, props! { "name" => "Input" })?;
+                    edit.set(SECOND, props! { "name" => "Archive 2026" })
+                },
+            )
             .expect_err("second worksheet mutation exceeds operation limit");
         assert_eq!(operation_error.code(), Code::LimitExceeded);
         assert_eq!(original.to_bytes().unwrap(), before);
@@ -541,9 +544,10 @@ fn transaction_operation_and_snapshot_limits_leave_xlsb_input_unchanged() {
             .build()
             .expect("snapshot profile");
         let snapshot_error = original
-            .edit_with_limits(&snapshot_limits, |edit| {
-                edit.set(FIRST, props! { "name" => "Input" })
-            })
+            .edit_with_options(
+                litchi_ops::EditOptions::new().semantic_limits(snapshot_limits),
+                |edit| edit.set(FIRST, props! { "name" => "Input" }),
+            )
             .expect_err("worksheet patch exceeds snapshot limit");
         assert_eq!(snapshot_error.code(), Code::LimitExceeded);
         assert_eq!(original.to_bytes().unwrap(), before);

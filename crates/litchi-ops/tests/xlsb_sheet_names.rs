@@ -194,20 +194,20 @@ fn complete_catalog_duplicate_names_fail_atomically_and_roll_back_batches() {
             )
             .expect("best-effort batch keeps the first rename");
         assert!(matches!(
-            &best_effort.results[0],
+            &best_effort.results()[0],
             ItemResult::Applied(applied) if applied.changed
         ));
         assert!(matches!(
-            &best_effort.results[1],
+            &best_effort.results()[1],
             ItemResult::Failed(error)
                 if error.item() == Some(1) && error.code() == Code::DuplicateName
         ));
         assert_eq!(
-            sheet_property(&best_effort.file, CHART, "name").as_deref(),
+            sheet_property(best_effort.file(), CHART, "name").as_deref(),
             Some("Dashboard")
         );
         assert_eq!(
-            sheet_property(&best_effort.file, WORKSHEET, "name").as_deref(),
+            sheet_property(best_effort.file(), WORKSHEET, "name").as_deref(),
             Some("Data")
         );
     }

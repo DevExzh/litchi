@@ -302,7 +302,8 @@ mod odg {
                 Ok(())
             })
             .unwrap()
-            .file;
+            .file()
+            .clone();
         file
     }
 
@@ -326,9 +327,9 @@ mod odg {
                 Ok(())
             })
             .unwrap();
-        assert_eq!(commit.diagnostics.operations(), 8);
-        assert_eq!(commit.diagnostics.commits(), 1);
-        let after = reopen(&commit.file);
+        assert_eq!(commit.diagnostics().operations(), 8);
+        assert_eq!(commit.diagnostics().commits(), 1);
+        let after = reopen(commit.file());
         assert_eq!(text(&after, "/page[1]/shape[6]").as_deref(), Some("t6"));
         assert_eq!(
             prop(&after, "/page[1]/shape[1]", "name").as_deref(),
@@ -339,7 +340,7 @@ mod odg {
             Some("3cm")
         );
         assert_eq!(prop(&after, "/page[1]", "name").as_deref(), Some("Renamed"));
-        let restored = commit.patch.inverse().apply(&commit.file).unwrap();
+        let restored = commit.patch().inverse().apply(commit.file()).unwrap();
         assert_eq!(restored.to_bytes().unwrap(), file.to_bytes().unwrap());
 
         // A second write of one shape's text, a second geometry write and a
@@ -353,8 +354,8 @@ mod odg {
                 Ok(())
             })
             .unwrap();
-        assert!(commit.diagnostics.commits() >= 3);
-        let after = reopen(&commit.file);
+        assert!(commit.diagnostics().commits() >= 3);
+        let after = reopen(commit.file());
         assert_eq!(text(&after, "/page[1]/shape[1]").as_deref(), Some("b"));
         assert_eq!(
             prop(&after, "/page[1]/shape[1]", "x").as_deref(),
@@ -962,9 +963,9 @@ mod odb {
                 Ok(())
             })
             .unwrap_or_else(|error| panic!("{error} {:?}", std::error::Error::source(&error)));
-        assert_eq!(commit.diagnostics.commits(), 1);
+        assert_eq!(commit.diagnostics().commits(), 1);
         assert_eq!(
-            prop(&reopen(&commit.file), "/query[3]", "command").as_deref(),
+            prop(&reopen(commit.file()), "/query[3]", "command").as_deref(),
             Some("SELECT 3 FROM u")
         );
     }

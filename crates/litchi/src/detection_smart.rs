@@ -8,6 +8,8 @@
 //! counterpart with the facade's iWork tail, which runs only after OOXML and
 //! ODF have declined a ZIP input.
 
+pub use litchi_ops::detect::SourceLimits;
+
 pub mod detected {
     //! Smart format detection with reusable owned results.
     //!
@@ -24,6 +26,7 @@ pub mod detected {
         any(unix, windows)
     ))]
     pub use litchi_ops::detect::PreparedDetection;
+    pub use litchi_ops::detect::SourceLimits;
 
     /// Detect a format while moving the source into a reusable result.
     ///
@@ -34,32 +37,24 @@ pub mod detected {
     /// - ODS and ODP files: return the moved bytes after package detection
     /// - iWork and RTF files: return the moved bytes after detection
     ///
+    /// `limits` bounds every raw probe used by detection, including the common
+    /// input length and enabled container profiles. OLE, RTF, ODF, and iWork
+    /// detection retains its existing format-specific precedence under those
+    /// limits.
+    /// ODF-marked packages with a present or uncertain OOXML catalog fail
+    /// closed on hard OPC policy errors.
+    ///
     /// # Arguments
     ///
     /// * `bytes` - The file data as bytes (ownership transferred)
+    /// * `limits` - Resource ceilings for every raw probe used by detection
     ///
     /// # Returns
     ///
     /// * `Some(DetectedFormat)` - Format detected with a reusable owner or byte buffer
     /// * `None` - Format not recognized
-    pub fn detect_format_smart(bytes: Vec<u8>) -> Option<DetectedFormat> {
-        litchi_ops::detect::detect_format_smart_with_tail(bytes, &FacadeTail)
-    }
-
-    /// Detect a format while applying an explicit OPC resource policy to an OOXML
-    /// ZIP candidate.
-    ///
-    /// The policy is used when a ZIP candidate must be ruled in or out as OOXML.
-    /// OLE, RTF, ODF, and iWork detection retains its existing format-specific
-    /// behavior after the ODF detector proves an ordinary package under its own
-    /// finite policy. ODF-marked packages with a present or uncertain OOXML
-    /// catalog fail closed on hard OPC policy errors.
-    #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
-    pub fn detect_format_smart_with_limits(
-        bytes: Vec<u8>,
-        limits: crate::opc::SourceLimits,
-    ) -> Option<DetectedFormat> {
-        litchi_ops::detect::detect_format_smart_with_limits_and_tail(bytes, limits, &FacadeTail)
+    pub fn detect_format_smart(bytes: Vec<u8>, limits: &SourceLimits) -> Option<DetectedFormat> {
+        litchi_ops::detect::detect_format_smart_with_tail(bytes, limits, &FacadeTail)
     }
 }
 
@@ -80,6 +75,7 @@ pub mod functions {
         any(unix, windows)
     ))]
     use super::detected::PreparedDetection;
+    pub use litchi_ops::detect::SourceLimits;
 
     /// Detect file format from a file path.
     ///
@@ -98,16 +94,19 @@ pub mod functions {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::common::detection::detect_file_format;
+    /// use litchi::common::detection::{detect_file_format, SourceLimits};
     ///
-    /// let format = detect_file_format("document.docx");
+    /// let format = detect_file_format("document.docx", &SourceLimits::default());
     /// if let Some(format) = format {
     ///     println!("Detected format: {:?}", format);
     /// }
     /// # Ok::<(), std::io::Error>(())
     /// ```
-    pub fn detect_file_format<P: AsRef<Path>>(path: P) -> Option<FileFormat> {
-        litchi_ops::detect::detect_file_format_with_tail(path, &FacadeTail)
+    pub fn detect_file_format<P: AsRef<Path>>(
+        path: P,
+        limits: &SourceLimits,
+    ) -> Option<FileFormat> {
+        litchi_ops::detect::detect_file_format_with_tail(path, limits, &FacadeTail)
     }
 
     /// Detect a file format and retain the OOXML package the detection built.
@@ -134,18 +133,23 @@ pub mod functions {
     /// The classification never differs from [`detect_file_format`]: any input
     /// that cannot be prepared falls back to that detector.
     ///
+    /// `limits` bounds every raw probe used by preparation. An input that
+    /// exceeds the common ceiling or a configured container ceiling is not
+    /// prepared.
+    ///
     /// # Examples
     ///
     /// ```
     /// # #[cfg(feature = "docx")]
     /// # {
+    /// use litchi::common::detection::SourceLimits;
     /// use litchi::common::detection::{FileFormat, detect_and_prepare};
     ///
     /// # let path = concat!(
     /// #     env!("CARGO_MANIFEST_DIR"),
     /// #     "/../../test-data/ooxml/docx/documentProperties.docx"
     /// # );
-    /// if let Some(detection) = detect_and_prepare(path)
+    /// if let Some(detection) = detect_and_prepare(path, &SourceLimits::default())
     ///     && detection.format() == FileFormat::Docx
     ///     && detection.is_prepared()
     /// {
@@ -159,25 +163,11 @@ pub mod functions {
         any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"),
         any(unix, windows)
     ))]
-    pub fn detect_and_prepare<P: AsRef<Path>>(path: P) -> Option<PreparedDetection> {
-        detect_and_prepare_with_limits(path, crate::opc::SourceLimits::default())
-    }
-
-    /// Detect a file format and retain the OOXML package, with an explicit OPC
-    /// resource policy.
-    ///
-    /// See [`detect_and_prepare`]. The policy bounds the OPC probe only; an input
-    /// that exceeds it is still classified through [`detect_file_format`], with no
-    /// prepared handle.
-    #[cfg(all(
-        any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"),
-        any(unix, windows)
-    ))]
-    pub fn detect_and_prepare_with_limits<P: AsRef<Path>>(
+    pub fn detect_and_prepare<P: AsRef<Path>>(
         path: P,
-        limits: crate::opc::SourceLimits,
+        limits: &SourceLimits,
     ) -> Option<PreparedDetection> {
-        litchi_ops::detect::detect_and_prepare_with_limits_and_tail(path, limits, &FacadeTail)
+        litchi_ops::detect::detect_and_prepare_with_tail(path, limits, &FacadeTail)
     }
 
     /// Detect file format from a byte slice.
@@ -202,14 +192,17 @@ pub mod functions {
     /// use std::fs;
     ///
     /// let data = fs::read("document.docx")?;
-    /// let format = detect_file_format_from_bytes(&data);
+    /// let format = detect_file_format_from_bytes(&data, &SourceLimits::default());
     /// if let Some(format) = format {
     ///     println!("Detected format: {:?}", format);
     /// }
     /// # Ok::<(), std::io::Error>(())
     /// ```
-    pub fn detect_file_format_from_bytes(bytes: &[u8]) -> Option<FileFormat> {
-        litchi_ops::detect::detect_file_format_from_bytes_with_tail(bytes, &FacadeTail)
+    pub fn detect_file_format_from_bytes(
+        bytes: &[u8],
+        limits: &SourceLimits,
+    ) -> Option<FileFormat> {
+        litchi_ops::detect::detect_file_format_from_bytes_with_tail(bytes, limits, &FacadeTail)
     }
 
     /// Detect file format from any reader that implements Read + Seek.
@@ -227,8 +220,11 @@ pub mod functions {
     /// * `Some(FileFormat)` if a supported format is detected
     /// * `None` if the format is not recognized
     ///
-    pub fn detect_format_from_reader<R: Read + Seek>(reader: &mut R) -> Option<FileFormat> {
-        litchi_ops::detect::detect_format_from_reader_with_tail(reader, &FacadeTail)
+    pub fn detect_format_from_reader<R: Read + Seek>(
+        reader: &mut R,
+        limits: &SourceLimits,
+    ) -> Option<FileFormat> {
+        litchi_ops::detect::detect_format_from_reader_with_tail(reader, limits, &FacadeTail)
     }
 }
 
@@ -271,12 +267,10 @@ mod tests;
     any(unix, windows)
 ))]
 pub use detected::PreparedDetection;
-#[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
-pub use detected::detect_format_smart_with_limits;
 pub use detected::{DetectedFormat, detect_format_smart};
 #[cfg(all(
     any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"),
     any(unix, windows)
 ))]
-pub use functions::{detect_and_prepare, detect_and_prepare_with_limits};
+pub use functions::detect_and_prepare;
 pub use functions::{detect_file_format, detect_file_format_from_bytes, detect_format_from_reader};

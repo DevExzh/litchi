@@ -282,18 +282,18 @@ fn semantic_cell_paths_survive_staged_reads_and_rename_barriers() {
             })
             .expect("semantic paths across read and rename barriers");
 
-        assert_eq!(commit.diagnostics.operations(), 3);
-        assert_eq!(commit.diagnostics.commits(), 3);
+        assert_eq!(commit.diagnostics().operations(), 3);
+        assert_eq!(commit.diagnostics().commits(), 3);
         assert_eq!(
-            sheet_property(&commit.file, "/sheet[1]", "name").as_deref(),
+            sheet_property(commit.file(), "/sheet[1]", "name").as_deref(),
             Some("Renamed")
         );
         assert_eq!(
-            cell_text(&commit.file, "/sheet[1]/A1").as_deref(),
+            cell_text(commit.file(), "/sheet[1]/A1").as_deref(),
             Some("before rename")
         );
         assert_eq!(
-            cell_text(&commit.file, "/sheet[1]/B1").as_deref(),
+            cell_text(commit.file(), "/sheet[1]/B1").as_deref(),
             Some("after rename")
         );
     }
@@ -504,10 +504,13 @@ fn workbook_scoped_query_targets_cells_on_both_worksheets() {
         let commit = original
             .edit(|transaction| transaction.set(selector.clone(), props! { "value" => "query" }))
             .expect("set all query matches");
-        assert!(commit.diagnostics.changed());
-        assert_eq!(commit.diagnostics.operations(), 1);
-        assert_eq!(cell_text(&commit.file, A1).as_deref(), Some("query"));
-        assert_eq!(cell_text(&commit.file, SECOND_A1).as_deref(), Some("query"));
+        assert!(commit.diagnostics().changed());
+        assert_eq!(commit.diagnostics().operations(), 1);
+        assert_eq!(cell_text(commit.file(), A1).as_deref(), Some("query"));
+        assert_eq!(
+            cell_text(commit.file(), SECOND_A1).as_deref(),
+            Some("query")
+        );
         assert_eq!(
             original.to_bytes().expect("publish unchanged query base"),
             original_bytes
@@ -554,26 +557,26 @@ fn distinct_same_sheet_cells_share_one_native_commit() {
             })
             .expect("coalesced same-sheet cell transaction");
 
-        assert!(commit.diagnostics.changed());
-        assert_eq!(commit.diagnostics.operations(), 3);
-        assert_eq!(commit.diagnostics.commits(), 1);
-        assert_eq!(commit.diagnostics.leaf_operations(), 3);
-        assert_eq!(cell_text(&commit.file, A1).as_deref(), Some("coalesced"));
-        assert_eq!(cell_text(&commit.file, B1).as_deref(), Some("7.25"));
-        assert_eq!(cell_text(&commit.file, C1).as_deref(), Some("FALSE"));
+        assert!(commit.diagnostics().changed());
+        assert_eq!(commit.diagnostics().operations(), 3);
+        assert_eq!(commit.diagnostics().commits(), 1);
+        assert_eq!(commit.diagnostics().leaf_operations(), 3);
+        assert_eq!(cell_text(commit.file(), A1).as_deref(), Some("coalesced"));
+        assert_eq!(cell_text(commit.file(), B1).as_deref(), Some("7.25"));
+        assert_eq!(cell_text(commit.file(), C1).as_deref(), Some("FALSE"));
 
         let replayed = commit
-            .patch
+            .patch()
             .apply(&original)
             .expect("replay coalesced cells");
         assert_eq!(
             replayed.to_bytes().expect("publish replayed cells"),
-            commit.file.to_bytes().expect("publish committed cells")
+            commit.file().to_bytes().expect("publish committed cells")
         );
         let restored = commit
-            .patch
+            .patch()
             .inverse()
-            .apply(&commit.file)
+            .apply(commit.file())
             .expect("inverse coalesced cells");
         assert_eq!(
             restored.to_bytes().expect("publish restored cells"),
@@ -601,11 +604,11 @@ fn repeated_cell_is_a_barrier_and_last_value_wins() {
             })
             .expect("repeated-cell barrier transaction");
 
-        assert_eq!(commit.diagnostics.operations(), 3);
-        assert_eq!(commit.diagnostics.commits(), 2);
-        assert_eq!(commit.diagnostics.leaf_operations(), 3);
-        assert_eq!(cell_text(&commit.file, A1).as_deref(), Some("last"));
-        assert_eq!(cell_text(&commit.file, B1).as_deref(), Some("8"));
+        assert_eq!(commit.diagnostics().operations(), 3);
+        assert_eq!(commit.diagnostics().commits(), 2);
+        assert_eq!(commit.diagnostics().leaf_operations(), 3);
+        assert_eq!(cell_text(commit.file(), A1).as_deref(), Some("last"));
+        assert_eq!(cell_text(commit.file(), B1).as_deref(), Some("8"));
     }
 }
 
@@ -627,11 +630,11 @@ fn staged_reads_are_barriers_and_observe_prior_cell_writes() {
             })
             .expect("read barrier transaction");
 
-        assert_eq!(commit.diagnostics.operations(), 2);
-        assert_eq!(commit.diagnostics.commits(), 2);
-        assert_eq!(commit.diagnostics.leaf_operations(), 2);
-        assert_eq!(cell_text(&commit.file, A1).as_deref(), Some("before read"));
-        assert_eq!(cell_text(&commit.file, B1).as_deref(), Some("9"));
+        assert_eq!(commit.diagnostics().operations(), 2);
+        assert_eq!(commit.diagnostics().commits(), 2);
+        assert_eq!(commit.diagnostics().leaf_operations(), 2);
+        assert_eq!(cell_text(commit.file(), A1).as_deref(), Some("before read"));
+        assert_eq!(cell_text(commit.file(), B1).as_deref(), Some("9"));
     }
 }
 
@@ -650,15 +653,18 @@ fn worksheet_name_changes_are_barriers_between_cell_runs() {
             })
             .expect("worksheet-name barrier transaction");
 
-        assert_eq!(commit.diagnostics.operations(), 3);
-        assert_eq!(commit.diagnostics.commits(), 3);
-        assert_eq!(commit.diagnostics.leaf_operations(), 3);
+        assert_eq!(commit.diagnostics().operations(), 3);
+        assert_eq!(commit.diagnostics().commits(), 3);
+        assert_eq!(commit.diagnostics().leaf_operations(), 3);
         assert_eq!(
-            sheet_property(&commit.file, "/sheet[1]", "name").as_deref(),
+            sheet_property(commit.file(), "/sheet[1]", "name").as_deref(),
             Some("Renamed")
         );
-        assert_eq!(cell_text(&commit.file, A1).as_deref(), Some("before sheet"));
-        assert_eq!(cell_text(&commit.file, B1).as_deref(), Some("after sheet"));
+        assert_eq!(
+            cell_text(commit.file(), A1).as_deref(),
+            Some("before sheet")
+        );
+        assert_eq!(cell_text(commit.file(), B1).as_deref(), Some("after sheet"));
     }
 }
 
@@ -683,13 +689,16 @@ fn empty_cell_props_are_exact_noops_like_xlsx() {
                 Ok::<_, litchi_ops::Error>(())
             })
             .expect("empty cell properties transaction");
-        assert!(!commit.diagnostics.changed());
-        assert_eq!(commit.diagnostics.operations(), 1);
-        assert_eq!(commit.diagnostics.commits(), 1);
-        assert_eq!(commit.diagnostics.leaf_operations(), 0);
-        assert!(commit.patch.is_noop());
+        assert!(!commit.diagnostics().changed());
+        assert_eq!(commit.diagnostics().operations(), 1);
+        assert_eq!(commit.diagnostics().commits(), 1);
+        assert_eq!(commit.diagnostics().leaf_operations(), 0);
+        assert!(commit.patch().is_noop());
         assert_eq!(
-            commit.file.to_bytes().expect("publish empty-props commit"),
+            commit
+                .file()
+                .to_bytes()
+                .expect("publish empty-props commit"),
             original_bytes
         );
         assert_eq!(
@@ -715,18 +724,18 @@ fn cell_transactions_replay_inverse_and_reject_foreign_snapshots() {
                 Ok::<_, litchi_ops::Error>(())
             })
             .expect("commit cell transaction");
-        assert!(commit.diagnostics.changed());
-        assert_eq!(commit.diagnostics.operations(), 2);
+        assert!(commit.diagnostics().changed());
+        assert_eq!(commit.diagnostics().operations(), 2);
 
-        let replayed = commit.patch.apply(&original).expect("replay cell patch");
+        let replayed = commit.patch().apply(&original).expect("replay cell patch");
         assert_eq!(
             replayed.to_bytes().expect("publish replayed cell patch"),
-            commit.file.to_bytes().expect("publish committed cells")
+            commit.file().to_bytes().expect("publish committed cells")
         );
         let restored = commit
-            .patch
+            .patch()
             .inverse()
-            .apply(&commit.file)
+            .apply(commit.file())
             .expect("inverse cell patch");
         assert_eq!(
             restored.to_bytes().expect("publish restored cells"),
@@ -736,7 +745,7 @@ fn cell_transactions_replay_inverse_and_reject_foreign_snapshots() {
         let foreign = open_owner(&original_bytes, eager);
         assert_eq!(
             commit
-                .patch
+                .patch()
                 .apply(&foreign)
                 .expect_err("foreign owner must be refused")
                 .code(),
@@ -781,26 +790,26 @@ fn atomic_and_best_effort_batches_handle_mixed_cell_operations() {
             )
             .expect("best-effort batch keeps valid cell writes");
         assert!(matches!(
-            &best_effort.results[0],
+            &best_effort.results()[0],
             ItemResult::Applied(result) if result.changed
         ));
         assert!(matches!(
-            &best_effort.results[1],
+            &best_effort.results()[1],
             ItemResult::Failed(error) if error.item() == Some(1)
         ));
         assert!(matches!(
-            &best_effort.results[2],
+            &best_effort.results()[2],
             ItemResult::Applied(result) if result.changed
         ));
-        assert_eq!(cell_text(&best_effort.file, A1).as_deref(), Some("best"));
+        assert_eq!(cell_text(best_effort.file(), A1).as_deref(), Some("best"));
         assert_eq!(
-            cell_text(&best_effort.file, SECOND_A1).as_deref(),
+            cell_text(best_effort.file(), SECOND_A1).as_deref(),
             Some("suffix")
         );
         let restored = best_effort
-            .patch
+            .patch()
             .inverse()
-            .apply(&best_effort.file)
+            .apply(best_effort.file())
             .expect("inverse best-effort batch");
         assert_eq!(
             restored.to_bytes().expect("publish restored batch"),
@@ -876,9 +885,10 @@ fn target_and_snapshot_limits_fail_before_mutating_the_input() {
             .build()
             .expect("build staged limit");
         let staged = original
-            .edit_with_limits(&strict_staged, |transaction| {
-                transaction.set(A1, props! { "value" => "staged" })
-            })
+            .edit_with_options(
+                litchi_ops::EditOptions::new().semantic_limits(strict_staged),
+                |transaction| transaction.set(A1, props! { "value" => "staged" }),
+            )
             .expect_err("staged limit must reject before native edit");
         assert_eq!(staged.code(), Code::LimitExceeded);
         assert_eq!(
@@ -889,7 +899,7 @@ fn target_and_snapshot_limits_fail_before_mutating_the_input() {
         let probe = original
             .edit(|transaction| transaction.set(A1, props! { "value" => "snapshot" }))
             .expect("measure snapshot charge");
-        let charge = probe.diagnostics.snapshot_bytes();
+        let charge = probe.diagnostics().snapshot_bytes();
         assert!(charge > 0);
         let strict_snapshot = SemanticLimits::builder()
             .max_snapshot_bytes(charge - 1)
@@ -897,9 +907,10 @@ fn target_and_snapshot_limits_fail_before_mutating_the_input() {
             .build()
             .expect("build snapshot limit");
         let snapshot = original
-            .edit_with_limits(&strict_snapshot, |transaction| {
-                transaction.set(A1, props! { "value" => "snapshot" })
-            })
+            .edit_with_options(
+                litchi_ops::EditOptions::new().semantic_limits(strict_snapshot),
+                |transaction| transaction.set(A1, props! { "value" => "snapshot" }),
+            )
             .expect_err("snapshot limit must reject before publication");
         assert_eq!(snapshot.code(), Code::LimitExceeded);
         assert_eq!(
@@ -944,7 +955,7 @@ fn atomic_batch_reports_exact_noop_per_item() {
                 BatchMode::Atomic,
             )
             .expect("mixed batch");
-        assert!(matches!(&result.results[0], ItemResult::Applied(result) if !result.changed));
-        assert!(matches!(&result.results[1], ItemResult::Applied(result) if result.changed));
+        assert!(matches!(&result.results()[0], ItemResult::Applied(result) if !result.changed));
+        assert!(matches!(&result.results()[1], ItemResult::Applied(result) if result.changed));
     }
 }

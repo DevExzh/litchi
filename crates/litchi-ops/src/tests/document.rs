@@ -310,8 +310,12 @@ mod docx {
         let bytes = minimal_docx(SECTION_XML);
         let source = crate::open_bytes(bytes.clone()).expect("open source-backed DOCX");
         let eager = eager(bytes);
-        let source_inventory = docx(&source).section_inventory().unwrap();
-        let eager_inventory = docx(&eager).section_inventory().unwrap();
+        let source_inventory = docx(&source)
+            .section_inventory(&litchi_docx::section::Limits::default())
+            .unwrap();
+        let eager_inventory = docx(&eager)
+            .section_inventory(&litchi_docx::section::Limits::default())
+            .unwrap();
         assert_eq!(source_inventory.sections(), eager_inventory.sections());
         assert_eq!(source_inventory.paragraph_count(), 2);
         assert_eq!(source_inventory.sections().len(), 2);
@@ -340,7 +344,9 @@ mod docx {
     fn docx_header_footer_inventory_keeps_inert_relationship_ids() {
         let bytes = std::fs::read(test_data("ooxml/docx/headerFooter.docx")).unwrap();
         let file = eager(bytes);
-        let inventory = docx(&file).section_inventory().unwrap();
+        let inventory = docx(&file)
+            .section_inventory(&litchi_docx::section::Limits::default())
+            .unwrap();
         let mut ids = inventory
             .sections()
             .iter()
@@ -398,7 +404,9 @@ mod docx {
         let memory = (minimal_docx(SECTION_XML).len() as u64).saturating_mul(4);
         let (_cancellation, budget, file) =
             managed(SECTION_XML, memory, "facade-managed-docx-section-inventory");
-        let inventory = docx(&file).section_inventory().unwrap();
+        let inventory = docx(&file)
+            .section_inventory(&litchi_docx::section::Limits::default())
+            .unwrap();
         drop(file);
         assert_eq!(inventory.sections().len(), 2);
         assert_eq!(budget.used(litchi_core::Resource::Memory), 0);
@@ -462,7 +470,10 @@ mod docx {
         let malformed = crate::open_bytes(minimal_docx(b"<w:document>"))
             .expect("malformed main XML stays deferred at source open");
         assert_eq!(
-            docx(&malformed).section_inventory().unwrap_err().code(),
+            docx(&malformed)
+                .section_inventory(&litchi_docx::section::Limits::default())
+                .unwrap_err()
+                .code(),
             Code::CorruptFile
         );
 
@@ -471,9 +482,7 @@ mod docx {
             max_input_bytes: 1,
             ..Default::default()
         };
-        let error = docx(&file)
-            .section_inventory_with_limits(&limits)
-            .unwrap_err();
+        let error = docx(&file).section_inventory(&limits).unwrap_err();
         assert_eq!(error.code(), Code::LimitExceeded, "{error:?}");
         assert!(error.message().contains("limit"), "{error:?}");
     }
@@ -486,7 +495,9 @@ mod docx {
         let expected = source_version(&file);
         super::super::mutate(temporary.path());
         super::super::assert_source_changed(
-            &docx(&file).section_inventory().unwrap_err(),
+            &docx(&file)
+                .section_inventory(&litchi_docx::section::Limits::default())
+                .unwrap_err(),
             expected,
         );
     }

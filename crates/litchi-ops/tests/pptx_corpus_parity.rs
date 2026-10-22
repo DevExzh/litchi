@@ -115,8 +115,11 @@ fn shape_fill_and_geometry_set_read_back_and_repeat_as_no_ops() {
         let commit = filled
             .edit(|edit| edit.set(SHAPE, props! { "fill" => "none", "shape" => "roundRect" }))
             .unwrap();
-        assert!(!commit.diagnostics.changed());
-        assert_eq!(commit.file.to_bytes().unwrap(), filled.to_bytes().unwrap());
+        assert!(!commit.diagnostics().changed());
+        assert_eq!(
+            commit.file().to_bytes().unwrap(),
+            filled.to_bytes().unwrap()
+        );
         // Null removes the local fill choice; geometry cannot be cleared.
         let cleared = filled
             .set(SHAPE, props! { "fill" => PropValue::Null })
@@ -155,7 +158,7 @@ fn slide_transitions_set_and_clear() {
         let again = pushed
             .edit(|edit| edit.set("/slide[1]", props! { "transition" => "push-right-slow" }))
             .unwrap();
-        assert!(!again.diagnostics.changed());
+        assert!(!again.diagnostics().changed());
 
         let morphed = pushed
             .set("/slide[1]", props! { "transition" => "morph-byword" })

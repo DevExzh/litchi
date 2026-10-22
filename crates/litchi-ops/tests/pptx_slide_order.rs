@@ -101,17 +101,17 @@ fn ordered_edits_replay_undo_and_reopen() {
             edit.set("/slide[3]/shape[1]", props! { "text" => "updated A" })
         })
         .unwrap();
-    assert_eq!(texts(&commit.file), ["C", "B", "updated A"]);
-    let bytes = commit.file.to_bytes().unwrap();
+    assert_eq!(texts(commit.file()), ["C", "B", "updated A"]);
+    let bytes = commit.file().to_bytes().unwrap();
     assert_eq!(
-        commit.patch.apply(&source).unwrap().to_bytes().unwrap(),
+        commit.patch().apply(&source).unwrap().to_bytes().unwrap(),
         bytes
     );
     assert_eq!(
         commit
-            .patch
+            .patch()
             .inverse()
-            .apply(&commit.file)
+            .apply(commit.file())
             .unwrap()
             .to_bytes()
             .unwrap(),
@@ -180,21 +180,21 @@ fn order_boundaries_batches_and_source_owner_keep_original_snapshot() {
             edit.set("/slide[3]/shape[1]", props! { "text" => "updated A" })
         })
         .unwrap();
-    assert_eq!(texts(&source_commit.file), ["B", "C", "updated A"]);
-    let source_bytes = source_commit.file.to_bytes().unwrap();
+    assert_eq!(texts(source_commit.file()), ["B", "C", "updated A"]);
+    let source_bytes = source_commit.file().to_bytes().unwrap();
     assert_eq!(
         texts(&litchi_ops::open_bytes(source_bytes.clone()).unwrap()),
         ["B", "C", "updated A"]
     );
     assert_eq!(
-        texts(&source_commit.patch.apply(&deferred).unwrap()),
+        texts(&source_commit.patch().apply(&deferred).unwrap()),
         ["B", "C", "updated A"]
     );
     assert_eq!(
         source_commit
-            .patch
+            .patch()
             .inverse()
-            .apply(&source_commit.file)
+            .apply(source_commit.file())
             .unwrap()
             .to_bytes()
             .unwrap(),
@@ -221,13 +221,13 @@ fn order_boundaries_batches_and_source_owner_keep_original_snapshot() {
         Some(1)
     );
     let result = source.batch(commands(), BatchMode::BestEffort).unwrap();
-    assert!(matches!(&result.results[1], ItemResult::Failed(e) if e.item()==Some(1)));
-    assert_eq!(texts(&result.file), ["C", "B", "A"]);
+    assert!(matches!(&result.results()[1], ItemResult::Failed(e) if e.item()==Some(1)));
+    assert_eq!(texts(result.file()), ["C", "B", "A"]);
     assert_eq!(source.to_bytes().unwrap(), before);
 
     let source_result = deferred.batch(commands(), BatchMode::BestEffort).unwrap();
-    assert!(matches!(&source_result.results[1], ItemResult::Failed(e) if e.item()==Some(1)));
-    assert_eq!(texts(&source_result.file), ["C", "B", "A"]);
+    assert!(matches!(&source_result.results()[1], ItemResult::Failed(e) if e.item()==Some(1)));
+    assert_eq!(texts(source_result.file()), ["C", "B", "A"]);
     assert_eq!(deferred.to_bytes().unwrap(), before);
 }
 
@@ -243,17 +243,26 @@ fn ordering_admits_distinct_targets_and_staged_actions_before_editing() {
         .unwrap();
     assert!(
         source
-            .edit_with_limits(&single, |edit| edit.move_to("/slide[1]", Placement::End))
+            .edit_with_options(
+                litchi_ops::EditOptions::new().semantic_limits(single),
+                |edit| edit.move_to("/slide[1]", Placement::End)
+            )
             .is_ok()
     );
     assert!(
         source
-            .edit_with_limits(&single, |edit| edit.swap("/slide[1]", "/slide[1]"))
+            .edit_with_options(
+                litchi_ops::EditOptions::new().semantic_limits(single),
+                |edit| edit.swap("/slide[1]", "/slide[1]")
+            )
             .is_ok()
     );
     assert_eq!(
         source
-            .edit_with_limits(&single, |edit| edit.swap("/slide[1]", "/slide[2]"))
+            .edit_with_options(
+                litchi_ops::EditOptions::new().semantic_limits(single),
+                |edit| edit.swap("/slide[1]", "/slide[2]")
+            )
             .unwrap_err()
             .code(),
         Code::LimitExceeded
@@ -267,7 +276,10 @@ fn ordering_admits_distinct_targets_and_staged_actions_before_editing() {
             .unwrap()
             .build()
             .unwrap();
-        let result = source.edit_with_limits(&limits, |edit| edit.swap("/slide[1]", "/slide[2]"));
+        let result = source.edit_with_options(
+            litchi_ops::EditOptions::new().semantic_limits(limits),
+            |edit| edit.swap("/slide[1]", "/slide[2]"),
+        );
         assert_eq!(result.is_ok(), succeeds);
         if !succeeds {
             assert_eq!(result.unwrap_err().code(), Code::LimitExceeded);

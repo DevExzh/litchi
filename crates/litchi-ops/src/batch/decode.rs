@@ -225,42 +225,33 @@ fn check_limit(kind: SourceLimitKind, value: usize, maximum: usize) -> Result<()
     Ok(())
 }
 
-/// Decode a complete batch JSON array under the default [`SourceLimits`].
-/// No command executes and no input is silently repaired.
+/// Decode a complete batch JSON array under caller-selected physical
+/// bounds ([`SourceLimits::default`] for the defaults). Unescaped strings
+/// borrow from `bytes`; the result owns its item/property lists. A failed
+/// decode returns no partial list. Trailing JSON is refused. No command
+/// executes and no input is silently repaired.
 ///
 /// # Errors
 /// Returns `corrupt_batch` for invalid JSON/envelopes, `limit_exceeded` for
 /// physical bounds, or a typed allocation error. Item failures carry their
 /// zero-based index; an envelope or trailing-data failure has no item index.
 ///
-/// ```
-/// let items = litchi_ops::batch::from_bytes(br#"[{"op":"set","path":"/body/p[1]","props":{"text":"Hello"}}]"#)?;
-/// assert_eq!(items[0].command, "set");
-/// # Ok::<(), litchi_ops::Error>(())
-/// ```
-pub fn from_bytes(bytes: &[u8]) -> Result<Vec<BatchItem<'_>>> {
-    from_bytes_with_limits(bytes, &SourceLimits::default())
-}
-
-/// Decode a complete JSON array with caller-selected physical bounds.
-/// Unescaped strings borrow from `bytes`; the result owns its item/property
-/// lists. A failed decode returns no partial list. Trailing JSON is refused.
-///
-/// # Errors
-/// As [`from_bytes`]. An input-byte refusal occurs before parsing any item;
-/// an item-count refusal occurs before decoding the excess item.
+/// An input-byte refusal occurs before parsing any item; an item-count
+/// refusal occurs before decoding the excess item.
 ///
 /// ```
 /// use litchi_ops::batch::{self, SourceLimits};
+/// let items = batch::from_bytes(
+///     br#"[{"op":"set","path":"/body/p[1]","props":{"text":"Hello"}}]"#,
+///     &SourceLimits::default(),
+/// )?;
+/// assert_eq!(items[0].command, "set");
 /// let limits = SourceLimits::builder().max_input_bytes(100)?.max_items(1)?.build()?;
-/// let items = batch::from_bytes_with_limits(br#"[{"command":"meta","dumpVersion":2}]"#, &limits)?;
+/// let items = batch::from_bytes(br#"[{"command":"meta","dumpVersion":2}]"#, &limits)?;
 /// assert_eq!(items.len(), 1);
 /// # Ok::<(), litchi_ops::Error>(())
 /// ```
-pub fn from_bytes_with_limits<'a>(
-    bytes: &'a [u8],
-    limits: &SourceLimits,
-) -> Result<Vec<BatchItem<'a>>> {
+pub fn from_bytes<'a>(bytes: &'a [u8], limits: &SourceLimits) -> Result<Vec<BatchItem<'a>>> {
     if bytes.len() > limits.input_bytes {
         return Err(Error::Limit {
             kind: SourceLimitKind::InputBytes,

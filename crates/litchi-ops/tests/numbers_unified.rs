@@ -95,7 +95,7 @@ fn renames_sheets_and_tables_in_one_names_transaction() {
             Ok(())
         })
         .expect("renames")
-        .file;
+        .into_file();
     let reopened = reopen(&renamed);
     assert_eq!(
         prop(&reopened, "/sheet[1]", "name").as_deref(),
@@ -154,15 +154,15 @@ fn moves_sheets_and_relocates_tables() {
     let reordered = relocated
         .edit(|tx| tx.move_to("/sheet[2]/table[2]", Placement::Start))
         .expect("in-sheet order");
-    let reopened = reopen(&reordered.file);
+    let reopened = reopen(reordered.file());
     assert_eq!(
         prop(&reopened, "/sheet[2]/table[1]", "name").as_deref(),
         Some("Table 1")
     );
     let restored = reordered
-        .patch
+        .patch()
         .inverse()
-        .apply(&reordered.file)
+        .apply(reordered.file())
         .expect("inverse");
     assert_eq!(restored.to_bytes().unwrap(), relocated.to_bytes().unwrap());
 }
@@ -301,7 +301,7 @@ fn cell_comments_are_read_set_added_and_removed() {
                 .map(|_| ())
             })
             .expect("add in a transaction");
-        let restored = edit.patch.inverse().apply(&edit.file).expect("inverse");
+        let restored = edit.patch().inverse().apply(edit.file()).expect("inverse");
         assert_eq!(restored.to_bytes().unwrap(), file.to_bytes().unwrap());
         let error = reopened
             .add(
@@ -400,9 +400,9 @@ fn batch_cell_sets_share_one_leaf_commit_per_table() {
         })
         .collect();
     let commit = file.batch(items, BatchMode::Atomic).expect("batch");
-    assert_eq!(commit.diagnostics.operations(), 40);
-    assert_eq!(commit.diagnostics.commits(), 1);
-    let reopened = reopen(&commit.file);
+    assert_eq!(commit.diagnostics().operations(), 40);
+    assert_eq!(commit.diagnostics().commits(), 1);
+    let reopened = reopen(commit.file());
     assert_eq!(
         prop(&reopened, "/sheet[1]/table[1]/D22", "value").as_deref(),
         Some("39")
@@ -416,12 +416,16 @@ fn batch_cell_sets_share_one_leaf_commit_per_table() {
             Ok(())
         })
         .expect("repeated");
-    assert_eq!(commit.diagnostics.commits(), 2);
+    assert_eq!(commit.diagnostics().commits(), 2);
     assert_eq!(
-        prop(&commit.file, "/sheet[1]/table[1]/C4", "value").as_deref(),
+        prop(commit.file(), "/sheet[1]/table[1]/C4", "value").as_deref(),
         Some("2")
     );
-    let restored = commit.patch.inverse().apply(&commit.file).expect("inverse");
+    let restored = commit
+        .patch()
+        .inverse()
+        .apply(commit.file())
+        .expect("inverse");
     assert_eq!(restored.to_bytes().unwrap(), file.to_bytes().unwrap());
 }
 
@@ -492,13 +496,13 @@ fn sheets_and_tables_are_added_and_removed() {
         .edit(|tx| tx.remove("/sheet[1]/table[1]"))
         .expect("remove table");
     assert_eq!(
-        prop(&reopen(&removed.file), "/sheet[1]", "tableCount").as_deref(),
+        prop(&reopen(removed.file()), "/sheet[1]", "tableCount").as_deref(),
         Some("0")
     );
     let restored = removed
-        .patch
+        .patch()
         .inverse()
-        .apply(&removed.file)
+        .apply(removed.file())
         .expect("inverse");
     assert_eq!(restored.to_bytes().unwrap(), table.file.to_bytes().unwrap());
     let gone = table
@@ -662,7 +666,7 @@ fn rows_and_columns_are_inserted_and_removed() {
             Ok(())
         })
         .expect("values")
-        .file;
+        .into_file();
     let rows = prop(&filled, "/sheet[1]/table[1]", "rowCount").expect("rows");
     let rows: usize = rows.parse().expect("count");
     // A row before row 3 (zero-based position 2), then filled.
@@ -700,7 +704,11 @@ fn rows_and_columns_are_inserted_and_removed() {
                 .map(|_| ())
         })
         .expect("append a row");
-    let restored = edited.patch.inverse().apply(&edited.file).expect("inverse");
+    let restored = edited
+        .patch()
+        .inverse()
+        .apply(edited.file())
+        .expect("inverse");
     assert_eq!(restored.to_bytes().unwrap(), filled.to_bytes().unwrap());
     // Removing row 3 drops its cells and moves the rest up.
     let removed = filled
@@ -776,7 +784,7 @@ fn rows_and_columns_move_formula_references() {
             Ok(())
         })
         .expect("formulas")
-        .file;
+        .into_file();
     let added = file
         .add(
             "/sheet[1]/table[1]",
@@ -804,7 +812,11 @@ fn rows_and_columns_move_formula_references() {
                 .map(|_| ())
         })
         .expect("append a row");
-    let restored = edited.patch.inverse().apply(&edited.file).expect("inverse");
+    let restored = edited
+        .patch()
+        .inverse()
+        .apply(edited.file())
+        .expect("inverse");
     assert_eq!(restored.to_bytes().unwrap(), file.to_bytes().unwrap());
     // Record 0329: removing row 3, which the formula reads, shrinks its
     // range and turns the reference to C3 into #REF!.
@@ -863,7 +875,7 @@ fn cell_fonts_are_written() {
             BatchMode::Atomic,
         )
         .expect("batch");
-    let package = leaf(&batch.file);
+    let package = leaf(batch.file());
     assert_eq!(
         package
             .table_cell_text_style(0, 0, litchi_numbers::At::new(1, 1))
@@ -915,7 +927,7 @@ fn swaps_sheets_and_tables() {
         .edit(|tx| tx.swap("/sheet[1]", "/sheet[3]"))
         .expect("swap sheets");
     assert_eq!(
-        names(&swapped.file, &sheets),
+        names(swapped.file(), &sheets),
         [
             Some("Sheet 3".into()),
             Some("Sheet 2".into()),
@@ -926,23 +938,26 @@ fn swaps_sheets_and_tables() {
         .move_to("/sheet[1]", Placement::End)
         .and_then(|file| file.move_to("/sheet[2]", Placement::Start))
         .expect("two moves");
-    assert_eq!(swapped.file.to_bytes().unwrap(), moved.to_bytes().unwrap());
+    assert_eq!(
+        swapped.file().to_bytes().unwrap(),
+        moved.to_bytes().unwrap()
+    );
     let reversed = file
         .swap("/sheet[3]", "/sheet[1]")
         .expect("reversed operands");
     assert_eq!(reversed.to_bytes().unwrap(), moved.to_bytes().unwrap());
     let restored = swapped
-        .patch
+        .patch()
         .inverse()
-        .apply(&swapped.file)
+        .apply(swapped.file())
         .expect("inverse");
     assert_eq!(restored.to_bytes().unwrap(), source);
     // An element swapped with itself is an exact no-op.
     let same = file
         .edit(|tx| tx.swap("/sheet[2]", "/Sheet 2"))
         .expect("self swap");
-    assert!(!same.diagnostics.changed());
-    assert_eq!(same.file.to_bytes().unwrap(), source);
+    assert!(!same.diagnostics().changed());
+    assert_eq!(same.file().to_bytes().unwrap(), source);
 
     // Tables of one sheet.
     let tables = [
@@ -954,18 +969,21 @@ fn swaps_sheets_and_tables() {
         .edit(|tx| tx.swap("/sheet[1]/table[1]", "/sheet[1]/table[3]"))
         .expect("swap tables");
     assert_eq!(
-        names(&swapped.file, &tables),
+        names(swapped.file(), &tables),
         [Some("C".into()), Some("B".into()), Some("Table 1".into())]
     );
     let moved = file
         .move_to("/sheet[1]/table[1]", Placement::End)
         .and_then(|file| file.move_to("/sheet[1]/table[2]", Placement::Start))
         .expect("two moves");
-    assert_eq!(swapped.file.to_bytes().unwrap(), moved.to_bytes().unwrap());
+    assert_eq!(
+        swapped.file().to_bytes().unwrap(),
+        moved.to_bytes().unwrap()
+    );
     let restored = swapped
-        .patch
+        .patch()
         .inverse()
-        .apply(&swapped.file)
+        .apply(swapped.file())
         .expect("inverse");
     assert_eq!(restored.to_bytes().unwrap(), source);
 
@@ -975,7 +993,7 @@ fn swaps_sheets_and_tables() {
         .expect("swap across sheets");
     assert_eq!(
         names(
-            &swapped.file,
+            swapped.file(),
             &[
                 "/sheet[1]/table[1]",
                 "/sheet[1]/table[2]",
@@ -1004,11 +1022,14 @@ fn swaps_sheets_and_tables() {
         })
         .and_then(|file| file.move_to("/sheet[3]/table[1]", Placement::Start))
         .expect("relocations and moves");
-    assert_eq!(swapped.file.to_bytes().unwrap(), moved.to_bytes().unwrap());
+    assert_eq!(
+        swapped.file().to_bytes().unwrap(),
+        moved.to_bytes().unwrap()
+    );
     let restored = swapped
-        .patch
+        .patch()
         .inverse()
-        .apply(&swapped.file)
+        .apply(swapped.file())
         .expect("inverse");
     assert_eq!(restored.to_bytes().unwrap(), source);
     // Two tables of one name in two sheets.
@@ -1026,7 +1047,7 @@ fn swaps_sheets_and_tables() {
     let swapped = renamed
         .edit(|tx| tx.swap("/sheet[1]/table[1]", "/sheet[3]/table[1]"))
         .expect("same-named tables");
-    let reopened = reopen(&swapped.file);
+    let reopened = reopen(swapped.file());
     assert_eq!(
         prop(&reopened, "/sheet[1]", "tableCount").as_deref(),
         Some("3")
@@ -1041,9 +1062,9 @@ fn swaps_sheets_and_tables() {
         Some("B")
     );
     let restored = swapped
-        .patch
+        .patch()
         .inverse()
-        .apply(&swapped.file)
+        .apply(swapped.file())
         .expect("inverse");
     assert_eq!(restored.to_bytes().unwrap(), renamed.to_bytes().unwrap());
     // A third table of the name in the destination sheet is refused.

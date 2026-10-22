@@ -30,21 +30,21 @@ fn alias_matches_value(format: FileFormat, path: &str) {
     let commit = file
         .edit(|edit| edit.set(path, props! { "text" => "Month" }))
         .expect("set text");
-    assert!(commit.diagnostics.changed());
-    let by_text = commit.file;
+    assert!(commit.diagnostics().changed());
+    let by_text = commit.file();
     assert_eq!(
         by_text.to_bytes().expect("text bytes"),
         by_value.to_bytes().expect("value bytes"),
         "{format:?}: text and value write the same bytes"
     );
-    assert_eq!(cell_text(&by_text, path).as_deref(), Some("Month"));
+    assert_eq!(cell_text(by_text, path).as_deref(), Some("Month"));
     let reopened = litchi_ops::open_bytes(by_text.to_bytes().expect("bytes")).expect("reopen");
     assert_eq!(cell_text(&reopened, path).as_deref(), Some("Month"));
 
     let again = by_text
         .edit(|edit| edit.set(path, props! { "text" => "Month" }))
         .expect("repeat");
-    assert!(!again.diagnostics.changed(), "{format:?}: exact no-op");
+    assert!(!again.diagnostics().changed(), "{format:?}: exact no-op");
 
     // The schema export lists the alias on the canonical property.
     let schema = litchi_ops::schema(format);

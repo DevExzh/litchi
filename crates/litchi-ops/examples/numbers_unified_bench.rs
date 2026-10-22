@@ -233,7 +233,8 @@ mod enabled {
     fn unified_batch(file: &File, items: &[BatchItem<'static>]) -> File {
         file.batch(items.to_vec(), BatchMode::Atomic)
             .expect("batch")
-            .file
+            .file()
+            .clone()
     }
 
     /// Print each corpus table's dimensions (`LITCHI_NUMBERS_BENCH_SURVEY`).
@@ -364,7 +365,11 @@ mod enabled {
             || time(|| leaf_batch(&leaf, &cells)),
             || {
                 let (file, owned) = (&file, items.to_vec());
-                time(move || file.batch(owned, BatchMode::Atomic).expect("batch").file)
+                time(move || {
+                    file.batch(owned, BatchMode::Atomic)
+                        .expect("batch")
+                        .into_file()
+                })
             },
         ));
         let targets: Vec<litchi_ops::TargetArg<'_>> = items
@@ -381,7 +386,7 @@ mod enabled {
                 Ok(())
             })
             .expect("edit")
-            .file
+            .into_file()
         };
         let same_parsed = leaf_bytes(&leaf_batch(&leaf, &cells))
             == unified_parsed(&file).to_bytes().expect("bytes");

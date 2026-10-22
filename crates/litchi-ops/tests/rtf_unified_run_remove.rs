@@ -58,19 +58,19 @@ fn direct_run_removal_matches_native_and_reopens_with_exact_inverse() {
         )])
         .unwrap();
         let expected = edit.commit().unwrap().package().to_bytes().unwrap();
-        assert_eq!(commit.file.to_bytes().unwrap(), expected);
-        assert_eq!(commit.diagnostics.operations(), 1);
-        assert_eq!(commit.file.query("p").unwrap().count(), 2);
-        assert_eq!(commit.file.query("r").unwrap().count(), 3);
+        assert_eq!(commit.file().to_bytes().unwrap(), expected);
+        assert_eq!(commit.diagnostics().operations(), 1);
+        assert_eq!(commit.file().query("p").unwrap().count(), 2);
+        assert_eq!(commit.file().query("r").unwrap().count(), 3);
         assert_eq!(
-            commit.patch.apply(&source).unwrap().to_bytes().unwrap(),
+            commit.patch().apply(&source).unwrap().to_bytes().unwrap(),
             expected
         );
         assert_eq!(
             commit
-                .patch
+                .patch()
                 .inverse()
-                .apply(&commit.file)
+                .apply(commit.file())
                 .unwrap()
                 .to_bytes()
                 .unwrap(),
@@ -142,13 +142,16 @@ fn run_removal_limits_include_retained_before_text_prior_to_native_allocation() 
         .unwrap();
     for remove in [false, true] {
         let error = source
-            .edit_with_limits(&limits, |edit| {
-                if remove {
-                    edit.remove("/body/p[1]/r[1]")
-                } else {
-                    edit.set("/body/p[1]/r[1]", props! {"text"=>"x"})
-                }
-            })
+            .edit_with_options(
+                litchi_ops::EditOptions::new().semantic_limits(limits),
+                |edit| {
+                    if remove {
+                        edit.remove("/body/p[1]/r[1]")
+                    } else {
+                        edit.set("/body/p[1]/r[1]", props! {"text"=>"x"})
+                    }
+                },
+            )
             .unwrap_err();
         assert!(matches!(
             error.leaf(),
@@ -160,9 +163,10 @@ fn run_removal_limits_include_retained_before_text_prior_to_native_allocation() 
     }
     // Format-only operations do not retain a cloned before-text payload.
     source
-        .edit_with_limits(&limits, |edit| {
-            edit.set("/body/p[1]/r[1]", props! {"bold"=>true})
-        })
+        .edit_with_options(
+            litchi_ops::EditOptions::new().semantic_limits(limits),
+            |edit| edit.set("/body/p[1]/r[1]", props! {"bold"=>true}),
+        )
         .unwrap();
     assert_eq!(source.to_bytes().unwrap(), bytes);
     let source = open_bytes(INPUT).unwrap();
@@ -201,7 +205,10 @@ fn run_removal_limits_include_retained_before_text_prior_to_native_allocation() 
         ),
     ] {
         let error = source
-            .edit_with_limits(&limits, |edit| edit.remove(query("r")))
+            .edit_with_options(
+                litchi_ops::EditOptions::new().semantic_limits(limits),
+                |edit| edit.remove(query("r")),
+            )
             .unwrap_err();
         assert!(
             matches!(error.leaf(),Source::Transaction(Error::Limit{kind:actual,..}) if *actual==kind)
@@ -264,12 +271,12 @@ fn sequential_batch_removals_resolve_current_positions_and_rollback_exactly() {
             edit.remove("/body/p[1]/r[1]")
         })
         .unwrap();
-    assert_eq!(text(&commit.file, "/body/p[1]"), "Bold");
+    assert_eq!(text(commit.file(), "/body/p[1]"), "Bold");
     assert_eq!(
         commit
-            .patch
+            .patch()
             .inverse()
-            .apply(&commit.file)
+            .apply(commit.file())
             .unwrap()
             .to_bytes()
             .unwrap(),
@@ -289,7 +296,7 @@ fn sequential_batch_removals_resolve_current_positions_and_rollback_exactly() {
             BatchMode::BestEffort,
         )
         .unwrap();
-    assert_eq!(text(&best.file, "/body/p[1]"), "PlainBold");
+    assert_eq!(text(best.file(), "/body/p[1]"), "PlainBold");
     assert_eq!(source.to_bytes().unwrap(), INPUT);
 }
 
@@ -359,9 +366,9 @@ fn opaque_bytes_and_shifted_anchors_survive_run_removal() {
     ] {
         let source = open_bytes(input).unwrap();
         let commit = source.edit(|edit| edit.remove(query("r"))).unwrap();
-        assert_eq!(commit.file.query("p").unwrap().count(), 1);
-        assert_eq!(commit.file.query("r").unwrap().count(), 0);
-        let bytes = commit.file.to_bytes().unwrap();
+        assert_eq!(commit.file().query("p").unwrap().count(), 1);
+        assert_eq!(commit.file().query("r").unwrap().count(), 0);
+        let bytes = commit.file().to_bytes().unwrap();
         let native_source = litchi_rtf::Package::from_bytes(input).unwrap();
         let native_target = litchi_rtf::Package::from_bytes(&bytes).unwrap();
         let opaque = |package: &litchi_rtf::Package| {
@@ -373,14 +380,14 @@ fn opaque_bytes_and_shifted_anchors_survive_run_removal() {
         };
         assert_eq!(opaque(&native_source), opaque(&native_target));
         assert_eq!(
-            commit.patch.apply(&source).unwrap().to_bytes().unwrap(),
+            commit.patch().apply(&source).unwrap().to_bytes().unwrap(),
             bytes
         );
         assert_eq!(
             commit
-                .patch
+                .patch()
                 .inverse()
-                .apply(&commit.file)
+                .apply(commit.file())
                 .unwrap()
                 .to_bytes()
                 .unwrap(),

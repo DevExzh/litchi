@@ -107,27 +107,27 @@ fn ordered_direct_paragraph_text_sets_share_one_publication_for_both_owners() {
             })
             .expect("ordered paragraph edit");
 
-        assert!(commit.diagnostics.changed());
-        assert_eq!(commit.diagnostics.operations(), 4);
-        assert_eq!(commit.diagnostics.commits(), 1);
+        assert!(commit.diagnostics().changed());
+        assert_eq!(commit.diagnostics().operations(), 4);
+        assert_eq!(commit.diagnostics().commits(), 1);
         assert_eq!(
-            commit.file.to_bytes().expect("coalesced bytes"),
+            commit.file().to_bytes().expect("coalesced bytes"),
             oracle.to_bytes().unwrap()
         );
-        assert_eq!(text(&commit.file, "/body/p[1]"), "First changed");
-        assert_eq!(text(&commit.file, "/body/p[2]"), "Second changed");
-        assert_eq!(text(&commit.file, "/body/p[3]"), "Third changed");
-        assert_eq!(text(&commit.file, "/body/p[4]"), "Fourth changed");
+        assert_eq!(text(commit.file(), "/body/p[1]"), "First changed");
+        assert_eq!(text(commit.file(), "/body/p[2]"), "Second changed");
+        assert_eq!(text(commit.file(), "/body/p[3]"), "Third changed");
+        assert_eq!(text(commit.file(), "/body/p[4]"), "Fourth changed");
         assert_eq!(source.to_bytes().expect("source remains immutable"), before);
         assert_eq!(
-            commit.patch.apply(&source).unwrap().to_bytes().unwrap(),
-            commit.file.to_bytes().unwrap()
+            commit.patch().apply(&source).unwrap().to_bytes().unwrap(),
+            commit.file().to_bytes().unwrap()
         );
         assert_eq!(
             commit
-                .patch
+                .patch()
                 .inverse()
-                .apply(&commit.file)
+                .apply(commit.file())
                 .unwrap()
                 .to_bytes()
                 .unwrap(),
@@ -157,8 +157,8 @@ fn ordered_direct_paragraph_format_sets_share_one_publication() {
                 edit.set("/body/p[4]", props! {"align" => "center"})
             })
             .expect("ordered paragraph formatting edit");
-        assert_eq!(commit.diagnostics.operations(), 4);
-        assert_eq!(commit.diagnostics.commits(), 1);
+        assert_eq!(commit.diagnostics().operations(), 4);
+        assert_eq!(commit.diagnostics().commits(), 1);
         // Sequential native formatting publication retains redundant control
         // prefixes. Compare semantics with it and exact bytes with one native
         // bulk transaction, which is the coalesced publication contract.
@@ -187,7 +187,7 @@ fn ordered_direct_paragraph_format_sets_share_one_publication() {
         ])
         .unwrap();
         assert_eq!(
-            commit.file.to_bytes().unwrap(),
+            commit.file().to_bytes().unwrap(),
             edit.commit().unwrap().package().to_bytes().unwrap()
         );
         for (path, key) in [
@@ -197,14 +197,14 @@ fn ordered_direct_paragraph_format_sets_share_one_publication() {
             ("/body/p[4]", "align"),
         ] {
             assert_eq!(
-                property(&commit.file, path, key),
+                property(commit.file(), path, key),
                 property(&oracle, path, key)
             );
         }
-        assert_eq!(property(&commit.file, "/body/p[1]", "align"), "right");
-        assert_eq!(property(&commit.file, "/body/p[2]", "spaceBefore"), "6pt");
-        assert_eq!(property(&commit.file, "/body/p[3]", "keepNext"), "true");
-        assert_eq!(property(&commit.file, "/body/p[4]", "align"), "center");
+        assert_eq!(property(commit.file(), "/body/p[1]", "align"), "right");
+        assert_eq!(property(commit.file(), "/body/p[2]", "spaceBefore"), "6pt");
+        assert_eq!(property(commit.file(), "/body/p[3]", "keepNext"), "true");
+        assert_eq!(property(commit.file(), "/body/p[4]", "align"), "center");
         assert_eq!(source.to_bytes().unwrap(), before);
     });
 }
@@ -271,26 +271,29 @@ fn ordered_direct_run_text_and_format_sets_share_one_publication() {
             })
             .expect("ordered run edit");
 
-        assert!(commit.diagnostics.changed());
-        assert_eq!(commit.diagnostics.operations(), 4);
-        assert_eq!(commit.diagnostics.commits(), 1);
-        assert_eq!(commit.file.to_bytes().unwrap(), oracle.to_bytes().unwrap());
-        assert_eq!(text(&commit.file, "/body/p[1]/r[1]"), "First changed");
-        assert_eq!(text(&commit.file, "/body/p[2]/r[1]"), "Second changed");
-        assert_eq!(text(&commit.file, "/body/p[3]/r[1]"), "Third changed");
-        assert_eq!(text(&commit.file, "/body/p[4]/r[1]"), "Fourth changed");
-        assert_eq!(property(&commit.file, "/body/p[2]/r[1]", "italic"), "true");
+        assert!(commit.diagnostics().changed());
+        assert_eq!(commit.diagnostics().operations(), 4);
+        assert_eq!(commit.diagnostics().commits(), 1);
         assert_eq!(
-            property(&commit.file, "/body/p[3]/r[1]", "underline"),
+            commit.file().to_bytes().unwrap(),
+            oracle.to_bytes().unwrap()
+        );
+        assert_eq!(text(commit.file(), "/body/p[1]/r[1]"), "First changed");
+        assert_eq!(text(commit.file(), "/body/p[2]/r[1]"), "Second changed");
+        assert_eq!(text(commit.file(), "/body/p[3]/r[1]"), "Third changed");
+        assert_eq!(text(commit.file(), "/body/p[4]/r[1]"), "Fourth changed");
+        assert_eq!(property(commit.file(), "/body/p[2]/r[1]", "italic"), "true");
+        assert_eq!(
+            property(commit.file(), "/body/p[3]/r[1]", "underline"),
             "single"
         );
-        assert_eq!(property(&commit.file, "/body/p[4]/r[1]", "bold"), "true");
+        assert_eq!(property(commit.file(), "/body/p[4]/r[1]", "bold"), "true");
         assert_eq!(source.to_bytes().unwrap(), before);
         assert_eq!(
             commit
-                .patch
+                .patch()
                 .inverse()
-                .apply(&commit.file)
+                .apply(commit.file())
                 .unwrap()
                 .to_bytes()
                 .unwrap(),
@@ -316,13 +319,13 @@ fn repeated_and_descending_direct_targets_close_runs_and_keep_sequential_results
             .unwrap()
             .set("/body/p[2]", props! {"text" => "second staged"})
             .unwrap();
-        assert_eq!(repeated.diagnostics.operations(), 3);
-        assert_eq!(repeated.diagnostics.commits(), 2);
+        assert_eq!(repeated.diagnostics().operations(), 3);
+        assert_eq!(repeated.diagnostics().commits(), 2);
         assert_eq!(
-            repeated.file.to_bytes().unwrap(),
+            repeated.file().to_bytes().unwrap(),
             repeated_oracle.to_bytes().unwrap()
         );
-        assert_eq!(text(&repeated.file, "/body/p[1]"), "first final");
+        assert_eq!(text(repeated.file(), "/body/p[1]"), "first final");
 
         let descending = source
             .edit(|edit| {
@@ -338,15 +341,15 @@ fn repeated_and_descending_direct_targets_close_runs_and_keep_sequential_results
             .unwrap()
             .set("/body/p[2]", props! {"text" => "middle staged"})
             .unwrap();
-        assert_eq!(descending.diagnostics.operations(), 3);
-        assert_eq!(descending.diagnostics.commits(), 2);
+        assert_eq!(descending.diagnostics().operations(), 3);
+        assert_eq!(descending.diagnostics().commits(), 2);
         assert_eq!(
-            descending.file.to_bytes().unwrap(),
+            descending.file().to_bytes().unwrap(),
             descending_oracle.to_bytes().unwrap()
         );
-        assert_eq!(text(&descending.file, "/body/p[1]"), "first descending");
-        assert_eq!(text(&descending.file, "/body/p[2]"), "middle staged");
-        assert_eq!(text(&descending.file, "/body/p[3]"), "third staged");
+        assert_eq!(text(descending.file(), "/body/p[1]"), "first descending");
+        assert_eq!(text(descending.file(), "/body/p[2]"), "middle staged");
+        assert_eq!(text(descending.file(), "/body/p[3]"), "third staged");
     });
 }
 
@@ -368,10 +371,13 @@ fn paragraph_and_run_families_are_incompatible_barriers() {
             .unwrap()
             .set("/body/p[3]", props! {"spaceAfter" => "3pt"})
             .unwrap();
-        assert_eq!(commit.diagnostics.operations(), 3);
-        assert_eq!(commit.diagnostics.commits(), 3);
-        assert_eq!(commit.file.to_bytes().unwrap(), oracle.to_bytes().unwrap());
-        assert_eq!(property(&commit.file, "/body/p[2]/r[1]", "bold"), "true");
+        assert_eq!(commit.diagnostics().operations(), 3);
+        assert_eq!(commit.diagnostics().commits(), 3);
+        assert_eq!(
+            commit.file().to_bytes().unwrap(),
+            oracle.to_bytes().unwrap()
+        );
+        assert_eq!(property(commit.file(), "/body/p[2]/r[1]", "bold"), "true");
         assert_eq!(source.to_bytes().unwrap(), before);
     });
 }
@@ -390,8 +396,8 @@ fn reads_queries_raw_paths_and_structural_commands_close_direct_runs() {
             edit.set("/body/p[2]", props! {"text" => "after-read"})
         })
         .expect("read barrier");
-    assert_eq!(read.diagnostics.commits(), 2);
-    assert_eq!(text(&read.file, "/body/p[2]"), "after-read");
+    assert_eq!(read.diagnostics().commits(), 2);
+    assert_eq!(text(read.file(), "/body/p[2]"), "after-read");
 
     let query_result = source
         .edit(|edit| {
@@ -400,9 +406,9 @@ fn reads_queries_raw_paths_and_structural_commands_close_direct_runs() {
             edit.set("/body/p[2]", props! {"text" => "after"})
         })
         .expect("query barrier");
-    assert_eq!(query_result.diagnostics.commits(), 3);
-    assert_eq!(text(&query_result.file, "/body/p[1]"), "query");
-    assert_eq!(text(&query_result.file, "/body/p[2]"), "after");
+    assert_eq!(query_result.diagnostics().commits(), 3);
+    assert_eq!(text(query_result.file(), "/body/p[1]"), "query");
+    assert_eq!(text(query_result.file(), "/body/p[2]"), "after");
 
     let raw = litchi_ops::path::raw::path("/body/p[2]").expect("raw RTF path");
     let raw_result = source
@@ -412,8 +418,8 @@ fn reads_queries_raw_paths_and_structural_commands_close_direct_runs() {
             edit.set("/body/p[3]", props! {"align" => "justify"})
         })
         .expect("raw path barrier");
-    assert_eq!(raw_result.diagnostics.commits(), 3);
-    assert_eq!(property(&raw_result.file, "/body/p[2]", "align"), "center");
+    assert_eq!(raw_result.diagnostics().commits(), 3);
+    assert_eq!(property(raw_result.file(), "/body/p[2]", "align"), "center");
 
     let structural = source
         .edit(|edit| {
@@ -422,9 +428,9 @@ fn reads_queries_raw_paths_and_structural_commands_close_direct_runs() {
             edit.set("/body/p[2]", props! {"text" => "after remove"})
         })
         .expect("structural barrier");
-    assert_eq!(structural.diagnostics.commits(), 3);
-    assert!(structural.file.get("/body/p[4]").is_err());
-    assert_eq!(text(&structural.file, "/body/p[2]"), "after remove");
+    assert_eq!(structural.diagnostics().commits(), 3);
+    assert!(structural.file().get("/body/p[4]").is_err());
+    assert_eq!(text(structural.file(), "/body/p[2]"), "after remove");
 
     let moved = source
         .edit(|edit| {
@@ -433,8 +439,8 @@ fn reads_queries_raw_paths_and_structural_commands_close_direct_runs() {
             edit.set("/body/p[2]", props! {"text" => "after move"})
         })
         .expect("move barrier");
-    assert_eq!(moved.diagnostics.commits(), 3);
-    assert_eq!(text(&moved.file, "/body/p[2]"), "after move");
+    assert_eq!(moved.diagnostics().commits(), 3);
+    assert_eq!(text(moved.file(), "/body/p[2]"), "after move");
 }
 
 #[test]
@@ -451,26 +457,26 @@ fn atomic_batch_coalesces_ordered_sets_while_best_effort_keeps_item_boundaries()
         let atomic = source
             .batch(commands(), BatchMode::Atomic)
             .expect("atomic ordered batch");
-        assert_eq!(atomic.results.len(), 3);
-        assert!(atomic.results.iter().all(|result| {
+        assert_eq!(atomic.results().len(), 3);
+        assert!(atomic.results().iter().all(|result| {
             matches!(result, litchi_ops::ItemResult::Applied(applied) if applied.changed)
         }));
-        assert_eq!(atomic.diagnostics.operations(), 3);
-        assert_eq!(atomic.diagnostics.commits(), 1);
-        assert_eq!(text(&atomic.file, "/body/p[1]"), "first batch");
-        assert_eq!(text(&atomic.file, "/body/p[2]"), "second batch");
-        assert_eq!(text(&atomic.file, "/body/p[3]"), "third batch");
+        assert_eq!(atomic.diagnostics().operations(), 3);
+        assert_eq!(atomic.diagnostics().commits(), 1);
+        assert_eq!(text(atomic.file(), "/body/p[1]"), "first batch");
+        assert_eq!(text(atomic.file(), "/body/p[2]"), "second batch");
+        assert_eq!(text(atomic.file(), "/body/p[3]"), "third batch");
         assert_eq!(source.to_bytes().unwrap(), before);
 
         let best = source
             .batch(commands(), BatchMode::BestEffort)
             .expect("best-effort ordered batch");
-        assert_eq!(best.results.len(), 3);
-        assert_eq!(best.diagnostics.operations(), 3);
-        assert_eq!(best.diagnostics.commits(), 3);
-        assert_eq!(text(&best.file, "/body/p[1]"), "first batch");
-        assert_eq!(text(&best.file, "/body/p[2]"), "second batch");
-        assert_eq!(text(&best.file, "/body/p[3]"), "third batch");
+        assert_eq!(best.results().len(), 3);
+        assert_eq!(best.diagnostics().operations(), 3);
+        assert_eq!(best.diagnostics().commits(), 3);
+        assert_eq!(text(best.file(), "/body/p[1]"), "first batch");
+        assert_eq!(text(best.file(), "/body/p[2]"), "second batch");
+        assert_eq!(text(best.file(), "/body/p[3]"), "third batch");
         assert_eq!(source.to_bytes().unwrap(), before);
     });
 }
@@ -486,17 +492,17 @@ fn noops_keep_exact_bytes_and_batch_result_order() {
     let commit = source
         .batch([same, changed], BatchMode::Atomic)
         .expect("noop plus changed batch");
-    assert_eq!(commit.diagnostics.operations(), 2);
-    assert_eq!(commit.diagnostics.commits(), 1);
+    assert_eq!(commit.diagnostics().operations(), 2);
+    assert_eq!(commit.diagnostics().commits(), 1);
     assert!(matches!(
-        &commit.results[0],
+        &commit.results()[0],
         litchi_ops::ItemResult::Applied(applied) if !applied.changed
     ));
     assert!(matches!(
-        &commit.results[1],
+        &commit.results()[1],
         litchi_ops::ItemResult::Applied(applied) if applied.changed
     ));
-    assert_eq!(text(&commit.file, "/body/p[2]"), "changed");
+    assert_eq!(text(commit.file(), "/body/p[2]"), "changed");
     assert_eq!(source.to_bytes().unwrap(), before);
 
     let all_noop = source
@@ -505,10 +511,10 @@ fn noops_keep_exact_bytes_and_batch_result_order() {
             edit.set("/body/p[2]", props! {"text" => "Second"})
         })
         .expect("all no-op direct sets");
-    assert!(!all_noop.diagnostics.changed());
-    assert_eq!(all_noop.diagnostics.operations(), 2);
-    assert_eq!(all_noop.diagnostics.commits(), 1);
-    assert_eq!(all_noop.file.to_bytes().unwrap(), before);
+    assert!(!all_noop.diagnostics().changed());
+    assert_eq!(all_noop.diagnostics().operations(), 2);
+    assert_eq!(all_noop.diagnostics().commits(), 1);
+    assert_eq!(all_noop.file().to_bytes().unwrap(), before);
 }
 
 #[test]
@@ -532,23 +538,23 @@ fn atomic_and_best_effort_batches_preserve_failure_indices_and_rollback() {
     let commit = source
         .batch(commands(), BatchMode::BestEffort)
         .expect("best-effort invalid item");
-    assert_eq!(commit.results.len(), 3);
+    assert_eq!(commit.results().len(), 3);
     assert!(matches!(
-        &commit.results[0],
+        &commit.results()[0],
         litchi_ops::ItemResult::Applied(applied) if applied.changed
     ));
     assert!(matches!(
-        &commit.results[1],
+        &commit.results()[1],
         litchi_ops::ItemResult::Failed(error)
             if error.item() == Some(1) && error.code() == Code::UnsupportedCapability
     ));
     assert!(matches!(
-        &commit.results[2],
+        &commit.results()[2],
         litchi_ops::ItemResult::Applied(applied) if applied.changed
     ));
-    assert_eq!(commit.diagnostics.commits(), 2);
-    assert_eq!(text(&commit.file, "/body/p[1]"), "atomic first");
-    assert_eq!(text(&commit.file, "/body/p[3]"), "atomic third");
+    assert_eq!(commit.diagnostics().commits(), 2);
+    assert_eq!(text(commit.file(), "/body/p[1]"), "atomic first");
+    assert_eq!(text(commit.file(), "/body/p[3]"), "atomic third");
     assert_eq!(source.to_bytes().unwrap(), before);
 }
 
@@ -580,19 +586,22 @@ fn pending_native_failure_precedes_operation_limit_excess_in_edit_and_batch() {
     let source = eager(INPUT);
     let before = source.to_bytes().unwrap();
     let error = source
-        .edit_with_limits(&limits, |edit| {
-            // The first item is retained by the direct planner until the
-            // second item forces the pending native run to publish.
-            edit.set("/body/p[1]/r[1]", props! {"text" => "first\nsecond"})?;
-            edit.set("/body/p[2]/r[1]", props! {"text" => "limit item"})
-        })
+        .edit_with_options(
+            litchi_ops::EditOptions::new().semantic_limits(limits),
+            |edit| {
+                // The first item is retained by the direct planner until the
+                // second item forces the pending native run to publish.
+                edit.set("/body/p[1]/r[1]", props! {"text" => "first\nsecond"})?;
+                edit.set("/body/p[2]/r[1]", props! {"text" => "limit item"})
+            },
+        )
         .expect_err("native failure must precede operation limit");
     assert_eq!(error.item(), Some(0));
     assert_eq!(error.code(), Code::UnsupportedCapability);
     assert_eq!(source.to_bytes().unwrap(), before);
 
     let error = source
-        .batch_with_limits(
+        .batch_with_options(
             [
                 batch_set(
                     "/body/p[1]/r[1]",
@@ -601,7 +610,7 @@ fn pending_native_failure_precedes_operation_limit_excess_in_edit_and_batch() {
                 batch_set("/body/p[2]/r[1]", Props::new().with("text", "limit item")),
             ],
             BatchMode::Atomic,
-            &limits,
+            litchi_ops::EditOptions::new().semantic_limits(limits),
         )
         .expect_err("native failure must precede batch operation limit");
     assert_eq!(error.item(), Some(0));
@@ -628,17 +637,20 @@ fn empty_run_text_removal_retargets_the_next_run_in_the_same_paragraph() {
         .unwrap()
         .set("/body/p[1]/r[1]", props! {"text" => "retargeted"})
         .unwrap();
-    assert_eq!(commit.file.to_bytes().unwrap(), oracle.to_bytes().unwrap());
-    assert_eq!(text(&commit.file, "/body/p[1]"), "retargetedBold");
-    assert_eq!(property(&commit.file, "/body/p[1]/r[1]", "italic"), "true");
-    assert_eq!(property(&commit.file, "/body/p[1]/r[2]", "bold"), "true");
-    assert_eq!(commit.diagnostics.operations(), 2);
+    assert_eq!(
+        commit.file().to_bytes().unwrap(),
+        oracle.to_bytes().unwrap()
+    );
+    assert_eq!(text(commit.file(), "/body/p[1]"), "retargetedBold");
+    assert_eq!(property(commit.file(), "/body/p[1]/r[1]", "italic"), "true");
+    assert_eq!(property(commit.file(), "/body/p[1]/r[2]", "bold"), "true");
+    assert_eq!(commit.diagnostics().operations(), 2);
     assert_eq!(source.to_bytes().unwrap(), before);
     assert_eq!(
         commit
-            .patch
+            .patch()
             .inverse()
-            .apply(&commit.file)
+            .apply(commit.file())
             .unwrap()
             .to_bytes()
             .unwrap(),
@@ -674,23 +686,26 @@ fn variable_unicode_run_replacements_preserve_ordered_boundaries() {
             Ok::<_, litchi_ops::Error>(())
         })
         .expect("ordered unicode replacement");
-    assert_eq!(commit.diagnostics.operations(), replacements.len());
+    assert_eq!(commit.diagnostics().operations(), replacements.len());
     // Variable-width Unicode replacements can close a native run when the
     // resulting semantic text fragments need new boundaries.  The important
     // contract here is exact sequential equivalence; any resulting native
     // barriers remain observable in the commit count.
-    assert!(commit.diagnostics.commits() >= 1);
-    assert_eq!(commit.file.to_bytes().unwrap(), oracle.to_bytes().unwrap());
+    assert!(commit.diagnostics().commits() >= 1);
     assert_eq!(
-        text(&commit.file, "/body/p[1]"),
+        commit.file().to_bytes().unwrap(),
+        oracle.to_bytes().unwrap()
+    );
+    assert_eq!(
+        text(commit.file(), "/body/p[1]"),
         text(&oracle, "/body/p[1]")
     );
     assert_eq!(source.to_bytes().unwrap(), before);
     assert_eq!(
         commit
-            .patch
+            .patch()
             .inverse()
-            .apply(&commit.file)
+            .apply(commit.file())
             .unwrap()
             .to_bytes()
             .unwrap(),
@@ -708,10 +723,13 @@ fn direct_set_limits_roll_over_or_refuse_without_partial_publication() {
         .build()
         .expect("limits");
     let error = source
-        .edit_with_limits(&operation_limits, |edit| {
-            edit.set("/body/p[1]", props! {"text" => "bounded one"})?;
-            edit.set("/body/p[2]", props! {"text" => "bounded two"})
-        })
+        .edit_with_options(
+            litchi_ops::EditOptions::new().semantic_limits(operation_limits),
+            |edit| {
+                edit.set("/body/p[1]", props! {"text" => "bounded one"})?;
+                edit.set("/body/p[2]", props! {"text" => "bounded two"})
+            },
+        )
         .expect_err("aggregate operation limit");
     assert!(matches!(
         error.leaf(),
@@ -728,15 +746,18 @@ fn direct_set_limits_roll_over_or_refuse_without_partial_publication() {
         .build()
         .expect("limits");
     let rolled = source
-        .edit_with_limits(&expanded_limits, |edit| {
-            edit.set("/body/p[1]", props! {"text" => "expanded one"})?;
-            edit.set("/body/p[2]", props! {"text" => "expanded two"})
-        })
+        .edit_with_options(
+            litchi_ops::EditOptions::new().semantic_limits(expanded_limits),
+            |edit| {
+                edit.set("/body/p[1]", props! {"text" => "expanded one"})?;
+                edit.set("/body/p[2]", props! {"text" => "expanded two"})
+            },
+        )
         .expect("expanded target rollover");
-    assert_eq!(rolled.diagnostics.operations(), 2);
-    assert_eq!(rolled.diagnostics.commits(), 2);
-    assert_eq!(text(&rolled.file, "/body/p[1]"), "expanded one");
-    assert_eq!(text(&rolled.file, "/body/p[2]"), "expanded two");
+    assert_eq!(rolled.diagnostics().operations(), 2);
+    assert_eq!(rolled.diagnostics().commits(), 2);
+    assert_eq!(text(rolled.file(), "/body/p[1]"), "expanded one");
+    assert_eq!(text(rolled.file(), "/body/p[2]"), "expanded two");
     assert_eq!(source.to_bytes().unwrap(), before);
 
     for (limits, kind) in [
@@ -758,9 +779,10 @@ fn direct_set_limits_roll_over_or_refuse_without_partial_publication() {
         ),
     ] {
         let error = source
-            .edit_with_limits(&limits, |edit| {
-                edit.set("/body/p[1]", props! {"text" => "bounded"})
-            })
+            .edit_with_options(
+                litchi_ops::EditOptions::new().semantic_limits(limits),
+                |edit| edit.set("/body/p[1]", props! {"text" => "bounded"}),
+            )
             .expect_err("individual RTF limit");
         assert!(
             matches!(
@@ -788,7 +810,7 @@ fn filtered_paths_keep_ordinary_resolution_semantics() {
             (Err(left), Err(right)) => assert_eq!(left.code(), right.code(), "{path}"),
             (Ok(left), Ok(right)) => assert_eq!(
                 left.to_bytes().unwrap(),
-                right.file.to_bytes().unwrap(),
+                right.file().to_bytes().unwrap(),
                 "{path}"
             ),
             (left, right) => {
@@ -808,10 +830,13 @@ fn staging_windows_roll_over_and_small_limits_keep_scalar_noop_admission() {
         .build()
         .unwrap();
     let noop = source
-        .edit_with_limits(&tiny, |edit| edit.set("/body/p[1]/r[1]", Props::new()))
+        .edit_with_options(
+            litchi_ops::EditOptions::new().semantic_limits(tiny),
+            |edit| edit.set("/body/p[1]/r[1]", Props::new()),
+        )
         .unwrap();
-    assert!(!noop.diagnostics.changed());
-    assert_eq!(noop.file.to_bytes().unwrap(), INPUT);
+    assert!(!noop.diagnostics().changed());
+    assert_eq!(noop.file().to_bytes().unwrap(), INPUT);
 
     let bounded = SemanticLimits::builder()
         .max_staged_bytes(1024)
@@ -820,14 +845,17 @@ fn staging_windows_roll_over_and_small_limits_keep_scalar_noop_admission() {
         .unwrap();
     let payload = "x".repeat(700);
     let commit = source
-        .edit_with_limits(&bounded, |edit| {
-            edit.set("/body/p[1]", props! {"text" => payload.as_str()})?;
-            edit.set("/body/p[2]", props! {"text" => payload.as_str()})
-        })
+        .edit_with_options(
+            litchi_ops::EditOptions::new().semantic_limits(bounded),
+            |edit| {
+                edit.set("/body/p[1]", props! {"text" => payload.as_str()})?;
+                edit.set("/body/p[2]", props! {"text" => payload.as_str()})
+            },
+        )
         .unwrap();
-    assert_eq!(commit.diagnostics.commits(), 2);
-    assert_eq!(text(&commit.file, "/body/p[1]"), payload);
-    assert_eq!(text(&commit.file, "/body/p[2]"), payload);
+    assert_eq!(commit.diagnostics().commits(), 2);
+    assert_eq!(text(commit.file(), "/body/p[1]"), payload);
+    assert_eq!(text(commit.file(), "/body/p[2]"), payload);
     assert_eq!(source.to_bytes().unwrap(), INPUT);
 }
 
@@ -845,8 +873,11 @@ fn noop_alignment_before_structural_text_is_a_native_boundary() {
         .unwrap()
         .set("/body/p[2]", props! {"text" => "x\ny"})
         .unwrap();
-    assert_eq!(commit.diagnostics.commits(), 2);
-    assert_eq!(commit.file.to_bytes().unwrap(), oracle.to_bytes().unwrap());
-    assert_eq!(text(&commit.file, "/body/p[2]"), "x");
-    assert_eq!(text(&commit.file, "/body/p[3]"), "y");
+    assert_eq!(commit.diagnostics().commits(), 2);
+    assert_eq!(
+        commit.file().to_bytes().unwrap(),
+        oracle.to_bytes().unwrap()
+    );
+    assert_eq!(text(commit.file(), "/body/p[2]"), "x");
+    assert_eq!(text(commit.file(), "/body/p[3]"), "y");
 }

@@ -2848,6 +2848,49 @@ def p0359():
     return out
 
 
+W8_OPS = {"open_get": "open", "set": "set", "batch1k": "batch", "import": "import", "merge": "merge"}
+W8_UNQUALIFIED = ("follow-up 0362ha: historical measurements retained; the blanket 1.05 "
+                  "threshold and code-placement explanation were returned on review. "
+                  "Matched current-source performance qualification remains required.")
+
+
+def w8_legs(directory):
+    legs: dict = {"before": {}, "after": {}}
+    paths = sorted(directory.glob("probe-*-*.json"))
+    for path in paths:
+        leg = path.stem.split("-")[2]
+        for r in load_json(path):
+            legs[leg].setdefault(r["scenario"], []).append(r["median_us"])
+    return legs, paths
+
+
+@needs("0362")
+def p0362():
+    """Record 0362 §5 (W8, the unified `File`): file_w8_probe, one source
+    built on the wave's base (trunk) and head, run A-B-B-A twice pinned in
+    release; one after/before row per format and route (run 1's medians, the
+    ratio range over both runs)."""
+    base = RES / "0362"
+    (run1, paths1), (run2, paths2) = w8_legs(base / "run1"), w8_legs(base / "run2")
+    out = []
+    for scen, after in run1["after"].items():
+        before = run1["before"].get(scen)
+        if not before:
+            continue
+        fmt, op = scen.split("/")
+        b, a = med(before), med(after)
+        ratios = [a / b]
+        if run2["after"].get(scen) and run2["before"].get(scen):
+            ratios.append(med(run2["after"][scen]) / med(run2["before"][scen]))
+        size = {"batch1k": "256 ops" if fmt == "doc" else "1k ops",
+                "import": "100 rows" if fmt == "xls" else "1k rows"}.get(op, "")
+        out.append(row("0362", fmt, W8_OPS.get(op, op),
+                       f"File {op.replace('_', ' ')} ({fmt}, W8 head vs base)",
+                       size, b, a, ratios, NONE, f"file_w8_probe:{scen}:after-before",
+                       src(paths1 + paths2), comparison="after/before", explanation=W8_UNQUALIFIED))
+    return out
+
+
 W5_SOURCE_BACKED = {
     "doc/source_set": ("doc", "set", "source_backed::Package open + edit_paragraph + set_text + commit + write_to", "1k paragraphs"),
     "xls/source_cells1": ("xls", "set", "SourceBackedWorkbook open + edit_cells (1 cell) + commit + write_to", "100×10 cells"),
@@ -3078,7 +3121,7 @@ PARSERS = [p0250, p0251, p0251f, p0252, p0253, p0254, p0255, p0256, p0258, p0259
            p0313, p0314, p0315, p0316, p0317, p0318, p0323, p0324, p0325, p0326,
            p0328, p0329, p0330, p0333, p0335, p0336, p0337, p0338, p0340, p0342, p0345, p0346,
            p0347, p0348, p0355, p0355a, p0356, p0356a, p0356b, p0356c, p0357, p0357a, p0357b, p0358, p0358a,
-           p0359, p0359a, p0359b, p0361, p0361a]
+           p0359, p0359a, p0359b, p0361, p0361a, p0362]
 
 
 

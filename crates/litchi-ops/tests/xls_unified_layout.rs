@@ -160,14 +160,14 @@ fn layout_transactions_invert_exactly() {
         })
         .unwrap();
     assert_eq!(
-        property(&commit.file, "/Data/row[1]", "hidden").as_deref(),
+        property(commit.file(), "/Data/row[1]", "hidden").as_deref(),
         Some("true")
     );
     assert_eq!(
         commit
-            .patch
+            .patch()
             .inverse()
-            .apply(&commit.file)
+            .apply(commit.file())
             .unwrap()
             .to_bytes()
             .unwrap(),

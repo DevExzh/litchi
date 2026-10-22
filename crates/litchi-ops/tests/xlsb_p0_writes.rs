@@ -314,8 +314,8 @@ fn p0_writes_replay_and_invert_in_transactions() {
                 Ok(())
             })
             .expect("transaction");
-        assert!(commit.diagnostics.changed());
-        let after = &commit.file;
+        assert!(commit.diagnostics().changed());
+        let after = commit.file();
         assert_eq!(
             property(after, "/Data/A1", "font.bold").as_deref(),
             Some("true")
@@ -332,9 +332,9 @@ fn p0_writes_replay_and_invert_in_transactions() {
             property(after, "/namedrange[1]", "ref").as_deref(),
             Some("Data!$A$1")
         );
-        let restored = commit.patch.inverse().apply(after).expect("inverse");
+        let restored = commit.patch().inverse().apply(after).expect("inverse");
         assert_eq!(restored.to_bytes().unwrap(), bytes);
-        let replayed = commit.patch.apply(&file).expect("replay");
+        let replayed = commit.patch().apply(&file).expect("replay");
         assert_eq!(replayed.to_bytes().unwrap(), after.to_bytes().unwrap());
     }
 }

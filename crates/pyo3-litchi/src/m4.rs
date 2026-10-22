@@ -74,7 +74,8 @@ pub(crate) fn import_commit(
     py: Python<'_>,
     commit: litchi::transaction::Commit<litchi::import::Summary>,
 ) -> PyResult<Commit> {
-    let summary = commit.value;
+    let diagnostics = *commit.diagnostics();
+    let (file, patch, summary) = commit.into_parts();
     let dict = PyDict::new(py);
     dict.set_item("sheet", summary.sheet())?;
     dict.set_item("row", summary.row())?;
@@ -91,10 +92,10 @@ pub(crate) fn import_commit(
     dict.set_item("empty", summary.empty())?;
     Commit::new(
         py,
-        commit.file,
-        Some(crate::write::Patch::one(commit.patch)),
-        commit.diagnostics.changed(),
-        commit.diagnostics.operations(),
+        file,
+        Some(crate::write::Patch::one(patch)),
+        diagnostics.changed(),
+        diagnostics.operations(),
         None,
         Some(dict.into_any().unbind()),
     )

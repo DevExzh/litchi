@@ -142,7 +142,7 @@ fn docx_placeholders_across_runs_keep_each_runs_formatting() {
                 &Options::new(),
             )
             .unwrap();
-        let file = &commit.file;
+        let file = commit.file();
         assert_eq!(text(file, "/body/p[1]"), "Dear Ada, welcome to London.");
         assert_eq!(text(file, "/body/p[1]/r[1]"), "Dear Ada");
         assert_eq!(text(file, "/body/p[1]/r[2]"), ", welcome to London.");
@@ -154,11 +154,11 @@ fn docx_placeholders_across_runs_keep_each_runs_formatting() {
             property(file, "/body/p[1]/r[2]", "italic").as_deref(),
             Some("true")
         );
-        let summary = &commit.value;
+        let summary = commit.value();
         assert_eq!(summary.replacements(), 2);
         assert_eq!(summary.keys(), ["city", "name"]);
         assert!(summary.unresolved().is_empty());
-        assert_eq!(commit.diagnostics.commits(), 1);
+        assert_eq!(commit.diagnostics().commits(), 1);
         // The template is unchanged, and the result survives a round trip.
         assert_eq!(
             text(&template, "/body/p[1]"),
@@ -167,7 +167,7 @@ fn docx_placeholders_across_runs_keep_each_runs_formatting() {
         let reopened = open(file.to_bytes().unwrap());
         assert_eq!(text(&reopened, "/body/p[1]/r[1]"), "Dear Ada");
         // The patch inverts to the template.
-        let restored = commit.patch.inverse().apply(file).unwrap();
+        let restored = commit.patch().inverse().apply(file).unwrap();
         assert_eq!(text(&restored, "/body/p[1]"), text(&template, "/body/p[1]"));
     }
 }
@@ -183,10 +183,14 @@ fn docx_merges_tables_controls_and_headers() {
         Some(r#"<w:p><w:r><w:t>{{client.name}} &amp; Co</w:t></w:r></w:p>"#),
     );
     let template = open(bytes);
-    let data = Data::from_json(br#"{"total": 5200.00, "client": {"name": "Acme <EU>"}}"#).unwrap();
+    let data = Data::from_json(
+        br#"{"total": 5200.00, "client": {"name": "Acme <EU>"}}"#,
+        &SemanticLimits::default(),
+    )
+    .unwrap();
     let commit = template.merge(&data.records()[0], &Options::new()).unwrap();
-    assert_eq!(commit.value.replacements(), 3);
-    let published = commit.file.to_bytes().unwrap();
+    assert_eq!(commit.value().replacements(), 3);
+    let published = commit.file().to_bytes().unwrap();
     let document = member(&published, "word/document.xml");
     assert!(document.contains("<w:t>Total: 5200.00</w:t>"), "{document}");
     assert!(
@@ -206,9 +210,9 @@ fn docx_merges_tables_controls_and_headers() {
     let commit = header_only
         .merge(&record(&[("x", "y")]), &Options::new())
         .unwrap();
-    assert!(commit.diagnostics.changed());
-    assert!(!commit.patch.is_noop());
-    let header = member(&commit.file.to_bytes().unwrap(), "word/header1.xml");
+    assert!(commit.diagnostics().changed());
+    assert!(!commit.patch().is_noop());
+    let header = member(&commit.file().to_bytes().unwrap(), "word/header1.xml");
     assert!(header.contains("<w:t>y</w:t>"), "{header}");
 }
 
@@ -233,9 +237,9 @@ fn docx_merge_fields_become_formatted_runs() {
             &Options::new(),
         )
         .unwrap();
-    assert_eq!(commit.value.fields(), 2);
-    assert_eq!(commit.value.keys(), ["Last Name", "first"]);
-    let file = &commit.file;
+    assert_eq!(commit.value().fields(), 2);
+    assert_eq!(commit.value().keys(), ["Last Name", "first"]);
+    let file = commit.file();
     assert_eq!(text(file, "/body/p[1]"), "To Mx ADA Lovelace1");
     let document = member(&file.to_bytes().unwrap(), "word/document.xml");
     assert!(
@@ -252,7 +256,7 @@ fn docx_merge_fields_become_formatted_runs() {
     let off = template
         .merge(&record(&[("First", "x")]), &Options::new().fields(false))
         .unwrap();
-    assert!(off.patch.is_noop());
+    assert!(off.patch().is_noop());
 }
 
 #[test]
@@ -262,14 +266,14 @@ fn missing_keys_are_kept_or_emptied() {
         None,
     ));
     let kept = template.merge(&Record::new(), &Options::new()).unwrap();
-    assert!(kept.patch.is_noop());
-    assert_eq!(kept.value.unresolved(), ["First", "Last Name", "gone"]);
+    assert!(kept.patch().is_noop());
+    assert_eq!(kept.value().unresolved(), ["First", "Last Name", "gone"]);
     let emptied = template
         .merge(&Record::new(), &Options::new().missing(Missing::Empty))
         .unwrap();
-    assert_eq!(text(&emptied.file, "/body/p[1]"), "[]");
-    assert_eq!(text(&emptied.file, "/body/p[2]"), "To  1");
-    assert_eq!(emptied.value.unresolved(), ["First", "Last Name", "gone"]);
+    assert_eq!(text(emptied.file(), "/body/p[1]"), "[]");
+    assert_eq!(text(emptied.file(), "/body/p[2]"), "To  1");
+    assert_eq!(emptied.value().unresolved(), ["First", "Last Name", "gone"]);
 }
 
 #[test]
@@ -282,12 +286,12 @@ fn a_template_without_placeholders_is_an_exact_no_op() {
     let commit = template
         .merge(&record(&[("x", "y")]), &Options::new())
         .unwrap();
-    assert!(commit.patch.is_noop());
-    assert!(!commit.diagnostics.changed());
-    assert_eq!(commit.diagnostics.commits(), 0);
-    assert_eq!(commit.diagnostics.operations(), 1);
+    assert!(commit.patch().is_noop());
+    assert!(!commit.diagnostics().changed());
+    assert_eq!(commit.diagnostics().commits(), 0);
+    assert_eq!(commit.diagnostics().operations(), 1);
     assert_eq!(
-        commit.file.to_bytes().unwrap(),
+        commit.file().to_bytes().unwrap(),
         template.to_bytes().unwrap()
     );
 }
@@ -298,13 +302,18 @@ fn one_template_fills_every_record() {
         r#"<w:p><w:r><w:t>Hello {{name}} ({{n}})</w:t></w:r></w:p>"#,
         None,
     ));
-    let data = Data::from_csv(b"name,n\nAda,1\nGrace,2\n\"Lin, M\",3\n").unwrap();
+    let data = Data::from_csv(
+        b"name,n\nAda,1\nGrace,2\n\"Lin, M\",3\n",
+        &litchi_ops::import::Options::csv(),
+        &SemanticLimits::default(),
+    )
+    .unwrap();
     let texts: Vec<String> = data
         .records()
         .iter()
         .map(|record| {
             text(
-                &template.merge(record, &Options::new()).unwrap().file,
+                template.merge(record, &Options::new()).unwrap().file(),
                 "/body/p[1]",
             )
         })
@@ -330,10 +339,10 @@ fn merge_composes_with_other_edits() {
         })
         .unwrap();
     // A value is never matched again.
-    assert_eq!(text(&commit.file, "/body/p[1]"), "Hi {{name}}");
-    assert_eq!(commit.value.replacements(), 1);
-    assert_eq!(commit.diagnostics.operations(), 2);
-    let restored = commit.patch.inverse().apply(&commit.file).unwrap();
+    assert_eq!(text(commit.file(), "/body/p[1]"), "Hi {{name}}");
+    assert_eq!(commit.value().replacements(), 1);
+    assert_eq!(commit.diagnostics().operations(), 2);
+    let restored = commit.patch().inverse().apply(commit.file()).unwrap();
     assert_eq!(restored.to_bytes().unwrap(), template.to_bytes().unwrap());
 }
 
@@ -353,7 +362,11 @@ fn values_and_limits_are_checked_before_any_change() {
         .build()
         .unwrap();
     let error = template
-        .merge_with_limits(&record(&[("a", "1"), ("b", "2")]), &Options::new(), &limits)
+        .merge_with_options(
+            &record(&[("a", "1"), ("b", "2")]),
+            &Options::new(),
+            litchi_ops::EditOptions::new().semantic_limits(limits),
+        )
         .unwrap_err();
     assert_eq!(error.code(), Code::LimitExceeded);
     let limits = SemanticLimits::builder()
@@ -362,7 +375,11 @@ fn values_and_limits_are_checked_before_any_change() {
         .build()
         .unwrap();
     let error = template
-        .merge_with_limits(&record(&[("a", "1"), ("b", "2")]), &Options::new(), &limits)
+        .merge_with_options(
+            &record(&[("a", "1"), ("b", "2")]),
+            &Options::new(),
+            litchi_ops::EditOptions::new().semantic_limits(limits),
+        )
         .unwrap_err();
     assert_eq!(error.code(), Code::LimitExceeded);
     assert_eq!(text(&template, "/body/p[1]"), "{{a}} {{b}}");
@@ -370,7 +387,7 @@ fn values_and_limits_are_checked_before_any_change() {
     let commit = template
         .merge(&record(&[("a", "x\ty"), ("b", "1\r\n2")]), &Options::new())
         .unwrap();
-    let document = member(&commit.file.to_bytes().unwrap(), "word/document.xml");
+    let document = member(&commit.file().to_bytes().unwrap(), "word/document.xml");
     assert!(
         document.contains("<w:t>x</w:t><w:tab/><w:t>y 1</w:t><w:br/><w:t>2</w:t>"),
         "{document}"
@@ -414,7 +431,7 @@ fn pptx_runs_keep_their_formatting() {
             &Options::new(),
         )
         .unwrap();
-    let file = &commit.file;
+    let file = commit.file();
     assert_eq!(text(file, "/slide[1]/shape[1]"), "Hello Ada! \nParis & Co");
     assert_eq!(
         text(file, "/slide[1]/shape[1]/paragraph[1]/run[1]"),
@@ -429,14 +446,14 @@ fn pptx_runs_keep_their_formatting() {
         property(file, "/slide[1]/shape[1]/paragraph[1]/run[2]", "italic").as_deref(),
         Some("true")
     );
-    assert_eq!(commit.value.replacements(), 2);
-    assert_eq!(commit.diagnostics.commits(), 1);
+    assert_eq!(commit.value().replacements(), 2);
+    assert_eq!(commit.diagnostics().commits(), 1);
     let reopened = open(file.to_bytes().unwrap());
     assert_eq!(
         text(&reopened, "/slide[1]/shape[1]"),
         "Hello Ada! \nParis & Co"
     );
-    let restored = commit.patch.inverse().apply(file).unwrap();
+    let restored = commit.patch().inverse().apply(file).unwrap();
     assert_eq!(
         text(&restored, "/slide[1]/shape[1]"),
         text(&template, "/slide[1]/shape[1]")
@@ -450,8 +467,8 @@ fn pptx_runs_keep_their_formatting() {
     let none = template
         .merge(&record(&[("other", "x")]), &Options::new())
         .unwrap();
-    assert!(none.patch.is_noop());
-    assert_eq!(none.value.unresolved(), ["city", "name"]);
+    assert!(none.patch().is_noop());
+    assert_eq!(none.value().unresolved(), ["city", "name"]);
 }
 
 #[test]
@@ -470,14 +487,14 @@ fn xlsx_text_cells_are_filled_and_formulas_kept() {
             Ok(())
         })
         .unwrap()
-        .file;
+        .into_file();
     let commit = template
         .merge(
             &record(&[("number", "0274"), ("client", "Acme")]),
             &Options::new(),
         )
         .unwrap();
-    let file = &commit.file;
+    let file = commit.file();
     assert_eq!(text(file, "/Sheet1/A1"), "Invoice 0274 for Acme");
     assert_eq!(text(file, "/Second/A1"), "Acme");
     assert_eq!(text(file, "/Sheet1/B2"), "42");
@@ -485,11 +502,11 @@ fn xlsx_text_cells_are_filled_and_formulas_kept() {
         property(file, "/Sheet1/C3", "formula").as_deref(),
         Some("\"{{client}}\"&\"!\"")
     );
-    assert_eq!(commit.value.replacements(), 3);
-    assert_eq!(commit.diagnostics.commits(), 1);
+    assert_eq!(commit.value().replacements(), 3);
+    assert_eq!(commit.diagnostics().commits(), 1);
     let reopened = open(file.to_bytes().unwrap());
     assert_eq!(text(&reopened, "/Sheet1/A1"), "Invoice 0274 for Acme");
-    let restored = commit.patch.inverse().apply(file).unwrap();
+    let restored = commit.patch().inverse().apply(file).unwrap();
     assert_eq!(
         text(&restored, "/Sheet1/A1"),
         "Invoice {{number}} for {{client}}"
@@ -512,7 +529,7 @@ fn other_formats_report_the_gap() {
     for format in [FileFormat::Xlsb, FileFormat::Xls] {
         let file = litchi_ops::create(format).unwrap();
         let commit = file.merge(&Record::new(), &Options::new()).unwrap();
-        assert!(commit.patch.is_noop());
+        assert!(commit.patch().is_noop());
     }
     for format in [
         FileFormat::Docx,
@@ -541,12 +558,26 @@ fn data_errors_are_typed() {
         (b"{\"a\": }", Code::InvalidJson),
         (b"{\"a\": 1} x", Code::InvalidJson),
     ] {
-        assert_eq!(Data::from_json(source).unwrap_err().code(), code);
+        assert_eq!(
+            Data::from_json(source, &SemanticLimits::default())
+                .unwrap_err()
+                .code(),
+            code
+        );
     }
     let deep = format!("{}1{}", "[".repeat(200), "]".repeat(200));
-    let error = Data::from_json(format!("{{\"a\": {deep}}}").as_bytes()).unwrap_err();
+    let error = Data::from_json(
+        format!("{{\"a\": {deep}}}").as_bytes(),
+        &SemanticLimits::default(),
+    )
+    .unwrap_err();
     assert_eq!(error.code(), Code::LimitExceeded);
-    let error = Data::from_csv(b"a\n\"open").unwrap_err();
+    let error = Data::from_csv(
+        b"a\n\"open",
+        &litchi_ops::import::Options::csv(),
+        &SemanticLimits::default(),
+    )
+    .unwrap_err();
     assert_eq!(error.code(), Code::InvalidInput);
 }
 
@@ -579,13 +610,13 @@ fn pptx_table_cells_and_notes_are_merged() {
                 &Options::new(),
             )
             .unwrap();
-        let file = &commit.file;
-        assert_eq!(commit.value.replacements(), 4);
+        let file = commit.file();
+        assert_eq!(commit.value().replacements(), 4);
         assert_eq!(text(file, "/slide[1]/shape[1]"), "To Ada");
         assert_eq!(text(file, "/slide[1]/table[1]/tr[1]/tc[1]"), "Paris");
         assert_eq!(text(file, "/slide[1]/table[1]/tr[1]/tc[2]"), "fixed");
         assert_eq!(text(file, "/slide[1]/notes"), "Call Ada in Paris");
-        let restored = commit.patch.inverse().apply(file).unwrap();
+        let restored = commit.patch().inverse().apply(file).unwrap();
         assert_eq!(
             text(&restored, "/slide[1]/notes"),
             "Call {{name}} in {{city}}"

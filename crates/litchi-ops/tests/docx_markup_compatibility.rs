@@ -147,7 +147,7 @@ fn find(file: &File, path: &str, props: Props<'_>) -> litchi_ops::Result<(File, 
     item.path = Some(path.into());
     item.props = Some(props);
     file.apply(&item)
-        .map(|commit| (commit.file, commit.value.matched()))
+        .map(|commit| (commit.file().clone(), commit.value().matched()))
 }
 
 /// The refusal of `edit`, after checking it left `file` untouched.
@@ -427,8 +427,8 @@ fn merge_fills_placeholders_beside_wrappers_and_never_inside_them() {
         let commit = template
             .merge(&record, &Options::new())
             .unwrap_or_else(|error| panic!("{owner}: {error}"));
-        assert_eq!(commit.value.replacements(), 1, "{owner}");
-        let merged = reopen(&commit.file, mode);
+        assert_eq!(commit.value().replacements(), 1, "{owner}");
+        let merged = reopen(commit.file(), mode);
         assert!(text(&merged, "/body/p[27]").starts_with("{{name}}Ada makes"));
         assert_eq!(wrappers(&document_xml(&merged)), kept, "{owner}");
     }

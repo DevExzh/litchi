@@ -362,12 +362,12 @@ fn duplicate_query_matches_are_removed_once_across_worksheets() {
         let commit = original
             .edit(|transaction| transaction.remove(selector.clone()))
             .expect("remove duplicate query matches");
-        assert!(commit.diagnostics.changed());
-        assert_eq!(commit.diagnostics.operations(), 1);
-        assert_eq!(cell_text(&commit.file, A1).as_deref(), Some(""));
-        assert_eq!(cell_text(&commit.file, ARCHIVE_A1).as_deref(), Some(""));
-        assert_eq!(cell_text(&commit.file, B1).as_deref(), Some("2.5"));
-        assert_eq!(cell_text(&commit.file, ARCHIVE_B1).as_deref(), Some("9"));
+        assert!(commit.diagnostics().changed());
+        assert_eq!(commit.diagnostics().operations(), 1);
+        assert_eq!(cell_text(commit.file(), A1).as_deref(), Some(""));
+        assert_eq!(cell_text(commit.file(), ARCHIVE_A1).as_deref(), Some(""));
+        assert_eq!(cell_text(commit.file(), B1).as_deref(), Some("2.5"));
+        assert_eq!(cell_text(commit.file(), ARCHIVE_B1).as_deref(), Some("9"));
     }
 }
 
@@ -436,26 +436,26 @@ fn mixed_set_remove_transactions_replay_inverse_and_reject_foreign_snapshots() {
                 Ok::<_, litchi_ops::Error>(())
             })
             .expect("mixed XLS transaction");
-        assert!(commit.diagnostics.changed());
-        assert_eq!(commit.diagnostics.operations(), 3);
-        assert_eq!(cell_text(&commit.file, A1).as_deref(), Some(""));
-        assert_eq!(cell_text(&commit.file, B1).as_deref(), Some("8.25"));
-        assert_eq!(cell_text(&commit.file, C1).as_deref(), Some(""));
+        assert!(commit.diagnostics().changed());
+        assert_eq!(commit.diagnostics().operations(), 3);
+        assert_eq!(cell_text(commit.file(), A1).as_deref(), Some(""));
+        assert_eq!(cell_text(commit.file(), B1).as_deref(), Some("8.25"));
+        assert_eq!(cell_text(commit.file(), C1).as_deref(), Some(""));
 
         assert_eq!(
             commit
-                .patch
+                .patch()
                 .apply(&original)
                 .expect("replay mixed patch")
                 .to_bytes()
                 .expect("publish replay"),
-            commit.file.to_bytes().expect("publish committed file")
+            commit.file().to_bytes().expect("publish committed file")
         );
         assert_eq!(
             commit
-                .patch
+                .patch()
                 .inverse()
-                .apply(&commit.file)
+                .apply(commit.file())
                 .expect("inverse mixed patch")
                 .to_bytes()
                 .expect("publish inverse"),
@@ -464,7 +464,7 @@ fn mixed_set_remove_transactions_replay_inverse_and_reject_foreign_snapshots() {
         let foreign = open_owner(&before, eager);
         assert_eq!(
             commit
-                .patch
+                .patch()
                 .apply(&foreign)
                 .expect_err("foreign patch source")
                 .code(),
@@ -506,27 +506,27 @@ fn removal_batches_are_atomic_or_attribute_failures_per_item() {
             )
             .expect("best-effort removal batch");
         assert!(matches!(
-            &best_effort.results[0],
+            &best_effort.results()[0],
             ItemResult::Applied(result) if result.changed
         ));
         assert!(matches!(
-            &best_effort.results[1],
+            &best_effort.results()[1],
             ItemResult::Failed(error) if error.item() == Some(1) && error.code() == Code::PathNotFound
         ));
         assert!(matches!(
-            &best_effort.results[2],
+            &best_effort.results()[2],
             ItemResult::Applied(result) if result.changed
         ));
-        assert_eq!(cell_text(&best_effort.file, A1).as_deref(), Some(""));
+        assert_eq!(cell_text(best_effort.file(), A1).as_deref(), Some(""));
         assert_eq!(
-            cell_text(&best_effort.file, ARCHIVE_A1).as_deref(),
+            cell_text(best_effort.file(), ARCHIVE_A1).as_deref(),
             Some("")
         );
         assert_eq!(
             best_effort
-                .patch
+                .patch()
                 .inverse()
-                .apply(&best_effort.file)
+                .apply(best_effort.file())
                 .expect("inverse removal batch")
                 .to_bytes()
                 .expect("publish inverse batch"),
@@ -546,9 +546,10 @@ fn removal_limits_cover_target_staged_and_retained_snapshot_charges() {
         .build()
         .expect("build expanded limit");
     let expanded = original
-        .edit_with_limits(&expanded_limits, |transaction| {
-            transaction.remove("Data!A1:C2")
-        })
+        .edit_with_options(
+            litchi_ops::EditOptions::new().semantic_limits(expanded_limits),
+            |transaction| transaction.remove("Data!A1:C2"),
+        )
         .expect_err("range removal exceeds target limit");
     assert_eq!(expanded.code(), Code::LimitExceeded);
     assert_eq!(expanded.item(), Some(0));
@@ -571,7 +572,10 @@ fn removal_limits_cover_target_staged_and_retained_snapshot_charges() {
         .build()
         .expect("build staged limit");
     let staged = original
-        .edit_with_limits(&staged_limits, |transaction| transaction.remove(A1))
+        .edit_with_options(
+            litchi_ops::EditOptions::new().semantic_limits(staged_limits),
+            |transaction| transaction.remove(A1),
+        )
         .expect_err("removal exceeds staged limit");
     assert_eq!(staged.code(), Code::LimitExceeded);
     assert_eq!(
@@ -582,7 +586,7 @@ fn removal_limits_cover_target_staged_and_retained_snapshot_charges() {
     let probe = original
         .edit(|transaction| transaction.remove(A1))
         .expect("measure removal snapshot charge");
-    let charge = probe.diagnostics.snapshot_bytes();
+    let charge = probe.diagnostics().snapshot_bytes();
     assert!(charge > 0);
     let snapshot_limits = SemanticLimits::builder()
         .max_snapshot_bytes(charge - 1)
@@ -590,7 +594,10 @@ fn removal_limits_cover_target_staged_and_retained_snapshot_charges() {
         .build()
         .expect("build snapshot limit");
     let snapshot = original
-        .edit_with_limits(&snapshot_limits, |transaction| transaction.remove(A1))
+        .edit_with_options(
+            litchi_ops::EditOptions::new().semantic_limits(snapshot_limits),
+            |transaction| transaction.remove(A1),
+        )
         .expect_err("removal exceeds snapshot limit");
     assert_eq!(snapshot.code(), Code::LimitExceeded);
     assert_eq!(

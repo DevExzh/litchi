@@ -102,7 +102,7 @@ fn find(file: &File, path: &str, props: Props<'_>) -> (File, Option<usize>) {
         }
         panic!("{path}: {error}{chain}")
     });
-    (commit.file, commit.value.matched())
+    (commit.file().clone(), commit.value().matched())
 }
 
 fn replace(find_text: &str, replace_text: &str) -> Props<'static> {

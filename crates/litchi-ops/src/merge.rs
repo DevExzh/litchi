@@ -13,17 +13,21 @@
 //! # {
 //! use litchi_core::FileFormat;
 //! use litchi_ops::merge::{Data, Options};
+//! use litchi_ops::transaction::SemanticLimits;
 //! use litchi_ops::{NewNode, create};
 //!
 //! let template = create(FileFormat::Docx)?
 //!     .add("/body", NewNode::new("paragraph").prop("text", "Dear {{name}}, {{ total }} due."))?
-//!     .file;
-//! let data = Data::from_json(br#"[{"name": "Ada", "total": 5200.00}, {"name": "Grace"}]"#)?;
+//!     .into_file();
+//! let data = Data::from_json(
+//!     br#"[{"name": "Ada", "total": 5200.00}, {"name": "Grace"}]"#,
+//!     &SemanticLimits::default(),
+//! )?;
 //! let first = template.merge(&data.records()[0], &Options::new())?;
-//! assert_eq!(first.file.text()?, "Dear Ada, 5200.00 due.");
+//! assert_eq!(first.file().text()?, "Dear Ada, 5200.00 due.");
 //! let second = template.merge(&data.records()[1], &Options::new())?;
-//! assert_eq!(second.file.text()?, "Dear Grace, {{ total }} due.");
-//! assert_eq!(second.value.unresolved(), ["total"]);
+//! assert_eq!(second.file().text()?, "Dear Grace, {{ total }} due.");
+//! assert_eq!(second.value().unresolved(), ["total"]);
 //! # }
 //! # Ok::<(), litchi_ops::Error>(())
 //! ```
@@ -273,13 +277,17 @@ pub struct Data {
 }
 
 impl Data {
-    /// Read a JSON object (one record) or an array of objects, under the
-    /// default [`SemanticLimits`].
+    /// Read a JSON object (one record) or an array of objects, under
+    /// caller-selected limits ([`SemanticLimits::default`] for the defaults).
     ///
     /// ```
     /// use litchi_ops::merge::Data;
+    /// use litchi_ops::transaction::SemanticLimits;
     ///
-    /// let data = Data::from_json(br#"{"client": {"name": "Acme"}, "items": [1, 2.50], "paid": true}"#)?;
+    /// let data = Data::from_json(
+    ///     br#"{"client": {"name": "Acme"}, "items": [1, 2.50], "paid": true}"#,
+    ///     &SemanticLimits::default(),
+    /// )?;
     /// let record = &data.records()[0];
     /// assert_eq!(record.get("client.name"), Some("Acme"));
     /// assert_eq!(record.get("items[1]"), Some("2.50"));
@@ -292,15 +300,7 @@ impl Data {
     /// [`Code::InvalidJson`](crate::Code::InvalidJson) for malformed JSON
     /// or a value that is not an object or an array of objects;
     /// [`Code::LimitExceeded`](crate::Code::LimitExceeded) past the limits.
-    pub fn from_json(source: &[u8]) -> Result<Self> {
-        Self::from_json_with_limits(source, &SemanticLimits::default())
-    }
-
-    /// [`Self::from_json`] under caller-selected limits.
-    ///
-    /// # Errors
-    /// As [`Self::from_json`].
-    pub fn from_json_with_limits(source: &[u8], limits: &SemanticLimits) -> Result<Self> {
+    pub fn from_json(source: &[u8], limits: &SemanticLimits) -> Result<Self> {
         check_bytes(source.len(), limits)?;
         let records = match json::parse(source)? {
             json::Value::Object(members) => vec![Record::from_object(&members)],
@@ -324,12 +324,20 @@ impl Data {
     /// whose fields are all empty (a blank line) is skipped; an empty or
     /// repeated key column is ignored. Parsing follows
     /// [`crate::import`] (byte-order marks, `sep=`, quotes) without type
-    /// inference.
+    /// inference. `options` selects the delimiter, quote and encoding
+    /// (`import::Options::csv()` or `tsv()` for the common cases; inference
+    /// is always off); `limits` bound the data.
     ///
     /// ```
+    /// use litchi_ops::import::Options;
     /// use litchi_ops::merge::Data;
+    /// use litchi_ops::transaction::SemanticLimits;
     ///
-    /// let data = Data::from_csv(b"name,total\nAda,\"5,200\"\nGrace\n")?;
+    /// let data = Data::from_csv(
+    ///     b"name,total\nAda,\"5,200\"\nGrace\n",
+    ///     &Options::csv(),
+    ///     &SemanticLimits::default(),
+    /// )?;
     /// assert_eq!(data.len(), 2);
     /// assert_eq!(data.records()[0].get("total"), Some("5,200"));
     /// assert_eq!(data.records()[1].get("total"), Some(""));
@@ -340,20 +348,7 @@ impl Data {
     ///
     /// The [`crate::import`] parse errors, and
     /// [`Code::LimitExceeded`](crate::Code::LimitExceeded) past the limits.
-    pub fn from_csv(source: &[u8]) -> Result<Self> {
-        Self::from_csv_with(
-            source,
-            &crate::import::Options::csv(),
-            &SemanticLimits::default(),
-        )
-    }
-
-    /// [`Self::from_csv`] with explicit parse options (delimiter, quote,
-    /// encoding; inference is always off) and limits.
-    ///
-    /// # Errors
-    /// As [`Self::from_csv`].
-    pub fn from_csv_with(
+    pub fn from_csv(
         source: &[u8],
         options: &crate::import::Options,
         limits: &SemanticLimits,

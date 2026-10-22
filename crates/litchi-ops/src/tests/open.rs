@@ -268,8 +268,11 @@ mod one_index {
     fn open_prepared_adopts_the_index_detection_built() {
         for relative in ooxml_fixtures() {
             reset_opc_probe_count();
-            let detection =
-                crate::detect::detect_and_prepare(test_data(relative)).expect("detect the fixture");
+            let detection = crate::detect::detect_and_prepare(
+                test_data(relative),
+                &crate::detect::SourceLimits::default(),
+            )
+            .expect("detect the fixture");
             assert!(detection.is_prepared(), "{relative}");
             let detected = opc_probe_count();
             let format = detection.format();
@@ -282,8 +285,11 @@ mod one_index {
     #[cfg(all(any(unix, windows), feature = "rtf"))]
     #[test]
     fn open_prepared_refuses_a_detection_without_a_package() {
-        let detection = crate::detect::detect_and_prepare(test_data("rtf/testUnicode.rtf"))
-            .expect("detect the RTF fixture");
+        let detection = crate::detect::detect_and_prepare(
+            test_data("rtf/testUnicode.rtf"),
+            &crate::detect::SourceLimits::default(),
+        )
+        .expect("detect the RTF fixture");
         assert!(!detection.is_prepared());
         let error = crate::open_prepared(detection).expect_err("nothing was prepared");
         assert_eq!(error.code(), crate::Code::InvalidArgument);
@@ -694,7 +700,9 @@ mod eager {
     #[test]
     fn eager_mode_open_prepared_materializes_the_prepared_index() {
         let path = test_data("ooxml/docx/FancyFoot.docx");
-        let detection = crate::detect::detect_and_prepare(&path).unwrap();
+        let detection =
+            crate::detect::detect_and_prepare(&path, &crate::detect::SourceLimits::default())
+                .unwrap();
         let file = crate::open_prepared_with(
             detection,
             &OpenOptions::new().source_mode(SourceMode::Eager),
@@ -928,7 +936,10 @@ mod zip_candidates {
             &[],
         );
         assert!(matches!(
-            crate::detect::detect_format_smart(bytes.clone()),
+            crate::detect::detect_format_smart(
+                bytes.clone(),
+                &crate::detect::SourceLimits::default(),
+            ),
             Some(crate::detect::DetectedFormat::Ods(_))
         ));
         let file = crate::open_bytes(bytes).unwrap();
@@ -949,8 +960,7 @@ mod zip_candidates {
     #[test]
     fn ods_opens_with_ordinary_and_malformed_ooxml_catalogs() {
         use crate::detect::{
-            DetectedFormat, detect_format_smart, detect_format_smart_with_limits, opc_probe_count,
-            reset_opc_probe_count,
+            DetectedFormat, detect_format_smart, opc_probe_count, reset_opc_probe_count,
         };
 
         let ordinary = odf(
@@ -960,7 +970,7 @@ mod zip_candidates {
         );
         reset_opc_probe_count();
         assert!(matches!(
-            detect_format_smart(ordinary.clone()),
+            detect_format_smart(ordinary.clone(), &crate::detect::SourceLimits::default()),
             Some(DetectedFormat::Ods(_))
         ));
         assert_eq!(opc_probe_count(), 0);
@@ -975,7 +985,10 @@ mod zip_candidates {
             .expect("consistent test limits");
         reset_opc_probe_count();
         assert!(matches!(
-            detect_format_smart_with_limits(ordinary.clone(), limits),
+            detect_format_smart(
+                ordinary.clone(),
+                &crate::detect::SourceLimits::default().ooxml_source_limits(limits)
+            ),
             Some(DetectedFormat::Ods(_))
         ));
         assert_eq!(opc_probe_count(), 0);
@@ -993,7 +1006,7 @@ mod zip_candidates {
         );
         reset_opc_probe_count();
         assert!(matches!(
-            detect_format_smart(malformed.clone()),
+            detect_format_smart(malformed.clone(), &crate::detect::SourceLimits::default()),
             Some(DetectedFormat::Ods(_))
         ));
         assert_eq!(opc_probe_count(), 1);
@@ -1032,7 +1045,10 @@ mod zip_candidates {
             &[],
         );
         assert!(matches!(
-            crate::detect::detect_format_smart(bytes.clone()),
+            crate::detect::detect_format_smart(
+                bytes.clone(),
+                &crate::detect::SourceLimits::default(),
+            ),
             Some(crate::detect::DetectedFormat::Odp(_))
         ));
         let file = crate::open_bytes(bytes).unwrap();

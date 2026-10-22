@@ -813,43 +813,43 @@ fn font_name_size_and_script_ranges_replay_inverse_and_repeat_without_changes() 
 
         for path in [CELL_A1, CELL_B1, CELL_C1, CELL_D1, "/sheet[1]/D2"] {
             assert_eq!(
-                cell_property(&commit.file, path, "font.size").as_deref(),
+                cell_property(commit.file(), path, "font.size").as_deref(),
                 Some("18pt"),
                 "{path} font size"
             );
             assert_eq!(
-                cell_property(&commit.file, path, "superscript").as_deref(),
+                cell_property(commit.file(), path, "superscript").as_deref(),
                 Some("true"),
                 "{path} superscript"
             );
         }
-        assert_eq!(cell_text(&commit.file, CELL_A1).as_deref(), Some("mixed"));
+        assert_eq!(cell_text(commit.file(), CELL_A1).as_deref(), Some("mixed"));
         assert_eq!(
-            cell_property(&commit.file, CELL_A1, "font.name").as_deref(),
+            cell_property(commit.file(), CELL_A1, "font.name").as_deref(),
             Some("Mixed Face")
         );
         assert_eq!(
-            cell_property(&commit.file, CELL_C1, "formula").as_deref(),
+            cell_property(commit.file(), CELL_C1, "formula").as_deref(),
             Some("B1*2")
         );
 
         let replayed = commit
-            .patch
+            .patch()
             .apply(&original)
             .expect("replay font range patch");
         assert_eq!(
             replayed.to_bytes().expect("replayed bytes"),
-            commit.file.to_bytes().expect("committed bytes")
+            commit.file().to_bytes().expect("committed bytes")
         );
         let restored = commit
-            .patch
+            .patch()
             .inverse()
             .apply(&replayed)
             .expect("inverse font range patch");
         assert_eq!(restored.to_bytes().expect("restored bytes"), before);
 
         let repeated = commit
-            .file
+            .file()
             .set(
                 "/sheet[1]/A1:D2",
                 props! { "font.size" => "18pt", "superscript" => true },
@@ -857,7 +857,7 @@ fn font_name_size_and_script_ranges_replay_inverse_and_repeat_without_changes() 
             .expect("repeat same range formatting");
         assert_eq!(
             repeated.to_bytes().expect("repeat bytes"),
-            commit.file.to_bytes().expect("first bytes")
+            commit.file().to_bytes().expect("first bytes")
         );
     }
 }
@@ -933,10 +933,13 @@ fn staged_font_name_bytes_are_checked_before_xlsx_publication() {
         let original = open_owner(&bytes, eager);
         let before = original.to_bytes().expect("original bytes");
         let error = original
-            .edit_with_limits(&limits, |edit| {
-                edit.set(CELL_A1, Props::new().with("font.name", long_name.as_str()))?;
-                Ok::<_, litchi_ops::Error>(())
-            })
+            .edit_with_options(
+                litchi_ops::EditOptions::new().semantic_limits(limits),
+                |edit| {
+                    edit.set(CELL_A1, Props::new().with("font.name", long_name.as_str()))?;
+                    Ok::<_, litchi_ops::Error>(())
+                },
+            )
             .expect_err("font name bytes must count against staged budget");
         assert_eq!(error.code(), Code::LimitExceeded);
         assert_eq!(
@@ -1054,33 +1057,36 @@ fn font_color_ranges_companions_replay_inverse_and_repeat_without_changes() {
             })
             .expect("payload and range color edits");
 
-        assert_eq!(cell_text(&commit.file, CELL_A1).as_deref(), Some("colored"));
+        assert_eq!(
+            cell_text(commit.file(), CELL_A1).as_deref(),
+            Some("colored")
+        );
         for path in [CELL_A1, CELL_B1, CELL_C1, CELL_D1, "/sheet[1]/D2"] {
             assert_eq!(
-                cell_property(&commit.file, path, "font.color").as_deref(),
+                cell_property(commit.file(), path, "font.color").as_deref(),
                 Some("#FF0000"),
                 "{path} font color"
             );
         }
         assert_eq!(
-            cell_property(&commit.file, CELL_C1, "formula").as_deref(),
+            cell_property(commit.file(), CELL_C1, "formula").as_deref(),
             Some("B1*2")
         );
 
-        let replayed = commit.patch.apply(&original).expect("replay color patch");
+        let replayed = commit.patch().apply(&original).expect("replay color patch");
         assert_eq!(
             replayed.to_bytes().expect("replayed bytes"),
-            commit.file.to_bytes().expect("committed bytes")
+            commit.file().to_bytes().expect("committed bytes")
         );
         let restored = commit
-            .patch
+            .patch()
             .inverse()
             .apply(&replayed)
             .expect("inverse color patch");
         assert_eq!(restored.to_bytes().expect("restored bytes"), before);
 
         let repeated = commit
-            .file
+            .file()
             .set(
                 "/sheet[1]/A1:D2",
                 Props::new().with("font.color", "#FF0000"),
@@ -1088,11 +1094,11 @@ fn font_color_ranges_companions_replay_inverse_and_repeat_without_changes() {
             .expect("repeat color range");
         assert_eq!(
             repeated.to_bytes().expect("repeat bytes"),
-            commit.file.to_bytes().expect("first bytes")
+            commit.file().to_bytes().expect("first bytes")
         );
 
         let cleared = commit
-            .file
+            .file()
             .set(CELL_A1, Props::new().with("font.color", PropValue::Null))
             .expect("clear font color");
         assert_eq!(cell_property(&cleared, CELL_A1, "font.color"), None);
@@ -1298,26 +1304,26 @@ fn strike_and_underline_broadcast_over_ranges_and_replay_inverse() {
                 Ok::<_, litchi_ops::Error>(())
             })
             .expect("broadcast strike and underline");
-        assert!(commit.diagnostics.changed());
+        assert!(commit.diagnostics().changed());
         for path in [CELL_A1, CELL_B1, CELL_C1, CELL_D1, "/sheet[1]/D2"] {
             assert_eq!(
-                cell_property(&commit.file, path, "strike").as_deref(),
+                cell_property(commit.file(), path, "strike").as_deref(),
                 Some("true"),
                 "{path} strike"
             );
             assert_eq!(
-                cell_property(&commit.file, path, "underline").as_deref(),
+                cell_property(commit.file(), path, "underline").as_deref(),
                 Some("singleAccounting"),
                 "{path} underline"
             );
         }
-        let replayed = commit.patch.apply(&original).expect("replay font patch");
+        let replayed = commit.patch().apply(&original).expect("replay font patch");
         assert_eq!(
             replayed.to_bytes().expect("replayed bytes"),
-            commit.file.to_bytes().expect("committed bytes")
+            commit.file().to_bytes().expect("committed bytes")
         );
         let restored = commit
-            .patch
+            .patch()
             .inverse()
             .apply(&replayed)
             .expect("inverse font patch");
@@ -1461,22 +1467,22 @@ fn custom_native_styles_survive_source_eager_font_payload_range_and_inverse() {
             })
             .expect("commit custom style edits");
         assert_eq!(
-            cell_text(&commit.file, CELL_A1).as_deref(),
+            cell_text(commit.file(), CELL_A1).as_deref(),
             Some("custom styled")
         );
         for path in [CELL_A1, CELL_B1, CELL_C1, CELL_D1, "/sheet[1]/D2"] {
             assert_eq!(
-                cell_property(&commit.file, path, "font.italic").as_deref(),
+                cell_property(commit.file(), path, "font.italic").as_deref(),
                 Some("true"),
                 "{path} italic"
             );
         }
         assert_eq!(
-            cell_property(&commit.file, CELL_A1, "font.bold").as_deref(),
+            cell_property(commit.file(), CELL_A1, "font.bold").as_deref(),
             Some("true")
         );
 
-        let edited_styles = styles_bytes(&commit.file);
+        let edited_styles = styles_bytes(commit.file());
         let edited_styles_text = std::str::from_utf8(&edited_styles).expect("edited styles XML");
         assert!(edited_styles_text.contains(r#"mc:Ignorable="x14ac""#));
         assert!(edited_styles_text.contains(r#"x14ac:knownFonts="1""#));
@@ -1484,7 +1490,7 @@ fn custom_native_styles_survive_source_eager_font_payload_range_and_inverse() {
         assert!(edited_styles_text.contains(r#"<x14ac:fontExtension marker="keep"/>"#));
         assert!(edited_styles_text.contains(r#"x14ac:xfMarker="keep""#));
 
-        let reopened = open_owner(&commit.file.to_bytes().expect("edited bytes"), eager);
+        let reopened = open_owner(&commit.file().to_bytes().expect("edited bytes"), eager);
         assert_eq!(
             cell_property(&reopened, CELL_A1, "font.bold").as_deref(),
             Some("true")
@@ -1494,13 +1500,13 @@ fn custom_native_styles_survive_source_eager_font_payload_range_and_inverse() {
             Some("true")
         );
 
-        let replayed = commit.patch.apply(&original).expect("forward replay");
+        let replayed = commit.patch().apply(&original).expect("forward replay");
         assert_eq!(
             replayed.to_bytes().expect("replayed bytes"),
-            commit.file.to_bytes().expect("committed bytes")
+            commit.file().to_bytes().expect("committed bytes")
         );
         let restored = commit
-            .patch
+            .patch()
             .inverse()
             .apply(&replayed)
             .expect("inverse replay");
@@ -1529,27 +1535,27 @@ fn font_ranges_replay_inverse_and_repeat_without_changes() {
             .expect("font range commit");
         for path in [CELL_A1, CELL_B1, CELL_C1, CELL_D1, "/sheet[1]/D2"] {
             assert_eq!(
-                cell_property(&commit.file, path, "font.bold").as_deref(),
+                cell_property(commit.file(), path, "font.bold").as_deref(),
                 Some("true")
             );
             assert_eq!(
-                cell_property(&commit.file, path, "font.italic").as_deref(),
+                cell_property(commit.file(), path, "font.italic").as_deref(),
                 Some("true")
             );
         }
         assert_eq!(
-            cell_property(&commit.file, CELL_C1, "formula").as_deref(),
+            cell_property(commit.file(), CELL_C1, "formula").as_deref(),
             Some("B1*2")
         );
-        let replayed = commit.patch.apply(&original).expect("replay font range");
+        let replayed = commit.patch().apply(&original).expect("replay font range");
         let restored = commit
-            .patch
+            .patch()
             .inverse()
             .apply(&replayed)
             .expect("undo font range");
         assert_eq!(restored.to_bytes().expect("restored bytes"), before);
         let repeat = commit
-            .file
+            .file()
             .edit(|edit| {
                 edit.set(
                     "/sheet[1]/A1:D2",
@@ -1558,11 +1564,11 @@ fn font_ranges_replay_inverse_and_repeat_without_changes() {
                 Ok::<_, litchi_ops::Error>(())
             })
             .expect("repeat same formatting");
-        assert!(!repeat.diagnostics.changed());
-        assert!(repeat.patch.is_noop());
+        assert!(!repeat.diagnostics().changed());
+        assert!(repeat.patch().is_noop());
         assert_eq!(
-            repeat.file.to_bytes().expect("repeat bytes"),
-            commit.file.to_bytes().expect("first bytes")
+            repeat.file().to_bytes().expect("repeat bytes"),
+            commit.file().to_bytes().expect("first bytes")
         );
     }
 }
@@ -1591,7 +1597,7 @@ fn invalid_font_assignment_rejects_combined_payload_atomically() {
                 Ok::<_, litchi_ops::Error>(())
             })
             .expect("clear absent font flag");
-        assert!(!empty_clear.diagnostics.changed());
+        assert!(!empty_clear.diagnostics().changed());
     }
 }
 
@@ -2095,55 +2101,58 @@ fn border_ranges_keep_payloads_and_ordered_batches_replay_inverse() {
                 ("border.diagonalUp", "true"),
             ] {
                 assert_eq!(
-                    cell_property(&commit.file, path, key).as_deref(),
+                    cell_property(commit.file(), path, key).as_deref(),
                     Some(expected),
                     "{path} {key}"
                 );
             }
         }
         assert_eq!(
-            cell_property(&commit.file, CELL_A1, "border.left").as_deref(),
+            cell_property(commit.file(), CELL_A1, "border.left").as_deref(),
             Some("thin")
         );
         assert_eq!(
-            cell_property(&commit.file, CELL_A1, "border.left.color").as_deref(),
+            cell_property(commit.file(), CELL_A1, "border.left.color").as_deref(),
             Some("#102030")
         );
         assert_eq!(
-            cell_property(&commit.file, CELL_B1, "border.right").as_deref(),
+            cell_property(commit.file(), CELL_B1, "border.right").as_deref(),
             Some("dotted")
         );
         assert_eq!(
-            cell_property(&commit.file, CELL_B1, "border.right.color").as_deref(),
+            cell_property(commit.file(), CELL_B1, "border.right.color").as_deref(),
             Some("#405060")
         );
         assert_eq!(
-            cell_property(&commit.file, CELL_A1, "font.bold").as_deref(),
+            cell_property(commit.file(), CELL_A1, "font.bold").as_deref(),
             Some("true")
         );
         assert_eq!(
-            cell_text(&commit.file, CELL_A1).as_deref(),
+            cell_text(commit.file(), CELL_A1).as_deref(),
             Some("border companion")
         );
         assert_eq!(
-            cell_property(&commit.file, CELL_C1, "formula").as_deref(),
+            cell_property(commit.file(), CELL_C1, "formula").as_deref(),
             Some("B1*2")
         );
 
-        let replayed = commit.patch.apply(&original).expect("replay border patch");
+        let replayed = commit
+            .patch()
+            .apply(&original)
+            .expect("replay border patch");
         assert_eq!(
             replayed.to_bytes().expect("replayed border bytes"),
-            commit.file.to_bytes().expect("committed border bytes")
+            commit.file().to_bytes().expect("committed border bytes")
         );
         let restored = commit
-            .patch
+            .patch()
             .inverse()
             .apply(&replayed)
             .expect("inverse border patch");
         assert_eq!(restored.to_bytes().expect("restored border bytes"), before);
 
         let repeated = commit
-            .file
+            .file()
             .edit(|edit| {
                 edit.set(
                     CELL_A1,
@@ -2173,10 +2182,10 @@ fn border_ranges_keep_payloads_and_ordered_batches_replay_inverse() {
                 Ok::<_, litchi_ops::Error>(())
             })
             .expect("repeat ordered border batch");
-        assert!(repeated.patch.is_noop());
+        assert!(repeated.patch().is_noop());
         assert_eq!(
-            repeated.file.to_bytes().expect("repeated border bytes"),
-            commit.file.to_bytes().expect("first border bytes")
+            repeated.file().to_bytes().expect("repeated border bytes"),
+            commit.file().to_bytes().expect("first border bytes")
         );
 
         let later_wins = original
@@ -2187,7 +2196,7 @@ fn border_ranges_keep_payloads_and_ordered_batches_replay_inverse() {
             })
             .expect("ordered same-side border batch");
         assert_eq!(
-            cell_property(&later_wins.file, CELL_A1, "border.left").as_deref(),
+            cell_property(later_wins.file(), CELL_A1, "border.left").as_deref(),
             Some("double")
         );
     }
@@ -2481,18 +2490,18 @@ fn a_round_trip_transaction_reuses_the_exact_input_snapshot() {
                 Ok(())
             })
             .expect("round-trip edit");
-        assert!(!commit.diagnostics.changed());
-        assert!(commit.patch.is_noop());
-        assert_eq!(commit.file.to_bytes().unwrap(), bytes);
+        assert!(!commit.diagnostics().changed());
+        assert!(commit.patch().is_noop());
+        assert_eq!(commit.file().to_bytes().unwrap(), bytes);
         assert_eq!(
-            commit.patch.apply(&original).unwrap().to_bytes().unwrap(),
+            commit.patch().apply(&original).unwrap().to_bytes().unwrap(),
             bytes
         );
         assert_eq!(
             commit
-                .patch
+                .patch()
                 .inverse()
-                .apply(&commit.file)
+                .apply(commit.file())
                 .unwrap()
                 .to_bytes()
                 .unwrap(),
@@ -2645,32 +2654,32 @@ fn xlsx_batches_are_atomic_or_best_effort_by_mode() {
                 BatchMode::BestEffort,
             )
             .expect("best-effort batches retain successful items");
-        assert_eq!(best_effort.results.len(), 3);
+        assert_eq!(best_effort.results().len(), 3);
         assert!(matches!(
-            &best_effort.results[0],
+            &best_effort.results()[0],
             ItemResult::Applied(result) if result.changed
         ));
         assert!(matches!(
-            &best_effort.results[1],
+            &best_effort.results()[1],
             ItemResult::Failed(error) if error.item() == Some(1)
         ));
         assert!(matches!(
-            &best_effort.results[2],
+            &best_effort.results()[2],
             ItemResult::Applied(result) if result.changed
         ));
         assert_eq!(
-            cell_text(&best_effort.file, CELL_A1).as_deref(),
+            cell_text(best_effort.file(), CELL_A1).as_deref(),
             Some("best")
         );
         assert_eq!(
-            cell_text(&best_effort.file, CELL_D1).as_deref(),
+            cell_text(best_effort.file(), CELL_D1).as_deref(),
             Some("FALSE")
         );
 
         let restored = best_effort
-            .patch
+            .patch()
             .inverse()
-            .apply(&best_effort.file)
+            .apply(best_effort.file())
             .expect("best-effort inverse restores the batch input");
         assert_eq!(
             restored.to_bytes().expect("publish restored batch owner"),
@@ -2692,7 +2701,7 @@ fn xlsx_snapshot_limits_roll_back_a_failed_transaction() {
                 Ok::<_, litchi_ops::Error>(())
             })
             .expect("measure a valid XLSX snapshot");
-        let charge = probe.diagnostics.snapshot_bytes();
+        let charge = probe.diagnostics().snapshot_bytes();
         assert!(charge > 0, "a changed XLSX patch must retain native bytes");
         let limits = SemanticLimits::builder()
             .max_snapshot_bytes(charge - 1)
@@ -2701,10 +2710,13 @@ fn xlsx_snapshot_limits_roll_back_a_failed_transaction() {
             .expect("build snapshot limit");
 
         let error = original
-            .edit_with_limits(&limits, |transaction| {
-                transaction.set(CELL_A1, props! { "value" => "snapshot-charge" })?;
-                Ok::<_, litchi_ops::Error>(())
-            })
+            .edit_with_options(
+                litchi_ops::EditOptions::new().semantic_limits(limits),
+                |transaction| {
+                    transaction.set(CELL_A1, props! { "value" => "snapshot-charge" })?;
+                    Ok::<_, litchi_ops::Error>(())
+                },
+            )
             .expect_err("snapshot limit must reject before publication");
         assert_eq!(error.code(), Code::LimitExceeded);
         assert_eq!(
@@ -2733,21 +2745,21 @@ fn xlsx_transaction_retains_native_patch_and_inverse_endpoints() {
             })
             .expect("commit XLSX transaction");
 
-        assert!(commit.diagnostics.changed());
-        assert_eq!(commit.diagnostics.operations(), 3);
-        assert!(commit.diagnostics.commits() > 0);
+        assert!(commit.diagnostics().changed());
+        assert_eq!(commit.diagnostics().operations(), 3);
+        assert!(commit.diagnostics().commits() > 0);
 
         let forward = commit
-            .patch
+            .patch()
             .apply(&original)
             .expect("apply forward XLSX patch");
         assert_eq!(
             forward.to_bytes().expect("publish forward endpoint"),
-            commit.file.to_bytes().expect("publish committed file")
+            commit.file().to_bytes().expect("publish committed file")
         );
 
         let restored = commit
-            .patch
+            .patch()
             .inverse()
             .apply(&forward)
             .expect("apply inverse XLSX patch");
@@ -2759,7 +2771,7 @@ fn xlsx_transaction_retains_native_patch_and_inverse_endpoints() {
         let reopened = open_owner(&original_bytes, eager);
         assert_eq!(
             commit
-                .patch
+                .patch()
                 .apply(&reopened)
                 .expect_err("foreign owner")
                 .code(),
@@ -3007,38 +3019,38 @@ fn long_tail_font_ranges_keep_payloads_and_replay_inverse() {
                 ("font.scheme", "minor"),
             ] {
                 assert_eq!(
-                    cell_property(&commit.file, path, key).as_deref(),
+                    cell_property(commit.file(), path, key).as_deref(),
                     Some(expected),
                     "{path} {key}"
                 );
             }
         }
         assert_eq!(
-            cell_text(&commit.file, CELL_A1).as_deref(),
+            cell_text(commit.file(), CELL_A1).as_deref(),
             Some("range companion")
         );
         assert_eq!(
-            cell_property(&commit.file, CELL_C1, "formula").as_deref(),
+            cell_property(commit.file(), CELL_C1, "formula").as_deref(),
             Some("B1*2")
         );
 
         let replayed = commit
-            .patch
+            .patch()
             .apply(&original)
             .expect("replay long-tail patch");
         assert_eq!(
             replayed.to_bytes().expect("replayed bytes"),
-            commit.file.to_bytes().expect("committed bytes")
+            commit.file().to_bytes().expect("committed bytes")
         );
         let restored = commit
-            .patch
+            .patch()
             .inverse()
             .apply(&replayed)
             .expect("inverse long-tail patch");
         assert_eq!(restored.to_bytes().expect("restored bytes"), before);
 
         let repeated = commit
-            .file
+            .file()
             .set(
                 "/sheet[1]/A1:D2",
                 props! {
@@ -3054,7 +3066,7 @@ fn long_tail_font_ranges_keep_payloads_and_replay_inverse() {
             .expect("repeat long-tail range");
         assert_eq!(
             repeated.to_bytes().expect("repeat bytes"),
-            commit.file.to_bytes().expect("first bytes")
+            commit.file().to_bytes().expect("first bytes")
         );
     }
 }
@@ -3383,39 +3395,39 @@ fn alignment_ranges_keep_payloads_and_replay_inverse() {
                 ("alignment.readingOrder", "ltr"),
             ] {
                 assert_eq!(
-                    cell_property(&commit.file, path, key).as_deref(),
+                    cell_property(commit.file(), path, key).as_deref(),
                     Some(expected),
                     "{path} {key}"
                 );
             }
         }
         assert_eq!(
-            cell_property(&commit.file, CELL_A1, "alignment.horizontal").as_deref(),
+            cell_property(commit.file(), CELL_A1, "alignment.horizontal").as_deref(),
             Some("center")
         );
         assert_eq!(
-            cell_property(&commit.file, CELL_A1, "font.bold").as_deref(),
+            cell_property(commit.file(), CELL_A1, "font.bold").as_deref(),
             Some("true")
         );
         assert_eq!(
-            cell_text(&commit.file, CELL_A1).as_deref(),
+            cell_text(commit.file(), CELL_A1).as_deref(),
             Some("alignment companion")
         );
         assert_eq!(
-            cell_property(&commit.file, CELL_C1, "formula").as_deref(),
+            cell_property(commit.file(), CELL_C1, "formula").as_deref(),
             Some("B1*2")
         );
 
         let replayed = commit
-            .patch
+            .patch()
             .apply(&original)
             .expect("replay alignment range patch");
         assert_eq!(
             replayed.to_bytes().expect("replayed alignment bytes"),
-            commit.file.to_bytes().expect("committed alignment bytes")
+            commit.file().to_bytes().expect("committed alignment bytes")
         );
         let restored = commit
-            .patch
+            .patch()
             .inverse()
             .apply(&replayed)
             .expect("inverse alignment range patch");
@@ -3425,7 +3437,7 @@ fn alignment_ranges_keep_payloads_and_replay_inverse() {
         );
 
         let repeated = commit
-            .file
+            .file()
             .set(
                 "/sheet[1]/A1:D2",
                 props! {
@@ -3440,7 +3452,7 @@ fn alignment_ranges_keep_payloads_and_replay_inverse() {
             .expect("repeat alignment range");
         assert_eq!(
             repeated.to_bytes().expect("repeat alignment bytes"),
-            commit.file.to_bytes().expect("first alignment bytes")
+            commit.file().to_bytes().expect("first alignment bytes")
         );
     }
 }
@@ -3974,39 +3986,39 @@ fn extended_cell_format_ranges_keep_companions_and_replay_inverse() {
                 ("quotePrefix", "true"),
             ] {
                 assert_eq!(
-                    cell_property(&commit.file, path, key).as_deref(),
+                    cell_property(commit.file(), path, key).as_deref(),
                     Some(expected),
                     "{path} {key}"
                 );
             }
         }
         assert_eq!(
-            cell_property(&commit.file, CELL_A1, "alignment.horizontal").as_deref(),
+            cell_property(commit.file(), CELL_A1, "alignment.horizontal").as_deref(),
             Some("center")
         );
         assert_eq!(
-            cell_property(&commit.file, CELL_A1, "font.bold").as_deref(),
+            cell_property(commit.file(), CELL_A1, "font.bold").as_deref(),
             Some("true")
         );
         assert_eq!(
-            cell_text(&commit.file, CELL_A1).as_deref(),
+            cell_text(commit.file(), CELL_A1).as_deref(),
             Some("extended companion")
         );
         assert_eq!(
-            cell_property(&commit.file, CELL_C1, "formula").as_deref(),
+            cell_property(commit.file(), CELL_C1, "formula").as_deref(),
             Some("B1*2")
         );
 
         let replayed = commit
-            .patch
+            .patch()
             .apply(&original)
             .expect("replay extended cell-format range patch");
         assert_eq!(
             replayed.to_bytes().expect("replayed extended bytes"),
-            commit.file.to_bytes().expect("committed extended bytes")
+            commit.file().to_bytes().expect("committed extended bytes")
         );
         let restored = commit
-            .patch
+            .patch()
             .inverse()
             .apply(&replayed)
             .expect("inverse extended cell-format range patch");
@@ -4016,7 +4028,7 @@ fn extended_cell_format_ranges_keep_companions_and_replay_inverse() {
         );
 
         let repeated = commit
-            .file
+            .file()
             .set(
                 "/sheet[1]/A1:D2",
                 props! {
@@ -4030,7 +4042,7 @@ fn extended_cell_format_ranges_keep_companions_and_replay_inverse() {
             .expect("repeat extended cell-format range");
         assert_eq!(
             repeated.to_bytes().expect("repeat extended bytes"),
-            commit.file.to_bytes().expect("first extended bytes")
+            commit.file().to_bytes().expect("first extended bytes")
         );
     }
 }
@@ -4411,25 +4423,25 @@ fn number_format_builtins_custom_ranges_and_replay_inverse() {
             .expect("commit custom and range number formats");
 
         assert_eq!(
-            cell_property(&commit.file, CELL_A1, "numberformat").as_deref(),
+            cell_property(commit.file(), CELL_A1, "numberformat").as_deref(),
             Some(custom)
         );
         for path in [CELL_B1, CELL_C1, CELL_D1, "/sheet[1]/D2"] {
             assert_eq!(
-                cell_property(&commit.file, path, "numberformat").as_deref(),
+                cell_property(commit.file(), path, "numberformat").as_deref(),
                 Some("0.00%"),
                 "range number format at {path}"
             );
         }
         assert_eq!(
-            cell_text(&commit.file, CELL_A1).as_deref(),
+            cell_text(commit.file(), CELL_A1).as_deref(),
             Some("number-format payload")
         );
         assert_eq!(
-            cell_property(&commit.file, CELL_C1, "formula").as_deref(),
+            cell_property(commit.file(), CELL_C1, "formula").as_deref(),
             Some("B1*2")
         );
-        let styles = styles_bytes(&commit.file);
+        let styles = styles_bytes(commit.file());
         let styles = std::str::from_utf8(&styles).expect("number-format styles XML");
         assert!(
             styles.contains(r#"formatCode="0.000 &quot;kg&quot;""#)
@@ -4438,15 +4450,15 @@ fn number_format_builtins_custom_ranges_and_replay_inverse() {
         );
 
         let replayed = commit
-            .patch
+            .patch()
             .apply(&original)
             .expect("replay number-format patch");
         assert_eq!(
             replayed.to_bytes().expect("replayed number-format bytes"),
-            commit.file.to_bytes().expect("number-format bytes")
+            commit.file().to_bytes().expect("number-format bytes")
         );
         let restored = commit
-            .patch
+            .patch()
             .inverse()
             .apply(&replayed)
             .expect("inverse number-format patch");
@@ -4456,7 +4468,7 @@ fn number_format_builtins_custom_ranges_and_replay_inverse() {
         );
 
         let repeated = commit
-            .file
+            .file()
             .set(
                 "/sheet[1]/B1:D2",
                 Props::new().with("numberformat", "0.00%"),
@@ -4467,7 +4479,7 @@ fn number_format_builtins_custom_ranges_and_replay_inverse() {
                 .to_bytes()
                 .expect("repeat range number-format bytes"),
             commit
-                .file
+                .file()
                 .to_bytes()
                 .expect("first range number-format bytes")
         );
@@ -5206,29 +5218,29 @@ fn gradient_fill_converts_patterns_source_and_eager_with_ordered_batches() {
             .expect("ordered gradient conversion");
 
         assert!(
-            cell_property(&commit.file, CELL_B1, "fill")
+            cell_property(commit.file(), CELL_B1, "fill")
                 .is_some_and(|value| value.starts_with("gradient;")),
             "gradient conversion at B1"
         );
         assert_eq!(
-            cell_property(&commit.file, CELL_C1, "fillPattern").as_deref(),
+            cell_property(commit.file(), CELL_C1, "fillPattern").as_deref(),
             Some("darkGray")
         );
         assert_eq!(
-            cell_text(&commit.file, CELL_B1).as_deref(),
+            cell_text(commit.file(), CELL_B1).as_deref(),
             Some("gradient payload")
         );
 
         let replayed = commit
-            .patch
+            .patch()
             .apply(&original)
             .expect("replay gradient conversion");
         assert_eq!(
             replayed.to_bytes().expect("replayed gradient bytes"),
-            commit.file.to_bytes().expect("gradient commit bytes")
+            commit.file().to_bytes().expect("gradient commit bytes")
         );
         let restored = commit
-            .patch
+            .patch()
             .inverse()
             .apply(&replayed)
             .expect("inverse gradient conversion");
@@ -5238,16 +5250,16 @@ fn gradient_fill_converts_patterns_source_and_eager_with_ordered_batches() {
         );
 
         let repeat = commit
-            .file
+            .file()
             .set(CELL_B1, Props::new().with("fill", gradient.as_str()))
             .expect("repeat gradient conversion");
         assert_eq!(
             repeat.to_bytes().expect("repeat gradient bytes"),
-            commit.file.to_bytes().expect("first gradient bytes")
+            commit.file().to_bytes().expect("first gradient bytes")
         );
 
         let reverse = commit
-            .file
+            .file()
             .edit(|edit| {
                 edit.set(CELL_B1, Props::new().with("fillPattern", "solid"))?;
                 edit.set(CELL_B1, Props::new().with("fill", gradient.as_str()))?;
@@ -5255,7 +5267,7 @@ fn gradient_fill_converts_patterns_source_and_eager_with_ordered_batches() {
             })
             .expect("later gradient replacement wins");
         assert!(
-            cell_property(&reverse.file, CELL_B1, "fill")
+            cell_property(reverse.file(), CELL_B1, "fill")
                 .is_some_and(|value| value.starts_with("gradient;"))
         );
     }
@@ -5421,42 +5433,42 @@ fn fill_ranges_keep_mixed_source_patterns_payloads_and_replay_inverse() {
 
         for path in [CELL_A1, CELL_B1] {
             assert_eq!(
-                cell_property(&commit.file, path, "fill").as_deref(),
+                cell_property(commit.file(), path, "fill").as_deref(),
                 Some("#AABBCC"),
                 "range foreground at {path}"
             );
         }
         assert_eq!(
-            cell_text(&commit.file, CELL_A1).as_deref(),
+            cell_text(commit.file(), CELL_A1).as_deref(),
             Some("range payload")
         );
         assert_eq!(
-            cell_property(&commit.file, CELL_A1, "fillPattern").as_deref(),
+            cell_property(commit.file(), CELL_A1, "fillPattern").as_deref(),
             Some("darkGray")
         );
         assert_eq!(
-            cell_property(&commit.file, CELL_B1, "fillPattern").as_deref(),
+            cell_property(commit.file(), CELL_B1, "fillPattern").as_deref(),
             Some("lightGray")
         );
         assert_eq!(
-            cell_property(&commit.file, CELL_A1, "fillBg").as_deref(),
+            cell_property(commit.file(), CELL_A1, "fillBg").as_deref(),
             Some("accent1+tint40")
         );
         assert_eq!(
-            cell_property(&commit.file, CELL_B1, "fillBg").as_deref(),
+            cell_property(commit.file(), CELL_B1, "fillBg").as_deref(),
             Some("#F0E0D0")
         );
 
         let replayed = commit
-            .patch
+            .patch()
             .apply(&original)
             .expect("replay mixed fill patch");
         assert_eq!(
             replayed.to_bytes().expect("replayed mixed fill bytes"),
-            commit.file.to_bytes().expect("mixed fill bytes")
+            commit.file().to_bytes().expect("mixed fill bytes")
         );
         let restored = commit
-            .patch
+            .patch()
             .inverse()
             .apply(&replayed)
             .expect("inverse mixed fill patch");
@@ -5466,12 +5478,12 @@ fn fill_ranges_keep_mixed_source_patterns_payloads_and_replay_inverse() {
         );
 
         let repeated = commit
-            .file
+            .file()
             .set("/sheet[1]/A1:B1", Props::new().with("fill", "#AABBCC"))
             .expect("repeat mixed fill range");
         assert_eq!(
             repeated.to_bytes().expect("repeated mixed fill bytes"),
-            commit.file.to_bytes().expect("first mixed fill bytes")
+            commit.file().to_bytes().expect("first mixed fill bytes")
         );
     }
 }

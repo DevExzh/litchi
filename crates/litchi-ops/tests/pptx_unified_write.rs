@@ -108,8 +108,10 @@ fn scoped_selector_batches_and_failed_properties_are_atomic() {
             .unwrap();
         assert_eq!(
             source
-                .edit_with_limits(&limits, |edit| edit
-                    .set("/slide[1]/*", props! { "text" => "too many" }))
+                .edit_with_options(
+                    litchi_ops::EditOptions::new().semantic_limits(limits),
+                    |edit| edit.set("/slide[1]/*", props! { "text" => "too many" })
+                )
                 .unwrap_err()
                 .code(),
             Code::LimitExceeded
@@ -129,32 +131,32 @@ fn transactions_replay_inverse_poison_and_detect_net_noop() {
                 edit.set("/slide[2]/shape[1]", props! { "text" => "second staged" })
             })
             .unwrap();
-        assert!(commit.diagnostics.changed());
-        assert_eq!(text(&commit.file, FIRST), "staged");
+        assert!(commit.diagnostics().changed());
+        assert_eq!(text(commit.file(), FIRST), "staged");
         assert_eq!(
-            commit.patch.apply(&source).unwrap().to_bytes().unwrap(),
-            commit.file.to_bytes().unwrap()
+            commit.patch().apply(&source).unwrap().to_bytes().unwrap(),
+            commit.file().to_bytes().unwrap()
         );
         assert_eq!(
             commit
-                .patch
+                .patch()
                 .inverse()
-                .apply(&commit.file)
+                .apply(commit.file())
                 .unwrap()
                 .to_bytes()
                 .unwrap(),
             before
         );
-        assert!(commit.patch.apply(&open(&bytes, eager)).is_err());
+        assert!(commit.patch().apply(&open(&bytes, eager)).is_err());
         let noop = source
             .edit(|edit| {
                 edit.set(FIRST, props! { "text" => "temporary" })?;
                 edit.set(FIRST, props! { "text" => "first" })
             })
             .unwrap();
-        assert!(noop.patch.is_noop());
-        assert!(!noop.diagnostics.changed());
-        assert_eq!(noop.file.to_bytes().unwrap(), before);
+        assert!(noop.patch().is_noop());
+        assert!(!noop.diagnostics().changed());
+        assert_eq!(noop.file().to_bytes().unwrap(), before);
         let poisoned = source.edit(|edit| {
             edit.set(FIRST, props! { "text" => "discarded" })?;
             let _ = edit.set(FIRST, props! { "highlight" => "FFFF00" });
@@ -169,8 +171,10 @@ fn transactions_replay_inverse_poison_and_detect_net_noop() {
             .unwrap();
         assert_eq!(
             source
-                .edit_with_limits(&limits, |edit| edit
-                    .set(FIRST, props! { "text" => "no budget" }))
+                .edit_with_options(
+                    litchi_ops::EditOptions::new().semantic_limits(limits),
+                    |edit| edit.set(FIRST, props! { "text" => "no budget" })
+                )
                 .unwrap_err()
                 .code(),
             Code::LimitExceeded
@@ -288,8 +292,10 @@ fn invalid_text_and_staging_limits_leave_input_unchanged() {
             .unwrap();
         assert_eq!(
             source
-                .edit_with_limits(&limits, |edit| edit
-                    .set(FIRST, props! { "text" => "too large" }))
+                .edit_with_options(
+                    litchi_ops::EditOptions::new().semantic_limits(limits),
+                    |edit| edit.set(FIRST, props! { "text" => "too large" })
+                )
                 .unwrap_err()
                 .code(),
             Code::LimitExceeded
@@ -366,9 +372,11 @@ fn batches_keep_atomic_and_best_effort_semantics() {
         );
         assert_eq!(text(&source, FIRST), "first");
         let result = source.batch(commands(), BatchMode::BestEffort).unwrap();
-        assert!(matches!(&result.results[1], ItemResult::Failed(error) if error.item() == Some(1)));
-        assert_eq!(text(&result.file, FIRST), "changed");
-        assert_eq!(text(&result.file, "/slide[2]/shape[1]"), "later");
+        assert!(
+            matches!(&result.results()[1], ItemResult::Failed(error) if error.item() == Some(1))
+        );
+        assert_eq!(text(result.file(), FIRST), "changed");
+        assert_eq!(text(result.file(), "/slide[2]/shape[1]"), "later");
         assert_eq!(text(&source, FIRST), "first");
     }
 }
@@ -542,8 +550,8 @@ fn created_presentation_is_an_immutable_native_owner_and_publishes() {
             .unwrap()
     );
     let commit = file.edit(|_| Ok(())).unwrap();
-    assert!(commit.patch.is_noop());
-    assert_eq!(commit.file.to_bytes().unwrap(), bytes);
+    assert!(commit.patch().is_noop());
+    assert_eq!(commit.file().to_bytes().unwrap(), bytes);
     for eager in [false, true] {
         let File::Pptx(reopened) = open(&bytes, eager) else {
             panic!("PPTX")
@@ -602,21 +610,21 @@ fn slide_addition_composes_with_text_edits_and_reversible_transactions() {
         })
         .unwrap();
     assert_eq!(
-        text(&commit.file, "/slide[2]/shape[1]"),
+        text(commit.file(), "/slide[2]/shape[1]"),
         "edited after insertion"
     );
-    assert_eq!(text(&commit.file, "/slide[4]/shape[1]"), "second");
-    let result = commit.file.to_bytes().unwrap();
+    assert_eq!(text(commit.file(), "/slide[4]/shape[1]"), "second");
+    let result = commit.file().to_bytes().unwrap();
     assert_eq!(source.to_bytes().unwrap(), before);
     assert_eq!(
-        commit.patch.apply(&source).unwrap().to_bytes().unwrap(),
+        commit.patch().apply(&source).unwrap().to_bytes().unwrap(),
         result
     );
     assert_eq!(
         commit
-            .patch
+            .patch()
             .inverse()
-            .apply(&commit.file)
+            .apply(commit.file())
             .unwrap()
             .to_bytes()
             .unwrap(),
@@ -696,10 +704,13 @@ fn slide_addition_refuses_properties_placements_and_limits_atomically() {
         .unwrap()
         .build()
         .unwrap();
-    let result = source.edit_with_limits(&limits, |edit| {
-        edit.add("/", NewNode::new("slide").prop("layout", "Blank"))?;
-        Ok(())
-    });
+    let result = source.edit_with_options(
+        litchi_ops::EditOptions::new().semantic_limits(limits),
+        |edit| {
+            edit.add("/", NewNode::new("slide").prop("layout", "Blank"))?;
+            Ok(())
+        },
+    );
     assert_eq!(result.unwrap_err().code(), Code::LimitExceeded);
     let result = source.edit(|edit| {
         edit.add("/", NewNode::new("slide").prop("layout", "Blank"))?;
@@ -740,8 +751,8 @@ fn slide_addition_batches_keep_prior_success_only_in_best_effort_mode() {
         Some(1)
     );
     let result = source.batch(commands(), BatchMode::BestEffort).unwrap();
-    assert!(matches!(&result.results[1], ItemResult::Failed(error) if error.item() == Some(1)));
-    assert!(result.file.get("/slide[2]").is_ok());
-    assert!(result.file.get("/slide[3]").is_err());
+    assert!(matches!(&result.results()[1], ItemResult::Failed(error) if error.item() == Some(1)));
+    assert!(result.file().get("/slide[2]").is_ok());
+    assert!(result.file().get("/slide[3]").is_err());
     assert_eq!(source.to_bytes().unwrap(), before);
 }

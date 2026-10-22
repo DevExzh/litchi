@@ -226,9 +226,9 @@ fn unified_once(file: &File, operations: PreparedOperations) -> Result<(File, Un
         }
         Ok(())
     })?;
-    let diagnostics = commit.diagnostics;
+    let diagnostics = *commit.diagnostics();
     Ok((
-        commit.file,
+        commit.into_file(),
         UnifiedStats {
             changed: diagnostics.changed(),
             operations: diagnostics.operations(),

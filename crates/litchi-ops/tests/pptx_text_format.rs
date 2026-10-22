@@ -237,7 +237,7 @@ fn edit_closure_composes_text_writes_atomically() {
                 Ok(())
             })
             .unwrap()
-            .file;
+            .into_file();
         assert_eq!(prop(&updated, RUN, "bold").as_deref(), Some("true"));
         assert_eq!(prop(&updated, CELL, "fill").as_deref(), Some("#00FF00"));
         let failed = file.edit(|edit| {

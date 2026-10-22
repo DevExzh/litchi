@@ -35,13 +35,13 @@ fn stale_caches_are_reported_then_written_once() {
         .set("/Sheet1/A5", props! { "formula" => "1/0" })
         .unwrap();
     let report = file.refresh(&Options::new()).unwrap();
-    assert!(report.patch.is_noop());
-    assert_eq!(report.value.count(Status::Stale), 4);
-    assert_eq!(report.value.fields()[0].location(), Some("Sheet1!A2"));
+    assert!(report.patch().is_noop());
+    assert_eq!(report.value().count(Status::Stale), 4);
+    assert_eq!(report.value().fields()[0].location(), Some("Sheet1!A2"));
     let written = file.refresh(&Options::new().write_cache(true)).unwrap();
-    assert_eq!(written.value.refreshed(), 4);
-    assert_eq!(written.diagnostics.commits(), 1);
-    let xml = sheet_xml(&written.file);
+    assert_eq!(written.value().refreshed(), 4);
+    assert_eq!(written.diagnostics().commits(), 1);
+    let xml = sheet_xml(written.file());
     for expected in [
         "<f>A1*2</f><v>40</v>",
         r#"t="str"><f>IF(A1&gt;10,&quot;big&quot;,&quot;small&quot;)</f><v>big</v>"#,
@@ -50,10 +50,10 @@ fn stale_caches_are_reported_then_written_once() {
     ] {
         assert!(xml.contains(expected), "{expected}: {xml}");
     }
-    let reopened = litchi_ops::open_bytes(written.file.to_bytes().unwrap()).unwrap();
+    let reopened = litchi_ops::open_bytes(written.file().to_bytes().unwrap()).unwrap();
     let again = reopened.refresh(&Options::new().write_cache(true)).unwrap();
-    assert!(again.patch.is_noop());
-    assert_eq!(again.value.count(Status::Unchanged), 4);
+    assert!(again.patch().is_noop());
+    assert_eq!(again.value().count(Status::Unchanged), 4);
 }
 
 #[test]
@@ -64,17 +64,18 @@ fn write_back_is_xlsx_only() {
         assert!(
             docx.refresh(&Options::new().write_cache(true))
                 .unwrap()
-                .patch
+                .patch()
                 .is_noop()
         );
     }
     let error = litchi_ops::create(FileFormat::Xlsx)
         .unwrap()
-        .refresh_with_limits(
+        .refresh_with_options(
             &Options::new(),
-            &litchi_ops::transaction::SemanticLimits::default(),
+            litchi_ops::EditOptions::new()
+                .semantic_limits(litchi_ops::transaction::SemanticLimits::default()),
         )
-        .map(|commit| commit.value.fields().len());
+        .map(|commit| commit.value().fields().len());
     assert_eq!(error.unwrap(), 0);
     let _ = Code::UnsupportedCapability;
 }
@@ -94,30 +95,30 @@ fn legacy_and_binary_workbooks_write_caches_back() {
             .set("/Sheet1/A3", props! { "formula" => "A1+1" })
             .unwrap();
         let report = file.refresh(&Options::new()).unwrap();
-        assert!(report.patch.is_noop(), "{format:?}");
-        let stale = report.value.count(Status::Stale);
+        assert!(report.patch().is_noop(), "{format:?}");
+        let stale = report.value().count(Status::Stale);
         let written = file
             .refresh(&Options::new().write_cache(true))
             .unwrap_or_else(|error| panic!("{format:?}: {error}"));
         assert_eq!(
-            written.value.refreshed(),
+            written.value().refreshed(),
             stale,
             "{format:?}: {:?}",
             written
-                .value
+                .value()
                 .fields()
                 .iter()
                 .map(|field| (field.status(), field.reason()))
                 .collect::<Vec<_>>()
         );
         if stale > 0 {
-            assert!(written.diagnostics.changed(), "{format:?}");
+            assert!(written.diagnostics().changed(), "{format:?}");
         }
-        let reopened = litchi_ops::open_bytes(written.file.to_bytes().unwrap()).unwrap();
+        let reopened = litchi_ops::open_bytes(written.file().to_bytes().unwrap()).unwrap();
         let again = reopened.refresh(&Options::new().write_cache(true)).unwrap();
-        assert!(again.patch.is_noop(), "{format:?}");
-        assert_eq!(again.value.count(Status::Unchanged), 2, "{format:?}");
-        let restored = written.patch.inverse().apply(&written.file).unwrap();
+        assert!(again.patch().is_noop(), "{format:?}");
+        assert_eq!(again.value().count(Status::Unchanged), 2, "{format:?}");
+        let restored = written.patch().inverse().apply(written.file()).unwrap();
         assert_eq!(
             restored.to_bytes().unwrap(),
             file.to_bytes().unwrap(),

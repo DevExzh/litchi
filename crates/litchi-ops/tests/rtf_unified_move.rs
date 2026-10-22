@@ -72,9 +72,9 @@ fn self_and_adjacent_anchors_are_exact_noops_even_on_protected_source() {
             let commit = source
                 .edit(|edit| edit.move_to("/body/p[2]", placement))
                 .unwrap();
-            assert!(!commit.diagnostics.changed());
-            assert_eq!(commit.file.to_bytes().unwrap(), input);
-            assert_eq!(commit.diagnostics.operations(), 1);
+            assert!(!commit.diagnostics().changed());
+            assert_eq!(commit.file().to_bytes().unwrap(), input);
+            assert_eq!(commit.diagnostics().operations(), 1);
         }
     }
 }
@@ -94,16 +94,16 @@ fn explicit_empty_paragraphs_survive_moves_and_reopen() {
             let commit = source.edit(|edit| edit.move_to(path, placement)).unwrap();
             assert_eq!(
                 commit
-                    .patch
+                    .patch()
                     .inverse()
-                    .apply(&commit.file)
+                    .apply(commit.file())
                     .unwrap()
                     .to_bytes()
                     .unwrap(),
                 input
             );
-            let result = commit.file;
-            assert_eq!(paragraphs(&result), expected);
+            let result = commit.file();
+            assert_eq!(paragraphs(result), expected);
             assert_eq!(
                 paragraphs(&open_bytes(result.to_bytes().unwrap()).unwrap()),
                 expected
@@ -122,25 +122,25 @@ fn mixed_sequential_edits_have_exact_identity_bound_history() {
             edit.remove("/body/p[2]")
         })
         .unwrap();
-    assert_eq!(paragraphs(&commit.file), ["changed", "Fourth", "First"]);
-    assert_eq!(commit.diagnostics.operations(), 3);
-    assert!(commit.diagnostics.changed());
+    assert_eq!(paragraphs(commit.file()), ["changed", "Fourth", "First"]);
+    assert_eq!(commit.diagnostics().operations(), 3);
+    assert!(commit.diagnostics().changed());
     assert_eq!(
-        commit.patch.apply(&source).unwrap().to_bytes().unwrap(),
-        commit.file.to_bytes().unwrap()
+        commit.patch().apply(&source).unwrap().to_bytes().unwrap(),
+        commit.file().to_bytes().unwrap()
     );
     assert_eq!(
         commit
-            .patch
+            .patch()
             .inverse()
-            .apply(&commit.file)
+            .apply(commit.file())
             .unwrap()
             .to_bytes()
             .unwrap(),
         INPUT
     );
     assert!(matches!(
-        commit.patch.apply(&file()).unwrap_err().leaf(),
+        commit.patch().apply(&file()).unwrap_err().leaf(),
         Source::Transaction(Error::PatchConflict)
     ));
 }
@@ -167,10 +167,10 @@ fn batches_attribute_failure_and_continue_from_successful_moves() {
     );
     let best = source.batch(items(), BatchMode::BestEffort).unwrap();
     assert_eq!(
-        paragraphs(&best.file),
+        paragraphs(best.file()),
         ["Third", "Second", "Fourth", "First"]
     );
-    assert!(matches!(&best.results[1], litchi_ops::ItemResult::Failed(e) if e.item() == Some(1)));
+    assert!(matches!(&best.results()[1], litchi_ops::ItemResult::Failed(e) if e.item() == Some(1)));
     assert_eq!(source.to_bytes().unwrap(), INPUT);
 }
 
@@ -196,7 +196,10 @@ fn limits_and_invalid_destinations_leave_source_unchanged() {
         ),
     ] {
         let error = source
-            .edit_with_limits(&limits, |edit| edit.move_to("/body/p[1]", Placement::End))
+            .edit_with_options(
+                litchi_ops::EditOptions::new().semantic_limits(limits),
+                |edit| edit.move_to("/body/p[1]", Placement::End),
+            )
             .unwrap_err();
         assert!(
             matches!(error.leaf(), Source::Transaction(Error::Limit {kind: actual, ..}) if *actual == kind),
@@ -209,10 +212,13 @@ fn limits_and_invalid_destinations_leave_source_unchanged() {
         .build()
         .unwrap();
     let error = source
-        .edit_with_limits(&limits, |edit| {
-            edit.move_to("/body/p[1]", Placement::End)?;
-            edit.move_to("/body/p[1]", Placement::End)
-        })
+        .edit_with_options(
+            litchi_ops::EditOptions::new().semantic_limits(limits),
+            |edit| {
+                edit.move_to("/body/p[1]", Placement::End)?;
+                edit.move_to("/body/p[1]", Placement::End)
+            },
+        )
         .unwrap_err();
     assert_eq!(error.code(), Code::LimitExceeded);
     for placement in [

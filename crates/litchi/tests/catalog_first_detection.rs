@@ -6,7 +6,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
 use litchi::common::detection::{
-    DetectedFormat, detect_file_format_from_bytes, detect_format_from_reader, detect_format_smart,
+    DetectedFormat, SourceLimits, detect_file_format_from_bytes, detect_format_from_reader,
+    detect_format_smart,
 };
 use litchi::common::{FileFormat, ReadAt, SourceVersion};
 
@@ -258,7 +259,7 @@ fn catalog_first_detection_matches_bytes_reader_and_typed_docx_without_payload_r
     let fixture = docx_fixture();
 
     assert_eq!(
-        detect_file_format_from_bytes(&fixture.bytes),
+        detect_file_format_from_bytes(&fixture.bytes, &SourceLimits::default()),
         Some(FileFormat::Docx)
     );
 
@@ -267,7 +268,7 @@ fn catalog_first_detection_matches_bytes_reader_and_typed_docx_without_payload_r
         .seek(SeekFrom::Start(41))
         .expect("initial reader position is valid");
     assert_eq!(
-        detect_format_from_reader(&mut reader),
+        detect_format_from_reader(&mut reader, &SourceLimits::default()),
         Some(FileFormat::Docx)
     );
     assert_eq!(reader.stream_position().expect("position is readable"), 41);
@@ -299,7 +300,7 @@ fn catalog_first_detection_matches_bytes_reader_and_typed_docx_without_payload_r
     let typed = litchi::docx::source_backed::Package::from_read_at(source_for_open)
         .expect("typed DOCX source open should use the catalog only");
     assert_eq!(
-        detect_file_format_from_bytes(&fixture.bytes),
+        detect_file_format_from_bytes(&fixture.bytes, &SourceLimits::default()),
         Some(FileFormat::Docx),
         "the typed source owner and both detector APIs identify DOCX"
     );
@@ -334,7 +335,7 @@ fn typed_catalog_and_owner_restore_reader_position_on_error_and_limit() {
         .seek(SeekFrom::Start(31))
         .expect("initial reader position is valid");
     assert_eq!(
-        detect_format_from_reader(&mut malformed_detection_reader),
+        detect_format_from_reader(&mut malformed_detection_reader, &SourceLimits::default(),),
         None
     );
     assert_eq!(
@@ -392,8 +393,14 @@ fn typed_malformed_package_error_is_distinct_from_fresh_no_match() {
     let malformed = malformed_opc_package();
     let fresh_no_match = b"this is not an Office package".to_vec();
 
-    assert_eq!(detect_file_format_from_bytes(&malformed), None);
-    assert_eq!(detect_file_format_from_bytes(&fresh_no_match), None);
+    assert_eq!(
+        detect_file_format_from_bytes(&malformed, &SourceLimits::default()),
+        None
+    );
+    assert_eq!(
+        detect_file_format_from_bytes(&fresh_no_match, &SourceLimits::default()),
+        None
+    );
 
     let malformed_source = GuardedSource::new(malformed, 0..0);
     let malformed_error =
@@ -422,7 +429,7 @@ fn typed_malformed_package_error_is_distinct_from_fresh_no_match() {
 fn smart_detection_still_returns_a_usable_eager_docx_variant() {
     let fixture = docx_fixture();
 
-    match detect_format_smart(fixture.bytes) {
+    match detect_format_smart(fixture.bytes, &SourceLimits::default()) {
         Some(DetectedFormat::Docx(package)) => {
             let main = package
                 .main_document_part()

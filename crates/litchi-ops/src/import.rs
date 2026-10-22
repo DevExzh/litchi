@@ -15,9 +15,9 @@
 //!
 //! let file = litchi_ops::create(FileFormat::Xlsx)?;
 //! let commit = file.import("/Sheet1", b"name,score\nAda,36\n", &Options::csv().header(true))?;
-//! assert_eq!(commit.value.cells(), 4);
-//! assert_eq!(commit.value.numbers(), 1);
-//! let score = commit.file.get("/Sheet1/B2")?;
+//! assert_eq!(commit.value().cells(), 4);
+//! assert_eq!(commit.value().numbers(), 1);
+//! let score = commit.file().get("/Sheet1/B2")?;
 //! assert_eq!(score.view().text()?.as_deref(), Some("36"));
 //! # }
 //! # Ok::<(), litchi_ops::Error>(())

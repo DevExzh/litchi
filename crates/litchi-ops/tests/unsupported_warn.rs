@@ -47,7 +47,7 @@ fn warn_applies_the_supported_subset_exactly() {
 
     let commit = file.apply_with(&item, &warn()).unwrap();
     let skipped: Vec<_> = commit
-        .value
+        .value()
         .warnings
         .iter()
         .map(|warning| (warning.code(), warning.property(), warning.item()))
@@ -67,10 +67,10 @@ fn warn_applies_the_supported_subset_exactly() {
         ))
         .unwrap();
     assert_eq!(
-        commit.file.to_bytes().unwrap(),
-        subset.file.to_bytes().unwrap()
+        commit.file().to_bytes().unwrap(),
+        subset.file().to_bytes().unwrap()
     );
-    assert!(commit.diagnostics.changed());
+    assert!(commit.diagnostics().changed());
     // Refuse is the default of the options too.
     assert_eq!(
         file.apply_with(&item, &Options::new()).unwrap_err().code(),
@@ -93,10 +93,10 @@ fn warn_keeps_other_failures_and_noops_exact() {
             &warn(),
         )
         .unwrap();
-    assert!(!commit.diagnostics.changed());
-    assert!(!commit.value.changed);
-    assert_eq!(commit.value.warnings.len(), 2);
-    assert_eq!(commit.file.to_bytes().unwrap(), before);
+    assert!(!commit.diagnostics().changed());
+    assert!(!commit.value().changed);
+    assert_eq!(commit.value().warnings.len(), 2);
+    assert_eq!(commit.file().to_bytes().unwrap(), before);
     // An invalid value is never skipped, and nothing applies.
     let error = file
         .apply_with(
@@ -131,11 +131,12 @@ fn warn_batches_report_per_item_and_stay_atomic() {
           {"command":"set","path":"/Sheet1/A2","props":{"value":"b"}},
           {"command":"set","path":"/Sheet1/A3","props":{"glow":1,"value":"c"}}
         ]"#,
+        &batch::SourceLimits::default(),
     )
     .unwrap();
     let commit = file.batch_with(&items, &warn()).unwrap();
     let warnings: Vec<Vec<(Option<&str>, Option<usize>)>> = commit
-        .results
+        .results()
         .iter()
         .map(|result| match result {
             ItemResult::Applied(applied) => applied
@@ -160,6 +161,7 @@ fn warn_batches_report_per_item_and_stay_atomic() {
           {"command":"set","path":"/Sheet1/A1","props":{"value":"a","sparkle":1}},
           {"command":"set","path":"/Sheet1/A2","props":{"font.bold":"maybe"}}
         ]"#,
+        &batch::SourceLimits::default(),
     )
     .unwrap();
     let error = file.batch_with(&items, &warn()).unwrap_err();
@@ -169,9 +171,9 @@ fn warn_batches_report_per_item_and_stay_atomic() {
         .batch_with(&items, &warn().mode(BatchMode::BestEffort))
         .unwrap();
     assert!(
-        matches!(&commit.results[0], ItemResult::Applied(applied) if applied.warnings.len() == 1)
+        matches!(&commit.results()[0], ItemResult::Applied(applied) if applied.warnings.len() == 1)
     );
-    assert!(matches!(&commit.results[1], ItemResult::Failed(_)));
+    assert!(matches!(commit.results()[1], ItemResult::Failed(_)));
 }
 
 #[cfg(feature = "xlsx")]
@@ -187,12 +189,12 @@ fn warn_batches_keep_the_native_runs() {
         .collect();
     let refuse = file.batch_with(&items, &Options::new()).unwrap();
     let warned = file.batch_with(&items, &warn()).unwrap();
-    assert_eq!(refuse.diagnostics.commits(), 1);
-    assert_eq!(warned.diagnostics.commits(), 1);
-    assert_eq!(warned.diagnostics.operations(), 100);
+    assert_eq!(refuse.diagnostics().commits(), 1);
+    assert_eq!(warned.diagnostics().commits(), 1);
+    assert_eq!(warned.diagnostics().operations(), 100);
     assert_eq!(
-        warned.file.to_bytes().unwrap(),
-        refuse.file.to_bytes().unwrap()
+        warned.file().to_bytes().unwrap(),
+        refuse.file().to_bytes().unwrap()
     );
 
     // A refused item closes the run, applies its supported subset alone and
@@ -208,16 +210,17 @@ fn warn_batches_keep_the_native_runs() {
           {"command":"set","path":"/Sheet1/A6","props":{"value":"f"}},
           {"command":"set","path":"/Sheet1/A7","props":{"value":"g"}}
         ]"#,
+        &batch::SourceLimits::default(),
     )
     .unwrap();
     let commit = file.batch_with(&items, &warn()).unwrap();
     let mut sequential = file.clone();
     for (index, item) in items.iter().enumerate() {
         let step = sequential.apply_with(item, &warn()).unwrap();
-        let ItemResult::Applied(applied) = &commit.results[index] else {
+        let ItemResult::Applied(applied) = &commit.results()[index] else {
             panic!("item {index} failed");
         };
-        assert_eq!(applied.changed, step.value.changed, "item {index}");
+        assert_eq!(applied.changed, step.value().changed, "item {index}");
         let properties = |warnings: &[litchi_ops::Error]| -> Vec<Option<String>> {
             warnings
                 .iter()
@@ -226,24 +229,24 @@ fn warn_batches_keep_the_native_runs() {
         };
         assert_eq!(
             properties(&applied.warnings),
-            properties(&step.value.warnings),
+            properties(&step.value().warnings),
             "item {index}"
         );
         // Batch warnings carry the wire index.
         assert!(applied.warnings.iter().all(|w| w.item() == Some(index)));
-        sequential = step.file;
+        sequential = step.file().clone();
     }
     assert_eq!(
-        commit.file.to_bytes().unwrap(),
+        commit.file().to_bytes().unwrap(),
         sequential.to_bytes().unwrap()
     );
     // Runs: A1-A2, A3 alone, A4, A6-A7. A5 skips its only property: a
     // no-op that dispatches nothing.
-    assert_eq!(commit.diagnostics.operations(), 6);
+    assert_eq!(commit.diagnostics().operations(), 6);
     assert!(
-        commit.diagnostics.commits() <= 4,
+        commit.diagnostics().commits() <= 4,
         "{:?}",
-        commit.diagnostics
+        commit.diagnostics()
     );
 
     // A failure other than a refusal still rolls back the whole batch and is
@@ -255,6 +258,7 @@ fn warn_batches_keep_the_native_runs() {
           {"command":"set","path":"/Sheet1/A3","props":{"value":"c"}},
           {"command":"set","path":"/Sheet1/A4","props":{"font.bold":"maybe"}}
         ]"#,
+        &batch::SourceLimits::default(),
     )
     .unwrap();
     let error = file.batch_with(&items, &warn()).unwrap_err();
@@ -273,7 +277,7 @@ fn warn_docx_formatting_runs_match_sequential_application() {
         item.props = Some(Props::new().with("text", text));
         seed.push(item);
     }
-    let file = file.batch(&seed, BatchMode::Atomic).unwrap().file;
+    let file = file.batch(&seed, BatchMode::Atomic).unwrap().into_file();
     let items = batch::from_bytes(
         br#"[
           {"command":"set","path":"/body/p[1]/r[1]","props":{"bold":true}},
@@ -281,24 +285,29 @@ fn warn_docx_formatting_runs_match_sequential_application() {
           {"command":"set","path":"/body/p[3]/r[1]","props":{"bold":true}},
           {"command":"set","path":"/body/p[4]/r[1]","props":{"underline":"single"}}
         ]"#,
+        &batch::SourceLimits::default(),
     )
     .unwrap();
     let commit = file.batch_with(&items, &warn()).unwrap();
     let mut sequential = file.clone();
     for item in &items {
-        sequential = sequential.apply_with(item, &warn()).unwrap().file;
+        sequential = sequential.apply_with(item, &warn()).unwrap().into_file();
     }
     assert_eq!(
-        commit.file.to_bytes().unwrap(),
+        commit.file().to_bytes().unwrap(),
         sequential.to_bytes().unwrap()
     );
-    let ItemResult::Applied(applied) = &commit.results[1] else {
+    let ItemResult::Applied(applied) = &commit.results()[1] else {
         panic!("item 1 failed");
     };
     assert_eq!(applied.warnings.len(), 1);
     assert_eq!(applied.warnings[0].property(), Some("sparkle"));
     assert_eq!(applied.warnings[0].item(), Some(1));
-    assert!(commit.diagnostics.commits() < 4, "{:?}", commit.diagnostics);
+    assert!(
+        commit.diagnostics().commits() < 4,
+        "{:?}",
+        commit.diagnostics()
+    );
 }
 
 #[cfg(feature = "docx")]
@@ -316,16 +325,16 @@ fn warn_adds_the_element_without_the_refused_properties() {
     let commit = file.apply_with(&item, &warn()).unwrap();
     assert_eq!(
         commit
-            .value
+            .value()
             .path
             .as_deref()
             .map(ToString::to_string)
             .as_deref(),
         Some("/body/p[1]")
     );
-    assert_eq!(commit.value.warnings[0].property(), Some("em"));
+    assert_eq!(commit.value().warnings[0].property(), Some("em"));
     let text = commit
-        .file
+        .file()
         .get("/body/p[1]")
         .unwrap()
         .view()
@@ -353,11 +362,11 @@ fn cell_links_in_a_batch_are_applied_not_skipped() {
     for options in [Options::new(), warn()] {
         let commit = file.apply_with(&item, &options).unwrap();
         assert!(
-            commit.value.warnings.is_empty(),
+            commit.value().warnings.is_empty(),
             "{:?}",
-            commit.value.warnings
+            commit.value().warnings
         );
-        let link = commit.file.get("/Sheet1/hyperlink[1]").unwrap();
+        let link = commit.file().get("/Sheet1/hyperlink[1]").unwrap();
         let format: Vec<_> = link
             .view()
             .format()
@@ -379,12 +388,15 @@ fn cell_links_in_a_batch_are_applied_not_skipped() {
                 },
             )
             .unwrap();
-        assert_eq!(commit.file.to_bytes().unwrap(), direct.to_bytes().unwrap());
+        assert_eq!(
+            commit.file().to_bytes().unwrap(),
+            direct.to_bytes().unwrap()
+        );
     }
     // In a batch of several cell sets, the link still lands.
     let other = set("/Sheet1/B1", Props::new().with("value", 2));
     let batch = file
         .batch([other.clone(), item.clone(), other], BatchMode::Atomic)
         .unwrap();
-    assert!(batch.file.get("/Sheet1/hyperlink[1]").is_ok());
+    assert!(batch.file().get("/Sheet1/hyperlink[1]").is_ok());
 }

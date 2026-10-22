@@ -141,34 +141,34 @@ fn slide_queries_transactions_replay_inverse_and_reopen_preserve_metadata() {
             .expect("transactional slide metadata update");
 
         assert_eq!(
-            property(&commit.file, "/slide[1]", "name").as_deref(),
+            property(commit.file(), "/slide[1]", "name").as_deref(),
             Some("Agenda")
         );
         assert_eq!(
-            property(&commit.file, "/slide[2]", "name").as_deref(),
+            property(commit.file(), "/slide[2]", "name").as_deref(),
             Some("Risks")
         );
-        assert!(hidden(&commit.file, "/slide[1]"));
-        assert!(hidden(&commit.file, "/slide[2]"));
-        assert!(!hidden(&commit.file, "/slide[3]"));
-        assert!(commit.diagnostics.changed());
+        assert!(hidden(commit.file(), "/slide[1]"));
+        assert!(hidden(commit.file(), "/slide[2]"));
+        assert!(!hidden(commit.file(), "/slide[3]"));
+        assert!(commit.diagnostics().changed());
 
-        let replayed = commit.patch.apply(&source).expect("replay slide patch");
+        let replayed = commit.patch().apply(&source).expect("replay slide patch");
         assert_eq!(
             replayed.to_bytes().expect("serialize replay"),
-            commit.file.to_bytes().expect("serialize target")
+            commit.file().to_bytes().expect("serialize target")
         );
         let restored = commit
-            .patch
+            .patch()
             .inverse()
-            .apply(&commit.file)
+            .apply(commit.file())
             .expect("inverse slide patch");
         assert_eq!(
             restored.to_bytes().expect("serialize inverse"),
             original_bytes
         );
 
-        let reopened = open(&commit.file.to_bytes().expect("serialize commit"), eager);
+        let reopened = open(&commit.file().to_bytes().expect("serialize commit"), eager);
         assert_eq!(
             property(&reopened, "/slide[1]", "name").as_deref(),
             Some("Agenda")
@@ -176,14 +176,14 @@ fn slide_queries_transactions_replay_inverse_and_reopen_preserve_metadata() {
         assert!(hidden(&reopened, "/slide[2]"));
 
         let noop = commit
-            .file
+            .file()
             .edit(|edit| {
                 edit.set("/slide[1]", props! { "name" => "Agenda" })?;
                 Ok::<_, litchi_ops::Error>(())
             })
             .expect("equal slide metadata is a transaction no-op");
-        assert!(!noop.diagnostics.changed());
-        assert!(noop.patch.is_noop());
+        assert!(!noop.diagnostics().changed());
+        assert!(noop.patch().is_noop());
     }
 }
 
@@ -235,24 +235,24 @@ fn mixed_slide_properties_validate_atomically_and_batch_modes_report_failures() 
             .batch(commands(), BatchMode::BestEffort)
             .expect("best-effort batch");
         assert!(matches!(
-            &best_effort.results[0],
+            &best_effort.results()[0],
             ItemResult::Applied(applied) if applied.changed
         ));
         assert!(matches!(
-            &best_effort.results[1],
+            &best_effort.results()[1],
             ItemResult::Failed(error) if error.item() == Some(1)
         ));
         assert!(matches!(
-            &best_effort.results[2],
+            &best_effort.results()[2],
             ItemResult::Applied(applied) if applied.changed
         ));
         assert_eq!(
-            property(&best_effort.file, "/slide[1]", "name").as_deref(),
+            property(best_effort.file(), "/slide[1]", "name").as_deref(),
             Some("Batch Agenda")
         );
-        assert!(hidden(&best_effort.file, "/slide[1]"));
+        assert!(hidden(best_effort.file(), "/slide[1]"));
         assert_eq!(
-            property(&best_effort.file, "/slide[3]", "name").as_deref(),
+            property(best_effort.file(), "/slide[3]", "name").as_deref(),
             Some("Batch Closing")
         );
         assert_eq!(
@@ -275,9 +275,12 @@ fn slide_metadata_noops_do_not_consume_transaction_changes() {
             edit.set("/slide[1]", props! { "name" => "Temporary" })
         })
         .expect("stage equal metadata twice");
-    assert!(!commit.diagnostics.changed());
-    assert!(commit.patch.is_noop());
-    assert_eq!(commit.file.to_bytes().expect("serialize net no-op"), before);
+    assert!(!commit.diagnostics().changed());
+    assert!(commit.patch().is_noop());
+    assert_eq!(
+        commit.file().to_bytes().expect("serialize net no-op"),
+        before
+    );
 }
 
 #[test]

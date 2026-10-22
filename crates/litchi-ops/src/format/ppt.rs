@@ -866,7 +866,7 @@ mod tests {
     /// A password-protected presentation reports the leaf's refusal, as the
     /// facade did; the unified opener turns it into `File::Locked`.
     fn open_bytes(bytes: Vec<u8>, options: &OpenOptions) -> Result<Ppt> {
-        match detect_format_smart(bytes) {
+        match detect_format_smart(bytes, &crate::detect::SourceLimits::default()) {
             Some(DetectedFormat::Ppt(ole)) => match Ppt::from_ole_file(ole, options, None)? {
                 LegacyOpen::Opened(ppt) => Ok(ppt),
                 LegacyOpen::PasswordRequired(_) => Err(litchi_ppt::Error::PasswordRequired.into()),

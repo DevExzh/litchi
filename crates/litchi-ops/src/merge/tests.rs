@@ -79,9 +79,7 @@ fn json_keeps_number_spellings_and_member_order() {
 
 #[test]
 fn records_flatten_nested_members_with_literal_keys_winning() {
-    let data = Data::from_json(
-        br#"{"a": {"b": "nested", "c": {"d": 1}}, "a.b": "literal", "list": [{"k": "v"}, [true]], "none": null}"#,
-    )
+    let data = Data::from_json(br#"{"a": {"b": "nested", "c": {"d": 1}}, "a.b": "literal", "list": [{"k": "v"}, [true]], "none": null}"#, &SemanticLimits::default())
     .unwrap();
     let record = &data.records()[0];
     assert_eq!(record.get("a.b"), Some("literal"));
@@ -91,18 +89,24 @@ fn records_flatten_nested_members_with_literal_keys_winning() {
     assert_eq!(record.get("list[1][0]"), Some("true"));
     assert_eq!(record.get("none"), Some(""));
     assert!(record.get("list[1]").is_none());
-    let many = Data::from_json(br#"[{"a": 1}, {"a": 2}]"#).unwrap();
+    let many = Data::from_json(br#"[{"a": 1}, {"a": 2}]"#, &SemanticLimits::default()).unwrap();
     assert_eq!(many.len(), 2);
     assert!(matches!(
-        Data::from_json(br#"[{"a": 1}, 2]"#).unwrap_err().leaf(),
+        Data::from_json(br#"[{"a": 1}, 2]"#, &SemanticLimits::default())
+            .unwrap_err()
+            .leaf(),
         crate::error::Source::Merge(Error::NotARecord { record: 2 })
     ));
 }
 
 #[test]
 fn csv_records_take_their_keys_from_the_header() {
-    let data =
-        Data::from_csv(b"\xEF\xBB\xBFname,,name,city\nAda,x,y,London\nGrace\n\n,,,\n").unwrap();
+    let data = Data::from_csv(
+        b"\xEF\xBB\xBFname,,name,city\nAda,x,y,London\nGrace\n\n,,,\n",
+        &crate::import::Options::csv(),
+        &SemanticLimits::default(),
+    )
+    .unwrap();
     assert_eq!(data.len(), 2);
     let first = &data.records()[0];
     assert_eq!(
@@ -112,15 +116,14 @@ fn csv_records_take_their_keys_from_the_header() {
     assert_eq!(first.len(), 2);
     assert_eq!(data.records()[1].get("city"), Some(""));
     let options = crate::import::Options::tsv();
-    let tabbed =
-        Data::from_csv_with(b"a\tb\n1\t2\n", &options, &SemanticLimits::default()).unwrap();
+    let tabbed = Data::from_csv(b"a\tb\n1\t2\n", &options, &SemanticLimits::default()).unwrap();
     assert_eq!(tabbed.records()[0].get("b"), Some("2"));
     let limits = SemanticLimits::builder()
         .max_staged_bytes(8)
         .unwrap()
         .build()
         .unwrap();
-    assert!(Data::from_json_with_limits(br#"{"key": "a long value"}"#, &limits).is_err());
+    assert!(Data::from_json(br#"{"key": "a long value"}"#, &limits).is_err());
 }
 
 #[test]

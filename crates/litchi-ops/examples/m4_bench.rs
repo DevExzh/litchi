@@ -169,9 +169,14 @@ fn import_xlsx(bytes: &[u8], table: &[Row], source: &[u8], rounds: usize) -> Val
         },
         || {
             let commit = file
-                .import_with_limits("/sheet[1]", source, &Options::csv(), &limits)
+                .import_with_options(
+                    "/sheet[1]",
+                    source,
+                    &Options::csv(),
+                    litchi_ops::EditOptions::new().semantic_limits(limits),
+                )
                 .expect("import");
-            assert_eq!(commit.value.cells(), table.len() * 5);
+            assert_eq!(commit.value().cells(), table.len() * 5);
         },
     )
 }
@@ -209,9 +214,14 @@ fn import_xlsb(bytes: &[u8], table: &[Row], source: &[u8], rounds: usize) -> Val
         },
         || {
             let commit = file
-                .import_with_limits("/sheet[1]", source, &Options::csv(), &limits)
+                .import_with_options(
+                    "/sheet[1]",
+                    source,
+                    &Options::csv(),
+                    litchi_ops::EditOptions::new().semantic_limits(limits),
+                )
                 .expect("import");
-            assert_eq!(commit.value.cells(), table.len() * 5);
+            assert_eq!(commit.value().cells(), table.len() * 5);
         },
     )
 }
@@ -254,9 +264,14 @@ fn import_xls(bytes: &[u8], table: &[Row], source: &[u8], rounds: usize) -> Valu
         },
         || {
             let commit = file
-                .import_with_limits("/sheet[1]", source, &Options::csv(), &limits)
+                .import_with_options(
+                    "/sheet[1]",
+                    source,
+                    &Options::csv(),
+                    litchi_ops::EditOptions::new().semantic_limits(limits),
+                )
                 .expect("import");
-            assert_eq!(commit.value.cells(), table.len() * 5);
+            assert_eq!(commit.value().cells(), table.len() * 5);
         },
     )
 }
@@ -270,14 +285,14 @@ fn eval_xlsx(count: u32, rounds: usize) -> Value {
     }
     let file = litchi_ops::create(FileFormat::Xlsx)
         .expect("create")
-        .import_with_limits(
+        .import_with_options(
             "/Sheet1",
             source.as_bytes(),
             &Options::csv().formulas(true),
-            &limits(),
+            litchi_ops::EditOptions::new().semantic_limits(limits()),
         )
         .expect("formulas")
-        .file;
+        .into_file();
     let file = litchi_ops::open_bytes(file.to_bytes().expect("publish")).expect("reopen");
     let File::Xlsx(handle) = &file else {
         unreachable!("an XLSX file")

@@ -156,7 +156,7 @@ mod probe {
                     Ok(())
                 })
                 .expect("edit");
-            black_box(commit.file);
+            black_box(commit.file());
         });
 
         let bytes = xls(100, 10);
@@ -187,7 +187,7 @@ mod probe {
                     Ok(())
                 })
                 .expect("edit");
-            black_box(commit.file);
+            black_box(commit.file());
         });
 
         let bytes = rtf(1_000);
@@ -232,7 +232,7 @@ mod probe {
                     Ok(())
                 })
                 .expect("edit");
-            black_box(commit.file);
+            black_box(commit.file());
         });
 
         println!(

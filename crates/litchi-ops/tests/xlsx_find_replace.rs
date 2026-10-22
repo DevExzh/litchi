@@ -15,7 +15,7 @@ fn find(file: &File, path: &str, props: Props<'_>) -> litchi_ops::Result<(File, 
     item.path = Some(path.into());
     item.props = Some(props);
     let commit = file.apply(&item)?;
-    Ok((commit.file, commit.value.matched()))
+    Ok((commit.file().clone(), commit.value().matched()))
 }
 
 fn value(file: &File, path: &str) -> String {
@@ -43,7 +43,8 @@ fn workbook() -> File {
         Ok(())
     })
     .unwrap()
-    .file
+    .file()
+    .clone()
 }
 
 #[test]
@@ -296,6 +297,6 @@ fn merge_keeps_rich_runs() {
     let commit = file
         .merge(&record, &litchi_ops::merge::Options::new())
         .unwrap();
-    assert_eq!(value(&commit.file, "/Sheet1/B1"), "rich Ada");
-    assert!(sheet_xml(&commit.file).contains(r#"<r><rPr><b/></rPr>"#));
+    assert_eq!(value(commit.file(), "/Sheet1/B1"), "rich Ada");
+    assert!(sheet_xml(commit.file()).contains(r#"<r><rPr><b/></rPr>"#));
 }

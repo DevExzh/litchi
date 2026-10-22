@@ -113,17 +113,21 @@ fn source_backed_metadata_sets_replay_and_invert_in_transactions() {
             Ok(())
         })
         .expect("transaction");
-    assert!(commit.diagnostics.changed());
-    assert_eq!(title(&commit.file).as_deref(), Some("In transaction"));
-    let restored = commit.patch.inverse().apply(&commit.file).expect("inverse");
+    assert!(commit.diagnostics().changed());
+    assert_eq!(title(commit.file()).as_deref(), Some("In transaction"));
+    let restored = commit
+        .patch()
+        .inverse()
+        .apply(commit.file())
+        .expect("inverse");
     assert_eq!(
         restored.to_bytes().expect("restored"),
         file.to_bytes().expect("source")
     );
-    let replayed = commit.patch.apply(&file).expect("replay");
+    let replayed = commit.patch().apply(&file).expect("replay");
     assert_eq!(
         replayed.to_bytes().expect("replayed"),
-        commit.file.to_bytes().expect("committed")
+        commit.file().to_bytes().expect("committed")
     );
 }
 

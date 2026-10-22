@@ -87,17 +87,20 @@ fn sequential_addressing_and_all_five_verbs_match_single_operation_oracle() {
             .unwrap()
             .remove("/body/p[3]")
             .unwrap();
-        assert_eq!(commit.file.to_bytes().unwrap(), oracle.to_bytes().unwrap());
+        assert_eq!(
+            commit.file().to_bytes().unwrap(),
+            oracle.to_bytes().unwrap()
+        );
         assert_eq!(file.to_bytes().unwrap(), original);
-        assert_eq!(commit.value, "PRIVATE_CLOSURE_VALUE");
-        assert!(commit.diagnostics.changed());
-        assert_eq!(commit.diagnostics.operations(), 5);
-        assert!(commit.diagnostics.leaf_operations() >= 5);
-        assert!(commit.diagnostics.snapshot_bytes() > 0);
-        assert!(!format!("{commit:?} {:?}", commit.patch).contains("PRIVATE"));
+        assert_eq!(*commit.value(), "PRIVATE_CLOSURE_VALUE");
+        assert!(commit.diagnostics().changed());
+        assert_eq!(commit.diagnostics().operations(), 5);
+        assert!(commit.diagnostics().leaf_operations() >= 5);
+        assert!(commit.diagnostics().snapshot_bytes() > 0);
+        assert!(!format!("{commit:?} {:?}", commit.patch()).contains("PRIVATE"));
         assert_eq!(
             commit
-                .patch
+                .patch()
                 .apply(&file.clone())
                 .unwrap()
                 .to_bytes()
@@ -106,9 +109,9 @@ fn sequential_addressing_and_all_five_verbs_match_single_operation_oracle() {
         );
         assert_eq!(
             commit
-                .patch
+                .patch()
                 .inverse()
-                .apply(&commit.file.clone())
+                .apply(&commit.file().clone())
                 .unwrap()
                 .to_bytes()
                 .unwrap(),
@@ -116,7 +119,7 @@ fn sequential_addressing_and_all_five_verbs_match_single_operation_oracle() {
         );
         assert_eq!(
             commit
-                .patch
+                .patch()
                 .inverse()
                 .inverse()
                 .apply(&file)
@@ -135,20 +138,20 @@ fn replay_is_bound_to_exact_handle_not_document_bytes() {
         let commit = file
             .edit(|tx| tx.set("/body/p[1]/r[1]", props! {"text" => "new"}))
             .unwrap();
-        conflict(commit.patch.apply(&open(eager)).unwrap_err());
-        conflict(commit.patch.apply(&commit.file).unwrap_err());
-        conflict(commit.patch.inverse().apply(&file).unwrap_err());
-        let reopened = litchi_ops::open_bytes(commit.file.to_bytes().unwrap()).unwrap();
-        conflict(commit.patch.inverse().apply(&reopened).unwrap_err());
-        let first = commit.patch.apply(&file).unwrap();
+        conflict(commit.patch().apply(&open(eager)).unwrap_err());
+        conflict(commit.patch().apply(commit.file()).unwrap_err());
+        conflict(commit.patch().inverse().apply(&file).unwrap_err());
+        let reopened = litchi_ops::open_bytes(commit.file().to_bytes().unwrap()).unwrap();
+        conflict(commit.patch().inverse().apply(&reopened).unwrap_err());
+        let first = commit.patch().apply(&file).unwrap();
         assert_eq!(
-            text(&commit.patch.inverse().apply(&first).unwrap()),
+            text(&commit.patch().inverse().apply(&first).unwrap()),
             "FIRST_PRIVATE"
         );
-        assert_eq!(text(&commit.patch.apply(&file).unwrap()), "new");
+        assert_eq!(text(&commit.patch().apply(&file).unwrap()), "new");
         let noop = file.edit(|_| Ok(())).unwrap();
-        assert!(noop.patch.is_noop());
-        conflict(noop.patch.apply(&open(eager)).unwrap_err());
+        assert!(noop.patch().is_noop());
+        conflict(noop.patch().apply(&open(eager)).unwrap_err());
     }
 }
 
@@ -157,10 +160,10 @@ fn empty_noop_and_cancelled_edits_preserve_exact_archive_and_identity() {
     for eager in [false, true] {
         let file = open(eager);
         let empty = file.edit(|_| Ok(7)).unwrap();
-        assert_eq!(empty.value, 7);
-        assert_eq!(empty.diagnostics.operations(), 0);
-        assert_eq!(empty.diagnostics.snapshot_bytes(), 0);
-        assert!(empty.patch.is_noop());
+        assert_eq!(*empty.value(), 7);
+        assert_eq!(empty.diagnostics().operations(), 0);
+        assert_eq!(empty.diagnostics().snapshot_bytes(), 0);
+        assert!(empty.patch().is_noop());
         let noop = file
             .edit(|tx| {
                 tx.set("/body/p[1]/r[1]", Props::new())?;
@@ -168,29 +171,29 @@ fn empty_noop_and_cancelled_edits_preserve_exact_archive_and_identity() {
                 tx.set("/body/p[1]/r[1]", props! {"text" => "FIRST_PRIVATE"})
             })
             .unwrap();
-        assert!(noop.patch.is_noop());
-        assert_eq!(noop.diagnostics.operations(), 3);
+        assert!(noop.patch().is_noop());
+        assert_eq!(noop.diagnostics().operations(), 3);
         let cancel = file
             .edit(|tx| {
                 tx.set("/body/p[1]/r[1]", props! {"text" => "temporary"})?;
                 tx.set("/body/p[1]/r[1]", props! {"text" => "FIRST_PRIVATE"})
             })
             .unwrap();
-        assert!(cancel.patch.is_noop());
-        assert!(!cancel.diagnostics.changed());
-        assert_eq!(cancel.diagnostics.operations(), 2);
-        assert!(cancel.diagnostics.leaf_operations() > 0);
-        for result in [empty.file, noop.file, cancel.file] {
+        assert!(cancel.patch().is_noop());
+        assert!(!cancel.diagnostics().changed());
+        assert_eq!(cancel.diagnostics().operations(), 2);
+        assert!(cancel.diagnostics().leaf_operations() > 0);
+        for result in [empty.file(), noop.file(), cancel.file()] {
             assert_eq!(result.to_bytes().unwrap(), bytes());
             assert_eq!(
-                cancel.patch.apply(&result).unwrap().to_bytes().unwrap(),
+                cancel.patch().apply(result).unwrap().to_bytes().unwrap(),
                 bytes()
             );
             assert_eq!(
                 cancel
-                    .patch
+                    .patch()
                     .inverse()
-                    .apply(&result)
+                    .apply(result)
                     .unwrap()
                     .to_bytes()
                     .unwrap(),
@@ -249,7 +252,7 @@ fn read_errors_can_be_handled_without_poisoning_mutations() {
             tx.set("/body/p[1]/r[1]", props! {"text" => "new"})
         })
         .unwrap();
-    assert_eq!(text(&result.file), "new");
+    assert_eq!(text(result.file()), "new");
 }
 
 #[test]
@@ -280,10 +283,13 @@ fn operation_and_retention_bounds_are_typed_and_discard_candidates() {
         .build()
         .unwrap();
     let error = file
-        .edit_with_limits(&limits, |tx| {
-            tx.set("/body/p[1]/r[1]", props! {"text" => "new"})?;
-            tx.remove("/body/p[2]")
-        })
+        .edit_with_options(
+            litchi_ops::EditOptions::new().semantic_limits(limits),
+            |tx| {
+                tx.set("/body/p[1]/r[1]", props! {"text" => "new"})?;
+                tx.remove("/body/p[2]")
+            },
+        )
         .unwrap_err();
     assert_eq!(error.item(), Some(1));
     assert_eq!(error.code(), Code::LimitExceeded);
@@ -296,16 +302,22 @@ fn operation_and_retention_bounds_are_typed_and_discard_candidates() {
         })
     ));
     let commit = file
-        .edit_with_limits(&limits, |tx| tx.remove("/body/p[2]"))
+        .edit_with_options(
+            litchi_ops::EditOptions::new().semantic_limits(limits),
+            |tx| tx.remove("/body/p[2]"),
+        )
         .unwrap();
-    let charge = commit.diagnostics.snapshot_bytes();
+    let charge = commit.diagnostics().snapshot_bytes();
     for (bound, success) in [(charge, true), (charge - 1, false)] {
         let limits = SemanticLimits::builder()
             .max_snapshot_bytes(bound)
             .unwrap()
             .build()
             .unwrap();
-        let result = file.edit_with_limits(&limits, |tx| tx.remove("/body/p[2]"));
+        let result = file.edit_with_options(
+            litchi_ops::EditOptions::new().semantic_limits(limits),
+            |tx| tx.remove("/body/p[2]"),
+        );
         assert_eq!(result.is_ok(), success);
         if let Err(error) = result {
             assert_eq!(error.item(), Some(0));
@@ -326,8 +338,8 @@ fn stale_physical_sources_refuse_transaction_and_both_replay_directions() {
     let commit = file.edit(|tx| tx.remove("/body/p[2]")).unwrap();
     std::fs::write(&path, b"changed physical source").unwrap();
     for error in [
-        commit.patch.apply(&file).unwrap_err(),
-        commit.patch.inverse().apply(&commit.file).unwrap_err(),
+        commit.patch().apply(&file).unwrap_err(),
+        commit.patch().inverse().apply(commit.file()).unwrap_err(),
         file.edit(|_| Ok(())).unwrap_err(),
     ] {
         assert_eq!(error.code(), Code::IoError);
@@ -399,10 +411,10 @@ fn signature_authorization_is_bound_and_inverse_never_restores_signatures() {
             .edit(|tx| tx.set("/body/p[1]/r[1]", props! {"text" => "unsigned edit"}))
             .unwrap();
         assert_eq!(
-            commit.patch.apply(&signed_inner).unwrap_err().code(),
+            commit.patch().apply(&signed_inner).unwrap_err().code(),
             Code::DocumentProtected
         );
-        let restored = commit.patch.inverse().apply(&commit.file).unwrap();
+        let restored = commit.patch().inverse().apply(commit.file()).unwrap();
         assert!(!restored.is_signed());
         assert_eq!(restored.to_bytes().unwrap(), baseline);
         assert!(
@@ -411,8 +423,8 @@ fn signature_authorization_is_bound_and_inverse_never_restores_signatures() {
                 .is_signed()
         );
         let noop = unsigned.edit(|_| Ok(())).unwrap();
-        assert!(noop.patch.is_noop());
-        assert_eq!(noop.file.to_bytes().unwrap(), baseline);
+        assert!(noop.patch().is_noop());
+        assert_eq!(noop.file().to_bytes().unwrap(), baseline);
     }
 }
 
@@ -430,14 +442,14 @@ fn source_guards_survive_signature_removal_promotion_to_eager_owner() {
         .unwrap();
     std::fs::write(&path, b"changed physical source").unwrap();
     assert_eq!(
-        commit.patch.apply(&unsigned).unwrap_err().code(),
+        commit.patch().apply(&unsigned).unwrap_err().code(),
         Code::IoError
     );
     assert_eq!(
         commit
-            .patch
+            .patch()
             .inverse()
-            .apply(&commit.file)
+            .apply(commit.file())
             .unwrap_err()
             .code(),
         Code::IoError
@@ -471,12 +483,12 @@ fn unsigned_noop_and_cancelled_transactions_keep_the_logical_unsigned_baseline()
                     tx.set("/body/p[1]/r[1]", props! {"text" => original_text.as_str()})
                 })
                 .unwrap();
-            assert!(!commit.diagnostics.changed());
-            assert!(commit.patch.is_noop());
+            assert!(!commit.diagnostics().changed());
+            assert!(commit.patch().is_noop());
             for endpoint in [
-                commit.file.clone(),
-                commit.patch.apply(&file).unwrap(),
-                commit.patch.inverse().apply(&commit.file).unwrap(),
+                commit.file().clone(),
+                commit.patch().apply(&file).unwrap(),
+                commit.patch().inverse().apply(commit.file()).unwrap(),
             ] {
                 assert!(!endpoint.is_signed());
                 assert_eq!(endpoint.to_bytes().unwrap(), baseline);
@@ -500,8 +512,8 @@ fn replay_preserves_origin_for_both_endpoints() {
     let commit = file
         .edit(|tx| tx.set("/body/p[1]/r[1]", props! {"text" => "new"}))
         .unwrap();
-    let forward = commit.patch.apply(&file).unwrap();
-    let inverse = commit.patch.inverse().apply(&forward).unwrap();
+    let forward = commit.patch().apply(&file).unwrap();
+    let inverse = commit.patch().inverse().apply(&forward).unwrap();
     assert_eq!(forward.save().unwrap().path, path);
     assert_eq!(text(&litchi_ops::open(&path).unwrap()), "new");
     assert_eq!(inverse.save().unwrap().path, path);
@@ -571,14 +583,17 @@ fn closure_formatting_coalesces_typed_targets_and_preserves_exact_inverse() {
             .unwrap()
             .set(&path, props! {"italic"=>true})
             .unwrap();
-        assert_eq!(commit.diagnostics.operations(), 4);
-        assert_eq!(commit.diagnostics.commits(), 1);
-        assert_eq!(commit.file.to_bytes().unwrap(), oracle.to_bytes().unwrap());
+        assert_eq!(commit.diagnostics().operations(), 4);
+        assert_eq!(commit.diagnostics().commits(), 1);
+        assert_eq!(
+            commit.file().to_bytes().unwrap(),
+            oracle.to_bytes().unwrap()
+        );
         assert_eq!(
             commit
-                .patch
+                .patch()
                 .inverse()
-                .apply(&commit.file)
+                .apply(commit.file())
                 .unwrap()
                 .to_bytes()
                 .unwrap(),
@@ -615,8 +630,11 @@ fn closure_reads_publish_pending_formatting_and_structural_barriers_readdress() 
             .unwrap()
             .set("/body/p[1]/r[1]", props! {"italic"=>true})
             .unwrap();
-        assert_eq!(commit.diagnostics.commits(), 4);
-        assert_eq!(commit.file.to_bytes().unwrap(), oracle.to_bytes().unwrap());
+        assert_eq!(commit.diagnostics().commits(), 4);
+        assert_eq!(
+            commit.file().to_bytes().unwrap(),
+            oracle.to_bytes().unwrap()
+        );
     }
 }
 
@@ -646,14 +664,17 @@ fn pending_formatting_is_poisoned_by_caught_input_errors_and_operation_limits() 
         .build()
         .unwrap();
     let error = file
-        .edit_with_limits(&limits, |tx| {
-            tx.set("/body/p[1]/r[1]", props! {"bold"=>true})?;
-            assert_eq!(
-                tx.set("bad[", props! {"unknown"=>true}).unwrap_err().code(),
-                Code::LimitExceeded
-            );
-            Ok(())
-        })
+        .edit_with_options(
+            litchi_ops::EditOptions::new().semantic_limits(limits),
+            |tx| {
+                tx.set("/body/p[1]/r[1]", props! {"bold"=>true})?;
+                assert_eq!(
+                    tx.set("bad[", props! {"unknown"=>true}).unwrap_err().code(),
+                    Code::LimitExceeded
+                );
+                Ok(())
+            },
+        )
         .unwrap_err();
     assert_eq!(error.code(), Code::LimitExceeded);
     assert_eq!(error.item(), Some(1));
@@ -671,18 +692,21 @@ fn closure_group_retention_is_bounded_and_cancellation_keeps_exact_baseline() {
         .build()
         .unwrap();
     let commit = file
-        .edit_with_limits(&limits, |tx| {
-            for index in 0..100 {
-                tx.set("/body/p[1]/r[1]", props! {"bold"=>index % 2 == 0})?;
-            }
-            Ok(())
-        })
+        .edit_with_options(
+            litchi_ops::EditOptions::new().semantic_limits(limits),
+            |tx| {
+                for index in 0..100 {
+                    tx.set("/body/p[1]/r[1]", props! {"bold"=>index % 2 == 0})?;
+                }
+                Ok(())
+            },
+        )
         .unwrap();
-    assert_eq!(commit.diagnostics.operations(), 100);
-    assert_eq!(commit.diagnostics.commits(), 1);
-    assert!(!commit.diagnostics.changed());
-    assert!(commit.patch.is_noop());
-    assert_eq!(commit.file.to_bytes().unwrap(), original);
+    assert_eq!(commit.diagnostics().operations(), 100);
+    assert_eq!(commit.diagnostics().commits(), 1);
+    assert!(!commit.diagnostics().changed());
+    assert!(commit.patch().is_noop());
+    assert_eq!(commit.file().to_bytes().unwrap(), original);
 }
 
 #[test]
@@ -700,8 +724,11 @@ fn closure_selectors_observe_pending_formatting_before_matching() {
             .unwrap()
             .set("/body/p[align=center]", props! {"style"=>"Heading1"})
             .unwrap();
-        assert_eq!(commit.diagnostics.commits(), 2);
-        assert_eq!(commit.file.to_bytes().unwrap(), oracle.to_bytes().unwrap());
+        assert_eq!(commit.diagnostics().commits(), 2);
+        assert_eq!(
+            commit.file().to_bytes().unwrap(),
+            oracle.to_bytes().unwrap()
+        );
     }
 }
 
@@ -715,23 +742,23 @@ fn native_paragraph_text_controls_preserve_slots_and_inverse() {
                 Ok(())
             })
             .unwrap();
-        let bytes_after = commit.file.to_bytes().unwrap();
+        let bytes_after = commit.file().to_bytes().unwrap();
         let package = litchi_docx::Package::from_bytes(&bytes_after).unwrap();
         let paragraphs = package.document().unwrap().paragraphs().unwrap();
         assert_eq!(paragraphs.len(), 2);
         assert_eq!(paragraphs[0].text().unwrap(), "first\tline\nsecond");
         assert_eq!(paragraphs[0].runs().unwrap().len(), 2);
         let repeat = commit
-            .file
+            .file()
             .edit(|edit| edit.set("/body/p[1]", props! { "text" => "first\tline\nsecond" }))
             .unwrap();
-        assert!(!repeat.diagnostics.changed());
-        assert_eq!(repeat.file.to_bytes().unwrap(), bytes_after);
+        assert!(!repeat.diagnostics().changed());
+        assert_eq!(repeat.file().to_bytes().unwrap(), bytes_after);
         assert_eq!(
             commit
-                .patch
+                .patch()
                 .inverse()
-                .apply(&commit.file)
+                .apply(commit.file())
                 .unwrap()
                 .to_bytes()
                 .unwrap(),
@@ -740,7 +767,7 @@ fn native_paragraph_text_controls_preserve_slots_and_inverse() {
         for invalid in ["bad\rtext", "bad\u{b}text", "bad\u{1}text"] {
             assert!(
                 commit
-                    .file
+                    .file()
                     .set("/body/p[1]", props! { "text" => invalid })
                     .is_err()
             );

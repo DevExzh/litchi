@@ -3,7 +3,9 @@
 
 use std::sync::Arc;
 
-use super::{Commit, Diagnostics, Edit, Error, History, LimitKind, Patch, SemanticLimits};
+use super::{
+    Commit, Diagnostics, Edit, EditOptions, Error, History, LimitKind, Patch, SemanticLimits,
+};
 use crate::merge::{Options, Record, Summary};
 use crate::{Code, File, Result};
 
@@ -22,7 +24,7 @@ impl File {
     /// # Errors
     ///
     /// [`Code::InvalidValue`] for a value a document cannot store,
-    /// [`Code::LimitExceeded`] past the default [`SemanticLimits`],
+    /// [`Code::LimitExceeded`] past the default [`EditOptions`],
     /// [`Code::DocumentProtected`] for a signed or locked file, and
     /// [`Code::UnsupportedCapability`] for other formats. The template
     /// handle is unchanged on failure.
@@ -38,27 +40,29 @@ impl File {
     ///     .set("/Sheet1/A1", props! { "value" => "Invoice for {{client}}" })?;
     /// let record: Record = [("client", "Acme")].into_iter().collect();
     /// let commit = template.merge(&record, &Options::new())?;
-    /// let cell = commit.file.get("/Sheet1/A1")?;
+    /// let cell = commit.file().get("/Sheet1/A1")?;
     /// assert_eq!(cell.view().text()?.as_deref(), Some("Invoice for Acme"));
-    /// assert_eq!(commit.value.replacements(), 1);
+    /// assert_eq!(commit.value().replacements(), 1);
     /// # }
     /// # Ok::<(), litchi_ops::Error>(())
     /// ```
     pub fn merge(&self, record: &Record, options: &Options) -> Result<Commit<Summary>> {
-        self.merge_with_limits(record, options, &SemanticLimits::default())
+        self.merge_with_options(record, options, EditOptions::default())
     }
 
-    /// [`Self::merge`] under caller-selected transaction limits: raise
-    /// `max_expanded_targets` and `max_staged_bytes` for large templates.
+    /// [`Self::merge`] under caller-selected [`EditOptions`]: raise the
+    /// semantic limits' `max_expanded_targets` and `max_staged_bytes` for
+    /// large templates.
     ///
     /// # Errors
     /// As [`Self::merge`].
-    pub fn merge_with_limits(
+    pub fn merge_with_options(
         &self,
         record: &Record,
         options: &Options,
-        limits: &SemanticLimits,
+        edit_options: EditOptions,
     ) -> Result<Commit<Summary>> {
+        let limits = &edit_options.semantic_limits_value();
         // One merge is the transaction `File::edit` would build around
         // `Edit::merge`, without its separate admission editor: a DOCX merge
         // builds its editor first, which applies the same signature, source
@@ -105,12 +109,7 @@ impl File {
                 inverse: false,
             };
             patch.check_sources()?;
-            Ok(Commit {
-                file,
-                patch,
-                diagnostics,
-                value: summary,
-            })
+            Ok(Commit::new(file, patch, diagnostics, summary))
         })()
         .map_err(|error: crate::Error| {
             if error.item().is_some() {

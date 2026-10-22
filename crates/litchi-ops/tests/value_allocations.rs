@@ -629,10 +629,10 @@ fn ppt_coalesced_text_planning_does_not_copy_the_existing_body() {
                 Ok::<_, litchi_ops::Error>(())
             })
             .expect("commit");
-        assert_eq!(commit.diagnostics.operations(), 2);
+        assert_eq!(commit.diagnostics().operations(), 2);
         assert_eq!(
             commit
-                .file
+                .file()
                 .get("/slide[1]/shape[2]")
                 .expect("shape")
                 .view()

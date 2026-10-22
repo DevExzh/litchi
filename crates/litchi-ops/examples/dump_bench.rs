@@ -77,7 +77,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         let mut file = litchi_ops::create(FileFormat::Pptx)?;
         for chunk in items.chunks(60) {
-            file = file.batch(chunk, BatchMode::Atomic)?.file;
+            file = file.batch(chunk, BatchMode::Atomic)?.into_file();
         }
         Ok(file)
     }

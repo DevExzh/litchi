@@ -355,17 +355,20 @@ mod enabled {
         let start = Instant::now();
         let commit = fixture
             .unified
-            .edit_with_limits(&fixture.limits, |edit| {
-                for (path, text) in fixture.paths.iter().zip(&fixture.texts) {
-                    edit.set(path, props! { "text" => text.as_str() })?;
-                }
-                Ok::<_, litchi_ops::Error>(())
-            })
+            .edit_with_options(
+                litchi_ops::EditOptions::new().semantic_limits(fixture.limits),
+                |edit| {
+                    for (path, text) in fixture.paths.iter().zip(&fixture.texts) {
+                        edit.set(path, props! { "text" => text.as_str() })?;
+                    }
+                    Ok::<_, litchi_ops::Error>(())
+                },
+            )
             .expect("unified closure edit");
-        let commits = commit.diagnostics.commits();
-        let operations = commit.diagnostics.operations();
-        let file = commit.file;
-        drop(commit.patch);
+        let commits = commit.diagnostics().commits();
+        let operations = commit.diagnostics().operations();
+        let (file, patch, ()) = commit.into_parts();
+        drop(patch);
         UnifiedRun {
             file,
             elapsed_ns: start.elapsed().as_nanos(),
@@ -378,17 +381,17 @@ mod enabled {
         let start = Instant::now();
         let commit = fixture
             .unified
-            .batch_with_limits(
+            .batch_with_options(
                 fixture.batch_items.clone(),
                 BatchMode::Atomic,
-                &fixture.limits,
+                litchi_ops::EditOptions::new().semantic_limits(fixture.limits),
             )
             .expect("unified command batch");
-        let commits = commit.diagnostics.commits();
-        let operations = commit.diagnostics.operations();
-        let file = commit.file;
-        drop(commit.patch);
-        drop(commit.results);
+        let commits = commit.diagnostics().commits();
+        let operations = commit.diagnostics().operations();
+        let (file, patch, results) = commit.into_parts();
+        drop(patch);
+        drop(results);
         UnifiedRun {
             file,
             elapsed_ns: start.elapsed().as_nanos(),

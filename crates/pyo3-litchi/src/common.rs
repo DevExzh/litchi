@@ -347,10 +347,12 @@ impl Length {
 ///     The detected FileFormat, or None if format cannot be determined
 #[pyfunction]
 fn detect_file_format(py: Python<'_>, path: PathBuf) -> PyResult<Option<FileFormat>> {
-    py.detach(|| litchi::detect_file_format(&path))
-        .map(FileFormat::from_core)
-        .transpose()
-        .map_err(PyErr::from)
+    py.detach(|| {
+        litchi::detect_file_format(&path, &litchi::common::detection::SourceLimits::default())
+    })
+    .map(FileFormat::from_core)
+    .transpose()
+    .map_err(PyErr::from)
 }
 
 /// Detect file format from bytes
@@ -364,10 +366,15 @@ fn detect_file_format(py: Python<'_>, path: PathBuf) -> PyResult<Option<FileForm
 ///     The detected FileFormat, or None if format cannot be determined
 #[pyfunction]
 fn detect_file_format_from_bytes(py: Python<'_>, data: &[u8]) -> PyResult<Option<FileFormat>> {
-    py.detach(|| litchi::detect_file_format_from_bytes(data))
-        .map(FileFormat::from_core)
-        .transpose()
-        .map_err(PyErr::from)
+    py.detach(|| {
+        litchi::detect_file_format_from_bytes(
+            data,
+            &litchi::common::detection::SourceLimits::default(),
+        )
+    })
+    .map(FileFormat::from_core)
+    .transpose()
+    .map_err(PyErr::from)
 }
 
 /// A `repr()` preview of `text`: the text itself when it has at most

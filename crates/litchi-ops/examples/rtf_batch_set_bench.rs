@@ -521,12 +521,15 @@ fn native_once(case: &Prepared) -> Result<(litchi_rtf::Package, usize), litchi_r
 
 #[cfg(feature = "rtf")]
 fn unified_once(case: &Prepared) -> litchi_ops::Result<Commit<()>> {
-    case.unified.edit_with_limits(&case.limits, |edit| {
-        for (path, props) in case.paths.iter().zip(&case.props) {
-            edit.set(path, props)?;
-        }
-        Ok(())
-    })
+    case.unified.edit_with_options(
+        litchi_ops::EditOptions::new().semantic_limits(case.limits),
+        |edit| {
+            for (path, props) in case.paths.iter().zip(&case.props) {
+                edit.set(path, props)?;
+            }
+            Ok(())
+        },
+    )
 }
 
 #[cfg(feature = "rtf")]
@@ -553,13 +556,13 @@ fn run_case(case: &Prepared) -> Result<serde_json::Value, Box<dyn std::error::Er
                 let start = Instant::now();
                 let commit = black_box(unified_once(case)?);
                 let elapsed = start.elapsed().as_nanos();
-                assert_eq!(commit.diagnostics.commits(), 1);
-                assert_eq!(commit.diagnostics.operations(), case.paths.len());
+                assert_eq!(commit.diagnostics().commits(), 1);
+                assert_eq!(commit.diagnostics().operations(), case.paths.len());
                 assert_eq!(
-                    commit.diagnostics.leaf_operations(),
+                    commit.diagnostics().leaf_operations(),
                     case.expected_native_operations
                 );
-                let output = commit.file.to_bytes()?;
+                let output = commit.file().to_bytes()?;
                 assert_eq!(output, expected_bytes);
                 validate_output(case, &output)?;
                 if round >= 2 {

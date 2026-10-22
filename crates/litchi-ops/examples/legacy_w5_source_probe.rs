@@ -198,14 +198,17 @@ mod probe {
             .unwrap_or(7);
         probe.time_rounds("doc/batch1k_ops", 1, batch_rounds, || {
             let commit = file
-                .edit_with_limits(&limits, |tx| {
-                    for path in &paragraphs {
-                        tx.set(path.as_str(), props! { "bold" => true })?;
-                    }
-                    Ok(())
-                })
+                .edit_with_options(
+                    litchi_ops::EditOptions::new().semantic_limits(limits),
+                    |tx| {
+                        for path in &paragraphs {
+                            tx.set(path.as_str(), props! { "bold" => true })?;
+                        }
+                        Ok(())
+                    },
+                )
                 .expect("edit");
-            black_box(commit.file);
+            black_box(commit.file());
         });
         let package = litchi_doc::Package::from_bytes(&bytes).expect("package");
         probe.time_rounds("doc/batch1k_leaf", 1, batch_rounds, || {

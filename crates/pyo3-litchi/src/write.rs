@@ -181,7 +181,11 @@ impl Items {
         match self {
             Self::Converted(items) => file.batch(items, mode).map_err(read),
             Self::Json(json) => {
-                let items = litchi::batch::from_bytes(json.bytes()).map_err(read)?;
+                let items = litchi::batch::from_bytes(
+                    json.bytes(),
+                    &litchi::batch::SourceLimits::default(),
+                )
+                .map_err(read)?;
                 file.batch(items, mode).map_err(read)
             },
         }
@@ -549,11 +553,12 @@ impl State {
         self.ran = true;
         match result {
             Ok(commit) => {
-                self.current = commit.file;
-                self.patches.push(commit.patch);
-                self.changed |= commit.diagnostics.changed();
+                self.changed |= commit.diagnostics().changed();
+                let (file, patch, value) = commit.into_parts();
+                self.current = file;
+                self.patches.push(patch);
                 self.first += count;
-                Ok(commit.value)
+                Ok(value)
             },
             Err(error) => {
                 let failure = Failure::read(&error);

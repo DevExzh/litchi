@@ -863,7 +863,9 @@ fn prepared_eager_ingress_preserves_exact_noop_and_untouched_members() {
     let directory = tempfile::tempdir().expect("prepared temporary directory");
     let path = directory.path().join("prepared.docx");
     std::fs::write(&path, &bytes).expect("write prepared fixture");
-    let prepared = litchi_ops::detect::detect_and_prepare(&path).expect("prepare fixture");
+    let prepared =
+        litchi_ops::detect::detect_and_prepare(&path, &litchi_ops::detect::SourceLimits::default())
+            .expect("prepare fixture");
     let eager = litchi_ops::open_prepared_with(
         prepared,
         &OpenOptions::new().source_mode(SourceMode::Eager),

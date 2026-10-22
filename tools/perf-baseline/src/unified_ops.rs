@@ -49,6 +49,7 @@ use litchi::{OpenOptions as UnifiedOpenOptions, SourceMode};
 use litchi_core::{Metadata, OwnedSource, Position, ReadAt};
 use litchi_ole_common::property_set::PropertySetReader;
 use litchi_opc::{OpcPackage, SourceBackedPackage, SourceLimits};
+use litchi_ops::detect::SourceLimits as DetectSourceLimits;
 use litchi_ops::transaction::SemanticLimits;
 use serde::Serialize;
 
@@ -1945,19 +1946,20 @@ fn apply_ppt_text_batch_unified(
     if paths.len() != props.len() {
         return Err("PPT text-batch path and property vectors differ".into());
     }
-    let commit = file.edit_with_limits(limits, |transaction| {
-        for (path, props) in paths.iter().zip(props) {
-            transaction.set(path.as_str(), props)?;
-        }
-        Ok(())
-    })?;
-    Ok((
-        commit.file,
-        PptTextBatchUnifiedStats {
-            operations: commit.diagnostics.operations(),
-            commits: commit.diagnostics.commits(),
+    let commit = file.edit_with_options(
+        litchi::EditOptions::new().semantic_limits(*limits),
+        |transaction| {
+            for (path, props) in paths.iter().zip(props) {
+                transaction.set(path.as_str(), props)?;
+            }
+            Ok(())
         },
-    ))
+    )?;
+    let stats = PptTextBatchUnifiedStats {
+        operations: commit.diagnostics().operations(),
+        commits: commit.diagnostics().commits(),
+    };
+    Ok((commit.into_file(), stats))
 }
 
 fn prepare_ppt_text_batch(
@@ -3473,6 +3475,7 @@ fn run_detection(
     if entry.leg == Leg::Leaf && !matches!(mode, DetectionMode::Bytes | DetectionMode::Reader) {
         return Err("only the ODF byte and reader inputs have a leaf detector".into());
     }
+    let detection_limits = DetectSourceLimits::default();
     let mut elapsed = Vec::with_capacity(samples);
     for iteration in 0..iteration_count(warmup, samples)? {
         let (observed, duration, cursor) = match mode {
@@ -3482,7 +3485,10 @@ fn run_detection(
                 reader.set_position(original_position);
                 let started = Instant::now();
                 let observed = match entry.leg {
-                    Leg::Unified => litchi_ops::detect::detect_format_from_reader(&mut reader),
+                    Leg::Unified => litchi_ops::detect::detect_format_from_reader(
+                        &mut reader,
+                        &detection_limits,
+                    ),
                     Leg::Leaf => litchi_odf_common::detect::reader(
                         &mut reader,
                         litchi_odf_common::detect::Limits::default(),
@@ -3501,7 +3507,10 @@ fn run_detection(
                 let started = Instant::now();
                 let observed = match entry.leg {
                     Leg::Unified => {
-                        litchi_ops::detect::detect_file_format_from_bytes(&corpus.archive)
+                        litchi_ops::detect::detect_file_format_from_bytes(
+                            &corpus.archive,
+                            &detection_limits,
+                        )
                     },
                     Leg::Leaf => litchi_odf_common::detect::bytes(
                         &corpus.archive,

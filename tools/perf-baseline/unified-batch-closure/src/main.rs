@@ -120,11 +120,11 @@ pub fn limits() -> SemanticLimits {
 
 /// The unified leg: one atomic batch of a clone of `items`.
 pub fn unified_leg<'a>(file: &'a File, items: &'a [BatchItem<'static>]) -> Leg<'a> {
-    let limits = limits();
+    let options = litchi_ops::EditOptions::new().semantic_limits(limits());
     Box::new(move || {
         timed_with(
             || Ok(items.to_vec()),
-            |items| Ok(file.batch_with_limits(items, BatchMode::Atomic, &limits)?),
+            |items| Ok(file.batch_with_options(items, BatchMode::Atomic, options)?),
         )
     })
 }
@@ -132,22 +132,23 @@ pub fn unified_leg<'a>(file: &'a File, items: &'a [BatchItem<'static>]) -> Leg<'
 /// Runs the unified batch once and checks its accounting; returns the output
 /// bytes and the number of leaf commits.
 pub fn unified_output(file: &File, items: &[BatchItem<'static>]) -> Result<(Vec<u8>, usize)> {
-    let commit = file.batch_with_limits(items.to_vec(), BatchMode::Atomic, &limits())?;
+    let options = litchi_ops::EditOptions::new().semantic_limits(limits());
+    let commit = file.batch_with_options(items.to_vec(), BatchMode::Atomic, options)?;
     let changed = commit
-        .results
+        .results()
         .iter()
         .filter(|r| matches!(r, ItemResult::Applied(a) if a.changed))
         .count();
-    if commit.results.len() != items.len() || changed != items.len() {
+    if commit.results().len() != items.len() || changed != items.len() {
         return Err(format!(
             "unified accounting: {} results, {} changed, {} items",
-            commit.results.len(),
+            commit.results().len(),
             changed,
             items.len()
         )
         .into());
     }
-    Ok((commit.file.to_bytes()?, commit.diagnostics.commits()))
+    Ok((commit.file().to_bytes()?, commit.diagnostics().commits()))
 }
 
 /// Compares two outputs: exact bytes, else decoded ZIP members.

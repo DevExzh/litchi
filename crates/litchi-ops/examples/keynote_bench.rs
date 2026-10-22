@@ -520,7 +520,7 @@ fn main() {
                             Ok(())
                         })
                         .unwrap();
-                    assert_eq!(commit.diagnostics.commits(), 1);
+                    assert_eq!(commit.diagnostics().commits(), 1);
                     black_box(commit);
                 })
             }),
@@ -563,7 +563,7 @@ fn main() {
                             Ok(())
                         })
                         .unwrap();
-                    assert_eq!(commit.diagnostics.commits(), 1);
+                    assert_eq!(commit.diagnostics().commits(), 1);
                     black_box(commit);
                 })
             }),

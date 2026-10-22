@@ -83,34 +83,34 @@ fn history_replays_exact_endpoints_and_refuses_foreign_owners() {
             edit.set("/body/p[3]", props! {"text" => "last"})
         })
         .unwrap();
-    assert!(commit.diagnostics.changed());
-    assert_eq!(commit.diagnostics.operations(), 2);
+    assert!(commit.diagnostics().changed());
+    assert_eq!(commit.diagnostics().operations(), 2);
     assert_eq!(
-        commit.patch.apply(&source).unwrap().to_bytes().unwrap(),
-        commit.file.to_bytes().unwrap()
+        commit.patch().apply(&source).unwrap().to_bytes().unwrap(),
+        commit.file().to_bytes().unwrap()
     );
     assert_eq!(
         commit
-            .patch
+            .patch()
             .inverse()
-            .apply(&commit.file)
+            .apply(commit.file())
             .unwrap()
             .to_bytes()
             .unwrap(),
         INPUT
     );
     assert!(matches!(
-        commit.patch.apply(&file()).unwrap_err().leaf(),
+        commit.patch().apply(&file()).unwrap_err().leaf(),
         Source::Transaction(Error::PatchConflict)
     ));
-    assert!(!format!("{:?} {:?}", commit.patch, commit).contains("PRIVATE"));
+    assert!(!format!("{:?} {:?}", commit.patch(), commit).contains("PRIVATE"));
     let noop = source
         .edit(|edit| edit.set("/body/p[3]", props! {"text" => "Third"}))
         .unwrap();
-    assert!(!noop.diagnostics.changed());
-    assert!(noop.patch.is_noop());
-    assert_eq!(noop.file.to_bytes().unwrap(), INPUT);
-    assert!(commit.patch.apply(&noop.file).is_ok());
+    assert!(!noop.diagnostics().changed());
+    assert!(noop.patch().is_noop());
+    assert_eq!(noop.file().to_bytes().unwrap(), INPUT);
+    assert!(commit.patch().apply(noop.file()).is_ok());
 }
 
 #[test]
@@ -131,11 +131,11 @@ fn failed_edits_are_atomic_and_best_effort_keeps_successes() {
         Some(1)
     );
     let result = source.batch(commands(), BatchMode::BestEffort).unwrap();
-    assert_eq!(text(&result.file, "/body/p[1]"), "first");
-    assert_eq!(text(&result.file, "/body/p[2]"), "");
-    assert_eq!(text(&result.file, "/body/p[3]"), "last");
+    assert_eq!(text(result.file(), "/body/p[1]"), "first");
+    assert_eq!(text(result.file(), "/body/p[2]"), "");
+    assert_eq!(text(result.file(), "/body/p[3]"), "last");
     assert!(
-        matches!(&result.results[1], litchi_ops::ItemResult::Failed(error) if error.item() == Some(1))
+        matches!(&result.results()[1], litchi_ops::ItemResult::Failed(error) if error.item() == Some(1))
     );
     assert!(
         source
@@ -179,9 +179,10 @@ fn expansion_staging_and_snapshot_limits_refuse_candidates() {
         ),
     ] {
         let error = source
-            .edit_with_limits(&limits, |edit| {
-                edit.set(paragraph_query(), props! {"text" => "long"})
-            })
+            .edit_with_options(
+                litchi_ops::EditOptions::new().semantic_limits(limits),
+                |edit| edit.set(paragraph_query(), props! {"text" => "long"}),
+            )
             .unwrap_err();
         assert_eq!(error.code(), Code::LimitExceeded);
         assert!(
@@ -259,17 +260,18 @@ fn snapshot_admission_matches_reported_retained_charge() {
     let commit = source
         .edit(|edit| edit.set("/body/p[1]", props! {"text" => "x"}))
         .unwrap();
-    let weight = commit.diagnostics.snapshot_bytes();
-    assert!(weight > source.to_bytes().unwrap().len() + commit.file.to_bytes().unwrap().len());
+    let weight = commit.diagnostics().snapshot_bytes();
+    assert!(weight > source.to_bytes().unwrap().len() + commit.file().to_bytes().unwrap().len());
     for (maximum, expected) in [(weight, true), (weight - 1, false)] {
         let limits = SemanticLimits::builder()
             .max_snapshot_bytes(maximum)
             .unwrap()
             .build()
             .unwrap();
-        let result = source.edit_with_limits(&limits, |edit| {
-            edit.set("/body/p[1]", props! {"text" => "x"})
-        });
+        let result = source.edit_with_options(
+            litchi_ops::EditOptions::new().semantic_limits(limits),
+            |edit| edit.set("/body/p[1]", props! {"text" => "x"}),
+        );
         assert_eq!(result.is_ok(), expected);
     }
 }
@@ -288,18 +290,18 @@ fn restoring_text_does_not_hide_changes_to_the_native_artifact() {
         })
         .unwrap();
     assert_eq!(
-        commit.file.to_bytes().unwrap(),
+        commit.file().to_bytes().unwrap(),
         expected.to_bytes().unwrap()
     );
     assert_eq!(
-        commit.diagnostics.changed(),
+        commit.diagnostics().changed(),
         source.to_bytes().unwrap() != expected.to_bytes().unwrap()
     );
     assert_eq!(
         commit
-            .patch
+            .patch()
             .inverse()
-            .apply(&commit.file)
+            .apply(commit.file())
             .unwrap()
             .to_bytes()
             .unwrap(),

@@ -478,7 +478,7 @@ impl File {
     /// slides accept `hidden`. PPT anchors round to the nearest 1/576-inch
     /// master unit. Native closure checks may refuse unsupported records.
     /// Default [`crate::transaction::SemanticLimits`] bound expanded targets
-    /// and staged payloads. Use [`Self::edit_with_limits`] to select those bounds.
+    /// and staged payloads. Use [`Self::edit_with_options`] to select those bounds.
     ///
     /// A `find` property turns the call into a text search over the target's
     /// subtree, as OfficeCLI's `set --find` (record 0273): `replace` gives

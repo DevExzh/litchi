@@ -152,7 +152,7 @@ pub fn open_bytes_with(bytes: impl Into<Vec<u8>>, options: &OpenOptions) -> Resu
 /// with the tail's format for an input the tail names.
 ///
 /// ```no_run
-/// use litchi_ops::OpenOptions;
+/// use litchi_ops::{OpenOptions, detect::SourceLimits};
 /// use litchi_ops::detect::tail::NoZipTail;
 ///
 /// # fn main() -> litchi_ops::Result<()> {
@@ -258,10 +258,11 @@ pub fn open_bytes_with_tail<T: ZipTail>(
 /// changed after it was prepared, and the format's typed error otherwise.
 ///
 /// ```no_run
+/// use litchi_ops::OpenOptions;
 /// use litchi_ops::detect::detect_and_prepare;
 ///
 /// # fn main() -> litchi_ops::Result<()> {
-/// if let Some(detection) = detect_and_prepare("report.docx") {
+/// if let Some(detection) = detect_and_prepare("report.docx", &SourceLimits::default()) {
 ///     if detection.is_prepared() {
 ///         let file = litchi_ops::open_prepared(detection)?;
 ///         println!("{:?}", file.format());
@@ -709,8 +710,7 @@ fn unlock_ooxml_with_origin(
     #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
     {
         let limits = options.ooxml_limits.unwrap_or_default();
-        let detected =
-            crate::detect::ooxml::try_detect_zip_format_with_limits(opened.bytes(), limits)?;
+        let detected = crate::detect::ooxml::try_detect_zip_format(opened.bytes(), &limits)?;
         let Some(detected) = detected else {
             return Err(Error::unsupported_format(None));
         };
