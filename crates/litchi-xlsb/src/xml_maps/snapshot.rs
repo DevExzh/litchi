@@ -38,6 +38,9 @@ pub struct SemanticLimits {
     pub max_total_bindings: usize,
     /// Maximum UTF-16 XPath units accumulated across every XML binding.
     pub max_total_xpath_units: usize,
+    /// Raw BIFF12 record and string limits for the table and connection
+    /// streams the snapshot reads.
+    pub raw: crate::raw::Limits,
 }
 
 impl SemanticLimits {
@@ -51,6 +54,7 @@ impl SemanticLimits {
         max_total_bytes: 512 * 1024 * 1024,
         max_total_bindings: 1_000_000,
         max_total_xpath_units: 64 * 1024 * 1024,
+        raw: crate::raw::Limits::DEFAULT,
     };
 }
 

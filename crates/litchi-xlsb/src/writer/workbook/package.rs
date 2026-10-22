@@ -131,7 +131,10 @@ impl Builder {
             package.add_part(Box::new(BlobPart::new(
                 connections_uri.clone(),
                 "application/vnd.ms-excel.connections".to_string(),
-                crate::package::connections::write::write_connections_part(connections)?,
+                crate::package::connections::write::write_connections_part(
+                    connections,
+                    crate::raw::Limits::DEFAULT,
+                )?,
             )));
             package
                 .get_part_mut(&PackURI::new("/xl/workbook.bin")?)?

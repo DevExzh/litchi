@@ -50,7 +50,7 @@ impl Snapshot {
         }
         let parsed = codec::parse_workbook(workbook.blob(), limits)?;
         let part = inspect_model_part(package)?;
-        let connections = crate::package::connections::package::load(package)?;
+        let connections = crate::package::connections::package::load(package, limits.raw)?;
         if connections
             .as_ref()
             .is_some_and(|value| value.connections.len() > limits.max_connections)

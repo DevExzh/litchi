@@ -14,8 +14,8 @@ pub(crate) struct Source {
 }
 
 /// Parse a complete connections stream while retaining future records.
-pub(crate) fn parse_source(data: &[u8]) -> Result<Source> {
-    parse_connections_part(data)?;
+pub(crate) fn parse_source(data: &[u8], raw_limits: crate::raw::Limits) -> Result<Source> {
+    parse_connections_part(data, raw_limits)?;
     let mut unknown_records = Vec::new();
     let mut owner = None;
     let mut root_known = 0usize;
@@ -24,7 +24,10 @@ pub(crate) fn parse_source(data: &[u8]) -> Result<Source> {
 
     for record in crate::raw::Records::new(
         data,
-        crate::raw::Limits::new(write::MAX_CONNECTIONS_PART_BYTES, 1_048_576),
+        crate::raw::Limits::new(
+            write::MAX_CONNECTIONS_PART_BYTES.min(raw_limits.payload()),
+            raw_limits.string_units().min(1_048_576),
+        ),
     ) {
         let record = record?;
         let kind = record.kind();
@@ -50,7 +53,10 @@ pub(crate) fn parse_source(data: &[u8]) -> Result<Source> {
         let offset = record.offset();
         let (_, header_len) = crate::raw::Header::parse(
             &data[offset..],
-            crate::raw::Limits::new(write::MAX_CONNECTIONS_PART_BYTES, 1_048_576),
+            crate::raw::Limits::new(
+                write::MAX_CONNECTIONS_PART_BYTES.min(raw_limits.payload()),
+                raw_limits.string_units().min(1_048_576),
+            ),
         )?;
         let end = offset
             .checked_add(header_len)

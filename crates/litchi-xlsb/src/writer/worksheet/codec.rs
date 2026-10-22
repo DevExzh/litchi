@@ -80,19 +80,22 @@ impl Worksheet {
         writer.write_record(kind::BEGIN_WS_VIEWS, &[])?;
         writer.write_record(
             kind::BEGIN_WS_VIEW,
-            &crate::package::sheet_view::write_view_payload(self.view.as_ref())?,
+            &crate::package::sheet_view::write_view_payload(self.view.as_ref(), writer.limits())?,
         )?;
         if let Some(view) = &self.view {
             if let Some(pane) = &view.pane {
                 writer.write_record(
                     kind::PANE,
-                    &crate::package::sheet_view::write_pane_payload(pane)?,
+                    &crate::package::sheet_view::write_pane_payload(pane, writer.limits())?,
                 )?;
             }
             for selection in &view.selections {
                 writer.write_record(
                     kind::SEL,
-                    &crate::package::sheet_view::write_selection_payload(selection)?,
+                    &crate::package::sheet_view::write_selection_payload(
+                        selection,
+                        writer.limits(),
+                    )?,
                 )?;
             }
         }

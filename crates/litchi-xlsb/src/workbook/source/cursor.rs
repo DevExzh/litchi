@@ -175,7 +175,10 @@ impl SourceBackedWorksheet {
             if !cells_ascend(inputs.data.as_bytes())? {
                 return Ok(Stage::Pending);
             }
-            let _ = crate::package::scenarios::parse_worksheet(inputs.data.as_bytes())?;
+            let _ = crate::package::scenarios::parse_worksheet(
+                inputs.data.as_bytes(),
+                self.inner.raw_limits,
+            )?;
             if let Some(partname) = &inputs.comments_part {
                 let _ = self.read_comments(partname, &mut ToleranceReport::default())?;
             }

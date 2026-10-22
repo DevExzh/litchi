@@ -1648,7 +1648,10 @@ impl SourceBackedWorksheet {
                 let part = self.inner.package.part(&table_part.partname)?;
                 require_content_type(&part, XLSB_TABLE_CONTENT_TYPE)?;
                 let data = part.data()?;
-                let table = crate::package::table::parse_table_part(data.as_bytes())?;
+                let table = crate::package::table::parse_table_part(
+                    data.as_bytes(),
+                    self.inner.raw_limits,
+                )?;
                 postflight_package(&self.inner.package)?;
                 tables.push(table);
             }
@@ -1827,6 +1830,7 @@ impl SourceBackedWorksheet {
         )?;
         worksheet.set_scenarios(crate::package::scenarios::parse_worksheet(
             inputs.data.as_bytes(),
+            self.inner.raw_limits,
         )?);
         if let Some(partname) = inputs.comments_part {
             for comment in self.read_comments(&partname, worksheet.tolerance_report_mut())? {

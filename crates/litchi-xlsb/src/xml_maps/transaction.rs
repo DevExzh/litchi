@@ -536,7 +536,8 @@ impl Edit {
             .iter()
             .filter(|part| part.content_type == TABLE_CONTENT_TYPE)
         {
-            let host = crate::package::table::parse_table_part(part.bytes())?;
+            let host =
+                crate::package::table::parse_table_part(part.bytes(), self.before.limits().raw)?;
             if host.id != table_id {
                 continue;
             }

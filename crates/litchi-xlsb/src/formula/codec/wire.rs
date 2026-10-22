@@ -30,28 +30,13 @@ fn read_bytes(data: &[u8], offset: usize, length: usize) -> Result<&[u8]> {
 
 /// Refuse a stream or output longer than the caller's raw payload ceiling.
 fn admit_len(length: usize, limits: crate::raw::Limits) -> Result<()> {
-    if length > limits.payload() {
-        return Err(crate::raw::Error::PayloadLimit {
-            length,
-            limit: limits.payload(),
-            offset: 0,
-        }
-        .into());
-    }
+    limits.admit(length)?;
     Ok(())
 }
 
 /// Refuse an emitted string longer than the caller's UTF-16-unit ceiling.
 fn admit_units(units: usize, limits: crate::raw::Limits) -> Result<()> {
-    if units > limits.string_units() {
-        return Err(crate::raw::Error::StringLimit {
-            units,
-            limit: limits.string_units(),
-            offset: 0,
-        }
-        .into());
-    }
-    Ok(())
+    Ok(limits.admit_units(units, 0)?)
 }
 
 pub(super) fn read_u16_le_at(data: &[u8], offset: usize) -> Result<u16> {

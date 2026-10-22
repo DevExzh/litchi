@@ -311,29 +311,12 @@ impl DifferentialStyle {
 
 /// Validate `limits` and admit a `BrtDXF` payload of `length` bytes.
 fn admit_payload(length: usize, limits: crate::raw::Limits) -> Result<crate::raw::Limits> {
-    let limits = limits.validate()?;
-    if length > limits.payload() {
-        return Err(crate::raw::Error::PayloadLimit {
-            length,
-            limit: limits.payload(),
-            offset: 0,
-        }
-        .into());
-    }
-    Ok(limits)
+    Ok(limits.admit(length)?)
 }
 
 /// Refuse a font name above the profile's UTF-16-unit ceiling.
 fn admit_units(units: usize, limits: crate::raw::Limits, offset: usize) -> Result<()> {
-    if units > limits.string_units() {
-        return Err(crate::raw::Error::StringLimit {
-            units,
-            limit: limits.string_units(),
-            offset,
-        }
-        .into());
-    }
-    Ok(())
+    Ok(limits.admit_units(units, offset)?)
 }
 
 /// A staged conditional-format edit. Dropping it discards it.

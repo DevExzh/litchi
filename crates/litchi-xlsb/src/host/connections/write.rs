@@ -495,14 +495,18 @@ fn param_payload(parameter: &Parameter) -> Result<Vec<u8>> {
 }
 
 /// Serialize the complete External Data Connections part.
-pub(crate) fn write_connections_part(connections: &Connections) -> Result<Vec<u8>> {
-    write_connections_part_with_unknown(connections, &[])
+pub(crate) fn write_connections_part(
+    connections: &Connections,
+    raw_limits: crate::raw::Limits,
+) -> Result<Vec<u8>> {
+    write_connections_part_with_unknown(connections, &[], raw_limits)
 }
 
 /// Serialize a connections part while retaining source-owned opaque records.
 pub(crate) fn write_connections_part_with_unknown(
     connections: &Connections,
     unknown_records: &[UnknownRecord],
+    raw_limits: crate::raw::Limits,
 ) -> Result<Vec<u8>> {
     validate_connections(connections)?;
     let connection_ids: HashSet<u32> = connections
@@ -517,7 +521,7 @@ pub(crate) fn write_connections_part_with_unknown(
         ));
     }
     let mut data = Vec::with_capacity(512);
-    let mut writer = Encoder::new(&mut data, crate::raw::Limits::DEFAULT);
+    let mut writer = Encoder::new(&mut data, raw_limits);
     writer.write_record(rt::BEGIN_EXT_CONNECTIONS, &[])?;
     for connection in &connections.connections {
         if connection.name.is_empty() {
@@ -712,8 +716,8 @@ mod tests {
     #[test]
     fn serialized_connections_round_trip_through_the_reader() {
         let connections = sample_connections();
-        let bytes = write_connections_part(&connections).unwrap();
-        let parsed = parse_connections_part(&bytes).unwrap();
+        let bytes = write_connections_part(&connections, crate::raw::Limits::DEFAULT).unwrap();
+        let parsed = parse_connections_part(&bytes, crate::raw::Limits::DEFAULT).unwrap();
         assert_eq!(parsed.connections.len(), 3);
         assert_eq!(parsed, connections);
     }
@@ -722,7 +726,7 @@ mod tests {
     fn rejects_unnamed_and_mistyped_parameters() {
         let mut connections = Connections::default();
         connections.connections.push(Connection::default());
-        assert!(write_connections_part(&connections).is_err());
+        assert!(write_connections_part(&connections, crate::raw::Limits::DEFAULT).is_err());
 
         let mut connections = Connections::default();
         connections.connections.push(Connection {
@@ -737,6 +741,6 @@ mod tests {
             }],
             ..Connection::default()
         });
-        assert!(write_connections_part(&connections).is_err());
+        assert!(write_connections_part(&connections, crate::raw::Limits::DEFAULT).is_err());
     }
 }

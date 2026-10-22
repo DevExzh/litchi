@@ -1235,7 +1235,7 @@ impl Worksheet {
     pub fn set_web_extension_bindings(&mut self, bindings: Vec<Binding>) -> Result<()> {
         let mut app_refs = HashSet::with_capacity(bindings.len());
         for binding in &bindings {
-            binding.to_payload()?;
+            binding.to_payload(crate::raw::Limits::DEFAULT)?;
             if !app_refs.insert(binding.application_reference.as_str()) {
                 return Err(Error::refused(
                     litchi_core::edit::RefusalKind::InvalidValue,

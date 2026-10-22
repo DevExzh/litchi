@@ -725,6 +725,7 @@ impl Workbook {
             let definition = crate::package::pivot::parse_pivot_cache_definition_recording(
                 part.blob(),
                 &mut self.tolerance,
+                self.raw_limits,
             )?;
             pivot_cache_definitions.push((*cache_id, definition));
         }
@@ -733,6 +734,7 @@ impl Workbook {
             &self.package,
             workbook_part.partname(),
             &mut self.tolerance,
+            self.raw_limits,
         )?;
 
         let mut tables = Vec::new();
@@ -855,6 +857,7 @@ impl Workbook {
                     sheet_part.blob(),
                     name,
                     state,
+                    self.raw_limits,
                 )?;
                 if let Some(drawing_rel_id) = chart_sheet.drawing_rel_id.clone() {
                     let relationship = sheet_part.rels().get(&drawing_rel_id).ok_or({
@@ -910,6 +913,7 @@ impl Workbook {
             for table_rel_id in crate::package::table::parse_table_part_rel_ids_recording(
                 sheet_part.blob(),
                 &mut self.tolerance,
+                self.raw_limits,
             )? {
                 let relationship = sheet_part.rels().get(&table_rel_id).ok_or({
                     crate::package::error::Error::InvalidFormula(
@@ -925,6 +929,7 @@ impl Workbook {
                 let table = crate::package::table::parse_table_part_recording(
                     part.blob(),
                     &mut self.tolerance,
+                    self.raw_limits,
                 )?;
                 structured_tables.push((worksheet_index, table));
             }

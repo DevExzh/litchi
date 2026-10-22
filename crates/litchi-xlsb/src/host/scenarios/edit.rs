@@ -72,7 +72,7 @@ impl Edit {
     /// scenario collection.
     pub fn scenarios(&self, sheet: usize) -> Result<Option<Manager>> {
         let worksheet = self.staged.worksheet(sheet)?;
-        super::parse_worksheet(self.staged.blob(&worksheet)?)
+        super::parse_worksheet(self.staged.blob(&worksheet)?, self.staged.raw_limits())
     }
 
     /// Add or replace a worksheet's Scenario Manager. Returns whether
@@ -85,8 +85,12 @@ impl Edit {
     /// edit of a signed workbook.
     pub fn set_scenarios(&mut self, sheet: usize, scenarios: &Manager) -> Result<bool> {
         let worksheet = self.staged.worksheet(sheet)?;
-        let updated = super::replace_worksheet(self.staged.blob(&worksheet)?, Some(scenarios))?;
-        super::parse_worksheet(&updated)?;
+        let updated = super::replace_worksheet(
+            self.staged.blob(&worksheet)?,
+            Some(scenarios),
+            self.staged.raw_limits(),
+        )?;
+        super::parse_worksheet(&updated, self.staged.raw_limits())?;
         self.staged.replace_worksheet(&worksheet, updated)
     }
 
@@ -99,8 +103,12 @@ impl Edit {
     /// scenario collection, and a changed edit of a signed workbook.
     pub fn remove_scenarios(&mut self, sheet: usize) -> Result<bool> {
         let worksheet = self.staged.worksheet(sheet)?;
-        let updated = super::replace_worksheet(self.staged.blob(&worksheet)?, None)?;
-        super::parse_worksheet(&updated)?;
+        let updated = super::replace_worksheet(
+            self.staged.blob(&worksheet)?,
+            None,
+            self.staged.raw_limits(),
+        )?;
+        super::parse_worksheet(&updated, self.staged.raw_limits())?;
         self.staged.replace_worksheet(&worksheet, updated)
     }
 

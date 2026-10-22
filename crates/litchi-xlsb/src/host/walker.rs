@@ -31,27 +31,41 @@ pub(crate) struct RecordWalker<'a, 't> {
     iter: Records<'a>,
     tolerance: Tolerance<'t>,
     current: Option<(Kind, usize)>,
+    limits: crate::raw::Limits,
 }
 
 impl<'a> RecordWalker<'a, 'static> {
-    /// Walk `data`, refusing every defect (no report can carry a repair).
-    pub(crate) fn new(data: &'a [u8]) -> Self {
+    /// Walk `data` under `limits`, refusing every defect (no report can
+    /// carry a repair).
+    pub(crate) fn new(data: &'a [u8], limits: crate::raw::Limits) -> Self {
         RecordWalker {
-            iter: Records::new(data, crate::raw::Limits::DEFAULT),
+            iter: Records::new(data, limits),
             tolerance: Tolerance::refusing(),
             current: None,
+            limits,
         }
     }
 }
 
 impl<'a, 't> RecordWalker<'a, 't> {
-    /// Walk `data`, recording Excel-compatible repairs into `report`.
-    pub(crate) fn recording(data: &'a [u8], report: &'t mut ToleranceReport) -> Self {
+    /// Walk `data` under `limits`, recording Excel-compatible repairs into
+    /// `report`.
+    pub(crate) fn recording(
+        data: &'a [u8],
+        report: &'t mut ToleranceReport,
+        limits: crate::raw::Limits,
+    ) -> Self {
         RecordWalker {
-            iter: Records::new(data, crate::raw::Limits::DEFAULT),
+            iter: Records::new(data, limits),
             tolerance: Tolerance::recording(report),
             current: None,
+            limits,
         }
+    }
+
+    /// The raw profile this walk admits records and payload strings under.
+    pub(crate) const fn limits(&self) -> crate::raw::Limits {
+        self.limits
     }
 
     pub(crate) fn next(&mut self) -> Result<Option<Record<'a>>> {

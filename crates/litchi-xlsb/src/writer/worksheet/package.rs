@@ -116,7 +116,10 @@ impl Worksheet {
         if !self.web_extension_bindings.is_empty() {
             writer.write_record(kind::BEGIN_WEB_EXTENSIONS, &[])?;
             for binding in &self.web_extension_bindings {
-                writer.write_record(kind::WEB_EXTENSION, &binding.to_payload()?)?;
+                writer.write_record(
+                    kind::WEB_EXTENSION,
+                    &binding.to_payload(crate::raw::Limits::DEFAULT)?,
+                )?;
             }
             writer.write_record(kind::END_WEB_EXTENSIONS, &[])?;
         }

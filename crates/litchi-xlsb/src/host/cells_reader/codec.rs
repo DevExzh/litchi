@@ -59,7 +59,7 @@ where
                 break;
             }
             if typ == kind::BEGIN_WS_VIEWS {
-                views = crate::package::sheet_view::read_views(&mut iter, &mut buf)?;
+                views = crate::package::sheet_view::read_views(&mut iter, &mut buf, raw_limits)?;
             }
         }
         if buf.len() != 16 {
@@ -89,7 +89,7 @@ where
                     Tolerance::recording(&mut tolerance),
                 )?);
             } else if typ == kind::BEGIN_WS_VIEWS {
-                views = crate::package::sheet_view::read_views(&mut iter, &mut buf)?;
+                views = crate::package::sheet_view::read_views(&mut iter, &mut buf, raw_limits)?;
             }
         }
 
@@ -724,9 +724,11 @@ where
                             val: "binding count exceeds 65,536",
                         });
                     }
-                    let binding = Binding::parse_payload(&self.buf, |index| {
-                        self.formula_context.is_internal_single_sheet_xti(index)
-                    })?;
+                    let binding = Binding::parse_payload(
+                        &self.buf,
+                        |index| self.formula_context.is_internal_single_sheet_xti(index),
+                        self.raw_limits,
+                    )?;
                     if !app_refs.insert(binding.application_reference.clone()) {
                         return Err(Error::Unrecognized {
                             typ: "WEBEXTENSIONS",

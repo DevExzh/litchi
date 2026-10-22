@@ -178,7 +178,7 @@ fn odbc_connection_records() -> Vec<(Kind, Vec<u8>)> {
 #[test]
 fn parses_odbc_connection_with_db_props_and_parameters() {
     let part = full_part(&odbc_connection_records());
-    let connections = parse_connections_part(&part).unwrap();
+    let connections = parse_connections_part(&part, crate::raw::Limits::DEFAULT).unwrap();
     assert_eq!(connections.connections.len(), 1);
     let connection = &connections.connections[0];
     assert_eq!(connection.connection_id, 42);
@@ -250,7 +250,8 @@ fn parses_olap_and_web_connections_with_lookup_helpers() {
         record(rt::END_EC_WP_TABLES, &[]),
         record(rt::END_EXT_CONNECTION, &[]),
     ];
-    let connections = parse_connections_part(&full_part(&records)).unwrap();
+    let connections =
+        parse_connections_part(&full_part(&records), crate::raw::Limits::DEFAULT).unwrap();
     assert_eq!(connections.connections.len(), 2);
     match &connections.connections[0].properties {
         Properties::Olap(olap) => {
@@ -305,7 +306,7 @@ fn skips_unknown_records_and_extension_collections() {
     let mut part = vec![record(rt::BEGIN_EXT_CONNECTIONS, &[])];
     part.append(&mut records);
     part.push(record(rt::END_EXT_CONNECTIONS, &[]));
-    let connections = parse_connections_part(&build(&part)).unwrap();
+    let connections = parse_connections_part(&build(&part), crate::raw::Limits::DEFAULT).unwrap();
     assert_eq!(connections.connections.len(), 1);
     assert_eq!(connections.connections[0].source_type, SourceType::Text);
     assert_eq!(connections.connections[0].properties, Properties::None);
@@ -314,15 +315,30 @@ fn skips_unknown_records_and_extension_collections() {
 #[test]
 fn rejects_malformed_parts() {
     // Not a connections part.
-    assert!(parse_connections_part(&build(&[record(rt::BEGIN_LIST, &[])])).is_err());
+    assert!(
+        parse_connections_part(
+            &build(&[record(rt::BEGIN_LIST, &[])]),
+            crate::raw::Limits::DEFAULT
+        )
+        .is_err()
+    );
     // Truncated stream.
-    assert!(parse_connections_part(&build(&[record(rt::BEGIN_EXT_CONNECTIONS, &[])])).is_err());
+    assert!(
+        parse_connections_part(
+            &build(&[record(rt::BEGIN_EXT_CONNECTIONS, &[])]),
+            crate::raw::Limits::DEFAULT
+        )
+        .is_err()
+    );
     // Non-empty begin payload.
     assert!(
-        parse_connections_part(&build(&[
-            record(rt::BEGIN_EXT_CONNECTIONS, &[0x01]),
-            record(rt::END_EXT_CONNECTIONS, &[]),
-        ]))
+        parse_connections_part(
+            &build(&[
+                record(rt::BEGIN_EXT_CONNECTIONS, &[0x01]),
+                record(rt::END_EXT_CONNECTIONS, &[]),
+            ]),
+            crate::raw::Limits::DEFAULT
+        )
         .is_err()
     );
     // Truncated connection payload.
@@ -332,7 +348,7 @@ fn rejects_malformed_parts() {
         record(rt::END_EXT_CONNECTION, &[]),
         record(rt::END_EXT_CONNECTIONS, &[]),
     ];
-    assert!(parse_connections_part(&build(&records)).is_err());
+    assert!(parse_connections_part(&build(&records), crate::raw::Limits::DEFAULT).is_err());
     // Unknown DBType.
     records = vec![
         record(rt::BEGIN_EXT_CONNECTIONS, &[]),
@@ -343,7 +359,7 @@ fn rejects_malformed_parts() {
         record(rt::END_EXT_CONNECTION, &[]),
         record(rt::END_EXT_CONNECTIONS, &[]),
     ];
-    assert!(parse_connections_part(&build(&records)).is_err());
+    assert!(parse_connections_part(&build(&records), crate::raw::Limits::DEFAULT).is_err());
     // Duplicate connection ids are rejected after the complete part is parsed.
     records = vec![
         record(rt::BEGIN_EXT_CONNECTIONS, &[]),
@@ -359,7 +375,7 @@ fn rejects_malformed_parts() {
         record(rt::END_EXT_CONNECTION, &[]),
         record(rt::END_EXT_CONNECTIONS, &[]),
     ];
-    assert!(parse_connections_part(&build(&records)).is_err());
+    assert!(parse_connections_part(&build(&records), crate::raw::Limits::DEFAULT).is_err());
     // Unterminated connection collection.
     records = vec![
         record(rt::BEGIN_EXT_CONNECTIONS, &[]),
@@ -369,7 +385,7 @@ fn rejects_malformed_parts() {
         ),
         record(rt::END_EXT_CONNECTIONS, &[]),
     ];
-    assert!(parse_connections_part(&build(&records)).is_err());
+    assert!(parse_connections_part(&build(&records), crate::raw::Limits::DEFAULT).is_err());
 }
 
 fn generated_package() -> crate::Package {
@@ -445,7 +461,10 @@ fn source_checked_transaction_preserves_opaque_records_and_inverse() {
             .any(|window| window == opaque.as_slice())
     );
     assert_eq!(
-        parse_connections_part(edited).unwrap().connections[0].name,
+        parse_connections_part(edited, crate::raw::Limits::DEFAULT)
+            .unwrap()
+            .connections[0]
+            .name,
         "After"
     );
 

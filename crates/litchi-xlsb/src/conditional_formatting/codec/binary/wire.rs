@@ -582,27 +582,10 @@ pub(crate) fn admit_payload(
     length: usize,
     limits: crate::raw::Limits,
 ) -> Result<crate::raw::Limits> {
-    let limits = limits.validate()?;
-    if length > limits.payload() {
-        return Err(crate::raw::Error::PayloadLimit {
-            length,
-            limit: limits.payload(),
-            offset: 0,
-        }
-        .into());
-    }
-    Ok(limits)
+    Ok(limits.admit(length)?)
 }
 
 /// Refuse a declared or emitted string longer than the UTF-16-unit ceiling.
 pub(crate) fn admit_units(units: usize, limits: crate::raw::Limits, offset: usize) -> Result<()> {
-    if units > limits.string_units() {
-        return Err(crate::raw::Error::StringLimit {
-            units,
-            limit: limits.string_units(),
-            offset,
-        }
-        .into());
-    }
-    Ok(())
+    Ok(limits.admit_units(units, offset)?)
 }

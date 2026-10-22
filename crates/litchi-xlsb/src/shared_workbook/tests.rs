@@ -8,7 +8,7 @@ use crate::raw::{Encoder, Kind, Records};
 use litchi_opc::{OpcPackage, PackURI};
 
 fn read(package: &OpcPackage) -> super::Result<Snapshot> {
-    Snapshot::read(package)
+    Snapshot::read(package, crate::raw::Limits::DEFAULT)
 }
 
 fn start_edit(package: &OpcPackage) -> Edit {
@@ -23,7 +23,7 @@ fn apply(package: &mut OpcPackage, patch: &Patch) -> super::Result<Snapshot> {
         .apply_shared_workbook(patch)?
         .into_package();
     *package = published.into_opc();
-    Snapshot::read(package)
+    Snapshot::read(package, crate::raw::Limits::DEFAULT)
 }
 
 const FUTURE_KIND: u16 = 0x3fff;
@@ -121,12 +121,12 @@ fn opaque_revision_records_are_borrowed_without_replay() {
 
 #[test]
 fn malformed_biff12_records_are_rejected_without_partial_metadata() {
-    assert!(super::codec::parse_log(&[0x80]).is_err());
+    assert!(super::codec::parse_log(&[0x80], crate::raw::Limits::DEFAULT).is_err());
 
     let mut users = Vec::new();
     let mut writer = Encoder::new(&mut users, crate::raw::Limits::DEFAULT);
     writer.write_record(Kind::new(401).unwrap(), &[]).unwrap();
-    assert!(super::codec::parse_users(&users).is_err());
+    assert!(super::codec::parse_users(&users, crate::raw::Limits::DEFAULT).is_err());
 }
 
 fn fixture() -> (OpcPackage, PackURI) {
@@ -177,7 +177,7 @@ fn fixture() -> (OpcPackage, PackURI) {
             b"opaque-log".to_vec(),
         )])],
     };
-    store(&mut package, &catalog).unwrap();
+    store(&mut package, &catalog, crate::raw::Limits::DEFAULT).unwrap();
     let headers = package
         .iter_parts()
         .find(|part| part.content_type() == super::package::HEADERS_CONTENT_TYPE)

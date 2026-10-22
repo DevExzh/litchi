@@ -12,9 +12,12 @@ use super::model::{PivotCacheDefinition, PivotCacheRecords};
 ///
 /// This standalone parser cannot report repairs, so it refuses every defect
 /// an opened workbook repairs and records (see [`crate::leniency`]).
-pub fn parse_pivot_cache_definition(data: &[u8]) -> Result<PivotCacheDefinition> {
+pub fn parse_pivot_cache_definition(
+    data: &[u8],
+    limits: crate::raw::Limits,
+) -> Result<PivotCacheDefinition> {
     let definition = super::parse::parse_pivot_cache_definition_binary(
-        crate::package::walker::RecordWalker::new(data),
+        crate::package::walker::RecordWalker::new(data, limits),
     )?;
     super::validation::validate_definition(&definition)?;
     Ok(definition)
@@ -25,9 +28,10 @@ pub fn parse_pivot_cache_definition(data: &[u8]) -> Result<PivotCacheDefinition>
 pub(crate) fn parse_pivot_cache_definition_recording(
     data: &[u8],
     report: &mut crate::leniency::ToleranceReport,
+    limits: crate::raw::Limits,
 ) -> Result<PivotCacheDefinition> {
     let definition = super::parse::parse_pivot_cache_definition_binary(
-        crate::package::walker::RecordWalker::recording(data, report),
+        crate::package::walker::RecordWalker::recording(data, report, limits),
     )?;
     super::validation::validate_definition(&definition)?;
     Ok(definition)
@@ -40,9 +44,10 @@ pub(crate) fn parse_pivot_cache_definition_recording(
 pub fn parse_pivot_cache_records(
     data: &[u8],
     definition: &PivotCacheDefinition,
+    limits: crate::raw::Limits,
 ) -> Result<PivotCacheRecords> {
     super::validation::validate_records_precondition(definition)?;
-    let records = super::records::parse_pivot_cache_records_binary(data, definition)?;
+    let records = super::records::parse_pivot_cache_records_binary(data, definition, limits)?;
     super::validation::validate_records(definition, &records)?;
     Ok(records)
 }

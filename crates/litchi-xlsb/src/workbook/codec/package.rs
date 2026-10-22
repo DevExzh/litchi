@@ -38,6 +38,7 @@ impl Workbook {
         Ok(crate::slicer::package::load_caches(
             &self.package,
             &litchi_opc::PackURI::new("/xl/workbook.bin")?,
+            self.raw_limits,
         )?
         .into_iter()
         .map(|part| part.cache)
@@ -47,7 +48,10 @@ impl Workbook {
     /// Return inert slicer views attached to one worksheet.
     pub fn slicers(&self, worksheet_index: usize) -> Result<Option<crate::slicer::Views>> {
         let worksheet = self.worksheet_uri(worksheet_index)?;
-        Ok(crate::slicer::package::load_views(&self.package, &worksheet)?.map(|part| part.views))
+        Ok(
+            crate::slicer::package::load_views(&self.package, &worksheet, self.raw_limits)?
+                .map(|part| part.views),
+        )
     }
 
     /// Return inert timeline cache snapshots in workbook relationship order.
@@ -77,7 +81,7 @@ impl Workbook {
     ) -> Result<Option<crate::package::scenarios::Manager>> {
         let uri = self.worksheet_uri(worksheet_index)?;
         let part = self.package.get_part(&uri)?;
-        crate::package::scenarios::parse_worksheet(part.blob())
+        crate::package::scenarios::parse_worksheet(part.blob(), self.raw_limits)
     }
 
     /// Return the typed Scenario Manager for a worksheet selected by name.

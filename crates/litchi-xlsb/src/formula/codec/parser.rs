@@ -181,31 +181,14 @@ impl<'a> Parser<'a> {
 
     /// Admit both streams against the caller's raw payload ceiling.
     fn admit(&self) -> Result<()> {
-        let limits = self.limits.validate()?;
-        for length in [self.data.len(), self.extra.len()] {
-            if length > limits.payload() {
-                return Err(crate::raw::Error::PayloadLimit {
-                    length,
-                    limit: limits.payload(),
-                    offset: 0,
-                }
-                .into());
-            }
-        }
+        self.limits.admit(self.data.len())?;
+        self.limits.admit(self.extra.len())?;
         Ok(())
     }
 
     /// Refuse a declared string longer than the caller's UTF-16-unit ceiling.
     fn admit_units(&self, units: usize, offset: usize) -> Result<()> {
-        if units > self.limits.string_units() {
-            return Err(crate::raw::Error::StringLimit {
-                units,
-                limit: self.limits.string_units(),
-                offset,
-            }
-            .into());
-        }
-        Ok(())
+        Ok(self.limits.admit_units(units, offset)?)
     }
 
     /// Parse a single token

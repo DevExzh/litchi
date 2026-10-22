@@ -33,12 +33,14 @@ fn invalid(detail: &'static str) -> Error {
 pub(crate) fn load_from_workbook(
     package: &OpcPackage,
     workbook_uri: &PackURI,
+    raw_limits: crate::raw::Limits,
 ) -> Result<Option<Connections>> {
     let Some(graph) = discover_graph(package, workbook_uri)? else {
         return Ok(None);
     };
     Ok(Some(parse_connections_part(
         package.get_part(&graph.part_name)?.blob(),
+        raw_limits,
     )?))
 }
 
@@ -47,6 +49,7 @@ pub(crate) fn load_from_workbook_recording(
     package: &OpcPackage,
     workbook_uri: &PackURI,
     report: &mut crate::leniency::ToleranceReport,
+    raw_limits: crate::raw::Limits,
 ) -> Result<Option<Connections>> {
     let Some(graph) = discover_graph(package, workbook_uri)? else {
         return Ok(None);
@@ -54,6 +57,7 @@ pub(crate) fn load_from_workbook_recording(
     Ok(Some(super::parse::parse_connections_part_recording(
         package.get_part(&graph.part_name)?.blob(),
         report,
+        raw_limits,
     )?))
 }
 
@@ -101,31 +105,29 @@ pub(crate) fn preflight(
     Ok(())
 }
 
-/// Load and validate the workbook-level connections owner.
-pub fn load(package: &OpcPackage) -> Result<Option<Connections>> {
+/// Load and validate the workbook-level connections owner, including its
+/// complete OPC graph, under an explicit raw profile.
+pub fn load(package: &OpcPackage, raw_limits: crate::raw::Limits) -> Result<Option<Connections>> {
     let workbook = package.main_document_part()?;
-    load_from_workbook(package, workbook.partname())
-}
-
-/// Validate the complete OPC connections graph and return its typed model.
-pub fn validate_graph(package: &OpcPackage) -> Result<Option<Connections>> {
-    load(package)
+    load_from_workbook(package, workbook.partname(), raw_limits)
 }
 
 pub(crate) fn store_on_workbook(
     package: &mut OpcPackage,
     workbook_uri: &PackURI,
     connections: &Connections,
+    raw_limits: crate::raw::Limits,
 ) -> Result<Connections> {
     let existing = discover_graph(package, workbook_uri)?;
     let payload = if let Some(graph) = existing.as_ref() {
-        let source = super::codec::parse_source(package.get_part(&graph.part_name)?.blob())?;
-        write_connections_part_with_unknown(connections, &source.unknown_records)?
+        let source =
+            super::codec::parse_source(package.get_part(&graph.part_name)?.blob(), raw_limits)?;
+        write_connections_part_with_unknown(connections, &source.unknown_records, raw_limits)?
     } else {
-        write_connections_part(connections)?
+        write_connections_part(connections, raw_limits)?
     };
     // Treat the reader as a post-serialization grammar oracle before mutation.
-    let canonical_model = parse_connections_part(&payload)?;
+    let canonical_model = parse_connections_part(&payload, raw_limits)?;
     let canonical_part = PackURI::new(CONNECTIONS_PART_NAME)?;
     if existing
         .as_ref()
@@ -153,7 +155,7 @@ pub(crate) fn store_on_workbook(
         .get_part_mut(workbook_uri)?
         .rels_mut()
         .get_or_add(CONNECTIONS_RELATIONSHIP_TYPE, &target);
-    load_from_workbook(package, workbook_uri)?
+    load_from_workbook(package, workbook_uri, raw_limits)?
         .ok_or_else(|| invalid("stored connections graph was not discoverable"))?;
     Ok(canonical_model)
 }

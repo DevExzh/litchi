@@ -35,7 +35,13 @@ fn writes_worksheet_web_extension_collection() {
         rgce: vec![0x3B, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 1, 0],
         rgcb: Vec::new(),
     };
-    let binding = Binding::new("sales-table", formula, |index| index == 0).unwrap();
+    let binding = Binding::new(
+        "sales-table",
+        formula,
+        |index| index == 0,
+        crate::raw::Limits::DEFAULT,
+    )
+    .unwrap();
     let mut sheet = Worksheet::new("Sheet1");
     sheet
         .set_web_extension_bindings(vec![binding.clone()])
@@ -55,7 +61,12 @@ fn writes_worksheet_web_extension_collection() {
     assert!(records[begin].payload().is_empty());
     assert_eq!(records[begin + 1].kind(), kind::WEB_EXTENSION);
     assert_eq!(
-        Binding::parse_payload(records[begin + 1].payload(), |index| index == 0).unwrap(),
+        Binding::parse_payload(
+            records[begin + 1].payload(),
+            |index| index == 0,
+            crate::raw::Limits::DEFAULT
+        )
+        .unwrap(),
         binding
     );
     assert_eq!(records[begin + 2].kind(), kind::END_WEB_EXTENSIONS);

@@ -89,9 +89,13 @@ impl Workbook {
             self.raw_limits,
             self.leniency,
         )?;
-        worksheet.set_scenarios(crate::package::scenarios::parse_worksheet(blob)?);
+        worksheet.set_scenarios(crate::package::scenarios::parse_worksheet(
+            blob,
+            self.raw_limits,
+        )?);
         worksheet.set_slicers(
-            crate::slicer::package::load_views(&self.package, &sheet_uri)?.map(|part| part.views),
+            crate::slicer::package::load_views(&self.package, &sheet_uri, self.raw_limits)?
+                .map(|part| part.views),
         );
         worksheet.set_timelines(
             crate::timeline::package::load_views(&self.package, &sheet_uri)?.map(|part| part.views),

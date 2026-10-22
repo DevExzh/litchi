@@ -121,9 +121,9 @@ fn legacy_default_view() -> View {
 }
 
 /// Parse a `BrtBeginWsView` payload.
-pub fn parse_view(data: &[u8]) -> Result<View> {
+pub fn parse_view(data: &[u8], limits: crate::raw::Limits) -> Result<View> {
     let context = "BrtBeginWsView";
-    let mut cursor = Cursor::new(data, context, crate::raw::Limits::DEFAULT);
+    let mut cursor = Cursor::new(data, context, limits.admit(data.len())?);
     let flags = cursor.read_u16()?;
     if flags & !VIEW_FLAG_MASK != 0 {
         return Err(malformed(context, "reserved view flags are set"));
@@ -178,7 +178,7 @@ pub fn parse_view(data: &[u8]) -> Result<View> {
 }
 
 /// Serialize a `BrtBeginWsView` payload. `None` writes the legacy default.
-pub fn write_view_payload(view: Option<&View>) -> Result<Vec<u8>> {
+pub fn write_view_payload(view: Option<&View>, limits: crate::raw::Limits) -> Result<Vec<u8>> {
     let view = view.cloned().unwrap_or_else(legacy_default_view);
     let display = view.display;
     let mut flags = 0u16;
@@ -204,7 +204,7 @@ pub fn write_view_payload(view: Option<&View>) -> Result<Vec<u8>> {
     }
 
     let mut payload = Vec::with_capacity(WS_VIEW_LEN);
-    let mut writer = Encoder::new(&mut payload, crate::raw::Limits::DEFAULT);
+    let mut writer = Encoder::new(&mut payload, limits);
     writer.write_u16(flags)?;
     writer.write_u32(mode_to_u32(view.mode))?;
     writer.write_u32(view.origin.row().get())?;
@@ -218,13 +218,14 @@ pub fn write_view_payload(view: Option<&View>) -> Result<Vec<u8>> {
     writer.write_u16(view.zoom.page_layout.map_or(0, Scale::get))?;
     writer.write_u32(view.window.get())?;
     debug_assert_eq!(payload.len(), WS_VIEW_LEN);
+    limits.admit(payload.len())?;
     Ok(payload)
 }
 
 /// Parse a `BrtPane` payload.
-pub fn parse_pane(data: &[u8]) -> Result<Pane> {
+pub fn parse_pane(data: &[u8], limits: crate::raw::Limits) -> Result<Pane> {
     let context = "BrtPane";
-    let mut cursor = Cursor::new(data, context, crate::raw::Limits::DEFAULT);
+    let mut cursor = Cursor::new(data, context, limits.admit(data.len())?);
     let horizontal = cursor.read_f64()?;
     let vertical = cursor.read_f64()?;
     let top_left = cell(cursor.read_u32()?, cursor.read_u32()?, context)?;
@@ -265,9 +266,9 @@ pub fn parse_pane(data: &[u8]) -> Result<Pane> {
 }
 
 /// Serialize a `BrtPane` payload.
-pub fn write_pane_payload(pane: &Pane) -> Result<Vec<u8>> {
+pub fn write_pane_payload(pane: &Pane, limits: crate::raw::Limits) -> Result<Vec<u8>> {
     let mut payload = Vec::with_capacity(PANE_LEN);
-    let mut writer = Encoder::new(&mut payload, crate::raw::Limits::DEFAULT);
+    let mut writer = Encoder::new(&mut payload, limits);
     writer.write_f64(pane.horizontal.map_or(0.0, Split::get))?;
     writer.write_f64(pane.vertical.map_or(0.0, Split::get))?;
     writer.write_u32(pane.top_left.row().get())?;
@@ -279,13 +280,14 @@ pub fn write_pane_payload(pane: &Pane) -> Result<Vec<u8>> {
         State::FrozenSplit => PANE_FLAG_FROZEN,
     })?;
     debug_assert_eq!(payload.len(), PANE_LEN);
+    limits.admit(payload.len())?;
     Ok(payload)
 }
 
 /// Parse a `BrtSel` payload.
-pub fn parse_selection(data: &[u8]) -> Result<Selection> {
+pub fn parse_selection(data: &[u8], limits: crate::raw::Limits) -> Result<Selection> {
     let context = "BrtSel";
-    let mut cursor = Cursor::new(data, context, crate::raw::Limits::DEFAULT);
+    let mut cursor = Cursor::new(data, context, limits.admit(data.len())?);
     let position = position_from_u32(cursor.read_u32()?, context)?;
     let active_cell = cell(cursor.read_u32()?, cursor.read_u32()?, context)?;
     let active_range = usize::try_from(cursor.read_u32()?)
@@ -334,7 +336,10 @@ pub fn parse_selection(data: &[u8]) -> Result<Selection> {
 }
 
 /// Serialize a `BrtSel` payload.
-pub fn write_selection_payload(selection: &Selection) -> Result<Vec<u8>> {
+pub fn write_selection_payload(
+    selection: &Selection,
+    limits: crate::raw::Limits,
+) -> Result<Vec<u8>> {
     let context = "BrtSel";
     let range_count = selection.ranges().len();
     if range_count == 0 || range_count > MAX_SHEET_VIEW_SELECTION_RANGES {
@@ -354,7 +359,7 @@ pub fn write_selection_payload(selection: &Selection) -> Result<Vec<u8>> {
         .checked_add(ranges_len)
         .ok_or_else(|| malformed(context, "selection payload length overflows"))?;
     let mut payload = Vec::with_capacity(capacity);
-    let mut writer = Encoder::new(&mut payload, crate::raw::Limits::DEFAULT);
+    let mut writer = Encoder::new(&mut payload, limits);
     writer.write_u32(position_to_u32(selection.position()))?;
     writer.write_u32(selection.active_cell().row().get())?;
     writer.write_u32(selection.active_cell().column().get())?;
@@ -376,6 +381,7 @@ pub fn write_selection_payload(selection: &Selection) -> Result<Vec<u8>> {
         writer.write_u32(last_column)?;
     }
     debug_assert_eq!(payload.len(), capacity);
+    limits.admit(payload.len())?;
     Ok(payload)
 }
 
@@ -383,6 +389,7 @@ pub fn write_selection_payload(selection: &Selection) -> Result<Vec<u8>> {
 pub(crate) fn read_views<RS: std::io::Read + std::io::Seek>(
     iter: &mut crate::package::records::Stream<RS>,
     buf: &mut Vec<u8>,
+    limits: crate::raw::Limits,
 ) -> Result<Vec<View>> {
     let context = "BrtBeginWsViews collection";
     let mut views = Vec::new();
@@ -399,7 +406,7 @@ pub(crate) fn read_views<RS: std::io::Read + std::io::Seek>(
                 if views.len() >= MAX_SHEET_VIEWS {
                     return Err(malformed(context, "too many worksheet views"));
                 }
-                views.push(parse_view(buf)?);
+                views.push(parse_view(buf, limits)?);
                 current = Some(views.len() - 1);
             },
             kind::END_WS_VIEW => {
@@ -414,7 +421,7 @@ pub(crate) fn read_views<RS: std::io::Read + std::io::Seek>(
                 if view.pane.is_some() {
                     return Err(malformed(context, "duplicate BrtPane"));
                 }
-                view.pane = Some(parse_pane(buf)?);
+                view.pane = Some(parse_pane(buf, limits)?);
             },
             kind::SEL => {
                 let index =
@@ -423,7 +430,7 @@ pub(crate) fn read_views<RS: std::io::Read + std::io::Seek>(
                 if view.selections.len() >= MAX_SHEET_VIEW_SELECTIONS {
                     return Err(malformed(context, "worksheet view exceeds four selections"));
                 }
-                view.selections.push(parse_selection(buf)?);
+                view.selections.push(parse_selection(buf, limits)?);
             },
             kind::END_WS_VIEWS => {
                 if current.is_some() {

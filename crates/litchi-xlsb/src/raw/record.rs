@@ -74,6 +74,33 @@ impl Limits {
     pub const fn string_units(self) -> usize {
         self.string_units
     }
+
+    /// Validate this profile and admit one standalone payload or output of
+    /// `length` bytes.
+    pub(crate) fn admit(self, length: usize) -> Result<Self> {
+        let limits = self.validate()?;
+        if length > limits.payload {
+            return Err(Error::PayloadLimit {
+                length,
+                limit: limits.payload,
+                offset: 0,
+            });
+        }
+        Ok(limits)
+    }
+
+    /// Refuse a declared or emitted string of `units` UTF-16 code units above
+    /// this profile; `offset` locates the length field (zero when writing).
+    pub(crate) const fn admit_units(self, units: usize, offset: usize) -> Result<()> {
+        if units > self.string_units {
+            return Err(Error::StringLimit {
+                units,
+                limit: self.string_units,
+                offset,
+            });
+        }
+        Ok(())
+    }
 }
 
 impl Default for Limits {
