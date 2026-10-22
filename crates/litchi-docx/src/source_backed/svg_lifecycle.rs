@@ -23,7 +23,7 @@ use crate::drawing::source::{
     SvgOwnerState,
 };
 use crate::error::{Error, Result};
-use crate::source_backed::StorySelector;
+use crate::source_backed::story_text::Selector as StorySelector;
 use litchi_core::edit::RefusalKind;
 
 const TRANSITIONAL_RELATIONSHIP_NAMESPACE: &str = svg_blip::RELATIONSHIP_NAMESPACE;

@@ -1813,19 +1813,6 @@ impl Package {
         ensure_current_archive(self, source_archive)?;
         plan.commit()
     }
-
-    /// Apply a durable stream patch using the shorter transaction-family
-    /// name.
-    pub fn apply_tail_append_patch<R>(
-        &self,
-        durable: &patch::ParagraphStreamPatch,
-        resolver: &R,
-    ) -> Result<super::paragraph_stream::Commit>
-    where
-        R: patch::AuthoredReplayResolver,
-    {
-        self.apply_tail_append_stream_patch(durable, resolver)
-    }
 }
 
 fn ensure_current_archive(package: &Package, expected: patch::ArtifactProof) -> Result<(), Error> {

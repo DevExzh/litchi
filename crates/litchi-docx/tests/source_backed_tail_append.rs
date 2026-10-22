@@ -32,14 +32,13 @@ use soapberry_zip::ZipArchive;
 use soapberry_zip::office::StreamingArchiveWriter;
 
 use litchi_docx::source_backed::tail_append::EditOptions;
-use litchi_docx::source_backed::tail_append::{Error as TailAppendError, Refusal};
-use litchi_docx::source_backed::{TailAppendLimits, TailAppendPlan};
+use litchi_docx::source_backed::tail_append::{self, Error as TailAppendError, Refusal};
 
 /// Record 0355a: a tail-append plan commits to a new source-backed package;
 /// writing that package publishes the splice. This keeps the plan-level
 /// call shape of the tests.
 struct Published {
-    commit: source_backed::tail_append::Commit,
+    commit: tail_append::Commit,
 }
 
 impl Published {
@@ -62,7 +61,7 @@ trait WritePlan {
     fn write_to(self, writer: impl Write) -> Result<Published, TailAppendError>;
 }
 
-impl WritePlan for TailAppendPlan<'_> {
+impl WritePlan for tail_append::Plan<'_> {
     fn write_to(self, writer: impl Write) -> Result<Published, TailAppendError> {
         let commit = self.commit()?;
         commit
@@ -237,7 +236,10 @@ fn settings_xml_with_relationships(strict: bool, body: &str) -> Vec<u8> {
         .into_bytes()
 }
 
-fn adversarial_settings_limits(source_xml_bytes: usize, max_token_bytes: u64) -> TailAppendLimits {
+fn adversarial_settings_limits(
+    source_xml_bytes: usize,
+    max_token_bytes: u64,
+) -> tail_append::Limits {
     let mut limits = limits(source_xml_bytes);
     // Keep these fixtures below the source and token ceilings so the asserted
     // failure comes from the settings owner envelope itself.
@@ -848,9 +850,9 @@ fn section_xml() -> &'static str {
     r#"<q:sectPr xmlns:q="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:v="urn:vendor-word-like" v:flag="keep" q:rsidR="007"><v:opaque a="&quot;"/><q:pgSz q:w="11906" q:h="16838"/></q:sectPr>"#
 }
 
-fn limits(source_xml_bytes: usize) -> TailAppendLimits {
+fn limits(source_xml_bytes: usize) -> tail_append::Limits {
     let source_xml_bytes = u64::try_from(source_xml_bytes).expect("fixture XML length fits u64");
-    TailAppendLimits {
+    tail_append::Limits {
         max_source_xml_bytes: source_xml_bytes.saturating_add(4096),
         max_text_bytes: 64 * 1024,
         max_fragment_bytes: 65_536,
@@ -877,7 +879,7 @@ fn append_plan<'a>(
     package: &'a source_backed::Package,
     text: &str,
     source_xml_bytes: usize,
-) -> TailAppendPlan<'a> {
+) -> tail_append::Plan<'a> {
     package
         .tail_append_plain_paragraph(text)
         .with_options(EditOptions::new(limits(source_xml_bytes)))
@@ -1667,7 +1669,7 @@ fn supported_settings_mce_fallback_is_admitted_at_exact_source_limit() {
             matches!(
                 &result,
                 Err(TailAppendError::Limit {
-                    kind: source_backed::tail_append::LimitKind::SettingsXmlBytes,
+                    kind: tail_append::LimitKind::SettingsXmlBytes,
                     ..
                 })
             ),
@@ -1955,7 +1957,7 @@ fn inherited_settings_namespace_copies_hit_the_workspace_ceiling() {
             .and_then(|plan| plan.write_to(&mut large_output));
         match result {
             Err(TailAppendError::Limit {
-                kind: source_backed::tail_append::LimitKind::SettingsXmlWorkspace,
+                kind: tail_append::LimitKind::SettingsXmlWorkspace,
                 ..
             }) => {},
             Err(error) => panic!(
@@ -2014,7 +2016,7 @@ fn nested_long_mce_directives_account_for_decoded_expanded_names() {
             .and_then(|plan| plan.write_to(&mut large_output));
         match result {
             Err(TailAppendError::Limit {
-                kind: source_backed::tail_append::LimitKind::SettingsXmlWorkspace,
+                kind: tail_append::LimitKind::SettingsXmlWorkspace,
                 ..
             }) => {},
             Err(error) => panic!(

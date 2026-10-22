@@ -655,10 +655,6 @@
           "ok": "litchi_docx::source_backed::tail_append::Commit"
         },
         {
-          "method": "litchi_docx::source_backed::Package::apply_tail_append_patch",
-          "ok": "litchi_docx::source_backed::paragraph_stream::Commit"
-        },
-        {
           "method": "litchi_docx::source_backed::Package::apply_tail_append_stream_patch",
           "ok": "litchi_docx::source_backed::paragraph_stream::Commit"
         }
@@ -1219,10 +1215,6 @@
         {
           "method": "litchi_docx::source_backed::Package::apply_tail_append",
           "ok": "litchi_docx::source_backed::tail_append::Commit"
-        },
-        {
-          "method": "litchi_docx::source_backed::Package::apply_tail_append_patch",
-          "ok": "litchi_docx::source_backed::paragraph_stream::Commit"
         },
         {
           "method": "litchi_docx::source_backed::Package::apply_tail_append_stream_patch",

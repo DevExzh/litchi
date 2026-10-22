@@ -120,8 +120,8 @@ fn managed_context(name: &'static str) -> (Budget, CancellationSource, Execution
     )
 }
 
-fn append_limits() -> source_backed::TailAppendLimits {
-    source_backed::TailAppendLimits {
+fn append_limits() -> source_backed::tail_append::Limits {
+    source_backed::tail_append::Limits {
         max_source_xml_bytes: 2 * 1024 * 1024,
         max_text_bytes: 64 * 1024,
         max_fragment_bytes: 65_536,

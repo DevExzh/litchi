@@ -12,7 +12,7 @@ use litchi_core::{
 };
 use litchi_docx::drawing::{DrawingPlacement, SourceDrawing};
 use litchi_docx::source_backed::{
-    self, PictureSelector, StorySelector, SvgInput, SvgPictureOwnerState,
+    self, PictureSelector, SvgInput, SvgPictureOwnerState, story_text::Selector as StorySelector,
 };
 use litchi_docx::{Package, SourceLimits};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
