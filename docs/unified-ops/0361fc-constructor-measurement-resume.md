@@ -48,3 +48,15 @@ The coordinator must obtain a quiet host window before starting. All scripts,
 raw attempts and external artifacts retain their recorded hashes. Allocation
 and latency acceptance, final integration and the workspace gate remain
 required.
+
+## Matched-v5 attempt a1
+
+The first v5 attempt ran after all three workers acknowledged a heavy-command
+hold and the coordinator's host preflight reported no blockers. An unrelated
+`peculiar` release build started during the first route's calibration. The
+during/after guards detected it and stopped the attempt before any complete
+ABBA block. The [verified receipt](results/0361fc/evidence.json) retains the
+manifest, runner log and external raw-artifact inventory. It reports one
+interrupted attempt and zero qualified blocks. No native ratio is accepted.
+The workers' hold was released after the interruption; the next native attempt
+still requires a quiet host window.
