@@ -298,6 +298,13 @@ impl SourceBackedWorkbook {
         if let Some(view) = pending.materialized.get() {
             return Ok(view);
         }
+        // Preserve the established source-first error precedence, and fence
+        // the deferred publication before it allocates an output buffer. A
+        // facade context is an additional policy boundary around an external
+        // package; checking it only after reopening would publish bytes after
+        // cancellation.
+        self.inner.package.source_version()?;
+        self.inner.execution_check()?;
         // A committed workbook either carries the catalog captured while its
         // change was authored, or changes only non-workbook parts. Reuse one
         // immutable proof whenever the output keeps the same catalog. The
@@ -347,6 +354,12 @@ impl SourceBackedWorkbook {
     /// Returns the OPC writer's error, a source-version error, or the
     /// family's publication error (for example a patch conflict).
     pub fn write_to(&self, mut writer: impl Write) -> Result<()> {
+        // Check the original source before any output, then apply both the
+        // package-owned and optional facade-owned execution fences. In
+        // particular, an uncached deferred owner must not publish into the
+        // caller's sink after its facade context has been cancelled.
+        self.inner.package.source_version()?;
+        self.inner.execution_check()?;
         match &self.pending {
             None => Ok(self
                 .inner
