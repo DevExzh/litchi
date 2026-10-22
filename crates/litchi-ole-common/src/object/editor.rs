@@ -130,8 +130,8 @@ impl Edit {
         &mut self.state_mut().package
     }
 
-    fn targets_mut(&mut self) -> &mut Arc<Targets> {
-        &mut self.state_mut().targets
+    fn targets_mut(&mut self) -> &mut Targets {
+        self.state_mut().targets.make_mut()
     }
 
     /// Opens a package with an explicit low-level CFB admission profile.
@@ -249,7 +249,7 @@ impl Edit {
         cfb_limits: OleFileLimits,
         (targets, package, objects): (Targets, CapturedPackage, Objects),
     ) -> Self {
-        let targets = Arc::new(targets);
+        let targets = targets.into_shared();
         let package = Arc::new(package);
         Self {
             state: Arc::new(PackageState {
@@ -258,7 +258,7 @@ impl Edit {
                 cfb_limits,
                 original: Arc::clone(&original),
                 package: Arc::clone(&package),
-                objects: Arc::new(objects),
+                objects: objects.into_shared(),
                 changed: false,
                 layout: SectorLayoutPolicy::default(),
                 validated_layout: SectorLayoutPolicy::default(),
@@ -283,7 +283,7 @@ impl Edit {
 
     pub(crate) fn staged_with_current(&self, current: Arc<Vec<u8>>) -> Package {
         Package::new(
-            Arc::clone(&self.state.targets),
+            self.state.targets.clone(),
             self.state.limits,
             self.state.cfb_limits,
             // A Package is an immutable publication of the supplied source
@@ -297,7 +297,7 @@ impl Edit {
             // commit render against stale topology and could turn a no-op
             // follow-up into a byte-changing publication.
             Arc::clone(&self.state.package),
-            Arc::clone(&self.state.objects),
+            self.state.objects.clone(),
             false,
             self.state.layout,
             self.state.layout,
@@ -872,7 +872,7 @@ impl Edit {
         let nested = CapturedPackage::capture_object(&mut nested_ole, self.state.limits)?;
         let mut candidate = self.clone();
         Arc::make_mut(candidate.package_mut()).add_object(&target, &nested, self.state.limits)?;
-        Arc::make_mut(candidate.targets_mut()).push(target)?;
+        candidate.targets_mut().push(target)?;
         *self = candidate.commit_candidate()?;
         Ok(())
     }
@@ -893,7 +893,7 @@ impl Edit {
         let mut candidate = self.clone();
         Arc::make_mut(candidate.package_mut()).remove_object(object.path(), self.state.limits)?;
         let targets = candidate.state.targets.without(key)?;
-        candidate.state_mut().targets = Arc::new(targets);
+        candidate.state_mut().targets = targets.into_shared();
         *self = candidate.commit_candidate()?;
         Ok(removed)
     }
@@ -1025,7 +1025,7 @@ impl Edit {
         } else {
             state.package = Arc::new(parsed);
         }
-        state.objects = Arc::new(objects);
+        state.objects = objects.into_shared();
         state.changed = true;
         state.validated_layout = state.layout;
         self.pending_render = Some(Arc::new(rendered));

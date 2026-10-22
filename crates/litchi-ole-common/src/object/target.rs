@@ -85,6 +85,20 @@ impl Target {
     }
 }
 
+static EMPTY_TARGETS: Targets = Targets {
+    targets: Vec::new(),
+};
+
+impl super::snapshot::EmptyValue for Targets {
+    fn empty() -> &'static Self {
+        &EMPTY_TARGETS
+    }
+
+    fn is_empty_value(&self) -> bool {
+        self.targets.is_empty()
+    }
+}
+
 /// A validated collection of host-resolved storage targets.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Targets {
@@ -92,6 +106,12 @@ pub struct Targets {
 }
 
 impl Targets {
+    /// Moves this collection into shared owner state; the empty (default)
+    /// collection allocates nothing.
+    pub(crate) fn into_shared(self) -> super::snapshot::Shared<Self> {
+        super::snapshot::Shared::new(self)
+    }
+
     /// Creates a target collection and rejects duplicate or overlapping paths.
     ///
     /// # Errors

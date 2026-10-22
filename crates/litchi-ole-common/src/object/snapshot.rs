@@ -19,6 +19,58 @@ use std::fmt;
 use std::io::Cursor;
 use std::sync::Arc;
 
+/// A value with a static empty instance.
+pub(crate) trait EmptyValue: Sized + 'static {
+    /// The process-wide empty value.
+    fn empty() -> &'static Self;
+
+    /// Whether this value equals [`Self::empty`].
+    fn is_empty_value(&self) -> bool;
+}
+
+/// One shared owner field whose empty value needs no allocation.
+///
+/// Most OLE packages have no host targets and no discovered objects; holding
+/// those as `None` keeps an open or publication from allocating an `Arc` for
+/// an empty collection, while a populated value is shared exactly as an
+/// `Arc` field would be.  The field stays one pointer wide.
+pub(crate) struct Shared<T: EmptyValue>(Option<Arc<T>>);
+
+impl<T: EmptyValue> Shared<T> {
+    pub(crate) fn new(value: T) -> Self {
+        if value.is_empty_value() {
+            Self(None)
+        } else {
+            Self(Some(Arc::new(value)))
+        }
+    }
+}
+
+impl<T: EmptyValue + Clone> Shared<T> {
+    /// Copy-on-write access, as [`Arc::make_mut`]; an empty value gains its
+    /// own allocation only here, when it is about to change.
+    pub(crate) fn make_mut(&mut self) -> &mut T {
+        Arc::make_mut(self.0.get_or_insert_with(|| Arc::new(T::empty().clone())))
+    }
+}
+
+impl<T: EmptyValue> Clone for Shared<T> {
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
+
+impl<T: EmptyValue> std::ops::Deref for Shared<T> {
+    type Target = T;
+
+    fn deref(&self) -> &T {
+        match &self.0 {
+            Some(value) => value,
+            None => T::empty(),
+        }
+    }
+}
+
 /// Shared immutable owner state.
 ///
 /// `Package` and an edit that starts from it hold one `Arc` to this state.
@@ -28,12 +80,12 @@ use std::sync::Arc;
 /// allocations.
 #[derive(Clone)]
 pub(crate) struct PackageState {
-    pub(crate) targets: Arc<Targets>,
+    pub(crate) targets: Shared<Targets>,
     pub(crate) limits: super::model::Limits,
     pub(crate) cfb_limits: OleFileLimits,
     pub(crate) original: Arc<Vec<u8>>,
     pub(crate) package: Arc<CapturedPackage>,
-    pub(crate) objects: Arc<Objects>,
+    pub(crate) objects: Shared<Objects>,
     pub(crate) changed: bool,
     pub(crate) layout: SectorLayoutPolicy,
     pub(crate) validated_layout: SectorLayoutPolicy,
@@ -68,12 +120,12 @@ impl fmt::Debug for Package {
 
 impl Package {
     pub(crate) fn new(
-        targets: Arc<Targets>,
+        targets: Shared<Targets>,
         limits: super::model::Limits,
         cfb_limits: OleFileLimits,
         original: Arc<Vec<u8>>,
         package: Arc<CapturedPackage>,
-        objects: Arc<Objects>,
+        objects: Shared<Objects>,
         changed: bool,
         layout: SectorLayoutPolicy,
         validated_layout: SectorLayoutPolicy,
@@ -193,13 +245,13 @@ impl Package {
     /// The target catalog used by this package.
     #[must_use]
     pub fn targets(&self) -> &Targets {
-        self.state.targets.as_ref()
+        &self.state.targets
     }
 
     /// The current target-selected object catalog.
     #[must_use]
     pub fn objects(&self) -> &Objects {
-        self.state.objects.as_ref()
+        &self.state.objects
     }
 
     /// The sector-layout policy captured from the edit that produced this

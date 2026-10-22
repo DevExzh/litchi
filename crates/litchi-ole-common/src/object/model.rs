@@ -476,6 +476,20 @@ impl Object {
     }
 }
 
+static EMPTY_OBJECTS: Objects = Objects {
+    objects: Vec::new(),
+};
+
+impl super::snapshot::EmptyValue for Objects {
+    fn empty() -> &'static Self {
+        &EMPTY_OBJECTS
+    }
+
+    fn is_empty_value(&self) -> bool {
+        self.objects.is_empty()
+    }
+}
+
 /// Ordered, immutable object discovery results.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Objects {
@@ -483,6 +497,12 @@ pub struct Objects {
 }
 
 impl Objects {
+    /// Moves these results into shared owner state; a package without
+    /// discovered objects allocates nothing.
+    pub(crate) fn into_shared(self) -> super::snapshot::Shared<Self> {
+        super::snapshot::Shared::new(self)
+    }
+
     pub(crate) fn new(objects: Vec<Object>) -> Result<Self, Error> {
         let mut keys = HashSet::new();
         let mut paths = HashSet::new();
