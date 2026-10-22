@@ -344,6 +344,12 @@ impl SourceBackedPresentation {
     /// The presentation that serves reads and edits: the materialized output
     /// of a committed presentation, published into memory once, or `self`.
     pub(crate) fn effective(&self) -> Result<&Self> {
+        self.effective_with_odf_error().map_err(Error::from)
+    }
+
+    /// The materialized presentation while retaining the common ODF
+    /// publication chain for source-backed edit callers.
+    pub(crate) fn effective_with_odf_error(&self) -> std::result::Result<&Self, OdfError> {
         let Some(deferred) = &self.deferred else {
             return Ok(self);
         };
@@ -354,9 +360,8 @@ impl SourceBackedPresentation {
         deferred
             .plan
             .write_to(&mut bytes, &deferred.options)
-            .map_err(|error| Error::from(OdfError::from(error)))?;
-        let materialized = Self::from_read_at(Arc::new(litchi_core::OwnedSource::new(bytes)))
-            .map_err(Error::from)?;
+            .map_err(OdfError::from)?;
+        let materialized = Self::from_read_at(Arc::new(litchi_core::OwnedSource::new(bytes)))?;
         Ok(deferred.materialized.get_or_init(|| materialized))
     }
 

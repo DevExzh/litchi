@@ -68,6 +68,41 @@ made the largest result error at least 144 bytes and failed strict Clippy's
 allocated only when retaining a stale diagnostic, so successful operations
 keep the original result ABI and perform no diagnostic allocation.
 
+## Common ODF publication boundary
+
+The previous common conversion flattened `SourceContentPublicationError` and
+`SourceContentInsertionError` into `Core` strings or a bare
+`SourceChanged`.  That lost sink progress and the replay callback's typed
+source-member diagnostic on `SourceBackedPresentation::save`, and it also
+turned a stale source discovered in a replay callback into a generic core
+error on `effective`.  The common owner error now has boxed
+`SourceContentPublication` and `SourceContentInsertion` variants.  Boxing
+keeps the ordinary package error layout bounded; the allocation is made only
+when the source-backed operation fails.  `save` retains the complete typed
+insertion chain, including progress, replay, source-member and secondary
+callback errors.
+
+`SourceBackedPresentation::effective_with_odf_error` is used by the ODP edit
+paths before the ordinary core-facing `effective` conversion.  Its conversion
+to `Error::SourceChanged` preserves the insertion progress and typed chain
+when a replay callback reports a stale source.  The core-facing result still
+has only the shared `SourceChanged` carrier, so a caller that requests the
+read-only projection receives the correct `io_error` classification while the
+typed chain remains available through the source-backed ODF/save route.
+
+The common `Error` remains 48 bytes and 8-aligned before and after this
+repair.  The preceding cached build measured 48 bytes, and the repaired
+build measured 48 bytes; `SourceContentInsertionError` is 96 bytes and
+`SourceContentPublicationError` is 64 bytes.  The new common variants hold
+boxes, so their larger typed payloads do not enlarge the successful-path
+package error value.
+
+The ODP facade now registers `tail_append::Error` as a leaf source and
+classifies its `SourceChanged` and `PatchConflict` variants as `io_error` and
+`invalid_input`.  A public source-backed open/edit/commit/replay regression
+exercises both outcomes against a revisioned `ReadAt` source and an unrelated
+recipient, rather than constructing only the leaf variants.
+
 ## Validation receipt
 
 The isolated worktree was `/home/zhuhe/code/litchi-worktrees/uo2-replay-error-audit`
@@ -86,9 +121,15 @@ Results:
 * ODP source-append progress regression: 1 passed.
 
 The follow-up's ODP stale-source filter passed all 4 freshness and diagnostic
-tests, and the complete `package::source_append::tests` filter passed all 16
-source-append tests.  Direct rustfmt on the changed Rust file and
-`git diff --check` passed.
+tests, and the complete `package::source_append::tests` filter passed all 18
+source-append tests.  The common conversion regression and the public ODP
+facade stale/conflict regression also passed.  Strict Clippy passed for
+`litchi-odf-common` and `litchi-odp`.  The strict `litchi-ops` command still
+encounters two pre-existing Rust 1.98 lint failures in `litchi-sheet-text`
+(`byte_char_slices` and `chunks_exact_to_as_chunks`) and two pre-existing
+`litchi-ops` failures (`chunks_exact_to_as_chunks` and `question_mark`); the
+affected package passed with those four baseline lints explicitly allowed.
+Direct rustfmt on all changed Rust files and `git diff --check` passed.
 
 Strict `cargo clippy --lib -- -D warnings` passed for ODT, ODG, ODM, ODB,
 ODI, ODF Formula, and ODP.  Broader all-target checks were limited by absent
@@ -104,8 +145,9 @@ wrappers.  These findings were intentionally left unchanged:
 * private `Patch::apply` functions that are reached only after a public exact
   source precondition; their malformed-target errors are not public stale-base
   diagnostics;
-* source-backed ODF common publication errors that already preserve
-  `SourceChanged` and are mapped by the common owner error; and
+* source-backed ODF common errors whose conversion is now handled by the
+  typed publication/insertion boundary above; the core-facing projection
+  intentionally retains only the shared freshness carrier; and
 * genuinely unsupported content, malformed XML/wire data, resource limits,
   cancellation, and source I/O errors unrelated to freshness.
 

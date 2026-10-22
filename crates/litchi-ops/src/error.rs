@@ -430,6 +430,10 @@ pub enum Source {
     /// An ODF package ingress, egress or transaction error (typed limits).
     #[cfg(any(feature = "odt", feature = "ods", feature = "odp", odf_objects))]
     Odf(litchi_odf_common::Error),
+    /// An ODP source-backed tail-append or replay error. This route retains
+    /// the format-owned freshness progress and nested source diagnostics.
+    #[cfg(feature = "odp")]
+    OdpTailAppend(litchi_odp::tail_append::Error),
     /// A formula conversion error: Markdown output renders OMML formulas as
     /// LaTeX.
     #[cfg(feature = "formula")]
@@ -532,6 +536,8 @@ impl Source {
             Self::Crypto(error) => Some(error),
             #[cfg(any(feature = "odt", feature = "ods", feature = "odp", odf_objects))]
             Self::Odf(error) => Some(error),
+            #[cfg(feature = "odp")]
+            Self::OdpTailAppend(error) => Some(error),
             #[cfg(feature = "formula")]
             Self::Formula(error) => Some(error),
             #[cfg(feature = "iwork-adapter")]
@@ -2024,6 +2030,157 @@ impl Classify for litchi_odf_common::Error {
             Self::PatchConflict { .. } => Class::of(Code::InvalidInput),
             Self::Signed => Class::of(Code::DocumentProtected),
             Self::Core(error) => error.classify(),
+            Self::SourceContentPublication(error) => classify_source_publication(error),
+            Self::SourceContentInsertion(error) => classify_source_insertion(error),
+            _ => Class::of(Code::InternalError),
+        }
+    }
+}
+
+#[cfg(any(feature = "odt", feature = "ods", feature = "odp", odf_objects))]
+fn classify_source_publication(error: &litchi_odf_common::SourceContentPublicationError) -> Class {
+    use litchi_odf_common::SourceContentPublicationError as Publication;
+
+    match error {
+        Publication::Core(error) => error.classify(),
+        Publication::Allocation { .. } => Class::of(Code::InternalError),
+        Publication::Unsupported { .. } => Class::of(Code::UnsupportedCapability),
+        Publication::Cancelled { .. } => Class::of(Code::Cancelled),
+        Publication::LimitExceeded { .. } => Class::of(Code::LimitExceeded),
+        Publication::SourceChanged { .. } => Class::of(Code::IoError),
+        Publication::Source { source, .. } => source.classify(),
+        Publication::Execution { source, .. } => source.classify(),
+        Publication::Sink { source, .. } => source.classify(),
+        Publication::Archive { source, .. } => classify_zip_error(source),
+        _ => Class::of(Code::InternalError),
+    }
+}
+
+#[cfg(any(feature = "odt", feature = "ods", feature = "odp", odf_objects))]
+fn classify_source_insertion(error: &litchi_odf_common::SourceContentInsertionError) -> Class {
+    use litchi_odf_common::SourceContentInsertionError as Insertion;
+
+    match error {
+        Insertion::Publication { source, .. } => classify_source_publication(source),
+        Insertion::Replay { source, .. } => classify_replay(source),
+        Insertion::Transport {
+            publication,
+            replay,
+            ..
+        } => {
+            let publication = classify_source_publication(publication);
+            if publication.code == Code::IoError {
+                publication
+            } else {
+                let replay = classify_replay(replay);
+                if replay.code == Code::IoError {
+                    replay
+                } else {
+                    publication
+                }
+            }
+        },
+        _ => Class::of(Code::InternalError),
+    }
+}
+
+#[cfg(any(feature = "odt", feature = "ods", feature = "odp", odf_objects))]
+fn classify_zip_error(error: &soapberry_zip::Error) -> Class {
+    use soapberry_zip::ErrorKind;
+
+    match error.kind() {
+        ErrorKind::IO(_) | ErrorKind::Io(_) | ErrorKind::CentralDirectorySpool { .. } => {
+            Class::of(Code::IoError)
+        },
+        ErrorKind::FileNotFound(_) => Class::of(Code::FileNotFound),
+        ErrorKind::LimitExceeded { .. } | ErrorKind::CentralDirectorySpoolLimitExceeded { .. } => {
+            Class::of(Code::LimitExceeded)
+        },
+        ErrorKind::Cancelled => Class::of(Code::Cancelled),
+        ErrorKind::UnsupportedPreservation { .. } => Class::of(Code::UnsupportedCapability),
+        _ if error.is_content_fault() => Class::of(Code::CorruptFile),
+        _ => Class::of(Code::InternalError),
+    }
+}
+
+#[cfg(any(feature = "odt", feature = "ods", feature = "odp", odf_objects))]
+fn classify_replay(
+    error: &soapberry_zip::ReplayPublicationError<
+        litchi_odf_common::SourceContentInsertionCallbackError,
+    >,
+) -> Class {
+    use soapberry_zip::ReplayPublicationError;
+
+    match error {
+        ReplayPublicationError::Archive {
+            source,
+            callback_error,
+            ..
+        } => {
+            let archive = classify_zip_error(source);
+            if archive.code == Code::CorruptFile {
+                archive
+            } else if let Some(callback) = callback_error {
+                classify_callback(callback)
+            } else {
+                archive
+            }
+        },
+        ReplayPublicationError::Callback { source, .. } => classify_callback(source),
+        ReplayPublicationError::Limit { .. } => Class::of(Code::LimitExceeded),
+        ReplayPublicationError::Sink {
+            source,
+            callback_error,
+            ..
+        } => {
+            let sink = source.classify();
+            if sink.code == Code::IoError {
+                sink
+            } else if let Some(callback) = callback_error {
+                classify_callback(callback)
+            } else {
+                sink
+            }
+        },
+        ReplayPublicationError::NonDeterministic { .. } => Class::of(Code::InternalError),
+        _ => Class::of(Code::InternalError),
+    }
+}
+
+#[cfg(any(feature = "odt", feature = "ods", feature = "odp", odf_objects))]
+fn classify_callback(error: &litchi_odf_common::SourceContentInsertionCallbackError) -> Class {
+    use litchi_odf_common::{SourceContentInsertionCallbackError, SourceMemberReaderError};
+
+    match error {
+        SourceContentInsertionCallbackError::Member(error) => match error.as_ref() {
+            SourceMemberReaderError::Core { error, .. } => error.classify(),
+            SourceMemberReaderError::Callback(error) => classify_callback(error),
+            _ => Class::of(Code::InternalError),
+        },
+        SourceContentInsertionCallbackError::Io(error) => error.classify(),
+        SourceContentInsertionCallbackError::Cancelled => Class::of(Code::Cancelled),
+        SourceContentInsertionCallbackError::Execution(error) => error.classify(),
+        SourceContentInsertionCallbackError::Verification { .. } => Class::of(Code::InternalError),
+        _ => Class::of(Code::InternalError),
+    }
+}
+
+#[cfg(feature = "odp")]
+impl Classify for litchi_odp::tail_append::Error {
+    fn classify(&self) -> Class {
+        use litchi_odf_common::SourceMemberReaderError;
+
+        match self {
+            Self::Invalid(error) => error.classify(),
+            Self::SourceMember(error) => match error {
+                SourceMemberReaderError::Core { error, .. }
+                | SourceMemberReaderError::Callback(error) => error.classify(),
+                _ => Class::of(Code::InternalError),
+            },
+            Self::Plan(error) => classify_source_publication(error),
+            Self::Publication(error) => classify_source_insertion(error),
+            Self::SourceChanged { .. } => Class::of(Code::IoError),
+            Self::PatchConflict { .. } => Class::of(Code::InvalidInput),
             _ => Class::of(Code::InternalError),
         }
     }
@@ -2432,6 +2589,10 @@ from_leaf!(#[cfg(feature = "rtf")] litchi_rtf::Error => Rtf, Some(FileFormat::Rt
 from_leaf!(
     #[cfg(any(feature = "odt", feature = "ods", feature = "odp", odf_objects))]
     litchi_odf_common::Error => Odf, None
+);
+from_leaf!(
+    #[cfg(feature = "odp")]
+    litchi_odp::tail_append::Error => OdpTailAppend, Some(FileFormat::Odp)
 );
 from_leaf!(#[cfg(feature = "rtf")] litchi_rtf::builder::Error => RtfBuild, Some(FileFormat::Rtf));
 from_leaf!(#[cfg(feature = "rtf")] litchi_rtf::edit::Error => RtfEdit, Some(FileFormat::Rtf));

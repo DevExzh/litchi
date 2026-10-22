@@ -3,8 +3,10 @@
 //! Package-level verbs (`open*`, `from_*`, `save*`, `to_bytes`, `write_to`,
 //! `Edit::commit` and `Package::apply`) of every ODF family return this type.
 //! Limit failures are typed with their dimension; every other failure keeps
-//! the established common-core error as its [`Error::Core`] payload, so
-//! `?` conversions in either direction stay lossless for limit dimensions.
+//! the established common-core error as its [`Error::Core`] payload, while
+//! source-backed publication failures retain their typed progress and
+//! diagnostics. `?` conversions in either direction stay lossless for limit
+//! dimensions and source-publication error details.
 
 use std::sync::Arc;
 
@@ -56,6 +58,18 @@ pub enum Error {
     /// no-op commit keeps the signatures byte-identical instead.
     #[error("ODF package is signed: a changed write would invalidate its signatures")]
     Signed,
+    /// A source-backed content publication failed before insertion replay.
+    ///
+    /// The box keeps the ordinary package error layout bounded; allocation is
+    /// paid only on this error path so source progress and typed causes remain
+    /// available to `save` callers.
+    #[error(transparent)]
+    SourceContentPublication(Box<crate::core::SourceContentPublicationError>),
+    /// A source-backed content insertion failed during ZIP replay or its
+    /// preflight. The typed replay retains source-member and secondary
+    /// callback diagnostics.
+    #[error(transparent)]
+    SourceContentInsertion(Box<crate::core::source_publication::SourceContentInsertionError>),
     /// Any other package, parse, I/O or publication failure.
     #[error(transparent)]
     Core(litchi_core::Error),
@@ -150,42 +164,24 @@ impl From<litchi_core::atomic::Error> for Error {
 }
 
 impl From<crate::core::SourceContentPublicationError> for Error {
-    /// A source-backed `content.xml` publication failure as an owner error:
-    /// a source change and an I/O, allocation or core failure keep their
-    /// typed core payload; every other publication failure keeps its message.
+    /// Preserve a source-backed `content.xml` publication failure, including
+    /// its exact sink progress and typed source cause.
     fn from(error: crate::core::SourceContentPublicationError) -> Self {
-        use crate::core::SourceContentPublicationError as Publication;
-        match error {
-            Publication::Core(error) => Self::from(error),
-            Publication::SourceChanged {
-                expected, observed, ..
-            } => Self::Core(litchi_core::Error::SourceChanged { expected, observed }),
-            Publication::Sink { source, .. } => Self::Core(litchi_core::Error::Io(source)),
-            Publication::Allocation { resource, source } => {
-                Self::Core(litchi_core::Error::Allocation { resource, source })
-            },
-            Publication::Source { source, .. } => Self::from(source),
-            other => Self::Core(litchi_core::Error::Other(other.to_string())),
-        }
+        Self::SourceContentPublication(Box::new(error))
     }
 }
 
 impl From<crate::core::source_publication::SourceContentInsertionError> for Error {
-    /// A source-backed `content.xml` insertion failure as an owner error; a
-    /// publication failure keeps the mapping of its publication error.
+    /// Preserve a source-backed `content.xml` insertion failure, including
+    /// replay progress and callback diagnostics.
     fn from(error: crate::core::source_publication::SourceContentInsertionError) -> Self {
-        use crate::core::source_publication::SourceContentInsertionError as Insertion;
-        match error {
-            Insertion::Publication { source, .. } => Self::from(source),
-            other => Self::Core(litchi_core::Error::Other(other.to_string())),
-        }
+        Self::SourceContentInsertion(Box::new(error))
     }
 }
 
 impl From<Error> for litchi_core::Error {
     fn from(error: Error) -> Self {
         match error {
-            Error::Core(error) => error,
             Error::Limit {
                 kind,
                 observed,
@@ -211,7 +207,141 @@ impl From<Error> for litchi_core::Error {
                 "odf.package",
                 "the package is signed: a changed write would invalidate its signatures",
             )),
+            Error::SourceContentPublication(error) => source_publication_core(*error),
+            Error::SourceContentInsertion(error) => source_insertion_core(*error),
+            Error::Core(error) => error,
         }
+    }
+}
+
+fn source_publication_core(
+    error: crate::core::SourceContentPublicationError,
+) -> litchi_core::Error {
+    use crate::core::SourceContentPublicationError as Publication;
+
+    match error {
+        Publication::Core(error) => error,
+        Publication::SourceChanged {
+            expected, observed, ..
+        } => litchi_core::Error::SourceChanged { expected, observed },
+        Publication::Sink { source, .. } => litchi_core::Error::Io(source),
+        Publication::Allocation { resource, source } => {
+            litchi_core::Error::Allocation { resource, source }
+        },
+        Publication::Source { source, .. } => source,
+        other => litchi_core::Error::Other(other.to_string()),
+    }
+}
+
+fn source_insertion_core(
+    error: crate::core::source_publication::SourceContentInsertionError,
+) -> litchi_core::Error {
+    use crate::core::source_publication::SourceContentInsertionError as Insertion;
+
+    match error {
+        Insertion::Publication { source, .. } => source_publication_core(source),
+        Insertion::Replay { source, .. } => replay_core(source),
+        Insertion::Transport {
+            publication,
+            replay,
+            ..
+        } => {
+            let publication = source_publication_core(publication);
+            if matches!(publication, litchi_core::Error::SourceChanged { .. }) {
+                publication
+            } else {
+                prefer_source_changed(publication, replay_core(*replay))
+            }
+        },
+    }
+}
+
+fn replay_core(
+    error: soapberry_zip::ReplayPublicationError<
+        crate::core::source_publication::SourceContentInsertionCallbackError,
+    >,
+) -> litchi_core::Error {
+    use soapberry_zip::ReplayPublicationError;
+
+    match error {
+        ReplayPublicationError::Archive {
+            source,
+            callback_error,
+            ..
+        } => {
+            let archive = archive_core(source);
+            match callback_error {
+                Some(callback) => prefer_source_changed(archive, callback_core(callback)),
+                None => archive,
+            }
+        },
+        ReplayPublicationError::Callback { source, .. } => callback_core(source),
+        ReplayPublicationError::Limit { .. } => {
+            litchi_core::Error::Other("source-content insertion replay limit exceeded".to_string())
+        },
+        ReplayPublicationError::Sink {
+            source,
+            callback_error,
+            ..
+        } => {
+            let sink = litchi_core::Error::Io(source);
+            match callback_error {
+                Some(callback) => prefer_source_changed(sink, callback_core(callback)),
+                None => sink,
+            }
+        },
+        ReplayPublicationError::NonDeterministic { .. } => litchi_core::Error::Other(
+            "source-content insertion replay was non-deterministic".to_string(),
+        ),
+        _ => litchi_core::Error::Other("unknown source-content insertion replay failure".into()),
+    }
+}
+
+fn callback_core(
+    error: crate::core::source_publication::SourceContentInsertionCallbackError,
+) -> litchi_core::Error {
+    use crate::core::SourceMemberReaderError;
+    use crate::core::source_publication::SourceContentInsertionCallbackError as Callback;
+
+    match error {
+        Callback::Member(error) => match *error {
+            SourceMemberReaderError::Core { error, .. } => error,
+            SourceMemberReaderError::Callback(error) => callback_core(error),
+        },
+        Callback::Io(error) => litchi_core::Error::Io(error),
+        Callback::Cancelled => {
+            litchi_core::Error::Other("source-content insertion cancelled".into())
+        },
+        Callback::Execution(error) => litchi_core::Error::Other(error.to_string()),
+        Callback::Verification { what } => litchi_core::Error::Other(format!(
+            "source-content insertion replay verification failed: {what}"
+        )),
+    }
+}
+
+fn archive_core(error: soapberry_zip::Error) -> litchi_core::Error {
+    use soapberry_zip::ErrorKind;
+
+    match error.into_kind() {
+        ErrorKind::IO(error)
+        | ErrorKind::Io(error)
+        | ErrorKind::CentralDirectorySpool { source: error, .. } => litchi_core::Error::Io(error),
+        ErrorKind::FileNotFound(path) => litchi_core::Error::ComponentNotFound(path),
+        ErrorKind::UnsupportedPreservation { reason } => {
+            litchi_core::Error::Unsupported(reason.to_string())
+        },
+        kind => litchi_core::Error::ZipError(kind.to_string()),
+    }
+}
+
+fn prefer_source_changed(
+    primary: litchi_core::Error,
+    secondary: litchi_core::Error,
+) -> litchi_core::Error {
+    if matches!(secondary, litchi_core::Error::SourceChanged { .. }) {
+        secondary
+    } else {
+        primary
     }
 }
 
@@ -308,5 +438,47 @@ mod tests {
             scope: std::sync::Arc::from("ODF XML depth"),
         });
         assert!(matches!(Error::from(core), Error::Core(_)));
+    }
+
+    #[test]
+    fn source_insertion_conversion_retains_progress_and_source_change() {
+        use crate::core::source_publication::SourceContentInsertionError;
+        use crate::core::{SourceContentPublicationError, SourceContentPublicationProgress};
+        use litchi_core::SourceVersion;
+
+        let expected = SourceVersion::new(0x100, 1);
+        let observed = SourceVersion::new(0x100, 2);
+        let typed = Error::from(SourceContentInsertionError::Publication {
+            progress: SourceContentPublicationProgress::Complete { bytes: 17 },
+            source: SourceContentPublicationError::SourceChanged {
+                expected,
+                observed,
+                progress: SourceContentPublicationProgress::Complete { bytes: 17 },
+            },
+        });
+        let Error::SourceContentInsertion(error) = typed else {
+            panic!("source insertion must remain typed");
+        };
+        assert_eq!(error.progress().accepted(), 17);
+        assert!(matches!(
+            error.as_ref(),
+            SourceContentInsertionError::Publication {
+                source: SourceContentPublicationError::SourceChanged {
+                    expected: actual_expected,
+                    observed: actual_observed,
+                    progress: SourceContentPublicationProgress::Complete { bytes: 17 },
+                },
+                ..
+            } if *actual_expected == expected && *actual_observed == observed
+        ));
+
+        let core = litchi_core::Error::from(Error::SourceContentInsertion(error));
+        assert!(matches!(
+            core,
+            litchi_core::Error::SourceChanged {
+                expected: actual_expected,
+                observed: actual_observed,
+            } if actual_expected == expected && actual_observed == observed
+        ));
     }
 }
