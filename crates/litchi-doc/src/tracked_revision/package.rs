@@ -3114,12 +3114,23 @@ impl RevisionEditor {
     /// A validated render retained under the owner's ceiling is moved out
     /// instead of rendering the package again.
     pub(crate) fn finish_unchecked(mut self) -> Result<Vec<u8>> {
+        self.finish_unchecked_in_place()
+    }
+
+    /// Renders the current package while retaining this editor allocation.
+    ///
+    /// The final body commit consumes the transaction, so it can publish the
+    /// owned stream buffers in place instead of cloning the complete revision
+    /// editor before the consuming handoff. Intermediate candidate renders
+    /// continue to use [`Self::finish_unchecked`] on a clone and therefore
+    /// retain clone-first failure atomicity.
+    pub(crate) fn finish_unchecked_in_place(&mut self) -> Result<Vec<u8>> {
         if self.chpx_dirty {
             // `rewrite_chpx` updates the editor's stream buffers. Publish
             // those buffers into the retained object owner before rendering;
             // otherwise the render would still observe the pre-toggle
             // package even though the semantic CHPX model is current.
-            self = self.commit_consuming()?;
+            self.commit_in_place()?;
         }
         if let Some(rendered) = self.retained_render.0.take() {
             return Ok(rendered);
@@ -3540,13 +3551,9 @@ impl RevisionEditor {
     }
 
     /// Publishes a final pending CHPX edit from the owned stream buffers.
-    /// `finish_unchecked` consumes the revision editor, so retaining the
-    /// clone-first `commit` above for every reusable edit would allocate and
-    /// copy an intermediate `Vec` once more before `Arc<[u8]>` performs its
-    /// required allocation and copy. This path is private to the consuming
-    /// finish route; all reusable mutation paths keep the failure-atomic
-    /// clone-and-publish behavior of `commit`.
-    fn commit_consuming(mut self) -> Result<Self> {
+    /// This path is private to the consuming finish route. Reusable mutation
+    /// paths keep the failure-atomic clone-and-publish behavior of `commit`.
+    fn commit_in_place(&mut self) -> Result<()> {
         self.flush_pending_chpx()?;
         self.protection_policy.authorize(self.protection)?;
         self.release_retained_render();
@@ -3576,7 +3583,7 @@ impl RevisionEditor {
             }
         }
         self.changed = true;
-        Ok(self)
+        Ok(())
     }
 }
 

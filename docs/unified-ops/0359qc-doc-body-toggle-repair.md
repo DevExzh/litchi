@@ -1,7 +1,7 @@
 # 0359qc — DOC body-toggle final handoff repair
 
-- **Status:** source repair committed; build and performance qualification
-  remain pending a quiet build slot.
+- **Status:** matched allocator and instruction receipts recorded; native
+  qualification remains pending because the host was overloaded.
 - **Date:** 2026-10-22.
 - **Input:** the ordinary-route attribution in [0359qb](0359qb-doc-body-toggle-qualification.md).
 - **Scope:** the existing `litchi-doc` body transaction. No public editing
@@ -43,8 +43,24 @@ while unrelated host builds were active. No Rust diagnostic or test failure
 was produced. The test and ordinary-route qualification must be rerun with
 the repository's one-job capped build after the host build window is quiet.
 
-The matched heap, Callgrind, native-attempt, source-assembly, and output
-hashes already recorded in 0359qb remain the evidence for the pre-repair
-implementation. This record makes no performance claim for 0359qc until a
-new after executable has been built from this source commit and compared with
-the same protected before executable and harness.
+The matched heap, Callgrind, source-assembly, and output hashes for this
+candidate are recorded in
+[`results/0359qc/qualification.json`](results/0359qc/qualification.json).
+The candidate was built with toolchain `1.95.0`, one Cargo job, incremental
+compilation disabled, release debuginfo disabled, and the 20 GB systemd cap.
+Its selected ordinary route produced the same output SHA as both 0359qb legs.
+
+The candidate's route-local Ir is 1.011632 of the original implementation and
+1.003013 of the 0359qb after leg. `Edit::commit` is 1.114649 of the original
+and 1.011591 of the 0359qb after leg. The peak total is 0.926057 of the
+original and 1.000006 of the 0359qb after leg; the peak tree remains under
+`routes::doc_leaf_write` and contains no batch route. These are deterministic
+Callgrind and Massif observations, not a claim that the consuming handoff
+improved CPU cost. The largest changed callees remain open for the next repair.
+
+No new native ABBA block was run: the host load was
+`119.63 138.73 155.23` with unrelated Cargo and rustc work active. The
+native blocks and their rejection reasons from 0359qb remain retained. One
+initial Callgrind launch also failed before execution because Valgrind could
+not create temporary files in shared `/tmp`; the successful capture used the
+private DOC `TMPDIR` and is the only profile included in the JSON receipt.
