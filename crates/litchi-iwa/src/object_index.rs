@@ -932,7 +932,7 @@ mod tests {
                 },
             )
             .unwrap();
-        let bundle = Bundle::from_bytes(&package.to_bytes().unwrap()).unwrap();
+        let bundle = Bundle::from_bytes(&package.to_bytes().unwrap(), Default::default()).unwrap();
 
         assert_eq!(
             preflight_bundle(&bundle).unwrap(),
@@ -1339,7 +1339,7 @@ mod tests {
         package
             .replace_archive("Index/Second.iwa", &second)
             .unwrap();
-        let bundle = Bundle::from_bytes(&package.to_bytes().unwrap()).unwrap();
+        let bundle = Bundle::from_bytes(&package.to_bytes().unwrap(), Default::default()).unwrap();
         let index = ObjectIndex::from_bundle(&bundle).unwrap();
 
         let typed_ids = [
@@ -1398,7 +1398,8 @@ mod tests {
         source_package
             .replace_archive("Index/A.iwa", &archive(10, 11))
             .unwrap();
-        let source_bundle = Bundle::from_bytes(&source_package.to_bytes().unwrap()).unwrap();
+        let source_bundle =
+            Bundle::from_bytes(&source_package.to_bytes().unwrap(), Default::default()).unwrap();
         let index = ObjectIndex::from_bundle(&source_bundle).unwrap();
 
         let mut stale_package = crate::HostPackage::new();
@@ -1408,7 +1409,8 @@ mod tests {
         stale_package
             .replace_archive("Index/A.iwa", &archive(11, 10))
             .unwrap();
-        let stale_bundle = Bundle::from_bytes(&stale_package.to_bytes().unwrap()).unwrap();
+        let stale_bundle =
+            Bundle::from_bytes(&stale_package.to_bytes().unwrap(), Default::default()).unwrap();
 
         let error = index
             .resolve_many_refs(
@@ -1459,7 +1461,7 @@ mod tests {
             )
             .unwrap();
 
-        let bundle = Bundle::from_bytes(&package.to_bytes().unwrap()).unwrap();
+        let bundle = Bundle::from_bytes(&package.to_bytes().unwrap(), Default::default()).unwrap();
         let error = ObjectIndex::from_bundle(&bundle).unwrap_err();
         assert!(matches!(
             error,
@@ -1473,7 +1475,7 @@ mod tests {
     #[test]
     fn typed_batch_resolution_rejects_unindexed_and_missing_objects() {
         let empty_package = crate::HostPackage::new().to_bytes().unwrap();
-        let empty_bundle = Bundle::from_bytes(&empty_package).unwrap();
+        let empty_bundle = Bundle::from_bytes(&empty_package, Default::default()).unwrap();
         let object_id = ObjectId::try_from(10).unwrap();
 
         let empty_index = ObjectIndex::new();

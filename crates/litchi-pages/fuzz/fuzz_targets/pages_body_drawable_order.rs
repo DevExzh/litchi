@@ -15,7 +15,7 @@ use libfuzzer_sys::fuzz_target;
 use litchi_iwa_archive::Limits;
 use litchi_iwa_archive::package::Catalog;
 use litchi_iwa_common::wire::{append_length_delimited_field, append_varint_field};
-use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
+use litchi_iwa_core::{Archive, ArchiveObject, Limits as CoreLimits, RawMessage, SnappyStream};
 use litchi_iwa_protos::{pages_drawable_order_codec, tp, tsa, tsp};
 use litchi_pages::{BodyDrawableSelector, DrawableLayerMove, Package, Position};
 use prost::Message as _;
@@ -499,7 +499,7 @@ fn fixture_bytes(descriptor: &[u8], mode: u8) -> BuildResult<Vec<u8>> {
             descriptor_payload(descriptor, identifier as usize),
         )?);
     }
-    let archive_bytes = Archive { objects }.to_bytes()?;
+    let archive_bytes = Archive { objects }.to_bytes(CoreLimits::default())?;
     let compressed = SnappyStream::compress(&archive_bytes, Default::default())?;
 
     let sentinel = descriptor_payload(descriptor, 12);
@@ -592,7 +592,7 @@ fn exact_bytes(package: &Package) -> BuildResult<Vec<u8>> {
 
 fn native_order(package: &Package) -> BuildResult<Vec<u64>> {
     let bytes = exact_bytes(package)?;
-    let catalog = Catalog::from_bytes(&bytes)?;
+    let catalog = Catalog::from_bytes(&bytes, Limits::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)

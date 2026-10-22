@@ -745,13 +745,9 @@ impl fmt::Display for BundleValidationReport {
 }
 
 impl Bundle {
-    /// Open an iWork bundle from a path (directory or zip file)
-    pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
-        Self::open_with_limits(path, BundleLimits::default())
-    }
-
-    /// Open an iWork bundle under caller-selected ingress ceilings.
-    pub fn open_with_limits<P: AsRef<Path>>(path: P, limits: BundleLimits) -> Result<Self> {
+    /// Open an iWork bundle from a path (directory or zip file) under
+    /// caller-selected ingress ceilings.
+    pub fn open<P: AsRef<Path>>(path: P, limits: BundleLimits) -> Result<Self> {
         let bundle_path = path.as_ref().to_path_buf();
 
         let metadata = fs::symlink_metadata(&bundle_path).map_err(|error| {
@@ -781,25 +777,13 @@ impl Bundle {
         }
     }
 
-    /// Open an iWork bundle from raw bytes (single-file zip archive)
+    /// Open an iWork bundle from raw bytes (single-file zip archive) under
+    /// caller-selected ingress ceilings.
     ///
     /// This function can parse iWork documents that are stored as ZIP archives
     /// directly from memory, without requiring file system access.
     ///
-    /// # Arguments
-    ///
-    /// * `bytes` - Raw bytes of the iWork ZIP archive
-    ///
-    /// # Returns
-    ///
-    /// * `Result<Self>` - Parsed bundle on success, error on failure
-    ///
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
-        Self::from_bytes_with_limits(bytes, BundleLimits::default())
-    }
-
-    /// Open a single-file bundle from bytes under caller-selected limits.
-    pub fn from_bytes_with_limits(bytes: &[u8], limits: BundleLimits) -> Result<Self> {
+    pub fn from_bytes(bytes: &[u8], limits: BundleLimits) -> Result<Self> {
         let input_size = u64::try_from(bytes.len()).map_err(|_| {
             Error::InvalidFormat("iWork bundle input length does not fit u64".to_owned())
         })?;
@@ -1592,12 +1576,12 @@ mod tests {
     fn test_bundle_validation() {
         // Test with a non-existent directory
         let bundle_path = std::path::Path::new("non_existent_bundle");
-        assert!(Bundle::open(bundle_path).is_err());
+        assert!(Bundle::open(bundle_path, BundleLimits::default()).is_err());
 
         // Test with existing iWork bundle
         let bundle_path = std::path::Path::new("test.pages");
         if bundle_path.exists() {
-            let result = Bundle::open(bundle_path);
+            let result = Bundle::open(bundle_path, BundleLimits::default());
             assert!(
                 result.is_ok(),
                 "Failed to open test.pages: {:?}",
@@ -1614,7 +1598,8 @@ mod tests {
             return;
         }
 
-        let bundle = Bundle::open(bundle_path).expect("Failed to open test.pages");
+        let bundle = Bundle::open(bundle_path, BundleLimits::default())
+            .expect("Failed to open test.pages");
 
         // Verify bundle has expected structure
         assert!(
@@ -1652,7 +1637,8 @@ mod tests {
             return;
         }
 
-        let bundle = Bundle::open(bundle_path).expect("Failed to open test.numbers");
+        let bundle = Bundle::open(bundle_path, BundleLimits::default())
+            .expect("Failed to open test.numbers");
 
         // Verify bundle has expected structure
         assert!(
@@ -1741,12 +1727,12 @@ mod tests {
 
         let archive_limits = IwaArchiveLimits::default().with_objects(1)?;
         let limits = BundleLimits::default().with_archive_limits(archive_limits)?;
-        let error = Bundle::from_bytes_with_limits(&bytes, limits).unwrap_err();
+        let error = Bundle::from_bytes(&bytes, limits).unwrap_err();
         assert!(error.to_string().contains("IWA object limit exceeded"));
 
         let byte_limits = IwaArchiveLimits::default().with_archive_bytes(1)?;
         let limits = BundleLimits::default().with_archive_limits(byte_limits)?;
-        let error = Bundle::from_bytes_with_limits(&bytes, limits).unwrap_err();
+        let error = Bundle::from_bytes(&bytes, limits).unwrap_err();
         assert!(matches!(
             error,
             Error::IwaCore(core)
@@ -1808,7 +1794,7 @@ mod tests {
             BundleLimits::MAX_TOTAL_BYTES,
             8,
         )?;
-        let error = Bundle::from_bytes_with_limits(&bytes, tight_stream).unwrap_err();
+        let error = Bundle::from_bytes(&bytes, tight_stream).unwrap_err();
         assert!(matches!(
             error,
             Error::IwaCore(core)
@@ -1828,12 +1814,12 @@ mod tests {
             BundleLimits::MAX_TOTAL_BYTES,
             BundleLimits::MAX_IWA_STREAM_BYTES,
         )?;
-        let error = Bundle::from_bytes_with_limits(&bytes, tight_input).unwrap_err();
+        let error = Bundle::from_bytes(&bytes, tight_input).unwrap_err();
         assert!(error.to_string().contains("iWork bundle input"));
 
         let file = tempfile::NamedTempFile::new()?;
         fs::write(file.path(), &bytes)?;
-        let error = Bundle::open_with_limits(file.path(), tight_input).unwrap_err();
+        let error = Bundle::open(file.path(), tight_input).unwrap_err();
         assert!(error.to_string().contains("iWork bundle is"));
         Ok(())
     }
@@ -2108,7 +2094,7 @@ mod tests {
 
         let bundle_link = temp.path().join("bundle.pages");
         symlink(&target, &bundle_link)?;
-        let error = Bundle::open(&bundle_link).unwrap_err();
+        let error = Bundle::open(&bundle_link, BundleLimits::default()).unwrap_err();
         assert!(error.to_string().contains("symbolic link"));
         Ok(())
     }

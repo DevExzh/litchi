@@ -28,7 +28,7 @@ use crate::{Error, Limits, Result};
 #[doc(hidden)]
 pub use litchi_iwa_package::{
     Entry as PackageEntry, EntryChangeKind as PackageEntryChangeKind,
-    Error as PackageEntryStoreError, Patch as PackagePatch,
+    Error as PackageEntryStoreError, Patch,
 };
 
 #[allow(

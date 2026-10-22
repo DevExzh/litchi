@@ -4438,7 +4438,7 @@ mod tests {
     fn prepared_source_handoff_matches_direct_ingress() -> PackageResult<()> {
         let bytes = package_bytes(Some("Prepared Pages body"), true, true)?;
         let direct = Package::from_bytes(&bytes)?;
-        let prepared = PreparedSource::from_bytes(&bytes)
+        let prepared = PreparedSource::from_bytes(&bytes, litchi_iwa_detect::Limits::default())
             .map_err(|error| PackageError::InvalidFormat(error.to_string()))?
             .ok_or_else(|| {
                 PackageError::InvalidFormat("Pages fixture was not detected".to_owned())
@@ -4469,7 +4469,7 @@ mod tests {
             ],
         )?;
         let direct = Package::from_bytes(&bytes)?;
-        let prepared = PreparedSource::from_bytes(&bytes)
+        let prepared = PreparedSource::from_bytes(&bytes, litchi_iwa_detect::Limits::default())
             .map_err(|error| PackageError::InvalidFormat(error.to_string()))?
             .ok_or_else(|| {
                 PackageError::InvalidFormat("Pages fixture was not detected".to_owned())
@@ -4496,7 +4496,7 @@ mod tests {
     fn semantic_prepared_source_releases_physical_source() -> PackageResult<()> {
         let source: Arc<[u8]> = package_bytes(Some("Detached"), true, true)?.into();
         let weak_source = Arc::downgrade(&source);
-        let prepared = PreparedSource::from_shared_bytes(Arc::clone(&source))
+        let prepared = PreparedSource::from_shared_bytes(Arc::clone(&source), litchi_iwa_detect::Limits::default())
             .map_err(|error| PackageError::InvalidFormat(error.to_string()))?
             .ok_or_else(|| {
                 PackageError::InvalidFormat("Pages fixture was not detected".to_owned())
@@ -4539,7 +4539,7 @@ mod tests {
             ],
             false,
         )?;
-        let prepared = PreparedSource::from_bytes(&bytes)
+        let prepared = PreparedSource::from_bytes(&bytes, litchi_iwa_detect::Limits::default())
             .map_err(|error| PackageError::InvalidFormat(error.to_string()))?
             .ok_or_else(|| {
                 PackageError::InvalidFormat("Pages fixture was not detected".to_owned())
@@ -4565,7 +4565,7 @@ mod tests {
     #[test]
     fn semantic_prepared_source_enforces_exact_and_one_over_text_limits() -> PackageResult<()> {
         let bytes = package_bytes(Some("12345"), true, false)?;
-        let exact = PreparedSource::from_bytes(&bytes)
+        let exact = PreparedSource::from_bytes(&bytes, litchi_iwa_detect::Limits::default())
             .map_err(|error| PackageError::InvalidFormat(error.to_string()))?
             .ok_or_else(|| {
                 PackageError::InvalidFormat("Pages fixture was not detected".to_owned())
@@ -4573,7 +4573,7 @@ mod tests {
         let document = __semantic_document_from_prepared_source(exact, MAX_SECTIONS, 5)?;
         assert_eq!(document.plain_text(), "12345");
 
-        let one_over = PreparedSource::from_bytes(&bytes)
+        let one_over = PreparedSource::from_bytes(&bytes, litchi_iwa_detect::Limits::default())
             .map_err(|error| PackageError::InvalidFormat(error.to_string()))?
             .ok_or_else(|| {
                 PackageError::InvalidFormat("Pages fixture was not detected".to_owned())
@@ -4601,7 +4601,7 @@ mod tests {
             None,
             vec![(43, vec![section_payload(Some("X"))])],
         )?;
-        let exact = PreparedSource::from_bytes(&bytes)
+        let exact = PreparedSource::from_bytes(&bytes, litchi_iwa_detect::Limits::default())
             .map_err(|error| PackageError::InvalidFormat(error.to_string()))?
             .ok_or_else(|| {
                 PackageError::InvalidFormat("Pages fixture was not detected".to_owned())
@@ -4626,7 +4626,7 @@ mod tests {
                 (44, vec![section_payload(Some("Two"))]),
             ],
         )?;
-        let exact = PreparedSource::from_bytes(&bytes)
+        let exact = PreparedSource::from_bytes(&bytes, litchi_iwa_detect::Limits::default())
             .map_err(|error| PackageError::InvalidFormat(error.to_string()))?
             .ok_or_else(|| {
                 PackageError::InvalidFormat("Pages fixture was not detected".to_owned())
@@ -4634,7 +4634,7 @@ mod tests {
         let document = __semantic_document_from_prepared_source(exact, 2, DEFAULT_MAX_TEXT_BYTES)?;
         assert_eq!(document.sections().len(), 2);
 
-        let one_over = PreparedSource::from_bytes(&bytes)
+        let one_over = PreparedSource::from_bytes(&bytes, litchi_iwa_detect::Limits::default())
             .map_err(|error| PackageError::InvalidFormat(error.to_string()))?
             .ok_or_else(|| {
                 PackageError::InvalidFormat("Pages fixture was not detected".to_owned())

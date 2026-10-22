@@ -18,7 +18,7 @@ pub(crate) struct IworkTail;
 
 impl ZipTail for IworkTail {
     fn classify_bytes(&self, bytes: &[u8]) -> Option<FileFormat> {
-        if let Ok(Some(format)) = litchi_iwa_detect::bytes(bytes)
+        if let Ok(Some(format)) = litchi_iwa_detect::bytes(bytes, litchi_iwa_detect::Limits::default())
             && let Some(result) = iwork_format(format)
         {
             return Some(result);
@@ -27,7 +27,7 @@ impl ZipTail for IworkTail {
     }
 
     fn classify_reader<R: Read + Seek>(&self, reader: &mut R) -> Option<FileFormat> {
-        if let Ok(Some(format)) = litchi_iwa_detect::reader(reader)
+        if let Ok(Some(format)) = litchi_iwa_detect::reader(reader, litchi_iwa_detect::Limits::default())
             && let Some(format) = iwork_format(format)
         {
             return Some(format);
@@ -36,7 +36,7 @@ impl ZipTail for IworkTail {
     }
 
     fn detect_owned(&self, bytes: Vec<u8>) -> Option<DetectedFormat> {
-        if let Ok(Some(format)) = litchi_iwa_detect::bytes(&bytes) {
+        if let Ok(Some(format)) = litchi_iwa_detect::bytes(&bytes, litchi_iwa_detect::Limits::default()) {
             #[allow(
                 unreachable_patterns,
                 reason = "match arms are feature-gated; some are unreachable depending on the enabled features"
