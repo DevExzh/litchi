@@ -1437,4 +1437,24 @@ mod tests {
         assert!(owner.content_xml().unwrap().contains(&"x".repeat(1024)));
         assert!(owner.content_xml.get().is_some());
     }
+
+    #[test]
+    fn append_facts_are_deferred_until_a_successful_prepare() {
+        let content = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"><office:body><office:presentation><draw:page/></office:presentation></office:body></office:document-content>"#;
+        let mut writer = PackageWriter::new();
+        writer.set_mimetype(ODF_PRESENTATION).unwrap();
+        writer.add_file("content.xml", content.as_bytes()).unwrap();
+        let owner = SourceBackedPresentation::from_read_at(Arc::new(OwnedSource::new(
+            writer.finish_to_bytes().unwrap(),
+        )))
+        .unwrap();
+        assert!(owner.append_facts.get().is_none());
+
+        owner
+            .edit_tail_append("title", "body")
+            .unwrap()
+            .prepare()
+            .unwrap();
+        assert!(owner.append_facts.get().is_some());
+    }
 }

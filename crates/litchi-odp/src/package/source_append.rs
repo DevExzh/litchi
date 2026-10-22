@@ -1818,22 +1818,6 @@ mod tests {
     }
 
     #[test]
-    fn append_facts_are_deferred_until_a_successful_prepare() {
-        let content = format!(
-            r#"<office:document-content xmlns:office="{OFFICE_NAMESPACE_UTF8}" xmlns:draw="{DRAW_NAMESPACE_UTF8}"><office:body><office:presentation><draw:page/></office:presentation></office:body></office:document-content>"#,
-        );
-        let owner = SourceBackedPresentation::from_read_at(source_package(&content)).unwrap();
-        assert!(owner.append_facts.get().is_none());
-
-        owner
-            .edit_tail_append("title", "body")
-            .unwrap()
-            .prepare()
-            .unwrap();
-        assert!(owner.append_facts.get().is_some());
-    }
-
-    #[test]
     fn doctype_open_remains_accepted_but_append_keeps_its_refusal() {
         let content = format!(
             r#"<!DOCTYPE office:document-content><office:document-content xmlns:office="{OFFICE_NAMESPACE_UTF8}" xmlns:draw="{DRAW_NAMESPACE_UTF8}"><office:body><office:presentation><draw:page/></office:presentation></office:body></office:document-content>"#,
