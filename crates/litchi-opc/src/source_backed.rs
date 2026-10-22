@@ -8872,7 +8872,11 @@ impl SourceBackedPackage {
                     }
                 }))?;
                 name.push_str(member);
-                crate::payload::PartPayload::deferred(deferred, name.into_boxed_str())
+                let declared_len = self
+                    .archive
+                    .metadata_for(catalog_part.entry_id)?
+                    .uncompressed_size();
+                crate::payload::PartPayload::deferred(deferred, name.into_boxed_str(), declared_len)
             } else {
                 let bytes = self.finish_stage(self.read_part_with_session(
                     index,

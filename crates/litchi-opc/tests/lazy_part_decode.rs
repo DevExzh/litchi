@@ -1,5 +1,6 @@
 #![allow(
     clippy::expect_used,
+    clippy::indexing_slicing,
     clippy::unwrap_used,
     reason = "focused lazy-decoding assertions intentionally panic on fixture errors"
 )]
@@ -54,6 +55,95 @@ fn corrupt_bad_member(mut bytes: Vec<u8>) -> Vec<u8> {
     bytes
 }
 
+fn misdeclare_bad_member(mut bytes: Vec<u8>) -> Vec<u8> {
+    let eocd = bytes
+        .windows(4)
+        .rposition(|window| window == b"PK\x05\x06")
+        .expect("fixture EOCD must be present");
+    let count = usize::from(u16::from_le_bytes(
+        bytes[eocd + 10..eocd + 12]
+            .try_into()
+            .expect("fixture EOCD count must fit"),
+    ));
+    let mut central = usize::try_from(u32::from_le_bytes(
+        bytes[eocd + 16..eocd + 20]
+            .try_into()
+            .expect("fixture central-directory offset must fit"),
+    ))
+    .expect("fixture central-directory offset must fit this platform");
+    for _ in 0..count {
+        assert_eq!(&bytes[central..central + 4], b"PK\x01\x02");
+        let name_len = usize::from(u16::from_le_bytes(
+            bytes[central + 28..central + 30]
+                .try_into()
+                .expect("fixture name length must fit"),
+        ));
+        let extra_len = usize::from(u16::from_le_bytes(
+            bytes[central + 30..central + 32]
+                .try_into()
+                .expect("fixture extra length must fit"),
+        ));
+        let comment_len = usize::from(u16::from_le_bytes(
+            bytes[central + 32..central + 34]
+                .try_into()
+                .expect("fixture comment length must fit"),
+        ));
+        if &bytes[central + 46..central + 46 + name_len] == BAD_MEMBER.as_bytes() {
+            let declared = u32::from_le_bytes(
+                bytes[central + 24..central + 28]
+                    .try_into()
+                    .expect("fixture uncompressed length must fit"),
+            )
+            .checked_add(1)
+            .expect("fixture length must not overflow");
+            bytes[central + 24..central + 28].copy_from_slice(&declared.to_le_bytes());
+
+            let local = usize::try_from(u32::from_le_bytes(
+                bytes[central + 42..central + 46]
+                    .try_into()
+                    .expect("fixture local-header offset must fit"),
+            ))
+            .expect("fixture local-header offset must fit this platform");
+            assert_eq!(&bytes[local..local + 4], b"PK\x03\x04");
+            bytes[local + 22..local + 26].copy_from_slice(&declared.to_le_bytes());
+            let flags = u16::from_le_bytes(
+                bytes[local + 6..local + 8]
+                    .try_into()
+                    .expect("fixture flags must fit"),
+            );
+            if flags & 8 != 0 {
+                let local_name_len = usize::from(u16::from_le_bytes(
+                    bytes[local + 26..local + 28]
+                        .try_into()
+                        .expect("fixture local name length must fit"),
+                ));
+                let local_extra_len = usize::from(u16::from_le_bytes(
+                    bytes[local + 28..local + 30]
+                        .try_into()
+                        .expect("fixture local extra length must fit"),
+                ));
+                let compressed_len = usize::try_from(u32::from_le_bytes(
+                    bytes[central + 20..central + 24]
+                        .try_into()
+                        .expect("fixture compressed length must fit"),
+                ))
+                .expect("fixture compressed length must fit this platform");
+                let descriptor = local + 30 + local_name_len + local_extra_len + compressed_len;
+                let descriptor_size = if &bytes[descriptor..descriptor + 4] == b"PK\x07\x08" {
+                    descriptor + 12
+                } else {
+                    descriptor + 8
+                };
+                bytes[descriptor_size..descriptor_size + 4]
+                    .copy_from_slice(&declared.to_le_bytes());
+            }
+            return bytes;
+        }
+        central += 46 + name_len + extra_len + comment_len;
+    }
+    panic!("fixture member {BAD_MEMBER} is missing");
+}
+
 #[test]
 fn metadata_and_exact_noop_leave_owned_payloads_cold() {
     let source = archive();
@@ -68,6 +158,14 @@ fn metadata_and_exact_noop_leave_owned_payloads_cold() {
         })
         .collect();
     assert_eq!(names.len(), 2);
+    assert_eq!(package.deferred_decode_counters(), Some((0, 0)));
+
+    let mut lengths: Vec<_> = package
+        .iter_parts()
+        .map(|part| part.payload_len().expect("admitted payload length"))
+        .collect();
+    lengths.sort_unstable();
+    assert_eq!(lengths, vec![GOOD_PAYLOAD.len(), BAD_PAYLOAD.len()]);
     assert_eq!(package.deferred_decode_counters(), Some((0, 0)));
 
     let output = PackageWriter::to_bytes(&package).expect("exact no-op publication");
@@ -103,6 +201,8 @@ fn part_metadata_separates_absence_from_a_failed_decode_without_decoding() {
     assert_eq!(bad.partname().as_str(), BAD_URI);
     assert_eq!(bad.content_type(), "application/octet-stream");
     assert!(!bad.payload_is_decoded());
+    assert_eq!(bad.payload_len().unwrap(), BAD_PAYLOAD.len());
+    assert_eq!(package.deferred_decode_counters(), Some((0, 0)));
     let good = package
         .part_metadata(&uri("/CUSTOM/Good.XML"))
         .expect("name resolution matches get_part");
@@ -115,6 +215,32 @@ fn part_metadata_separates_absence_from_a_failed_decode_without_decoding() {
         package.get_part(&uri(BAD_URI)),
         Err(OpcError::ZipError(_))
     ));
+}
+
+#[test]
+fn misdeclared_lazy_member_is_rejected_after_a_bounded_decode_probe() {
+    let source = misdeclare_bad_member(archive());
+    let package = OpcPackage::from_vec(source.clone()).expect("misdeclaration is deferred");
+    let bad = package
+        .part_metadata(&uri(BAD_URI))
+        .expect("the misdeclared member is still present");
+
+    // Metadata admission reports the central-directory declaration without
+    // inflating the member. The declared + 1 probe is only exercised on the
+    // first payload access, and the source accounting remains untouched when
+    // the decoded length fails verification.
+    assert_eq!(bad.payload_len().unwrap(), BAD_PAYLOAD.len() + 1);
+    assert_eq!(package.deferred_decode_counters(), Some((0, 0)));
+    let error = match package.get_part(&uri(BAD_URI)) {
+        Ok(_) => panic!("a misdeclared member must refuse on first access"),
+        Err(error) => error,
+    };
+    assert!(matches!(error, OpcError::ZipError(_)));
+    assert_eq!(package.deferred_decode_counters(), Some((0, 0)));
+
+    // The failed read does not publish a replacement or alter exact-source
+    // publication; no decoded payload is retained as a fallback.
+    assert_eq!(PackageWriter::to_bytes(&package).unwrap(), source);
 }
 
 #[test]

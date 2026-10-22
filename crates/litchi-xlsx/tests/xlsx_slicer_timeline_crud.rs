@@ -1,7 +1,15 @@
+#![allow(
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    clippy::unwrap_used,
+    reason = "focused raw-package assertions intentionally panic on fixture errors"
+)]
+
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
-use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, SourceLimits};
+use litchi_opc::{BlobPart, OpcError, OpcPackage, PackURI, PackageWriter, Part, SourceLimits};
 use litchi_xlsx::slicer::{self, Definition, Slicer};
 use litchi_xlsx::timeline::{CacheDefinition, FilterType, Level, Range, State, View};
+use litchi_xlsx::{Error, SourceLimitKind};
 
 const SML: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 const R: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
@@ -30,6 +38,113 @@ fn package() -> (OpcPackage, PackURI) {
     )));
     package.relate_to("xl/workbook.xml", rt::OFFICE_DOCUMENT);
     (package, worksheet)
+}
+
+fn misdeclare_member(mut bytes: Vec<u8>, wanted: &str) -> Vec<u8> {
+    let eocd = bytes
+        .windows(4)
+        .rposition(|window| window == b"PK\x05\x06")
+        .expect("fixture EOCD must be present");
+    let count = usize::from(u16::from_le_bytes(
+        bytes[eocd + 10..eocd + 12]
+            .try_into()
+            .expect("fixture EOCD count must fit"),
+    ));
+    let mut central = usize::try_from(u32::from_le_bytes(
+        bytes[eocd + 16..eocd + 20]
+            .try_into()
+            .expect("fixture central-directory offset must fit"),
+    ))
+    .expect("fixture central-directory offset must fit this platform");
+    for _ in 0..count {
+        assert_eq!(&bytes[central..central + 4], b"PK\x01\x02");
+        let name_len = usize::from(u16::from_le_bytes(
+            bytes[central + 28..central + 30]
+                .try_into()
+                .expect("fixture name length must fit"),
+        ));
+        let extra_len = usize::from(u16::from_le_bytes(
+            bytes[central + 30..central + 32]
+                .try_into()
+                .expect("fixture extra length must fit"),
+        ));
+        let comment_len = usize::from(u16::from_le_bytes(
+            bytes[central + 32..central + 34]
+                .try_into()
+                .expect("fixture comment length must fit"),
+        ));
+        if &bytes[central + 46..central + 46 + name_len] == wanted.as_bytes() {
+            let declared = u32::from_le_bytes(
+                bytes[central + 24..central + 28]
+                    .try_into()
+                    .expect("fixture uncompressed length must fit"),
+            )
+            .checked_add(1)
+            .expect("fixture length must not overflow");
+            bytes[central + 24..central + 28].copy_from_slice(&declared.to_le_bytes());
+
+            let local = usize::try_from(u32::from_le_bytes(
+                bytes[central + 42..central + 46]
+                    .try_into()
+                    .expect("fixture local-header offset must fit"),
+            ))
+            .expect("fixture local-header offset must fit this platform");
+            assert_eq!(&bytes[local..local + 4], b"PK\x03\x04");
+            bytes[local + 22..local + 26].copy_from_slice(&declared.to_le_bytes());
+            let flags = u16::from_le_bytes(
+                bytes[local + 6..local + 8]
+                    .try_into()
+                    .expect("fixture flags must fit"),
+            );
+            if flags & 8 != 0 {
+                let local_name_len = usize::from(u16::from_le_bytes(
+                    bytes[local + 26..local + 28]
+                        .try_into()
+                        .expect("fixture local name length must fit"),
+                ));
+                let local_extra_len = usize::from(u16::from_le_bytes(
+                    bytes[local + 28..local + 30]
+                        .try_into()
+                        .expect("fixture local extra length must fit"),
+                ));
+                let compressed_len = usize::try_from(u32::from_le_bytes(
+                    bytes[central + 20..central + 24]
+                        .try_into()
+                        .expect("fixture compressed length must fit"),
+                ))
+                .expect("fixture compressed length must fit this platform");
+                let descriptor = local + 30 + local_name_len + local_extra_len + compressed_len;
+                let descriptor_size = if &bytes[descriptor..descriptor + 4] == b"PK\x07\x08" {
+                    descriptor + 12
+                } else {
+                    descriptor + 8
+                };
+                bytes[descriptor_size..descriptor_size + 4]
+                    .copy_from_slice(&declared.to_le_bytes());
+            }
+            return bytes;
+        }
+        central += 46 + name_len + extra_len + comment_len;
+    }
+    panic!("fixture member {wanted} is missing");
+}
+
+fn total_part_bytes(package: &OpcPackage) -> u64 {
+    package
+        .iter_parts()
+        .map(|part| part.blob().len() as u64)
+        .sum()
+}
+
+fn assert_total_part_limit(error: Error) {
+    assert!(matches!(
+        error,
+        Error::Package(OpcError::Limit {
+            kind: SourceLimitKind::TotalPartBytes,
+            observed,
+            maximum,
+        }) if observed > maximum
+    ));
 }
 
 fn slicer_cache(name: &str, source: &str) -> Definition {
@@ -79,6 +194,143 @@ fn timeline(name: &str, cache: &str) -> View {
         style: Some("TimelineStyleLight1".into()),
         extension_list: None,
     }
+}
+
+#[test]
+fn raw_slicer_rejects_an_over_limit_baseline_before_source_capture() {
+    let (package, _) = package();
+    let source = litchi_xlsx::Package::from_opc(package).unwrap();
+    let limits = SourceLimits::builder()
+        .max_total_part_bytes(1)
+        .unwrap()
+        .build()
+        .unwrap();
+    let mut edit = source
+        .edit_slicers_with_options(slicer::EditOptions::default().limits(limits))
+        .unwrap();
+
+    let error = edit
+        .insert_cache(slicer::raw::Cache {
+            relationship_id: "rIdOverLimitBaseline".into(),
+            part_name: "/xl/slicerCaches/over-limit-baseline.xml".into(),
+            definition: slicer_cache("OverLimitBaseline", "State"),
+        })
+        .expect_err("the existing package is already over the aggregate limit");
+    assert_total_part_limit(error);
+    assert!(edit.cache("OverLimitBaseline").unwrap().is_none());
+}
+
+#[test]
+fn raw_slicer_rejects_lazy_baseline_without_decoding_payloads() {
+    let (package, _) = package();
+    let bytes = litchi_opc::PackageWriter::to_bytes(&package).unwrap();
+    let source = litchi_xlsx::Package::from_opc(OpcPackage::from_vec(bytes).unwrap()).unwrap();
+    let before = source.clone().into_plain_opc().deferred_decode_counters();
+    let limits = SourceLimits::builder()
+        .max_total_part_bytes(1)
+        .unwrap()
+        .build()
+        .unwrap();
+    let mut edit = source
+        .edit_slicers_with_options(slicer::EditOptions::default().limits(limits))
+        .unwrap();
+
+    let error = edit
+        .insert_cache(slicer::raw::Cache {
+            relationship_id: "rIdLazyOverLimitBaseline".into(),
+            part_name: "/xl/slicerCaches/lazy-over-limit-baseline.xml".into(),
+            definition: slicer_cache("LazyOverLimitBaseline", "State"),
+        })
+        .expect_err("the existing lazy package is already over the aggregate limit");
+    assert_total_part_limit(error);
+    assert_eq!(
+        edit.opc().deferred_decode_counters(),
+        before,
+        "size-only aggregate admission must leave deferred payloads cold"
+    );
+}
+
+#[test]
+fn raw_slicer_rejects_a_misdeclared_lazy_member_without_mutation() {
+    let (package, _) = package();
+    let bytes = PackageWriter::to_bytes(&package).unwrap();
+    let bytes = misdeclare_member(bytes, "xl/worksheets/sheet1.xml");
+    let source = litchi_xlsx::Package::from_opc(OpcPackage::from_vec(bytes).unwrap()).unwrap();
+    let before = PackageWriter::to_bytes(&source.clone().into_plain_opc()).unwrap();
+    let before_counters = source.clone().into_plain_opc().deferred_decode_counters();
+
+    let error = source
+        .edit_slicers_with_options(slicer::EditOptions::default())
+        .expect_err("raw edit must reject the declared-versus-decoded mismatch");
+    assert!(matches!(error, Error::Package(OpcError::ZipError(_))));
+    assert_eq!(
+        source.clone().into_plain_opc().deferred_decode_counters(),
+        before_counters,
+        "the bounded mismatch probe must not charge a failed payload"
+    );
+    assert_eq!(
+        PackageWriter::to_bytes(&source.clone().into_plain_opc()).unwrap(),
+        before,
+        "a rejected raw edit must not publish a mutation"
+    );
+}
+
+#[test]
+fn raw_slicer_rejects_workbook_rewrite_after_new_part_fits_aggregate() {
+    let (package, _) = package();
+    let existing_bytes = total_part_bytes(&package);
+    let definition = slicer_cache("RewriteAggregate", "State");
+    let new_part_bytes = slicer::write(&definition).unwrap().len() as u64;
+    let limits = SourceLimits::builder()
+        // The new cache fits with one byte of headroom, but the workbook
+        // integration extension does not fit in the remaining aggregate.
+        .max_total_part_bytes(existing_bytes + new_part_bytes + 1)
+        .unwrap()
+        .build()
+        .unwrap();
+    let source = litchi_xlsx::Package::from_opc(package).unwrap();
+    let mut edit = source
+        .edit_slicers_with_options(slicer::EditOptions::default().limits(limits))
+        .unwrap();
+
+    let error = edit
+        .insert_cache(slicer::raw::Cache {
+            relationship_id: "rIdRewriteAggregate".into(),
+            part_name: "/xl/slicerCaches/rewrite-aggregate.xml".into(),
+            definition,
+        })
+        .expect_err("the rewritten workbook must consume the remaining aggregate");
+    assert_total_part_limit(error);
+    assert!(edit.cache("RewriteAggregate").unwrap().is_none());
+}
+
+#[test]
+fn raw_timeline_rejects_workbook_rewrite_after_new_part_fits_aggregate() {
+    let (package, _) = package();
+    let existing_bytes = total_part_bytes(&package);
+    let definition = timeline_cache("RewriteAggregateTimeline", "Date");
+    let new_part_bytes = litchi_xlsx::timeline::codec::write_cache(&definition)
+        .unwrap()
+        .len() as u64;
+    let limits = SourceLimits::builder()
+        .max_total_part_bytes(existing_bytes + new_part_bytes + 1)
+        .unwrap()
+        .build()
+        .unwrap();
+    let source = litchi_xlsx::Package::from_opc(package).unwrap();
+    let mut edit = source
+        .edit_timelines_with_options(litchi_xlsx::timeline::EditOptions::default().limits(limits))
+        .unwrap();
+
+    let error = edit
+        .insert_caches(&[litchi_xlsx::timeline::raw::Cache {
+            relationship_id: "rIdRewriteAggregateTimeline".into(),
+            part_name: "/xl/timelineCaches/rewrite-aggregate.xml".into(),
+            definition,
+        }])
+        .expect_err("the rewritten workbook must consume the remaining aggregate");
+    assert_total_part_limit(error);
+    assert!(edit.cache("RewriteAggregateTimeline").unwrap().is_none());
 }
 
 #[test]
