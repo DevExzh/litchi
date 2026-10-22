@@ -68,9 +68,9 @@ fn semantic_order_edits_compose_replay_invert_and_preserve_the_source() {
         litchi_pptx::opened::Limits::default(),
     )
     .unwrap();
-    let replayed = original.apply(&wire).unwrap();
+    let replayed = original.apply(&wire).unwrap().into_package();
     assert_eq!(replayed.to_bytes().unwrap(), changed.to_bytes().unwrap());
-    let restored = replayed.apply(&wire.inverse()).unwrap();
+    let restored = replayed.apply(&wire.inverse()).unwrap().into_package();
     assert_eq!(restored.to_bytes().unwrap(), source);
     let reopened = Package::from_reader(std::io::Cursor::new(changed.to_bytes().unwrap())).unwrap();
     assert_eq!(names(&reopened), names(&changed));

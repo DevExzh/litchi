@@ -190,12 +190,17 @@ fn eager_text_chunks_match_bounded_sequential_oracle_and_replay() {
     assert_eq!(text_values(&changed)[999], "chunked-999");
 
     let patch = transported_opened(commit.patch());
-    let replayed = Package::from_bytes(&before).unwrap().apply(&patch).unwrap();
+    let replayed = Package::from_bytes(&before)
+        .unwrap()
+        .apply(&patch)
+        .unwrap()
+        .into_package();
     assert_eq!(replayed.to_bytes().unwrap(), changed_bytes);
     let restored = Package::from_bytes(&changed_bytes)
         .unwrap()
         .apply(&patch.inverse())
-        .unwrap();
+        .unwrap()
+        .into_package();
     assert_eq!(restored.to_bytes().unwrap(), before);
 }
 
@@ -233,9 +238,12 @@ fn source_primary_text_chunks_match_bounded_sequential_oracle_and_replay() {
     assert_eq!(source_values(&changed)[999], "source-chunked-999");
 
     let patch = transported_source(&patch);
-    let replayed = open_source(&before).apply(&patch).unwrap();
+    let replayed = open_source(&before).apply(&patch).unwrap().into_package();
     assert_eq!(replayed.to_bytes().unwrap(), changed_bytes);
-    let restored = open_source(&changed_bytes).apply(&patch.inverse()).unwrap();
+    let restored = open_source(&changed_bytes)
+        .apply(&patch.inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(restored.to_bytes().unwrap(), before);
 }
 
@@ -355,6 +363,7 @@ fn eager_and_source_property_chunks_mix_text_and_bounds_like_sequential_batches(
         open_source(&before)
             .apply(&transported_source(&patch))
             .unwrap()
+            .into_package()
             .to_bytes()
             .unwrap(),
         source_changed_bytes

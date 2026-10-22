@@ -454,13 +454,13 @@ fn run_control(corpus: Corpus, directory: &Path) -> Result<RunOutput, Box<dyn Er
     };
 
     let mut inverse_package = package;
-    inverse_package = inverse_package.apply(&inverse)?;
+    inverse_package = inverse_package.apply(&inverse)?.into_package();
     let inverse_output = inverse_package.to_bytes()?;
     write_new_bytes(&directory.join(INVERSE_FILE), &inverse_output)?;
     if inverse_output != source {
         return Err("owning PPTX inverse did not restore exact source bytes".into());
     }
-    inverse_package = inverse_package.apply(&forward)?;
+    inverse_package = inverse_package.apply(&forward)?.into_package();
     let forward_replay = inverse_package.to_bytes()?;
     write_new_bytes(&directory.join(FORWARD_REPLAY_FILE), &forward_replay)?;
     if forward_replay != output {
@@ -485,14 +485,18 @@ fn run_control(corpus: Corpus, directory: &Path) -> Result<RunOutput, Box<dyn Er
     }
     let mut durable_forward_package =
         litchi_pptx::Package::from_reader(std::io::Cursor::new(source.clone()))?;
-    durable_forward_package = durable_forward_package.apply(&decoded_forward)?;
+    durable_forward_package = durable_forward_package
+        .apply(&decoded_forward)?
+        .into_package();
     let durable_forward_output = durable_forward_package.to_bytes()?;
     if durable_forward_output != output {
         return Err("owning PPTX durable forward patch failed on a reopened source".into());
     }
     let mut durable_inverse_package =
         litchi_pptx::Package::from_reader(std::io::Cursor::new(output.clone()))?;
-    durable_inverse_package = durable_inverse_package.apply(&decoded_inverse)?;
+    durable_inverse_package = durable_inverse_package
+        .apply(&decoded_inverse)?
+        .into_package();
     let durable_inverse_output = durable_inverse_package.to_bytes()?;
     if durable_inverse_output != source {
         return Err("owning PPTX durable inverse patch failed on a reopened candidate".into());

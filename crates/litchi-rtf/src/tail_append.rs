@@ -575,7 +575,7 @@ struct OwnedParagraph {
 /// assert!(commit.diagnostics().changed());
 /// let (package, patch) = commit.into_parts();
 /// assert!(!patch.is_noop());
-/// assert_eq!(source.apply_tail_append(&patch)?.text(), package.text());
+/// assert_eq!(source.apply_tail_append(&patch)?.into_package().text(), package.text());
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 pub struct Edit {
@@ -3249,11 +3249,23 @@ fn hash_source_range(
             } else {
                 let left_end = skip_start.min(chunk_end);
                 if left_end > offset {
-                    target_hasher.update(&chunk[..left_end - offset]);
+                    let left = chunk.get(..left_end - offset).ok_or_else(|| {
+                        SourceScanFailure::Io(io::Error::new(
+                            io::ErrorKind::InvalidData,
+                            "source digest range exceeds its window",
+                        ))
+                    })?;
+                    target_hasher.update(left);
                 }
                 let right_start = skip_end.max(offset);
                 if right_start < chunk_end {
-                    target_hasher.update(&chunk[right_start - offset..]);
+                    let right = chunk.get(right_start - offset..).ok_or_else(|| {
+                        SourceScanFailure::Io(io::Error::new(
+                            io::ErrorKind::InvalidData,
+                            "source digest range exceeds its window",
+                        ))
+                    })?;
+                    target_hasher.update(right);
                 }
             }
         } else {
@@ -3576,6 +3588,25 @@ pub struct Commit {
 }
 
 impl Commit {
+    pub(crate) fn from_replay(package: Package, patch: Patch) -> Self {
+        let source_bytes = patch.before.source_bytes().map_or(0, <[u8]>::len);
+        let output_bytes = patch.after.source_bytes().map_or(source_bytes, <[u8]>::len);
+        Self {
+            snapshot: package,
+            diagnostics: Diagnostics {
+                changed: !patch.is_noop(),
+                operation_count: usize::from(!patch.is_noop()),
+                paragraphs: 0,
+                runs: 0,
+                input_bytes: 0,
+                source_bytes,
+                inserted_bytes: patch.inserted.len(),
+                output_bytes,
+            },
+            patch,
+        }
+    }
+
     /// Published immutable candidate snapshot.
     #[must_use]
     pub const fn package(&self) -> &Package {
@@ -3639,6 +3670,11 @@ pub struct Patch {
 }
 
 impl Patch {
+    pub(crate) fn apply_commit(&self, source: &Package) -> Result<Commit, Error> {
+        let package = self.apply(source)?;
+        Ok(Commit::from_replay(package, self.clone()))
+    }
+
     fn no_op(source: Package, selector: TailSelector) -> Self {
         Self {
             before: source.clone(),

@@ -525,12 +525,12 @@ fn verify_move_durable(corpus: &Corpus) -> Result<(bool, bool, bool, bool), Box<
         litchi_pptx::opened::Limits::default(),
     )?;
     let mut applied = Package::from_reader(std::io::Cursor::new(corpus.archive.clone()))?;
-    applied = applied.apply(&forward)?;
+    applied = applied.apply(&forward)?.into_package();
     let applied_bytes = applied.to_bytes()?;
     let forward_verified = verify_semantic_output(&applied_bytes, Operation::Move, 0, corpus)?
         && verify_untouched_raw_members(&corpus.archive, &applied_bytes, Operation::Move, None)?;
     let mut restored = Package::from_reader(std::io::Cursor::new(applied_bytes))?;
-    restored = restored.apply(&inverse)?;
+    restored = restored.apply(&inverse)?.into_package();
     let restored_bytes = restored.to_bytes()?;
     let inverse_verified = restored_bytes == corpus.archive;
 

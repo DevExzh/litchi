@@ -100,6 +100,7 @@ fn insertion_positions_readback_and_source_immutability() {
             source
                 .apply(&transported(&patch))
                 .unwrap()
+                .into_package()
                 .to_bytes()
                 .unwrap(),
             after.to_bytes().unwrap()
@@ -108,6 +109,7 @@ fn insertion_positions_readback_and_source_immutability() {
             after
                 .apply(&transported(&patch.inverse()))
                 .unwrap()
+                .into_package()
                 .to_bytes()
                 .unwrap(),
             before
@@ -127,13 +129,17 @@ fn empty_source_insertion_and_reopened_inverse_restore_exact_members() {
         let encoded = after.to_bytes().unwrap();
         let reopened = open(&encoded);
         assert_eq!(texts(&reopened), [""]);
-        let restored = reopened.apply(&transported(&patch.inverse())).unwrap();
+        let restored = reopened
+            .apply(&transported(&patch.inverse()))
+            .unwrap()
+            .into_package();
         assert_eq!(restored.presentation().unwrap().slide_count().unwrap(), 0);
         assert_eq!(members(&restored.to_bytes().unwrap()), members(&before));
         assert_eq!(
             source
                 .apply(&transported(&patch))
                 .unwrap()
+                .into_package()
                 .to_bytes()
                 .unwrap(),
             encoded
@@ -175,7 +181,10 @@ fn insertion_composes_with_text_order_and_removal() {
     let (after, patch) = edit.commit().unwrap().into_parts();
     assert_eq!(texts(&after), ["", "edited original", ""]);
     let reopened = open(&after.to_bytes().unwrap());
-    let restored = reopened.apply(&transported(&patch.inverse())).unwrap();
+    let restored = reopened
+        .apply(&transported(&patch.inverse()))
+        .unwrap()
+        .into_package();
     assert_eq!(members(&restored.to_bytes().unwrap()), members(&before));
     assert_eq!(texts(&restored), ["original 0", "original 1"]);
 }
@@ -224,9 +233,9 @@ fn replacing_every_original_identity_has_complete_durable_resource_proofs() {
     let (after, patch) = edit.commit().unwrap().into_parts();
     assert_eq!(texts(&after), [""]);
     let wire = transported(&patch);
-    assert_eq!(texts(&source.apply(&wire).unwrap()), [""]);
+    assert_eq!(texts(&source.apply(&wire).unwrap().into_package()), [""]);
     let reopened = open(&after.to_bytes().unwrap());
-    let restored = reopened.apply(&wire.inverse()).unwrap();
+    let restored = reopened.apply(&wire.inverse()).unwrap().into_package();
     assert_eq!(members(&restored.to_bytes().unwrap()), members(&before));
 }
 
@@ -325,10 +334,18 @@ fn dangling_case_equivalent_targets_reserve_future_slide_names() {
     let archive = ArchiveReader::new(&output).unwrap();
     assert!(archive.read("ppt/slides/slide1.xml").is_err());
     assert!(archive.read("ppt/slides/slide2.xml").is_ok());
-    let restored = open(&output).apply(&transported(&patch.inverse())).unwrap();
+    let restored = open(&output)
+        .apply(&transported(&patch.inverse()))
+        .unwrap()
+        .into_package();
     assert_eq!(members(&restored.to_bytes().unwrap()), members(&before));
     assert_eq!(
-        after.apply(&patch.inverse()).unwrap().to_bytes().unwrap(),
+        after
+            .apply(&patch.inverse())
+            .unwrap()
+            .into_package()
+            .to_bytes()
+            .unwrap(),
         before
     );
 }
@@ -386,7 +403,18 @@ fn insertion_inverse_preserves_unrelated_fragments_with_nonempty_target() {
     edit.insert_slide(Position::new(1), "Blank").unwrap();
     let (after, patch) = edit.commit().unwrap().into_parts();
     let inverse = transported(&patch.inverse());
-    assert_eq!(after.apply(&inverse).unwrap().to_bytes().unwrap(), before);
-    let restored = open(&after.to_bytes().unwrap()).apply(&inverse).unwrap();
+    assert_eq!(
+        after
+            .apply(&inverse)
+            .unwrap()
+            .into_package()
+            .to_bytes()
+            .unwrap(),
+        before
+    );
+    let restored = open(&after.to_bytes().unwrap())
+        .apply(&inverse)
+        .unwrap()
+        .into_package();
     assert_eq!(members(&restored.to_bytes().unwrap()), members(&before));
 }

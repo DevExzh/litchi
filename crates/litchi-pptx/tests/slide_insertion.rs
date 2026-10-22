@@ -85,7 +85,7 @@ fn insertions_into_empty_and_populated_lists_compose_and_invert_losslessly() {
         let (changed, patch) = edit.commit().unwrap().into_parts();
         assert_eq!(names(&changed), [second.name(), first.name(), third.name()]);
         let wire = Patch::from_bytes(&patch.to_bytes().unwrap(), Limits::default()).unwrap();
-        let replay = original.apply(&wire).unwrap();
+        let replay = original.apply(&wire).unwrap().into_package();
         assert_eq!(replay.to_bytes().unwrap(), changed.to_bytes().unwrap());
         let reopened =
             Package::from_reader(std::io::Cursor::new(replay.to_bytes().unwrap())).unwrap();
@@ -94,7 +94,8 @@ fn insertions_into_empty_and_populated_lists_compose_and_invert_losslessly() {
             .apply(
                 &Patch::from_bytes(&wire.inverse().to_bytes().unwrap(), Limits::default()).unwrap(),
             )
-            .unwrap();
+            .unwrap()
+            .into_package();
         assert_eq!(restored.to_bytes().unwrap(), original_bytes);
         assert_eq!(original.to_bytes().unwrap(), original_bytes);
         let after = changed.to_bytes().unwrap();
@@ -274,7 +275,7 @@ fn insertion_and_inverse_preserve_unrelated_destination_metadata() {
     let overlay =
         Package::from_reader(std::io::Cursor::new(writer.finish().unwrap().into_inner())).unwrap();
     let wire = Patch::from_bytes(&patch.to_bytes().unwrap(), Limits::default()).unwrap();
-    let changed = overlay.apply(&wire).unwrap();
+    let changed = overlay.apply(&wire).unwrap().into_package();
     let bytes = changed.to_bytes().unwrap();
     let archive = ArchiveReader::new(&bytes).unwrap();
     for (name, _) in &expected {
@@ -286,7 +287,8 @@ fn insertion_and_inverse_preserve_unrelated_destination_metadata() {
     }
     let restored = changed
         .apply(&Patch::from_bytes(&wire.inverse().to_bytes().unwrap(), Limits::default()).unwrap())
-        .unwrap();
+        .unwrap()
+        .into_package();
     let bytes = restored.to_bytes().unwrap();
     let archive = ArchiveReader::new(&bytes).unwrap();
     for (name, bytes) in expected {
@@ -347,9 +349,10 @@ fn fresh_package_insertion_uses_the_same_immutable_transaction() {
     let (changed, patch) = edit.commit().unwrap().into_parts();
     let replay = original
         .apply(&Patch::from_bytes(&patch.to_bytes().unwrap(), Limits::default()).unwrap())
-        .unwrap();
+        .unwrap()
+        .into_package();
     assert_eq!(changed.to_bytes().unwrap(), replay.to_bytes().unwrap());
-    let restored = replay.apply(&patch.inverse()).unwrap();
+    let restored = replay.apply(&patch.inverse()).unwrap().into_package();
     assert_eq!(restored.to_bytes().unwrap(), before);
     assert!(
         original

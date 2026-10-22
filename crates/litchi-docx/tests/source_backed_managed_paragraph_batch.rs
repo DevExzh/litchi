@@ -57,7 +57,7 @@ impl PublishDocument for source_backed::Package {
         writer: impl io::Write,
         commit: &litchi_docx::document::snapshot::Commit,
     ) -> Result<Published, TransactionError> {
-        let applied = self.apply_document(commit.patch())?;
+        let applied = self.apply(commit.patch())?;
         applied.package().write_to(writer)?;
         Ok(Published {
             patch: applied.patch().clone(),
@@ -71,8 +71,8 @@ impl PublishDocument for source_backed::Package {
         publication: &Published,
     ) -> Result<litchi_docx::document::Snapshot, TransactionError> {
         let restored = self.apply(&publication.patch.inverse())?;
-        restored.write_to(writer)?;
-        restored.document_snapshot()
+        restored.package().write_to(writer)?;
+        restored.package().document_snapshot()
     }
 }
 
@@ -315,6 +315,7 @@ fn managed_batch_matches_repeated_scalar_xml_and_preserves_unknown_members() {
     batch_package
         .apply(batch_commit.patch())
         .and_then(|committed| {
+            let committed = committed.into_package();
             committed.write_to(&mut batch_output)?;
             committed.document_snapshot()
         })
@@ -339,6 +340,7 @@ fn managed_batch_matches_repeated_scalar_xml_and_preserves_unknown_members() {
     scalar_package
         .apply(scalar_commit.patch())
         .and_then(|committed| {
+            let committed = committed.into_package();
             committed.write_to(&mut scalar_output)?;
             committed.document_snapshot()
         })
@@ -406,6 +408,7 @@ fn managed_batch_forward_and_inverse_are_source_checked() {
     mutable.bump_revision();
     let mut refused_output = Vec::new();
     let result = package.apply(commit.patch()).and_then(|committed| {
+        let committed = committed.into_package();
         committed.write_to(&mut refused_output)?;
         committed.document_snapshot()
     });
@@ -440,6 +443,7 @@ fn managed_batch_noop_and_revert_restore_the_exact_source_owner() {
     package
         .apply(commit.patch())
         .and_then(|committed| {
+            let committed = committed.into_package();
             committed.write_to(&mut output)?;
             committed.document_snapshot()
         })
@@ -465,6 +469,7 @@ fn managed_batch_noop_and_revert_restore_the_exact_source_owner() {
     package
         .apply(commit.patch())
         .and_then(|committed| {
+            let committed = committed.into_package();
             committed.write_to(&mut output)?;
             committed.document_snapshot()
         })
@@ -494,6 +499,7 @@ fn managed_batch_composes_with_scalar_edits_in_either_order() {
     first_package
         .apply(first_commit.patch())
         .and_then(|committed| {
+            let committed = committed.into_package();
             committed.write_to(&mut first_output)?;
             committed.document_snapshot()
         })
@@ -512,6 +518,7 @@ fn managed_batch_composes_with_scalar_edits_in_either_order() {
     second_package
         .apply(second_commit.patch())
         .and_then(|committed| {
+            let committed = committed.into_package();
             committed.write_to(&mut second_output)?;
             committed.document_snapshot()
         })
@@ -712,6 +719,7 @@ fn managed_signed_batch_noop_is_exact_and_change_is_refused() {
     package
         .apply(commit.patch())
         .and_then(|committed| {
+            let committed = committed.into_package();
             committed.write_to(&mut output)?;
             committed.document_snapshot()
         })

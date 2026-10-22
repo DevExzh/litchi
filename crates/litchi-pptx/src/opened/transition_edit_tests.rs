@@ -93,7 +93,7 @@ fn source_edit_matches_the_eager_edit_and_inverts() -> Result<()> {
     let reopened = Package::from_bytes(&after.to_bytes()?)?;
     assert_eq!(slide_xml(&reopened)?, slide_xml(&eager)?);
     assert_eq!(
-        after.apply(&patch.inverse())?.to_bytes()?,
+        after.apply(&patch.inverse())?.into_package().to_bytes()?,
         source.to_bytes()?
     );
     // An absent transition cleared is a no-op on the source owner too.

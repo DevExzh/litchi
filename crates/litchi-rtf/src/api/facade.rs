@@ -585,8 +585,8 @@ impl Package {
     pub fn apply_tail_append(
         &self,
         patch: &crate::tail_append::Patch,
-    ) -> Result<Self, crate::tail_append::Error> {
-        patch.apply(self)
+    ) -> Result<crate::tail_append::Commit, crate::tail_append::Error> {
+        patch.apply_commit(self)
     }
 
     /// Applies a shared durable RTF semantic patch to this exact snapshot.

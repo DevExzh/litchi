@@ -17052,11 +17052,13 @@ fn verify_rtf_logical_tail_gates(
         appended,
     )?;
 
-    let applied = source.apply_tail_append(changed.patch())?;
+    let applied = source.apply_tail_append(changed.patch())?.into_package();
     if applied.to_bytes()? != expected {
         return Err("RTF logical-tail in-memory patch replay differs from publication".into());
     }
-    let restored = applied.apply_tail_append(&changed.patch().inverse())?;
+    let restored = applied
+        .apply_tail_append(&changed.patch().inverse())?
+        .into_package();
     if restored.to_bytes()? != source.to_bytes()? {
         return Err("RTF logical-tail in-memory inverse did not restore exact source".into());
     }
@@ -22100,7 +22102,9 @@ fn build_detection_corpus(case: Case, shape: SemanticShape) -> Result<Corpus, Bo
         DetectionMode::CatalogAlias => detection_catalog_alias_archive(family, &base.archive)?,
     };
     let expected = mode.expected_format(family);
-    let observed = litchi::common::detection::detect_file_format_from_bytes(&archive);
+    let detection_limits = litchi::common::SourceLimits::default();
+    let observed =
+        litchi::common::detection::detect_file_format_from_bytes(&archive, &detection_limits);
     if observed != Some(expected) {
         return Err(format!(
             "{} detection corpus oracle differs: expected {}, observed {}",
@@ -45763,7 +45767,11 @@ fn run_detection_case(
         .detection_spec()
         .ok_or("non-detection case passed to detection runner")?;
     let expected = mode.expected_format(family);
-    let preflight = litchi::common::detection::detect_file_format_from_bytes(&corpus.archive);
+    let detection_limits = litchi::common::SourceLimits::default();
+    let preflight = litchi::common::detection::detect_file_format_from_bytes(
+        &corpus.archive,
+        &detection_limits,
+    );
     if preflight != Some(expected) {
         return Err(format!(
             "{} detection preflight differs from expected {}: {:?}",
@@ -45785,7 +45793,10 @@ fn run_detection_case(
                 let mut reader = Cursor::new(corpus.archive.as_slice());
                 reader.set_position(original_position);
                 let started = Instant::now();
-                let observed = litchi::common::detection::detect_format_from_reader(&mut reader);
+                let observed = litchi::common::detection::detect_format_from_reader(
+                    &mut reader,
+                    &detection_limits,
+                );
                 let duration = started.elapsed();
                 (
                     observed,
@@ -45795,8 +45806,10 @@ fn run_detection_case(
             },
             DetectionMode::Bytes | DetectionMode::Polyglot | DetectionMode::CatalogAlias => {
                 let started = Instant::now();
-                let observed =
-                    litchi::common::detection::detect_file_format_from_bytes(&corpus.archive);
+                let observed = litchi::common::detection::detect_file_format_from_bytes(
+                    &corpus.archive,
+                    &detection_limits,
+                );
                 let duration = started.elapsed();
                 (observed, duration, None)
             },
@@ -49835,7 +49848,10 @@ fn publish_docx_source_edit<W: Write>(
     let materializations = usize::try_from(package.cache_diagnostics().successful_loads)?;
     // Record 0355a: the detached commit replays onto the package, and the
     // committed package is written; callers compare the output bytes.
-    package.apply(commit.patch())?.write_to(writer)?;
+    package
+        .apply(commit.patch())?
+        .into_package()
+        .write_to(writer)?;
     Ok((materializations, commit))
 }
 
@@ -51297,7 +51313,7 @@ fn publish_pptx_source_edit<W: Write>(
     if !commit.diagnostics().changed() {
         return Err("PPTX source edit produced an unchanged commit".into());
     }
-    let replayed = package.apply(commit.patch())?;
+    let replayed = package.apply(commit.patch())?.into_package();
     if replayed.apply(&commit.patch().inverse()).is_err() {
         return Err("PPTX source edit inverse rejected its candidate".into());
     }
@@ -51427,7 +51443,7 @@ fn publish_pptx_batch_edit<W: Write>(
         if !commit.diagnostics().changed() {
             return Err("PPTX source-backed batch produced an unchanged commit".into());
         }
-        let replayed = package.apply(commit.patch())?;
+        let replayed = package.apply(commit.patch())?.into_package();
         if replayed.apply(&commit.patch().inverse()).is_err() {
             return Err("PPTX source-backed batch inverse rejected its candidate".into());
         }
@@ -51457,7 +51473,7 @@ fn publish_pptx_batch_edit<W: Write>(
         let published = package.opened_presentation()?;
         if package
             .apply(&inverse)
-            .and_then(|restored| restored.apply(&inverse.inverse()))
+            .and_then(|restored| restored.into_package().apply(&inverse.inverse()))
             .is_err()
         {
             return Err("PPTX eager batch inverse/forward replay failed".into());
@@ -51597,7 +51613,7 @@ fn publish_pptx_multi_slide_batch_edit<W: Write>(
         if !commit.diagnostics().changed() {
             return Err("PPTX source-backed multi-slide batch produced no changes".into());
         }
-        let replayed = package.apply(commit.patch())?;
+        let replayed = package.apply(commit.patch())?.into_package();
         if replayed.apply(&commit.patch().inverse()).is_err() {
             return Err("PPTX source-backed multi-slide inverse rejected its candidate".into());
         }
@@ -51635,7 +51651,7 @@ fn publish_pptx_multi_slide_batch_edit<W: Write>(
     let published = package.opened_presentation()?;
     if package
         .apply(&inverse)
-        .and_then(|restored| restored.apply(&inverse.inverse()))
+        .and_then(|restored| restored.into_package().apply(&inverse.inverse()))
         .is_err()
     {
         return Err("PPTX eager multi-slide batch inverse/forward replay failed".into());
@@ -61978,14 +61994,20 @@ mod tests {
             let corpus = build_detection_corpus(case, SemanticShape::Tiny)
                 .expect("detection corpus has a deterministic oracle");
             assert_eq!(
-                litchi::common::detection::detect_file_format_from_bytes(&corpus.archive),
+                litchi::common::detection::detect_file_format_from_bytes(
+                    &corpus.archive,
+                    &litchi::common::SourceLimits::default(),
+                ),
                 Some(expected)
             );
             if mode == super::DetectionMode::Reader {
                 let mut reader = std::io::Cursor::new(corpus.archive.as_slice());
                 reader.set_position(7);
                 assert_eq!(
-                    litchi::common::detection::detect_format_from_reader(&mut reader),
+                    litchi::common::detection::detect_format_from_reader(
+                        &mut reader,
+                        &litchi::common::SourceLimits::default(),
+                    ),
                     Some(expected)
                 );
                 assert_eq!(reader.position(), 7);

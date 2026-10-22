@@ -252,7 +252,7 @@ fn generate_pptx(output: &Path) -> Result<()> {
     let mut edit = root.edit();
     edit.set_shape_text(0, shape, SENTINEL)?;
     let patch = edit.commit()?.into_patch();
-    package = package.apply(&patch)?;
+    package = package.apply(&patch)?.into_package();
     fs::write(output, package.to_bytes()?)?;
     readback_pptx(output)
 }

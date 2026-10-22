@@ -188,14 +188,20 @@ fn text_box_addition_reads_replays_and_inverts_after_reopening() {
         assert!(texts(&after)[0].contains("A<&\r\nB\tC"));
         assert!(texts(&after)[0].contains("second"));
         assert_eq!(source.to_bytes().unwrap(), before);
-        let replayed = source.apply(&transported(&patch)).unwrap();
+        let replayed = source.apply(&transported(&patch)).unwrap().into_package();
         assert_eq!(replayed.to_bytes().unwrap(), after.to_bytes().unwrap());
         let restored = open(&after.to_bytes().unwrap())
             .apply(&transported(&patch.inverse()))
-            .unwrap();
+            .unwrap()
+            .into_package();
         assert_eq!(members(&restored.to_bytes().unwrap()), members(&before));
         assert_eq!(
-            after.apply(&patch.inverse()).unwrap().to_bytes().unwrap(),
+            after
+                .apply(&patch.inverse())
+                .unwrap()
+                .into_package()
+                .to_bytes()
+                .unwrap(),
             before
         );
         let old = members(&before);
@@ -230,13 +236,15 @@ fn addition_composes_with_text_order_and_slide_topology() {
         source
             .apply(&transported(&patch))
             .unwrap()
+            .into_package()
             .to_bytes()
             .unwrap(),
         after.to_bytes().unwrap()
     );
     let restored = open(&after.to_bytes().unwrap())
         .apply(&transported(&patch.inverse()))
-        .unwrap();
+        .unwrap()
+        .into_package();
     assert_eq!(members(&restored.to_bytes().unwrap()), members(&before));
 }
 
@@ -288,7 +296,8 @@ fn addition_on_a_reopened_revision_has_an_independent_inverse() {
     let (after, patch) = edit.commit().unwrap().into_parts();
     let restored = open(&after.to_bytes().unwrap())
         .apply(&transported(&patch.inverse()))
-        .unwrap();
+        .unwrap()
+        .into_package();
     assert_eq!(members(&restored.to_bytes().unwrap()), members(&before));
 }
 
@@ -399,7 +408,8 @@ fn blank_slide_addition_keeps_existing_related_parts() {
     }
     let restored = open(&after.to_bytes().unwrap())
         .apply(&transported(&patch.inverse()))
-        .unwrap();
+        .unwrap()
+        .into_package();
     assert_eq!(members(&restored.to_bytes().unwrap()), members(&before));
 }
 
@@ -468,7 +478,10 @@ fn final_shape_identity_is_usable_and_exhaustion_is_atomic() {
     );
     let (after, patch) = edit.commit().unwrap().into_parts();
     let inverse = transported(&patch.inverse());
-    let restored = open(&after.to_bytes().unwrap()).apply(&inverse).unwrap();
+    let restored = open(&after.to_bytes().unwrap())
+        .apply(&inverse)
+        .unwrap()
+        .into_package();
     assert_eq!(members(&restored.to_bytes().unwrap()), members(&before));
 }
 
@@ -527,7 +540,8 @@ fn additions_do_not_activate_dangling_shape_references() {
         let (after, patch) = edit.commit().unwrap().into_parts();
         let restored = open(&after.to_bytes().unwrap())
             .apply(&transported(&patch.inverse()))
-            .unwrap();
+            .unwrap()
+            .into_package();
         assert_eq!(members(&restored.to_bytes().unwrap()), members(&before));
     }
 }

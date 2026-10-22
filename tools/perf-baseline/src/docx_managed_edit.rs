@@ -1282,7 +1282,7 @@ fn execute_api(
     let publication_started = phase_start(config.phase_diagnostics);
     // Record 0355a: the detached commit replays onto the package and the
     // committed package is written.
-    let published = package.apply(commit.patch())?;
+    let published = package.apply(commit.patch())?.into_package();
     published.write_to(sink)?;
     let publication_ns = phase_elapsed(publication_started)?;
 

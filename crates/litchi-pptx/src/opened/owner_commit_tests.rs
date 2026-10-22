@@ -26,10 +26,10 @@ fn direct_commit_and_immutable_replay_preserve_their_sources() -> Result<()> {
     let (changed, patch) = commit.into_parts();
     assert_eq!(source.to_bytes()?, original);
     let output = changed.to_bytes()?;
-    let replayed = source.apply(&patch)?;
+    let replayed = source.apply(&patch)?.into_package();
     assert_eq!(replayed.to_bytes()?, output);
     assert_eq!(source.to_bytes()?, original);
-    let restored = changed.apply(&patch.inverse())?;
+    let restored = changed.apply(&patch.inverse())?.into_package();
     assert_eq!(restored.to_bytes()?, original);
     assert_eq!(changed.to_bytes()?, output);
     assert!(changed.apply(&patch).is_err());
@@ -62,7 +62,13 @@ fn cloned_commits_and_snapshot_derived_edits_keep_owner_evidence() -> Result<()>
     assert_eq!(next.tolerance_report(), &report);
     let noop = source.edit()?.commit()?;
     assert!(!noop.diagnostics().changed());
-    assert_eq!(source.apply(noop.patch())?.tolerance_report(), &report);
+    assert_eq!(
+        source
+            .apply(noop.patch())?
+            .into_package()
+            .tolerance_report(),
+        &report
+    );
     let plan = source.opened_presentation()?.plan_slide_removal(1_usize)?;
     let result = source.apply_slide_removal_plan(&plan)?;
     assert_eq!(
@@ -89,7 +95,7 @@ fn direct_publication_keeps_the_candidate_independent_of_source_drift() -> Resul
     assert!(!direct.opc.contains_part(&extra));
     assert!(source.opc.contains_part(&extra));
     // Durable patch replay deliberately uses the destination's unrelated state.
-    let replayed = source.apply(&patch)?;
+    let replayed = source.apply(&patch)?.into_package();
     assert!(replayed.opc.contains_part(&extra));
     Ok(())
 }
@@ -124,7 +130,7 @@ fn encryption_provenance_survives_commits_clones_replay_and_reencryption() -> Re
     let source =
         Package::from_reader_with_password(std::io::Cursor::new(encrypted), "test password")?;
     let noop = source.edit()?.commit()?;
-    let replayed_noop = source.apply(noop.patch())?;
+    let replayed_noop = source.apply(noop.patch())?.into_package();
     assert_eq!(replayed_noop.encryption(), Some(Mode::Standard));
     assert!(replayed_noop.to_bytes().is_err());
     let mut edit = source.opened_presentation()?.edit();
@@ -137,7 +143,7 @@ fn encryption_provenance_survives_commits_clones_replay_and_reencryption() -> Re
         assert_eq!(package.encryption(), Some(Mode::Standard));
         assert!(package.to_bytes().is_err());
     }
-    let replayed = source.apply(&patch)?;
+    let replayed = source.apply(&patch)?.into_package();
     assert_eq!(replayed.encryption(), Some(Mode::Standard));
     assert!(replayed.to_bytes().is_err());
     let bytes = changed.to_reencrypted("new password")?;
@@ -158,7 +164,10 @@ fn signed_replay_refuses_changed_sources_and_signature_injection() -> Result<()>
     let noop = signed.edit()?.commit()?;
     assert!(!noop.diagnostics().changed());
     assert_eq!(noop.clone().into_package().to_bytes()?, bytes);
-    assert_eq!(signed.apply(noop.patch())?.to_bytes()?, bytes);
+    assert_eq!(
+        signed.apply(noop.patch())?.into_package().to_bytes()?,
+        bytes
+    );
     let mut unsigned = Package::from_reader(std::io::Cursor::new(bytes.clone()))?;
     unsigned = unsigned.unsign()?;
     let mut edit = unsigned.edit()?;

@@ -237,6 +237,7 @@ fn source_backed_edits_publish_what_the_eager_owner_publishes() {
         let commit = edit.commit().unwrap();
         let mut published = Vec::new();
         let source_result = package.apply(commit.patch()).and_then(|committed| {
+            let committed = committed.into_package();
             committed.write_to(&mut published)?;
             committed.document_snapshot()
         });
@@ -318,6 +319,7 @@ fn exact_no_ops_republish_every_fixture_byte_for_byte() {
         package
             .apply(commit.patch())
             .and_then(|committed| {
+                let committed = committed.into_package();
                 committed.write_to(&mut published)?;
                 committed.document_snapshot()
             })

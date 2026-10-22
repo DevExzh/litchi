@@ -108,7 +108,12 @@ fn source_insertion_matches_the_eager_slide() {
     let reopened = Package::from_bytes(&after.to_bytes().unwrap()).unwrap();
     assert_eq!(placeholders(&slide_xml(&reopened, 1)), expected());
     assert_eq!(
-        after.apply(&patch.inverse()).unwrap().to_bytes().unwrap(),
+        after
+            .apply(&patch.inverse())
+            .unwrap()
+            .into_package()
+            .to_bytes()
+            .unwrap(),
         source.to_bytes().unwrap()
     );
 }

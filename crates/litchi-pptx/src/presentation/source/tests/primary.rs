@@ -37,12 +37,22 @@ fn immutable_commits_compose_replay_inverse_and_keep_original_exact() {
     assert_eq!(text(&changed, 0), "final text");
     assert_eq!(source.to_bytes().unwrap(), bytes);
     assert_eq!(
-        source.apply(&patch).unwrap().to_bytes().unwrap(),
+        source
+            .apply(&patch)
+            .unwrap()
+            .into_package()
+            .to_bytes()
+            .unwrap(),
         changed.to_bytes().unwrap()
     );
     assert!(changed.apply(&patch).is_err());
     assert_eq!(
-        changed.apply(&patch.inverse()).unwrap().to_bytes().unwrap(),
+        changed
+            .apply(&patch.inverse())
+            .unwrap()
+            .into_package()
+            .to_bytes()
+            .unwrap(),
         bytes
     );
     assert!(package(bytes.clone()).apply(&patch).is_err());
@@ -56,6 +66,7 @@ fn immutable_commits_compose_replay_inverse_and_keep_original_exact() {
     assert_eq!(
         both.apply(&second_patch.inverse())
             .unwrap()
+            .into_package()
             .to_bytes()
             .unwrap(),
         changed.to_bytes().unwrap()
@@ -239,7 +250,7 @@ fn disjoint_replay_preserves_destination_changes_and_atomic_save_reopens() {
     let mut right = source.edit().unwrap();
     right.set_shape_text(1, 0_usize, "right").unwrap();
     let right = right.commit().unwrap().into_package();
-    let combined = right.apply(left.patch()).unwrap();
+    let combined = right.apply(left.patch()).unwrap().into_package();
     assert_eq!(text(&combined, 0), "left");
     assert_eq!(text(&combined, 1), "right");
     assert_eq!(text(&right, 0), "First slide");
@@ -318,7 +329,12 @@ fn signed_noop_is_exact_and_changed_stage_refuses() {
     let commit = source.edit().unwrap().commit().unwrap();
     assert_eq!(commit.package().to_bytes().unwrap(), bytes);
     assert_eq!(
-        source.apply(commit.patch()).unwrap().to_bytes().unwrap(),
+        source
+            .apply(commit.patch())
+            .unwrap()
+            .into_package()
+            .to_bytes()
+            .unwrap(),
         bytes
     );
     let mut edit = source.edit().unwrap();

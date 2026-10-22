@@ -53,6 +53,7 @@ fn minimal_package_is_directly_editable_and_replayable() {
         package
             .apply(&patch)
             .unwrap()
+            .into_package()
             .same_content(&changed)
             .unwrap()
     );
@@ -60,6 +61,7 @@ fn minimal_package_is_directly_editable_and_replayable() {
         changed
             .apply(&patch.inverse())
             .unwrap()
+            .into_package()
             .same_content(&package)
             .unwrap()
     );

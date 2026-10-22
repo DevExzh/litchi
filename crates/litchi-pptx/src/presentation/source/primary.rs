@@ -75,8 +75,8 @@ impl RootPayload {
 /// updated.save("updated.pptx")?;
 /// let transported = Patch::from_bytes(&patch.to_bytes()?)?;
 /// let reopened = Package::open("deck.pptx")?;
-/// let replayed = reopened.apply(&transported)?;
-/// let restored = replayed.apply(&transported.inverse())?;
+/// let replayed = reopened.apply(&transported)?.into_package();
+/// let restored = replayed.apply(&transported.inverse())?.into_package();
 /// assert_eq!(restored.to_bytes()?, source.to_bytes()?);
 /// # Ok(())
 /// # }
@@ -375,33 +375,39 @@ impl Package {
     }
 
     /// Replay an exact-source patch without changing this package.
-    pub fn apply(&self, patch: &Patch) -> Result<Self> {
+    pub fn apply(&self, patch: &Patch) -> Result<Commit> {
         let this = self.effective()?;
         if !std::ptr::eq(this, self) {
             return this.apply(patch);
         }
         self.check()?;
-        let (source, before_root, before_order, after_root, after_order, changes) = match &patch
-            .data
-        {
-            PatchData::Local {
-                source,
-                before_root,
-                before_order,
-                after_root,
-                after_order,
-                changes,
-            } => (
-                source,
-                before_root,
-                before_order,
-                after_root,
-                after_order,
-                changes,
-            ),
-            PatchData::Durable(data) => return durable::apply(self, data, patch.shape_removals),
-            PatchData::Topology(data) => return data.apply(self, patch.shape_removals),
-        };
+        let (source, before_root, before_order, after_root, after_order, changes) =
+            match &patch.data {
+                PatchData::Local {
+                    source,
+                    before_root,
+                    before_order,
+                    after_root,
+                    after_order,
+                    changes,
+                } => (
+                    source,
+                    before_root,
+                    before_order,
+                    after_root,
+                    after_order,
+                    changes,
+                ),
+                PatchData::Durable(data) => {
+                    return durable::apply(self, data, patch.shape_removals)
+                        .map(|package| commit_of(package, patch.clone()));
+                },
+                PatchData::Topology(data) => {
+                    return data
+                        .apply(self, patch.shape_removals)
+                        .map(|package| commit_of(package, patch.clone()));
+                },
+            };
         source.check()?;
         if !self.same_source_owner(source)
             || self.root.as_bytes() != before_root.as_bytes()
@@ -424,7 +430,7 @@ impl Package {
             candidate = candidate.with_snapshot(after)?;
         }
         candidate.check()?;
-        Ok(candidate)
+        Ok(commit_of(candidate, patch.clone()))
     }
 
     /// Serialize with exact no-op and raw-copy preservation of untouched members.
@@ -865,15 +871,12 @@ impl std::error::Error for ReplayHashError {}
 
 impl Write for ReplayHashWriter {
     fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
-        let amount = u64::try_from(bytes.len()).map_err(|_| {
-            std::io::Error::new(
-                std::io::ErrorKind::Other,
-                ReplayHashError::InputLengthExceedsU64,
-            )
-        })?;
-        let total = self.bytes.checked_add(amount).ok_or_else(|| {
-            std::io::Error::new(std::io::ErrorKind::Other, ReplayHashError::LengthOverflow)
-        })?;
+        let amount = u64::try_from(bytes.len())
+            .map_err(|_| std::io::Error::other(ReplayHashError::InputLengthExceedsU64))?;
+        let total = self
+            .bytes
+            .checked_add(amount)
+            .ok_or_else(|| std::io::Error::other(ReplayHashError::LengthOverflow))?;
         self.digest.update(bytes);
         self.bytes = total;
         Ok(bytes.len())
@@ -1523,7 +1526,10 @@ impl Edit {
     /// edit.remove_slide(Position::new(0))?;
     /// let (updated, patch) = edit.commit()?.into_parts();
     /// assert_eq!(updated.presentation()?.slide_count()?, 1);
-    /// assert_eq!(updated.apply(&patch.inverse())?.to_bytes()?, source.to_bytes()?);
+    /// assert_eq!(
+    ///     updated.apply(&patch.inverse())?.into_package().to_bytes()?,
+    ///     source.to_bytes()?
+    /// );
     /// # Ok(())
     /// # }
     /// ```

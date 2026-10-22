@@ -947,6 +947,7 @@ fn both_owners_publish_formatting_and_structure_identically() {
         backed
             .apply(commit.patch())
             .and_then(|committed| {
+                let committed = committed.into_package();
                 committed.write_to(&mut backed_bytes)?;
                 committed.document_snapshot()
             })
@@ -1012,6 +1013,7 @@ fn signed_packages_refuse_formatting_until_explicitly_unsigned() {
     let mut output = Vec::new();
     assert!(matches!(
         backed.apply(backed_commit.patch()).and_then(|committed| {
+            let committed = committed.into_package();
             committed.write_to(&mut output)?;
             committed.document_snapshot()
         }),
@@ -1102,6 +1104,6 @@ fn canonical_owner_commits_retain_source_and_support_inverse() {
     assert_eq!(source.document_snapshot().unwrap().xml_bytes(), before);
     let inverse = commit.patch().inverse();
     let changed = commit.into_package();
-    let restored = changed.apply(&inverse).unwrap();
+    let restored = changed.apply(&inverse).unwrap().into_package();
     assert_eq!(restored.document_snapshot().unwrap().xml_bytes(), before);
 }

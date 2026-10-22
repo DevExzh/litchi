@@ -297,9 +297,12 @@ fn exact_source_patch_and_durable_inverse_round_trip_bytes() {
     let commit = edit.commit().unwrap();
     let patch = commit.patch();
 
-    let applied = source.apply_tail_append(patch).unwrap();
+    let applied = source.apply_tail_append(patch).unwrap().into_package();
     assert_eq!(retained_bytes(&applied), retained_bytes(commit.package()));
-    let restored = applied.apply_tail_append(&patch.inverse()).unwrap();
+    let restored = applied
+        .apply_tail_append(&patch.inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(retained_bytes(&restored), retained_bytes(&source));
 
     let durable = patch.to_durable(patch_limits()).unwrap();
@@ -1085,6 +1088,7 @@ fn native_replay_preserves_recipient_policy_and_noop_identity() {
         recipient
             .apply_tail_append(noop.patch())
             .unwrap()
+            .into_package()
             .same_snapshot(&recipient)
     );
     let mut edit = source.edit_tail_append(TailSelector::Body);
@@ -1106,6 +1110,7 @@ fn native_replay_preserves_recipient_policy_and_noop_identity() {
         source
             .apply_tail_append(&patch)
             .unwrap()
+            .into_package()
             .to_bytes()
             .unwrap(),
         package.to_bytes().unwrap()
@@ -1114,6 +1119,7 @@ fn native_replay_preserves_recipient_policy_and_noop_identity() {
         package
             .apply_tail_append(&patch.inverse())
             .unwrap()
+            .into_package()
             .to_bytes()
             .unwrap(),
         bytes
@@ -1143,7 +1149,10 @@ fn native_replay_retains_distinct_admitting_recipient_profile() {
     let mut edit = source.edit_tail_append(TailSelector::Body);
     edit.append_text_paragraphs(&["B"]).unwrap();
     let commit = edit.commit().unwrap();
-    let applied = recipient.apply_tail_append(commit.patch()).unwrap();
+    let applied = recipient
+        .apply_tail_append(commit.patch())
+        .unwrap()
+        .into_package();
     assert_eq!(applied.open_options(), options);
     assert_eq!(
         applied.to_bytes().unwrap(),
@@ -1151,7 +1160,8 @@ fn native_replay_retains_distinct_admitting_recipient_profile() {
     );
     let restored = applied
         .apply_tail_append(&commit.patch().inverse())
-        .unwrap();
+        .unwrap()
+        .into_package();
     assert_eq!(restored.open_options(), options);
     assert_eq!(restored.to_bytes().unwrap(), bytes);
 }

@@ -274,7 +274,7 @@ fn inverse_of_removing_an_already_text_edited_slide_restores_original_payload() 
     let (changed, patch) = edit.commit().unwrap().into_parts();
     assert_eq!(texts(&changed), ["A", "C"]);
 
-    let restored = changed.apply(&patch.inverse()).unwrap();
+    let restored = changed.apply(&patch.inverse()).unwrap().into_package();
     assert_eq!(texts(&restored), ["A", "B", "C"]);
 }
 
@@ -291,14 +291,14 @@ fn local_removal_patch_replays_and_inverse_restores_decoded_state() {
     assert!(edit.remove_slide(Position::new(1)).unwrap());
     let (changed, patch) = edit.commit().unwrap().into_parts();
 
-    let replayed = source.apply(&patch).unwrap();
+    let replayed = source.apply(&patch).unwrap().into_package();
     assert_eq!(texts(&replayed), ["B*", "A"]);
     assert_eq!(
         source_positions(&replayed),
         [Position::new(1), Position::new(0)]
     );
 
-    let restored = changed.apply(&patch.inverse()).unwrap();
+    let restored = changed.apply(&patch.inverse()).unwrap().into_package();
     assert_eq!(texts(&restored), ["A", "B", "C"]);
     assert_eq!(
         source_positions(&restored),
@@ -324,7 +324,7 @@ fn durable_removal_patch_reopens_forward_and_inverse_after_removed_output() {
     let (changed, patch) = edit.commit().unwrap().into_parts();
     let durable = litchi_pptx::source::Patch::from_bytes(&patch.to_bytes().unwrap()).unwrap();
 
-    let replayed = fresh(&bytes).apply(&durable).unwrap();
+    let replayed = fresh(&bytes).apply(&durable).unwrap().into_package();
     assert_eq!(texts(&replayed), ["B*", "A"]);
     assert_eq!(replayed.presentation().unwrap().slide_count().unwrap(), 2);
 
@@ -332,7 +332,7 @@ fn durable_removal_patch_reopens_forward_and_inverse_after_removed_output() {
     let reopened_removed = fresh(&removed_output);
     let inverse =
         litchi_pptx::source::Patch::from_bytes(&durable.inverse().to_bytes().unwrap()).unwrap();
-    let restored = reopened_removed.apply(&inverse).unwrap();
+    let restored = reopened_removed.apply(&inverse).unwrap().into_package();
     assert_eq!(texts(&restored), ["A", "B", "C"]);
     assert_eq!(
         decoded_members(&restored.to_bytes().unwrap()),
@@ -356,7 +356,8 @@ fn restored_middle_slide_can_be_read_edited_reordered_replayed_and_removed_again
             &litchi_pptx::source::Patch::from_bytes(&removal.inverse().to_bytes().unwrap())
                 .unwrap(),
         )
-        .unwrap();
+        .unwrap()
+        .into_package();
     let middle = restored
         .presentation()
         .unwrap()
@@ -380,15 +381,15 @@ fn restored_middle_slide_can_be_read_edited_reordered_replayed_and_removed_again
 
     let durable = litchi_pptx::source::Patch::from_bytes(&patch.to_bytes().unwrap()).unwrap();
     assert_eq!(
-        texts(&restored.apply(&durable).unwrap()),
+        texts(&restored.apply(&durable).unwrap().into_package()),
         ["A", "C", "B-restored"]
     );
     let reopened_restored = fresh(&restored.to_bytes().unwrap());
-    let replayed = reopened_restored.apply(&durable).unwrap();
+    let replayed = reopened_restored.apply(&durable).unwrap().into_package();
     assert_eq!(texts(&replayed), ["A", "C", "B-restored"]);
     let inverse =
         litchi_pptx::source::Patch::from_bytes(&durable.inverse().to_bytes().unwrap()).unwrap();
-    let replayed_inverse = replayed.apply(&inverse).unwrap();
+    let replayed_inverse = replayed.apply(&inverse).unwrap().into_package();
     assert_eq!(texts(&replayed_inverse), ["A", "B", "C"]);
 
     let mut remove_again = ordered.edit().unwrap();
@@ -416,7 +417,7 @@ fn durable_inverse_reopens_after_two_removals_and_restores_every_member() {
     let removed = fresh(&changed.to_bytes().unwrap());
     let inverse =
         litchi_pptx::source::Patch::from_bytes(&durable.inverse().to_bytes().unwrap()).unwrap();
-    let restored = removed.apply(&inverse).unwrap();
+    let restored = removed.apply(&inverse).unwrap().into_package();
     assert_eq!(texts(&restored), ["A", "B", "C"]);
     assert_eq!(
         decoded_members(&restored.to_bytes().unwrap()),
@@ -618,13 +619,16 @@ fn removal_authored_after_a_committed_text_edit_guards_effective_preimages() {
     removal.remove_slide(Position::new(1)).unwrap();
     let (removed, patch) = removal.commit().unwrap().into_parts();
     let durable = litchi_pptx::source::Patch::from_bytes(&patch.to_bytes().unwrap()).unwrap();
-    assert_eq!(texts(&edited.apply(&durable).unwrap()), ["A", "C"]);
+    assert_eq!(
+        texts(&edited.apply(&durable).unwrap().into_package()),
+        ["A", "C"]
+    );
     assert!(source.apply(&durable).is_err());
-    let restored = removed.apply(&durable.inverse()).unwrap();
+    let restored = removed.apply(&durable.inverse()).unwrap().into_package();
     assert_eq!(texts(&restored), ["A", "B-previous", "C"]);
     let reopened = fresh(&removed.to_bytes().unwrap());
     assert_eq!(
-        texts(&reopened.apply(&durable.inverse()).unwrap()),
+        texts(&reopened.apply(&durable.inverse()).unwrap().into_package()),
         ["A", "B-previous", "C"]
     );
 }
