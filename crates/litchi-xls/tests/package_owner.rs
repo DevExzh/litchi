@@ -773,10 +773,12 @@ fn primary_source_commit_retains_query_limits_and_positional_projection() {
     .unwrap();
     let committed = edit.commit().unwrap().into_package();
     assert!(committed.is_source_backed());
-    assert!(committed
-        .source()
-        .expect("source-backed commit retains its CFB owner")
-        .is_owned_immutable());
+    assert!(
+        committed
+            .source()
+            .expect("source-backed commit retains its CFB owner")
+            .is_owned_immutable()
+    );
     assert!(matches!(
         committed.workbook().text(),
         Err(PackageError::Source(
