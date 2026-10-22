@@ -35,9 +35,10 @@ sources, and unsupported content remain their existing typed errors.
 ## ODP tail-append source wrapper
 
 `crates/litchi-odp/src/package/source_append.rs` has a format-owned
-`Error::SourceChanged { expected, observed, progress }` variant.  Its display
-is limited to opaque source-version tokens and progress, it has no underlying
-error source, and helper conversions preserve freshness from:
+`Error::SourceChanged { expected, observed, progress, source }` variant.  Its
+display is limited to opaque source-version tokens and progress, while
+`Error::source()` exposes an optional typed diagnostic through the boxed
+`SourceChangedSource` wrapper.  Helper conversions preserve freshness from:
 
 * `check_source`, `effective`, `source_version`, and
   `member_materialized_size` during apply, prepare, and commit;
@@ -53,18 +54,28 @@ failure, `Complete` progress for a stale-after-output failure, and freshness
 retention for a callback-scoped source-member error.
 
 The follow-up keeps `SourceChanged` as the primary classification while
-retaining the typed source-member or publication diagnostic through
+retaining the typed core, source-member, or publication diagnostic through
 `SourceChangedSource`.  This preserves a secondary callback failure when a
 source verification failure wins precedence; `Error::source()` exposes the
 retained typed chain.
 
+The retained wrapper is heap-indirected on the error path.  On the capped
+lane, `size_of::<litchi_odp::tail_append::Error>()` is 104 bytes with
+alignment 8, equal to the 104-byte/8-aligned pre-follow-up base at
+`7dbfa217fa0c338a175e290f5b3f278be888aab9`; the unboxed wrapper would have
+made the largest result error at least 144 bytes and failed strict Clippy's
+`result_large_err` check.  `SourceChangedSource` itself is 96 bytes and is
+allocated only when retaining a stale diagnostic, so successful operations
+keep the original result ABI and perform no diagnostic allocation.
+
 ## Validation receipt
 
 The isolated worktree was `/home/zhuhe/code/litchi-worktrees/uo2-replay-error-audit`
-at `273aa07748674cc67b6d6a229d9f8b7248e38762` before this progress fix.  The
-focused lane reused
+at `a5c83d3a2f90e5e1a3bba1889b44d9d6a22f8418` before this layout follow-up.
+The focused lane reused
 `/home/zhuhe/code/litchi-worktrees/.coord/zip-gate-repair/target`, ran with one
-Cargo job and one test thread, and remained below 1 GiB.  Results:
+Cargo job and one test thread, and remained below the 20 GiB target cap.
+Results:
 
 * ODT `embedded_resource_gc`: 12 passed;
 * ODG `package_semantics`: 24 passed;
@@ -73,6 +84,11 @@ Cargo job and one test thread, and remained below 1 GiB.  Results:
 * ODI `semantic_planning`: 14 passed;
 * ODF Formula `fifth_wave`: 5 passed; and
 * ODP source-append progress regression: 1 passed.
+
+The follow-up's ODP stale-source filter passed all 4 freshness and diagnostic
+tests, and the complete `package::source_append::tests` filter passed all 16
+source-append tests.  Direct rustfmt on the changed Rust file and
+`git diff --check` passed.
 
 Strict `cargo clippy --lib -- -D warnings` passed for ODT, ODG, ODM, ODB,
 ODI, ODF Formula, and ODP.  Broader all-target checks were limited by absent

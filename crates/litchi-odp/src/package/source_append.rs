@@ -134,7 +134,7 @@ pub enum Error {
         progress: SourceContentPublicationProgress,
         /// The typed reader or publication diagnostic retained below the
         /// freshness classification.
-        source: Option<SourceChangedSource>,
+        source: Option<Box<SourceChangedSource>>,
     },
     /// A patch was applied to a presentation it was not made on.
     PatchConflict {
@@ -210,7 +210,7 @@ impl std::error::Error for Error {
             Self::SourceChanged {
                 source: Some(source),
                 ..
-            } => Some(source),
+            } => Some(source.as_ref()),
             Self::SourceChanged { source: None, .. } | Self::PatchConflict { .. } => None,
         }
     }
@@ -239,7 +239,7 @@ fn source_error(error: CoreError) -> Error {
             expected,
             observed,
             progress: SourceContentPublicationProgress::Untouched,
-            source: Some(SourceChangedSource::Core(error)),
+            source: Some(Box::new(SourceChangedSource::Core(error))),
         },
         other => Error::Invalid(other),
     }
@@ -262,7 +262,7 @@ fn publication_error(error: SourceContentPublicationError) -> Error {
             expected,
             observed,
             progress,
-            source: Some(SourceChangedSource::Publication(error)),
+            source: Some(Box::new(SourceChangedSource::Publication(error))),
         },
         other => Error::Plan(other),
     }
@@ -281,7 +281,7 @@ fn source_member_error(error: SourceMemberReaderError<CoreError>) -> Error {
             expected,
             observed,
             progress: SourceContentPublicationProgress::Untouched,
-            source: Some(SourceChangedSource::SourceMember(error)),
+            source: Some(Box::new(SourceChangedSource::SourceMember(error))),
         },
         other => Error::SourceMember(other),
     }
@@ -2253,12 +2253,15 @@ mod tests {
         assert!(matches!(
             &error,
             Error::SourceChanged {
-                source: Some(SourceChangedSource::Core(CoreError::SourceChanged {
+                source: Some(source),
+                ..
+            } if matches!(
+                source.as_ref(),
+                SourceChangedSource::Core(CoreError::SourceChanged {
                     expected: retained_expected,
                     observed: retained_observed,
-                })),
-                ..
-            } if *retained_expected == expected && *retained_observed == observed
+                }) if *retained_expected == expected && *retained_observed == observed
+            )
         ));
         assert!(matches!(
             std::error::Error::source(&error)
@@ -2285,14 +2288,15 @@ mod tests {
         assert!(matches!(
             &error,
             Error::SourceChanged {
-                source: Some(SourceChangedSource::SourceMember(
-                    SourceMemberReaderError::Core {
-                        error: CoreError::SourceChanged { .. },
-                        callback_error: Some(CoreError::InvalidFormat(message)),
-                    }
-                )),
+                source: Some(source),
                 ..
-            } if message == "callback verification failed"
+            } if matches!(
+                source.as_ref(),
+                SourceChangedSource::SourceMember(SourceMemberReaderError::Core {
+                    error: CoreError::SourceChanged { .. },
+                    callback_error: Some(CoreError::InvalidFormat(message)),
+                }) if message == "callback verification failed"
+            )
         ));
 
         let retained = std::error::Error::source(&error)
