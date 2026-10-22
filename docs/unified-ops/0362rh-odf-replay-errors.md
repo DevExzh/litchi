@@ -52,6 +52,12 @@ focused regression also verifies `Untouched` progress for a stale-before-output
 failure, `Complete` progress for a stale-after-output failure, and freshness
 retention for a callback-scoped source-member error.
 
+The follow-up keeps `SourceChanged` as the primary classification while
+retaining the typed source-member or publication diagnostic through
+`SourceChangedSource`.  This preserves a secondary callback failure when a
+source verification failure wins precedence; `Error::source()` exposes the
+retained typed chain.
+
 ## Validation receipt
 
 The isolated worktree was `/home/zhuhe/code/litchi-worktrees/uo2-replay-error-audit`

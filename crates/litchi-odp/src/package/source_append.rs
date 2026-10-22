@@ -132,6 +132,9 @@ pub enum Error {
         observed: SourceVersion,
         /// Sink progress observed when the source became stale.
         progress: SourceContentPublicationProgress,
+        /// The typed reader or publication diagnostic retained below the
+        /// freshness classification.
+        source: Option<SourceChangedSource>,
     },
     /// A patch was applied to a presentation it was not made on.
     PatchConflict {
@@ -140,6 +143,38 @@ pub enum Error {
         /// Why the base does not match.
         reason: &'static str,
     },
+}
+
+/// Typed diagnostic retained by [`Error::SourceChanged`].
+#[derive(Debug)]
+#[non_exhaustive]
+pub enum SourceChangedSource {
+    /// The common core freshness error observed before source publication.
+    Core(CoreError),
+    /// The verified source-member reader that observed the stale source.
+    SourceMember(SourceMemberReaderError<CoreError>),
+    /// The common source-content publication failure that observed it.
+    Publication(SourceContentPublicationError),
+}
+
+impl fmt::Display for SourceChangedSource {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Core(error) => error.fmt(formatter),
+            Self::SourceMember(error) => error.fmt(formatter),
+            Self::Publication(error) => error.fmt(formatter),
+        }
+    }
+}
+
+impl std::error::Error for SourceChangedSource {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Core(error) => Some(error),
+            Self::SourceMember(error) => Some(error),
+            Self::Publication(error) => Some(error),
+        }
+    }
 }
 
 impl fmt::Display for Error {
@@ -153,6 +188,7 @@ impl fmt::Display for Error {
                 expected,
                 observed,
                 progress,
+                ..
             } => write!(
                 formatter,
                 "ODP source changed (expected {expected:?}, observed {observed:?}, {progress:?})"
@@ -171,7 +207,11 @@ impl std::error::Error for Error {
             Self::SourceMember(error) => Some(error),
             Self::Plan(error) => Some(error),
             Self::Publication(error) => Some(error),
-            Self::SourceChanged { .. } | Self::PatchConflict { .. } => None,
+            Self::SourceChanged {
+                source: Some(source),
+                ..
+            } => Some(source),
+            Self::SourceChanged { source: None, .. } | Self::PatchConflict { .. } => None,
         }
     }
 }
@@ -195,10 +235,11 @@ fn invalid(message: impl Into<String>) -> Error {
 
 fn source_error(error: CoreError) -> Error {
     match error {
-        CoreError::SourceChanged { expected, observed } => Error::SourceChanged {
+        error @ CoreError::SourceChanged { expected, observed } => Error::SourceChanged {
             expected,
             observed,
             progress: SourceContentPublicationProgress::Untouched,
+            source: Some(SourceChangedSource::Core(error)),
         },
         other => Error::Invalid(other),
     }
@@ -207,17 +248,21 @@ fn source_error(error: CoreError) -> Error {
 fn publication_error(error: SourceContentPublicationError) -> Error {
     let progress = error.progress();
     match error {
-        SourceContentPublicationError::SourceChanged {
+        error @ SourceContentPublicationError::SourceChanged {
             expected, observed, ..
         }
-        | SourceContentPublicationError::Core(CoreError::SourceChanged { expected, observed })
-        | SourceContentPublicationError::Source {
+        | error @ SourceContentPublicationError::Core(CoreError::SourceChanged {
+            expected,
+            observed,
+        })
+        | error @ SourceContentPublicationError::Source {
             source: CoreError::SourceChanged { expected, observed },
             ..
         } => Error::SourceChanged {
             expected,
             observed,
             progress,
+            source: Some(SourceChangedSource::Publication(error)),
         },
         other => Error::Plan(other),
     }
@@ -225,16 +270,18 @@ fn publication_error(error: SourceContentPublicationError) -> Error {
 
 fn source_member_error(error: SourceMemberReaderError<CoreError>) -> Error {
     match error {
-        SourceMemberReaderError::Core {
+        error @ SourceMemberReaderError::Core {
             error: CoreError::SourceChanged { expected, observed },
             ..
         }
-        | SourceMemberReaderError::Callback(CoreError::SourceChanged { expected, observed }) => {
-            Error::SourceChanged {
-                expected,
-                observed,
-                progress: SourceContentPublicationProgress::Untouched,
-            }
+        | error @ SourceMemberReaderError::Callback(CoreError::SourceChanged {
+            expected,
+            observed,
+        }) => Error::SourceChanged {
+            expected,
+            observed,
+            progress: SourceContentPublicationProgress::Untouched,
+            source: Some(SourceChangedSource::SourceMember(error)),
         },
         other => Error::SourceMember(other),
     }
@@ -2195,6 +2242,69 @@ mod tests {
             callback.progress(),
             Some(SourceContentPublicationProgress::Untouched)
         );
+    }
+
+    #[test]
+    fn stale_source_retains_core_diagnostic() {
+        let expected = SourceVersion::new(0x300, 1);
+        let observed = SourceVersion::new(0x300, 2);
+        let error = source_error(CoreError::SourceChanged { expected, observed });
+
+        assert!(matches!(
+            &error,
+            Error::SourceChanged {
+                source: Some(SourceChangedSource::Core(CoreError::SourceChanged {
+                    expected: retained_expected,
+                    observed: retained_observed,
+                })),
+                ..
+            } if *retained_expected == expected && *retained_observed == observed
+        ));
+        assert!(matches!(
+            std::error::Error::source(&error)
+                .and_then(|source| source.downcast_ref::<SourceChangedSource>()),
+            Some(SourceChangedSource::Core(CoreError::SourceChanged { .. }))
+        ));
+    }
+
+    #[test]
+    fn stale_verification_retains_secondary_callback_failure() {
+        let expected = SourceVersion::new(0x200, 1);
+        let observed = SourceVersion::new(0x200, 2);
+        let error = source_member_error(SourceMemberReaderError::Core {
+            error: CoreError::SourceChanged { expected, observed },
+            callback_error: Some(CoreError::InvalidFormat(
+                "callback verification failed".to_string(),
+            )),
+        });
+
+        assert_eq!(
+            error.progress(),
+            Some(SourceContentPublicationProgress::Untouched)
+        );
+        assert!(matches!(
+            &error,
+            Error::SourceChanged {
+                source: Some(SourceChangedSource::SourceMember(
+                    SourceMemberReaderError::Core {
+                        error: CoreError::SourceChanged { .. },
+                        callback_error: Some(CoreError::InvalidFormat(message)),
+                    }
+                )),
+                ..
+            } if message == "callback verification failed"
+        ));
+
+        let retained = std::error::Error::source(&error)
+            .and_then(|source| source.downcast_ref::<SourceChangedSource>())
+            .expect("stale source keeps its typed reader diagnostic");
+        assert!(matches!(
+            retained,
+            SourceChangedSource::SourceMember(SourceMemberReaderError::Core {
+                callback_error: Some(CoreError::InvalidFormat(message)),
+                ..
+            }) if message == "callback verification failed"
+        ));
     }
 
     #[test]
