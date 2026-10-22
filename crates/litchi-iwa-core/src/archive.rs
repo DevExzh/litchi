@@ -1046,7 +1046,9 @@ impl MessageInfo {
             .map_err(|_| {
                 Error::allocation("IWA message versions", DEFAULT_MESSAGE_VERSIONS.len())
             })?;
-        versions.extend(DEFAULT_MESSAGE_VERSIONS);
+        versions.push(1);
+        versions.push(0);
+        versions.push(5);
         Ok(Self {
             type_,
             versions,
@@ -1073,7 +1075,9 @@ impl MessageInfo {
             .map_err(|_| {
                 Error::allocation("IWA message versions", DEFAULT_MESSAGE_VERSIONS.len())
             })?;
-        versions.extend(DEFAULT_MESSAGE_VERSIONS);
+        versions.push(1);
+        versions.push(0);
+        versions.push(5);
         Ok(Self {
             type_,
             versions,
