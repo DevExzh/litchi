@@ -55,6 +55,7 @@ pub(crate) struct Run {
     edit: Edit,
     items: Vec<Item>,
     last_target: Option<(Box<str>, Position)>,
+    signed: bool,
 }
 
 impl Doc {
@@ -107,7 +108,12 @@ impl Doc {
 impl Run {
     pub(crate) fn new(base: &Doc, limits: &SemanticLimits) -> Result<Self> {
         base.check_source_for_write()?;
-        let package = base.editable_package_for_write()?.ok_or_else(|| {
+        let package = (if base.signature() == crate::format::signature::Signature::Signed {
+            base.editable_package_for_write()?
+        } else {
+            base.editable_package()?
+        })
+        .ok_or_else(|| {
             Error::new(
                 Code::UnsupportedCapability,
                 "the DOC document was opened without retaining its source for editing",
@@ -122,6 +128,7 @@ impl Run {
             edit,
             items: Vec::new(),
             last_target: None,
+            signed: base.signature() == crate::format::signature::Signature::Signed,
         })
     }
 
@@ -266,7 +273,11 @@ impl Run {
 
     pub(crate) fn commit(self) -> Result<WriteCommit> {
         let Self {
-            base, edit, items, ..
+            base,
+            edit,
+            items,
+            signed,
+            ..
         } = self;
         base.check_source_for_write()?;
         let operations = items.len();
@@ -279,7 +290,7 @@ impl Run {
         // its original state.  Signed transactions must publish the exact
         // retained source in that case; compare the final authored values
         // against the immutable base rather than relying on stream bytes.
-        let logical_noop = logical_noop(&base, &items)?;
+        let logical_noop = signed && logical_noop(&base, &items)?;
         let (package, patch) = commit.into_parts();
         let snapshot_bytes = super::patch_snapshot_bytes(&patch);
         let after = if changed && !logical_noop {

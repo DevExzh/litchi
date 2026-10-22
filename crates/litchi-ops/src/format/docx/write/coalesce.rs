@@ -154,7 +154,17 @@ impl Run {
     pub(crate) fn new(base: &Docx) -> Result<Self> {
         Ok(Self {
             base: base.clone(),
-            edit: WorkEdit::from(base.edit()?)?,
+            // The transaction owner may be signed.  `edit_for_write` keeps
+            // that source-backed writer private while allowing the native
+            // patch to prove a cancellation; the outer transaction still
+            // rejects every nonempty final change.
+            edit: WorkEdit::from(
+                if base.signature() == crate::format::signature::Signature::Signed {
+                    base.edit_for_write()?
+                } else {
+                    base.edit()?
+                },
+            )?,
             items: Vec::new(),
             last_target: None,
             texted: BTreeSet::new(),
@@ -277,7 +287,13 @@ impl Run {
 
 fn replay(base: &Docx, items: &[Item]) -> Result<Commit> {
     let result = (|| {
-        let mut edit = WorkEdit::from(base.edit()?)?;
+        let mut edit = WorkEdit::from(
+            if base.signature() == crate::format::signature::Signature::Signed {
+                base.edit_for_write()?
+            } else {
+                base.edit()?
+            },
+        )?;
         for item in items {
             item.plan
                 .stage(&mut edit)

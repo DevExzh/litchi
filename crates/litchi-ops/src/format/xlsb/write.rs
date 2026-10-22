@@ -2348,7 +2348,13 @@ pub(crate) mod sheet_coalesce {
                 ));
             }
             base.check_source_for_replay()?;
-            let source = package_from_editor(base.editor_for_write()?);
+            let source = package_from_editor(
+                if base.signature() == crate::format::signature::Signature::Signed {
+                    base.editor_for_write()?
+                } else {
+                    base.editor()?
+                },
+            );
             let native_limits = NativeTransferLimits::new(
                 remaining_snapshot,
                 limits.max_expanded_targets(),
@@ -2712,7 +2718,12 @@ pub(crate) mod coalesce {
                 }
                 let spelling = target;
                 let target = targets[0];
-                let (present, original_known, original) = original_scalar(self, spelling)?;
+                let signed = self.signature() == crate::format::signature::Signature::Signed;
+                let (present, original_known, original) = if signed {
+                    original_scalar(self, spelling)?
+                } else {
+                    (false, true, None)
+                };
                 Ok(Some(Plan {
                     target,
                     action: Action::Set(value),
@@ -2750,7 +2761,12 @@ pub(crate) mod coalesce {
                 check_remove_limits(1, limits)?;
                 let spelling = target;
                 let target = targets[0];
-                let (present, original_known, original) = original_scalar(self, spelling)?;
+                let signed = self.signature() == crate::format::signature::Signature::Signed;
+                let (present, original_known, original) = if signed {
+                    original_scalar(self, spelling)?
+                } else {
+                    (false, true, None)
+                };
                 Ok(Some(Plan {
                     target,
                     action: Action::Remove,
@@ -2778,7 +2794,13 @@ pub(crate) mod coalesce {
                 ));
             }
             base.check_source_for_replay()?;
-            let source = package_from_editor(base.editor_for_write()?);
+            let source = package_from_editor(
+                if base.signature() == crate::format::signature::Signature::Signed {
+                    base.editor_for_write()?
+                } else {
+                    base.editor()?
+                },
+            );
             let native_limits = TransferLimits::new(
                 remaining_snapshot,
                 limits.max_expanded_targets(),
@@ -2888,10 +2910,10 @@ pub(crate) mod coalesce {
                 edit,
                 items,
                 native_limits,
-                allow_repeated: _,
+                allow_repeated,
                 ..
             } = self;
-            let logical_noop = logical_noop(&items);
+            let logical_noop = allow_repeated && logical_noop(&items);
             base.check_source_for_replay()?;
             let result = edit
                 .commit()

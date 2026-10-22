@@ -88,6 +88,24 @@ struct CellTarget {
     formula: bool,
 }
 
+/// Stable cell identity for coalescing.  Presence is a property of the
+/// authored state, not of the address: remove/reinsert must resolve to this
+/// same key so a signed cancellation can be recognized.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+struct CellIdentity {
+    sheet: usize,
+    reference: Reference,
+}
+
+impl CellTarget {
+    fn identity(self) -> CellIdentity {
+        CellIdentity {
+            sheet: self.sheet,
+            reference: self.reference,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 enum SheetAssignment {
     Name(String),
@@ -1129,7 +1147,7 @@ pub(crate) mod refresh;
 
 pub(crate) mod coalesce {
     use super::{
-        CellAssignment, CellTarget, FileFormat, Kind, NativeValue, Result, TargetArg,
+        CellAssignment, CellIdentity, CellTarget, FileFormat, Kind, NativeValue, Result, TargetArg,
         WRITE_ENTRY_OVERHEAD, Xls, admit_cell_property, cell_state_facts, finish_commit,
         native_edit_error, native_value_error, staged_limit,
     };
@@ -1159,11 +1177,20 @@ pub(crate) mod coalesce {
         /// The authored scalar before this run.  Retaining it lets a signed
         /// run prove a cancellation without comparing reserialized BIFF.
         original: Option<NativeValue>,
+        /// Whether the authored cell existed in the original package.  This
+        /// stays separate from the staged target's current presence so a
+        /// remove/reinsert pair cannot turn an absent coordinate into a
+        /// false cancellation.
+        original_present: bool,
+        /// Stored errors and formulas do not have a comparable scalar value.
+        /// They remain barriers for signed cancellation even when a later
+        /// operation happens to produce `None`.
+        original_known: bool,
     }
 
     impl Plan {
-        fn key(&self) -> CellTarget {
-            self.target
+        fn key(&self) -> CellIdentity {
+            self.target.identity()
         }
 
         fn charge(&self) -> usize {
@@ -1182,7 +1209,7 @@ pub(crate) mod coalesce {
         source: Package,
         edit: litchi_xls::package::edit::Edit,
         items: Vec<Item>,
-        seen: HashSet<CellTarget>,
+        seen: HashSet<CellIdentity>,
         staged_bytes: usize,
         max_staged_bytes: usize,
         limits: SemanticLimits,
@@ -1240,19 +1267,22 @@ pub(crate) mod coalesce {
                 let Some((target, current)) = direct_target(self, spelling, limits, source)? else {
                     return Ok(None);
                 };
+                let signed = self.signature() == crate::format::signature::Signature::Signed;
                 // A coalesced signed run resolves each command through its
                 // staged native edit so later commands see earlier values.
                 // The cancellation proof must retain the value from the
                 // original package, however; otherwise a changed-then-restored
                 // cell would compare against the changed intermediate value
                 // and lose the exact signed no-op route.
-                let original = if source.is_some() {
-                    let Some((_, original)) = direct_target(self, spelling, limits, None)? else {
+                let (original_target, original) = if signed && source.is_some() {
+                    let Some((original_target, original)) =
+                        direct_target(self, spelling, limits, None)?
+                    else {
                         return Ok(None);
                     };
-                    original
+                    (original_target, original)
                 } else {
-                    current.clone()
+                    (target, signed.then(|| current.clone()))
                 };
                 // Formula cells are deliberately left to the ordinary setter,
                 // which reports the dependency-aware unsupported capability.
@@ -1286,12 +1316,15 @@ pub(crate) mod coalesce {
                     | CellAssignment::Format(_)
                     | CellAssignment::Noop => return Ok(None),
                 };
+                let original_known = !signed || !original_target.present || original.is_some();
                 Ok(Some(Plan {
                     target,
                     action,
                     staged_bytes: admitted.staged_bytes,
                     changed,
                     original,
+                    original_present: signed && original_target.present,
+                    original_known,
                 }))
             })();
             self.check_outside_run(source).and(result)
@@ -1343,13 +1376,16 @@ pub(crate) mod coalesce {
                 let Some((target, current)) = direct_target(self, spelling, limits, source)? else {
                     return Ok(None);
                 };
-                let original = if source.is_some() {
-                    let Some((_, original)) = direct_target(self, spelling, limits, None)? else {
+                let signed = self.signature() == crate::format::signature::Signature::Signed;
+                let (original_target, original) = if signed && source.is_some() {
+                    let Some((original_target, original)) =
+                        direct_target(self, spelling, limits, None)?
+                    else {
                         return Ok(None);
                     };
-                    original
+                    (original_target, original)
                 } else {
-                    current.clone()
+                    (target, signed.then(|| current.clone()))
                 };
                 if target.formula {
                     return Ok(None);
@@ -1363,6 +1399,7 @@ pub(crate) mod coalesce {
                         limits.max_staged_bytes(),
                     ));
                 }
+                let original_known = !signed || !original_target.present || original.is_some();
                 Ok(Some(Plan {
                     action: if target.present {
                         Action::Remove
@@ -1373,6 +1410,8 @@ pub(crate) mod coalesce {
                     staged_bytes: WRITE_ENTRY_OVERHEAD,
                     changed: target.present,
                     original,
+                    original_present: signed && original_target.present,
+                    original_known,
                 }))
             })();
             self.check_outside_run(source).and(result)
@@ -1426,7 +1465,7 @@ pub(crate) mod coalesce {
             // even after an intermediate remove made the staged target
             // absent. Original absence stays a barrier so insertion is never
             // mistaken for restoring a missing coordinate.
-            (self.seen.contains(&plan.key()) && !(self.allow_repeated && plan.original.is_some()))
+            (self.seen.contains(&plan.key()) && !(self.allow_repeated && plan.original_present))
                 || self
                     .staged_bytes
                     .checked_add(plan.charge())
@@ -1434,8 +1473,7 @@ pub(crate) mod coalesce {
         }
 
         pub(crate) fn stage(&mut self, plan: Plan, index: usize) -> Result<bool> {
-            if (self.seen.contains(&plan.key())
-                && !(self.allow_repeated && plan.original.is_some()))
+            if (self.seen.contains(&plan.key()) && !(self.allow_repeated && plan.original_present))
                 || self
                     .staged_bytes
                     .checked_add(plan.charge())
@@ -1503,10 +1541,14 @@ pub(crate) mod coalesce {
                 edit,
                 items,
                 limits,
-                allow_repeated: _,
+                allow_repeated,
                 ..
             } = self;
-            let logical_noop = logical_noop(&items);
+            let logical_noop = if allow_repeated {
+                logical_noop(&items)
+            } else {
+                false
+            };
             base.check_source_for_write()?;
             let result = edit
                 .commit()
@@ -1527,25 +1569,33 @@ pub(crate) mod coalesce {
     }
 
     fn logical_noop(items: &[Item]) -> bool {
-        let mut final_values = std::collections::HashMap::<CellTarget, Option<NativeValue>>::new();
-        let mut originals = std::collections::HashMap::<CellTarget, Option<NativeValue>>::new();
+        type State = (bool, bool, Option<NativeValue>);
+        let mut final_values = std::collections::HashMap::<CellIdentity, State>::new();
+        let mut originals = std::collections::HashMap::<CellIdentity, State>::new();
         for item in items {
             let plan = &item.plan;
-            originals
-                .entry(plan.key())
-                .or_insert_with(|| plan.original.clone());
-            let final_value = match &plan.action {
-                Action::Set(value) => Some(value.clone()),
-                Action::Clear if plan.target.present => Some(NativeValue::Blank),
-                Action::Remove if plan.target.present => None,
-                Action::Clear | Action::Remove | Action::Noop => plan.original.clone(),
-            };
-            final_values.insert(plan.key(), final_value);
+            let key = plan.key();
+            let original = originals.entry(key).or_insert_with(|| {
+                (
+                    plan.original_present,
+                    plan.original_known,
+                    plan.original.clone(),
+                )
+            });
+            let state = final_values.entry(key).or_insert_with(|| original.clone());
+            match &plan.action {
+                Action::Set(value) => *state = (true, true, Some(value.clone())),
+                Action::Clear if plan.target.present => {
+                    *state = (true, true, Some(NativeValue::Blank));
+                },
+                Action::Remove if plan.target.present => *state = (false, true, None),
+                Action::Clear | Action::Remove | Action::Noop => {},
+            }
         }
         !final_values.is_empty()
             && final_values
                 .into_iter()
-                .all(|(key, value)| originals.get(&key) == Some(&value))
+                .all(|(key, value)| value.1 && originals.get(&key) == Some(&value))
     }
 
     fn apply_item(edit: &mut litchi_xls::package::edit::Edit, item: &Item) -> Result<()> {

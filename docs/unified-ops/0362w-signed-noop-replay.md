@@ -50,12 +50,14 @@ The authoring matrix now retains the original signed bytes for supported
 same-value setters and for edits whose final plan cancels its intermediate
 changes. DOCX, PPTX, XLSX, XLSB, XLS and the legacy PPT leaf compare the final
 native values with the values read from the original signed owner before
-collapsing a native rewrite. A final real change, an absent cell populated with
-the native default, a formula/error cell without a complete scalar proof, or an
-invalid intermediate operation remains a signed refusal. The empty closure
-remains format-neutral. No setter is treated as a no-op by skipping
-target/property admission, and no unsigned candidate is used to restore a
-signature.
+collapsing a native rewrite. The transaction retains each native patch inside
+an exact-no-op leaf marker bound to the original signed publication; its
+diagnostics, replay and inverse therefore share the same collapsed endpoint.
+A final real change, an absent cell populated with the native default, a
+formula/error cell without a complete scalar proof, or an invalid intermediate
+operation remains a signed refusal. The empty closure remains format-neutral.
+No setter is treated as a no-op by skipping target/property admission, and no
+unsigned candidate is used to restore a signature.
 
 The tests cover:
 
@@ -75,7 +77,9 @@ The tests cover:
 - a path-backed signed recipient changed after open returning `io_error`;
 - the all-feature signed-input matrix checking signed empty no-op replay and
   unsigned authorized no-op negatives for every signed format route;
-- locked and unlocked-encrypted recipient protection remaining intact.
+- locked and unlocked-encrypted recipient protection remaining intact;
+- an invalid intermediate target returning its typed path error while both the
+  signed leaf and the `File` facade retain their original publication bytes.
 
 The earlier signed replay slice was validated on the capped one-job target
 with no external fixtures. This follow-up's focused build and tests are still

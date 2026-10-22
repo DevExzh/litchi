@@ -7,6 +7,7 @@
 //! presentation projection as its only read model and publishes one native
 //! package edit.
 
+use std::borrow::Cow;
 use std::collections::HashSet;
 use std::sync::Arc;
 
@@ -101,7 +102,11 @@ impl Run {
     /// lower bound before the native editor captures its before image.
     pub(crate) fn new(base: &Ppt, limits: &SemanticLimits) -> Result<Self> {
         base.check_source_for_write()?;
-        let package = base.editable_package_for_write()?;
+        let package = if base.signature() == crate::format::signature::Signature::Signed {
+            base.editable_package_for_write()?
+        } else {
+            base.editable_package()?
+        };
         let before_bytes =
             usize::try_from(package.shared_ole_file().file_size()).unwrap_or(usize::MAX);
         let minimum = before_bytes.saturating_add(size_of::<litchi_ppt::Patch>());
@@ -203,10 +208,10 @@ impl Run {
             mut edit,
             items,
             limits,
-            allow_repeated: _,
+            allow_repeated,
             ..
         } = self;
-        let logical_noop = logical_noop(&items);
+        let logical_noop = allow_repeated && logical_noop(&items);
         base.check_source_for_write()?;
         let result = (|| {
             stage_all(&mut edit, &items)?;
@@ -347,25 +352,25 @@ pub(crate) fn shape_plan(
     let has_geometry = values.has_geometry();
     let geometry = values.geometry;
     // Geometry-only and empty payloads follow the one-shot writer's admission
-    // path without decoding a text body. A requested text value still reads
-    // the same native aggregate as the node projection, so equal text is
-    // retained for native validation of the editable body.
-    let text_changed = if let Some(text) = values.text.as_deref() {
-        // These native accessors expose the same text as ShapeEnum::text,
-        // without cloning an already-owned body solely for comparison.
-        match shape {
-            ShapeEnum::TextBox(textbox) => textbox.text() != text,
-            ShapeEnum::AutoShape(autoshape) => autoshape.text() != text,
-            _ => shape.text().map_err(Error::from)? != text,
-        }
+    // path without decoding a text body. A requested text value reads the
+    // native body once. Unsigned plans borrow the body for comparison, while
+    // signed plans retain the same read as their cancellation proof.
+    let current_text = if values.text.is_some() {
+        Some(match shape {
+            ShapeEnum::TextBox(textbox) => Cow::Borrowed(textbox.text()),
+            ShapeEnum::AutoShape(autoshape) => Cow::Borrowed(autoshape.text()),
+            _ => Cow::Owned(shape.text().map_err(Error::from)?),
+        })
     } else {
-        false
+        None
     };
-    let original_text = values
+    let text_changed = values
         .text
-        .as_ref()
-        .map(|_| shape.text().map_err(Error::from))
-        .transpose()?;
+        .as_deref()
+        .is_some_and(|text| current_text.as_deref() != Some(text));
+    let original_text = (file.signature() == crate::format::signature::Signature::Signed)
+        .then(|| current_text.map(|text| text.into_owned()))
+        .flatten();
     let text = values.text;
     let anchor = if has_geometry {
         let source = Arc::clone(&cached.source);
@@ -435,10 +440,11 @@ fn direct_path(path: &Path<'_>) -> Option<(usize, DirectKind, usize)> {
 }
 
 fn stage_all(edit: &mut litchi_ppt::package::edit::Edit, items: &[Item]) -> Result<()> {
-    let text_only = items.iter().all(|item| item.plan.anchor.is_none()) && {
-        let mut targets = HashSet::new();
-        items.iter().all(|item| targets.insert(item.plan.key()))
-    };
+    let text_only = items.iter().all(|item| item.plan.anchor.is_none())
+        && (!items.iter().any(|item| item.plan.original_text.is_some()) || {
+            let mut targets = HashSet::new();
+            items.iter().all(|item| targets.insert(item.plan.key()))
+        });
     if text_only {
         let mut replacements = Vec::new();
         replacements

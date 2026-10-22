@@ -848,6 +848,112 @@ fn signed_pptx_shape_setter_preserves_exact_noops_and_refuses_changes() {
     }
 }
 
+#[cfg(feature = "docx")]
+#[test]
+fn signed_docx_paragraph_setter_preserves_exact_noops_and_refuses_changes() {
+    for input in inputs()
+        .into_iter()
+        .filter(|input| input.format == FileFormat::Docx)
+    {
+        let file = crate::open_bytes(input.bytes.clone()).unwrap();
+        let path = "/body/p[1]";
+        let text = file
+            .get(path)
+            .unwrap_or_else(|error| panic!("{}: resolve DOCX paragraph: {error:?}", input.label))
+            .view()
+            .text()
+            .unwrap_or_else(|error| panic!("{}: read DOCX paragraph: {error:?}", input.label))
+            .unwrap_or_default()
+            .into_owned();
+        let props = crate::props! { "text" => text.as_str() };
+        let leaf = signed_leaf(&file);
+
+        for (route, candidate) in [("leaf", leaf.clone()), ("facade", file.clone())] {
+            let updated = candidate.set(path, props.clone()).unwrap_or_else(|error| {
+                panic!(
+                    "{} ({route}): DOCX signed no-op setter: {error:?}",
+                    input.label
+                )
+            });
+            assert!(
+                updated.is_signed(),
+                "{} ({route}): lost signature",
+                input.label
+            );
+            assert_eq!(updated.to_bytes().unwrap(), input.bytes);
+
+            let commit = candidate
+                .edit(|edit| edit.set(path, props.clone()))
+                .unwrap_or_else(|error| {
+                    panic!("{} ({route}): DOCX signed edit: {error:?}", input.label)
+                });
+            assert!(!commit.diagnostics().changed(), "{} ({route})", input.label);
+            assert!(commit.file().is_signed(), "{} ({route})", input.label);
+            assert_eq!(commit.file().to_bytes().unwrap(), input.bytes);
+            let restored = commit
+                .patch()
+                .inverse()
+                .apply(commit.file())
+                .unwrap_or_else(|error| {
+                    panic!(
+                        "{} ({route}): DOCX signed no-op inverse replay: {error:?}",
+                        input.label
+                    )
+                });
+            assert!(restored.is_signed(), "{} ({route})", input.label);
+            assert_eq!(restored.to_bytes().unwrap(), input.bytes);
+        }
+
+        let changed = format!("{text} changed");
+        for (route, candidate) in [("leaf", leaf.clone()), ("facade", file.clone())] {
+            let commit = candidate
+                .edit(|edit| {
+                    edit.set(path, crate::props! { "text" => changed.as_str() })?;
+                    edit.set(path, props.clone())
+                })
+                .unwrap_or_else(|error| {
+                    panic!(
+                        "{} ({route}): DOCX signed cancellation: {error:?}",
+                        input.label
+                    )
+                });
+            assert!(!commit.diagnostics().changed(), "{} ({route})", input.label);
+            assert!(commit.file().is_signed(), "{} ({route})", input.label);
+            assert_eq!(commit.file().to_bytes().unwrap(), input.bytes);
+            let restored = commit
+                .patch()
+                .inverse()
+                .apply(commit.file())
+                .unwrap_or_else(|error| {
+                    panic!(
+                        "{} ({route}): DOCX signed cancellation inverse replay: {error:?}",
+                        input.label
+                    )
+                });
+            assert_eq!(restored.to_bytes().unwrap(), input.bytes);
+
+            let error = candidate
+                .edit(|edit| {
+                    edit.set(path, crate::props! { "text" => changed.as_str() })?;
+                    edit.set(path, props.clone())?;
+                    edit.set(path, crate::props! { "text" => changed.as_str() })
+                })
+                .unwrap_err();
+            assert_signed_refusal(
+                &error,
+                FileFormat::Docx,
+                &format!("{} ({route}) mixed signed DOCX edit", input.label),
+            );
+            assert_eq!(
+                candidate.to_bytes().unwrap(),
+                input.bytes,
+                "{} ({route}): changed signed DOCX edit published bytes",
+                input.label
+            );
+        }
+    }
+}
+
 #[cfg(feature = "xlsx")]
 #[test]
 fn signed_xlsx_sheet_setter_preserves_exact_noops_and_refuses_changes() {
@@ -1392,6 +1498,20 @@ fn signed_xls_sheet_setter_preserves_exact_noops_and_refuses_changes() {
             assert!(!commit.diagnostics().changed());
             assert!(commit.file().is_signed());
             assert_eq!(commit.file().to_bytes().unwrap(), input.bytes);
+            let remove_reinsert = candidate
+                .edit(|edit| {
+                    edit.remove(cell_path.as_str())?;
+                    edit.set(cell_path.as_str(), cell_props.clone())
+                })
+                .unwrap_or_else(|error| {
+                    panic!(
+                        "{} ({route}): signed remove/reinsert cancellation: {error:?}",
+                        input.label
+                    )
+                });
+            assert!(!remove_reinsert.diagnostics().changed());
+            assert!(remove_reinsert.file().is_signed());
+            assert_eq!(remove_reinsert.file().to_bytes().unwrap(), input.bytes);
             let mixed_error = candidate
                 .edit(|edit| {
                     edit.set(
@@ -1550,6 +1670,48 @@ fn every_signed_input_follows_the_explicit_signature_policy() {
 
         // 5. The per-format leaf transaction still keeps a signed exact no-op.
         assert_exact_noop(input);
+    }
+}
+
+#[test]
+fn invalid_intermediate_signed_edits_return_their_typed_error_without_publication() {
+    for input in inputs() {
+        let file = crate::open_bytes(input.bytes.clone()).unwrap();
+        for (route, candidate) in [("leaf", signed_leaf(&file)), ("facade", file.clone())] {
+            let before = candidate.to_bytes().unwrap();
+            let error = candidate
+                .edit(|edit| {
+                    edit.set(
+                        "/__signed_noop_missing__",
+                        crate::props! { "text" => "invalid" },
+                    )
+                })
+                .unwrap_err();
+            assert_ne!(
+                error.code(),
+                Code::DocumentProtected,
+                "{} ({route}): invalid admission was hidden by signature refusal: {error:?}",
+                input.label
+            );
+            assert!(
+                matches!(
+                    error.code(),
+                    Code::PathNotFound
+                        | Code::ZeroMatches
+                        | Code::NotFound
+                        | Code::InvalidPath
+                        | Code::UnsupportedPath
+                ),
+                "{} ({route}): unexpected invalid intermediate code: {error:?}",
+                input.label
+            );
+            assert_eq!(
+                candidate.to_bytes().unwrap(),
+                before,
+                "{} ({route}): failed intermediate edit published bytes",
+                input.label
+            );
+        }
     }
 }
 

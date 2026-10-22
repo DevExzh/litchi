@@ -302,7 +302,11 @@ impl Xlsx {
         // Even an empty property list must honor signed, retained-source and
         // encrypted edit policy.  Native empty commits return the original
         // unified handle below, preserving exact source bytes on a no-op.
-        let source = self.editor_for_write()?;
+        let source = if self.signature() == super::Signature::Signed {
+            self.editor_for_write()?
+        } else {
+            self.editor()?
+        };
         let mut edit = source.edit().map_err(native_error)?;
         cells.apply(&mut edit)?;
         let native = edit.commit().map_err(native_error)?;
@@ -344,7 +348,11 @@ impl Xlsx {
         } else {
             Some(PreparedCells::new(self, target, props, limits)?)
         };
-        let source = self.editor_for_write()?;
+        let source = if self.signature() == super::Signature::Signed {
+            self.editor_for_write()?
+        } else {
+            self.editor()?
+        };
         let mut edit = source.edit().map_err(native_error)?;
         if let Some(cells) = &cells {
             cells.apply(&mut edit)?;
@@ -2997,8 +3005,8 @@ pub(crate) mod coalesce {
         edit: xlsx::workbook::Edit,
         items: Vec<Item>,
         seen: HashSet<CellTarget>,
-        initial: HashMap<CellTarget, xlsx::State>,
-        final_states: HashMap<CellTarget, xlsx::State>,
+        initial: Option<HashMap<CellTarget, xlsx::State>>,
+        final_states: Option<HashMap<CellTarget, xlsx::State>>,
         staged_bytes: usize,
         max_staged_bytes: usize,
         allow_repeated: bool,
@@ -3094,9 +3102,12 @@ pub(crate) mod coalesce {
                 // against that owner so a retained source does not stream
                 // the worksheet again for each command in this run.
                 let prepared = match &self.0.owner {
-                    super::super::XlsxOwner::Source(_) => {
+                    super::super::XlsxOwner::Source(_)
+                        if self.signature() == super::Signature::Signed =>
+                    {
                         Some(self.adopt_workbook(self.editor_for_write()?))
                     },
+                    super::super::XlsxOwner::Source(_) => Some(self.adopt_workbook(self.editor()?)),
                     _ => None,
                 };
                 let resolved = prepared.as_ref().unwrap_or(self);
@@ -3120,7 +3131,11 @@ pub(crate) mod coalesce {
         /// Promote/admit the native source once for this run.
         pub(crate) fn new(base: &Xlsx, limits: &SemanticLimits) -> Result<Self> {
             base.check_source_for_replay()?;
-            let source = base.editor_for_write()?;
+            let source = if base.signature() == super::Signature::Signed {
+                base.editor_for_write()?
+            } else {
+                base.editor()?
+            };
             let edit = source.edit().map_err(native_error)?;
             base.check_source_for_replay()?;
             Ok(Self {
@@ -3130,8 +3145,8 @@ pub(crate) mod coalesce {
                 edit,
                 items: Vec::new(),
                 seen: HashSet::new(),
-                initial: HashMap::new(),
-                final_states: HashMap::new(),
+                initial: (base.signature() == super::Signature::Signed).then(HashMap::new),
+                final_states: (base.signature() == super::Signature::Signed).then(HashMap::new),
                 staged_bytes: 0,
                 max_staged_bytes: limits.max_staged_bytes(),
                 allow_repeated: base.signature() == crate::format::signature::Signature::Signed,
@@ -3219,7 +3234,9 @@ pub(crate) mod coalesce {
                 })?;
             let before = worksheet.state(plan.target.address).map_err(native_error)?;
             let key = plan.key();
-            self.initial.entry(key).or_insert_with(|| before.clone());
+            if let Some(initial) = self.initial.as_mut() {
+                initial.entry(key).or_insert_with(|| before.clone());
+            }
             match &plan.operation {
                 CellOperation::Set(content) => worksheet
                     .set(plan.target.address, content.clone())
@@ -3232,7 +3249,9 @@ pub(crate) mod coalesce {
                 },
             };
             let after = worksheet.state(plan.target.address).map_err(native_error)?;
-            self.final_states.insert(key, after.clone());
+            if let Some(final_states) = self.final_states.as_mut() {
+                final_states.insert(key, after.clone());
+            }
             Ok(before != after)
         }
 
@@ -3247,13 +3266,18 @@ pub(crate) mod coalesce {
                 items,
                 initial,
                 final_states,
-                allow_repeated: _,
+                allow_repeated,
                 ..
             } = self;
-            let logical_noop = !initial.is_empty()
-                && initial
-                    .iter()
-                    .all(|(key, before)| final_states.get(key) == Some(before));
+            let logical_noop = allow_repeated
+                && initial.as_ref().is_some_and(|initial| {
+                    !initial.is_empty()
+                        && final_states.as_ref().is_some_and(|final_states| {
+                            initial
+                                .iter()
+                                .all(|(key, before)| final_states.get(key) == Some(before))
+                        })
+                });
             base.check_source_for_replay()?;
             let result = edit
                 .commit()

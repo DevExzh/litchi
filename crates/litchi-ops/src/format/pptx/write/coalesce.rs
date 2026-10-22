@@ -396,9 +396,10 @@ impl Run {
             source,
             mut edit,
             items,
+            allow_repeated,
             ..
         } = self;
-        let logical_noop = logical_noop(&items);
+        let logical_noop = allow_repeated && logical_noop(&items);
         base.check_source_for_write()?;
         let result = (|| {
             let mut changes = Vec::new();
@@ -553,10 +554,19 @@ fn shape_plan(
         } else {
             None
         };
+    let current_text = values.text.as_ref().and_then(|_| {
+        common.text().map(|text| {
+            if file.signature() == crate::format::signature::Signature::Signed {
+                std::borrow::Cow::Owned(text.to_owned())
+            } else {
+                std::borrow::Cow::Borrowed(text)
+            }
+        })
+    });
     let mut changed = values
         .text
         .as_deref()
-        .is_some_and(|text| common.text() != Some(text));
+        .is_some_and(|text| current_text.as_deref() != Some(text));
     if let Some(requested) = values.geometry[0]
         && current_bounds.is_none_or(|bounds| bounds.0 != requested)
     {
@@ -577,10 +587,9 @@ fn shape_plan(
     {
         changed = true;
     }
-    let original_text = values
-        .text
-        .as_ref()
-        .and_then(|_| common.text().map(str::to_owned));
+    let original_text = (file.signature() == crate::format::signature::Signature::Signed)
+        .then_some(current_text)
+        .flatten();
     Ok(Some(Plan {
         target: Target {
             slot: true,
@@ -1240,8 +1249,12 @@ fn stage_all(
             && left.plan.format.is_some() == right.plan.format.is_some()
             && left.plan.notes == right.plan.notes
     }) {
-        let mut targets = HashSet::new();
-        let duplicate = run.iter().any(|item| !targets.insert(item.plan.key()));
+        let duplicate = if run.iter().any(|item| item.plan.original_text.is_some()) {
+            let mut targets = HashSet::new();
+            run.iter().any(|item| !targets.insert(item.plan.key()))
+        } else {
+            false
+        };
         if duplicate {
             for item in run {
                 stage_one(edit, &item.plan)?;
