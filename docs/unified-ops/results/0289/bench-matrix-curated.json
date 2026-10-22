@@ -2946,6 +2946,10 @@
   {
    "record": "0362lc",
    "reason": "Durable-Ink source ownership validation and six native before/after allocation comparisons, not a leaf-versus-facade pair. The record has zero qualified native timing blocks; integrated native qualification remains required."
+  },
+  {
+   "record": "0362ub",
+   "reason": "Detector doctest and native-resave lock consumer fixes, with failed old-gate and successful current checks. Runtime source is unchanged; no paired performance measurement."
   }
  ]
 }

@@ -1,0 +1,146 @@
+{
+  "source": "3c1d25de24 plus the two reviewed consumer corrections",
+  "checks": [
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "litchi",
+        "--all-features",
+        "--doc"
+      ],
+      "exit": 0,
+      "seconds": 547.2126239230856,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-consumers-v1/check-0.log",
+      "bytes": 11801,
+      "sha256": "a45c74f3514481a8bf7522e0172e362a6b2bf5df453c72dddcc7c717e6774535"
+    },
+    {
+      "command": [
+        "cargo",
+        "check",
+        "--offline",
+        "--locked",
+        "--manifest-path",
+        "tools/native-resave/Cargo.toml",
+        "--all-targets"
+      ],
+      "exit": 0,
+      "seconds": 6.461594795924611,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-consumers-v1/check-1.log",
+      "bytes": 1843,
+      "sha256": "6e43758a5270c470f62b6af689f5a51467d9836814558ae970c3c8448e1f87b4"
+    },
+    {
+      "command": [
+        "cargo",
+        "check",
+        "--offline",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--all-targets"
+      ],
+      "exit": 0,
+      "seconds": 166.63549364800565,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-consumers-v1/check-2.log",
+      "bytes": 5918,
+      "sha256": "b3be6152271a51792582e0b29616d2100460b31a1260cae81caff42a3e80506e"
+    }
+  ],
+  "resumed_gate": {
+    "source": "ad1c6cede8",
+    "checks": {
+      "fmt": 0,
+      "clippy": 0,
+      "ops-noenc": 0,
+      "ops-sub-": 0,
+      "ops-sub-xlsx": 0,
+      "ops-sub-pptx": 0,
+      "ops-sub-docx": 0,
+      "ops-sub-xls": 0,
+      "ops-sub-xlsb": 0,
+      "ops-sub-doc": 0,
+      "ops-sub-ppt": 0,
+      "ops-sub-rtf": 0,
+      "ops-sub-odt": 0,
+      "ops-sub-ods": 0,
+      "ops-sub-odp": 0,
+      "ops-sub-oth": 0,
+      "ops-sub-odm": 0,
+      "ops-sub-odg": 0,
+      "ops-sub-odc": 0,
+      "ops-sub-odi": 0,
+      "ops-sub-odb": 0,
+      "ops-sub-odf-formula": 0,
+      "ops-sub-pages": 0,
+      "ops-sub-keynote": 0,
+      "ops-sub-numbers": 0,
+      "ops": 1,
+      "facade": 1,
+      "core": 0,
+      "leafclippy": 0,
+      "odsclippy": 0,
+      "leaftest": 0,
+      "odstest": 0,
+      "wsclippy": 0,
+      "wstest": 1,
+      "wsdoc": 0,
+      "ppt-alone": 0,
+      "rustdoc": 0,
+      "cli": 0,
+      "py": 0,
+      "featmatrix": 0,
+      "featclippy": 0,
+      "fuzz": 0,
+      "goldens": 0,
+      "golden-clean": 0,
+      "harness": 0,
+      "resave": 101,
+      "glossary": 0,
+      "toolunit": 0,
+      "bounds": 0,
+      "noniwork": 0,
+      "benchmatrix": 0,
+      "dispositions": 0
+    },
+    "total": 52,
+    "passed": 48,
+    "external_logs": [
+      {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/gates/int-ad1c/summary.txt",
+        "bytes": 638,
+        "sha256": "1f608e2eb7ac5bed06286468801873c3212751a3fb2fce578dc6a2609e989363"
+      },
+      {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/gates/int-ad1c/ops.out",
+        "bytes": 275262,
+        "sha256": "eebd252372c352413f0d839b7a6a0ab04f7cc33aacfc427a16238d6cc0ff999f"
+      },
+      {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/gates/int-ad1c/facade.out",
+        "bytes": 44461,
+        "sha256": "55cbb55e6b12d0bc406f3639b569b834a6070bd3d52ff4299aec11297e0f8034"
+      },
+      {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/gates/int-ad1c/wstest.out",
+        "bytes": 3194893,
+        "sha256": "e278145afddd577decd971757a8a54a204a4959da5ba1e8ab8d654da63a9dc57"
+      },
+      {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/gates/int-ad1c/resave.out",
+        "bytes": 268,
+        "sha256": "d66d50a3bc267d845ea1d12c5d9d561298235c93722df9b2b3a48205559c665e"
+      },
+      {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/gates/int-ad1c/wsdoc.out",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ]
+  },
+  "runtime_change": false
+}

@@ -188,7 +188,7 @@ pub mod functions {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi::common::detection::detect_file_format_from_bytes;
+    /// use litchi::common::detection::{SourceLimits, detect_file_format_from_bytes};
     /// use std::fs;
     ///
     /// let data = fs::read("document.docx")?;
