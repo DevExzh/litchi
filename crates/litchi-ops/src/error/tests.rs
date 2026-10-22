@@ -1929,29 +1929,30 @@ fn odp_archive_replay_prefers_typed_stale_callback_over_content_fault() {
     use litchi_core::SourceVersion;
     use litchi_odf_common::{
         Error as OdfError, SourceContentInsertionCallbackError, SourceContentInsertionError,
-        SourceMemberReaderError,
+        SourceContentPublicationError, SourceContentPublicationProgress, SourceMemberReaderError,
     };
     use soapberry_zip::{ErrorKind, ReplayPass, ReplayProgress, ReplayPublicationError};
 
     let expected = SourceVersion::new(0x300, 1);
     let observed = SourceVersion::new(0x300, 2);
-    let callback =
+    let stale_callback = || {
         SourceContentInsertionCallbackError::Member(Box::new(SourceMemberReaderError::Core {
             error: litchi_core::Error::SourceChanged { expected, observed },
             callback_error: Some(SourceContentInsertionCallbackError::Verification {
                 what: "secondary proof",
             }),
-        }));
+        }))
+    };
     let replay = ReplayPublicationError::Archive {
         pass: ReplayPass::Emit,
         source: soapberry_zip::Error::from(ErrorKind::InvalidInput {
             msg: "malformed archive member".to_string(),
         }),
-        callback_error: Some(callback),
+        callback_error: Some(stale_callback()),
         progress: ReplayProgress::Complete { bytes: 19 },
     };
     let odf = OdfError::from(SourceContentInsertionError::Replay {
-        progress: litchi_odf_common::SourceContentPublicationProgress::Complete { bytes: 19 },
+        progress: SourceContentPublicationProgress::Complete { bytes: 19 },
         source: replay,
     });
 
@@ -1961,6 +1962,33 @@ fn odp_archive_replay_prefers_typed_stale_callback_over_content_fault() {
         unified.leaf(),
         Source::Odf(OdfError::SourceContentInsertion(_))
     ));
+
+    let archive_with_cancelled_callback = ReplayPublicationError::Archive {
+        pass: ReplayPass::Emit,
+        source: soapberry_zip::Error::from(ErrorKind::InvalidInput {
+            msg: "malformed archive member".to_string(),
+        }),
+        callback_error: Some(SourceContentInsertionCallbackError::Cancelled),
+        progress: ReplayProgress::Untouched,
+    };
+    let cancelled = Error::from(OdfError::from(SourceContentInsertionError::Replay {
+        progress: SourceContentPublicationProgress::Untouched,
+        source: archive_with_cancelled_callback,
+    }));
+    assert_eq!(cancelled.code(), Code::CorruptFile);
+
+    let transport = Error::from(OdfError::from(SourceContentInsertionError::Transport {
+        progress: SourceContentPublicationProgress::Complete { bytes: 19 },
+        publication: SourceContentPublicationError::Unsupported {
+            reason: "unsupported test source".to_string(),
+        },
+        replay: Box::new(ReplayPublicationError::Callback {
+            pass: ReplayPass::Emit,
+            source: stale_callback(),
+            progress: ReplayProgress::Complete { bytes: 19 },
+        }),
+    }));
+    assert_eq!(transport.code(), Code::IoError);
 }
 
 #[cfg(feature = "odp")]
