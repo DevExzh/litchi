@@ -55,3 +55,16 @@ type name, without changing runtime behavior.
 [consumer-v3.json](results/0362uf/consumer-v3.json) retains the complete stop
 receipt. The harness group was not reached; consumer and semantic validation
 remain pending.
+
+## Graph memo cleanup
+
+The fourth check ran on `d797add634` after integrating the reviewed external
+XLSX cache/context repair and the RTF qualification receipt. It progressed
+through PPTX and XLSX, then stopped at a denied dead-code lint in DOCX. The
+graph-local memo repair had left an unused `Shared<T>::shared` accessor for
+metadata fields. Removing that private accessor retains the separate
+`SharedOpc::shared` graph handoff and changes no runtime behavior.
+
+[consumer-v4.json](results/0362uf/consumer-v4.json) records the stopped
+command. The harness was not reached, and the assembled semantic checks
+remain pending.

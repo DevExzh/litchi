@@ -1,0 +1,24 @@
+{
+  "source": "d797add634d77039fd42643064a0707fbc5fe32e",
+  "checks": [
+    {
+      "command": [
+        "cargo",
+        "check",
+        "--offline",
+        "--locked",
+        "--workspace",
+        "--all-targets",
+        "--all-features"
+      ],
+      "exit": 101,
+      "seconds": 305.05951829999685,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/api-assembly-consumers-v4/check-0.log",
+      "bytes": 1405,
+      "sha256": "daf317431edb539d2e6e6f9c2889540c1492c0150685ed81b2e7a7fed08b7e2a",
+      "target_bytes_before": 18304647977,
+      "completed_test_executables_pruned": []
+    }
+  ],
+  "note": "Workspace check progressed through PPTX and XLSX; DOCX denied unused Shared<T>::shared accessor. Harness not reached."
+}

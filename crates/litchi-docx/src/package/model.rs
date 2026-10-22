@@ -172,12 +172,6 @@ impl<T> Clone for Shared<T> {
     }
 }
 
-impl<T> Shared<T> {
-    pub(super) fn shared(&self) -> std::sync::Arc<T> {
-        std::sync::Arc::clone(&self.0)
-    }
-}
-
 impl<T> From<T> for Shared<T> {
     fn from(value: T) -> Self {
         Self(std::sync::Arc::new(value))
