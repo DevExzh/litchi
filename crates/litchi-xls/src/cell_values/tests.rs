@@ -10,8 +10,8 @@ use litchi_cfb::{
 };
 use std::io::Write;
 use std::sync::{
-    atomic::{AtomicU64, Ordering},
     Arc,
+    atomic::{AtomicU64, Ordering},
 };
 
 fn package() -> Vec<u8> {
