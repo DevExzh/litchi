@@ -22,6 +22,15 @@ and inventory classification. Both existing DOCX profiles and their inventory
 also pass using the retained 0362q captures; production Rust is unchanged.
 The fixture's compiled artifacts are temporary and are not committed.
 
-RTF's production migration, fresh capture and registrations remain integration
-work. This tooling change claims no native performance result or final
-workspace acceptance.
+A follow-up check verifies all five RTF owner replay returns against the
+worker's fresh rustdoc capture from candidate `28d4262acc`, with warnings
+denied during generation. The receipt retains the 49.8 MB external capture and
+the candidate-only policy by hash. RTF defines no Cargo features, so the
+all-features capture has the same feature set as its minimal profile.
+The [candidate inventory](results/0362qa/rtf-candidate-inventory.tsv) has no
+remaining rows in the categories implemented by the inventory tool; raw-policy
+source audits remain separate obligations.
+RTF's production migration and these registrations remain integration work;
+the candidate policy is not installed on trunk ahead of its source. This
+tooling change claims no native performance result or final workspace
+acceptance.

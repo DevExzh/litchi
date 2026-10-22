@@ -113,5 +113,48 @@
     "The DOCX captures are the retained 0362q captures from unchanged production Rust, not new rustdoc builds.",
     "The fixture builds a real dependency and caller rustdoc graph. No compiled binary is committed.",
     "RTF source migration and its policy registration remain on the integration lane, not trunk."
-  ]
+  ],
+  "rtf_candidate_validation": {
+    "worker_source_commit": "28d4262acc",
+    "capture": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/w8-rtf-tail-litchi_rtf-rustdoc.json",
+      "bytes": 49776372,
+      "sha256": "20374a4543f8ff82711bd4d595eb4ee391fd8f5adccc56fddbe4730a21f73542"
+    },
+    "policy": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-generics/rtf-five-result-policy.json",
+      "bytes": 22214,
+      "sha256": "ef2daad1a42ef9bb6339b392c8c76c2ba176319d7dfa1d28e277a310ff19a283"
+    },
+    "checks": [
+      {
+        "command": [
+          "python3",
+          "tools/check_api_glossary.py",
+          "--policy",
+          "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-generics/rtf-five-result-policy.json",
+          "--profile",
+          "rtf-minimal",
+          "--json",
+          "/home/zhuhe/code/litchi-worktrees/.coord/w8-rtf-tail-litchi_rtf-rustdoc.json"
+        ],
+        "exit": 0,
+        "seconds": 1.820195989916101,
+        "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-generics/rtf-validation-v1/check-0.log",
+        "bytes": 154,
+        "sha256": "7d6e4d59417fa762be2e667491389974ac9ffaeeea80f2db79e46b1397cafcd4"
+      }
+    ],
+    "result_methods": 5,
+    "feature_note": "litchi-rtf defines no Cargo features; the worker all-features capture and minimal profile have the same feature set. Rustdoc warnings were denied.",
+    "integration_note": "This proves the external candidate capture, not the RTF source currently on trunk. The five rules are not registered on trunk yet.",
+    "inventory": {
+      "path": "docs/unified-ops/results/0362qa/rtf-candidate-inventory.tsv",
+      "bytes": 28,
+      "sha256": "72ad46bedd27da7fe027031dd7de9db11057455fc19ca19f1027ed89b60beb54",
+      "rows": 0,
+      "replay_return_rows": 0,
+      "note": "Only the categories implemented by api_debt_inventory; required raw-policy source audits remain separate."
+    }
+  }
 }

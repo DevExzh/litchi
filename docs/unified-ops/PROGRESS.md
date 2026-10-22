@@ -1972,3 +1972,51 @@ See [0063](0063-source-pptx-modern-comments.md).
   work and the remaining DOCX API audit. Native qualification, remaining
   integrations, the complete inventory/glossary sweep and final 53-check gate
   remain required. Nothing has been pushed.
+
+- Coordinator checkpoint (2026-10-22, replay integration and raw-policy repairs):
+  `fddfbdb0a0` extends the return gate to direct shared Commit types, nested
+  type arguments and declared method generic parameters. Record 0362qa retains
+  1,334 passing tooling tests and the existing DOCX profile checks. All five
+  RTF replay returns also verify against the worker's fresh candidate capture;
+  its inventory has no remaining rows in the implemented categories. Those
+  RTF source changes and policy registrations are not on trunk yet.
+
+  The combined replay/metadata candidate is committed as `ad1c6cede8` on
+  `uo2/coordinator-replay-integration`, in the metadata integration worktree.
+  Record 0362pa fixes inverse RTF tail replay diagnostics and migrates the
+  remaining ops Commit consumers. Record 0362u describes the assembly and
+  bounded validation. Full merged testing additionally found a stale ODF
+  replacement-range assertion and W4's accidental DOCX durable-error mapping
+  change; both are repaired in the merge commit. The ops library suite now
+  passes all 969 tests. The remaining 225-group affected-package run, consumer
+  harness checks and final receipts are still in progress. This is not the
+  final workspace gate or trunk performance acceptance.
+
+  RTF primary/durable/redaction replay is committed through `cbf4e30276`, and
+  logical tail replay span storage through `30ca8a13d8`. Its matched 1 MiB
+  probe removes one 1,048,606-byte allocation from forward and inverse replay,
+  with unchanged authored allocation totals and exact authored/durable bytes.
+  The fresh ops consumer check on that standalone branch still encounters the
+  DOCX/PPTX consumers already repaired by the coordinator; the complete merged
+  source remains the required validation target. DOCX paragraph-stream API
+  cleanup is committed as `b96137acb4`; paragraph-copy raw codec limits remain
+  in progress.
+
+  XLSB raw-policy work is committed through `8d59abb26f`: comments/calc,
+  styles and host style parsers, filters/page breaks/cell watches, and named
+  ranges now take required retained raw limits, with their consumers and
+  tests migrated. The last slice passes 741 library tests, integration tests
+  and Clippy. Remaining formula, XML and host raw codec slices are required.
+  ODF's raw reader repair passes its full affected suites and Clippy. Review
+  0362nca found one remaining namespace URI conversion through a coarse core
+  error; source repair `3f802aec9d` now creates that typed error at its origin.
+  Coordinator integration and native qualification remain open.
+
+  W4's cold-reader prototype restores reference allocation counts, leaving
+  +8 allocated bytes and +16 peak bytes per measured operation. Source review
+  0360ac returns its defined-name storage change because proof-backed reopens
+  retain duplicate catalogues. The repair must preserve shared history and
+  include managed/custom-policy admission measurements. No performance
+  exception is granted. Three workers continue these bounded repairs; native
+  qualification, remaining integrations, the complete inventory/glossary sweep
+  and final 53-check gate remain required. Nothing has been pushed.
