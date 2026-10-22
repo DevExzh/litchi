@@ -351,7 +351,8 @@ impl Package {
             digest: Sha256::new(),
             bytes: 0,
         };
-        self.write_to(&mut sink)?;
+        self.write_to(&mut sink)
+            .map_err(map_replay_hash_write_error)?;
         Ok((sink.bytes, sink.digest.finalize().into()))
     }
 
@@ -824,6 +825,27 @@ struct ReplayHashWriter {
     bytes: u64,
 }
 
+fn map_replay_hash_write_error(error: Error) -> Error {
+    match error {
+        Error::Io(error) if is_replay_hash_error(&error) => Error::CapacityOverflow {
+            resource: "replay content fingerprint",
+        },
+        Error::Opc(litchi_opc::OpcError::IoError(error)) if is_replay_hash_error(&error) => {
+            Error::CapacityOverflow {
+                resource: "replay content fingerprint",
+            }
+        },
+        error => error,
+    }
+}
+
+fn is_replay_hash_error(error: &std::io::Error) -> bool {
+    error
+        .get_ref()
+        .and_then(|source| source.downcast_ref::<ReplayHashError>())
+        .is_some()
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ReplayHashError {
     InputLengthExceedsU64,
@@ -864,7 +886,8 @@ impl Write for ReplayHashWriter {
 
 #[cfg(test)]
 mod replay_hash_tests {
-    use super::{ReplayHashError, ReplayHashWriter};
+    use super::{ReplayHashError, ReplayHashWriter, map_replay_hash_write_error};
+    use crate::Error;
     use sha2::{Digest, Sha256};
     use std::io::Write;
 
@@ -886,6 +909,41 @@ mod replay_hash_tests {
         ));
         assert_eq!(writer.bytes, u64::MAX);
         assert_eq!(writer.digest.clone().finalize(), Sha256::digest([]));
+    }
+
+    #[test]
+    fn replay_hash_boundary_maps_wrapped_capacity_error() {
+        let source = std::io::Error::other(ReplayHashError::LengthOverflow);
+        let error = map_replay_hash_write_error(Error::Opc(litchi_opc::OpcError::IoError(source)));
+        assert!(matches!(
+            error,
+            Error::CapacityOverflow {
+                resource: "replay content fingerprint"
+            }
+        ));
+    }
+
+    #[test]
+    fn replay_hash_boundary_maps_direct_capacity_error() {
+        let source = std::io::Error::other(ReplayHashError::InputLengthExceedsU64);
+        let error = map_replay_hash_write_error(Error::Io(source));
+        assert!(matches!(
+            error,
+            Error::CapacityOverflow {
+                resource: "replay content fingerprint"
+            }
+        ));
+    }
+
+    #[test]
+    fn replay_hash_boundary_preserves_destination_io() {
+        let source = std::io::Error::new(std::io::ErrorKind::BrokenPipe, "sink");
+        let error = map_replay_hash_write_error(Error::Opc(litchi_opc::OpcError::IoError(source)));
+        assert!(matches!(
+            error,
+            Error::Opc(litchi_opc::OpcError::IoError(error))
+                if error.kind() == std::io::ErrorKind::BrokenPipe
+        ));
     }
 }
 

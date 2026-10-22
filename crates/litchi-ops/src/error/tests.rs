@@ -709,6 +709,13 @@ fn row_allocation_commit_and_other_are_internal_error() {
         },
         Code::InternalError,
     );
+    #[cfg(feature = "pptx")]
+    assert_code(
+        litchi_pptx::Error::CapacityOverflow {
+            resource: "replay content fingerprint",
+        },
+        Code::InternalError,
+    );
     #[cfg(feature = "xlsx")]
     assert_code(
         litchi_xlsx::Error::Allocation {

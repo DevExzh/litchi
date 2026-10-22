@@ -1348,7 +1348,9 @@ impl Classify for litchi_pptx::Error {
             },
             Self::SlideCopyPlan { kind, .. } => kind.kind().classify(),
             Self::ShapeTransfer { kind, .. } => kind.kind().classify(),
-            Self::Allocation { .. } | Self::Internal { .. } => Class::of(Code::InternalError),
+            Self::Allocation { .. }
+            | Self::CapacityOverflow { .. }
+            | Self::Internal { .. } => Class::of(Code::InternalError),
             _ => Class::of(Code::CorruptFile),
         }
     }
