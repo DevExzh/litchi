@@ -32,19 +32,16 @@ from a too-small field budget. Existing Pages footnote unit tests and IWA
 footnote graph tests continue to exercise malformed, unknown, reference,
 attachment and body-marker behavior.
 
-Validation on this branch:
+Validation at tip `3600111b59` is recorded in
+`results/0361i-footnote-validation-receipt.json`:
 
-- `cargo check -p litchi-iwa -p litchi-pages --lib` — passed.
-- `cargo test -p litchi-pages --lib` — 189 passed, 0 failed.
-- `cargo test -p litchi-iwa --lib pages::editor::footnotes::tests:: -- --nocapture`
-  — 10 passed, 0 failed.
-- `cargo clippy -p litchi-iwa -p litchi-pages --lib --all-features -- -D warnings`
-  — passed.
-- `cargo fmt --all -- --check` — passed.
+- `cargo test --offline --locked -p litchi-pages --lib --all-features` — 211
+  passed, 0 failed.
+- `cargo test --offline --locked -p litchi-iwa --lib --all-features` — 1,695
+  passed, 0 failed.
+- `cargo clippy --offline --locked -p litchi-pages -p litchi-iwa --all-features
+  --lib -- -D warnings` — passed with no warnings.
 
-The attempted `cargo check --workspace --all-targets` reached the changed IWA
-and Pages crates, then stopped at the pre-existing W8 integration mismatch in
-`crates/litchi-ops/src/error.rs:1850`: the current `litchi_ppt::slide_order::Error`
-is non-exhaustive and that downstream match has no wildcard. This slice does not
-modify that classifier; the final workspace check must rerun after the
-coordinator's error-contract integration. No native timing is claimed here.
+The workspace-wide gate remains an integration responsibility after the
+coordinator's error-contract and W4/W4b changes. No native timing is claimed
+here.
