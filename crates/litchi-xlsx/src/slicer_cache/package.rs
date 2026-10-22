@@ -113,6 +113,31 @@ pub(crate) fn load_slicer_caches_limited(
     Ok(output)
 }
 
+fn preflight_slicer_cache_insertion(
+    package: &OpcPackage,
+    value: &Cache,
+    limits: &SourceLimits,
+) -> Result<()> {
+    validate(&value.definition)?;
+    crate::raw::check_new_part_count(package, 1, limits)?;
+    let workbook_name = package.main_document_part()?.partname().clone();
+    let uri = crate::slicer::raw::validate_cache_identity_fields(
+        &value.relationship_id,
+        &value.part_name,
+        workbook_name.base_uri(),
+        limits,
+    )?;
+    crate::raw::check_new_relationship_identity(
+        package,
+        &workbook_name,
+        &value.relationship_id,
+        &uri,
+    )?;
+    let existing = load_slicer_caches_limited(package, limits)?;
+    validate_set(existing.iter().chain(std::iter::once(value)))?;
+    Ok(())
+}
+
 /// Add one Slicer Cache part and append its workbook integration reference.
 /// The operation is staged on a package clone so malformed graphs cannot
 /// partially mutate the caller's package.
@@ -120,20 +145,11 @@ pub(crate) fn load_slicer_caches_limited(
 /// Adding a cache changes the package, so a signed package is refused with
 /// [`crate::Error::Signed`]: remove the signature explicitly first
 /// ([`OpcPackage::unsign`]).
-pub fn store_slicer_cache(package: &mut OpcPackage, value: &Cache) -> Result<()> {
+pub(crate) fn store_slicer_cache(package: &mut OpcPackage, value: &Cache) -> Result<()> {
     validate(&value.definition)?;
+    let limits = package.read_limits();
+    preflight_slicer_cache_insertion(package, value, &limits)?;
     let mut staged = package.clone();
-    let limits = staged.read_limits();
-    store_slicer_cache_in_place(&mut staged, value, &limits)?;
-    *package = staged;
-    Ok(())
-}
-
-pub(crate) fn store_slicer_cache_in_place(
-    package: &mut OpcPackage,
-    value: &Cache,
-    limits: &SourceLimits,
-) -> Result<()> {
     let prepared = crate::slicer::raw::prepare_cache(
         crate::slicer::raw::Cache {
             relationship_id: value.relationship_id.clone(),
@@ -141,9 +157,11 @@ pub(crate) fn store_slicer_cache_in_place(
             definition: value.definition.clone(),
         },
         package.main_document_part()?.partname().base_uri(),
-        limits,
+        &limits,
     )?;
-    store_slicer_cache_prepared_in_place(package, &prepared, limits)
+    store_slicer_cache_prepared_in_place(&mut staged, &prepared, &limits)?;
+    *package = staged;
+    Ok(())
 }
 
 pub(crate) fn store_slicer_cache_prepared_in_place(

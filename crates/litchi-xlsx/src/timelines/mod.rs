@@ -87,11 +87,10 @@ pub use model::{
     Cache, CacheDefinition, CachePivotTable, FilterType, Level, OpaqueXml, Part, PivotFilter,
     Range, State, View, Views,
 };
-pub use package::{
-    load_timeline_caches, load_timelines, store_timeline_caches, store_worksheet_timelines,
-};
+pub use package::{load_timeline_caches, load_timelines};
 pub(crate) use package::{
-    load_timeline_caches_limited, load_timelines_limited, store_timeline_caches_limited,
-    store_timeline_caches_prepared_limited, store_worksheet_timelines_limited,
+    load_timeline_caches_limited, load_timelines_limited, store_timeline_caches,
+    store_timeline_caches_limited, store_timeline_caches_prepared_limited,
+    store_worksheet_timelines, store_worksheet_timelines_limited,
     store_worksheet_timelines_prepared_limited,
 };

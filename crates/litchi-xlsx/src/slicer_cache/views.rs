@@ -444,7 +444,7 @@ pub(crate) fn load_slicer_parts_limited(
 /// with [`crate::Error::Signed`] (it used to be changed in memory and refused
 /// only when saved): remove the signature explicitly first
 /// ([`OpcPackage::unsign`]).
-pub fn store_slicer_part(
+pub(crate) fn store_slicer_part(
     package: &mut OpcPackage,
     worksheet_name: &PackURI,
     value: &SlicerPart,
@@ -453,12 +453,53 @@ pub fn store_slicer_part(
     store_slicer_part_limited(package, worksheet_name, value, &limits)
 }
 
+fn preflight_slicer_part_insertion(
+    package: &OpcPackage,
+    worksheet_name: &PackURI,
+    value: &SlicerPart,
+    limits: &SourceLimits,
+) -> Result<()> {
+    validate_package_graph(package)?;
+    validate_slicers(&value.slicers)?;
+    crate::raw::check_new_part_count(package, 1, limits)?;
+    let part_uri = crate::slicer::raw::validate_part_identity_fields(
+        &value.relationship_id,
+        &value.part_name,
+        worksheet_name.base_uri(),
+        limits,
+    )?;
+    let worksheet = package.get_part(worksheet_name)?;
+    require_worksheet(worksheet.partname(), worksheet.content_type())?;
+    let count = worksheet
+        .rels()
+        .iter()
+        .filter(|relationship| relationship.reltype() == SLICERS_RELATIONSHIP_TYPE)
+        .count();
+    if count >= MAX_SLICER_PARTS_PER_WORKSHEET {
+        return Err(limit("parts per worksheet"));
+    }
+    if worksheet.rels().get(&value.relationship_id).is_some() {
+        return Err(invalid(format!(
+            "worksheet relationship ID '{}' already exists",
+            value.relationship_id
+        )));
+    }
+    crate::raw::check_new_relationship_identity(
+        package,
+        worksheet_name,
+        &value.relationship_id,
+        &part_uri,
+    )?;
+    Ok(())
+}
+
 pub(crate) fn store_slicer_part_limited(
     package: &mut OpcPackage,
     worksheet_name: &PackURI,
     value: &SlicerPart,
     limits: &SourceLimits,
 ) -> Result<()> {
+    preflight_slicer_part_insertion(package, worksheet_name, value, limits)?;
     let prepared = crate::slicer::raw::prepare_part(
         crate::slicer::raw::Part {
             relationship_id: value.relationship_id.clone(),

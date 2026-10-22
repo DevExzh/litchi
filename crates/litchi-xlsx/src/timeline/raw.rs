@@ -65,14 +65,27 @@ pub(crate) fn validate_cache_identity(
     owner_base_uri: &str,
     limits: &SourceLimits,
 ) -> Result<litchi_opc::PackURI> {
-    crate::raw::validate_relationship_id(&value.relationship_id)?;
+    validate_cache_identity_fields(
+        &value.relationship_id,
+        &value.part_name,
+        owner_base_uri,
+        limits,
+    )
+}
+
+pub(crate) fn validate_cache_identity_fields(
+    relationship_id: &str,
+    part_name: &str,
+    owner_base_uri: &str,
+    limits: &SourceLimits,
+) -> Result<litchi_opc::PackURI> {
+    crate::raw::validate_relationship_id(relationship_id)?;
     crate::raw::check_limit(
         litchi_opc::SourceLimitKind::XmlAttributeBytes,
-        value.relationship_id.len() as u64,
+        relationship_id.len() as u64,
         limits.max_xml_attribute_bytes() as u64,
     )?;
-    crate::raw::check_source_bytes(value.part_name.len(), limits)?;
-    let part_uri = litchi_opc::PackURI::new(&value.part_name)
+    let part_uri = litchi_opc::PackURI::new(part_name)
         .map_err(|error| crate::Error::Invalid(format!("invalid View Cache part URI: {error}")))?;
     if !part_uri.as_str().starts_with("/xl/timelineCaches/") || !part_uri.as_str().ends_with(".xml")
     {
@@ -126,15 +139,27 @@ pub(crate) fn validate_part_identity(
     value: &Part,
     limits: &SourceLimits,
 ) -> Result<(litchi_opc::PackURI, litchi_opc::PackURI)> {
-    crate::raw::validate_relationship_id(&value.relationship_id)?;
+    validate_part_identity_fields(
+        &value.worksheet_part_name,
+        &value.relationship_id,
+        &value.part_name,
+        limits,
+    )
+}
+
+pub(crate) fn validate_part_identity_fields(
+    worksheet_part_name: &str,
+    relationship_id: &str,
+    part_name: &str,
+    limits: &SourceLimits,
+) -> Result<(litchi_opc::PackURI, litchi_opc::PackURI)> {
+    crate::raw::validate_relationship_id(relationship_id)?;
     crate::raw::check_limit(
         litchi_opc::SourceLimitKind::XmlAttributeBytes,
-        value.relationship_id.len() as u64,
+        relationship_id.len() as u64,
         limits.max_xml_attribute_bytes() as u64,
     )?;
-    crate::raw::check_source_bytes(value.worksheet_part_name.len(), limits)?;
-    crate::raw::check_source_bytes(value.part_name.len(), limits)?;
-    let part_uri = litchi_opc::PackURI::new(&value.part_name)
+    let part_uri = litchi_opc::PackURI::new(part_name)
         .map_err(|error| crate::Error::Invalid(format!("invalid Timelines part URI: {error}")))?;
     if !part_uri.as_str().starts_with("/xl/timelines/") || !part_uri.as_str().ends_with(".xml") {
         return Err(crate::Error::Invalid(
@@ -142,7 +167,7 @@ pub(crate) fn validate_part_identity(
         ));
     }
     crate::raw::check_part_member_name(&part_uri, limits)?;
-    let worksheet = litchi_opc::PackURI::new(&value.worksheet_part_name)
+    let worksheet = litchi_opc::PackURI::new(worksheet_part_name)
         .map_err(|error| crate::Error::Invalid(format!("invalid worksheet part URI: {error}")))?;
     crate::raw::check_relationship_target(&part_uri, worksheet.base_uri(), limits)?;
     Ok((part_uri, worksheet))
@@ -158,4 +183,29 @@ pub fn parse_cache(xml: &[u8], limits: &SourceLimits) -> Result<CacheDefinition>
 pub fn parse_part(xml: &[u8], limits: &SourceLimits) -> Result<Views> {
     crate::raw::check_xml_limits(xml, limits)?;
     super::codec::read_views(xml)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::validate_cache_identity_fields;
+    use litchi_opc::{PackURI, SourceLimits};
+
+    #[test]
+    fn cache_identity_does_not_charge_part_name_to_payload_limit() {
+        let part_name = format!(
+            "/xl/timelineCaches/{}.xml",
+            "long-native-identity-".repeat(64)
+        );
+        let uri = PackURI::new(&part_name).unwrap();
+        let limits = SourceLimits::builder()
+            .max_part_bytes(1)
+            .unwrap()
+            .max_archive_member_name_bytes(uri.membername().len() as u64)
+            .unwrap()
+            .max_relationship_target_bytes(uri.membername().len())
+            .unwrap()
+            .build()
+            .unwrap();
+        validate_cache_identity_fields("rIdNativeIdentity", &part_name, "/xl/", &limits).unwrap();
+    }
 }

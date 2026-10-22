@@ -29,10 +29,12 @@ pub mod package;
 pub mod views;
 
 pub use crud::*;
-pub use package::{load_slicer_caches, store_slicer_cache};
+pub use package::load_slicer_caches;
+pub(crate) use package::store_slicer_cache;
+pub(crate) use views::store_slicer_part;
 pub use views::{
     Slicer, SlicerExtensionList, SlicerPart, Slicers, load_slicer_parts, parse_slicers,
-    store_slicer_part, write_slicers,
+    write_slicers,
 };
 
 pub const SLICER_CACHE_CONTENT_TYPE: &str = "application/vnd.ms-excel.slicerCache+xml";

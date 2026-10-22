@@ -197,7 +197,7 @@ pub(crate) fn load_timeline_caches_limited(
 /// [`crate::Error::Signed`] (it used to be changed in memory and refused only
 /// when saved): remove the signature explicitly first
 /// ([`OpcPackage::unsign`]).
-pub fn store_timeline_caches(
+pub(crate) fn store_timeline_caches(
     package: &mut OpcPackage,
     workbook_name: &PackURI,
     caches: &[Cache],
@@ -206,12 +206,69 @@ pub fn store_timeline_caches(
     store_timeline_caches_limited(package, workbook_name, caches, &limits)
 }
 
+fn preflight_timeline_cache_insertions(
+    package: &OpcPackage,
+    workbook_name: &PackURI,
+    caches: &[Cache],
+    limits: &SourceLimits,
+) -> Result<()> {
+    if caches.is_empty() {
+        return Err(invalid("at least one View Cache is required for storage"));
+    }
+    crate::raw::check_limit(
+        litchi_opc::SourceLimitKind::RelationshipsPerPart,
+        caches.len() as u64,
+        limits.max_relationships_per_part() as u64,
+    )?;
+    crate::raw::check_new_part_count(package, caches.len(), limits)?;
+    validate_cache_set(caches.iter())?;
+
+    let mut ids = HashSet::new();
+    ids.try_reserve(caches.len())
+        .map_err(|source| Error::Allocation {
+            resource: "timeline cache relationship IDs",
+            source,
+        })?;
+    let mut targets = HashSet::new();
+    targets
+        .try_reserve(caches.len())
+        .map_err(|source| Error::Allocation {
+            resource: "timeline cache part names",
+            source,
+        })?;
+    for cache in caches {
+        let uri = crate::timeline::raw::validate_cache_identity_fields(
+            &cache.relationship_id,
+            &cache.part_name,
+            workbook_name.base_uri(),
+            limits,
+        )?;
+        if !ids.insert(cache.relationship_id.as_str()) {
+            return Err(invalid("duplicate View Cache relationship ID"));
+        }
+        if !targets.insert(uri.to_string()) {
+            return Err(invalid("duplicate View Cache part name"));
+        }
+        crate::raw::check_new_relationship_identity(
+            package,
+            workbook_name,
+            &cache.relationship_id,
+            &uri,
+        )?;
+    }
+    if !load_timeline_caches_limited(package, workbook_name, limits)?.is_empty() {
+        return Err(invalid("workbook already contains View Caches"));
+    }
+    Ok(())
+}
+
 pub(crate) fn store_timeline_caches_limited(
     package: &mut OpcPackage,
     workbook_name: &PackURI,
     caches: &[Cache],
     limits: &SourceLimits,
 ) -> Result<()> {
+    preflight_timeline_cache_insertions(package, workbook_name, caches, limits)?;
     let prepared = caches
         .iter()
         .cloned()
@@ -465,7 +522,7 @@ pub(crate) fn load_timelines_limited(
 /// [`crate::Error::Signed`] (it used to be changed in memory and refused only
 /// when saved): remove the signature explicitly first
 /// ([`OpcPackage::unsign`]).
-pub fn store_worksheet_timelines(
+pub(crate) fn store_worksheet_timelines(
     package: &mut OpcPackage,
     workbook_name: &PackURI,
     value: &Part,
@@ -480,6 +537,7 @@ pub(crate) fn store_worksheet_timelines_limited(
     value: &Part,
     limits: &SourceLimits,
 ) -> Result<()> {
+    preflight_timeline_part_insertion(package, value, limits)?;
     let prepared = crate::timeline::raw::prepare_part(
         crate::timeline::raw::Part {
             worksheet_part_name: value.worksheet_part_name.clone(),
@@ -490,6 +548,40 @@ pub(crate) fn store_worksheet_timelines_limited(
         limits,
     )?;
     store_worksheet_timelines_prepared_limited(package, workbook_name, &prepared, limits)
+}
+
+fn preflight_timeline_part_insertion(
+    package: &OpcPackage,
+    value: &Part,
+    limits: &SourceLimits,
+) -> Result<()> {
+    validate_views_local(&value.timelines)?;
+    crate::raw::check_new_part_count(package, 1, limits)?;
+    let (target_uri, worksheet_uri) = crate::timeline::raw::validate_part_identity_fields(
+        &value.worksheet_part_name,
+        &value.relationship_id,
+        &value.part_name,
+        limits,
+    )?;
+    let worksheet = package.get_part(&worksheet_uri)?;
+    if worksheet.content_type() != ct::SML_WORKSHEET {
+        return Err(invalid(format!(
+            "part '{worksheet_uri}' is not a worksheet"
+        )));
+    }
+    if worksheet.rels().get(&value.relationship_id).is_some() {
+        return Err(invalid(format!(
+            "worksheet relationship ID '{}' already exists",
+            value.relationship_id
+        )));
+    }
+    crate::raw::check_new_relationship_identity(
+        package,
+        &worksheet_uri,
+        &value.relationship_id,
+        &target_uri,
+    )?;
+    Ok(())
 }
 
 pub(crate) fn store_worksheet_timelines_prepared_limited(

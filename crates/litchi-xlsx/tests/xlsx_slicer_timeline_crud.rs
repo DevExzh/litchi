@@ -426,6 +426,105 @@ fn raw_identity_admission_uses_archive_member_spelling_and_global_relationship_b
 }
 
 #[test]
+fn raw_batch_admission_rejects_invalid_and_duplicate_ids_before_staging() {
+    let (package, _) = package();
+    let source = litchi_xlsx::Package::from_opc(package).unwrap();
+
+    let valid = litchi_xlsx::timeline::raw::Cache {
+        relationship_id: "rIdValidTimeline".into(),
+        part_name: "/xl/timelineCaches/valid.xml".into(),
+        definition: timeline_cache("ValidTimelineCache", "Date"),
+    };
+    let invalid = litchi_xlsx::timeline::raw::Cache {
+        relationship_id: "r:id-invalid".into(),
+        part_name: "/xl/timelineCaches/invalid.xml".into(),
+        definition: timeline_cache("InvalidTimelineCache", "Date"),
+    };
+    let mut invalid_edit = source.edit_timelines().unwrap();
+    assert!(
+        invalid_edit
+            .insert_caches(&[valid.clone(), invalid])
+            .is_err()
+    );
+    assert!(invalid_edit.cache("ValidTimelineCache").unwrap().is_none());
+
+    let duplicate = litchi_xlsx::timeline::raw::Cache {
+        relationship_id: valid.relationship_id.clone(),
+        part_name: "/xl/timelineCaches/duplicate.xml".into(),
+        definition: timeline_cache("DuplicateTimelineCache", "Date"),
+    };
+    let mut duplicate_edit = source.edit_timelines().unwrap();
+    assert!(duplicate_edit.insert_caches(&[valid, duplicate]).is_err());
+    assert!(
+        duplicate_edit
+            .cache("ValidTimelineCache")
+            .unwrap()
+            .is_none()
+    );
+    assert!(
+        duplicate_edit
+            .cache("DuplicateTimelineCache")
+            .unwrap()
+            .is_none()
+    );
+}
+
+#[test]
+fn raw_relationship_budget_charges_an_unrelated_owner_and_preserves_it() {
+    let (mut package, _) = package();
+    let unrelated = PackURI::new("/xl/unrelated.xml").unwrap();
+    let mut unrelated_part = BlobPart::new(
+        unrelated.clone(),
+        "application/octet-stream".into(),
+        b"unrelated owner payload".to_vec(),
+    );
+    unrelated_part.rels_mut().add_relationship(
+        rt::WORKSHEET.into(),
+        "worksheets/sheet1.xml".into(),
+        "rIdUnrelatedOwner".into(),
+        false,
+    );
+    package.add_part(Box::new(unrelated_part));
+    let source = litchi_xlsx::Package::from_opc(package).unwrap();
+    let value = || slicer::raw::Cache {
+        relationship_id: "rIdLedgerCache".into(),
+        part_name: "/xl/slicerCaches/ledger.xml".into(),
+        definition: slicer_cache("LedgerCache", "State"),
+    };
+
+    // The package root, workbook and unrelated owner already consume three
+    // relationship slots. The insertion must account for all owners.
+    let tight = SourceLimits::builder()
+        .max_total_relationships(3)
+        .unwrap()
+        .build()
+        .unwrap();
+    let mut rejected = source
+        .edit_slicers_with_options(slicer::EditOptions::default().limits(tight))
+        .unwrap();
+    assert!(rejected.insert_cache(value()).is_err());
+    assert!(rejected.cache("LedgerCache").unwrap().is_none());
+
+    let admitted = SourceLimits::builder()
+        .max_total_relationships(4)
+        .unwrap()
+        .build()
+        .unwrap();
+    let mut edit = source
+        .edit_slicers_with_options(slicer::EditOptions::default().limits(admitted))
+        .unwrap();
+    edit.insert_cache(value()).unwrap();
+    let after = edit.commit().unwrap().into_package().into_plain_opc();
+    let relationship = after
+        .get_part(&unrelated)
+        .unwrap()
+        .rels()
+        .get("rIdUnrelatedOwner")
+        .unwrap();
+    assert_eq!(relationship.target_ref(), "worksheets/sheet1.xml");
+}
+
+#[test]
 fn slicer_cache_and_view_crud_preserves_state_extensions_and_shared_targets() {
     let (mut package, worksheet) = package();
     package.add_part(Box::new(BlobPart::new(
