@@ -10,9 +10,6 @@ use std::sync::Arc;
 
 use litchi_core::{ExecutionError, FileFormat, Resource, ResourceLimit, SourceVersion};
 
-#[cfg(feature = "doc")]
-use litchi_core::Position;
-
 #[cfg(any(feature = "doc", feature = "xls", feature = "ppt", feature = "xlsb"))]
 use super::PASSWORD_SUGGESTION;
 use super::{Code, Error, LIMIT_SUGGESTION, SIGNED_SUGGESTION, Source};
@@ -2279,13 +2276,13 @@ fn public_doc_stale_replay_reaches_the_facade_as_invalid_input() {
 
     let mut first = source.edit().expect("first edit");
     first
-        .replace_paragraph(Position::new(0), "first")
+        .replace_paragraph(litchi_core::Position::new(0), "first")
         .expect("first replacement");
     let patch = first.commit().expect("first commit").patch().clone();
 
     let mut second = source.edit().expect("second edit");
     second
-        .replace_paragraph(Position::new(0), "second")
+        .replace_paragraph(litchi_core::Position::new(0), "second")
         .expect("second replacement");
     let changed = second.commit().expect("second commit").into_package();
     let native = changed.apply(&patch).expect_err("stale package replay");
