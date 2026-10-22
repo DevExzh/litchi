@@ -6,6 +6,7 @@ publish = false
 
 [features]
 allocator-metrics = []
+xlsx-raw-candidate = []
 ordinary-save-process-metrics = []
 xls-source-attribution = ["litchi/xls"]
 xlsb-crud = ["litchi/xlsb"]

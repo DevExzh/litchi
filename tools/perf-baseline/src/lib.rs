@@ -58,6 +58,7 @@ mod xlsx_attribute_fixtures;
 mod xlsx_commit_metrics_tests;
 mod xlsx_managed_compression;
 pub mod xlsx_planning_guard;
+pub mod xlsx_raw_identity;
 #[path = "../../../crates/litchi-xlsx/tests/support/source_editors.rs"]
 mod xlsx_source_editors;
 pub mod xml_stream_audit;
