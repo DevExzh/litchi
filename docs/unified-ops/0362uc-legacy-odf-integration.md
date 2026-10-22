@@ -39,3 +39,20 @@ The incoming 88 commits were checked against the history-rewrite map before
 integration; none reintroduces a pre-rewrite commit. Large logs, captures and
 compiled binaries remain outside Git. The required repository artifact
 checks apply to the complete staged merge, including incoming files.
+
+## Combined semantic follow-up
+
+All nine focused legacy/ODF groups pass on assembly `50122ae80a`, for
+750 tests: OLE common/property sets, ODF common/parser hardening, XLS source
+and metadata, ODT source and drawing resources, ODP source and drawing
+resources, and the facade OLE metadata, XLS batch, ODP write and ODT write
+suites. The receipt records every exact command, count and external log hash.
+
+The runner stopped before the final ODT facade group when the shared build
+cache crossed its size guard. A second attempt also stopped before running
+that group. Once all other builds had released the coordinator target, only
+obsolete check-only compiler metadata was moved to external storage, with
+hash receipts; compiled libraries and measured binaries were preserved. The
+final group then passed. The eight previously passing groups were not rerun.
+These results close this assembly's focused semantic check; the final merged
+workspace gate and outstanding performance qualification remain required.
