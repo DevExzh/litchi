@@ -12,6 +12,7 @@ use super::model::{
     Variables,
 };
 use crate::{Error, Result};
+use std::borrow::Cow;
 
 /// Caller-selected admission and output policy for the raw settings codec.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -180,20 +181,27 @@ impl Tree {
     }
 
     /// Set or replace one variable without serializing the whole settings XML.
-    pub fn set<N, V>(&mut self, name: N, value: V, limits: Limits) -> Result<Option<String>>
+    pub fn set<'name, 'value, N, V>(
+        &mut self,
+        name: N,
+        value: V,
+        limits: Limits,
+    ) -> Result<Option<String>>
     where
-        N: AsRef<str> + Into<String>,
-        V: AsRef<str> + Into<String>,
+        N: Into<Cow<'name, str>>,
+        V: Into<Cow<'value, str>>,
     {
         self.validate_variables_if_tighter(limits)?;
+        let name = name.into();
+        let value = value.into();
         super::model::validate_document_variable_with_limits(
             name.as_ref(),
             value.as_ref(),
             &limits,
         )?;
-        let previous = self
-            .variables
-            .insert_prevalidated(name.into(), value.into(), &limits)?;
+        let previous =
+            self.variables
+                .insert_prevalidated(name.into_owned(), value.into_owned(), &limits)?;
         self.admitted_variables = VariableLimits::from_limits(limits);
         Ok(previous)
     }
@@ -395,25 +403,44 @@ mod tests {
     }
 
     #[test]
-    fn borrowed_over_limit_values_are_rejected_before_ownership_conversion() {
-        struct BorrowedInput(&'static str);
+    fn cow_values_are_checked_before_ownership_conversion() {
+        struct MismatchedInput {
+            borrowed: &'static str,
+            owned: &'static str,
+        }
 
-        impl AsRef<str> for BorrowedInput {
+        impl AsRef<str> for MismatchedInput {
             fn as_ref(&self) -> &str {
-                self.0
+                self.borrowed
             }
         }
 
-        impl Into<String> for BorrowedInput {
-            fn into(self) -> String {
-                panic!("invalid raw input must not be owned before admission")
+        impl From<MismatchedInput> for String {
+            fn from(_: MismatchedInput) -> String {
+                panic!("the legacy owned view must never be selected")
+            }
+        }
+
+        impl<'a> From<MismatchedInput> for Cow<'a, str> {
+            fn from(input: MismatchedInput) -> Cow<'a, str> {
+                Cow::Owned(input.owned.to_owned())
             }
         }
 
         let policy = Limits::new(1024, 64, 4, 8, 3).unwrap();
         let source = format!(r#"<w:settings xmlns:w="{W}"/>"#);
         let mut tree = Tree::from_xml(source.into_bytes(), policy).unwrap();
-        let error = tree.set(BorrowedInput("name"), BorrowedInput("value"), policy);
+        let error = tree.set(
+            MismatchedInput {
+                borrowed: "name",
+                owned: "name",
+            },
+            MismatchedInput {
+                borrowed: "value",
+                owned: "too-long",
+            },
+            policy,
+        );
         assert!(matches!(
             error,
             Err(Error::SettingsLimit {
@@ -422,5 +449,22 @@ mod tests {
             })
         ));
         assert!(!tree.changed());
+    }
+
+    #[test]
+    fn owned_cow_values_move_into_the_collection_without_copying() {
+        let policy = limits(1024);
+        let source = format!(r#"<w:settings xmlns:w="{W}"/>"#);
+        let mut tree = Tree::from_xml(source.into_bytes(), policy).unwrap();
+        let name = String::from("owned-name");
+        let value = String::from("owned-value");
+        let name_pointer = name.as_ptr();
+        let value_pointer = value.as_ptr();
+
+        tree.set(name, value, policy).unwrap();
+
+        let (stored_name, stored_value) = tree.variables().iter().next().unwrap();
+        assert_eq!(stored_name.as_ptr(), name_pointer);
+        assert_eq!(stored_value.as_ptr(), value_pointer);
     }
 }

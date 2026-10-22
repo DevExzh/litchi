@@ -56,12 +56,20 @@ collection validations, then observes one validation for a tighter value
 policy. `to_bytes` still rechecks the complete collection, source depth, and
 source XML bytes for every caller policy, including an unchanged tree.
 
-`Tree::set` admits `AsRef<str> + Into<String>` inputs before taking ownership.
-An oversized borrowed name or value therefore returns its typed limit error
-without first allocating a caller-sized `String`; an already-owned `String`
-still moves into the collection without a second copy. The focused
-`borrowed_over_limit_values_are_rejected_before_ownership_conversion` test
-uses an input whose ownership conversion would panic to prove this ordering.
+`Tree::set` takes one `Into<Cow<'a, str>>` representation for each input and
+validates the actual `Cow` view before calling `into_owned`. This removes the
+old `AsRef<str> + Into<String>` split view: a type can no longer validate one
+string and insert another. The focused
+`cow_values_are_checked_before_ownership_conversion` test implements both
+views with different contents; the oversized owned `Cow` is refused and the
+legacy owned conversion is never selected. A separate
+`owned_cow_values_move_into_the_collection_without_copying` test checks that
+already-owned `String` values retain their allocations when admitted.
+
+This follow-up supersedes the earlier dual-view input wording in this record;
+the raw model remains bounded and source-neutral, while the source-backed
+owner's existing `Edit::set` keeps its owner-level `Into<String>` convenience
+surface.
 
 ## Validation
 
@@ -77,7 +85,9 @@ cargo test --offline --locked -p litchi-docx \
 cargo clippy --offline --locked -p litchi-docx --all-targets --all-features -- -D warnings
 ```
 
-The final variables run passed 18 tests. The retained source-backed run passed
+The original variables run passed 18 tests. The follow-up Cow-input run passed
+7 raw-tree tests, and the strict all-target/all-feature Clippy run finished
+with no diagnostics. The retained source-backed run passed
 18 + 9 + 6 tests. The final all-target/all-feature Clippy run finished with
 `Finished dev profile` and no diagnostics. The first all-target attempt is
 retained because it caught the now-migrated integration consumer that called
@@ -89,6 +99,8 @@ the private engine `try_edit`:
 | `.coord/w8-docx-variables/source-backed-policy-final.log` | 3,544 | `1530fe6a39af01563de08c54d2e2af34e442d0b98ee84e41abf95a6550d0344e` |
 | `.coord/w8-docx-variables/clippy-policy-final.log` | 170 | `94bc541edd44e5a8d1c7b24de1635ab4ee6176a54cdacd4ddfc8268282b5c835` |
 | `.coord/w8-docx-variables/clippy-all-targets-failed.log` | 759 | `08c2b42f95a91680e62184308fd4770b6a8c885d85185ae2b2cac89f5ff37ec5` |
+| `.coord/w8-docx-variables/cow-focused-v2.log` | 1,042 | `3249e71314292f9c1a1be5c50337a86e0ebb80d9039b6487e4082ccd81582e77` |
+| `.coord/w8-docx-variables/cow-clippy-v2.log` | 222 | `146dda73c8b4c0c0716465987e56c785509e16557712e15a4cb3c7d8cd3552fe` |
 
 The external receipts are intentionally outside the repository. No benchmark
 or native performance claim is made here; the batching behavior is covered by
