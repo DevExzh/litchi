@@ -44,3 +44,18 @@ Both commands used the external target
 The frozen 0359j–0359l receipts remain historical evidence; this candidate
 has no accepted performance result until the source-matched owner, cell,
 history and inverse routes are rebuilt and requalified in a quiet window.
+
+The source-matched untimed release probes and counting-allocator receipts are
+outside the checkout at
+`/home/zhuhe/code/litchi-worktrees/.coord/w5-ole-source-arc-final-20261021`.
+The baseline is `baseline-0ce4-src-8f0ffa`; the candidate source is
+`daa2d35860` (documentation tip `8ee0e97297`).  The shared probe, clone probe
+and lock hashes are `ad4c52c0`, `0a23c99e` and `bc5a133f` respectively.  All
+12 untimed routes have equal normalized output and archive sizes.  Counting
+receipts show read/edit exact allocation parity; XLS cells requested bytes
+fall from 2,361,904 to 2,137,013, DOC history from 1,830,103,867 to
+1,770,486,356, and XLS history from 441,765,854 to 398,342,748.  The
+history routes retain 129 packages and 128 patches through their snapshots;
+live bytes are equal for DOC and increase by 24 bytes for XLS, with peak
+bytes increasing by 56 bytes for XLS.  Native timing remains pending a quiet
+coordinator grant.
