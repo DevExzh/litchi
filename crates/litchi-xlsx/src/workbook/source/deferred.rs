@@ -329,6 +329,7 @@ impl SourceBackedWorkbook {
             Arc::new(litchi_core::OwnedSource::new(bytes)),
             options,
             Some(shared_catalog),
+            Some(Arc::clone(&self.inner.owner_options)),
         )?;
         Ok(pending.materialized.get_or_init(|| view))
     }

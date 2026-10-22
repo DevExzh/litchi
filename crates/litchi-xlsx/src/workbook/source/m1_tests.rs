@@ -597,6 +597,10 @@ fn deferred_views_reuse_the_lineage_catalog_policy_and_reject_mismatch() {
         &proof.limits,
         &second_view.inner.source_limits()
     ));
+    assert!(Arc::ptr_eq(
+        &first_view.inner.owner_options,
+        &second_view.inner.owner_options
+    ));
 
     let mismatch = SourceBackedWorkbook::from_read_at_with_options_and_shared_catalog(
         ProbeSource::new(bytes),
@@ -608,6 +612,7 @@ fn deferred_views_reuse_the_lineage_catalog_policy_and_reject_mismatch() {
                 .unwrap(),
         ),
         Some(proof),
+        None,
     );
     assert!(mismatch.is_err());
 }

@@ -273,7 +273,7 @@ pub(crate) struct SourceInner {
     catalog_proof: OnceLock<Arc<SourceCatalogProof>>,
     /// The ingress policies this workbook was opened with; a committed
     /// workbook reopens its output under them.
-    owner_options: SourceOwnerOptions,
+    owner_options: Arc<SourceOwnerOptions>,
 }
 
 /// Read-only XLSX catalog and worksheet access over a positional source.
@@ -409,13 +409,14 @@ impl SourceBackedWorkbook {
         source: Arc<dyn ReadAt>,
         options: crate::OpenOptions,
     ) -> Result<Self> {
-        Self::from_read_at_with_options_and_shared_catalog(source, options, None)
+        Self::from_read_at_with_options_and_shared_catalog(source, options, None, None)
     }
 
     fn from_read_at_with_options_and_shared_catalog(
         source: Arc<dyn ReadAt>,
         options: crate::OpenOptions,
         shared_catalog: Option<Arc<SourceCatalogProof>>,
+        shared_owner_options: Option<Arc<SourceOwnerOptions>>,
     ) -> Result<Self> {
         let limits = options.source_limits;
         let cache_limits = options.cache_limits.unwrap_or_default();
@@ -434,7 +435,12 @@ impl SourceBackedWorkbook {
                 cache_limits,
             )?,
         };
-        Self::open_source_backed_package_with_shared_catalog(package, options, shared_catalog)
+        Self::open_source_backed_package_with_shared_catalog(
+            package,
+            options,
+            shared_catalog,
+            shared_owner_options,
+        )
     }
 
     /// Open an XLSX package from a sequential reader with the default
@@ -480,13 +486,14 @@ impl SourceBackedWorkbook {
         package: SourceBackedPackage,
         options: crate::OpenOptions,
     ) -> Result<Self> {
-        Self::open_source_backed_package_with_shared_catalog(package, options, None)
+        Self::open_source_backed_package_with_shared_catalog(package, options, None, None)
     }
 
     fn open_source_backed_package_with_shared_catalog(
         package: SourceBackedPackage,
         options: crate::OpenOptions,
         shared_catalog: Option<Arc<SourceCatalogProof>>,
+        shared_owner_options: Option<Arc<SourceOwnerOptions>>,
     ) -> Result<Self> {
         let execution = options.execution_context.clone();
         let leniency = options.leniency;
@@ -581,7 +588,8 @@ impl SourceBackedWorkbook {
             let _ = source_limits.set(Arc::clone(&shared.limits));
             let _ = catalog_proof.set(shared);
         }
-        let owner_options = SourceOwnerOptions::from_open_options(&options);
+        let owner_options = shared_owner_options
+            .unwrap_or_else(|| Arc::new(SourceOwnerOptions::from_open_options(&options)));
 
         Ok(Self {
             inner: Arc::new(SourceInner {
