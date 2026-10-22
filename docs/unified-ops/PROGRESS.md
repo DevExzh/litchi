@@ -1794,3 +1794,21 @@ See [0063](0063-source-pptx-modern-comments.md).
 - Coordinator acceptance [0361h](0361h-character-style-required-limits.md) and repair [0361ha](0361ha-character-style-output-repair.md): all seven raw character-style APIs require a wire policy, with every Pages/Numbers/Keynote consumer migrated and typed failures preserved. Aggregate admission precedes nested decoding and output allocation. All 57 raw unit tests, eight compile-fail doctests, 1,015 owner tests, four-crate Clippy and the raw glossary pass. The first memory regression was returned and repaired; every final allocation route is equal to or below the base, and all 11 native routes improve (0.3521–0.9618× medians). All 60 qualified ABBA blocks, the interrupted warmup and exact fixture/output comparisons remain recorded. Retained footnote policies, remaining raw/shared audits, wave integration and the final workspace gate stay required.
 
 - Coordinator follow-up [0361j](0361j-pages-registry-error-fidelity.md): Pages section text-style registry failures preserve their actual resource kind and counts, replacing the fabricated RegistryBytes 0/0 mapping. All 209 Pages library tests, the File classification regression and all-target/all-feature Pages/ops Clippy pass. Successful read/edit/commit/replay implementation bytes are unchanged. Remaining owner policies, shared error conversions, wave integration and the final full gate remain required.
+
+
+- Coordinator checkpoint (2026-10-22): the unpublished W8 Part A integration
+  candidate is committed on `uo2/coordinator-w8-part-a` through `4d464d60b7`
+  (`8c4ccb269f` assembly, `17d4cf011d` ODF/OPC isolation and `4d464d60b7` typed
+  ODF source errors). Its full ops library run passes 962 tests plus the added
+  DOCX policy-isolation regression; 217 doctests, all-feature and ODT-only
+  Clippy, and no-format compilation pass. It is not merged or performance
+  accepted. ODF semantic-policy propagation, File probe review, W4/W4b
+  integration, corpus dispositions and the final gate remain required.
+  W4's retained/replay memory repair continues on `uo2/w4-xlsx`; the latest
+  implementation removes duplicated deferred endpoint catalogs (`913ed0f3bd`)
+  and awaits matched allocation evidence. Protected constructor v4 binaries
+  and allocation/fidelity receipts are committed through `7686d7014c` on
+  `uo2/coordinator-constructors`; native qualification remains pending.
+  Numbers, Pages and Keynote owner Snappy policies remain active engineering
+  work. No new performance exception or redaction deferral is accepted, and
+  nothing has been pushed.
