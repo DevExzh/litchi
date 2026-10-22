@@ -14,10 +14,13 @@ mod allocator;
 
 use std::error::Error;
 use std::io::Write;
+use std::num::{NonZeroU64, NonZeroUsize};
 use std::sync::Arc;
 
-use litchi_core::OwnedSource;
-use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter};
+use litchi_core::{
+    Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits, OwnedSource,
+};
+use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter, SourceCacheLimits, SourceLimits};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 
@@ -32,6 +35,12 @@ const DEFAULT_WARMUPS: usize = 2;
 const MAIN_PART: &str = "/xl/workbook.xml";
 const SHEET_ONE: &str = "/xl/worksheets/sheet1.xml";
 const SHEET_TWO: &str = "/xl/worksheets/sheet2.xml";
+const MANAGED_MEMORY: u64 = 16 * 1024 * 1024;
+const MANAGED_CACHE_BYTES: usize = 256 * 1024;
+const MANAGED_CACHE_ENTRIES: usize = 4;
+const CUSTOM_INPUT_BYTES: u64 = 8 * 1024 * 1024;
+const CUSTOM_CACHE_BYTES: usize = 128 * 1024;
+const CUSTOM_CACHE_ENTRIES: usize = 2;
 
 // Keeping the pins here makes later baseline/candidate runs fail closed if
 // the fixture drifts.
@@ -45,12 +54,31 @@ struct Arguments {
     iterations: usize,
     warmups: usize,
     print_fixture_identity: bool,
+    profile: PolicyProfile,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PolicyProfile {
+    Default,
+    Managed,
+    Custom,
+}
+
+impl PolicyProfile {
+    const fn name(self) -> &'static str {
+        match self {
+            Self::Default => "default",
+            Self::Managed => "managed",
+            Self::Custom => "custom",
+        }
+    }
 }
 
 #[derive(Debug, Serialize)]
 struct Report {
     schema: &'static str,
     api_variant: &'static str,
+    policy_profile: &'static str,
     operation_pattern: &'static str,
     catalog_defined_names: usize,
     history_steps: usize,
@@ -117,6 +145,124 @@ struct Verification {
     inverse_hidden_sha256: String,
 }
 
+fn custom_source_limits() -> AnyResult<SourceLimits> {
+    Ok(SourceLimits::builder()
+        .max_input_bytes(CUSTOM_INPUT_BYTES)?
+        .build()?)
+}
+
+fn cache_limits(profile: PolicyProfile) -> AnyResult<SourceCacheLimits> {
+    let (bytes, entries) = match profile {
+        PolicyProfile::Default => (MANAGED_CACHE_BYTES, MANAGED_CACHE_ENTRIES),
+        PolicyProfile::Managed => (MANAGED_CACHE_BYTES, MANAGED_CACHE_ENTRIES),
+        PolicyProfile::Custom => (CUSTOM_CACHE_BYTES, CUSTOM_CACHE_ENTRIES),
+    };
+    Ok(SourceCacheLimits::new(bytes, entries)?)
+}
+
+fn managed_context() -> AnyResult<ExecutionContext> {
+    let budget = Budget::root(
+        "xlsx-tab-state-history-alloc",
+        Limits::new(
+            MANAGED_MEMORY,
+            u64::MAX,
+            u64::MAX,
+            u64::MAX,
+            u64::MAX,
+            u64::MAX,
+        ),
+    );
+    let (_cancellation_source, cancellation) = CancellationSource::pair();
+    let execution_limits = ExecutionLimits::new(
+        NonZeroUsize::new(1).ok_or("managed object limit is zero")?,
+        NonZeroUsize::new(1).ok_or("managed depth limit is zero")?,
+        NonZeroU64::new(MANAGED_MEMORY).ok_or("managed memory limit is zero")?,
+        0,
+    )?;
+    Ok(ExecutionContext::new(
+        budget,
+        cancellation,
+        execution_limits,
+    ))
+}
+
+#[cfg(not(feature = "legacy-xlsx-source-history"))]
+fn open_workbook(
+    fixture: &[u8],
+    profile: PolicyProfile,
+) -> AnyResult<litchi_xlsx::SourceBackedWorkbook> {
+    let source = Arc::new(OwnedSource::new(fixture.to_vec()));
+    let mut options = litchi_xlsx::OpenOptions::new();
+    match profile {
+        PolicyProfile::Default => {},
+        PolicyProfile::Managed => {
+            options = options
+                .cache_limits(cache_limits(profile)?)
+                .execution_context(managed_context()?);
+        },
+        PolicyProfile::Custom => {
+            options = options
+                .source_limits(custom_source_limits()?)
+                .cache_limits(cache_limits(profile)?);
+        },
+    }
+    Ok(litchi_xlsx::SourceBackedWorkbook::from_read_at_with_options(source, options)?)
+}
+
+#[cfg(feature = "legacy-xlsx-source-history")]
+fn open_workbook(
+    fixture: &[u8],
+    profile: PolicyProfile,
+) -> AnyResult<litchi_xlsx::SourceBackedWorkbook> {
+    let source = Arc::new(OwnedSource::new(fixture.to_vec()));
+    match profile {
+        PolicyProfile::Default => Ok(litchi_xlsx::SourceBackedWorkbook::from_read_at(source)?),
+        PolicyProfile::Managed => Ok(
+            litchi_xlsx::SourceBackedWorkbook::from_read_at_with_limits_and_cache_limits_and_execution_context(
+                source,
+                SourceLimits::default(),
+                cache_limits(profile)?,
+                managed_context()?,
+            )?,
+        ),
+        PolicyProfile::Custom => Ok(
+            litchi_xlsx::SourceBackedWorkbook::from_read_at_with_limits_and_cache_limits(
+                source,
+                custom_source_limits()?,
+                cache_limits(profile)?,
+            )?,
+        ),
+    }
+}
+
+#[cfg(feature = "legacy-xlsx-source-history")]
+fn open_editor(
+    fixture: &[u8],
+    profile: PolicyProfile,
+) -> AnyResult<litchi_xlsx::tab_state::SourceBackedEditor> {
+    let source = Arc::new(OwnedSource::new(fixture.to_vec()));
+    match profile {
+        PolicyProfile::Default => Ok(litchi_xlsx::tab_state::SourceBackedEditor::from_read_at(
+            source,
+        )?),
+        PolicyProfile::Managed => Ok(
+            litchi_xlsx::tab_state::SourceBackedEditor::from_read_at_with_limits_and_cache_limits_and_execution_context(
+                source,
+                SourceLimits::default(),
+                cache_limits(profile)?,
+                managed_context()?,
+            )?,
+        ),
+        PolicyProfile::Custom => Ok(
+            litchi_xlsx::tab_state::SourceBackedEditor::from_read_at_with_limits_and_cache_limits(
+                source,
+                custom_source_limits()?,
+                cache_limits(profile)?,
+            )?,
+        ),
+    }
+}
+
 fn main() -> AnyResult<()> {
     allocation_metrics::enable();
     let arguments = parse_arguments(std::env::args().skip(1))?;
@@ -128,15 +274,22 @@ fn main() -> AnyResult<()> {
     let patches = run_history(
         arguments.iterations,
         arguments.warmups,
+        arguments.profile,
         &visible_fixture,
         &hidden_fixture,
     )?;
     let retained = allocation_metrics::snapshot();
-    let verification = verify_history(&patches, &visible_fixture, &hidden_fixture)?;
+    let verification = verify_history(
+        &patches,
+        arguments.profile,
+        &visible_fixture,
+        &hidden_fixture,
+    )?;
     let after = allocation_metrics::snapshot();
     let source_owner_admission_allocator = run_source_owner_admission(
         arguments.iterations,
         arguments.warmups,
+        arguments.profile,
         &visible_fixture,
         &hidden_fixture,
     )?;
@@ -153,6 +306,7 @@ fn main() -> AnyResult<()> {
     let report = Report {
         schema: SCHEMA,
         api_variant: API_VARIANT,
+        policy_profile: arguments.profile.name(),
         operation_pattern: "hide/show repeated from independently reopened equal sources with two defined names",
         catalog_defined_names: 2,
         history_steps: arguments.iterations,
@@ -187,15 +341,12 @@ fn main() -> AnyResult<()> {
 fn run_history(
     iterations: usize,
     warmups: usize,
+    profile: PolicyProfile,
     visible_fixture: &[u8],
     hidden_fixture: &[u8],
 ) -> AnyResult<Vec<Patch>> {
-    use litchi_xlsx::SourceBackedWorkbook;
-
-    let visible_owner =
-        SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(visible_fixture.to_vec())))?;
-    let hidden_owner =
-        SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(hidden_fixture.to_vec())))?;
+    let visible_owner = open_workbook(visible_fixture, profile)?;
+    let hidden_owner = open_workbook(hidden_fixture, profile)?;
     for step in 0..warmups {
         if step % 2 == 0 {
             run_hide_step(&visible_owner)?;
@@ -243,15 +394,12 @@ fn run_show_step(owner: &litchi_xlsx::SourceBackedWorkbook) -> AnyResult<StepChe
 fn run_history(
     iterations: usize,
     warmups: usize,
+    profile: PolicyProfile,
     visible_fixture: &[u8],
     hidden_fixture: &[u8],
 ) -> AnyResult<Vec<Patch>> {
-    use litchi_xlsx::tab_state::SourceBackedEditor;
-
-    let visible_owner =
-        SourceBackedEditor::from_read_at(Arc::new(OwnedSource::new(visible_fixture.to_vec())))?;
-    let hidden_owner =
-        SourceBackedEditor::from_read_at(Arc::new(OwnedSource::new(hidden_fixture.to_vec())))?;
+    let visible_owner = open_editor(visible_fixture, profile)?;
+    let hidden_owner = open_editor(hidden_fixture, profile)?;
     for step in 0..warmups {
         if step % 2 == 0 {
             run_hide_step(&visible_owner)?;
@@ -298,11 +446,10 @@ fn run_show_step(owner: &litchi_xlsx::tab_state::SourceBackedEditor) -> AnyResul
 #[cfg(not(feature = "legacy-xlsx-source-history"))]
 fn verify_history(
     patches: &[Patch],
+    profile: PolicyProfile,
     visible_fixture: &[u8],
     hidden_fixture: &[u8],
 ) -> AnyResult<Verification> {
-    use litchi_xlsx::SourceBackedWorkbook;
-
     let mut verification = Verification {
         exact_forward_checks: 0,
         exact_inverse_checks: 0,
@@ -317,8 +464,7 @@ fn verify_history(
         } else {
             hidden_fixture
         };
-        let replay_owner =
-            SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(fixture.to_vec())))?;
+        let replay_owner = open_workbook(fixture, profile)?;
         let forward = replay_owner.apply_tab_state(patch)?.package().to_bytes()?;
         if forward == fixture {
             return Err(format!("step {step} exact forward replay was a no-op").into());
@@ -333,8 +479,7 @@ fn verify_history(
             .checked_add(1)
             .ok_or("forward check counter overflow")?;
 
-        let inverse_owner =
-            SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(forward.clone())))?;
+        let inverse_owner = open_workbook(&forward, profile)?;
         let restored = inverse_owner
             .apply_tab_state(&patch.inverse())?
             .package()
@@ -358,6 +503,7 @@ fn verify_history(
 #[cfg(feature = "legacy-xlsx-source-history")]
 fn verify_history(
     patches: &[Patch],
+    _profile: PolicyProfile,
     visible_fixture: &[u8],
     hidden_fixture: &[u8],
 ) -> AnyResult<Verification> {
@@ -414,19 +560,17 @@ fn verify_history(
 fn run_source_owner_admission(
     iterations: usize,
     warmups: usize,
+    profile: PolicyProfile,
     visible_fixture: &[u8],
     hidden_fixture: &[u8],
 ) -> AnyResult<AllocationDelta> {
-    use litchi_xlsx::SourceBackedWorkbook;
-
     for step in 0..warmups {
         let fixture = if step % 2 == 0 {
             visible_fixture
         } else {
             hidden_fixture
         };
-        let owner =
-            SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(fixture.to_vec())))?;
+        let owner = open_workbook(fixture, profile)?;
         let _edit = owner.edit_tab_state()?;
     }
     let before = allocation_metrics::snapshot();
@@ -436,8 +580,7 @@ fn run_source_owner_admission(
         } else {
             hidden_fixture
         };
-        let owner =
-            SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(fixture.to_vec())))?;
+        let owner = open_workbook(fixture, profile)?;
         let _edit = owner.edit_tab_state()?;
     }
     let after = allocation_metrics::snapshot();
@@ -452,18 +595,17 @@ fn run_source_owner_admission(
 fn run_source_owner_admission(
     iterations: usize,
     warmups: usize,
+    profile: PolicyProfile,
     visible_fixture: &[u8],
     hidden_fixture: &[u8],
 ) -> AnyResult<AllocationDelta> {
-    use litchi_xlsx::tab_state::SourceBackedEditor;
-
     for step in 0..warmups {
         let fixture = if step % 2 == 0 {
             visible_fixture
         } else {
             hidden_fixture
         };
-        let owner = SourceBackedEditor::from_read_at(Arc::new(OwnedSource::new(fixture.to_vec())))?;
+        let owner = open_editor(fixture, profile)?;
         let _edit = owner.edit()?;
     }
     let before = allocation_metrics::snapshot();
@@ -473,7 +615,7 @@ fn run_source_owner_admission(
         } else {
             hidden_fixture
         };
-        let owner = SourceBackedEditor::from_read_at(Arc::new(OwnedSource::new(fixture.to_vec())))?;
+        let owner = open_editor(fixture, profile)?;
         let _edit = owner.edit()?;
     }
     let after = allocation_metrics::snapshot();
@@ -634,6 +776,7 @@ where
         iterations: DEFAULT_ITERATIONS,
         warmups: DEFAULT_WARMUPS,
         print_fixture_identity: false,
+        profile: PolicyProfile::Default,
     };
     let mut arguments = arguments.into_iter();
     while let Some(argument) = arguments.next() {
@@ -657,10 +800,22 @@ where
                     .ok_or("--warmups requires a value")?;
                 parsed.warmups = value.parse()?;
             },
+            "--profile" => {
+                let value = value
+                    .map(str::to_owned)
+                    .or_else(|| arguments.next())
+                    .ok_or("--profile requires a value")?;
+                parsed.profile = match value.as_str() {
+                    "default" => PolicyProfile::Default,
+                    "managed" => PolicyProfile::Managed,
+                    "custom" => PolicyProfile::Custom,
+                    other => return Err(format!("unknown policy profile '{other}'").into()),
+                };
+            },
             "--print-fixture-identity" => parsed.print_fixture_identity = true,
             "--help" | "-h" => {
                 println!(
-                    "xlsx_tab_state_history_alloc [--iterations N] [--warmups N] [--print-fixture-identity]"
+                    "xlsx_tab_state_history_alloc [--iterations N] [--warmups N] [--profile default|managed|custom] [--print-fixture-identity]"
                 );
                 std::process::exit(0);
             },
