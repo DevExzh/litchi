@@ -1,0 +1,81 @@
+{
+  "schema": "litchi-iwa-constructor-admission.v4",
+  "status": "deterministic repair evidence; native qualification pending",
+  "source": {
+    "commit": "f44804d2c24d204719c08fc77f0397ae5a5bd573",
+    "changes": [
+      "The default minimal admission predicate rejects an oversized public length with a widened comparison before accepting the fixed-shape fast path.",
+      "ArchiveInfo::new and MessageInfo::new are inlineable, and fixed message versions are copied with one extend operation.",
+      "Public mutation checks and strict-profile admission remain on their existing paths; no unchecked provenance is introduced."
+    ],
+    "lock_sha256": "551fd8812350c2b13b5d1791fb8773ba4a50c71801728c3a18f6c1dca3f7f89a"
+  },
+  "method": {
+    "callgrind": "valgrind --tool=callgrind --collect-jumps=no --error-exitcode=99; Ir/op=(Ir at 12,000 - Ir at 2,000)/10,000",
+    "message_counts": [1, 8, 32, 128],
+    "output_check": "Every base and candidate row has matching checksum, encoded byte length and output SHA-256.",
+    "raw_artifacts": "The captures and executables remain outside the repository under /home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator."
+  },
+  "consumer_audit": {
+    "result": "No production raw Vec<MessageInfo> ArchiveInfo::new consumer is equivalent to push_new.",
+    "archive_object": "ArchiveObject::new already constructs conventional MessageInfo records with its internal try_new path and admits the complete header before publication.",
+    "external_sample": "crates/litchi-iwa-archive/tests/core_type_routes.rs deliberately mutates nested MessageInfo fields, so it must retain the generic checked route.",
+    "probe_routes": "The complete authoring probe uses push_new; the fair raw probe retains the public Vec<MessageInfo> capability."
+  },
+  "v20_complete_archive_object_serialization": {
+    "route": "ArchiveObject::new plus Archive::to_bytes inside every measured iteration",
+    "probe_source_sha256": {
+      "base": "ecd0c13426552b5486632258cba75fbca13628969c23c6989ec49fa8b288510e",
+      "candidate": "5c2dc2834fe5184077e28a5441ece97328b814f83c2c447b66a4ff41a9b3c669"
+    },
+    "binary_sha256": {
+      "base": "d3ff541f17c9ae5983adfe5e4e105993b9a15d28011ab790374c8ff6221c6fc8",
+      "candidate": "9a3f63c7346be58d0dad07d7f81d9649aa30349434a19dd22203684071397e8b"
+    },
+    "capture_directory": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/count-callgrind-v20-archive-serialize",
+    "capture_manifest_sha256": "f8142abd30ae9c0fe173d2d4756afdb5775c14d25f8999fc55bcd5290eb86f27",
+    "capture_files": 16,
+    "capture_bytes": 1773127,
+    "rows": [
+      {"messages": 1, "base_ir": 10587.0053, "candidate_ir": 8017.0057, "candidate_base": 0.757249616, "output_bytes": 1040, "output_sha256": "9023b16c5bbd17a50293cab64fd4aeb3408644e555338eee9ba058469a3220e1"},
+      {"messages": 8, "base_ir": 55524.2542, "candidate_ir": 39915.5046, "candidate_base": 0.718884120, "output_bytes": 8299, "output_sha256": "8b436827ca0ea648569e590e9a37fca13b42c6c63c93a4e45955b62a02b98d15"},
+      {"messages": 32, "base_ir": 259512.0048, "candidate_ir": 173925.0052, "candidate_base": 0.670200230, "output_bytes": 33188, "output_sha256": "fcd0b10420e42a94d43f6174285c5ca423a31baaa01c7bb6ca8e7e486248c698"},
+      {"messages": 128, "base_ir": 1070983.7656, "candidate_ir": 717469.9051, "candidate_base": 0.669916695, "output_bytes": 132740, "output_sha256": "dbc59a16097dc1a379d9342db3dc25603a6a4ab3581ce7bf098a76875479ede2"}
+    ]
+  },
+  "v21_fair_raw_constructor": {
+    "route": "ArchiveInfo::new(identifier, Vec<MessageInfo>, Limits), with raw and metadata-assembly endpoints",
+    "probe_source_sha256": {
+      "base": "ecd0c13426552b5486632258cba75fbca13628969c23c6989ec49fa8b288510e",
+      "candidate": "5c2dc2834fe5184077e28a5441ece97328b814f83c2c447b66a4ff41a9b3c669"
+    },
+    "binary_sha256": {
+      "base": "d3ff541f17c9ae5983adfe5e4e105993b9a15d28011ab790374c8ff6221c6fc8",
+      "candidate": "9a3f63c7346be58d0dad07d7f81d9649aa30349434a19dd22203684071397e8b"
+    },
+    "capture_directory": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/count-callgrind-v21-raw-inline",
+    "capture_manifest_sha256": "211df51863e86e5d2881b129f86aaa3bcf6968f9cd3babae1285a28ad61a3460",
+    "capture_files": 32,
+    "capture_bytes": 3444377,
+    "direct_raw_rows": [
+      {"messages": 1, "base_ir": 46.0051, "candidate_ir": 101.0051, "candidate_base": 2.195519627},
+      {"messages": 8, "base_ir": 46.0051, "candidate_ir": 248.0041, "candidate_base": 5.390795803},
+      {"messages": 32, "base_ir": 46.0062, "candidate_ir": 752.0056, "candidate_base": 16.345744704},
+      {"messages": 128, "base_ir": 46.0036, "candidate_ir": 2768.0052, "candidate_base": 60.169317184}
+    ],
+    "assembled_raw_rows": [
+      {"messages": 1, "base_ir": 1066.0056, "candidate_ir": 1218.0056, "candidate_base": 1.142588369, "output_bytes": 1040, "output_sha256": "9023b16c5bbd17a50293cab64fd4aeb3408644e555338eee9ba058469a3220e1"},
+      {"messages": 8, "base_ir": 2177.0041, "candidate_ir": 3246.0051, "candidate_base": 1.491042254, "output_bytes": 8299, "output_sha256": "8b436827ca0ea648569e590e9a37fca13b42c6c63c93a4e45955b62a02b98d15"},
+      {"messages": 32, "base_ir": 10333.0062, "candidate_ir": 14761.0051, "candidate_base": 1.428529589, "output_bytes": 33188, "output_sha256": "fcd0b10420e42a94d43f6174285c5ca423a31baaa01c7bb6ca8e7e486248c698"},
+      {"messages": 128, "base_ir": 51543.0041, "candidate_ir": 68362.0052, "candidate_base": 1.326310067, "output_bytes": 132740, "output_sha256": "dbc59a16097dc1a379d9342db3dc25603a6a4ab3581ce7bf098a76875479ede2"}
+    ],
+    "interpretation": "The direct rows expose the required current public-record scan and are not a whole-lifecycle score. The assembled rows include metadata construction and show the comparable raw-constructor lifecycle after the repair."
+  },
+  "validation": {
+    "format": "cargo fmt --all -- --check passed; git diff --check passed.",
+    "core_tests": "cargo test --offline --locked --manifest-path crates/litchi-iwa-core/Cargo.toml --lib: 78 passed, 3 pre-existing failures in reference-pruning tests.",
+    "core_type_routes": "cargo test --offline --locked --manifest-path crates/litchi-iwa-archive/Cargo.toml --test core_type_routes: 2 passed.",
+    "failure_attribution": "The exact data_pruning_zero_and_noop_policies_preserve_existing_behavior test fails with the same ArchiveInfo nested encoded length mismatch on baseline 57c2ff520b; the other two failures have the same pre-existing error family.",
+    "staged_size_and_binary_checks": "passed with no output; no evidence file or binary was staged."
+  }
+}

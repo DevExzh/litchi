@@ -362,3 +362,52 @@ exact bytes are checked for every row. Serialization is therefore semantic
 validation for this deterministic probe, not a timed native latency claim.
 Native latency, heap and allocation qualification remain pending until a quiet
 host is available.
+
+## 0361fdc v22 complete authoring lifecycle repair
+
+Commit `f44804d2c2` keeps the public mutable `MessageInfo` contract while
+removing avoidable constructor work. The default minimal admission predicate
+now widens the public `u32` length before comparing it with the byte ceiling,
+and the fixed version vector uses one extend operation. `ArchiveInfo::new` and
+`MessageInfo::new` are inlineable. Strict profiles and nonminimal records still
+use the complete admission path; public mutable fields are never trusted after
+construction.
+
+The reduced receipt is
+[`constructor-v22-complete-lifecycle.json`](results/0361fd/constructor-v22-complete-lifecycle.json).
+The v20 and v21 captures and measured binaries remain outside the repository at
+`/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator`.
+The capture manifests are `f8142abd30ae9c0fe173d2d4756afdb5775c14d25f8999fc55bcd5290eb86f27`
+for the 16 v20 output captures and
+`211df51863e86e5d2881b129f86aaa3bcf6968f9cd3babae1285a28ad61a3460` for the
+32 v21 output captures.
+
+The complete used authoring route constructs an `ArchiveObject` and serializes
+the containing `Archive` in every measured iteration. It is the relevant
+end-to-end lifecycle for the conventional raw-message consumer, and every row
+has identical output bytes and SHA-256 on base and candidate:
+
+| Messages | Base Ir/op | Candidate Ir/op | Candidate/base |
+|---:|---:|---:|---:|
+| 1 | 10,587.0053 | 8,017.0057 | 0.7572 |
+| 8 | 55,524.2542 | 39,915.5046 | 0.7189 |
+| 32 | 259,512.0048 | 173,925.0052 | 0.6702 |
+| 128 | 1,070,983.7656 | 717,469.9051 | 0.6699 |
+
+The fair raw `ArchiveInfo::new(identifier, Vec<MessageInfo>, Limits)` route is
+also retained as a capability test. Its direct endpoint measures the required
+current-field scan against the historical unchecked move; that diagnostic is
+not a whole-lifecycle score. With metadata assembly included, the same route
+is 1.1426×, 1.4910×, 1.4285× and 1.3263× of base at 1, 8, 32 and 128
+messages, respectively, with matching serialized output. This separates the
+unavoidable public-record admission work from the used authoring lifecycle and
+does not waive either route for native qualification.
+
+The consumer audit found no production raw `Vec<MessageInfo>` constructor call
+that can become `push_new`: `ArchiveObject::new` already uses its internal
+single-pass conventional constructor, while the external core-type sample
+deliberately mutates nested metadata and must retain the generic checked path.
+The focused core-type route test passed 2/2. The core unit run passed 78 tests;
+its three reference-pruning failures reproduce on the committed baseline with
+the same `ArchiveInfo nested encoded length mismatch` error and are recorded as
+pre-existing attribution, not caused by this repair.
