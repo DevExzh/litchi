@@ -409,7 +409,10 @@ impl IrreversibleRedactionPatch {
         if self.source.exact_source_matches(current) {
             Ok(())
         } else {
-            Err(Error::ExternalHyperlinkRedactionConflict)
+            Err(Error::conflict(
+                "external_hyperlink_redaction",
+                "the patch base does not match the supplied source",
+            ))
         }
     }
 

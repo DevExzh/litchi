@@ -754,6 +754,21 @@ impl Package {
         }
     }
 
+    fn preflight_external_hyperlink_document_xml(&self, limits: sanitize::Limits) -> Result<()> {
+        let main = self.physical_package()?.main_document_part()?;
+        validate_document_main_content_type(main.content_type())?;
+        let declared = main.declared_uncompressed_size()?;
+        let declared = usize::try_from(declared).unwrap_or(usize::MAX);
+        if declared > limits.max_document_bytes() {
+            return Err(Error::ExternalHyperlinkDetachmentLimit {
+                kind: sanitize::LimitKind::MainDocumentXmlBytes,
+                maximum: limits.max_document_bytes(),
+                actual: declared,
+            });
+        }
+        Ok(())
+    }
+
     /// Stream visible main-document paragraphs to a caller-owned sink.
     ///
     /// Resolves the current main part from the effective graph after a commit,
@@ -1341,8 +1356,10 @@ impl Package {
         let target = patch.apply_content(&current.snapshot)?;
         if !patch.is_empty() {
             if !current.unique_inbound_owner {
-                return Err(Error::DocumentVariablesPreservation(
-                    "the settings Part has an additional internal inbound relationship",
+                return Err(Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedContent,
+                    operation,
+                    "document-variable markup cannot be preserved for this settings owner",
                 ));
             }
             if current.protected {
@@ -1435,6 +1452,7 @@ impl Package {
         &self,
         limits: sanitize::Limits,
     ) -> Result<sanitize::Snapshot> {
+        self.preflight_external_hyperlink_document_xml(limits)?;
         let (_, document) = self
             .main_document_snapshot("external_hyperlink_sanitization_snapshot", false)
             .map_err(transaction_error_to_document)?;
@@ -1492,6 +1510,7 @@ impl Package {
         &self,
         limits: sanitize::Limits,
     ) -> Result<redact::Snapshot> {
+        self.preflight_external_hyperlink_document_xml(limits)?;
         let (_, document) = self
             .main_document_snapshot("external_hyperlink_redaction_snapshot", false)
             .map_err(transaction_error_to_document)?;

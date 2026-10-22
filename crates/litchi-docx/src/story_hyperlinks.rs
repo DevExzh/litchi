@@ -453,6 +453,15 @@ struct StoryOwnerSource {
     target_ref: String,
 }
 
+#[derive(Clone)]
+struct StoryCandidate {
+    part: PackURI,
+    kind: StoryKind,
+    owner: StoryOwnerSource,
+    declared_bytes: usize,
+    relationship_count: usize,
+}
+
 /// Exact source-bound story inventory.
 #[derive(Clone)]
 pub struct Snapshot {
@@ -726,7 +735,12 @@ impl Plan {
                 .stories
                 .iter()
                 .find(|story| story.part == selection.part)
-                .ok_or(Error::ExternalHyperlinkRedactionConflict)?;
+                .ok_or_else(|| {
+                    Error::internal(
+                        "story_hyperlink_redaction",
+                        "selected story is absent from the captured source",
+                    )
+                })?;
             let mut wrappers = Vec::new();
             for wrapper in story.wrappers.iter().filter(|wrapper| {
                 selection
@@ -857,7 +871,10 @@ impl ForwardOnlyPatch {
         if self.source.source_version != current_version
             || self.source.source_lineage != package.source_lineage()
         {
-            return Err(Error::ExternalHyperlinkRedactionConflict);
+            return Err(Error::conflict(
+                "story_hyperlink_redaction",
+                "the patch base does not match the supplied source",
+            ));
         }
 
         let current_fingerprint = package.source_artifact().fingerprint()?;
@@ -870,7 +887,10 @@ impl ForwardOnlyPatch {
             .into());
         }
         if self.source.source_fingerprint != current_fingerprint {
-            return Err(Error::ExternalHyperlinkRedactionConflict);
+            return Err(Error::conflict(
+                "story_hyperlink_redaction",
+                "the patch base does not match the supplied source",
+            ));
         }
         package.check_execution()?;
         Ok(())
@@ -883,7 +903,10 @@ impl ForwardOnlyPatch {
         {
             Ok(())
         } else {
-            Err(Error::ExternalHyperlinkRedactionConflict)
+            Err(Error::conflict(
+                "story_hyperlink_redaction",
+                "the patch base does not match the supplied source",
+            ))
         }
     }
 }
@@ -1095,7 +1118,12 @@ pub mod raw {
                     .parts
                     .iter_mut()
                     .find(|part| part.name == replacement.part)
-                    .ok_or(Error::ExternalHyperlinkRedactionConflict)?;
+                    .ok_or_else(|| {
+                        Error::internal(
+                            "story_hyperlink_redaction",
+                            "selected story is absent from the raw codec",
+                        )
+                    })?;
                 part.xml = replacement.xml.as_ref().clone();
                 part.removed_relationship_ids = replacement.removed_ids.clone();
             }
@@ -1340,8 +1368,8 @@ fn capture_stories(
             source,
         })?;
     seen.insert(clone_uri(main.partname())?);
-    let mut stories = Vec::new();
-    stories
+    let mut candidates = Vec::new();
+    candidates
         .try_reserve(limits.story.max_stories)
         .map_err(|source| Error::Allocation {
             resource: "story hyperlink source stories",
@@ -1356,26 +1384,35 @@ fn capture_stories(
             "story hyperlink main relationship target",
         )?,
     };
-    stories.push(load_story(
-        &main,
-        StoryKind::Main,
-        dialect,
-        main_owner,
-        limits,
-        diagnostics,
-    )?);
-    let mut total_story_bytes = stories[0].xml.as_bytes().len();
-    if total_story_bytes > limits.story.max_total_story_bytes {
-        return Err(invalid(
-            "story hyperlink aggregate story byte limit exceeded",
-        ));
-    }
+    let (
+        main_declared_bytes,
+        main_relationship_count,
+        mut total_story_bytes,
+        mut total_relationships,
+    ) = preflight_story_part(&main, limits, 0, 0)?;
+    candidates.push(StoryCandidate {
+        part: clone_uri(main.partname())?,
+        kind: StoryKind::Main,
+        owner: main_owner,
+        declared_bytes: main_declared_bytes,
+        relationship_count: main_relationship_count,
+    });
     let mut singleton = [false; 4];
-    let mut total_relationships = main_relationship_count;
     let mut index = 0usize;
-    while index < stories.len() {
+    while index < candidates.len() {
         package.check_execution()?;
-        let owner = package.part(&stories[index].part)?;
+        let (owner_part, owner_kind, owner_relationship_count) = {
+            let candidate = &candidates[index];
+            (
+                candidate.part.clone(),
+                candidate.kind,
+                candidate.relationship_count,
+            )
+        };
+        let owner = package.part(&owner_part)?;
+        if owner.rels().len() != owner_relationship_count {
+            return Err(invalid("story hyperlink relationship metadata changed"));
+        }
         if owner.rels().len() > limits.story.max_relationships_per_owner {
             return Err(invalid("story relationship limit exceeded"));
         }
@@ -1394,11 +1431,11 @@ fn capture_stories(
                 add_diagnostic(diagnostics, UnsupportedClass::UnknownOwner, 1)?;
                 continue;
             }
-            if stories[index].kind != StoryKind::Main {
+            if owner_kind != StoryKind::Main {
                 add_diagnostic(diagnostics, UnsupportedClass::UnknownOwner, 1)?;
                 continue;
             }
-            if stories.len() >= limits.story.max_stories {
+            if candidates.len() >= limits.story.max_stories {
                 return Err(invalid("story hyperlink story limit exceeded"));
             }
             if let Some(singleton_index) = singleton_index(kind) {
@@ -1418,18 +1455,8 @@ fn capture_stories(
                 add_diagnostic(diagnostics, UnsupportedClass::UnknownOwner, 1)?;
                 continue;
             }
-            let target_relationship_count = target_part.rels().len();
-            if target_relationship_count > limits.story.max_relationships_per_owner {
-                return Err(invalid("story relationship limit exceeded"));
-            }
-            total_relationships = total_relationships
-                .checked_add(target_relationship_count)
-                .ok_or_else(|| invalid("story hyperlink relationship count overflows usize"))?;
-            if total_relationships > limits.story.max_total_relationships {
-                return Err(invalid("story hyperlink relationship limit exceeded"));
-            }
             let owner = StoryOwnerSource {
-                part: Some(clone_uri(&stories[index].part)?),
+                part: Some(clone_uri(&owner_part)?),
                 relationship_id: owned_str(
                     relationship.r_id(),
                     "story hyperlink owner relationship ID",
@@ -1443,20 +1470,43 @@ fn capture_stories(
                     "story hyperlink owner relationship target",
                 )?,
             };
-            let loaded = load_story(&target_part, kind, dialect, owner, limits, diagnostics)?;
-            total_story_bytes = total_story_bytes
-                .checked_add(loaded.xml.as_bytes().len())
-                .ok_or_else(|| invalid("story hyperlink aggregate story byte overflow"))?;
-            if total_story_bytes > limits.story.max_total_story_bytes {
-                return Err(invalid(
-                    "story hyperlink aggregate story byte limit exceeded",
-                ));
-            }
-            stories.push(loaded);
+            let (declared_bytes, relationship_count, next_story_bytes, next_relationships) =
+                preflight_story_part(&target_part, limits, total_story_bytes, total_relationships)?;
+            total_story_bytes = next_story_bytes;
+            total_relationships = next_relationships;
+            candidates.push(StoryCandidate {
+                part: clone_uri(target_part.partname())?,
+                kind,
+                owner,
+                declared_bytes,
+                relationship_count,
+            });
         }
         index = index
             .checked_add(1)
             .ok_or_else(|| invalid("story hyperlink story index overflows usize"))?;
+    }
+
+    let mut stories = Vec::new();
+    stories
+        .try_reserve_exact(candidates.len())
+        .map_err(|source| Error::Allocation {
+            resource: "story hyperlink loaded stories",
+            source,
+        })?;
+    for candidate in candidates {
+        package.check_execution()?;
+        let part = package.part(&candidate.part)?;
+        stories.push(load_story(
+            &part,
+            candidate.kind,
+            dialect,
+            candidate.owner,
+            candidate.declared_bytes,
+            candidate.relationship_count,
+            limits,
+            diagnostics,
+        )?);
     }
 
     for part in package.iter_parts() {
@@ -1492,6 +1542,45 @@ fn capture_stories(
     }
     inspect_settings(package, &main, diagnostics)?;
     Ok(stories)
+}
+
+fn preflight_story_part(
+    part: &litchi_opc::PartView<'_>,
+    limits: Limits,
+    current_story_bytes: usize,
+    current_relationships: usize,
+) -> Result<(usize, usize, usize, usize)> {
+    let declared = part.declared_uncompressed_size()?;
+    let declared = usize::try_from(declared)
+        .map_err(|_| invalid("story hyperlink declared byte count does not fit usize"))?;
+    if declared > limits.story.max_story_bytes {
+        return Err(invalid("story hyperlink story byte limit exceeded"));
+    }
+    let total_story_bytes = current_story_bytes
+        .checked_add(declared)
+        .ok_or_else(|| invalid("story hyperlink aggregate story byte overflow"))?;
+    if total_story_bytes > limits.story.max_total_story_bytes {
+        return Err(invalid(
+            "story hyperlink aggregate story byte limit exceeded",
+        ));
+    }
+
+    let relationship_count = part.rels().len();
+    if relationship_count > limits.story.max_relationships_per_owner {
+        return Err(invalid("story relationship limit exceeded"));
+    }
+    let total_relationships = current_relationships
+        .checked_add(relationship_count)
+        .ok_or_else(|| invalid("story hyperlink relationship count overflows usize"))?;
+    if total_relationships > limits.story.max_total_relationships {
+        return Err(invalid("story hyperlink relationship limit exceeded"));
+    }
+    Ok((
+        declared,
+        relationship_count,
+        total_story_bytes,
+        total_relationships,
+    ))
 }
 
 fn validate_package_relationship_dialects(
@@ -1544,6 +1633,8 @@ fn load_story(
     kind: StoryKind,
     dialect: Dialect,
     owner: StoryOwnerSource,
+    declared_bytes: usize,
+    relationship_count: usize,
     limits: Limits,
     diagnostics: &mut Vec<Diagnostic>,
 ) -> Result<StorySource> {
@@ -1552,17 +1643,22 @@ fn load_story(
     // Keep the bounded PartData handle intact.  In particular, managed
     // source-backed packages reject `into_arc()` so the execution-budget
     // reservation cannot escape with an untracked allocation.
-    let bytes = part.data()?;
-    if bytes.as_bytes().len() > limits.story.max_story_bytes {
-        return Err(invalid("story hyperlink story byte limit exceeded"));
-    }
     let mut relationships = Vec::new();
     relationships
-        .try_reserve_exact(part.rels().len())
+        .try_reserve_exact(relationship_count)
         .map_err(|source| Error::Allocation {
             resource: "story hyperlink relationship closure",
             source,
         })?;
+    let bytes = part.data()?;
+    if bytes.as_bytes().len() != declared_bytes {
+        return Err(invalid(
+            "story hyperlink story bytes changed during capture",
+        ));
+    }
+    if part.rels().len() != relationship_count {
+        return Err(invalid("story hyperlink relationship metadata changed"));
+    }
     for relationship in part.rels().iter() {
         relationships.push(RelationshipState::new(
             owned_str(relationship.r_id(), "story hyperlink relationship ID")?,

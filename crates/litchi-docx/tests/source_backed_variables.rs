@@ -313,7 +313,7 @@ fn set_remove_clear_noop_and_inverse_reopen_complete_packages() {
     );
     assert!(matches!(
         open_source(source_bytes.clone()).apply_document_variables(&inverse),
-        Err(Error::DocumentVariablesConflict)
+        Err(Error::PatchConflict { .. })
     ));
 
     let package = open_source(set_output);
@@ -560,7 +560,8 @@ fn additional_inbound_settings_owner_is_noop_safe_but_changed_refused() {
     // A refused change fails at commit, before any output.
     assert!(matches!(
         edit.commit(),
-        Err(Error::DocumentVariablesPreservation(_))
+        Err(Error::Refused(refusal))
+            if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
     ));
     assert!(output.is_empty());
 }

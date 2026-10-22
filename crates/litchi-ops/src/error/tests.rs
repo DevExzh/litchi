@@ -1901,6 +1901,20 @@ fn docx_refusals_classify_by_kind_and_patch_conflicts_are_invalid_input() {
         },
         Code::InvalidInput,
     );
+    for operation in [
+        "external_hyperlink_detachment",
+        "external_hyperlink_redaction",
+        "story_hyperlink_redaction",
+        "document_variables",
+    ] {
+        assert_code(
+            litchi_docx::Error::PatchConflict {
+                operation,
+                reason: "the patch base does not match the supplied source",
+            },
+            Code::InvalidInput,
+        );
+    }
     assert_code(
         litchi_docx::Error::Internal {
             operation: "edit",

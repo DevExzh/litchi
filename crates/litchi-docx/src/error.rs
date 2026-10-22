@@ -369,18 +369,6 @@ pub enum Error {
         actual: usize,
     },
 
-    /// A source-bound external hyperlink patch was applied to a foreign closure.
-    #[error("DOCX external hyperlink detachment patch conflicts with the supplied source")]
-    ExternalHyperlinkDetachmentConflict,
-
-    /// A forward-only external-hyperlink redaction was applied to a foreign source.
-    #[error("DOCX external hyperlink redaction conflicts with the supplied exact source")]
-    ExternalHyperlinkRedactionConflict,
-
-    /// A source-backed document-variable patch does not match its exact source.
-    #[error("DOCX document-variable patch conflicts with the supplied source")]
-    DocumentVariablesConflict,
-
     /// A section-layout patch was applied to byte-different source XML.
     #[error("DOCX section-layout patch conflicts with the supplied source bytes")]
     SectionLayoutStaleSource,
@@ -404,10 +392,6 @@ pub enum Error {
     /// A detached section-layout patch was applied to a source-backed target.
     #[error("DOCX detached section-layout authorization cannot target a source-backed package")]
     SectionLayoutAuthorizationConflict,
-
-    /// A changed document-variable publication cannot preserve selected markup.
-    #[error("unsafe DOCX document-variable edit rejected: {0}")]
-    DocumentVariablesPreservation(&'static str),
 }
 
 impl Error {

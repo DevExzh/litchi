@@ -608,7 +608,10 @@ impl Patch {
         if source.xml.as_ref() != self.before_xml.as_ref()
             || source.relationships.as_ref() != self.relationships.as_ref()
         {
-            return Err(Error::ExternalHyperlinkDetachmentConflict);
+            return Err(Error::conflict(
+                "external_hyperlink_detachment",
+                "the patch base does not match the supplied source",
+            ));
         }
         if self.is_noop() {
             return Ok(source.clone());
@@ -925,19 +928,15 @@ fn external_relationship_id(
         .binary_search_by(|candidate| candidate.id.as_str().cmp(&id))
         .ok()
         .map(|index| &relationships[index])
-        .ok_or_else(|| {
-            invalid(format!(
-                "WordprocessingML hyperlink references missing relationship '{id}'"
-            ))
-        })?;
+        .ok_or_else(|| invalid("WordprocessingML hyperlink references a missing relationship"))?;
     if !matches!(
         relationship.relationship_type.as_str(),
         litchi_opc::constants::relationship_type::HYPERLINK
             | litchi_opc::constants::relationship_type::STRICT_HYPERLINK
     ) {
-        return Err(invalid(format!(
-            "WordprocessingML hyperlink relationship '{id}' has the wrong type"
-        )));
+        return Err(invalid(
+            "WordprocessingML hyperlink relationship has an unsupported type",
+        ));
     }
     if !relationship.external {
         return Ok(None);

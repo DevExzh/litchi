@@ -62,7 +62,11 @@ impl Change for RedactionChange {
             },
             Self::Inverse { noop: true, .. } => Ok(package.clone()),
             // Only the commit's own package can be restored.
-            Self::Inverse { .. } => Err(crate::Error::ExternalHyperlinkRedactionConflict),
+            Self::Inverse { .. } => Err(crate::Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "external_hyperlink_redaction",
+                "forward-only redaction cannot be inverted on another package",
+            )),
         }
     }
 }
@@ -140,9 +144,8 @@ impl Package {
     ///
     /// # Errors
     ///
-    /// Returns [`crate::Error::ExternalHyperlinkRedactionConflict`] for another
-    /// source, or for an inverse applied to anything but its commit's
-    /// package.
+    /// Returns [`crate::Error::PatchConflict`] for another source, or a typed
+    /// refusal for an inverse applied to anything but its commit's package.
     pub fn apply_external_hyperlink_redaction(&self, patch: &Patch) -> Result<Commit> {
         apply_change(self, patch)
     }

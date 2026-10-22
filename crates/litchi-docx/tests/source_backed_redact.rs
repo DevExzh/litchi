@@ -204,6 +204,13 @@ fn inventories_and_irreversibly_redacts_duplicate_target_ids_first_middle_last()
         .commit()
         .unwrap();
 
+    let inverse = commit.patch().inverse();
+    assert!(matches!(
+        package.apply_external_hyperlink_redaction(&inverse),
+        Err(Error::Refused(refusal))
+            if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedOperation
+    ));
+
     let mut output = Vec::new();
     commit.package().write_to(&mut output).unwrap();
     assert!(!contains_bytes(&output, b"https://remove.invalid/"));
@@ -357,7 +364,7 @@ fn full_artifact_fingerprint_defeats_colliding_custom_source_versions() {
         colliding
             .apply_external_hyperlink_redaction(commit.patch())
             .and_then(|committed| committed.package().write_to(&mut output)),
-        Err(Error::ExternalHyperlinkRedactionConflict)
+        Err(Error::PatchConflict { .. })
     ));
     assert!(output.is_empty());
 }

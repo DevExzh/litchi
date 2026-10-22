@@ -597,6 +597,12 @@ fn stale_commits_fail_and_matching_sources_replay_before_output() {
         .unwrap()
         .commit()
         .unwrap();
+    let inverse = commit.patch().inverse();
+    assert!(matches!(
+        package.apply_story_hyperlink_redaction(&inverse),
+        Err(Error::Refused(refusal))
+            if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedOperation
+    ));
     source.revision.fetch_add(1, Ordering::SeqCst);
     let mut output = Vec::new();
     assert!(matches!(
@@ -604,7 +610,7 @@ fn stale_commits_fail_and_matching_sources_replay_before_output() {
             .apply_story_hyperlink_redaction(commit.patch())
             .and_then(|committed| committed.package().write_to(&mut output)),
         Err(Error::Opc(litchi_opc::OpcError::SourceChanged { .. }))
-            | Err(Error::ExternalHyperlinkRedactionConflict)
+            | Err(Error::PatchConflict { .. })
     ));
     assert!(output.is_empty());
 
@@ -1050,7 +1056,28 @@ fn relationship_limits_are_checked_before_main_payload_reads() {
 }
 
 #[test]
-fn child_relationship_owner_limit_is_preflighted_before_payload_reads() {
+fn main_story_byte_limit_is_preflighted_before_payload_reads() {
+    let package = open(fixture(false));
+    let before = package.cache_diagnostics();
+    let limits = StoryLimits {
+        max_story_bytes: 1,
+        ..StoryLimits::default()
+    };
+    assert!(
+        package
+            .with_semantic_limits(
+                litchi_docx::SemanticLimits::default().story_hyperlinks(with_story_limits(limits))
+            )
+            .story_hyperlinks_only_snapshot()
+            .is_err()
+    );
+    let after = package.cache_diagnostics();
+    assert_eq!(before.cold_loads, after.cold_loads);
+    assert_eq!(before.successful_loads, after.successful_loads);
+}
+
+#[test]
+fn child_relationship_owner_limit_is_preflighted_before_any_payload_reads() {
     let package = open(child_relationship_limit_fixture(7));
     let before = package.cache_diagnostics();
     let one_under = StoryLimits {
@@ -1067,8 +1094,8 @@ fn child_relationship_owner_limit_is_preflighted_before_payload_reads() {
             .is_err()
     );
     let after = package.cache_diagnostics();
-    assert_eq!(after.cold_loads, before.cold_loads + 1);
-    assert_eq!(after.successful_loads, before.successful_loads + 1);
+    assert_eq!(after.cold_loads, before.cold_loads);
+    assert_eq!(after.successful_loads, before.successful_loads);
 
     let exact = StoryLimits {
         max_relationships_per_owner: 8,
@@ -1085,7 +1112,7 @@ fn child_relationship_owner_limit_is_preflighted_before_payload_reads() {
 }
 
 #[test]
-fn child_relationship_total_is_preflighted_before_the_offending_payload_read() {
+fn child_relationship_total_is_preflighted_before_any_offending_payload_read() {
     let package = open(fixture(false));
     let before = package.cache_diagnostics();
     let one_under = StoryLimits {
@@ -1103,8 +1130,8 @@ fn child_relationship_total_is_preflighted_before_the_offending_payload_read() {
             .is_err()
     );
     let after = package.cache_diagnostics();
-    assert_eq!(after.cold_loads, before.cold_loads + 6);
-    assert_eq!(after.successful_loads, before.successful_loads + 6);
+    assert_eq!(after.cold_loads, before.cold_loads);
+    assert_eq!(after.successful_loads, before.successful_loads);
 
     let exact = StoryLimits {
         max_relationships_per_owner: 7,

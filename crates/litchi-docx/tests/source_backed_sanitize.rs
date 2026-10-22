@@ -308,7 +308,7 @@ fn patch_inverse_is_exact_and_foreign_xml_or_relationships_conflict() {
     .unwrap();
     assert!(matches!(
         patch.apply(&foreign_xml),
-        Err(Error::ExternalHyperlinkDetachmentConflict)
+        Err(Error::PatchConflict { .. })
     ));
 
     let foreign_relationship = open_source(fixture(
@@ -319,7 +319,46 @@ fn patch_inverse_is_exact_and_foreign_xml_or_relationships_conflict() {
     .unwrap();
     assert!(matches!(
         patch.apply(&foreign_relationship),
-        Err(Error::ExternalHyperlinkDetachmentConflict)
+        Err(Error::PatchConflict { .. })
+    ));
+}
+
+#[test]
+fn canonical_replay_rejects_an_unrelated_part_mutation() {
+    let document = external_document("visible");
+    let original_comments = format!(
+        r#"<w:comments xmlns:w="{W}"><w:comment w:id="1"><w:p><w:r><w:t>original</w:t></w:r></w:p></w:comment></w:comments>"#
+    )
+    .into_bytes();
+    let original = fixture(
+        document.clone(),
+        FixtureOptions {
+            relationships: external_options("https://one.invalid/").relationships,
+            comments: Some(original_comments),
+            ..FixtureOptions::default()
+        },
+    );
+    let commit = open_source(original)
+        .edit_external_hyperlink_detachment()
+        .unwrap()
+        .commit()
+        .unwrap();
+
+    let changed_comments = format!(
+        r#"<w:comments xmlns:w="{W}"><w:comment w:id="1"><w:p><w:r><w:t>changed</w:t></w:r></w:p></w:comment></w:comments>"#
+    )
+    .into_bytes();
+    let changed = fixture(
+        document,
+        FixtureOptions {
+            relationships: external_options("https://one.invalid/").relationships,
+            comments: Some(changed_comments),
+            ..FixtureOptions::default()
+        },
+    );
+    assert!(matches!(
+        open_source(changed).apply_external_hyperlink_detachment(commit.patch()),
+        Err(Error::PatchConflict { .. })
     ));
 }
 
@@ -436,6 +475,37 @@ fn protected_malformed_active_and_over_limit_sources_fail_closed() {
             actual: 3,
         })
     ));
+}
+
+#[test]
+fn main_declared_size_is_preflighted_before_raw_hyperlink_payload_reads() {
+    let package = open_source(fixture(
+        external_document("preflight"),
+        external_options("https://one.invalid/"),
+    ));
+    let before = package.cache_diagnostics();
+    let limits = Limits::default().with_max_document_bytes(1).unwrap();
+    let bounded =
+        package.with_semantic_limits(litchi_docx::SemanticLimits::default().hyperlinks(limits));
+    assert!(matches!(
+        bounded.external_hyperlink_sanitization_snapshot(),
+        Err(Error::ExternalHyperlinkDetachmentLimit {
+            kind: litchi_docx::sanitize::LimitKind::MainDocumentXmlBytes,
+            maximum: 1,
+            actual,
+        }) if actual > 1
+    ));
+    assert!(matches!(
+        bounded.external_hyperlink_redaction_snapshot(),
+        Err(Error::ExternalHyperlinkDetachmentLimit {
+            kind: litchi_docx::sanitize::LimitKind::MainDocumentXmlBytes,
+            maximum: 1,
+            actual,
+        }) if actual > 1
+    ));
+    let after = package.cache_diagnostics();
+    assert_eq!(after.cold_loads, before.cold_loads);
+    assert_eq!(after.successful_loads, before.successful_loads);
 }
 
 #[test]
