@@ -5657,7 +5657,7 @@ fn cross_slide_copy_family_publishes_a_source_backed_package() -> TestResult {
     );
 
     // Replay onto the same destination, and the inverse onto the commit's
-    // own package; the inverse refuses any other package.
+    // own package.
     let replayed = destination.apply_cross_slide_copy(&patch)?.into_package();
     assert_eq!(replayed.to_bytes()?, streamed);
     let restored = copied_package
@@ -5668,11 +5668,28 @@ fn cross_slide_copy_family_publishes_a_source_backed_package() -> TestResult {
         destination.apply_cross_slide_copy(&patch.inverse()),
         Err(Error::PatchConflict)
     ));
-    // The patch is exact-source: another opening of the same bytes is
-    // another source.
+    // Another opening of the same bytes is an independent recipient, but its
+    // content still matches the recorded base. The output is deferred onto
+    // that recipient and therefore keeps its own source policy.
     let reopened = Package::from_read_at(Arc::new(OwnedSource::new(destination_bytes.clone())))?;
+    let replayed = reopened.apply_cross_slide_copy(&patch)?.into_package();
+    assert_eq!(replayed.to_bytes()?, streamed);
+    let reopened_after = Package::from_read_at(Arc::new(OwnedSource::new(streamed.clone())))?;
+    let restored = reopened_after
+        .apply_cross_slide_copy(&patch.inverse())?
+        .into_package();
+    assert_eq!(restored.to_bytes()?, destination_bytes);
+
+    // A same-shaped but changed recipient is still refused.
+    let wrong = replace_text_member(
+        &destination_bytes,
+        "ppt/slides/slide2.xml",
+        "Destination Last",
+        "Destination Other",
+    )?;
+    let wrong = Package::from_read_at(Arc::new(OwnedSource::new(wrong)))?;
     assert!(matches!(
-        reopened.apply_cross_slide_copy(&patch),
+        wrong.apply_cross_slide_copy(&patch),
         Err(Error::PatchConflict)
     ));
 

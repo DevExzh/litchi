@@ -237,14 +237,23 @@ impl Package {
     /// # Errors
     ///
     /// Returns [`Error::PatchConflict`] when this package does not hold the
-    /// patch's before state: a different destination source, or an inverse
-    /// applied to a package other than the commit's own.
+    /// patch's before state. An independently opened package is accepted when
+    /// its published bytes match the recorded state; the replayed output is
+    /// then rebased onto that recipient's source policy.
     pub fn apply_cross_slide_copy(&self, patch: &Patch) -> Result<Commit> {
         if let Some((before, after)) = &patch.restore
-            && self.same_content(before)?
+            && self.same_replay_content(before)?
         {
+            if patch.is_noop() {
+                return Ok(Commit::new(
+                    self.clone(),
+                    patch.clone(),
+                    Diagnostics::new(false),
+                ));
+            }
+            let package = self.deferred_replay_from(after)?;
             return Ok(Commit::new(
-                after.clone(),
+                package,
                 patch.clone(),
                 Diagnostics::new(!patch.is_noop()),
             ));

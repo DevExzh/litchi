@@ -22,6 +22,7 @@ use std::sync::Arc;
 use litchi_core::{Position, ReadAt, Reservation};
 use litchi_opc::constants::relationship_type as rt;
 use litchi_opc::{PackURI, PartData, TargetMode};
+use sha2::{Digest, Sha256};
 
 use super::{
     MAX_SOURCE_BACKED_SLIDE_BATCH, SourceBackedPresentation, SourceBackedPresentationEditor,
@@ -317,6 +318,60 @@ impl Package {
         self.check()?;
         other.check()?;
         Ok(equal)
+    }
+
+    /// Compare the bytes a replay would publish without requiring the two
+    /// packages to share a source lineage.
+    ///
+    /// This is deliberately private to source-backed replay.  The public
+    /// [`Self::same_content`] contract remains a same-owner semantic
+    /// comparison, while a replay recipient may be an independent open of
+    /// the exact artifact recorded by a patch.  Pristine packages use the
+    /// retained source artifact fingerprint directly; an edited package is
+    /// streamed through a bounded hash sink, so this proof never constructs
+    /// a second full output buffer.
+    pub(super) fn same_replay_content(&self, other: &Self) -> Result<bool> {
+        Ok(self.replay_content_fingerprint()? == other.replay_content_fingerprint()?)
+    }
+
+    fn replay_content_fingerprint(&self) -> Result<[u8; 32]> {
+        let effective = self.effective()?;
+        if !std::ptr::eq(effective, self) {
+            return effective.replay_content_fingerprint();
+        }
+        self.check()?;
+        if self.is_pristine() {
+            return Ok(self
+                .owner
+                .package
+                .source_artifact()
+                .fingerprint()
+                .map_err(Error::from)?
+                .into_sha256());
+        }
+        let mut sink = ReplayHashWriter {
+            digest: Sha256::new(),
+        };
+        self.write_to(&mut sink)?;
+        Ok(sink.digest.finalize().into())
+    }
+
+    /// Rebase a replayed artifact onto this package's source policy.
+    ///
+    /// The artifact remains deferred and is streamed only when the recipient
+    /// is written.  Both the recipient source and the recorded artifact source
+    /// are checked before and after publication, while the deferred options
+    /// and execution context come from the recipient package.
+    pub(super) fn deferred_replay_from(&self, artifact: &Self) -> Result<Self> {
+        let recipient = self.effective()?.clone();
+        let check_recipient = recipient.clone();
+        let recorded = artifact.clone();
+        Ok(recipient.deferred(move |writer| {
+            check_recipient.check()?;
+            let result = recorded.write_to(writer);
+            check_recipient.check()?;
+            result
+        }))
     }
 
     /// Replay an exact-source patch without changing this package.
@@ -762,6 +817,21 @@ impl Package {
             None => RootPayload::Edited(xml),
         };
         self.with_order(root, ordered)
+    }
+}
+
+struct ReplayHashWriter {
+    digest: Sha256,
+}
+
+impl Write for ReplayHashWriter {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        self.digest.update(bytes);
+        Ok(bytes.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
     }
 }
 
