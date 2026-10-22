@@ -30,6 +30,7 @@ use litchi_odf_common::core::{
 use litchi_odf_common::{Error as OdfError, OpenOptions};
 use zeroize::Zeroizing;
 
+use super::source_append::{OpenContentFacts, ScanFacts, scan_open_content};
 use crate::codec::Parser;
 use crate::model::{Reference, Slide};
 
@@ -55,6 +56,7 @@ fn file_source(path: impl AsRef<Path>) -> Result<Arc<dyn ReadAt>> {
 enum StreamProbeError {
     Invalid(Error),
     BodyMissing,
+    Parser(Error),
 }
 
 #[derive(Debug, Default)]
@@ -229,7 +231,61 @@ fn encrypted_member_cannot_stream(error: &Error) -> bool {
     )
 }
 
-fn validate_source_content(package: &SourceBackedPackage) -> Result<(u64, bool)> {
+#[derive(Debug)]
+struct ContentValidation {
+    content_xml_bytes: u64,
+    doctype: bool,
+    append_facts: Option<ScanFacts>,
+}
+
+fn validate_source_content(package: &SourceBackedPackage) -> Result<ContentValidation> {
+    // The structural pass is opportunistic: it supplies the append proof's
+    // bounded facts while preserving the historical byte/body admission for
+    // malformed or unusually deep XML.  The common insertion plan still
+    // proves the source hash and exact splice after this pass.
+    let streamed = package.with_verified_member_reader("content.xml", |reader| {
+        scan_open_content(reader, 256 * 1024 * 1024).map_err(StreamProbeError::Parser)
+    });
+
+    match streamed {
+        Ok(OpenContentFacts {
+            content_xml_bytes,
+            doctype,
+            append,
+        }) => Ok(ContentValidation {
+            content_xml_bytes,
+            doctype,
+            append_facts: append,
+        }),
+        Err(SourceMemberReaderError::Callback(StreamProbeError::Parser(error)))
+            if can_fallback_to_legacy_probe(&error) =>
+        {
+            validate_source_content_legacy(package)
+        },
+        Err(SourceMemberReaderError::Callback(StreamProbeError::Parser(error))) => Err(error),
+        Err(SourceMemberReaderError::Callback(StreamProbeError::Invalid(error))) => Err(error),
+        Err(SourceMemberReaderError::Callback(StreamProbeError::BodyMissing)) => {
+            validate_materialized_content(package)
+        },
+        Err(SourceMemberReaderError::Core {
+            error,
+            callback_error: _,
+        }) if encrypted_member_cannot_stream(&error) => validate_materialized_content(package),
+        Err(SourceMemberReaderError::Core { error, .. }) => Err(error),
+        Err(_) => Err(Error::InvalidFormat(
+            "ODP content.xml source validation failed".to_string(),
+        )),
+    }
+}
+
+fn can_fallback_to_legacy_probe(error: &Error) -> bool {
+    !matches!(
+        error,
+        Error::Io(_) | Error::Committed(_) | Error::SourceChanged { .. }
+    )
+}
+
+fn validate_source_content_legacy(package: &SourceBackedPackage) -> Result<ContentValidation> {
     let streamed = package.with_verified_member_reader("content.xml", |reader| {
         let mut bytes = 0_u64;
         let mut utf8 = Utf8Probe::default();
@@ -251,11 +307,15 @@ fn validate_source_content(package: &SourceBackedPackage) -> Result<(u64, bool)>
         }
         utf8.finish("content.xml")?;
         let doctype = body.finish()?;
-        Ok((bytes, doctype))
+        Ok(ContentValidation {
+            content_xml_bytes: bytes,
+            doctype,
+            append_facts: None,
+        })
     });
 
     match streamed {
-        Ok((bytes, doctype)) => Ok((bytes, doctype)),
+        Ok(validation) => Ok(validation),
         Err(SourceMemberReaderError::Callback(StreamProbeError::BodyMissing)) => {
             validate_materialized_content(package)
         },
@@ -271,16 +331,17 @@ fn validate_source_content(package: &SourceBackedPackage) -> Result<(u64, bool)>
     }
 }
 
-fn validate_materialized_content(package: &SourceBackedPackage) -> Result<(u64, bool)> {
+fn validate_materialized_content(package: &SourceBackedPackage) -> Result<ContentValidation> {
     let mut content_xml = String::from_utf8(package.get_file("content.xml")?).map_err(|error| {
         Error::InvalidFormat(format!("{FAMILY_NAME} content.xml is not UTF-8: {error}"))
     })?;
     let doctype = litchi_odf_common::core::private::neutralize_prologue_doctype(&mut content_xml);
     litchi_odf_common::core::validate_content_part(&content_xml, BODY_MARKER, FAMILY_NAME)?;
-    Ok((
-        u64::try_from(content_xml.len()).unwrap_or(u64::MAX),
+    Ok(ContentValidation {
+        content_xml_bytes: u64::try_from(content_xml.len()).unwrap_or(u64::MAX),
         doctype,
-    ))
+        append_facts: None,
+    })
 }
 
 fn validate_source_styles(package: &SourceBackedPackage) -> Result<()> {
@@ -340,6 +401,7 @@ pub struct SourceBackedPresentation {
     source: Arc<dyn ReadAt>,
     source_version: SourceVersion,
     content_xml_bytes: u64,
+    append_facts: Option<ScanFacts>,
     content_xml: OnceLock<Arc<String>>,
     styles_xml: OnceLock<Option<Arc<String>>>,
     metadata: Option<litchi_core::Metadata>,
@@ -518,7 +580,11 @@ impl SourceBackedPresentation {
                 package.member_materialized_size("content.xml")?,
                 FAMILY_NAME,
             )?;
-            let (content_xml_bytes, doctype) = validate_source_content(&package)?;
+            let ContentValidation {
+                content_xml_bytes,
+                doctype,
+                append_facts,
+            } = validate_source_content(&package)?;
 
             if package.has_file("styles.xml")? {
                 // Validate the optional styles part at open, but leave its
@@ -537,13 +603,13 @@ impl SourceBackedPresentation {
                 None
             };
 
-            Ok((content_xml_bytes, metadata, doctype))
+            Ok((content_xml_bytes, metadata, doctype, append_facts))
         })();
 
         // Reconcile the source before exposing any secondary parse error. This
         // keeps stale-source errors authoritative across the whole open pass,
         // including pure validation and UTF-8/metadata parsing work.
-        let (content_xml_bytes, metadata, doctype) =
+        let (content_xml_bytes, metadata, doctype, append_facts) =
             reconcile_source(source.as_ref(), source_version, parsed)?;
         let mut open_tolerance = package.tolerance_report().clone();
         if doctype {
@@ -558,6 +624,7 @@ impl SourceBackedPresentation {
             source,
             source_version,
             content_xml_bytes,
+            append_facts,
             content_xml: OnceLock::new(),
             styles_xml: OnceLock::new(),
             metadata,
@@ -581,6 +648,7 @@ impl SourceBackedPresentation {
             source: Arc::clone(&self.source),
             source_version: self.source_version,
             content_xml_bytes: self.content_xml_bytes,
+            append_facts: self.append_facts.clone(),
             content_xml,
             styles_xml,
             metadata: self.metadata.clone(),
@@ -706,18 +774,21 @@ impl SourceBackedPresentation {
         &self,
     ) -> Result<(Vec<Slide>, litchi_odf_common::leniency::ToleranceReport)> {
         self.check_source()?;
-        let styles_xml = self.read_styles_xml()?;
+        // The optional styles part was validated during open.  Reuse its
+        // bounded lazy projection for semantic reads so repeated slide/text
+        // queries do not reopen and decode the same member on every call.
+        let styles_xml = self.styles_xml_snapshot()?;
         let result = match self
             .package
             .with_verified_member_reader("content.xml", |reader| {
-                Parser::parse_slides_with_report_from_reader(reader, styles_xml.as_deref())
+                Parser::parse_slides_with_report_from_reader(reader, styles_xml)
             }) {
             Ok(result) => Ok(result),
             Err(SourceMemberReaderError::Core { error, .. })
                 if encrypted_member_cannot_stream(&error) =>
             {
                 let content_xml = self.read_content_xml()?;
-                Parser::parse_slides_with_report(&content_xml, styles_xml.as_deref())
+                Parser::parse_slides_with_report(&content_xml, styles_xml)
             },
             Err(error) => Err(source_reader_error(error)),
         };
@@ -810,6 +881,29 @@ impl SourceBackedPresentation {
     /// Check the source identity and revision without reading a package part.
     pub fn check_source(&self) -> Result<()> {
         ensure_current(self.source_version, self.source.version()?)
+    }
+
+    /// Reuse the bounded structural facts collected during strict open when
+    /// the append operation has no per-operation accounting or cancellation
+    /// policy.  The common insertion plan still rechecks source freshness and
+    /// proves the complete source hash and exact splice.
+    pub(super) fn cached_append_facts(
+        &self,
+        max_content_xml_bytes: u64,
+        max_slides: usize,
+        options: &SourceContentPublicationOptions,
+    ) -> Result<Option<ScanFacts>> {
+        self.check_source()?;
+        if options.execution_context().is_some() || options.cancellation().is_some() {
+            return Ok(None);
+        }
+        let Some(facts) = self.append_facts.as_ref() else {
+            return Ok(None);
+        };
+        if facts.content_bytes > max_content_xml_bytes || facts.slide_count >= max_slides {
+            return Ok(None);
+        }
+        Ok(Some(facts.clone()))
     }
 
     /// Everything a tolerant read repaired while this presentation was opened.
@@ -954,13 +1048,16 @@ impl SourceBackedPresentation {
 
     fn slide_uncached(&self, index: usize) -> Result<Option<Slide>> {
         self.check_source()?;
-        let styles_xml = self.read_styles_xml()?;
+        // Keep indexed semantic reads on the same validated lazy styles
+        // projection as full slide scans.  This also memoizes an absent
+        // styles.xml member, avoiding repeated archive admission work.
+        let styles_xml = self.styles_xml_snapshot()?;
         let result = match self
             .package
             .with_verified_member_reader("content.xml", |reader| {
                 Parser::parse_slide_with_styles_at_recording_from_reader(
                     reader,
-                    styles_xml.as_deref(),
+                    styles_xml,
                     index,
                     &mut litchi_odf_common::leniency::ToleranceReport::default(),
                 )
@@ -970,7 +1067,7 @@ impl SourceBackedPresentation {
                 if encrypted_member_cannot_stream(&error) =>
             {
                 let content_xml = self.read_content_xml()?;
-                Parser::parse_slide_with_styles_at(&content_xml, styles_xml.as_deref(), index)
+                Parser::parse_slide_with_styles_at(&content_xml, styles_xml, index)
             },
             Err(error) => Err(source_reader_error(error)),
         };
@@ -1322,7 +1419,7 @@ fn check_semantic_part_sizes(
 
 #[cfg(test)]
 mod tests {
-    use std::io;
+    use std::io::{self, Cursor};
 
     use litchi_core::OwnedSource;
     use litchi_odf_common::constants::ODF_PRESENTATION;
@@ -1355,6 +1452,21 @@ mod tests {
             reconcile_source(&FixedSource, expected, secondary),
             Err(Error::SourceChanged { .. })
         ));
+    }
+
+    #[test]
+    fn open_scan_retains_only_bounded_append_facts() {
+        let content = br#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"><office:body><office:presentation><draw:page/></office:presentation></office:body></office:document-content>"#;
+        let mut reader = Cursor::new(content.as_slice());
+        let facts = scan_open_content(&mut reader, 256 * 1024 * 1024).unwrap();
+
+        assert_eq!(facts.content_xml_bytes, content.len() as u64);
+        assert!(!facts.doctype);
+        let append = facts.append.expect("valid page tail is appendable");
+        assert_eq!(append.content_bytes, content.len() as u64);
+        assert_eq!(append.slide_count, 1);
+        assert!(append.insert_at > 0);
+        assert!(append.insert_at <= append.content_bytes);
     }
 
     #[test]
