@@ -583,6 +583,7 @@ fn snapshot_scope(snapshot: &Snapshot) -> Result<Box<[Change]>> {
                 relationship_target,
                 before,
                 after,
+                free_relationship_id: state.present.is_none(),
             })
         })
         .collect()
@@ -1008,6 +1009,7 @@ fn stage_change(
                 relationship_target: present.relationship_target,
                 before: Some(present.bytes),
                 after: None,
+                free_relationship_id: false,
             }
         },
         (Some(present), false, Some(bytes)) => {
@@ -1027,6 +1029,7 @@ fn stage_change(
                 relationship_target: present.relationship_target,
                 before: Some(present.bytes),
                 after: Some(bytes),
+                free_relationship_id: false,
             }
         },
         (None, false, Some(bytes)) => {
@@ -1049,6 +1052,7 @@ fn stage_change(
                 relationship_target: present.relationship_target.clone(),
                 before: None,
                 after: Some(bytes),
+                free_relationship_id: false,
             };
             let slot = after.family_mut(family);
             slot.present = Some(present);
@@ -1122,6 +1126,10 @@ pub struct Change {
     relationship_target: String,
     before: Option<Arc<Vec<u8>>>,
     after: Option<Arc<Vec<u8>>>,
+    /// An absent family has no meaningful relationship ID. Snapshot scopes
+    /// retain a free placeholder for diagnostics, but replay accepts any
+    /// free ID because a later creation may choose a different gap.
+    free_relationship_id: bool,
 }
 
 impl Change {
@@ -1574,7 +1582,9 @@ fn scope_is_complete(scope: &[Change]) -> bool {
 fn same_change_identity(first: &Change, second: &Change) -> bool {
     first.family == second.family
         && first.part == second.part
-        && first.relationship_id == second.relationship_id
+        && (first.free_relationship_id
+            || second.free_relationship_id
+            || first.relationship_id == second.relationship_id)
         && first.relationship_type == second.relationship_type
         && first.relationship_target == second.relationship_target
 }
@@ -1701,7 +1711,8 @@ fn check_change<P: PackageMetadata>(
         None => {
             if part.is_some()
                 || relationship_id.is_some()
-                || relationships.get(&change.relationship_id).is_some()
+                || (!change.free_relationship_id
+                    && relationships.get(&change.relationship_id).is_some())
                 || package
                     .metadata_parts()
                     .any(|candidate| names_conflict(candidate.part_name(), &change.part))

@@ -328,6 +328,46 @@ fn composed_no_op_scope_authenticates_absent_property_families() {
     // proving that the app and custom IDs are free.
     assert!(composed.inverse().apply(&mut composed_package).unwrap());
     assert_eq!(composed_package.iter_parts().count(), 0);
+
+    // The same wildcard absence guard composes with an application-only or
+    // custom-only creation, whichever free relationship ID the plan chooses.
+    let mut app_plan = snapshot.plan();
+    app_plan.set_app_props(Some(app::Props {
+        company: Some("Litchi".into()),
+        ..app::Props::default()
+    }));
+    let (_, app_creation, _) = app_plan.finish().unwrap();
+    let app_composed = no_op.compose(&app_creation).unwrap();
+    let mut app_package = empty.clone();
+    app_composed.apply(&mut app_package).unwrap();
+    app_composed.inverse().apply(&mut app_package).unwrap();
+    assert_eq!(app_package.iter_parts().count(), 0);
+
+    let mut custom_plan = snapshot.plan();
+    let mut custom_props = custom::Props::new();
+    custom_props.insert("Created", "yes").unwrap();
+    custom_plan.set_custom_props(custom_props);
+    let (_, custom_creation, _) = custom_plan.finish().unwrap();
+    let custom_composed = no_op.compose(&custom_creation).unwrap();
+    let mut custom_package = empty.clone();
+    custom_composed.apply(&mut custom_package).unwrap();
+    custom_composed
+        .inverse()
+        .apply(&mut custom_package)
+        .unwrap();
+    assert_eq!(custom_package.iter_parts().count(), 0);
+
+    // A creation followed by an independently captured exact-after no-op
+    // keeps its creation relationship and still composes to one patch.
+    let mut created = empty.clone();
+    changed.apply(&mut created).unwrap();
+    let after_snapshot = Snapshot::read(&created, Host::Excel).unwrap();
+    let (_, after_no_op, _) = after_snapshot.plan().finish().unwrap();
+    let creation_then_no_op = changed.compose(&after_no_op).unwrap();
+    let mut recreated = empty.clone();
+    creation_then_no_op.apply(&mut recreated).unwrap();
+    creation_then_no_op.inverse().apply(&mut recreated).unwrap();
+    assert_eq!(recreated.iter_parts().count(), 0);
     assert!(matches!(
         no_op.compose(&changed_no_op),
         Err(Error::Conflict(_))
@@ -355,8 +395,10 @@ fn removal_composes_only_with_a_no_op_from_its_exact_after_graph() {
         bytes(&source, "/docProps/custom.xml")
     );
 
-    // A separately captured no-op whose free-ID graph differs is not the
-    // removal's after state, even though both owners have no custom part.
+    // A separately captured no-op may choose a different free ID because an
+    // unrelated relationship occupies the old gap. That phantom ID is not
+    // part of the property state, so the valid composition must remain
+    // supported.
     let removed_custom_id = source
         .rels()
         .iter()
@@ -381,10 +423,19 @@ fn removal_composes_only_with_a_no_op_from_its_exact_after_graph() {
         .unwrap();
     let unrelated_snapshot = Snapshot::read(&unrelated, Host::Word).unwrap();
     let (_, different_no_op, _) = unrelated_snapshot.plan().finish().unwrap();
-    assert!(matches!(
-        removal.compose(&different_no_op),
-        Err(Error::Conflict(_))
-    ));
+    let composed_with_different_gap = removal.compose(&different_no_op).unwrap();
+    let mut different_gap_result = source.clone();
+    composed_with_different_gap
+        .apply(&mut different_gap_result)
+        .unwrap();
+    composed_with_different_gap
+        .inverse()
+        .apply(&mut different_gap_result)
+        .unwrap();
+    assert_eq!(
+        bytes(&different_gap_result, "/docProps/custom.xml"),
+        bytes(&source, "/docProps/custom.xml")
+    );
 }
 
 #[test]
