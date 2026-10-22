@@ -25,7 +25,7 @@
 //! # }
 //! ```
 
-use std::{fmt, io::BufRead, sync::Arc};
+use std::{fmt, sync::Arc};
 
 use super::source::SourceBackedPresentation;
 pub use litchi_odf_common::LimitKind;
@@ -502,17 +502,7 @@ fn rebase_patch(
     let base = recipient.effective().map_err(Error::Invalid)?;
     let expected = &patch.before_proof;
     let package = Arc::clone(&base.package);
-    let facts = match base
-        .cached_append_facts(
-            patch.limits.max_content_xml_bytes,
-            patch.limits.max_slides,
-            &patch.options,
-        )
-        .map_err(Error::Invalid)?
-    {
-        Some(facts) => facts,
-        None => scan_source(&package, patch.limits, &patch.options)?,
-    };
+    let facts = scan_or_cached_source(&base, &package, patch.limits, &patch.options)?;
     if facts.content_bytes != expected.content_bytes
         || facts.insert_at != expected.insert_at
         || facts.slide_count != expected.slide_count
@@ -579,6 +569,8 @@ fn rebase_patch(
             reason: "the recipient content bytes differ from the recorded base",
         });
     }
+
+    base.remember_append_facts(&facts, &patch.options);
 
     let options = patch.options.clone();
     let package = base.deferred(common, options);
@@ -650,13 +642,7 @@ impl<'a> Edit<'a> {
         if content_bytes > limits.max_content_xml_bytes {
             return Err(invalid("ODP content.xml exceeds the source append limit"));
         }
-        let first = match base
-            .cached_append_facts(limits.max_content_xml_bytes, limits.max_slides, &options)
-            .map_err(Error::Invalid)?
-        {
-            Some(facts) => facts,
-            None => scan_source(&package, limits, &options)?,
-        };
+        let first = scan_or_cached_source(&base, &package, limits, &options)?;
         if first.slide_count >= limits.max_slides {
             return Err(invalid("ODP append would exceed the slide-count limit"));
         }
@@ -712,6 +698,8 @@ impl<'a> Edit<'a> {
             |event, tracker| validator.observe(event, tracker),
         )
         .map_err(Error::Plan)?;
+
+        base.remember_append_facts(&first, &options);
 
         Ok(Plan {
             source,
@@ -896,126 +884,6 @@ pub(crate) struct ScanFacts {
     pub(crate) slide_count: usize,
 }
 
-/// Facts collected while the source-backed owner admits `content.xml`.
-///
-/// The owner still exposes the same strict open result as before.  These
-/// facts are retained only when the append proof also succeeds; the common
-/// insertion plan later re-reads the member for its byte hash and splice
-/// proof.  Keeping the two proofs separate avoids retaining the XML while
-/// removing a duplicate format-owned structural scan.
-#[derive(Debug)]
-pub(crate) struct OpenContentFacts {
-    pub(crate) content_xml_bytes: u64,
-    pub(crate) doctype: bool,
-    pub(crate) append: Option<ScanFacts>,
-}
-
-/// Parse one already-verified `content.xml` reader for the owner open pass.
-///
-/// The parser envelope is the same bounded envelope used by append.  A
-/// source that is accepted by the historical byte/body probe but is not
-/// accepted by this opportunistic structural state is reported as an error;
-/// the owner converts that parser-only failure back to its historical probe.
-/// Thus this helper can add a cache without changing the public admission
-/// contract for malformed or unusually deep source XML.
-pub(crate) fn scan_open_content(
-    reader: &mut dyn BufRead,
-    max_content_xml_bytes: u64,
-) -> Result<OpenContentFacts> {
-    let stream_limits =
-        XmlStreamLimits::new(max_content_xml_bytes, 256, 4_000_000, 1_000_000, 64 * 1024)?;
-    let mut probe = OpenContentProbe {
-        append: Some(OdpScanState::for_open()),
-        ..OpenContentProbe::default()
-    };
-    let report = litchi_odf_common::core::private::scan_xml(
-        reader,
-        stream_limits,
-        |event: &XmlStreamEvent<'_>, tracker: &BindingTracker| probe.observe(event, tracker),
-    )?;
-    if !probe.body_seen {
-        return Err(CoreError::InvalidFormat(
-            "ODP content.xml has no expected body".to_string(),
-        ));
-    }
-    let append = if probe.doctype {
-        // source_append::scan_source intentionally refuses a doctype.  Do
-        // not let the owner cache turn that refusal into an accepted edit.
-        None
-    } else {
-        probe.append.take().and_then(|mut state| {
-            let facts = ScanFacts {
-                content_bytes: report.bytes(),
-                insert_at: probe.append_facts.insert_at,
-                slide_count: state.pages_seen,
-            };
-            state.finish(&facts).ok()?;
-            Some(facts)
-        })
-    };
-    Ok(OpenContentFacts {
-        content_xml_bytes: report.bytes(),
-        doctype: probe.doctype,
-        append,
-    })
-}
-
-#[derive(Debug, Default)]
-struct OpenContentProbe {
-    depth: usize,
-    body_seen: bool,
-    doctype: bool,
-    append: Option<OdpScanState>,
-    append_facts: ScanFacts,
-}
-
-impl OpenContentProbe {
-    fn observe(&mut self, event: &XmlStreamEvent<'_>, tracker: &BindingTracker) -> Result<()> {
-        match event.event() {
-            Event::Start(element) => {
-                if self.depth == 1 && is_prefixed_office_body(element, tracker) {
-                    self.body_seen = true;
-                }
-                self.depth = self.depth.saturating_add(1);
-            },
-            Event::Empty(element) => {
-                if self.depth == 1 && is_prefixed_office_body(element, tracker) {
-                    self.body_seen = true;
-                }
-            },
-            Event::End(_) => {
-                self.depth = self.depth.saturating_sub(1);
-            },
-            Event::DocType(_) => self.doctype = true,
-            _ => {},
-        }
-        if let Some(state) = self.append.as_mut() {
-            if state
-                .observe(event, tracker, &mut self.append_facts, Limits::default())
-                .is_err()
-            {
-                self.append = None;
-            }
-        }
-        Ok(())
-    }
-}
-
-fn is_prefixed_office_body(element: &BytesStart<'_>, tracker: &BindingTracker) -> bool {
-    let raw_name = element.name().as_ref();
-    let Some(colon) = raw_name.iter().rposition(|byte| *byte == b':') else {
-        return false;
-    };
-    if &raw_name[colon + 1..] != b"body" {
-        return false;
-    }
-    matches!(
-        tracker.resolve_element(element.name()),
-        Ok((ResolveResult::Bound(Namespace(uri)), local))
-            if uri == OFFICE_NAMESPACE && local.as_ref() == b"body"
-    )
-}
-
 fn scan_source(
     package: &SourceBackedPackage,
     limits: Limits,
@@ -1056,6 +924,21 @@ fn scan_source(
     Ok(facts)
 }
 
+fn scan_or_cached_source(
+    base: &SourceBackedPresentation,
+    package: &SourceBackedPackage,
+    limits: Limits,
+    options: &SourceContentPublicationOptions,
+) -> std::result::Result<ScanFacts, Error> {
+    if let Some(facts) = base
+        .cached_append_facts(limits.max_content_xml_bytes, limits.max_slides, options)
+        .map_err(Error::Invalid)?
+    {
+        return Ok(facts);
+    }
+    scan_source(package, limits, options)
+}
+
 #[derive(Debug, Default)]
 struct OdpScanState {
     stack: Vec<ElementKind>,
@@ -1067,7 +950,6 @@ struct OdpScanState {
     pages_seen: usize,
     trailing_seen: bool,
     content_bytes: u64,
-    allow_doctype: bool,
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -1081,13 +963,6 @@ enum ElementKind {
 }
 
 impl OdpScanState {
-    fn for_open() -> Self {
-        Self {
-            allow_doctype: true,
-            ..Self::default()
-        }
-    }
-
     fn observe(
         &mut self,
         event: &XmlStreamEvent<'_>,
@@ -1199,7 +1074,7 @@ impl OdpScanState {
             {
                 self.trailing_seen = true;
             },
-            Event::DocType(_) if !self.allow_doctype => {
+            Event::DocType(_) => {
                 return Err(candidate_invalid(
                     "ODP content.xml must not contain a doctype",
                 ));
@@ -1940,6 +1815,22 @@ mod tests {
             owner.slides().is_err(),
             "semantic parsing still reports malformed XML"
         );
+    }
+
+    #[test]
+    fn append_facts_are_deferred_until_a_successful_prepare() {
+        let content = format!(
+            r#"<office:document-content xmlns:office="{OFFICE_NAMESPACE_UTF8}" xmlns:draw="{DRAW_NAMESPACE_UTF8}"><office:body><office:presentation><draw:page/></office:presentation></office:body></office:document-content>"#,
+        );
+        let owner = SourceBackedPresentation::from_read_at(source_package(&content)).unwrap();
+        assert!(owner.append_facts.get().is_none());
+
+        owner
+            .edit_tail_append("title", "body")
+            .unwrap()
+            .prepare()
+            .unwrap();
+        assert!(owner.append_facts.get().is_some());
     }
 
     #[test]
