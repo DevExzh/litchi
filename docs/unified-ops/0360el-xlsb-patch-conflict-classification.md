@@ -17,13 +17,15 @@ now preserve that fact as `PackageError::PatchConflict` or the family error's
 `PatchConflict`. The host conversion keeps external-link conflicts typed as
 the XLSB package conflict.
 
-The facade's process-local owner guard runs before the format leaf for a
-foreign `File`, so its rejection remains
-`Source::Transaction(transaction::Error::PatchConflict)`. The leaf tests
+The facade's process-local owner guard runs before the format leaf, but it
+accepts a reopened package when its current bytes match the patch base. A
+different owner identity alone is not a conflict. When the current bytes do
+not match, the guard reports
+`Source::Transaction(transaction::Error::PatchConflict)`; the leaf tests
 assert the format-level `PackageError::PatchConflict`, while the unified
 cell-write test asserts the transaction-level source and its `InvalidInput`
-code. These are two boundaries of the same classification, not different
-source-change semantics.
+code. These are two boundaries of the same content-mismatch classification,
+not different source-change semantics.
 
 Malformed content, post-publication invariant failures, and source-backed
 freshness remain their existing errors. In particular, `SourceChanged` is
@@ -32,13 +34,15 @@ still an I/O classification; it is not converted to `PatchConflict`.
 ## Recipient admission before an exact-image copy
 
 Structural replay publishes the retained exact after image through the
-recipient's `SourceLimits`. Before `changed_candidate` or replay publication
-clones that image into a new owned `Vec`, it now checks its byte length against
-the recipient `max_input_bytes`. An over-limit image returns the typed OPC
-`InputBytes` limit without first allocating the second whole-image buffer.
-`OpcPackage::from_vec_with_limits` still performs the complete archive,
-member, and raw-policy admission afterward; the preflight only avoids a
-known oversized copy and does not replace validation.
+recipient's `SourceLimits`. A borrowed physical-reader preflight checks input,
+archive/member counts, names, metadata, and declared ZIP sizes before the
+patch takes ownership. The accepted image is then passed through
+`from_shared_vec_with_limits`, so the exact `Arc<Vec<u8>>` is retained by the
+published OPC package without a second whole-image clone. BIFF12 raw admission
+still runs through `project_candidate` and complete worksheet validation before
+the package is returned; the physical preflight does not replace that semantic
+validation. Replay-generated images use the same one-Arc handoff after their
+byte and archive preflight.
 
 ## Validation
 

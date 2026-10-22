@@ -224,7 +224,8 @@ fn assert_external_formula_length_error(source: &[u8], found: usize) {
         | Error::InvalidFormula(_)
         | Error::InvalidLength { .. }
         | Error::Allocation { .. }
-        | Error::LimitExceeded { .. }) => {
+        | Error::LimitExceeded { .. }
+        | Error::PatchConflict) => {
             panic!("unexpected external formula error: {other:?}")
         },
     }
@@ -627,7 +628,8 @@ fn opaque_external_record_count_and_byte_limits_are_typed() {
         other @ (Error::Wire(_)
         | Error::InvalidFormula(_)
         | Error::Allocation { .. }
-        | Error::LimitExceeded { .. }) => {
+        | Error::LimitExceeded { .. }
+        | Error::PatchConflict) => {
             panic!("unexpected unknown-record count error: {other:?}")
         },
     }
@@ -647,7 +649,8 @@ fn opaque_external_record_count_and_byte_limits_are_typed() {
         other @ (Error::Wire(_)
         | Error::InvalidFormula(_)
         | Error::Allocation { .. }
-        | Error::LimitExceeded { .. }) => {
+        | Error::LimitExceeded { .. }
+        | Error::PatchConflict) => {
             panic!("unexpected unknown-record byte error: {other:?}")
         },
     }

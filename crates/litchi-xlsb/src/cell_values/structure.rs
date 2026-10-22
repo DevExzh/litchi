@@ -335,7 +335,7 @@ impl Operation {
 #[derive(Debug, Clone)]
 pub struct Edit {
     base: crate::Package,
-    before: Arc<[u8]>,
+    before: Arc<Vec<u8>>,
     sheet_catalog: Arc<[SheetTarget]>,
     operations: Vec<Operation>,
     operation_indexes: BTreeMap<Selection, Vec<usize>>,
@@ -358,7 +358,7 @@ impl Edit {
             .collect::<Vec<_>>();
         Ok(Self {
             base: package.clone(),
-            before: Arc::from(package.to_bytes()?),
+            before: Arc::new(package.to_bytes()?),
             sheet_catalog: sheet_catalog.into(),
             operations: Vec::new(),
             operation_indexes: BTreeMap::new(),
@@ -1467,7 +1467,6 @@ impl Edit {
     /// Returns an error when replay, complete workbook readback, or bounds fail.
     pub fn commit(self) -> Result<Commit> {
         let (after, package) = replay_package(&self.base, &self.before, &self.operations)?;
-        let after = Arc::from(after);
         let patch = Patch {
             before: self.before,
             after,
@@ -1619,8 +1618,8 @@ impl Commit {
 /// An exact before/after workbook patch with semantic replay operations.
 #[derive(Debug, Clone)]
 pub struct Patch {
-    before: Arc<[u8]>,
-    after: Arc<[u8]>,
+    before: Arc<Vec<u8>>,
+    after: Arc<Vec<u8>>,
     operations: Vec<Operation>,
     external_link_limits: ExternalLinkLimits,
     drawing_load_policy: DrawingLoadPolicy,
@@ -1639,15 +1638,16 @@ impl Patch {
         // an equal-content image whose actual resources fit this owner. Keep
         // the owned OPC path here: it preserves the exact source/provenance
         // publication bytes used by the original package commit path.
-        admit_archive_input_before_copy(self.after.as_ref(), limits)?;
-        let candidate = litchi_opc::OpcPackage::from_vec_with_limits(self.after.to_vec(), limits)?;
+        admit_archive_before_copy(self.after.as_slice(), limits)?;
+        let candidate =
+            litchi_opc::OpcPackage::from_shared_vec_with_limits(Arc::clone(&self.after), limits)?;
         let workbook = package.project_candidate(candidate)?;
         validate_all_worksheets(&workbook)?;
         Ok(workbook)
     }
 
     pub(crate) fn apply_to_package(&self, package: &crate::Package) -> Result<crate::Package> {
-        if package.to_bytes()?.as_slice() != self.before.as_ref() {
+        if package.to_bytes()?.as_slice() != self.before.as_slice() {
             return Err(Error::PatchConflict { part: "workbook" });
         }
         if self.is_noop() {
@@ -1669,13 +1669,13 @@ impl Patch {
     /// Canonical exact package image required before application.
     #[must_use]
     pub fn before(&self) -> &[u8] {
-        &self.before
+        self.before.as_slice()
     }
 
     /// Canonical validated package image published by application.
     #[must_use]
     pub fn after(&self) -> &[u8] {
-        &self.after
+        self.after.as_slice()
     }
 
     /// Number of semantic workbook operations retained for durable replay.
@@ -1690,7 +1690,7 @@ impl Patch {
     #[cfg(test)]
     pub(crate) fn apply(&self, workbook: &mut Workbook) -> Result<()> {
         let package = crate::Package::from_workbook(workbook);
-        if workbook_bytes(workbook)?.as_slice() != self.before.as_ref() {
+        if workbook_bytes(workbook)?.as_slice() != self.before.as_slice() {
             return Err(Error::PatchConflict { part: "workbook" });
         }
         if self.is_noop() {
@@ -1762,8 +1762,8 @@ impl Patch {
                 conflicts,
             });
         }
-        let after = Arc::from(replay(
-            &self.before,
+        let after = Arc::new(replay(
+            self.before.as_slice(),
             &merged,
             self.external_link_limits,
             self.drawing_load_policy,
@@ -1983,8 +1983,8 @@ impl Patch {
                 found: data.len(),
             });
         }
-        let before = copy_arc(&data[32..before_end], "workbook patch before image")?;
-        let after = copy_arc(&data[before_end..after_end], "workbook patch after image")?;
+        let before = copy_vec_arc(&data[32..before_end], "workbook patch before image")?;
+        let after = copy_vec_arc(&data[before_end..after_end], "workbook patch after image")?;
         let validated_before = validated_workbook_with_external_link_limits_and_drawing_policy(
             &before,
             external_link_limits,
@@ -2014,7 +2014,7 @@ impl Patch {
                 raw_limits,
             )?
             .as_slice()
-                != after.as_ref()
+                != after.as_slice()
         {
             return Err(Error::InvalidFormat(
                 "durable workbook patch operations do not reconstruct its after image",
@@ -2207,7 +2207,7 @@ impl History {
                 .get(self.cursor.saturating_sub(1))
                 .map(|entry| Arc::clone(&entry.after))
         };
-        if expected.is_some_and(|source| source.as_ref() != patch.before.as_ref()) {
+        if expected.is_some_and(|source| source.as_slice() != patch.before.as_slice()) {
             return Err(Error::PatchConflict {
                 part: "workbook history",
             });
@@ -2298,35 +2298,37 @@ fn replay(
 
 fn replay_package(
     base: &crate::Package,
-    before: &[u8],
+    before: &Arc<Vec<u8>>,
     operations: &[Operation],
-) -> Result<(Vec<u8>, crate::Package)> {
+) -> Result<(Arc<Vec<u8>>, crate::Package)> {
     // Durable replay is defined against this exact serialized image, not the
     // in-memory graph's potentially different archive/layout provenance.
     let limits = base.opc_package().read_limits();
-    let graph = litchi_opc::OpcPackage::from_bytes_with_limits(before, limits)?;
+    let graph = litchi_opc::OpcPackage::from_bytes_with_limits(before.as_slice(), limits)?;
     let workbook = base.project_candidate(graph)?;
     validate_all_worksheets(&workbook)?;
-    let (bytes, mut workbook) = replay_workbook(workbook, before, operations)?;
-    let package = if bytes == before {
-        base.clone()
+    let (bytes, mut workbook) = replay_workbook(workbook, before.as_slice(), operations)?;
+    let bytes = if bytes == before.as_slice() {
+        return Ok((Arc::clone(before), base.clone()));
     } else {
         // Admit the generated physical image under the same finite policy
         // before publication. This also establishes the precise archive
         // lineage used by later edits/applications. The semantic workbook is
         // already validated by replay; do not parse that projection again.
-        admit_archive_input_before_copy(&bytes, limits)?;
-        workbook.package = litchi_opc::OpcPackage::from_vec_with_limits(bytes.clone(), limits)?;
-        workbook.into_package()
+        admit_archive_before_copy(&bytes, limits)?;
+        Arc::new(bytes)
     };
-    Ok((bytes, package))
+    workbook.package =
+        litchi_opc::OpcPackage::from_shared_vec_with_limits(Arc::clone(&bytes), limits)?;
+    Ok((bytes, workbook.into_package()))
 }
 
-/// Check the recipient's physical input ceiling before cloning an exact
-/// after-image into an owned OPC package. `from_vec_with_limits` repeats this
-/// check while validating the archive, but doing it here keeps an oversized
-/// patch from allocating its second whole-image buffer first.
-fn admit_archive_input_before_copy(bytes: &[u8], limits: litchi_opc::SourceLimits) -> Result<()> {
+/// Admit the recipient's physical archive policy before taking ownership of
+/// an exact after-image. The borrowed reader checks input, archive/member
+/// counts, names, metadata, and declared ZIP sizes without copying the image;
+/// the later shared owned ingress repeats the checks while retaining the
+/// exact source for publication.
+fn admit_archive_before_copy(bytes: &[u8], limits: litchi_opc::SourceLimits) -> Result<()> {
     let observed = u64::try_from(bytes.len()).map_err(|_error| Error::CapacityOverflow {
         resource: "workbook archive input bytes",
     })?;
@@ -2338,7 +2340,37 @@ fn admit_archive_input_before_copy(bytes: &[u8], limits: litchi_opc::SourceLimit
             maximum,
         }));
     }
+    let _reader = litchi_opc::phys_pkg::PhysPkgReader::new_with_limits(bytes, limits)?;
     Ok(())
+}
+
+#[cfg(test)]
+mod replay_admission_tests {
+    use super::admit_archive_before_copy;
+    use crate::Package;
+    use litchi_opc::SourceLimits;
+
+    #[test]
+    fn archive_preflight_checks_member_budget_before_owned_handoff() {
+        let bytes = Package::new()
+            .expect("fixture package")
+            .to_bytes()
+            .expect("fixture bytes");
+        let limits = SourceLimits::builder()
+            .max_members(1)
+            .expect("member limit")
+            .max_parts(1)
+            .expect("part limit")
+            .max_relationship_parts(1)
+            .expect("relationship limit")
+            .build()
+            .expect("source limits");
+
+        assert!(
+            admit_archive_before_copy(&bytes, limits).is_err(),
+            "the borrowed preflight must reject an archive whose member count exceeds the recipient budget"
+        );
+    }
 }
 
 fn canonicalize_legacy_operations(
@@ -6846,6 +6878,15 @@ fn copy_arc(bytes: &[u8], resource: &'static str) -> Result<Arc<[u8]>> {
         .map_err(|source| Error::Allocation { resource, source })?;
     copied.extend_from_slice(bytes);
     Ok(Arc::from(copied))
+}
+
+fn copy_vec_arc(bytes: &[u8], resource: &'static str) -> Result<Arc<Vec<u8>>> {
+    let mut copied = Vec::new();
+    copied
+        .try_reserve_exact(bytes.len())
+        .map_err(|source| Error::Allocation { resource, source })?;
+    copied.extend_from_slice(bytes);
+    Ok(Arc::new(copied))
 }
 
 fn encoded_operation_length(operation: &Operation) -> Result<usize> {
