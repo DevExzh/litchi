@@ -10,6 +10,9 @@ use std::sync::Arc;
 
 use litchi_core::{ExecutionError, FileFormat, Resource, ResourceLimit, SourceVersion};
 
+#[cfg(feature = "doc")]
+use litchi_core::Position;
+
 #[cfg(any(feature = "doc", feature = "xls", feature = "ppt", feature = "xlsb"))]
 use super::PASSWORD_SUGGESTION;
 use super::{Code, Error, LIMIT_SUGGESTION, SIGNED_SUGGESTION, Source};
@@ -1292,6 +1295,8 @@ fn doc_edit_errors_keep_the_edit_type_and_map_native_categories() {
         EditError::Refused(Refusal::ResourceNotFound { storage_id: 7 }),
         Code::NotFound,
     );
+    assert_code(EditError::PatchConflict, Code::InvalidInput);
+    // A three-way semantic overlap remains a distinct body conflict.
     assert_code(EditError::Conflict, Code::InvalidInput);
     assert_code(
         EditError::Refused(Refusal::StructuralContent),
@@ -1664,7 +1669,7 @@ fn doc_primary_transactions_preserve_typed_causes_and_safe_messages() {
             Code::LimitExceeded,
         ),
         (
-            Native::Body(litchi_doc::body_text::Error::Conflict),
+            Native::Body(litchi_doc::body_text::Error::PatchConflict),
             Code::InvalidInput,
         ),
         (
@@ -2263,4 +2268,33 @@ fn legacy_raw_replay_categories_reach_the_facade_unchanged() {
         )),
         Code::IoError,
     );
+}
+
+#[cfg(feature = "doc")]
+#[test]
+fn public_doc_stale_replay_reaches_the_facade_as_invalid_input() {
+    let mut builder = litchi_doc::Builder::new();
+    builder.add_paragraph("before").expect("fixture paragraph");
+    let source = builder.build().expect("fixture document");
+
+    let mut first = source.edit().expect("first edit");
+    first
+        .replace_paragraph(Position::new(0), "first")
+        .expect("first replacement");
+    let patch = first.commit().expect("first commit").patch().clone();
+
+    let mut second = source.edit().expect("second edit");
+    second
+        .replace_paragraph(Position::new(0), "second")
+        .expect("second replacement");
+    let changed = second.commit().expect("second commit").into_package();
+    let native = changed.apply(&patch).expect_err("stale package replay");
+    assert!(matches!(
+        &native,
+        litchi_doc::package::edit::Error::Body(litchi_doc::body_text::Error::PatchConflict)
+    ));
+
+    let facade = Error::from(native);
+    assert_eq!(facade.code(), Code::InvalidInput);
+    assert!(matches!(facade.leaf(), Source::DocTransaction(_)));
 }

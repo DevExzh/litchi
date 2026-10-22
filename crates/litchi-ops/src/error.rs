@@ -1702,6 +1702,10 @@ impl Classify for litchi_doc::body_text::Error {
             ),
             // Every other refusal by its kind alone (record 0351 §2.4).
             Self::Refused(refusal) => refusal.kind().classify(),
+            Self::PatchConflict => Class::of(Code::InvalidInput),
+            // A three-way semantic overlap remains a caller-resolvable
+            // invalid input; stale replay uses the distinct PatchConflict
+            // variant above.
             Self::Conflict => Class::of(Code::InvalidInput),
             Self::Composition(error) => error.classify(),
             Self::Durable(error) => error.classify(),

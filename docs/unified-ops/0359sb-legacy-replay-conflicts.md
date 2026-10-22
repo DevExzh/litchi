@@ -16,9 +16,10 @@ the callers and assertions in the same change:
 
 Reopened equal-content snapshots continue to replay. Parser, clone, and
 structural validation failures retain their existing malformed-input variants,
-so the facade still reports them as `corrupt_file`. Full-document owner checks
-that intentionally use the body editor's private `Error::Conflict` remain
-unchanged.
+so the facade still reports them as `corrupt_file`. The public body-text owner
+now uses `Error::PatchConflict` for stale package patches, durable preconditions,
+owner-bound auxiliary patches, and transfer plans. Its `Error::Conflict`
+remains the distinct three-way semantic-overlap result.
 
 The source changes and all consumer checks were validated by the commands and
 log hashes recorded in `0359s-legacy-replay-classification.md`. The borrowed

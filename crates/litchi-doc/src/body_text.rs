@@ -830,7 +830,9 @@ pub enum Error {
     Invalid(PackageError),
     /// The request is valid in general but unsafe for this preservation seam.
     Refused(Refusal),
-    /// A patch was presented with any snapshot other than its exact source.
+    /// A patch or replay plan was presented with a different source snapshot.
+    PatchConflict,
+    /// Two three-way branches write one semantic facet differently.
     Conflict,
     /// A shared bounded composition rejected staged work.
     Composition(CompositionError),
@@ -843,7 +845,10 @@ impl std::fmt::Display for Error {
         match self {
             Self::Invalid(error) => error.fmt(formatter),
             Self::Refused(refusal) => refusal.fmt(formatter),
-            Self::Conflict => formatter.write_str("body-text patch source conflict"),
+            Self::PatchConflict => {
+                formatter.write_str("DOC body-text patch base does not match recipient")
+            },
+            Self::Conflict => formatter.write_str("body-text three-way composition conflict"),
             Self::Composition(error) => error.fmt(formatter),
             Self::Durable(error) => error.fmt(formatter),
         }
@@ -856,7 +861,7 @@ impl std::error::Error for Error {
             Self::Invalid(error) => Some(error),
             Self::Composition(error) => Some(error),
             Self::Durable(error) => Some(error),
-            Self::Refused(_) | Self::Conflict => None,
+            Self::Refused(_) | Self::PatchConflict | Self::Conflict => None,
         }
     }
 }
@@ -1539,7 +1544,7 @@ impl Snapshot {
                 .and_then(serde_json::Value::as_str)
                 .ok_or_else(|| invalid_durable_patch("missing artifact hash precondition"))?;
             if artifact != expected_artifact {
-                return Err(Error::Conflict);
+                return Err(Error::PatchConflict);
             }
             if operation.op == "revision-mark.set" {
                 apply_durable_revision(&mut edit, operation)?;
@@ -1572,7 +1577,7 @@ impl Snapshot {
                         .ok_or_else(|| invalid_durable_patch("missing text precondition"))?;
                     let span = resolve_target(&edit.editor, target)?;
                     if span.text != expected {
-                        return Err(Error::Conflict);
+                        return Err(Error::PatchConflict);
                     }
                     let replacement = operation
                         .value
@@ -1752,7 +1757,7 @@ impl Snapshot {
     /// ranges without silently dropping one side.
     pub(crate) fn plan_three_way(&self, left: &Patch, right: &Patch) -> Result<ThreeWayPlan> {
         if left.before != *self || right.before != *self {
-            return Err(Error::Conflict);
+            return Err(Error::PatchConflict);
         }
         if left.has_auxiliary_changes() || right.has_auxiliary_changes() {
             return Err(Error::Refused(Refusal::AuxiliaryThreeWayMergeUnsupported));
@@ -2035,7 +2040,7 @@ impl Edit {
         }
         let owner = self.source.bytes_shared();
         if !patch.owner_matches(&owner) {
-            return Err(Error::Conflict);
+            return Err(Error::PatchConflict);
         }
         if self.signed {
             return Err(Error::Refused(Refusal::SignedSource));
@@ -2088,7 +2093,7 @@ impl Edit {
         }
         let owner = self.source.bytes_shared();
         if !patch.owner_matches(&owner) {
-            return Err(Error::Conflict);
+            return Err(Error::PatchConflict);
         }
         if self.signed {
             return Err(Error::Refused(Refusal::SignedSource));
@@ -2622,7 +2627,7 @@ impl Edit {
     /// receiving artifact.
     pub(crate) fn apply_transfer(&mut self, plan: &TransferPlan) -> Result<()> {
         if plan.target != self.source.lineage() {
-            return Err(Error::Conflict);
+            return Err(Error::PatchConflict);
         }
         self.with_transaction_limits(plan.transaction_limits, |edit| {
             edit.replace_text(plan.destination, &plan.value)
@@ -2633,7 +2638,7 @@ impl Edit {
     /// exact receiving artifact.
     pub(crate) fn apply_embedded_transfer(&mut self, plan: &EmbeddedTransferPlan) -> Result<()> {
         if plan.target != self.source.lineage() {
-            return Err(Error::Conflict);
+            return Err(Error::PatchConflict);
         }
         self.with_transaction_limits(plan.transaction_limits, |edit| {
             edit.add_embedded_object(plan.options.clone())
@@ -2643,7 +2648,7 @@ impl Edit {
     /// Applies a canonical picture graph prepared for this exact receiver.
     pub(crate) fn apply_picture_transfer(&mut self, plan: &PictureTransferPlan) -> Result<()> {
         if plan.target != self.source.lineage() {
-            return Err(Error::Conflict);
+            return Err(Error::PatchConflict);
         }
         self.with_transaction_limits(plan.transaction_limits, |edit| {
             edit.install_picture(plan.destination, plan.graph.clone())
@@ -2705,7 +2710,7 @@ impl Edit {
             .editor
             .replace_with_picture_graph(span.start_cp, span.end_cp, &graph)
             .map_err(Error::Invalid)?
-            .ok_or(Error::Conflict)?;
+            .ok_or(Error::PatchConflict)?;
         self.replacement_units = self.replacement_units.saturating_add(actual);
         self.changes.push(Change::Picture {
             target,
@@ -2733,7 +2738,7 @@ impl Edit {
             "\u{0001}"
         };
         if span.text != expected_marker {
-            return Err(Error::Conflict);
+            return Err(Error::PatchConflict);
         }
         if has_structural_content(&replacement) {
             return Err(Error::Refused(
@@ -3281,7 +3286,7 @@ impl Patch {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Conflict`] unless `source` has byte-for-byte equality
+    /// Returns [`Error::PatchConflict`] unless `source` has byte-for-byte equality
     /// with this patch's captured source snapshot.
     pub(crate) fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
         let limits = intersect_revision_limits(
@@ -3304,7 +3309,7 @@ impl Patch {
             && (source.fingerprint() != self.before.fingerprint()
                 || source.bytes() != self.before.bytes())
         {
-            return Err(Error::Conflict);
+            return Err(Error::PatchConflict);
         }
         if self.is_noop() {
             return Ok(source.with_policies(
@@ -4580,7 +4585,7 @@ fn apply_durable_embedded_object(
         .ok_or_else(|| invalid_durable_patch("embedded presence precondition is invalid"))?;
     let actual = embedded_object_value(edit, storage_id)?.is_some();
     if actual != expected {
-        return Err(Error::Conflict);
+        return Err(Error::PatchConflict);
     }
     if operation.value.is_null() {
         if !expected {
@@ -4745,7 +4750,7 @@ fn apply_durable_format(
         .map_err(Error::Invalid)?
         .ok_or(Error::Refused(Refusal::FormattingDependency))?;
     if actual != expected {
-        return Err(Error::Conflict);
+        return Err(Error::PatchConflict);
     }
     let value = parse_optional_bool(&operation.value)?;
     edit.set_character_property_override(target, property, value)
@@ -4966,7 +4971,7 @@ fn apply_durable_embedded_display(edit: &mut Edit, operation: &PatchOperation) -
         .and_then(serde_json::Value::as_bool)
         .ok_or_else(|| invalid_durable_patch("embedded display precondition is invalid"))?;
     if embedded_display_value(edit, storage_id)? != expected {
-        return Err(Error::Conflict);
+        return Err(Error::PatchConflict);
     }
     let enabled = operation
         .value
@@ -5068,7 +5073,7 @@ fn apply_change_after(edit: &mut Edit, change: &Change) -> Result<()> {
             (PictureSlot::Text(expected), PictureSlot::Graph(graph)) => {
                 let actual = resolve_target(&edit.editor, *target)?;
                 if actual.text != expected.as_str() {
-                    return Err(Error::Conflict);
+                    return Err(Error::PatchConflict);
                 }
                 edit.install_picture(*target, graph.clone())
             },
@@ -5090,7 +5095,7 @@ fn set_picture_slot(
         (PictureSlot::Text(text), PictureSlot::Graph(graph)) => {
             let actual = resolve_target(&edit.editor, target)?;
             if actual.text != text.as_str() {
-                return Err(Error::Conflict);
+                return Err(Error::PatchConflict);
             }
             edit.install_picture(target, graph.clone())
         },
@@ -5109,7 +5114,7 @@ fn set_embedded_object(
 ) -> Result<()> {
     let actual = embedded_object_value(edit, storage_id)?;
     if actual != expected {
-        return Err(Error::Conflict);
+        return Err(Error::PatchConflict);
     }
     if expected == value {
         return Ok(());
@@ -5175,11 +5180,11 @@ fn set_revision_mark(
         })
         .collect::<Vec<_>>();
     if matches.len() > 1 {
-        return Err(Error::Conflict);
+        return Err(Error::PatchConflict);
     }
     let actual = matches.first().map(|(_index, spec)| spec.clone());
     if actual != expected {
-        return Err(Error::Conflict);
+        return Err(Error::PatchConflict);
     }
     if expected == value {
         return Ok(());
@@ -5190,7 +5195,7 @@ fn set_revision_mark(
             let index = matches
                 .first()
                 .map(|(index, _spec)| *index)
-                .ok_or(Error::Conflict)?;
+                .ok_or(Error::PatchConflict)?;
             edit.editor.remove(index).map_err(Error::Invalid)?;
         },
         (None, Some(spec)) => {
@@ -6673,7 +6678,7 @@ mod tests {
         let result: super::Result<()> = observe_phase(
             &mut |event| events.push(event),
             DiagnosticPhase::Finish,
-            || Err(Error::Conflict),
+            || Err(Error::PatchConflict),
         );
 
         assert!(result.is_err());
@@ -6865,7 +6870,10 @@ mod tests {
         assert_eq!(restored.bytes(), source.bytes());
 
         let other = Snapshot::open(doc(&["other"]), Limits::default()).expect("other source");
-        assert!(matches!(commit.patch().apply(&other), Err(Error::Conflict)));
+        assert!(matches!(
+            commit.patch().apply(&other),
+            Err(Error::PatchConflict)
+        ));
     }
 
     #[test]
@@ -7138,7 +7146,7 @@ mod tests {
         collision.fingerprint_cache = cache;
         assert_eq!(collision.fingerprint(), source_fingerprint);
         assert_ne!(collision.bytes(), patch.before.bytes());
-        assert!(matches!(patch.apply(&collision), Err(Error::Conflict)));
+        assert!(matches!(patch.apply(&collision), Err(Error::PatchConflict)));
     }
 
     #[test]
@@ -7828,7 +7836,7 @@ mod tests {
             .expect("stale edit");
         assert!(matches!(
             stale_receiver.apply_transfer(&transfer),
-            Err(Error::Conflict)
+            Err(Error::PatchConflict)
         ));
     }
 
@@ -8137,7 +8145,7 @@ mod tests {
             mismatched.graph.data_offset = Some(u32::MAX);
             assert!(matches!(
                 edit.apply_picture_transfer(&mismatched),
-                Err(Error::Conflict)
+                Err(Error::PatchConflict)
             ));
             assert_eq!(edit.retained_render_bytes(), held);
             assert_eq!(edit.changes.len(), changes);

@@ -271,8 +271,8 @@ impl Package {
     ///
     /// # Errors
     ///
-    /// Returns [`body_text::Error::Conflict`] when either patch was made from
-    /// another package, and a refusal for auxiliary-table changes.
+    /// Returns [`body_text::Error::PatchConflict`] when either patch was made
+    /// from another package, and a refusal for auxiliary-table changes.
     pub fn plan_three_way(&self, left: &Patch, right: &Patch) -> Result<ThreeWayPlan> {
         Ok(ThreeWayPlan {
             package: self.clone(),
@@ -368,8 +368,9 @@ impl ThreeWayPlan {
     ///
     /// # Errors
     ///
-    /// Returns [`body_text::Error::Conflict`] for a conflicting plan and the
-    /// staging, publication and reopen errors of [`Edit::commit`].
+    /// Returns [`body_text::Error::Conflict`] for a three-way plan whose
+    /// branches write the same facet differently, and the staging, publication
+    /// and reopen errors of [`Edit::commit`].
     pub fn commit(self) -> Result<Commit> {
         let inner = self.inner.into_edit().map_err(Error::from)?;
         Edit::from_body(self.package, inner).commit()
