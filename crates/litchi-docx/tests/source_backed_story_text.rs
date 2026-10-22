@@ -614,7 +614,7 @@ fn strict_xml_rejects_duplicate_attributes_and_mismatched_end_names() {
 }
 
 #[test]
-fn patches_reject_foreign_and_stale_snapshots_and_cancel_before_output() {
+fn patches_accept_matching_copy_and_reject_stale_snapshots_and_cancel_before_output() {
     let source = fixture();
     let package = open(&source);
     let snapshot = package
