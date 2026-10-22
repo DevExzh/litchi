@@ -42,7 +42,7 @@ impl Patch {
     /// The durable record patch of this change, bound to the complete
     /// artifact it applies to: for a commit's patch, the artifact of the
     /// package it was committed on; for its inverse, the committed
-    /// package's output. Serialize it with `to_bytes` and replay it with
+    /// package's output. Serialize it with `to_bytes(limits)` and replay it with
     /// `Patch::from` (record 0355a).
     ///
     /// # Errors

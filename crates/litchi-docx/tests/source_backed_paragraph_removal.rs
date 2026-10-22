@@ -175,9 +175,9 @@ fn publication_raw_copies_others_and_both_inverse_paths_restore_exact_artifact()
         .inverse()
         .durable()
         .unwrap()
-        .to_bytes()
+        .to_bytes(Limits::default())
         .unwrap();
-    let inverse = Patch::from_bytes(&inverse_wire).unwrap();
+    let inverse = Patch::from_bytes(&inverse_wire, Limits::default()).unwrap();
     let mut durable_restored = Vec::new();
     open(output.clone())
         .apply_plain_paragraph_removal(&inverse.clone().into())
@@ -201,13 +201,25 @@ fn durable_removal_is_canonical_semantically_closed_and_whole_artifact_bound() {
     let mut edit = snapshot.removal_edit();
     edit.remove_plain_paragraph(Position::new(1)).unwrap();
     let commit = edit.commit();
-    let wire = commit.patch().to_bytes().unwrap();
+    let wire = commit.patch().to_bytes(Limits::default()).unwrap();
+    let caller_limits = Limits::new(1024, 4, 100, 8, 2048, wire.len() - 1).unwrap();
     assert!(matches!(
-        CopyPatch::from_bytes(&wire),
+        commit.patch().to_bytes(caller_limits),
+        Err(Error::Limit {
+            kind: source_backed::paragraph_copy::LimitKind::DurablePatchBytes,
+            ..
+        })
+    ));
+    assert!(matches!(
+        Patch::from_bytes(&wire, caller_limits),
         Err(Error::InvalidDurable)
     ));
-    let durable = Patch::from_bytes(&wire).unwrap();
-    assert_eq!(durable.to_bytes().unwrap(), wire);
+    assert!(matches!(
+        CopyPatch::from_bytes(&wire, Limits::default()),
+        Err(Error::InvalidDurable)
+    ));
+    let durable = Patch::from_bytes(&wire, Limits::default()).unwrap();
+    assert_eq!(durable.to_bytes(Limits::default()).unwrap(), wire);
     assert_eq!(
         durable.apply(&snapshot).unwrap().xml_bytes(),
         commit.projected().xml_bytes()
@@ -238,13 +250,13 @@ fn durable_removal_is_canonical_semantically_closed_and_whole_artifact_bound() {
     let mut noncanonical_reserved = wire.clone();
     noncanonical_reserved[62..66].copy_from_slice(&1u32.to_le_bytes());
     assert!(matches!(
-        Patch::from_bytes(&noncanonical_reserved),
+        Patch::from_bytes(&noncanonical_reserved, Limits::default()),
         Err(Error::InvalidDurable)
     ));
     let mut forged_target = wire;
     let last = forged_target.len() - 1;
     forged_target[last] ^= 1;
-    assert!(Patch::from_bytes(&forged_target).is_err());
+    assert!(Patch::from_bytes(&forged_target, Limits::default()).is_err());
 }
 
 #[test]
@@ -311,7 +323,7 @@ fn invalid_positions_operation_and_resource_limits_leave_projection_unchanged() 
     let mut edit = snapshot.removal_edit();
     edit.remove_plain_paragraph(Position::new(0)).unwrap();
     assert!(matches!(
-        edit.commit().patch().to_bytes(),
+        edit.commit().patch().to_bytes(Limits::default()),
         Err(Error::Limit {
             kind: source_backed::paragraph_copy::LimitKind::DurablePatchBytes,
             ..
@@ -330,8 +342,14 @@ fn empty_edit_is_exact_noop_and_security_or_complexity_refuses_before_editing() 
         .commit();
     assert!(commit.patch().is_noop());
     assert!(commit.effect_report().is_noop());
-    let wire = commit.patch().to_bytes().unwrap();
-    assert_eq!(Patch::from_bytes(&wire).unwrap().to_bytes().unwrap(), wire);
+    let wire = commit.patch().to_bytes(Limits::default()).unwrap();
+    assert_eq!(
+        Patch::from_bytes(&wire, Limits::default())
+            .unwrap()
+            .to_bytes(Limits::default())
+            .unwrap(),
+        wire
+    );
     let mut output = Vec::new();
     package
         .apply_plain_paragraph_removal(&commit.patch().clone().into())

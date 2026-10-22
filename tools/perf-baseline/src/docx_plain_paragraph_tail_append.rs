@@ -721,12 +721,12 @@ fn build_candidate(
     let commit = edit.commit();
     let candidate_xml = commit.projected().xml_bytes().to_vec();
     let effect = commit.effect_report();
-    let wire = commit.patch().to_bytes()?;
-    let durable = Patch::from_bytes(&wire)?;
+    let wire = commit.patch().to_bytes(limits)?;
+    let durable = Patch::from_bytes(&wire, limits)?;
     let replayed = durable.apply(&snapshot)?;
     let replay_verified = replayed.xml_bytes() == candidate_xml;
     let inverse_verified = durable.inverse().apply(&replayed)?.xml_bytes() == source_xml_bytes;
-    let canonical = durable.to_bytes()? == wire;
+    let canonical = durable.to_bytes(limits)? == wire;
 
     let stale_archive = source_archive(source_xml_bytes, 1)?;
     let stale_source: Arc<dyn ReadAt> = Arc::new(OwnedSource::new(stale_archive));

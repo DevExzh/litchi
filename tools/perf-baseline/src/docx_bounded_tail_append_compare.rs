@@ -36,7 +36,8 @@ use litchi_docx::source_backed::paragraph_copy::Limits as CopyLimits;
 // this import narrow so the benchmark does not reach into OPC internals.
 use litchi_docx::Package as OwnedDocxPackage;
 use litchi_docx::source_backed::tail_append::{
-    CandidateProof as TailAppendCandidateProof, Limits as TailAppendLimits,
+    CandidateProof as TailAppendCandidateProof, EditOptions as TailAppendEditOptions,
+    Limits as TailAppendLimits,
     SourceProof as TailAppendSourceProof,
 };
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
@@ -942,8 +943,8 @@ fn build_materialized_candidate(
     let expected = independent_candidate_xml(source_xml_bytes, &append_text(count))?;
     let output_xml = commit.projected().xml_bytes();
     let candidate_xml_expected = output_xml == expected.as_slice();
-    let wire = commit.patch().to_bytes()?;
-    let durable = litchi_docx::source_backed::paragraph_copy::Patch::from_bytes(&wire)?;
+    let wire = commit.patch().to_bytes(limits)?;
+    let durable = litchi_docx::source_backed::paragraph_copy::Patch::from_bytes(&wire, limits)?;
     let replayed = durable.apply(&snapshot)?;
     let replay_verified = replayed.xml_bytes() == output_xml;
     if !candidate_xml_expected || !replay_verified {
@@ -1047,7 +1048,10 @@ fn bounded_noop_oracle(source_archive_bytes: &[u8], limits: TailAppendLimits) ->
     let package = litchi_docx::source_backed::Package::from_read_at(Arc::new(OwnedSource::new(
         source_archive_bytes.to_vec(),
     )))?;
-    let plan = package.tail_append_noop().with_limits(limits).prepare()?;
+    let plan = package
+        .tail_append_noop()
+        .with_options(TailAppendEditOptions::new(limits))
+        .prepare()?;
     if !plan.is_noop() {
         return Ok(false);
     }
