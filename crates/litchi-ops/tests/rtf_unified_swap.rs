@@ -105,7 +105,7 @@ fn swapping_identical_plain_paragraphs_is_an_exact_noop() {
 }
 
 #[test]
-fn mixed_edits_keep_sequential_paths_and_identity_bound_history() {
+fn mixed_edits_keep_sequential_paths_and_content_bound_history() {
     let source = file();
     let commit = source
         .edit(|edit| {
@@ -134,8 +134,23 @@ fn mixed_edits_keep_sequential_paths_and_identity_bound_history() {
             .unwrap(),
         INPUT
     );
+    assert_eq!(
+        commit.patch().apply(&file()).unwrap().to_bytes().unwrap(),
+        commit.file().to_bytes().unwrap()
+    );
+    let reopened = open_bytes(commit.file().to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        commit
+            .patch()
+            .inverse()
+            .apply(&reopened)
+            .unwrap()
+            .to_bytes()
+            .unwrap(),
+        INPUT
+    );
     assert!(matches!(
-        commit.patch().apply(&file()).unwrap_err().leaf(),
+        commit.patch().apply(commit.file()).unwrap_err().leaf(),
         Source::Transaction(Error::PatchConflict)
     ));
 }

@@ -163,8 +163,23 @@ fn query_fanout_uses_one_native_batch_and_history_has_exact_endpoints() {
             .unwrap(),
         INPUT
     );
+    assert_eq!(
+        commit.patch().apply(&file()).unwrap().to_bytes().unwrap(),
+        commit.file().to_bytes().unwrap()
+    );
+    let reopened = open_bytes(commit.file().to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        commit
+            .patch()
+            .inverse()
+            .apply(&reopened)
+            .unwrap()
+            .to_bytes()
+            .unwrap(),
+        INPUT
+    );
     assert!(matches!(
-        commit.patch().apply(&file()).unwrap_err().leaf(),
+        commit.patch().apply(commit.file()).unwrap_err().leaf(),
         Source::Transaction(Error::PatchConflict)
     ));
 }

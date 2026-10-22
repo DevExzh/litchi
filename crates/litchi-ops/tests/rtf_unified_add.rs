@@ -180,12 +180,30 @@ fn add_set_move_remove_resolve_sequentially_and_undo_exactly() {
             .unwrap(),
         before
     );
-    assert!(matches!(
+    let independent = create(FileFormat::Rtf).unwrap();
+    assert_eq!(independent.to_bytes().unwrap(), before);
+    assert_eq!(
         commit
             .patch()
-            .apply(&create(FileFormat::Rtf).unwrap())
-            .unwrap_err()
-            .leaf(),
+            .apply(&independent)
+            .unwrap()
+            .to_bytes()
+            .unwrap(),
+        commit.file().to_bytes().unwrap()
+    );
+    let reopened = open_bytes(commit.file().to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        commit
+            .patch()
+            .inverse()
+            .apply(&reopened)
+            .unwrap()
+            .to_bytes()
+            .unwrap(),
+        before
+    );
+    assert!(matches!(
+        commit.patch().apply(commit.file()).unwrap_err().leaf(),
         Source::Transaction(Error::PatchConflict)
     ));
 }

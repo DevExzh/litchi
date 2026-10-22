@@ -83,7 +83,7 @@ fn adjacent_empty_and_last_paragraph_removal_preserves_survivors() {
 }
 
 #[test]
-fn mixed_edits_are_sequential_reversible_and_identity_bound() {
+fn mixed_edits_are_sequential_reversible_and_content_bound() {
     let source = file();
     let commit = source
         .edit(|edit| {
@@ -113,8 +113,23 @@ fn mixed_edits_are_sequential_reversible_and_identity_bound() {
             .unwrap(),
         INPUT
     );
+    assert_eq!(
+        commit.patch().apply(&file()).unwrap().to_bytes().unwrap(),
+        commit.file().to_bytes().unwrap()
+    );
+    let reopened = open_bytes(commit.file().to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        commit
+            .patch()
+            .inverse()
+            .apply(&reopened)
+            .unwrap()
+            .to_bytes()
+            .unwrap(),
+        INPUT
+    );
     assert!(matches!(
-        commit.patch().apply(&file()).unwrap_err().leaf(),
+        commit.patch().apply(commit.file()).unwrap_err().leaf(),
         Source::Transaction(Error::PatchConflict)
     ));
 }

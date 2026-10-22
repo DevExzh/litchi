@@ -132,8 +132,23 @@ fn selector_fanout_and_mixed_properties_match_one_native_commit() {
             .unwrap(),
         INPUT
     );
+    assert_eq!(
+        commit.patch().apply(&file()).unwrap().to_bytes().unwrap(),
+        commit.file().to_bytes().unwrap()
+    );
+    let reopened = open_bytes(commit.file().to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        commit
+            .patch()
+            .inverse()
+            .apply(&reopened)
+            .unwrap()
+            .to_bytes()
+            .unwrap(),
+        INPUT
+    );
     assert!(matches!(
-        commit.patch().apply(&file()).unwrap_err().leaf(),
+        commit.patch().apply(commit.file()).unwrap_err().leaf(),
         Source::Transaction(Error::PatchConflict)
     ));
     let alignment_only = source
