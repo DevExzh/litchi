@@ -1,4 +1,4 @@
-# 0362r — DOCX variables raw codec tree
+# 0362ra — DOCX variables raw codec tree
 
 This slice starts from `a18593385c` on `uo2/w8-docx-variables`. It closes
 the document-variables row as a raw codec model; it does not claim the other
@@ -34,8 +34,18 @@ retains that policy for later edits and rewrites.
 The typed `Variables` collection remains available as a data model. Its
 convenience `insert`/`validate` methods retain the format hard bounds; raw
 ingress, mutation, and output through `raw::Tree` use the caller's `Limits`
-before allocating or publishing. `Tree::from_xml` and its base clone use
-fallible admission; output checks include unchanged and rewritten paths.
+before allocating or publishing. `Tree::from_xml` and `Snapshot::from_xml`
+take an owned `Vec<u8>` so these APIs do not silently copy an oversized slice
+before admission. Their base clone and output buffers use fallible
+reservation. An unchanged tree retains the parsed source depth and typed
+collection limits, so a caller cannot bypass a stricter output policy by
+choosing the no-op path.
+
+Resource failures use the crate's typed `settings::LimitKind` through
+`Error::SettingsLimit`: XML bytes, XML depth, variable count, name characters,
+and value characters are distinct observations. Invalid policy construction
+is still a request error, while allocation failures retain their allocator
+source.
 
 ## Validation
 
@@ -51,7 +61,7 @@ cargo test --offline --locked -p litchi-docx \
 cargo clippy --offline --locked -p litchi-docx --all-targets --all-features -- -D warnings
 ```
 
-The final variables run passed 15 tests. The retained source-backed run passed
+The final variables run passed 16 tests. The retained source-backed run passed
 18 + 9 + 6 tests. The final all-target/all-feature Clippy run finished with
 `Finished dev profile` and no diagnostics. The first all-target attempt is
 retained because it caught the now-migrated integration consumer that called
@@ -59,9 +69,9 @@ the private engine `try_edit`:
 
 | receipt | bytes | SHA-256 |
 | --- | ---: | --- |
-| `.coord/w8-docx-variables/variables-tests-final.log` | 1,803 | `ae4d456f9e518056ef6d6a189c829dfc25d390de0f597191144d11fad14216f0` |
-| `.coord/w8-docx-variables/source-backed-tests.log` | 3,330 | `a729196178ff3a759f68186448599ef756849d50ec936cc48e02a073ef942468` |
-| `.coord/w8-docx-variables/clippy-all-targets-final.log` | 222 | `090bcbbcf75d5bd00eae6f2e5da226cb83fe56f1eed34286f4365010c35cd282` |
+| `.coord/w8-docx-variables/variables-tests-policy-final.log` | 1,949 | `5d59760add22d8f08833b31675f315c4dbc0650ad1e414ac05c0817622297a17` |
+| `.coord/w8-docx-variables/source-backed-policy-final.log` | 3,544 | `1530fe6a39af01563de08c54d2e2af34e442d0b98ee84e41abf95a6550d0344e` |
+| `.coord/w8-docx-variables/clippy-policy-final.log` | 170 | `94bc541edd44e5a8d1c7b24de1635ab4ee6176a54cdacd4ddfc8268282b5c835` |
 | `.coord/w8-docx-variables/clippy-all-targets-failed.log` | 759 | `08c2b42f95a91680e62184308fd4770b6a8c885d85185ae2b2cac89f5ff37ec5` |
 
 The external receipts are intentionally outside the repository. No benchmark

@@ -105,10 +105,11 @@ impl Variables {
             return Ok(Some(std::mem::replace(existing, value)));
         }
         if self.variables.len() >= limits.max_variables() {
-            return Err(invalid(format!(
-                "document variables exceed the {} entry limit",
-                limits.max_variables()
-            )));
+            return Err(limit_error(
+                crate::settings::LimitKind::DocumentVariableCount,
+                self.variables.len().saturating_add(1),
+                limits.max_variables(),
+            ));
         }
         self.variables
             .try_reserve(1)
@@ -145,10 +146,11 @@ impl Variables {
 
     pub(crate) fn validate_with_limits(&self, limits: &Limits) -> Result<()> {
         if self.variables.len() > limits.max_variables() {
-            return Err(invalid(format!(
-                "document variables exceed the {} entry limit",
-                limits.max_variables()
-            )));
+            return Err(limit_error(
+                crate::settings::LimitKind::DocumentVariableCount,
+                self.variables.len(),
+                limits.max_variables(),
+            ));
         }
         for (name, value) in &self.variables {
             validate_document_variable_with_limits(name, value, limits)?;
@@ -164,10 +166,11 @@ impl Variables {
     ) -> Result<()> {
         validate_document_variable_with_limits(&name, &value, limits)?;
         if self.variables.len() >= limits.max_variables() {
-            return Err(invalid(format!(
-                "document variables exceed the {} entry limit",
-                limits.max_variables()
-            )));
+            return Err(limit_error(
+                crate::settings::LimitKind::DocumentVariableCount,
+                self.variables.len().saturating_add(1),
+                limits.max_variables(),
+            ));
         }
         self.variables
             .try_reserve(1)
@@ -203,16 +206,18 @@ impl Default for Variables {
 fn validate_document_variable_with_limits(name: &str, value: &str, limits: &Limits) -> Result<()> {
     let name_chars = name.chars().count();
     if !(1..=limits.max_name_chars()).contains(&name_chars) {
-        return Err(invalid(format!(
-            "document variable name must contain 1 to {} characters",
-            limits.max_name_chars()
-        )));
+        return Err(limit_error(
+            crate::settings::LimitKind::DocumentVariableNameChars,
+            name_chars,
+            limits.max_name_chars(),
+        ));
     }
     if value.chars().count() > limits.max_value_chars() {
-        return Err(invalid(format!(
-            "document variable value exceeds {} characters",
-            limits.max_value_chars()
-        )));
+        return Err(limit_error(
+            crate::settings::LimitKind::DocumentVariableValueChars,
+            value.chars().count(),
+            limits.max_value_chars(),
+        ));
     }
     Ok(())
 }
@@ -228,8 +233,12 @@ fn try_clone_string(value: &str) -> Result<String> {
     Ok(copy)
 }
 
-fn invalid(message: impl Into<String>) -> Error {
-    Error::Invalid(message.into())
+fn limit_error(kind: crate::settings::LimitKind, actual: usize, maximum: usize) -> Error {
+    Error::SettingsLimit {
+        kind,
+        actual,
+        maximum,
+    }
 }
 
 #[cfg(test)]

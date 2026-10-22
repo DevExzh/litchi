@@ -2202,12 +2202,6 @@ impl Package {
         let data = settings_part.data()?;
         let raw = data.into_arc()?;
         let variable_limits = variables::raw::Limits::default();
-        if raw.len() > variable_limits.max_xml_bytes() {
-            return Err(Error::InvalidFormat(format!(
-                "settings XML exceeds the {} byte document-variable limit",
-                variable_limits.max_xml_bytes()
-            )));
-        }
         admit_settings_source(raw.as_slice(), operation)?;
         let policy = variables::inspect_source_policy(raw.as_slice(), &variable_limits)?;
         let settings_strict = relationship.reltype() == STRICT_SETTINGS;

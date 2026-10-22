@@ -26,8 +26,10 @@ pub struct Limits {
 impl Limits {
     /// Construct a bounded raw settings policy.
     ///
-    /// Every value must be nonzero and no larger than the format's hard
-    /// bound.  The limits are used for parsing, mutation, and serialization.
+    /// XML bytes and nesting must be nonzero; collection and character limits
+    /// may be zero when an empty model is required. No value may exceed the
+    /// format's hard bound. The limits are used for parsing, mutation, and
+    /// serialization.
     pub fn new(
         max_xml_bytes: usize,
         max_depth: usize,
@@ -83,13 +85,13 @@ impl Limits {
         if self.max_depth == 0 || self.max_depth > MAX_DOCUMENT_VARIABLE_DEPTH {
             return Err(invalid("raw document-variable depth limit is out of range"));
         }
-        if self.max_variables == 0 || self.max_variables > MAX_DOCUMENT_VARIABLES {
+        if self.max_variables > MAX_DOCUMENT_VARIABLES {
             return Err(invalid("raw document-variable count limit is out of range"));
         }
-        if self.max_name_chars == 0 || self.max_name_chars > MAX_DOCUMENT_VARIABLE_NAME_CHARS {
+        if self.max_name_chars > MAX_DOCUMENT_VARIABLE_NAME_CHARS {
             return Err(invalid("raw document-variable name limit is out of range"));
         }
-        if self.max_value_chars == 0 || self.max_value_chars > MAX_DOCUMENT_VARIABLE_VALUE_CHARS {
+        if self.max_value_chars > MAX_DOCUMENT_VARIABLE_VALUE_CHARS {
             return Err(invalid("raw document-variable value limit is out of range"));
         }
         Ok(())
@@ -112,18 +114,23 @@ impl Default for Limits {
 #[derive(Debug, Clone)]
 pub struct Tree {
     source_xml: Vec<u8>,
+    source_depth: usize,
     base: Variables,
     variables: Variables,
 }
 
 impl Tree {
     /// Parse a complete settings XML payload under the required raw policy.
-    pub fn from_xml(xml: impl Into<Vec<u8>>, limits: Limits) -> Result<Self> {
-        let xml = xml.into();
-        let variables = codec::parse_variables(&xml, &limits)?;
+    ///
+    /// The owned `Vec` input is intentional: the caller performs any input
+    /// copy before this boundary, so an oversized slice is never copied before
+    /// the required byte admission check.
+    pub fn from_xml(xml: Vec<u8>, limits: Limits) -> Result<Self> {
+        let (variables, source_depth) = codec::parse_variables_with_depth(&xml, &limits)?;
         let base = variables.try_clone()?;
         Ok(Self {
             source_xml: xml,
+            source_depth,
             base,
             variables,
         })
@@ -148,6 +155,7 @@ impl Tree {
         value: impl Into<String>,
         limits: Limits,
     ) -> Result<Option<String>> {
+        self.variables.validate_with_limits(&limits)?;
         self.variables.insert_with_limits(name, value, &limits)
     }
 
@@ -174,6 +182,7 @@ impl Tree {
         limits: Limits,
         edit: impl FnOnce(&mut Variables) -> Result<()>,
     ) -> Result<()> {
+        self.variables.validate_with_limits(&limits)?;
         let mut candidate = self.variables.try_clone()?;
         edit(&mut candidate)?;
         candidate.validate_with_limits(&limits)?;
@@ -183,12 +192,21 @@ impl Tree {
 
     /// Serialize the current tree under the required raw policy.
     pub fn to_bytes(&self, limits: Limits) -> Result<Vec<u8>> {
+        self.variables.validate_with_limits(&limits)?;
+        if self.source_depth > limits.max_depth() {
+            return Err(limit_error(
+                crate::settings::LimitKind::DocumentVariableDepth,
+                self.source_depth,
+                limits.max_depth(),
+            ));
+        }
         if !self.changed() {
             if self.source_xml.len() > limits.max_xml_bytes() {
-                return Err(invalid(format!(
-                    "source settings XML exceeds the {} byte document-variable limit",
-                    limits.max_xml_bytes()
-                )));
+                return Err(limit_error(
+                    crate::settings::LimitKind::DocumentVariableXmlBytes,
+                    self.source_xml.len(),
+                    limits.max_xml_bytes(),
+                ));
             }
             let mut bytes = Vec::new();
             bytes
@@ -211,6 +229,14 @@ impl Tree {
 
 fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
+}
+
+fn limit_error(kind: crate::settings::LimitKind, actual: usize, maximum: usize) -> Error {
+    Error::SettingsLimit {
+        kind,
+        actual,
+        maximum,
+    }
 }
 
 #[cfg(test)]
@@ -263,5 +289,31 @@ mod tests {
         let stricter = limits(source.len() - 1);
         assert!(tree.to_bytes(stricter).is_err());
         assert!(!tree.changed());
+    }
+
+    #[test]
+    fn unchanged_output_rechecks_depth_and_collection_limits() {
+        let source = format!(
+            r#"<w:settings xmlns:w="{W}"><w:docVars><w:docVar w:name="name" w:val="value"/></w:docVars></w:settings>"#
+        );
+        let admitted = limits(1024);
+        let tree = Tree::from_xml(source.as_bytes().to_vec(), admitted).unwrap();
+
+        let depth_tight = Limits::new(1024, 1, 16, 32, 128).unwrap();
+        assert!(matches!(
+            tree.to_bytes(depth_tight),
+            Err(Error::SettingsLimit {
+                kind: crate::settings::LimitKind::DocumentVariableDepth,
+                ..
+            })
+        ));
+        let count_tight = Limits::new(1024, 64, 0, 32, 128).unwrap();
+        assert!(matches!(
+            tree.to_bytes(count_tight),
+            Err(Error::SettingsLimit {
+                kind: crate::settings::LimitKind::DocumentVariableCount,
+                ..
+            })
+        ));
     }
 }

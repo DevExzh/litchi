@@ -24,8 +24,8 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn from_xml(xml: impl Into<Vec<u8>>, limits: Limits) -> Result<Self> {
-        Self::from_shared_xml(Arc::new(xml.into()), limits)
+    pub fn from_xml(xml: Vec<u8>, limits: Limits) -> Result<Self> {
+        Self::from_shared_xml(Arc::new(xml), limits)
     }
 
     pub(crate) fn from_shared_xml(xml: Arc<Vec<u8>>, limits: Limits) -> Result<Self> {
@@ -60,13 +60,6 @@ impl Snapshot {
     #[must_use]
     pub const fn variables(&self) -> &Variables {
         &self.variables
-    }
-
-    /// Alias for [`Self::variables`] when the owner is used as a collection.
-    #[inline]
-    #[must_use]
-    pub const fn collection(&self) -> &Variables {
-        self.variables()
     }
 
     /// Start an isolated source-checked edit.

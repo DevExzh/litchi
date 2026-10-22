@@ -117,16 +117,25 @@ impl Variables {
 ///
 /// Returns an error if the operation cannot be completed.
 pub fn parse_variables(xml: &[u8], limits: &Limits) -> Result<Variables> {
+    parse_variables_with_depth(xml, limits).map(|(variables, _)| variables)
+}
+
+pub(super) fn parse_variables_with_depth(
+    xml: &[u8],
+    limits: &Limits,
+) -> Result<(Variables, usize)> {
     if xml.len() > limits.max_xml_bytes() {
-        return Err(invalid(format!(
-            "settings XML exceeds the {} byte document-variable limit",
-            limits.max_xml_bytes()
-        )));
+        return Err(limit_error(
+            crate::settings::LimitKind::DocumentVariableXmlBytes,
+            xml.len(),
+            limits.max_xml_bytes(),
+        ));
     }
     let mut reader = NsReader::from_reader(xml);
     let mut variables = Variables::new();
     let mut names = Vec::new();
     let mut depth = 0usize;
+    let mut max_depth_seen = 0usize;
     let mut saw_root = false;
     let mut saw_doc_vars = false;
     let mut doc_vars_depth = None;
@@ -146,11 +155,13 @@ pub fn parse_variables(xml: &[u8], limits: &Limits) -> Result<Variables> {
                 depth = depth
                     .checked_add(1)
                     .ok_or_else(|| invalid("document-variable XML nesting overflow"))?;
+                max_depth_seen = max_depth_seen.max(depth);
                 if depth > limits.max_depth() {
-                    return Err(invalid(format!(
-                        "document-variable XML exceeds depth {}",
-                        limits.max_depth()
-                    )));
+                    return Err(limit_error(
+                        crate::settings::LimitKind::DocumentVariableDepth,
+                        depth,
+                        limits.max_depth(),
+                    ));
                 }
                 if depth == 1 {
                     validate_settings_root(&namespace, &element, saw_root)?;
@@ -186,11 +197,13 @@ pub fn parse_variables(xml: &[u8], limits: &Limits) -> Result<Variables> {
                 let child_depth = depth
                     .checked_add(1)
                     .ok_or_else(|| invalid("document-variable XML nesting overflow"))?;
+                max_depth_seen = max_depth_seen.max(child_depth);
                 if child_depth > limits.max_depth() {
-                    return Err(invalid(format!(
-                        "document-variable XML exceeds depth {}",
-                        limits.max_depth()
-                    )));
+                    return Err(limit_error(
+                        crate::settings::LimitKind::DocumentVariableDepth,
+                        child_depth,
+                        limits.max_depth(),
+                    ));
                 }
                 if child_depth == 1 {
                     validate_settings_root(&namespace, &element, saw_root)?;
@@ -268,15 +281,16 @@ pub fn parse_variables(xml: &[u8], limits: &Limits) -> Result<Variables> {
             duplicate[0]
         )));
     }
-    Ok(variables)
+    Ok((variables, max_depth_seen))
 }
 
 pub(crate) fn inspect_source_policy(xml: &[u8], limits: &Limits) -> Result<SourcePolicy> {
     if xml.len() > limits.max_xml_bytes() {
-        return Err(invalid(format!(
-            "settings XML exceeds the {} byte document-variable limit",
-            limits.max_xml_bytes()
-        )));
+        return Err(limit_error(
+            crate::settings::LimitKind::DocumentVariableXmlBytes,
+            xml.len(),
+            limits.max_xml_bytes(),
+        ));
     }
     let mut reader = NsReader::from_reader(xml);
     reader.config_mut().check_end_names = true;
@@ -298,10 +312,11 @@ pub(crate) fn inspect_source_policy(xml: &[u8], limits: &Limits) -> Result<Sourc
                     .checked_add(1)
                     .ok_or_else(|| invalid("settings XML nesting overflow"))?;
                 if depth > limits.max_depth() {
-                    return Err(invalid(format!(
-                        "settings XML exceeds depth {}",
-                        limits.max_depth()
-                    )));
+                    return Err(limit_error(
+                        crate::settings::LimitKind::DocumentVariableDepth,
+                        depth,
+                        limits.max_depth(),
+                    ));
                 }
                 if depth == 1 {
                     dialect = Some(settings_root_dialect(&namespace, &element)?);
@@ -320,10 +335,11 @@ pub(crate) fn inspect_source_policy(xml: &[u8], limits: &Limits) -> Result<Sourc
                     .checked_add(1)
                     .ok_or_else(|| invalid("settings XML nesting overflow"))?;
                 if child_depth > limits.max_depth() {
-                    return Err(invalid(format!(
-                        "settings XML exceeds depth {}",
-                        limits.max_depth()
-                    )));
+                    return Err(limit_error(
+                        crate::settings::LimitKind::DocumentVariableDepth,
+                        child_depth,
+                        limits.max_depth(),
+                    ));
                 }
                 if child_depth == 1 {
                     dialect = Some(settings_root_dialect(&namespace, &element)?);
@@ -479,10 +495,11 @@ struct SettingsLayout {
 
 fn scan_settings_layout(xml: &[u8], limits: &Limits) -> Result<SettingsLayout> {
     if xml.len() > limits.max_xml_bytes() {
-        return Err(invalid(format!(
-            "settings XML exceeds the {} byte document-variable limit",
-            limits.max_xml_bytes()
-        )));
+        return Err(limit_error(
+            crate::settings::LimitKind::DocumentVariableXmlBytes,
+            xml.len(),
+            limits.max_xml_bytes(),
+        ));
     }
 
     let mut reader = NsReader::from_reader(xml);
@@ -512,10 +529,11 @@ fn scan_settings_layout(xml: &[u8], limits: &Limits) -> Result<SettingsLayout> {
                     .checked_add(1)
                     .ok_or_else(|| invalid("document-variable XML nesting overflow"))?;
                 if depth > limits.max_depth() {
-                    return Err(invalid(format!(
-                        "document-variable XML exceeds depth {}",
-                        limits.max_depth()
-                    )));
+                    return Err(limit_error(
+                        crate::settings::LimitKind::DocumentVariableDepth,
+                        depth,
+                        limits.max_depth(),
+                    ));
                 }
                 if depth == 1 {
                     capture_settings_root(&mut layout, &namespace, &element)?;
@@ -541,10 +559,11 @@ fn scan_settings_layout(xml: &[u8], limits: &Limits) -> Result<SettingsLayout> {
                     .checked_add(1)
                     .ok_or_else(|| invalid("document-variable XML nesting overflow"))?;
                 if child_depth > limits.max_depth() {
-                    return Err(invalid(format!(
-                        "document-variable XML exceeds depth {}",
-                        limits.max_depth()
-                    )));
+                    return Err(limit_error(
+                        crate::settings::LimitKind::DocumentVariableDepth,
+                        child_depth,
+                        limits.max_depth(),
+                    ));
                 }
                 if child_depth == 1 {
                     capture_settings_root(&mut layout, &namespace, &element)?;
@@ -682,10 +701,11 @@ fn document_variables_element_len(
     }
     capacity = checked_len_add(capacity, 2 + prefix.len() + ":docVars>".len())?;
     if capacity > limits.max_xml_bytes() {
-        return Err(invalid(format!(
-            "encoded document variables exceed the {} byte limit",
-            limits.max_xml_bytes()
-        )));
+        return Err(limit_error(
+            crate::settings::LimitKind::DocumentVariableXmlBytes,
+            capacity,
+            limits.max_xml_bytes(),
+        ));
     }
     Ok(capacity)
 }
@@ -875,10 +895,11 @@ fn escaped_attribute_len(value: &str) -> Result<usize> {
 
 fn ensure_output_limit(length: usize, limits: &Limits) -> Result<()> {
     if length > limits.max_xml_bytes() {
-        return Err(invalid(format!(
-            "rewritten settings XML exceeds the {} byte document-variable limit",
-            limits.max_xml_bytes()
-        )));
+        return Err(limit_error(
+            crate::settings::LimitKind::DocumentVariableXmlBytes,
+            length,
+            limits.max_xml_bytes(),
+        ));
     }
     Ok(())
 }
@@ -1028,6 +1049,14 @@ fn escape_attribute(output: &mut String, value: &str) {
 
 fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
+}
+
+fn limit_error(kind: crate::settings::LimitKind, actual: usize, maximum: usize) -> Error {
+    Error::SettingsLimit {
+        kind,
+        actual,
+        maximum,
+    }
 }
 
 fn xml_error(message: impl Into<String>) -> Error {
