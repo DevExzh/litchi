@@ -237,25 +237,51 @@ impl Patch {
     ///
     /// # Errors
     /// Returns a typed [`Error::PatchConflict`] for changed or mismatched
-    /// content, protected state errors for signed/locked input, or source
-    /// freshness failures.
+    /// content, protected state errors for changed signed/locked input, or
+    /// source freshness failures. An exact no-op may replay onto a signed
+    /// recipient after its published bytes match the recorded base.
     pub fn apply(&self, file: &File) -> Result<File> {
+        let exact_noop = self.is_noop();
         let result = (|| {
-            check_source(file)?;
+            if exact_noop {
+                check_source_for_replay(file)?;
+            } else {
+                check_source(file)?;
+            }
             self.check_sources()?;
             let (source, target) = if self.inverse {
                 (&self.inner.target, &self.inner.source)
             } else {
                 (&self.inner.source, &self.inner.target)
             };
-            if !same_snapshot(file, source) && !same_content(file, source)? {
+            let matches_recorded_base = if exact_noop && (file.is_signed() || source.is_signed()) {
+                // A signed recipient must always go through the byte proof,
+                // even when its leaf owner happens to be the same Arc as the
+                // patch source. The caller's published bytes are the replay
+                // admission fact; owner identity alone is insufficient.
+                same_content_for_replay(file, source, true)?
+            } else {
+                same_snapshot(file, source) || same_content_for_replay(file, source, exact_noop)?
+            };
+            if !matches_recorded_base {
                 return Err(Error::PatchConflict.into());
             }
-            let target = target.clone();
+            let target = if exact_noop && file.is_signed() {
+                // Retain the recipient wrapper and signature bytes. The
+                // fingerprint above proves it is the patch base; cloning the
+                // recorded unsigned endpoint would silently discard them.
+                file.clone()
+            } else {
+                target.clone()
+            };
             self.check_sources()?;
             Ok(target)
         })();
-        check_source(file)?;
+        if exact_noop {
+            check_source_for_replay(file)?;
+        } else {
+            check_source(file)?;
+        }
         result
     }
     fn check_sources(&self) -> Result<()> {
@@ -3796,6 +3822,61 @@ fn same_content(left: &File, right: &File) -> Result<bool> {
     Ok(stream_fingerprint(left)? == stream_fingerprint(right)?)
 }
 
+#[cfg(any(
+    feature = "doc",
+    feature = "docx",
+    feature = "ppt",
+    feature = "pptx",
+    feature = "xls",
+    feature = "xlsx",
+    feature = "xlsb"
+))]
+fn recorded_content(file: &File) -> File {
+    if file.is_signed() {
+        file.clone()
+    } else {
+        // `Signed::unsign` marks the same retained owner as
+        // `RemovalAuthorized`; its ordinary writer removes signature parts.
+        // Replay must authenticate the bytes that were recorded before that
+        // authorization, so restore the signed disposition for this bounded
+        // proof without changing either caller-owned handle.
+        file.with_signature(crate::format::signature::Signature::Signed)
+    }
+}
+
+#[cfg(not(any(
+    feature = "doc",
+    feature = "docx",
+    feature = "ppt",
+    feature = "pptx",
+    feature = "xls",
+    feature = "xlsx",
+    feature = "xlsb"
+)))]
+fn recorded_content(file: &File) -> File {
+    file.clone()
+}
+
+/// Compare a replay recipient with the recorded base. Signed no-op replay
+/// intentionally ignores only the signature disposition: the format and the
+/// bytes still have to match, and the bounded stream proof uses the actual
+/// published file through the facade. Changed patches keep the stricter
+/// [`same_content`] policy.
+fn same_content_for_replay(left: &File, right: &File, exact_noop: bool) -> Result<bool> {
+    if !exact_noop || (!left.is_signed() && !right.is_signed()) {
+        return same_content(left, right);
+    }
+    if matches!(left, File::Locked(_))
+        || matches!(right, File::Locked(_))
+        || left.format() != right.format()
+    {
+        return Ok(false);
+    }
+    let left = recorded_content(left);
+    let right = recorded_content(right);
+    Ok(stream_fingerprint(&left)? == stream_fingerprint(&right)?)
+}
+
 /// Content equality cannot transfer a signature or encryption disposition.
 /// The outer `apply` fence rejects the protected variants, while this helper
 /// keeps an authorized plain owner from matching a differently protected
@@ -3961,6 +4042,51 @@ fn check_source(file: &File) -> Result<()> {
         #[cfg(feature = "odp")]
         File::Odp(handle) => handle.check_source(),
         File::Signed(signed) => Err(crate::Error::signed(signed.format())),
+        File::Locked(locked) => Err(locked.read_error()),
+        #[allow(unreachable_patterns)]
+        _ => Err(pending()),
+    }
+}
+
+/// Check retained source freshness while leaving the signature disposition
+/// to the exact byte proof in [`same_content_for_replay`]. This is used only
+/// by no-op replay; edit admission and changed patches continue through
+/// [`check_source`].
+fn check_source_for_replay(file: &File) -> Result<()> {
+    match file {
+        #[cfg(feature = "doc")]
+        File::Doc(handle) => handle.check_source(),
+        #[cfg(feature = "pptx")]
+        File::Pptx(handle) => handle.check_source_for_replay(),
+        #[cfg(feature = "docx")]
+        File::Docx(handle) => handle.owner().check_source(),
+        #[cfg(feature = "xlsx")]
+        File::Xlsx(handle) => handle.check_source(),
+        #[cfg(feature = "xlsb")]
+        File::Xlsb(handle) => handle.check_source_for_replay(),
+        #[cfg(feature = "xls")]
+        File::Xls(handle) => handle.check_source(),
+        #[cfg(feature = "ppt")]
+        File::Ppt(handle) => handle.check_source(),
+        #[cfg(feature = "rtf")]
+        File::Rtf(_) => Ok(()),
+        #[cfg(feature = "ods")]
+        File::Ods(handle) => handle.check_source(),
+        #[cfg(feature = "odt")]
+        File::Odt(handle) | File::Oth(handle) | File::Odm(handle) => handle.check_source(),
+        #[cfg(odf_objects)]
+        File::Odg(handle)
+        | File::Odc(handle)
+        | File::Odi(handle)
+        | File::Odb(handle)
+        | File::Odf(handle) => handle.check_source(),
+        #[cfg(feature = "iwork-adapter")]
+        File::Pages(handle) | File::Keynote(handle) | File::Numbers(handle) => {
+            handle.check_source()
+        },
+        #[cfg(feature = "odp")]
+        File::Odp(handle) => handle.check_source(),
+        File::Signed(signed) => check_source_for_replay(signed.file()),
         File::Locked(locked) => Err(locked.read_error()),
         #[allow(unreachable_patterns)]
         _ => Err(pending()),

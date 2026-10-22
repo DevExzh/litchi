@@ -11,9 +11,9 @@
 //!    carries no signature part, and the clone that was not unsigned still
 //!    refuses;
 //! 4. an exact no-op through the leaf entry the builder reaches keeps the
-//!    signed input byte for byte (the OOXML leaves); the compound-file leaves
-//!    refuse a signed container outright, so they have no signed no-op path,
-//!    and the test pins that refusal instead.
+//!    signed input byte for byte (the OOXML leaves); the unified facade also
+//!    replays an authorized no-op onto the signed wrapper and returns it
+//!    byte-identically.
 //!
 //! The DOCX, PPTX and XLSX fixtures are producer-signed (Apache POI's
 //! `xmldsign` corpus). No signed XLSB or compound-file fixture exists, so
@@ -663,6 +663,20 @@ fn every_signed_input_follows_the_explicit_signature_policy() {
                 unsigned.text().unwrap(),
                 text,
                 "{what}: unsign rewrote nothing"
+            );
+            let noop = unsigned
+                .edit(|_| Ok(()))
+                .unwrap_or_else(|error| panic!("{what}: unified signed no-op: {error:?}"));
+            assert!(noop.patch().is_noop(), "{what}");
+            let replayed = noop
+                .patch()
+                .apply(&file)
+                .unwrap_or_else(|error| panic!("{what}: unified signed replay: {error:?}"));
+            assert!(replayed.is_signed(), "{what}: replay lost signature");
+            assert_eq!(
+                replayed.to_bytes().unwrap(),
+                file.to_bytes().unwrap(),
+                "{what}: unified replay changed signed bytes"
             );
             assert_signed_refusal(&builder_refusal(signed.file()), input.format, &what);
             let (output, expected) = changed_commit(&unsigned);

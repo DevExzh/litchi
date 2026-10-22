@@ -395,6 +395,10 @@ const SIGNED: &[u8] = include_bytes!(concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/../../test-data/poi/test-data/xmldsign/hello-world-signed.docx"
 ));
+const SIGNED_OTHER: &[u8] = include_bytes!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../test-data/poi/test-data/xmldsign/hello-world-signed-twice.docx"
+));
 #[test]
 fn signature_authorization_is_bound_and_inverse_never_restores_signatures() {
     for eager in [false, true] {
@@ -414,6 +418,7 @@ fn signature_authorization_is_bound_and_inverse_never_restores_signatures() {
         let File::Signed(signed) = file else {
             panic!("signed fixture")
         };
+        let signed_outer = File::Signed(signed.clone());
         let signed_inner = signed.file().clone();
         let unsigned = signed.unsign();
         let baseline = unsigned.to_bytes().unwrap();
@@ -422,6 +427,10 @@ fn signature_authorization_is_bound_and_inverse_never_restores_signatures() {
             .unwrap();
         assert_eq!(
             commit.patch().apply(&signed_inner).unwrap_err().code(),
+            Code::DocumentProtected
+        );
+        assert_eq!(
+            commit.patch().apply(&signed_outer).unwrap_err().code(),
             Code::DocumentProtected
         );
         let restored = commit.patch().inverse().apply(commit.file()).unwrap();
@@ -435,10 +444,17 @@ fn signature_authorization_is_bound_and_inverse_never_restores_signatures() {
         let noop = unsigned.edit(|_| Ok(())).unwrap();
         assert!(noop.patch().is_noop());
         assert_eq!(noop.file().to_bytes().unwrap(), baseline);
+        for recipient in [&signed_inner, &signed_outer] {
+            let replayed = noop.patch().apply(recipient).unwrap();
+            assert!(replayed.is_signed());
+            assert_eq!(replayed.to_bytes().unwrap(), SIGNED);
+        }
+        let other = litchi_ops::open_bytes(SIGNED_OTHER.to_vec()).unwrap();
+        assert!(other.is_signed());
         assert_eq!(
-            noop.patch().apply(&signed_inner).unwrap_err().code(),
-            Code::DocumentProtected,
-            "a no-op patch must not bypass a signed recipient"
+            noop.patch().apply(&other).unwrap_err().code(),
+            Code::InvalidInput,
+            "a signed recipient with different recorded bytes is a patch conflict"
         );
     }
 }
@@ -451,11 +467,18 @@ fn source_guards_survive_signature_removal_promotion_to_eager_owner() {
     let File::Signed(signed) = litchi_ops::open(&path).unwrap() else {
         panic!("signed fixture")
     };
+    let signed_target = File::Signed(signed.clone());
     let unsigned = signed.unsign();
+    let noop = unsigned.edit(|_| Ok(())).unwrap();
     let commit = unsigned
         .edit(|tx| tx.set("/body/p[1]/r[1]", props! {"text" => "unsigned edit"}))
         .unwrap();
     std::fs::write(&path, b"changed physical source").unwrap();
+    assert_eq!(
+        noop.patch().apply(&signed_target).unwrap_err().code(),
+        Code::IoError,
+        "a signed no-op recipient still checks its retained source"
+    );
     assert_eq!(
         commit.patch().apply(&unsigned).unwrap_err().code(),
         Code::IoError
