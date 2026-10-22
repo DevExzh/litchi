@@ -2884,6 +2884,18 @@
    "reason": "Qualification probe and guarded runner source only; the corrected protocol is recorded in 0362ha. No accepted measurements exist for this replacement unified/leaf matrix yet."
   },
   {
+   "record": "0362ha",
+   "reason": "Corrected File qualification protocol and 109 untimed route validation; native paired qualification remains required, with no new accepted timing rows."
+  },
+  {
+   "record": "0362hc",
+   "reason": "Prepared/flat ODF option propagation source and validation receipts; no paired performance measurement or native acceptance."
+  },
+  {
+   "record": "0362hda",
+   "reason": "ODF flat output admission correctness follow-up with an untimed flat qualification probe, source and allocation receipts; native timing remains open and no performance acceptance is claimed."
+  },
+  {
    "record": "0362i",
    "reason": "Canonical ODraw resource-kind naming slice. Source-equivalence and validation receipts contain no new paired performance measurement."
   },
