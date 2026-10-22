@@ -971,6 +971,7 @@ pub(crate) struct RevisionEditor {
     data: Vec<u8>,
     pieces: Vec<RawPiece>,
     chpx: Vec<FcRun>,
+    chpx_dirty: bool,
     papx: Vec<PapxRun>,
     authors: Vec<String>,
     cp_tables: Vec<CpTable>,
@@ -1175,6 +1176,7 @@ impl RevisionEditor {
             data,
             pieces,
             chpx,
+            chpx_dirty: false,
             papx,
             authors,
             cp_tables,
@@ -1701,8 +1703,14 @@ impl RevisionEditor {
             self.pieces.last().map_or(self.main_ccp, |piece| piece.end),
         )?;
         let intervals = self.fc_intervals(start, end)?;
-        let mut candidate = self.clone();
-        split_transform_chpx(&mut candidate.chpx, &intervals, |group| {
+        // A body edit may stage hundreds of format changes before it renders
+        // its candidate.  Keep the semantic CHPX model current for the next
+        // validation, but defer the FKP rebuild and package publication until
+        // the edit is rendered.  Cloning just this vector preserves the
+        // operation's atomicity when a transformed group would exceed the
+        // one-byte FKP limit without cloning the complete DOC owner.
+        let mut chpx = self.chpx.clone();
+        split_transform_chpx(&mut chpx, &intervals, |group| {
             let mut output = retain_sprms(group, &[opcode])?;
             if let Some(enabled) = value {
                 output.extend_from_slice(&opcode.to_le_bytes());
@@ -1713,9 +1721,10 @@ impl RevisionEditor {
             }
             Ok(output)
         })?;
-        candidate.rewrite_chpx()?;
-        candidate.commit()?;
-        *self = candidate;
+        self.chpx = chpx;
+        self.chpx_dirty = true;
+        self.changed = true;
+        self.release_retained_render();
         Ok(())
     }
 
@@ -3105,6 +3114,13 @@ impl RevisionEditor {
     /// A validated render retained under the owner's ceiling is moved out
     /// instead of rendering the package again.
     pub(crate) fn finish_unchecked(mut self) -> Result<Vec<u8>> {
+        if self.chpx_dirty {
+            // `rewrite_chpx` updates the editor's stream buffers. Publish
+            // those buffers into the retained object owner before rendering;
+            // otherwise the render would still observe the pre-toggle
+            // package even though the semantic CHPX model is current.
+            self.commit()?;
+        }
         if let Some(rendered) = self.retained_render.0.take() {
             return Ok(rendered);
         }
@@ -3378,7 +3394,18 @@ impl RevisionEditor {
         for pn in pns {
             plc.extend_from_slice(&pn.to_le_bytes());
         }
-        append_table_block(&mut self.word, &mut self.table, PLCFBTE_CHPX, &plc)
+        let result = append_table_block(&mut self.word, &mut self.table, PLCFBTE_CHPX, &plc);
+        if result.is_ok() {
+            self.chpx_dirty = false;
+        }
+        result
+    }
+
+    fn flush_pending_chpx(&mut self) -> Result<()> {
+        if self.chpx_dirty {
+            self.rewrite_chpx()?;
+        }
+        Ok(())
     }
 
     fn rewrite_papx(&mut self) -> Result<()> {
@@ -3471,6 +3498,7 @@ impl RevisionEditor {
     }
 
     fn commit(&mut self) -> Result<()> {
+        self.flush_pending_chpx()?;
         self.protection_policy.authorize(self.protection)?;
         // The package mutation below invalidates every render for the prior
         // editor state, including the Data-stream add path. Mutation callers
@@ -3502,8 +3530,7 @@ impl RevisionEditor {
             .put_streams_shared(replacements)
             .map_err(PackageError::from)?;
         if self.retained_render_limit != 0 {
-            let rendered =
-                crate::package::object_edit_bytes(&self.package).map_err(PackageError::from)?;
+            let rendered = crate::package::object_edit_bytes(&self.package)?;
             if rendered.capacity() <= self.retained_render_limit {
                 self.retained_render.0 = Some(rendered);
             }
