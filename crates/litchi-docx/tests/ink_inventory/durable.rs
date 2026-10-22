@@ -561,11 +561,14 @@ fn artifact_hash(bytes: &[u8]) -> String {
 
 fn apply_and_inverse(original: &[u8], durable: &CorePatch<Reversible>, annotations: usize) {
     let mut package = Package::from_reader(Cursor::new(original)).unwrap();
-    package = package.apply_durable_ink(durable).unwrap();
+    package = package.apply_durable_ink(durable).unwrap().into_package();
     let published = save(&mut package);
     let mut reopened = Package::from_reader(Cursor::new(&published)).unwrap();
     assert_eq!(reopened.ink().unwrap().annotations().len(), annotations);
-    reopened = reopened.apply_durable_ink(&durable.inverse()).unwrap();
+    reopened = reopened
+        .apply_durable_ink(&durable.inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(members(&save(&mut reopened)), members(original));
 }
 
@@ -647,6 +650,142 @@ fn durable_base_profiles_and_dialects_roundtrip_deterministically() {
 }
 
 #[test]
+fn durable_default_replay_retains_owner_ink_policy() {
+    let original = PackageWriter::to_bytes(&source(false, false)).unwrap();
+    let package = Package::from_reader(Cursor::new(&original)).unwrap();
+    let noop = durable_patch(&package.edit_ink().unwrap().commit().unwrap());
+    let limits = Limits {
+        max_payload_bytes: INK.len() - 1,
+        ..Limits::default()
+    };
+    let constrained = Package::from_bytes_with_options(
+        &original,
+        litchi_docx::OpenOptions::default()
+            .semantic_limits(litchi_docx::SemanticLimits::default().ink(limits)),
+    )
+    .unwrap();
+    assert!(matches!(
+        constrained.apply_durable_ink(&noop),
+        Err(Error::InkLimit {
+            kind: litchi_docx::ink::LimitKind::PayloadBytes,
+            actual,
+            maximum,
+        }) if actual == INK.len() && maximum == INK.len() - 1
+    ));
+    let exact = Package::from_bytes_with_options(
+        &original,
+        litchi_docx::OpenOptions::default().semantic_limits(
+            litchi_docx::SemanticLimits::default().ink(Limits {
+                max_payload_bytes: INK.len(),
+                ..limits
+            }),
+        ),
+    )
+    .unwrap();
+    assert!(
+        !exact
+            .apply_durable_ink(&noop)
+            .unwrap()
+            .diagnostics()
+            .changed()
+    );
+    assert_eq!(save(&mut constrained.clone()), original);
+}
+
+#[test]
+fn durable_stale_source_is_a_patch_conflict() {
+    let original = PackageWriter::to_bytes(&source(false, false)).unwrap();
+    let package = Package::from_reader(Cursor::new(&original)).unwrap();
+    let noop = durable_patch(&package.edit_ink().unwrap().commit().unwrap());
+    let stale = rewrite_member(&original, "word/_rels/document.xml.rels", lexical_comment);
+    let changed = Package::from_reader(Cursor::new(&stale)).unwrap();
+    assert!(matches!(
+        changed.apply_durable_ink(&noop),
+        Err(Error::PatchConflict { .. })
+    ));
+    assert_eq!(save(&mut changed.clone()), stale);
+}
+
+#[test]
+fn durable_replay_returns_reversible_commit_for_changed_inverse_and_noop() {
+    let original = PackageWriter::to_bytes(&source(false, false)).unwrap();
+    let package = Package::from_reader(Cursor::new(&original)).unwrap();
+    let mut edit = package.edit_ink().unwrap();
+    edit.insert(
+        Destination::main(Position::new(0)),
+        prepared(),
+        Style::Base(BaseProfile::InkContent),
+    )
+    .unwrap();
+    let authored = edit.commit().unwrap();
+    let durable = durable_patch(&authored);
+    let forward: litchi_docx::ink::Commit = package.apply_durable_ink(&durable).unwrap();
+    assert!(forward.diagnostics().changed());
+    assert!(!forward.patch().is_noop());
+    let target_bytes = save(&mut forward.package().clone());
+    assert_eq!(
+        members(&target_bytes),
+        members(&save(&mut authored.into_package()))
+    );
+    assert_eq!(members(&save(&mut package.clone())), members(&original));
+
+    let copy = Package::from_reader(Cursor::new(&original)).unwrap();
+    let replayed = copy.apply_ink(forward.patch()).unwrap();
+    assert_eq!(
+        members(&save(&mut replayed.into_package())),
+        members(&target_bytes)
+    );
+    let restored = forward
+        .package()
+        .apply_ink(&forward.patch().inverse())
+        .unwrap();
+    assert_eq!(
+        members(&save(&mut restored.into_package())),
+        members(&original)
+    );
+
+    let reopened = Package::from_reader(Cursor::new(&target_bytes)).unwrap();
+    let inverse: litchi_docx::ink::Commit = reopened
+        .apply_durable_ink_with_options(&durable.inverse(), EditOptions::default())
+        .unwrap();
+    assert!(inverse.diagnostics().changed());
+    assert!(!inverse.patch().is_noop());
+    assert_eq!(
+        members(&save(&mut inverse.package().clone())),
+        members(&original)
+    );
+    let target_copy = Package::from_reader(Cursor::new(&target_bytes)).unwrap();
+    let replayed = target_copy.apply_ink(inverse.patch()).unwrap();
+    assert_eq!(
+        members(&save(&mut replayed.into_package())),
+        members(&original)
+    );
+    let restored = inverse
+        .package()
+        .apply_ink(&inverse.patch().inverse())
+        .unwrap();
+    assert_eq!(
+        members(&save(&mut restored.into_package())),
+        members(&target_bytes)
+    );
+
+    let noop = durable_patch(&package.edit_ink().unwrap().commit().unwrap());
+    let applied: litchi_docx::ink::Commit = package.apply_durable_ink(&noop).unwrap();
+    assert!(!applied.diagnostics().changed());
+    assert!(applied.patch().is_noop());
+    let replayed = copy.apply_ink(applied.patch()).unwrap();
+    assert!(!replayed.diagnostics().changed());
+    assert_eq!(
+        save(&mut applied.into_package()),
+        save(&mut package.clone())
+    );
+    assert_eq!(
+        members(&save(&mut replayed.into_package())),
+        members(&original)
+    );
+}
+
+#[test]
 fn durable_replacement_keeps_same_trace_count_and_restores_legacy_inkml_exactly() {
     let original = PackageWriter::to_bytes(&source(false, false)).unwrap();
     let package = Package::from_reader(Cursor::new(&original)).unwrap();
@@ -658,7 +797,10 @@ fn durable_replacement_keeps_same_trace_count_and_restores_legacy_inkml_exactly(
     let durable = durable_patch(&commit);
 
     let mut published = Package::from_reader(Cursor::new(&original)).unwrap();
-    published = published.apply_durable_ink(&durable).unwrap();
+    published = published
+        .apply_durable_ink(&durable)
+        .unwrap()
+        .into_package();
     assert_eq!(published.ink().unwrap().annotations().len(), 1);
     assert_eq!(published.ink().unwrap().annotations()[0].trace_count(), 1);
     let published_members = members(&save(&mut published));
@@ -669,7 +811,10 @@ fn durable_replacement_keeps_same_trace_count_and_restores_legacy_inkml_exactly(
     }));
 
     let mut reopened = Package::from_reader(Cursor::new(&save(&mut published))).unwrap();
-    reopened = reopened.apply_durable_ink(&durable.inverse()).unwrap();
+    reopened = reopened
+        .apply_durable_ink(&durable.inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(members(&save(&mut reopened)), members(&original));
 }
 
@@ -725,7 +870,10 @@ fn durable_replacement_restores_noncanonical_relationship_and_content_type_sourc
     let durable = durable_patch(&edit.commit().unwrap());
 
     let mut published = Package::from_reader(Cursor::new(&original)).unwrap();
-    published = published.apply_durable_ink(&durable).unwrap();
+    published = published
+        .apply_durable_ink(&durable)
+        .unwrap()
+        .into_package();
     let published_bytes = save(&mut published);
     let published_members = members(&published_bytes);
     assert!(
@@ -735,7 +883,10 @@ fn durable_replacement_restores_noncanonical_relationship_and_content_type_sourc
     );
     assert!(published_members.contains_key("payload/handwriting.xml"));
     let mut reopened = Package::from_reader(Cursor::new(&published_bytes)).unwrap();
-    reopened = reopened.apply_durable_ink(&durable.inverse()).unwrap();
+    reopened = reopened
+        .apply_durable_ink(&durable.inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(members(&save(&mut reopened)), members(&original));
 }
 
@@ -778,10 +929,16 @@ fn durable_exclusive_ink_resource_restores_explicit_empty_relationship_member() 
 
     let durable = durable_patch(&commit);
     let mut published = Package::from_reader(Cursor::new(&original)).unwrap();
-    published = published.apply_durable_ink(&durable).unwrap();
+    published = published
+        .apply_durable_ink(&durable)
+        .unwrap()
+        .into_package();
     let published_bytes = save(&mut published);
     let mut reopened = Package::from_reader(Cursor::new(&published_bytes)).unwrap();
-    reopened = reopened.apply_durable_ink(&durable.inverse()).unwrap();
+    reopened = reopened
+        .apply_durable_ink(&durable.inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(members(&save(&mut reopened)), original_members);
 }
 
@@ -800,7 +957,10 @@ fn durable_fallback_only_replacement_changes_image_bytes_and_restores_exactly() 
     let durable = durable_patch(&commit);
 
     let mut published = Package::from_reader(Cursor::new(&original)).unwrap();
-    published = published.apply_durable_ink(&durable).unwrap();
+    published = published
+        .apply_durable_ink(&durable)
+        .unwrap()
+        .into_package();
     let published_members = members(&save(&mut published));
     assert!(
         published_members
@@ -810,7 +970,10 @@ fn durable_fallback_only_replacement_changes_image_bytes_and_restores_exactly() 
     assert!(!published_members.values().any(|bytes| bytes == PNG));
 
     let mut reopened = Package::from_reader(Cursor::new(&save(&mut published))).unwrap();
-    reopened = reopened.apply_durable_ink(&durable.inverse()).unwrap();
+    reopened = reopened
+        .apply_durable_ink(&durable.inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(members(&save(&mut reopened)), members(&original));
 }
 
@@ -891,12 +1054,18 @@ fn durable_drawing_canvas_and_group_inline_and_anchor_restore_exactly() {
             let durable = durable_patch(&commit);
 
             let mut published = Package::from_reader(Cursor::new(&original)).unwrap();
-            published = published.apply_durable_ink(&durable).unwrap();
+            published = published
+                .apply_durable_ink(&durable)
+                .unwrap()
+                .into_package();
             assert_eq!(members(&save(&mut published)), expected_members);
             let published_bytes = save(&mut published);
             let mut reopened = Package::from_reader(Cursor::new(&published_bytes)).unwrap();
             assert_eq!(reopened.ink().unwrap().annotations().len(), 2);
-            reopened = reopened.apply_durable_ink(&durable.inverse()).unwrap();
+            reopened = reopened
+                .apply_durable_ink(&durable.inverse())
+                .unwrap()
+                .into_package();
             assert_eq!(members(&save(&mut reopened)), members(&original));
         }
     }
@@ -930,7 +1099,7 @@ fn durable_noop_is_deterministic_exact_and_source_bound() {
 
     let mut package = Package::from_reader(Cursor::new(&original)).unwrap();
     let before = members(&save(&mut package));
-    package = package.apply_durable_ink(&durable).unwrap();
+    package = package.apply_durable_ink(&durable).unwrap().into_package();
     assert_eq!(package.ink().unwrap().annotations().len(), 1);
     assert_eq!(members(&save(&mut package)), before);
 
@@ -1034,11 +1203,13 @@ fn durable_changed_and_noop_patches_reject_payload_graph_and_lexical_stale_sourc
     let mut non_part_package = Package::from_reader(Cursor::new(&non_part_lexical)).unwrap();
     non_part_package = non_part_package
         .apply_durable_ink(&non_part_changed)
-        .unwrap();
+        .unwrap()
+        .into_package();
     assert_eq!(non_part_package.ink().unwrap().annotations().len(), 2);
     non_part_package = non_part_package
         .apply_durable_ink(&non_part_changed.inverse())
-        .unwrap();
+        .unwrap()
+        .into_package();
     assert_eq!(non_part_package.ink().unwrap().annotations().len(), 1);
     assert_eq!(
         members(&save(&mut non_part_package)),
@@ -1048,7 +1219,8 @@ fn durable_changed_and_noop_patches_reject_payload_graph_and_lexical_stale_sourc
     let non_part_noop_before = members(&save(&mut non_part_noop_package));
     non_part_noop_package = non_part_noop_package
         .apply_durable_ink(&non_part_noop)
-        .unwrap();
+        .unwrap()
+        .into_package();
     assert_eq!(
         members(&save(&mut non_part_noop_package)),
         non_part_noop_before
@@ -1239,7 +1411,10 @@ fn durable_replay_limits_refuse_operations_staging_package_and_payloads_atomical
     );
 
     let mut canonical_published = Package::from_reader(Cursor::new(&canonical_original)).unwrap();
-    canonical_published = canonical_published.apply_durable_ink(&canonical).unwrap();
+    canonical_published = canonical_published
+        .apply_durable_ink(&canonical)
+        .unwrap()
+        .into_package();
     let canonical_published_bytes = save(&mut canonical_published);
     let inverse = canonical.inverse();
     let (_, _, restore) = wire_blob(&inverse.to_deterministic_json().unwrap(), "forward_blobs");
@@ -1283,7 +1458,10 @@ fn durable_replay_limits_refuse_operations_staging_package_and_payloads_atomical
     );
 
     let mut drawing_published = Package::from_reader(Cursor::new(&drawing_original)).unwrap();
-    drawing_published = drawing_published.apply_durable_ink(&drawing).unwrap();
+    drawing_published = drawing_published
+        .apply_durable_ink(&drawing)
+        .unwrap()
+        .into_package();
     let drawing_published_bytes = save(&mut drawing_published);
     let drawing_inverse = drawing.inverse();
     let mut inverse_relationship_limits = EditOptions::default();
@@ -1370,7 +1548,7 @@ fn durable_coherent_alternate_intent_replays_to_its_matching_target() {
         CorePatch::<Reversible>::from_deterministic_json(&tampered_wire, durable_limits()).unwrap();
 
     let mut actual = Package::from_reader(Cursor::new(&original)).unwrap();
-    actual = actual.apply_durable_ink(&tampered).unwrap();
+    actual = actual.apply_durable_ink(&tampered).unwrap().into_package();
     assert_eq!(members(&save(&mut actual)), members(&expected_bytes));
 }
 
@@ -1388,7 +1566,10 @@ fn durable_restore_tampering_rejects_recomputed_closure_and_intent_variants() {
     let durable = durable_patch(&edit.commit().unwrap());
 
     let mut published = Package::from_reader(Cursor::new(&original)).unwrap();
-    published = published.apply_durable_ink(&durable).unwrap();
+    published = published
+        .apply_durable_ink(&durable)
+        .unwrap()
+        .into_package();
     let published_bytes = save(&mut published);
     let inverse_wire = durable.inverse().to_deterministic_json().unwrap();
     let (_, _, restore) = wire_blob(&inverse_wire, "forward_blobs");
@@ -1443,7 +1624,10 @@ fn durable_restore_rejects_existing_part_content_type_tampering() {
     let durable = durable_patch(&edit.commit().unwrap());
 
     let mut published = Package::from_reader(Cursor::new(&original)).unwrap();
-    published = published.apply_durable_ink(&durable).unwrap();
+    published = published
+        .apply_durable_ink(&durable)
+        .unwrap()
+        .into_package();
     let published_bytes = save(&mut published);
     let inverse_wire = durable.inverse().to_deterministic_json().unwrap();
     let (_, _, restore) = wire_blob(&inverse_wire, "forward_blobs");
