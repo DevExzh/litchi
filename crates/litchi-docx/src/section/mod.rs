@@ -29,7 +29,3 @@ pub use limit::LimitKind;
 pub use model::{
     Column, Columns, Emu, Margins, Orientation, PageSize, Reference, Section, Sections, Start,
 };
-
-pub use layout::{
-    Commit as LayoutCommit, Edit as LayoutEdit, Patch as LayoutPatch, Snapshot as LayoutSnapshot,
-};

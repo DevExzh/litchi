@@ -50058,24 +50058,21 @@ fn docx_section_layout_signed_archive(corpus: &Corpus) -> Result<Vec<u8>, Box<dy
 
 fn verify_docx_section_layout_controls(
     corpus: &Corpus,
-    commit: &litchi_docx::section::layout::Commit,
     publication: &litchi_docx::source_backed::section_layout::Commit,
 ) -> Result<(), Box<dyn Error>> {
     let noop_package = litchi_docx::source_backed::Package::from_read_at(Arc::new(
         OwnedSource::new(corpus.archive.clone()),
     ))?;
-    let noop_snapshot = noop_package.section_layout_snapshot()?;
-    let noop = noop_snapshot
-        .edit(litchi_docx::section::Selector::paragraph(Position::new(
-            DOCX_SECTION_LAYOUT_SECTION_POSITIONS[0],
-        )))?
-        .commit()?;
+    let noop_edit = noop_package.edit_section_layout(litchi_docx::section::Selector::paragraph(
+        Position::new(DOCX_SECTION_LAYOUT_SECTION_POSITIONS[0]),
+    ))?;
+    let noop = noop_edit.commit()?;
     if !noop.patch().is_noop() {
         return Err("DOCX section-layout no-op control produced a changed patch".into());
     }
     let mut noop_output = Vec::new();
     noop_package
-        .apply_section_layout(&noop.patch().clone().into())
+        .apply_section_layout(noop.patch())
         .and_then(|committed| committed.package().write_to(&mut noop_output))?;
     if noop_output != corpus.archive {
         return Err("DOCX section-layout no-op publication changed source bytes".into());
@@ -50088,7 +50085,7 @@ fn verify_docx_section_layout_controls(
     // package holding the same source bytes publishes the same artifact.
     let mut foreign_output = Vec::new();
     foreign
-        .apply_section_layout(&commit.patch().clone().into())
+        .apply_section_layout(publication.patch())
         .and_then(|committed| committed.package().write_to(&mut foreign_output))?;
     let mut expected_output = Vec::new();
     publication.package().write_to(&mut expected_output)?;
@@ -50104,7 +50101,7 @@ fn verify_docx_section_layout_controls(
         stale
             .apply_section_layout(&publication.patch().inverse())
             .and_then(|committed| committed.package().write_to(&mut stale_output)),
-        Err(litchi_docx::Error::SectionLayoutStaleSource)
+        Err(litchi_docx::Error::PatchConflict { .. })
     ) || !stale_output.is_empty()
     {
         return Err("DOCX section-layout stale-source refusal is not typed".into());
@@ -50114,18 +50111,17 @@ fn verify_docx_section_layout_controls(
     let signed_noop = litchi_docx::source_backed::Package::from_read_at(Arc::new(
         OwnedSource::new(signed_archive.clone()),
     ))?;
-    let signed_noop_snapshot = signed_noop.section_layout_snapshot()?;
-    let signed_noop_commit = signed_noop_snapshot
-        .edit(litchi_docx::section::Selector::paragraph(Position::new(
-            DOCX_SECTION_LAYOUT_SECTION_POSITIONS[0],
-        )))?
-        .commit()?;
+    let signed_noop_edit =
+        signed_noop.edit_section_layout(litchi_docx::section::Selector::paragraph(
+            Position::new(DOCX_SECTION_LAYOUT_SECTION_POSITIONS[0]),
+        ))?;
+    let signed_noop_commit = signed_noop_edit.commit()?;
     if !signed_noop_commit.patch().is_noop() {
         return Err("DOCX section-layout signed no-op control produced a changed patch".into());
     }
     let mut signed_noop_output = Vec::new();
     signed_noop
-        .apply_section_layout(&signed_noop_commit.patch().clone().into())
+        .apply_section_layout(signed_noop_commit.patch())
         .and_then(|committed| committed.package().write_to(&mut signed_noop_output))?;
     if signed_noop_output != signed_archive {
         return Err("DOCX section-layout signed no-op changed source bytes".into());
@@ -50134,8 +50130,7 @@ fn verify_docx_section_layout_controls(
     let signed = litchi_docx::source_backed::Package::from_read_at(Arc::new(OwnedSource::new(
         signed_archive,
     )))?;
-    let signed_snapshot = signed.section_layout_snapshot()?;
-    let mut signed_edit = signed_snapshot.edit(litchi_docx::section::Selector::paragraph(
+    let mut signed_edit = signed.edit_section_layout(litchi_docx::section::Selector::paragraph(
         Position::new(DOCX_SECTION_LAYOUT_SECTION_POSITIONS[0]),
     ))?;
     signed_edit.set_columns(Some(litchi_docx::section::Columns {
@@ -50149,7 +50144,7 @@ fn verify_docx_section_layout_controls(
     let mut signed_output = Vec::new();
     if !matches!(
         signed
-            .apply_section_layout(&signed_commit.patch().clone().into())
+            .apply_section_layout(signed_commit.patch())
             .and_then(|committed| committed.package().write_to(&mut signed_output)),
         Err(litchi_docx::Error::Opc(
             OpcError::SignedSourceRequiresExplicitPolicy
@@ -50179,10 +50174,10 @@ fn verify_docx_section_layout_controls(
     let partial = litchi_docx::source_backed::Package::from_read_at(Arc::new(OwnedSource::new(
         corpus.archive.clone(),
     )))?;
-    let partial_snapshot = partial.section_layout_snapshot()?;
-    let mut partial_edit = partial_snapshot.edit(litchi_docx::section::Selector::paragraph(
-        Position::new(DOCX_SECTION_LAYOUT_SECTION_POSITIONS[0]),
-    ))?;
+    let mut partial_edit =
+        partial.edit_section_layout(litchi_docx::section::Selector::paragraph(Position::new(
+            DOCX_SECTION_LAYOUT_SECTION_POSITIONS[0],
+        )))?;
     partial_edit.set_columns(Some(litchi_docx::section::Columns {
         equal_width: true,
         count: 3,
@@ -50197,7 +50192,7 @@ fn verify_docx_section_layout_controls(
     };
     if !matches!(
         partial
-            .apply_section_layout(&partial_commit.patch().clone().into())
+            .apply_section_layout(partial_commit.patch())
             .and_then(|committed| committed.package().write_to(&mut partial_sink)),
         Err(litchi_docx::Error::Opc(OpcError::IncompleteOutput { .. }))
     ) || partial_sink.accepted != 128
@@ -50527,9 +50522,10 @@ fn run_docx_source_backed_existing_section_layout_edit_save(
     ))?;
     let expected_snapshot = expected_package.section_layout_snapshot()?;
     verify_docx_section_layout_snapshot(&expected_snapshot, [2, 2, 2])?;
-    let mut expected_edit = expected_snapshot.edit(litchi_docx::section::Selector::paragraph(
-        Position::new(DOCX_SECTION_LAYOUT_SECTION_POSITIONS[0]),
-    ))?;
+    let mut expected_edit =
+        expected_package.edit_section_layout(litchi_docx::section::Selector::paragraph(
+            Position::new(DOCX_SECTION_LAYOUT_SECTION_POSITIONS[0]),
+        ))?;
     expected_edit.set_columns(Some(litchi_docx::section::Columns {
         equal_width: true,
         count: 3,
@@ -50538,17 +50534,16 @@ fn run_docx_source_backed_existing_section_layout_edit_save(
         columns: Vec::new(),
     }))?;
     let expected_commit = expected_edit.commit()?;
-    if !expected_commit.patch().changed() || expected_commit.patch().is_noop() {
+    if expected_commit.patch().is_noop() {
         return Err("DOCX section-layout expected commit is not changed".into());
     }
     let mut expected_output = Vec::new();
-    let expected_publication =
-        expected_package.apply_section_layout(&expected_commit.patch().clone().into())?;
+    let expected_publication = expected_package.apply_section_layout(expected_commit.patch())?;
     expected_publication
         .package()
         .write_to(&mut expected_output)?;
     verify_docx_section_layout_output(corpus, &expected_output, [3, 2, 2])?;
-    verify_docx_section_layout_controls(corpus, &expected_commit, &expected_publication)?;
+    verify_docx_section_layout_controls(corpus, &expected_publication)?;
     let expected_digest = sha256_hex(&expected_output);
     let maximum = u64::try_from(expected_output.len())?
         .checked_mul(2)
@@ -50785,9 +50780,9 @@ fn run_docx_source_backed_existing_section_layout_edit_save(
         let query_ns = elapsed_ns(query_started.elapsed())?;
 
         let edit_started = Instant::now();
-        let mut edit = snapshot.edit(litchi_docx::section::Selector::paragraph(Position::new(
-            DOCX_SECTION_LAYOUT_SECTION_POSITIONS[0],
-        )))?;
+        let mut edit = package.edit_section_layout(litchi_docx::section::Selector::paragraph(
+            Position::new(DOCX_SECTION_LAYOUT_SECTION_POSITIONS[0]),
+        ))?;
         edit.set_columns(Some(litchi_docx::section::Columns {
             equal_width: true,
             count: 3,
@@ -50805,7 +50800,7 @@ fn run_docx_source_backed_existing_section_layout_edit_save(
         let before_publication_after_commit = package.cache_diagnostics();
 
         let publication_started = Instant::now();
-        let publication = package.apply_section_layout(&commit.patch().clone().into())?;
+        let publication = package.apply_section_layout(commit.patch())?;
         publication.package().write_to(&mut sink)?;
         std::hint::black_box(&publication);
         let publication_ns = elapsed_ns(publication_started.elapsed())?;
@@ -50869,21 +50864,37 @@ fn run_docx_source_backed_existing_section_layout_edit_save(
         let operation_end_source_observation = source.as_ref().map(|source| source.snapshot());
 
         verify_docx_section_layout_snapshot(&snapshot, [2, 2, 2])?;
-        if !commit.patch().changed()
-            || commit.patch().is_noop()
-            || commit.snapshot().inventory().sections()[0]
+        if commit.patch().is_noop()
+            || publication
+                .package()
+                .section_layout_snapshot()?
+                .inventory()
+                .sections()[0]
                 .columns()
                 .map(|columns| columns.count)
                 != Some(3)
         {
             return Err("DOCX section-layout commit changed an unexpected section".into());
         }
-        let replayed = commit.patch().apply(&snapshot)?;
-        let restored = commit.patch().inverse().apply(&replayed)?;
-        if restored.inventory().sections() != snapshot.inventory().sections()
-            || commit.patch().apply(commit.snapshot()).is_ok()
-        {
-            return Err("DOCX section-layout patch forward/inverse/stale oracle failed".into());
+        let raw_patch = snapshot.raw_tree_at(
+            litchi_docx::section::Selector::paragraph(Position::new(
+                DOCX_SECTION_LAYOUT_SECTION_POSITIONS[0],
+            )),
+            &litchi_docx::section::Limits::default(),
+        )?;
+        let mut raw_patch = raw_patch;
+        raw_patch.set_columns(Some(litchi_docx::section::Columns {
+            equal_width: true,
+            count: 3,
+            space: Some(litchi_docx::section::Emu::from_twips(240)),
+            separator: true,
+            columns: Vec::new(),
+        }))?;
+        let raw_patch = raw_patch.patch()?;
+        let replayed = raw_patch.apply(&snapshot)?;
+        let restored = raw_patch.inverse().apply(&replayed)?;
+        if restored.inventory().sections() != snapshot.inventory().sections() {
+            return Err("DOCX section-layout raw patch forward/inverse oracle failed".into());
         }
         if sink.bytes != expected_output {
             return Err("DOCX section-layout publication differs from expected output".into());
@@ -61856,10 +61867,9 @@ mod tests {
         let package = litchi_docx::source_backed::Package::from_read_at(Arc::new(
             OwnedSource::new(corpus.archive.clone()),
         ))?;
-        let snapshot = package.section_layout_snapshot()?;
-        let mut edit = snapshot.edit(litchi_docx::section::Selector::paragraph(Position::new(
-            super::DOCX_SECTION_LAYOUT_SECTION_POSITIONS[0],
-        )))?;
+        let mut edit = package.edit_section_layout(litchi_docx::section::Selector::paragraph(
+            Position::new(super::DOCX_SECTION_LAYOUT_SECTION_POSITIONS[0]),
+        ))?;
         edit.set_columns(Some(litchi_docx::section::Columns {
             equal_width: true,
             count: 3,
@@ -61870,7 +61880,7 @@ mod tests {
         let commit = edit.commit()?;
         let mut output = Vec::new();
         package
-            .apply_section_layout(&commit.patch().clone().into())
+            .apply_section_layout(commit.patch())
             .and_then(|committed| committed.package().write_to(&mut output))?;
         Ok(output)
     }
@@ -61901,15 +61911,14 @@ mod tests {
             docx_read_diagnostic_snapshot(&range_source, &provider_counter)?
         }));
 
-        let snapshot = package.section_layout_snapshot()?;
         snapshots.push((
             "query",
             docx_read_diagnostic_snapshot(&range_source, &provider_counter)?,
         ));
 
-        let mut edit = snapshot.edit(litchi_docx::section::Selector::paragraph(Position::new(
-            super::DOCX_SECTION_LAYOUT_SECTION_POSITIONS[0],
-        )))?;
+        let mut edit = package.edit_section_layout(litchi_docx::section::Selector::paragraph(
+            Position::new(super::DOCX_SECTION_LAYOUT_SECTION_POSITIONS[0]),
+        ))?;
         edit.set_columns(Some(litchi_docx::section::Columns {
             equal_width: true,
             count: 3,
@@ -61934,7 +61943,7 @@ mod tests {
             .ok_or("DOCX section-layout diagnostic output ceiling overflows u64")?;
         let mut sink = super::CountingSink::bounded(maximum, 64 * 1024);
         sink.reserve_budget()?;
-        let publication = package.apply_section_layout(&commit.patch().clone().into())?;
+        let publication = package.apply_section_layout(commit.patch())?;
         publication.package().write_to(&mut sink)?;
         let publication_snapshot = docx_read_diagnostic_snapshot(&range_source, &provider_counter)?;
         snapshots.push(("publication", publication_snapshot));
