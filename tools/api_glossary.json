@@ -11650,6 +11650,17 @@
           "name": "Editor",
           "scope": "litchi_ole_common",
           "replacement": "use the codec-level Edit (record 0359)"
+        },
+        {
+          "name": "fingerprint",
+          "scope": "litchi_ole_common::ole1::Revision",
+          "replacement": "use Revision::value (record 0362rd)"
+        },
+        {
+          "name": "Snapshot",
+          "scope": "litchi_ole_common::ole1",
+          "recursive": false,
+          "replacement": "use ole1::ObjectSnapshot (record 0362rd)"
         }
       ],
       "families": [],
@@ -11715,6 +11726,11 @@
           "scope": "litchi_crypto",
           "replacement": "use the codec-level Edit (record 0359)",
           "match": "suffix"
+        },
+        {
+          "name": "fingerprint",
+          "scope": "litchi_crypto::spaces::Revision",
+          "replacement": "use Revision::value (record 0362rd)"
         }
       ],
       "families": [],

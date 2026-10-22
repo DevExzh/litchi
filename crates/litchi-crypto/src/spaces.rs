@@ -254,12 +254,6 @@ impl Revision {
     pub const fn value(self) -> u64 {
         self.0
     }
-
-    /// Alias for [`Self::value`].
-    #[must_use]
-    pub const fn fingerprint(self) -> u64 {
-        self.value()
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

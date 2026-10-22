@@ -1286,12 +1286,6 @@ impl Revision {
         self.0
     }
 
-    /// Alias for [`Self::value`].
-    #[must_use]
-    pub const fn fingerprint(self) -> u64 {
-        self.value()
-    }
-
     fn of(bytes: &[u8]) -> Self {
         let mut value = 0xcbf2_9ce4_8422_2325u64;
         for byte in bytes {
@@ -1301,9 +1295,6 @@ impl Revision {
         Self(value)
     }
 }
-
-/// Convenient module-level snapshot alias.
-pub type Snapshot = ObjectSnapshot;
 
 #[derive(Debug, Clone)]
 struct Layout {
