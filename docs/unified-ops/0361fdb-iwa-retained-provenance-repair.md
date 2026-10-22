@@ -86,6 +86,45 @@ No native ABBA block ran in this window. These deterministic results do not
 qualify native latency or close the constructor return; a quiet-host run is
 still required after source review.
 
+## Correctness return and v12 constructor count
+
+The v11 source review found one admission gap: a public mutation of
+`MessageInfo.length` could bypass the default minimal certificate on the
+decoded validation path. Commit `ada701ba3a` makes that path apply the typed
+`MessageBytes` check and adds a constructor/decode boundary regression. Commit
+`ed10b876af` then removes avoidable default-profile work: default limits skip a
+second invariant walk after exact equality with `Limits::default()`, and the
+minimal shape certificate aggregates all public shape fields without changing
+the checks. Nondefault profiles still run `Limits::validate()` and the exact
+admission path.
+
+The corrected source was rebuilt and measured against the same base using the
+external count probe. The reduced receipt is
+[`constructor-v12-count-summary.json`](results/0361fd/constructor-v12-count-summary.json),
+10,666 bytes, SHA-256
+`58e9878bd595edab5ec6d2da15786cc62fd2258ebb626bc5e4284e1cfdb5f0d0`.
+The probe source SHA-256 is
+`eb3157342b9bd2c5c9e0c5d373ad4c507987b3acf46c680246d84bae7f6efdf0` and
+the lock SHA-256 is
+`551fd8812350c2b13b5d1791fb8773ba4a50c71801728c3a18f6c1dca3f7f89a`.
+Callgrind again uses `(Ir at 12,000 - Ir at 2,000) / 10,000`, with setup
+outside the measured loop. `archive_info` is the canonical route; the
+`retained_validate` route contains 64 unknown fields and a noncanonical
+unknown varint in its retained header.
+
+| Messages | Canonical base → candidate Ir/op | Ratio | Retained base → candidate Ir/op | Ratio |
+|---:|---:|---:|---:|---:|
+| 1 | 51.005 → 185.004 | 3.627 | 2,127.005 → 2,011.004 | 0.945 |
+| 8 | 51.005 → 332.004 | 6.509 | 9,067.006 → 9,340.005 | 1.030 |
+| 32 | 51.006 → 836.006 | 16.390 | 48,055.504 → 34,828.005 | 0.725 |
+| 128 | 51.004 → 2,852.005 | 55.918 | 195,076.405 → 136,132.005 | 0.698 |
+
+The constructor still performs one public-field admission pass per message;
+the corrected counts show that cost grows linearly with metadata cardinality.
+There is no cached header generation, inventory allocation, or provenance
+allocation on this route. The constructor performance remains returned for
+repair and owner review. No native qualification was run.
+
 ## Validation and workspace hygiene
 
 The source passed `cargo fmt --all -- --check`,
