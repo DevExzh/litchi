@@ -149,7 +149,7 @@ fn document_text(source: &[u8], sink: &mut Vec<u8>) -> BenchResult<()> {
 
 fn document_detached(source: &[u8], sink: &mut Vec<u8>) -> BenchResult<()> {
     let package = open(source)?;
-    let mut edit = package.document_snapshot()?.edit();
+    let mut edit = package.edit()?;
     edit.replace_paragraph_text(Position::new(PARAGRAPHS / 2), "changed")?;
     let commit = edit.commit()?;
     package

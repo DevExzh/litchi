@@ -9,7 +9,7 @@
 //! story's own tags. Every byte of the part outside the story's content is
 //! kept, and an unchanged story stages nothing.
 
-use super::super::transaction::Edit as SnapshotEdit;
+use super::super::raw::Tree as SnapshotEdit;
 use super::super::{Error, Refusal, Result, Snapshot};
 use super::Edit;
 use super::notes::{NoteKind, find_note};

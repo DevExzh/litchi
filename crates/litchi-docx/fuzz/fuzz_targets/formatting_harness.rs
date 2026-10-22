@@ -1,6 +1,6 @@
 //! Bounded formatting and exact-inverse exercise for untrusted source XML.
 use litchi_core::Position;
-use litchi_docx::document::{BodyAnchor, NewParagraph, NewRun, Snapshot};
+use litchi_docx::document::{BodyAnchor, NewParagraph, NewRun, raw};
 
 pub fn exercise(data: &[u8]) -> bool {
     let Some((&selector, xml)) = data.split_first() else {
@@ -9,10 +9,10 @@ pub fn exercise(data: &[u8]) -> bool {
     if xml.len() > 64 * 1024 {
         return false;
     }
-    let Ok(source) = Snapshot::from_xml(xml) else {
+    let limits = raw::Limits::default();
+    let Ok(mut edit) = raw::Tree::from_xml(xml.to_vec(), limits) else {
         return false;
     };
-    let mut edit = source.edit();
     let result = match selector % 5 {
         0 => edit
             .format_run(Position::new(0), Position::new(0), |run| {
@@ -36,17 +36,15 @@ pub fn exercise(data: &[u8]) -> bool {
         _ => edit.remove_paragraph(Position::new(0)).map(|_| ()),
     };
     if result.is_err() {
-        assert_eq!(edit.projected().xml_bytes(), source.xml_bytes());
+        assert_eq!(edit.projected().xml_bytes(), xml);
         return false;
     }
-    let Ok(commit) = edit.commit() else {
+    let Ok(patch) = edit.patch() else {
         return false;
     };
-    let restored = commit
-        .patch()
-        .inverse()
-        .apply(commit.snapshot())
+    let restored = edit
+        .apply_patch(&patch.inverse(), limits)
         .expect("inverse of accepted edit");
-    assert_eq!(restored.xml_bytes(), source.xml_bytes());
+    assert_eq!(restored.to_bytes(limits).unwrap(), xml);
     true
 }

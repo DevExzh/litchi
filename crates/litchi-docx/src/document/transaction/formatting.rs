@@ -495,19 +495,20 @@ impl Edit {
     ///
     /// ```
     /// use litchi_core::Position;
-    /// use litchi_docx::document::Snapshot;
+    /// use litchi_docx::document::raw;
     /// use litchi_docx::properties::HalfPoints;
     ///
-    /// let snapshot = Snapshot::from_xml(
-    ///     r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:rPr><w:i/></w:rPr><w:t>x</w:t></w:r></w:p></w:body></w:document>"#,
+    /// let mut edit = raw::Tree::from_xml(
+    ///     br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:rPr><w:i/></w:rPr><w:t>x</w:t></w:r></w:p></w:body></w:document>"#
+    ///         .to_vec(),
+    ///     raw::Limits::default(),
     /// )?;
-    /// let mut edit = snapshot.edit();
     /// edit.format_run(Position::new(0), Position::new(0), |run| {
     ///     run.bold = Some(true);
     ///     run.size = Some(HalfPoints(28));
     /// })?;
-    /// let commit = edit.commit()?;
-    /// let xml = std::str::from_utf8(commit.snapshot().xml_bytes())?;
+    /// let bytes = edit.to_bytes(raw::Limits::default())?;
+    /// let xml = std::str::from_utf8(&bytes)?;
     /// assert!(xml.contains("<w:rPr><w:b/><w:i/><w:sz w:val=\"28\"/></w:rPr>"));
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
@@ -569,13 +570,14 @@ impl Edit {
     ///
     /// ```
     /// use litchi_core::Position;
-    /// use litchi_docx::document::Snapshot;
+    /// use litchi_docx::document::raw;
     /// use litchi_docx::properties::{Justification, Numbering};
     ///
-    /// let snapshot = Snapshot::from_xml(
-    ///     r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>Item</w:t></w:r></w:p></w:body></w:document>"#,
+    /// let mut edit = raw::Tree::from_xml(
+    ///     br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>Item</w:t></w:r></w:p></w:body></w:document>"#
+    ///         .to_vec(),
+    ///     raw::Limits::default(),
     /// )?;
-    /// let mut edit = snapshot.edit();
     /// edit.format_paragraph(Position::new(0), |paragraph| {
     ///     paragraph.style = Some("ListParagraph".to_owned());
     ///     let mut numbering = Numbering::default();
@@ -584,8 +586,7 @@ impl Edit {
     ///     paragraph.numbering = Some(numbering);
     ///     paragraph.justification = Some(Justification::Both);
     /// })?;
-    /// let commit = edit.commit()?;
-    /// let paragraph = commit.snapshot().paragraph(Position::new(0)).unwrap();
+    /// let paragraph = edit.projected().paragraph(Position::new(0)).unwrap();
     /// let properties = paragraph.direct_properties()?;
     /// assert_eq!(properties.style.as_deref(), Some("ListParagraph"));
     /// assert_eq!(properties.numbering.and_then(|numbering| numbering.id), Some(3));
@@ -637,21 +638,21 @@ impl Edit {
     ///
     /// ```
     /// use litchi_core::Position;
-    /// use litchi_docx::document::{BodyAnchor, BodyBlock, NewParagraph, NewRun, Snapshot};
+    /// use litchi_docx::document::{raw, BodyAnchor, BodyBlock, NewParagraph, NewRun};
     ///
-    /// let snapshot = Snapshot::from_xml(
-    ///     r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/><w:tbl/><w:sectPr/></w:body></w:document>"#,
+    /// let mut edit = raw::Tree::from_xml(
+    ///     br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/><w:tbl/><w:sectPr/></w:body></w:document>"#
+    ///         .to_vec(),
+    ///     raw::Limits::default(),
     /// )?;
     /// let mut run = NewRun::new("after the table");
     /// run.properties_mut().italic = Some(true);
-    /// let mut edit = snapshot.edit();
     /// let position = edit.insert_formatted_paragraph(
     ///     BodyAnchor::After(BodyBlock::Table(Position::new(0))),
     ///     &NewParagraph::new().with_run(run),
     /// )?;
     /// assert_eq!(position, Position::new(1));
-    /// let commit = edit.commit()?;
-    /// assert_eq!(commit.snapshot().paragraph_count(), 2);
+    /// assert_eq!(edit.projected().paragraph_count(), 2);
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     ///

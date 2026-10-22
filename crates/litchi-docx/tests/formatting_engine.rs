@@ -8,7 +8,7 @@ use std::io::Cursor;
 
 use litchi_core::Position;
 use litchi_docx::color::Theme;
-use litchi_docx::document::{BodyAnchor, BodyBlock, NewParagraph, NewRun, Snapshot};
+use litchi_docx::document::{BodyAnchor, BodyBlock, Edit, NewParagraph, NewRun, raw};
 use litchi_docx::paragraph::{LineSpacingRule, ParagraphSpacing};
 use litchi_docx::properties::{
     Border, BorderStyle, Color, EighthPoints, Emphasis, Fonts, HalfPoints, HexColor, Highlight,
@@ -744,13 +744,13 @@ fn officecli_property_sets_read_back_from_a_blank_document() {
         let mut added = Package::from_reader(Cursor::new(blank())).unwrap();
         let base = added.document_snapshot().unwrap();
         let existing = base.paragraph_count();
-        let mut edit = base.edit();
+        let mut edit = added.edit().unwrap();
         for line in &lines {
             edit.insert_formatted_paragraph(BodyAnchor::End, &new_paragraph(line))
                 .unwrap_or_else(|error| panic!("{script} {}: {error}", line.keys));
         }
         let commit = edit.commit().unwrap();
-        let added_document = commit.snapshot().xml_bytes().to_vec();
+        let added_document = commit.patch().target().xml_bytes().to_vec();
         added = added.apply(commit.patch()).unwrap().into_package();
         let added_bytes = saved(&mut added);
         let readback = read_back(&added_bytes);
@@ -762,8 +762,7 @@ fn officecli_property_sets_read_back_from_a_blank_document() {
         // `set`: plain paragraphs and runs formatted in place, runs after
         // the first appended to the existing paragraph.
         let mut set = Package::from_reader(Cursor::new(blank())).unwrap();
-        let base = set.document_snapshot().unwrap();
-        let mut edit = base.edit();
+        let mut edit = set.edit().unwrap();
         for line in &lines {
             let mut plain = NewParagraph::new();
             if let Some((text, _)) = line.runs.first() {
@@ -785,7 +784,7 @@ fn officecli_property_sets_read_back_from_a_blank_document() {
         // Every property element lands in schema order with canonical
         // attributes either way, so the two documents are the same bytes.
         assert_eq!(
-            commit.snapshot().xml_bytes(),
+            commit.patch().target().xml_bytes(),
             added_document.as_slice(),
             "{script}: `set` and `add` disagree"
         );
@@ -858,7 +857,7 @@ fn tracked_changes_of_a_real_producer_survive_formatting() {
         before.iter().map(Vec::len).sum::<usize>() >= 20,
         "the fixture should carry tracked changes"
     );
-    let mut edit = base.edit();
+    let mut edit = package.edit().unwrap();
     let mut runs = 0usize;
     for position in 0..base.paragraph_count() {
         let paragraph = Position::new(position);
@@ -882,7 +881,7 @@ fn tracked_changes_of_a_real_producer_survive_formatting() {
     }
     assert!(runs >= 10, "{runs} direct runs formatted");
     let commit = edit.commit().unwrap();
-    let after = commit.snapshot().xml_bytes();
+    let after = commit.patch().target().xml_bytes();
     for (local, before) in tracked.iter().zip(&before) {
         for element in before {
             assert!(
@@ -893,7 +892,11 @@ fn tracked_changes_of_a_real_producer_survive_formatting() {
         }
         assert_eq!(elements(after, local).len(), before.len(), "w:{local}");
     }
-    let restored = commit.patch().inverse().apply(commit.snapshot()).unwrap();
+    let restored = commit
+        .patch()
+        .inverse()
+        .apply(commit.patch().target())
+        .unwrap();
     assert_eq!(restored.xml_bytes(), base.xml_bytes());
 }
 
@@ -907,13 +910,12 @@ fn both_owners_publish_formatting_and_structure_identically() {
         "test-data/poi/test-data/document/saut_page.docx",
     ] {
         let source = fixture(relative);
-        let stage = |snapshot: &Snapshot| {
-            let mut edit = snapshot.edit();
+        fn stage<P: Clone>(edit: &mut Edit<P>) {
             edit.format_run(Position::new(0), Position::new(0), |run| {
                 run.bold = Some(true);
                 run.size = Some(HalfPoints(30));
             })
-            .unwrap_or_else(|error| panic!("{relative}: {error}"));
+            .unwrap_or_else(|error| panic!("formatting edit failed: {error}"));
             edit.format_paragraph(Position::new(0), |paragraph| {
                 paragraph.justification = Some(Justification::Center);
             })
@@ -932,17 +934,20 @@ fn both_owners_publish_formatting_and_structure_identically() {
                 BodyAnchor::Before(BodyBlock::Paragraph(Position::new(0))),
             )
             .unwrap();
-            edit.commit().unwrap()
-        };
+        }
 
         let owned = Package::from_reader(Cursor::new(source.as_slice())).unwrap();
-        let commit = stage(&owned.document_snapshot().unwrap());
+        let mut owned_edit = owned.edit().unwrap();
+        stage(&mut owned_edit);
+        let commit = owned_edit.commit().unwrap();
         let mut owned = owned;
         owned = owned.apply(commit.patch()).unwrap().into_package();
         let owned_bytes = saved(&mut owned);
 
         let backed = source_backed::Package::from_reader(Cursor::new(source.as_slice())).unwrap();
-        let commit = stage(&backed.edit().unwrap().source().clone());
+        let mut backed_edit = backed.edit().unwrap();
+        stage(&mut backed_edit);
+        let commit = backed_edit.commit().unwrap();
         let mut backed_bytes = Vec::new();
         backed
             .apply(commit.patch())
@@ -981,9 +986,7 @@ fn signed_packages_refuse_formatting_until_explicitly_unsigned() {
     let mut package = Package::from_reader(Cursor::new(source.as_slice())).unwrap();
     assert!(package.is_signed());
     let original = saved(&mut package);
-    let snapshot = package.document_snapshot().unwrap();
-
-    let mut noop = snapshot.edit();
+    let mut noop = package.edit().unwrap();
     noop.format_run(Position::new(0), Position::new(0), |_| {})
         .unwrap();
     package = package
@@ -993,23 +996,25 @@ fn signed_packages_refuse_formatting_until_explicitly_unsigned() {
     assert!(package.is_signed());
     assert_eq!(saved(&mut package), original);
 
-    let stage = |snapshot: &Snapshot| {
-        let mut edit = snapshot.edit();
+    fn stage<P: Clone>(edit: &mut Edit<P>) {
         edit.format_run(Position::new(0), Position::new(0), |run| {
             run.italic = Some(true);
         })
         .unwrap();
         edit.insert_formatted_paragraph(BodyAnchor::End, &NewParagraph::new())
             .unwrap();
-        edit.commit().unwrap()
-    };
-    let commit = stage(&snapshot);
+    }
+    let mut package_edit = package.edit().unwrap();
+    stage(&mut package_edit);
+    let commit = package_edit.commit().unwrap();
     assert!(package.apply(commit.patch()).is_err());
     assert!(package.is_signed());
     assert_eq!(saved(&mut package), original);
 
     let backed = source_backed::Package::from_reader(Cursor::new(source.as_slice())).unwrap();
-    let backed_commit = stage(&backed.document_snapshot().unwrap());
+    let mut backed_edit = backed.edit().unwrap();
+    stage(&mut backed_edit);
+    let backed_commit = backed_edit.commit().unwrap();
     let mut output = Vec::new();
     assert!(matches!(
         backed.apply(backed_commit.patch()).and_then(|committed| {
@@ -1040,27 +1045,26 @@ fn signed_packages_refuse_formatting_until_explicitly_unsigned() {
 /// Formatting a theme-coloured run keeps the theme reference and transforms.
 #[test]
 fn theme_colours_round_trip_through_the_engine() {
-    let snapshot = Snapshot::from_xml(
-        r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:rPr><w:color w:val="4472C4" w:themeColor="accent1"/></w:rPr><w:t>x</w:t></w:r></w:p></w:body></w:document>"#,
+    let mut edit = raw::Tree::from_xml(
+        r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:rPr><w:color w:val="4472C4" w:themeColor="accent1"/></w:rPr><w:t>x</w:t></w:r></w:p></w:body></w:document>"#.as_bytes().to_vec(),
+        raw::Limits::default(),
     )
     .unwrap();
-    let mut edit = snapshot.edit();
     edit.format_run(Position::new(0), Position::new(0), |run| {
         let color = run.color.as_mut().unwrap();
         color.theme = Some(Theme::Accent2);
         color.theme_shade = Some(0xBF);
     })
     .unwrap();
-    let commit = edit.commit().unwrap();
     assert_eq!(
-        std::str::from_utf8(commit.snapshot().xml_bytes()).unwrap(),
+        std::str::from_utf8(&edit.to_bytes(raw::Limits::default()).unwrap()).unwrap(),
         r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:rPr><w:color w:val="4472C4" w:themeColor="accent2" w:themeShade="BF"/></w:rPr><w:t>x</w:t></w:r></w:p></w:body></w:document>"#
     );
 }
 
 #[test]
 fn canonical_owner_commits_retain_source_and_support_inverse() {
-    fn stage<P: Clone>(edit: &mut litchi_docx::document::Edit<P>) {
+    fn stage<P: Clone>(edit: &mut Edit<P>) {
         let first = edit
             .insert_formatted_paragraph(
                 BodyAnchor::End,

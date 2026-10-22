@@ -511,19 +511,21 @@ impl Edit {
     ///
     /// ```
     /// use litchi_core::Position;
-    /// use litchi_docx::document::{ElementAnchor, ElementPath, ElementStep, NewCell, NewTable, Snapshot};
+    /// use litchi_docx::document::{raw, ElementAnchor, ElementPath, ElementStep, NewCell, NewTable};
     ///
-    /// let snapshot = Snapshot::from_xml(
-    ///     r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:sectPr/></w:body></w:document>"#,
+    /// let mut edit = raw::Tree::from_xml(
+    ///     br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:sectPr/></w:body></w:document>"#
+    ///         .to_vec(),
+    ///     raw::Limits::default(),
     /// )?;
-    /// let mut edit = snapshot.edit();
     /// edit.insert_table_at(&ElementPath::body(), ElementAnchor::End, &NewTable::new(2, 2)?)?;
     /// let row = ElementPath::new([
     ///     ElementStep::Table(Position::new(0)),
     ///     ElementStep::Row(Position::new(0)),
     /// ]);
     /// assert_eq!(edit.insert_cell_at(&row, None, &NewCell::new().with_text("x"))?, Position::new(2));
-    /// let xml = String::from_utf8_lossy(edit.commit()?.snapshot().xml_bytes()).into_owned();
+    /// let bytes = edit.to_bytes(raw::Limits::default())?;
+    /// let xml = String::from_utf8_lossy(&bytes).into_owned();
     /// assert_eq!(xml.matches("<w:gridCol ").count(), 3);
     /// assert_eq!(xml.matches("<w:tc>").count(), 6);
     /// # Ok::<(), Box<dyn std::error::Error>>(())
@@ -608,16 +610,18 @@ impl Edit {
     ///
     /// ```
     /// use litchi_core::Position;
-    /// use litchi_docx::document::{ElementAnchor, ElementPath, ElementStep, NewTable, Snapshot};
+    /// use litchi_docx::document::{raw, ElementAnchor, ElementPath, ElementStep, NewTable};
     ///
-    /// let snapshot = Snapshot::from_xml(
-    ///     r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:sectPr/></w:body></w:document>"#,
+    /// let mut edit = raw::Tree::from_xml(
+    ///     br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:sectPr/></w:body></w:document>"#
+    ///         .to_vec(),
+    ///     raw::Limits::default(),
     /// )?;
-    /// let mut edit = snapshot.edit();
     /// edit.insert_table_at(&ElementPath::body(), ElementAnchor::End, &NewTable::new(2, 2)?)?;
     /// let table = ElementPath::new([ElementStep::Table(Position::new(0))]);
     /// assert_eq!(edit.insert_column_at(&table, Some(Position::new(0)), Some(1200), "Q")?, Position::new(0));
-    /// let xml = String::from_utf8_lossy(edit.commit()?.snapshot().xml_bytes()).into_owned();
+    /// let bytes = edit.to_bytes(raw::Limits::default())?;
+    /// let xml = String::from_utf8_lossy(&bytes).into_owned();
     /// assert!(xml.contains(r#"<w:tblGrid><w:gridCol w:w="1200"/>"#));
     /// assert_eq!(xml.matches("<w:t>Q</w:t>").count(), 2);
     /// # Ok::<(), Box<dyn std::error::Error>>(())

@@ -151,6 +151,11 @@ pub struct Package {
     /// place, so a live allocation that is still this one holds the same
     /// bytes; the weak reference keeps nothing alive.
     pub(super) main_admission: std::sync::Arc<std::sync::Mutex<std::sync::Weak<Vec<u8>>>>,
+    /// Complete-package fingerprint memo keyed by the immutable OPC graph
+    /// allocation. A graph edit replaces that allocation, so an old digest
+    /// can never be reused for a changed package.
+    pub(super) artifact_fingerprint:
+        std::sync::Arc<std::sync::Mutex<Option<(std::sync::Weak<OpcPackage>, [u8; 32])>>>,
     /// Authoritative, mutation-tracked core properties.
     pub(super) properties: Shared<Slot>,
     /// Custom document properties
@@ -175,6 +180,10 @@ impl<T> Clone for Shared<T> {
 impl<T> Shared<T> {
     pub(super) fn shared(&self) -> std::sync::Arc<T> {
         std::sync::Arc::clone(&self.0)
+    }
+
+    pub(super) fn weak(&self) -> std::sync::Weak<T> {
+        std::sync::Arc::downgrade(&self.0)
     }
 }
 

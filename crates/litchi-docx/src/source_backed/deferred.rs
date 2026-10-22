@@ -133,8 +133,26 @@ impl Package {
                     return Ok(*artifact);
                 }
             } else {
-                let artifact = self.physical_source()?.source_artifact();
-                return Ok((artifact.len(), artifact.fingerprint()?.into_sha256()));
+                let physical = self.physical_source()?;
+                let version = physical.source_version()?;
+                if let Some((_cached_version, fingerprint)) = self
+                    .artifact_fingerprint
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .as_ref()
+                    .copied()
+                    .filter(|(cached_version, _)| *cached_version == version)
+                {
+                    return Ok((physical.source_artifact().len(), fingerprint));
+                }
+                let artifact = physical.source_artifact();
+                let fingerprint = artifact.fingerprint()?.into_sha256();
+                *self
+                    .artifact_fingerprint
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner) =
+                    Some((version, fingerprint));
+                return Ok((artifact.len(), fingerprint));
             }
         }
         let mut sink = Hashing(<sha2::Sha256 as sha2::Digest>::new(), 0);

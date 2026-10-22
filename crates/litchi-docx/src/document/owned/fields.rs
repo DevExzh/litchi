@@ -33,14 +33,14 @@ impl<P: Clone> Edit<P> {
     ///
     /// # Errors
     ///
-    /// As [`super::super::snapshot::Edit::refresh_fields`]. Source-backed
+    /// As [`super::super::raw::Tree::refresh_fields`]. Source-backed
     /// edits refuse it as an unmanaged-only operation.
     pub fn refresh_fields(&mut self, fields: &Fields, updates: &[Update]) -> Result<Outcome> {
         self.inner.refresh_fields(fields, updates)
     }
 
     /// Insert a bookmark into the paragraph at `paragraph`; see
-    /// [`super::super::snapshot::Edit::insert_bookmark_at`] (record 0325).
+    /// [`super::super::raw::Tree::insert_bookmark_at`] (record 0325).
     ///
     /// ```
     /// use litchi_core::Position;
@@ -58,7 +58,7 @@ impl<P: Clone> Edit<P> {
     ///
     /// # Errors
     ///
-    /// As [`super::super::snapshot::Edit::insert_bookmark_at`].
+    /// As [`super::super::raw::Tree::insert_bookmark_at`].
     pub fn insert_bookmark_at(
         &mut self,
         paragraph: &super::super::ElementPath,
@@ -70,11 +70,11 @@ impl<P: Clone> Edit<P> {
     }
 
     /// Insert a complex field into the paragraph at `paragraph`; see
-    /// [`super::super::snapshot::Edit::insert_field_at`] (record 0325).
+    /// [`super::super::raw::Tree::insert_field_at`] (record 0325).
     ///
     /// # Errors
     ///
-    /// As [`super::super::snapshot::Edit::insert_field_at`].
+    /// As [`super::super::raw::Tree::insert_field_at`].
     pub fn insert_field_at(
         &mut self,
         paragraph: &super::super::ElementPath,

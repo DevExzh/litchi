@@ -7,6 +7,7 @@ use super::{
 };
 use crate::Package;
 use litchi_core::Position;
+use litchi_core::patch::CompositionLimits;
 
 mod chart;
 mod comments;
@@ -54,9 +55,22 @@ impl<P: Clone> Edit<P> {
         Self { package, inner }
     }
 
+    /// Apply one already-planned composition batch without opening a second
+    /// document snapshot. Package owners use this to retain one validation and
+    /// publication pass for all joined operations.
+    pub(crate) fn apply_composition_operations(
+        &mut self,
+        operations: &[transaction::Operation],
+    ) -> Result<&mut Self> {
+        for operation in operations {
+            self.inner.apply_operation(operation)?;
+        }
+        Ok(self)
+    }
+
     /// Change one direct run's local properties while preserving unrelated markup.
     ///
-    /// See [`super::snapshot::Edit::format_run`] for selection and preservation rules.
+    /// See [`super::raw::Tree::format_run`] for selection and preservation rules.
     ///
     /// # Errors
     /// Returns a typed selection, property, dependency or resource refusal without
@@ -73,7 +87,7 @@ impl<P: Clone> Edit<P> {
 
     /// Change one direct-body paragraph's local properties.
     ///
-    /// See [`super::snapshot::Edit::format_paragraph`] for selection and preservation rules.
+    /// See [`super::raw::Tree::format_paragraph`] for selection and preservation rules.
     ///
     /// # Errors
     /// Returns a typed selection, property, dependency or resource refusal without
@@ -89,7 +103,7 @@ impl<P: Clone> Edit<P> {
 
     /// Insert a paragraph with typed direct properties at a body anchor.
     ///
-    /// See [`super::snapshot::Edit::insert_formatted_paragraph`] for selection and preservation rules.
+    /// See [`super::raw::Tree::insert_formatted_paragraph`] for selection and preservation rules.
     ///
     /// # Errors
     /// Returns a typed selection, property, dependency or resource refusal without
@@ -104,7 +118,7 @@ impl<P: Clone> Edit<P> {
 
     /// Remove a paragraph after checking ranges, section breaks and story references.
     ///
-    /// See [`super::snapshot::Edit::remove_paragraph`] for selection and preservation rules.
+    /// See [`super::raw::Tree::remove_paragraph`] for selection and preservation rules.
     ///
     /// # Errors
     /// Returns a typed selection, property, dependency or resource refusal without
@@ -116,7 +130,7 @@ impl<P: Clone> Edit<P> {
 
     /// Move a paragraph atomically, preserving its exact XML.
     ///
-    /// See [`super::snapshot::Edit::move_paragraph`] for selection and preservation rules.
+    /// See [`super::raw::Tree::move_paragraph`] for selection and preservation rules.
     ///
     /// # Errors
     /// Returns a typed selection, property, dependency or resource refusal without
@@ -131,7 +145,7 @@ impl<P: Clone> Edit<P> {
 
     /// Swap two direct-body paragraphs while retaining their exact XML.
     ///
-    /// See [`super::snapshot::Edit::swap_paragraphs`] for selection and
+    /// See [`super::raw::Tree::swap_paragraphs`] for selection and
     /// preservation rules.
     pub fn swap_paragraphs(&mut self, first: Position, second: Position) -> Result<&mut Self> {
         self.inner.swap_paragraphs(first, second)?;
@@ -140,7 +154,7 @@ impl<P: Clone> Edit<P> {
 
     /// Insert a typed run before a direct run position.
     ///
-    /// See [`super::snapshot::Edit::insert_run`] for selection and preservation rules.
+    /// See [`super::raw::Tree::insert_run`] for selection and preservation rules.
     ///
     /// # Errors
     /// Returns a typed selection, property, dependency or resource refusal without
@@ -156,7 +170,7 @@ impl<P: Clone> Edit<P> {
 
     /// Append a typed run after a paragraph's last child.
     ///
-    /// See [`super::snapshot::Edit::append_run`] for selection and preservation rules.
+    /// See [`super::raw::Tree::append_run`] for selection and preservation rules.
     ///
     /// # Errors
     /// Returns a typed selection, property, dependency or resource refusal without
@@ -167,7 +181,7 @@ impl<P: Clone> Edit<P> {
 
     /// Remove one direct run after checking field and story dependencies.
     ///
-    /// See [`super::snapshot::Edit::remove_run`] for selection and preservation rules.
+    /// See [`super::raw::Tree::remove_run`] for selection and preservation rules.
     ///
     /// # Errors
     /// Returns a typed selection, property, dependency or resource refusal without
@@ -179,7 +193,7 @@ impl<P: Clone> Edit<P> {
 
     /// Move one direct run within a paragraph while retaining its exact XML.
     ///
-    /// See [`super::snapshot::Edit::move_run`] for selection and preservation
+    /// See [`super::raw::Tree::move_run`] for selection and preservation
     /// rules.
     pub fn move_run(
         &mut self,
@@ -193,7 +207,7 @@ impl<P: Clone> Edit<P> {
     /// Move one direct run to another direct-body paragraph when the source
     /// and destination namespace scopes are proven equivalent.
     ///
-    /// See [`super::snapshot::Edit::move_run_to`] for selection and
+    /// See [`super::raw::Tree::move_run_to`] for selection and
     /// preservation rules.
     pub fn move_run_to(
         &mut self,
@@ -208,7 +222,7 @@ impl<P: Clone> Edit<P> {
 
     /// Swap two direct runs in one paragraph while retaining their exact XML.
     ///
-    /// See [`super::snapshot::Edit::swap_runs`] for selection and preservation
+    /// See [`super::raw::Tree::swap_runs`] for selection and preservation
     /// rules.
     pub fn swap_runs(
         &mut self,
@@ -246,9 +260,23 @@ impl<P: Clone> Edit<P> {
         self.inner.projected()
     }
 
+    /// Convert this staged edit into an immutable sub-edit for a package
+    /// composition. The package owner remains responsible for publishing the
+    /// resulting [`super::composition::Composition`] in one commit.
+    ///
+    /// # Errors
+    /// Returns a common composition bound or identifier error.
+    pub fn prepare(
+        self,
+        limits: CompositionLimits,
+        identifier: impl Into<String>,
+    ) -> Result<super::composition::Prepared> {
+        self.inner.prepare(limits, identifier)
+    }
+
     /// Change the direct properties of the paragraph at `path`.
     ///
-    /// See [`super::snapshot::Edit::format_paragraph_at`].
+    /// See [`super::raw::Tree::format_paragraph_at`].
     ///
     /// # Errors
     /// Returns a typed selection, property, dependency or resource refusal without
@@ -264,7 +292,7 @@ impl<P: Clone> Edit<P> {
 
     /// Change the direct properties of the table at `path` (record 0342).
     ///
-    /// See [`super::snapshot::Edit::format_table_at`].
+    /// See [`super::raw::Tree::format_table_at`].
     ///
     /// # Errors
     /// Returns a typed selection, property or resource refusal without
@@ -281,7 +309,7 @@ impl<P: Clone> Edit<P> {
     /// Change the direct properties of the table row at `path` (record
     /// 0342).
     ///
-    /// See [`super::snapshot::Edit::format_row_at`].
+    /// See [`super::raw::Tree::format_row_at`].
     ///
     /// # Errors
     /// Returns a typed selection, property or resource refusal without
@@ -297,7 +325,7 @@ impl<P: Clone> Edit<P> {
 
     /// Change the direct properties of the run at `path`.
     ///
-    /// See [`super::snapshot::Edit::format_run_at`].
+    /// See [`super::raw::Tree::format_run_at`].
     ///
     /// # Errors
     /// Returns a typed selection, property, dependency or resource refusal without
@@ -313,7 +341,7 @@ impl<P: Clone> Edit<P> {
 
     /// Replace the text of the paragraph, run or hyperlink at `path`.
     ///
-    /// See [`super::snapshot::Edit::replace_text_at`].
+    /// See [`super::raw::Tree::replace_text_at`].
     ///
     /// # Errors
     /// Returns a typed selection, text or resource refusal without changing the
@@ -329,7 +357,7 @@ impl<P: Clone> Edit<P> {
 
     /// Replace a table cell's content with one paragraph of text.
     ///
-    /// See [`super::snapshot::Edit::replace_cell_text_at`].
+    /// See [`super::raw::Tree::replace_cell_text_at`].
     ///
     /// # Errors
     /// Returns a typed selection, dependency, text or resource refusal without
@@ -346,7 +374,7 @@ impl<P: Clone> Edit<P> {
     /// Set or remove the screen tip of the hyperlink at `hyperlink` (record
     /// 0345).
     ///
-    /// See [`super::snapshot::Edit::set_hyperlink_tooltip_at`].
+    /// See [`super::raw::Tree::set_hyperlink_tooltip_at`].
     ///
     /// # Errors
     /// Returns a typed selection, value or resource refusal without changing
@@ -362,7 +390,7 @@ impl<P: Clone> Edit<P> {
 
     /// Insert a run into the paragraph or hyperlink at `owner`.
     ///
-    /// See [`super::snapshot::Edit::insert_run_at`].
+    /// See [`super::raw::Tree::insert_run_at`].
     ///
     /// # Errors
     /// Returns a typed selection, field, property or resource refusal without
@@ -436,7 +464,7 @@ impl<P: Clone> Edit<P> {
 
     /// Insert a paragraph into the body, a cell or a block content control.
     ///
-    /// See [`super::snapshot::Edit::insert_paragraph_at`].
+    /// See [`super::raw::Tree::insert_paragraph_at`].
     ///
     /// # Errors
     /// Returns a typed selection, property or resource refusal without changing
@@ -452,7 +480,7 @@ impl<P: Clone> Edit<P> {
 
     /// Insert a table into the body, a cell or a block content control.
     ///
-    /// See [`super::snapshot::Edit::insert_table_at`].
+    /// See [`super::raw::Tree::insert_table_at`].
     ///
     /// # Errors
     /// Returns a typed selection, text or resource refusal without changing the
@@ -468,7 +496,7 @@ impl<P: Clone> Edit<P> {
 
     /// Insert a row into the table at `table`.
     ///
-    /// See [`super::snapshot::Edit::insert_row_at`].
+    /// See [`super::raw::Tree::insert_row_at`].
     ///
     /// # Errors
     /// Returns a typed selection, text or resource refusal without changing the
@@ -486,7 +514,7 @@ impl<P: Clone> Edit<P> {
     /// Insert a cell into the row at `row`, keeping the table grid in step
     /// (record 0345).
     ///
-    /// See [`super::snapshot::Edit::insert_cell_at`].
+    /// See [`super::raw::Tree::insert_cell_at`].
     ///
     /// # Errors
     /// Returns a typed selection, text or resource refusal without changing the
@@ -503,7 +531,7 @@ impl<P: Clone> Edit<P> {
     /// Insert a grid column, with a cell in every row, into the table at
     /// `table` (record 0345).
     ///
-    /// See [`super::snapshot::Edit::insert_column_at`].
+    /// See [`super::raw::Tree::insert_column_at`].
     ///
     /// # Errors
     /// Returns a typed selection, merge, text or resource refusal without
@@ -521,7 +549,7 @@ impl<P: Clone> Edit<P> {
     /// Remove a grid column and its cells from the table at `table`
     /// (record 0345).
     ///
-    /// See [`super::snapshot::Edit::remove_column_at`].
+    /// See [`super::raw::Tree::remove_column_at`].
     ///
     /// # Errors
     /// Returns a typed selection, merge, dependency or resource refusal
@@ -538,7 +566,7 @@ impl<P: Clone> Edit<P> {
     /// Set the width of a grid column of the table at `table` (record
     /// 0345).
     ///
-    /// See [`super::snapshot::Edit::set_column_width_at`].
+    /// See [`super::raw::Tree::set_column_width_at`].
     ///
     /// # Errors
     /// Returns a typed selection, value or resource refusal without changing
@@ -555,7 +583,7 @@ impl<P: Clone> Edit<P> {
 
     /// Remove the element at `path`.
     ///
-    /// See [`super::snapshot::Edit::remove_element_at`].
+    /// See [`super::raw::Tree::remove_element_at`].
     ///
     /// # Errors
     /// Returns a typed selection, dependency or resource refusal without
@@ -567,7 +595,7 @@ impl<P: Clone> Edit<P> {
 
     /// Move the element at `path` into `container`.
     ///
-    /// See [`super::snapshot::Edit::move_element_at`].
+    /// See [`super::raw::Tree::move_element_at`].
     ///
     /// # Errors
     /// Returns a typed selection, dependency or resource refusal without

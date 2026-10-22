@@ -5,7 +5,7 @@ use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 
 use litchi_core::{Position, ReadAt, SourceVersion};
 use litchi_docx::alt::{Data, MAX_DATA_BYTES};
-use litchi_docx::document::{Error as TransactionError, Snapshot};
+use litchi_docx::document::Error as TransactionError;
 use litchi_docx::{Error, Package, SourceLimits, source_backed};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::rel::TargetMode;
@@ -394,7 +394,7 @@ fn document_commit_edits_only_the_main_part_and_reopens() {
     ));
     let read_at: Arc<dyn ReadAt> = source.clone();
     let package = source_backed::Package::from_read_at(read_at).unwrap();
-    let mut edit = package.document_snapshot().unwrap().edit();
+    let mut edit = package.edit().unwrap();
     edit.replace_paragraph_text(Position::new(1), "edited")
         .unwrap();
     let commit = edit.commit().unwrap();
@@ -408,7 +408,7 @@ fn document_commit_edits_only_the_main_part_and_reopens() {
         })
         .unwrap();
 
-    assert_eq!(published.xml_bytes(), commit.snapshot().xml_bytes());
+    assert_eq!(published.xml_bytes(), commit.patch().target().xml_bytes());
     assert_eq!(
         &output[payload_range(&output, UNUSED_PART)],
         &source_bytes[unused]
@@ -449,12 +449,7 @@ fn exact_noop_reproduces_every_source_byte() {
     let source = Arc::new(ObservedSource::new(source_bytes.clone(), main, unused));
     let read_at: Arc<dyn ReadAt> = source;
     let package = source_backed::Package::from_read_at(read_at).unwrap();
-    let commit = package
-        .document_snapshot()
-        .unwrap()
-        .edit()
-        .commit()
-        .unwrap();
+    let commit = package.edit().unwrap().commit().unwrap();
     let mut output = Vec::new();
 
     package
@@ -478,7 +473,7 @@ fn rolled_back_document_operations_use_the_exact_signed_source_path() {
     let source = Arc::new(ObservedSource::new(source_bytes.clone(), main, unused));
     let read_at: Arc<dyn ReadAt> = source;
     let package = source_backed::Package::from_read_at(read_at).unwrap();
-    let mut edit = package.document_snapshot().unwrap().edit();
+    let mut edit = package.edit().unwrap();
     edit.replace_paragraph_text(Position::new(0), "temporary")
         .unwrap();
     edit.replace_paragraph_text(Position::new(0), "alpha")
@@ -491,11 +486,16 @@ fn rolled_back_document_operations_use_the_exact_signed_source_path() {
     let mut retained_output = Vec::new();
     retained.write_to(&mut retained_output).unwrap();
     assert_eq!(retained_output, source_bytes);
-    let mut changed = package.document_snapshot().unwrap().edit();
+    let mut changed = package.edit().unwrap();
     changed
         .replace_paragraph_text(Position::new(0), "changed")
         .unwrap();
-    assert!(package.apply(changed.commit().unwrap().patch()).is_err());
+    assert!(matches!(
+        changed.commit(),
+        Err(TransactionError::Document(Error::Opc(
+            OpcError::SignedSourceRequiresExplicitPolicy
+        )))
+    ));
     let mut canonical = package.edit().unwrap();
     canonical
         .replace_paragraph_text(Position::new(0), "changed")
@@ -519,12 +519,32 @@ fn stale_commit_and_changed_source_fail_before_output() {
     let source = Arc::new(ObservedSource::new(source_bytes, main, unused));
     let read_at: Arc<dyn ReadAt> = source.clone();
     let package = source_backed::Package::from_read_at(read_at).unwrap();
-    let mut edit = package.document_snapshot().unwrap().edit();
+    let mut edit = package.edit().unwrap();
     edit.replace_paragraph_text(Position::new(1), "edited")
         .unwrap();
     let commit = edit.commit().unwrap();
-    source.changed();
+
+    let stale_document = format!(
+        r#"<w:document xmlns:w="{W}"><w:body><w:p><w:r><w:t>different</w:t></w:r></w:p></w:body></w:document>"#
+    )
+    .into_bytes();
+    let (stale_bytes, stale_main, stale_unused) =
+        fixture_for_document(stale_document, rt::OFFICE_DOCUMENT, false);
+    let stale_source = Arc::new(ObservedSource::new(stale_bytes, stale_main, stale_unused));
+    let stale_read_at: Arc<dyn ReadAt> = stale_source;
+    let stale_package = source_backed::Package::from_read_at(stale_read_at).unwrap();
     let mut output = Vec::new();
+    assert!(matches!(
+        stale_package.apply(commit.patch()).and_then(|committed| {
+            let committed = committed.into_package();
+            committed.write_to(&mut output)?;
+            committed.document_snapshot()
+        }),
+        Err(TransactionError::PatchConflict)
+    ));
+    assert!(output.is_empty());
+
+    source.changed();
     assert!(matches!(
         package.apply(commit.patch()).and_then(|committed| {
             let committed = committed.into_package();
@@ -536,25 +556,54 @@ fn stale_commit_and_changed_source_fail_before_output() {
         )))
     ));
     assert!(output.is_empty());
+}
 
-    let stale_document = format!(
-        r#"<w:document xmlns:w="{W}"><w:body><w:p><w:r><w:t>different</w:t></w:r></w:p></w:body></w:document>"#
-    )
-    .into_bytes();
-    let (stale_bytes, stale_main, stale_unused) =
-        fixture_for_document(stale_document, rt::OFFICE_DOCUMENT, false);
-    let stale_source = Arc::new(ObservedSource::new(stale_bytes, stale_main, stale_unused));
-    let stale_read_at: Arc<dyn ReadAt> = stale_source;
-    let stale_package = source_backed::Package::from_read_at(stale_read_at).unwrap();
+#[test]
+fn composition_binds_reopened_equal_content_untouched_parts_and_source_freshness() {
+    let (source_bytes, main, unused) = fixture();
+    let source = Arc::new(ObservedSource::new(source_bytes.clone(), main, unused));
+    let package = source_backed::Package::from_read_at(source.clone()).unwrap();
+    let limits = litchi_core::patch::CompositionLimits::new(8, 16, 48, 8);
+    let composition = || {
+        let mut edit = package.edit().unwrap();
+        edit.replace_paragraph_text(Position::new(0), "composed")
+            .unwrap();
+        let prepared = edit.prepare(limits, "source-backed").unwrap();
+        let mut composition = package.compose(limits).unwrap();
+        composition.join(prepared).unwrap();
+        composition
+    };
+
+    let reopened =
+        source_backed::Package::from_reader(io::Cursor::new(source_bytes.clone())).unwrap();
+    let commit = reopened.apply_composition(composition()).unwrap();
+    assert!(
+        std::str::from_utf8(commit.package().document_snapshot().unwrap().xml_bytes())
+            .unwrap()
+            .contains(">composed</w:t>")
+    );
+
+    let mut changed = OpcPackage::from_reader(io::Cursor::new(source_bytes.clone())).unwrap();
+    changed
+        .get_part_mut(&PackURI::new(format!("/{UNUSED_PART}")).unwrap())
+        .unwrap()
+        .set_blob(b"changed untouched member".to_vec());
+    let changed_bytes = PackageWriter::to_bytes(&changed).unwrap();
+    let changed_package =
+        source_backed::Package::from_reader(io::Cursor::new(changed_bytes)).unwrap();
     assert!(matches!(
-        stale_package.apply(commit.patch()).and_then(|committed| {
-            let committed = committed.into_package();
-            committed.write_to(&mut output)?;
-            committed.document_snapshot()
-        }),
+        changed_package.apply_composition(composition()),
         Err(TransactionError::PatchConflict)
     ));
-    assert!(output.is_empty());
+
+    let stale_composition = composition();
+    source.changed();
+    assert!(matches!(
+        package.apply_composition(stale_composition),
+        Err(TransactionError::Document(Error::Opc(
+            OpcError::SourceChanged { .. }
+        )))
+    ));
 }
 
 #[test]
@@ -563,11 +612,13 @@ fn markup_compatibility_branch_selection_is_refused_before_output() {
         r#"<w:document xmlns:w="{W}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x="urn:unsupported"><w:body><mc:AlternateContent><mc:Choice Requires="x"><w:p><w:r><w:t>choice</w:t></w:r></w:p></mc:Choice><mc:Fallback><w:p><w:r><w:t>fallback</w:t></w:r></w:p></mc:Fallback></mc:AlternateContent></w:body></w:document>"#
     )
     .into_bytes();
-    let commit = Snapshot::from_xml(document.clone())
-        .unwrap()
-        .edit()
-        .commit()
-        .unwrap();
+    let commit = litchi_docx::document::raw::Tree::from_xml(
+        document.clone(),
+        litchi_docx::document::raw::Limits::default(),
+    )
+    .unwrap()
+    .patch()
+    .unwrap();
     let (bytes, main, unused) = fixture_for_document(document, rt::OFFICE_DOCUMENT, false);
     let source = Arc::new(ObservedSource::new(bytes, main, unused));
     let read_at: Arc<dyn ReadAt> = source;
@@ -575,7 +626,7 @@ fn markup_compatibility_branch_selection_is_refused_before_output() {
     let mut output = Vec::new();
 
     assert!(matches!(
-        package.apply(commit.patch()).and_then(|committed| {
+        package.apply(&commit).and_then(|committed| {
             let committed = committed.into_package();
             committed.write_to(&mut output)?;
             committed.document_snapshot()
@@ -599,12 +650,7 @@ fn signed_changes_are_refused_but_signed_noops_are_exact() {
     ));
     let read_at: Arc<dyn ReadAt> = source;
     let package = source_backed::Package::from_read_at(read_at).unwrap();
-    let noop = package
-        .document_snapshot()
-        .unwrap()
-        .edit()
-        .commit()
-        .unwrap();
+    let noop = package.edit().unwrap().commit().unwrap();
     let mut output = Vec::new();
     package
         .apply(noop.patch())
@@ -619,17 +665,12 @@ fn signed_changes_are_refused_but_signed_noops_are_exact() {
     let source = Arc::new(ObservedSource::new(signed_bytes, main, unused));
     let read_at: Arc<dyn ReadAt> = source;
     let package = source_backed::Package::from_read_at(read_at).unwrap();
-    let mut edit = package.document_snapshot().unwrap().edit();
+    let mut edit = package.edit().unwrap();
     edit.replace_paragraph_text(Position::new(0), "changed")
         .unwrap();
-    let commit = edit.commit().unwrap();
     output.clear();
     assert!(matches!(
-        package.apply(commit.patch()).and_then(|committed| {
-            let committed = committed.into_package();
-            committed.write_to(&mut output)?;
-            committed.document_snapshot()
-        }),
+        edit.commit(),
         Err(TransactionError::Document(Error::Opc(
             OpcError::SignedSourceRequiresExplicitPolicy
         )))
@@ -643,7 +684,7 @@ fn sequential_sink_failure_is_typed_as_incomplete_output() {
     let source = Arc::new(ObservedSource::new(bytes, main, unused));
     let read_at: Arc<dyn ReadAt> = source;
     let package = source_backed::Package::from_read_at(read_at).unwrap();
-    let mut edit = package.document_snapshot().unwrap().edit();
+    let mut edit = package.edit().unwrap();
     edit.replace_paragraph_text(Position::new(1), "edited")
         .unwrap();
     let commit = edit.commit().unwrap();
@@ -676,7 +717,7 @@ fn strict_main_document_relationship_uses_the_same_overlay_contract() {
     let source = Arc::new(ObservedSource::new(bytes, main, unused));
     let read_at: Arc<dyn ReadAt> = source;
     let package = source_backed::Package::from_read_at(read_at).unwrap();
-    let mut edit = package.document_snapshot().unwrap().edit();
+    let mut edit = package.edit().unwrap();
     edit.replace_paragraph_text(Position::new(0), "strict edited")
         .unwrap();
     let commit = edit.commit().unwrap();
@@ -863,7 +904,7 @@ fn shared_source_publishes_repeatedly_without_reopen_or_consumption() {
     let shared = package.clone();
     assert_eq!(source.main_reads.load(Ordering::SeqCst), before_main);
     assert_eq!(source.unused_reads.load(Ordering::SeqCst), before_unused);
-    let mut edit = package.document_snapshot().unwrap().edit();
+    let mut edit = package.edit().unwrap();
     edit.replace_paragraph_text(Position::new(1), "changed")
         .unwrap();
     let commit = edit.commit().unwrap();
@@ -907,7 +948,7 @@ fn shared_source_publishes_repeatedly_without_reopen_or_consumption() {
     let reopened = Package::from_reader(io::Cursor::new(first)).unwrap();
     assert_eq!(reopened.document().unwrap().text().unwrap(), "alphachanged");
     drop(package);
-    let noop = shared.document_snapshot().unwrap().edit().commit().unwrap();
+    let noop = shared.edit().unwrap().commit().unwrap();
     let mut original = Vec::new();
     shared
         .apply(noop.patch())
@@ -941,12 +982,7 @@ fn concurrent_source_shares_keep_the_same_noop_artifact() {
     let second = package.clone();
     let outputs = std::thread::scope(|scope| {
         let publish = |package: source_backed::Package| {
-            let commit = package
-                .document_snapshot()
-                .unwrap()
-                .edit()
-                .commit()
-                .unwrap();
+            let commit = package.edit().unwrap().commit().unwrap();
             let mut output = Vec::new();
             package
                 .apply(commit.patch())

@@ -49867,10 +49867,13 @@ fn verify_docx_section_layout_output(
 fn publish_docx_source_edit<W: Write>(
     source: Arc<dyn ReadAt>,
     writer: W,
-) -> Result<(usize, litchi_docx::document::snapshot::Commit), Box<dyn Error>> {
+) -> Result<(
+    usize,
+    litchi_docx::document::Commit<litchi_docx::source_backed::Package>,
+), Box<dyn Error>> {
     let package = litchi_docx::source_backed::Package::from_read_at(source)?;
     let target = SemanticShape::Medium.docx_paragraphs() / 2;
-    let mut edit = package.document_snapshot()?.edit();
+    let mut edit = package.edit()?;
     edit.replace_paragraph_text(Position::new(target), semantic_docx_text(target, true))?;
     let commit = edit.commit()?;
     if commit.patch().is_noop() || commit.diagnostics().operations() != 1 {

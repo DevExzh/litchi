@@ -168,6 +168,12 @@ pub struct Package {
     /// The pending output of a committed package (record 0355a); its
     /// physical source is the materialized output.
     deferred: Option<Arc<deferred::Deferred>>,
+    /// A complete-artifact fingerprint for the current physical source.
+    /// Generic positional sources do not have the OPC owned-source memo, so
+    /// retain the digest at this owner boundary and key it by the source
+    /// version. A changed source therefore invalidates the memo before a
+    /// composition can use it.
+    artifact_fingerprint: Arc<Mutex<Option<(SourceVersion, [u8; 32])>>>,
 }
 
 /// A checked selector for one active `w:altChunk` anchor in the main story.
@@ -446,6 +452,7 @@ impl Package {
             main_admission: Arc::new(Mutex::new(None)),
             main_snapshot: Arc::new(Mutex::new(None)),
             deferred: None,
+            artifact_fingerprint: Arc::new(Mutex::new(None)),
         })
     }
 
@@ -1295,8 +1302,9 @@ impl Package {
     /// Start an isolated semantic edit retaining this complete source owner.
     ///
     /// Commit returns a new immutable package without serializing a ZIP.
-    /// For the transitional raw stream publishers, explicitly start with
-    /// `document_snapshot()?.edit()` instead.
+    /// For standalone XML editing, use [`crate::document::raw::Tree`] with a
+    /// required [`crate::document::raw::Limits`] policy; package publication
+    /// continues through this owner edit.
     ///
     /// # Errors
     ///
@@ -1304,6 +1312,29 @@ impl Package {
     pub fn edit(&self) -> TransactionResult<crate::document::Edit<Self>> {
         let (_, snapshot) = self.main_document_snapshot("edit", true)?;
         Ok(crate::document::Edit::new(self.clone(), snapshot.edit()))
+    }
+
+    /// Publish one joined document composition through this source owner. The
+    /// source identity and current source version are checked before staging,
+    /// then all accepted operations share one validation and deferred package
+    /// publication pass.
+    pub fn apply_composition(
+        &self,
+        composition: crate::document::composition::Composition,
+    ) -> TransactionResult<crate::document::Commit<Self>> {
+        let (source, operations, artifact_fingerprint) = composition.into_parts();
+        let (_, current) = self.main_document_snapshot("apply_composition", true)?;
+        if current.xml_bytes() != source.xml_bytes() {
+            return Err(crate::document::Error::PatchConflict);
+        }
+        if let Some(expected) = artifact_fingerprint
+            && self.output_fingerprint()? != expected
+        {
+            return Err(crate::document::Error::PatchConflict);
+        }
+        let mut edit = crate::document::Edit::new(self.clone(), current.edit());
+        edit.apply_composition_operations(&operations)?;
+        edit.commit()
     }
 
     /// Capture document variables from the existing internal settings Part.

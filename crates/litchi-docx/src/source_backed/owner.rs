@@ -4,6 +4,21 @@ use super::*;
 use litchi_opc::PreparedTopology;
 
 impl Package {
+    /// Start a bounded composition tied to this owner's complete artifact.
+    /// Reopened equal-content sources may publish it, while an untouched-part
+    /// change is refused before document staging.
+    pub fn compose(
+        &self,
+        limits: litchi_core::patch::CompositionLimits,
+    ) -> TransactionResult<crate::document::composition::Composition> {
+        self.check_source()?;
+        let source = self.document_snapshot()?;
+        let fingerprint = self.output_fingerprint()?;
+        Ok(source
+            .compose(limits)
+            .with_artifact_fingerprint(fingerprint))
+    }
+
     /// Adopt a validated effective topology derived from this physical source.
     ///
     /// The returned owner has fresh semantic caches. The original owner and

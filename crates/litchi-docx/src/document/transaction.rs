@@ -41,31 +41,42 @@ use crate::paragraph::Paragraph;
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 pub(crate) use durable::durable_transfer_operations;
-pub use durable::{Composition, History, JoinError, PreparedEdit, ThreeWayError, ThreeWayPlan};
+pub use durable::{Composition, History, JoinError, Prepared, ThreeWayError, ThreeWayPlan};
 pub use formatting::{
     BodyAnchor, BodyBlock, ElementAnchor, ElementPath, ElementStep, MAX_NEW_TABLE_DIMENSION,
     NewCell, NewParagraph, NewRun, NewTable, RunAnchor,
 };
-pub use litchi_core::patch::{
-    CompositionLimits, HistoryLimits, MergeChoice, SubEditConflict, SubEditJoinFailure,
-    ThreeWayMergeFailure,
-};
+use litchi_core::patch::{CompositionLimits, HistoryLimits};
+#[cfg(test)]
+use litchi_core::patch::{MergeChoice, SubEditJoinFailure};
 
 pub(crate) const MAX_DOCUMENT_XML_BYTES: usize = 32 * 1024 * 1024;
 #[cfg(test)]
 const UTF8_BYTE_ORDER_MARK: &[u8] = b"\xEF\xBB\xBF";
 const UTF8_BYTE_ORDER_MARK_TEXT: &str = "\u{feff}";
-const MAX_DOCUMENT_DEPTH: usize = 256;
-const MAX_DOCUMENT_NODES: usize = 1_000_000;
+pub(crate) const MAX_DOCUMENT_DEPTH: usize = 256;
+pub(crate) const MAX_DOCUMENT_NODES: usize = 1_000_000;
+pub(crate) const MAX_DOCUMENT_ATTRIBUTES: usize = 256;
+pub(crate) const MAX_DOCUMENT_ATTRIBUTE_BYTES: usize = 8 * 1024 * 1024;
 /// Semantic operations one edit may stage (record 0251f raised it from
 /// 4,096 so a 10,000-paragraph fanout is one transaction; it matches the
 /// unified layer's expanded-target bound).
-const MAX_OPERATIONS: usize = 65_536;
+pub(crate) const MAX_OPERATIONS: usize = 65_536;
 /// Runs a field-result scan visits in one paragraph.
 const MAX_FIELD_RUNS: usize = 4_096;
 /// Steps of one nested element path (content controls, tables).
 const MAX_PATH_STEPS: usize = 4_096;
-const MAX_REPLACEMENT_TEXT_BYTES: usize = 16 * 1024 * 1024;
+pub(crate) const MAX_REPLACEMENT_TEXT_BYTES: usize = 16 * 1024 * 1024;
+
+#[cfg(test)]
+pub(crate) fn commit_composition_for_test(composition: Composition) -> Commit {
+    let (source, operations, _artifact_fingerprint) = composition.into_parts();
+    let mut edit = source.edit();
+    for operation in operations {
+        edit.apply_operation(&operation).unwrap();
+    }
+    edit.commit().unwrap()
+}
 // The managed layout scanner owns each quick-xml event and grows bounded
 // layout indexes. `scan_text_owner` additionally retains one `TextSlot` for
 // every editable text element and copies each element's prefix/local-name
@@ -1125,7 +1136,7 @@ impl Snapshot {
     ///
     /// Returns a typed document or resource-limit error when the XML is
     /// malformed, unsupported, or exceeds the transaction bounds.
-    pub fn from_xml(source_xml: impl Into<Vec<u8>>) -> Result<Self> {
+    pub(crate) fn from_xml(source_xml: impl Into<Vec<u8>>) -> Result<Self> {
         let xml = source_xml.into();
         if xml.len() > MAX_DOCUMENT_XML_BYTES {
             return Err(Error::Limit {
@@ -1991,7 +2002,7 @@ impl Snapshot {
     /// Start an isolated edit whose selectors resolve against its projected
     /// state.
     #[must_use]
-    pub fn edit(&self) -> Edit {
+    pub(crate) fn edit(&self) -> Edit {
         Edit {
             base: self.clone(),
             projected: self.clone(),
@@ -2000,6 +2011,7 @@ impl Snapshot {
             operation_admission: None,
             operation_string_admission: None,
             compaction: CompactionPolicy::default(),
+            raw_limits: None,
         }
     }
 
@@ -2009,7 +2021,7 @@ impl Snapshot {
             .map(|admission| admission.context.clone())
     }
 
-    fn same_source(&self, other: &Self) -> bool {
+    pub(crate) fn same_source(&self, other: &Self) -> bool {
         // The retained bytes are immutable, so the same address and length
         // is an exact equality proof; distinct allocations still receive the
         // full byte comparison. An edit's projection shares its base's
@@ -2978,9 +2990,97 @@ pub struct Edit {
     operation_admission: Option<Arc<OperationAdmission>>,
     operation_string_admission: Option<Arc<StringAdmission>>,
     compaction: CompactionPolicy,
+    raw_limits: Option<crate::document::raw::Limits>,
 }
 
 impl Edit {
+    /// Parse one raw document and start a mutable codec tree.
+    pub fn from_xml(source_xml: Vec<u8>, limits: crate::document::raw::Limits) -> Result<Self> {
+        crate::document::raw::validate_xml(&source_xml, limits)?;
+        let snapshot = Snapshot::from_xml(source_xml)?;
+        snapshot.edit().with_raw_limits(limits)
+    }
+
+    /// Return the raw policy retained by this codec tree.
+    #[must_use]
+    pub fn limits(&self) -> crate::document::raw::Limits {
+        self.raw_limits.unwrap_or_default()
+    }
+
+    /// Serialize the current projected document under a caller-selected
+    /// policy. The policy may tighten, but never widen, the admission policy
+    /// retained by this tree.
+    pub fn to_bytes(&self, limits: crate::document::raw::Limits) -> Result<Vec<u8>> {
+        let retained = self.raw_limits.ok_or_else(|| {
+            Error::Document(crate::Error::internal(
+                "document.raw.to_bytes",
+                "raw output requested from an owner transaction",
+            ))
+        })?;
+        limits.validate()?;
+        if let Some((kind, observed, maximum)) = retained.first_widened(limits) {
+            return Err(Error::Limit {
+                kind,
+                observed,
+                maximum,
+            });
+        }
+        crate::document::raw::validate_xml(self.projected.xml_bytes(), limits)?;
+        let mut bytes = Vec::new();
+        bytes
+            .try_reserve_exact(self.projected.xml_bytes().len())
+            .map_err(|source| crate::Error::Allocation {
+                resource: "raw document XML",
+                source,
+            })?;
+        bytes.extend_from_slice(self.projected.xml_bytes());
+        Ok(bytes)
+    }
+
+    /// Discard staged operations and restore the admitted source tree.
+    pub fn reset(&mut self) {
+        let limits = self.raw_limits;
+        let source = self.base.clone();
+        *self = source.edit();
+        self.raw_limits = limits;
+    }
+
+    /// Return a reversible patch for the currently staged tree.
+    pub fn patch(&self) -> Result<Patch> {
+        if let Some(limits) = self.raw_limits {
+            crate::document::raw::validate_xml(self.projected.xml_bytes(), limits)?;
+        }
+        Ok(self.try_clone()?.commit()?.patch().clone())
+    }
+
+    /// Replay a patch onto this tree under a policy no wider than the
+    /// retained admission policy.
+    pub fn apply_patch(&self, patch: &Patch, limits: crate::document::raw::Limits) -> Result<Self> {
+        let retained = self.raw_limits.ok_or_else(|| {
+            Error::Document(crate::Error::internal(
+                "document.raw.apply_patch",
+                "raw replay requested from an owner transaction",
+            ))
+        })?;
+        limits.validate()?;
+        if let Some((kind, observed, maximum)) = retained.first_widened(limits) {
+            return Err(Error::Limit {
+                kind,
+                observed,
+                maximum,
+            });
+        }
+        let snapshot = patch.apply(self.projected())?;
+        crate::document::raw::validate_xml(snapshot.xml_bytes(), limits)?;
+        snapshot.edit().with_raw_limits(limits)
+    }
+
+    pub(crate) fn with_raw_limits(mut self, limits: crate::document::raw::Limits) -> Result<Self> {
+        limits.validate()?;
+        self.raw_limits = Some(limits);
+        Ok(self)
+    }
+
     /// Borrow the immutable source snapshot.
     #[must_use]
     pub const fn source(&self) -> &Snapshot {
@@ -2999,7 +3099,9 @@ impl Edit {
     /// would exceed the native cap. A no-op may use fewer slots than requested.
     #[must_use]
     pub fn remaining_operations(&self) -> usize {
-        MAX_OPERATIONS.saturating_sub(self.operations.len())
+        self.raw_limits
+            .map_or(MAX_OPERATIONS, crate::document::raw::Limits::max_operations)
+            .saturating_sub(self.operations.len())
     }
 
     /// Choose how this edit compacts the main document it publishes.
@@ -3091,6 +3193,7 @@ impl Edit {
             operation_admission,
             operation_string_admission,
             compaction: self.compaction,
+            raw_limits: self.raw_limits,
         })
     }
 
@@ -5554,7 +5657,7 @@ impl Edit {
         )
     }
 
-    fn apply_operation(&mut self, operation: &Operation) -> Result<&mut Self> {
+    pub(crate) fn apply_operation(&mut self, operation: &Operation) -> Result<&mut Self> {
         match operation {
             Operation::ReplaceParagraphText {
                 position,
@@ -6424,7 +6527,10 @@ impl Edit {
     /// # Errors
     ///
     /// Reserved for commit-time document validation failures.
-    pub fn commit(self) -> Result<Commit> {
+    pub(crate) fn commit(self) -> Result<Commit> {
+        if let Some(limits) = self.raw_limits {
+            crate::document::raw::validate_xml(self.projected.xml_bytes(), limits)?;
+        }
         let managed_context = self.projected.managed_context();
         if let Some(context) = managed_context.as_ref() {
             context.check().map_err(managed_execution)?;
@@ -6502,10 +6608,13 @@ impl Edit {
     }
 
     fn reserve_operation(&mut self) -> Result<()> {
-        if self.operations.len() >= MAX_OPERATIONS {
+        let maximum = self
+            .raw_limits
+            .map_or(MAX_OPERATIONS, crate::document::raw::Limits::max_operations);
+        if self.operations.len() >= maximum {
             return Err(Error::Limit {
                 kind: crate::document::LimitKind::Operations,
-                maximum: MAX_OPERATIONS,
+                maximum,
                 observed: self.operations.len().saturating_add(1),
             });
         }
@@ -6620,18 +6729,22 @@ impl Edit {
     }
 
     fn checked_text_total(&self, bytes: usize) -> Result<usize> {
+        let maximum = self.raw_limits.map_or(
+            MAX_REPLACEMENT_TEXT_BYTES,
+            crate::document::raw::Limits::max_replacement_text_bytes,
+        );
         let actual = self
             .replacement_text_bytes
             .checked_add(bytes)
             .ok_or(Error::Limit {
                 kind: crate::document::LimitKind::ReplacementTextBytes,
-                maximum: MAX_REPLACEMENT_TEXT_BYTES,
+                maximum,
                 observed: usize::MAX,
             })?;
-        if actual > MAX_REPLACEMENT_TEXT_BYTES {
+        if actual > maximum {
             return Err(Error::Limit {
                 kind: crate::document::LimitKind::ReplacementTextBytes,
-                maximum: MAX_REPLACEMENT_TEXT_BYTES,
+                maximum,
                 observed: actual,
             });
         }
@@ -6669,7 +6782,7 @@ impl Diagnostics {
 
 /// A successful main-document publication.
 #[derive(Debug, Clone)]
-pub struct Commit {
+pub(crate) struct Commit {
     snapshot: Snapshot,
     patch: Patch,
     diagnostics: Diagnostics,
@@ -6678,25 +6791,25 @@ pub struct Commit {
 impl Commit {
     /// Borrow the published snapshot.
     #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
+    pub(crate) const fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
     /// Borrow the reversible patch.
     #[must_use]
-    pub const fn patch(&self) -> &Patch {
+    pub(crate) const fn patch(&self) -> &Patch {
         &self.patch
     }
 
     /// Return content-free commit diagnostics.
     #[must_use]
-    pub const fn diagnostics(&self) -> Diagnostics {
+    pub(crate) const fn diagnostics(&self) -> Diagnostics {
         self.diagnostics
     }
 
     /// Move the snapshot and patch out of the commit.
     #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch) {
+    pub(crate) fn into_parts(self) -> (Snapshot, Patch) {
         (self.snapshot, self.patch)
     }
 }
@@ -13315,6 +13428,15 @@ mod tests {
 
     const WORD: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 
+    fn commit_composition(composition: Composition) -> Commit {
+        let (source, operations, _artifact_fingerprint) = composition.into_parts();
+        let mut edit = source.edit();
+        for operation in operations {
+            edit.apply_operation(&operation).unwrap();
+        }
+        edit.commit().unwrap()
+    }
+
     /// Compare a snapshot's retained layout with a full rescan of its own
     /// bytes.
     ///
@@ -15501,10 +15623,7 @@ mod tests {
         let plan = source.plan_three_way(left, right).unwrap();
         assert!(plan.is_clean());
         assert_eq!(
-            plan.finish()
-                .unwrap()
-                .commit()
-                .unwrap()
+            commit_composition(plan.finish().unwrap())
                 .patch()
                 .operations()
                 .len(),
@@ -15527,7 +15646,7 @@ mod tests {
         assert!(!conflict.is_clean());
         assert!(!conflict.conflicts().is_empty());
         conflict.resolve(MergeChoice::Left);
-        let merged = conflict.finish().unwrap().commit().unwrap();
+        let merged = commit_composition(conflict.finish().unwrap());
         assert!(
             std::str::from_utf8(merged.snapshot().xml_bytes())
                 .unwrap()
@@ -15597,7 +15716,7 @@ mod tests {
         let cell = cell.prepare(limits, "a-cell").unwrap();
         let mut composition = source.compose(limits);
         composition.join(paragraph).unwrap().join(cell).unwrap();
-        let commit = composition.commit().unwrap();
+        let commit = commit_composition(composition);
         assert_eq!(commit.patch().operations().len(), 2);
         assert!(matches!(
             commit.patch().operations()[0],
@@ -15636,7 +15755,7 @@ mod tests {
             .unwrap()
             .join(appended)
             .unwrap();
-        append_composition.commit().unwrap();
+        commit_composition(append_composition);
 
         let mut indexed = source.edit();
         indexed
@@ -15657,7 +15776,7 @@ mod tests {
 
         let budget = u64::try_from(commit.snapshot().xml_bytes().len()).unwrap();
         let mut history = source.history(HistoryLimits::new(1, budget));
-        history.record(commit).unwrap();
+        history.record_transaction(commit).unwrap();
         assert!(history.can_undo());
         assert!(history.undo());
         assert_eq!(history.current().xml_bytes(), source.xml_bytes());
@@ -15888,13 +16007,13 @@ mod tests {
             .join(table.prepare(composition_limits, "table").unwrap())
             .unwrap();
         assert_eq!(
-            composition.commit().unwrap().snapshot().xml_bytes(),
+            commit_composition(composition).snapshot().xml_bytes(),
             commit.snapshot().xml_bytes()
         );
 
         let history_budget = u64::try_from(commit.snapshot().xml_bytes().len()).unwrap();
         let mut history = source.history(HistoryLimits::new(2, history_budget));
-        history.record(commit).unwrap();
+        history.record_transaction(commit).unwrap();
         assert!(history.undo());
         assert_eq!(history.current().xml_bytes(), source.xml_bytes());
         assert!(history.redo());
@@ -16000,7 +16119,10 @@ mod tests {
             .unwrap()
             .join(right_edit.prepare(limits, "right").unwrap())
             .unwrap();
-        assert_eq!(composition.commit().unwrap().patch().operations().len(), 2);
+        assert_eq!(
+            commit_composition(composition).patch().operations().len(),
+            2
+        );
     }
 
     #[test]
@@ -16113,13 +16235,13 @@ mod tests {
             .join(body.prepare(limits, "a-body").unwrap())
             .unwrap();
         assert_eq!(
-            composition.commit().unwrap().snapshot().xml_bytes(),
+            commit_composition(composition).snapshot().xml_bytes(),
             commit.snapshot().xml_bytes()
         );
 
         let history_budget = u64::try_from(commit.snapshot().xml_bytes().len()).unwrap();
         let mut history = source.history(HistoryLimits::new(2, history_budget));
-        history.record(commit).unwrap();
+        history.record_transaction(commit).unwrap();
         assert!(history.undo());
         assert_eq!(history.current().xml_bytes(), source.xml_bytes());
         assert!(history.redo());

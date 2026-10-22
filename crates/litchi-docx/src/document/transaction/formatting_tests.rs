@@ -1749,7 +1749,7 @@ fn formatting_composes_with_disjoint_edits_and_conflicts_with_overlapping_ones()
     composition.join(italic).unwrap();
     composition.join(text).unwrap();
     composition.join(paragraph).unwrap();
-    let composed = composition.commit().unwrap();
+    let composed = commit_composition_for_test(composition);
     let mut sequential = base.edit();
     sequential
         .format_run(Position::new(0), Position::new(0), |run| {

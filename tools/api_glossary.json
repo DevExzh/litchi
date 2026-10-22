@@ -496,6 +496,10 @@
           "ok": "litchi_docx::document::Commit"
         },
         {
+          "method": "litchi_docx::Package::apply_composition",
+          "ok": "litchi_docx::document::Commit"
+        },
+        {
           "method": "litchi_docx::Package::apply_alt_chunks",
           "ok": "litchi_docx::alt::Commit"
         },
@@ -597,6 +601,13 @@
         },
         {
           "method": "litchi_docx::source_backed::Package::apply",
+          "ok": "litchi_docx::document::Commit",
+          "type_args": [
+            "litchi_docx::source_backed::Package"
+          ]
+        },
+        {
+          "method": "litchi_docx::source_backed::Package::apply_composition",
           "ok": "litchi_docx::document::Commit",
           "type_args": [
             "litchi_docx::source_backed::Package"
@@ -1058,6 +1069,10 @@
           "ok": "litchi_docx::document::Commit"
         },
         {
+          "method": "litchi_docx::Package::apply_composition",
+          "ok": "litchi_docx::document::Commit"
+        },
+        {
           "method": "litchi_docx::Package::apply_alt_chunks",
           "ok": "litchi_docx::alt::Commit"
         },
@@ -1163,6 +1178,13 @@
         },
         {
           "method": "litchi_docx::source_backed::Package::apply",
+          "ok": "litchi_docx::document::Commit",
+          "type_args": [
+            "litchi_docx::source_backed::Package"
+          ]
+        },
+        {
+          "method": "litchi_docx::source_backed::Package::apply_composition",
           "ok": "litchi_docx::document::Commit",
           "type_args": [
             "litchi_docx::source_backed::Package"

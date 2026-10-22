@@ -29,22 +29,15 @@
 
 mod blocks;
 mod codec;
+pub mod composition;
 mod limit;
 mod model;
 mod owned;
 mod package;
+pub mod raw;
 #[cfg(test)]
 mod tests;
 mod transaction;
-
-/// Transitional standalone XML transactions used by source-backed publication.
-///
-/// These values retain main-document XML, not an editable package. Ordinary
-/// callers use [`crate::Package::edit`] or [`crate::source_backed::Package::edit`]
-/// and [`crate::document::Edit`] instead.
-pub mod snapshot {
-    pub use super::transaction::{Commit, Edit};
-}
 
 /// Formatting-preserving text substitution over the text of a story: the
 /// main document, a header, a footer, the notes or the comments
@@ -74,12 +67,11 @@ pub mod fields {
 }
 
 pub use limit::LimitKind;
+pub(crate) use owned::story_parts_of;
 pub use owned::{
     CommentChange, Commit, Edit, HyperlinkTarget, NewChart, NewComment, NewNote, NewPicture,
     NewSmartArt, NewStory, NoteKind, PictureChange, SmartArtParts, StoryTarget, chart_workbook,
 };
-
-pub(crate) use owned::story_parts_of;
 pub(crate) use transaction::MAX_DOCUMENT_XML_BYTES;
 pub(crate) use transaction::validate_paragraph_text;
 pub(crate) use transaction::{ManagedAdmission, ManagedNamespaceAdmission, ManagedParserAdmission};
@@ -89,40 +81,9 @@ pub use blocks::{BlockContentControl, BlockKind, Blocks, IndexedBlock};
 pub(crate) use blocks::{BlockIndex, ContainerRoot, index as index_blocks};
 pub use model::{Block, Document, Element, ImageWatermarkPart, OpaqueBlock};
 pub use transaction::{
-    BodyAnchor, BodyBlock, CompactionPolicy, Composition, CompositionLimits, Diagnostics,
-    ElementAnchor, ElementPath, ElementStep, Error, GraphChange, History, HistoryLimits,
-    HyperlinkTextReplacement, JoinError, MAX_NEW_TABLE_DIMENSION, MergeChoice, NewCell,
-    NewParagraph, NewRun, NewTable, Operation, ParagraphHyperlinkAddress, ParagraphTextReplacement,
-    ParagraphTransfer, Patch, PreparedEdit, Refusal, Result, RevisionAction, RevisionKind,
-    RevisionSelector, RunAnchor, Snapshot, SubEditConflict, SubEditJoinFailure, TableCellAddress,
-    ThreeWayError, ThreeWayMergeFailure, ThreeWayPlan, TransferGraph, TransferRefusal,
+    BodyAnchor, BodyBlock, CompactionPolicy, Diagnostics, ElementAnchor, ElementPath, ElementStep,
+    Error, GraphChange, HyperlinkTextReplacement, MAX_NEW_TABLE_DIMENSION, NewCell, NewParagraph,
+    NewRun, NewTable, Operation, ParagraphHyperlinkAddress, ParagraphTextReplacement,
+    ParagraphTransfer, Patch, Refusal, Result, RevisionAction, RevisionKind, RevisionSelector,
+    RunAnchor, Snapshot, TableCellAddress, TransferGraph, TransferRefusal,
 };
-
-/// Explicit native identifiers for indexed document blocks.
-pub mod raw {
-    /// Find a paragraph block by its native Word paragraph identifier.
-    ///
-    /// # Errors
-    /// Refuses malformed identifier attributes. Duplicate identifiers across
-    /// blocks resolve to the first block in document order.
-    pub fn by_para_id(
-        blocks: &super::Blocks,
-        id: crate::paragraph::Id,
-    ) -> crate::Result<Option<super::IndexedBlock>> {
-        blocks.by_para_id(id)
-    }
-    /// Read a paragraph's native extension identifiers from its start tag.
-    ///
-    /// # Errors
-    /// Refuses malformed extension attributes.
-    pub fn paragraph_ids(paragraph: &crate::Paragraph) -> crate::Result<crate::paragraph::Ids> {
-        paragraph.extension_ids()
-    }
-    /// Read a content control's native identifier.
-    ///
-    /// # Errors
-    /// Refuses malformed content-control properties.
-    pub fn content_control_id(control: &super::BlockContentControl) -> crate::Result<Option<i32>> {
-        control.id()
-    }
-}

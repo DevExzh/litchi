@@ -1400,7 +1400,7 @@ fn admit_targets(nodes: &[Node<'_>]) -> Result<Few<Target>> {
 /// Apply one admitted assignment to a story element on the story's edit,
 /// as [`WorkEdit::apply_element`] does on the main document's.
 fn apply_story(
-    story: &mut litchi_docx::document::snapshot::Edit,
+    story: &mut litchi_docx::document::raw::Tree,
     path: &litchi_docx::document::ElementPath,
     kind: TargetKind,
     assignment: &Assignment<'_>,

@@ -179,10 +179,18 @@ fn plan_is_non_mutating_and_detaches_first_middle_last_while_retaining_text() {
     assert!(sanitized.contains("<w:hyperlink w:anchor=\"local\">"));
     assert!(sanitized.contains("<w:commentRangeStart w:id=\"8\"/>"));
     assert!(sanitized.contains("<x:opaque x:value=\"keep\"><![CDATA[a < b]]></x:opaque>"));
-    let parsed =
-        litchi_docx::document::Snapshot::from_xml(commit.snapshot().xml_bytes().to_vec()).unwrap();
+    let parsed = litchi_docx::document::raw::Tree::from_xml(
+        commit.snapshot().xml_bytes().to_vec(),
+        litchi_docx::document::raw::Limits::default(),
+    )
+    .unwrap();
     assert_eq!(
-        parsed.paragraph(Position::new(0)).unwrap().text().unwrap(),
+        parsed
+            .projected()
+            .paragraph(Position::new(0))
+            .unwrap()
+            .text()
+            .unwrap(),
         "first|middle|local|last"
     );
 
