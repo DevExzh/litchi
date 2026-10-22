@@ -111,7 +111,7 @@ impl EditOptions {
 }
 
 struct State {
-    package: OpcPackage,
+    package: Arc<OpcPackage>,
     binding: Binding,
     snapshot: Snapshot,
 }
@@ -433,7 +433,7 @@ impl Edit {
         let stories =
             crate::package::story::capture(&self.base.package, self.limits.inventory.stories)?;
         let mut changes = Vec::new();
-        let mut candidate = self.base.package.clone();
+        let mut candidate = self.base.package.as_ref().clone();
         let mut ordinal = 0usize;
         let mut staged_bytes = 0usize;
         for story in stories.stories() {
@@ -561,7 +561,7 @@ impl Edit {
         let binding = Binding::capture(&candidate, self.limits.inventory)?;
         let intent = self.take_semantic_intent()?;
         let after = Arc::new(State {
-            package: candidate,
+            package: Arc::new(candidate),
             binding,
             snapshot,
         });
@@ -756,7 +756,7 @@ impl Package {
         Ok(Edit {
             source: self.clone(),
             base: Arc::new(State {
-                package: package.clone(),
+                package: self.shared_opc_package(),
                 binding,
                 snapshot,
             }),

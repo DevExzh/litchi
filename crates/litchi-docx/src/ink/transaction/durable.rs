@@ -2994,7 +2994,8 @@ mod tests {
     #[test]
     fn inverse_restore_replays_intent_before_publishing_forged_story() {
         let (patch, durable) = make_patch();
-        let target = Package::from_opc_package(patch.after.package.clone()).expect("target");
+        let target =
+            Package::from_opc_package(patch.after.package.as_ref().clone()).expect("target");
         let forged_source = tamper_story(&patch.before.package);
         let intent_id = durable.operations()[0].preconditions["intent_sha256"]
             .as_str()
@@ -3061,7 +3062,8 @@ mod tests {
             limits(),
         )
         .expect("forged patch parses");
-        let source = Package::from_opc_package(patch.before.package.clone()).expect("source");
+        let source =
+            Package::from_opc_package(patch.before.package.as_ref().clone()).expect("source");
         let before = package_fingerprint(source.opc_package()).expect("source fingerprint");
         assert!(source.apply_durable_ink(&forged).is_err());
         assert_eq!(
@@ -3073,7 +3075,8 @@ mod tests {
     #[test]
     fn inverse_restore_rebuilds_source_content_types_from_exact_proof() {
         let (initial, _) = make_patch();
-        let source = Package::from_opc_package(initial.after.package.clone()).expect("source");
+        let source =
+            Package::from_opc_package(initial.after.package.as_ref().clone()).expect("source");
         let mut edit = source.edit_ink().expect("Ink edit");
         edit.replace(
             Position::new(0),
@@ -3083,8 +3086,8 @@ mod tests {
         .expect("replace");
         let commit = edit.commit().expect("commit");
         let durable = commit.patch().to_durable(limits()).expect("durable");
-        let target =
-            Package::from_opc_package(commit.patch().after.package.clone()).expect("target");
+        let target = Package::from_opc_package(commit.patch().after.package.as_ref().clone())
+            .expect("target");
 
         let target = target
             .apply_durable_ink(&durable.inverse())

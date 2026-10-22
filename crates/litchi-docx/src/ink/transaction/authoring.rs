@@ -45,7 +45,7 @@ pub(super) fn commit(mut edit: Edit) -> Result<Planned> {
     )?;
     let stories =
         crate::package::story::capture(&edit.base.package, edit.limits.inventory.stories)?;
-    let mut candidate = edit.base.package.clone();
+    let mut candidate = edit.base.package.as_ref().clone();
     let mut drawing_ids = DrawingIds::new(edit.limits.inventory.max_xml_nodes);
     if edit
         .additions
@@ -459,7 +459,7 @@ pub(super) fn commit(mut edit: Edit) -> Result<Planned> {
     let binding = Binding::capture(&candidate, edit.limits.inventory)?;
     let intent = edit.take_semantic_intent()?;
     let after = Arc::new(State {
-        package: candidate,
+        package: Arc::new(candidate),
         binding,
         snapshot,
     });
