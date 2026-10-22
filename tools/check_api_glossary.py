@@ -8,8 +8,9 @@ prefix/suffix when it says so ("match"). Record 0351 adds shape rules:
 whose public methods must not take `&mut self`, and "family_methods" makes
 every registered family expose the commit-triad accessors and return its
 Commit from Edit::commit. "result_methods" pins a method's Result payload to a
-specific Commit (including generic type arguments); owner replay must publish
-that owner. Local aliases are resolved by identity, not spelling.
+specific Commit (including nested types and method type parameters); owner
+replay must publish that owner. Local aliases are resolved by identity, not
+spelling. Direct shared core Commit types use their canonical dependency path.
 Each profile builds its own feature-specific rustdoc JSON; --json/--profile
 checks an existing document instead. Names are matched exactly under a public
 path prefix, never by substring. A ban with recursive=false matches direct
@@ -112,11 +113,28 @@ def checked_policy(value: Any) -> list[dict[str, Any]]:
             raise ValueError("features must be unique Cargo feature names")
         crate = profile["package"].replace("-", "_")
 
-        def check_path(path: Any) -> None:
-            if not isinstance(path, str) or not all(IDENTIFIER.fullmatch(p) for p in path.split("::")):
+        def check_path(path: Any, *, local=True) -> None:
+            if (not isinstance(path, str) or not all(IDENTIFIER.fullmatch(p) for p in path.split("::"))
+                    or (not local and len(path.split("::")) < 2)):
                 raise ValueError("scope/family must be a fully qualified Rust path")
-            if path.split("::")[0] != crate:
+            if local and path.split("::")[0] != crate:
                 raise ValueError(f"scope/family must start with {crate}")
+
+        def check_type(spec: Any) -> None:
+            if isinstance(spec, str):
+                check_path(spec, local=False)
+            elif isinstance(spec, dict) and set(spec) == {"generic"}:
+                name = spec["generic"]
+                if not isinstance(name, str) or not IDENTIFIER.fullmatch(name) or name == "Self":
+                    raise ValueError("type generic must name a method type parameter")
+            elif isinstance(spec, dict) and {"path"} <= set(spec) <= {"path", "type_args"}:
+                check_path(spec["path"], local=False)
+                if not isinstance(spec.get("type_args", []), list):
+                    raise ValueError("nested type_args must be an array")
+                for arg in spec.get("type_args", []):
+                    check_type(arg)
+            else:
+                raise ValueError("type argument must be a path, parameter or nested nominal type")
 
         bans = profile["banned_names"]
         if not isinstance(bans, list):
@@ -163,7 +181,7 @@ def checked_policy(value: Any) -> list[dict[str, Any]]:
                     or set(result) - {"method", "ok", "type_args"}):
                 raise ValueError("result method requires method and ok, with optional type_args")
             check_path(result["method"])
-            check_path(result["ok"])
+            check_path(result["ok"], local=False)
             if result["ok"].split("::")[-1] not in {"Commit", "BatchCommit"}:
                 raise ValueError("result method ok must name Commit or BatchCommit")
             if result["method"] in seen_methods:
@@ -172,7 +190,7 @@ def checked_policy(value: Any) -> list[dict[str, Any]]:
             if not isinstance(result.get("type_args", []), list):
                 raise ValueError("result method type_args must be an array")
             for arg in result.get("type_args", []):
-                check_path(arg)
+                check_type(arg)
     return value["profiles"]
 
 
@@ -476,7 +494,7 @@ def violations(document: Any, profile: dict[str, Any]) -> list[str]:
     for rule in profile.get("result_methods", []):
         method = tuple(rule["method"].split("::"))
         expected = tuple(rule["ok"].split("::"))
-        args = [return_types.raw_type_at(tuple(arg.split("::")))
+        args = [return_types.policy_type(arg, method)
                 for arg in rule.get("type_args", [])]
         if (surface.exports.get(method) != "function" or not return_types.is_commit(expected)
                 or any(arg is None for arg in args)

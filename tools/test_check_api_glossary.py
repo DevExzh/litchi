@@ -175,6 +175,27 @@ pub mod returns {
         pub fn into_parts(self) -> (P, Patch) { (self.0, Patch) }
     }
 }
+pub mod durable {
+    pub struct Package;
+    pub struct Other;
+    pub struct Error;
+    impl Package {
+        pub fn apply<Mode>(&self) -> Result<litchi_core::edit::Commit<Self, litchi_core::patch::Patch<Mode>>, Error> { todo!() }
+        pub fn apply_other<Mode>(&self) -> Result<litchi_core::edit::Commit<Other, litchi_core::patch::Patch<Mode>>, Error> { todo!() }
+        pub fn apply_fixed<Mode>(&self) -> Result<litchi_core::edit::Commit<Self, litchi_core::patch::Patch<Other>>, Error> { todo!() }
+        pub fn apply_swapped<Mode>(&self) -> Result<litchi_core::edit::Commit<litchi_core::patch::Patch<Mode>, Self>, Error> { todo!() }
+        pub fn apply_foreign<Mode>(&self) -> Result<litchi_core::unrelated::Commit<Self, litchi_core::patch::Patch<Mode>>, Error> { todo!() }
+    }
+}
+'''
+
+DEPENDENCY_SOURCE = r'''
+pub mod edit {
+    pub struct Diagnostics;
+    pub struct Commit<P, T, D = Diagnostics>(pub P, pub T, pub D);
+}
+pub mod patch { pub struct Patch<Mode>(pub Mode); }
+pub mod unrelated { pub struct Commit<P, T>(pub P, pub T); }
 '''
 
 
@@ -217,10 +238,10 @@ class PolicyTests(unittest.TestCase):
             {"version": 1, "profiles": [profile(immutable_owners=["fixture::Owner", "fixture::Owner"])]},
             {"version": 1, "profiles": [profile(result_methods="yes")]},
             {"version": 1, "profiles": [profile(result_methods=[{"method": "fixture::f"}])]},
-            {"version": 1, "profiles": [profile(result_methods=[{"method": "fixture::f", "ok": "other::Commit"}])]},
+            {"version": 1, "profiles": [profile(result_methods=[{"method": "fixture::f", "ok": "Commit"}])]},
             {"version": 1, "profiles": [profile(result_methods=[{"method": "fixture::f", "ok": "fixture::Package"}])]},
             {"version": 1, "profiles": [profile(result_methods=[{"method": "fixture::f", "ok": "fixture::Commit", "type_args": "P"}])]},
-            {"version": 1, "profiles": [profile(result_methods=[{"method": "fixture::f", "ok": "fixture::Commit", "type_args": ["other::Package"]}])]},
+            {"version": 1, "profiles": [profile(result_methods=[{"method": "fixture::f", "ok": "fixture::Commit", "type_args": ["Package"]}])]},
             {"version": 1, "profiles": [profile(result_methods=[{"method": "fixture::f", "ok": "fixture::Commit"}] * 2)]},
         ]
         for value in cases:
@@ -235,6 +256,21 @@ class PolicyTests(unittest.TestCase):
         self.assertNotIn("--document-private-items", command)
         self.assertNotIn("--no-default-features", gate.rustdoc_command(profile(default_features=True), Path("build")))
 
+    def test_structured_type_rules_require_exact_keys_and_qualified_paths(self):
+        def policy(arg):
+            return {"version": 1, "profiles": [profile(result_methods=[{
+                "method": "fixture::durable::Package::apply", "ok": "litchi_core::edit::Commit",
+                "type_args": ["fixture::durable::Package", arg],
+            }])]}
+        self.assertTrue(gate.checked_policy(policy({"path": "litchi_core::patch::Patch", "type_args": [{"generic": "Mode"}]})))
+        for bad in ({}, {"generic": ""}, {"generic": "Mode", "path": "fixture::Patch"},
+                    {"generic": "Self"}, {"generic": "Mode::T"}, {"path": "Patch"},
+                    {"path": "fixture::Patch", "type_args": "Mode"},
+                    {"path": "fixture::Patch", "type_args": [None]},
+                    {"path": "fixture::Patch", "typo": []}):
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                gate.checked_policy(policy(bad))
+
 
 class RustdocTests(unittest.TestCase):
     """Use real rustdoc graphs so re-export/visibility assumptions are tested."""
@@ -244,12 +280,17 @@ class RustdocTests(unittest.TestCase):
         cls.scratch = tempfile.TemporaryDirectory(prefix="litchi-glossary-test-", dir=gate.ROOT)
         cls.addClassCleanup(cls.scratch.cleanup)
         cls.directory = Path(cls.scratch.name)
+        dependency = cls.directory / "dependency.rs"
+        dependency.write_text(DEPENDENCY_SOURCE, encoding="utf-8")
+        library = cls.directory / "liblitchi_core.rlib"
+        subprocess.run(["rustc", "--edition=2024", "--crate-type=rlib", "--crate-name=litchi_core",
+                        str(dependency), "-o", str(library)], check=True, capture_output=True, text=True)
         source = cls.directory / "lib.rs"
         source.write_text(SOURCE, encoding="utf-8")
         subprocess.run(
             ["rustdoc", "--edition=2024", "--crate-type=lib", "--crate-name=fixture",
              "-Zunstable-options", "--output-format=json", "--document-hidden-items",
-             "-o", str(cls.directory), str(source)],
+             "--extern", f"litchi_core={library}", "-o", str(cls.directory), str(source)],
             env={**os.environ, "RUSTC_BOOTSTRAP": "1"}, check=True,
             capture_output=True, text=True,
         )
@@ -502,6 +543,34 @@ class RustdocTests(unittest.TestCase):
             "method": "fixture::returns::Package::fake_commit", "ok": "fixture::returns::fake::Commit",
         }]))
         self.assertEqual(len(failures), 1, failures)
+
+    def test_direct_shared_commit_preserves_nested_method_generic_identity(self):
+        rule = {"method": "fixture::durable::Package::apply", "ok": "litchi_core::edit::Commit",
+                "type_args": ["fixture::durable::Package", {
+                    "path": "litchi_core::patch::Patch", "type_args": [{"generic": "Mode"}],
+                }]}
+        self.assertEqual(gate.violations(self.document, profile(result_methods=[rule])), [])
+        findings = list(inventory.rows(self.document, "fixture", result_rules=[rule]))
+        self.assertNotIn(rule["method"], {path for category, path, _, _ in findings if category == "replay_return"})
+        for method in ("apply_other", "apply_fixed", "apply_swapped", "apply_foreign"):
+            changed = {**rule, "method": "fixture::durable::Package::" + method}
+            with self.subTest(method=method):
+                self.assertEqual(len(gate.violations(self.document, profile(result_methods=[changed]))), 1)
+        wrong_owner = {**rule, "method": "fixture::durable::Package::apply_other",
+                       "type_args": ["fixture::durable::Other", rule["type_args"][1]]}
+        self.assertEqual(len(gate.violations(self.document, profile(result_methods=[wrong_owner]))), 1)
+        for name in ("Unknown", "Self"):
+            changed = copy.deepcopy(rule)
+            changed["type_args"][1]["type_args"] = [{"generic": name}]
+            self.assertEqual(len(gate.violations(self.document, profile(result_methods=[changed]))), 1)
+        for path in ("litchi_core::missing::Patch", "litchi_core::unrelated::Commit"):
+            changed = {**rule, "ok": path}
+            self.assertEqual(len(gate.violations(self.document, profile(result_methods=[changed]))), 1)
+        ambiguous = copy.deepcopy(self.document)
+        canonical = next(value for value in ambiguous["paths"].values()
+                         if value["path"] == ["litchi_core", "edit", "Commit"])
+        ambiguous["paths"]["ambiguous-core-commit"] = copy.deepcopy(canonical)
+        self.assertEqual(len(gate.violations(ambiguous, profile(result_methods=[rule]))), 1)
 
     def test_unresolved_and_recursive_result_aliases_fail_closed(self):
         for mutation in ("missing", "cycle"):

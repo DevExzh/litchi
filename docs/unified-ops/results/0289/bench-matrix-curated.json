@@ -2894,6 +2894,10 @@
   {
    "record": "0362q",
    "reason": "Rustdoc return-contract gate and DOCX policy registrations; validation and remaining inventory contain no paired performance measurement."
+  },
+  {
+   "record": "0362qa",
+   "reason": "Return-contract tooling validation and real rustdoc fixtures only; no runtime measurement or performance acceptance."
   }
  ]
 }
