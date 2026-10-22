@@ -2294,3 +2294,40 @@ See [0063](0063-source-pptx-modern-comments.md).
   qualification, corpus dispositions, final inventory/glossary and the full
   assembled gate remain open. Only the comprehensive redaction audit is
   deferred. Nothing has been pushed.
+
+- Coordinator checkpoint (2026-10-22, policy review and consumer rerun):
+  The reviewed assembly reaches `d797add634`, adding corrected historical
+  DOCX error records, XLSB retained-provenance presence assertions, the RTF
+  final-source qualification receipt, and the external XLSX cache/context
+  repair. Independent review confirms that the XLSX owner retains the supplied
+  package's cache policy and both package/facade execution contexts through
+  deferred reads and writes. These changes still require combined validation.
+
+  Record 0362uf also preserves the DOCX compilation stop and correction:
+  a missing documentation-macro comma and denied redundant qualification
+  are fixed in `d43273a13b`. The fourth locked workspace/harness consumer
+  attempt is running on the fixed assembly. No unfinished command counts as
+  a pass; the last completed 1,578-test receipt remains tied to `c2122e2678`.
+
+  The final-source RTF receipt reports 34 focused tests passing, about
+  2.67 million fewer matched Callgrind instructions, and unchanged peak heap,
+  with three first-promotion allocations across the measured replay workload.
+  Native timing remains unqualified because compiler activity contaminated
+  the attempt. Its evidence is retained without a native acceptance claim.
+
+  OPC constructor review returns production calls that use default limits
+  instead of the existing package's retained policy, including replacement
+  relationship admission. XLSX raw aggregate review returns a lazy-payload
+  allocation bypass: `try_iter_parts()` decodes parts before the tighter raw
+  aggregate policy is checked. Both repairs remain required. DOCX raw helper
+  review likewise requires selected limits through MCE, semantic projection,
+  and output planning before allocation, while preserving shared resources.
+
+  DOCX cross-owner restored replay is being repaired with an explicit bounded
+  OPC artifact-stream path for deferred/effective endpoints. Producer source
+  checks and recipient output accounting must remain separate, including
+  nested restores; a full-artifact Vec fallback is not accepted. Genuine
+  signed native no-op patches, iWork constructor correctness and performance,
+  the other performance returns, corpus dispositions, final inventory/glossary
+  and the full assembled gate remain open. Only the comprehensive redaction
+  audit is deferred. Nothing has been pushed.
