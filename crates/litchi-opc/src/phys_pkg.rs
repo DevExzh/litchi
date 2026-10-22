@@ -596,6 +596,19 @@ impl<'data> PhysPkgReader<'data> {
         self.limits
     }
 
+    /// Whether this reader physically borrows the supplied source allocation.
+    ///
+    /// A shared owned-package handoff must reject a reader borrowed from a
+    /// different byte allocation: the deferred package keeps the supplied
+    /// `Arc<Vec<u8>>` while its physical index was built from the reader's
+    /// source.  Pointer and length identity is sufficient because the source
+    /// is immutable for the lifetime of this reader.
+    #[inline]
+    pub(crate) fn source_matches(&self, source: &[u8]) -> bool {
+        let admitted = self.archive.as_bytes();
+        admitted.as_ptr() == source.as_ptr() && admitted.len() == source.len()
+    }
+
     fn declared_part_bytes(&self, name: &str, label: &str) -> Result<u64> {
         self.archive
             .metadata(name)

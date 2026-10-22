@@ -1638,9 +1638,11 @@ impl Patch {
         // an equal-content image whose actual resources fit this owner. Keep
         // the owned OPC path here: it preserves the exact source/provenance
         // publication bytes used by the original package commit path.
-        admit_archive_before_copy(self.after.as_slice(), limits)?;
-        let candidate =
-            litchi_opc::OpcPackage::from_shared_vec_with_limits(Arc::clone(&self.after), limits)?;
+        let reader = admit_archive_before_copy(self.after.as_slice(), limits)?;
+        let candidate = litchi_opc::OpcPackage::from_shared_vec_with_admitted_reader(
+            Arc::clone(&self.after),
+            reader,
+        )?;
         let workbook = package.project_candidate(candidate)?;
         validate_all_worksheets(&workbook)?;
         Ok(workbook)
@@ -2315,20 +2317,23 @@ fn replay_package(
         // before publication. This also establishes the precise archive
         // lineage used by later edits/applications. The semantic workbook is
         // already validated by replay; do not parse that projection again.
-        admit_archive_before_copy(&bytes, limits)?;
         Arc::new(bytes)
     };
+    let reader = admit_archive_before_copy(bytes.as_slice(), limits)?;
     workbook.package =
-        litchi_opc::OpcPackage::from_shared_vec_with_limits(Arc::clone(&bytes), limits)?;
+        litchi_opc::OpcPackage::from_shared_vec_with_admitted_reader(Arc::clone(&bytes), reader)?;
     Ok((bytes, workbook.into_package()))
 }
 
 /// Admit the recipient's physical archive policy before taking ownership of
-/// an exact after-image. The borrowed reader checks input, archive/member
+/// an exact after-image. The returned reader checks input, archive/member
 /// counts, names, metadata, and declared ZIP sizes without copying the image;
-/// the later shared owned ingress repeats the checks while retaining the
+/// the admitted-reader handoff consumes that same reader while retaining the
 /// exact source for publication.
-fn admit_archive_before_copy(bytes: &[u8], limits: litchi_opc::SourceLimits) -> Result<()> {
+fn admit_archive_before_copy<'data>(
+    bytes: &'data [u8],
+    limits: litchi_opc::SourceLimits,
+) -> Result<litchi_opc::phys_pkg::PhysPkgReader<'data>> {
     let observed = u64::try_from(bytes.len()).map_err(|_error| Error::CapacityOverflow {
         resource: "workbook archive input bytes",
     })?;
@@ -2340,8 +2345,9 @@ fn admit_archive_before_copy(bytes: &[u8], limits: litchi_opc::SourceLimits) -> 
             maximum,
         }));
     }
-    let _reader = litchi_opc::phys_pkg::PhysPkgReader::new_with_limits(bytes, limits)?;
-    Ok(())
+    Ok(litchi_opc::phys_pkg::PhysPkgReader::new_with_limits(
+        bytes, limits,
+    )?)
 }
 
 #[cfg(test)]
