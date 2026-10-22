@@ -101,7 +101,7 @@ pub(crate) fn read_with_limits(
     for (sheet_index, worksheet_name) in worksheet_parts.iter().enumerate() {
         let worksheet = package.get_part(worksheet_name)?;
         require_content_type(worksheet, WORKSHEET_CONTENT_TYPE)?;
-        let geometry = worksheet_geometry(worksheet.blob())?;
+        let geometry = worksheet_geometry(worksheet.blob(), limits.raw)?;
         let listed_tables =
             crate::package::table::parse_table_part_rel_ids(worksheet.blob(), limits.raw)?;
         let listed = listed_tables.iter().cloned().collect::<HashSet<_>>();
@@ -534,9 +534,9 @@ impl WorksheetGeometry {
     }
 }
 
-fn worksheet_geometry(data: &[u8]) -> Result<WorksheetGeometry> {
+fn worksheet_geometry(data: &[u8], raw_limits: crate::raw::Limits) -> Result<WorksheetGeometry> {
     let mut geometry = WorksheetGeometry::default();
-    for record in crate::raw::Records::new(data, crate::raw::Limits::DEFAULT) {
+    for record in crate::raw::Records::new(data, raw_limits) {
         let record = record?;
         let slot = match record.kind() {
             crate::raw::kind::WS_DIM => &mut geometry.dimension,

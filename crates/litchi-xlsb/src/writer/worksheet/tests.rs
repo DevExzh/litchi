@@ -516,7 +516,7 @@ fn writes_shared_definition_immediately_after_anchor_and_exp_followers() {
     let mut shared_strings = crate::writer::SharedStringsWriter::new();
     sheet.write_cells(&mut writer, &mut shared_strings).unwrap();
 
-    let mut iter = Stream::new(Cursor::new(buffer));
+    let mut iter = Stream::new(Cursor::new(buffer), crate::raw::Limits::DEFAULT);
     let mut records = Vec::new();
     while let Ok(record_type) = iter.read_type() {
         let mut data = Vec::new();
@@ -567,7 +567,7 @@ fn writes_unsupported_group_definition_losslessly() {
     let mut shared_strings = crate::writer::SharedStringsWriter::new();
     sheet.write_cells(&mut writer, &mut shared_strings).unwrap();
 
-    let mut iter = Stream::new(Cursor::new(buffer));
+    let mut iter = Stream::new(Cursor::new(buffer), crate::raw::Limits::DEFAULT);
     let mut definition = None;
     while let Ok(record_type) = iter.read_type() {
         let mut data = Vec::new();

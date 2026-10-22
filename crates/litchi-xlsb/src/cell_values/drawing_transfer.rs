@@ -241,6 +241,7 @@ pub(super) fn transfer(
     let source = super::structure::validated_workbook_with_external_link_limits(
         source_bytes,
         target.external_link_limits(),
+        target.raw_limits_value(),
     )?;
     let source_plan = plan_source(&source, source_sheet, source_anchor)?;
     let target_plan = plan_target(target, target_sheet)?;
@@ -755,7 +756,13 @@ fn install_transfer(
             )?;
         }
         package.try_add_part(Box::new(drawing_part))?;
-        attach_drawing_to_worksheet(package, target, target_sheet, &plan.uri)?;
+        attach_drawing_to_worksheet(
+            package,
+            target,
+            target_sheet,
+            &plan.uri,
+            target.raw_limits_value(),
+        )?;
     }
     Ok(())
 }
@@ -796,7 +803,8 @@ fn locate_drawing(workbook: &Workbook, sheet: usize) -> Result<Option<LocatedDra
     let worksheet_uri = workbook.worksheet_uri(sheet)?;
     let worksheet = workbook.package.get_part(&worksheet_uri)?;
     let mut relationship_id = None;
-    for item in Records::new(worksheet.blob(), crate::raw::Limits::DEFAULT) {
+    let raw_limits = workbook.raw_limits_value();
+    for item in Records::new(worksheet.blob(), raw_limits) {
         let record = item?;
         if record.kind() == kind::DRAWING {
             if relationship_id.is_some() {
@@ -804,11 +812,7 @@ fn locate_drawing(workbook: &Workbook, sheet: usize) -> Result<Option<LocatedDra
                     "worksheet contains multiple BrtDrawing records",
                 ));
             }
-            let mut cursor = crate::raw::Cursor::new(
-                record.payload(),
-                "BrtDrawing",
-                crate::raw::Limits::DEFAULT,
-            );
+            let mut cursor = crate::raw::Cursor::new(record.payload(), "BrtDrawing", raw_limits);
             relationship_id = Some(cursor.read_wide_string()?);
         }
     }
@@ -1749,6 +1753,7 @@ fn attach_drawing_to_worksheet(
     workbook: &Workbook,
     sheet: usize,
     drawing_uri: &PackURI,
+    raw_limits: RawLimits,
 ) -> Result<()> {
     let worksheet_uri = workbook.worksheet_uri(sheet)?;
     let worksheet_source = package.get_part(&worksheet_uri)?.blob().to_vec();
@@ -1762,18 +1767,16 @@ fn attach_drawing_to_worksheet(
         },
     );
     let mut payload = Vec::new();
-    BinaryEncoder::new(&mut payload, crate::raw::Limits::DEFAULT)
-        .write_wide_string(&relationship_id)?;
+    BinaryEncoder::new(&mut payload, raw_limits).write_wide_string(&relationship_id)?;
     let mut output = Vec::new();
     let mut inserted = false;
-    for item in Records::new(&worksheet_source, crate::raw::Limits::DEFAULT) {
+    for item in Records::new(&worksheet_source, raw_limits) {
         let record = item?;
         if !inserted && matches!(record.kind(), kind::BEGIN_LIST_PARTS | kind::END_SHEET) {
-            BinaryEncoder::new(&mut output, crate::raw::Limits::DEFAULT)
-                .write_record(kind::DRAWING, &payload)?;
+            BinaryEncoder::new(&mut output, raw_limits).write_record(kind::DRAWING, &payload)?;
             inserted = true;
         }
-        copy_record(&worksheet_source, &record, &mut output)?;
+        copy_record(&worksheet_source, &record, raw_limits, &mut output)?;
     }
     if !inserted {
         return Err(Error::InvalidFormat(
@@ -1785,11 +1788,16 @@ fn attach_drawing_to_worksheet(
     Ok(())
 }
 
-fn copy_record(source: &[u8], record: &crate::raw::Record<'_>, output: &mut Vec<u8>) -> Result<()> {
+fn copy_record(
+    source: &[u8],
+    record: &crate::raw::Record<'_>,
+    raw_limits: RawLimits,
+    output: &mut Vec<u8>,
+) -> Result<()> {
     let record_source = source.get(record.offset()..).ok_or(Error::InvalidFormat(
         "record offset is outside worksheet.bin",
     ))?;
-    let (_, header_len) = Header::parse(record_source, RawLimits::DEFAULT)?;
+    let (_, header_len) = Header::parse(record_source, raw_limits)?;
     let end = record
         .offset()
         .checked_add(header_len)

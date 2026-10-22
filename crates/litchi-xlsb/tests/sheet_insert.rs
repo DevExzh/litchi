@@ -768,7 +768,12 @@ fn durable_tag9_replay_inverse_and_malformed_fields_are_rejected() {
     let wire = commit.patch().to_bytes(TransferLimits::DEFAULT).unwrap();
     let offset = operation_offset(&wire);
     assert_eq!(wire[offset], 9, "insert operation tag");
-    let patch = Patch::from_bytes(&wire, TransferLimits::DEFAULT).unwrap();
+    let patch = Patch::from_bytes(
+        &wire,
+        TransferLimits::DEFAULT,
+        litchi_xlsb::raw::Limits::DEFAULT,
+    )
+    .unwrap();
     let replay = source
         .apply(&patch)
         .map(litchi_xlsb::cell_values::structure::Commit::into_package)
@@ -787,7 +792,14 @@ fn durable_tag9_replay_inverse_and_malformed_fields_are_rejected() {
 
     let mut out_of_range_position = wire.clone();
     out_of_range_position[offset + 1..offset + 9].copy_from_slice(&u64::MAX.to_le_bytes());
-    assert!(Patch::from_bytes(&out_of_range_position, TransferLimits::DEFAULT).is_err());
+    assert!(
+        Patch::from_bytes(
+            &out_of_range_position,
+            TransferLimits::DEFAULT,
+            litchi_xlsb::raw::Limits::DEFAULT
+        )
+        .is_err()
+    );
 
     let name_start = wire[offset..]
         .windows("Inserted".len())
@@ -796,11 +808,25 @@ fn durable_tag9_replay_inverse_and_malformed_fields_are_rejected() {
         .expect("encoded inserted name");
     let mut malformed_name_count = wire.clone();
     malformed_name_count[name_start - 8..name_start].copy_from_slice(&u64::MAX.to_le_bytes());
-    assert!(Patch::from_bytes(&malformed_name_count, TransferLimits::DEFAULT).is_err());
+    assert!(
+        Patch::from_bytes(
+            &malformed_name_count,
+            TransferLimits::DEFAULT,
+            litchi_xlsb::raw::Limits::DEFAULT
+        )
+        .is_err()
+    );
 
     let mut malformed_name = wire.clone();
     malformed_name[name_start] = 0xff;
-    assert!(Patch::from_bytes(&malformed_name, TransferLimits::DEFAULT).is_err());
+    assert!(
+        Patch::from_bytes(
+            &malformed_name,
+            TransferLimits::DEFAULT,
+            litchi_xlsb::raw::Limits::DEFAULT
+        )
+        .is_err()
+    );
 
     assert_eq!(
         name_start,
@@ -809,7 +835,14 @@ fn durable_tag9_replay_inverse_and_malformed_fields_are_rejected() {
     );
     let mut malformed_state = wire.clone();
     malformed_state[offset + 9] = 0xff;
-    assert!(Patch::from_bytes(&malformed_state, TransferLimits::DEFAULT).is_err());
+    assert!(
+        Patch::from_bytes(
+            &malformed_state,
+            TransferLimits::DEFAULT,
+            litchi_xlsb::raw::Limits::DEFAULT
+        )
+        .is_err()
+    );
 }
 
 #[test]

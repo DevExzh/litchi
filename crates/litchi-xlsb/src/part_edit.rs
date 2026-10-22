@@ -1263,7 +1263,7 @@ pub(crate) fn feature_pass(
     leniency: crate::leniency::Leniency,
 ) -> Result<FeaturePass> {
     let context = context.for_sheet(sheet);
-    let stream = crate::package::records::Stream::new(std::io::Cursor::new(bytes));
+    let stream = crate::package::records::Stream::new(std::io::Cursor::new(bytes), raw_limits);
     let mut reader = crate::package::cells_reader::CellsReader::new(
         stream,
         &[],
@@ -1470,12 +1470,6 @@ pub(crate) struct SheetLayout {
 }
 
 impl SheetLayout {
-    /// Scan a worksheet stream. Unbalanced collections and a stream without
-    /// a cell table or end record are refused.
-    pub(crate) fn scan(data: &[u8]) -> Result<Self> {
-        Self::scan_with_limits(data, crate::raw::Limits::DEFAULT)
-    }
-
     /// Scan a worksheet stream under the owning workbook's raw policy.
     pub(crate) fn scan_with_limits(data: &[u8], limits: crate::raw::Limits) -> Result<Self> {
         let mut records = Records::new(data, limits);
@@ -1571,11 +1565,6 @@ pub(crate) fn splice(data: &[u8], span: Range<usize>, replacement: &[u8]) -> Vec
     out.extend_from_slice(replacement);
     out.extend_from_slice(&data[span.end..]);
     out
-}
-
-/// Encode one record.
-pub(crate) fn record(kind: Kind, payload: &[u8]) -> Result<Vec<u8>> {
-    record_with_limits(kind, payload, crate::raw::Limits::DEFAULT)
 }
 
 /// Encode one record under an owning workbook's raw policy.
@@ -1731,7 +1720,7 @@ mod tests {
             (kind::FRT_END, &[]),
             (kind::END_SHEET, &[]),
         ]);
-        let layout = SheetLayout::scan(&data).unwrap();
+        let layout = SheetLayout::scan_with_limits(&data, crate::raw::Limits::DEFAULT).unwrap();
         let kinds: Vec<_> = layout.units.iter().map(|unit| unit.kind).collect();
         assert_eq!(
             kinds,
@@ -1767,7 +1756,7 @@ mod tests {
             (kind::END_D_VALS, &[]),
             (kind::END_SHEET, &[]),
         ]);
-        assert!(SheetLayout::scan(&data).is_err());
+        assert!(SheetLayout::scan_with_limits(&data, crate::raw::Limits::DEFAULT).is_err());
     }
 }
 

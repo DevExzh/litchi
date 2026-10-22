@@ -58,7 +58,12 @@ fn a_name_is_added_to_a_workbook_without_an_externals_block() {
 
     // The durable patch replays and inverts exactly.
     let wire = patch.to_bytes(TransferLimits::DEFAULT).unwrap();
-    let decoded = Patch::from_bytes(&wire, TransferLimits::DEFAULT).unwrap();
+    let decoded = Patch::from_bytes(
+        &wire,
+        TransferLimits::DEFAULT,
+        litchi_xlsb::raw::Limits::DEFAULT,
+    )
+    .unwrap();
     assert_eq!(
         source
             .apply(&decoded)

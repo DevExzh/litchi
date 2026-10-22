@@ -1870,7 +1870,7 @@ impl SourceBackedWorksheet {
             "comments",
         )?;
         let worksheet_data = worksheet_part.data()?;
-        for record in Records::new(worksheet_data.as_bytes(), crate::raw::Limits::DEFAULT) {
+        for record in Records::new(worksheet_data.as_bytes(), self.inner.raw_limits) {
             if record?.kind() == kind::BEGIN_SPARKLINE_GROUPS {
                 return Err(Error::UnsupportedFeature(
                     "source-backed XLSB worksheet materialization does not yet include sparkline groups",
@@ -2023,8 +2023,13 @@ impl SourceInner {
                 let data = self.package.part(partname)?.data()?;
                 self.package.check_execution()?;
                 self.package.source_version()?;
-                let mut records = Records::new(data.as_bytes(), crate::raw::Limits::DEFAULT);
-                Workbook::read_shared_strings(&mut records, &mut strings, &mut report)?;
+                let mut records = Records::new(data.as_bytes(), self.raw_limits);
+                Workbook::read_shared_strings(
+                    &mut records,
+                    &mut strings,
+                    &mut report,
+                    self.raw_limits,
+                )?;
                 self.package.check_execution()?;
                 self.package.source_version()?;
             }
@@ -2100,6 +2105,7 @@ impl SourceInner {
                     data.as_bytes(),
                     table_part.worksheet_position,
                     &mut Tolerance::recording(&mut report),
+                    self.raw_limits,
                 );
                 postflight_package(&self.package)?;
                 let table = table?;

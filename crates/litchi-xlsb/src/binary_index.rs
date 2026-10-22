@@ -1132,6 +1132,7 @@ pub(crate) fn decode_cached_value(
                     tolerance,
                     kind_value,
                     row,
+                    limits,
                 )?,
             ))
         },

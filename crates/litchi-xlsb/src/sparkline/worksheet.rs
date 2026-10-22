@@ -275,7 +275,7 @@ pub fn read(source: &[u8], limits: Limits) -> Result<Snapshot> {
 fn scan(source: Vec<u8>, limits: Limits) -> Result<Snapshot> {
     limits.validate()?;
     enforce_worksheet_bytes(source.len(), limits)?;
-    let mut records = Records::new(&source, crate::raw::Limits::DEFAULT);
+    let mut records = Records::new(&source, crate::raw::Limits::new(limits.record_bytes(), 1));
     let mut family = Vec::new();
     family.try_reserve_exact(3).map_err(|_| Error::Allocation {
         resource: "worksheet family stack",

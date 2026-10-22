@@ -172,7 +172,7 @@ impl SourceBackedWorksheet {
             }
             let partname = self.physical_partname()?.clone();
             let inputs = self.materialization_inputs(partname)?;
-            if !cells_ascend(inputs.data.as_bytes())? {
+            if !cells_ascend(inputs.data.as_bytes(), self.inner.raw_limits)? {
                 return Ok(Stage::Pending);
             }
             let _ = crate::package::scenarios::parse_worksheet(
@@ -270,7 +270,7 @@ impl SourceBackedWorksheet {
             };
             let context = inputs.formula_context.for_sheet(inputs.workbook_position);
             let mut reader = CellsReader::new(
-                Stream::new(Cursor::new(inputs.data.as_bytes())),
+                Stream::new(Cursor::new(inputs.data.as_bytes()), self.inner.raw_limits),
                 inputs.shared_strings.as_slice(),
                 &context,
                 inputs.cell_xf_count,
@@ -367,10 +367,10 @@ impl std::fmt::Debug for CellCursor {
 /// the reader skips, so the reader's cells are a subsequence of the walked
 /// ones and ascend whenever they do. A row header or cell payload too short
 /// to hold its number gives `false`.
-fn cells_ascend(data: &[u8]) -> Result<bool> {
+fn cells_ascend(data: &[u8], raw_limits: crate::raw::Limits) -> Result<bool> {
     let mut row = 0_u32;
     let mut last: Option<(u32, u32)> = None;
-    for record in Records::new(data, crate::raw::Limits::DEFAULT) {
+    for record in Records::new(data, raw_limits) {
         let record = record?;
         let kind = record.kind();
         let is_cell = (kind::CELL_BLANK.get()..=kind::FMLA_ERROR.get()).contains(&kind.get())
@@ -570,21 +570,21 @@ mod tests {
             (kind::ROW_HDR, &r2),
             (kind::FMLA_NUM, &a),
         ]);
-        assert!(super::cells_ascend(&ascending).unwrap());
+        assert!(super::cells_ascend(&ascending, crate::raw::Limits::DEFAULT).unwrap());
         let backwards = records(&[
             (kind::ROW_HDR, &r2),
             (kind::CELL_BLANK, &a),
             (kind::ROW_HDR, &r1),
             (kind::CELL_BLANK, &b),
         ]);
-        assert!(!super::cells_ascend(&backwards).unwrap());
+        assert!(!super::cells_ascend(&backwards, crate::raw::Limits::DEFAULT).unwrap());
         let twice = records(&[
             (kind::ROW_HDR, &r1),
             (kind::CELL_BLANK, &b),
             (kind::CELL_R_STRING, &b),
         ]);
-        assert!(!super::cells_ascend(&twice).unwrap());
+        assert!(!super::cells_ascend(&twice, crate::raw::Limits::DEFAULT).unwrap());
         let short = records(&[(kind::ROW_HDR, &r1[..2])]);
-        assert!(!super::cells_ascend(&short).unwrap());
+        assert!(!super::cells_ascend(&short, crate::raw::Limits::DEFAULT).unwrap());
     }
 }

@@ -104,6 +104,7 @@ fn durable_patch_decode_can_opt_into_skipped_drawing_projection() {
     let decoded = crate::cell_values::structure::Patch::from_bytes_without_drawing_parse(
         &encoded,
         crate::cell_values::TransferLimits::DEFAULT,
+        workbook.raw_limits_value(),
     )
     .unwrap();
     assert_eq!(decoded.operation_count(), 0);
@@ -116,6 +117,29 @@ fn durable_patch_decode_can_opt_into_skipped_drawing_projection() {
     .unwrap();
     decoded.apply(&mut skipped).unwrap();
     assert!(!skipped.drawings_parsed());
+}
+
+#[test]
+fn durable_patch_rejects_a_broader_decode_policy_on_a_narrower_owner() {
+    let workbook = generated_workbook();
+    let package = workbook.to_package();
+    let commit = package.edit().unwrap().commit().unwrap();
+    let encoded = commit
+        .patch()
+        .to_bytes(crate::cell_values::TransferLimits::DEFAULT)
+        .unwrap();
+    let broad_raw = crate::raw::Limits::new(
+        crate::raw::Limits::DEFAULT.payload().saturating_add(1),
+        crate::raw::Limits::DEFAULT.string_units(),
+    );
+    let decoded = crate::cell_values::structure::Patch::from_bytes(
+        &encoded,
+        crate::cell_values::TransferLimits::DEFAULT,
+        broad_raw,
+    )
+    .unwrap();
+    let error = package.apply(&decoded).unwrap_err();
+    assert!(matches!(error, crate::package::PackageError::Refused(_)));
 }
 
 #[test]
@@ -297,7 +321,12 @@ fn parse_shared_string_records(records: &[(RawKind, Vec<u8>)]) -> Result<Vec<Sha
     let data = external_link_records(records);
     let mut iter = Records::new(data.as_slice(), crate::raw::Limits::DEFAULT);
     let mut strings = Vec::new();
-    Workbook::read_shared_strings(&mut iter, &mut strings, &mut Default::default())?;
+    Workbook::read_shared_strings(
+        &mut iter,
+        &mut strings,
+        &mut Default::default(),
+        crate::raw::Limits::DEFAULT,
+    )?;
     Ok(strings)
 }
 

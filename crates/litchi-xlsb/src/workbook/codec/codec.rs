@@ -130,6 +130,7 @@ impl Workbook {
         iter: &mut Records<'_>,
         strings: &mut Vec<SharedString>,
         report: &mut crate::leniency::ToleranceReport,
+        raw_limits: crate::raw::Limits,
     ) -> Result<()> {
         let initial_count = strings.len();
         let mut expected_unique = None;
@@ -180,6 +181,7 @@ impl Workbook {
                         &mut crate::leniency::Tolerance::recording(report),
                         kind::SST_ITEM,
                         location,
+                        raw_limits,
                     )?);
                 },
                 kind::END_SST => {
@@ -236,7 +238,7 @@ impl Workbook {
         leniency: crate::leniency::Leniency,
     ) -> Result<Worksheet> {
         let mut worksheet = Worksheet::new(name);
-        let iter = crate::package::records::Stream::new(cursor);
+        let iter = crate::package::records::Stream::new(cursor, raw_limits);
         let formula_context = formula_context.for_sheet(sheet_index);
         let mut cells_reader = crate::package::cells_reader::CellsReader::new(
             iter,

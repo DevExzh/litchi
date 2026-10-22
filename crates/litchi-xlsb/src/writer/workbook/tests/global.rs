@@ -119,8 +119,11 @@ fn external_links_round_trip_with_inert_package_topology() {
     for record in crate::raw::Records::new(workbook_part.blob(), crate::raw::Limits::DEFAULT) {
         let record = record.unwrap();
         if record.kind() == kind::SUP_BOOK_SRC {
-            let (relationship_id, consumed) =
-                crate::package::records::decode_string(record.payload()).unwrap();
+            let (relationship_id, consumed) = crate::package::records::decode_string(
+                record.payload(),
+                crate::raw::Limits::DEFAULT,
+            )
+            .unwrap();
             assert_eq!(consumed, record.payload().len());
             support_relationship_ids.push(relationship_id);
         }

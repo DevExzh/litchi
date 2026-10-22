@@ -708,7 +708,7 @@ impl Workbook {
         for uri in &external_link_uris {
             external_books.push(self.load_external_book_with_budget(uri, external_link_budget)?);
         }
-        let pivot_cache_ids = Self::parse_pivot_cache_ids(workbook_part.blob())?;
+        let pivot_cache_ids = Self::parse_pivot_cache_ids(workbook_part.blob(), self.raw_limits)?;
         let mut pivot_cache_definitions = Vec::with_capacity(pivot_cache_ids.len());
         for (cache_id, rel_id) in &pivot_cache_ids {
             let relationship = workbook_part.rels().get(rel_id).ok_or(
@@ -956,6 +956,7 @@ impl Workbook {
                     part.blob(),
                     sheet_index,
                     &mut Tolerance::recording(&mut already_recorded),
+                    self.raw_limits,
                 )?;
                 if tables
                     .iter()
@@ -986,7 +987,7 @@ impl Workbook {
                     ));
                 }
                 let part = self.package.get_part(&relationship.target_partname()?)?;
-                let view = Self::parse_pivot_view(part.blob(), sheet_index)?;
+                let view = Self::parse_pivot_view(part.blob(), sheet_index, self.raw_limits)?;
                 if !pivot_cache_ids
                     .iter()
                     .any(|(cache_id, _)| *cache_id == view.cache_id())
@@ -1071,8 +1072,13 @@ impl Workbook {
             });
         }
         let blob = shared_strings_part.blob();
-        let mut iter = Records::new(blob, crate::raw::Limits::DEFAULT);
-        Self::read_shared_strings(&mut iter, &mut self.shared_strings, &mut self.tolerance)?;
+        let mut iter = Records::new(blob, self.raw_limits);
+        Self::read_shared_strings(
+            &mut iter,
+            &mut self.shared_strings,
+            &mut self.tolerance,
+            self.raw_limits,
+        )?;
 
         Ok(())
     }

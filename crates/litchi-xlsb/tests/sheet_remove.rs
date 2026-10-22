@@ -1237,7 +1237,12 @@ fn durable_tag10_is_sorted_and_replays_inverse_exactly() {
         u64::from_le_bytes(wire[offset + 17..offset + 25].try_into().unwrap()),
         3
     );
-    let patch = Patch::from_bytes(&wire, TransferLimits::DEFAULT).unwrap();
+    let patch = Patch::from_bytes(
+        &wire,
+        TransferLimits::DEFAULT,
+        litchi_xlsb::raw::Limits::DEFAULT,
+    )
+    .unwrap();
     let replay = source
         .apply(&patch)
         .map(litchi_xlsb::cell_values::structure::Commit::into_package)
@@ -1270,18 +1275,37 @@ fn durable_tag10_rejects_malformed_count_order_duplicates_and_positions() {
 
     let mut huge_count = wire.clone();
     huge_count[offset + 1..offset + 9].copy_from_slice(&u64::MAX.to_le_bytes());
-    assert!(Patch::from_bytes(&huge_count, TransferLimits::DEFAULT).is_err());
+    assert!(
+        Patch::from_bytes(
+            &huge_count,
+            TransferLimits::DEFAULT,
+            litchi_xlsb::raw::Limits::DEFAULT
+        )
+        .is_err()
+    );
 
     let mut truncated = wire.clone();
     truncated.truncate(truncated.len() - 1);
-    assert!(Patch::from_bytes(&truncated, TransferLimits::DEFAULT).is_err());
+    assert!(
+        Patch::from_bytes(
+            &truncated,
+            TransferLimits::DEFAULT,
+            litchi_xlsb::raw::Limits::DEFAULT
+        )
+        .is_err()
+    );
 
     for positions in [[1_u64, 1], [3, 1], [1, u64::MAX]] {
         let mut malformed = wire.clone();
         malformed[offset + 9..offset + 17].copy_from_slice(&positions[0].to_le_bytes());
         malformed[offset + 17..offset + 25].copy_from_slice(&positions[1].to_le_bytes());
         assert!(
-            Patch::from_bytes(&malformed, TransferLimits::DEFAULT).is_err(),
+            Patch::from_bytes(
+                &malformed,
+                TransferLimits::DEFAULT,
+                litchi_xlsb::raw::Limits::DEFAULT
+            )
+            .is_err(),
             "accepted malformed positions {positions:?}"
         );
     }

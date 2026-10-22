@@ -541,7 +541,7 @@ impl Edit {
     fn splice(&mut self, sheet: usize, index: Option<usize>, encoded: &[u8]) -> Result<bool> {
         let worksheet = self.staged.worksheet(sheet)?;
         let bytes = self.staged.blob(&worksheet)?;
-        let layout = SheetLayout::scan(bytes)?;
+        let layout = SheetLayout::scan_with_limits(bytes, self.staged.raw_limits())?;
         let units: Vec<_> = layout.units_of(kind::BEGIN_COND_FORMATTING).collect();
         let span = match index {
             Some(index) => units

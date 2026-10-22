@@ -66,7 +66,12 @@ fn merges_and_unmerges_publish_and_replay_exactly() {
 
     // The durable patch round-trips and replays; its inverse restores bytes.
     let wire = patch.to_bytes(TransferLimits::DEFAULT).unwrap();
-    let decoded = Patch::from_bytes(&wire, TransferLimits::DEFAULT).unwrap();
+    let decoded = Patch::from_bytes(
+        &wire,
+        TransferLimits::DEFAULT,
+        litchi_xlsb::raw::Limits::DEFAULT,
+    )
+    .unwrap();
     assert_eq!(
         source
             .apply(&decoded)

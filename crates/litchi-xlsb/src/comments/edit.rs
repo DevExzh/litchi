@@ -39,7 +39,7 @@ use litchi_opc::{BlobPart, PackURI};
 use super::{MAX_COLUMNS, MAX_ROWS, MAX_TEXT_UNITS, Record};
 use crate::package::Package;
 use crate::package::error::{Error as PackageError, Result};
-use crate::part_edit::{Rank, SheetLayout, Staged, family, invalid, record, splice};
+use crate::part_edit::{Rank, SheetLayout, Staged, family, invalid, record_with_limits, splice};
 use crate::raw::{Encoder, Records, kind};
 use litchi_spreadsheet_drawing::vml;
 
@@ -330,9 +330,10 @@ impl Edit {
                 Some(index) => (index, None),
                 None => (
                     layout.authors.len(),
-                    Some(record(
+                    Some(record_with_limits(
                         kind::COMMENT_AUTHOR,
                         &super::codec::encode_author(author)?,
+                        limits,
                     )?),
                 ),
             };
@@ -502,7 +503,7 @@ impl Edit {
                 let updated = splice(
                     bytes,
                     at..at,
-                    &crate::part_edit::record_with_limits(kind::LEGACY_DRAWING, &payload, limits)?,
+                    &record_with_limits(kind::LEGACY_DRAWING, &payload, limits)?,
                 );
                 self.staged.replace_worksheet(worksheet, updated)?;
                 self.staged.touch(worksheet);

@@ -380,7 +380,12 @@ fn durable_tag8_replay_and_inverse_preserve_the_complete_catalog() {
         .to_bytes(TransferLimits::DEFAULT)
         .expect("durable patch");
     assert_eq!(wire[operation_offset(&wire)], 8, "reorder operation tag");
-    let patch = Patch::from_bytes(&wire, TransferLimits::DEFAULT).expect("decode tag8");
+    let patch = Patch::from_bytes(
+        &wire,
+        TransferLimits::DEFAULT,
+        litchi_xlsb::raw::Limits::DEFAULT,
+    )
+    .expect("decode tag8");
     let replay = source
         .apply(&patch)
         .map(litchi_xlsb::cell_values::structure::Commit::into_package)
@@ -419,10 +424,24 @@ fn malformed_tag8_count_is_rejected_before_allocation_or_replay() {
 
     let mut huge_count = wire.clone();
     huge_count[offset + 1..offset + 9].copy_from_slice(&u64::MAX.to_le_bytes());
-    assert!(Patch::from_bytes(&huge_count, TransferLimits::DEFAULT).is_err());
+    assert!(
+        Patch::from_bytes(
+            &huge_count,
+            TransferLimits::DEFAULT,
+            litchi_xlsb::raw::Limits::DEFAULT
+        )
+        .is_err()
+    );
 
     let truncated = wire[..wire.len().saturating_sub(1)].to_vec();
-    assert!(Patch::from_bytes(&truncated, TransferLimits::DEFAULT).is_err());
+    assert!(
+        Patch::from_bytes(
+            &truncated,
+            TransferLimits::DEFAULT,
+            litchi_xlsb::raw::Limits::DEFAULT
+        )
+        .is_err()
+    );
 }
 
 #[test]
@@ -441,7 +460,14 @@ fn duplicate_tag8_operations_are_rejected_as_source_relative_history() {
     duplicate[24..32].copy_from_slice(&2_u64.to_le_bytes());
     duplicate.extend_from_slice(&one[offset..]);
     duplicate.extend_from_slice(&one[offset..]);
-    assert!(Patch::from_bytes(&duplicate, TransferLimits::DEFAULT).is_err());
+    assert!(
+        Patch::from_bytes(
+            &duplicate,
+            TransferLimits::DEFAULT,
+            litchi_xlsb::raw::Limits::DEFAULT
+        )
+        .is_err()
+    );
 }
 
 #[test]

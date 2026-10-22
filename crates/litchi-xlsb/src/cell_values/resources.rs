@@ -71,7 +71,6 @@ pub(super) fn plan_style(
             ));
         }
     }
-    let font = crate::writer::StylesWriter::encode_font_payload(&style.font)?;
     if style.font.name.encode_utf16().count() > limits.string_units() {
         return Err(crate::raw::Error::StringLimit {
             units: style.font.name.encode_utf16().count(),
@@ -80,8 +79,9 @@ pub(super) fn plan_style(
         }
         .into());
     }
+    let font = crate::writer::StylesWriter::encode_font_payload(&style.font)?;
     let fill = crate::writer::StylesWriter::encode_fill_payload(&style.fill)?;
-    let border = encode_authored_border(&style.border)?;
+    let border = encode_authored_border(&style.border, limits)?;
     for payload in [&font, &fill, &border] {
         if payload.len() > limits.payload() {
             return Err(crate::raw::Error::PayloadLimit {
@@ -101,7 +101,7 @@ pub(super) fn plan_style(
     })
 }
 
-fn encode_authored_border(border: &crate::styles::Border) -> Result<Vec<u8>> {
+fn encode_authored_border(border: &crate::styles::Border, limits: RawLimits) -> Result<Vec<u8>> {
     if border.vertical.is_some() || border.horizontal.is_some() {
         return Err(Error::refused(
             litchi_core::edit::RefusalKind::UnsupportedContent,
@@ -115,7 +115,7 @@ fn encode_authored_border(border: &crate::styles::Border) -> Result<Vec<u8>> {
         ));
     }
     let mut data = Vec::new();
-    let mut writer = Encoder::new(&mut data, crate::raw::Limits::DEFAULT);
+    let mut writer = Encoder::new(&mut data, limits);
     writer.write_u8(u8::from(border.diagonal_down) | (u8::from(border.diagonal_up) << 1))?;
     write_authored_border_side(&mut writer, border.top.as_ref())?;
     write_authored_border_side(&mut writer, border.bottom.as_ref())?;
@@ -403,8 +403,9 @@ pub(super) fn intern_number_format(
 pub(super) fn intern_shared_string_for_new_cell(
     package: &mut OpcPackage,
     value: &SharedString,
+    raw_limits: RawLimits,
 ) -> Result<u32> {
-    let encoded = value.encode()?;
+    let encoded = value.encode(raw_limits)?;
     let uri = PackURI::new(SST_URI)?;
     let existing = match package.get_part(&uri) {
         Ok(part) => Some(part.blob().to_vec()),
@@ -417,8 +418,8 @@ pub(super) fn intern_shared_string_for_new_cell(
         has_workbook_resource_relationship(package, relationship_type, "sharedStrings.bin")?;
     let has_part = existing.is_some();
     let (bytes, index) = match existing {
-        Some(source) => append_or_reuse_sst(&source, value, &encoded)?,
-        None => (new_sst(&encoded)?, 0),
+        Some(source) => append_or_reuse_sst(&source, value, &encoded, raw_limits)?,
+        None => (new_sst(&encoded, raw_limits)?, 0),
     };
     if has_part {
         package.get_part_mut(&uri)?.set_blob(bytes);
@@ -642,11 +643,12 @@ fn append_or_reuse_sst(
     source: &[u8],
     value: &SharedString,
     encoded: &[u8],
+    raw_limits: RawLimits,
 ) -> Result<(Vec<u8>, u32)> {
     let mut total = None;
     let mut unique = None;
     let mut items = Vec::new();
-    for item in Records::new(source, crate::raw::Limits::DEFAULT) {
+    for item in Records::new(source, raw_limits) {
         let record = item?;
         match record.kind() {
             kind::BEGIN_SST => {
@@ -659,7 +661,7 @@ fn append_or_reuse_sst(
                 total = Some(binary::read_u32_le_at(record.payload(), 0)?);
                 unique = Some(binary::read_u32_le_at(record.payload(), 4)?);
             },
-            kind::SST_ITEM => items.push(SharedString::parse(record.payload())?),
+            kind::SST_ITEM => items.push(SharedString::parse(record.payload(), raw_limits)?),
             _ => {},
         }
     }
@@ -696,6 +698,7 @@ fn append_or_reuse_sst(
         new_total,
         new_unique,
         existing.is_none().then_some(encoded),
+        raw_limits,
     )?;
     let index = u32::try_from(index).map_err(|_| {
         Error::refused(
@@ -707,38 +710,42 @@ fn append_or_reuse_sst(
     Ok((bytes, index))
 }
 
-fn new_sst(encoded: &[u8]) -> Result<Vec<u8>> {
+fn new_sst(encoded: &[u8], raw_limits: RawLimits) -> Result<Vec<u8>> {
     let mut bytes = Vec::new();
     let mut header = Vec::new();
-    Encoder::new(&mut header, crate::raw::Limits::DEFAULT).write_u32(1)?;
-    Encoder::new(&mut header, crate::raw::Limits::DEFAULT).write_u32(1)?;
-    let mut writer = Encoder::new(&mut bytes, crate::raw::Limits::DEFAULT);
+    Encoder::new(&mut header, raw_limits).write_u32(1)?;
+    Encoder::new(&mut header, raw_limits).write_u32(1)?;
+    let mut writer = Encoder::new(&mut bytes, raw_limits);
     writer.write_record(kind::BEGIN_SST, &header)?;
     writer.write_record(kind::SST_ITEM, encoded)?;
     writer.write_record(kind::END_SST, &[])?;
     Ok(bytes)
 }
 
-fn rewrite_sst(source: &[u8], total: u32, unique: u32, appended: Option<&[u8]>) -> Result<Vec<u8>> {
+fn rewrite_sst(
+    source: &[u8],
+    total: u32,
+    unique: u32,
+    appended: Option<&[u8]>,
+    raw_limits: RawLimits,
+) -> Result<Vec<u8>> {
     let mut output = Vec::new();
-    for item in Records::new(source, crate::raw::Limits::DEFAULT) {
+    for item in Records::new(source, raw_limits) {
         let record = item?;
         match record.kind() {
             kind::BEGIN_SST => {
                 let mut payload = record.payload().to_vec();
                 payload[..4].copy_from_slice(&total.to_le_bytes());
                 payload[4..8].copy_from_slice(&unique.to_le_bytes());
-                Encoder::new(&mut output, crate::raw::Limits::DEFAULT)
-                    .write_record(kind::BEGIN_SST, &payload)?;
+                Encoder::new(&mut output, raw_limits).write_record(kind::BEGIN_SST, &payload)?;
             },
             kind::END_SST => {
                 if let Some(payload) = appended {
-                    Encoder::new(&mut output, crate::raw::Limits::DEFAULT)
-                        .write_record(kind::SST_ITEM, payload)?;
+                    Encoder::new(&mut output, raw_limits).write_record(kind::SST_ITEM, payload)?;
                 }
-                copy_record(source, &record, RawLimits::DEFAULT, &mut output)?;
+                copy_record(source, &record, raw_limits, &mut output)?;
             },
-            _ => copy_record(source, &record, RawLimits::DEFAULT, &mut output)?,
+            _ => copy_record(source, &record, raw_limits, &mut output)?,
         }
     }
     Ok(output)
@@ -1167,7 +1174,11 @@ mod tests {
             .try_add_part(Box::new(BlobPart::new(
                 shared_strings_uri,
                 SST_CONTENT_TYPE.to_string(),
-                new_sst(&value.encode().unwrap()).unwrap(),
+                new_sst(
+                    &value.encode(RawLimits::DEFAULT).unwrap(),
+                    RawLimits::DEFAULT,
+                )
+                .unwrap(),
             )))
             .unwrap();
         let relationship_type = litchi_opc::constants::relationship_type::SHARED_STRINGS;
@@ -1178,7 +1189,7 @@ mod tests {
         );
 
         assert_eq!(
-            intern_shared_string_for_new_cell(&mut package, &value).unwrap(),
+            intern_shared_string_for_new_cell(&mut package, &value, RawLimits::DEFAULT).unwrap(),
             0
         );
 

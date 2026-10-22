@@ -152,9 +152,10 @@ impl Workbook {
                     }
                 },
                 kind::WORKBOOK_PROP => {
-                    if let Ok(prop) =
-                        crate::package::records::WorkbookPropRecord::parse(record.payload())
-                    {
+                    if let Ok(prop) = crate::package::records::WorkbookPropRecord::parse(
+                        record.payload(),
+                        raw_limits,
+                    ) {
                         *is_1904 = prop.is_date1904;
                     }
                 },
@@ -176,6 +177,7 @@ impl Workbook {
                         record.payload(),
                         u32::try_from(worksheet_names.len()).unwrap_or(u32::MAX),
                         Tolerance::recording(report),
+                        raw_limits,
                     )?;
                     let name_key = worksheet_name_key(&bundle_sh.name)?;
                     if worksheet_name_keys.contains(&name_key) {
@@ -203,7 +205,7 @@ impl Workbook {
                 },
                 kind::SUP_BOOK_SRC => {
                     let (rel_id, consumed) =
-                        crate::package::records::decode_string(record.payload())?;
+                        crate::package::records::decode_string(record.payload(), raw_limits)?;
                     if rel_id.is_empty() || consumed != record.payload().len() {
                         return Err(crate::package::error::Error::InvalidFormula(
                             "BrtSupBookSrc has an invalid relationship ID",
@@ -312,6 +314,7 @@ impl Workbook {
 
     pub(in crate::workbook) fn parse_nullable_wide_string(
         data: &[u8],
+        raw_limits: crate::raw::Limits,
     ) -> Result<(Option<String>, usize)> {
         if data.len() < 4 {
             return Err(crate::package::error::Error::InvalidLength {
@@ -322,17 +325,20 @@ impl Workbook {
         if binary::read_u32_le_at(data, 0)? == u32::MAX {
             Ok((None, 4))
         } else {
-            let (value, consumed) = crate::package::records::decode_string(data)?;
+            let (value, consumed) = crate::package::records::decode_string(data, raw_limits)?;
             Ok((Some(value), consumed))
         }
     }
 
-    pub(in crate::workbook) fn parse_pivot_cache_ids(data: &[u8]) -> Result<Vec<(u32, String)>> {
+    pub(in crate::workbook) fn parse_pivot_cache_ids(
+        data: &[u8],
+        raw_limits: crate::raw::Limits,
+    ) -> Result<Vec<(u32, String)>> {
         let mut in_collection = false;
         let mut open_cache = false;
         let mut ended = false;
         let mut caches = Vec::new();
-        for record in Records::new(data, crate::raw::Limits::DEFAULT) {
+        for record in Records::new(data, raw_limits) {
             let record = record?;
             match record.kind() {
                 kind::BEGIN_PIVOT_CACHE_IDS => {
@@ -351,7 +357,7 @@ impl Workbook {
                     }
                     let cache_id = binary::read_u32_le_at(record.payload(), 0)?;
                     let (rel_id, consumed) =
-                        crate::package::records::decode_string(&record.payload()[4..])?;
+                        crate::package::records::decode_string(&record.payload()[4..], raw_limits)?;
                     if 4 + consumed != record.payload().len()
                         || rel_id.is_empty()
                         || rel_id.encode_utf16().count() > 255
@@ -394,9 +400,13 @@ impl Workbook {
         Ok(caches)
     }
 
-    pub(in crate::workbook) fn parse_pivot_view(data: &[u8], sheet_index: usize) -> Result<View> {
+    pub(in crate::workbook) fn parse_pivot_view(
+        data: &[u8],
+        sheet_index: usize,
+        raw_limits: crate::raw::Limits,
+    ) -> Result<View> {
         let mut view = None;
-        for record in Records::new(data, crate::raw::Limits::DEFAULT) {
+        for record in Records::new(data, raw_limits) {
             let record = record?;
             if record.kind() != kind::BEGIN_SX_VIEW {
                 continue;
@@ -407,7 +417,8 @@ impl Workbook {
                 ));
             }
             let cache_id = binary::read_u32_le_at(record.payload(), 28)?;
-            let (name, consumed) = crate::package::records::decode_string(&record.payload()[32..])?;
+            let (name, consumed) =
+                crate::package::records::decode_string(&record.payload()[32..], raw_limits)?;
             if consumed > record.payload().len() - 32 {
                 return Err(crate::package::error::Error::InvalidFormula(
                     "PivotTable view name overruns BrtBeginSXView",
@@ -426,6 +437,7 @@ impl Workbook {
         data: &[u8],
         sheet_index: usize,
         tolerance: &mut Tolerance<'_>,
+        raw_limits: crate::raw::Limits,
     ) -> Result<TableDefinition> {
         // Extension content is inert and source-owned by the XML Maps codec.
         // A fixed stack bounds adversarial nesting without allocating in this
@@ -442,7 +454,7 @@ impl Workbook {
         let mut xml_extension_depth = 0usize;
         let mut ended_columns = false;
         let mut ended_table = false;
-        let mut iter = Records::new(data, crate::raw::Limits::DEFAULT);
+        let mut iter = Records::new(data, raw_limits);
         for record in iter.by_ref() {
             let record = record?;
             if ended_table {
@@ -521,6 +533,7 @@ impl Workbook {
                         record.payload(),
                         record_location(record.offset()),
                         tolerance,
+                        raw_limits,
                     )?);
                 },
                 kind::BEGIN_LIST_COLS => {
@@ -558,6 +571,7 @@ impl Workbook {
                         columns.len(),
                         record_location(record.offset()),
                         tolerance,
+                        raw_limits,
                     )?);
                     in_column = true;
                     saw_xml_properties = false;
@@ -625,6 +639,7 @@ impl Workbook {
         data: &[u8],
         location: u32,
         tolerance: &mut Tolerance<'_>,
+        raw_limits: crate::raw::Limits,
     ) -> Result<(u32, String, usize)> {
         if data.len() < 64 {
             return Err(crate::package::error::Error::InvalidLength {
@@ -656,7 +671,7 @@ impl Workbook {
         let mut offset = 64;
         let mut strings = Vec::with_capacity(6);
         for _ in 0..6 {
-            let (value, consumed) = Self::parse_nullable_wide_string(&data[offset..])?;
+            let (value, consumed) = Self::parse_nullable_wide_string(&data[offset..], raw_limits)?;
             offset = offset.checked_add(consumed).ok_or(
                 crate::package::error::Error::InvalidFormula("BrtBeginList string size overflow"),
             )?;
@@ -684,6 +699,7 @@ impl Workbook {
         _index: usize,
         location: u32,
         tolerance: &mut Tolerance<'_>,
+        raw_limits: crate::raw::Limits,
     ) -> Result<String> {
         if data.len() < 24 || binary::read_u32_le_at(data, 0)? == 0 {
             return Err(crate::package::error::Error::InvalidFormula(
@@ -693,7 +709,7 @@ impl Workbook {
         let mut offset = 24;
         let mut strings = Vec::with_capacity(6);
         for _ in 0..6 {
-            let (value, consumed) = Self::parse_nullable_wide_string(&data[offset..])?;
+            let (value, consumed) = Self::parse_nullable_wide_string(&data[offset..], raw_limits)?;
             offset = offset.checked_add(consumed).ok_or(
                 crate::package::error::Error::InvalidFormula(
                     "BrtBeginListCol string size overflow",

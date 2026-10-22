@@ -32,7 +32,7 @@ use litchi_opc::{PackURI, TargetMode};
 use super::Hyperlink;
 use crate::package::Package;
 use crate::package::error::Result;
-use crate::part_edit::{Rank, SheetLayout, Staged, family, invalid, record, splice};
+use crate::part_edit::{Rank, SheetLayout, Staged, family, invalid, record_with_limits, splice};
 use crate::raw::{Records, kind};
 
 family!("hyperlink");
@@ -131,7 +131,7 @@ impl Edit {
     fn sheet(&self, sheet: usize) -> Result<(PackURI, Vec<Hyperlink>, SheetLayout)> {
         let worksheet = self.staged.worksheet(sheet)?;
         let part = self.staged.opc().get_part(&worksheet)?;
-        let layout = SheetLayout::scan(part.blob())?;
+        let layout = SheetLayout::scan_with_limits(part.blob(), self.staged.raw_limits())?;
         let links = read_layout(part.blob(), &layout, part.rels(), self.staged.raw_limits())?;
         Ok((worksheet, links, layout))
     }
@@ -173,7 +173,7 @@ impl Edit {
             )?;
             stored.r_id = id;
         }
-        record(kind::H_LINK, &stored.serialize(raw_limits)?)
+        record_with_limits(kind::H_LINK, &stored.serialize(raw_limits)?, raw_limits)
     }
 
     /// Drop the relationship of a removed or replaced link when no other

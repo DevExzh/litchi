@@ -207,7 +207,7 @@ where
                     // BrtCellRk
                     if self.buf.len() >= 12 => {
                         let header = required_cell_header(cell_header)?;
-                        let mut cursor = Cursor::new(&self.buf[8..], "BrtCellRk", crate::raw::Limits::DEFAULT);
+                        let mut cursor = Cursor::new(&self.buf[8..], "BrtCellRk", self.raw_limits);
                         let value = super::semantic::cell_value_from_number(cursor.read_rk()?);
                         return Ok(Some(Cell::new_styled(
                             self.current_row,
@@ -230,7 +230,7 @@ where
                     // BrtCellBool
                     if self.buf.len() >= 9 => {
                         let header = required_cell_header(cell_header)?;
-                        let mut cursor = Cursor::new(&self.buf[8..], "BrtCellBool", crate::raw::Limits::DEFAULT);
+                        let mut cursor = Cursor::new(&self.buf[8..], "BrtCellBool", self.raw_limits);
                         let row = self.current_row;
                         let value = Tolerance::recording(&mut self.tolerance)
                             .read_bool8(&mut cursor, typ, row)?;
@@ -262,6 +262,7 @@ where
                             &mut Tolerance::recording(&mut self.tolerance),
                             typ,
                             row,
+                            self.raw_limits,
                         )?;
                         return Ok(Some(Cell::new_styled(
                             self.current_row,
@@ -299,6 +300,7 @@ where
                         &mut Tolerance::recording(&mut self.tolerance),
                         typ,
                         row,
+                        self.raw_limits,
                     )?;
                     return Ok(Some(Cell::new_rich_string(
                         self.current_row,
@@ -321,6 +323,7 @@ where
                         &mut Tolerance::recording(&mut self.tolerance),
                         typ,
                         row,
+                        self.raw_limits,
                     )?;
                     let parsed =
                         self.parse_formula_cell(
@@ -354,7 +357,11 @@ where
                         });
                     }
                     let header = required_cell_header(cell_header)?;
-                    let mut cursor = Cursor::new(&self.buf[8..], "BrtFmlaBool cached value", crate::raw::Limits::DEFAULT);
+                    let mut cursor = Cursor::new(
+                        &self.buf[8..],
+                        "BrtFmlaBool cached value",
+                        self.raw_limits,
+                    );
                     let row = self.current_row;
                     let bool_value = Tolerance::recording(&mut self.tolerance)
                         .read_bool8(&mut cursor, typ, row)?;

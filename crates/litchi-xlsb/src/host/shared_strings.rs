@@ -134,12 +134,13 @@ pub struct SharedString {
 }
 
 impl SharedString {
-    pub(crate) fn parse(data: &[u8]) -> Result<Self> {
+    pub(crate) fn parse(data: &[u8], raw_limits: crate::raw::Limits) -> Result<Self> {
         Self::parse_with(
             data,
             &mut crate::leniency::Tolerance::refusing(),
             crate::raw::kind::SST_ITEM,
             0,
+            raw_limits,
         )
     }
 
@@ -150,6 +151,7 @@ impl SharedString {
         tolerance: &mut crate::leniency::Tolerance<'_>,
         record_type: crate::raw::Kind,
         location: u32,
+        raw_limits: crate::raw::Limits,
     ) -> Result<Self> {
         if data.is_empty() {
             return Err(Error::InvalidLength {
@@ -159,7 +161,8 @@ impl SharedString {
         }
         let rich = data[0] & 1 != 0;
         let extended = data[0] & 2 != 0;
-        let (text, consumed) = decode_string_with(&data[1..], tolerance, record_type, location)?;
+        let (text, consumed) =
+            decode_string_with(&data[1..], tolerance, record_type, location, raw_limits)?;
         let text_len = text.encode_utf16().count();
         if text_len > 0x7FFF {
             return Err(Error::Unrecognized {
@@ -205,8 +208,13 @@ impl SharedString {
         }
 
         let phonetic = if extended {
-            let (phonetic_text, consumed) =
-                decode_string_with(&data[offset..], tolerance, record_type, location)?;
+            let (phonetic_text, consumed) = decode_string_with(
+                &data[offset..],
+                tolerance,
+                record_type,
+                location,
+                raw_limits,
+            )?;
             offset += consumed;
             let phonetic_len = phonetic_text.encode_utf16().count();
             let count = Self::read_count(data, &mut offset, "PhRun")?;
@@ -281,8 +289,9 @@ impl SharedString {
         })
     }
 
-    pub(crate) fn encode(&self) -> Result<Vec<u8>> {
+    pub(crate) fn encode(&self, limits: crate::raw::Limits) -> Result<Vec<u8>> {
         self.validate()?;
+        limits.validate()?;
         let mut data = Vec::new();
         let mut flags = 0_u8;
         if !self.runs.is_empty() {
@@ -292,7 +301,7 @@ impl SharedString {
             flags |= 2;
         }
         data.push(flags);
-        Encoder::new(&mut data, crate::raw::Limits::DEFAULT).write_wide_string(&self.text)?;
+        Encoder::new(&mut data, limits).write_wide_string(&self.text)?;
         if !self.runs.is_empty() {
             let count = u32::try_from(self.runs.len())
                 .map_err(|_| Error::Encoding("shared-string formatting-run count overflow"))?;
@@ -303,8 +312,7 @@ impl SharedString {
             }
         }
         if let Some(phonetic) = &self.phonetic {
-            Encoder::new(&mut data, crate::raw::Limits::DEFAULT)
-                .write_wide_string(&phonetic.text)?;
+            Encoder::new(&mut data, limits).write_wide_string(&phonetic.text)?;
             let count = u32::try_from(phonetic.runs.len())
                 .map_err(|_| Error::Encoding("shared-string phonetic-run count overflow"))?;
             data.extend_from_slice(&count.to_le_bytes());
@@ -424,7 +432,7 @@ mod tests {
         data.extend_from_slice(&[0, 0, 0, 0, 2, 0]);
         data.extend_from_slice(&[3, 0, 6, 0]);
 
-        let value = SharedString::parse(&data).unwrap();
+        let value = SharedString::parse(&data, crate::raw::Limits::DEFAULT).unwrap();
         assert_eq!(value.text, "AB");
         assert_eq!(value.runs.len(), 2);
         assert_eq!(value.runs[1].font_id, 2);
@@ -460,7 +468,10 @@ mod tests {
                 alignment: PhoneticAlignment::Distributed,
             }),
         };
-        let encoded = value.encode().unwrap();
-        assert_eq!(SharedString::parse(&encoded).unwrap(), value);
+        let encoded = value.encode(crate::raw::Limits::DEFAULT).unwrap();
+        assert_eq!(
+            SharedString::parse(&encoded, crate::raw::Limits::DEFAULT).unwrap(),
+            value
+        );
     }
 }

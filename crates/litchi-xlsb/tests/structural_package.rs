@@ -31,7 +31,12 @@ fn package_edit_commit_apply_and_inverse_are_immutable() {
         .patch()
         .to_bytes(TransferLimits::DEFAULT)
         .expect("wire");
-    let patch = Patch::from_bytes(&bytes, TransferLimits::DEFAULT).expect("decode");
+    let patch = Patch::from_bytes(
+        &bytes,
+        TransferLimits::DEFAULT,
+        litchi_xlsb::raw::Limits::DEFAULT,
+    )
+    .expect("decode");
     let applied = source
         .apply(&patch)
         .map(litchi_xlsb::cell_values::structure::Commit::into_package)

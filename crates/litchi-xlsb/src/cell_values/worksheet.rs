@@ -2188,7 +2188,7 @@ fn parse_value(
         },
         kind::CELL_RK => {
             require_exact(payload, 12)?;
-            let mut cursor = Cursor::new(&payload[8..], "BrtCellRk", crate::raw::Limits::DEFAULT);
+            let mut cursor = Cursor::new(&payload[8..], "BrtCellRk", limits);
             Ok((Value::RkNumber(cursor.read_rk()?), None))
         },
         kind::CELL_ERROR => {
@@ -2234,6 +2234,7 @@ fn parse_value(
                     tolerance,
                     kind_value,
                     row,
+                    limits,
                 )?),
                 None,
             ))
@@ -2471,10 +2472,7 @@ fn validate_value(value: &Value) -> Result<()> {
             }
             Ok(())
         },
-        Value::RichString(string) => {
-            let _ = string.encode()?;
-            Ok(())
-        },
+        Value::RichString(_) => Ok(()),
         Value::Blank
         | Value::Error(_)
         | Value::Boolean(_)
@@ -2486,14 +2484,28 @@ fn validate_value(value: &Value) -> Result<()> {
 
 fn validate_value_with_limits(value: &Value, limits: Limits) -> Result<()> {
     validate_value(value)?;
-    if let Value::InlineString(string) | Value::FormulaStringCache(string) = value {
-        let units = string.encode_utf16().count();
-        if units > limits.raw.string_units() {
-            return Err(Error::InvalidLength {
-                expected: limits.raw.string_units(),
-                found: units,
-            });
-        }
+    match value {
+        Value::InlineString(string) | Value::FormulaStringCache(string) => {
+            let units = string.encode_utf16().count();
+            if units > limits.raw.string_units() {
+                return Err(Error::InvalidLength {
+                    expected: limits.raw.string_units(),
+                    found: units,
+                });
+            }
+        },
+        Value::RichString(string) => {
+            string.encode(limits.raw)?;
+        },
+        Value::Blank
+        | Value::RkNumber(_)
+        | Value::Error(_)
+        | Value::Boolean(_)
+        | Value::Number(_)
+        | Value::SharedStringIndex(_)
+        | Value::FormulaBooleanCache(_)
+        | Value::FormulaErrorCache(_)
+        | _ => {},
     }
     Ok(())
 }
@@ -2555,7 +2567,7 @@ fn rebuild_stream(edit: &Draft) -> Result<Vec<u8>> {
     }
 
     let insertion_growth = edit.inserted.values().try_fold(0usize, |total, cell| {
-        encoded_cell(cell).and_then(|record| {
+        encoded_cell(cell, edit.limits.raw).and_then(|record| {
             total
                 .checked_add(record.len())
                 .ok_or(Error::CapacityOverflow {
@@ -2568,7 +2580,7 @@ fn rebuild_stream(edit: &Draft) -> Result<Vec<u8>> {
         .iter()
         .filter(|entry| entry.changed() && !edit.removed.contains(&entry.cell.reference))
         .try_fold(0usize, |total, entry| {
-            let new_len = encoded_cell(&entry.cell)?.len();
+            let new_len = encoded_cell(&entry.cell, edit.limits.raw)?.len();
             let old_len = record_total_len(&edit.source, entry.record_offset, edit.limits.raw)?;
             total
                 .checked_add(new_len.saturating_sub(old_len))
@@ -2632,6 +2644,7 @@ fn rebuild_stream(edit: &Draft) -> Result<Vec<u8>> {
                         &mut output,
                         inserted_rows.get(&row),
                         &mut pending_insert_index,
+                        edit.limits.raw,
                     )?;
                 }
                 let row = binary::read_u32_le_at(record.payload(), 0)?;
@@ -2642,6 +2655,7 @@ fn rebuild_stream(edit: &Draft) -> Result<Vec<u8>> {
                     &existing_rows,
                     &mut emitted_absent_rows,
                     &final_columns,
+                    edit.limits.raw,
                 )?;
                 if structural_rows.contains(&row) {
                     let payload = encode_row_header(record.payload(), final_columns.get(&row))?;
@@ -2659,6 +2673,7 @@ fn rebuild_stream(edit: &Draft) -> Result<Vec<u8>> {
                         &mut output,
                         inserted_rows.get(&row),
                         &mut pending_insert_index,
+                        edit.limits.raw,
                     )?;
                 }
                 emit_absent_rows_before(
@@ -2668,6 +2683,7 @@ fn rebuild_stream(edit: &Draft) -> Result<Vec<u8>> {
                     &existing_rows,
                     &mut emitted_absent_rows,
                     &final_columns,
+                    edit.limits.raw,
                 )?;
                 copy_record(&edit.source, &record, edit.limits.raw, &mut output)?;
                 in_sheet_data = false;
@@ -2682,11 +2698,12 @@ fn rebuild_stream(edit: &Draft) -> Result<Vec<u8>> {
                     inserted_rows.get(&row),
                     &mut pending_insert_index,
                     column,
+                    edit.limits.raw,
                 )?;
                 if let Some(entry) = replacements.get(&record.offset()) {
                     if !edit.removed.contains(&entry.cell.reference) {
                         if entry.changed() {
-                            output.extend_from_slice(&encoded_cell(&entry.cell)?);
+                            output.extend_from_slice(&encoded_cell(&entry.cell, edit.limits.raw)?);
                         } else {
                             copy_record(&edit.source, &record, edit.limits.raw, &mut output)?;
                         }
@@ -2819,11 +2836,15 @@ fn encode_row_header(source: &[u8], columns: Option<&BTreeSet<u32>>) -> Result<V
     Ok(payload)
 }
 
-fn synthetic_row_header(row: u32, columns: Option<&BTreeSet<u32>>) -> Result<Vec<u8>> {
+fn synthetic_row_header(
+    row: u32,
+    columns: Option<&BTreeSet<u32>>,
+    raw_limits: RawLimits,
+) -> Result<Vec<u8>> {
     let mut payload = Vec::new();
-    Encoder::new(&mut payload, crate::raw::Limits::DEFAULT).write_u32(row)?;
-    Encoder::new(&mut payload, crate::raw::Limits::DEFAULT).write_u32(0)?;
-    Encoder::new(&mut payload, crate::raw::Limits::DEFAULT).write_u16(300)?;
+    Encoder::new(&mut payload, raw_limits).write_u32(row)?;
+    Encoder::new(&mut payload, raw_limits).write_u32(0)?;
+    Encoder::new(&mut payload, raw_limits).write_u16(300)?;
     payload.extend_from_slice(&[0, 0, 0]);
     append_spans(&mut payload, columns)?;
     Ok(payload)
@@ -2861,16 +2882,16 @@ fn emit_absent_rows_before(
     existing_rows: &BTreeSet<u32>,
     emitted: &mut BTreeSet<u32>,
     final_columns: &BTreeMap<u32, BTreeSet<u32>>,
+    raw_limits: RawLimits,
 ) -> Result<()> {
     for (row, cells) in inserted_rows.range(..upper_bound) {
         if existing_rows.contains(row) || !emitted.insert(*row) {
             continue;
         }
-        let payload = synthetic_row_header(*row, final_columns.get(row))?;
-        Encoder::new(&mut *output, crate::raw::Limits::DEFAULT)
-            .write_record(kind::ROW_HDR, &payload)?;
+        let payload = synthetic_row_header(*row, final_columns.get(row), raw_limits)?;
+        Encoder::new(&mut *output, raw_limits).write_record(kind::ROW_HDR, &payload)?;
         for cell in cells {
-            output.extend_from_slice(&encoded_cell(cell)?);
+            output.extend_from_slice(&encoded_cell(cell, raw_limits)?);
         }
     }
     Ok(())
@@ -2881,6 +2902,7 @@ fn emit_insertions_before(
     cells: Option<&Vec<&StoredCell>>,
     index: &mut usize,
     upper_column: u32,
+    raw_limits: RawLimits,
 ) -> Result<()> {
     let Some(cells) = cells else {
         return Ok(());
@@ -2889,7 +2911,7 @@ fn emit_insertions_before(
         if cell.reference.column() >= upper_column {
             break;
         }
-        output.extend_from_slice(&encoded_cell(cell)?);
+        output.extend_from_slice(&encoded_cell(cell, raw_limits)?);
         *index = index.saturating_add(1);
     }
     Ok(())
@@ -2899,24 +2921,25 @@ fn emit_remaining_insertions(
     output: &mut Vec<u8>,
     cells: Option<&Vec<&StoredCell>>,
     index: &mut usize,
+    raw_limits: RawLimits,
 ) -> Result<()> {
     let Some(cells) = cells else {
         return Ok(());
     };
     while let Some(cell) = cells.get(*index) {
-        output.extend_from_slice(&encoded_cell(cell)?);
+        output.extend_from_slice(&encoded_cell(cell, raw_limits)?);
         *index = index.saturating_add(1);
     }
     Ok(())
 }
 
-fn encoded_cell(cell: &StoredCell) -> Result<Vec<u8>> {
+fn encoded_cell(cell: &StoredCell, raw_limits: RawLimits) -> Result<Vec<u8>> {
     let mut payload = Vec::new();
-    Encoder::new(&mut payload, crate::raw::Limits::DEFAULT).write_u32(cell.reference.column())?;
+    Encoder::new(&mut payload, raw_limits).write_u32(cell.reference.column())?;
     let style = cell.style.get().to_le_bytes();
     payload.extend_from_slice(&style[..3]);
     payload.push(u8::from(cell.show_phonetic));
-    encode_value_into(&mut payload, &cell.value)?;
+    encode_value_into(&mut payload, &cell.value, raw_limits)?;
     match (&cell.formula, cell.value.is_formula_cache()) {
         (Some(formula), true) => encode_formula_into(&mut payload, formula)?,
         (None, false) => {},
@@ -2927,12 +2950,11 @@ fn encoded_cell(cell: &StoredCell) -> Result<Vec<u8>> {
         },
     }
     let mut record = Vec::new();
-    Encoder::new(&mut record, crate::raw::Limits::DEFAULT)
-        .write_record(value_kind(&cell.value), &payload)?;
+    Encoder::new(&mut record, raw_limits).write_record(value_kind(&cell.value), &payload)?;
     Ok(record)
 }
 
-fn encode_value_into(output: &mut Vec<u8>, value: &Value) -> Result<()> {
+fn encode_value_into(output: &mut Vec<u8>, value: &Value, raw_limits: RawLimits) -> Result<()> {
     match value {
         Value::Blank => {},
         Value::RkNumber(number) => output.extend_from_slice(&encode_rk(*number)?),
@@ -2945,10 +2967,10 @@ fn encode_value_into(output: &mut Vec<u8>, value: &Value) -> Result<()> {
             output.extend_from_slice(&number.to_le_bytes());
         },
         Value::InlineString(string) | Value::FormulaStringCache(string) => {
-            Encoder::new(output, crate::raw::Limits::DEFAULT).write_wide_string(string)?;
+            Encoder::new(output, raw_limits).write_wide_string(string)?;
         },
         Value::SharedStringIndex(index) => output.extend_from_slice(&index.to_le_bytes()),
-        Value::RichString(string) => output.extend_from_slice(&string.encode()?),
+        Value::RichString(string) => output.extend_from_slice(&string.encode(raw_limits)?),
     }
     Ok(())
 }
@@ -3458,7 +3480,11 @@ mod tests {
         };
         let mut rich = vec![0; 8];
         rich[..4].copy_from_slice(&12_u32.to_le_bytes());
-        rich.extend_from_slice(&rich_value.encode().expect("rich string"));
+        rich.extend_from_slice(
+            &rich_value
+                .encode(crate::raw::Limits::DEFAULT)
+                .expect("rich string"),
+        );
         writer
             .write_record(kind::CELL_R_STRING, &rich)
             .expect("rich string cell");
