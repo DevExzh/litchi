@@ -824,23 +824,36 @@ struct ReplayHashWriter {
     bytes: u64,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ReplayHashError {
+    InputLengthExceedsU64,
+    LengthOverflow,
+}
+
+impl std::fmt::Display for ReplayHashError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(match self {
+            Self::InputLengthExceedsU64 => "replay input length exceeds u64",
+            Self::LengthOverflow => "replay content length overflows u64",
+        })
+    }
+}
+
+impl std::error::Error for ReplayHashError {}
+
 impl Write for ReplayHashWriter {
     fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        let amount = u64::try_from(bytes.len()).map_err(|_| {
+            std::io::Error::new(
+                std::io::ErrorKind::Other,
+                ReplayHashError::InputLengthExceedsU64,
+            )
+        })?;
+        let total = self.bytes.checked_add(amount).ok_or_else(|| {
+            std::io::Error::new(std::io::ErrorKind::Other, ReplayHashError::LengthOverflow)
+        })?;
         self.digest.update(bytes);
-        self.bytes = self
-            .bytes
-            .checked_add(u64::try_from(bytes.len()).map_err(|_| {
-                std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    "replay content length exceeds u64",
-                )
-            })?)
-            .ok_or_else(|| {
-                std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    "replay content length overflows u64",
-                )
-            })?;
+        self.bytes = total;
         Ok(bytes.len())
     }
 
@@ -851,7 +864,7 @@ impl Write for ReplayHashWriter {
 
 #[cfg(test)]
 mod replay_hash_tests {
-    use super::ReplayHashWriter;
+    use super::{ReplayHashError, ReplayHashWriter};
     use sha2::{Digest, Sha256};
     use std::io::Write;
 
@@ -865,7 +878,14 @@ mod replay_hash_tests {
             .write_all(b"x")
             .expect_err("a length past u64::MAX must be refused");
         assert_eq!(error.kind(), std::io::ErrorKind::Other);
-        assert_eq!(error.to_string(), "replay content length overflows u64");
+        assert!(matches!(
+            error
+                .get_ref()
+                .and_then(|source| source.downcast_ref::<ReplayHashError>()),
+            Some(ReplayHashError::LengthOverflow)
+        ));
+        assert_eq!(writer.bytes, u64::MAX);
+        assert_eq!(writer.digest.clone().finalize(), Sha256::digest([]));
     }
 }
 
