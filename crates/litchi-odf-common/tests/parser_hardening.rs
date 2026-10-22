@@ -42,16 +42,16 @@ fn exercise_archive(bytes: &[u8]) {
 #[test]
 fn chart_truncation_and_mutation_sweeps_never_panic() -> Result<(), Error> {
     for end in 0..CHART_SEED.len() {
-        drop(chart::read(&CHART_SEED[..end]));
+        drop(chart_read(&CHART_SEED[..end]));
     }
     for position in 0..CHART_SEED.len() {
         let mut mutated = CHART_SEED.as_bytes().to_vec();
         mutated[position] ^= 1;
         if let Ok(xml) = std::str::from_utf8(&mutated) {
-            drop(chart::read(xml));
+            drop(chart_read(xml));
         }
     }
-    let parsed = chart::read(CHART_SEED)?;
+    let parsed = chart_read(CHART_SEED)?;
     assert_eq!(parsed.kind(), chart::Kind::Chart);
     assert_eq!(parsed.all_text(), "Revenue");
     Ok(())
@@ -60,19 +60,19 @@ fn chart_truncation_and_mutation_sweeps_never_panic() -> Result<(), Error> {
 #[test]
 fn chart_malformed_inputs_yield_typed_errors() {
     assert_invalid(
-        chart::read(
+        chart_read(
             r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:chart="urn:oasis:names:tc:opendocument:xmlns:chart:1.0"><office:body><office:chart><chart:chart><chart:plot-area></chart:chart></chart:plot-area></office:chart></office:body></office:document-content>"#,
         ),
         "mismatched chart close",
     );
     assert_invalid(
-        chart::read(
+        chart_read(
             r#"<!DOCTYPE office [<!ENTITY x "y">]><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:chart="urn:oasis:names:tc:opendocument:xmlns:chart:1.0"><office:body><office:chart><chart:chart/></office:chart></office:body></office:document-content>"#,
         ),
         "chart DTD",
     );
     assert_invalid(
-        chart::read(
+        chart_read(
             r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:chart="urn:oasis:names:tc:opendocument:xmlns:chart:1.0"><office:body><chart:chart/></office:body></office:document-content>"#,
         ),
         "misplaced chart",
@@ -131,4 +131,8 @@ fn archive_and_manifest_malformed_sweeps_never_panic() -> Result<(), Box<dyn std
         "invalid manifest size",
     );
     Ok(())
+}
+
+fn chart_read(xml: &str) -> Result<chart::Element, Error> {
+    chart::read(xml, litchi_odf_common::XmlStreamLimits::default()).map_err(Error::from)
 }

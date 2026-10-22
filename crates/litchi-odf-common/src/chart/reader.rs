@@ -5,9 +5,10 @@ use litchi_core::{Error, Result};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesRef, Event};
 use quick_xml::name::{Namespace, QName, ResolveResult};
-use quick_xml::reader::NsReader;
 
-const MAX_CONTENT_BYTES: usize = 256 * 1024 * 1024;
+use crate::core::{ResolvedReader, XmlStreamLimits};
+use crate::limits::{LimitKind, SemanticLimitKind};
+
 const MAX_DEPTH: usize = 128;
 const MAX_ELEMENTS: usize = 65_536;
 const MAX_ATTRIBUTES: usize = 256;
@@ -193,22 +194,25 @@ impl Element {
     }
 }
 
-/// Read and retain the standard chart subtree from an ODF `content.xml` part.
+/// Read and retain the standard chart subtree from an ODF `content.xml` part
+/// under the caller's raw XML policy.
 ///
 /// Namespace prefixes are resolved before validation. Unknown elements and
 /// attributes are retained as inert expanded names, so a family owner can
-/// inspect or copy vendor extensions without interpreting them.
+/// inspect or copy vendor extensions without interpreting them. The policy
+/// bounds the source bytes, events, attributes, tokens and namespace
+/// declarations while the part is read; the retained tree is additionally
+/// bounded to 128 nesting levels, 65,536 elements, 256 attributes per element,
+/// 1 MiB per attribute value and 16 MiB per text node.
 ///
 /// # Errors
 ///
-/// Returns an invalid-format error when the XML is malformed, the required
-/// ODF chart structure is absent, or a configured size/depth limit is exceeded.
-pub fn read(xml: &str) -> Result<Element> {
-    if xml.len() > MAX_CONTENT_BYTES {
-        return invalid("chart content exceeds 256 MiB");
-    }
-
-    let mut reader = NsReader::from_str(xml);
+/// Returns an invalid-format error when the XML is malformed or the required
+/// ODF chart structure is absent, [`LimitKind::RawXml`] when the policy is
+/// exceeded and [`SemanticLimitKind::Depth`] when the retained tree is too
+/// deep.
+pub fn read(xml: &str, limits: XmlStreamLimits) -> std::result::Result<Element, crate::Error> {
+    let mut reader = ResolvedReader::from_xml(xml, limits)?;
     let mut buffer = Vec::new();
     let mut depth = 0usize;
     let mut root_seen = false;
@@ -223,9 +227,7 @@ pub fn read(xml: &str) -> Result<Element> {
     let mut element_count = 0usize;
 
     loop {
-        let (namespace, event) = reader
-            .read_resolved_event_into(&mut buffer)
-            .map_err(|error| invalid_error(format!("invalid chart XML: {error}")))?;
+        let (namespace, event) = reader.read_resolved_event_into(&mut buffer)?;
         match event {
             Event::Start(ref element) => {
                 let namespace_uri = namespace_uri(&namespace)?;
@@ -279,7 +281,11 @@ pub fn read(xml: &str) -> Result<Element> {
                     .checked_add(1)
                     .ok_or_else(|| invalid_error("chart XML nesting overflow"))?;
                 if depth > MAX_DEPTH || stack.len() > MAX_DEPTH {
-                    return invalid("chart element nesting exceeds 128 levels");
+                    return Err(crate::Error::Limit {
+                        kind: LimitKind::Semantic(SemanticLimitKind::Depth),
+                        observed: depth.max(stack.len()) as u64,
+                        maximum: MAX_DEPTH as u64,
+                    });
                 }
             },
             Event::Empty(ref element) => {
@@ -406,11 +412,11 @@ pub fn read(xml: &str) -> Result<Element> {
     {
         return invalid("incomplete standalone chart structure");
     }
-    chart_complete.ok_or_else(|| invalid_error("standalone chart has no chart:chart"))
+    chart_complete.ok_or_else(|| invalid_error("standalone chart has no chart:chart").into())
 }
 
 fn push_node(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     element: &quick_xml::events::BytesStart<'_>,
     namespace_uri: Option<String>,
     local_name: String,
@@ -428,7 +434,7 @@ fn push_node(
 }
 
 fn make_node(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     element: &quick_xml::events::BytesStart<'_>,
     resolved_namespace_uri: Option<String>,
     local_name: String,
@@ -549,8 +555,8 @@ fn decode_reference(reference: &BytesRef<'_>) -> Result<String> {
     }
 }
 
-fn invalid<T>(message: impl Into<String>) -> Result<T> {
-    Err(invalid_error(message))
+fn invalid<T, E: From<Error>>(message: impl Into<String>) -> std::result::Result<T, E> {
+    Err(E::from(invalid_error(message)))
 }
 
 fn invalid_error(message: impl Into<String>) -> Error {
@@ -560,6 +566,10 @@ fn invalid_error(message: impl Into<String>) -> Error {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn read(xml: &str) -> std::result::Result<Element, crate::Error> {
+        super::read(xml, XmlStreamLimits::default())
+    }
 
     const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
     const CHART: &str = "urn:oasis:names:tc:opendocument:xmlns:chart:1.0";

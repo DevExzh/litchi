@@ -1671,7 +1671,7 @@ fn parse(bytes: Vec<u8>, root_kind: RootKind, limits: crate::Limits) -> Result<S
     };
     let normalized_xml = std::str::from_utf8(&normalized_bytes)
         .map_err(|_utf8_error| invalid_error("normalized ODC is not UTF-8"))?;
-    let chart = chart::read(normalized_xml)?;
+    let chart = chart::read(normalized_xml, limits.options().xml_limits_value())?;
     let _ = chart.chart_class()?;
     crate::codec::validate_tree(&chart, limits)?;
     if let Some(plot_area) = chart.plot_area() {

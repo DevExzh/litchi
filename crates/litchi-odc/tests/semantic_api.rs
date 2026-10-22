@@ -111,7 +111,9 @@ fn package_authoring_and_readback_keep_typed_chart_classes_compact() {
 #[test]
 fn reader_keeps_chart_class_namespace_alias_and_unknown_value() {
     let content = r#"<?xml version="1.0" encoding="UTF-8"?><o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:c="urn:oasis:names:tc:opendocument:xmlns:chart:1.0"><o:body><o:chart><c:chart c:class="c:future"><c:plot-area/></c:chart></o:chart></o:body></o:document-content>"#;
-    let chart = litchi_odf_common::chart::read(content).unwrap();
+    let chart =
+        litchi_odf_common::chart::read(content, litchi_odf_common::XmlStreamLimits::default())
+            .unwrap();
     let class = chart.chart_class().unwrap();
     assert_eq!(class.kind(), ChartClassKind::Unknown);
     assert_eq!(class.lexical(), "c:future");

@@ -1181,7 +1181,9 @@ mod tests {
     use super::*;
     use crate::chart::ChartClass;
     use crate::chart::authoring::model::{EquationSpec, GridSpec};
-    use crate::chart::read;
+    fn read(xml: &str) -> std::result::Result<crate::chart::Element, crate::Error> {
+        crate::chart::read(xml, crate::XmlStreamLimits::default())
+    }
 
     fn sample() -> Definition {
         let mut chart = Definition::new(ChartClass::line());

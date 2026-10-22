@@ -112,14 +112,14 @@ impl Document {
             ))
             .into());
         }
-        let chart = read(&package.content_xml()?)?;
+        let chart = read(&package.content_xml()?, package.xml_limits_value())?;
         Ok(Self { package, chart })
     }
 
     /// Replace the typed chart content while preserving package entries.
     pub(crate) fn set_definition(&mut self, definition: &Definition) -> Result<()> {
         let content = serialize_content(definition)?;
-        let parsed = read(&content)?;
+        let parsed = read(&content, self.package.xml_limits_value())?;
         self.package.replace_content_xml(content)?;
         self.chart = parsed;
         Ok(())
