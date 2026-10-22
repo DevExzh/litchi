@@ -1,0 +1,25 @@
+{
+  "record": "0360ad",
+  "branch": "uo2/w4-raw-capability-review",
+  "base_commit": "47c89d20da",
+  "code_commit": "d0ac4d5ce4",
+  "scope": [
+    "native slicer cache and worksheet slicer identities",
+    "native timeline cache and worksheet timeline identities",
+    "caller SourceLimits admission before raw model cloning",
+    "owner-local relationship planning and bounded XML writers"
+  ],
+  "validation": {
+    "cargo_check_xlsx_all_features": "passed",
+    "cargo_clippy_xlsx_all_targets_all_features": "passed",
+    "cargo_test_opc_relative_ref_len": "1 passed",
+    "cargo_test_xlsx_slicer_timeline_crud": "6 passed",
+    "cargo_test_xlsx_lib_all_features": "1822 passed, 0 failed"
+  },
+  "allocator_probe": {
+    "fixture": "8 MiB untouched OPC part and four inserted timeline caches",
+    "allocation_calls": 6741,
+    "requested_bytes": 930766,
+    "qualification": "diagnostic only; no timing or performance claim"
+  }
+}
