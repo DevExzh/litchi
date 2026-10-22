@@ -539,6 +539,29 @@ fn source_snapshot_public_accessors_survive_owner_drop() {
 }
 
 #[test]
+fn proof_backed_reopen_shares_deferred_defined_name_storage() {
+    let source = fixture(Fixture {
+        workbook_prefix:
+            "<definedNames><definedName name=\"Rate\">One!$A$1</definedName></definedNames>",
+        ..Fixture::default()
+    });
+    let editor = open_editor(source);
+    let mut edit = editor.edit_tab_state().unwrap();
+    assert!(edit.show("Two").unwrap());
+    let commit = edit.commit().unwrap();
+
+    // The deferred catalog and the proof-backed reopened owner must retain
+    // one immutable defined-name slice, rather than reparsing and storing a
+    // second boxed catalogue for every source-history step.
+    let deferred_names = commit.package().defined_names();
+    assert_eq!(deferred_names.len(), 1);
+    assert_eq!(deferred_names[0].name, "Rate");
+    let deferred_ptr = deferred_names.as_ptr();
+    commit.package().sheet("One").unwrap().unwrap();
+    assert_eq!(commit.package().defined_names().as_ptr(), deferred_ptr);
+}
+
+#[test]
 fn tab_state_xml_audit_limits_are_configurable_and_typed() {
     let bytes = fixture(Fixture::default());
     let xml_bytes = Limits::new().with_max_xml_bytes(1).unwrap();

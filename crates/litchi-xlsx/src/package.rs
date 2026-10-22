@@ -713,19 +713,6 @@ impl Package {
     }
 }
 
-/// Plaintext-build compatibility conversion.
-///
-/// Encryption-enabled builds intentionally require
-/// [`Package::into_plain_opc`] so provenance loss is explicit.
-/// This compatibility shim is deprecated; new code should use the explicit
-/// plaintext-named method in all feature configurations.
-#[cfg(not(feature = "encryption"))]
-impl From<Package> for OpcPackage {
-    fn from(package: Package) -> Self {
-        package.into_plain_opc()
-    }
-}
-
 /// Unit tests read the projection through the owner directly; the public
 /// API always goes through [`Package::workbook`].
 #[cfg(test)]
