@@ -7,7 +7,7 @@ use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits as CoreLimits,
     OwnedSource, Position, ReadAt, SourceVersion,
 };
-use litchi_docx::source_backed::{self, StorySelector};
+use litchi_docx::source_backed::{self, story_text};
 use litchi_docx::{Error, SourceLimits};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter, Part, TargetMode};
@@ -579,7 +579,7 @@ fn changed_part(source: &[u8], name: &str, from: &str, to: &str) -> Vec<u8> {
 
 fn exercise_change(
     dialect: Dialect,
-    selector: StorySelector,
+    selector: story_text::Selector,
     part: &str,
     before: &str,
     after: &str,
@@ -588,15 +588,15 @@ fn exercise_change(
     let package = open(&source);
     let snapshot = package.story_text_snapshot(selector.clone()).unwrap();
     assert_eq!(snapshot.paragraph_text(0).unwrap().as_deref(), Some(before));
-    let mut edit = snapshot.edit().unwrap();
+    let mut edit = snapshot.raw_tree(snapshot.limits_value()).unwrap();
     edit.replace_paragraph_text(Position::new(0), after)
         .unwrap();
-    let commit = edit.commit().unwrap();
-    assert_eq!(commit.snapshot().extract_text().unwrap(), after);
+    let patch = edit.patch().unwrap();
+    assert_eq!(patch.target().extract_text().unwrap(), after);
 
     let mut published = Vec::new();
     let publication = package
-        .apply_story_text(&commit.patch().clone().into())
+        .apply_story_text(&patch.clone().into())
         .and_then(|committed| {
             committed.package().write_to(&mut published)?;
             Ok(committed)
@@ -633,21 +633,21 @@ fn secondary_stories_select_edit_and_preserve_siblings_root_and_anchors() {
     for dialect in [Dialect::Transitional, Dialect::Strict] {
         exercise_change(
             dialect,
-            StorySelector::footnote(41),
+            story_text::Selector::footnote(41),
             "/word/footnotes.xml",
             "footnote-target",
             "footnote-changed",
         );
         exercise_change(
             dialect,
-            StorySelector::endnote(51),
+            story_text::Selector::endnote(51),
             "/word/endnotes.xml",
             "endnote-target",
             "endnote-changed",
         );
         exercise_change(
             dialect,
-            StorySelector::comment(61),
+            story_text::Selector::comment(61),
             "/word/comments.xml",
             "comment-target",
             "comment-changed",
@@ -660,15 +660,15 @@ fn secondary_entry_preserves_whitespace_comments_and_opaque_markup() {
     let source = fixture(Dialect::Transitional, Mutation::Valid);
     let package = open(&source);
     let snapshot = package
-        .story_text_snapshot(StorySelector::footnote(41))
+        .story_text_snapshot(story_text::Selector::footnote(41))
         .unwrap();
-    let mut edit = snapshot.edit().unwrap();
+    let mut edit = snapshot.raw_tree(snapshot.limits_value()).unwrap();
     edit.replace_paragraph_text(Position::new(0), "footnote-preserved")
         .unwrap();
-    let commit = edit.commit().unwrap();
+    let patch = edit.patch().unwrap();
     let mut published = Vec::new();
     package
-        .apply_story_text(&commit.patch().clone().into())
+        .apply_story_text(&patch.clone().into())
         .and_then(|committed| Ok(committed.package().write_to(&mut published)?))
         .unwrap();
 
@@ -706,30 +706,34 @@ fn secondary_noop_is_exact_and_inverse_restores_the_source() {
     let source = fixture(Dialect::Transitional, Mutation::Valid);
     let noop_package = open(&source);
     let noop_snapshot = noop_package
-        .story_text_snapshot(StorySelector::comment(61))
+        .story_text_snapshot(story_text::Selector::comment(61))
         .unwrap();
-    let mut noop = noop_snapshot.edit().unwrap();
+    let mut noop = noop_snapshot
+        .raw_tree(noop_snapshot.limits_value())
+        .unwrap();
     noop.replace_paragraph_text(Position::new(0), "comment-target")
         .unwrap();
-    let noop_commit = noop.commit().unwrap();
+    let noop_patch = noop.patch().unwrap();
     let mut exact = Vec::new();
     noop_package
-        .apply_story_text(&noop_commit.patch().clone().into())
+        .apply_story_text(&noop_patch.clone().into())
         .and_then(|committed| Ok(committed.package().write_to(&mut exact)?))
         .unwrap();
     assert_eq!(exact, source);
 
     let changed_package = open(&source);
     let changed_snapshot = changed_package
-        .story_text_snapshot(StorySelector::comment(61))
+        .story_text_snapshot(story_text::Selector::comment(61))
         .unwrap();
-    let mut edit = changed_snapshot.edit().unwrap();
+    let mut edit = changed_snapshot
+        .raw_tree(changed_snapshot.limits_value())
+        .unwrap();
     edit.replace_paragraph_text(Position::new(0), "comment-changed")
         .unwrap();
-    let commit = edit.commit().unwrap();
+    let patch = edit.patch().unwrap();
     let mut published = Vec::new();
     let publication = changed_package
-        .apply_story_text(&commit.patch().clone().into())
+        .apply_story_text(&patch.clone().into())
         .and_then(|committed| {
             committed.package().write_to(&mut published)?;
             Ok(committed)
@@ -748,7 +752,7 @@ fn secondary_noop_is_exact_and_inverse_restores_the_source() {
                 committed.package().write_to(Vec::new())?;
                 Ok(committed)
             }),
-        Err(source_backed::StoryTextError::PatchConflict)
+        Err(story_text::Error::PatchConflict)
     ));
 }
 
@@ -757,31 +761,35 @@ fn signed_secondary_change_is_refused_but_signed_noop_is_exact() {
     let source = fixture(Dialect::Transitional, Mutation::Signed);
     let noop_package = open(&source);
     let noop_snapshot = noop_package
-        .story_text_snapshot(StorySelector::footnote(41))
+        .story_text_snapshot(story_text::Selector::footnote(41))
         .unwrap();
 
-    let mut noop = noop_snapshot.edit().unwrap();
+    let mut noop = noop_snapshot
+        .raw_tree(noop_snapshot.limits_value())
+        .unwrap();
     noop.replace_paragraph_text(Position::new(0), "footnote-target")
         .unwrap();
-    let noop_commit = noop.commit().unwrap();
+    let noop_patch = noop.patch().unwrap();
     let mut exact = Vec::new();
     noop_package
-        .apply_story_text(&noop_commit.patch().clone().into())
+        .apply_story_text(&noop_patch.clone().into())
         .and_then(|committed| Ok(committed.package().write_to(&mut exact)?))
         .unwrap();
     assert_eq!(exact, source);
 
     let changed_package = open(&source);
     let changed_snapshot = changed_package
-        .story_text_snapshot(StorySelector::footnote(41))
+        .story_text_snapshot(story_text::Selector::footnote(41))
         .unwrap();
-    let mut edit = changed_snapshot.edit().unwrap();
+    let mut edit = changed_snapshot
+        .raw_tree(changed_snapshot.limits_value())
+        .unwrap();
     edit.replace_paragraph_text(Position::new(0), "signed-change")
         .unwrap();
-    let commit = edit.commit().unwrap();
+    let patch = edit.patch().unwrap();
     assert!(
         changed_package
-            .apply_story_text(&commit.patch().clone().into())
+            .apply_story_text(&patch.clone().into())
             .and_then(|committed| {
                 committed.package().write_to(Vec::new())?;
                 Ok(committed)
@@ -794,22 +802,22 @@ fn signed_secondary_change_is_refused_but_signed_noop_is_exact() {
 fn secondary_ids_cover_missing_reserved_and_duplicate_values() {
     let package = open(&fixture(Dialect::Transitional, Mutation::Valid));
     for selector in [
-        StorySelector::footnote(99),
-        StorySelector::footnote(0),
-        StorySelector::footnote(u32::MAX),
-        StorySelector::endnote(0),
-        StorySelector::comment(99),
+        story_text::Selector::footnote(99),
+        story_text::Selector::footnote(0),
+        story_text::Selector::footnote(u32::MAX),
+        story_text::Selector::endnote(0),
+        story_text::Selector::comment(99),
     ] {
         assert!(package.story_text_snapshot(selector).is_err());
     }
     assert!(
         open(&fixture(Dialect::Transitional, Mutation::DuplicateFootnote))
-            .story_text_snapshot(StorySelector::footnote(41))
+            .story_text_snapshot(story_text::Selector::footnote(41))
             .is_err()
     );
     assert!(
         open(&fixture(Dialect::Transitional, Mutation::DuplicateComment))
-            .story_text_snapshot(StorySelector::comment(61))
+            .story_text_snapshot(story_text::Selector::comment(61))
             .is_err()
     );
 }
@@ -824,7 +832,7 @@ fn secondary_relationship_topology_and_content_type_are_checked() {
     ] {
         assert!(
             open(&fixture(Dialect::Transitional, mutation))
-                .story_text_snapshot(StorySelector::footnote(41))
+                .story_text_snapshot(story_text::Selector::footnote(41))
                 .is_err()
         );
     }
@@ -838,7 +846,7 @@ fn secondary_relationship_dialect_mismatch_is_refused() {
                 dialect,
                 Mutation::FootnoteRelationshipDialectMismatch
             ))
-            .story_text_snapshot(StorySelector::footnote(41))
+            .story_text_snapshot(story_text::Selector::footnote(41))
             .is_err()
         );
     }
@@ -849,9 +857,9 @@ fn transitional_main_rejects_strict_header_relationship_metadata() {
     let source = fixture(Dialect::Transitional, Mutation::MainStrictStoryRelationship);
     let package = open(&source);
     for selector in [
-        StorySelector::footnote(41),
-        StorySelector::endnote(51),
-        StorySelector::comment(61),
+        story_text::Selector::footnote(41),
+        story_text::Selector::endnote(51),
+        story_text::Selector::comment(61),
     ] {
         assert!(package.story_text_snapshot(selector).is_err());
     }
@@ -864,9 +872,9 @@ fn package_wide_mixed_dialect_rejects_main_header_and_footer_capture() {
         Mutation::MainStrictStoryRelationship,
     ));
     for selector in [
-        StorySelector::main(),
-        StorySelector::header(0),
-        StorySelector::footer(0),
+        story_text::Selector::main(),
+        story_text::Selector::header(0),
+        story_text::Selector::footer(0),
     ] {
         assert!(package.story_text_snapshot(selector).is_err());
     }
@@ -877,12 +885,12 @@ fn header_and_footer_root_dialect_mismatches_are_refused() {
     for dialect in [Dialect::Transitional, Dialect::Strict] {
         assert!(
             open(&fixture(dialect, Mutation::HeaderRootDialectMismatch))
-                .story_text_snapshot(StorySelector::header(0))
+                .story_text_snapshot(story_text::Selector::header(0))
                 .is_err()
         );
         assert!(
             open(&fixture(dialect, Mutation::FooterRootDialectMismatch))
-                .story_text_snapshot(StorySelector::footer(0))
+                .story_text_snapshot(story_text::Selector::footer(0))
                 .is_err()
         );
     }
@@ -893,12 +901,12 @@ fn header_and_footer_stories_cannot_own_word_story_relationships() {
     for dialect in [Dialect::Transitional, Dialect::Strict] {
         assert!(
             open(&fixture(dialect, Mutation::HeaderOwnsStoryRelationship))
-                .story_text_snapshot(StorySelector::header(0))
+                .story_text_snapshot(story_text::Selector::header(0))
                 .is_err()
         );
         assert!(
             open(&fixture(dialect, Mutation::FooterOwnsStoryRelationship))
-                .story_text_snapshot(StorySelector::footer(0))
+                .story_text_snapshot(story_text::Selector::footer(0))
                 .is_err()
         );
     }
@@ -909,34 +917,35 @@ fn secondary_story_cannot_own_a_word_story_relationship() {
     for dialect in [Dialect::Transitional, Dialect::Strict] {
         assert!(
             open(&fixture(dialect, Mutation::SecondaryOwnsStoryRelationship))
-                .story_text_snapshot(StorySelector::footnote(41))
+                .story_text_snapshot(story_text::Selector::footnote(41))
                 .is_err()
         );
     }
 }
 
 #[test]
-fn secondary_patches_reject_stale_and_foreign_snapshots() {
+fn secondary_patches_reject_stale_and_accept_matching_copies() {
     let source = fixture(Dialect::Transitional, Mutation::Valid);
     let package = open(&source);
     let snapshot = package
-        .story_text_snapshot(StorySelector::footnote(41))
+        .story_text_snapshot(story_text::Selector::footnote(41))
         .unwrap();
-    let mut edit = snapshot.edit().unwrap();
+    let mut edit = snapshot.raw_tree(snapshot.limits_value()).unwrap();
     edit.replace_paragraph_text(Position::new(0), "changed")
         .unwrap();
-    let commit = edit.commit().unwrap();
+    let patch = edit.patch().unwrap();
     assert!(matches!(
-        commit.patch().apply(commit.snapshot()),
-        Err(source_backed::StoryTextError::PatchConflict)
+        patch.apply(patch.target()),
+        Err(story_text::Error::PatchConflict)
     ));
     let foreign = open(&source)
-        .story_text_snapshot(StorySelector::footnote(41))
+        .story_text_snapshot(story_text::Selector::footnote(41))
         .unwrap();
-    assert!(matches!(
-        commit.patch().apply(&foreign),
-        Err(source_backed::StoryTextError::ForeignSource)
-    ));
+    let applied = patch.apply(&foreign).unwrap();
+    assert_eq!(
+        applied.paragraph_text(0).unwrap().as_deref(),
+        Some("changed")
+    );
 }
 
 fn managed_open(bytes: Vec<u8>) -> (Budget, CancellationSource, source_backed::Package) {
@@ -972,16 +981,16 @@ fn managed_secondary_edits_refuse_and_cancellation_stops_selection() {
     let (_budget, cancellation, package) =
         managed_open(fixture(Dialect::Transitional, Mutation::Valid));
     let snapshot = package
-        .story_text_snapshot(StorySelector::footnote(41))
+        .story_text_snapshot(story_text::Selector::footnote(41))
         .unwrap();
     assert!(matches!(
-        snapshot.edit(),
-        Err(source_backed::StoryTextError::Document(Error::Refused(_)))
+        snapshot.raw_tree(snapshot.limits_value()),
+        Err(story_text::Error::Document(Error::Refused(_)))
     ));
     cancellation.cancel();
     assert!(
         package
-            .story_text_snapshot(StorySelector::comment(61))
+            .story_text_snapshot(story_text::Selector::comment(61))
             .is_err()
     );
 }
@@ -1024,21 +1033,21 @@ fn secondary_publication_rejects_a_source_revision_change() {
     });
     let package = source_backed::Package::from_read_at(versioned.clone()).unwrap();
     let snapshot = package
-        .story_text_snapshot(StorySelector::endnote(51))
+        .story_text_snapshot(story_text::Selector::endnote(51))
         .unwrap();
-    let mut edit = snapshot.edit().unwrap();
+    let mut edit = snapshot.raw_tree(snapshot.limits_value()).unwrap();
     edit.replace_paragraph_text(Position::new(0), "revision-change")
         .unwrap();
-    let commit = edit.commit().unwrap();
+    let patch = edit.patch().unwrap();
     versioned.revision.fetch_add(1, Ordering::SeqCst);
     assert!(matches!(
         package
-            .apply_story_text(&commit.patch().clone().into())
+            .apply_story_text(&patch.clone().into())
             .and_then(|committed| {
                 committed.package().write_to(Vec::new())?;
                 Ok(committed)
             }),
-        Err(source_backed::StoryTextError::Document(Error::Opc(
+        Err(story_text::Error::Document(Error::Opc(
             litchi_opc::OpcError::SourceChanged { .. }
         )))
     ));
@@ -1047,136 +1056,128 @@ fn secondary_publication_rejects_a_source_revision_change() {
 #[test]
 fn secondary_limits_bound_xml_paragraphs_and_output() {
     let source = fixture(Dialect::Transitional, Mutation::Valid);
-    let invalid_limits = source_backed::StoryTextLimits::new(4096, 0, 10_000, 64, 4096, 4096, 4096);
+    let invalid_limits = story_text::Limits::new(4096, 0, 10_000, 64, 4096, 4096, 4096);
     assert!(invalid_limits.is_err());
-    let paragraph_limit =
-        source_backed::StoryTextLimits::new(4096, 1, 10_000, 64, 4096, 4096, 4096)
-            .unwrap()
-            .with_secondary_entry_limits(8, 4096, 256)
-            .unwrap();
+    let paragraph_limit = story_text::Limits::new(4096, 1, 10_000, 64, 4096, 4096, 4096)
+        .unwrap()
+        .with_secondary_entry_limits(8, 4096, 256)
+        .unwrap();
     assert!(matches!(
         open(&fixture(
             Dialect::Transitional,
             Mutation::TwoParagraphFootnote
         ))
         .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(paragraph_limit))
-        .story_text_snapshot(StorySelector::footnote(41)),
-        Err(source_backed::StoryTextError::Limit {
-            kind: source_backed::story_text::LimitKind::Paragraphs,
+        .story_text_snapshot(story_text::Selector::footnote(41)),
+        Err(story_text::Error::Limit {
+            kind: story_text::LimitKind::Paragraphs,
             ..
         })
     ));
-    let xml_limit =
-        source_backed::StoryTextLimits::new(1, 10, 10_000, 64, 4096, 4096, 4096).unwrap();
+    let xml_limit = story_text::Limits::new(1, 10, 10_000, 64, 4096, 4096, 4096).unwrap();
     assert!(matches!(
         open(&source)
             .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(xml_limit))
-            .story_text_snapshot(StorySelector::footnote(41)),
-        Err(source_backed::StoryTextError::Limit {
-            kind: source_backed::story_text::LimitKind::XmlBytes,
+            .story_text_snapshot(story_text::Selector::footnote(41)),
+        Err(story_text::Error::Limit {
+            kind: story_text::LimitKind::XmlBytes,
             ..
         })
     ));
-    let output_limit =
-        source_backed::StoryTextLimits::new(4096, 10, 10_000, 64, 1, 4096, 4096).unwrap();
+    let output_limit = story_text::Limits::new(4096, 10, 10_000, 64, 1, 4096, 4096).unwrap();
     let snapshot = open(&source)
         .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(output_limit))
-        .story_text_snapshot(StorySelector::footnote(41))
+        .story_text_snapshot(story_text::Selector::footnote(41))
         .unwrap();
     assert!(matches!(
         snapshot.extract_text(),
-        Err(source_backed::StoryTextError::Limit { .. })
+        Err(story_text::Error::Limit { .. })
     ));
 }
 
 #[test]
 fn deep_large_namespace_input_hits_a_finite_namespace_limit() {
-    let limits =
-        source_backed::StoryTextLimits::new(1024 * 1024, 10, 100_000, 64, 4096, 4096, 4096)
-            .unwrap()
-            .with_secondary_entry_limits(64, 1024 * 1024, 8)
-            .unwrap();
+    let limits = story_text::Limits::new(1024 * 1024, 10, 100_000, 64, 4096, 4096, 4096)
+        .unwrap()
+        .with_secondary_entry_limits(64, 1024 * 1024, 8)
+        .unwrap();
     assert!(
         open(&fixture(
             Dialect::Transitional,
             Mutation::DeepNamespaceFootnote
         ))
         .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(limits))
-        .story_text_snapshot(StorySelector::footnote(41))
+        .story_text_snapshot(story_text::Selector::footnote(41))
         .is_err()
     );
 }
 
 #[test]
 fn long_namespace_prefix_and_value_hit_namespace_byte_and_count_limits() {
-    let namespace_limits =
-        source_backed::StoryTextLimits::new(64 * 1024, 10, 100_000, 64, 4096, 4096, 4096)
-            .unwrap()
-            .with_secondary_entry_limits(64, 64 * 1024, 256)
-            .unwrap()
-            .with_max_namespace_bytes(2048)
-            .unwrap();
+    let namespace_limits = story_text::Limits::new(64 * 1024, 10, 100_000, 64, 4096, 4096, 4096)
+        .unwrap()
+        .with_secondary_entry_limits(64, 64 * 1024, 256)
+        .unwrap()
+        .with_max_namespace_bytes(2048)
+        .unwrap();
     assert!(matches!(
         open(&fixture(
             Dialect::Transitional,
             Mutation::LongNamespaceFootnote,
         ))
         .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(namespace_limits))
-        .story_text_snapshot(StorySelector::footnote(41)),
-        Err(source_backed::StoryTextError::Limit {
-            kind: source_backed::story_text::LimitKind::NamespaceBytes,
+        .story_text_snapshot(story_text::Selector::footnote(41)),
+        Err(story_text::Error::Limit {
+            kind: story_text::LimitKind::NamespaceBytes,
             ..
         })
     ));
 
-    let count_limits =
-        source_backed::StoryTextLimits::new(1024 * 1024, 10, 100_000, 64, 4096, 4096, 4096)
-            .unwrap()
-            .with_secondary_entry_limits(64, 1024 * 1024, 8)
-            .unwrap();
+    let count_limits = story_text::Limits::new(1024 * 1024, 10, 100_000, 64, 4096, 4096, 4096)
+        .unwrap()
+        .with_secondary_entry_limits(64, 1024 * 1024, 8)
+        .unwrap();
     assert!(
         open(&fixture(
             Dialect::Transitional,
             Mutation::DeepNamespaceFootnote,
         ))
         .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(count_limits))
-        .story_text_snapshot(StorySelector::footnote(41))
+        .story_text_snapshot(story_text::Selector::footnote(41))
         .is_err()
     );
 }
 
 #[test]
 fn large_text_event_is_bounded_by_xml_and_decoded_output_limits() {
-    let output_limits =
-        source_backed::StoryTextLimits::new(64 * 1024, 10, 100_000, 64, 1024, 4096, 4096)
-            .unwrap()
-            .with_secondary_entry_limits(8, 64 * 1024, 256)
-            .unwrap();
+    let output_limits = story_text::Limits::new(64 * 1024, 10, 100_000, 64, 1024, 4096, 4096)
+        .unwrap()
+        .with_secondary_entry_limits(8, 64 * 1024, 256)
+        .unwrap();
     let snapshot = open(&fixture(Dialect::Transitional, Mutation::LargeTextFootnote))
         .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(output_limits))
-        .story_text_snapshot(StorySelector::footnote(41))
+        .story_text_snapshot(story_text::Selector::footnote(41))
         .unwrap();
     assert!(matches!(
         snapshot.extract_text(),
-        Err(source_backed::StoryTextError::Limit { .. })
+        Err(story_text::Error::Limit { .. })
     ));
 
-    let xml_limits =
-        source_backed::StoryTextLimits::new(1024, 10, 100_000, 64, 64 * 1024, 4096, 4096)
-            .unwrap()
-            .with_secondary_entry_limits(8, 1024, 256)
-            .unwrap();
+    let xml_limits = story_text::Limits::new(1024, 10, 100_000, 64, 64 * 1024, 4096, 4096)
+        .unwrap()
+        .with_secondary_entry_limits(8, 1024, 256)
+        .unwrap();
     assert!(
         open(&fixture(Dialect::Transitional, Mutation::LargeTextFootnote,))
             .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(xml_limits))
-            .story_text_snapshot(StorySelector::footnote(41))
+            .story_text_snapshot(story_text::Selector::footnote(41))
             .is_err()
     );
 }
 
 #[test]
 fn allowed_references_stream_under_caller_bounds_and_unknown_named_refs_refuse() {
-    let limits = source_backed::StoryTextLimits::new(32 * 1024, 10, 100_000, 64, 4096, 4096, 4096)
+    let limits = story_text::Limits::new(32 * 1024, 10, 100_000, 64, 4096, 4096, 4096)
         .unwrap()
         .with_secondary_entry_limits(8, 32 * 1024, 256)
         .unwrap();
@@ -1185,7 +1186,7 @@ fn allowed_references_stream_under_caller_bounds_and_unknown_named_refs_refuse()
         Mutation::EscapedTextFootnote,
     ))
     .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(limits))
-    .story_text_snapshot(StorySelector::footnote(41))
+    .story_text_snapshot(story_text::Selector::footnote(41))
     .unwrap();
 
     let expected = "A&<>\"'".repeat(64);
@@ -1219,7 +1220,7 @@ fn allowed_references_stream_under_caller_bounds_and_unknown_named_refs_refuse()
             Dialect::Transitional,
             Mutation::UnknownNamedEntityFootnote,
         ))
-        .story_text_snapshot(StorySelector::footnote(41))
+        .story_text_snapshot(story_text::Selector::footnote(41))
         .is_err()
     );
 
@@ -1227,27 +1228,27 @@ fn allowed_references_stream_under_caller_bounds_and_unknown_named_refs_refuse()
         Dialect::Transitional,
         Mutation::InstrTextReferenceFootnote,
     ))
-    .story_text_snapshot(StorySelector::footnote(41))
+    .story_text_snapshot(story_text::Selector::footnote(41))
     .unwrap();
     assert_eq!(instruction_snapshot.extract_text().unwrap(), "visible");
 }
 
 #[test]
 fn secondary_edit_refuses_when_synthetic_wrapper_exceeds_output_limit() {
-    let limits = source_backed::StoryTextLimits::new(4096, 10, 100_000, 64, 1, 4096, 4096)
+    let limits = story_text::Limits::new(4096, 10, 100_000, 64, 1, 4096, 4096)
         .unwrap()
         .with_secondary_entry_limits(8, 4096, 256)
         .unwrap();
     let snapshot = open(&fixture(Dialect::Transitional, Mutation::Valid))
         .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(limits))
-        .story_text_snapshot(StorySelector::footnote(41))
+        .story_text_snapshot(story_text::Selector::footnote(41))
         .unwrap();
-    assert!(snapshot.edit().is_err());
+    assert!(snapshot.raw_tree(snapshot.limits_value()).is_err());
 }
 
 #[test]
 fn markup_heavier_than_output_bound_can_decode_to_visible_text() {
-    let limits = source_backed::StoryTextLimits::new(64 * 1024, 10, 100_000, 64, 4, 4096, 4096)
+    let limits = story_text::Limits::new(64 * 1024, 10, 100_000, 64, 4, 4096, 4096)
         .unwrap()
         .with_secondary_entry_limits(8, 64 * 1024, 256)
         .unwrap();
@@ -1256,41 +1257,39 @@ fn markup_heavier_than_output_bound_can_decode_to_visible_text() {
         Mutation::MarkupHeavyFootnote,
     ))
     .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(limits))
-    .story_text_snapshot(StorySelector::footnote(41))
+    .story_text_snapshot(story_text::Selector::footnote(41))
     .unwrap();
     assert_eq!(snapshot.paragraph_text(0).unwrap().as_deref(), Some("fit"));
 }
 
 #[test]
 fn secondary_output_accumulation_and_borrowed_replacement_are_bounded() {
-    let aggregate_limits =
-        source_backed::StoryTextLimits::new(4096, 10, 100_000, 64, 20, 4096, 4096)
-            .unwrap()
-            .with_secondary_entry_limits(8, 4096, 256)
-            .unwrap();
+    let aggregate_limits = story_text::Limits::new(4096, 10, 100_000, 64, 20, 4096, 4096)
+        .unwrap()
+        .with_secondary_entry_limits(8, 4096, 256)
+        .unwrap();
     let aggregate = open(&fixture(
         Dialect::Transitional,
         Mutation::TwoParagraphFootnote,
     ))
     .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(aggregate_limits))
-    .story_text_snapshot(StorySelector::footnote(41))
+    .story_text_snapshot(story_text::Selector::footnote(41))
     .unwrap();
     assert!(matches!(
         aggregate.extract_text(),
-        Err(source_backed::StoryTextError::Limit { .. })
+        Err(story_text::Error::Limit { .. })
     ));
 
-    let stream_limits =
-        source_backed::StoryTextLimits::new(4096, 10, 100_000, 64, 4096, 4096, 4096)
-            .unwrap()
-            .with_secondary_entry_limits(8, 4096, 256)
-            .unwrap();
+    let stream_limits = story_text::Limits::new(4096, 10, 100_000, 64, 4096, 4096, 4096)
+        .unwrap()
+        .with_secondary_entry_limits(8, 4096, 256)
+        .unwrap();
     let stream_snapshot = open(&fixture(
         Dialect::Transitional,
         Mutation::TwoParagraphFootnote,
     ))
     .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(stream_limits))
-    .story_text_snapshot(StorySelector::footnote(41))
+    .story_text_snapshot(story_text::Selector::footnote(41))
     .unwrap();
     let mut streamed = Vec::new();
     let stream_error = stream_snapshot
@@ -1309,16 +1308,17 @@ fn secondary_output_accumulation_and_borrowed_replacement_are_bounded() {
     assert_eq!(stream_error.progress().objects_written(), 1);
     assert_eq!(streamed, b"footnote-target");
 
-    let replacement_limits =
-        source_backed::StoryTextLimits::new(4096, 10, 100_000, 64, 4096, 4096, 4)
-            .unwrap()
-            .with_secondary_entry_limits(8, 4096, 256)
-            .unwrap();
+    let replacement_limits = story_text::Limits::new(4096, 10, 100_000, 64, 4096, 4096, 4)
+        .unwrap()
+        .with_secondary_entry_limits(8, 4096, 256)
+        .unwrap();
     let replacement_snapshot = open(&fixture(Dialect::Transitional, Mutation::Valid))
         .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(replacement_limits))
-        .story_text_snapshot(StorySelector::footnote(41))
+        .story_text_snapshot(story_text::Selector::footnote(41))
         .unwrap();
-    let mut edit = replacement_snapshot.edit().unwrap();
+    let mut edit = replacement_snapshot
+        .raw_tree(replacement_snapshot.limits_value())
+        .unwrap();
     let borrowed = "borrowed-replacement-too-large";
     assert!(
         edit.replace_paragraph_text(Position::new(0), borrowed)
@@ -1336,15 +1336,15 @@ fn secondary_output_accumulation_and_borrowed_replacement_are_bounded() {
 
 #[test]
 fn xml_expanding_replacement_is_refused_without_changing_projection() {
-    let limits = source_backed::StoryTextLimits::new(4096, 10, 100_000, 64, 2048, 4096, 2048)
+    let limits = story_text::Limits::new(4096, 10, 100_000, 64, 2048, 4096, 2048)
         .unwrap()
         .with_secondary_entry_limits(8, 4096, 256)
         .unwrap();
     let snapshot = open(&fixture(Dialect::Transitional, Mutation::Valid))
         .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(limits))
-        .story_text_snapshot(StorySelector::footnote(41))
+        .story_text_snapshot(story_text::Selector::footnote(41))
         .unwrap();
-    let mut edit = snapshot.edit().unwrap();
+    let mut edit = snapshot.raw_tree(snapshot.limits_value()).unwrap();
     let before = edit.projected().unwrap().paragraph_text(0).unwrap();
     let replacement = "&<>\"'".repeat(256);
     assert!(
@@ -1383,15 +1383,15 @@ fn secondary_publication_rejects_a_partial_sink_without_panicking() {
     let source = fixture(Dialect::Transitional, Mutation::Valid);
     let package = open(&source);
     let snapshot = package
-        .story_text_snapshot(StorySelector::endnote(51))
+        .story_text_snapshot(story_text::Selector::endnote(51))
         .unwrap();
-    let mut edit = snapshot.edit().unwrap();
+    let mut edit = snapshot.raw_tree(snapshot.limits_value()).unwrap();
     edit.replace_paragraph_text(Position::new(0), "changed")
         .unwrap();
-    let commit = edit.commit().unwrap();
+    let patch = edit.patch().unwrap();
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         package
-            .apply_story_text(&commit.patch().clone().into())
+            .apply_story_text(&patch.clone().into())
             .and_then(|committed| {
                 committed.package().write_to(PartialWriter {
                     wrote_prefix: false,

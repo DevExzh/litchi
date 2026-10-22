@@ -41,7 +41,7 @@ use litchi_docx::source_backed::tail_append_stream::{
     MemoryReplayStore, ParagraphCursor, ParagraphEventSink, ParagraphStreamLimits,
     PlainParagraphEvent, ReplayableParagraphSource,
 };
-use litchi_docx::source_backed::{self, TailAppendLimits};
+use litchi_docx::source_backed::{self, tail_append::Limits as TailAppendLimits};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{PackURI, SourceBackedPackage};
 use sha2::{Digest as _, Sha256};

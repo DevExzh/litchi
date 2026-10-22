@@ -9,6 +9,7 @@
 //! selected entry body range is spliced back, preserving the root and all
 //! sibling entries byte-for-byte.
 
+use std::cell::RefCell;
 use std::collections::TryReserveError;
 use std::io::{self, Write};
 use std::sync::Arc;
@@ -282,9 +283,6 @@ pub enum Error {
     /// A patch was applied to a source with different selected-part bytes.
     #[error("source-backed story text patch source is stale")]
     PatchConflict,
-    /// A patch was applied to a package lineage other than its source.
-    #[error("source-backed story text patch belongs to a different source lineage")]
-    ForeignSource,
     /// A patch was applied to a different selected story or package topology.
     #[error("source-backed story text patch conflicts with the selected story topology")]
     TopologyConflict,
@@ -334,9 +332,6 @@ pub enum Error {
         /// Direct paragraph index within that entry.
         paragraph_index: usize,
     },
-    /// A publication inverse was applied to a foreign complete artifact.
-    #[error("source-backed story text publication conflicts with the complete source artifact")]
-    ArtifactConflict,
     /// A bounded allocation failed before publication began.
     #[error("source-backed story text allocation failed for {resource}: {source}")]
     Allocation {
@@ -518,6 +513,26 @@ impl Limits {
         self.max_namespace_bytes = max_namespace_bytes;
         Ok(self)
     }
+
+    fn intersect(self, other: Self) -> Self {
+        Self {
+            max_xml_bytes: self.max_xml_bytes.min(other.max_xml_bytes),
+            max_paragraphs: self.max_paragraphs.min(other.max_paragraphs),
+            max_events: self.max_events.min(other.max_events),
+            max_depth: self.max_depth.min(other.max_depth),
+            max_output_bytes: self.max_output_bytes.min(other.max_output_bytes),
+            max_replacements: self.max_replacements.min(other.max_replacements),
+            max_replacement_text_bytes: self
+                .max_replacement_text_bytes
+                .min(other.max_replacement_text_bytes),
+            max_entries: self.max_entries.min(other.max_entries),
+            max_entry_bytes: self.max_entry_bytes.min(other.max_entry_bytes),
+            max_namespace_bindings: self
+                .max_namespace_bindings
+                .min(other.max_namespace_bindings),
+            max_namespace_bytes: self.max_namespace_bytes.min(other.max_namespace_bytes),
+        }
+    }
 }
 
 impl Default for Limits {
@@ -588,6 +603,13 @@ struct Envelope {
 #[derive(Clone)]
 enum Payload {
     Owned(Arc<Vec<u8>>),
+    /// A validated view into the transaction XML.  Main-story projections
+    /// already own the complete document buffer; retaining its range avoids
+    /// copying that buffer merely to construct the raw story snapshot.
+    OwnedRange {
+        bytes: Arc<Vec<u8>>,
+        range: Range,
+    },
     Managed(PartData),
 }
 
@@ -595,6 +617,7 @@ impl Payload {
     fn as_bytes(&self) -> &[u8] {
         match self {
             Self::Owned(bytes) => bytes.as_slice(),
+            Self::OwnedRange { bytes, range } => &bytes[range.start..range.end],
             Self::Managed(data) => data.as_bytes(),
         }
     }
@@ -660,6 +683,12 @@ impl Snapshot {
     #[must_use]
     pub const fn part_fingerprint(&self) -> [u8; 32] {
         self.part_fingerprint
+    }
+
+    /// Return the policy under which this snapshot was admitted.
+    #[must_use]
+    pub const fn limits_value(&self) -> Limits {
+        self.limits
     }
 
     /// Return the number of direct paragraphs in the selected story.
@@ -820,13 +849,18 @@ impl Snapshot {
         Ok(writer.finish())
     }
 
-    /// Start a staged direct-paragraph text edit.
+    /// Open the selected story as a bounded mutable raw codec model.
     ///
-    /// Managed source-backed packages support bounded read and stream access,
-    /// but edits are refused rather than detaching a second owned XML buffer
-    /// from the managed `PartData` reservation. This matches the established
-    /// main-document transaction boundary.
-    pub fn edit(&self) -> Result<Edit> {
+    /// The supplied policy is intersected with the policy retained by this
+    /// admitted snapshot. Raw models publish [`Patch`] values rather than
+    /// package owners; source-backed package edits use the private consuming
+    /// transaction engine instead.
+    pub fn raw_tree(&self, limits: Limits) -> Result<raw::Tree> {
+        let base = self.with_raw_limits(limits)?;
+        Ok(raw::Tree::from_engine(base.edit_engine()?))
+    }
+
+    pub(crate) fn edit_engine(&self) -> Result<Edit> {
         self.check_execution()?;
         if self.payload.is_managed() {
             return Err(Error::Document(crate::Error::refused(
@@ -845,7 +879,15 @@ impl Snapshot {
             base.envelope = Some(envelope);
             DocumentSnapshot::from_xml(document_xml)?
         } else {
-            let document_xml = checked_vec_clone(self.raw_bytes(), "story transaction XML")?;
+            let source_bytes = self.raw_bytes();
+            if source_bytes.len() > self.limits.max_output_bytes {
+                return Err(Error::Limit {
+                    kind: LimitKind::TransactionXml,
+                    actual: source_bytes.len(),
+                    maximum: self.limits.max_output_bytes,
+                });
+            }
+            let document_xml = checked_vec_clone(source_bytes, "story transaction XML")?;
             DocumentSnapshot::from_xml(document_xml)?
         };
         base.transaction = Some(transaction.clone());
@@ -861,8 +903,28 @@ impl Snapshot {
         self.payload.as_bytes()
     }
 
+    fn with_raw_limits(&self, requested: Limits) -> Result<Self> {
+        let limits = self.limits.intersect(requested);
+        if limits == self.limits {
+            return Ok(self.clone());
+        }
+        let layout = scan_selected_story(
+            self.raw_bytes(),
+            &self.selector,
+            Some(self.layout.word_namespace.as_ref()),
+            limits,
+            self.execution.as_ref(),
+        )?;
+        let mut base = self.clone();
+        base.layout = layout;
+        base.limits = limits;
+        base.transaction = None;
+        base.envelope = None;
+        Ok(base)
+    }
+
     fn with_transaction_snapshot(&self, transaction: DocumentSnapshot) -> Result<Self> {
-        let (raw, envelope) = if let Some(envelope) = self.envelope {
+        let (payload, envelope) = if let Some(envelope) = self.envelope {
             let wrapped = transaction.shared_xml().map_err(Error::DocumentEdit)?;
             let wrapped_end = wrapped
                 .len()
@@ -917,21 +979,22 @@ impl Snapshot {
             raw.extend_from_slice(before);
             raw.extend_from_slice(inner);
             raw.extend_from_slice(after);
-            (raw, Some(envelope))
+            (Payload::Owned(Arc::new(raw)), Some(envelope))
         } else {
-            (
-                checked_story_output_clone(
-                    transaction
-                        .shared_xml()
-                        .map_err(Error::DocumentEdit)?
-                        .as_ref(),
-                    &self.limits,
-                    LimitKind::TransactionXml,
-                )?,
-                None,
-            )
+            let bytes = transaction.shared_xml().map_err(Error::DocumentEdit)?;
+            if bytes.len() > self.limits.max_output_bytes {
+                return Err(Error::Limit {
+                    kind: LimitKind::TransactionXml,
+                    actual: bytes.len(),
+                    maximum: self.limits.max_output_bytes,
+                });
+            }
+            let range = Range {
+                start: 0,
+                end: bytes.len(),
+            };
+            (Payload::OwnedRange { bytes, range }, None)
         };
-        let payload = Payload::Owned(Arc::new(raw));
         let layout = scan_selected_story(
             payload.as_bytes(),
             &self.selector,
@@ -962,8 +1025,10 @@ impl Snapshot {
     }
 }
 
-/// A staged selected-story direct-paragraph edit.
-pub struct Edit {
+/// Private transaction engine for the raw codec model and source-backed owner
+/// family. The public raw model wraps this engine with a bounded projection
+/// cache; the owner family consumes it directly.
+pub(crate) struct Edit {
     base: Snapshot,
     projected: DocumentEdit,
     replacements: usize,
@@ -973,18 +1038,18 @@ pub struct Edit {
 impl Edit {
     /// Borrow the immutable source snapshot.
     #[must_use]
-    pub const fn source(&self) -> &Snapshot {
+    pub(crate) const fn source(&self) -> &Snapshot {
         &self.base
     }
 
     /// Borrow the current projected selected-story snapshot.
-    pub fn projected(&self) -> Result<Snapshot> {
+    pub(crate) fn projected(&self) -> Result<Snapshot> {
         self.base
             .with_transaction_snapshot(self.projected.projected().clone())
     }
 
     /// Replace all text in one direct selected-story paragraph.
-    pub fn replace_paragraph_text(
+    pub(crate) fn replace_paragraph_text(
         &mut self,
         position: Position,
         authored_text: impl AsRef<str>,
@@ -1035,15 +1100,24 @@ impl Edit {
         Ok(self)
     }
 
-    /// Finish the staged edit as a source-bound reversible patch.
-    pub fn commit(self) -> Result<Commit> {
+    fn target(&self) -> Result<Snapshot> {
         self.base.check_execution()?;
-        // The document transaction commit intentionally compacts changed
-        // main-document XML. Collection stories use an envelope, however:
-        // their projected snapshot already contains the exact raw paragraph
-        // range replacements produced by the validated transaction. Reusing
-        // that projection avoids normalizing unrelated bytes inside the
-        // selected entry while preserving the outer source splice.
+        // The staged transaction has already validated every replacement and
+        // `with_transaction_snapshot` below performs the selected-story
+        // admission again.  Reusing its projected snapshot keeps raw output
+        // source-preserving and avoids cloning the complete transaction just
+        // to call its consuming owner commit.  The owner family still uses
+        // `finish`, which consumes the transaction at publication time.
+        let transaction_snapshot = self.projected.projected().clone();
+        self.base.check_execution()?;
+        let target = self.base.with_transaction_snapshot(transaction_snapshot)?;
+        Ok(target)
+    }
+}
+
+impl Edit {
+    pub(crate) fn finish(self) -> Result<Patch> {
+        self.base.check_execution()?;
         let transaction_snapshot = if self.base.envelope.is_some() {
             self.projected.projected().clone()
         } else {
@@ -1051,39 +1125,16 @@ impl Edit {
         };
         self.base.check_execution()?;
         let target = self.base.with_transaction_snapshot(transaction_snapshot)?;
-        let patch = Patch {
+        Ok(Patch {
             before: self.base,
-            after: target.clone(),
-        };
-        Ok(Commit {
-            snapshot: target,
-            patch,
+            after: target,
         })
     }
 }
 
-/// A completed selected-story edit.
-pub struct Commit {
-    snapshot: Snapshot,
-    patch: Patch,
-}
-
-impl Commit {
-    /// Borrow the projected selected-story snapshot.
-    #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
-    }
-
-    /// Borrow the source-bound reversible patch.
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-}
-
-/// A reversible selected-story patch bound to one source lineage, revision,
-/// selected part, and exact selected-part bytes.
+/// A reversible selected-story patch carrying the selected-part identity and
+/// exact before and after bytes. Owner publication adds its complete-artifact
+/// and source-freshness proof; raw replay matches the selected content.
 #[derive(Clone)]
 pub struct Patch {
     before: Snapshot,
@@ -1091,7 +1142,7 @@ pub struct Patch {
 }
 
 impl Patch {
-    /// Borrow the exact source snapshot required by this patch.
+    /// Borrow the before snapshot represented by this patch.
     #[must_use]
     pub const fn source(&self) -> &Snapshot {
         &self.before
@@ -1122,14 +1173,7 @@ impl Patch {
     /// part and before bytes, from any source (record 0355a: a package
     /// replay reads the snapshot it applies to).
     pub(crate) fn apply_content(&self, source: &Snapshot) -> Result<Snapshot> {
-        if source.selector != self.before.selector
-            || !same_part_name(&source.partname, &self.before.partname)
-        {
-            return Err(Error::TopologyConflict);
-        }
-        if source.raw_bytes() != self.before.raw_bytes() {
-            return Err(Error::PatchConflict);
-        }
+        self.check_content(source)?;
         Ok(if self.is_noop() {
             source.clone()
         } else {
@@ -1137,37 +1181,205 @@ impl Patch {
         })
     }
 
-    pub(crate) fn limits(&self) -> Limits {
-        self.before.limits
+    fn check_content(&self, source: &Snapshot) -> Result<()> {
+        if source.selector != self.before.selector
+            || !same_part_name(&source.partname, &self.before.partname)
+        {
+            return Err(Error::TopologyConflict);
+        }
+        if !same_content(
+            source.part_fingerprint,
+            source.raw_bytes(),
+            self.before.raw_bytes(),
+            self.before.part_fingerprint,
+        ) {
+            return Err(Error::PatchConflict);
+        }
+        Ok(())
+    }
+
+    /// Replay this raw patch on an independently opened matching snapshot.
+    ///
+    /// Raw codec replay is scoped to the selected XML member. The owning
+    /// package family performs its separate complete-artifact and source
+    /// freshness checks before publication. The returned snapshot is
+    /// admitted under the recipient policy and carries the recipient source
+    /// identity, so a subsequent raw edit cannot inherit the author's fence.
+    pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
+        source.check_execution()?;
+        self.check_content(source)?;
+        self.rebased_target(source)
+    }
+
+    fn rebased_target(&self, source: &Snapshot) -> Result<Snapshot> {
+        if self.is_noop() {
+            return Ok(source.clone());
+        }
+        let bytes = self.after.raw_bytes();
+        if bytes.len() > source.limits.max_output_bytes {
+            return Err(Error::Limit {
+                kind: LimitKind::OutputBytes,
+                actual: bytes.len(),
+                maximum: source.limits.max_output_bytes,
+            });
+        }
+        let layout = scan_selected_story(
+            bytes,
+            &source.selector,
+            Some(source.layout.word_namespace.as_ref()),
+            source.limits,
+            source.execution.as_ref(),
+        )?;
+        let mut target = self.after.clone();
+        target.selector = source.selector.clone();
+        target.partname = source.partname.clone();
+        target.layout = layout;
+        target.transaction = None;
+        target.envelope = None;
+        target.source_version = source.source_version;
+        target.source_lineage = source.source_lineage.clone();
+        target.part_fingerprint = digest(bytes);
+        target.artifact_fingerprint = source.artifact_fingerprint;
+        target.limits = source.limits;
+        target.execution = source.execution.clone();
+        Ok(target)
     }
 
     pub(crate) fn selector(&self) -> Selector {
         self.before.selector.clone()
     }
+}
 
-    /// Apply only to an equivalent selected-story source snapshot.
-    pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
-        if source.selector != self.before.selector
-            || !same_part_name(&source.partname, &self.before.partname)
-        {
-            return Err(Error::TopologyConflict);
+/// Raw mutable codec models for selected-story and glossary text records.
+pub mod raw {
+    use super::{
+        Edit, GlossaryBatchEdit, GlossaryBatchPatch, GlossaryBatchSnapshot, Patch, Position,
+        RefCell, Result, Snapshot,
+    };
+
+    /// A mutable raw selected-story text model.
+    ///
+    /// The model keeps only the private transaction engine and one cached
+    /// projection. Repeated output calls borrow the cached snapshot; they do
+    /// not clone the complete transaction. The consuming engine remains
+    /// private to the source-backed owner family.
+    pub struct Tree {
+        inner: Edit,
+        projected: RefCell<Option<Snapshot>>,
+    }
+
+    impl Tree {
+        pub(super) fn from_engine(inner: Edit) -> Self {
+            Self {
+                inner,
+                projected: RefCell::new(None),
+            }
         }
-        if source.source_lineage != self.before.source_lineage {
-            return Err(Error::ForeignSource);
+
+        /// Borrow the immutable source snapshot.
+        #[must_use]
+        pub const fn source(&self) -> &Snapshot {
+            self.inner.source()
         }
-        if source.source_version != self.before.source_version {
-            return Err(Error::PatchConflict);
+
+        /// Return the current bounded projection.
+        pub fn projected(&self) -> Result<Snapshot> {
+            if let Some(projected) = self.projected.borrow().as_ref() {
+                return Ok(projected.clone());
+            }
+            let projected = self.inner.target()?;
+            *self.projected.borrow_mut() = Some(projected.clone());
+            Ok(projected)
         }
-        if source.part_fingerprint != self.before.part_fingerprint
-            || source.raw_bytes() != self.before.raw_bytes()
-        {
-            return Err(Error::PatchConflict);
+
+        /// Replace all text in one direct paragraph.
+        pub fn replace_paragraph_text(
+            &mut self,
+            position: Position,
+            authored_text: impl AsRef<str>,
+        ) -> Result<&mut Self> {
+            self.inner.replace_paragraph_text(position, authored_text)?;
+            self.projected.borrow_mut().take();
+            Ok(self)
         }
-        Ok(if self.is_noop() {
-            source.clone()
-        } else {
-            self.after.clone()
-        })
+
+        /// Produce the source-bound raw patch without publishing a package.
+        pub fn patch(&self) -> Result<Patch> {
+            let target = self.projected()?;
+            Ok(Patch {
+                before: self.inner.source().clone(),
+                after: target,
+            })
+        }
+
+        /// Replay a selected-story patch against this model's source.
+        ///
+        /// The returned snapshot is a raw projection; no package is
+        /// published and no source lineage is required.
+        pub fn apply(&self, patch: &Patch) -> Result<Snapshot> {
+            patch.apply(self.source())
+        }
+    }
+
+    /// A mutable raw glossary-entry batch model.
+    pub struct GlossaryTree {
+        inner: GlossaryBatchEdit,
+        projected: RefCell<Option<GlossaryBatchSnapshot>>,
+    }
+
+    impl GlossaryTree {
+        pub(super) fn from_engine(inner: GlossaryBatchEdit) -> Self {
+            Self {
+                inner,
+                projected: RefCell::new(None),
+            }
+        }
+
+        /// Borrow the immutable source snapshot.
+        #[must_use]
+        pub const fn source(&self) -> &GlossaryBatchSnapshot {
+            self.inner.source()
+        }
+
+        /// Return the current bounded projection.
+        pub fn projected(&self) -> Result<GlossaryBatchSnapshot> {
+            if let Some(projected) = self.projected.borrow().as_ref() {
+                return Ok(projected.clone());
+            }
+            let projected = self.inner.projected()?;
+            *self.projected.borrow_mut() = Some(projected.clone());
+            Ok(projected)
+        }
+
+        /// Replace all text in one direct paragraph of one selected entry.
+        pub fn replace_paragraph_text(
+            &mut self,
+            entry_index: usize,
+            position: Position,
+            authored_text: impl AsRef<str>,
+        ) -> Result<&mut Self> {
+            self.inner
+                .replace_paragraph_text(entry_index, position, authored_text)?;
+            self.projected.borrow_mut().take();
+            Ok(self)
+        }
+
+        /// Produce the source-bound raw patch without publishing a package.
+        pub fn patch(&self) -> Result<GlossaryBatchPatch> {
+            let target = self.projected()?;
+            Ok(GlossaryBatchPatch {
+                before: self.inner.source().clone(),
+                after: target,
+            })
+        }
+
+        /// Replay a glossary batch patch against this model's source.
+        ///
+        /// The returned snapshot is a raw projection; no package is
+        /// published and no source lineage is required.
+        pub fn apply(&self, patch: &GlossaryBatchPatch) -> Result<GlossaryBatchSnapshot> {
+            patch.apply(self.source())
+        }
     }
 }
 
@@ -1191,14 +1403,15 @@ impl Package {
     pub(crate) fn story_text_target(&self, patch: &Patch) -> Result<(PackURI, Arc<Vec<u8>>)> {
         self.trim_clean_paragraph_index_for_operation();
         self.physical_package()?.check_execution()?;
-        let current = capture(self, patch.selector(), patch.limits())?;
+        let recipient_limits = self.semantic_limits.story_text_value();
+        let current = capture(self, patch.selector(), recipient_limits)?;
         let target = patch.apply_content(&current)?;
         story_replacement(
             self,
             patch.is_noop(),
             &current.partname,
             target.raw_bytes(),
-            patch.limits(),
+            recipient_limits,
             LimitKind::OutputBytes,
             "story publication replacement",
         )
@@ -4417,27 +4630,26 @@ fn checked_string_clone(value: &str, resource: &'static str) -> Result<String> {
     Ok(copy)
 }
 
-fn checked_story_output_clone(
-    bytes: &[u8],
-    limits: &Limits,
-    resource: LimitKind,
-) -> Result<Vec<u8>> {
-    if bytes.len() > limits.max_output_bytes {
-        return Err(Error::Limit {
-            kind: resource,
-            actual: bytes.len(),
-            maximum: limits.max_output_bytes,
-        });
-    }
-    checked_vec_clone(bytes, resource.as_str())
-}
-
 fn digest(bytes: &[u8]) -> [u8; 32] {
     Sha256::digest(bytes).into()
 }
 
 fn same_part_name(left: &PackURI, right: &PackURI) -> bool {
     left.as_str().eq_ignore_ascii_case(right.as_str())
+}
+
+fn same_content(
+    actual_fingerprint: [u8; 32],
+    actual: &[u8],
+    expected: &[u8],
+    expected_fingerprint: [u8; 32],
+) -> bool {
+    // Snapshots are immutable and their fingerprint was computed when the
+    // source was admitted. Reusing that authenticated value avoids hashing
+    // the same payload again on every owner publication.
+    actual.len() == expected.len()
+        && actual_fingerprint == expected_fingerprint
+        && actual == expected
 }
 
 #[derive(Debug)]
@@ -4578,6 +4790,12 @@ impl GlossaryBatchSnapshot {
         self.part_fingerprint
     }
 
+    /// Return the policy under which this batch was admitted.
+    #[must_use]
+    pub const fn limits_value(&self) -> Limits {
+        self.limits
+    }
+
     /// Return the direct paragraph count for one selected entry.
     pub fn paragraph_count(&self, entry_index: usize) -> Result<Option<usize>> {
         self.check_execution()?;
@@ -4649,8 +4867,17 @@ impl GlossaryBatchSnapshot {
         Ok(Some(output))
     }
 
-    /// Start one atomic direct-paragraph edit spanning the selected entries.
-    pub fn edit(&self) -> Result<GlossaryBatchEdit> {
+    /// Open the selected entries as a bounded mutable raw codec model.
+    ///
+    /// The supplied policy is intersected with the policy retained by this
+    /// admitted snapshot. The model publishes a raw
+    /// [`GlossaryBatchPatch`] and never a detached package owner.
+    pub fn raw_tree(&self, limits: Limits) -> Result<raw::GlossaryTree> {
+        let base = self.with_raw_limits(limits)?;
+        Ok(raw::GlossaryTree::from_engine(base.edit_engine()?))
+    }
+
+    pub(crate) fn edit_engine(&self) -> Result<GlossaryBatchEdit> {
         self.check_execution()?;
         if self.payload.is_managed() {
             return Err(Error::Document(crate::Error::refused(
@@ -4674,6 +4901,49 @@ impl GlossaryBatchSnapshot {
     fn raw_bytes(&self) -> &[u8] {
         self.payload.as_bytes()
     }
+
+    fn with_raw_limits(&self, requested: Limits) -> Result<Self> {
+        let limits = self.limits.intersect(requested);
+        if limits == self.limits {
+            return Ok(self.clone());
+        }
+        let expected_word_namespace = self
+            .entries
+            .first()
+            .map(|entry| entry.layout.word_namespace.as_ref());
+        let layouts = scan_glossary_many(
+            self.raw_bytes(),
+            &self.selector.selectors,
+            expected_word_namespace,
+            limits,
+            self.execution.as_ref(),
+        )?;
+        if layouts.len() != self.entries.len() {
+            return Err(Error::TopologyConflict);
+        }
+        let mut entries = Vec::new();
+        entries
+            .try_reserve_exact(layouts.len())
+            .map_err(|source| Error::Allocation {
+                resource: "glossary raw tree entries",
+                source,
+            })?;
+        for (selector_index, layout) in layouts.into_iter().enumerate() {
+            entries.push(GlossaryBatchEntry {
+                selector_index,
+                layout,
+            });
+        }
+        entries.sort_unstable_by_key(|entry| entry.layout.root_start_end);
+        validate_batch_ranges(&entries, self.raw_bytes().len())?;
+        for (canonical_index, entry) in entries.iter_mut().enumerate() {
+            entry.selector_index = canonical_index;
+        }
+        let mut base = self.clone();
+        base.entries = entries;
+        base.limits = limits;
+        Ok(base)
+    }
 }
 
 #[derive(Clone)]
@@ -4688,7 +4958,7 @@ struct GlossaryBatchEditIntent {
 /// Only compact replacement intents are retained. During projection one
 /// selected entry is wrapped and edited at a time, so the batch does not hold
 /// one full document wrapper or XML payload per selected entry.
-pub struct GlossaryBatchEdit {
+pub(crate) struct GlossaryBatchEdit {
     base: GlossaryBatchSnapshot,
     intents: Vec<GlossaryBatchEditIntent>,
     replacements: usize,
@@ -4698,12 +4968,12 @@ pub struct GlossaryBatchEdit {
 impl GlossaryBatchEdit {
     /// Borrow the immutable batch source snapshot.
     #[must_use]
-    pub const fn source(&self) -> &GlossaryBatchSnapshot {
+    pub(crate) const fn source(&self) -> &GlossaryBatchSnapshot {
         &self.base
     }
 
     /// Return the current projected batch after atomically validating intents.
-    pub fn projected(&self) -> Result<GlossaryBatchSnapshot> {
+    pub(crate) fn projected(&self) -> Result<GlossaryBatchSnapshot> {
         self.base.check_execution()?;
         let target = assemble_batch_snapshot(&self.base, &self.intents)?;
         self.base.check_execution()?;
@@ -4715,7 +4985,7 @@ impl GlossaryBatchEdit {
     /// A paragraph may be addressed only once in one staged batch. This
     /// removes overlapping intent ambiguity and leaves every failed operation
     /// free to return without changing counters or stored intents.
-    pub fn replace_paragraph_text(
+    pub(crate) fn replace_paragraph_text(
         &mut self,
         entry_index: usize,
         position: Position,
@@ -4803,44 +5073,20 @@ impl GlossaryBatchEdit {
         Ok(self)
     }
 
-    /// Finish the staged intents as one source-bound reversible patch.
-    pub fn commit(self) -> Result<GlossaryBatchCommit> {
+    pub(crate) fn finish(self) -> Result<GlossaryBatchPatch> {
         self.base.check_execution()?;
         let target = self.projected()?;
         self.base.check_execution()?;
-        let patch = GlossaryBatchPatch {
+        Ok(GlossaryBatchPatch {
             before: self.base,
-            after: target.clone(),
-        };
-        Ok(GlossaryBatchCommit {
-            snapshot: target,
-            patch,
+            after: target,
         })
     }
 }
 
-/// A completed atomic glossary batch edit.
-pub struct GlossaryBatchCommit {
-    snapshot: GlossaryBatchSnapshot,
-    patch: GlossaryBatchPatch,
-}
-
-impl GlossaryBatchCommit {
-    /// Borrow the projected batch snapshot.
-    #[must_use]
-    pub const fn snapshot(&self) -> &GlossaryBatchSnapshot {
-        &self.snapshot
-    }
-
-    /// Borrow the source-bound reversible batch patch.
-    #[must_use]
-    pub const fn patch(&self) -> &GlossaryBatchPatch {
-        &self.patch
-    }
-}
-
-/// A reversible source-bound patch for a glossary Part containing a bounded
-/// set of selected entries.
+/// A reversible patch for a glossary Part containing a bounded set of selected
+/// entries. Owner publication adds its complete-artifact and source-freshness
+/// proof; raw replay matches the selected content.
 #[derive(Clone)]
 pub struct GlossaryBatchPatch {
     before: GlossaryBatchSnapshot,
@@ -4848,7 +5094,7 @@ pub struct GlossaryBatchPatch {
 }
 
 impl GlossaryBatchPatch {
-    /// Borrow the exact batch source required by this patch.
+    /// Borrow the before batch snapshot represented by this patch.
     #[must_use]
     pub const fn source(&self) -> &GlossaryBatchSnapshot {
         &self.before
@@ -4881,14 +5127,7 @@ impl GlossaryBatchPatch {
         &self,
         source: &GlossaryBatchSnapshot,
     ) -> Result<GlossaryBatchSnapshot> {
-        if self.before.selector != source.selector
-            || !same_part_name(&self.before.partname, &source.partname)
-        {
-            return Err(Error::TopologyConflict);
-        }
-        if source.raw_bytes() != self.before.raw_bytes() {
-            return Err(Error::PatchConflict);
-        }
+        self.check_content(source)?;
         Ok(if self.is_noop() {
             source.clone()
         } else {
@@ -4896,28 +5135,88 @@ impl GlossaryBatchPatch {
         })
     }
 
-    pub fn apply(&self, source: &GlossaryBatchSnapshot) -> Result<GlossaryBatchSnapshot> {
+    fn check_content(&self, source: &GlossaryBatchSnapshot) -> Result<()> {
         if self.before.selector != source.selector
             || !same_part_name(&self.before.partname, &source.partname)
         {
             return Err(Error::TopologyConflict);
         }
-        if source.source_lineage != self.before.source_lineage {
-            return Err(Error::ForeignSource);
-        }
-        if source.source_version != self.before.source_version {
+        if !same_content(
+            source.part_fingerprint,
+            source.raw_bytes(),
+            self.before.raw_bytes(),
+            self.before.part_fingerprint,
+        ) {
             return Err(Error::PatchConflict);
         }
-        if source.part_fingerprint != self.before.part_fingerprint
-            || source.raw_bytes() != self.before.raw_bytes()
-        {
-            return Err(Error::PatchConflict);
+        Ok(())
+    }
+
+    /// Replay this raw glossary patch on an independently opened matching
+    /// batch snapshot. Replay is scoped to the selected glossary XML part;
+    /// package publication performs complete-artifact and source-freshness
+    /// checks separately.
+    pub fn apply(&self, source: &GlossaryBatchSnapshot) -> Result<GlossaryBatchSnapshot> {
+        source.check_execution()?;
+        self.check_content(source)?;
+        self.rebased_target(source)
+    }
+
+    fn rebased_target(&self, source: &GlossaryBatchSnapshot) -> Result<GlossaryBatchSnapshot> {
+        if self.is_noop() {
+            return Ok(source.clone());
         }
-        Ok(if self.is_noop() {
-            source.clone()
-        } else {
-            self.after.clone()
-        })
+        let bytes = self.after.raw_bytes();
+        if bytes.len() > source.limits.max_output_bytes {
+            return Err(Error::Limit {
+                kind: LimitKind::GlossaryBatchOutputBytes,
+                actual: bytes.len(),
+                maximum: source.limits.max_output_bytes,
+            });
+        }
+        let expected_word_namespace = source
+            .entries
+            .first()
+            .map(|entry| entry.layout.word_namespace.as_ref());
+        let layouts = scan_glossary_many(
+            bytes,
+            &source.selector.selectors,
+            expected_word_namespace,
+            source.limits,
+            source.execution.as_ref(),
+        )?;
+        if layouts.len() != source.entries.len() {
+            return Err(Error::TopologyConflict);
+        }
+        let mut entries = Vec::new();
+        entries
+            .try_reserve_exact(layouts.len())
+            .map_err(|source| Error::Allocation {
+                resource: "glossary raw replay entries",
+                source,
+            })?;
+        for (selector_index, layout) in layouts.into_iter().enumerate() {
+            entries.push(GlossaryBatchEntry {
+                selector_index,
+                layout,
+            });
+        }
+        entries.sort_unstable_by_key(|entry| entry.layout.root_start_end);
+        validate_batch_ranges(&entries, bytes.len())?;
+        for (canonical_index, entry) in entries.iter_mut().enumerate() {
+            entry.selector_index = canonical_index;
+        }
+        let mut target = self.after.clone();
+        target.selector = source.selector.clone();
+        target.entries = entries;
+        target.partname = source.partname.clone();
+        target.source_version = source.source_version;
+        target.source_lineage = source.source_lineage.clone();
+        target.part_fingerprint = digest(bytes);
+        target.artifact_fingerprint = source.artifact_fingerprint;
+        target.limits = source.limits;
+        target.execution = source.execution.clone();
+        Ok(target)
     }
 }
 
@@ -4947,15 +5246,16 @@ impl Package {
     ) -> Result<(PackURI, Arc<Vec<u8>>)> {
         self.trim_clean_paragraph_index_for_operation();
         self.physical_package()?.check_execution()?;
+        let recipient_limits = self.semantic_limits.story_text_value();
         let current =
-            capture_glossary_batch(self, patch.before.selector.clone(), patch.before.limits)?;
+            capture_glossary_batch(self, patch.before.selector.clone(), recipient_limits)?;
         let target = patch.apply_content(&current)?;
         story_replacement(
             self,
             patch.is_noop(),
             &current.partname,
             target.raw_bytes(),
-            patch.before.limits,
+            recipient_limits,
             LimitKind::GlossaryBatchOutputBytes,
             "glossary batch publication replacement",
         )

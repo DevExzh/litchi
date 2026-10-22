@@ -6,7 +6,7 @@ use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits as CoreLimits,
     OwnedSource, Position, TextOutputOptions,
 };
-use litchi_docx::source_backed::{self, StorySelector};
+use litchi_docx::source_backed::{self, story_text};
 use litchi_docx::{Error, SourceLimits};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter, Part, TargetMode};
@@ -133,7 +133,9 @@ impl Write for HostileWriter {
 #[test]
 fn selected_story_snapshot_reads_main_header_and_footer() {
     let package = open(&fixture());
-    let main = package.story_text_snapshot(StorySelector::Main).unwrap();
+    let main = package
+        .story_text_snapshot(story_text::Selector::Main)
+        .unwrap();
     assert_eq!(main.paragraph_count().unwrap(), 1);
     assert_eq!(main.paragraph_text(0).unwrap().as_deref(), Some("main"));
 
@@ -145,20 +147,20 @@ fn selected_story_snapshot_reads_main_header_and_footer() {
     assert_eq!(report.objects_written(), 1);
 
     let header = package
-        .story_text_snapshot(StorySelector::Header(0))
+        .story_text_snapshot(story_text::Selector::Header(0))
         .unwrap();
     assert_eq!(header.paragraph_text(0).unwrap().as_deref(), Some("header"));
     let footer = package
-        .story_text_snapshot(StorySelector::Footer(0))
+        .story_text_snapshot(story_text::Selector::Footer(0))
         .unwrap();
     assert_eq!(footer.paragraph_text(0).unwrap().as_deref(), Some("footer"));
     assert!(
         package
-            .story_text_snapshot(StorySelector::Header(1))
+            .story_text_snapshot(story_text::Selector::Header(1))
             .is_err_and(|error| {
                 matches!(
                     error,
-                    source_backed::StoryTextError::Document(Error::OutOfBounds {
+                    story_text::Error::Document(Error::OutOfBounds {
                         object: "header",
                         index: 1,
                         ..
@@ -173,20 +175,20 @@ fn selected_story_edit_publishes_one_part_and_restores_exact_source() {
     let source = fixture();
     let package = open(&source);
     let snapshot = package
-        .story_text_snapshot(StorySelector::Header(0))
+        .story_text_snapshot(story_text::Selector::Header(0))
         .unwrap();
-    let mut edit = snapshot.edit().unwrap();
+    let mut edit = snapshot.raw_tree(snapshot.limits_value()).unwrap();
     edit.replace_paragraph_text(Position::new(0), "changed")
         .unwrap();
-    let commit = edit.commit().unwrap();
+    let patch = edit.patch().unwrap();
     assert_eq!(
-        commit.snapshot().paragraph_text(0).unwrap().as_deref(),
+        patch.target().paragraph_text(0).unwrap().as_deref(),
         Some("changed")
     );
 
     let mut published = Vec::new();
     let publication = package
-        .apply_story_text(&commit.patch().clone().into())
+        .apply_story_text(&patch.clone().into())
         .and_then(|committed| {
             committed.package().write_to(&mut published)?;
             Ok(committed)
@@ -195,7 +197,7 @@ fn selected_story_edit_publishes_one_part_and_restores_exact_source() {
     let reopened = open(&published);
     assert_eq!(
         reopened
-            .story_text_snapshot(StorySelector::Header(0))
+            .story_text_snapshot(story_text::Selector::Header(0))
             .unwrap()
             .paragraph_text(0)
             .unwrap()
@@ -204,7 +206,7 @@ fn selected_story_edit_publishes_one_part_and_restores_exact_source() {
     );
     assert_eq!(
         reopened
-            .story_text_snapshot(StorySelector::Main)
+            .story_text_snapshot(story_text::Selector::Main)
             .unwrap()
             .paragraph_text(0)
             .unwrap()
@@ -213,7 +215,7 @@ fn selected_story_edit_publishes_one_part_and_restores_exact_source() {
     );
     assert_eq!(
         reopened
-            .story_text_snapshot(StorySelector::Footer(0))
+            .story_text_snapshot(story_text::Selector::Footer(0))
             .unwrap()
             .paragraph_text(0)
             .unwrap()
@@ -241,32 +243,144 @@ fn selected_story_edit_publishes_one_part_and_restores_exact_source() {
 }
 
 #[test]
+fn selected_story_replays_on_independent_matching_copies_and_chains_edits() {
+    let source = fixture();
+    let package = open(&source);
+    let snapshot = package
+        .story_text_snapshot(story_text::Selector::Header(0))
+        .unwrap();
+    let mut edit = snapshot.raw_tree(snapshot.limits_value()).unwrap();
+    edit.replace_paragraph_text(Position::new(0), "first change")
+        .unwrap();
+    let patch = edit.patch().unwrap();
+
+    // The patch records the selected story's content, so a separately opened
+    // package with the same bytes is an eligible recipient.
+    let first = open(&source)
+        .apply_story_text(&patch.clone().into())
+        .unwrap();
+    let mut first_bytes = Vec::new();
+    first.package().write_to(&mut first_bytes).unwrap();
+    assert_eq!(
+        open(&first_bytes)
+            .story_text_snapshot(story_text::Selector::Header(0))
+            .unwrap()
+            .paragraph_text(0)
+            .unwrap()
+            .as_deref(),
+        Some("first change")
+    );
+
+    // A second raw edit can be authored from that independently published
+    // copy, and its inverse restores the exact first publication bytes.
+    let second_source = open(&first_bytes);
+    let second_snapshot = second_source
+        .story_text_snapshot(story_text::Selector::Header(0))
+        .unwrap();
+    let mut second_edit = second_snapshot
+        .raw_tree(second_snapshot.limits_value())
+        .unwrap();
+    second_edit
+        .replace_paragraph_text(Position::new(0), "second change")
+        .unwrap();
+    let second = second_source
+        .apply_story_text(&second_edit.patch().unwrap().into())
+        .unwrap();
+    let mut second_bytes = Vec::new();
+    second.package().write_to(&mut second_bytes).unwrap();
+    assert_eq!(
+        open(&second_bytes)
+            .story_text_snapshot(story_text::Selector::Header(0))
+            .unwrap()
+            .paragraph_text(0)
+            .unwrap()
+            .as_deref(),
+        Some("second change")
+    );
+
+    let mut restored = Vec::new();
+    open(&second_bytes)
+        .apply_story_text(&second.patch().inverse())
+        .unwrap()
+        .package()
+        .write_to(&mut restored)
+        .unwrap();
+    assert_eq!(restored, first_bytes);
+}
+
+#[test]
 fn selected_story_noop_copies_the_complete_source_byte_for_byte() {
     let source = fixture();
     let package = open(&source);
     let snapshot = package
-        .story_text_snapshot(StorySelector::Footer(0))
+        .story_text_snapshot(story_text::Selector::Footer(0))
         .unwrap();
-    let mut edit = snapshot.edit().unwrap();
+    let mut edit = snapshot.raw_tree(snapshot.limits_value()).unwrap();
     edit.replace_paragraph_text(Position::new(0), "footer")
         .unwrap();
-    let commit = edit.commit().unwrap();
+    let patch = edit.patch().unwrap();
     let mut output = Vec::new();
     package
-        .apply_story_text(&commit.patch().clone().into())
+        .apply_story_text(&patch.clone().into())
         .and_then(|committed| Ok(committed.package().write_to(&mut output)?))
         .unwrap();
     assert_eq!(output, source);
 }
 
 #[test]
+fn raw_story_tree_caches_projection_and_invalidates_after_mutation() {
+    let package = open(&fixture());
+    let snapshot = package
+        .story_text_snapshot(story_text::Selector::Main)
+        .unwrap();
+    let mut tree = snapshot.raw_tree(snapshot.limits_value()).unwrap();
+
+    let first = tree.projected().unwrap();
+    let second = tree.projected().unwrap();
+    assert_eq!(first.part_fingerprint(), second.part_fingerprint());
+    assert_eq!(
+        first.paragraph_text(0).unwrap(),
+        second.paragraph_text(0).unwrap()
+    );
+
+    tree.replace_paragraph_text(Position::new(0), "cached mutation")
+        .unwrap();
+    let changed = tree.projected().unwrap();
+    assert_ne!(first.part_fingerprint(), changed.part_fingerprint());
+    assert_eq!(
+        changed.paragraph_text(0).unwrap().as_deref(),
+        Some("cached mutation")
+    );
+    let patch = tree.patch().unwrap();
+    assert_eq!(
+        patch.target().part_fingerprint(),
+        changed.part_fingerprint()
+    );
+}
+
+#[test]
+fn raw_story_tree_intersects_requested_output_policy() {
+    let package = open(&fixture());
+    let snapshot = package
+        .story_text_snapshot(story_text::Selector::Header(0))
+        .unwrap();
+    let requested = story_text::Limits::new(4096, 10, 10_000, 64, 1, 4096, 4096).unwrap();
+    assert!(matches!(
+        snapshot.raw_tree(requested),
+        Err(story_text::Error::Limit { .. })
+    ));
+}
+
+#[test]
 fn managed_story_reads_are_bounded_and_edits_are_typed_refusals() {
     let (budget, _cancellation, package) = managed_open(fixture());
-    let snapshot = package.story_text_snapshot(StorySelector::Main).unwrap();
+    let snapshot = package
+        .story_text_snapshot(story_text::Selector::Main)
+        .unwrap();
     assert_eq!(snapshot.paragraph_text(0).unwrap().as_deref(), Some("main"));
     assert!(matches!(
-            snapshot.edit(),
-            Err(source_backed::StoryTextError::Document(Error::Refused(refusal))) if refusal.operation() == "source-backed story text edit"
+            snapshot.raw_tree(snapshot.limits_value()),
+            Err(story_text::Error::Document(Error::Refused(refusal))) if refusal.operation() == "source-backed story text edit"
     ));
     drop(snapshot);
     drop(package);
@@ -280,66 +394,62 @@ fn story_scan_enforces_paragraph_depth_and_output_limits() {
     );
     let source = main_only_fixture(&document);
     let paragraph_limited =
-        source_backed::StoryTextLimits::new(4096, 1, 10_000, 64, 4096, 4_096, 4096).unwrap();
+        story_text::Limits::new(4096, 1, 10_000, 64, 4096, 4_096, 4096).unwrap();
     assert!(matches!(
         open(&source)
             .with_semantic_limits(
                 litchi_docx::SemanticLimits::default().story_text(paragraph_limited)
             )
-            .story_text_snapshot(StorySelector::Main),
-        Err(source_backed::StoryTextError::Limit {
-            kind: source_backed::story_text::LimitKind::Paragraphs,
+            .story_text_snapshot(story_text::Selector::Main),
+        Err(story_text::Error::Limit {
+            kind: story_text::LimitKind::Paragraphs,
             ..
         })
     ));
 
-    let depth_limited =
-        source_backed::StoryTextLimits::new(4096, 10, 10_000, 2, 4096, 4_096, 4096).unwrap();
+    let depth_limited = story_text::Limits::new(4096, 10, 10_000, 2, 4096, 4_096, 4096).unwrap();
     assert!(matches!(
         open(&source)
             .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(depth_limited))
-            .story_text_snapshot(StorySelector::Main),
-        Err(source_backed::StoryTextError::Limit {
-            kind: source_backed::story_text::LimitKind::XmlDepth,
+            .story_text_snapshot(story_text::Selector::Main),
+        Err(story_text::Error::Limit {
+            kind: story_text::LimitKind::XmlDepth,
             ..
         })
     ));
 
     let empty_depth_document =
         format!(r#"<w:document xmlns:w="{W}"><w:body><w:p/></w:body></w:document>"#);
-    let empty_depth =
-        source_backed::StoryTextLimits::new(4096, 10, 10_000, 2, 4096, 4_096, 4096).unwrap();
+    let empty_depth = story_text::Limits::new(4096, 10, 10_000, 2, 4096, 4_096, 4096).unwrap();
     assert!(matches!(
         open(&main_only_fixture(&empty_depth_document))
             .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(empty_depth))
-            .story_text_snapshot(StorySelector::Main),
-        Err(source_backed::StoryTextError::Limit {
-            kind: source_backed::story_text::LimitKind::XmlDepth,
+            .story_text_snapshot(story_text::Selector::Main),
+        Err(story_text::Error::Limit {
+            kind: story_text::LimitKind::XmlDepth,
             ..
         })
     ));
 
-    let output_limited =
-        source_backed::StoryTextLimits::new(4096, 10, 10_000, 64, 1, 4_096, 4096).unwrap();
+    let output_limited = story_text::Limits::new(4096, 10, 10_000, 64, 1, 4_096, 4096).unwrap();
     let snapshot = open(&main_only_fixture(&format!(
         r#"<w:document xmlns:w="{W}"><w:body><w:p><w:r><w:t>long</w:t></w:r></w:p></w:body></w:document>"#
     )))
-    .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(output_limited)).story_text_snapshot(StorySelector::Main)
+    .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(output_limited)).story_text_snapshot(story_text::Selector::Main)
     .unwrap();
     assert!(matches!(
         snapshot.extract_text(),
-        Err(source_backed::StoryTextError::Limit {
-            kind: source_backed::story_text::LimitKind::ParagraphText,
+        Err(story_text::Error::Limit {
+            kind: story_text::LimitKind::ParagraphText,
             ..
         })
     ));
 
-    let aggregate_limits =
-        source_backed::StoryTextLimits::new(4096, 10, 10_000, 64, 6, 4_096, 4096).unwrap();
+    let aggregate_limits = story_text::Limits::new(4096, 10, 10_000, 64, 6, 4_096, 4096).unwrap();
     let aggregate_snapshot = open(&main_only_fixture(&format!(
         r#"<w:document xmlns:w="{W}"><w:body><w:p><w:r><w:t>one</w:t></w:r></w:p><w:p><w:r><w:t>two</w:t></w:r></w:p></w:body></w:document>"#
     )))
-    .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(aggregate_limits)).story_text_snapshot(StorySelector::Main)
+    .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(aggregate_limits)).story_text_snapshot(story_text::Selector::Main)
     .unwrap();
     let mut aggregate_output = Vec::new();
     let aggregate_error = aggregate_snapshot
@@ -362,16 +472,16 @@ fn hostile_publication_writer_is_rejected_without_panicking() {
     let source = fixture();
     let package = open(&source);
     let snapshot = package
-        .story_text_snapshot(StorySelector::Header(0))
+        .story_text_snapshot(story_text::Selector::Header(0))
         .unwrap();
-    let mut edit = snapshot.edit().unwrap();
+    let mut edit = snapshot.raw_tree(snapshot.limits_value()).unwrap();
     edit.replace_paragraph_text(Position::new(0), "changed")
         .unwrap();
-    let commit = edit.commit().unwrap();
+    let patch = edit.patch().unwrap();
     let mut writer = HostileWriter;
     assert!(
         package
-            .apply_story_text(&commit.patch().clone().into())
+            .apply_story_text(&patch.clone().into())
             .and_then(|committed| {
                 committed.package().write_to(&mut writer)?;
                 Ok(committed)
@@ -386,15 +496,15 @@ fn trailing_source_bytes_are_preserved_by_an_exact_noop() {
     source.extend_from_slice(b"opaque trailing source bytes");
     let package = open(&source);
     let snapshot = package
-        .story_text_snapshot(StorySelector::Footer(0))
+        .story_text_snapshot(story_text::Selector::Footer(0))
         .unwrap();
-    let mut edit = snapshot.edit().unwrap();
+    let mut edit = snapshot.raw_tree(snapshot.limits_value()).unwrap();
     edit.replace_paragraph_text(Position::new(0), "footer")
         .unwrap();
-    let commit = edit.commit().unwrap();
+    let patch = edit.patch().unwrap();
     let mut output = Vec::new();
     package
-        .apply_story_text(&commit.patch().clone().into())
+        .apply_story_text(&patch.clone().into())
         .and_then(|committed| Ok(committed.package().write_to(&mut output)?))
         .unwrap();
     assert_eq!(output, source);
@@ -407,7 +517,7 @@ fn namespace_aliases_are_resolved_and_wrong_bindings_are_refused() {
     ));
     assert_eq!(
         open(&alias)
-            .story_text_snapshot(StorySelector::Main)
+            .story_text_snapshot(story_text::Selector::Main)
             .unwrap()
             .paragraph_text(0)
             .unwrap()
@@ -419,20 +529,24 @@ fn namespace_aliases_are_resolved_and_wrong_bindings_are_refused() {
         r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/mai&#x6e;"><w:body><w:p><w:r><w:t>escaped</w:t></w:r></w:p></w:body></w:document>"#,
     );
     let escaped_snapshot = open(&escaped_word_namespace)
-        .story_text_snapshot(StorySelector::Main)
+        .story_text_snapshot(story_text::Selector::Main)
         .unwrap();
     assert_eq!(
         escaped_snapshot.paragraph_text(0).unwrap().as_deref(),
         Some("escaped")
     );
-    assert!(escaped_snapshot.edit().is_err());
+    assert!(
+        escaped_snapshot
+            .raw_tree(escaped_snapshot.limits_value())
+            .is_err()
+    );
 
     let wrong = main_only_fixture(
         r#"<x:document xmlns:x="urn:not-word"><x:body><x:p><x:r><x:t>wrong</x:t></x:r></x:p></x:body></x:document>"#,
     );
     assert!(matches!(
-        open(&wrong).story_text_snapshot(StorySelector::Main),
-        Err(source_backed::StoryTextError::Document(Error::Refused(_)))
+        open(&wrong).story_text_snapshot(story_text::Selector::Main),
+        Err(story_text::Error::Document(Error::Refused(_)))
     ));
 }
 
@@ -441,14 +555,18 @@ fn nested_mce_and_processing_instructions_are_refused() {
     let mce = main_only_fixture(&format!(
         r#"<w:document xmlns:w="{W}" xmlns:m="http://schemas.openxmlformats.org/markup-compatibility/2006"><w:body><m:AlternateContent/></w:body></w:document>"#
     ));
-    assert!(open(&mce).story_text_snapshot(StorySelector::Main).is_err());
+    assert!(
+        open(&mce)
+            .story_text_snapshot(story_text::Selector::Main)
+            .is_err()
+    );
 
     let escaped_mce = main_only_fixture(&format!(
         r#"<w:document xmlns:w="{W}" xmlns:m="http://schemas.openxmlformats.org/markup-compatibility/200&#x36;"><w:body><m:AlternateContent/></w:body></w:document>"#
     ));
     assert!(
         open(&escaped_mce)
-            .story_text_snapshot(StorySelector::Main)
+            .story_text_snapshot(story_text::Selector::Main)
             .is_err()
     );
 
@@ -457,7 +575,7 @@ fn nested_mce_and_processing_instructions_are_refused() {
     ));
     assert!(
         open(&processing_instruction)
-            .story_text_snapshot(StorySelector::Main)
+            .story_text_snapshot(story_text::Selector::Main)
             .is_err()
     );
 }
@@ -469,8 +587,8 @@ fn strict_xml_rejects_duplicate_attributes_and_mismatched_end_names() {
     ));
     if let Ok(source) = duplicate_namespace {
         assert!(matches!(
-            open(&source).story_text_snapshot(StorySelector::Main),
-            Err(source_backed::StoryTextError::Document(_))
+            open(&source).story_text_snapshot(story_text::Selector::Main),
+            Err(story_text::Error::Document(_))
         ));
     }
 
@@ -479,8 +597,8 @@ fn strict_xml_rejects_duplicate_attributes_and_mismatched_end_names() {
     ));
     if let Ok(source) = duplicate_attribute {
         assert!(matches!(
-            open(&source).story_text_snapshot(StorySelector::Main),
-            Err(source_backed::StoryTextError::Document(_))
+            open(&source).story_text_snapshot(story_text::Selector::Main),
+            Err(story_text::Error::Document(_))
         ));
     }
 
@@ -489,37 +607,209 @@ fn strict_xml_rejects_duplicate_attributes_and_mismatched_end_names() {
     ));
     if let Ok(source) = mismatched_end {
         assert!(matches!(
-            open(&source).story_text_snapshot(StorySelector::Main),
-            Err(source_backed::StoryTextError::Document(_))
+            open(&source).story_text_snapshot(story_text::Selector::Main),
+            Err(story_text::Error::Document(_))
         ));
     }
 }
 
 #[test]
-fn patches_reject_foreign_and_stale_snapshots_and_cancel_before_output() {
+fn patches_accept_matching_copy_and_reject_stale_snapshots_and_cancel_before_output() {
     let source = fixture();
     let package = open(&source);
-    let snapshot = package.story_text_snapshot(StorySelector::Main).unwrap();
-    let mut edit = snapshot.edit().unwrap();
+    let snapshot = package
+        .story_text_snapshot(story_text::Selector::Main)
+        .unwrap();
+    let mut edit = snapshot.raw_tree(snapshot.limits_value()).unwrap();
     edit.replace_paragraph_text(Position::new(0), "changed")
         .unwrap();
-    let commit = edit.commit().unwrap();
+    let patch = edit.patch().unwrap();
     assert!(matches!(
-        commit.patch().apply(commit.snapshot()),
-        Err(source_backed::StoryTextError::PatchConflict)
+        patch.apply(patch.target()),
+        Err(story_text::Error::PatchConflict)
     ));
 
     let foreign = open(&source)
-        .story_text_snapshot(StorySelector::Main)
+        .story_text_snapshot(story_text::Selector::Main)
+        .unwrap();
+    let foreign_applied = patch.apply(&foreign).unwrap();
+    assert_eq!(
+        foreign_applied.paragraph_text(0).unwrap().as_deref(),
+        Some("changed")
+    );
+
+    let tight_limits = story_text::Limits::new(16 * 1024, 128, 10_000, 64, 1, 16, 4096)
         .unwrap();
     assert!(matches!(
-        commit.patch().apply(&foreign),
-        Err(source_backed::StoryTextError::ForeignSource)
+        snapshot.raw_tree(tight_limits),
+        Err(story_text::Error::Limit {
+            kind: story_text::LimitKind::TransactionXml,
+            ..
+        })
     ));
 
-    let (_budget, cancellation, package) = managed_open(source);
+    let changed_package = open(&source)
+        .apply_story_text(&patch.clone().into())
+        .unwrap();
+    let mut changed_bytes = Vec::new();
+    changed_package
+        .package()
+        .write_to(&mut changed_bytes)
+        .unwrap();
+    let changed = open(&changed_bytes)
+        .story_text_snapshot(story_text::Selector::Main)
+        .unwrap();
+    assert!(matches!(
+        patch.apply(&changed),
+        Err(story_text::Error::PatchConflict)
+    ));
+
+    let (_budget, cancellation, package) = managed_open(source.clone());
+    let cancelled_snapshot = package
+        .story_text_snapshot(story_text::Selector::Main)
+        .unwrap();
     cancellation.cancel();
+    assert!(matches!(
+        patch.apply(&cancelled_snapshot),
+        Err(story_text::Error::Document(Error::Opc(
+            litchi_opc::OpcError::Cancelled
+        )))
+    ));
+    let noop = snapshot
+        .raw_tree(snapshot.limits_value())
+        .unwrap()
+        .patch()
+        .unwrap();
+    assert!(noop.is_noop());
+    assert!(matches!(
+        noop.apply(&cancelled_snapshot),
+        Err(story_text::Error::Document(Error::Opc(
+            litchi_opc::OpcError::Cancelled
+        )))
+    ));
     let output: Vec<u8> = Vec::new();
-    assert!(package.story_text_snapshot(StorySelector::Main).is_err());
+    assert!(
+        package
+            .story_text_snapshot(story_text::Selector::Main)
+            .is_err()
+    );
     assert!(output.is_empty());
+}
+
+#[test]
+fn raw_story_replay_reopens_matches_and_chains_under_recipient_limits() {
+    let source = fixture();
+    let author = open(&source);
+    let snapshot = author
+        .story_text_snapshot(story_text::Selector::Header(0))
+        .unwrap();
+    let mut tree = snapshot.raw_tree(snapshot.limits_value()).unwrap();
+    tree.replace_paragraph_text(Position::new(0), "first raw change")
+        .unwrap();
+    let patch = tree.patch().unwrap();
+
+    let recipient_limits =
+        story_text::Limits::new(16 * 1024, 128, 10_000, 64, 16 * 1024, 16, 4096).unwrap();
+    let recipient = open(&source)
+        .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(recipient_limits))
+        .story_text_snapshot(story_text::Selector::Header(0))
+        .unwrap();
+    assert_ne!(snapshot.limits_value(), recipient.limits_value());
+
+    let first = patch.apply(&recipient).unwrap();
+    assert_eq!(first.limits_value(), recipient.limits_value());
+    assert_eq!(
+        first.paragraph_text(0).unwrap().as_deref(),
+        Some("first raw change")
+    );
+
+    let restrictive_limits =
+        story_text::Limits::new(16 * 1024, 128, 10_000, 64, 1, 16, 4096).unwrap();
+    let restrictive = open(&source)
+        .with_semantic_limits(
+            litchi_docx::SemanticLimits::default().story_text(restrictive_limits),
+        )
+        .story_text_snapshot(story_text::Selector::Header(0))
+        .unwrap();
+    assert!(matches!(
+        patch.apply(&restrictive),
+        Err(story_text::Error::Limit {
+            kind: story_text::LimitKind::OutputBytes,
+            ..
+        })
+    ));
+
+    let restored = patch.inverse().apply(&first).unwrap();
+    assert_eq!(restored.part_fingerprint(), recipient.part_fingerprint());
+    assert_eq!(
+        restored.paragraph_text(0).unwrap().as_deref(),
+        Some("header")
+    );
+
+    let mut second_tree = first.raw_tree(first.limits_value()).unwrap();
+    second_tree
+        .replace_paragraph_text(Position::new(0), "second raw change")
+        .unwrap();
+    let second_patch = second_tree.patch().unwrap();
+    let second = second_patch.apply(&first).unwrap();
+    assert_eq!(
+        second.paragraph_text(0).unwrap().as_deref(),
+        Some("second raw change")
+    );
+    let second_restored = second_patch.inverse().apply(&second).unwrap();
+    assert_eq!(
+        second_restored.paragraph_text(0).unwrap().as_deref(),
+        Some("first raw change")
+    );
+}
+
+#[test]
+fn story_replay_uses_recipient_limits_for_broad_raw_patches() {
+    let source = fixture();
+    let producer_limits = story_text::Limits::new(128 * 1024, 128, 10_000, 64, 128 * 1024, 16, 4096)
+        .unwrap();
+    let producer = open(&source)
+        .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(producer_limits));
+    let snapshot = producer
+        .story_text_snapshot(story_text::Selector::Main)
+        .unwrap();
+    let mut tree = snapshot.raw_tree(snapshot.limits_value()).unwrap();
+    tree.replace_paragraph_text(Position::new(0), "broad producer patch")
+        .unwrap();
+    let patch = tree.patch().unwrap();
+
+    let accepted_limits = story_text::Limits::new(16 * 1024, 128, 10_000, 64, 1024, 16, 4096)
+        .unwrap();
+    let accepted = open(&source)
+        .with_semantic_limits(
+            litchi_docx::SemanticLimits::default().story_text(accepted_limits),
+        )
+        .story_text_snapshot(story_text::Selector::Main)
+        .unwrap();
+    let accepted_target = patch.apply(&accepted).unwrap();
+    assert_eq!(accepted_target.limits_value(), accepted_limits);
+
+    let narrow_limits = story_text::Limits::new(16 * 1024, 128, 10_000, 64, 1, 16, 4096)
+        .unwrap();
+    let narrow = open(&source).with_semantic_limits(
+        litchi_docx::SemanticLimits::default().story_text(narrow_limits),
+    );
+    let narrow_snapshot = narrow
+        .story_text_snapshot(story_text::Selector::Main)
+        .unwrap();
+    assert!(matches!(
+        patch.apply(&narrow_snapshot),
+        Err(story_text::Error::Limit {
+            kind: story_text::LimitKind::OutputBytes,
+            ..
+        })
+    ));
+    let package_patch = patch.clone().into();
+    assert!(matches!(
+        narrow.apply_story_text(&package_patch),
+        Err(story_text::Error::Limit {
+            kind: story_text::LimitKind::OutputBytes,
+            ..
+        })
+    ));
 }

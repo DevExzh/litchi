@@ -103,7 +103,7 @@ impl Edit {
     /// Returns a typed source, topology, output-limit or signature error
     /// before any output.
     pub fn commit(self) -> Result<Commit, Error> {
-        let patch = self.inner.commit()?.patch().clone();
+        let patch = self.inner.finish()?;
         commit_change(&self.package, StoryTextChange(patch))
     }
 }
@@ -117,7 +117,7 @@ impl Package {
     pub fn edit_story_text(&self, selector: Selector) -> Result<Edit, Error> {
         Ok(Edit {
             package: self.clone(),
-            inner: self.story_text_snapshot(selector)?.edit()?,
+            inner: self.story_text_snapshot(selector)?.edit_engine()?,
         })
     }
 

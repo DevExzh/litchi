@@ -105,7 +105,7 @@ impl Edit {
     /// Returns a typed source, topology, output-limit or signature error
     /// before any output.
     pub fn commit(self) -> Result<Commit, Error> {
-        let patch = self.inner.commit()?.patch().clone();
+        let patch = self.inner.finish()?;
         commit_change(&self.package, GlossaryTextChange(patch))
     }
 }
@@ -119,7 +119,7 @@ impl Package {
     pub fn edit_glossary_text_batch(&self, selector: GlossaryBatchSelector) -> Result<Edit, Error> {
         Ok(Edit {
             package: self.clone(),
-            inner: self.glossary_text_batch_snapshot(selector)?.edit()?,
+            inner: self.glossary_text_batch_snapshot(selector)?.edit_engine()?,
         })
     }
 

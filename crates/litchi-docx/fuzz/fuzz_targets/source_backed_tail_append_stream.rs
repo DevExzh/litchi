@@ -17,8 +17,13 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use libfuzzer_sys::fuzz_target;
 use litchi_docx::SourceLimits;
 use litchi_docx::source_backed::{
-    Package, TailAppendLimits, TailAppendStreamCursor, TailAppendStreamEvent,
-    TailAppendStreamLimits, TailAppendStreamSource,
+    Package,
+    tail_append::Limits as TailAppendLimits,
+    tail_append_stream::{
+        ParagraphCursor as TailAppendStreamCursor, ParagraphStreamLimits as TailAppendStreamLimits,
+        PlainParagraphEvent as TailAppendStreamEvent,
+        ReplayableParagraphSource as TailAppendStreamSource,
+    },
 };
 
 const MAX_INPUT_BYTES: usize = 64 * 1024;

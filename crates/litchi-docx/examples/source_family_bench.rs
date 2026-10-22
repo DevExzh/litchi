@@ -24,7 +24,7 @@ use std::time::Instant;
 
 use litchi_core::{OwnedSource, Position};
 use litchi_docx::section::{Columns, Emu, Selector as SectionSelector};
-use litchi_docx::source_backed::{self, StorySelector};
+use litchi_docx::source_backed::{self, story_text::Selector as StorySelector};
 use litchi_docx::story_hyperlinks::Mode;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter, Part as _, TargetMode};

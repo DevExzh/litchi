@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use litchi_core::{OwnedSource, Position};
 use litchi_docx::glossary::{Id, Name};
-use litchi_docx::source_backed::{self, GlossaryBatchSelector, GlossarySelector, StorySelector};
+use litchi_docx::source_backed::{self, story_text};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter, Part, TargetMode};
 
@@ -430,20 +430,22 @@ fn open(bytes: &[u8]) -> source_backed::Package {
     source_backed::Package::from_read_at(Arc::new(OwnedSource::new(bytes.to_vec()))).unwrap()
 }
 
-fn selector(selector: GlossarySelector) -> StorySelector {
-    StorySelector::Glossary(selector)
+fn selector(selector: story_text::GlossarySelector) -> story_text::Selector {
+    story_text::Selector::Glossary(selector)
 }
 
-fn alpha_by_name() -> StorySelector {
-    selector(GlossarySelector::ByName("Alpha".to_owned()))
+fn alpha_by_name() -> story_text::Selector {
+    selector(story_text::GlossarySelector::ByName("Alpha".to_owned()))
 }
 
-fn alpha_by_id() -> StorySelector {
-    selector(GlossarySelector::ById(Id::new(ALPHA_ID).unwrap()))
+fn alpha_by_id() -> story_text::Selector {
+    selector(story_text::GlossarySelector::ById(
+        Id::new(ALPHA_ID).unwrap(),
+    ))
 }
 
-fn glossary_by_index(index: usize) -> StorySelector {
-    selector(GlossarySelector::ByIndex(index))
+fn glossary_by_index(index: usize) -> story_text::Selector {
+    selector(story_text::GlossarySelector::ByIndex(index))
 }
 
 fn part(bytes: &[u8], name: &str) -> Vec<u8> {
@@ -492,11 +494,11 @@ fn glossary_selectors_read_unique_entries_in_both_dialects() {
         for selected in [
             alpha_by_name(),
             alpha_by_id(),
-            selector(GlossarySelector::ByNameAndId {
+            selector(story_text::GlossarySelector::ByNameAndId {
                 name: "Alpha".to_owned(),
                 id: Id::new(ALPHA_ID).unwrap(),
             }),
-            selector(GlossarySelector::ByIndex(0)),
+            selector(story_text::GlossarySelector::ByIndex(0)),
         ] {
             let snapshot = package.story_text_snapshot(selected).unwrap();
             assert_eq!(snapshot.paragraph_count().unwrap(), 1);
@@ -512,7 +514,9 @@ fn glossary_selectors_read_unique_entries_in_both_dialects() {
 fn glossary_selection_rejects_missing_ambiguous_and_malformed_identity() {
     assert!(
         open(&fixture(Dialect::Transitional, Mutation::Valid))
-            .story_text_snapshot(selector(GlossarySelector::ByName("Missing".to_owned())))
+            .story_text_snapshot(selector(story_text::GlossarySelector::ByName(
+                "Missing".to_owned()
+            )))
             .is_err()
     );
     assert!(
@@ -571,15 +575,15 @@ fn glossary_selector_name_limits_accept_exact_and_refuse_one_over() {
     let exact = "n".repeat(MAX_GLOSSARY_SELECTOR_NAME_BYTES);
     assert!(matches!(
         open(&fixture(Dialect::Transitional, Mutation::Valid))
-            .story_text_snapshot(StorySelector::glossary_by_name(exact)),
-        Err(source_backed::StoryTextError::MissingGlossaryEntry { .. })
+            .story_text_snapshot(story_text::Selector::glossary_by_name(exact)),
+        Err(story_text::Error::MissingGlossaryEntry { .. })
     ));
     let over = "n".repeat(MAX_GLOSSARY_SELECTOR_NAME_BYTES + 1);
     assert!(matches!(
         open(&fixture(Dialect::Transitional, Mutation::Valid))
-            .story_text_snapshot(StorySelector::glossary_by_name(over)),
-        Err(source_backed::StoryTextError::Limit {
-            kind: source_backed::story_text::LimitKind::GlossarySelectorNameBytes,
+            .story_text_snapshot(story_text::Selector::glossary_by_name(over)),
+        Err(story_text::Error::Limit {
+            kind: story_text::LimitKind::GlossarySelectorNameBytes,
             actual,
             maximum: MAX_GLOSSARY_SELECTOR_NAME_BYTES,
         }) if actual == MAX_GLOSSARY_SELECTOR_NAME_BYTES + 1
@@ -588,17 +592,17 @@ fn glossary_selector_name_limits_accept_exact_and_refuse_one_over() {
     let exact = "n".repeat(MAX_GLOSSARY_SELECTOR_NAME_BYTES);
     assert!(matches!(
         open(&fixture(Dialect::Transitional, Mutation::Valid)).story_text_snapshot(
-            StorySelector::glossary_by_name_and_id(exact, Id::new(ALPHA_ID).unwrap())
+            story_text::Selector::glossary_by_name_and_id(exact, Id::new(ALPHA_ID).unwrap())
         ),
-        Err(source_backed::StoryTextError::MissingGlossaryEntry { .. })
+        Err(story_text::Error::MissingGlossaryEntry { .. })
     ));
     let over = "n".repeat(MAX_GLOSSARY_SELECTOR_NAME_BYTES + 1);
     assert!(matches!(
         open(&fixture(Dialect::Transitional, Mutation::Valid)).story_text_snapshot(
-            StorySelector::glossary_by_name_and_id(over, Id::new(ALPHA_ID).unwrap())
+            story_text::Selector::glossary_by_name_and_id(over, Id::new(ALPHA_ID).unwrap())
         ),
-        Err(source_backed::StoryTextError::Limit {
-            kind: source_backed::story_text::LimitKind::GlossarySelectorNameBytes,
+        Err(story_text::Error::Limit {
+            kind: story_text::LimitKind::GlossarySelectorNameBytes,
             actual,
             maximum: MAX_GLOSSARY_SELECTOR_NAME_BYTES,
         }) if actual == MAX_GLOSSARY_SELECTOR_NAME_BYTES + 1
@@ -616,17 +620,17 @@ fn glossary_entry_edit_splices_only_selected_body_and_round_trips() {
         let source = fixture(dialect, Mutation::Valid);
         let package = open(&source);
         let snapshot = package.story_text_snapshot(alpha_by_name()).unwrap();
-        let mut edit = snapshot.edit().unwrap();
+        let mut edit = snapshot.raw_tree(snapshot.limits_value()).unwrap();
         edit.replace_paragraph_text(Position::new(0), "changed")
             .unwrap();
-        let commit = edit.commit().unwrap();
+        let patch = edit.patch().unwrap();
         assert_eq!(
-            commit.snapshot().paragraph_text(0).unwrap().as_deref(),
+            patch.target().paragraph_text(0).unwrap().as_deref(),
             Some("changed")
         );
         let mut output = Vec::new();
         let publication = package
-            .apply_story_text(&commit.patch().clone().into())
+            .apply_story_text(&patch.clone().into())
             .and_then(|committed| {
                 committed.package().write_to(&mut output)?;
                 Ok(committed)
@@ -679,11 +683,15 @@ fn glossary_noop_and_inverse_preserve_the_complete_artifact() {
     let source = fixture(Dialect::Transitional, Mutation::Valid);
     let package = open(&source);
     let snapshot = package.story_text_snapshot(alpha_by_name()).unwrap();
-    let commit = snapshot.edit().unwrap().commit().unwrap();
-    assert!(commit.patch().is_noop());
+    let patch = snapshot
+        .raw_tree(snapshot.limits_value())
+        .unwrap()
+        .patch()
+        .unwrap();
+    assert!(patch.is_noop());
     let mut exact = Vec::new();
     package
-        .apply_story_text(&commit.patch().clone().into())
+        .apply_story_text(&patch.clone().into())
         .and_then(|committed| Ok(committed.package().write_to(&mut exact)?))
         .unwrap();
     assert_eq!(exact, source);
@@ -691,13 +699,13 @@ fn glossary_noop_and_inverse_preserve_the_complete_artifact() {
     let source = fixture(Dialect::Transitional, Mutation::Valid);
     let package = open(&source);
     let snapshot = package.story_text_snapshot(alpha_by_name()).unwrap();
-    let mut edit = snapshot.edit().unwrap();
+    let mut edit = snapshot.raw_tree(snapshot.limits_value()).unwrap();
     edit.replace_paragraph_text(Position::new(0), "changed")
         .unwrap();
-    let commit = edit.commit().unwrap();
+    let patch = edit.patch().unwrap();
     let mut output = Vec::new();
     let publication = package
-        .apply_story_text(&commit.patch().clone().into())
+        .apply_story_text(&patch.clone().into())
         .and_then(|committed| {
             committed.package().write_to(&mut output)?;
             Ok(committed)
@@ -709,6 +717,156 @@ fn glossary_noop_and_inverse_preserve_the_complete_artifact() {
         .and_then(|committed| Ok(committed.package().write_to(&mut restored)?))
         .unwrap();
     assert_eq!(restored, source);
+}
+
+#[test]
+fn raw_glossary_tree_caches_projection_and_invalidates_after_mutation() {
+    let package = open(&fixture(Dialect::Transitional, Mutation::BatchThreeEntries));
+    let snapshot = package
+        .glossary_text_batch_snapshot(glossary_triplet())
+        .unwrap();
+    let mut tree = snapshot.raw_tree(snapshot.limits_value()).unwrap();
+
+    let first = tree.projected().unwrap();
+    let second = tree.projected().unwrap();
+    assert_eq!(first.part_fingerprint(), second.part_fingerprint());
+    assert_eq!(
+        first.paragraph_text(0, 0).unwrap(),
+        second.paragraph_text(0, 0).unwrap()
+    );
+
+    tree.replace_paragraph_text(0, Position::new(0), "cached glossary mutation")
+        .unwrap();
+    let changed = tree.projected().unwrap();
+    assert_ne!(first.part_fingerprint(), changed.part_fingerprint());
+    assert_eq!(
+        changed.paragraph_text(0, 0).unwrap().as_deref(),
+        Some("cached glossary mutation")
+    );
+    let patch = tree.patch().unwrap();
+    assert_eq!(
+        patch.target().part_fingerprint(),
+        changed.part_fingerprint()
+    );
+}
+
+#[test]
+fn raw_glossary_replay_reopens_matches_and_chains_edits() {
+    let source = fixture(Dialect::Transitional, Mutation::BatchThreeEntries);
+    let author = open(&source);
+    let snapshot = author
+        .glossary_text_batch_snapshot(glossary_triplet())
+        .unwrap();
+    let mut tree = snapshot.raw_tree(snapshot.limits_value()).unwrap();
+    tree.replace_paragraph_text(0, Position::new(0), "first raw glossary")
+        .unwrap();
+    let patch = tree.patch().unwrap();
+
+    let recipient = open(&source)
+        .glossary_text_batch_snapshot(glossary_triplet())
+        .unwrap();
+    let first = patch.apply(&recipient).unwrap();
+    assert_eq!(
+        first.paragraph_text(0, 0).unwrap().as_deref(),
+        Some("first raw glossary")
+    );
+
+    let restored = patch.inverse().apply(&first).unwrap();
+    assert_eq!(restored.part_fingerprint(), recipient.part_fingerprint());
+    assert_eq!(
+        restored.paragraph_text(0, 0).unwrap().as_deref(),
+        Some("target")
+    );
+
+    let mut second_tree = first.raw_tree(first.limits_value()).unwrap();
+    second_tree
+        .replace_paragraph_text(1, Position::new(0), "second raw glossary")
+        .unwrap();
+    let second_patch = second_tree.patch().unwrap();
+    let second = second_patch.apply(&first).unwrap();
+    assert_eq!(
+        second.paragraph_text(1, 0).unwrap().as_deref(),
+        Some("second raw glossary")
+    );
+    let second_restored = second_patch.inverse().apply(&second).unwrap();
+    assert_eq!(
+        second_restored.paragraph_text(0, 0).unwrap().as_deref(),
+        Some("first raw glossary")
+    );
+}
+
+#[test]
+fn glossary_replay_uses_recipient_limits_for_broad_raw_patches() {
+    let source = batch_source();
+    let producer_limits = story_text::Limits::new(
+        128 * 1024,
+        8,
+        10_000,
+        64,
+        128 * 1024,
+        8,
+        128 * 1024,
+    )
+    .unwrap()
+    .with_secondary_entry_limits(3, 16 * 1024, 256)
+    .unwrap();
+    let producer = open(&source)
+        .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(producer_limits));
+    let snapshot = producer
+        .glossary_text_batch_snapshot(glossary_triplet())
+        .unwrap();
+    let mut tree = snapshot.raw_tree(snapshot.limits_value()).unwrap();
+    let glossary_bytes = part(&source, "/word/glossary/document.xml").len();
+    tree.replace_paragraph_text(0, Position::new(0), "wide".repeat(glossary_bytes))
+        .unwrap();
+    let patch = tree.patch().unwrap();
+
+    let accepted_limits = story_text::Limits::new(128 * 1024, 8, 10_000, 64, 64 * 1024, 8, 128 * 1024)
+        .unwrap()
+        .with_secondary_entry_limits(3, 16 * 1024, 256)
+        .unwrap();
+    let accepted = open(&source)
+        .with_semantic_limits(
+            litchi_docx::SemanticLimits::default().story_text(accepted_limits),
+        )
+        .glossary_text_batch_snapshot(glossary_triplet())
+        .unwrap();
+    let accepted_target = patch.apply(&accepted).unwrap();
+    assert_eq!(accepted_target.limits_value(), accepted_limits);
+
+    let narrow_limits = story_text::Limits::new(
+        128 * 1024,
+        8,
+        10_000,
+        64,
+        glossary_bytes,
+        8,
+        128 * 1024,
+    )
+    .unwrap()
+    .with_secondary_entry_limits(3, 16 * 1024, 256)
+    .unwrap();
+    let narrow = open(&source).with_semantic_limits(
+        litchi_docx::SemanticLimits::default().story_text(narrow_limits),
+    );
+    let narrow_snapshot = narrow
+        .glossary_text_batch_snapshot(glossary_triplet())
+        .unwrap();
+    assert!(matches!(
+        patch.apply(&narrow_snapshot),
+        Err(story_text::Error::Limit {
+            kind: story_text::LimitKind::GlossaryBatchOutputBytes,
+            ..
+        })
+    ));
+    let package_patch = patch.clone().into();
+    assert!(matches!(
+        narrow.apply_glossary_text_batch(&package_patch),
+        Err(story_text::Error::Limit {
+            kind: story_text::LimitKind::GlossaryBatchOutputBytes,
+            ..
+        })
+    ));
 }
 
 #[test]
@@ -803,15 +961,15 @@ fn glossary_topology_and_dialect_boundaries_refuse_before_editing() {
 fn glossary_signed_change_refuses_but_signed_noop_is_exact() {
     let source = fixture(Dialect::Transitional, Mutation::Signed);
     let package = open(&source);
-    let commit = package
-        .story_text_snapshot(alpha_by_name())
+    let snapshot = package.story_text_snapshot(alpha_by_name()).unwrap();
+    let patch = snapshot
+        .raw_tree(snapshot.limits_value())
         .unwrap()
-        .edit()
+        .patch()
         .unwrap();
-    let commit = commit.commit().unwrap();
     let mut exact = Vec::new();
     package
-        .apply_story_text(&commit.patch().clone().into())
+        .apply_story_text(&patch.clone().into())
         .and_then(|committed| Ok(committed.package().write_to(&mut exact)?))
         .unwrap();
     assert_eq!(exact, source);
@@ -819,14 +977,14 @@ fn glossary_signed_change_refuses_but_signed_noop_is_exact() {
     let source = fixture(Dialect::Transitional, Mutation::Signed);
     let package = open(&source);
     let snapshot = package.story_text_snapshot(alpha_by_name()).unwrap();
-    let mut edit = snapshot.edit().unwrap();
+    let mut edit = snapshot.raw_tree(snapshot.limits_value()).unwrap();
     edit.replace_paragraph_text(Position::new(0), "changed")
         .unwrap();
-    let commit = edit.commit().unwrap();
+    let patch = edit.patch().unwrap();
     let mut refused = Vec::new();
     assert!(
         package
-            .apply_story_text(&commit.patch().clone().into())
+            .apply_story_text(&patch.clone().into())
             .and_then(|committed| {
                 committed.package().write_to(&mut refused)?;
                 Ok(committed)
@@ -848,7 +1006,7 @@ fn glossary_references_and_limits_are_failure_atomic() {
             .is_err()
     );
     let source = fixture(Dialect::Transitional, Mutation::LargeNamespace);
-    let limits = source_backed::StoryTextLimits::new(16 * 1024, 8, 10_000, 64, 4096, 4096, 4096)
+    let limits = story_text::Limits::new(16 * 1024, 8, 10_000, 64, 4096, 4096, 4096)
         .unwrap()
         .with_max_namespace_bytes(64)
         .unwrap();
@@ -859,8 +1017,7 @@ fn glossary_references_and_limits_are_failure_atomic() {
             .is_err()
     );
 
-    let paragraph_limits =
-        source_backed::StoryTextLimits::new(4096, 1, 10_000, 64, 4096, 4096, 4096).unwrap();
+    let paragraph_limits = story_text::Limits::new(4096, 1, 10_000, 64, 4096, 4096, 4096).unwrap();
     assert!(
         open(&fixture(Dialect::Transitional, Mutation::TwoParagraphs))
             .with_semantic_limits(
@@ -869,8 +1026,7 @@ fn glossary_references_and_limits_are_failure_atomic() {
             .story_text_snapshot(alpha_by_name())
             .is_err()
     );
-    let output_limits =
-        source_backed::StoryTextLimits::new(4096, 8, 10_000, 64, 1, 4096, 4096).unwrap();
+    let output_limits = story_text::Limits::new(4096, 8, 10_000, 64, 1, 4096, 4096).unwrap();
     assert!(
         open(&fixture(Dialect::Transitional, Mutation::Valid))
             .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(output_limits))
@@ -879,15 +1035,14 @@ fn glossary_references_and_limits_are_failure_atomic() {
             .extract_text()
             .is_err()
     );
-    let xml_limits =
-        source_backed::StoryTextLimits::new(1, 8, 10_000, 64, 4096, 4096, 4096).unwrap();
+    let xml_limits = story_text::Limits::new(1, 8, 10_000, 64, 4096, 4096, 4096).unwrap();
     assert!(
         open(&source)
             .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(xml_limits))
             .story_text_snapshot(alpha_by_name())
             .is_err()
     );
-    let entry_limits = source_backed::StoryTextLimits::default()
+    let entry_limits = story_text::Limits::default()
         .with_secondary_entry_limits(1, 1, 256)
         .unwrap();
     assert!(
@@ -898,13 +1053,13 @@ fn glossary_references_and_limits_are_failure_atomic() {
     );
 
     let source = fixture(Dialect::Transitional, Mutation::Valid);
-    let limits = source_backed::StoryTextLimits::new(4096, 2, 10_000, 64, 4096, 1, 4096).unwrap();
+    let limits = story_text::Limits::new(4096, 2, 10_000, 64, 4096, 1, 4096).unwrap();
     let package = open(&source);
     let snapshot = package
         .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(limits))
         .story_text_snapshot(alpha_by_name())
         .unwrap();
-    let mut edit = snapshot.edit().unwrap();
+    let mut edit = snapshot.raw_tree(snapshot.limits_value()).unwrap();
     assert!(edit.replace_paragraph_text(Position::new(0), "one").is_ok());
     assert!(
         edit.replace_paragraph_text(Position::new(0), "two")
@@ -925,32 +1080,23 @@ fn glossary_quote_namespace_wrapper_has_exact_and_one_under_boundaries() {
     let source = fixture(Dialect::Transitional, Mutation::QuotedNamespace);
     let wrapper_bytes = quoted_wrapper_bytes(&source, Dialect::Transitional.word());
     let exact =
-        source_backed::StoryTextLimits::new(16 * 1024, 8, 10_000, 64, wrapper_bytes, 4096, 4096)
-            .unwrap();
+        story_text::Limits::new(16 * 1024, 8, 10_000, 64, wrapper_bytes, 4096, 4096).unwrap();
     let snapshot = open(&source)
         .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(exact))
         .story_text_snapshot(alpha_by_name())
         .unwrap();
-    assert!(snapshot.edit().is_ok());
+    assert!(snapshot.raw_tree(snapshot.limits_value()).is_ok());
 
-    let one_under = source_backed::StoryTextLimits::new(
-        16 * 1024,
-        8,
-        10_000,
-        64,
-        wrapper_bytes - 1,
-        4096,
-        4096,
-    )
-    .unwrap();
+    let one_under =
+        story_text::Limits::new(16 * 1024, 8, 10_000, 64, wrapper_bytes - 1, 4096, 4096).unwrap();
     let snapshot = open(&source)
         .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(one_under))
         .story_text_snapshot(alpha_by_name())
         .unwrap();
     assert!(matches!(
-        snapshot.edit(),
-        Err(source_backed::StoryTextError::Limit {
-            kind: source_backed::story_text::LimitKind::WrappedStoryXmlBytes,
+        snapshot.raw_tree(snapshot.limits_value()),
+        Err(story_text::Error::Limit {
+            kind: story_text::LimitKind::WrappedStoryXmlBytes,
             ..
         })
     ));
@@ -986,18 +1132,18 @@ fn glossary_publication_sink_failure_does_not_panic_and_complex_edit_is_refused(
     let source = fixture(Dialect::Transitional, Mutation::Valid);
     let package = open(&source);
     let snapshot = package.story_text_snapshot(alpha_by_name()).unwrap();
-    let mut edit = snapshot.edit().unwrap();
+    let mut edit = snapshot.raw_tree(snapshot.limits_value()).unwrap();
     assert!(
         edit.replace_paragraph_text(Position::new(0), "a\u{0}b")
             .is_err()
     );
-    let mut edit = snapshot.edit().unwrap();
+    let mut edit = snapshot.raw_tree(snapshot.limits_value()).unwrap();
     edit.replace_paragraph_text(Position::new(0), "changed")
         .unwrap();
-    let commit = edit.commit().unwrap();
+    let patch = edit.patch().unwrap();
     assert!(
         open(&source)
-            .apply_story_text(&commit.patch().clone().into())
+            .apply_story_text(&patch.clone().into())
             .and_then(|committed| {
                 committed.package().write_to(PartialWriter { writes: 0 })?;
                 Ok(committed)
@@ -1038,7 +1184,7 @@ impl litchi_core::ReadAt for VersionedSource {
 }
 
 #[test]
-fn glossary_source_mutation_and_foreign_patch_are_rejected() {
+fn glossary_source_mutation_is_rejected_and_matching_copy_is_accepted() {
     let source = fixture(Dialect::Transitional, Mutation::Valid);
     let versioned = Arc::new(VersionedSource {
         bytes: source.clone(),
@@ -1046,17 +1192,17 @@ fn glossary_source_mutation_and_foreign_patch_are_rejected() {
     });
     let package = source_backed::Package::from_read_at(versioned.clone()).unwrap();
     let snapshot = package.story_text_snapshot(alpha_by_name()).unwrap();
-    let mut edit = snapshot.edit().unwrap();
+    let mut edit = snapshot.raw_tree(snapshot.limits_value()).unwrap();
     edit.replace_paragraph_text(Position::new(0), "changed")
         .unwrap();
-    let commit = edit.commit().unwrap();
+    let patch = edit.patch().unwrap();
     versioned
         .revision
         .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
     let mut refused = Vec::new();
     assert!(
         package
-            .apply_story_text(&commit.patch().clone().into())
+            .apply_story_text(&patch.clone().into())
             .and_then(|committed| {
                 committed.package().write_to(&mut refused)?;
                 Ok(committed)
@@ -1065,7 +1211,8 @@ fn glossary_source_mutation_and_foreign_patch_are_rejected() {
     );
     assert!(refused.is_empty());
     let foreign = open(&source).story_text_snapshot(alpha_by_name()).unwrap();
-    assert!(commit.patch().apply(&foreign).is_err());
+    let applied = patch.apply(&foreign).unwrap();
+    assert_eq!(applied.extract_text().unwrap(), "changed");
 }
 
 #[test]
@@ -1105,16 +1252,16 @@ fn glossary_managed_entry_edit_and_cancellation_are_refused() {
     )
     .unwrap();
     let snapshot = package.story_text_snapshot(alpha_by_name()).unwrap();
-    assert!(snapshot.edit().is_err());
+    assert!(snapshot.raw_tree(snapshot.limits_value()).is_err());
     cancel_source.cancel();
     assert!(package.story_text_snapshot(alpha_by_name()).is_err());
 }
 
-fn glossary_triplet() -> GlossaryBatchSelector {
-    GlossaryBatchSelector::try_new(vec![
-        GlossarySelector::ById(Id::new(BETA_ID).unwrap()),
-        GlossarySelector::ByName("Gamma".to_owned()),
-        GlossarySelector::ByName("Alpha".to_owned()),
+fn glossary_triplet() -> story_text::GlossaryBatchSelector {
+    story_text::GlossaryBatchSelector::try_new(vec![
+        story_text::GlossarySelector::ById(Id::new(BETA_ID).unwrap()),
+        story_text::GlossarySelector::ByName("Gamma".to_owned()),
+        story_text::GlossarySelector::ByName("Alpha".to_owned()),
     ])
     .unwrap()
 }
@@ -1126,13 +1273,13 @@ fn batch_source() -> Vec<u8> {
 #[test]
 fn glossary_batch_does_not_charge_unselected_entry_paragraphs() {
     let source = fixture(Dialect::Transitional, Mutation::UnselectedManyParagraphs);
-    let limits = source_backed::StoryTextLimits::new(16 * 1024, 2, 10_000, 64, 32 * 1024, 8, 4096)
+    let limits = story_text::Limits::new(16 * 1024, 2, 10_000, 64, 32 * 1024, 8, 4096)
         .unwrap()
         .with_secondary_entry_limits(3, 16 * 1024, 256)
         .unwrap();
-    let selected = GlossaryBatchSelector::try_new(vec![
-        GlossarySelector::ByName("Gamma".to_owned()),
-        GlossarySelector::ByName("Alpha".to_owned()),
+    let selected = story_text::GlossaryBatchSelector::try_new(vec![
+        story_text::GlossarySelector::ByName("Gamma".to_owned()),
+        story_text::GlossarySelector::ByName("Alpha".to_owned()),
     ])
     .unwrap();
     let snapshot = open(&source)
@@ -1154,20 +1301,20 @@ fn glossary_batch_is_general_n_canonical_and_preserves_siblings() {
     assert_eq!(snapshot.entry_count().unwrap(), 3);
     assert!(matches!(
         snapshot.entry_selector(0),
-        Some(GlossarySelector::ByName(name)) if name == "Alpha"
+        Some(story_text::GlossarySelector::ByName(name)) if name == "Alpha"
     ));
     assert!(matches!(
         snapshot.entry_selector(1),
-        Some(GlossarySelector::ById(id)) if *id == Id::new(BETA_ID).unwrap()
+        Some(story_text::GlossarySelector::ById(id)) if *id == Id::new(BETA_ID).unwrap()
     ));
     assert!(matches!(
         snapshot.entry_selector(2),
-        Some(GlossarySelector::ByName(name)) if name == "Gamma"
+        Some(story_text::GlossarySelector::ByName(name)) if name == "Gamma"
     ));
-    let forward = GlossaryBatchSelector::try_new(vec![
-        GlossarySelector::ByName("Alpha".to_owned()),
-        GlossarySelector::ById(Id::new(BETA_ID).unwrap()),
-        GlossarySelector::ByName("Gamma".to_owned()),
+    let forward = story_text::GlossaryBatchSelector::try_new(vec![
+        story_text::GlossarySelector::ByName("Alpha".to_owned()),
+        story_text::GlossarySelector::ById(Id::new(BETA_ID).unwrap()),
+        story_text::GlossarySelector::ByName("Gamma".to_owned()),
     ])
     .unwrap();
     let forward_snapshot = package.glossary_text_batch_snapshot(forward).unwrap();
@@ -1182,15 +1329,15 @@ fn glossary_batch_is_general_n_canonical_and_preserves_siblings() {
     );
     assert_eq!(snapshot.extract_text(2).unwrap().as_deref(), Some("third"));
 
-    let mut edit = snapshot.edit().unwrap();
+    let mut edit = snapshot.raw_tree(snapshot.limits_value()).unwrap();
     edit.replace_paragraph_text(0, Position::new(0), "alpha changed")
         .unwrap();
     edit.replace_paragraph_text(2, Position::new(0), "gamma changed")
         .unwrap();
-    let commit = edit.commit().unwrap();
+    let patch = edit.patch().unwrap();
     let mut output = Vec::new();
     let publication = package
-        .apply_glossary_text_batch(&commit.patch().clone().into())
+        .apply_glossary_text_batch(&patch.clone().into())
         .and_then(|committed| {
             committed.package().write_to(&mut output)?;
             Ok(committed)
@@ -1230,17 +1377,19 @@ fn glossary_batch_is_general_n_canonical_and_preserves_siblings() {
     let deterministic_snapshot = deterministic_package
         .glossary_text_batch_snapshot(glossary_triplet())
         .unwrap();
-    let mut deterministic_edit = deterministic_snapshot.edit().unwrap();
+    let mut deterministic_edit = deterministic_snapshot
+        .raw_tree(snapshot.limits_value())
+        .unwrap();
     deterministic_edit
         .replace_paragraph_text(0, Position::new(0), "alpha changed")
         .unwrap();
     deterministic_edit
         .replace_paragraph_text(2, Position::new(0), "gamma changed")
         .unwrap();
-    let deterministic_commit = deterministic_edit.commit().unwrap();
+    let deterministic_patch = deterministic_edit.patch().unwrap();
     let mut deterministic = Vec::new();
     deterministic_package
-        .apply_glossary_text_batch(&deterministic_commit.patch().clone().into())
+        .apply_glossary_text_batch(&deterministic_patch.clone().into())
         .and_then(|committed| Ok(committed.package().write_to(&mut deterministic)?))
         .unwrap();
     assert_eq!(output, deterministic);
@@ -1272,21 +1421,24 @@ fn glossary_batch_is_general_n_canonical_and_preserves_siblings() {
 
 #[test]
 fn glossary_batch_rejects_empty_alias_missing_and_ambiguous_selectors() {
-    assert!(GlossaryBatchSelector::try_new(Vec::new()).is_err());
-    assert!(GlossaryBatchSelector::try_new(vec![GlossarySelector::ByIndex(0)]).is_ok());
+    assert!(story_text::GlossaryBatchSelector::try_new(Vec::new()).is_err());
     assert!(
-        GlossaryBatchSelector::try_new(vec![
-            GlossarySelector::ByIndex(0),
-            GlossarySelector::ByName("Alpha".to_owned()),
+        story_text::GlossaryBatchSelector::try_new(vec![story_text::GlossarySelector::ByIndex(0)])
+            .is_ok()
+    );
+    assert!(
+        story_text::GlossaryBatchSelector::try_new(vec![
+            story_text::GlossarySelector::ByIndex(0),
+            story_text::GlossarySelector::ByName("Alpha".to_owned()),
         ])
         .is_ok()
     );
     assert!(
         open(&batch_source())
             .glossary_text_batch_snapshot(
-                GlossaryBatchSelector::try_new(vec![
-                    GlossarySelector::ByIndex(0),
-                    GlossarySelector::ByName("Alpha".to_owned()),
+                story_text::GlossaryBatchSelector::try_new(vec![
+                    story_text::GlossarySelector::ByIndex(0),
+                    story_text::GlossarySelector::ByName("Alpha".to_owned()),
                 ])
                 .unwrap()
             )
@@ -1295,9 +1447,9 @@ fn glossary_batch_rejects_empty_alias_missing_and_ambiguous_selectors() {
     assert!(
         open(&batch_source())
             .glossary_text_batch_snapshot(
-                GlossaryBatchSelector::try_new(vec![
-                    GlossarySelector::ByName("Alpha".to_owned()),
-                    GlossarySelector::ByNameAndId {
+                story_text::GlossaryBatchSelector::try_new(vec![
+                    story_text::GlossarySelector::ByName("Alpha".to_owned()),
+                    story_text::GlossarySelector::ByNameAndId {
                         name: "Alpha".to_owned(),
                         id: Id::new(ALPHA_ID).unwrap(),
                     },
@@ -1309,9 +1461,9 @@ fn glossary_batch_rejects_empty_alias_missing_and_ambiguous_selectors() {
     assert!(
         open(&batch_source())
             .glossary_text_batch_snapshot(
-                GlossaryBatchSelector::try_new(vec![
-                    GlossarySelector::ByName("Missing".to_owned()),
-                    GlossarySelector::ById(Id::new(BETA_ID).unwrap()),
+                story_text::GlossaryBatchSelector::try_new(vec![
+                    story_text::GlossarySelector::ByName("Missing".to_owned()),
+                    story_text::GlossarySelector::ById(Id::new(BETA_ID).unwrap()),
                 ])
                 .unwrap()
             )
@@ -1320,9 +1472,9 @@ fn glossary_batch_rejects_empty_alias_missing_and_ambiguous_selectors() {
     assert!(
         open(&fixture(Dialect::Transitional, Mutation::DuplicateName))
             .glossary_text_batch_snapshot(
-                GlossaryBatchSelector::try_new(vec![
-                    GlossarySelector::ByName("Alpha".to_owned()),
-                    GlossarySelector::ById(Id::new(BETA_ID).unwrap()),
+                story_text::GlossaryBatchSelector::try_new(vec![
+                    story_text::GlossarySelector::ByName("Alpha".to_owned()),
+                    story_text::GlossarySelector::ById(Id::new(BETA_ID).unwrap()),
                 ])
                 .unwrap()
             )
@@ -1331,9 +1483,9 @@ fn glossary_batch_rejects_empty_alias_missing_and_ambiguous_selectors() {
     assert!(
         open(&fixture(Dialect::Transitional, Mutation::DuplicateId))
             .glossary_text_batch_snapshot(
-                GlossaryBatchSelector::try_new(vec![
-                    GlossarySelector::ById(Id::new(ALPHA_ID).unwrap()),
-                    GlossarySelector::ByName("Gamma".to_owned()),
+                story_text::GlossaryBatchSelector::try_new(vec![
+                    story_text::GlossarySelector::ById(Id::new(ALPHA_ID).unwrap()),
+                    story_text::GlossarySelector::ByName("Gamma".to_owned()),
                 ])
                 .unwrap()
             )
@@ -1348,11 +1500,15 @@ fn glossary_batch_noop_inverse_and_limits_are_atomic() {
     let snapshot = package
         .glossary_text_batch_snapshot(glossary_triplet())
         .unwrap();
-    let commit = snapshot.edit().unwrap().commit().unwrap();
-    assert!(commit.patch().is_noop());
+    let patch = snapshot
+        .raw_tree(snapshot.limits_value())
+        .unwrap()
+        .patch()
+        .unwrap();
+    assert!(patch.is_noop());
     let mut exact = Vec::new();
     package
-        .apply_glossary_text_batch(&commit.patch().clone().into())
+        .apply_glossary_text_batch(&patch.clone().into())
         .and_then(|committed| Ok(committed.package().write_to(&mut exact)?))
         .unwrap();
     assert_eq!(exact, source);
@@ -1361,13 +1517,13 @@ fn glossary_batch_noop_inverse_and_limits_are_atomic() {
     let snapshot = package
         .glossary_text_batch_snapshot(glossary_triplet())
         .unwrap();
-    let mut edit = snapshot.edit().unwrap();
+    let mut edit = snapshot.raw_tree(snapshot.limits_value()).unwrap();
     edit.replace_paragraph_text(0, Position::new(0), "changed")
         .unwrap();
-    let commit = edit.commit().unwrap();
+    let patch = edit.patch().unwrap();
     let mut output = Vec::new();
     let publication = package
-        .apply_glossary_text_batch(&commit.patch().clone().into())
+        .apply_glossary_text_batch(&patch.clone().into())
         .and_then(|committed| {
             committed.package().write_to(&mut output)?;
             Ok(committed)
@@ -1380,7 +1536,7 @@ fn glossary_batch_noop_inverse_and_limits_are_atomic() {
         .unwrap();
     assert_eq!(restored, source);
 
-    let count_limited = source_backed::StoryTextLimits::default()
+    let count_limited = story_text::Limits::default()
         .with_secondary_entry_limits(1, 16 * 1024, 256)
         .unwrap();
     assert!(
@@ -1390,14 +1546,14 @@ fn glossary_batch_noop_inverse_and_limits_are_atomic() {
             .is_err()
     );
     let replacement_limited =
-        source_backed::StoryTextLimits::new(16 * 1024, 8, 10_000, 64, 32 * 1024, 1, 4096).unwrap();
+        story_text::Limits::new(16 * 1024, 8, 10_000, 64, 32 * 1024, 1, 4096).unwrap();
     let snapshot = open(&source)
         .with_semantic_limits(
             litchi_docx::SemanticLimits::default().story_text(replacement_limited),
         )
         .glossary_text_batch_snapshot(glossary_triplet())
         .unwrap();
-    let mut edit = snapshot.edit().unwrap();
+    let mut edit = snapshot.raw_tree(snapshot.limits_value()).unwrap();
     edit.replace_paragraph_text(0, Position::new(0), "one")
         .unwrap();
     assert!(
@@ -1405,14 +1561,13 @@ fn glossary_batch_noop_inverse_and_limits_are_atomic() {
             .is_err()
     );
     assert!(edit.projected().is_ok());
-    let output_limited =
-        source_backed::StoryTextLimits::new(16 * 1024, 8, 10_000, 64, 1, 4096, 4096).unwrap();
+    let output_limited = story_text::Limits::new(16 * 1024, 8, 10_000, 64, 1, 4096, 4096).unwrap();
     assert!(matches!(
         open(&source)
             .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(output_limited))
             .glossary_text_batch_snapshot(glossary_triplet()),
-        Err(source_backed::StoryTextError::Limit {
-            kind: source_backed::story_text::LimitKind::GlossaryBatchEntryBytes,
+        Err(story_text::Error::Limit {
+            kind: story_text::LimitKind::GlossaryBatchEntryBytes,
             maximum: 1,
             ..
         })
@@ -1426,7 +1581,7 @@ fn glossary_batch_rejects_repeated_targets_and_aggregate_limits() {
     let snapshot = package
         .glossary_text_batch_snapshot(glossary_triplet())
         .unwrap();
-    let mut edit = snapshot.edit().unwrap();
+    let mut edit = snapshot.raw_tree(snapshot.limits_value()).unwrap();
     edit.replace_paragraph_text(0, Position::new(0), "one")
         .unwrap();
     assert!(
@@ -1443,14 +1598,14 @@ fn glossary_batch_rejects_repeated_targets_and_aggregate_limits() {
     );
 
     let replacement_limited =
-        source_backed::StoryTextLimits::new(16 * 1024, 8, 10_000, 64, 32 * 1024, 8, 5).unwrap();
+        story_text::Limits::new(16 * 1024, 8, 10_000, 64, 32 * 1024, 8, 5).unwrap();
     let snapshot = open(&source)
         .with_semantic_limits(
             litchi_docx::SemanticLimits::default().story_text(replacement_limited),
         )
         .glossary_text_batch_snapshot(glossary_triplet())
         .unwrap();
-    let mut edit = snapshot.edit().unwrap();
+    let mut edit = snapshot.raw_tree(snapshot.limits_value()).unwrap();
     edit.replace_paragraph_text(0, Position::new(0), "one")
         .unwrap();
     assert!(
@@ -1458,32 +1613,31 @@ fn glossary_batch_rejects_repeated_targets_and_aggregate_limits() {
             .is_err()
     );
 
-    let entry_limited = source_backed::StoryTextLimits::default()
+    let entry_limited = story_text::Limits::default()
         .with_secondary_entry_limits(3, 1, 256)
         .unwrap();
     assert!(matches!(
         open(&source)
             .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(entry_limited))
             .glossary_text_batch_snapshot(glossary_triplet()),
-        Err(source_backed::StoryTextError::Limit { .. })
+        Err(story_text::Error::Limit { .. })
     ));
 
     let glossary_bytes = part(&source, "/word/glossary/document.xml").len();
     let output_limited =
-        source_backed::StoryTextLimits::new(16 * 1024, 8, 10_000, 64, glossary_bytes - 1, 8, 4096)
-            .unwrap();
+        story_text::Limits::new(16 * 1024, 8, 10_000, 64, glossary_bytes - 1, 8, 4096).unwrap();
     let snapshot = open(&source)
         .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(output_limited))
         .glossary_text_batch_snapshot(glossary_triplet())
         .unwrap();
-    let mut edit = snapshot.edit().unwrap();
+    let mut edit = snapshot.raw_tree(snapshot.limits_value()).unwrap();
     edit.replace_paragraph_text(0, Position::new(0), "x".repeat(512))
         .unwrap();
-    assert!(edit.commit().is_err());
+    assert!(edit.patch().is_err());
 }
 
 #[test]
-fn glossary_batch_rejects_stale_foreign_managed_cancelled_signed_and_sink_paths() {
+fn glossary_batch_rejects_stale_managed_cancelled_signed_and_sink_paths_and_accepts_matching_copy() {
     let source = batch_source();
     let versioned = Arc::new(VersionedSource {
         bytes: source.clone(),
@@ -1493,17 +1647,23 @@ fn glossary_batch_rejects_stale_foreign_managed_cancelled_signed_and_sink_paths(
     let snapshot = package
         .glossary_text_batch_snapshot(glossary_triplet())
         .unwrap();
-    let mut edit = snapshot.edit().unwrap();
+    let mut edit = snapshot.raw_tree(snapshot.limits_value()).unwrap();
     edit.replace_paragraph_text(0, Position::new(0), "changed")
         .unwrap();
-    let commit = edit.commit().unwrap();
+    let patch = edit.patch().unwrap();
+    let noop = snapshot
+        .raw_tree(snapshot.limits_value())
+        .unwrap()
+        .patch()
+        .unwrap();
+    assert!(noop.is_noop());
     versioned
         .revision
         .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
     let mut refused = Vec::new();
     assert!(
         package
-            .apply_glossary_text_batch(&commit.patch().clone().into())
+            .apply_glossary_text_batch(&patch.clone().into())
             .and_then(|committed| {
                 committed.package().write_to(&mut refused)?;
                 Ok(committed)
@@ -1514,7 +1674,8 @@ fn glossary_batch_rejects_stale_foreign_managed_cancelled_signed_and_sink_paths(
     let foreign = open(&source)
         .glossary_text_batch_snapshot(glossary_triplet())
         .unwrap();
-    assert!(commit.patch().apply(&foreign).is_err());
+    let applied = patch.apply(&foreign).unwrap();
+    assert_eq!(applied.extract_text(0).unwrap().as_deref(), Some("changed"));
 
     let managed = source_backed::Package::from_read_at_with_options(
         Arc::new(OwnedSource::new(source.clone())),
@@ -1543,11 +1704,12 @@ fn glossary_batch_rejects_stale_foreign_managed_cancelled_signed_and_sink_paths(
             )),
     )
     .unwrap();
+    let managed_snapshot = managed
+        .glossary_text_batch_snapshot(glossary_triplet())
+        .unwrap();
     assert!(
-        managed
-            .glossary_text_batch_snapshot(glossary_triplet())
-            .unwrap()
-            .edit()
+        managed_snapshot
+            .raw_tree(managed_snapshot.limits_value())
             .is_err()
     );
 
@@ -1584,6 +1746,18 @@ fn glossary_batch_rejects_stale_foreign_managed_cancelled_signed_and_sink_paths(
         .unwrap();
     cancel_source.cancel();
     assert!(captured.entry_count().is_err());
+    assert!(matches!(
+        patch.apply(&captured),
+        Err(story_text::Error::Document(litchi_docx::Error::Opc(
+            litchi_opc::OpcError::Cancelled
+        )))
+    ));
+    assert!(matches!(
+        noop.apply(&captured),
+        Err(story_text::Error::Document(litchi_docx::Error::Opc(
+            litchi_opc::OpcError::Cancelled
+        )))
+    ));
     assert!(
         cancelled
             .glossary_text_batch_snapshot(glossary_triplet())
@@ -1591,33 +1765,35 @@ fn glossary_batch_rejects_stale_foreign_managed_cancelled_signed_and_sink_paths(
     );
 
     let signed = open(&fixture(Dialect::Transitional, Mutation::Signed));
-    let noop = signed
+    let signed_snapshot = signed
         .glossary_text_batch_snapshot(glossary_triplet())
+        .unwrap();
+    let noop = signed_snapshot
+        .raw_tree(signed_snapshot.limits_value())
         .unwrap()
-        .edit()
-        .unwrap()
-        .commit()
+        .patch()
         .unwrap();
     let mut exact = Vec::new();
     signed
-        .apply_glossary_text_batch(&noop.patch().clone().into())
+        .apply_glossary_text_batch(&noop.clone().into())
         .and_then(|committed| Ok(committed.package().write_to(&mut exact)?))
         .unwrap();
     assert_eq!(exact, fixture(Dialect::Transitional, Mutation::Signed));
 
     let signed = open(&fixture(Dialect::Transitional, Mutation::Signed));
-    let mut edit = signed
+    let signed_snapshot = signed
         .glossary_text_batch_snapshot(glossary_triplet())
-        .unwrap()
-        .edit()
+        .unwrap();
+    let mut edit = signed_snapshot
+        .raw_tree(signed_snapshot.limits_value())
         .unwrap();
     edit.replace_paragraph_text(0, Position::new(0), "changed")
         .unwrap();
-    let commit = edit.commit().unwrap();
+    let patch = edit.patch().unwrap();
     let mut refused = Vec::new();
     assert!(
         signed
-            .apply_glossary_text_batch(&commit.patch().clone().into())
+            .apply_glossary_text_batch(&patch.clone().into())
             .and_then(|committed| {
                 committed.package().write_to(&mut refused)?;
                 Ok(committed)
@@ -1630,13 +1806,13 @@ fn glossary_batch_rejects_stale_foreign_managed_cancelled_signed_and_sink_paths(
     let snapshot = package
         .glossary_text_batch_snapshot(glossary_triplet())
         .unwrap();
-    let mut edit = snapshot.edit().unwrap();
+    let mut edit = snapshot.raw_tree(snapshot.limits_value()).unwrap();
     edit.replace_paragraph_text(0, Position::new(0), "changed")
         .unwrap();
-    let commit = edit.commit().unwrap();
+    let patch = edit.patch().unwrap();
     assert!(
         package
-            .apply_glossary_text_batch(&commit.patch().clone().into())
+            .apply_glossary_text_batch(&patch.clone().into())
             .and_then(|committed| {
                 committed.package().write_to(PartialWriter { writes: 0 })?;
                 Ok(committed)

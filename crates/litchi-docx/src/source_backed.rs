@@ -42,49 +42,6 @@ pub mod tail_append_stream;
 
 pub use litchi_opc::{SourceReadDiagnostics, SourceReadPolicy, SourceReadPolicyError};
 
-pub use story_text::{
-    Commit as StoryTextCommit, Edit as StoryTextEdit, Error as StoryTextError, GlossaryBatchCommit,
-    GlossaryBatchEdit, GlossaryBatchPatch, GlossaryBatchSelector, GlossaryBatchSnapshot,
-    GlossarySelector, GlossarySelectorKind, Limits as StoryTextLimits, Patch as StoryTextPatch,
-    Selector as StorySelector, Snapshot as StoryTextSnapshot,
-};
-pub use tail_append::{
-    CandidateProof as TailAppendCandidateProof, Commit as TailAppendCommit,
-    Error as TailAppendError, Limits as TailAppendLimits, Plan as TailAppendPlan,
-    Refusal as TailAppendRefusal, SourceProof as TailAppendSourceProof,
-};
-
-pub use tail_append_stream::{
-    AuthoredPassProof as TailAppendStreamPassProof,
-    AuthoredReplayError as TailAppendStreamReplayError,
-    AuthoredReplayHandle as TailAppendStreamReplayHandle,
-    AuthoredReplayReader as TailAppendStreamReplayReader,
-    AuthoredReplayReference as TailAppendStreamReplayReference,
-    AuthoredReplayStore as TailAppendStreamReplayStore,
-    AuthoredStreamProof as TailAppendStreamProof, Error as TailAppendStreamError,
-    MemoryReplayStore as TailAppendStreamMemoryReplayStore,
-    OneShotParagraphProducer as TailAppendStreamOneShotProducer,
-    ParagraphCursor as TailAppendStreamCursor, ParagraphEventSink as TailAppendStreamEventSink,
-    ParagraphStreamLimits as TailAppendStreamLimits, ParagraphStreamPlan as TailAppendStreamPlan,
-    PlainParagraphEvent as TailAppendStreamEvent,
-    ReplayableParagraphSource as TailAppendStreamSource,
-};
-
-pub use tail_append_stream::patch::{
-    ArtifactProof as TailAppendStreamArtifactProof,
-    AuthoredReplayResolver as TailAppendStreamReplayResolver,
-    ExactInverseAuthorization as TailAppendStreamExactInverseAuthorization,
-    OriginalArtifactError as TailAppendStreamOriginalArtifactError,
-    OriginalArtifactProvider as TailAppendStreamOriginalArtifactProvider,
-    OriginalArtifactReference as TailAppendStreamOriginalArtifactReference,
-    ParagraphStreamPatch as TailAppendStreamPatch, Patch as TailAppendStreamDurablePatch,
-    PatchError as TailAppendStreamPatchError, PatchLimits as TailAppendStreamPatchLimits,
-    ReplayResolverError as TailAppendStreamReplayResolverError,
-    StreamCandidateProof as TailAppendStreamPatchCandidateProof,
-    StreamSourceProof as TailAppendStreamPatchSourceProof,
-    apply_exact_inverse as apply_tail_append_exact_inverse,
-};
-
 use crate::document::{Result as TransactionResult, Snapshot};
 use crate::error::{Error, Result};
 use crate::namespace::scan_word_element_ranges;
