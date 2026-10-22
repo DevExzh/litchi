@@ -1097,7 +1097,7 @@ fn mutate_native_comment(source: &[u8], mutation: HostileMutation) -> Option<Vec
     if matches!(mutation, HostileMutation::UnknownHeader) {
         return None;
     }
-    let catalog = Catalog::from_bytes(source).ok()?;
+    let catalog = Catalog::from_bytes(source, ArchiveLimits::default()).ok()?;
     let mut comments = Vec::new();
     let mut referenced = BTreeSet::new();
     let mut duplicate_reply = None;
@@ -1199,7 +1199,15 @@ fn mutate_native_comment(source: &[u8], mutation: HostileMutation) -> Option<Vec
             }
         }
         message.data = payload;
-        replacement = Some(SnappyStream::compress(&archive.to_bytes().ok()?, Default::default()).ok()?);
+        replacement = Some(
+            SnappyStream::compress(
+                &archive
+                    .to_bytes(litchi_iwa_core::Limits::default())
+                    .ok()?,
+                Default::default(),
+            )
+            .ok()?,
+        );
         break;
     }
     let replacement = replacement?;
@@ -1222,7 +1230,7 @@ fn mutate_native_comment(source: &[u8], mutation: HostileMutation) -> Option<Vec
 /// edits the decompressed IWA bytes directly and lets the archive parser prove
 /// that the resulting source remains well-framed.
 fn mutate_native_comment_header(source: &[u8]) -> Option<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source).ok()?;
+    let catalog = Catalog::from_bytes(source, ArchiveLimits::default()).ok()?;
     let mut comments = Vec::new();
     let mut referenced = BTreeSet::new();
     for entry in catalog.iter() {
