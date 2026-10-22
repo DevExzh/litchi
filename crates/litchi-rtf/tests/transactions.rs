@@ -10,7 +10,7 @@ use litchi_rtf::{
     SemanticLimitKind, SemanticLimits, SourceLimits, TableCellPath, UnderlineStyle,
     edit::{
         Composition, CompositionError, CompositionLimits, Error, HeaderFooterParagraph, History,
-        HistoryLimits, MergePlan, MergeResolution, TextSpan, TransferPlan,
+        HistoryLimits, MergePlan, MergeResolution, ParagraphLayoutPatch, TextSpan, TransferPlan,
     },
 };
 use std::num::NonZeroU16;
@@ -1297,6 +1297,109 @@ fn underline_property_refuses_mixed_structure_transport_and_stale_durable_state(
         source.apply_durable(&invalid),
         Err(Error::DurablePatch(message))
             if message == "underline value must be a string"
+    ));
+}
+
+#[test]
+fn underline_empty_span_fast_path_preserves_error_precedence() {
+    let cp1252_bytes = [br"{\rtf1\ansi\ansicpg1252 Caf".as_slice(), &[0xe9], b"}"].concat();
+    let source = Package::from_bytes(&cp1252_bytes).unwrap();
+    let text = source.text();
+    assert_eq!(text, "Café");
+    let accented = text.find('é').unwrap();
+
+    let mut first = source.edit();
+    assert!(matches!(
+        first.set_text_underline(TextSpan::new(0, 0).unwrap(), UnderlineStyle::Single),
+        Err(Error::Refused(refusal))
+            if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
+                && refusal.reason()
+                    == "underline edits require non-empty text within one paragraph"
+    ));
+    let mut last = source.edit();
+    assert!(matches!(
+        last.set_text_underline(
+            TextSpan::new(text.len(), text.len()).unwrap(),
+            UnderlineStyle::Single
+        ),
+        Err(Error::Refused(refusal))
+            if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
+                && refusal.reason()
+                    == "underline edits require non-empty text within one paragraph"
+    ));
+    let mut interior = source.edit();
+    assert!(matches!(
+        interior.set_text_underline(
+            TextSpan::new(accented, accented).unwrap(),
+            UnderlineStyle::Single
+        ),
+        Err(Error::Refused(refusal))
+            if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
+                && refusal.reason()
+                    == "underline edits require non-empty text within one paragraph"
+    ));
+    let mut non_boundary = source.edit();
+    assert!(matches!(
+        non_boundary.set_text_underline(
+            TextSpan::new(accented + 1, accented + 1).unwrap(),
+            UnderlineStyle::Single
+        ),
+        Err(Error::SpanNotOnCharacterBoundary { position }) if position == accented + 1
+    ));
+    let mut out_of_range = source.edit();
+    assert!(matches!(
+        out_of_range.set_text_underline(
+            TextSpan::new(text.len() + 1, text.len() + 1).unwrap(),
+            UnderlineStyle::Single
+        ),
+        Err(Error::SpanOutOfRange { end, length })
+            if end == text.len() + 1 && length == text.len()
+    ));
+
+    let mut limited =
+        source.edit_with_options(EditOptions::new().semantic_limits(semantic_limits(0)));
+    assert!(matches!(
+        limited.set_text_underline(TextSpan::new(0, 0).unwrap(), UnderlineStyle::Single),
+        Err(Error::Limit {
+            kind: SemanticLimitKind::Operations,
+            observed: 1,
+            maximum: 0
+        })
+    ));
+
+    let plain = Package::parse(r"{\rtf1\ansi Alpha}").unwrap();
+    let mut success = plain.edit();
+    success
+        .set_text_underline(TextSpan::new(0, 5).unwrap(), UnderlineStyle::Single)
+        .unwrap();
+    assert_eq!(
+        success
+            .commit()
+            .unwrap()
+            .package()
+            .body()
+            .runs()
+            .next()
+            .unwrap()
+            .format()
+            .underline(),
+        UnderlineStyle::Single
+    );
+
+    let paragraph = Package::parse(r"{\rtf1\ansi Alpha\par Beta}").unwrap();
+    let mut unsupported_body = paragraph.edit();
+    unsupported_body
+        .patch_paragraph_layout(
+            Position::new(0),
+            ParagraphLayoutPatch::new().with_space_before(1),
+        )
+        .unwrap();
+    assert!(matches!(
+        unsupported_body.set_text_underline(TextSpan::new(0, 0).unwrap(), UnderlineStyle::Single),
+        Err(Error::Refused(refusal))
+            if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedOperation
+                && refusal.reason()
+                    == "paragraph-layout updates cannot compose with body text or character changes"
     ));
 }
 

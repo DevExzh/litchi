@@ -2518,16 +2518,36 @@ impl Edit {
         span: TextSpan,
         underline: UnderlineStyle,
     ) -> Result<&mut Self, Error> {
-        self.ensure_body_compatible()?;
-        self.ensure_operation_room()?;
-        if self
-            .operations
-            .iter()
-            .any(|operation| matches!(operation, Operation::ParagraphLayout { .. }))
-        {
-            return Err(Error::unsupported_operation(
-                "paragraph-layout updates cannot compose with body text or character changes",
-            ));
+        // With no staged operation, the compatibility and paragraph-layout
+        // scans are vacuous. Keep the operation-limit check first, then reject
+        // only the two empty positions whose UTF-8 boundary is proven without
+        // materializing the lazy text projection.
+        if self.operations.is_empty() {
+            self.ensure_operation_room()?;
+            if span.is_empty() {
+                if span.start == 0 {
+                    return Err(Error::unsupported_source(
+                        "underline edits require non-empty text within one paragraph",
+                    ));
+                }
+                if span.start == self.source.raw().retained_text_len() {
+                    return Err(Error::unsupported_source(
+                        "underline edits require non-empty text within one paragraph",
+                    ));
+                }
+            }
+        } else {
+            self.ensure_body_compatible()?;
+            self.ensure_operation_room()?;
+            if self
+                .operations
+                .iter()
+                .any(|operation| matches!(operation, Operation::ParagraphLayout { .. }))
+            {
+                return Err(Error::unsupported_operation(
+                    "paragraph-layout updates cannot compose with body text or character changes",
+                ));
+            }
         }
         let body = self.source.text();
         validate_span(body, span)?;
