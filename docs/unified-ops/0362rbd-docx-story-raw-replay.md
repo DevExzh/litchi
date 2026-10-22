@@ -6,6 +6,9 @@ selected member with its selector, case-insensitive part name, byte length,
 SHA-256, and exact bytes. They accept an independently opened equal-content
 recipient and reject changed content with the crate's canonical
 `PatchConflict`. Selector or part mismatches remain `TopologyConflict`.
+The SHA-256 value is the immutable fingerprint stored by snapshot admission;
+replay compares that authenticated value plus length and exact bytes rather
+than hashing the same payload a second time.
 
 The public raw replay path re-admits a changed target under the recipient's
 limits and execution context. It reconstructs the selected-story or glossary
