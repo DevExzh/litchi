@@ -322,10 +322,12 @@ fn source_facade_text_cache_preserves_projection_and_checks_freshness() {
     let reads_after_first_text = source.reads();
     assert!(
         reads_after_first_text > reads_before_text,
-        "the first semantic read materializes the validated source projection"
+        "the first semantic read streams the validated source projection"
     );
     let versions_before_threshold_call = source.versions();
     assert_eq!(presentation.text().unwrap(), expected);
+    let reads_after_second_text = source.reads();
+    assert!(reads_after_second_text > reads_after_first_text);
     assert!(source.versions() - versions_before_threshold_call >= 3);
     let versions_before_cache_hit = source.versions();
     assert_eq!(presentation.text().unwrap(), expected);
@@ -334,7 +336,7 @@ fn source_facade_text_cache_preserves_projection_and_checks_freshness() {
         2,
         "a retained text cache hit only observes source freshness before and after cloning"
     );
-    assert_eq!(source.reads(), reads_after_first_text);
+    assert_eq!(source.reads(), reads_after_second_text);
     assert_eq!(expected, "First\nalpha\n\nSecond\nbeta");
 
     source.bump_revision();

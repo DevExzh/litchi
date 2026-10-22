@@ -367,7 +367,10 @@ fn source_backed_sink_matches_owned_and_does_not_use_text_cache() {
         "the first streaming semantic read materializes the lazy source projection"
     );
     assert_eq!(presentation.text().unwrap(), owned.text().unwrap());
-    assert_eq!(source.reads.load(Ordering::Relaxed), reads_after_write);
+    assert!(
+        source.reads.load(Ordering::Relaxed) > reads_after_write,
+        "the ordinary text projection is independently streamed from the source"
+    );
     assert_eq!(source.revision.load(Ordering::Relaxed), 0);
 }
 

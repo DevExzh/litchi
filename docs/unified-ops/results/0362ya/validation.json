@@ -1,0 +1,89 @@
+{
+  "schema": "litchi_odp_source_heap_review.v1",
+  "candidate_parent": "681e5ec809f4e463bf684b56c155b6a944280166",
+  "status": "candidate_review",
+  "source": {
+    "path": "crates/litchi-odp/src/package/source.rs",
+    "bytes": 49360,
+    "sha256": "c2ef89a35115e6cc8459dd73f1ed838c7b8f16369fca6b5e184ae66c7dee2efa"
+  },
+  "consumers": [
+    {
+      "path": "crates/litchi-odp/tests/source_backed.rs",
+      "bytes": 19949,
+      "sha256": "9bc052b60c1fc21a85ff86ce988047309fa371fc7d89d16814f99c2e32bd38fc"
+    },
+    {
+      "path": "crates/litchi-odp/tests/sequential_text.rs",
+      "bytes": 18840,
+      "sha256": "8c09be560af665d87d60b3704820ca31c387d102369acac008311f19e73d37de"
+    }
+  ],
+  "workload": {
+    "slides": 2000,
+    "content_xml_bytes": 591185,
+    "media_bytes": 4194304,
+    "source_archive_bytes": 4215428,
+    "lifecycle": "open; optional semantic read or publication; append/replay commit and write"
+  },
+  "accepted_0358a": {
+    "before_peak_bytes": 5513403,
+    "after_peak_bytes": [6107267, 6107267],
+    "delta_bytes": 593864,
+    "ratio": 1.108,
+    "samples_per_leg": 15,
+    "output_bytes": 4215645,
+    "source": "docs/unified-ops/results/0358a/sb-before-1.json and sb-after-2.json/sb-after-3.json"
+  },
+  "allocation_probe": {
+    "source_sha256": "d47d8bf1960e3e305bf42e6de3f2dbe40cc2185fd921271c55ae60f1159cfd7c",
+    "command": "cargo run --offline --release -p litchi-ops --features odp --example odp_alloc_probe -- all",
+    "source_retained_outside_checkout": true,
+    "candidate": {
+      "open": {"peak": 116001, "allocated": 200325, "allocs": 72, "reallocs": 7},
+      "open_first_slide": {"peak": 694351, "allocated": 3325010, "allocs": 20093, "reallocs": 23},
+      "open_first_text": {"peak": 1501757, "allocated": 4786692, "allocs": 34090, "reallocs": 7947},
+      "unchanged_write": {"peak": 1285577, "allocated": 1582282, "allocs": 86, "reallocs": 9},
+      "append_commit_write": {"peak": 612845, "allocated": 5853743, "allocs": 36185, "reallocs": 99},
+      "replay_write": {"peak": 612845, "allocated": 5853775, "allocs": 36189, "reallocs": 99}
+    },
+    "eager_arc_string_reference": {
+      "open": {"peak": 693231, "allocated": 777932},
+      "open_first_slide": {"peak": 693231, "allocated": 3211442},
+      "open_first_text": {"peak": 1501373, "allocated": 4673124},
+      "unchanged_write": {"peak": 1285153, "allocated": 1468674},
+      "append_commit_write": {"peak": 1204071, "allocated": 6431822},
+      "replay_write": {"peak": 1204071, "allocated": 6431854}
+    },
+    "semantic_allocation_delta_vs_eager": {
+      "first_slide": 691175,
+      "first_text": 691175,
+      "unchanged_write": 691215
+    }
+  },
+  "checks": [
+    {
+      "command": "cargo fmt --all -- --check",
+      "result": "passed"
+    },
+    {
+      "command": "cargo test --offline -p litchi-odp --test source_backed --test sequential_text",
+      "result": "28 passed"
+    },
+    {
+      "command": "cargo test --offline -p litchi-odp --lib package::source::tests",
+      "result": "2 passed"
+    },
+    {
+      "command": "cargo clippy --offline -p litchi-odp --all-targets --all-features -- -D warnings",
+      "result": "passed"
+    }
+  ],
+  "native_timing": "required_quiet_host_abba_not_run",
+  "native_instruction_counts": "not_collected",
+  "previous_candidate": {
+    "commit": "681e5ec809f4e463bf684b56c155b6a944280166",
+    "receipt": "docs/unified-ops/results/0362y/validation.json",
+    "disposition": "rejected: semantic reread allocation regression"
+  }
+}
