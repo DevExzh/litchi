@@ -661,6 +661,25 @@ fn cross_owner_noop_preserves_signed_artifact_and_changed_replay_checks_policy()
 }
 
 #[test]
+fn dropped_noop_patch_replays_after_source_owner_drop() {
+    let source = fixture(Fixture::default());
+    let patch = {
+        let producer = open_editor(source.clone());
+        let commit = producer.edit_tab_state().unwrap().commit().unwrap();
+        assert!(!commit.diagnostics().changed());
+        commit.patch().clone()
+    };
+
+    let forward = open_editor(source.clone()).apply_tab_state(&patch).unwrap();
+    assert_eq!(forward.package().to_bytes().unwrap(), source);
+
+    let inverse = open_editor(source.clone())
+        .apply_tab_state(&patch.inverse())
+        .unwrap();
+    assert_eq!(inverse.package().to_bytes().unwrap(), source);
+}
+
+#[test]
 fn deferred_endpoint_replays_after_committed_owner_is_dropped() {
     let source = fixture(Fixture::default());
     let producer = open_editor(source.clone());

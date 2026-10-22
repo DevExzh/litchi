@@ -353,6 +353,14 @@ impl Snapshot {
             .ok_or_else(|| invalid("tab selector position is outside the workbook catalog"))
     }
 
+    /// Materialize the exact source graph before a patch is allowed to outlive
+    /// its source-backed owner. The public snapshot remains independent of
+    /// the owner, while deferred fallback replay still has the graph proof it
+    /// needs after the owner and its weak graph source have been dropped.
+    pub(super) fn materialize_source_graph(&self) -> Result<()> {
+        self.source.graph.data().map(|_| ())
+    }
+
     pub(super) fn touched(&self) -> &[TouchedPart] {
         &self.source.touched
     }

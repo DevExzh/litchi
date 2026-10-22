@@ -430,6 +430,11 @@ impl Edit {
                 .requested_active
                 .is_none_or(|position| position == self.before.active_position())
         {
+            // A no-op patch may outlive both the edit and its source owner.
+            // Capture the exact graph proof before the only owner reference
+            // becomes weak, so detached fallback replay remains infallible
+            // for the same admitted source closure.
+            self.before.materialize_source_graph()?;
             let patch = super::Patch::new(self.before.clone(), self.before.clone());
             return commit_change(&self.workbook, patch);
         }
