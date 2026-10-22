@@ -41,6 +41,37 @@ ordinary edit/commit or same-owner replay cost. The capped validation below
 records the source-independent correctness checks; native qualification remains
 open.
 
+## Facade protection boundary and PPTX source replay
+
+The unified `File` facade cannot currently create a signed-base no-op
+`Commit`. `crates/litchi-ops/src/transaction.rs` runs `admit` and
+`check_source` before it creates an edit, and its existing protection path
+rejects signed input (including a signed no-op) before `File::edit` can return
+an editable owner. This is distinct from the leaf contract: a directly opened
+PPTX source package admits an exact signed no-op because its package apply
+guard refuses signed input only when `!patch.is_noop`; the focused PPTX owner
+tests cover that legal no-op and still refuse signed changes. No blanket
+signed-content exclusion was added to facade replay.
+
+Commit `d100f18016` extends the PPTX source cross-slide-copy family to accept
+an independently opened package when its published content matches the
+recorded directional source. Pristine packages use the retained source
+artifact fingerprint; edited packages stream the publication into a SHA-256
+sink without retaining a second artifact buffer. The deferred result is
+rebased onto the recipient's source, limits, execution context and freshness
+fences, while the recorded artifact remains authenticated before and after
+publication. The inverse follows the patch's directional before/after pair;
+it is not selected by a separate `inverse` flag. The focused source-family
+test now covers forward replay onto an equal reopened package, exact inverse
+restoration from the streamed output, and a same-shaped changed recipient
+returning `PatchConflict`.
+
+The already-run validation for this slice was `cargo fmt --all -- --check`,
+the focused PPTX source-family test, the 59-test cross-copy engine module,
+and the seven-case `source_backed_cross_copy_adversarial` integration test,
+all under the capped W8 environment. Native timing for this additional leaf
+path remains unqualified.
+
 Validation on the branch used the generated, untracked lockfile
 `2c10b15dfc669fffc555913731171ccd507691659d3226c77a162ecafc3d2b72` and the
 capped environment from `.coord/w8-file/env.sh`, with
