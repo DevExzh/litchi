@@ -101,8 +101,8 @@ admission path.
 The corrected source was rebuilt and measured against the same base using the
 external count probe. The reduced receipt is
 [`constructor-v12-count-summary.json`](results/0361fd/constructor-v12-count-summary.json),
-10,666 bytes, SHA-256
-`58e9878bd595edab5ec6d2da15786cc62fd2258ebb626bc5e4284e1cfdb5f0d0`.
+11,312 bytes, SHA-256
+`a53ebbd2e1e59f3e8fdca8be3765bdd85446f4191b848af8e8094adb142cdace`.
 The probe source SHA-256 is
 `eb3157342b9bd2c5c9e0c5d373ad4c507987b3acf46c680246d84bae7f6efdf0` and
 the lock SHA-256 is
@@ -118,6 +118,13 @@ unknown varint in its retained header.
 | 8 | 51.005 → 332.004 | 6.509 | 9,067.006 → 9,340.005 | 1.030 |
 | 32 | 51.006 → 836.006 | 16.390 | 48,055.504 → 34,828.005 | 0.725 |
 | 128 | 51.004 → 2,852.005 | 55.918 | 195,076.405 → 136,132.005 | 0.698 |
+
+The callgrind call edge for `ArchiveInfo::new` itself is 119, 266, 770 and
+2,786 Ir per call at those four cardinalities, an exact `98 + 21 × messages`
+fit. The complete canonical route is `164 + 21 × messages` Ir/op; the base
+route is a flat 51 Ir/op. The 21-instruction slope is the public shape and
+length admission pass. The remaining candidate fixed work is profile equality
+and constructor ownership setup; no second encoded-header pass appears.
 
 The constructor still performs one public-field admission pass per message;
 the corrected counts show that cost grows linearly with metadata cardinality.

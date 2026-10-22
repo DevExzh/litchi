@@ -1,6 +1,18 @@
 {
   "attribution": {
     "constructor": "The corrected candidate performs one default-profile validation branch and a branchless aggregate check of every public MessageInfo shape field plus length; it does not encode a header, allocate metadata, or retain a cache.",
+    "linear_fit": {
+      "base_archive_info_route_ir_per_op": "approximately 51",
+      "candidate_archive_info_new_body_ir_per_call": "98 + 21 * message_count",
+      "candidate_archive_info_route_ir_per_op": "164 + 21 * message_count",
+      "interpretation": "The 21-instruction slope is the aggregate public shape and length admission pass; the fixed route cost includes exact default-profile equality and constructor ownership setup. No encoded header or cache allocation occurs in this route.",
+      "measured_archive_info_new_body_ir_per_call": {
+        "1": 119,
+        "128": 2786,
+        "32": 770,
+        "8": 266
+      }
+    },
     "repair": "Default Limits skip the repeated invariant walk only after exact equality with Limits::default(); nondefault profiles still call Limits::validate() and the exact admission path.",
     "return": "The constructor remains returned for owner review. Retained noncanonical validation is below base at 1 and 32/128 messages and 3.0% above at 8 messages; no native qualification was run."
   },
