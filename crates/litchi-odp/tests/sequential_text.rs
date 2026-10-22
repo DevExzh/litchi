@@ -361,8 +361,13 @@ fn source_backed_sink_matches_owned_and_does_not_use_text_cache() {
         b"Title\nbody one\nbody two\nouter shape\ninner shape\n\nretained child\n\n"
     );
     assert_eq!(report.objects_written(), 3);
-    assert_eq!(source.reads.load(Ordering::Relaxed), reads_before);
+    let reads_after_write = source.reads.load(Ordering::Relaxed);
+    assert!(
+        reads_after_write > reads_before,
+        "the first streaming semantic read materializes the lazy source projection"
+    );
     assert_eq!(presentation.text().unwrap(), owned.text().unwrap());
+    assert_eq!(source.reads.load(Ordering::Relaxed), reads_after_write);
     assert_eq!(source.revision.load(Ordering::Relaxed), 0);
 }
 

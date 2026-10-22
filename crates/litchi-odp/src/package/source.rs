@@ -2,9 +2,9 @@
 //!
 //! [`SourceBackedPresentation`] is deliberately additive: the existing
 //! [`super::Presentation`] keeps its owned-byte and mutation behavior.  This
-//! facade retains only the validated XML needed for ordinary semantic reads;
-//! package media remains cold until [`SourceBackedPresentation::media_data`]
-//! selects a member.
+//! facade validates the XML needed for ordinary semantic reads at open, then
+//! keeps the source-backed projection lazy; package media remains cold until
+//! [`SourceBackedPresentation::media_data`] selects a member.
 
 use std::sync::{
     Arc, OnceLock,
@@ -24,8 +24,8 @@ use litchi_odf_common::core::source_publication::{
     SourceContentInsertionError, SourceContentInsertionPlan,
 };
 use litchi_odf_common::core::{
-    Meta, SourceBackedPackage, SourceContentPublicationOptions, SourceContentPublicationReport,
-    private::ContentDocumentValidator, validate_content_part,
+    Meta, SourceBackedPackage, SourceContentPublicationError, SourceContentPublicationOptions,
+    SourceContentPublicationReport, private::ContentDocumentValidator, validate_content_part,
 };
 use litchi_odf_common::{Error as OdfError, OpenOptions};
 use zeroize::Zeroizing;
@@ -37,9 +37,8 @@ const ODF_PRESENTATION: &str = "application/vnd.oasis.opendocument.presentation"
 const BODY_MARKER: &str = "<office:presentation";
 const FAMILY_NAME: &str = "ODP";
 const SLIDES_CACHE_QUERY_THRESHOLD: usize = 2;
-// The source-backed owner already retains bounded content.xml bytes.  Keep a
-// much smaller ceiling for the optional semantic projection so a repeated
-// query cannot turn an otherwise lazy source view into a large second model.
+// Keep a ceiling for the optional semantic projection so a repeated query
+// cannot turn an otherwise lazy source view into a large second model.
 const SLIDES_CACHE_MAX_SOURCE_BYTES: usize = 4 * 1024 * 1024;
 const SLIDES_CACHE_MAX_COUNT: usize = 256;
 const TEXT_CACHE_QUERY_THRESHOLD: usize = 2;
@@ -53,11 +52,13 @@ fn file_source(path: impl AsRef<Path>) -> Result<Arc<dyn ReadAt>> {
 /// Read-only ODP access over an immutable positional source.
 ///
 /// Opening validates the ZIP archive, MIME member, and family content root,
-/// then loads only `content.xml` and the optional `styles.xml`.  Other package
-/// members—including pictures and audio/video payloads—remain deferred until
-/// [`Self::media_data`] is called.  Every public operation checks the captured
-/// [`SourceVersion`] before and after work, returning
-/// [`Error::SourceChanged`] when the source revision is no longer current.
+/// then validates only `content.xml` and the optional `styles.xml`.  Their
+/// semantic text is materialized on first use and retained only as a shared
+/// cache. Other package members—including pictures and audio/video payloads—
+/// remain deferred until [`Self::media_data`] is called. Every public
+/// operation checks the captured [`SourceVersion`] before and after work,
+/// returning [`Error::SourceChanged`] when the source revision is no longer
+/// current.
 ///
 /// This type has no edit or output methods.  Use [`super::Presentation`] for
 /// the established owned-byte/mutation API.
@@ -65,8 +66,9 @@ pub struct SourceBackedPresentation {
     pub(super) package: Arc<SourceBackedPackage>,
     source: Arc<dyn ReadAt>,
     source_version: SourceVersion,
-    content_xml: Arc<str>,
-    styles_xml: Option<Arc<str>>,
+    content_xml_bytes: u64,
+    content_xml: OnceLock<Arc<str>>,
+    styles_xml: OnceLock<Option<Arc<str>>>,
     metadata: Option<litchi_core::Metadata>,
     slides_queries: AtomicUsize,
     slides_cache: OnceLock<Option<Arc<[Slide]>>>,
@@ -251,17 +253,18 @@ impl SourceBackedPresentation {
                 litchi_odf_common::core::private::neutralize_prologue_doctype(&mut content_xml);
             validate_content_part(&content_xml, BODY_MARKER, FAMILY_NAME)?;
 
-            let styles_xml = if package.has_file("styles.xml")? {
-                Some(
+            if package.has_file("styles.xml")? {
+                // Validate the optional styles part at open, but leave its
+                // semantic projection in the source until a caller asks for
+                // it.  This keeps the open and first-read contracts strict
+                // without retaining another potentially large XML string.
+                let _styles_xml =
                     String::from_utf8(package.get_file("styles.xml")?).map_err(|error| {
                         Error::InvalidFormat(format!(
                             "{FAMILY_NAME} styles.xml is not UTF-8: {error}"
                         ))
-                    })?,
-                )
-            } else {
-                None
-            };
+                    })?;
+            }
 
             // Match the ordinary family package's mandatory metadata
             // validation: a malformed optional meta.xml must not become
@@ -272,13 +275,14 @@ impl SourceBackedPresentation {
                 None
             };
 
-            Ok((content_xml, styles_xml, metadata, doctype))
+            let content_xml_bytes = u64::try_from(content_xml.len()).unwrap_or(u64::MAX);
+            Ok((content_xml_bytes, metadata, doctype))
         })();
 
         // Reconcile the source before exposing any secondary parse error. This
         // keeps stale-source errors authoritative across the whole open pass,
         // including pure validation and UTF-8/metadata parsing work.
-        let (content_xml, styles_xml, metadata, doctype) =
+        let (content_xml_bytes, metadata, doctype) =
             reconcile_source(source.as_ref(), source_version, parsed)?;
         let mut open_tolerance = package.tolerance_report().clone();
         if doctype {
@@ -292,8 +296,9 @@ impl SourceBackedPresentation {
             package: Arc::new(package),
             source,
             source_version,
-            content_xml: Arc::from(content_xml),
-            styles_xml: styles_xml.map(Arc::from),
+            content_xml_bytes,
+            content_xml: OnceLock::new(),
+            styles_xml: OnceLock::new(),
             metadata,
             slides_queries: AtomicUsize::new(0),
             slides_cache: OnceLock::new(),
@@ -308,12 +313,15 @@ impl SourceBackedPresentation {
     /// A share of this presentation's source, retained parts and pending
     /// output, with fresh caches.
     pub(crate) fn share(&self) -> Self {
+        let content_xml = clone_once_lock(&self.content_xml);
+        let styles_xml = clone_once_lock(&self.styles_xml);
         Self {
             package: Arc::clone(&self.package),
             source: Arc::clone(&self.source),
             source_version: self.source_version,
-            content_xml: Arc::clone(&self.content_xml),
-            styles_xml: self.styles_xml.clone(),
+            content_xml_bytes: self.content_xml_bytes,
+            content_xml,
+            styles_xml,
             metadata: self.metadata.clone(),
             slides_queries: AtomicUsize::new(0),
             slides_cache: OnceLock::new(),
@@ -369,6 +377,61 @@ impl SourceBackedPresentation {
         }
     }
 
+    fn load_content_xml(&self) -> Result<Arc<str>> {
+        let result = (|| {
+            let mut content_xml = String::from_utf8(self.package.get_file("content.xml")?)
+                .map_err(|error| {
+                    Error::InvalidFormat(format!("{FAMILY_NAME} content.xml is not UTF-8: {error}"))
+                })?;
+            litchi_odf_common::core::private::neutralize_prologue_doctype(&mut content_xml);
+            validate_content_part(&content_xml, BODY_MARKER, FAMILY_NAME)?;
+            Ok(Arc::<str>::from(content_xml))
+        })();
+        reconcile_source(self.source.as_ref(), self.source_version, result)
+    }
+
+    fn content_xml_snapshot(&self) -> Result<&str> {
+        self.check_source()?;
+        if self.content_xml.get().is_none() {
+            let content_xml = self.load_content_xml()?;
+            let _ = self.content_xml.set(content_xml);
+        }
+        self.check_source()?;
+        Ok(self
+            .content_xml
+            .get()
+            .expect("content.xml cache is initialized")
+            .as_ref())
+    }
+
+    fn load_styles_xml(&self) -> Result<Option<Arc<str>>> {
+        let result = (|| {
+            if !self.package.has_file("styles.xml")? {
+                return Ok(None);
+            }
+            let styles_xml =
+                String::from_utf8(self.package.get_file("styles.xml")?).map_err(|error| {
+                    Error::InvalidFormat(format!("{FAMILY_NAME} styles.xml is not UTF-8: {error}"))
+                })?;
+            Ok(Some(Arc::<str>::from(styles_xml)))
+        })();
+        reconcile_source(self.source.as_ref(), self.source_version, result)
+    }
+
+    fn styles_xml_snapshot(&self) -> Result<Option<&str>> {
+        self.check_source()?;
+        if self.styles_xml.get().is_none() {
+            let styles_xml = self.load_styles_xml()?;
+            let _ = self.styles_xml.set(styles_xml);
+        }
+        self.check_source()?;
+        Ok(self
+            .styles_xml
+            .get()
+            .expect("styles.xml cache is initialized")
+            .as_deref())
+    }
+
     /// Write this presentation as a complete ODP package: the source archive,
     /// or the committed output of a source-backed edit, which copies every
     /// untouched member raw from the retained source (record 0358a).
@@ -405,11 +468,16 @@ impl SourceBackedPresentation {
                 Some(materialized) => materialized.write_to_with_options(writer, options),
                 None => deferred.plan.write_to(writer, options),
             },
-            None => Ok(self.package.write_content_xml_to_stream_with_options(
-                writer,
-                self.content_xml.as_bytes(),
-                options,
-            )?),
+            None => {
+                let content_xml = self.content_xml_snapshot().map_err(|error| {
+                    SourceContentInsertionError::from(SourceContentPublicationError::from(error))
+                })?;
+                Ok(self.package.write_content_xml_to_stream_with_options(
+                    writer,
+                    content_xml.as_bytes(),
+                    options,
+                )?)
+            },
         }
     }
 
@@ -470,8 +538,10 @@ impl SourceBackedPresentation {
             // Content repairs (LENIENCY_AUDIT F9.10) are found by the slide
             // scan; a scan that fails outright reports its error through
             // `slides()`, and the report then lists the package repairs only.
-            if let Ok((_slides, content)) =
-                Parser::parse_slides_with_report(&self.content_xml, self.styles_xml.as_deref())
+            if let (Ok(content_xml), Ok(styles_xml)) =
+                (self.content_xml_snapshot(), self.styles_xml_snapshot())
+                && let Ok((_slides, content)) =
+                    Parser::parse_slides_with_report(content_xml, styles_xml)
             {
                 merged.append(&content);
             }
@@ -491,8 +561,7 @@ impl SourceBackedPresentation {
         if self.deferred.is_some() {
             return self.effective()?.content_xml();
         }
-        self.check_source()?;
-        Ok(&self.content_xml)
+        self.content_xml_snapshot()
     }
 
     /// Borrow the optional validated `styles.xml` snapshot.
@@ -500,8 +569,7 @@ impl SourceBackedPresentation {
         if self.deferred.is_some() {
             return self.effective()?.styles_xml();
         }
-        self.check_source()?;
-        Ok(self.styles_xml.as_deref())
+        self.styles_xml_snapshot()
     }
 
     /// Return common document metadata projected from the optional
@@ -552,8 +620,9 @@ impl SourceBackedPresentation {
 
     fn slides_uncached(&self) -> Result<Vec<Slide>> {
         self.check_source()?;
-        let result =
-            Parser::parse_slides_with_report(&self.content_xml, self.styles_xml.as_deref());
+        let content_xml = self.content_xml_snapshot()?;
+        let styles_xml = self.styles_xml_snapshot()?;
+        let result = Parser::parse_slides_with_report(content_xml, styles_xml);
         let observed = self.source.version()?;
         ensure_current(self.source_version, observed)?;
         let (slides, content) = result?;
@@ -601,11 +670,9 @@ impl SourceBackedPresentation {
 
     fn slide_uncached(&self, index: usize) -> Result<Option<Slide>> {
         self.check_source()?;
-        let result = Parser::parse_slide_with_styles_at(
-            &self.content_xml,
-            self.styles_xml.as_deref(),
-            index,
-        );
+        let content_xml = self.content_xml_snapshot()?;
+        let styles_xml = self.styles_xml_snapshot()?;
+        let result = Parser::parse_slide_with_styles_at(content_xml, styles_xml, index);
         let observed = self.source.version()?;
         ensure_current(self.source_version, observed)?;
         result
@@ -634,7 +701,7 @@ impl SourceBackedPresentation {
     }
 
     fn publish_slides_cache(&self, slides: &[Slide]) {
-        if self.content_xml.len() > SLIDES_CACHE_MAX_SOURCE_BYTES
+        if self.content_xml_bytes > SLIDES_CACHE_MAX_SOURCE_BYTES as u64
             || slides.len() > SLIDES_CACHE_MAX_COUNT
         {
             let _ = self.slides_cache.set(None);
@@ -747,10 +814,15 @@ impl SourceBackedPresentation {
                 source,
                 progress: TextOutputReport::default(),
             })?;
+        let content_xml =
+            self.content_xml_snapshot()
+                .map_err(|source| TextOutputError::Document {
+                    source,
+                    progress: TextOutputReport::default(),
+                })?;
         let paragraph_separator = options.paragraph_separator();
         let mut writer = SequentialTextWriter::new(output, options);
-        let result =
-            Parser::write_slides_text_to(&self.content_xml, &mut writer, paragraph_separator);
+        let result = Parser::write_slides_text_to(content_xml, &mut writer, paragraph_separator);
         let progress = writer.progress();
         if let Err(source) = self.check_source() {
             return Err(TextOutputError::Document { source, progress });
@@ -864,6 +936,14 @@ fn clone_text_result(text: &str) -> Result<String> {
     Ok(result)
 }
 
+fn clone_once_lock<T: Clone>(source: &OnceLock<T>) -> OnceLock<T> {
+    let cloned = OnceLock::new();
+    if let Some(value) = source.get() {
+        let _ = cloned.set(value.clone());
+    }
+    cloned
+}
+
 fn reconcile_source<T>(
     source: &dyn ReadAt,
     expected: SourceVersion,
@@ -904,6 +984,10 @@ fn check_semantic_part_sizes(
 mod tests {
     use std::io;
 
+    use litchi_core::OwnedSource;
+    use litchi_odf_common::constants::ODF_PRESENTATION;
+    use litchi_odf_common::core::PackageWriter;
+
     use super::*;
 
     struct FixedSource;
@@ -931,5 +1015,25 @@ mod tests {
             reconcile_source(&FixedSource, expected, secondary),
             Err(Error::SourceChanged { .. })
         ));
+    }
+
+    #[test]
+    fn source_owner_drops_large_validation_buffer_before_semantic_read() {
+        let content = format!(
+            r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><office:body><office:presentation><draw:page><draw:frame><draw:text-box><text:p>{}</text:p></draw:text-box></draw:frame></draw:page></office:presentation></office:body></office:document-content>"#,
+            "x".repeat(1024 * 1024),
+        );
+        let mut writer = PackageWriter::new();
+        writer.set_mimetype(ODF_PRESENTATION).unwrap();
+        writer.add_file("content.xml", content.as_bytes()).unwrap();
+        let bytes = writer.finish_to_bytes().unwrap();
+        let owner =
+            SourceBackedPresentation::from_read_at(Arc::new(OwnedSource::new(bytes))).unwrap();
+
+        assert!(owner.content_xml.get().is_none());
+        assert_eq!(owner.content_xml_bytes, content.len() as u64);
+
+        assert!(owner.content_xml().unwrap().contains(&"x".repeat(1024)));
+        assert!(owner.content_xml.get().is_some());
     }
 }
