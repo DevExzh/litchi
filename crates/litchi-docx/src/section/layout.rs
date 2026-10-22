@@ -111,9 +111,32 @@ impl Snapshot {
         self.inventory.section(selector)
     }
 
-    /// Start an isolated edit of one existing, locally authored section.
-    pub fn edit(&self, selector: impl Into<Selector>) -> Result<Edit> {
+    /// Start the source-backed section-layout family through the package
+    /// facade.  The detached record editor is crate-private; standalone raw
+    /// callers use [`raw_tree`](Self::raw_tree) instead.
+    pub(crate) fn edit(&self, selector: impl Into<Selector>) -> Result<Edit> {
         Edit::new(self.clone(), selector.into())
+    }
+
+    /// Create a bounded raw tree for the first authored section.
+    ///
+    /// The requested policy is intersected with the policy retained when this
+    /// snapshot was admitted.  A raw caller therefore cannot widen an
+    /// already-admitted source by asking for a broader policy at edit time.
+    /// Use [`Self::raw_tree_at`] when a document has more than one section.
+    pub fn raw_tree(&self, limits: &Limits) -> Result<raw::Tree> {
+        self.raw_tree_at(Position::new(0), limits)
+    }
+
+    /// Create a bounded raw tree for one existing, locally authored section.
+    ///
+    /// The returned tree is a mutable raw codec model.  Its output and patch
+    /// methods validate the complete rewritten document before returning, but
+    /// no detached package publication type is exposed by this module.
+    pub fn raw_tree_at(&self, selector: impl Into<Selector>, limits: &Limits) -> Result<raw::Tree> {
+        let effective = self.limits.intersection(limits);
+        let base = self.with_limits(effective)?;
+        raw::Tree::from_snapshot(base, selector.into())
     }
 
     pub(crate) fn limits(&self) -> &Limits {
@@ -137,21 +160,43 @@ impl Snapshot {
         size_of::<Self>().checked_add(self.inventory.retained_bytes()?)
     }
 
-    fn with_source_identity(&self, source: &Self) -> Self {
-        Self {
-            xml: Arc::clone(&self.xml),
-            inventory: self.inventory.clone(),
-            source_version: source.source_version,
-            lineage: source.lineage.clone(),
-            artifact_fingerprint: source.artifact_fingerprint,
-            limits: source.limits.clone(),
+    fn with_limits(&self, limits: Limits) -> Result<Self> {
+        if self.limits == limits {
+            return Ok(self.clone());
         }
+        Self::from_shared_xml(
+            Arc::clone(&self.xml),
+            self.source_version,
+            self.lineage.clone(),
+            self.artifact_fingerprint,
+            limits,
+        )
+    }
+
+    fn with_source_identity(&self, source: &Self) -> Result<Self> {
+        if self.limits == source.limits {
+            return Ok(Self {
+                xml: Arc::clone(&self.xml),
+                inventory: self.inventory.clone(),
+                source_version: source.source_version,
+                lineage: source.lineage.clone(),
+                artifact_fingerprint: source.artifact_fingerprint,
+                limits: source.limits.clone(),
+            });
+        }
+        Self::from_shared_xml(
+            Arc::clone(&self.xml),
+            source.source_version,
+            source.lineage.clone(),
+            source.artifact_fingerprint,
+            source.limits.clone(),
+        )
     }
 }
 
 /// An isolated edit over one existing section's local page-layout properties.
 #[derive(Clone)]
-pub struct Edit {
+pub(crate) struct Edit {
     base: Snapshot,
     projected: Section,
     selector: Selector,
@@ -249,45 +294,45 @@ impl Edit {
     /// commit simply retains no base snapshot and publication recomputes it;
     /// the ceiling never changes semantic results, refusals, or output bytes.
     #[must_use]
-    pub fn with_max_retained_base_bytes(mut self, maximum: usize) -> Self {
+    pub(crate) fn with_max_retained_base_bytes(mut self, maximum: usize) -> Self {
         self.max_retained_base_bytes = maximum;
         self
     }
 
     /// Borrow the exact immutable source snapshot.
     #[must_use]
-    pub const fn source(&self) -> &Snapshot {
+    pub(crate) const fn source(&self) -> &Snapshot {
         &self.base
     }
 
     /// Return the checked semantic source-order section position.
     #[must_use]
-    pub const fn position(&self) -> Position {
+    pub(crate) const fn position(&self) -> Position {
         self.position
     }
 
     /// Return the projected local page geometry.
-    pub fn page_size(&mut self) -> Result<Option<PageSize>> {
+    pub(crate) fn page_size(&self) -> Result<Option<PageSize>> {
         Ok(self.projected_state.page_size)
     }
 
     /// Return the projected local margins.
-    pub fn margins(&mut self) -> Result<Option<Margins>> {
+    pub(crate) fn margins(&self) -> Result<Option<Margins>> {
         Ok(self.projected_state.margins)
     }
 
     /// Return the projected local section-break placement.
-    pub fn start(&mut self) -> Result<Option<Start>> {
+    pub(crate) fn start(&self) -> Result<Option<Start>> {
         Ok(self.projected_state.start)
     }
 
     /// Return the projected local columns.
-    pub fn columns(&mut self) -> Result<Option<Columns>> {
+    pub(crate) fn columns(&self) -> Result<Option<Columns>> {
         Ok(self.projected_state.columns.clone())
     }
 
     /// Replace or remove the locally authored page geometry.
-    pub fn set_page_size(&mut self, value: Option<PageSize>) -> Result<&mut Self> {
+    pub(crate) fn set_page_size(&mut self, value: Option<PageSize>) -> Result<&mut Self> {
         if self.projected_state.page_size == value {
             return Ok(self);
         }
@@ -300,12 +345,12 @@ impl Edit {
     }
 
     /// Remove the locally authored page geometry.
-    pub fn clear_page_size(&mut self) -> Result<&mut Self> {
+    pub(crate) fn clear_page_size(&mut self) -> Result<&mut Self> {
         self.set_page_size(None)
     }
 
     /// Replace or remove the locally authored margins.
-    pub fn set_margins(&mut self, value: Option<Margins>) -> Result<&mut Self> {
+    pub(crate) fn set_margins(&mut self, value: Option<Margins>) -> Result<&mut Self> {
         if self.projected_state.margins == value {
             return Ok(self);
         }
@@ -318,12 +363,12 @@ impl Edit {
     }
 
     /// Remove the locally authored margins.
-    pub fn clear_margins(&mut self) -> Result<&mut Self> {
+    pub(crate) fn clear_margins(&mut self) -> Result<&mut Self> {
         self.set_margins(None)
     }
 
     /// Replace or remove the locally authored section-break placement.
-    pub fn set_start(&mut self, value: Option<Start>) -> Result<&mut Self> {
+    pub(crate) fn set_start(&mut self, value: Option<Start>) -> Result<&mut Self> {
         if self.projected_state.start == value {
             return Ok(self);
         }
@@ -333,12 +378,12 @@ impl Edit {
     }
 
     /// Remove the locally authored section-break placement.
-    pub fn clear_start(&mut self) -> Result<&mut Self> {
+    pub(crate) fn clear_start(&mut self) -> Result<&mut Self> {
         self.set_start(None)
     }
 
     /// Replace or remove the locally authored columns.
-    pub fn set_columns(&mut self, value: Option<Columns>) -> Result<&mut Self> {
+    pub(crate) fn set_columns(&mut self, value: Option<Columns>) -> Result<&mut Self> {
         if self.projected_state.columns == value {
             return Ok(self);
         }
@@ -348,40 +393,42 @@ impl Edit {
     }
 
     /// Remove the locally authored columns.
-    pub fn clear_columns(&mut self) -> Result<&mut Self> {
+    pub(crate) fn clear_columns(&mut self) -> Result<&mut Self> {
         self.set_columns(None)
     }
 
-    /// Finish the edit as an exact, reversible patch.
-    pub fn commit(mut self) -> Result<Commit> {
-        let projected_state = self.projected_state.clone();
-        let semantic_noop = projected_state == self.base_state;
-        let replacement = if semantic_noop {
-            None
-        } else {
-            let candidate = self.projected.to_xml_bytes()?;
-            let (start, end) = self.source_span.range();
-            let original =
-                self.base.xml.get(start..end).ok_or_else(|| {
-                    Error::InvalidFormat("section source span is outside XML".into())
-                })?;
-            Some(rewrite_known_children(
-                original,
-                &candidate,
-                &self.base_state,
-                &projected_state,
-                &self.source_context,
-            )?)
-        };
-        if let Some(replacement) = &replacement
-            && replacement.len() > self.base.limits.max_section_bytes
-        {
+    fn replacement(&self) -> Result<Option<Vec<u8>>> {
+        let projected_state = &self.projected_state;
+        if projected_state == &self.base_state {
+            return Ok(None);
+        }
+        let candidate = self.projected.encode_xml_bytes()?;
+        let (start, end) = self.source_span.range();
+        let original = self
+            .base
+            .xml
+            .get(start..end)
+            .ok_or_else(|| Error::InvalidFormat("section source span is outside XML".into()))?;
+        let replacement = rewrite_known_children(
+            original,
+            &candidate,
+            &self.base_state,
+            projected_state,
+            &self.source_context,
+        )?;
+        if replacement.len() > self.base.limits.max_section_bytes {
             return Err(Error::SectionInventoryLimit {
                 kind: crate::section::LimitKind::Bytes,
                 maximum: self.base.limits.max_section_bytes,
                 actual: replacement.len(),
             });
         }
+        Ok(Some(replacement))
+    }
+
+    fn target(&self) -> Result<Snapshot> {
+        let semantic_noop = self.projected_state == self.base_state;
+        let replacement = self.replacement()?;
         let target = if semantic_noop {
             self.base.clone()
         } else {
@@ -389,6 +436,12 @@ impl Edit {
             let replacement = replacement.as_deref().ok_or_else(|| {
                 Error::InvalidFormat("changed section layout has no replacement bytes".into())
             })?;
+            let output_len = replaced_len(self.base.xml.as_slice(), start, end, replacement)?;
+            enforce_layout_limit(
+                crate::section::LimitKind::InputBytes,
+                output_len,
+                self.base.limits.max_input_bytes,
+            )?;
             let next_xml = replace_range(self.base.xml.as_slice(), start, end, replacement)?;
             let target = Snapshot::from_shared_xml(
                 Arc::new(next_xml),
@@ -398,12 +451,33 @@ impl Edit {
                 self.base.limits.clone(),
             )?;
             ensure_same_topology(&self.base.inventory, &target.inventory)?;
-            ensure_semantic_readback(&target.inventory, self.selector, &projected_state)?;
+            ensure_semantic_readback(&target.inventory, self.selector, &self.projected_state)?;
             target
         };
         if semantic_noop {
-            ensure_semantic_readback(&target.inventory, self.selector, &projected_state)?;
+            ensure_semantic_readback(&target.inventory, self.selector, &self.projected_state)?;
         }
+        Ok(target)
+    }
+
+    fn patch_record(&self) -> Result<Patch> {
+        let target = self.target()?;
+        let patch = Patch {
+            before: self.base.shared_xml(),
+            after: target.shared_xml(),
+            authorization: PatchAuthorization::from_snapshot(&self.base)?,
+            limits: self.base.limits.clone(),
+            selector: self.selector,
+        };
+        Ok(patch)
+    }
+
+    /// Finish the edit as an exact, reversible patch for the source-backed
+    /// family.  This staging operation is crate-private; standalone callers
+    /// use [`raw::Tree::patch`].
+    pub(crate) fn commit(self) -> Result<Commit> {
+        let semantic_noop = self.projected_state == self.base_state;
+        let target = self.target()?;
         let patch = Patch {
             before: self.base.shared_xml(),
             after: target.shared_xml(),
@@ -434,23 +508,25 @@ impl Edit {
 
 /// A successful section-layout commit.
 #[derive(Clone)]
-pub struct Commit {
+pub(crate) struct Commit {
     snapshot: Snapshot,
     patch: Patch,
     base_snapshot: Option<Snapshot>,
+    #[allow(dead_code)]
     retained_base_bytes: usize,
 }
 
 impl Commit {
     /// Borrow the projected immutable snapshot.
     #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
+    #[allow(dead_code)]
+    pub(crate) const fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
     /// Borrow the exact reversible patch.
     #[must_use]
-    pub const fn patch(&self) -> &Patch {
+    pub(crate) const fn patch(&self) -> &Patch {
         &self.patch
     }
 
@@ -467,7 +543,8 @@ impl Commit {
     /// while an active retained base includes its `Snapshot` owner once. The
     /// estimate excludes allocator bookkeeping and physical RSS.
     #[must_use]
-    pub const fn retained_base_bytes(&self) -> usize {
+    #[allow(dead_code)]
+    pub(crate) const fn retained_base_bytes(&self) -> usize {
         self.retained_base_bytes
     }
 
@@ -478,7 +555,8 @@ impl Commit {
     /// existing current-source inventory parse. A no-op commit may still
     /// reuse its already-held projected snapshot because that needs no extra
     /// retained base state.
-    pub fn release_retained_base(&mut self) {
+    #[allow(dead_code)]
+    pub(crate) fn release_retained_base(&mut self) {
         self.base_snapshot = None;
         self.retained_base_bytes = 0;
     }
@@ -496,14 +574,14 @@ impl Commit {
         if self.patch.is_noop() {
             Ok(current.clone())
         } else {
-            Ok(self.snapshot.with_source_identity(current))
+            self.snapshot.with_source_identity(current)
         }
     }
 }
 
 /// An exact-source-checked, reversible section-layout patch.
 #[derive(Clone)]
-pub struct Patch {
+pub(crate) struct Patch {
     before: Arc<Vec<u8>>,
     after: Arc<Vec<u8>>,
     authorization: PatchAuthorization,
@@ -515,28 +593,23 @@ pub struct Patch {
 enum PatchAuthorization {
     Detached,
     SourceBound {
-        source_version: SourceVersion,
-        lineage: SourceLineage,
         artifact_fingerprint: SourceArtifactFingerprint,
     },
 }
 
 impl PatchAuthorization {
     fn from_snapshot(snapshot: &Snapshot) -> Result<Self> {
-        match (
-            snapshot.source_version,
-            snapshot.lineage.clone(),
-            snapshot.artifact_fingerprint,
-        ) {
-            (None, None, None) => Ok(Self::Detached),
-            (Some(source_version), Some(lineage), Some(artifact_fingerprint)) => {
-                Ok(Self::SourceBound {
-                    source_version,
-                    lineage,
-                    artifact_fingerprint,
-                })
+        match snapshot.artifact_fingerprint {
+            None if snapshot.source_version.is_none() && snapshot.lineage.is_none() => {
+                Ok(Self::Detached)
             },
-            _ => Err(Error::SectionLayoutAuthorizationConflict),
+            Some(artifact_fingerprint) => Ok(Self::SourceBound {
+                artifact_fingerprint,
+            }),
+            None => Err(Error::internal(
+                "section_layout_patch",
+                "source provenance is partial",
+            )),
         }
     }
 }
@@ -544,25 +617,25 @@ impl PatchAuthorization {
 impl Patch {
     /// Whether this patch is an exact byte no-op.
     #[must_use]
-    pub fn is_noop(&self) -> bool {
+    pub(crate) fn is_noop(&self) -> bool {
         self.before.as_slice() == self.after.as_slice()
     }
 
     /// Whether this patch changes the main-document bytes.
     #[must_use]
-    pub fn changed(&self) -> bool {
+    pub(crate) fn changed(&self) -> bool {
         !self.is_noop()
     }
 
     /// The selector retained as the semantic patch coordinate.
     #[must_use]
-    pub const fn selector(&self) -> Selector {
+    pub(crate) const fn selector(&self) -> Selector {
         self.selector
     }
 
     /// Construct the exact inverse patch.
     #[must_use]
-    pub fn inverse(&self) -> Self {
+    pub(crate) fn inverse(&self) -> Self {
         Self {
             before: Arc::clone(&self.after),
             after: Arc::clone(&self.before),
@@ -572,26 +645,12 @@ impl Patch {
         }
     }
 
-    /// Apply only to a snapshot with the exact source bytes, source lineage,
-    /// and semantic limits used to create this patch. A package replays a
-    /// patch through `source_backed::Package::apply_section_layout`.
-    pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
-        self.authorize_source(source)?;
-        if self.is_noop() {
-            return Ok(source.clone());
-        }
-        Snapshot::from_shared_xml(
-            Arc::clone(&self.after),
-            source.source_version,
-            source.lineage.clone(),
-            source.artifact_fingerprint,
-            self.limits.clone(),
-        )
-    }
-
     fn authorize_source(&self, source: &Snapshot) -> Result<()> {
         if source.xml.as_slice() != self.before.as_slice() {
-            return Err(Error::SectionLayoutStaleSource);
+            return Err(Error::conflict(
+                "apply_section_layout",
+                "section source bytes differ",
+            ));
         }
         match &self.authorization {
             PatchAuthorization::Detached => {
@@ -599,44 +658,45 @@ impl Patch {
                     || source.lineage.is_some()
                     || source.artifact_fingerprint.is_some()
                 {
-                    return Err(Error::SectionLayoutAuthorizationConflict);
+                    return Err(Error::refused(
+                        litchi_core::edit::RefusalKind::UnsupportedOperation,
+                        "apply_section_layout",
+                        "a detached section-layout patch cannot use an owner source proof",
+                    ));
                 }
             },
             PatchAuthorization::SourceBound {
-                source_version,
-                lineage,
                 artifact_fingerprint,
             } => {
-                if source.lineage.as_ref() != Some(lineage) {
-                    return Err(Error::SectionLayoutForeignSource);
-                }
-                if source.source_version != Some(*source_version) {
-                    return Err(Error::SectionLayoutRevisionConflict);
-                }
                 if source.artifact_fingerprint != Some(*artifact_fingerprint) {
-                    return Err(Error::SectionLayoutFingerprintConflict);
+                    return Err(Error::conflict(
+                        "apply_section_layout",
+                        "section patch artifact fingerprint differs",
+                    ));
                 }
             },
-        }
-        if source.limits != self.limits {
-            return Err(Error::SectionLayoutPolicyConflict);
         }
         Ok(())
     }
 
-    pub(crate) fn limits(&self) -> &Limits {
-        &self.limits
-    }
-
-    /// Apply to a snapshot with the patch's exact before bytes and limits,
-    /// from any source (record 0355a: a package replay reads the snapshot it
-    /// applies to).
+    /// Apply to a snapshot with the patch's before bytes and complete source
+    /// artifact identity, from any package source (record 0355a).
     pub(crate) fn apply_content(&self, source: &Snapshot) -> Result<Snapshot> {
         if source.xml.as_slice() != self.before.as_slice() {
-            return Err(Error::SectionLayoutStaleSource);
+            return Err(Error::conflict(
+                "apply_section_layout",
+                "section source bytes differ",
+            ));
         }
-        if source.limits != self.limits {
-            return Err(Error::SectionLayoutPolicyConflict);
+        if let PatchAuthorization::SourceBound {
+            artifact_fingerprint,
+        } = &self.authorization
+            && source.artifact_fingerprint != Some(*artifact_fingerprint)
+        {
+            return Err(Error::conflict(
+                "apply_section_layout",
+                "section patch artifact fingerprint differs",
+            ));
         }
         if self.is_noop() {
             return Ok(source.clone());
@@ -646,8 +706,219 @@ impl Patch {
             source.source_version,
             source.lineage.clone(),
             source.artifact_fingerprint,
-            self.limits.clone(),
+            source.limits.clone(),
         )
+    }
+
+    /// Apply a detached raw patch by its recorded XML content identity.
+    /// Reopened snapshots with equal before bytes are valid recipients; the
+    /// recipient policy re-admits the after image before allocating its
+    /// retained XML.
+    pub(crate) fn apply_raw(&self, source: &Snapshot) -> Result<Snapshot> {
+        if source.xml.as_slice() != self.before.as_slice() {
+            return Err(Error::conflict(
+                "apply_section_layout",
+                "section source bytes differ",
+            ));
+        }
+        if self.is_noop() {
+            return Ok(source.clone());
+        }
+        Snapshot::from_shared_xml(
+            Arc::clone(&self.after),
+            source.source_version,
+            source.lineage.clone(),
+            source.artifact_fingerprint,
+            source.limits.clone(),
+        )
+    }
+}
+
+/// Raw, bounded section-layout codecs.
+///
+/// `Tree` is a mutable codec model rather than an owner publication type.  It
+/// retains the complete source document so unknown XML remains byte-exact;
+/// `to_xml` and `patch` validate the rewritten document before returning it.
+pub mod raw {
+    use super::{Columns, Margins, PageSize, Start};
+    use super::{Edit, Limits, Patch as RecordPatch, Position, Result, Selector, Snapshot};
+
+    /// A mutable raw section-layout tree selected from one document snapshot.
+    #[derive(Clone)]
+    pub struct Tree {
+        inner: Edit,
+    }
+
+    impl Tree {
+        /// Parse a document and select its first authored section.
+        ///
+        /// A raw caller must provide the complete policy for this parse;
+        /// there is no default-policy constructor.
+        pub fn from_xml(xml: Vec<u8>, limits: &Limits) -> Result<Self> {
+            let snapshot = Snapshot::from_xml(xml, limits)?;
+            Self::from_snapshot(snapshot, Position::new(0))
+        }
+
+        /// Parse a document and select one section by its semantic selector.
+        pub fn from_xml_at(
+            xml: Vec<u8>,
+            selector: impl Into<Selector>,
+            limits: &Limits,
+        ) -> Result<Self> {
+            let snapshot = Snapshot::from_xml(xml, limits)?;
+            Self::from_snapshot(snapshot, selector.into())
+        }
+
+        pub(crate) fn from_snapshot(
+            snapshot: Snapshot,
+            selector: impl Into<Selector>,
+        ) -> Result<Self> {
+            Ok(Self {
+                inner: snapshot.edit(selector)?,
+            })
+        }
+
+        /// Borrow the immutable source projection retained by this tree.
+        #[must_use]
+        pub fn source(&self) -> &Snapshot {
+            self.inner.source()
+        }
+
+        /// Return the policy used by this tree after source/requested
+        /// intersection.
+        #[must_use]
+        pub fn limits(&self) -> &Limits {
+            self.inner.source().limits()
+        }
+
+        /// Return the selected source-order section position.
+        #[must_use]
+        pub fn position(&self) -> Position {
+            self.inner.position()
+        }
+
+        /// Return the projected local page geometry.
+        pub fn page_size(&self) -> Result<Option<PageSize>> {
+            self.inner.page_size()
+        }
+
+        /// Return the projected local margins.
+        pub fn margins(&self) -> Result<Option<Margins>> {
+            self.inner.margins()
+        }
+
+        /// Return the projected local section-break placement.
+        pub fn start(&self) -> Result<Option<Start>> {
+            self.inner.start()
+        }
+
+        /// Return the projected local columns.
+        pub fn columns(&self) -> Result<Option<Columns>> {
+            self.inner.columns()
+        }
+
+        /// Replace or remove the locally authored page geometry.
+        pub fn set_page_size(&mut self, value: Option<PageSize>) -> Result<&mut Self> {
+            self.inner.set_page_size(value)?;
+            Ok(self)
+        }
+
+        /// Remove the locally authored page geometry.
+        pub fn clear_page_size(&mut self) -> Result<&mut Self> {
+            self.inner.clear_page_size()?;
+            Ok(self)
+        }
+
+        /// Replace or remove the locally authored margins.
+        pub fn set_margins(&mut self, value: Option<Margins>) -> Result<&mut Self> {
+            self.inner.set_margins(value)?;
+            Ok(self)
+        }
+
+        /// Remove the locally authored margins.
+        pub fn clear_margins(&mut self) -> Result<&mut Self> {
+            self.inner.clear_margins()?;
+            Ok(self)
+        }
+
+        /// Replace or remove the locally authored section-break placement.
+        pub fn set_start(&mut self, value: Option<Start>) -> Result<&mut Self> {
+            self.inner.set_start(value)?;
+            Ok(self)
+        }
+
+        /// Remove the locally authored section-break placement.
+        pub fn clear_start(&mut self) -> Result<&mut Self> {
+            self.inner.clear_start()?;
+            Ok(self)
+        }
+
+        /// Replace or remove the locally authored columns.
+        pub fn set_columns(&mut self, value: Option<Columns>) -> Result<&mut Self> {
+            self.inner.set_columns(value)?;
+            Ok(self)
+        }
+
+        /// Remove the locally authored columns.
+        pub fn clear_columns(&mut self) -> Result<&mut Self> {
+            self.inner.clear_columns()?;
+            Ok(self)
+        }
+
+        /// Serialize the current tree with the original unknown XML retained.
+        pub fn to_xml(&self) -> Result<Vec<u8>> {
+            Ok(self.inner.target()?.xml.as_ref().clone())
+        }
+
+        /// Create an exact, reversible raw patch without publishing an owner.
+        pub fn patch(&self) -> Result<Patch> {
+            Ok(Patch {
+                inner: self.inner.patch_record()?,
+            })
+        }
+    }
+
+    /// An exact-source-checked raw section-layout patch.
+    #[derive(Clone)]
+    pub struct Patch {
+        inner: RecordPatch,
+    }
+
+    impl Patch {
+        /// Whether this patch is an exact byte no-op.
+        #[must_use]
+        pub fn is_noop(&self) -> bool {
+            self.inner.is_noop()
+        }
+
+        /// Whether this patch changes the source document bytes.
+        #[must_use]
+        pub fn changed(&self) -> bool {
+            self.inner.changed()
+        }
+
+        /// The selected semantic section coordinate.
+        #[must_use]
+        pub fn selector(&self) -> Selector {
+            self.inner.selector()
+        }
+
+        /// Construct the exact inverse patch.
+        #[must_use]
+        pub fn inverse(&self) -> Self {
+            Self {
+                inner: self.inner.inverse(),
+            }
+        }
+
+        /// Apply this patch to a matching raw snapshot.
+        pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
+            self.inner.apply_raw(source)
+        }
+
+        pub(crate) fn into_record(self) -> RecordPatch {
+            self.inner
+        }
     }
 }
 
@@ -2225,17 +2496,13 @@ fn element_prefix(opening: &[u8]) -> &[u8] {
 }
 
 fn replace_range(source: &[u8], start: usize, end: usize, replacement: &[u8]) -> Result<Vec<u8>> {
+    let capacity = replaced_len(source, start, end, replacement)?;
     let prefix = source
         .get(..start)
         .ok_or_else(|| Error::InvalidFormat("section source range starts outside XML".into()))?;
     let suffix = source
         .get(end..)
         .ok_or_else(|| Error::InvalidFormat("section source range ends outside XML".into()))?;
-    let capacity = prefix
-        .len()
-        .checked_add(replacement.len())
-        .and_then(|size| size.checked_add(suffix.len()))
-        .ok_or_else(|| Error::InvalidFormat("section layout output size overflow".into()))?;
     let mut output = Vec::new();
     output
         .try_reserve_exact(capacity)
@@ -2247,6 +2514,17 @@ fn replace_range(source: &[u8], start: usize, end: usize, replacement: &[u8]) ->
     output.extend_from_slice(replacement);
     output.extend_from_slice(suffix);
     Ok(output)
+}
+
+fn replaced_len(source: &[u8], start: usize, end: usize, replacement: &[u8]) -> Result<usize> {
+    let replaced = source
+        .get(start..end)
+        .ok_or_else(|| Error::InvalidFormat("section source range is outside XML".into()))?;
+    source
+        .len()
+        .checked_sub(replaced.len())
+        .and_then(|size| size.checked_add(replacement.len()))
+        .ok_or_else(|| Error::InvalidFormat("section layout output size overflow".into()))
 }
 
 fn ensure_same_topology(before: &Inventory, after: &Inventory) -> Result<()> {
@@ -2283,8 +2561,8 @@ fn ensure_semantic_readback(
 
 #[cfg(test)]
 mod tests {
-    use super::{PageSize, Snapshot};
-    use crate::section::{Emu, Orientation};
+    use super::{Margins, PageSize, Snapshot};
+    use crate::section::{Emu, LimitKind, Limits, Orientation};
     use litchi_opc::constants::{content_type as ct, relationship_type as rt};
     use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter};
 
@@ -2396,5 +2674,36 @@ mod tests {
                 .unwrap();
             assert_eq!(below.retained_base_bytes(), 0);
         }
+    }
+
+    #[test]
+    fn changed_edit_rejects_total_output_before_allocating_document() {
+        let limits = Limits {
+            max_input_bytes: DOCUMENT.len(),
+            ..Limits::default()
+        };
+        let base = Snapshot::from_xml(DOCUMENT.to_vec(), &limits).unwrap();
+        let mut edit = base.edit(0).unwrap();
+        edit.set_margins(Some(Margins {
+            top: Some(Emu::from_twips(720)),
+            right: Some(Emu::from_twips(720)),
+            bottom: Some(Emu::from_twips(720)),
+            left: Some(Emu::from_twips(720)),
+            header: Some(Emu::from_twips(360)),
+            footer: Some(Emu::from_twips(360)),
+            gutter: Some(Emu::from_twips(0)),
+        }))
+        .unwrap();
+
+        let error = edit.commit().unwrap_err();
+        assert!(matches!(
+            error,
+            crate::Error::SectionInventoryLimit {
+                kind: LimitKind::InputBytes,
+                maximum,
+                actual,
+            } if maximum == DOCUMENT.len() && actual > maximum
+        ));
+        assert_eq!(base.shared_xml().as_slice(), DOCUMENT);
     }
 }

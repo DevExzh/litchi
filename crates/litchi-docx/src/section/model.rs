@@ -463,13 +463,29 @@ impl Section {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn to_xml_bytes(&mut self) -> Result<Vec<u8>> {
+        let dirty = self
+            .snapshot
+            .as_ref()
+            .is_some_and(|snapshot| snapshot.is_dirty());
+        let bytes = self.encode_xml_bytes()?;
+        if dirty {
+            self.xml_bytes = bytes.clone();
+            self.snapshot = Some(codec::decode(&bytes)?);
+        }
+        Ok(bytes)
+    }
+
+    /// Encode the current semantic state without mutating the model cache.
+    ///
+    /// Focused raw trees expose their output through `&self`; keeping this
+    /// pure path separate avoids cloning a staged section merely to serialize
+    /// it.  The ordinary mutable compatibility writer above still refreshes
+    /// its cache after encoding.
+    pub(crate) fn encode_xml_bytes(&self) -> Result<Vec<u8>> {
         if let Some(snapshot) = &self.snapshot
             && snapshot.is_dirty()
         {
-            let bytes = codec::encode(snapshot)?;
-            self.xml_bytes = bytes.clone();
-            self.snapshot = Some(codec::decode(&bytes)?);
-            return Ok(bytes);
+            return codec::encode(snapshot);
         }
         Ok(self.xml_bytes.clone())
     }

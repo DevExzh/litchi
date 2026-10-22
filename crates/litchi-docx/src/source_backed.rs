@@ -1387,9 +1387,10 @@ impl Package {
         operation: &'static str,
     ) -> Result<(PackURI, Arc<Vec<u8>>, SourceArtifactFingerprint)> {
         self.trim_clean_paragraph_index_for_operation();
+        let recipient_limits = self.semantic_limits.sections_value();
         let (main, current) = self.main_section_layout_snapshot(
             operation,
-            patch.limits(),
+            recipient_limits,
             commit.and_then(layout::Commit::base_snapshot_for_publication),
         )?;
         let target = match commit.map(|commit| commit.apply_to_current(&current)) {

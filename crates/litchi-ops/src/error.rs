@@ -1299,13 +1299,7 @@ impl Classify for litchi_docx::Error {
             Self::Refused(refusal) => refusal.classify(),
             Self::ExternalHyperlinkDetachmentConflict
             | Self::ExternalHyperlinkRedactionConflict
-            | Self::DocumentVariablesConflict
-            | Self::SectionLayoutStaleSource
-            | Self::SectionLayoutRevisionConflict
-            | Self::SectionLayoutForeignSource
-            | Self::SectionLayoutFingerprintConflict
-            | Self::SectionLayoutPolicyConflict
-            | Self::SectionLayoutAuthorizationConflict => Class::of(Code::InvalidInput),
+            | Self::DocumentVariablesConflict => Class::of(Code::InvalidInput),
             Self::PatchConflict { .. } => Class::of(Code::InvalidInput),
             Self::Allocation { .. }
             | Self::RevisionAllocation { .. }

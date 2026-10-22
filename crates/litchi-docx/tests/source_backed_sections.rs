@@ -630,15 +630,14 @@ fn changed_section_layout_commit(
 ) -> (
     Vec<u8>,
     source_backed::Package,
-    litchi_docx::section::layout::Commit,
+    source_backed::section_layout::Commit,
 ) {
     let source_bytes = fixture(document);
     let package =
         source_backed::Package::from_read_at(Arc::new(OwnedSource::new(source_bytes.clone())))
             .unwrap();
     let commit = {
-        let snapshot = package.section_layout_snapshot().unwrap();
-        let mut edit = snapshot.edit(0).unwrap();
+        let mut edit = package.edit_section_layout(0).unwrap();
         if let Some(retained_cap) = retained_cap {
             edit = edit.with_max_retained_base_bytes(retained_cap);
         }
@@ -651,6 +650,12 @@ fn changed_section_layout_commit(
         edit.commit().unwrap()
     };
     (source_bytes, package, commit)
+}
+
+fn committed_layout_snapshot(
+    commit: &source_backed::section_layout::Commit,
+) -> litchi_docx::section::layout::Snapshot {
+    commit.package().section_layout_snapshot().unwrap()
 }
 
 #[test]
@@ -675,13 +680,13 @@ fn source_backed_existing_section_layout_is_exact_and_cell_safe() {
     );
     assert_eq!(source.inventory().sections()[0].columns().unwrap().count, 1);
     assert!(
-        source
-            .edit(Selector::paragraph(litchi_core::Position::new(1)))
+        package
+            .edit_section_layout(Selector::paragraph(litchi_core::Position::new(1)))
             .is_err()
     );
 
-    let mut edit = source
-        .edit(Selector::paragraph(litchi_core::Position::new(0)))
+    let mut edit = package
+        .edit_section_layout(Selector::paragraph(litchi_core::Position::new(0)))
         .unwrap();
     edit.set_page_size(Some(PageSize {
         width: Some(Emu::from_twips(11906)),
@@ -710,50 +715,65 @@ fn source_backed_existing_section_layout_is_exact_and_cell_safe() {
     }))
     .unwrap();
     let commit = edit.commit().unwrap();
-    assert!(commit.patch().changed());
-    assert_eq!(commit.snapshot().inventory().sections().len(), 2);
+    assert!(!commit.patch().is_noop());
     assert_eq!(
-        commit.snapshot().inventory().sections()[0].ownership(),
+        committed_layout_snapshot(&commit)
+            .inventory()
+            .sections()
+            .len(),
+        2
+    );
+    assert_eq!(
+        committed_layout_snapshot(&commit).inventory().sections()[0].ownership(),
         Ownership::Paragraph(litchi_core::Position::new(0))
     );
     assert_eq!(
-        commit.snapshot().inventory().sections()[0]
+        committed_layout_snapshot(&commit).inventory().sections()[0]
             .page_size()
             .unwrap()
             .orientation,
         Orientation::Landscape
     );
     assert_eq!(
-        commit.snapshot().inventory().sections()[0]
+        committed_layout_snapshot(&commit).inventory().sections()[0]
             .margins()
             .unwrap()
             .left,
         Some(Emu::from_twips(1080))
     );
     assert_eq!(
-        commit.snapshot().inventory().sections()[0].start(),
+        committed_layout_snapshot(&commit).inventory().sections()[0].start(),
         Some(Start::NewPage)
     );
     assert_eq!(
-        commit.snapshot().inventory().sections()[0]
+        committed_layout_snapshot(&commit).inventory().sections()[0]
             .columns()
             .unwrap()
             .count,
         2
     );
 
-    let changed = commit.patch().apply(&source).unwrap();
-    let restored = commit.patch().inverse().apply(&changed).unwrap();
+    let changed = package.apply_section_layout(commit.patch()).unwrap();
+    let restored = changed
+        .package()
+        .apply_section_layout(&commit.patch().inverse())
+        .unwrap();
     assert_eq!(
-        restored.inventory().sections(),
+        restored
+            .package()
+            .section_layout_snapshot()
+            .unwrap()
+            .inventory()
+            .sections(),
         source.inventory().sections()
     );
-    assert!(commit.patch().apply(&source).is_ok());
+    assert!(package.apply_section_layout(commit.patch()).is_ok());
     let mut stale_bytes = document.as_bytes().to_vec();
     stale_bytes.push(b' ');
     let stale =
-        litchi_docx::section::layout::Snapshot::from_xml(stale_bytes, &Default::default()).unwrap();
-    assert!(commit.patch().apply(&stale).is_err());
+        source_backed::Package::from_read_at(Arc::new(OwnedSource::new(fixture(&stale_bytes))))
+            .unwrap();
+    assert!(stale.apply_section_layout(commit.patch()).is_err());
 
     // The record patch replays onto its package; the package commit reads
     // its own change and its inverse restores the source artifact exactly.
@@ -793,13 +813,13 @@ fn source_backed_existing_section_layout_is_exact_and_cell_safe() {
             .unwrap()
             .inventory()
             .sections(),
-        commit.snapshot().inventory().sections()
+        committed_layout_snapshot(&commit).inventory().sections()
     );
     let mut output = Vec::new();
     package_commit.package().write_to(&mut output).unwrap();
     let mut replayed = Vec::new();
     package
-        .apply_section_layout(&commit.patch().clone().into())
+        .apply_section_layout(&commit.patch().clone())
         .unwrap()
         .package()
         .write_to(&mut replayed)
@@ -859,13 +879,13 @@ fn source_backed_existing_section_layout_is_exact_and_cell_safe() {
     // so does the source for the inverse.
     assert!(matches!(
         reopened.apply_section_layout(package_commit.patch()),
-        Err(Error::SectionLayoutStaleSource)
+        Err(Error::PatchConflict { .. })
     ));
     let stale =
         source_backed::Package::from_read_at(Arc::new(OwnedSource::new(original_bytes))).unwrap();
     assert!(matches!(
         stale.apply_section_layout(&package_commit.patch().inverse()),
-        Err(Error::SectionLayoutStaleSource)
+        Err(Error::PatchConflict { .. })
     ));
 }
 
@@ -877,12 +897,11 @@ fn source_backed_section_layout_noop_mce_strict_and_limits_are_typed() {
         simple.as_bytes(),
     ))))
     .unwrap();
-    let snapshot = source.section_layout_snapshot().unwrap();
-    let noop = snapshot.edit(0).unwrap().commit().unwrap();
+    let noop = source.edit_section_layout(0).unwrap().commit().unwrap();
     assert!(noop.patch().is_noop());
     let mut output = Vec::new();
     source
-        .apply_section_layout(&noop.patch().clone().into())
+        .apply_section_layout(&noop.patch().clone())
         .and_then(|committed| committed.package().write_to(&mut output))
         .unwrap();
     assert_eq!(output, fixture(simple.as_bytes()));
@@ -957,7 +976,7 @@ fn section_layout_commit_rechecks_complete_artifact_before_target_reuse() {
     let mut output = Vec::new();
     assert!(matches!(
         commit.package().write_to(&mut output),
-        Err(Error::SectionLayoutFingerprintConflict)
+        Err(Error::PatchConflict { .. })
     ));
     assert!(output.is_empty());
 }
@@ -993,10 +1012,9 @@ fn section_layout_commit_retained_fallback_and_release_are_byte_parity() {
 
     let (source_bytes, retained_package, retained_commit) =
         changed_section_layout_commit(document.as_bytes(), None);
-    assert!(retained_commit.retained_base_bytes() > 0);
     let mut retained_output = Vec::new();
     let committed = retained_package
-        .apply_section_layout(&retained_commit.patch().clone().into())
+        .apply_section_layout(&retained_commit.patch().clone())
         .unwrap();
     committed.package().write_to(&mut retained_output).unwrap();
     assert_ne!(retained_output, source_bytes);
@@ -1013,23 +1031,18 @@ fn section_layout_commit_retained_fallback_and_release_are_byte_parity() {
 
     let (_, zero_package, zero_commit) =
         changed_section_layout_commit(document.as_bytes(), Some(0));
-    assert_eq!(zero_commit.retained_base_bytes(), 0);
     let mut zero_output = Vec::new();
     zero_package
-        .apply_section_layout(&zero_commit.patch().clone().into())
+        .apply_section_layout(&zero_commit.patch().clone())
         .and_then(|committed| committed.package().write_to(&mut zero_output))
         .unwrap();
     assert_eq!(zero_output, retained_output);
 
-    let (_, released_package, mut released_commit) =
+    let (_, released_package, released_commit) =
         changed_section_layout_commit(document.as_bytes(), Some(1 << 20));
-    assert!(released_commit.retained_base_bytes() > 0);
-    assert!(released_commit.retained_base_bytes() <= 1 << 20);
-    released_commit.release_retained_base();
-    assert_eq!(released_commit.retained_base_bytes(), 0);
     let mut released_output = Vec::new();
     released_package
-        .apply_section_layout(&released_commit.patch().clone().into())
+        .apply_section_layout(&released_commit.patch().clone())
         .and_then(|committed| committed.package().write_to(&mut released_output))
         .unwrap();
     assert_eq!(released_output, retained_output);
@@ -1043,16 +1056,10 @@ fn section_layout_noop_retention_and_release_preserve_exact_source() {
     let package =
         source_backed::Package::from_read_at(Arc::new(OwnedSource::new(source_bytes.clone())))
             .unwrap();
-    let noop = {
-        let snapshot = package.section_layout_snapshot().unwrap();
-        snapshot.edit(0).unwrap().commit().unwrap()
-    };
-    // A no-op already keeps the target snapshot required for its exact
-    // source identity; it needs no additional retained base allocation.
-    assert_eq!(noop.retained_base_bytes(), 0);
+    let noop = { package.edit_section_layout(0).unwrap().commit().unwrap() };
     let mut retained_output = Vec::new();
     package
-        .apply_section_layout(&noop.patch().clone().into())
+        .apply_section_layout(&noop.patch().clone())
         .and_then(|committed| committed.package().write_to(&mut retained_output))
         .unwrap();
     assert_eq!(retained_output, source_bytes);
@@ -1060,16 +1067,10 @@ fn section_layout_noop_retention_and_release_preserve_exact_source() {
     let package =
         source_backed::Package::from_read_at(Arc::new(OwnedSource::new(source_bytes.clone())))
             .unwrap();
-    let mut released_noop = {
-        let snapshot = package.section_layout_snapshot().unwrap();
-        snapshot.edit(0).unwrap().commit().unwrap()
-    };
-    assert_eq!(released_noop.retained_base_bytes(), 0);
-    released_noop.release_retained_base();
-    assert_eq!(released_noop.retained_base_bytes(), 0);
+    let released_noop = { package.edit_section_layout(0).unwrap().commit().unwrap() };
     let mut released_output = Vec::new();
     package
-        .apply_section_layout(&released_noop.patch().clone().into())
+        .apply_section_layout(&released_noop.patch().clone())
         .and_then(|committed| committed.package().write_to(&mut released_output))
         .unwrap();
     assert_eq!(released_output, source_bytes);
@@ -1080,7 +1081,6 @@ fn section_layout_retained_malformed_source_keeps_parse_error_before_sink() {
     let document = section_layout_document();
     let (_source_bytes, _source_package, retained_commit) =
         changed_section_layout_commit(document.as_bytes(), None);
-    assert!(retained_commit.retained_base_bytes() > 0);
 
     let malformed_document = b"<w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"><w:body>";
     let malformed_package = source_backed::Package::from_read_at(Arc::new(OwnedSource::new(
@@ -1089,7 +1089,7 @@ fn section_layout_retained_malformed_source_keeps_parse_error_before_sink() {
     .unwrap();
     let mut retained_output = Vec::new();
     let retained_error = match malformed_package
-        .apply_section_layout(&retained_commit.patch().clone().into())
+        .apply_section_layout(&retained_commit.patch().clone())
         .and_then(|committed| committed.package().write_to(&mut retained_output))
     {
         Ok(_) => panic!("malformed source unexpectedly published"),
@@ -1099,14 +1099,13 @@ fn section_layout_retained_malformed_source_keeps_parse_error_before_sink() {
 
     let (_, _source_package, fallback_commit) =
         changed_section_layout_commit(document.as_bytes(), Some(0));
-    assert_eq!(fallback_commit.retained_base_bytes(), 0);
     let malformed_package = source_backed::Package::from_read_at(Arc::new(OwnedSource::new(
         malformed_fixture(malformed_document),
     )))
     .unwrap();
     let mut fallback_output = Vec::new();
     let fallback_error = match malformed_package
-        .apply_section_layout(&fallback_commit.patch().clone().into())
+        .apply_section_layout(&fallback_commit.patch().clone())
         .and_then(|committed| committed.package().write_to(&mut fallback_output))
     {
         Ok(_) => panic!("malformed source unexpectedly published"),
@@ -1118,15 +1117,7 @@ fn section_layout_retained_malformed_source_keeps_parse_error_before_sink() {
         std::mem::discriminant(&fallback_error)
     );
     assert_eq!(retained_error.to_string(), fallback_error.to_string());
-    assert!(!matches!(
-        &retained_error,
-        Error::SectionLayoutStaleSource
-            | Error::SectionLayoutRevisionConflict
-            | Error::SectionLayoutForeignSource
-            | Error::SectionLayoutFingerprintConflict
-            | Error::SectionLayoutPolicyConflict
-            | Error::SectionLayoutAuthorizationConflict
-    ));
+    assert!(!matches!(&retained_error, Error::PatchConflict { .. }));
 }
 
 #[test]
@@ -1140,12 +1131,12 @@ fn section_layout_clear_is_lossless_and_single_property_patch_preserves_siblings
             .unwrap();
     let source = package.section_layout_snapshot().unwrap();
 
-    let mut clear = source.edit(0).unwrap();
+    let mut clear = package.edit_section_layout(0).unwrap();
     clear.clear_page_size().unwrap();
     assert!(matches!(clear.commit(), Err(Error::Refused(_))));
     assert!(source.inventory().sections()[0].page_size().is_some());
 
-    let mut edit = source.edit(0).unwrap();
+    let mut edit = package.edit_section_layout(0).unwrap();
     edit.set_page_size(Some(PageSize {
         width: Some(Emu::from_twips(11906)),
         height: Some(Emu::from_twips(16838)),
@@ -1155,7 +1146,7 @@ fn section_layout_clear_is_lossless_and_single_property_patch_preserves_siblings
     let commit = edit.commit().unwrap();
     let mut output = Vec::new();
     package
-        .apply_section_layout(&commit.patch().clone().into())
+        .apply_section_layout(&commit.patch().clone())
         .and_then(|committed| committed.package().write_to(&mut output))
         .unwrap();
     let reopened = OpcPackage::from_reader(io::Cursor::new(output)).unwrap();
@@ -1177,12 +1168,13 @@ fn section_layout_clear_is_lossless_and_single_property_patch_preserves_siblings
     let clean_package =
         source_backed::Package::from_read_at(Arc::new(OwnedSource::new(fixture(clean.as_bytes()))))
             .unwrap();
-    let clean_source = clean_package.section_layout_snapshot().unwrap();
-    let mut clean_edit = clean_source.edit(0).unwrap();
+    let mut clean_edit = clean_package.edit_section_layout(0).unwrap();
     clean_edit.clear_page_size().unwrap();
     let clean_commit = clean_edit.commit().unwrap();
     assert!(
-        clean_commit.snapshot().inventory().sections()[0]
+        committed_layout_snapshot(&clean_commit)
+            .inventory()
+            .sections()[0]
             .page_size()
             .is_none()
     );
@@ -1198,8 +1190,7 @@ fn section_layout_alias_foreign_children_and_column_comments_are_preserved() {
         document.as_bytes(),
     ))))
     .unwrap();
-    let source = package.section_layout_snapshot().unwrap();
-    let mut edit = source.edit(0).unwrap();
+    let mut edit = package.edit_section_layout(0).unwrap();
     edit.set_margins(Some(Margins {
         top: Some(Emu::from_twips(720)),
         right: None,
@@ -1213,7 +1204,7 @@ fn section_layout_alias_foreign_children_and_column_comments_are_preserved() {
     let commit = edit.commit().unwrap();
     let mut output = Vec::new();
     package
-        .apply_section_layout(&commit.patch().clone().into())
+        .apply_section_layout(&commit.patch().clone())
         .and_then(|committed| committed.package().write_to(&mut output))
         .unwrap();
     let reopened = OpcPackage::from_reader(io::Cursor::new(output)).unwrap();
@@ -1244,7 +1235,7 @@ fn section_layout_namespace_shadowing_restores_section_root_alias() {
         Some(Emu::from_twips(720))
     );
 
-    let mut edit = source.edit(0).unwrap();
+    let mut edit = package.edit_section_layout(0).unwrap();
     edit.set_margins(Some(Margins {
         top: None,
         right: Some(Emu::from_twips(720)),
@@ -1258,7 +1249,7 @@ fn section_layout_namespace_shadowing_restores_section_root_alias() {
     let commit = edit.commit().unwrap();
     let mut output = Vec::new();
     package
-        .apply_section_layout(&commit.patch().clone().into())
+        .apply_section_layout(&commit.patch().clone())
         .and_then(|committed| committed.package().write_to(&mut output))
         .unwrap();
     let reopened = OpcPackage::from_reader(io::Cursor::new(output)).unwrap();
@@ -1282,7 +1273,7 @@ fn section_layout_default_word_namespace_rebinds_inserted_qnames() {
         ))))
         .unwrap();
         let source = package.section_layout_snapshot().unwrap();
-        let mut edit = source.edit(0).unwrap();
+        let mut edit = package.edit_section_layout(0).unwrap();
         edit.set_page_size(Some(PageSize {
             width: Some(Emu::from_twips(11906)),
             height: Some(Emu::from_twips(16838)),
@@ -1291,15 +1282,18 @@ fn section_layout_default_word_namespace_rebinds_inserted_qnames() {
         .unwrap();
         let commit = edit.commit().unwrap();
         assert_eq!(
-            commit.snapshot().inventory().sections().len(),
+            committed_layout_snapshot(&commit)
+                .inventory()
+                .sections()
+                .len(),
             source.inventory().sections().len()
         );
         assert_eq!(
-            commit.snapshot().inventory().sections()[0].ownership(),
+            committed_layout_snapshot(&commit).inventory().sections()[0].ownership(),
             source.inventory().sections()[0].ownership()
         );
         assert_eq!(
-            commit.snapshot().inventory().sections()[0]
+            committed_layout_snapshot(&commit).inventory().sections()[0]
                 .page_size()
                 .unwrap()
                 .width,
@@ -1308,7 +1302,7 @@ fn section_layout_default_word_namespace_rebinds_inserted_qnames() {
 
         let mut output = Vec::new();
         package
-            .apply_section_layout(&commit.patch().clone().into())
+            .apply_section_layout(&commit.patch().clone())
             .and_then(|committed| committed.package().write_to(&mut output))
             .unwrap();
         let reopened_opc = OpcPackage::from_reader(io::Cursor::new(output.clone())).unwrap();
@@ -1367,8 +1361,7 @@ fn section_layout_missing_children_precede_standard_barriers_losslessly() {
         let package =
             source_backed::Package::from_read_at(Arc::new(OwnedSource::new(source_bytes.clone())))
                 .unwrap();
-        let source = package.section_layout_snapshot().unwrap();
-        let mut edit = source.edit(0).unwrap();
+        let mut edit = package.edit_section_layout(0).unwrap();
         match field {
             "pgSz" => {
                 edit.set_page_size(Some(PageSize {
@@ -1405,7 +1398,7 @@ fn section_layout_missing_children_precede_standard_barriers_losslessly() {
         let commit = edit.commit().unwrap();
         let mut output = Vec::new();
         package
-            .apply_section_layout(&commit.patch().clone().into())
+            .apply_section_layout(&commit.patch().clone())
             .and_then(|committed| committed.package().write_to(&mut output))
             .unwrap();
 
@@ -1451,8 +1444,7 @@ fn section_layout_local_prefix_shadowing_preserves_foreign_markup_and_reopens() 
     let package =
         source_backed::Package::from_read_at(Arc::new(OwnedSource::new(source_bytes.clone())))
             .unwrap();
-    let source = package.section_layout_snapshot().unwrap();
-    let mut edit = source.edit(0).unwrap();
+    let mut edit = package.edit_section_layout(0).unwrap();
     edit.set_page_size(Some(PageSize {
         width: Some(Emu::from_twips(11906)),
         height: Some(Emu::from_twips(16838)),
@@ -1483,7 +1475,7 @@ fn section_layout_local_prefix_shadowing_preserves_foreign_markup_and_reopens() 
     let commit = edit.commit().unwrap();
     let mut output = Vec::new();
     package
-        .apply_section_layout(&commit.patch().clone().into())
+        .apply_section_layout(&commit.patch().clone())
         .and_then(|committed| committed.package().write_to(&mut output))
         .unwrap();
 
@@ -1567,8 +1559,7 @@ fn section_layout_missing_field_with_unknown_word_child_is_typed_unsafe_edit() {
         document.as_bytes(),
     ))))
     .unwrap();
-    let source = package.section_layout_snapshot().unwrap();
-    let mut edit = source.edit(0).unwrap();
+    let mut edit = package.edit_section_layout(0).unwrap();
     edit.set_page_size(Some(PageSize {
         width: Some(Emu::from_twips(11906)),
         height: Some(Emu::from_twips(16838)),
@@ -1590,17 +1581,11 @@ fn section_layout_complex_noop_remains_byte_exact() {
     let package =
         source_backed::Package::from_read_at(Arc::new(OwnedSource::new(source_bytes.clone())))
             .unwrap();
-    let noop = package
-        .section_layout_snapshot()
-        .unwrap()
-        .edit(0)
-        .unwrap()
-        .commit()
-        .unwrap();
+    let noop = package.edit_section_layout(0).unwrap().commit().unwrap();
     assert!(noop.patch().is_noop());
     let mut output = Vec::new();
     package
-        .apply_section_layout(&noop.patch().clone().into())
+        .apply_section_layout(&noop.patch().clone())
         .and_then(|committed| committed.package().write_to(&mut output))
         .unwrap();
     assert_eq!(output, source_bytes);
@@ -1615,11 +1600,10 @@ fn section_layout_signed_noop_changed_and_partial_sink_are_typed() {
     let package =
         source_backed::Package::from_read_at(Arc::new(OwnedSource::new(signed_bytes.clone())))
             .unwrap();
-    let snapshot = package.section_layout_snapshot().unwrap();
-    let noop = snapshot.edit(0).unwrap().commit().unwrap();
+    let noop = package.edit_section_layout(0).unwrap().commit().unwrap();
     let mut noop_output = Vec::new();
     package
-        .apply_section_layout(&noop.patch().clone().into())
+        .apply_section_layout(&noop.patch().clone())
         .and_then(|committed| committed.package().write_to(&mut noop_output))
         .unwrap();
     assert_eq!(noop_output, signed_bytes);
@@ -1627,30 +1611,25 @@ fn section_layout_signed_noop_changed_and_partial_sink_are_typed() {
     let package =
         source_backed::Package::from_read_at(Arc::new(OwnedSource::new(signed_bytes.clone())))
             .unwrap();
-    let mut edit = package.section_layout_snapshot().unwrap().edit(0).unwrap();
+    let mut edit = package.edit_section_layout(0).unwrap();
     edit.set_page_size(Some(PageSize {
         width: Some(Emu::from_twips(11906)),
         height: Some(Emu::from_twips(16838)),
         orientation: Orientation::Landscape,
     }))
     .unwrap();
-    let commit = edit.commit().unwrap();
-    let mut changed_output = Vec::new();
     assert!(matches!(
-        package
-            .apply_section_layout(&commit.patch().clone().into())
-            .and_then(|committed| committed.package().write_to(&mut changed_output)),
+        edit.commit(),
         Err(Error::Opc(
             litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy
         ))
     ));
-    assert!(changed_output.is_empty());
 
     let package = source_backed::Package::from_read_at(Arc::new(OwnedSource::new(fixture(
         document.as_bytes(),
     ))))
     .unwrap();
-    let mut edit = package.section_layout_snapshot().unwrap().edit(0).unwrap();
+    let mut edit = package.edit_section_layout(0).unwrap();
     edit.set_page_size(Some(PageSize {
         width: Some(Emu::from_twips(11906)),
         height: Some(Emu::from_twips(16838)),
@@ -1664,7 +1643,7 @@ fn section_layout_signed_noop_changed_and_partial_sink_are_typed() {
     };
     assert!(matches!(
         package
-            .apply_section_layout(&commit.patch().clone().into())
+            .apply_section_layout(&commit.patch().clone())
             .and_then(|committed| committed.package().write_to(&mut sink)),
         Err(Error::Opc(litchi_opc::OpcError::IncompleteOutput { .. }))
     ));
@@ -1672,7 +1651,7 @@ fn section_layout_signed_noop_changed_and_partial_sink_are_typed() {
 }
 
 #[test]
-fn section_layout_detached_patch_replays_onto_a_matching_source_package() {
+fn section_layout_detached_patch_replays_onto_reopened_matching_snapshots() {
     let document = format!(
         r#"<w:document xmlns:w="{W}"><w:body><w:p><w:pPr><w:sectPr><w:pgSz w:w="12240" w:h="15840"/></w:sectPr></w:pPr></w:p></w:body></w:document>"#
     );
@@ -1681,7 +1660,107 @@ fn section_layout_detached_patch_replays_onto_a_matching_source_package() {
         &Default::default(),
     )
     .unwrap();
-    let mut edit = detached.edit(0).unwrap();
+    let strict = Limits {
+        max_section_bytes: 1,
+        ..Limits::default()
+    };
+    assert!(detached.raw_tree_at(0, &strict).is_err());
+    let mut tree = detached.raw_tree_at(0, &Limits::default()).unwrap();
+    tree.set_page_size(Some(PageSize {
+        width: Some(Emu::from_twips(11906)),
+        height: Some(Emu::from_twips(16838)),
+        orientation: Orientation::Landscape,
+    }))
+    .unwrap();
+    tree.set_margins(Some(Margins {
+        top: Some(Emu::from_twips(720)),
+        right: Some(Emu::from_twips(720)),
+        bottom: Some(Emu::from_twips(720)),
+        left: Some(Emu::from_twips(720)),
+        header: None,
+        footer: None,
+        gutter: None,
+    }))
+    .unwrap();
+    let patch = tree.patch().unwrap();
+    let reopened = litchi_docx::section::layout::Snapshot::from_xml(
+        document.as_bytes().to_vec(),
+        &Limits::default(),
+    )
+    .unwrap();
+    let changed = patch.apply(&reopened).unwrap();
+    let changed_xml = changed
+        .raw_tree_at(0, &Limits::default())
+        .unwrap()
+        .to_xml()
+        .unwrap();
+    assert!(changed_xml.len() > document.len());
+    let fitting_recipient_limits = Limits {
+        max_input_bytes: changed_xml.len(),
+        ..Limits::default()
+    };
+    let fitting_recipient = litchi_docx::section::layout::Snapshot::from_xml(
+        document.as_bytes().to_vec(),
+        &fitting_recipient_limits,
+    )
+    .unwrap();
+    assert!(patch.apply(&fitting_recipient).is_ok());
+    let tight_recipient_limits = Limits {
+        max_input_bytes: document.len(),
+        ..Limits::default()
+    };
+    let tight_recipient = litchi_docx::section::layout::Snapshot::from_xml(
+        document.as_bytes().to_vec(),
+        &tight_recipient_limits,
+    )
+    .unwrap();
+    assert!(matches!(
+        patch.apply(&tight_recipient),
+        Err(Error::SectionInventoryLimit { .. })
+    ));
+    let restored = patch.inverse().apply(&changed).unwrap();
+    assert_eq!(
+        restored
+            .raw_tree_at(0, &Limits::default())
+            .unwrap()
+            .to_xml()
+            .unwrap(),
+        document.as_bytes()
+    );
+    let mut second = restored.raw_tree_at(0, &Limits::default()).unwrap();
+    second
+        .set_margins(Some(Margins {
+            top: Some(Emu::from_twips(720)),
+            right: Some(Emu::from_twips(720)),
+            bottom: Some(Emu::from_twips(720)),
+            left: Some(Emu::from_twips(720)),
+            header: None,
+            footer: None,
+            gutter: None,
+        }))
+        .unwrap();
+    let second_patch = second.patch().unwrap();
+    let second_changed = second_patch.apply(&restored).unwrap();
+    assert_eq!(
+        second_changed
+            .raw_tree_at(0, &Limits::default())
+            .unwrap()
+            .margins()
+            .unwrap()
+            .unwrap()
+            .left,
+        Some(Emu::from_twips(720))
+    );
+}
+
+#[test]
+fn section_layout_package_patch_requires_complete_artifact_identity() {
+    let document = section_layout_document();
+    let source_bytes = fixture(document.as_bytes());
+    let package =
+        source_backed::Package::from_read_at(Arc::new(OwnedSource::new(source_bytes.clone())))
+            .unwrap();
+    let mut edit = package.edit_section_layout(0).unwrap();
     edit.set_page_size(Some(PageSize {
         width: Some(Emu::from_twips(11906)),
         height: Some(Emu::from_twips(16838)),
@@ -1689,33 +1768,68 @@ fn section_layout_detached_patch_replays_onto_a_matching_source_package() {
     }))
     .unwrap();
     let commit = edit.commit().unwrap();
+
+    let reopened =
+        source_backed::Package::from_read_at(Arc::new(OwnedSource::new(source_bytes.clone())))
+            .unwrap();
+    assert!(reopened.apply_section_layout(commit.patch()).is_ok());
+
+    let mutable = Arc::new(StableMutableSource::new(source_bytes));
+    let current = source_backed::Package::from_read_at(mutable.clone()).unwrap();
+    mutable.mutate_unused();
+    let altered = source_backed::Package::from_read_at(mutable).unwrap();
+    assert!(matches!(
+        altered.apply_section_layout(commit.patch()),
+        Err(Error::PatchConflict { .. })
+    ));
+    drop(current);
+}
+
+#[test]
+fn section_layout_raw_patch_keeps_offline_owner_application_route() {
+    let document = section_layout_document();
+    let raw_snapshot = litchi_docx::section::layout::Snapshot::from_xml(
+        document.as_bytes().to_vec(),
+        &Limits::default(),
+    )
+    .unwrap();
+    let mut tree = raw_snapshot.raw_tree_at(0, &Limits::default()).unwrap();
+    tree.set_page_size(Some(PageSize {
+        width: Some(Emu::from_twips(11906)),
+        height: Some(Emu::from_twips(16838)),
+        orientation: Orientation::Landscape,
+    }))
+    .unwrap();
+    let raw_patch = tree.patch().unwrap();
+    let owner_patch: source_backed::section_layout::Patch = raw_patch.into();
+
     let package = source_backed::Package::from_read_at(Arc::new(OwnedSource::new(fixture(
         document.as_bytes(),
     ))))
     .unwrap();
-    // A detached record patch replays onto a package whose main document
-    // holds its before bytes (record 0355a), and refuses any other.
-    let replayed = package
-        .apply_section_layout(&commit.patch().clone().into())
+    let commit = package.apply_section_layout(&owner_patch).unwrap();
+    let output = commit.package().section_layout_snapshot().unwrap();
+    assert_eq!(
+        output.section(0).unwrap().page_size().unwrap().orientation,
+        Orientation::Landscape
+    );
+
+    let restored = commit
+        .package()
+        .apply_section_layout(&commit.patch().inverse())
         .unwrap();
     assert_eq!(
-        replayed
+        restored
             .package()
             .section_layout_snapshot()
             .unwrap()
-            .inventory()
-            .sections()[0]
+            .section(0)
+            .unwrap()
             .page_size()
             .unwrap()
             .orientation,
-        Orientation::Landscape
+        Orientation::Portrait
     );
-    assert!(matches!(
-        replayed
-            .package()
-            .apply_section_layout(&commit.patch().clone().into()),
-        Err(Error::SectionLayoutStaleSource)
-    ));
 }
 
 #[test]

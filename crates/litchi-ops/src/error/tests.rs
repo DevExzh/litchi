@@ -338,20 +338,21 @@ fn row_other_io_and_source_changes_are_io_error() {
 fn docx_recorded_replay_conflicts_are_invalid_input() {
     use litchi_docx::Error as DocxError;
 
-    let conflicts: [fn() -> DocxError; 9] = [
+    let conflicts: [fn() -> DocxError; 3] = [
         || DocxError::ExternalHyperlinkDetachmentConflict,
         || DocxError::ExternalHyperlinkRedactionConflict,
         || DocxError::DocumentVariablesConflict,
-        || DocxError::SectionLayoutStaleSource,
-        || DocxError::SectionLayoutRevisionConflict,
-        || DocxError::SectionLayoutForeignSource,
-        || DocxError::SectionLayoutFingerprintConflict,
-        || DocxError::SectionLayoutPolicyConflict,
-        || DocxError::SectionLayoutAuthorizationConflict,
     ];
     for make_conflict in conflicts {
         assert_code(make_conflict(), Code::InvalidInput);
     }
+    assert_code(
+        DocxError::PatchConflict {
+            operation: "apply_section_layout",
+            reason: "the patch source does not match the package",
+        },
+        Code::InvalidInput,
+    );
 
     assert_code(
         DocxError::Opc(litchi_opc::OpcError::SourceArtifactMismatch {

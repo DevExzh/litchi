@@ -50,7 +50,10 @@ impl Change for LayoutChange {
         package.deferred(move |writer| {
             // The committed target was derived from this complete artifact.
             if base.source_artifact_fingerprint()? != fingerprint {
-                return Err(crate::Error::SectionLayoutFingerprintConflict);
+                return Err(crate::Error::conflict(
+                    "commit_section_layout",
+                    "section patch artifact fingerprint differs",
+                ));
             }
             base.write_part_overlay(writer, &main, &target)
         })
@@ -59,13 +62,15 @@ impl Change for LayoutChange {
 
 source_family!("section-layout", LayoutChange);
 
-impl From<record::Patch> for Patch {
-    /// Replay a detached section-layout record patch onto a package: it
-    /// applies to a package whose main document holds its before bytes.
-    fn from(patch: record::Patch) -> Self {
+impl From<record::raw::Patch> for Patch {
+    /// Replay a detached raw section-layout patch onto a package.  The raw
+    /// patch is XML-content scoped; the family wrapper binds the publication
+    /// to the complete artifact when `Package::apply_section_layout` is
+    /// called, while retaining the old offline authoring route.
+    fn from(patch: record::raw::Patch) -> Self {
         Self {
             change: LayoutChange {
-                patch,
+                patch: patch.into_record(),
                 commit: None,
             },
             restore: None,
@@ -99,7 +104,7 @@ macro_rules! property {
         /// # Errors
         ///
         /// Returns an error for a value the section cannot represent.
-        pub fn $get(&mut self) -> Result<Option<$ty>> {
+        pub fn $get(&self) -> Result<Option<$ty>> {
             self.inner.$get()
         }
 
@@ -188,7 +193,7 @@ impl Package {
     ///
     /// # Errors
     ///
-    /// Returns [`crate::Error::SectionLayoutStaleSource`] for another
+    /// Returns a typed [`crate::Error::PatchConflict`] for another
     /// main-document state, and the errors of [`Edit::commit`].
     pub fn apply_section_layout(&self, patch: &Patch) -> Result<Commit> {
         apply_change(self, patch)

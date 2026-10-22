@@ -39,6 +39,25 @@ pub struct Limits {
 }
 
 impl Limits {
+    /// Intersect two policies without allowing a requested raw operation to
+    /// widen the policy under which its source was admitted.
+    pub(crate) fn intersection(&self, requested: &Self) -> Self {
+        Self {
+            max_input_bytes: self.max_input_bytes.min(requested.max_input_bytes),
+            max_events: self.max_events.min(requested.max_events),
+            max_depth: self.max_depth.min(requested.max_depth),
+            max_paragraphs: self.max_paragraphs.min(requested.max_paragraphs),
+            max_sections: self.max_sections.min(requested.max_sections),
+            max_section_bytes: self.max_section_bytes.min(requested.max_section_bytes),
+            max_reference_bytes: self.max_reference_bytes.min(requested.max_reference_bytes),
+            max_mce_output_bytes: self
+                .max_mce_output_bytes
+                .min(requested.max_mce_output_bytes),
+            max_mce_bindings: self.max_mce_bindings.min(requested.max_mce_bindings),
+            max_mce_choices: self.max_mce_choices.min(requested.max_mce_choices),
+        }
+    }
+
     fn validate(&self) -> Result<()> {
         if [
             self.max_input_bytes,
