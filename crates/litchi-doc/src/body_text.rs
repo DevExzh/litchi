@@ -7515,6 +7515,68 @@ mod tests {
     }
 
     #[test]
+    fn deferred_body_formatting_flushes_before_table_edits_and_keeps_failures_atomic() {
+        let source = Snapshot::parse(&structured_doc()).expect("structured snapshot");
+        let mut edit = source.edit().expect("edit");
+        edit.set_paragraph_bold(Position::new(0), true)
+            .expect("body bold");
+        edit.set_character_property(
+            TextTarget::body_paragraph(Position::new(0)),
+            CharacterProperty::Italic,
+            true,
+        )
+        .expect("body italic");
+
+        // A failed selector must not discard or partially publish the pending
+        // CHPX changes. Rendering a clone is the same output check used by
+        // the source-backed publication path, while leaving `edit` staged.
+        let before_refusal = edit.editor.clone().finish().expect("pending output");
+        assert!(matches!(
+            edit.set_paragraph_bold(Position::new(99), true),
+            Err(Error::Refused(Refusal::TargetNotFound))
+        ));
+        assert_eq!(
+            edit.editor.clone().finish().expect("output after refusal"),
+            before_refusal
+        );
+
+        // The table-cell edit is a serialized-stream dependency. It must see
+        // the deferred body format and retain both changes in one final
+        // candidate before the package commit.
+        edit.replace_text(TextTarget::TableCell(Position::new(0)), "Cell!")
+            .expect("table cell");
+        let commit = edit.commit().expect("mixed commit");
+        assert_eq!(
+            commit.package().table_cells().expect("table cells")[0].text(),
+            "Cell!"
+        );
+        let body = commit
+            .package()
+            .paragraphs(Projection::All)
+            .expect("body paragraphs");
+        assert_eq!(body[0].text(), "Body");
+        let mut package = crate::raw::Reader::from_reader(Cursor::new(commit.package().finish()))
+            .expect("DOC reopens");
+        let document = package.document().expect("document");
+        let runs = document.paragraphs().expect("paragraphs")[0]
+            .runs()
+            .expect("runs");
+        assert_eq!(runs[0].bold(), Some(true));
+        assert_eq!(runs[0].italic(), Some(true));
+
+        let inverse = commit
+            .patch()
+            .inverse()
+            .apply(commit.package())
+            .expect("inverse");
+        assert_eq!(inverse.bytes(), source.bytes());
+
+        let noop = source.edit().expect("no-op edit").commit().expect("no-op");
+        assert!(!noop.diagnostics().changed());
+        assert_eq!(noop.package().bytes(), source.bytes());
+    }
+
+    #[test]
     fn durable_patch_composition_and_history_are_bounded() {
         let source = Snapshot::parse(&doc(&["alpha", "bravo"])).expect("snapshot");
         let composition_limits = CompositionLimits::new(4, 2, 8, 8);
@@ -8113,7 +8175,7 @@ mod tests {
     }
 
     #[test]
-    fn retained_render_is_cleared_by_resource_reopen_and_reenabled_for_formatting() {
+    fn retained_render_is_cleared_by_resource_reopen_and_formatting_flushes_at_commit() {
         let donor = Snapshot::parse(&embedded_doc()).expect("embedded donor");
         let receiver = Snapshot::parse(&doc(&["placeholder", "other"])).expect("receiver");
         let plan = receiver
@@ -8134,7 +8196,11 @@ mod tests {
             assert_eq!(edit.retained_render_bytes(), None);
             edit.set_paragraph_bold(Position::new(1), true)
                 .expect("format after resource reopen");
-            assert_eq!(edit.retained_render_bytes().is_some(), ceiling != 0);
+            // Direct format changes stay in the editor's CHPX model until
+            // the transaction renders. This is what lets a run of toggles
+            // rebuild and publish its FKP once; the final output still uses
+            // the configured retention ceiling.
+            assert_eq!(edit.retained_render_bytes(), None);
             outputs.push(edit.commit().expect("commit").package().bytes().to_vec());
         }
         assert_eq!(outputs[0], outputs[1]);
