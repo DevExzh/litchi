@@ -668,7 +668,7 @@ impl Patch {
         if !self
             .before
             .binding
-            .matches(package, self.limits.inventory)?
+            .matches(&self.before.package, package, self.limits.inventory)?
         {
             return Ok(false);
         }
@@ -711,7 +711,7 @@ impl Patch {
         if !self
             .after
             .binding
-            .matches(candidate, self.limits.inventory)?
+            .matches(&self.after.package, candidate, self.limits.inventory)?
         {
             return Err(Error::Invalid(
                 "DOCX Ink graph publication did not match its target".into(),
