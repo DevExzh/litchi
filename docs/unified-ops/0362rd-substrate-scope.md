@@ -54,7 +54,7 @@ The resulting classification is:
 
 | Surface | Textual basis | Status |
 |---|---|---|
-| Public format-facing re-export, alias or leak | 0350’s every-format requirement; 0351 W5/W6 owned paths; ADR 0034 §1’s one-name/no-alias rule. Examples are the W5 `Revision`/`Snapshot` aliases and W6 `PackageWriterLimits`. | Required in the owning format wave. The three W5 removals in this branch are this category. A public ODF path cannot be excused as “generic ZIP”. |
+| Public format-facing re-export, alias or leak | 0350’s every-format requirement; 0351 W5/W6 owned paths; ADR 0034 §1’s one-name/no-alias rule. Examples are the W5 `Revision`/`Snapshot` aliases and the W6 writer’s public ZIP limit/error types. | Required in the owning format wave. The three W5 removals in this branch are this category. A public ODF path cannot be excused as “generic ZIP”; the concrete ODF repair must still distinguish a canonical re-export from a migration alias. |
 | Office-specific OPC surface | ADR 0034 §5 explicitly names OPC `ReadLimits` → `SourceLimits` and says OOXML re-exports follow (`docs/adr/0034-unified-api-glossary-and-default-policies.md:169-181`); 0343’s closure also records OPC stream-verb renames. The W4 brief fixes the raw `Package::edit_opc` boundary. | Required canonicalization for the Office package substrate, but it should be one atomic OPC lane with DOCX/PPTX/XLSX/XLSB consumers. Its absence from the 0351 wave table is a scheduling qualification, not a permanent exception. |
 | Standalone CFB or soapberry-ZIP methods with no public format leak | 0350 names format crates and `File`; 0351’s inventory and ownership table do not include these implementation crates. ADR 0034’s vocabulary policy does not assign their independent transport surface to W5/W6. | Separate scope requiring an explicit owner/coordinator lane. Do not claim the entire generic API is mandatory in the current format wave solely because formats depend on it. Any method re-exported through an owned format surface moves back into the first row and is required there. |
 
@@ -133,7 +133,7 @@ limits from `OpenOptions`; this finding concerns the public raw/codec routes.
 the literal suffix check, but it should be folded into the chosen canonical
 raw limits shape rather than left as a second spelling.
 
-### `PackageWriterLimits` leaks a transport type into ODF
+### ODF writer limits: canonical re-export versus an owned wrapper
 
 `crates/litchi-odf-common/src/core/writer.rs:222-227` publicly defines
 
@@ -141,22 +141,51 @@ raw limits shape rather than left as a second spelling.
 pub use soapberry_zip::office::StreamingArchiveLimits as PackageWriterLimits;
 ```
 
-That is a public alias from an ODF writer module to a generic ZIP type. The
-writer module is a legitimate raw/builder surface, so its mutable staging is
-not itself an owner violation; the type alias is the layering and one-name
-violation. Production streaming consumers are in the ODF common writer and in
-`litchi-odt/src/streaming.rs`, `litchi-ods/src/streaming.rs` and
-`litchi-odp/src/streaming.rs`. A search finds ten source/test files naming
-`PackageWriterLimits` and fifteen files naming `with_writer_and_limits`.
+That is a public re-export with a second name, but the contract does not by
+itself require an ODF-owned wrapper. 0351 §2.5.1 explicitly permits a shared
+canonical `OpenOptions` re-export (`:293-300`), and §2.5.3 permits a raw or
+codec API to take its module's limits as the required argument (`:308-314`).
+ADR 0034 §1 requires one name per concept and removes renamed migration aliases
+(`docs/adr/0034-unified-api-glossary-and-default-policies.md:83-89`); that is
+different from choosing one canonical public re-export. `StreamingArchiveLimits`
+is the actual public transport type (`crates/soapberry-zip/src/office.rs:6238-6272`),
+and its documented dimensions are exactly the finite ZIP ceilings described by
+the ODF re-export (`writer.rs:222-227`). It is `Copy`, so an owned newtype would
+not allocate, but it would add field conversions, builders/accessors and another
+public vocabulary without adding an ODF dimension.
 
-The W6 lane should replace the foreign alias with an ODF-owned limits type (or
-an ODF wrapper with an internal conversion), then migrate those consumers in
-one commit. `PackageWriter::with_writer` currently defaults the limits at
-`src/core/writer.rs:766-780`; whether a default is retained for a fresh
-authoring builder must be decided against the literal raw API rule in 0351
-§2.5.3 before implementation. It cannot be silently justified by calling
-`soapberry-zip` a transport crate. The lane must measure streamed output and
-memory, including the ODF streaming profiles.
+The zero-cost canonical choice is therefore to re-export
+`StreamingArchiveLimits` without renaming it and migrate the ODF consumers to
+that one name. This is the same kind of canonical sharing that 0351 permits for
+ODF `OpenOptions`; it is not a retained compatibility alias. An ODF-owned
+wrapper remains an option only if the owner deliberately adds semantics that
+the transport type cannot express. Production streaming consumers are in the
+ODF common writer and in `litchi-odt/src/streaming.rs`,
+`litchi-ods/src/streaming.rs` and `litchi-odp/src/streaming.rs`. A search finds
+ten source/test files naming `PackageWriterLimits` and fifteen files naming
+`with_writer_and_limits`.
+
+There is a separate, factual foreign-error leak. The public ODF
+`PackageWriterError` has `Archive(soapberry_zip::Error)` and
+`ArchiveFailure(StreamingArchiveFailure)` variants (`writer.rs:314-330`), and
+the latter exposes the foreign error, progress and transport-limit reports
+through its public methods (`soapberry-zip/src/office.rs:6536-6568`). The ODF
+`PackageWriterLimitResource`/`PackageWriterLimitExceeded` types and the mapping
+from `StreamingLimitExceeded` are ODF-owned (`writer.rs:238-300,2028-2047`),
+so the limit carrier and the error-source leak are distinct decisions. ADR
+0034 §6 permits typed boundary variants (`:198-206`), but does not prove that
+foreign payload types must be copied; if the coordinator requires a strict
+format-owned error payload, that mapping is its own change and may preserve the
+foreign error only as a private causal source. A limits wrapper would not solve
+that leak.
+
+Finally, `PackageWriter::with_writer` and `new` default the transport limits
+(`writer.rs:723-780`). Whether those defaults are acceptable depends on whether
+this output/builder surface is classified as a raw untrusted-data ingress under
+0351 §2.5.3; that policy question is independent of the limit type and should
+not be used to justify an owned wrapper. The lane must measure streamed output
+and memory, including the ODF streaming profiles, after selecting the canonical
+name and error boundary.
 
 ## W5 format-domain aliases that must not be deferred as substrate work
 
@@ -292,9 +321,9 @@ wave.
 
 The public-leak audit found no public `soapberry_zip` type in OPC signatures.
 ODF source-publication uses of `PreservationIndex` are `pub(crate)`. The
-public ODF `PackageWriterLimits` re-export above is the confirmed current
-format-facing leak and must be repaired in W6 even though the remaining ZIP
-surface waits for its own lane. Internal calls such as
+public ODF writer re-exports the ZIP limit and error types above, so W6 must
+make the canonical-name and error-boundary decisions even though the remaining
+ZIP surface waits for its own lane. Internal calls such as
 `litchi-odf-common/src/core/writer.rs:1309` using
 `write_deflated_reader` belong to that eventual generic alias migration but
 do not by themselves expand the current ODF owner scope.
@@ -302,10 +331,12 @@ do not by themselves expand the current ODF owner scope.
 ## Atomic lane proposal and required evidence
 
 1. **W6 ODF raw/alias lane:** remove the six source-member aliases; make
-   archive/manifest limits caller-selected and required; replace the foreign
-   `PackageWriterLimits` alias; decide and document the writer default policy;
-   migrate the named ODF and ops callers; run ODF round-trip/parser-hardening,
-   streaming and facade tests; measure memory and output performance.
+   archive/manifest limits caller-selected and required; canonicalize the
+   writer limit re-export (an unchanged `StreamingArchiveLimits` re-export is
+   sufficient unless ODF adds distinct semantics); decide the writer error
+   boundary and default policy; migrate the named ODF and ops callers; run ODF
+   round-trip/parser-hardening, streaming and facade tests; measure memory and
+   output performance.
 2. **W5 domain alias lane:** remove the two `Revision::fingerprint`
    methods and `ole1::Snapshot`; migrate all consumers and glossary rows with
    no CFB/ZIP exception.
