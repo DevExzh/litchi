@@ -300,7 +300,8 @@ impl SourceBackedWorkbook {
         let package = view.edit_package()?;
         let source_owner = view.tab_state_source_owner();
         let shared_catalog = view.shared_catalog_proof();
-        let snapshot_cache = view.tab_state_snapshot();
+        let tab_state_cache = view.tab_state_cache();
+        let snapshot_cache = &tab_state_cache.snapshot;
         let before = match snapshot_cache.get() {
             Some(snapshot) => {
                 // The source-owner loader performs this freshness check while
@@ -316,7 +317,10 @@ impl SourceBackedWorkbook {
                     Arc::new(()),
                     shared_catalog,
                 )?);
-                if view.tab_state_snapshot_should_cache() {
+                if tab_state_cache
+                    .snapshot_seen
+                    .swap(true, std::sync::atomic::Ordering::AcqRel)
+                {
                     Arc::clone(snapshot_cache.get_or_init(|| snapshot))
                 } else {
                     snapshot

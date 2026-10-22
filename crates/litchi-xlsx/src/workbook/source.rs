@@ -20,7 +20,7 @@ use std::io::Read;
 use std::ops::ControlFlow;
 #[cfg(any(unix, windows))]
 use std::path::Path;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex, MutexGuard, OnceLock, PoisonError};
 
 #[cfg(any(unix, windows))]
@@ -124,6 +124,27 @@ pub(crate) struct SourceCatalogProof {
     pub(crate) limits: Arc<SourceLimits>,
 }
 
+/// Lazy tab-state cells shared by edits from one immutable source lineage.
+///
+/// These cells are needed only when the tab-state family is first admitted.
+/// Keeping them behind one lazy allocation prevents the read-only owner from
+/// crossing an allocator size class merely because it exposes the family.
+pub(crate) struct TabStateCache {
+    pub(crate) snapshot: OnceLock<Arc<crate::tab_state::Snapshot>>,
+    pub(crate) snapshot_seen: AtomicBool,
+    pub(crate) graph: OnceLock<Arc<crate::tab_state::GraphBinding>>,
+}
+
+impl TabStateCache {
+    fn new() -> Self {
+        Self {
+            snapshot: OnceLock::new(),
+            snapshot_seen: AtomicBool::new(false),
+            graph: OnceLock::new(),
+        }
+    }
+}
+
 pub(crate) struct SourceInner {
     package: SourceBackedPackage,
     /// One exact replay endpoint shared by every patch that observes this
@@ -131,19 +152,9 @@ pub(crate) struct SourceInner {
     /// same endpoint state twice: the earlier patch's `after` and the next
     /// patch's `before` are the same pending owner.
     pub(crate) restore_endpoint: OnceLock<Arc<deferred::RestoreEndpoint>>,
-    /// The immutable tab-state source closure captured for this owner. A
-    /// source-backed edit does not mutate that closure, so repeated edits can
-    /// share its parsed graph, relationships and source payload metadata.
-    pub(crate) tab_state_snapshot: OnceLock<Arc<crate::tab_state::Snapshot>>,
-    /// The first edit on an owner is commonly a one-shot admission probe. Do
-    /// not retain its snapshot solely because the edit was dropped; arm the
-    /// immutable cache after the first successful snapshot load so repeated
-    /// edits still share the closure without adding one to every new owner.
-    pub(crate) tab_state_snapshot_seen: AtomicBool,
-    /// The source-backed tab graph is already admitted by the workbook open.
-    /// Keep its exact validation lazy for the edit path, while sharing the
-    /// resulting graph across snapshots once a commit needs it.
-    pub(crate) tab_state_graph: OnceLock<Arc<crate::tab_state::GraphBinding>>,
+    /// Lazy tab-state snapshot and graph state. The owner keeps no tab-family
+    /// cache allocation until that family is actually admitted.
+    pub(crate) tab_state_cache: OnceLock<Box<TabStateCache>>,
     /// One shared package handle for exact replay endpoints. Keeping this
     /// lazy leaves ordinary read-only opens allocation-free while letting a
     /// retained patch refer to one package owner per source lineage instead
@@ -513,9 +524,7 @@ impl SourceBackedWorkbook {
             inner: Arc::new(SourceInner {
                 package,
                 restore_endpoint: OnceLock::new(),
-                tab_state_snapshot: OnceLock::new(),
-                tab_state_snapshot_seen: AtomicBool::new(false),
-                tab_state_graph: OnceLock::new(),
+                tab_state_cache: OnceLock::new(),
                 package_handle: OnceLock::new(),
                 merge_source_states: Mutex::new(HashMap::new()),
                 execution,
@@ -591,18 +600,12 @@ impl SourceBackedWorkbook {
         self.current().catalog_proof()
     }
 
-    pub(crate) fn tab_state_snapshot(&self) -> &OnceLock<Arc<crate::tab_state::Snapshot>> {
-        &self.current().tab_state_snapshot
+    pub(crate) fn tab_state_cache(&self) -> &TabStateCache {
+        self.current().tab_state_cache()
     }
 
     pub(crate) fn tab_state_source_owner(&self) -> Arc<SourceInner> {
         Arc::clone(self.current())
-    }
-
-    pub(crate) fn tab_state_snapshot_should_cache(&self) -> bool {
-        self.current()
-            .tab_state_snapshot_seen
-            .swap(true, Ordering::AcqRel)
     }
 
     /// Content-free diagnostics of the workbook's semantic cache.
@@ -1588,12 +1591,19 @@ impl SourceInner {
         &self,
         owner: std::sync::Weak<SourceInner>,
     ) -> Arc<crate::tab_state::GraphBinding> {
-        Arc::clone(self.tab_state_graph.get_or_init(|| {
+        let cache = self.tab_state_cache();
+        Arc::clone(cache.graph.get_or_init(|| {
             Arc::new(crate::tab_state::GraphBinding::source(
                 owner,
                 Arc::clone(&self.sheets),
             ))
         }))
+    }
+
+    pub(crate) fn tab_state_cache(&self) -> &TabStateCache {
+        self.tab_state_cache
+            .get_or_init(|| Box::new(TabStateCache::new()))
+            .as_ref()
     }
 
     pub(crate) fn tab_state_package(&self) -> &SourceBackedPackage {
