@@ -36,3 +36,18 @@ requested/peak/retained count matches the preceding candidate and stays at or
 below the reference. [The build and allocation receipt](results/0361fa/evidence.json)
 retains source, binary, dependency and command identities. Native latency
 remains unqualified; no timing from the allocation processes is accepted.
+
+## Interrupted v4 native attempts
+
+The coordinator held all three Litchi workers before running the protected v4
+binaries on CPU 29. `native-a1` exited 1 before its first calibration sample
+because an unrelated `peculiar` Cargo/rustc release build was active. After
+those processes ended, `native-a2` also exited 1 during field-path calibration
+when the same external build started Chromium/`peculiar_shell` linking. The
+guard retained the calibration output and before/during/after host snapshots.
+Neither attempt produced a qualified block, and neither is latency evidence.
+Both runners have ended; their original manifests still say `running` because
+the guard interrupted them before finalization, and those raw files are kept
+unchanged. The refreshed evidence inventory records both runner logs and all
+artifacts by path, size and SHA-256. Worker holds were released after the
+second interruption so engineering and bounded validation could continue.
