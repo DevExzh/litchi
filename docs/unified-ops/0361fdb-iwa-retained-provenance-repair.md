@@ -171,6 +171,43 @@ admission path. This removes the duplicate general metadata walk after
 The matched generic and `push_new` end-to-end counts remain pending until the
 coordinator releases a build window.
 
+## 0361fdc constructor admission return
+
+Commit `70930f91c3` keeps the public mutation checks above while removing work
+that was repeated for every conventional message. `Limits` carries a private
+profile marker in an existing bounded field, so default-profile dispatch is a
+single masked-bit test without widening `Limits`. `MessageInfo::new` still
+checks the current payload length and all strict profiles run their exact
+structural admission. Minimal collection admission records exact encoded
+message bytes as messages arrive, defers fixed field/memory/item totals to the
+final aggregate, and materializes those totals before a nonminimal message can
+follow a minimal prefix. The new mixed-prefix regression covers that
+transition; public mutation still invalidates the certificate.
+
+The reduced receipt is
+[`constructor-v15-push-admission.json`](results/0361fd/constructor-v15-push-admission.json).
+The raw captures, allocation JSON and measured binaries remain outside the
+repository under
+`/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator`.
+Callgrind used the matched release probe with setup inside each end-to-end
+iteration, `IWA_MESSAGE_COUNT=8`, and 12,000 iterations. Both routes produced
+the same checksum, output size and output digest on base and candidate.
+
+| Route | Base Ir | Candidate Ir | Candidate/base |
+|---|---:|---:|---:|
+| `archive_info_e2e` (`push_new`) | 27,558,858 | 54,839,971 | 1.9899 |
+| `archive_info_generic_e2e` (`push(MessageInfo)`) | 27,594,949 | 73,032,058 | 2.6466 |
+
+The candidate still has a returned constructor cost because it performs the
+required current-field admission that the historical constructor did not.
+The generic allocation probe also retains the caller's input `Vec` while it
+moves records into a certified collection: at N=8 and 100 iterations, peak
+live bytes are 3,424 on the candidate versus 1,760 on base, while allocated
+bytes are 342,500 versus 176,100. `push_new` has equal peak live bytes and
+adds one 100-byte collection allocation over 100 iterations. These are
+recorded returns, not performance waivers; native qualification remains
+pending. The earlier 0361fd generic attempt remains preserved and rejected.
+
 ## Validation and workspace hygiene
 
 The source passed `cargo fmt --all -- --check`,
