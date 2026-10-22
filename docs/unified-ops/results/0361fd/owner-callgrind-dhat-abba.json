@@ -1,0 +1,247 @@
+{
+ "routes": {
+  "numbers_headers": {
+   "callgrind_total_ir": {
+    "base": {
+     "1": 56482336,
+     "5": 135106695
+    },
+    "candidate": {
+     "1": 54798869,
+     "5": 131011732
+    }
+   },
+   "ir_per_op": {
+    "base": 19656089.75,
+    "candidate": 19053215.75
+   },
+   "ir_ratio": 0.9693288946241202,
+   "dhat": {
+    "base": {
+     "bytes_per_op": 4179843.0,
+     "blocks_per_op": 25632.0,
+     "peak_bytes": 2355400
+    },
+    "candidate": {
+     "bytes_per_op": 3419803.0,
+     "blocks_per_op": 19579.0,
+     "peak_bytes": 2346309
+    }
+   }
+  },
+  "keynote_media": {
+   "callgrind_total_ir": {
+    "base": {
+     "1": 191620717,
+     "5": 519254626
+    },
+    "candidate": {
+     "1": 189751572,
+     "5": 514944200
+    }
+   },
+   "ir_per_op": {
+    "base": 81908477.25,
+    "candidate": 81298157.0
+   },
+   "ir_ratio": 0.9925487535540773,
+   "dhat": {
+    "base": {
+     "bytes_per_op": 7546272.0,
+     "blocks_per_op": 35297.0,
+     "peak_bytes": 5909141
+    },
+    "candidate": {
+     "bytes_per_op": 6601160.0,
+     "blocks_per_op": 27213.0,
+     "peak_bytes": 5909146
+    }
+   }
+  },
+  "pages_footnote_insert": {
+   "callgrind_total_ir": {
+    "base": {
+     "1": 3726775,
+     "5": 9909262
+    },
+    "candidate": {
+     "1": 3650497,
+     "5": 9683996
+    }
+   },
+   "ir_per_op": {
+    "base": 1545621.75,
+    "candidate": 1508374.75
+   },
+   "ir_ratio": 0.9759016072334644,
+   "dhat": {
+    "base": {
+     "bytes_per_op": 183017.0,
+     "blocks_per_op": 2131.0,
+     "peak_bytes": 32684
+    },
+    "candidate": {
+     "bytes_per_op": 144649.0,
+     "blocks_per_op": 1672.0,
+     "peak_bytes": 32689
+    }
+   }
+  },
+  "pages_section_name": {
+   "callgrind_total_ir": {
+    "base": {
+     "1": 54104274,
+     "5": 131411403
+    },
+    "candidate": {
+     "1": 52412185,
+     "5": 127153994
+    }
+   },
+   "ir_per_op": {
+    "base": 19326782.25,
+    "candidate": 18685452.25
+   },
+   "ir_ratio": 0.9668165144252091,
+   "dhat": {
+    "base": {
+     "bytes_per_op": 4189472.0,
+     "blocks_per_op": 25768.0,
+     "peak_bytes": 2247087
+    },
+    "candidate": {
+     "bytes_per_op": 3392520.0,
+     "blocks_per_op": 19430.0,
+     "peak_bytes": 2237916
+    }
+   }
+  }
+ },
+ "abba_a1": [
+  {
+   "route": "numbers_headers",
+   "count": 390,
+   "ratios": [
+    0.9862192111667951,
+    0.9872625091766055,
+    0.9672511148656395,
+    0.9828991132718862,
+    0.9846175064572192
+   ],
+   "median": 0.9846175064572192,
+   "spread": [
+    0.9672511148656395,
+    0.9872625091766055
+   ],
+   "clean_blocks": 0,
+   "output_digest": "b5ec27ca45761520",
+   "output_bytes": 79384,
+   "host_load": [
+    "5.62",
+    "5.62",
+    "5.49",
+    "5.49",
+    "5.49"
+   ],
+   "blockers_seen": [
+    "cargo",
+    "cc",
+    "rustc"
+   ]
+  },
+  {
+   "route": "keynote_media",
+   "count": 124,
+   "ratios": [
+    0.9929469339332166,
+    0.9752190324502885,
+    0.96014946140073,
+    0.9947693691673141,
+    0.9911153721453614
+   ],
+   "median": 0.9911153721453614,
+   "spread": [
+    0.96014946140073,
+    0.9947693691673141
+   ],
+   "clean_blocks": 0,
+   "output_digest": "c05db7c7eae28b25",
+   "output_bytes": 692034,
+   "host_load": [
+    "5.19",
+    "5.19",
+    "5.01",
+    "5.01",
+    "5.01"
+   ],
+   "blockers_seen": [
+    "cargo",
+    "cc",
+    "rustc"
+   ]
+  },
+  {
+   "route": "pages_footnote_insert",
+   "count": 5528,
+   "ratios": [
+    0.9852282592818191,
+    0.9926133172570663,
+    0.9888892007677479,
+    0.9905346807545801,
+    0.9951168508005028
+   ],
+   "median": 0.9905346807545801,
+   "spread": [
+    0.9852282592818191,
+    0.9951168508005028
+   ],
+   "clean_blocks": 0,
+   "output_digest": "157d2a4a9d772ce0",
+   "output_bytes": 1350,
+   "host_load": [
+    "4.70",
+    "4.70",
+    "6.09",
+    "6.09",
+    "5.84"
+   ],
+   "blockers_seen": [
+    "cargo",
+    "cc",
+    "rustc"
+   ]
+  },
+  {
+   "route": "pages_section_name",
+   "count": 416,
+   "ratios": [
+    0.9784380090337246,
+    0.9791140736374778,
+    0.9778785857751287,
+    0.9840799836964568,
+    0.9817945605738864
+   ],
+   "median": 0.9791140736374778,
+   "spread": [
+    0.9778785857751287,
+    0.9840799836964568
+   ],
+   "clean_blocks": 0,
+   "output_digest": "d57c39300ed58fec",
+   "output_bytes": 96472,
+   "host_load": [
+    "5.93",
+    "5.93",
+    "5.70",
+    "5.70",
+    "7.89"
+   ],
+   "blockers_seen": [
+    "cargo",
+    "cc",
+    "rustc",
+    "rustdoc"
+   ]
+  }
+ ]
+}

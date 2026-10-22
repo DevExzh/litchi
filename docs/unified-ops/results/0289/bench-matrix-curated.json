@@ -2860,12 +2860,36 @@
    "reason": "Canonical raw IWA, archive and Snappy required-policy before/after qualification, not a leaf-versus-facade pair. The record retains the rejected native attempt and accepted repaired measurements, exact-output checks and allocation receipts."
   },
   {
+   "record": "0361f",
+   "reason": "Raw IWA metadata constructor before/after qualification (matched base and candidate binaries), not a leaf-versus-facade pair. Allocation receipts are recorded; every native ABBA attempt so far was interrupted by host overlap and is retained unqualified."
+  },
+  {
+   "record": "0361fa",
+   "reason": "Constructor path-admission repair; matched allocation receipts and interrupted native attempts only, not a leaf-versus-facade pair."
+  },
+  {
+   "record": "0361fb",
+   "reason": "Retained-header admission repair; fidelity and allocation receipts and interrupted native attempts only, not a leaf-versus-facade pair."
+  },
+  {
+   "record": "0361fc",
+   "reason": "Constructor measurement resume protocol (runner, collector, synthetic receipt tests) and an interrupted matched-v5 attempt; no qualified timing."
+  },
+  {
+   "record": "0361fd",
+   "reason": "iWork branch integration and retained Snappy policy review. Owner before/after callgrind, dhat and ABBA evidence compares trunk with the integrated branch, not a leaf-versus-facade pair."
+  },
+  {
    "record": "0361g",
    "reason": "Canonical raw text-wire naming/required-argument migration. Source-body equivalence and validation receipts contain no new paired performance measurement."
   },
   {
    "record": "0361h",
    "reason": "Raw character-style before/after qualification, not a leaf-versus-facade pair. Records 0361h/0361ha retain rejected buffer growth, repaired allocation results, all interrupted and complete native attempts, and acceptance of the repaired source."
+  },
+  {
+   "record": "0361i",
+   "reason": "Pages footnote retained-policy validation receipt (test and Clippy counts); no paired performance measurement."
   },
   {
    "record": "0361j",
