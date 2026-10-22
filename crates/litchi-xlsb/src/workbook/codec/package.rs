@@ -59,6 +59,7 @@ impl Workbook {
         Ok(crate::timeline::package::load_caches(
             &self.package,
             &litchi_opc::PackURI::new("/xl/workbook.bin")?,
+            self.semantic_limits.xml_parts_value(),
         )?
         .into_iter()
         .map(|part| part.cache)
@@ -68,7 +69,12 @@ impl Workbook {
     /// Return inert timeline views attached to one worksheet.
     pub fn timelines(&self, worksheet_index: usize) -> Result<Option<crate::timeline::Views>> {
         let worksheet = self.worksheet_uri(worksheet_index)?;
-        Ok(crate::timeline::package::load_views(&self.package, &worksheet)?.map(|part| part.views))
+        Ok(crate::timeline::package::load_views(
+            &self.package,
+            &worksheet,
+            self.semantic_limits.xml_parts_value(),
+        )?
+        .map(|part| part.views))
     }
 
     /// Return the typed Scenario Manager stored in one worksheet, if any.

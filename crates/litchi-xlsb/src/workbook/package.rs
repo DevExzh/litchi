@@ -391,7 +391,10 @@ impl Workbook {
             crate::package::error::Error::Encoding("Drawings part is not UTF-8")
         })?;
         let shapes = crate::shapes::read(drawing_xml)?.unwrap_or_default();
-        let drawing = crate::package::drawing::parse_drawing_part(drawing_part.blob())?;
+        let drawing = crate::package::drawing::parse_drawing_part(
+            drawing_part.blob(),
+            self.semantic_limits.xml_parts_value(),
+        )?;
         let mut charts = Vec::new();
         let mut images = Vec::new();
         let mut image_bytes = 0usize;

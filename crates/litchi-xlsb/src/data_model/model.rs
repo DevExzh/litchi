@@ -134,8 +134,25 @@ pub struct ModelPart {
 }
 
 impl ModelPart {
-    /// Build a model part using the fixed XLSB model-part envelope.
-    pub fn from_bytes(data: Vec<u8>) -> crate::package::error::Result<Self> {
+    /// Build a model part using the fixed XLSB model-part envelope, admitting
+    /// `data` against `limits.max_part_bytes` before it is retained.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::package::PackageError::Limit`] above the limit and the
+    /// payload validation errors.
+    pub fn from_bytes(
+        data: Vec<u8>,
+        limits: super::SemanticLimits,
+    ) -> crate::package::error::Result<Self> {
+        let limits = limits.validate()?;
+        if data.len() > limits.max_part_bytes {
+            return Err(crate::package::error::Error::Limit {
+                kind: crate::package::LimitKind::DataModel(super::LimitKind::PayloadBytes),
+                observed: data.len(),
+                maximum: limits.max_part_bytes,
+            });
+        }
         let part = Self {
             part_name: super::package::DATA_MODEL_PART_NAME.to_string(),
             content_type: super::package::DATA_MODEL_CONTENT_TYPE.to_string(),
@@ -199,11 +216,17 @@ impl Model {
         Self { definition, part }
     }
 
-    /// Construct a model from typed workbook metadata and opaque payload bytes.
+    /// Construct a model from typed workbook metadata and opaque payload
+    /// bytes, admitted under `limits` (see [`ModelPart::from_bytes`]).
+    ///
+    /// # Errors
+    ///
+    /// The errors of [`ModelPart::from_bytes`].
     pub fn from_bytes(
         definition: Definition,
         data: Vec<u8>,
+        limits: super::SemanticLimits,
     ) -> crate::package::error::Result<Self> {
-        Ok(Self::new(definition, ModelPart::from_bytes(data)?))
+        Ok(Self::new(definition, ModelPart::from_bytes(data, limits)?))
     }
 }

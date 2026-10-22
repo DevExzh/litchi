@@ -83,7 +83,9 @@ fn package_with_model(definition: Definition, payload: Vec<u8>) -> Package {
     writer.add_worksheet(builder::Worksheet::new("Sheet1"));
     writer.set_connections(connections()).expect("connections");
     writer
-        .set_data_model(Model::from_bytes(definition, payload).expect("model"))
+        .set_data_model(
+            Model::from_bytes(definition, payload, SemanticLimits::DEFAULT).expect("model"),
+        )
         .expect("set Data Model");
     let mut output = Cursor::new(Vec::new());
     writer

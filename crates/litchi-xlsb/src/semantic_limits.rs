@@ -32,6 +32,7 @@ pub struct SemanticLimits {
     cell_values: crate::cell_values::Limits,
     binary_index: crate::binary_index::Limits,
     embedded: embedded::Limits,
+    xml_parts: litchi_core::Limits,
 }
 
 impl Default for SemanticLimits {
@@ -55,6 +56,7 @@ impl SemanticLimits {
             cell_values: crate::cell_values::Limits::DEFAULT,
             binary_index: crate::binary_index::Limits::DEFAULT,
             embedded: embedded::Limits::default(),
+            xml_parts: litchi_core::Limits::for_profile(litchi_core::Profile::Server),
         }
     }
 
@@ -195,4 +197,30 @@ impl SemanticLimits {
     pub const fn embedded_value(&self) -> embedded::Limits {
         self.embedded
     }
+
+    /// Select the budget of the XML parts an XLSB package carries
+    /// (SpreadsheetDrawing, timeline and threaded-comment parts): input bytes,
+    /// output bytes, elements (objects) and depth. Each family's format
+    /// ceiling still applies.
+    #[must_use]
+    pub const fn xml_parts(mut self, limits: litchi_core::Limits) -> Self {
+        self.xml_parts = limits;
+        self
+    }
+
+    /// The XML-part budget.
+    #[must_use]
+    pub const fn xml_parts_value(&self) -> litchi_core::Limits {
+        self.xml_parts
+    }
+}
+
+/// The smaller of a family's format `ceiling` and the caller's `resource`
+/// budget in `limits`.
+pub(crate) fn xml_ceiling(
+    ceiling: usize,
+    limits: litchi_core::Limits,
+    resource: litchi_core::Resource,
+) -> usize {
+    ceiling.min(usize::try_from(limits.get(resource)).unwrap_or(usize::MAX))
 }

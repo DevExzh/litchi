@@ -98,7 +98,12 @@ impl Workbook {
                 .map(|part| part.views),
         );
         worksheet.set_timelines(
-            crate::timeline::package::load_views(&self.package, &sheet_uri)?.map(|part| part.views),
+            crate::timeline::package::load_views(
+                &self.package,
+                &sheet_uri,
+                self.semantic_limits.xml_parts_value(),
+            )?
+            .map(|part| part.views),
         );
         worksheet.set_sparkline_groups(self.sparklines(index)?.groups().cloned());
         if let Some(uri) = comments_uri {

@@ -221,6 +221,7 @@ fn package_with_data_model_and_connections() -> Package {
                     time_groupings: Vec::new(),
                 },
                 vec![1, 2, 3, 4],
+                litchi_xlsb::data_model::SemanticLimits::DEFAULT,
             )
             .expect("model"),
         )
@@ -234,7 +235,14 @@ fn package_with_data_model() -> Package {
         builder.add_worksheet(builder::Worksheet::new(name));
     }
     builder
-        .set_data_model(Model::from_bytes(Definition::default(), vec![1, 2, 3, 4]).expect("model"))
+        .set_data_model(
+            Model::from_bytes(
+                Definition::default(),
+                vec![1, 2, 3, 4],
+                litchi_xlsb::data_model::SemanticLimits::DEFAULT,
+            )
+            .expect("model"),
+        )
         .expect("data model");
     builder.build().expect("data-model package")
 }

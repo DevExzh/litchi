@@ -1452,11 +1452,22 @@ fn worksheet_images_round_trip_with_charts_in_one_drawing_graph() {
     ];
 
     let png_anchor = Anchor::with_offsets(1, 10, 2, 20, 5, 30, 8, 40);
-    let png = Image::new(PNG_1X1.to_vec(), ImageFormat::Png, png_anchor)
-        .unwrap()
-        .with_description("Logo & <mark>")
-        .unwrap();
-    let svg = Image::new(SVG.to_vec(), ImageFormat::Svg, Anchor::new(6, 2, 9, 8)).unwrap();
+    let png = Image::new(
+        PNG_1X1.to_vec(),
+        ImageFormat::Png,
+        png_anchor,
+        &crate::package::drawing_image::Limits::DEFAULT,
+    )
+    .unwrap()
+    .with_description("Logo & <mark>")
+    .unwrap();
+    let svg = Image::new(
+        SVG.to_vec(),
+        ImageFormat::Svg,
+        Anchor::new(6, 2, 9, 8),
+        &crate::package::drawing_image::Limits::DEFAULT,
+    )
+    .unwrap();
     let chart = Chart::line_chart(
         "Trend",
         "Pictures!$A$1:$A$2",
@@ -1488,7 +1499,15 @@ fn worksheet_images_round_trip_with_charts_in_one_drawing_graph() {
         .unwrap();
     let mut image_only = Worksheet::new("Image only");
     image_only
-        .add_image(Image::new(GIF_1X1.to_vec(), ImageFormat::Gif, Anchor::new(0, 0, 2, 3)).unwrap())
+        .add_image(
+            Image::new(
+                GIF_1X1.to_vec(),
+                ImageFormat::Gif,
+                Anchor::new(0, 0, 2, 3),
+                &crate::package::drawing_image::Limits::DEFAULT,
+            )
+            .unwrap(),
+        )
         .unwrap();
     let mut workbook = Builder::new();
     workbook.add_worksheet(sheet);
@@ -1577,6 +1596,7 @@ fn worksheet_image_validation_and_crud_are_lossless_or_refuse() {
             b"not a png".to_vec(),
             ImageFormat::Png,
             Anchor::new(0, 0, 1, 1),
+            &crate::package::drawing_image::Limits::DEFAULT,
         )
         .is_err()
     );
@@ -1585,6 +1605,7 @@ fn worksheet_image_validation_and_crud_are_lossless_or_refuse() {
             b"<not-svg/>".to_vec(),
             ImageFormat::Svg,
             Anchor::new(0, 0, 1, 1),
+            &crate::package::drawing_image::Limits::DEFAULT,
         )
         .is_err()
     );
@@ -1593,6 +1614,7 @@ fn worksheet_image_validation_and_crud_are_lossless_or_refuse() {
             b"GIF89a".to_vec(),
             ImageFormat::Gif,
             Anchor::new(2, 2, 1, 1),
+            &crate::package::drawing_image::Limits::DEFAULT,
         )
         .is_err()
     );
@@ -1601,6 +1623,7 @@ fn worksheet_image_validation_and_crud_are_lossless_or_refuse() {
         b"GIF89a".to_vec(),
         ImageFormat::Gif,
         Anchor::new(0, 0, 1, 1),
+        &crate::package::drawing_image::Limits::DEFAULT,
     )
     .unwrap();
     let mut sheet = Worksheet::new("Pictures");

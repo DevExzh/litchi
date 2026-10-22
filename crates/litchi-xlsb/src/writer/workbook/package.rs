@@ -740,6 +740,7 @@ impl Builder {
                         worksheet.shapes(),
                         worksheet.groups(),
                         worksheet.connections(),
+                        crate::SemanticLimits::new().xml_parts_value(),
                     )?;
                     let drawing_name = format!("drawing{next_drawing_index}.xml");
                     next_drawing_index = next_drawing_index
@@ -935,7 +936,10 @@ impl Builder {
             let mut drawing_part = BlobPart::new(
                 PackURI::new(format!("/xl/drawings/{drawing_name}"))?,
                 ct::OFC_DRAWING.to_string(),
-                crate::package::drawing_write::serialize_chart_sheet_drawing(sheet.name())?,
+                crate::package::drawing_write::serialize_chart_sheet_drawing(
+                    sheet.name(),
+                    crate::SemanticLimits::new().xml_parts_value(),
+                )?,
             );
             let chart_rel_id =
                 drawing_part.relate_to(&format!("../charts/{chart_name}"), rel::CHART);

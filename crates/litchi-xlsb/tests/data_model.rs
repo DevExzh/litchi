@@ -55,7 +55,14 @@ fn package() -> Package {
     writer.add_worksheet(builder::Worksheet::new("Sheet1"));
     writer.set_connections(connections()).expect("connections");
     writer
-        .set_data_model(Model::from_bytes(definition(), vec![1, 2, 3, 4]).expect("model"))
+        .set_data_model(
+            Model::from_bytes(
+                definition(),
+                vec![1, 2, 3, 4],
+                litchi_xlsb::data_model::SemanticLimits::DEFAULT,
+            )
+            .expect("model"),
+        )
         .expect("set model");
     let mut output = Cursor::new(Vec::new());
     writer
@@ -325,7 +332,14 @@ fn writer_requires_a_connection_for_each_model_table() {
     let mut writer = Builder::new();
     writer.add_worksheet(builder::Worksheet::new("Sheet1"));
     writer
-        .set_data_model(Model::from_bytes(definition(), vec![1, 2, 3]).expect("model"))
+        .set_data_model(
+            Model::from_bytes(
+                definition(),
+                vec![1, 2, 3],
+                litchi_xlsb::data_model::SemanticLimits::DEFAULT,
+            )
+            .expect("model"),
+        )
         .expect("set model before its owner");
     let error = writer.build().expect_err("missing owner");
     assert!(error.to_string().contains("External Data Connections part"));
@@ -339,7 +353,14 @@ fn table_connection_binding_is_case_insensitive() {
     writer.add_worksheet(builder::Worksheet::new("Sheet1"));
     writer.set_connections(connections()).expect("connections");
     writer
-        .set_data_model(Model::from_bytes(value.clone(), vec![1, 2, 3]).expect("model"))
+        .set_data_model(
+            Model::from_bytes(
+                value.clone(),
+                vec![1, 2, 3],
+                litchi_xlsb::data_model::SemanticLimits::DEFAULT,
+            )
+            .expect("model"),
+        )
         .expect("case-insensitive binding");
     let mut output = Cursor::new(Vec::new());
     writer
@@ -498,7 +519,12 @@ fn creation_removal_and_stale_source_checks_are_atomic() {
     let mut create = empty.edit_data_model().expect("empty model");
     create
         .replace_model(Some(
-            Model::from_bytes(definition(), vec![9, 8, 7]).expect("model"),
+            Model::from_bytes(
+                definition(),
+                vec![9, 8, 7],
+                litchi_xlsb::data_model::SemanticLimits::DEFAULT,
+            )
+            .expect("model"),
         ))
         .expect("create");
     let create_commit = create.commit().expect("create commit");
@@ -859,12 +885,29 @@ fn writer_rejects_time_grouping_before_retaining_unproven_opaque_payload() {
     writer.set_connections(connections()).expect("connections");
     let mut definition = definition();
     definition.time_groupings.push(time_grouping());
-    let error = match writer
-        .set_data_model(Model::from_bytes(definition, vec![1, 2, 3, 4]).expect("model"))
-    {
+    let error = match writer.set_data_model(
+        Model::from_bytes(
+            definition,
+            vec![1, 2, 3, 4],
+            litchi_xlsb::data_model::SemanticLimits::DEFAULT,
+        )
+        .expect("model"),
+    ) {
         Ok(_) => panic!("writer must prove retained groupings before staging"),
         Err(error) => error,
     };
     assert!(error.to_string().contains("XLDM outer proof failed"));
     assert!(writer.data_model().is_none());
+}
+
+#[test]
+fn model_payload_is_admitted_under_caller_limits() {
+    let mut limits = litchi_xlsb::data_model::SemanticLimits::DEFAULT;
+    limits.max_part_bytes = 4;
+    assert!(Model::from_bytes(definition(), vec![1, 2, 3, 4], limits).is_ok());
+    limits.max_part_bytes = 3;
+    assert!(matches!(
+        Model::from_bytes(definition(), vec![1, 2, 3, 4], limits),
+        Err(litchi_xlsb::package::PackageError::Limit { .. })
+    ));
 }

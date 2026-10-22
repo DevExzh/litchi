@@ -273,8 +273,11 @@ pub(super) fn transfer(
         &name_mapping,
         &relationship_mapping,
     )?;
-    let drawing_xml =
-        crate::package::drawing_write::append_drawing_anchors(&target_plan.xml, &fragments)?;
+    let drawing_xml = crate::package::drawing_write::append_drawing_anchors(
+        &target_plan.xml,
+        &fragments,
+        target.semantic_limits().xml_parts_value(),
+    )?;
     install_transfer(
         &mut package,
         target,

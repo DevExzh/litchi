@@ -39,7 +39,10 @@ pub(crate) fn validate_chart(chart: &Chart) -> Result<()> {
 }
 
 /// Serialize the single absolute-anchored chart frame used by a chart sheet.
-pub(crate) fn serialize_chart_sheet_drawing(title: &str) -> Result<Vec<u8>> {
+pub(crate) fn serialize_chart_sheet_drawing(
+    title: &str,
+    xml_limits: litchi_core::Limits,
+) -> Result<Vec<u8>> {
     if title.encode_utf16().count() > 32_767 || title.contains('\0') {
         return Err(Error::InvalidFormula(
             "chart-sheet drawing title is too long or contains NUL",
@@ -55,7 +58,7 @@ pub(crate) fn serialize_chart_sheet_drawing(title: &str) -> Result<Vec<u8>> {
             found: xml.len(),
         });
     }
-    crate::package::drawing::parse_drawing_part(xml.as_bytes())?;
+    crate::package::drawing::parse_drawing_part(xml.as_bytes(), xml_limits)?;
     Ok(xml.into_bytes())
 }
 
@@ -65,6 +68,7 @@ pub(crate) fn serialize_drawing(
     shapes: &[ShapeSpec],
     groups: &[GroupSpec],
     connections: &[ConnectionShapeSpec],
+    xml_limits: litchi_core::Limits,
 ) -> Result<Vec<u8>> {
     if images.is_empty()
         && charts.is_empty()
@@ -139,7 +143,7 @@ pub(crate) fn serialize_drawing(
     crate::shapes::read(&xml)?.ok_or(Error::Encoding("authored drawing lacks an xdr:wsDr root"))?;
     let bytes = xml.into_bytes();
     // The XLSB drawing inventory reader is the package-load oracle.
-    crate::package::drawing::parse_drawing_part(&bytes)?;
+    crate::package::drawing::parse_drawing_part(&bytes, xml_limits)?;
     Ok(bytes)
 }
 
@@ -168,9 +172,10 @@ pub(crate) fn append_image_anchor(
     image: &Image,
     object_id: u32,
     relationship_id: &str,
+    xml_limits: litchi_core::Limits,
 ) -> Result<Vec<u8>> {
     image.validate()?;
-    let _inventory = crate::package::drawing::parse_drawing_part(source)?;
+    let _inventory = crate::package::drawing::parse_drawing_part(source, xml_limits)?;
     let root_end = drawing_root_end(source)?;
     let mut anchor = String::new();
     write_image_anchor_with_ids(&mut anchor, image, object_id, relationship_id, true)?;
@@ -186,7 +191,7 @@ pub(crate) fn append_image_anchor(
     output.extend_from_slice(&source[..root_end]);
     output.extend_from_slice(anchor.as_bytes());
     output.extend_from_slice(&source[root_end..]);
-    let _inventory = crate::package::drawing::parse_drawing_part(&output)?;
+    let _inventory = crate::package::drawing::parse_drawing_part(&output, xml_limits)?;
     let xml = std::str::from_utf8(&output)
         .map_err(|_error| Error::Encoding("drawing XML is not UTF-8"))?;
     crate::shapes::read(xml)?.ok_or(Error::Encoding("appended drawing lacks an xdr:wsDr root"))?;
@@ -195,8 +200,12 @@ pub(crate) fn append_image_anchor(
 
 /// Append already validated, self-contained top-level anchors while retaining
 /// every byte of the existing drawing part.
-pub(crate) fn append_drawing_anchors(source: &[u8], anchors: &[Vec<u8>]) -> Result<Vec<u8>> {
-    let before = crate::package::drawing::parse_drawing_part(source)?;
+pub(crate) fn append_drawing_anchors(
+    source: &[u8],
+    anchors: &[Vec<u8>],
+    xml_limits: litchi_core::Limits,
+) -> Result<Vec<u8>> {
+    let before = crate::package::drawing::parse_drawing_part(source, xml_limits)?;
     let root_end = drawing_root_end(source)?;
     let added = anchors.iter().try_fold(0usize, |total, anchor| {
         total
@@ -224,7 +233,7 @@ pub(crate) fn append_drawing_anchors(source: &[u8], anchors: &[Vec<u8>]) -> Resu
         output.extend_from_slice(anchor);
     }
     output.extend_from_slice(&source[root_end..]);
-    let after = crate::package::drawing::parse_drawing_part(&output)?;
+    let after = crate::package::drawing::parse_drawing_part(&output, xml_limits)?;
     let expected =
         before
             .anchors
@@ -244,8 +253,11 @@ pub(crate) fn append_drawing_anchors(source: &[u8], anchors: &[Vec<u8>]) -> Resu
     Ok(output)
 }
 
-pub(crate) fn next_drawing_object_id(source: &[u8]) -> Result<u32> {
-    let _inventory = crate::package::drawing::parse_drawing_part(source)?;
+pub(crate) fn next_drawing_object_id(
+    source: &[u8],
+    xml_limits: litchi_core::Limits,
+) -> Result<u32> {
+    let _inventory = crate::package::drawing::parse_drawing_part(source, xml_limits)?;
     let mut reader = quick_xml::Reader::from_reader(source);
     let mut maximum = 0u32;
     loop {

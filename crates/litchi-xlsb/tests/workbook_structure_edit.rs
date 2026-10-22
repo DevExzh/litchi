@@ -557,6 +557,7 @@ fn ordinary_root_authors_sst_rich_style_and_formula_resources() {
         GIF_1X1.to_vec(),
         ImageFormat::Gif,
         ChartAnchor::new(0, 3, 2, 7),
+        &litchi_xlsb::package::drawing_image::Limits::DEFAULT,
     )
     .expect("valid image")
     .with_description("authored one-pixel image")
@@ -651,6 +652,7 @@ fn ordinary_root_authors_sst_rich_style_and_formula_resources() {
         GIF_1X1.to_vec(),
         ImageFormat::Gif,
         ChartAnchor::new(7, 4, 9, 8),
+        &litchi_xlsb::package::drawing_image::Limits::DEFAULT,
     )
     .expect("valid appended image")
     .with_description("appended image")
@@ -822,6 +824,7 @@ fn ordinary_chart_graph_transfer_retains_existing_drawing_and_resource_payloads(
                 GIF_1X1.to_vec(),
                 ImageFormat::Gif,
                 ChartAnchor::new(8, 1, 10, 4),
+                &litchi_xlsb::package::drawing_image::Limits::DEFAULT,
             )
             .expect("target image")
             .with_description("retained target image")

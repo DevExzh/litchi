@@ -16,8 +16,19 @@ fn cache() -> Cache {
 #[test]
 fn timeline_cache_xml_round_trip() {
     let original = cache();
-    let bytes = write_cache(&original).unwrap();
-    assert_eq!(parse_cache(&bytes).unwrap(), original);
+    let bytes = write_cache(
+        &original,
+        litchi_core::Limits::for_profile(litchi_core::Profile::Server),
+    )
+    .unwrap();
+    assert_eq!(
+        parse_cache(
+            &bytes,
+            litchi_core::Limits::for_profile(litchi_core::Profile::Server)
+        )
+        .unwrap(),
+        original
+    );
 }
 
 #[test]
@@ -29,16 +40,48 @@ fn timeline_views_xml_round_trip() {
     view.scroll_position = Some("2024-06-01T00:00:00Z".to_string());
     view.style = Some("TimeSlicerStyleLight1".to_string());
     let views = Views { items: vec![view] };
-    assert_eq!(parse_views(&write_views(&views).unwrap()).unwrap(), views);
+    assert_eq!(
+        parse_views(
+            &write_views(
+                &views,
+                litchi_core::Limits::for_profile(litchi_core::Profile::Server)
+            )
+            .unwrap(),
+            litchi_core::Limits::for_profile(litchi_core::Profile::Server)
+        )
+        .unwrap(),
+        views
+    );
 }
 
 #[test]
 fn timeline_validation_rejects_inverted_ranges_and_unknown_filters() {
     assert!(Range::new("2025-01-01T00:00:00Z", "2024-01-01T00:00:00Z").is_err());
     assert!(matches!(
-        parse_cache(
-            br#"<x15:timelineCacheDefinition xmlns:x15="http://schemas.microsoft.com/office/spreadsheetml/2010/11/main" name="c" sourceName="d"><x15:state minimalRefreshVersion="0" lastRefreshVersion="0" pivotCacheId="0" filterType="nope"><x15:bounds startDate="2024-01-01T00:00:00Z" endDate="2024-01-02T00:00:00Z"/></x15:state></x15:timelineCacheDefinition>"#
-        ),
+        parse_cache(br#"<x15:timelineCacheDefinition xmlns:x15="http://schemas.microsoft.com/office/spreadsheetml/2010/11/main" name="c" sourceName="d"><x15:state minimalRefreshVersion="0" lastRefreshVersion="0" pivotCacheId="0" filterType="nope"><x15:bounds startDate="2024-01-01T00:00:00Z" endDate="2024-01-02T00:00:00Z"/></x15:state></x15:timelineCacheDefinition>"#, litchi_core::Limits::for_profile(litchi_core::Profile::Server)),
         Err(Error::Unrecognized { .. })
     ));
+}
+
+#[test]
+fn xml_limits_bound_timeline_input_elements_depth_and_output() {
+    let server = litchi_core::Limits::for_profile(litchi_core::Profile::Server);
+    let original = cache();
+    let bytes = write_cache(&original, server).unwrap();
+    let len = bytes.len() as u64;
+    let limits = |input: u64, output: u64, objects: u64, depth: u64| {
+        litchi_core::Limits::new(u64::MAX, input, output, objects, depth, u64::MAX)
+    };
+    assert_eq!(
+        parse_cache(&bytes, limits(len, u64::MAX, u64::MAX, u64::MAX)).unwrap(),
+        original
+    );
+    assert!(parse_cache(&bytes, limits(len - 1, u64::MAX, u64::MAX, u64::MAX)).is_err());
+    assert!(parse_cache(&bytes, limits(len, u64::MAX, 1, u64::MAX)).is_err());
+    assert!(parse_cache(&bytes, limits(len, u64::MAX, u64::MAX, 1)).is_err());
+    assert_eq!(
+        write_cache(&original, limits(u64::MAX, len, u64::MAX, u64::MAX)).unwrap(),
+        bytes
+    );
+    assert!(write_cache(&original, limits(u64::MAX, len - 1, u64::MAX, u64::MAX)).is_err());
 }

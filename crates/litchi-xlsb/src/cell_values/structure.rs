@@ -252,7 +252,14 @@ impl ImagePlan {
             self.to_row,
             self.to_row_offset,
         );
-        let image = crate::writer::Image::new(Arc::clone(&self.data), self.format, anchor)?;
+        // The bytes were admitted when the source workbook was opened; the
+        // copy is re-admitted under the format ceilings.
+        let image = crate::writer::Image::new(
+            Arc::clone(&self.data),
+            self.format,
+            anchor,
+            &crate::package::drawing_image::Limits::DEFAULT,
+        )?;
         match &self.description {
             Some(description) => image.with_description(description.clone()),
             None => Ok(image),
@@ -1364,8 +1371,12 @@ impl Edit {
                 "source sheet has no embedded image",
             )
         })?;
-        let image =
-            crate::writer::Image::new(Arc::clone(&embedded.data), embedded.format, target_anchor)?;
+        let image = crate::writer::Image::new(
+            Arc::clone(&embedded.data),
+            embedded.format,
+            target_anchor,
+            &crate::package::drawing_image::Limits::DEFAULT,
+        )?;
         let image = match &embedded.description {
             Some(description) => image.with_description(description.clone())?,
             None => image,
@@ -2668,6 +2679,7 @@ fn add_image(workbook: &mut Workbook, sheet: usize, plan: &ImagePlan) -> Result<
         &[],
         &[],
         &[],
+        litchi_core::Limits::for_profile(litchi_core::Profile::Server),
     )?;
     let mut package = workbook.package.clone();
     package.try_add_part(Box::new(BlobPart::new(
@@ -2774,6 +2786,7 @@ fn append_image(
     let before_images = drawing.images.len();
     let object_id = crate::package::drawing_write::next_drawing_object_id(
         workbook.package.get_part(&drawing_uri)?.blob(),
+        litchi_core::Limits::for_profile(litchi_core::Profile::Server),
     )?;
     let media_index = free_media_index(&workbook.package, plan.format.extension())?;
     let media_uri = PackURI::new(format!(
@@ -2801,6 +2814,7 @@ fn append_image(
         image,
         object_id,
         &image_rel_id,
+        litchi_core::Limits::for_profile(litchi_core::Profile::Server),
     )?;
     drawing_part.set_blob(drawing_xml);
     let validated = workbook.reparse_candidate(package)?;

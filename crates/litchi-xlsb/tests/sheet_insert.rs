@@ -416,7 +416,14 @@ fn package_with_data_model() -> Package {
         builder.add_worksheet(builder::Worksheet::new(name));
     }
     builder
-        .set_data_model(Model::from_bytes(Definition::default(), vec![1, 2, 3, 4]).unwrap())
+        .set_data_model(
+            Model::from_bytes(
+                Definition::default(),
+                vec![1, 2, 3, 4],
+                litchi_xlsb::data_model::SemanticLimits::DEFAULT,
+            )
+            .unwrap(),
+        )
         .unwrap();
     builder.build().unwrap()
 }

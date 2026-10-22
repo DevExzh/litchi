@@ -210,6 +210,8 @@ pub enum LimitKind {
     VolatileDependencies(crate::volatile_dependencies::LimitKind),
     /// Source-backed workbook indexing ([`crate::workbook::LimitKind`]).
     Workbook(crate::workbook::LimitKind),
+    /// Worksheet-image authoring ([`crate::package::drawing_image::LimitKind`]).
+    Image(crate::package::drawing_image::LimitKind),
 }
 
 impl fmt::Display for LimitKind {
@@ -225,6 +227,7 @@ impl fmt::Display for LimitKind {
             Self::Theme(kind) => fmt::Display::fmt(kind, f),
             Self::VolatileDependencies(kind) => fmt::Display::fmt(kind, f),
             Self::Workbook(kind) => fmt::Display::fmt(kind, f),
+            Self::Image(kind) => fmt::Display::fmt(kind, f),
         }
     }
 }

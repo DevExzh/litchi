@@ -41,23 +41,31 @@ const MENTION: &str = "{44444444-4444-4444-4444-444444444444}";
 fn parses_and_preserves_unknown_threaded_payloads() {
     let people = parse_persons(format!(
         r#"<tc:personList xmlns:tc="{NS}" xmlns:f="urn:future"><tc:person displayName="Alice" id="{ALICE}"><f:personExt><f:value/></f:personExt></tc:person><f:peopleExt/></tc:personList>"#
-    ))
+    ), litchi_core::Limits::for_profile(litchi_core::Profile::Server))
     .unwrap();
     assert_eq!(people.persons[0].display_name, "Alice");
     assert_eq!(people.persons[0].extensions.len(), 1);
     assert_eq!(people.extensions.len(), 1);
-    let people_xml = write_persons(&people).unwrap();
+    let people_xml = write_persons(
+        &people,
+        litchi_core::Limits::for_profile(litchi_core::Profile::Server),
+    )
+    .unwrap();
     assert!(String::from_utf8_lossy(&people_xml).contains("personExt"));
 
     let comments = parse_comments(format!(
         r#"<tc:ThreadedComments xmlns:tc="{NS}" xmlns:f="urn:future"><tc:threadedComment ref="B2" id="{ROOT}" personId="{ALICE}"><tc:text>Hello &amp; @Bob</tc:text><tc:mentions><tc:mention mentionpersonId="{ALICE}" mentionId="{MENTION}" startIndex="8" length="4"/></tc:mentions><f:commentExt/></tc:threadedComment><f:rootExt/></tc:ThreadedComments>"#
-    ))
+    ), litchi_core::Limits::for_profile(litchi_core::Profile::Server))
     .unwrap();
     assert_eq!(comments.comments[0].text.as_deref(), Some("Hello & @Bob"));
     assert_eq!(comments.comments[0].mentions.len(), 1);
     assert_eq!(comments.comments[0].extensions.len(), 1);
     assert_eq!(comments.extensions.len(), 1);
-    let xml = write_comments(&comments).unwrap();
+    let xml = write_comments(
+        &comments,
+        litchi_core::Limits::for_profile(litchi_core::Profile::Server),
+    )
+    .unwrap();
     assert!(String::from_utf8_lossy(&xml).contains("commentExt"));
 }
 
