@@ -424,7 +424,7 @@ fn create_set_remove_save_and_reopen_keeps_the_cell_absent() {
 }
 
 #[test]
-fn mixed_set_remove_transactions_replay_inverse_and_reject_foreign_snapshots() {
+fn mixed_set_remove_transactions_replay_inverse_and_accept_reopened_copies() {
     for eager in [false, true] {
         let original = open_owner(&fixture(), eager);
         let before = original.to_bytes().expect("publish transaction source");
@@ -461,14 +461,15 @@ fn mixed_set_remove_transactions_replay_inverse_and_reject_foreign_snapshots() {
                 .expect("publish inverse"),
             before
         );
-        let foreign = open_owner(&before, eager);
+        let reopened = open_owner(&before, eager);
         assert_eq!(
             commit
                 .patch()
-                .apply(&foreign)
-                .expect_err("foreign patch source")
-                .code(),
-            Code::InvalidInput
+                .apply(&reopened)
+                .expect("a byte-identical copy takes the patch")
+                .to_bytes()
+                .expect("publish reopened replay"),
+            commit.file().to_bytes().expect("publish committed file")
         );
     }
 }

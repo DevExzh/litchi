@@ -255,7 +255,7 @@ with open("presentation.pptx", "rb") as f:
 - **`File.unsign()`**: A `File` that may edit a signed document
 - **`Edit.set(...)`**, **`Edit.add(...)`**, **`Edit.remove(...)`**, **`Edit.move(...)`**, **`Edit.swap(...)`**, **`Edit.get(...)`**, **`Edit.query(...)`**, **`Edit.commit()`**: The transaction's verbs
 - `Commit.file`, `Commit.changed`, `Commit.operations`, `Commit.results`, `Commit.value`: A transaction's or batch's result
-- `Commit.patch`: The change's reversible `Patch` (None for `add_part` and `raw_set`): `Patch.apply(file)` replays it on the File it started from, `Patch.inverse()` undoes it, `Patch.is_noop()`; a Patch applied to any other File raises `invalid_input`
+- `Commit.patch`: The change's reversible `Patch` (None for `add_part` and `raw_set`): `Patch.apply(file)` replays it, `Patch.inverse()` undoes it, `Patch.is_noop()`; the original File and clones use the fast identity path, while a same-format independently opened File is accepted when its published base passes the bounded content proof; changed content, protected state and stale sources raise the corresponding typed error
 
 ### Document API
 

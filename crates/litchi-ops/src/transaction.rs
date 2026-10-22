@@ -5,7 +5,10 @@
 //! sets in one native transaction. Other commands and staged reads close a run.
 
 use std::fmt;
+use std::io::{self, Write};
 use std::sync::Arc;
+
+use sha2::{Digest as _, Sha256};
 
 use crate::path::{IntoPath, Path};
 use crate::{Code, File, IntoNode, IntoPlacement, IntoProps, IntoTarget, Result};
@@ -87,7 +90,9 @@ impl<T> Commit<T> {
     pub fn into_file(self) -> File {
         self.file
     }
-    /// The process-local, owner-bound reversible patch.
+    /// The process-local reversible patch. The exact owner/clone path uses
+    /// retained identity; a same-variant reopened copy is admitted only after
+    /// its published base passes the bounded content proof.
     #[must_use]
     pub const fn patch(&self) -> &Patch {
         &self.patch
@@ -125,16 +130,14 @@ impl<T> fmt::Debug for Commit<T> {
 
 /// Opaque, process-local history of validated native commits.
 ///
-/// Applying a patch accepts its original input handle or a cheap clone. In
-/// most formats a separately opened file is a foreign snapshot even if its
-/// document text or bytes match. The ODF text family (ODT, OTH, ODM) and the
-/// ODF object formats (ODG, ODC, ODI, ODB, ODF formula) check content
-/// instead: a separately opened file whose package bytes (or flat XML) equal
-/// the patch's source takes the patch, and the result is the patch's
-/// retained endpoint (record 0347). A file whose bytes differ is refused in
-/// every format. Native owners, source guards, origin and policy sidecars are
-/// retained; applying reuses the already-validated endpoint without a ZIP
-/// round trip. Source freshness is checked in both directions.
+/// Applying a patch accepts its original input handle, a cheap clone, or a
+/// separately opened file of the same variant whose published bytes equal the
+/// patch's source. The exact-owner path is constant work; a reopened candidate
+/// is checked with a bounded-memory length-and-digest proof (record 0362m).
+/// A file whose bytes differ is refused in every format. Native owners, source
+/// guards, origin and policy sidecars are retained; applying reuses the
+/// already-validated endpoint without a ZIP round trip. Source freshness is
+/// checked in both directions.
 ///
 /// Signature consumption precedes editing. Inverse replay restores the
 /// authorized unsigned logical source and never recreates a signed state.
@@ -200,7 +203,7 @@ struct XlsxLeaf {
     source: litchi_xlsx::Package,
     target: litchi_xlsx::Package,
     // Retain the complete native proof even though process-local replay
-    // reuses a validated owner-bound endpoint.
+    // reuses a validated endpoint after a content proof for reopened copies.
     _patch: litchi_xlsx::workbook::Patch,
 }
 impl fmt::Debug for Patch {
@@ -226,14 +229,16 @@ impl Patch {
             inverse: !self.inverse,
         }
     }
-    /// Apply to the exact bound input (or a cheap clone), returning the retained
-    /// validated native endpoint. The input is unchanged on success or failure.
-    /// The ODF formats also accept a separately opened, byte-identical copy
-    /// of the input (see [`Patch`]).
+    /// Apply to the bound input, a cheap clone, or a separately opened
+    /// byte-identical copy of the same file variant, returning the retained
+    /// validated native endpoint. The input is unchanged on success or
+    /// failure. A reopened candidate is checked by streaming its publication
+    /// through a bounded-memory content proof.
     ///
     /// # Errors
-    /// Returns a typed [`Error::PatchConflict`] for another snapshot, protected
-    /// state errors for signed/locked input, or source freshness failures.
+    /// Returns a typed [`Error::PatchConflict`] for changed or mismatched
+    /// content, protected state errors for signed/locked input, or source
+    /// freshness failures.
     pub fn apply(&self, file: &File) -> Result<File> {
         let result = (|| {
             check_source(file)?;
@@ -243,7 +248,7 @@ impl Patch {
             } else {
                 (&self.inner.source, &self.inner.target)
             };
-            if !same_snapshot(file, source) {
+            if !same_snapshot(file, source) && !same_content(file, source)? {
                 return Err(Error::PatchConflict.into());
             }
             let target = target.clone();
@@ -3773,6 +3778,86 @@ fn same_snapshot(left: &File, right: &File) -> bool {
         _ => false,
     }
 }
+
+/// Compare two separately opened plain files without retaining either
+/// publication in a second `Vec`. The exact-owner path is checked by
+/// [`same_snapshot`] before this function is called. A length is compared in
+/// addition to SHA-256 so the proof cannot equate a digest of a prefix with a
+/// different-length publication. This is a process-local replay proof; it is
+/// never serialized into a durable patch envelope.
+fn same_content(left: &File, right: &File) -> Result<bool> {
+    if std::mem::discriminant(left) != std::mem::discriminant(right)
+        || !same_security_disposition(left, right)
+        || matches!(left, File::Signed(_) | File::Locked(_))
+        || matches!(right, File::Signed(_) | File::Locked(_))
+    {
+        return Ok(false);
+    }
+    Ok(stream_fingerprint(left)? == stream_fingerprint(right)?)
+}
+
+/// Content equality cannot transfer a signature or encryption disposition.
+/// The outer `apply` fence rejects the protected variants, while this helper
+/// keeps an authorized plain owner from matching a differently protected
+/// owner whose publication happens to have equal bytes.
+fn same_security_disposition(left: &File, right: &File) -> bool {
+    if left.is_signed() != right.is_signed() {
+        return false;
+    }
+    match (left, right) {
+        #[cfg(all(feature = "pptx", feature = "encryption"))]
+        (File::Pptx(left), File::Pptx(right)) => {
+            left.requires_reencryption() == right.requires_reencryption()
+        },
+        #[cfg(all(feature = "xlsx", feature = "encryption"))]
+        (File::Xlsx(left), File::Xlsx(right)) => {
+            left.requires_reencryption() == right.requires_reencryption()
+        },
+        #[cfg(feature = "xls")]
+        (File::Xls(left), File::Xls(right)) => left.is_encrypted() == right.is_encrypted(),
+        #[cfg(feature = "ppt")]
+        (File::Ppt(left), File::Ppt(right)) => left.is_encrypted() == right.is_encrypted(),
+        _ => true,
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+struct StreamFingerprint {
+    bytes: u64,
+    digest: [u8; 32],
+}
+
+fn stream_fingerprint(file: &File) -> Result<StreamFingerprint> {
+    let mut sink = DigestSink::default();
+    let bytes = file.write_to(&mut sink)?;
+    debug_assert_eq!(bytes, sink.bytes);
+    Ok(StreamFingerprint {
+        bytes,
+        digest: sink.hasher.finalize().into(),
+    })
+}
+
+#[derive(Default)]
+struct DigestSink {
+    hasher: Sha256,
+    bytes: u64,
+}
+
+impl Write for DigestSink {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        self.hasher.update(bytes);
+        self.bytes = self
+            .bytes
+            .checked_add(bytes.len() as u64)
+            .ok_or_else(|| io::Error::other("content length exceeds u64"))?;
+        Ok(bytes.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
 fn admit(file: &File) -> Result<()> {
     match file {
         #[cfg(feature = "doc")]

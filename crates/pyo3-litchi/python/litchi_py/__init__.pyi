@@ -1658,9 +1658,11 @@ class Patch:
     """The reversible record of one change: ``Commit.patch``.
 
     ``apply(file)`` replays the change on the File it started from and
-    returns the changed File; ``inverse()`` is the Patch that undoes it. A
-    Patch applied to any other File raises a LitchiError with code
-    ``invalid_input``. A Patch lives only in this process.
+    returns the changed File; ``inverse()`` is the Patch that undoes it. The
+    original File and clones use the fast identity path; a same-format
+    independently opened File is accepted when its published base passes the
+    bounded content proof. Changed content, protected state and stale sources
+    raise their typed errors. A Patch lives only in this process.
 
     Example:
         >>> commit = doc.edit(lambda tx: tx.set("/body/p[1]", {"bold": True}))
@@ -1677,12 +1679,12 @@ class Patch:
         ...
 
     def apply(self, file: File) -> File:
-        """Replay the change on ``file`` (the File it started from); return
-        the changed File. ``file`` is unchanged.
+        """Replay the change on ``file`` and return the changed File. The
+        original input is unchanged; a same-format independently opened copy
+        is accepted after the bounded content proof.
 
         Raises:
-            LitchiError: ``invalid_input`` if ``file`` is another File, or a
-                protection or source failure
+            LitchiError: A typed patch-conflict, protection or source failure
         """
         ...
 

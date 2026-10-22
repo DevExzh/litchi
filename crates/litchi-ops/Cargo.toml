@@ -146,6 +146,7 @@ litchi-xlsx         = { workspace = true, optional = true }
 memchr              = { workspace = true } # Markdown HTML escaping; find/replace literal search
 quick-xml           = { workspace = true } # Raw layer: part addressing and `raw_set` splices (record 0336)
 serde-saphyr        = { workspace = true, optional = true } # Markdown YAML front matter
+sha2                = { workspace = true } # Streaming content proofs for process-local patch replay
 
 [dev-dependencies]
 proptest = "1.5" # PathArg display fixed point (record 0338 F2)

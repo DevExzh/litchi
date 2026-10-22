@@ -711,7 +711,7 @@ fn empty_cell_props_are_exact_noops_like_xlsx() {
 }
 
 #[test]
-fn cell_transactions_replay_inverse_and_reject_foreign_snapshots() {
+fn cell_transactions_replay_inverse_and_accept_reopened_copies() {
     let bytes = fixture();
 
     for eager in [false, true] {
@@ -742,14 +742,15 @@ fn cell_transactions_replay_inverse_and_reject_foreign_snapshots() {
             original_bytes
         );
 
-        let foreign = open_owner(&original_bytes, eager);
+        let reopened = open_owner(&original_bytes, eager);
         assert_eq!(
             commit
                 .patch()
-                .apply(&foreign)
-                .expect_err("foreign owner must be refused")
-                .code(),
-            Code::InvalidInput
+                .apply(&reopened)
+                .expect("a byte-identical copy takes the patch")
+                .to_bytes()
+                .expect("publish reopened replay"),
+            commit.file().to_bytes().expect("publish committed cells")
         );
     }
 }

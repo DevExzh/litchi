@@ -71,7 +71,7 @@ fn query_fanout_matches_one_native_batch() {
 }
 
 #[test]
-fn history_replays_exact_endpoints_and_refuses_foreign_owners() {
+fn history_replays_exact_endpoints_and_accepts_reopened_copies() {
     let source = file();
     let commit = source
         .edit(|edit| {
@@ -99,10 +99,15 @@ fn history_replays_exact_endpoints_and_refuses_foreign_owners() {
             .unwrap(),
         INPUT
     );
-    assert!(matches!(
-        commit.patch().apply(&file()).unwrap_err().leaf(),
-        Source::Transaction(Error::PatchConflict)
-    ));
+    assert_eq!(
+        commit
+            .patch()
+            .apply(&file())
+            .expect("a byte-identical copy takes the patch")
+            .to_bytes()
+            .unwrap(),
+        commit.file().to_bytes().unwrap()
+    );
     assert!(!format!("{:?} {:?}", commit.patch(), commit).contains("PRIVATE"));
     let noop = source
         .edit(|edit| edit.set("/body/p[3]", props! {"text" => "Third"}))

@@ -985,12 +985,15 @@ and closure value through the triad accessors `file`, `into_file`, `patch`,
 `Diagnostics::changed()` and `Patch::is_noop()` describe the final logical
 artifact, not how many operations ran. Other counts remain explicit facts.
 
-Patches are process-local and bound to exact immutable owner handles (clones
-accepted). `Patch::inverse()` reverses endpoint direction; `Patch::apply(&File)`
-returns the retained validated endpoint after source guards. It cannot apply to
-an independent open or reverse explicit signature removal. `Error::PatchConflict`
-remains distinct from physical stale-source failures. `capabilities::Verb::Edit`
-advertises this DOCX closure subset; command `Batch` execution stays pending.
+Patches are process-local. The original immutable owner and its clones use a
+constant-work identity path; a separately opened same-variant file is accepted
+when its published base passes the bounded length-and-digest proof. A changed
+publication, format/security mismatch, stale source, signed input or locked
+input remains refused. `Patch::inverse()` reverses endpoint direction;
+`Patch::apply(&File)` returns the retained validated endpoint after source
+guards. `Error::PatchConflict` remains distinct from physical stale-source
+failures. `capabilities::Verb::Edit` advertises this DOCX closure subset;
+command `Batch` execution stays pending.
 
 ## Unified command execution (record 0076)
 
@@ -1045,9 +1048,11 @@ atomic or best-effort batches. `ValueType::Scalar` preserves text, boolean,
 64-bit integer, and finite-number kinds. Text stays literal; native formulas
 omit the leading `=`. Null clears `value` or `formula`.
 
-Transactions retain native patches and immutable endpoint owners. Replay is
-bound to the input snapshot, and inverse replay returns the retained source.
-Native content comparison detects final no-ops without ZIP serialization.
+Transactions retain native patches and immutable endpoint owners. Replay uses
+the input identity fast path; a same-variant reopened publication is accepted
+after the unified bounded content proof, and inverse replay returns the
+retained source. Native content comparison detects final no-ops without ZIP
+serialization.
 Structural commands, command coalescing, OfficeCLI string inference/extended
 clear modes, and encrypted-owner edits remain explicit capability gaps.
 
@@ -2983,7 +2988,7 @@ gain the ADR 0034 §3 patch vocabulary over `litchi_ops::transaction::Patch`.
 | Name | Status |
 |---|---|
 | Python `Commit.patch` (None for `File.add_part` and `File.raw_set`) | adopted (0347) |
-| Python `Patch.{apply, inverse, is_noop}` | adopted (0347): the Rust `transaction::Patch` names; one Python `Patch` spans every Rust run of an `Edit` |
+| Python `Patch.{apply, inverse, is_noop}` | adopted (0347, 0362m): the Rust `transaction::Patch` names; one Python `Patch` spans every Rust run of an `Edit`, and same-format reopened equal-content inputs pass the bounded replay proof |
 | `litchi_numbers::table::relocation::Error::DuplicateTableName` | adopted (0347): a relocation into a sheet that already has a table of that name, refused before any rewrite |
 | Numbers `swap` of `sheet`s and `table`s | adopted (0347): two moves applied one at a time (four leaf steps across sheets) |
 | `litchi_xlsx::drawing::edit::Edit::replace_element_image` | adopted (0347): `replace_image` for a picture element the caller already read; `replace_image` delegates to it |

@@ -363,9 +363,10 @@ impl Commit {
 /// ``apply(file)`` replays the change on the File it started from (or the
 /// same File object again) and returns the changed File. ``inverse()`` is
 /// the Patch that undoes it: applied to the changed File it gives the
-/// original back. A Patch applied to any other File raises a LitchiError
-/// with code ``invalid_input`` and nothing changes. A Patch lives only in
-/// this process; it is not a file format.
+/// original back. A same-format independently opened copy is accepted after
+/// its published base passes the bounded content proof; changed content,
+/// protected state and stale sources remain typed failures. A Patch lives
+/// only in this process; it is not a file format.
 ///
 /// Example:
 ///     >>> commit = doc.edit(lambda tx: tx.set("/body/p[1]", {"bold": True}))
@@ -410,14 +411,14 @@ impl Patch {
     /// The GIL is released while the patch applies.
     ///
     /// Args:
-    ///     file: The File the change started from
+    ///     file: The original File, a clone, or a same-format equal-content
+    ///         File reopened from the published base
     ///
     /// Returns:
     ///     The changed File; ``file`` is unchanged
     ///
     /// Raises:
-    ///     LitchiError: ``invalid_input`` if ``file`` is another File, or a
-    ///         protection or source failure
+    ///     LitchiError: A typed patch-conflict, protection or source failure
     fn apply(&self, py: Python<'_>, file: PyRef<'_, File>) -> PyResult<File> {
         let mut current = file.handle()?;
         let steps = &self.steps;
