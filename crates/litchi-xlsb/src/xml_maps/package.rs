@@ -45,8 +45,11 @@ pub(crate) fn read_with_limits(
     preflight(package, limits)?;
     let workbook = package.main_document_part()?;
     let workbook_name = workbook.partname().clone();
-    let connections =
-        crate::package::connections::package::load_from_workbook(package, &workbook_name)?;
+    let connections = crate::package::connections::package::load_from_workbook(
+        package,
+        &workbook_name,
+        limits.raw,
+    )?;
     let map_relationship = xml_maps_relationship(package, &workbook_name)?;
     let (map_info, conformance, map_part) = if let Some((part_name, conformance)) = map_relationship
     {
@@ -98,8 +101,9 @@ pub(crate) fn read_with_limits(
     for (sheet_index, worksheet_name) in worksheet_parts.iter().enumerate() {
         let worksheet = package.get_part(worksheet_name)?;
         require_content_type(worksheet, WORKSHEET_CONTENT_TYPE)?;
-        let geometry = worksheet_geometry(worksheet.blob())?;
-        let listed_tables = crate::package::table::parse_table_part_rel_ids(worksheet.blob())?;
+        let geometry = worksheet_geometry(worksheet.blob(), limits.raw)?;
+        let listed_tables =
+            crate::package::table::parse_table_part_rel_ids(worksheet.blob(), limits.raw)?;
         let listed = listed_tables.iter().cloned().collect::<HashSet<_>>();
         if listed.len() != listed_tables.len() {
             return Err(invalid("worksheet repeats a BrtListPart relationship"));
@@ -122,7 +126,7 @@ pub(crate) fn read_with_limits(
                 let part_name = relationship.target_partname()?;
                 let part = package.get_part(&part_name)?;
                 require_content_type(part, TABLE_CONTENT_TYPE)?;
-                let typed = crate::package::table::parse_table_part(part.blob())?;
+                let typed = crate::package::table::parse_table_part(part.blob(), limits.raw)?;
                 validate_table_range(&typed.range)?;
                 validate_table_height(&typed, sheet_index)?;
                 validate_table_connection(&typed, connections.as_ref(), sheet_index)?;
@@ -530,9 +534,9 @@ impl WorksheetGeometry {
     }
 }
 
-fn worksheet_geometry(data: &[u8]) -> Result<WorksheetGeometry> {
+fn worksheet_geometry(data: &[u8], raw_limits: crate::raw::Limits) -> Result<WorksheetGeometry> {
     let mut geometry = WorksheetGeometry::default();
-    for record in crate::raw::Records::new(data, crate::raw::Limits::DEFAULT) {
+    for record in crate::raw::Records::new(data, raw_limits) {
         let record = record?;
         let slot = match record.kind() {
             crate::raw::kind::WS_DIM => &mut geometry.dimension,

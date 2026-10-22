@@ -33,7 +33,7 @@ fn manager() -> Manager {
 }
 
 fn worksheet(manager: &Manager) -> Vec<u8> {
-    let mut data = codec::write_manager(manager).unwrap();
+    let mut data = codec::write_manager(manager, Limits::DEFAULT).unwrap();
     Encoder::new(&mut data, Limits::DEFAULT)
         .write_record(kind::END_SHEET, &[])
         .unwrap();
@@ -65,7 +65,7 @@ fn insert_before_kind(data: &[u8], target: Kind, inserted: &[u8]) -> Vec<u8> {
 fn typed_manager_round_trips_known_metadata() {
     let original = manager();
     let data = worksheet(&original);
-    let parsed = parse_worksheet(&data).unwrap().unwrap();
+    let parsed = parse_worksheet(&data, Limits::DEFAULT).unwrap().unwrap();
 
     assert_eq!(parsed.current(), Some(0));
     assert_eq!(parsed.shown(), Some(0));
@@ -78,10 +78,13 @@ fn typed_manager_round_trips_known_metadata() {
     assert!(parsed.scenarios()[0].locked());
     assert_eq!(parsed.scenarios()[0].changed_cells()[0].value(), "42");
     assert_eq!(
-        codec::write_manager(&parsed).unwrap(),
-        codec::write_manager(&original).unwrap()
+        codec::write_manager(&parsed, Limits::DEFAULT).unwrap(),
+        codec::write_manager(&original, Limits::DEFAULT).unwrap()
     );
-    assert_eq!(replace_worksheet(&data, Some(&parsed)).unwrap(), data);
+    assert_eq!(
+        replace_worksheet(&data, Some(&parsed), Limits::DEFAULT).unwrap(),
+        data
+    );
 }
 
 #[test]
@@ -93,7 +96,7 @@ fn opaque_records_keep_order_and_unchanged_package_bytes() {
     data = insert_before_kind(&data, codec::begin_scenario(), &manager_unknown);
     data = insert_before_kind(&data, codec::scenario_cell(), &scenario_unknown);
 
-    let parsed = parse_worksheet(&data).unwrap().unwrap();
+    let parsed = parse_worksheet(&data, Limits::DEFAULT).unwrap().unwrap();
     assert_eq!(parsed.unknown_records().len(), 1);
     assert_eq!(parsed.unknown_records()[0].payload(), b"manager extension");
     assert_eq!(parsed.scenarios()[0].unknown_records().len(), 1);
@@ -101,7 +104,10 @@ fn opaque_records_keep_order_and_unchanged_package_bytes() {
         parsed.scenarios()[0].unknown_records()[0].payload(),
         b"scenario extension"
     );
-    assert_eq!(replace_worksheet(&data, Some(&parsed)).unwrap(), data);
+    assert_eq!(
+        replace_worksheet(&data, Some(&parsed), Limits::DEFAULT).unwrap(),
+        data
+    );
 }
 
 #[test]
@@ -110,16 +116,16 @@ fn opaque_manager_rejects_semantic_edits_and_removal() {
     let mut data = worksheet(&manager);
     let unknown = record(Kind::new(0x0ffe).unwrap(), b"must not be discarded");
     data = insert_before_kind(&data, codec::begin_scenario(), &unknown);
-    let parsed = parse_worksheet(&data).unwrap().unwrap();
+    let parsed = parse_worksheet(&data, Limits::DEFAULT).unwrap().unwrap();
 
     let mut candidate = parsed.clone();
     candidate.set_current(None).unwrap();
     assert!(matches!(
-        replace_worksheet(&data, Some(&candidate)),
+        replace_worksheet(&data, Some(&candidate), Limits::DEFAULT),
         Err(Error::Refused(_))
     ));
     assert!(matches!(
-        replace_worksheet(&data, None),
+        replace_worksheet(&data, None, Limits::DEFAULT),
         Err(Error::Refused(_))
     ));
 }
@@ -133,9 +139,13 @@ fn package_splice_inserts_replaces_and_removes_only_the_known_block() {
         .unwrap();
 
     let original = manager();
-    let inserted = replace_worksheet(&absent, Some(&original)).unwrap();
+    let inserted = replace_worksheet(&absent, Some(&original), Limits::DEFAULT).unwrap();
     assert_eq!(&inserted[..prefix.len()], &prefix);
-    assert!(parse_worksheet(&inserted).unwrap().is_some());
+    assert!(
+        parse_worksheet(&inserted, Limits::DEFAULT)
+            .unwrap()
+            .is_some()
+    );
 
     let mut edited = original.clone();
     let mut scenario = edited.scenarios()[0].clone();
@@ -143,13 +153,21 @@ fn package_splice_inserts_replaces_and_removes_only_the_known_block() {
         .set_changed_cell(0, ChangedCell::new(3, 4, "99").unwrap())
         .unwrap();
     edited.set_scenario(0, scenario).unwrap();
-    let replaced = replace_worksheet(&inserted, Some(&edited)).unwrap();
+    let replaced = replace_worksheet(&inserted, Some(&edited), Limits::DEFAULT).unwrap();
     assert_eq!(&replaced[..prefix.len()], &prefix);
     assert_eq!(
-        parse_worksheet(&replaced).unwrap().unwrap().scenarios()[0].changed_cells()[0].value(),
+        parse_worksheet(&replaced, Limits::DEFAULT)
+            .unwrap()
+            .unwrap()
+            .scenarios()[0]
+            .changed_cells()[0]
+            .value(),
         "99"
     );
-    assert_eq!(replace_worksheet(&replaced, None).unwrap(), absent);
+    assert_eq!(
+        replace_worksheet(&replaced, None, Limits::DEFAULT).unwrap(),
+        absent
+    );
 }
 
 #[test]
@@ -167,7 +185,7 @@ fn reserved_changed_cell_bits_are_rejected() {
     };
     let payload_offset = record_offset + header_len;
     data[payload_offset + 8..payload_offset + 12].copy_from_slice(&1_u32.to_le_bytes());
-    assert!(parse_worksheet(&data).is_err());
+    assert!(parse_worksheet(&data, Limits::DEFAULT).is_err());
 }
 
 #[test]

@@ -51,6 +51,8 @@ pub struct Workbook {
     /// Primary `BrtBookView.itabCur` position in full workbook sheet order.
     pub(super) active_catalog_position: Option<usize>,
     pub(crate) formula_context: Context,
+    /// Caller-selected raw BIFF12 policy retained for lazy workbook reads.
+    pub(super) raw_limits: crate::raw::Limits,
     pub(super) external_link_limits: ExternalLinkLimits,
     pub(super) shared_strings: Vec<SharedString>,
     pub(super) styles: StylesTable,
@@ -175,6 +177,12 @@ impl Workbook {
         self.semantic_limits
     }
 
+    /// The BIFF12 raw policy retained by this workbook projection.
+    #[must_use]
+    pub const fn raw_limits_value(&self) -> crate::raw::Limits {
+        self.raw_limits
+    }
+
     /// Return the drawing projection boundary selected when this workbook was
     /// opened.  Internal publication helpers must carry this state through
     /// every reconstruction; a skipped projection is an intentional opaque
@@ -196,7 +204,7 @@ impl Workbook {
         &self,
     ) -> crate::package::error::Result<Vec<crate::named_ranges::Entry>> {
         let part = self.package.main_document_part()?;
-        crate::named_ranges::read_entries(part.blob(), &self.formula_context)
+        crate::named_ranges::read_entries(part.blob(), &self.formula_context, self.raw_limits)
     }
 
     /// The worksheet ordinal of a complete-catalog position, when that tab is

@@ -602,9 +602,11 @@ pub(super) fn render_formula(
     formula: &ParsedFormula,
     base: (u32, u32),
     context: &impl Resolution,
+    limits: crate::raw::Limits,
 ) -> Result<String> {
     let tokens =
-        Parser::with_base_cell_and_extra(&formula.rgce, &formula.rgcb, base.0, base.1).parse()?;
+        Parser::with_base_cell_and_extra(&formula.rgce, &formula.rgcb, base.0, base.1, limits)
+            .parse()?;
     Ok(Compiler::try_tokens_to_string_with_resolution(
         &tokens, context,
     )?)

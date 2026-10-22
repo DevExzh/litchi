@@ -14,11 +14,12 @@ use crate::raw::{Cursor, kind as rt};
 pub(super) fn parse_pivot_cache_records_binary(
     data: &[u8],
     definition: &PivotCacheDefinition,
+    limits: crate::raw::Limits,
 ) -> Result<PivotCacheRecords> {
-    let mut walker = RecordWalker::new(data);
+    let mut walker = RecordWalker::new(data, limits);
     let begin =
         walker.required_begin(rt::BEGIN_PIVOT_CACHE_RECORDS, "BrtBeginPivotCacheRecords")?;
-    let declared = read_count(begin.payload(), "BrtBeginPivotCacheRecords")?;
+    let declared = read_count(begin.payload(), "BrtBeginPivotCacheRecords", limits)?;
     let mut records = PivotCacheRecords {
         record_count: declared,
         records: Vec::new(),
@@ -33,7 +34,7 @@ pub(super) fn parse_pivot_cache_records_binary(
             rt::PCR_RECORD => {
                 records
                     .records
-                    .push(parse_direct_record(record.payload(), definition)?);
+                    .push(parse_direct_record(record.payload(), definition, limits)?);
             },
             rt::PCR_RECORD_DT => {
                 records
@@ -47,8 +48,8 @@ pub(super) fn parse_pivot_cache_records_binary(
     Err(Error::UnexpectedEndOfStream("BrtEndPivotCacheRecords"))
 }
 
-fn read_count(data: &[u8], context: &'static str) -> Result<u32> {
-    let mut cursor = Cursor::new(data, context, crate::raw::Limits::DEFAULT);
+fn read_count(data: &[u8], context: &'static str, limits: crate::raw::Limits) -> Result<u32> {
+    let mut cursor = Cursor::new(data, context, limits);
     let count = cursor.read_u32()?;
     cursor.finish()?;
     Ok(count)
@@ -64,8 +65,12 @@ fn validate_record_count(declared: u32, actual: usize) -> Result<()> {
     Ok(())
 }
 
-fn parse_direct_record(data: &[u8], definition: &PivotCacheDefinition) -> Result<PivotCacheRecord> {
-    let mut cursor = Cursor::new(data, "BrtPCRRecord", crate::raw::Limits::DEFAULT);
+fn parse_direct_record(
+    data: &[u8],
+    definition: &PivotCacheDefinition,
+    limits: crate::raw::Limits,
+) -> Result<PivotCacheRecord> {
+    let mut cursor = Cursor::new(data, "BrtPCRRecord", limits);
     let mut values = Vec::with_capacity(source_field_count(definition));
     for field in source_fields(definition) {
         values.push(read_direct_value(&mut cursor, field)?);
@@ -85,6 +90,7 @@ fn parse_record_dt(
             record.kind(),
             record.payload(),
             field,
+            walker.limits(),
         )?);
     }
     Ok(PivotCacheRecord { values })
@@ -134,12 +140,9 @@ fn read_record_dt_value(
     record_type: crate::raw::Kind,
     data: &[u8],
     field: &PivotCacheField,
+    limits: crate::raw::Limits,
 ) -> Result<PivotCacheItemValue> {
-    let mut cursor = Cursor::new(
-        data,
-        "BrtPCDI cache record value",
-        crate::raw::Limits::DEFAULT,
-    );
+    let mut cursor = Cursor::new(data, "BrtPCDI cache record value", limits);
     let value = if !field.shared_items.items.is_empty() {
         if record_type != rt::PCDI_INDEX {
             return Err(Error::UnexpectedRecord {

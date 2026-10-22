@@ -38,7 +38,7 @@ const HEADERS_PART_TEMPLATE: &str = "/xl/sharedWorkbook/revisionHeaders%d.bin";
 const LOG_PART_TEMPLATE: &str = "/xl/sharedWorkbook/revisionLog%d.bin";
 
 /// Load and validate the complete shared-workbook metadata graph.
-pub fn load(package: &OpcPackage) -> Result<Catalog> {
+pub fn load(package: &OpcPackage, limits: crate::raw::Limits) -> Result<Catalog> {
     let workbook = package.main_document_part()?;
     require_workbook(workbook)?;
     validate_sources(package, workbook.partname())?;
@@ -73,12 +73,12 @@ pub fn load(package: &OpcPackage) -> Result<Catalog> {
     require_content_type(header_part, HEADERS_CONTENT_TYPE)?;
     require_no_relationships(user_part, "userNames")?;
 
-    let mut users = parse_users(user_part.blob())?;
+    let mut users = parse_users(user_part.blob(), limits)?;
     users.relationship_id = user_relationship.r_id().to_string();
     users.relationship_type = user_relationship.reltype().to_string();
     users.part_name = user_uri.to_string();
 
-    let mut headers = parse_headers(header_part.blob())?;
+    let mut headers = parse_headers(header_part.blob(), limits)?;
     headers.relationship_id = header_relationship.r_id().to_string();
     headers.relationship_type = header_relationship.reltype().to_string();
     headers.part_name = header_uri.to_string();
@@ -118,7 +118,7 @@ pub fn load(package: &OpcPackage) -> Result<Catalog> {
         let part = package.get_part(&uri)?;
         require_content_type(part, LOG_CONTENT_TYPE)?;
         require_no_relationships(part, "revisionLog")?;
-        let mut log = parse_log(part.blob())?;
+        let mut log = parse_log(part.blob(), limits)?;
         log.relationship_id = relationship.r_id().to_string();
         log.relationship_type = relationship.reltype().to_string();
         log.part_name = uri.to_string();
@@ -141,16 +141,24 @@ pub fn load(package: &OpcPackage) -> Result<Catalog> {
 }
 
 /// Atomically replace the shared-workbook owner on a cloned OPC graph.
-pub(crate) fn store(package: &mut OpcPackage, catalog: &Catalog) -> Result<()> {
-    let _ = load(package)?;
+pub(crate) fn store(
+    package: &mut OpcPackage,
+    catalog: &Catalog,
+    limits: crate::raw::Limits,
+) -> Result<()> {
+    let _ = load(package, limits)?;
     let mut candidate = package.clone();
-    store_inner(&mut candidate, catalog)?;
-    let _ = load(&candidate)?;
+    store_inner(&mut candidate, catalog, limits)?;
+    let _ = load(&candidate, limits)?;
     *package = candidate;
     Ok(())
 }
 
-fn store_inner(package: &mut OpcPackage, source: &Catalog) -> Result<()> {
+fn store_inner(
+    package: &mut OpcPackage,
+    source: &Catalog,
+    limits: crate::raw::Limits,
+) -> Result<()> {
     let mut catalog = source.clone();
     normalize_identity(package, &mut catalog)?;
     validation::validate_catalog(&catalog)?;
@@ -167,12 +175,12 @@ fn store_inner(package: &mut OpcPackage, source: &Catalog) -> Result<()> {
     package.try_add_part(Box::new(BlobPart::new(
         PackURI::new(&users.part_name)?,
         USERS_CONTENT_TYPE.to_string(),
-        write_users(users)?,
+        write_users(users, limits)?,
     )))?;
     package.try_add_part(Box::new(BlobPart::new(
         PackURI::new(&headers.part_name)?,
         HEADERS_CONTENT_TYPE.to_string(),
-        write_headers(headers)?,
+        write_headers(headers, limits)?,
     )))?;
     {
         let workbook = package.get_part_mut(&workbook_uri)?;
@@ -195,7 +203,7 @@ fn store_inner(package: &mut OpcPackage, source: &Catalog) -> Result<()> {
         package.try_add_part(Box::new(BlobPart::new(
             log_uri.clone(),
             LOG_CONTENT_TYPE.to_string(),
-            write_log(log)?,
+            write_log(log, limits)?,
         )))?;
         package
             .get_part_mut(&header_uri)?

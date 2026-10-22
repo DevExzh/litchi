@@ -129,7 +129,10 @@ fn merge_block(declared_count: u32, ranges: &[MergedCell]) -> Vec<u8> {
         .unwrap();
     for range in ranges {
         writer
-            .write_record(kind::MERGE_CELL, &range.serialize())
+            .write_record(
+                kind::MERGE_CELL,
+                &range.serialize(litchi_xlsb::raw::Limits::DEFAULT).unwrap(),
+            )
             .unwrap();
     }
     writer.write_record(kind::END_MERGE_CELLS, &[]).unwrap();

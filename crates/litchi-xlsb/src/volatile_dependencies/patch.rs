@@ -58,9 +58,9 @@ impl Patch {
     pub(crate) fn apply(&self, package: &mut OpcPackage) -> Result<Snapshot> {
         let current = Snapshot::read_with_limits(package, self.limits())?;
         if !current.same_source(&self.before) {
-            return Err(Error::InvalidFormat(
-                "Volatile Dependencies patch source is stale",
-            ));
+            return Err(Error::PatchConflict {
+                part: "volatile dependencies",
+            });
         }
         if self.is_noop() {
             return Ok(current);

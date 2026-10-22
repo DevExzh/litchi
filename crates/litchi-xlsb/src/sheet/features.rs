@@ -59,11 +59,12 @@ pub(crate) fn read(
     sheet: usize,
     leniency: crate::leniency::Leniency,
     select: FeatureSet,
+    raw_limits: crate::raw::Limits,
 ) -> Result<Features> {
-    let layout = SheetLayout::scan(bytes)?;
+    let layout = SheetLayout::scan_with_limits(bytes, raw_limits)?;
     let (validations, formats) = if select.intersects(FeatureSet::VALIDATIONS | FeatureSet::FORMATS)
     {
-        let pass = crate::part_edit::feature_pass(bytes, context, sheet, leniency)?;
+        let pass = crate::part_edit::feature_pass(bytes, context, sheet, raw_limits, leniency)?;
         (
             if select.contains(FeatureSet::VALIDATIONS) {
                 crate::data_validation::edit::classic(pass.validations)
@@ -81,19 +82,19 @@ pub(crate) fn read(
     };
     Ok(Features {
         hyperlinks: if select.contains(FeatureSet::HYPERLINKS) {
-            crate::hyperlinks::edit::read_layout(bytes, &layout, relationships)?
+            crate::hyperlinks::edit::read_layout(bytes, &layout, relationships, raw_limits)?
         } else {
             Vec::new()
         },
         auto_filter: if select.contains(FeatureSet::AUTO_FILTER) {
-            crate::auto_filter::read_layout(bytes, &layout)?
+            crate::auto_filter::read_layout(bytes, &layout, raw_limits)?
         } else {
             None
         },
         validations,
         formats,
         page_breaks: if select.contains(FeatureSet::PAGE_BREAKS) {
-            crate::page_breaks::read_layout(bytes, &layout)?
+            crate::page_breaks::read_layout(bytes, &layout, raw_limits)?
         } else {
             PageBreaks::default()
         },

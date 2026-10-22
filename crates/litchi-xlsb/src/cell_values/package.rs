@@ -183,7 +183,12 @@ impl StylesDraft {
         })
     }
 
-    fn restyle(&mut self, old: u32, format: &super::Format) -> Result<u32> {
+    fn restyle(
+        &mut self,
+        old: u32,
+        format: &super::Format,
+        limits: crate::raw::Limits,
+    ) -> Result<u32> {
         let slot = match self
             .restyled
             .iter()
@@ -206,7 +211,7 @@ impl StylesDraft {
             return Ok(*index);
         }
         let mut bytes = self.bytes.clone();
-        let index = super::format::restyle(&mut bytes, old, format)?;
+        let index = super::format::restyle(&mut bytes, old, format, limits)?;
         if bytes != self.bytes {
             self.bytes = bytes;
             self.changed = true;
@@ -445,7 +450,7 @@ impl Edit {
             .styles
             .as_mut()
             .ok_or(Error::InvalidFormat("the styles draft was not loaded"))?;
-        let new = styles.restyle(old, format)?;
+        let new = styles.restyle(old, format, self.base.raw_limits_value())?;
         if new == old {
             return Ok(false);
         }
@@ -485,7 +490,12 @@ impl Edit {
                 error
             }
         })?;
-        let formula = CellFormula::new(0x0002, parsed.rgce, parsed.rgcb)?;
+        let formula = CellFormula::new(
+            0x0002,
+            parsed.rgce,
+            parsed.rgcb,
+            self.base.raw_limits_value(),
+        )?;
         self.raw.scalar_assignment_guard(reference)?;
         if self.raw.is_removed(reference) {
             return Err(Error::refused(
@@ -720,6 +730,7 @@ impl Edit {
             self.base.external_link_limits(),
             self.base.drawing_load_policy(),
             self.base.leniency(),
+            self.base.raw_limits_value(),
         )?;
 
         let (package, after) = match applied {
@@ -864,11 +875,9 @@ impl Patch {
         validate_limits(self.transfer_limits)?;
         let source = serialize_package(package, self.transfer_limits.bytes())?;
         if source.as_slice() != self.before.as_ref() {
-            return Err(Error::refused(
-                litchi_core::edit::RefusalKind::UnsupportedContent,
-                "edit_cell_values",
-                "cell-values package patch source is stale",
-            ));
+            return Err(Error::PatchConflict {
+                part: "cell values",
+            });
         }
         if self.is_noop() {
             return Ok(package.clone());

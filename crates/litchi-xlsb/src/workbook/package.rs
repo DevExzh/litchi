@@ -145,6 +145,7 @@ impl Workbook {
             self.external_link_limits,
             self.drawing_load_policy,
             self.leniency,
+            self.raw_limits,
         )
     }
 
@@ -160,11 +161,13 @@ impl Workbook {
         external_link_limits: ExternalLinkLimits,
         drawing_load_policy: DrawingLoadPolicy,
         leniency: Leniency,
+        raw_limits: crate::raw::Limits,
     ) -> Result<Self> {
         let mut workbook = Self::from_opc_package_with_external_link_limits_and_drawing_policy(
             package,
             external_link_limits,
             drawing_load_policy,
+            raw_limits,
         )?;
         workbook.set_projection_leniency(leniency);
         Ok(workbook)
@@ -222,7 +225,7 @@ impl Workbook {
     /// zero-based worksheet index.
     pub fn cell_watches(&self, worksheet_index: usize) -> Result<cell_watches::Snapshot> {
         let uri = self.worksheet_uri(worksheet_index)?;
-        cell_watches::workbook::read(&self.package, &uri)
+        cell_watches::workbook::read(&self.package, &uri, self.raw_limits)
     }
 
     /// Read the typed cell-watch and phonetic snapshot selected by worksheet
@@ -388,7 +391,10 @@ impl Workbook {
             crate::package::error::Error::Encoding("Drawings part is not UTF-8")
         })?;
         let shapes = crate::shapes::read(drawing_xml)?.unwrap_or_default();
-        let drawing = crate::package::drawing::parse_drawing_part(drawing_part.blob())?;
+        let drawing = crate::package::drawing::parse_drawing_part(
+            drawing_part.blob(),
+            self.semantic_limits.xml_parts_value(),
+        )?;
         let mut charts = Vec::new();
         let mut images = Vec::new();
         let mut image_bytes = 0usize;
@@ -573,6 +579,7 @@ impl Workbook {
             package,
             options.external_link_limits,
             options.drawing_load_policy(),
+            options.raw_limits,
         )?;
         workbook.leniency = options.leniency;
         workbook.semantic_limits = options.semantic_limits;
@@ -582,11 +589,13 @@ impl Workbook {
     pub(crate) fn from_opc_package_with_external_link_limits(
         package: OpcPackage,
         external_link_limits: ExternalLinkLimits,
+        raw_limits: crate::raw::Limits,
     ) -> Result<Self> {
         Self::from_opc_package_with_external_link_limits_and_drawing_policy(
             package,
             external_link_limits,
             DrawingLoadPolicy::Eager,
+            raw_limits,
         )
     }
 
@@ -594,6 +603,7 @@ impl Workbook {
         package: OpcPackage,
         external_link_limits: ExternalLinkLimits,
         drawing_load_policy: DrawingLoadPolicy,
+        raw_limits: crate::raw::Limits,
     ) -> Result<Self> {
         let mut external_link_budget = external_link_limits.budget();
         // The packaging repairs of the OPC read come first in discovery order.
@@ -608,6 +618,7 @@ impl Workbook {
             sheet_tabs: Vec::new(),
             active_catalog_position: None,
             formula_context: Context::default(),
+            raw_limits,
             external_link_limits,
             shared_strings: Vec::new(),
             styles: StylesTable::default(),
@@ -642,8 +653,8 @@ impl Workbook {
         let workbook_part = self.package.main_document_part()?;
 
         let blob = workbook_part.blob();
-        let mut iter = Records::new(blob, crate::raw::Limits::DEFAULT);
-        let info = Self::read_workbook(&mut iter, &mut self.tolerance)?;
+        let mut iter = Records::new(blob, self.raw_limits);
+        let info = Self::read_workbook(&mut iter, &mut self.tolerance, self.raw_limits)?;
         if info.worksheet_names.len() != info.worksheet_rel_ids.len() {
             return Err(crate::package::error::Error::InvalidFormat(
                 "XLSB sheet names and relationship identifiers have different lengths",
@@ -697,7 +708,7 @@ impl Workbook {
         for uri in &external_link_uris {
             external_books.push(self.load_external_book_with_budget(uri, external_link_budget)?);
         }
-        let pivot_cache_ids = Self::parse_pivot_cache_ids(workbook_part.blob())?;
+        let pivot_cache_ids = Self::parse_pivot_cache_ids(workbook_part.blob(), self.raw_limits)?;
         let mut pivot_cache_definitions = Vec::with_capacity(pivot_cache_ids.len());
         for (cache_id, rel_id) in &pivot_cache_ids {
             let relationship = workbook_part.rels().get(rel_id).ok_or(
@@ -717,6 +728,7 @@ impl Workbook {
             let definition = crate::package::pivot::parse_pivot_cache_definition_recording(
                 part.blob(),
                 &mut self.tolerance,
+                self.raw_limits,
             )?;
             pivot_cache_definitions.push((*cache_id, definition));
         }
@@ -725,6 +737,7 @@ impl Workbook {
             &self.package,
             workbook_part.partname(),
             &mut self.tolerance,
+            self.raw_limits,
         )?;
 
         let mut tables = Vec::new();
@@ -847,6 +860,7 @@ impl Workbook {
                     sheet_part.blob(),
                     name,
                     state,
+                    self.raw_limits,
                 )?;
                 if let Some(drawing_rel_id) = chart_sheet.drawing_rel_id.clone() {
                     let relationship = sheet_part.rels().get(&drawing_rel_id).ok_or({
@@ -902,6 +916,7 @@ impl Workbook {
             for table_rel_id in crate::package::table::parse_table_part_rel_ids_recording(
                 sheet_part.blob(),
                 &mut self.tolerance,
+                self.raw_limits,
             )? {
                 let relationship = sheet_part.rels().get(&table_rel_id).ok_or({
                     crate::package::error::Error::InvalidFormula(
@@ -917,6 +932,7 @@ impl Workbook {
                 let table = crate::package::table::parse_table_part_recording(
                     part.blob(),
                     &mut self.tolerance,
+                    self.raw_limits,
                 )?;
                 structured_tables.push((worksheet_index, table));
             }
@@ -940,6 +956,7 @@ impl Workbook {
                     part.blob(),
                     sheet_index,
                     &mut Tolerance::recording(&mut already_recorded),
+                    self.raw_limits,
                 )?;
                 if tables
                     .iter()
@@ -970,7 +987,7 @@ impl Workbook {
                     ));
                 }
                 let part = self.package.get_part(&relationship.target_partname()?)?;
-                let view = Self::parse_pivot_view(part.blob(), sheet_index)?;
+                let view = Self::parse_pivot_view(part.blob(), sheet_index, self.raw_limits)?;
                 if !pivot_cache_ids
                     .iter()
                     .any(|(cache_id, _)| *cache_id == view.cache_id())
@@ -1055,8 +1072,13 @@ impl Workbook {
             });
         }
         let blob = shared_strings_part.blob();
-        let mut iter = Records::new(blob, crate::raw::Limits::DEFAULT);
-        Self::read_shared_strings(&mut iter, &mut self.shared_strings, &mut self.tolerance)?;
+        let mut iter = Records::new(blob, self.raw_limits);
+        Self::read_shared_strings(
+            &mut iter,
+            &mut self.shared_strings,
+            &mut self.tolerance,
+            self.raw_limits,
+        )?;
 
         Ok(())
     }
@@ -1067,8 +1089,11 @@ impl Workbook {
         let styles_uri = litchi_opc::PackURI::new("/xl/styles.bin")?;
         match self.package.get_part(&styles_uri) {
             Ok(styles_part) => {
-                self.styles =
-                    StylesTable::from_bytes_with_report(styles_part.blob(), &mut self.tolerance)?;
+                self.styles = StylesTable::from_bytes_with_report(
+                    styles_part.blob(),
+                    self.raw_limits,
+                    &mut self.tolerance,
+                )?;
             },
             Err(OpcError::PartNotFound(_)) => {},
             Err(error) => return Err(error.into()),

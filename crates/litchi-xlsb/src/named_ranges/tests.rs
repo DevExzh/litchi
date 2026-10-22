@@ -5,6 +5,7 @@
 
 use super::{Definition, area3d_formula, validate_name};
 use crate::formula::{ParsedFormula, ptg_types};
+use crate::raw::Limits;
 
 fn name_record(flags: u32, ch_key: u8, name: &str) -> Vec<u8> {
     let mut data = Vec::new();
@@ -21,7 +22,7 @@ fn name_record(flags: u32, ch_key: u8, name: &str) -> Vec<u8> {
             rgce: vec![ptg_types::PTG_INT, 1, 0],
             rgcb: Vec::new(),
         }
-        .to_bytes()
+        .to_bytes(Limits::DEFAULT)
         .unwrap(),
     );
     data.extend_from_slice(&u32::MAX.to_le_bytes());
@@ -74,7 +75,7 @@ fn validates_defined_name_grammar() {
 #[test]
 fn parses_complete_brt_name_and_rejects_malformed_records() {
     let record = name_record(1, 0, "SalesData");
-    let parsed = Definition::parse(&record).unwrap();
+    let parsed = Definition::parse(&record, Limits::DEFAULT).unwrap();
     assert_eq!(parsed.name, "SalesData");
     assert!(parsed.hidden);
     assert!(!parsed.function);
@@ -82,24 +83,54 @@ fn parses_complete_brt_name_and_rejects_malformed_records() {
 
     let mut reserved = record.clone();
     reserved[3] = 0x80;
-    assert!(Definition::parse(&reserved).is_err());
+    assert!(Definition::parse(&reserved, Limits::DEFAULT).is_err());
 
     let mut shortcut = record.clone();
     shortcut[4] = b'A';
-    assert!(Definition::parse(&shortcut).is_err());
+    assert!(Definition::parse(&shortcut, Limits::DEFAULT).is_err());
 
     let mut trailing = record.clone();
     trailing.push(0);
-    assert!(Definition::parse(&trailing).is_err());
+    assert!(Definition::parse(&trailing, Limits::DEFAULT).is_err());
 
     let mut macro_record = name_record(0x0008, b'A', "MacroName");
     for _ in 0..4 {
         macro_record.extend_from_slice(&u32::MAX.to_le_bytes());
     }
-    assert!(Definition::parse(&macro_record).unwrap().function);
+    assert!(
+        Definition::parse(&macro_record, Limits::DEFAULT)
+            .unwrap()
+            .function
+    );
 
     let mut truncated_comment = record;
     let comment_offset = truncated_comment.len() - 4;
     truncated_comment[comment_offset..].copy_from_slice(&1_u32.to_le_bytes());
-    assert!(Definition::parse(&truncated_comment).is_err());
+    assert!(Definition::parse(&truncated_comment, Limits::DEFAULT).is_err());
+}
+
+#[test]
+fn parse_uses_the_required_payload_and_string_limits() {
+    let record = name_record(0, 0, "BoundedName");
+    let payload_limit = Limits::new(record.len() - 1, Limits::DEFAULT.string_units());
+    let error = Definition::parse(&record, payload_limit).unwrap_err();
+    assert!(matches!(
+        error,
+        super::Error::Wire(crate::raw::Error::PayloadLimit {
+            length,
+            limit,
+            ..
+        }) if length == record.len() && limit == record.len() - 1
+    ));
+
+    let string_limit = Limits::new(record.len(), 1);
+    let error = Definition::parse(&record, string_limit).unwrap_err();
+    assert!(matches!(
+        error,
+        super::Error::Wire(crate::raw::Error::StringLimit { units, limit, .. })
+            if units > limit && limit == 1
+    ));
+
+    let parsed = Definition::parse(&record, Limits::new(record.len(), 64)).unwrap();
+    assert_eq!(parsed.name, "BoundedName");
 }

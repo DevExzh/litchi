@@ -65,9 +65,9 @@ impl Patch {
             .map(|graph| &graph.part_name);
         let current = Snapshot::read_with_probe(package, self.limits(), probe_target)?;
         if !current.same_source(&self.before) {
-            return Err(Error::InvalidFormat(
-                "Calculation Chain patch source is stale",
-            ));
+            return Err(Error::PatchConflict {
+                part: "calculation chain",
+            });
         }
         Ok(current)
     }

@@ -140,7 +140,12 @@ fn native_package_preserves_members_through_synthetic_model_lifecycle() {
     let mut create = with_connections.edit_data_model().expect("before snapshot");
     create
         .replace_model(Some(
-            Model::from_bytes(definition(), vec![1, 2, 3, 4]).expect("synthetic model"),
+            Model::from_bytes(
+                definition(),
+                vec![1, 2, 3, 4],
+                litchi_xlsb::data_model::SemanticLimits::DEFAULT,
+            )
+            .expect("synthetic model"),
         ))
         .expect("stage synthetic model");
     let create_commit = create.commit().expect("commit synthetic model");

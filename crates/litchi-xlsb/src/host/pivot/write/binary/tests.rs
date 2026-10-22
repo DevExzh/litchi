@@ -334,7 +334,7 @@ fn full_definition() -> PivotCacheDefinition {
 
 fn round_trip(definition: &PivotCacheDefinition) -> PivotCacheDefinition {
     let bytes = write_pivot_cache_definition(definition).unwrap();
-    parse_pivot_cache_definition(&bytes).unwrap()
+    parse_pivot_cache_definition(&bytes, crate::raw::Limits::DEFAULT).unwrap()
 }
 
 #[test]

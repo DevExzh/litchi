@@ -1087,6 +1087,11 @@ impl Staged {
         &self.workbook
     }
 
+    /// The raw BIFF12 policy retained by the package being edited.
+    pub(crate) fn raw_limits(&self) -> crate::raw::Limits {
+        self.workbook.raw_limits_value()
+    }
+
     /// The staged OPC graph.
     pub(crate) fn opc(&self) -> &OpcPackage {
         self.staged
@@ -1254,15 +1259,17 @@ pub(crate) fn feature_pass(
     bytes: &[u8],
     context: &crate::package::formula::Context,
     sheet: usize,
+    raw_limits: crate::raw::Limits,
     leniency: crate::leniency::Leniency,
 ) -> Result<FeaturePass> {
     let context = context.for_sheet(sheet);
-    let stream = crate::package::records::Stream::new(std::io::Cursor::new(bytes));
+    let stream = crate::package::records::Stream::new(std::io::Cursor::new(bytes), raw_limits);
     let mut reader = crate::package::cells_reader::CellsReader::new(
         stream,
         &[],
         &context,
         usize::MAX,
+        raw_limits,
         leniency,
     )?;
     reader.skip_to_features()?;
@@ -1281,6 +1288,7 @@ impl Staged {
             self.blob(name)?,
             &workbook.formula_context,
             sheet,
+            workbook.raw_limits_value(),
             workbook.leniency(),
         )
     }
@@ -1462,10 +1470,9 @@ pub(crate) struct SheetLayout {
 }
 
 impl SheetLayout {
-    /// Scan a worksheet stream. Unbalanced collections and a stream without
-    /// a cell table or end record are refused.
-    pub(crate) fn scan(data: &[u8]) -> Result<Self> {
-        let mut records = Records::new(data, crate::raw::Limits::DEFAULT);
+    /// Scan a worksheet stream under the owning workbook's raw policy.
+    pub(crate) fn scan_with_limits(data: &[u8], limits: crate::raw::Limits) -> Result<Self> {
+        let mut records = Records::new(data, limits);
         let mut after_cells = false;
         let mut units = Vec::new();
         let mut stack: Vec<Kind> = Vec::new();
@@ -1560,10 +1567,14 @@ pub(crate) fn splice(data: &[u8], span: Range<usize>, replacement: &[u8]) -> Vec
     out
 }
 
-/// Encode one record.
-pub(crate) fn record(kind: Kind, payload: &[u8]) -> Result<Vec<u8>> {
+/// Encode one record under an owning workbook's raw policy.
+pub(crate) fn record_with_limits(
+    kind: Kind,
+    payload: &[u8],
+    limits: crate::raw::Limits,
+) -> Result<Vec<u8>> {
     let mut out = Vec::with_capacity(payload.len() + 6);
-    crate::raw::Encoder::new(&mut out, crate::raw::Limits::DEFAULT).write_record(kind, payload)?;
+    crate::raw::Encoder::new(&mut out, limits).write_record(kind, payload)?;
     Ok(out)
 }
 
@@ -1709,7 +1720,7 @@ mod tests {
             (kind::FRT_END, &[]),
             (kind::END_SHEET, &[]),
         ]);
-        let layout = SheetLayout::scan(&data).unwrap();
+        let layout = SheetLayout::scan_with_limits(&data, crate::raw::Limits::DEFAULT).unwrap();
         let kinds: Vec<_> = layout.units.iter().map(|unit| unit.kind).collect();
         assert_eq!(
             kinds,
@@ -1745,7 +1756,7 @@ mod tests {
             (kind::END_D_VALS, &[]),
             (kind::END_SHEET, &[]),
         ]);
-        assert!(SheetLayout::scan(&data).is_err());
+        assert!(SheetLayout::scan_with_limits(&data, crate::raw::Limits::DEFAULT).is_err());
     }
 }
 

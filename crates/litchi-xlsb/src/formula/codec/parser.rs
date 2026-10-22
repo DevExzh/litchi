@@ -29,11 +29,16 @@ pub struct Parser<'a> {
     memory_expression_ends: Vec<usize>,
     control_flow_targets: Vec<usize>,
     base_cell: Option<(u32, u32)>,
+    limits: crate::raw::Limits,
 }
 
 impl<'a> Parser<'a> {
-    /// Create a new formula parser
-    pub fn new(data: &'a [u8]) -> Self {
+    /// Create a formula parser under an explicit raw profile.
+    ///
+    /// `limits` bounds the token and ancillary streams (payload) and every
+    /// decoded string (UTF-16 units); the MS-XLSB formula ceilings still apply.
+    #[must_use]
+    pub const fn new(data: &'a [u8], limits: crate::raw::Limits) -> Self {
         Parser {
             data,
             offset: 0,
@@ -43,11 +48,13 @@ impl<'a> Parser<'a> {
             memory_expression_ends: Vec::new(),
             control_flow_targets: Vec::new(),
             base_cell: None,
+            limits,
         }
     }
 
     /// Parse a formula together with its corresponding `RgbExtra` stream.
-    pub fn with_extra(data: &'a [u8], extra: &'a [u8]) -> Self {
+    #[must_use]
+    pub const fn with_extra(data: &'a [u8], extra: &'a [u8], limits: crate::raw::Limits) -> Self {
         Parser {
             data,
             offset: 0,
@@ -57,11 +64,18 @@ impl<'a> Parser<'a> {
             memory_expression_ends: Vec::new(),
             control_flow_targets: Vec::new(),
             base_cell: None,
+            limits,
         }
     }
 
     /// Parse a shared-formula definition relative to a concrete target cell.
-    pub fn with_base_cell(data: &'a [u8], row: u32, col: u32) -> Self {
+    #[must_use]
+    pub const fn with_base_cell(
+        data: &'a [u8],
+        row: u32,
+        col: u32,
+        limits: crate::raw::Limits,
+    ) -> Self {
         Parser {
             data,
             offset: 0,
@@ -71,11 +85,19 @@ impl<'a> Parser<'a> {
             memory_expression_ends: Vec::new(),
             control_flow_targets: Vec::new(),
             base_cell: Some((row, col)),
+            limits,
         }
     }
 
     /// Parse a shared formula and ancillary stream at a concrete target cell.
-    pub fn with_base_cell_and_extra(data: &'a [u8], extra: &'a [u8], row: u32, col: u32) -> Self {
+    #[must_use]
+    pub const fn with_base_cell_and_extra(
+        data: &'a [u8],
+        extra: &'a [u8],
+        row: u32,
+        col: u32,
+        limits: crate::raw::Limits,
+    ) -> Self {
         Parser {
             data,
             offset: 0,
@@ -85,6 +107,7 @@ impl<'a> Parser<'a> {
             memory_expression_ends: Vec::new(),
             control_flow_targets: Vec::new(),
             base_cell: Some((row, col)),
+            limits,
         }
     }
 
@@ -116,6 +139,7 @@ impl<'a> Parser<'a> {
         reason = "formula dependency spans use parser-proven offsets without unchecked conversions"
     )]
     pub(crate) fn parse_spanned(&mut self) -> Result<Vec<(Token, std::ops::Range<usize>)>> {
+        self.admit()?;
         let mut tokens = Vec::new();
         let mut boundaries = Vec::new();
 
@@ -153,6 +177,18 @@ impl<'a> Parser<'a> {
         }
 
         Ok(tokens)
+    }
+
+    /// Admit both streams against the caller's raw payload ceiling.
+    fn admit(&self) -> Result<()> {
+        self.limits.admit(self.data.len())?;
+        self.limits.admit(self.extra.len())?;
+        Ok(())
+    }
+
+    /// Refuse a declared string longer than the caller's UTF-16-unit ceiling.
+    fn admit_units(&self, units: usize, offset: usize) -> Result<()> {
+        Ok(self.limits.admit_units(units, offset)?)
     }
 
     /// Parse a single token
@@ -272,6 +308,7 @@ impl<'a> Parser<'a> {
     fn parse_str(&mut self) -> Result<Token> {
         self.require(2, "PtgStr length")?;
         let len = read_u16_le_at(self.data, self.offset)? as usize;
+        self.admit_units(len, self.offset)?;
         self.offset += 2;
         let byte_len = len
             .checked_mul(2)
@@ -566,6 +603,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_extra_utf16(&mut self, units: usize, context: &str) -> Result<String> {
+        self.admit_units(units, self.extra_offset)?;
         let byte_len = units
             .checked_mul(2)
             .ok_or(Error::InvalidFormula("length overflow"))?;
@@ -639,6 +677,7 @@ impl<'a> Parser<'a> {
                 0x01 => {
                     self.require_extra(2, "SerStr length")?;
                     let len = usize::from(read_u16_le_at(self.extra, self.extra_offset)?);
+                    self.admit_units(len, self.extra_offset)?;
                     self.extra_offset += 2;
                     if len >= 256 {
                         return Err(Error::InvalidFormula(

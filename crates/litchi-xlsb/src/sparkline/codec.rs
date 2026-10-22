@@ -16,6 +16,10 @@ use super::model::{
 const GROUP_FIXED_BYTES: usize = 2 + 8 * 8 + 3 * 8 + 4;
 const LOCATION_HEADER_BYTES: usize = 4 + 4 + 4 + 4 + 16;
 
+fn raw_limits(limits: Limits) -> raw::Limits {
+    raw::Limits::new(limits.record_bytes(), 1)
+}
+
 /// Parse one block beginning at `BrtBeginSparklineGroups` and return the
 /// number of source bytes consumed through `BrtEndSparklineGroups`.
 pub(crate) fn parse_block(input: &[u8], limits: Limits) -> Result<(Groups, usize)> {
@@ -110,7 +114,7 @@ fn parse_group(
             .get(header_bytes..)
             .ok_or_else(|| value("BrtBeginSparklineGroup", "FRTHeader length overflow"))?,
         "BrtBeginSparklineGroup",
-        raw::Limits::DEFAULT,
+        raw_limits(limits),
     );
     let flags = cursor.read_u16()?;
     let date_axis = flags & 0x0001 != 0;
@@ -237,7 +241,7 @@ fn parse_group(
 }
 
 fn parse_sparkline(payload: &[u8], limits: Limits) -> Result<Sparkline> {
-    let mut cursor = Cursor::new(payload, "BrtSparkline", raw::Limits::DEFAULT);
+    let mut cursor = Cursor::new(payload, "BrtSparkline", raw_limits(limits));
     let flags = cursor.read_u32()?;
     if !matches!(flags, 0x02 | 0x06) {
         return Err(value(
@@ -282,7 +286,7 @@ fn parse_sparkline(payload: &[u8], limits: Limits) -> Result<Sparkline> {
 }
 
 fn parse_formula_header(payload: &[u8], limits: Limits) -> Result<(Option<Formula>, usize)> {
-    let mut cursor = Cursor::new(payload, "BrtBeginSparklineGroup", raw::Limits::DEFAULT);
+    let mut cursor = Cursor::new(payload, "BrtBeginSparklineGroup", raw_limits(limits));
     let flags = cursor.read_u32()?;
     if !matches!(flags, 0x00 | 0x04) {
         return Err(value(

@@ -1008,9 +1008,9 @@ pub(crate) fn patch_workbook(
 ) -> Result<Vec<u8>> {
     let parsed = parse_workbook(source, limits)?;
     if parsed.definition.as_ref() != before {
-        return Err(Error::InvalidFormat(
-            "Data Model workbook source does not match the transaction snapshot",
-        ));
+        return Err(Error::PatchConflict {
+            part: "data model workbook",
+        });
     }
     if before == after {
         return Ok(source.to_vec());

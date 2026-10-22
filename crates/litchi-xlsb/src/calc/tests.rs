@@ -15,7 +15,10 @@ fn defaults_round_trip_exactly() {
     .unwrap();
 
     assert_eq!(payload.len(), LEN);
-    assert_eq!(read(&payload).unwrap(), expected);
+    assert_eq!(
+        read(&payload, crate::raw::Limits::DEFAULT).unwrap(),
+        expected
+    );
 }
 
 #[test]

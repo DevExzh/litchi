@@ -221,7 +221,7 @@ fn parse_collection_count(
     data: &[u8],
     context: &'static str,
 ) -> Result<u32> {
-    let mut cursor = Cursor::new(data, context, crate::raw::Limits::DEFAULT);
+    let mut cursor = Cursor::new(data, context, walker.limits());
     let count = cursor.read_u32()?;
     walker.finish(&cursor)?;
     Ok(count)
@@ -240,7 +240,7 @@ fn parse_definition_payload(
     walker: &mut RecordWalker<'_, '_>,
     data: &[u8],
 ) -> Result<PivotCacheDefinition> {
-    let mut cursor = Cursor::new(data, "BrtBeginPivotCacheDef", crate::raw::Limits::DEFAULT);
+    let mut cursor = Cursor::new(data, "BrtBeginPivotCacheDef", walker.limits());
     let version_last_refresh = cursor.read_u8()?;
     let version_refreshable_min = cursor.read_u8()?;
     let version_created = cursor.read_u8()?;
@@ -290,7 +290,7 @@ fn parse_definition_payload(
 
 /// `BrtBeginPCDSource` collection (MS-XLSB 2.4.166).
 fn parse_source(walker: &mut RecordWalker<'_, '_>, data: &[u8]) -> Result<PivotCacheSource> {
-    let mut cursor = Cursor::new(data, "BrtBeginPCDSource", crate::raw::Limits::DEFAULT);
+    let mut cursor = Cursor::new(data, "BrtBeginPCDSource", walker.limits());
     let source_type = PivotCacheSourceType::try_from(cursor.read_u32()?)?;
     let connection_id = cursor.read_u32()?;
     walker.finish(&cursor)?;
@@ -321,7 +321,7 @@ fn parse_worksheet_range(
     walker: &mut RecordWalker<'_, '_>,
     data: &[u8],
 ) -> Result<PivotCacheWorksheetSource> {
-    let mut cursor = Cursor::new(data, "BrtBeginPCDSRange", crate::raw::Limits::DEFAULT);
+    let mut cursor = Cursor::new(data, "BrtBeginPCDSRange", walker.limits());
     let flags0 = cursor.read_u8()?;
     let flags1 = cursor.read_u8()?;
     let flags2 = cursor.read_u8()?;
@@ -356,7 +356,7 @@ fn parse_consolidation(
     walker: &mut RecordWalker<'_, '_>,
     data: &[u8],
 ) -> Result<PivotCacheConsolidationSource> {
-    let mut cursor = Cursor::new(data, "BrtBeginPCDSConsol", crate::raw::Limits::DEFAULT);
+    let mut cursor = Cursor::new(data, "BrtBeginPCDSConsol", walker.limits());
     let flags = cursor.read_u16()?;
     walker.finish(&cursor)?;
     let mut consolidation = PivotCacheConsolidationSource {
@@ -413,7 +413,7 @@ fn parse_consolidation_set(
     walker: &mut RecordWalker<'_, '_>,
     data: &[u8],
 ) -> Result<PivotCacheConsolidationSet> {
-    let mut cursor = Cursor::new(data, "BrtBeginPCDSCSet", crate::raw::Limits::DEFAULT);
+    let mut cursor = Cursor::new(data, "BrtBeginPCDSCSet", walker.limits());
     let item_indexes = [
         cursor.read_u32()?,
         cursor.read_u32()?,
@@ -492,11 +492,8 @@ fn parse_consolidation_page(
                 return Ok(page);
             },
             rt::BEGIN_PCDSCP_ITEM => {
-                let mut cursor = Cursor::new(
-                    record.payload(),
-                    "BrtBeginPCDSCPItem",
-                    crate::raw::Limits::DEFAULT,
-                );
+                let mut cursor =
+                    Cursor::new(record.payload(), "BrtBeginPCDSCPItem", walker.limits());
                 page.item_names.push(cursor.read_wide_string()?);
                 walker.finish(&cursor)?;
                 walker.expect_end(rt::END_PCDSCP_ITEM, "BrtBeginPCDSCPItem")?;
@@ -556,7 +553,7 @@ fn parse_field(walker: &mut RecordWalker<'_, '_>, data: &[u8]) -> Result<PivotCa
 
 /// `BrtBeginPCDField` payload (MS-XLSB 2.4.136).
 fn parse_field_payload(walker: &mut RecordWalker<'_, '_>, data: &[u8]) -> Result<PivotCacheField> {
-    let mut cursor = Cursor::new(data, "BrtBeginPCDField", crate::raw::Limits::DEFAULT);
+    let mut cursor = Cursor::new(data, "BrtBeginPCDField", walker.limits());
     let flags = cursor.read_u16()?;
     let number_format = match cursor.read_u32()? {
         DEFAULT_NUMBER_FORMAT => None,
@@ -667,7 +664,7 @@ fn parse_shared_items_stats(
     walker: &mut RecordWalker<'_, '_>,
     data: &[u8],
 ) -> Result<PivotCacheSharedItemsStats> {
-    let mut cursor = Cursor::new(data, "BrtBeginPCDFAtbl", crate::raw::Limits::DEFAULT);
+    let mut cursor = Cursor::new(data, "BrtBeginPCDFAtbl", walker.limits());
     let flags = cursor.read_u16()?;
     let item_count = cursor.read_u32()?;
     let (minimum, maximum) = if flags & ATBL_NUM_MIN_MAX_VALID != 0 {
@@ -703,7 +700,7 @@ fn parse_cache_item(
     data: &[u8],
     strict: bool,
 ) -> Result<PivotCacheItem> {
-    let mut cursor = Cursor::new(data, "BrtPCDI cache item", crate::raw::Limits::DEFAULT);
+    let mut cursor = Cursor::new(data, "BrtPCDI cache item", walker.limits());
     let value = match record_type {
         rt::PCDI_MISSING | rt::PCDIA_MISSING => PivotCacheItemValue::Missing,
         rt::PCDI_NUMBER | rt::PCDIA_NUMBER => PivotCacheItemValue::Number(cursor.read_f64()?),
@@ -784,7 +781,7 @@ fn parse_item_run(
     data: &[u8],
     items: &mut Vec<PivotCacheItem>,
 ) -> Result<()> {
-    let mut cursor = Cursor::new(data, "BrtBeginPCDIRun", crate::raw::Limits::DEFAULT);
+    let mut cursor = Cursor::new(data, "BrtBeginPCDIRun", walker.limits());
     let operation = cursor.read_u16()?;
     let count = cursor.read_u32()?;
     for _ in 0..count {
@@ -812,7 +809,7 @@ fn parse_grouping(
     walker: &mut RecordWalker<'_, '_>,
     data: &[u8],
 ) -> Result<PivotCacheFieldGrouping> {
-    let mut cursor = Cursor::new(data, "BrtBeginPCDFGroup", crate::raw::Limits::DEFAULT);
+    let mut cursor = Cursor::new(data, "BrtBeginPCDFGroup", walker.limits());
     let parent_field = non_negative_index(cursor.read_i32()?);
     let base_field = non_negative_index(cursor.read_i32()?);
     walker.finish(&cursor)?;
@@ -852,7 +849,7 @@ fn parse_range_grouping(
     walker: &mut RecordWalker<'_, '_>,
     data: &[u8],
 ) -> Result<PivotCacheRangeGrouping> {
-    let mut cursor = Cursor::new(data, "BrtBeginPCDFGRange", crate::raw::Limits::DEFAULT);
+    let mut cursor = Cursor::new(data, "BrtBeginPCDFGRange", walker.limits());
     let group_by = PivotCacheGroupBy::try_from(cursor.read_u8()?)?;
     let flags = cursor.read_u8()?;
     let start = cursor.read_f64()?;
@@ -890,11 +887,7 @@ fn parse_discrete_grouping(
                 return Ok(grouping);
             },
             rt::PCDI_INDEX => {
-                let mut cursor = Cursor::new(
-                    record.payload(),
-                    "BrtPCDIIndex",
-                    crate::raw::Limits::DEFAULT,
-                );
+                let mut cursor = Cursor::new(record.payload(), "BrtPCDIIndex", walker.limits());
                 grouping.item_indexes.push(cursor.read_u32()?);
                 walker.finish(&cursor)?;
             },
@@ -1003,7 +996,7 @@ fn parse_hierarchy_payload(
     walker: &mut RecordWalker<'_, '_>,
     data: &[u8],
 ) -> Result<PivotCacheHierarchy> {
-    let mut cursor = Cursor::new(data, "BrtBeginPCDHierarchy", crate::raw::Limits::DEFAULT);
+    let mut cursor = Cursor::new(data, "BrtBeginPCDHierarchy", walker.limits());
     let flags1 = cursor.read_u16()?;
     let level_count = cursor.read_u32()?;
     let set_parent_index = non_negative_index(cursor.read_i32()?);
@@ -1063,7 +1056,7 @@ fn conditional_string(cursor: &mut Cursor<'_>, present: bool) -> Result<Option<S
 
 /// `BrtBeginPCDHFieldsUsage` payload (MS-XLSB 2.4.138).
 fn parse_fields_usage(walker: &mut RecordWalker<'_, '_>, data: &[u8]) -> Result<Vec<i32>> {
-    let mut cursor = Cursor::new(data, "BrtBeginPCDHFieldsUsage", crate::raw::Limits::DEFAULT);
+    let mut cursor = Cursor::new(data, "BrtBeginPCDHFieldsUsage", walker.limits());
     let count = cursor.read_u32()?;
     let mut usage = Vec::new();
     for _ in 0..count {
@@ -1091,11 +1084,8 @@ fn parse_grouping_levels(
                 );
             },
             rt::BEGIN_PCDHG_LEVEL => {
-                let mut cursor = Cursor::new(
-                    record.payload(),
-                    "BrtBeginPCDHGLevel",
-                    crate::raw::Limits::DEFAULT,
-                );
+                let mut cursor =
+                    Cursor::new(record.payload(), "BrtBeginPCDHGLevel", walker.limits());
                 let flags = cursor.read_u8()?;
                 let unique_name = cursor.read_wide_string()?;
                 let caption = cursor.read_wide_string()?;
@@ -1145,7 +1135,7 @@ fn parse_grouping_group(
     walker: &mut RecordWalker<'_, '_>,
     data: &[u8],
 ) -> Result<PivotCacheGroupingGroup> {
-    let mut cursor = Cursor::new(data, "BrtBeginPCDHGLGroup", crate::raw::Limits::DEFAULT);
+    let mut cursor = Cursor::new(data, "BrtBeginPCDHGLGroup", walker.limits());
     let group_number = cursor.read_i32()?;
     let flags = cursor.read_u8()?;
     let name = cursor.read_wide_string()?;
@@ -1192,11 +1182,8 @@ fn parse_grouping_group_members(
                 );
             },
             rt::BEGIN_PCDHGLG_MEMBER => {
-                let mut cursor = Cursor::new(
-                    record.payload(),
-                    "BrtBeginPCDHGLGMember",
-                    crate::raw::Limits::DEFAULT,
-                );
+                let mut cursor =
+                    Cursor::new(record.payload(), "BrtBeginPCDHGLGMember", walker.limits());
                 let is_group = cursor.read_u32()? != 0;
                 let unique_name = cursor.read_wide_string()?;
                 walker.finish(&cursor)?;
@@ -1217,7 +1204,7 @@ fn parse_hierarchy_ext14(
     walker: &mut RecordWalker<'_, '_>,
     data: &[u8],
 ) -> Result<PivotCacheHierarchyExt14> {
-    let mut cursor = Cursor::new(data, "BrtPCDH14", crate::raw::Limits::DEFAULT);
+    let mut cursor = Cursor::new(data, "BrtPCDH14", walker.limits());
     // FRTBlank header (4 bytes, MS-XLSB 2.5.55).
     cursor.guard(4)?;
     cursor.skip(4)?;
@@ -1309,11 +1296,8 @@ fn parse_tuple_cache_queries(
                 );
             },
             rt::BEGIN_PCDSDTC_QUERY => {
-                let mut cursor = Cursor::new(
-                    record.payload(),
-                    "BrtBeginPCDSDTCQuery",
-                    crate::raw::Limits::DEFAULT,
-                );
+                let mut cursor =
+                    Cursor::new(record.payload(), "BrtBeginPCDSDTCQuery", walker.limits());
                 queries.push(cursor.read_wide_string()?);
                 walker.finish(&cursor)?;
                 walker.expect_end(rt::END_PCDSDTC_QUERY, "BrtBeginPCDSDTCQuery")?;
@@ -1356,7 +1340,7 @@ fn parse_tuple_cache_set(
     walker: &mut RecordWalker<'_, '_>,
     data: &[u8],
 ) -> Result<PivotCacheTupleCacheSet> {
-    let mut cursor = Cursor::new(data, "BrtBeginPCDSDTCSet", crate::raw::Limits::DEFAULT);
+    let mut cursor = Cursor::new(data, "BrtBeginPCDSDTCSet", walker.limits());
     let tuple_count = match cursor.read_u32()? {
         TUPLE_COUNT_UNKNOWN => None,
         count => Some(count),
@@ -1404,7 +1388,7 @@ fn parse_calculated_items(
 
 /// `BrtBeginPCDCalcItem` collection (MS-XLSB 2.4.124).
 fn parse_calculated_item(walker: &mut RecordWalker<'_, '_>, data: &[u8]) -> Result<CalculatedItem> {
-    let mut cursor = Cursor::new(data, "BrtBeginPCDCalcItem", crate::raw::Limits::DEFAULT);
+    let mut cursor = Cursor::new(data, "BrtBeginPCDCalcItem", walker.limits());
     // reserved (4 bytes): MUST be -1 and is ignored.
     cursor.guard(4)?;
     cursor.skip(4)?;
@@ -1456,7 +1440,7 @@ fn parse_names(
 
 /// `BrtBeginPName` collection (MS-XLSB 2.4.176).
 fn parse_name(walker: &mut RecordWalker<'_, '_>, data: &[u8]) -> Result<PivotName> {
-    let mut cursor = Cursor::new(data, "BrtBeginPName", crate::raw::Limits::DEFAULT);
+    let mut cursor = Cursor::new(data, "BrtBeginPName", walker.limits());
     let field_index = cursor.read_u32()?;
     let function = PivotNameFunction::try_from(cursor.read_u8()?)?;
     let flags = cursor.read_u8()?;
@@ -1498,11 +1482,7 @@ fn parse_name_pairs(
                 );
             },
             rt::BEGIN_PN_PAIR => {
-                let mut cursor = Cursor::new(
-                    record.payload(),
-                    "BrtBeginPNPair",
-                    crate::raw::Limits::DEFAULT,
-                );
+                let mut cursor = Cursor::new(record.payload(), "BrtBeginPNPair", walker.limits());
                 let flags = cursor.read_u8()?;
                 let field_index = cursor.read_u32()?;
                 let item_index = cursor.read_i32()?;
@@ -1552,7 +1532,7 @@ fn parse_rule_filters(
 
 /// `BrtBeginPRFilter` collection (MS-XLSB 2.4.180; `PRFilter` structure).
 fn parse_rule_filter(walker: &mut RecordWalker<'_, '_>, data: &[u8]) -> Result<PivotRuleFilter> {
-    let mut cursor = Cursor::new(data, "BrtBeginPRFilter", crate::raw::Limits::DEFAULT);
+    let mut cursor = Cursor::new(data, "BrtBeginPRFilter", walker.limits());
     let field = cursor.read_i32()?;
     let declared_items = cursor.read_u32()?;
     let flags = u32::from(cursor.read_u8()?)
@@ -1572,11 +1552,7 @@ fn parse_rule_filter(walker: &mut RecordWalker<'_, '_>, data: &[u8]) -> Result<P
                 return Ok(filter);
             },
             rt::BEGIN_PRF_ITEM => {
-                let mut cursor = Cursor::new(
-                    record.payload(),
-                    "BrtBeginPRFItem",
-                    crate::raw::Limits::DEFAULT,
-                );
+                let mut cursor = Cursor::new(record.payload(), "BrtBeginPRFItem", walker.limits());
                 filter.items.push(cursor.read_u32()?);
                 walker.finish(&cursor)?;
                 walker.expect_end(rt::END_PRF_ITEM, "BrtBeginPRFItem")?;
@@ -1638,7 +1614,7 @@ fn parse_calculated_member_payload(
     walker: &mut RecordWalker<'_, '_>,
     data: &[u8],
 ) -> Result<CalculatedMember> {
-    let mut cursor = Cursor::new(data, "BrtBeginPCDCalcMem", crate::raw::Limits::DEFAULT);
+    let mut cursor = Cursor::new(data, "BrtBeginPCDCalcMem", walker.limits());
     let flags = cursor.read_u32()?;
     let solve_order = cursor.read_i32()?;
     let is_set = cursor.read_u32()? != 0;
@@ -1665,7 +1641,7 @@ fn parse_calculated_member_ext14(
     walker: &mut RecordWalker<'_, '_>,
     data: &[u8],
 ) -> Result<CalculatedMemberExt14> {
-    let mut cursor = Cursor::new(data, "BrtBeginPCDCalcMem14", crate::raw::Limits::DEFAULT);
+    let mut cursor = Cursor::new(data, "BrtBeginPCDCalcMem14", walker.limits());
     // FRTBlank header (4 bytes, MS-XLSB 2.5.55).
     cursor.guard(4)?;
     cursor.skip(4)?;
@@ -1692,7 +1668,7 @@ fn parse_pcd14(
     walker: &mut RecordWalker<'_, '_>,
     data: &[u8],
 ) -> Result<PivotCacheDefinitionExt14> {
-    let mut cursor = Cursor::new(data, "BrtBeginPCD14", crate::raw::Limits::DEFAULT);
+    let mut cursor = Cursor::new(data, "BrtBeginPCD14", walker.limits());
     // FRTBlank header (4 bytes, MS-XLSB 2.5.55).
     cursor.guard(4)?;
     cursor.skip(4)?;

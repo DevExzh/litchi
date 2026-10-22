@@ -224,7 +224,8 @@ fn assert_external_formula_length_error(source: &[u8], found: usize) {
         | Error::InvalidFormula(_)
         | Error::InvalidLength { .. }
         | Error::Allocation { .. }
-        | Error::LimitExceeded { .. }) => {
+        | Error::LimitExceeded { .. }
+        | Error::PatchConflict) => {
             panic!("unexpected external formula error: {other:?}")
         },
     }
@@ -276,12 +277,10 @@ fn workbook_edits_are_source_checked_and_reversible() {
         .apply(&changed, ExternalLinkLimits::DEFAULT)
         .unwrap();
     assert_eq!(restored, source);
-    assert!(
-        commit
-            .patch()
-            .apply(b"stale", ExternalLinkLimits::DEFAULT)
-            .is_err()
-    );
+    assert!(matches!(
+        commit.patch().apply(b"stale", ExternalLinkLimits::DEFAULT),
+        Err(Error::PatchConflict)
+    ));
 }
 
 #[test]
@@ -629,7 +628,8 @@ fn opaque_external_record_count_and_byte_limits_are_typed() {
         other @ (Error::Wire(_)
         | Error::InvalidFormula(_)
         | Error::Allocation { .. }
-        | Error::LimitExceeded { .. }) => {
+        | Error::LimitExceeded { .. }
+        | Error::PatchConflict) => {
             panic!("unexpected unknown-record count error: {other:?}")
         },
     }
@@ -649,7 +649,8 @@ fn opaque_external_record_count_and_byte_limits_are_typed() {
         other @ (Error::Wire(_)
         | Error::InvalidFormula(_)
         | Error::Allocation { .. }
-        | Error::LimitExceeded { .. }) => {
+        | Error::LimitExceeded { .. }
+        | Error::PatchConflict) => {
             panic!("unexpected unknown-record byte error: {other:?}")
         },
     }
@@ -1055,7 +1056,10 @@ fn external_link_apply_with_limits_is_fallible_and_accepts_exact_patch_bytes() {
         .build()
         .unwrap();
     assert_eq!(apply(patch.before(), patch, exact).unwrap(), patch.after());
-    assert!(apply(b"stale", patch, exact).is_err());
+    assert!(matches!(
+        apply(b"stale", patch, exact),
+        Err(Error::PatchConflict)
+    ));
 
     let one_below = ExternalLinkLimits::builder()
         .max_part_bytes(maximum - 1)

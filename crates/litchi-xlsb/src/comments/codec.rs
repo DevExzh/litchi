@@ -76,17 +76,25 @@ pub enum Error {
 ///
 /// This standalone function cannot report repairs, so it refuses every
 /// defect an opened worksheet repairs and records (see [`crate::leniency`]).
-pub fn read(bytes: &[u8]) -> Result<Vec<Record>> {
-    read_with(bytes, &mut Tolerance::refusing())
+pub fn read(bytes: &[u8], limits: crate::raw::Limits) -> Result<Vec<Record>> {
+    read_with(bytes, limits, &mut Tolerance::refusing())
 }
 
 /// Read one comments stream, recording Excel-compatible repairs into `report`.
-pub(crate) fn read_recording(bytes: &[u8], report: &mut ToleranceReport) -> Result<Vec<Record>> {
-    read_with(bytes, &mut Tolerance::recording(report))
+pub(crate) fn read_recording(
+    bytes: &[u8],
+    limits: crate::raw::Limits,
+    report: &mut ToleranceReport,
+) -> Result<Vec<Record>> {
+    read_with(bytes, limits, &mut Tolerance::recording(report))
 }
 
-fn read_with(bytes: &[u8], tolerance: &mut Tolerance<'_>) -> Result<Vec<Record>> {
-    let records = collect_records(bytes)?;
+fn read_with(
+    bytes: &[u8],
+    limits: crate::raw::Limits,
+    tolerance: &mut Tolerance<'_>,
+) -> Result<Vec<Record>> {
+    let records = collect_records(bytes, limits)?;
     let mut pos = 0;
     expect(&records, &mut pos, kind::BEGIN_COMMENTS)?;
     expect(&records, &mut pos, kind::BEGIN_COMMENT_AUTHORS)?;
@@ -100,6 +108,7 @@ fn read_with(bytes: &[u8], tolerance: &mut Tolerance<'_>) -> Result<Vec<Record>>
         pos += 1;
         let (author, consumed) = decode_wide_string(
             record.payload(),
+            limits,
             tolerance,
             kind::COMMENT_AUTHOR,
             record_location(record.offset()),
@@ -208,6 +217,7 @@ fn read_with(bytes: &[u8], tolerance: &mut Tolerance<'_>) -> Result<Vec<Record>>
             pos += 1;
             let rich = RichString::parse_with(
                 record.payload(),
+                limits,
                 record_location(record.offset()),
                 tolerance,
             )?;
@@ -364,9 +374,9 @@ fn record_location(offset: usize) -> u32 {
     u32::try_from(offset).unwrap_or(u32::MAX)
 }
 
-fn collect_records(bytes: &[u8]) -> Result<Vec<RawRecord<'_>>> {
+fn collect_records(bytes: &[u8], limits: crate::raw::Limits) -> Result<Vec<RawRecord<'_>>> {
     let mut records = Vec::new();
-    for record in Records::new(bytes, crate::raw::Limits::DEFAULT) {
+    for record in Records::new(bytes, limits) {
         reserve(&mut records, 1, "comments records")?;
         records.push(record?);
     }
@@ -392,11 +402,12 @@ fn expect(records: &[RawRecord<'_>], pos: &mut usize, expected: crate::raw::Kind
 
 fn decode_wide_string(
     data: &[u8],
+    limits: crate::raw::Limits,
     tolerance: &mut Tolerance<'_>,
     record_type: crate::raw::Kind,
     location: u32,
 ) -> Result<(String, usize)> {
-    let mut cursor = Cursor::new(data, "XLWideString", crate::raw::Limits::DEFAULT);
+    let mut cursor = Cursor::new(data, "XLWideString", limits);
     let value = tolerance.read_wide_string(&mut cursor, record_type, location)?;
     Ok((value, cursor.position()))
 }
@@ -418,7 +429,12 @@ struct RichString {
 }
 
 impl RichString {
-    fn parse_with(data: &[u8], location: u32, tolerance: &mut Tolerance<'_>) -> Result<Self> {
+    fn parse_with(
+        data: &[u8],
+        limits: crate::raw::Limits,
+        location: u32,
+        tolerance: &mut Tolerance<'_>,
+    ) -> Result<Self> {
         if data.is_empty() {
             return Err(Error::InvalidLength {
                 expected: 1,
@@ -428,7 +444,7 @@ impl RichString {
         let is_rich = data[0] & 1 != 0;
         let is_extended = data[0] & 2 != 0;
         let (text, consumed) =
-            decode_wide_string(&data[1..], tolerance, kind::COMMENT_TEXT, location)?;
+            decode_wide_string(&data[1..], limits, tolerance, kind::COMMENT_TEXT, location)?;
         let text_len = text.encode_utf16().count();
         if text_len > MAX_TEXT_UNITS {
             return Err(Error::Unrecognized {
@@ -476,8 +492,13 @@ impl RichString {
         }
 
         if is_extended {
-            let (phonetic_text, consumed) =
-                decode_wide_string(&data[offset..], tolerance, kind::COMMENT_TEXT, location)?;
+            let (phonetic_text, consumed) = decode_wide_string(
+                &data[offset..],
+                limits,
+                tolerance,
+                kind::COMMENT_TEXT,
+                location,
+            )?;
             offset = offset
                 .checked_add(consumed)
                 .ok_or(Error::Encoding("phonetic text offset overflow"))?;
@@ -696,7 +717,7 @@ mod tests {
         ];
         comment.guid = [7; 16];
 
-        let parsed = read(&comment_stream(&comment)).unwrap();
+        let parsed = read(&comment_stream(&comment), crate::raw::Limits::DEFAULT).unwrap();
         assert_eq!(parsed.len(), 1);
         assert_eq!(parsed[0].row, 2);
         assert_eq!(parsed[0].col, 3);
@@ -706,6 +727,21 @@ mod tests {
         assert_eq!(parsed[0].guid, [7; 16]);
         assert_eq!(parsed[0].alternate_guid, None);
         assert!(!parsed[0].visible);
+    }
+
+    #[test]
+    fn required_raw_limits_bound_comment_record_payloads() {
+        let comment = Record::new(2, 3, "Sven".to_string(), "text".to_string());
+        let bytes = comment_stream(&comment);
+        let limits = crate::raw::Limits::new(35, crate::raw::Limits::DEFAULT.string_units());
+        assert!(matches!(
+            read(&bytes, limits),
+            Err(Error::Wire(crate::raw::Error::PayloadLimit {
+                length: 36,
+                limit: 35,
+                ..
+            }))
+        ));
     }
 
     #[test]
@@ -739,7 +775,7 @@ mod tests {
         writer.write_record(kind::FRT_END, &[]).unwrap();
         writer.write_record(kind::END_COMMENTS, &[]).unwrap();
 
-        let comments = read(&bytes).unwrap();
+        let comments = read(&bytes, crate::raw::Limits::DEFAULT).unwrap();
         assert_eq!(comments.len(), 1);
         assert_eq!(comments[0].alternate_guid, Some([9; 16]));
         assert_eq!(comments[0].guid, [7; 16]);
@@ -755,7 +791,7 @@ mod tests {
             &[comment.clone(), comment],
         )
         .unwrap_err();
-        assert!(read(&bytes).is_ok());
+        assert!(read(&bytes, crate::raw::Limits::DEFAULT).is_ok());
 
         let mut malformed = Vec::new();
         let mut writer = Encoder::new(&mut malformed, crate::raw::Limits::DEFAULT);
@@ -780,6 +816,6 @@ mod tests {
         writer.write_record(kind::END_COMMENT, &[]).unwrap();
         writer.write_record(kind::END_COMMENT_LIST, &[]).unwrap();
         writer.write_record(kind::END_COMMENTS, &[]).unwrap();
-        assert!(read(&malformed).is_err());
+        assert!(read(&malformed, crate::raw::Limits::DEFAULT).is_err());
     }
 }

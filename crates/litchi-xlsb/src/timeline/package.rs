@@ -310,7 +310,11 @@ fn validate_cache_set(caches: &[Cache]) -> Result<()> {
 }
 
 /// Load all workbook timeline cache parts.
-pub fn load_caches(package: &OpcPackage, workbook: &PackURI) -> Result<Vec<CachePart>> {
+pub fn load_caches(
+    package: &OpcPackage,
+    workbook: &PackURI,
+    xml_limits: litchi_core::Limits,
+) -> Result<Vec<CachePart>> {
     let workbook_part = package.get_part(workbook)?;
     let refs = parse_collection_refs(workbook_part.blob(), "timeline cache references")?;
     let mut output = Vec::with_capacity(refs.len());
@@ -336,7 +340,7 @@ pub fn load_caches(package: &OpcPackage, workbook: &PackURI) -> Result<Vec<Cache
         output.push(CachePart {
             relationship_id: relationship_id.clone(),
             part_name: target.as_str().to_string(),
-            cache: parse_cache(part.blob())?,
+            cache: parse_cache(part.blob(), xml_limits)?,
         });
     }
     let referenced: HashSet<_> = output.iter().map(|part| part.part_name.as_str()).collect();
@@ -393,10 +397,11 @@ pub(crate) fn store_caches(
     package: &mut OpcPackage,
     workbook: &PackURI,
     caches: &[Cache],
+    xml_limits: litchi_core::Limits,
 ) -> Result<()> {
     validate_cache_set(caches)?;
     crate::signature_policy::ensure_unsigned(package)?;
-    let _ = load_caches(package, workbook)?;
+    let _ = load_caches(package, workbook, xml_limits)?;
     let old_block = record_span(
         package.get_part(workbook)?.blob(),
         kind::BEGIN_TIMELINE_CACHE_IDS,
@@ -424,7 +429,7 @@ pub(crate) fn store_caches(
             }
         };
         let uri = next_part(package, "xl/timelineCaches", "timelineCache", "xml")?;
-        let bytes = write_cache(cache)?;
+        let bytes = write_cache(cache, xml_limits)?;
         package.try_add_part(Box::new(BlobPart::new(
             uri.clone(),
             CACHE_CONTENT_TYPE.to_string(),
@@ -454,7 +459,11 @@ pub(crate) fn store_caches(
 }
 
 /// Load one worksheet timeline view part, if attached.
-pub fn load_views(package: &OpcPackage, worksheet: &PackURI) -> Result<Option<ViewPart>> {
+pub fn load_views(
+    package: &OpcPackage,
+    worksheet: &PackURI,
+    xml_limits: litchi_core::Limits,
+) -> Result<Option<ViewPart>> {
     let worksheet_part = package.get_part(worksheet)?;
     let reference = parse_single_ref(worksheet_part.blob(), "timeline views")?;
     let relationships: Vec<_> = worksheet_part
@@ -494,7 +503,7 @@ pub fn load_views(package: &OpcPackage, worksheet: &PackURI) -> Result<Option<Vi
     Ok(Some(ViewPart {
         relationship_id: relationship.r_id().to_string(),
         part_name: target.as_str().to_string(),
-        views: parse_views(part.blob())?,
+        views: parse_views(part.blob(), xml_limits)?,
     }))
 }
 
@@ -503,17 +512,23 @@ pub(crate) fn store_views(
     package: &mut OpcPackage,
     worksheet: &PackURI,
     views: &Views,
+    xml_limits: litchi_core::Limits,
 ) -> Result<()> {
     let mut candidate = package.clone();
-    store_views_inner(&mut candidate, worksheet, views)?;
+    store_views_inner(&mut candidate, worksheet, views, xml_limits)?;
     *package = candidate;
     Ok(())
 }
 
-fn store_views_inner(package: &mut OpcPackage, worksheet: &PackURI, views: &Views) -> Result<()> {
+fn store_views_inner(
+    package: &mut OpcPackage,
+    worksheet: &PackURI,
+    views: &Views,
+    xml_limits: litchi_core::Limits,
+) -> Result<()> {
     validate_views(views)?;
     crate::signature_policy::ensure_unsigned(package)?;
-    if let Some(existing) = load_views(package, worksheet)? {
+    if let Some(existing) = load_views(package, worksheet, xml_limits)? {
         let target = PackURI::new(&existing.part_name)?;
         crate::package::owner_transaction::require_exclusive_inbound(
             package,
@@ -535,7 +550,7 @@ fn store_views_inner(package: &mut OpcPackage, worksheet: &PackURI, views: &View
     )?;
     let mut worksheet_blob = package.get_part(worksheet)?.blob().to_vec();
     let original_worksheet_blob = worksheet_blob.clone();
-    if let Some(old) = load_views(package, worksheet)? {
+    if let Some(old) = load_views(package, worksheet, xml_limits)? {
         let part = package.get_part_mut(worksheet)?;
         part.rels_mut().remove(&old.relationship_id);
         package.remove_part(&PackURI::new(&old.part_name)?);
@@ -551,7 +566,7 @@ fn store_views_inner(package: &mut OpcPackage, worksheet: &PackURI, views: &View
     package.try_add_part(Box::new(BlobPart::new(
         uri.clone(),
         VIEWS_CONTENT_TYPE.to_string(),
-        write_views(views)?,
+        write_views(views, xml_limits)?,
     )))?;
     let replacement = write_single_ref(&relationship_id)?;
     worksheet_blob = rewrite_block(

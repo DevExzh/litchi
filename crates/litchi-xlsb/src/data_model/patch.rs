@@ -52,7 +52,7 @@ impl Patch {
     pub(crate) fn check_source(&self, package: &OpcPackage) -> Result<Snapshot> {
         let current = Snapshot::read_with_limits(package, self.limits())?;
         if !current.same_source(&self.before) {
-            return Err(invalid("Data Model patch source is stale"));
+            return Err(Error::PatchConflict { part: "data model" });
         }
         Ok(current)
     }

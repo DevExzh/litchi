@@ -245,7 +245,7 @@ fn read_index(payload: &[u8], offset: usize) -> Result<usize> {
     Ok(usize::from(u16::from_le_bytes([bytes[0], bytes[1]])))
 }
 
-fn patch_font(font: &mut Vec<u8>, format: &Format) -> Result<()> {
+fn patch_font(font: &mut Vec<u8>, format: &Format, limits: crate::raw::Limits) -> Result<()> {
     if font.len() < FONT_NAME {
         return Err(Error::InvalidFormat("BrtFont record is truncated"));
     }
@@ -280,7 +280,7 @@ fn patch_font(font: &mut Vec<u8>, format: &Format) -> Result<()> {
     }
     if let Some(name) = &format.font_name {
         font.truncate(FONT_NAME);
-        Encoder::new(&mut *font, crate::raw::Limits::DEFAULT).write_wide_string(name)?;
+        Encoder::new(&mut *font, limits).write_wide_string(name)?;
     }
     Ok(())
 }
@@ -360,9 +360,19 @@ fn builtin_number_format(code: &str) -> Option<u16> {
 
 /// Apply `format` to the cell XF `old` of the styles stream `styles`,
 /// interning every changed record. Returns the resulting XF index.
-pub(super) fn restyle(styles: &mut Vec<u8>, old: u32, format: &Format) -> Result<u32> {
-    let xfs =
-        super::resources::collection(styles, kind::BEGIN_CELL_XFS, kind::END_CELL_XFS, kind::XF)?;
+pub(super) fn restyle(
+    styles: &mut Vec<u8>,
+    old: u32,
+    format: &Format,
+    limits: crate::raw::Limits,
+) -> Result<u32> {
+    let xfs = super::resources::collection(
+        styles,
+        kind::BEGIN_CELL_XFS,
+        kind::END_CELL_XFS,
+        kind::XF,
+        limits,
+    )?;
     let old_index = usize::try_from(old)
         .map_err(|_error| Error::InvalidFormat("cell XF index exceeds this platform"))?;
     let mut xf = xfs
@@ -374,19 +384,25 @@ pub(super) fn restyle(styles: &mut Vec<u8>, old: u32, format: &Format) -> Result
     }
     let mut applied = 0_u8;
     if format.changes_font() {
-        let fonts =
-            super::resources::collection(styles, kind::BEGIN_FONTS, kind::END_FONTS, kind::FONT)?;
+        let fonts = super::resources::collection(
+            styles,
+            kind::BEGIN_FONTS,
+            kind::END_FONTS,
+            kind::FONT,
+            limits,
+        )?;
         let mut font = fonts
             .get(read_index(&xf, XF_FONT)?)
             .cloned()
             .ok_or(Error::InvalidFormat("the cell XF names a missing font"))?;
-        patch_font(&mut font, format)?;
+        patch_font(&mut font, format, limits)?;
         let index = super::resources::intern_payload(
             styles,
             kind::BEGIN_FONTS,
             kind::END_FONTS,
             kind::FONT,
             &font,
+            limits,
         )?;
         if usize::from(index) != read_index(&xf, XF_FONT)? {
             xf[XF_FONT..XF_FONT + 2].copy_from_slice(&index.to_le_bytes());
@@ -405,6 +421,7 @@ pub(super) fn restyle(styles: &mut Vec<u8>, old: u32, format: &Format) -> Result
             kind::END_FILLS,
             kind::FILL,
             &payload,
+            limits,
         )?;
         if usize::from(index) != read_index(&xf, XF_FILL)? {
             xf[XF_FILL..XF_FILL + 2].copy_from_slice(&index.to_le_bytes());
@@ -417,6 +434,7 @@ pub(super) fn restyle(styles: &mut Vec<u8>, old: u32, format: &Format) -> Result
             kind::BEGIN_BORDERS,
             kind::END_BORDERS,
             kind::BORDER,
+            limits,
         )?;
         let mut border = borders
             .get(read_index(&xf, XF_BORDER)?)
@@ -429,6 +447,7 @@ pub(super) fn restyle(styles: &mut Vec<u8>, old: u32, format: &Format) -> Result
             kind::END_BORDERS,
             kind::BORDER,
             &border,
+            limits,
         )?;
         if usize::from(index) != read_index(&xf, XF_BORDER)? {
             xf[XF_BORDER..XF_BORDER + 2].copy_from_slice(&index.to_le_bytes());
@@ -438,7 +457,7 @@ pub(super) fn restyle(styles: &mut Vec<u8>, old: u32, format: &Format) -> Result
     if let Some(code) = &format.number_format {
         let id = match builtin_number_format(code) {
             Some(id) => id,
-            None => super::resources::intern_number_format(styles, code)?,
+            None => super::resources::intern_number_format(styles, code, limits)?,
         };
         if usize::from(id) != read_index(&xf, XF_NUMBER_FORMAT)? {
             xf[XF_NUMBER_FORMAT..XF_NUMBER_FORMAT + 2].copy_from_slice(&id.to_le_bytes());
@@ -462,6 +481,7 @@ pub(super) fn restyle(styles: &mut Vec<u8>, old: u32, format: &Format) -> Result
         kind::END_CELL_XFS,
         kind::XF,
         &xf,
+        limits,
     )?;
     Ok(u32::from(index))
 }

@@ -3,7 +3,7 @@
 use crate::formula::{Compiler, Parser};
 use crate::package::error::{Error, Result};
 use crate::package::formula::Context;
-use crate::raw::{Records, kind};
+use crate::raw::{Limits, Records, kind};
 
 /// One defined name of a workbook: its scope and its formula as text.
 ///
@@ -39,14 +39,14 @@ pub struct Entry {
 }
 
 /// Read every `BrtName` record of a workbook stream in record order.
-pub(crate) fn read(stream: &[u8], context: &Context) -> Result<Vec<Entry>> {
+pub(crate) fn read(stream: &[u8], context: &Context, limits: Limits) -> Result<Vec<Entry>> {
     let mut entries = Vec::new();
-    for record in Records::new(stream, crate::raw::Limits::DEFAULT) {
+    for record in Records::new(stream, limits) {
         let record = record?;
         if record.kind() != kind::NAME {
             continue;
         }
-        let definition = super::Definition::parse(record.payload())?;
+        let definition = super::Definition::parse(record.payload(), limits)?;
         let scope = definition
             .sheet_id
             .map(|id| {
@@ -55,7 +55,7 @@ pub(crate) fn read(stream: &[u8], context: &Context) -> Result<Vec<Entry>> {
             })
             .transpose()?;
         let formula = definition.formula.as_deref().and_then(|rgce| {
-            let tokens = Parser::new(rgce).parse().ok()?;
+            let tokens = Parser::new(rgce, limits).parse().ok()?;
             let context = match scope {
                 Some(sheet) => context.for_sheet(sheet),
                 None => context.clone(),

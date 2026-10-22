@@ -238,12 +238,20 @@ fn limit(_what: &str) -> Error {
 ///
 /// Markup-compatibility processing is applied so `mc:AlternateContent`
 /// fallbacks resolve before parsing. The root element must be `xdr:wsDr`.
-pub fn parse_drawing_part(xml_bytes: &[u8]) -> Result<Drawing> {
-    Ok(parse_drawing_part_xml(xml_bytes)?)
+/// The part is admitted against the smaller of the format ceiling and the
+/// caller's input-byte budget before it is decoded.
+pub fn parse_drawing_part(xml_bytes: &[u8], xml_limits: litchi_core::Limits) -> Result<Drawing> {
+    Ok(parse_drawing_part_xml(xml_bytes, xml_limits)?)
 }
 
-fn parse_drawing_part_xml(xml_bytes: &[u8]) -> Result<Drawing> {
-    if xml_bytes.len() > MAX_DRAWING_XML_BYTES {
+fn parse_drawing_part_xml(xml_bytes: &[u8], xml_limits: litchi_core::Limits) -> Result<Drawing> {
+    if xml_bytes.len()
+        > crate::semantic_limits::xml_ceiling(
+            MAX_DRAWING_XML_BYTES,
+            xml_limits,
+            litchi_core::Resource::InputBytes,
+        )
+    {
         return Err(limit("drawing part bytes"));
     }
     let xml =

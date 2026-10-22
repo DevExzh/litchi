@@ -43,6 +43,14 @@ fn invalid(message: &'static str) -> Error {
     Error::InvalidFormat(message)
 }
 
+fn output_ceiling(xml_limits: litchi_core::Limits) -> usize {
+    crate::semantic_limits::xml_ceiling(
+        MAX_XML_BYTES,
+        xml_limits,
+        litchi_core::Resource::OutputBytes,
+    )
+}
+
 fn element_name(bytes: &[u8]) -> Result<(String, String)> {
     let text = std::str::from_utf8(bytes).map_err(|_error| invalid("invalid XML name"))?;
     let (prefix, local) = text
@@ -91,8 +99,12 @@ fn resolve_namespace(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Resu
     }
 }
 
-fn parse_document(xml: &[u8]) -> Result<Node> {
-    if xml.len() > MAX_XML_BYTES {
+fn parse_document(xml: &[u8], xml_limits: litchi_core::Limits) -> Result<Node> {
+    use crate::semantic_limits::xml_ceiling;
+    use litchi_core::Resource;
+    let max_nodes = xml_ceiling(MAX_NODES, xml_limits, Resource::Objects);
+    let max_depth = xml_ceiling(MAX_DEPTH, xml_limits, Resource::Depth);
+    if xml.len() > xml_ceiling(MAX_XML_BYTES, xml_limits, Resource::InputBytes) {
         return Err(invalid("timeline XML exceeds the bounded byte limit"));
     }
     let mut reader = NsReader::from_reader(xml);
@@ -110,7 +122,7 @@ fn parse_document(xml: &[u8]) -> Result<Node> {
         match event {
             Event::Start(element) | Event::Empty(element) => {
                 nodes += 1;
-                if nodes > MAX_NODES || stack.len() >= MAX_DEPTH {
+                if nodes > max_nodes || stack.len() >= max_depth {
                     return Err(invalid("timeline XML structure limit exceeded"));
                 }
                 let (namespace, name) = element_name(element.name().as_ref())?;
@@ -305,8 +317,8 @@ fn parse_filter(node: &Node) -> Result<Filter> {
 }
 
 /// Parse one timeline cache definition XML part.
-pub fn parse_cache(xml: &[u8]) -> Result<Cache> {
-    let root = parse_document(xml)?;
+pub fn parse_cache(xml: &[u8], xml_limits: litchi_core::Limits) -> Result<Cache> {
+    let root = parse_document(xml, xml_limits)?;
     if root.namespace != X15 || root.name != "timelineCacheDefinition" {
         return Err(invalid(
             "timeline cache root must be x15:timelineCacheDefinition",
@@ -409,8 +421,8 @@ fn parse_view(node: &Node) -> Result<View> {
 }
 
 /// Parse one worksheet timelines XML part.
-pub fn parse_views(xml: &[u8]) -> Result<Views> {
-    let root = parse_document(xml)?;
+pub fn parse_views(xml: &[u8], xml_limits: litchi_core::Limits) -> Result<Views> {
+    let root = parse_document(xml, xml_limits)?;
     if root.namespace != X15 || root.name != "timelines" || !root.attributes.is_empty() {
         return Err(invalid(
             "timeline views root must be x15:timelines without attributes",
@@ -445,7 +457,7 @@ fn range_write(output: &mut String, name: &str, value: &Range) {
 }
 
 /// Encode one timeline cache definition.
-pub fn write_cache(value: &Cache) -> Result<Vec<u8>> {
+pub fn write_cache(value: &Cache, xml_limits: litchi_core::Limits) -> Result<Vec<u8>> {
     validate_cache(value)?;
     let mut output = String::from("<x15:timelineCacheDefinition xmlns:x15=\"");
     output.push_str(X15);
@@ -511,14 +523,14 @@ pub fn write_cache(value: &Cache) -> Result<Vec<u8>> {
         output.push_str("/>");
     }
     output.push_str("</x15:timelineCacheDefinition>");
-    if output.len() > MAX_XML_BYTES {
+    if output.len() > output_ceiling(xml_limits) {
         return Err(invalid("timeline cache XML exceeds the bounded byte limit"));
     }
     Ok(output.into_bytes())
 }
 
 /// Encode one worksheet timelines XML part.
-pub fn write_views(value: &Views) -> Result<Vec<u8>> {
+pub fn write_views(value: &Views, xml_limits: litchi_core::Limits) -> Result<Vec<u8>> {
     validate_views(value)?;
     let mut output = String::from("<x15:timelines xmlns:x15=\"");
     output.push_str(X15);
@@ -558,7 +570,7 @@ pub fn write_views(value: &Views) -> Result<Vec<u8>> {
         output.push_str("/>");
     }
     output.push_str("</x15:timelines>");
-    if output.len() > MAX_XML_BYTES {
+    if output.len() > output_ceiling(xml_limits) {
         return Err(invalid("timeline views XML exceeds the bounded byte limit"));
     }
     Ok(output.into_bytes())

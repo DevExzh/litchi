@@ -83,8 +83,8 @@ const PARAM_DATA_BOOLEAN: u32 = 4;
 
 /// Parse the complete External Data Connections part, refusing every
 /// defect (see [`crate::leniency`]).
-pub fn parse_connections_part(data: &[u8]) -> Result<Connections> {
-    parse_connections(RecordWalker::new(data))
+pub fn parse_connections_part(data: &[u8], limits: crate::raw::Limits) -> Result<Connections> {
+    parse_connections(RecordWalker::new(data, limits))
 }
 
 /// Parse the complete External Data Connections part, recording
@@ -92,8 +92,9 @@ pub fn parse_connections_part(data: &[u8]) -> Result<Connections> {
 pub(crate) fn parse_connections_part_recording(
     data: &[u8],
     report: &mut crate::leniency::ToleranceReport,
+    limits: crate::raw::Limits,
 ) -> Result<Connections> {
-    parse_connections(RecordWalker::recording(data, report))
+    parse_connections(RecordWalker::recording(data, report, limits))
 }
 
 fn parse_connections(mut walker: RecordWalker<'_, '_>) -> Result<Connections> {
@@ -102,7 +103,7 @@ fn parse_connections(mut walker: RecordWalker<'_, '_>) -> Result<Connections> {
     walker.finish(&Cursor::new(
         begin.payload(),
         "BrtBeginExtConnections",
-        crate::raw::Limits::DEFAULT,
+        walker.limits(),
     ))?;
 
     let mut connections = Connections::default();
@@ -123,7 +124,7 @@ fn parse_connections(mut walker: RecordWalker<'_, '_>) -> Result<Connections> {
                 walker.finish(&Cursor::new(
                     record.payload(),
                     "BrtEndExtConnections",
-                    crate::raw::Limits::DEFAULT,
+                    walker.limits(),
                 ))?;
                 super::write::validate_connections(&connections)?;
                 return Ok(connections);
@@ -169,7 +170,7 @@ fn parse_connection(walker: &mut RecordWalker<'_, '_>, data: &[u8]) -> Result<Co
 /// `BrtBeginExtConnection` payload (MS-XLSB 2.4.80).
 fn parse_ext_connection(walker: &mut RecordWalker<'_, '_>, data: &[u8]) -> Result<Connection> {
     const CONTEXT: &str = "BrtBeginExtConnection";
-    let mut cursor = Cursor::new(data, CONTEXT, crate::raw::Limits::DEFAULT);
+    let mut cursor = Cursor::new(data, CONTEXT, walker.limits());
     let refreshed_version = cursor.read_u8()?;
     let refreshable_min_version = cursor.read_u8()?;
     let pc = cursor.read_u8()?;
@@ -250,7 +251,7 @@ fn parse_ext_connection(walker: &mut RecordWalker<'_, '_>, data: &[u8]) -> Resul
 
 /// `BrtBeginECDbProps` payload (MS-XLSB 2.4.61).
 fn parse_db_props(walker: &mut RecordWalker<'_, '_>, data: &[u8]) -> Result<DbProperties> {
-    let mut cursor = Cursor::new(data, "BrtBeginECDbProps", crate::raw::Limits::DEFAULT);
+    let mut cursor = Cursor::new(data, "BrtBeginECDbProps", walker.limits());
     let command_type = CommandType::try_from(cursor.read_u32()?)?;
     let flags = cursor.read_u8()?;
     let connection_string = cursor.read_wide_string()?;
@@ -275,7 +276,7 @@ fn parse_db_props(walker: &mut RecordWalker<'_, '_>, data: &[u8]) -> Result<DbPr
 
 /// `BrtBeginECOlapProps` payload (MS-XLSB 2.4.62).
 fn parse_olap_props(walker: &mut RecordWalker<'_, '_>, data: &[u8]) -> Result<OlapProperties> {
-    let mut cursor = Cursor::new(data, "BrtBeginECOlapProps", crate::raw::Limits::DEFAULT);
+    let mut cursor = Cursor::new(data, "BrtBeginECOlapProps", walker.limits());
     let flags = cursor.read_u8()?;
     let drillthrough_rows = cursor.read_u32()?;
     let load_flags = cursor.read_u8()?;
@@ -300,7 +301,7 @@ fn parse_olap_props(walker: &mut RecordWalker<'_, '_>, data: &[u8]) -> Result<Ol
 
 /// `BrtBeginECWebProps` payload (MS-XLSB 2.4.71).
 fn parse_web_props(walker: &mut RecordWalker<'_, '_>, data: &[u8]) -> Result<WebProperties> {
-    let mut cursor = Cursor::new(data, "BrtBeginECWebProps", crate::raw::Limits::DEFAULT);
+    let mut cursor = Cursor::new(data, "BrtBeginECWebProps", walker.limits());
     let html_format = match cursor.read_u8()? {
         0 => HtmlFormat::None,
         1 => HtmlFormat::RichText,
@@ -366,7 +367,7 @@ fn parse_params(walker: &mut RecordWalker<'_, '_>, connection: &mut Connection) 
 /// `BrtBeginECParam` payload (MS-XLSB 2.4.63).
 fn parse_param(walker: &mut RecordWalker<'_, '_>, data: &[u8]) -> Result<Parameter> {
     const CONTEXT: &str = "BrtBeginECParam";
-    let mut cursor = Cursor::new(data, CONTEXT, crate::raw::Limits::DEFAULT);
+    let mut cursor = Cursor::new(data, CONTEXT, walker.limits());
     let flags = cursor.read_u16()?;
     let pbt = flags & PARAM_TYPE_MASK;
     let sql_type = cursor.read_u16()?;
@@ -441,11 +442,7 @@ fn parse_web_tables(walker: &mut RecordWalker<'_, '_>, connection: &mut Connecti
                 if connection.web_tables.len() >= MAX_WEB_TABLE_ITEMS {
                     return Err(malformed(CONTEXT, "Web table item limit exceeded"));
                 }
-                let mut cursor = Cursor::new(
-                    record.payload(),
-                    "BrtPCDIString",
-                    crate::raw::Limits::DEFAULT,
-                );
+                let mut cursor = Cursor::new(record.payload(), "BrtPCDIString", walker.limits());
                 connection
                     .web_tables
                     .push(WebTableItem::Named(cursor.read_wide_string()?));
@@ -455,11 +452,7 @@ fn parse_web_tables(walker: &mut RecordWalker<'_, '_>, connection: &mut Connecti
                 if connection.web_tables.len() >= MAX_WEB_TABLE_ITEMS {
                     return Err(malformed(CONTEXT, "Web table item limit exceeded"));
                 }
-                let mut cursor = Cursor::new(
-                    record.payload(),
-                    "BrtPCDIIndex",
-                    crate::raw::Limits::DEFAULT,
-                );
+                let mut cursor = Cursor::new(record.payload(), "BrtPCDIIndex", walker.limits());
                 connection
                     .web_tables
                     .push(WebTableItem::Index(cursor.read_u32()?));

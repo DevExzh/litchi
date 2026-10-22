@@ -131,7 +131,10 @@ impl Builder {
             package.add_part(Box::new(BlobPart::new(
                 connections_uri.clone(),
                 "application/vnd.ms-excel.connections".to_string(),
-                crate::package::connections::write::write_connections_part(connections)?,
+                crate::package::connections::write::write_connections_part(
+                    connections,
+                    crate::raw::Limits::DEFAULT,
+                )?,
             )));
             package
                 .get_part_mut(&PackURI::new("/xl/workbook.bin")?)?
@@ -379,12 +382,14 @@ impl Builder {
 
         // Write workbook structure
         let mut workbook_data = Vec::new();
-        let mut writer = Encoder::new(&mut workbook_data, crate::raw::Limits::DEFAULT);
+        let raw_limits = crate::raw::Limits::DEFAULT;
+        let mut writer = Encoder::new(&mut workbook_data, raw_limits);
         self.write_workbook(
             &mut writer,
             formula_sheet_ranges,
             &pivot_cache_rel_ids,
             &external_link_rel_ids,
+            raw_limits,
         )?;
         workbook_part.set_blob(workbook_data);
 
@@ -735,6 +740,7 @@ impl Builder {
                         worksheet.shapes(),
                         worksheet.groups(),
                         worksheet.connections(),
+                        crate::SemanticLimits::new().xml_parts_value(),
                     )?;
                     let drawing_name = format!("drawing{next_drawing_index}.xml");
                     next_drawing_index = next_drawing_index
@@ -930,7 +936,10 @@ impl Builder {
             let mut drawing_part = BlobPart::new(
                 PackURI::new(format!("/xl/drawings/{drawing_name}"))?,
                 ct::OFC_DRAWING.to_string(),
-                crate::package::drawing_write::serialize_chart_sheet_drawing(sheet.name())?,
+                crate::package::drawing_write::serialize_chart_sheet_drawing(
+                    sheet.name(),
+                    crate::SemanticLimits::new().xml_parts_value(),
+                )?,
             );
             let chart_rel_id =
                 drawing_part.relate_to(&format!("../charts/{chart_name}"), rel::CHART);

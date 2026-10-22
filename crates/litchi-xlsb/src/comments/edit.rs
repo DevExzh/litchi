@@ -39,7 +39,7 @@ use litchi_opc::{BlobPart, PackURI};
 use super::{MAX_COLUMNS, MAX_ROWS, MAX_TEXT_UNITS, Record};
 use crate::package::Package;
 use crate::package::error::{Error as PackageError, Result};
-use crate::part_edit::{Rank, SheetLayout, Staged, family, invalid, record, splice};
+use crate::part_edit::{Rank, SheetLayout, Staged, family, invalid, record_with_limits, splice};
 use crate::raw::{Encoder, Records, kind};
 use litchi_spreadsheet_drawing::vml;
 
@@ -120,14 +120,14 @@ struct Layout {
     list_end: usize,
 }
 
-fn layout(bytes: &[u8]) -> Result<Layout> {
+fn layout(bytes: &[u8], limits: crate::raw::Limits) -> Result<Layout> {
     let mut authors = Vec::new();
     let mut authors_end = None;
     let mut notes = Vec::new();
     let mut list_end = None;
     let mut note_start: Option<usize> = None;
     let mut cell = None;
-    let mut records = Records::new(bytes, crate::raw::Limits::DEFAULT);
+    let mut records = Records::new(bytes, limits);
     while let Some(item) = records.next() {
         let item = item?;
         let start = item.offset();
@@ -220,7 +220,7 @@ impl Edit {
     pub fn comments(&self, sheet: usize) -> Result<Vec<Record>> {
         let worksheet = self.staged.worksheet(sheet)?;
         match self.part(&worksheet)? {
-            Some((_, name)) => read(self.staged.blob(&name)?),
+            Some((_, name)) => read(self.staged.blob(&name)?, self.staged.raw_limits()),
             None => Ok(Vec::new()),
         }
     }
@@ -291,7 +291,7 @@ impl Edit {
             let note = Record::new(row, col, author.to_owned(), text.to_owned());
             let mut bytes = Vec::new();
             super::write(
-                &mut Encoder::new(&mut bytes, crate::raw::Limits::DEFAULT),
+                &mut Encoder::new(&mut bytes, self.staged.raw_limits()),
                 std::slice::from_ref(&note),
             )?;
             let name = self.staged.free_name("/xl/comments", ".bin")?;
@@ -310,8 +310,9 @@ impl Edit {
             return Ok(true);
         };
         let bytes = self.staged.blob(&name)?.to_vec();
-        let notes = read(&bytes)?;
-        let layout = layout(&bytes)?;
+        let limits = self.staged.raw_limits();
+        let notes = read(&bytes, limits)?;
+        let layout = layout(&bytes, limits)?;
         let current = notes
             .iter()
             .position(|note| (note.row, note.col) == (row, col));
@@ -329,9 +330,10 @@ impl Edit {
                 Some(index) => (index, None),
                 None => (
                     layout.authors.len(),
-                    Some(record(
+                    Some(record_with_limits(
                         kind::COMMENT_AUTHOR,
                         &super::codec::encode_author(author)?,
+                        limits,
                     )?),
                 ),
             };
@@ -347,12 +349,8 @@ impl Edit {
         note.author = author.to_owned();
         note.text = text.to_owned();
         let mut encoded = Vec::new();
-        super::codec::write_comment(
-            &mut Encoder::new(&mut encoded, crate::raw::Limits::DEFAULT),
-            &note,
-            author_index,
-        )
-        .map_err(|error| match error {
+        super::codec::write_comment(&mut Encoder::new(&mut encoded, limits), &note, author_index)
+            .map_err(|error| match error {
             super::codec::Error::UnsupportedFeature(_) => PackageError::refused(
                 litchi_core::edit::RefusalKind::UnsupportedContent,
                 "edit_comments",
@@ -370,7 +368,7 @@ impl Edit {
                 let (span, _) = &layout.notes[index];
                 // Keep an alternate-content identifier that precedes the
                 // note's header.
-                let header = header_offset(&bytes, span.clone())?;
+                let header = header_offset(&bytes, span.clone(), limits)?;
                 header..span.end
             },
             None => {
@@ -412,7 +410,7 @@ impl Edit {
             return Ok(false);
         };
         let bytes = self.staged.blob(&name)?.to_vec();
-        let layout = layout(&bytes)?;
+        let layout = layout(&bytes, self.staged.raw_limits())?;
         let Some(index) = layout
             .notes
             .iter()
@@ -437,19 +435,16 @@ impl Edit {
     /// The worksheet's VML drawing: its relationship id and part name.
     fn vml(&self, worksheet: &PackURI) -> Result<Option<(String, PackURI)>> {
         let bytes = self.staged.blob(worksheet)?;
-        let layout = SheetLayout::scan(bytes)?;
+        let layout = SheetLayout::scan_with_limits(bytes, self.staged.raw_limits())?;
         let Some(unit) = layout.units_of(kind::LEGACY_DRAWING).next() else {
             return Ok(None);
         };
-        let item = Records::new(&bytes[unit.span.clone()], crate::raw::Limits::DEFAULT)
+        let limits = self.staged.raw_limits();
+        let item = Records::new(&bytes[unit.span.clone()], limits)
             .next()
             .transpose()?
             .ok_or_else(|| invalid("an empty legacy-drawing record"))?;
-        let mut cursor = crate::raw::Cursor::new(
-            item.payload(),
-            "BrtLegacyDrawing",
-            crate::raw::Limits::DEFAULT,
-        );
+        let mut cursor = crate::raw::Cursor::new(item.payload(), "BrtLegacyDrawing", limits);
         let id = cursor.read_wide_string()?;
         let part = self.staged.opc().get_part(worksheet)?;
         let relationship = part
@@ -500,11 +495,16 @@ impl Edit {
                     relationship_type::VML_DRAWING,
                 );
                 let bytes = self.staged.blob(worksheet)?;
-                let layout = SheetLayout::scan(bytes)?;
+                let limits = self.staged.raw_limits();
+                let layout = SheetLayout::scan_with_limits(bytes, limits)?;
                 let at = layout.insertion(Rank::LegacyDrawing);
                 let mut payload = Vec::new();
-                Encoder::new(&mut payload, crate::raw::Limits::DEFAULT).write_wide_string(&id)?;
-                let updated = splice(bytes, at..at, &record(kind::LEGACY_DRAWING, &payload)?);
+                Encoder::new(&mut payload, limits).write_wide_string(&id)?;
+                let updated = splice(
+                    bytes,
+                    at..at,
+                    &record_with_limits(kind::LEGACY_DRAWING, &payload, limits)?,
+                );
                 self.staged.replace_worksheet(worksheet, updated)?;
                 self.staged.touch(worksheet);
             },
@@ -529,7 +529,7 @@ impl Edit {
         // The last shape: drop the drawing, its relationship and the
         // worksheet's `BrtLegacyDrawing`.
         let bytes = self.staged.blob(worksheet)?;
-        let layout = SheetLayout::scan(bytes)?;
+        let layout = SheetLayout::scan_with_limits(bytes, self.staged.raw_limits())?;
         let span = layout
             .units_of(kind::LEGACY_DRAWING)
             .next()
@@ -564,14 +564,14 @@ impl Edit {
 
 /// Decode a comments stream, recording (not refusing) repairs as an opened
 /// worksheet does.
-pub(crate) fn read(bytes: &[u8]) -> Result<Vec<Record>> {
+pub(crate) fn read(bytes: &[u8], limits: crate::raw::Limits) -> Result<Vec<Record>> {
     let mut report = crate::leniency::ToleranceReport::default();
-    Ok(super::read_recording(bytes, &mut report)?)
+    Ok(super::read_recording(bytes, limits, &mut report)?)
 }
 
 /// The offset of the `BrtBeginComment` inside a note's span.
-fn header_offset(bytes: &[u8], span: Range<usize>) -> Result<usize> {
-    let mut records = Records::new(&bytes[span.clone()], crate::raw::Limits::DEFAULT);
+fn header_offset(bytes: &[u8], span: Range<usize>, limits: crate::raw::Limits) -> Result<usize> {
+    let mut records = Records::new(&bytes[span.clone()], limits);
     while let Some(item) = records.next() {
         let item = item?;
         if item.kind() == kind::BEGIN_COMMENT {

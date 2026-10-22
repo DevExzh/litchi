@@ -670,7 +670,7 @@ mod tests {
         styles
             .write(&mut Encoder::new(&mut bytes, crate::raw::Limits::DEFAULT))
             .unwrap();
-        let parsed = StylesTable::from_bytes(&bytes).unwrap();
+        let parsed = StylesTable::from_bytes(&bytes, crate::raw::Limits::DEFAULT).unwrap();
 
         let font = parsed.get_font(1).unwrap();
         assert_eq!(font.name, "Arial");

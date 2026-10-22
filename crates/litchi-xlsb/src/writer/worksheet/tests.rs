@@ -35,7 +35,13 @@ fn writes_worksheet_web_extension_collection() {
         rgce: vec![0x3B, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 1, 0],
         rgcb: Vec::new(),
     };
-    let binding = Binding::new("sales-table", formula, |index| index == 0).unwrap();
+    let binding = Binding::new(
+        "sales-table",
+        formula,
+        |index| index == 0,
+        crate::raw::Limits::DEFAULT,
+    )
+    .unwrap();
     let mut sheet = Worksheet::new("Sheet1");
     sheet
         .set_web_extension_bindings(vec![binding.clone()])
@@ -55,7 +61,12 @@ fn writes_worksheet_web_extension_collection() {
     assert!(records[begin].payload().is_empty());
     assert_eq!(records[begin + 1].kind(), kind::WEB_EXTENSION);
     assert_eq!(
-        Binding::parse_payload(records[begin + 1].payload(), |index| index == 0).unwrap(),
+        Binding::parse_payload(
+            records[begin + 1].payload(),
+            |index| index == 0,
+            crate::raw::Limits::DEFAULT
+        )
+        .unwrap(),
         binding
     );
     assert_eq!(records[begin + 2].kind(), kind::END_WEB_EXTENSIONS);
@@ -505,7 +516,7 @@ fn writes_shared_definition_immediately_after_anchor_and_exp_followers() {
     let mut shared_strings = crate::writer::SharedStringsWriter::new();
     sheet.write_cells(&mut writer, &mut shared_strings).unwrap();
 
-    let mut iter = Stream::new(Cursor::new(buffer));
+    let mut iter = Stream::new(Cursor::new(buffer), crate::raw::Limits::DEFAULT);
     let mut records = Vec::new();
     while let Ok(record_type) = iter.read_type() {
         let mut data = Vec::new();
@@ -523,10 +534,11 @@ fn writes_shared_definition_immediately_after_anchor_and_exp_followers() {
         ]
     );
 
-    let group = Group::parse_shared(&records[2].1).unwrap();
+    let group = Group::parse_shared(&records[2].1, crate::raw::Limits::DEFAULT).unwrap();
     assert_eq!(group.range.to_a1(), "C3:C4");
     for formula_record in [&records[1].1, &records[4].1] {
-        let (placeholder, consumed) = ParsedFormula::parse(&formula_record[18..]).unwrap();
+        let (placeholder, consumed) =
+            ParsedFormula::parse(&formula_record[18..], crate::raw::Limits::DEFAULT).unwrap();
         assert_eq!(18 + consumed, formula_record.len());
         assert_eq!(placeholder.exp_cell().unwrap(), Some((2, 2)));
     }
@@ -546,7 +558,7 @@ fn writes_unsupported_group_definition_losslessly() {
         },
         always_calculate: true,
     };
-    let expected = group.to_record_data().unwrap();
+    let expected = group.to_record_data(crate::raw::Limits::DEFAULT).unwrap();
     let mut sheet = Worksheet::new("Sheet1");
     sheet.set_formula_group_binary(group).unwrap();
 
@@ -555,7 +567,7 @@ fn writes_unsupported_group_definition_losslessly() {
     let mut shared_strings = crate::writer::SharedStringsWriter::new();
     sheet.write_cells(&mut writer, &mut shared_strings).unwrap();
 
-    let mut iter = Stream::new(Cursor::new(buffer));
+    let mut iter = Stream::new(Cursor::new(buffer), crate::raw::Limits::DEFAULT);
     let mut definition = None;
     while let Ok(record_type) = iter.read_type() {
         let mut data = Vec::new();

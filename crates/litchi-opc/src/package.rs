@@ -1524,6 +1524,39 @@ impl OpcPackage {
         Self::from_shared_bytes_with_limits(data, limits)
     }
 
+    /// Build a deferred owned package from a physical reader that has already
+    /// admitted the exact `Arc<Vec<u8>>` source under its retained policy.
+    ///
+    /// This is the handoff for callers that must perform a borrowed physical
+    /// preflight before taking the package ownership path.  The reader is
+    /// consumed by the deferred package reader, so its central directory is
+    /// not parsed again.  The source allocation is shared, never copied, and
+    /// the reader's policy remains the package's policy.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OpcError::SourceArtifactMismatch`] if `reader` was borrowed
+    /// from another allocation, or the same errors as the ordinary deferred
+    /// shared ingress for package-structure admission.
+    pub fn from_shared_vec_with_admitted_reader(
+        data: Arc<Vec<u8>>,
+        reader: PhysPkgReader<'_>,
+    ) -> Result<Self> {
+        if !reader.source_matches(data.as_slice()) {
+            return Err(OpcError::SourceArtifactMismatch {
+                artifact: "shared OPC source",
+                field: "physical reader bytes",
+            });
+        }
+        let limits = reader.limits();
+        let mut package = {
+            let pkg_reader = PackageReader::from_phys_reader_deferred(&reader, &data)?;
+            Self::unmarshal(pkg_reader)?
+        };
+        package.authorize_shared_owned_source(data, limits);
+        Ok(package)
+    }
+
     /// Moves an owned ZIP archive into an explicitly scheduled eager open.
     ///
     /// This additive advanced API retains exact owned-source authorization on
@@ -5104,6 +5137,43 @@ mod tests {
             handles,
             "a refused shared ingress keeps no handle"
         );
+    }
+
+    #[test]
+    fn admitted_reader_handoff_rejects_a_reader_from_another_source() {
+        let source = Arc::new(create_minimal_docx());
+        let foreign = Arc::new(source.as_ref().clone());
+        let reader =
+            PhysPkgReader::new_with_limits(source.as_slice(), SourceLimits::default()).unwrap();
+
+        let result = OpcPackage::from_shared_vec_with_admitted_reader(foreign, reader);
+        assert!(matches!(
+            result,
+            Err(OpcError::SourceArtifactMismatch {
+                artifact: "shared OPC source",
+                field: "physical reader bytes",
+            })
+        ));
+    }
+
+    #[test]
+    fn admitted_reader_handoff_retains_the_reader_policy() {
+        let source = Arc::new(create_minimal_docx());
+        let limits = SourceLimits::builder()
+            .max_input_bytes(source.len() as u64)
+            .unwrap()
+            .build()
+            .unwrap();
+        let reader = PhysPkgReader::new_with_limits(source.as_slice(), limits).unwrap();
+
+        let package =
+            OpcPackage::from_shared_vec_with_admitted_reader(Arc::clone(&source), reader).unwrap();
+        assert_eq!(package.read_limits(), limits);
+        assert_eq!(package.source_read_limits(), Some(limits));
+        assert!(Arc::ptr_eq(
+            &package.exact_source_shared().unwrap(),
+            &source
+        ));
     }
 
     #[test]

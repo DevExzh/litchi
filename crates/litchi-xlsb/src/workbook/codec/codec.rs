@@ -86,14 +86,24 @@ impl Workbook {
             &self.formula_context,
             catalog_position,
             self.styles.cell_xfs.len(),
+            self.raw_limits,
             self.leniency,
         )?;
-        worksheet.set_scenarios(crate::package::scenarios::parse_worksheet(blob)?);
+        worksheet.set_scenarios(crate::package::scenarios::parse_worksheet(
+            blob,
+            self.raw_limits,
+        )?);
         worksheet.set_slicers(
-            crate::slicer::package::load_views(&self.package, &sheet_uri)?.map(|part| part.views),
+            crate::slicer::package::load_views(&self.package, &sheet_uri, self.raw_limits)?
+                .map(|part| part.views),
         );
         worksheet.set_timelines(
-            crate::timeline::package::load_views(&self.package, &sheet_uri)?.map(|part| part.views),
+            crate::timeline::package::load_views(
+                &self.package,
+                &sheet_uri,
+                self.semantic_limits.xml_parts_value(),
+            )?
+            .map(|part| part.views),
         );
         worksheet.set_sparkline_groups(self.sparklines(index)?.groups().cloned());
         if let Some(uri) = comments_uri {
@@ -104,9 +114,11 @@ impl Workbook {
                     val: "relationships are not permitted",
                 });
             }
-            for comment in
-                crate::comments::read_recording(part.blob(), worksheet.tolerance_report_mut())?
-            {
+            for comment in crate::comments::read_recording(
+                part.blob(),
+                self.raw_limits,
+                worksheet.tolerance_report_mut(),
+            )? {
                 worksheet.add_comment(comment);
             }
         }
@@ -118,6 +130,7 @@ impl Workbook {
         iter: &mut Records<'_>,
         strings: &mut Vec<SharedString>,
         report: &mut crate::leniency::ToleranceReport,
+        raw_limits: crate::raw::Limits,
     ) -> Result<()> {
         let initial_count = strings.len();
         let mut expected_unique = None;
@@ -168,6 +181,7 @@ impl Workbook {
                         &mut crate::leniency::Tolerance::recording(report),
                         kind::SST_ITEM,
                         location,
+                        raw_limits,
                     )?);
                 },
                 kind::END_SST => {
@@ -220,16 +234,18 @@ impl Workbook {
         formula_context: &Context,
         sheet_index: usize,
         cell_xf_count: usize,
+        raw_limits: crate::raw::Limits,
         leniency: crate::leniency::Leniency,
     ) -> Result<Worksheet> {
         let mut worksheet = Worksheet::new(name);
-        let iter = crate::package::records::Stream::new(cursor);
+        let iter = crate::package::records::Stream::new(cursor, raw_limits);
         let formula_context = formula_context.for_sheet(sheet_index);
         let mut cells_reader = crate::package::cells_reader::CellsReader::new(
             iter,
             shared_strings,
             &formula_context,
             cell_xf_count,
+            raw_limits,
             leniency,
         )?;
 

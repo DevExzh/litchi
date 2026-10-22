@@ -29,9 +29,9 @@ const NAMESPACE: &[u8] = b"http://schemas.microsoft.com/office/spreadsheetml/201
 const XML_HEADER: &str = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#;
 
 /// Parse a bounded `personList` part.
-pub fn parse_persons(xml: impl AsRef<[u8]>) -> Result<People> {
+pub fn parse_persons(xml: impl AsRef<[u8]>, xml_limits: litchi_core::Limits) -> Result<People> {
     let xml = xml.as_ref();
-    check_size(xml)?;
+    check_size(xml, xml_limits)?;
     let mut reader = NsReader::from_reader(xml);
     let mut people = People::default();
     let mut root_open = false;
@@ -106,9 +106,9 @@ pub fn parse_persons(xml: impl AsRef<[u8]>) -> Result<People> {
 }
 
 /// Parse a bounded `ThreadedComments` part.
-pub fn parse_comments(xml: impl AsRef<[u8]>) -> Result<Comments> {
+pub fn parse_comments(xml: impl AsRef<[u8]>, xml_limits: litchi_core::Limits) -> Result<Comments> {
     let xml = xml.as_ref();
-    check_size(xml)?;
+    check_size(xml, xml_limits)?;
     let mut reader = NsReader::from_reader(xml);
     let mut comments = Comments::default();
     let mut root_open = false;
@@ -202,7 +202,7 @@ pub fn parse_comments(xml: impl AsRef<[u8]>) -> Result<Comments> {
 }
 
 /// Serialize a persons part after validating its bounded semantic model.
-pub fn write_persons(people: &People) -> Result<Vec<u8>> {
+pub fn write_persons(people: &People, xml_limits: litchi_core::Limits) -> Result<Vec<u8>> {
     validate_people(people)?;
     let mut xml = String::with_capacity(1024);
     xml.push_str(XML_HEADER);
@@ -216,11 +216,12 @@ pub fn write_persons(people: &People) -> Result<Vec<u8>> {
     }
     write_extensions(&mut xml, &people.extensions)?;
     xml.push_str("</personList>");
+    check_output(&xml, xml_limits)?;
     Ok(xml.into_bytes())
 }
 
 /// Serialize a worksheet threaded-comments part after validating its model.
-pub fn write_comments(comments: &Comments) -> Result<Vec<u8>> {
+pub fn write_comments(comments: &Comments, xml_limits: litchi_core::Limits) -> Result<Vec<u8>> {
     validate_comments(comments)?;
     let mut xml = String::with_capacity(4096);
     xml.push_str(XML_HEADER);
@@ -234,6 +235,7 @@ pub fn write_comments(comments: &Comments) -> Result<Vec<u8>> {
     }
     write_extensions(&mut xml, &comments.extensions)?;
     xml.push_str("</ThreadedComments>");
+    check_output(&xml, xml_limits)?;
     Ok(xml.into_bytes())
 }
 
@@ -826,8 +828,26 @@ fn optional_bool(
     }
 }
 
-fn check_size(xml: &[u8]) -> Result<()> {
-    if xml.len() > MAX_PART_BYTES {
+fn check_size(xml: &[u8], xml_limits: litchi_core::Limits) -> Result<()> {
+    let ceiling = crate::semantic_limits::xml_ceiling(
+        MAX_PART_BYTES,
+        xml_limits,
+        litchi_core::Resource::InputBytes,
+    );
+    if xml.len() > ceiling {
+        Err(invalid("threaded-comments part exceeds the resource bound"))
+    } else {
+        Ok(())
+    }
+}
+
+fn check_output(xml: &str, xml_limits: litchi_core::Limits) -> Result<()> {
+    let ceiling = crate::semantic_limits::xml_ceiling(
+        MAX_PART_BYTES,
+        xml_limits,
+        litchi_core::Resource::OutputBytes,
+    );
+    if xml.len() > ceiling {
         Err(invalid("threaded-comments part exceeds the resource bound"))
     } else {
         Ok(())

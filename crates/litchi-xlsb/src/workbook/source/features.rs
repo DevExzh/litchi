@@ -48,6 +48,7 @@ impl SourceBackedWorksheet {
                 self.metadata().workbook_position,
                 self.inner.leniency,
                 select,
+                self.inner.raw_limits,
             )
         })
     }
@@ -67,7 +68,7 @@ impl SourceBackedWorksheet {
             };
             let comments = self.inner.package.part(&name)?;
             require_content_type(&comments, XLSB_COMMENTS_CONTENT_TYPE)?;
-            crate::comments::edit::read(comments.data()?.as_bytes())
+            crate::comments::edit::read(comments.data()?.as_bytes(), self.inner.raw_limits)
         })
     }
 
@@ -114,7 +115,10 @@ impl SourceBackedWorkbook {
                 return Ok(Vec::new());
             };
             let part = self.inner.package.part(&styles)?;
-            crate::conditional_formatting::edit::read_differentials(part.data()?.as_bytes())
+            crate::conditional_formatting::edit::read_differentials(
+                part.data()?.as_bytes(),
+                self.inner.raw_limits,
+            )
         })();
         postflight_package(&self.inner.package)?;
         result

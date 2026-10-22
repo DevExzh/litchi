@@ -103,7 +103,11 @@ pub fn load_people(package: &OpcPackage, workbook_part: &PackURI) -> Result<Opti
     };
     let part = package.get_part(&part_name)?;
     validate_xml_part(part, PERSONS_CONTENT_TYPE, "persons")?;
-    let persons = parse_persons(part.blob()).map_err(map_model_error)?;
+    let persons = parse_persons(
+        part.blob(),
+        litchi_core::Limits::for_profile(litchi_core::Profile::Server),
+    )
+    .map_err(map_model_error)?;
     Ok(Some(PeoplePart {
         relationship_id,
         part_name: part_name.to_string(),
@@ -127,7 +131,11 @@ pub fn load_from_worksheet(
     };
     let part = package.get_part(&part_name)?;
     validate_xml_part(part, COMMENTS_CONTENT_TYPE, "threaded comments")?;
-    let comments = parse_comments(part.blob()).map_err(map_model_error)?;
+    let comments = parse_comments(
+        part.blob(),
+        litchi_core::Limits::for_profile(litchi_core::Profile::Server),
+    )
+    .map_err(map_model_error)?;
     Ok(Some(CommentsPart {
         worksheet_part_name: worksheet_part.to_string(),
         relationship_id,
@@ -143,7 +151,11 @@ fn store_people_part(
 ) -> Result<PeoplePart> {
     require_workbook(package.get_part(workbook_part)?)?;
     validate_people(&value.persons).map_err(map_authoring_error)?;
-    let payload = write_persons(&value.persons).map_err(map_authoring_error)?;
+    let payload = write_persons(
+        &value.persons,
+        litchi_core::Limits::for_profile(litchi_core::Profile::Server),
+    )
+    .map_err(map_authoring_error)?;
     let existing = find_relationship(
         package.get_part(workbook_part)?,
         PERSONS_RELATIONSHIP_TYPE,
@@ -193,7 +205,11 @@ fn store_comments_part(
     value: &CommentsPart,
 ) -> Result<CommentsPart> {
     require_worksheet(package.get_part(worksheet_part)?)?;
-    let payload = write_comments(&value.comments).map_err(map_authoring_error)?;
+    let payload = write_comments(
+        &value.comments,
+        litchi_core::Limits::for_profile(litchi_core::Profile::Server),
+    )
+    .map_err(map_authoring_error)?;
     let existing = find_relationship(
         package.get_part(worksheet_part)?,
         COMMENTS_RELATIONSHIP_TYPE,
@@ -305,7 +321,11 @@ fn validate_package_graph(package: &OpcPackage) -> Result<()> {
             if people_target.replace(target.clone()).is_some() {
                 return Err(invalid("workbook has multiple persons relationships"));
             }
-            let persons = parse_persons(target_part.blob()).map_err(map_model_error)?;
+            let persons = parse_persons(
+                target_part.blob(),
+                litchi_core::Limits::for_profile(litchi_core::Profile::Server),
+            )
+            .map_err(map_model_error)?;
             graph.persons = Some(PeoplePart {
                 relationship_id,
                 part_name: target.to_string(),
@@ -330,7 +350,11 @@ fn validate_package_graph(package: &OpcPackage) -> Result<()> {
             if !comment_targets.insert(target.clone()) {
                 return Err(invalid("threaded-comments part is targeted more than once"));
             }
-            let comments = parse_comments(target_part.blob()).map_err(map_model_error)?;
+            let comments = parse_comments(
+                target_part.blob(),
+                litchi_core::Limits::for_profile(litchi_core::Profile::Server),
+            )
+            .map_err(map_model_error)?;
             graph.worksheets.push(CommentsPart {
                 worksheet_part_name: source_name.to_string(),
                 relationship_id,

@@ -38,6 +38,7 @@ impl Workbook {
         Ok(crate::slicer::package::load_caches(
             &self.package,
             &litchi_opc::PackURI::new("/xl/workbook.bin")?,
+            self.raw_limits,
         )?
         .into_iter()
         .map(|part| part.cache)
@@ -47,7 +48,10 @@ impl Workbook {
     /// Return inert slicer views attached to one worksheet.
     pub fn slicers(&self, worksheet_index: usize) -> Result<Option<crate::slicer::Views>> {
         let worksheet = self.worksheet_uri(worksheet_index)?;
-        Ok(crate::slicer::package::load_views(&self.package, &worksheet)?.map(|part| part.views))
+        Ok(
+            crate::slicer::package::load_views(&self.package, &worksheet, self.raw_limits)?
+                .map(|part| part.views),
+        )
     }
 
     /// Return inert timeline cache snapshots in workbook relationship order.
@@ -55,6 +59,7 @@ impl Workbook {
         Ok(crate::timeline::package::load_caches(
             &self.package,
             &litchi_opc::PackURI::new("/xl/workbook.bin")?,
+            self.semantic_limits.xml_parts_value(),
         )?
         .into_iter()
         .map(|part| part.cache)
@@ -64,7 +69,12 @@ impl Workbook {
     /// Return inert timeline views attached to one worksheet.
     pub fn timelines(&self, worksheet_index: usize) -> Result<Option<crate::timeline::Views>> {
         let worksheet = self.worksheet_uri(worksheet_index)?;
-        Ok(crate::timeline::package::load_views(&self.package, &worksheet)?.map(|part| part.views))
+        Ok(crate::timeline::package::load_views(
+            &self.package,
+            &worksheet,
+            self.semantic_limits.xml_parts_value(),
+        )?
+        .map(|part| part.views))
     }
 
     /// Return the typed Scenario Manager stored in one worksheet, if any.
@@ -77,7 +87,7 @@ impl Workbook {
     ) -> Result<Option<crate::package::scenarios::Manager>> {
         let uri = self.worksheet_uri(worksheet_index)?;
         let part = self.package.get_part(&uri)?;
-        crate::package::scenarios::parse_worksheet(part.blob())
+        crate::package::scenarios::parse_worksheet(part.blob(), self.raw_limits)
     }
 
     /// Return the typed Scenario Manager for a worksheet selected by name.
@@ -94,7 +104,7 @@ impl Workbook {
     pub fn merged_cell_ranges(&self, worksheet_index: usize) -> Result<Vec<MergedCell>> {
         let uri = self.worksheet_uri(worksheet_index)?;
         let part = self.package.get_part(&uri)?;
-        Ok(Self::inspect_merge_block(part.blob())?.ranges)
+        Ok(Self::inspect_merge_block(part.blob(), self.raw_limits)?.ranges)
     }
 
     /// List merged ranges in a worksheet selected by exact name.
@@ -111,9 +121,9 @@ impl Workbook {
     ) -> Result<()> {
         let uri = self.worksheet_uri(worksheet_index)?;
         let original = self.package.get_part(&uri)?.blob().to_vec();
-        let layout = Self::inspect_merge_block(&original)?;
+        let layout = Self::inspect_merge_block(&original, self.raw_limits)?;
         let normalized = Self::normalize_merge_ranges(ranges)?;
-        let replacement = Self::serialize_merge_block(&normalized)?;
+        let replacement = Self::serialize_merge_block(&normalized, self.raw_limits)?;
         let (start, end) = layout
             .block_span
             .unwrap_or((layout.insertion_offset, layout.insertion_offset));
@@ -121,7 +131,7 @@ impl Workbook {
         updated.extend_from_slice(&original[..start]);
         updated.extend_from_slice(&replacement);
         updated.extend_from_slice(&original[end..]);
-        Self::inspect_merge_block(&updated)?;
+        Self::inspect_merge_block(&updated, self.raw_limits)?;
         if updated == original {
             return Ok(());
         }
@@ -268,8 +278,11 @@ impl Workbook {
         )
     }
 
-    pub(crate) fn inspect_merge_block(data: &[u8]) -> Result<MergeBlockLayout> {
-        let mut records = Records::new(data, crate::raw::Limits::DEFAULT);
+    pub(crate) fn inspect_merge_block(
+        data: &[u8],
+        raw_limits: crate::raw::Limits,
+    ) -> Result<MergeBlockLayout> {
+        let mut records = Records::new(data, raw_limits);
         let mut begin_offset = None;
         let mut block_span = None;
         let mut declared_count = None;
@@ -314,7 +327,7 @@ impl Workbook {
                             val: "record occurs outside BrtBeginMergeCells",
                         });
                     }
-                    ranges.push(MergedCell::parse(record.payload())?);
+                    ranges.push(MergedCell::parse(record.payload(), raw_limits)?);
                     if ranges.len() > declared_count.unwrap_or_default() {
                         return Err(crate::package::error::Error::Unrecognized {
                             typ: "BrtBeginMergeCells",
@@ -402,18 +415,21 @@ impl Workbook {
         })
     }
 
-    pub(crate) fn serialize_merge_block(ranges: &[MergedCell]) -> Result<Vec<u8>> {
+    pub(crate) fn serialize_merge_block(
+        ranges: &[MergedCell],
+        raw_limits: crate::raw::Limits,
+    ) -> Result<Vec<u8>> {
         if ranges.is_empty() {
             return Ok(Vec::new());
         }
         let mut output = Vec::with_capacity(10 + ranges.len() * 19);
-        let mut writer = crate::raw::Encoder::new(&mut output, crate::raw::Limits::DEFAULT);
+        let mut writer = crate::raw::Encoder::new(&mut output, raw_limits);
         writer.write_record(
             kind::BEGIN_MERGE_CELLS,
             &(ranges.len() as u32).to_le_bytes(),
         )?;
         for range in ranges {
-            writer.write_record(kind::MERGE_CELL, &range.serialize())?;
+            writer.write_record(kind::MERGE_CELL, &range.serialize(raw_limits)?)?;
         }
         writer.write_record(kind::END_MERGE_CELLS, &[])?;
         Ok(output)

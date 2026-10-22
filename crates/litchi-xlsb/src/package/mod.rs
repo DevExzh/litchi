@@ -124,6 +124,8 @@ pub struct Package(
     Projection,
     // The semantic budgets every family read and edit defaults to.
     crate::SemanticLimits,
+    // The raw BIFF12 policy every detached codec reached by this owner uses.
+    crate::raw::Limits,
 );
 
 /// The lazily filled, shared workbook projection of a [`Package`].
@@ -174,7 +176,7 @@ impl Package {
 
     pub(crate) fn project_candidate(&self, candidate: OpcPackage) -> Result<Workbook> {
         let mut workbook =
-            Workbook::reparse_candidate_with_policy(candidate, self.1, self.3, self.4)?;
+            Workbook::reparse_candidate_with_policy(candidate, self.1, self.3, self.4, self.7)?;
         workbook.set_semantic_limits(self.6);
         Ok(workbook)
     }
@@ -184,6 +186,12 @@ impl Package {
     #[must_use]
     pub const fn semantic_limits(&self) -> crate::SemanticLimits {
         self.6
+    }
+
+    /// The BIFF12 raw policy retained by this package owner.
+    #[must_use]
+    pub const fn raw_limits_value(&self) -> crate::raw::Limits {
+        self.7
     }
 
     /// Return this package with other semantic budgets; the OPC graph and
@@ -289,6 +297,7 @@ impl Package {
             package.clone(),
             options.external_link_limits,
             drawing_load_policy,
+            options.raw_limits,
         )?;
         workbook.set_projection_leniency(options.leniency);
         workbook.set_semantic_limits(options.semantic_limits);
@@ -301,6 +310,7 @@ impl Package {
             options.leniency,
             Projection::filled(workbook),
             options.semantic_limits,
+            options.raw_limits,
         ))
     }
 
@@ -313,6 +323,7 @@ impl Package {
             workbook.leniency(),
             Projection::default(),
             workbook.semantic_limits(),
+            workbook.raw_limits_value(),
         )
     }
 
@@ -324,6 +335,7 @@ impl Package {
         let drawing_policy = workbook.drawing_load_policy();
         let leniency = workbook.leniency();
         let semantic_limits = workbook.semantic_limits();
+        let raw_limits = workbook.raw_limits_value();
         let package = workbook.package.clone();
         Self(
             Arc::new(package),
@@ -333,6 +345,7 @@ impl Package {
             leniency,
             Projection::filled(workbook),
             semantic_limits,
+            raw_limits,
         )
     }
 
@@ -354,6 +367,7 @@ impl Package {
             self.4,
             Projection::filled(workbook),
             self.6,
+            self.7,
         ))
     }
 
@@ -373,6 +387,7 @@ impl Package {
             self.4,
             Projection::default(),
             self.6,
+            self.7,
         )
     }
 
@@ -552,6 +567,7 @@ impl Package {
             (*self.0).clone(),
             self.1,
             self.3,
+            self.7,
         )?;
         workbook.set_projection_leniency(self.4);
         workbook.set_semantic_limits(self.6);
@@ -643,6 +659,7 @@ impl From<OpcPackage> for Package {
             Leniency::Strict,
             Projection::default(),
             crate::SemanticLimits::new(),
+            crate::raw::Limits::DEFAULT,
         )
     }
 }
@@ -671,21 +688,25 @@ mod tests {
             .max_links(1)
             .build()
             .expect("external limits");
+        let raw_limits = crate::raw::Limits::new(4096, 1024);
         let workbook = Workbook::new_with_options(
             Cursor::new(bytes),
             OpenOptions::new()
                 .source_limits(source_limits)
-                .external_link_limits(external_limits),
+                .external_link_limits(external_limits)
+                .raw_limits(raw_limits),
         )
         .expect("bounded workbook");
         let package = workbook.into_package();
         assert_eq!(package.external_link_limits(), external_limits);
+        assert_eq!(package.raw_limits_value(), raw_limits);
         assert_eq!(
             package.opc_package().source_read_limits(),
             Some(source_limits)
         );
         let reconstructed = package.materialize_workbook().expect("projection");
         assert_eq!(reconstructed.external_link_limits(), external_limits);
+        assert_eq!(reconstructed.raw_limits_value(), raw_limits);
         assert_eq!(
             reconstructed.opc_package().source_read_limits(),
             Some(source_limits)

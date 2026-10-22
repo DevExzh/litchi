@@ -37,7 +37,7 @@ fn stream(records: &[(Kind, Vec<u8>)]) -> Vec<u8> {
 }
 
 fn parse(records: &[(Kind, Vec<u8>)]) -> Result<PivotCacheDefinition> {
-    parse_pivot_cache_definition(&stream(records))
+    parse_pivot_cache_definition(&stream(records), crate::raw::Limits::DEFAULT)
 }
 
 /// `BrtBeginPivotCacheDef` payload with refreshed-by and records rel id.

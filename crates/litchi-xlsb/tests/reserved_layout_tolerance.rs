@@ -93,7 +93,7 @@ fn name_record(flags: u32, name: &str) -> Vec<u8> {
             rgce: vec![litchi_xlsb::ptg_types::PTG_INT, 1, 0],
             rgcb: Vec::new(),
         }
-        .to_bytes()
+        .to_bytes(litchi_xlsb::raw::Limits::DEFAULT)
         .unwrap(),
     );
     data.extend_from_slice(&u32::MAX.to_le_bytes());
@@ -483,14 +483,14 @@ fn standalone_codec_functions_still_refuse_what_they_cannot_report() {
         }
     }
     let mut calc = calc.unwrap();
-    litchi_xlsb::calc::read(&calc).unwrap();
+    litchi_xlsb::calc::read(&calc, litchi_xlsb::raw::Limits::DEFAULT).unwrap();
     calc[25] |= 0x80;
-    assert!(litchi_xlsb::calc::read(&calc).is_err());
+    assert!(litchi_xlsb::calc::read(&calc, litchi_xlsb::raw::Limits::DEFAULT).is_err());
 
     let mut border = border.unwrap();
-    litchi_xlsb::styles::parse_border(&border).unwrap();
+    litchi_xlsb::styles::parse_border(&border, litchi_xlsb::raw::Limits::DEFAULT).unwrap();
     border[0] |= 0x80;
-    assert!(litchi_xlsb::styles::parse_border(&border).is_err());
+    assert!(litchi_xlsb::styles::parse_border(&border, litchi_xlsb::raw::Limits::DEFAULT).is_err());
 }
 
 #[test]

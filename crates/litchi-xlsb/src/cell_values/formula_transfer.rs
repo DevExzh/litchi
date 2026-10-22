@@ -55,9 +55,13 @@ pub(super) fn remap(
         .formula_context
         .for_sheet(target.catalog_position_for_worksheet(target_sheet)?);
     let mut tokens = formula.tokens().to_vec();
-    let parsed = Parser::with_extra(formula.tokens(), formula.ancillary())
-        .parse_spanned()
-        .map_err(formula_error)?;
+    let parsed = Parser::with_extra(
+        formula.tokens(),
+        formula.ancillary(),
+        source.raw_limits_value(),
+    )
+    .parse_spanned()
+    .map_err(formula_error)?;
 
     for (token, span) in parsed {
         match token {
@@ -153,7 +157,12 @@ pub(super) fn remap(
         }
     }
 
-    CellFormula::new(formula.flags(), tokens, formula.ancillary().to_vec())
+    CellFormula::new(
+        formula.flags(),
+        tokens,
+        formula.ancillary().to_vec(),
+        target.raw_limits_value(),
+    )
 }
 
 fn map_name(source: &Workbook, target: &Workbook, index: u32) -> Result<u32> {
@@ -183,12 +192,13 @@ fn defined_names(workbook: &Workbook) -> Result<Vec<NameIdentity>> {
     let workbook_uri = workbook.package.main_document_part()?.partname().clone();
     let source = workbook.package.get_part(&workbook_uri)?.blob();
     let mut names = Vec::new();
-    for item in Records::new(source, crate::raw::Limits::DEFAULT) {
+    let raw_limits = workbook.raw_limits_value();
+    for item in Records::new(source, raw_limits) {
         let record = item?;
         if record.kind() != kind::NAME {
             continue;
         }
-        let definition = crate::named_ranges::parse(record.payload())?;
+        let definition = crate::named_ranges::parse(record.payload(), raw_limits)?;
         let scope = definition
             .sheet_id
             .map(|sheet| {

@@ -58,7 +58,12 @@ fn package_with_model_connection(names: &[&str], model_connection: &str) -> Pack
         .expect("connections");
     writer
         .set_data_model(
-            Model::from_bytes(definition(model_connection), vec![1, 2, 3, 4]).expect("model"),
+            Model::from_bytes(
+                definition(model_connection),
+                vec![1, 2, 3, 4],
+                litchi_xlsb::data_model::SemanticLimits::DEFAULT,
+            )
+            .expect("model"),
         )
         .expect("data model");
 
@@ -238,7 +243,14 @@ fn case_variant_connection_names_are_rejected_as_ambiguous_owners() {
     let mut writer = Builder::new();
     writer.add_worksheet(builder::Worksheet::new("Sheet1"));
     writer
-        .set_data_model(Model::from_bytes(definition("alpha"), vec![1, 2, 3, 4]).expect("model"))
+        .set_data_model(
+            Model::from_bytes(
+                definition("alpha"),
+                vec![1, 2, 3, 4],
+                litchi_xlsb::data_model::SemanticLimits::DEFAULT,
+            )
+            .expect("model"),
+        )
         .expect("stage model before owner");
     let error = writer
         .set_connections(Connections {

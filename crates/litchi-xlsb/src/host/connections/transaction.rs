@@ -30,14 +30,15 @@ pub struct Snapshot {
 }
 
 impl Snapshot {
-    /// Read and validate the complete workbook connections graph.
-    pub fn read(package: &OpcPackage) -> Result<Self> {
-        let connections = package::validate_graph(package)?;
+    /// Read and validate the complete workbook connections graph under the
+    /// owner's raw profile.
+    pub(crate) fn read(package: &OpcPackage, raw_limits: crate::raw::Limits) -> Result<Self> {
+        let connections = package::load(package, raw_limits)?;
         let source = package::capture_source(package)?;
         let unknown_records = source
             .connection
             .as_ref()
-            .map(|part| super::codec::parse_source(part.bytes.as_ref()))
+            .map(|part| super::codec::parse_source(part.bytes.as_ref(), raw_limits))
             .transpose()?
             .map_or_else(Vec::new, |source| source.unknown_records);
         validation::unknown_records(&unknown_records)?;
@@ -46,11 +47,6 @@ impl Snapshot {
             source,
             unknown_records,
         })
-    }
-
-    /// Alias for [`Snapshot::read`].
-    pub fn load(package: &OpcPackage) -> Result<Self> {
-        Self::read(package)
     }
 
     /// Borrow the typed connection catalog, when present.
@@ -128,7 +124,7 @@ impl crate::Package {
     ///
     /// Returns the connections graph and decoding errors.
     pub fn connections(&self) -> Result<Snapshot> {
-        Snapshot::read(self.opc_package())
+        Snapshot::read(self.opc_package(), self.raw_limits_value())
     }
 
     /// Start a connections edit. Starting one copies no part payload.
@@ -137,7 +133,7 @@ impl crate::Package {
     ///
     /// Returns the connections graph and decoding errors.
     pub fn edit_connections(&self) -> Result<Edit> {
-        let before = Snapshot::read(self.opc_package())?;
+        let before = Snapshot::read(self.opc_package(), self.raw_limits_value())?;
         Ok(Edit {
             staged: Staged::of_package(self)?,
             draft: before.connections.clone(),
@@ -348,15 +344,18 @@ impl Edit {
         crate::signature_policy::ensure_unsigned(self.staged.opc())?;
         let workbook = self.before.source.workbook_name.clone();
         let draft = self.draft.clone();
+        let raw_limits = self.staged.raw_limits();
         self.staged.update(|candidate| {
             let stored = match &draft {
-                Some(value) => Some(package::store_on_workbook(candidate, &workbook, value)?),
+                Some(value) => Some(package::store_on_workbook(
+                    candidate, &workbook, value, raw_limits,
+                )?),
                 None => {
                     package::remove_from_workbook(candidate, &workbook)?;
                     None
                 },
             };
-            let snapshot = Snapshot::read(candidate)?;
+            let snapshot = Snapshot::read(candidate, raw_limits)?;
             if snapshot.connections != stored {
                 return Err(super::invalid(
                     "connection publication changed the staged model",

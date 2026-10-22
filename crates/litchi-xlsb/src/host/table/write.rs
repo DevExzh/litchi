@@ -283,7 +283,7 @@ mod tests {
     fn serialized_table_round_trips_through_the_reader() {
         let table = sample_table();
         let bytes = write_table_part(&table).unwrap();
-        let parsed = parse_table_part(&bytes).unwrap();
+        let parsed = parse_table_part(&bytes, crate::raw::Limits::DEFAULT).unwrap();
         assert_eq!(parsed, table);
     }
 
@@ -302,7 +302,7 @@ mod tests {
             ..Table::default()
         };
         let bytes = write_table_part(&table).unwrap();
-        let parsed = parse_table_part(&bytes).unwrap();
+        let parsed = parse_table_part(&bytes, crate::raw::Limits::DEFAULT).unwrap();
         assert_eq!(parsed, table);
     }
 
@@ -322,7 +322,9 @@ mod tests {
         }
         writer.write_record(rt::END_LIST_PARTS, &[]).unwrap();
         writer.write_record(rt::END_SHEET, &[]).unwrap();
-        let rel_ids = crate::package::table::parse_table_part_rel_ids(&stream).unwrap();
+        let rel_ids =
+            crate::package::table::parse_table_part_rel_ids(&stream, crate::raw::Limits::DEFAULT)
+                .unwrap();
         assert_eq!(rel_ids, ["rId5", "rId9"]);
     }
 }

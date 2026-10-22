@@ -83,7 +83,9 @@ fn package_with_model(definition: Definition, payload: Vec<u8>) -> Package {
     writer.add_worksheet(builder::Worksheet::new("Sheet1"));
     writer.set_connections(connections()).expect("connections");
     writer
-        .set_data_model(Model::from_bytes(definition, payload).expect("model"))
+        .set_data_model(
+            Model::from_bytes(definition, payload, SemanticLimits::DEFAULT).expect("model"),
+        )
         .expect("set Data Model");
     let mut output = Cursor::new(Vec::new());
     writer
@@ -937,13 +939,14 @@ fn rename_patch_inverse_restores_exact_source_and_rejects_stale_source() {
     assert_eq!(restored.to_bytes().unwrap(), source_bytes);
 
     let stale = package_with_corrupted_model_source(source.clone());
-    assert!(
-        stale
-            .apply_data_model(commit.patch())
-            .map(litchi_core::edit::Commit::into_package)
-            .is_err(),
-        "stale source must be refused"
-    );
+    let error = stale
+        .apply_data_model(commit.patch())
+        .map(litchi_core::edit::Commit::into_package)
+        .expect_err("stale source must be refused");
+    assert!(matches!(
+        error,
+        litchi_xlsb::package::PackageError::PatchConflict { part: "data model" }
+    ));
     assert_eq!(
         stale.to_bytes().unwrap(),
         package_with_corrupted_model_source(source)

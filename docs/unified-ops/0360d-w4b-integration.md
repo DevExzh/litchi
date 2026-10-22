@@ -47,11 +47,14 @@ sizes, SHA-256 values, commands, exit codes and test counts, including failed
 attempts. Nine affected packages pass all-target/all-feature compilation.
 The OPC/XLDM library command passes 824 tests; the full XLSB command passes
 1,317 tests with 11 ignored doctests. Tool tests, corpus, capability delta,
-benchmark-matrix regeneration and crate boundaries pass. Additional lint
-and facade results are listed in the receipt. Unified XLSB tests, locked
-harness checks and both XLSB glossary profiles are still running or queued
-at this assembly checkpoint; their completed receipts will follow.
-All 26 incoming commits were checked against the history rewrite map and contain no purged IDs.
+benchmark-matrix regeneration and crate boundaries pass. All-target/all-feature
+Clippy passes for eleven affected packages, as does the XLSB-only ops profile.
+The facade suite passes 23 tests and the unified XLSB filter passes 36.
+The main benchmark harness and all nine XLSB harnesses pass locked offline
+all-target checks. Both XLSB glossary profiles and both formatting checks pass.
+All 26 incoming commits were checked against the history rewrite map and
+contain no purged IDs. The source assembly is committed as `933ce43de3`;
+the later results use the same Rust source and lockfiles.
 
 This assembly does not accept the later XLSX source-owner memory residual or
 metadata no-op composition restriction. Those repairs remain on the worker

@@ -56,6 +56,7 @@ fn empty_workbook() -> Workbook {
         sheet_tabs: Vec::new(),
         active_catalog_position: None,
         formula_context: Context::default(),
+        raw_limits: crate::raw::Limits::DEFAULT,
         external_link_limits: ExternalLinkLimits::default(),
         shared_strings: Vec::new(),
         styles: StylesTable::default(),
@@ -103,6 +104,7 @@ fn durable_patch_decode_can_opt_into_skipped_drawing_projection() {
     let decoded = crate::cell_values::structure::Patch::from_bytes_without_drawing_parse(
         &encoded,
         crate::cell_values::TransferLimits::DEFAULT,
+        workbook.raw_limits_value(),
     )
     .unwrap();
     assert_eq!(decoded.operation_count(), 0);
@@ -115,6 +117,82 @@ fn durable_patch_decode_can_opt_into_skipped_drawing_projection() {
     .unwrap();
     decoded.apply(&mut skipped).unwrap();
     assert!(!skipped.drawings_parsed());
+}
+
+#[test]
+fn durable_patch_replays_when_decoded_policy_is_wider_but_content_fits_owner() {
+    let workbook = generated_workbook();
+    let package = workbook.to_package();
+    let mut edit = package.edit().unwrap();
+    edit.set_sheet_name(0, "Renamed".to_owned())
+        .expect("stage sheet rename")
+        .expect("worksheet selector");
+    let commit = edit.commit().unwrap();
+    let encoded = commit
+        .patch()
+        .to_bytes(crate::cell_values::TransferLimits::DEFAULT)
+        .unwrap();
+    let broad_raw = crate::raw::Limits::new(
+        crate::raw::Limits::DEFAULT.payload().saturating_add(1),
+        crate::raw::Limits::DEFAULT.string_units(),
+    );
+    let decoded = crate::cell_values::structure::Patch::from_bytes(
+        &encoded,
+        crate::cell_values::TransferLimits::DEFAULT,
+        broad_raw,
+    )
+    .unwrap();
+    let applied = package
+        .apply(&decoded)
+        .expect("the after image fits the recipient raw policy")
+        .into_package();
+    assert_eq!(
+        applied.to_bytes().expect("applied bytes"),
+        commit.package().to_bytes().expect("committed bytes")
+    );
+}
+
+#[test]
+fn durable_patch_rejects_after_image_that_exceeds_recipient_raw_policy() {
+    let workbook = generated_workbook();
+    let source = workbook.to_package().to_bytes().expect("source bytes");
+    let broad = crate::Package::from_bytes_with_options(
+        &source,
+        crate::OpenOptions::new().raw_limits(crate::raw::Limits::DEFAULT),
+    )
+    .expect("broad owner");
+    // The generated workbook's initial metadata uses seven UTF-16 units. The
+    // narrow recipient admits that base but not the eight-unit replacement.
+    let narrow_raw = crate::raw::Limits::new(crate::raw::Limits::DEFAULT.payload(), 7);
+    let narrow = crate::Package::from_bytes_with_options(
+        &source,
+        crate::OpenOptions::new().raw_limits(narrow_raw),
+    )
+    .expect("narrow owner admits the before image");
+    let mut edit = broad.edit().unwrap();
+    edit.set_sheet_name(0, "Renamed8".to_owned())
+        .expect("stage sheet rename")
+        .expect("worksheet selector");
+    let commit = edit.commit().unwrap();
+    let encoded = commit
+        .patch()
+        .to_bytes(crate::cell_values::TransferLimits::DEFAULT)
+        .unwrap();
+    let decoded = crate::cell_values::structure::Patch::from_bytes(
+        &encoded,
+        crate::cell_values::TransferLimits::DEFAULT,
+        crate::raw::Limits::DEFAULT,
+    )
+    .unwrap();
+    let error = narrow.apply(&decoded).unwrap_err();
+    assert!(matches!(
+        error,
+        crate::package::PackageError::Wire(crate::raw::Error::StringLimit {
+            units: 8,
+            limit: 7,
+            ..
+        })
+    ));
 }
 
 #[test]
@@ -272,6 +350,7 @@ fn parse_external_link_with_relationship_type(
         sheet_tabs: Vec::new(),
         active_catalog_position: None,
         formula_context: Context::default(),
+        raw_limits: crate::raw::Limits::DEFAULT,
         external_link_limits: ExternalLinkLimits::default(),
         shared_strings: Vec::new(),
         styles: StylesTable::default(),
@@ -295,7 +374,12 @@ fn parse_shared_string_records(records: &[(RawKind, Vec<u8>)]) -> Result<Vec<Sha
     let data = external_link_records(records);
     let mut iter = Records::new(data.as_slice(), crate::raw::Limits::DEFAULT);
     let mut strings = Vec::new();
-    Workbook::read_shared_strings(&mut iter, &mut strings, &mut Default::default())?;
+    Workbook::read_shared_strings(
+        &mut iter,
+        &mut strings,
+        &mut Default::default(),
+        crate::raw::Limits::DEFAULT,
+    )?;
     Ok(strings)
 }
 
@@ -546,6 +630,7 @@ fn default_external_link_constructors_match_explicit_default_policy() {
     let explicit_workbook = Workbook::from_opc_package_with_external_link_limits(
         package_with_external_links(&links),
         ExternalLinkLimits::DEFAULT,
+        crate::raw::Limits::DEFAULT,
     )
     .unwrap();
     assert_eq!(
@@ -604,9 +689,12 @@ fn eager_external_link_part_bytes_are_aggregated_across_parts() {
         .unwrap();
 
     let source_package = package_with_external_links(&links);
-    let error =
-        Workbook::from_opc_package_with_external_link_limits(source_package.clone(), limits)
-            .unwrap_err();
+    let error = Workbook::from_opc_package_with_external_link_limits(
+        source_package.clone(),
+        limits,
+        crate::raw::Limits::DEFAULT,
+    )
+    .unwrap_err();
     assert_external_link_limit(
         error,
         ExternalLinkResource::TotalPartBytes,
@@ -631,9 +719,12 @@ fn eager_external_link_part_bytes_are_aggregated_across_parts() {
         .max_total_part_bytes(part_bytes * 2)
         .build()
         .unwrap();
-    let workbook =
-        Workbook::from_opc_package_with_external_link_limits(source_package, larger_limits)
-            .unwrap();
+    let workbook = Workbook::from_opc_package_with_external_link_limits(
+        source_package,
+        larger_limits,
+        crate::raw::Limits::DEFAULT,
+    )
+    .unwrap();
     assert_eq!(workbook.external_link_limits(), larger_limits);
     assert_eq!(workbook.external_link_count(), 2);
     assert_eq!(
@@ -671,9 +762,12 @@ fn eager_external_link_limits_are_atomic_and_reconstruct_with_policy() {
     let restrictive = ExternalLinkLimits::builder().max_links(1).build().unwrap();
 
     let source_package = package_with_external_links(&links);
-    let error =
-        Workbook::from_opc_package_with_external_link_limits(source_package.clone(), restrictive)
-            .unwrap_err();
+    let error = Workbook::from_opc_package_with_external_link_limits(
+        source_package.clone(),
+        restrictive,
+        crate::raw::Limits::DEFAULT,
+    )
+    .unwrap_err();
     assert_external_link_limit(error, ExternalLinkResource::Links, 2, 1);
 
     let error = crate::Package::from_opc_with_options(
@@ -745,6 +839,7 @@ fn custom_external_link_limits_survive_unrelated_opc_reparse() {
     let mut workbook = Workbook::from_opc_package_with_external_link_limits(
         package_with_external_links(&links),
         limits,
+        crate::raw::Limits::DEFAULT,
     )
     .unwrap();
     let marker = PackURI::new("/xl/raw-edit-marker.bin").unwrap();
@@ -790,15 +885,21 @@ fn eager_external_link_item_limits_are_aggregated_across_parts() {
     ];
     let limits = ExternalLinkLimits::builder().max_items(1).build().unwrap();
     let source_package = package_with_external_links(&links);
-    let error =
-        Workbook::from_opc_package_with_external_link_limits(source_package.clone(), limits)
-            .unwrap_err();
+    let error = Workbook::from_opc_package_with_external_link_limits(
+        source_package.clone(),
+        limits,
+        crate::raw::Limits::DEFAULT,
+    )
+    .unwrap_err();
     assert_external_link_limit(error, ExternalLinkResource::Items, 2, 1);
 
     let larger_limits = ExternalLinkLimits::builder().max_items(2).build().unwrap();
-    let workbook =
-        Workbook::from_opc_package_with_external_link_limits(source_package, larger_limits)
-            .unwrap();
+    let workbook = Workbook::from_opc_package_with_external_link_limits(
+        source_package,
+        larger_limits,
+        crate::raw::Limits::DEFAULT,
+    )
+    .unwrap();
     assert_eq!(workbook.external_link_limits(), larger_limits);
     assert_eq!(workbook.external_link_count(), 2);
 }
@@ -833,15 +934,21 @@ fn eager_external_link_cell_limits_are_aggregated_across_parts() {
     ];
     let limits = ExternalLinkLimits::builder().max_cells(1).build().unwrap();
     let source_package = package_with_external_links(&links);
-    let error =
-        Workbook::from_opc_package_with_external_link_limits(source_package.clone(), limits)
-            .unwrap_err();
+    let error = Workbook::from_opc_package_with_external_link_limits(
+        source_package.clone(),
+        limits,
+        crate::raw::Limits::DEFAULT,
+    )
+    .unwrap_err();
     assert_external_link_limit(error, ExternalLinkResource::Cells, 2, 1);
 
     let larger_limits = ExternalLinkLimits::builder().max_cells(2).build().unwrap();
-    let workbook =
-        Workbook::from_opc_package_with_external_link_limits(source_package, larger_limits)
-            .unwrap();
+    let workbook = Workbook::from_opc_package_with_external_link_limits(
+        source_package,
+        larger_limits,
+        crate::raw::Limits::DEFAULT,
+    )
+    .unwrap();
     assert_eq!(workbook.external_link_limits(), larger_limits);
     assert_eq!(workbook.external_link_count(), 2);
 }
@@ -887,6 +994,7 @@ fn eager_external_link_aggregate_boundaries_are_inclusive() {
     let workbook = Workbook::from_opc_package_with_external_link_limits(
         package_with_external_links(&links),
         limits,
+        crate::raw::Limits::DEFAULT,
     )
     .unwrap();
     assert_eq!(workbook.external_link_count(), 2);
@@ -930,6 +1038,7 @@ fn eager_dde_and_ole_targets_remain_inert() {
     let workbook = Workbook::from_opc_package_with_external_link_limits(
         package_with_external_links(&links),
         limits,
+        crate::raw::Limits::DEFAULT,
     )
     .unwrap();
     let dde = workbook.external_link(0).unwrap();
@@ -1225,6 +1334,7 @@ fn reads_external_book_metadata_from_local_fixture() {
         sheet_tabs: Vec::new(),
         active_catalog_position: None,
         formula_context: Context::default(),
+        raw_limits: crate::raw::Limits::DEFAULT,
         external_link_limits: ExternalLinkLimits::default(),
         shared_strings: Vec::new(),
         styles: StylesTable::default(),
@@ -1430,7 +1540,7 @@ fn resolves_external_formula_tokens_from_package_relationships() {
     assert_eq!(link.sheet_names(), &["Data Sheet".to_string()]);
     assert_eq!(link.defined_names()[0].name(), "Rate");
 
-    let reference = Parser::new(&[0x5A, 0, 0, 0, 0, 0, 0, 0, 0])
+    let reference = Parser::new(&[0x5A, 0, 0, 0, 0, 0, 0, 0, 0], crate::raw::Limits::DEFAULT)
         .parse()
         .unwrap();
     assert_eq!(
@@ -1438,7 +1548,9 @@ fn resolves_external_formula_tokens_from_package_relationships() {
             .unwrap(),
         "'[Book.xlsx]Data Sheet'!$A$1"
     );
-    let name = Parser::new(&[0x59, 0, 0, 1, 0, 0, 0]).parse().unwrap();
+    let name = Parser::new(&[0x59, 0, 0, 1, 0, 0, 0], crate::raw::Limits::DEFAULT)
+        .parse()
+        .unwrap();
     assert_eq!(
         Compiler::try_tokens_to_string_with_resolution(&name, &workbook.formula_context).unwrap(),
         "'[Book.xlsx]'!Rate"
@@ -1637,6 +1749,7 @@ fn workbook_projection(workbook: &Workbook) -> String {
         sheet_tabs,
         active_catalog_position,
         formula_context,
+        raw_limits: _,
         external_link_limits,
         shared_strings,
         styles,
@@ -1678,6 +1791,7 @@ fn reparse_published_package(workbook: &Workbook) -> Workbook {
     Workbook::from_opc_package_with_external_link_limits(
         workbook.opc_package().clone(),
         workbook.external_link_limits(),
+        crate::raw::Limits::DEFAULT,
     )
     .unwrap()
 }

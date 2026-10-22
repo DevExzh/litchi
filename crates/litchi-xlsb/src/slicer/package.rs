@@ -363,7 +363,11 @@ fn load_cache_refs(package: &OpcPackage, workbook: &PackURI) -> Result<Vec<Strin
 }
 
 /// Load all workbook slicer cache parts.
-pub fn load_caches(package: &OpcPackage, workbook: &PackURI) -> Result<Vec<CachePart>> {
+pub fn load_caches(
+    package: &OpcPackage,
+    workbook: &PackURI,
+    limits: crate::raw::Limits,
+) -> Result<Vec<CachePart>> {
     let refs = load_cache_refs(package, workbook)?;
     let workbook_part = package.get_part(workbook)?;
     let mut output = Vec::with_capacity(refs.len());
@@ -389,7 +393,7 @@ pub fn load_caches(package: &OpcPackage, workbook: &PackURI) -> Result<Vec<Cache
         output.push(CachePart {
             relationship_id: relationship_id.clone(),
             part_name: target.as_str().to_string(),
-            cache: parse_cache(part.blob())?,
+            cache: parse_cache(part.blob(), limits)?,
         });
     }
     let referenced: HashSet<_> = output.iter().map(|part| part.part_name.as_str()).collect();
@@ -443,10 +447,11 @@ pub(crate) fn store_caches(
     package: &mut OpcPackage,
     workbook: &PackURI,
     caches: &[Cache],
+    limits: crate::raw::Limits,
 ) -> Result<()> {
     validate_cache_set(caches)?;
     crate::signature_policy::ensure_unsigned(package)?;
-    let _ = load_caches(package, workbook)?;
+    let _ = load_caches(package, workbook, limits)?;
     let old_refs = load_cache_refs(package, workbook)?;
     let old_block = record_span(
         package.get_part(workbook)?.blob(),
@@ -477,7 +482,7 @@ pub(crate) fn store_caches(
                 break candidate;
             }
         };
-        let bytes = write_cache(cache)?;
+        let bytes = write_cache(cache, limits)?;
         package.try_add_part(Box::new(BlobPart::new(
             uri.clone(),
             CACHE_CONTENT_TYPE.to_string(),
@@ -521,6 +526,7 @@ fn load_view_ref(
     begin: crate::raw::Kind,
     end: crate::raw::Kind,
     typ: &'static str,
+    limits: crate::raw::Limits,
 ) -> Result<Option<ViewPart>> {
     let worksheet_part = package.get_part(worksheet)?;
     let reference = parse_single_ref(worksheet_part.blob(), begin, end, typ)?;
@@ -549,12 +555,16 @@ fn load_view_ref(
     Ok(Some(ViewPart {
         relationship_id: relationship.r_id().to_string(),
         part_name: target.as_str().to_string(),
-        views: parse_views(part.blob())?,
+        views: parse_views(part.blob(), limits)?,
     }))
 }
 
 /// Load worksheet slicer views, if a slicers part is attached.
-pub fn load_views(package: &OpcPackage, worksheet: &PackURI) -> Result<Option<ViewPart>> {
+pub fn load_views(
+    package: &OpcPackage,
+    worksheet: &PackURI,
+    limits: crate::raw::Limits,
+) -> Result<Option<ViewPart>> {
     load_view_ref(
         package,
         worksheet,
@@ -562,6 +572,7 @@ pub fn load_views(package: &OpcPackage, worksheet: &PackURI) -> Result<Option<Vi
         kind::BEGIN_SLICER_EX,
         kind::END_SLICER_EX,
         "slicer views",
+        limits,
     )
 }
 
@@ -570,17 +581,23 @@ pub(crate) fn store_views(
     package: &mut OpcPackage,
     worksheet: &PackURI,
     views: &Views,
+    limits: crate::raw::Limits,
 ) -> Result<()> {
     let mut candidate = package.clone();
-    store_views_inner(&mut candidate, worksheet, views)?;
+    store_views_inner(&mut candidate, worksheet, views, limits)?;
     *package = candidate;
     Ok(())
 }
 
-fn store_views_inner(package: &mut OpcPackage, worksheet: &PackURI, views: &Views) -> Result<()> {
+fn store_views_inner(
+    package: &mut OpcPackage,
+    worksheet: &PackURI,
+    views: &Views,
+    limits: crate::raw::Limits,
+) -> Result<()> {
     validate_views(views)?;
     crate::signature_policy::ensure_unsigned(package)?;
-    if let Some(existing) = load_views(package, worksheet)? {
+    if let Some(existing) = load_views(package, worksheet, limits)? {
         let target = PackURI::new(&existing.part_name)?;
         crate::package::owner_transaction::require_exclusive_inbound(
             package,
@@ -595,7 +612,7 @@ fn store_views_inner(package: &mut OpcPackage, worksheet: &PackURI, views: &View
             found: views.items.len(),
         });
     }
-    let old = load_views(package, worksheet)?;
+    let old = load_views(package, worksheet, limits)?;
     let old_block = record_span(
         package.get_part(worksheet)?.blob(),
         kind::BEGIN_SLICER_EX,
@@ -621,7 +638,7 @@ fn store_views_inner(package: &mut OpcPackage, worksheet: &PackURI, views: &View
     }
     let uri = next_part(package, "xl/slicers", "slicer", "bin")?;
     let relationship_id = next_rel_id(package.get_part(worksheet)?);
-    let bytes = write_views(views)?;
+    let bytes = write_views(views, limits)?;
     package.try_add_part(Box::new(BlobPart::new(
         uri.clone(),
         VIEWS_CONTENT_TYPE.to_string(),

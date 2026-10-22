@@ -31,7 +31,7 @@ fn empty(record: &Record<'_>, typ: &str) -> Result<()> {
     Ok(())
 }
 
-fn parse_all(data: &[u8]) -> Result<Vec<Record<'_>>> {
+fn parse_all(data: &[u8], limits: crate::raw::Limits) -> Result<Vec<Record<'_>>> {
     if data.len() > MAX_PART_BYTES {
         return Err(Error::InvalidLength {
             expected: MAX_PART_BYTES,
@@ -39,7 +39,7 @@ fn parse_all(data: &[u8]) -> Result<Vec<Record<'_>>> {
         });
     }
     let mut output = Vec::new();
-    for record in Records::new(data, crate::raw::Limits::DEFAULT) {
+    for record in Records::new(data, limits) {
         if output.len() >= MAX_RECORDS {
             return Err(invalid("slicer BIFF12 stream", "record limit exceeded"));
         }
@@ -48,12 +48,13 @@ fn parse_all(data: &[u8]) -> Result<Vec<Record<'_>>> {
     Ok(output)
 }
 
-fn strings(payload: &[u8], first: &'static str, second: &'static str) -> Result<(String, String)> {
-    let mut cursor = Cursor::new(
-        payload,
-        "slicer cache definition",
-        crate::raw::Limits::DEFAULT,
-    );
+fn strings(
+    payload: &[u8],
+    first: &'static str,
+    second: &'static str,
+    limits: crate::raw::Limits,
+) -> Result<(String, String)> {
+    let mut cursor = Cursor::new(payload, "slicer cache definition", limits);
     let first_value = cursor.read_wide_string()?;
     let second_value = cursor.read_wide_string()?;
     cursor.finish()?;
@@ -61,12 +62,8 @@ fn strings(payload: &[u8], first: &'static str, second: &'static str) -> Result<
     Ok((first_value, second_value))
 }
 
-fn pivot_tables(payload: &[u8]) -> Result<Vec<PivotTable>> {
-    let mut cursor = Cursor::new(
-        payload,
-        "slicer cache PivotTables",
-        crate::raw::Limits::DEFAULT,
-    );
+fn pivot_tables(payload: &[u8], limits: crate::raw::Limits) -> Result<Vec<PivotTable>> {
+    let mut cursor = Cursor::new(payload, "slicer cache PivotTables", limits);
     let count = usize::try_from(cursor.read_u32()?).map_err(|_| Error::InvalidLength {
         expected: usize::MAX,
         found: usize::MAX,
@@ -88,18 +85,14 @@ fn pivot_tables(payload: &[u8]) -> Result<Vec<PivotTable>> {
     Ok(output)
 }
 
-fn native(payload: &[u8], items_payload: &[u8]) -> Result<Native> {
+fn native(payload: &[u8], items_payload: &[u8], limits: crate::raw::Limits) -> Result<Native> {
     if payload.len() != 9 {
         return Err(Error::InvalidLength {
             expected: 9,
             found: payload.len(),
         });
     }
-    let mut header = Cursor::new(
-        payload,
-        "BrtBeginSlicerCacheNative",
-        crate::raw::Limits::DEFAULT,
-    );
+    let mut header = Cursor::new(payload, "BrtBeginSlicerCacheNative", limits);
     let reserved = header.read_u32()?;
     if reserved != 0 {
         return Err(invalid(
@@ -115,11 +108,7 @@ fn native(payload: &[u8], items_payload: &[u8]) -> Result<Native> {
             "unexpected value",
         ));
     }
-    let mut items = Cursor::new(
-        items_payload,
-        "BrtSlicerCacheNativeItem",
-        crate::raw::Limits::DEFAULT,
-    );
+    let mut items = Cursor::new(items_payload, "BrtSlicerCacheNativeItem", limits);
     let count = usize::try_from(items.read_u32()?).map_err(|_| Error::InvalidLength {
         expected: usize::MAX,
         found: usize::MAX,
@@ -170,18 +159,14 @@ fn native(payload: &[u8], items_payload: &[u8]) -> Result<Native> {
     Ok(output)
 }
 
-fn table(payload: &[u8]) -> Result<Table> {
+fn table(payload: &[u8], limits: crate::raw::Limits) -> Result<Table> {
     if payload.len() != 13 {
         return Err(Error::InvalidLength {
             expected: 13,
             found: payload.len(),
         });
     }
-    let mut cursor = Cursor::new(
-        payload,
-        "BrtBeginTableSlicerCache",
-        crate::raw::Limits::DEFAULT,
-    );
+    let mut cursor = Cursor::new(payload, "BrtBeginTableSlicerCache", limits);
     let reserved = cursor.read_u32()?;
     if reserved != 0 {
         return Err(invalid(
@@ -212,8 +197,8 @@ fn table(payload: &[u8]) -> Result<Table> {
 }
 
 /// Parse one slicer cache part.
-pub fn parse_cache(data: &[u8]) -> Result<Cache> {
-    let records = parse_all(data)?;
+pub fn parse_cache(data: &[u8], limits: crate::raw::Limits) -> Result<Cache> {
+    let records = parse_all(data, limits)?;
     let mut index = 0;
     let begin = records
         .get(index)
@@ -229,14 +214,14 @@ pub fn parse_cache(data: &[u8]) -> Result<Cache> {
     if definition.kind() != kind::BEGIN_SLICER_CACHE_DEF {
         return Err(invalid("slicer cache", "missing BrtBeginSlicerCacheDef"));
     }
-    let (name, hierarchy) = strings(definition.payload(), "stName", "stHierarchy")?;
+    let (name, hierarchy) = strings(definition.payload(), "stName", "stHierarchy", limits)?;
     index += 1;
     let mut pivot = Vec::new();
     if records
         .get(index)
         .is_some_and(|record| record.kind() == kind::SLICER_CACHE_PIVOT_TABLES)
     {
-        pivot = pivot_tables(records[index].payload())?;
+        pivot = pivot_tables(records[index].payload(), limits)?;
         index += 1;
     }
 
@@ -250,7 +235,7 @@ pub fn parse_cache(data: &[u8]) -> Result<Cache> {
             if item.kind() != kind::SLICER_CACHE_NATIVE_ITEM {
                 return Err(invalid("slicer cache", "native source has no item record"));
             }
-            let native = native(header, item.payload())?;
+            let native = native(header, item.payload(), limits)?;
             index += 1;
             let end = records
                 .get(index)
@@ -263,7 +248,7 @@ pub fn parse_cache(data: &[u8]) -> Result<Cache> {
             Source::Native(native)
         },
         Some(kind) if kind == kind::BEGIN_TABLE_SLICER_CACHE => {
-            let table = table(records[index].payload())?;
+            let table = table(records[index].payload(), limits)?;
             index += 1;
             let end = records
                 .get(index)
@@ -315,26 +300,29 @@ pub fn parse_cache(data: &[u8]) -> Result<Cache> {
     Ok(cache)
 }
 
-fn write_wide(output: &mut Vec<u8>, value: &str) -> Result<()> {
-    Encoder::new(output, crate::raw::Limits::DEFAULT).write_wide_string(value)?;
+fn write_wide(output: &mut Vec<u8>, value: &str, limits: crate::raw::Limits) -> Result<()> {
+    Encoder::new(output, limits).write_wide_string(value)?;
     Ok(())
 }
 
-fn write_cache_inner(cache: &Cache, output: &mut Vec<u8>) -> Result<()> {
+fn write_cache_inner(
+    cache: &Cache,
+    output: &mut Vec<u8>,
+    limits: crate::raw::Limits,
+) -> Result<()> {
     validate_cache(cache)?;
-    let mut writer = Encoder::new(output, crate::raw::Limits::DEFAULT);
+    let mut writer = Encoder::new(output, limits);
     writer.write_record(kind::BEGIN_SLICER_CACHE, &[])?;
     let mut definition = Vec::new();
-    write_wide(&mut definition, &cache.name)?;
-    write_wide(&mut definition, &cache.hierarchy)?;
+    write_wide(&mut definition, &cache.name, limits)?;
+    write_wide(&mut definition, &cache.hierarchy, limits)?;
     writer.write_record(kind::BEGIN_SLICER_CACHE_DEF, &definition)?;
     if !cache.pivot_tables.is_empty() {
         let mut payload = Vec::new();
-        Encoder::new(&mut payload, crate::raw::Limits::DEFAULT)
-            .write_u32(cache.pivot_tables.len() as u32)?;
+        Encoder::new(&mut payload, limits).write_u32(cache.pivot_tables.len() as u32)?;
         for pivot in &cache.pivot_tables {
             let mut item = Vec::new();
-            let mut item_writer = Encoder::new(&mut item, crate::raw::Limits::DEFAULT);
+            let mut item_writer = Encoder::new(&mut item, limits);
             item_writer.write_u32(pivot.sheet_id)?;
             item_writer.write_wide_string(&pivot.name)?;
             payload.extend_from_slice(&item);
@@ -348,13 +336,13 @@ fn write_cache_inner(cache: &Cache, output: &mut Vec<u8>) -> Result<()> {
                 | (u8::from(native.sort_using_custom_lists) << 4)
                 | (u8::from(native.show_all_items) << 5);
             let mut header = Vec::with_capacity(9);
-            let mut header_writer = Encoder::new(&mut header, crate::raw::Limits::DEFAULT);
+            let mut header_writer = Encoder::new(&mut header, limits);
             header_writer.write_u32(0)?;
             header_writer.write_u32(native.cache_id)?;
             header_writer.write_u8(flags)?;
             writer.write_record(kind::BEGIN_SLICER_CACHE_NATIVE, &header)?;
             let mut items = Vec::with_capacity(4 + native.items.len() * 5);
-            let mut item_writer = Encoder::new(&mut items, crate::raw::Limits::DEFAULT);
+            let mut item_writer = Encoder::new(&mut items, limits);
             item_writer.write_u32(native.items.len() as u32)?;
             for item in &native.items {
                 item_writer.write_u32(item.cache_index)?;
@@ -368,7 +356,7 @@ fn write_cache_inner(cache: &Cache, output: &mut Vec<u8>) -> Result<()> {
                 | (table.cross_filter.wire() << 2)
                 | (u8::from(table.sort_using_custom_lists) << 4);
             let mut payload = Vec::with_capacity(13);
-            let mut payload_writer = Encoder::new(&mut payload, crate::raw::Limits::DEFAULT);
+            let mut payload_writer = Encoder::new(&mut payload, limits);
             payload_writer.write_u32(0)?;
             payload_writer.write_u32(table.column)?;
             payload_writer.write_u32(table.table_id)?;
@@ -390,14 +378,14 @@ fn write_cache_inner(cache: &Cache, output: &mut Vec<u8>) -> Result<()> {
 }
 
 /// Encode one slicer cache part.
-pub fn write_cache(cache: &Cache) -> Result<Vec<u8>> {
+pub fn write_cache(cache: &Cache, limits: crate::raw::Limits) -> Result<Vec<u8>> {
     let mut output = Vec::new();
-    write_cache_inner(cache, &mut output)?;
+    write_cache_inner(cache, &mut output, limits)?;
     Ok(output)
 }
 
-fn parse_view(payload: &[u8]) -> Result<View> {
-    let mut cursor = Cursor::new(payload, "BrtBeginSlicer", crate::raw::Limits::DEFAULT);
+fn parse_view(payload: &[u8], limits: crate::raw::Limits) -> Result<View> {
+    let mut cursor = Cursor::new(payload, "BrtBeginSlicer", limits);
     let flags = cursor.read_u8()?;
     if flags & 0xf0 != 0 {
         return Err(invalid("BrtBeginSlicer unused flags", "unexpected value"));
@@ -426,8 +414,8 @@ fn parse_view(payload: &[u8]) -> Result<View> {
 }
 
 /// Parse one worksheet slicer views part.
-pub fn parse_views(data: &[u8]) -> Result<Views> {
-    let records = parse_all(data)?;
+pub fn parse_views(data: &[u8], limits: crate::raw::Limits) -> Result<Views> {
+    let records = parse_all(data, limits)?;
     if records.len() < 2 || records[0].kind() != kind::BEGIN_SLICERS {
         return Err(invalid("slicer views", "missing BrtBeginSlicers"));
     }
@@ -446,7 +434,7 @@ pub fn parse_views(data: &[u8]) -> Result<Views> {
                 "unexpected record in view collection",
             ));
         }
-        let view = parse_view(records[index].payload())?;
+        let view = parse_view(records[index].payload(), limits)?;
         index += 1;
         let end = records
             .get(index)
@@ -469,17 +457,17 @@ pub fn parse_views(data: &[u8]) -> Result<Views> {
 }
 
 /// Encode one worksheet slicer views part.
-pub fn write_views(views: &Views) -> Result<Vec<u8>> {
+pub fn write_views(views: &Views, limits: crate::raw::Limits) -> Result<Vec<u8>> {
     validate_views(views)?;
     let mut output = Vec::new();
-    let mut writer = Encoder::new(&mut output, crate::raw::Limits::DEFAULT);
+    let mut writer = Encoder::new(&mut output, limits);
     writer.write_record(kind::BEGIN_SLICERS, &[])?;
     for view in &views.items {
         let mut payload = Vec::new();
         let mut flags = u8::from(view.caption_visible) | (u8::from(view.caption.is_some()) << 1);
         flags |= u8::from(view.style.is_some()) << 2;
         flags |= u8::from(view.locked_position) << 3;
-        let mut payload_writer = Encoder::new(&mut payload, crate::raw::Limits::DEFAULT);
+        let mut payload_writer = Encoder::new(&mut payload, limits);
         payload_writer.write_u8(flags)?;
         payload_writer.write_u32(view.start_item)?;
         payload_writer.write_u32(view.column_count)?;

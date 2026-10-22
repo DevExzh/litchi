@@ -23,10 +23,14 @@ pub(super) enum Scope {
     Views(PackURI),
 }
 
-pub(super) fn inspect(package_value: &OpcPackage, scope: &Scope) -> Result<Content> {
+pub(super) fn inspect(
+    package_value: &OpcPackage,
+    scope: &Scope,
+    limits: crate::raw::Limits,
+) -> Result<Content> {
     match scope {
         Scope::Caches(workbook) => {
-            let parts = package::load_caches(package_value, workbook)?;
+            let parts = package::load_caches(package_value, workbook, limits)?;
             let mut caches = Vec::new();
             caches
                 .try_reserve_exact(parts.len())
@@ -40,7 +44,7 @@ pub(super) fn inspect(package_value: &OpcPackage, scope: &Scope) -> Result<Conte
             Ok(Content::Caches(caches))
         },
         Scope::Views(worksheet) => {
-            let view_part = package::load_views(package_value, worksheet)?;
+            let view_part = package::load_views(package_value, worksheet, limits)?;
             Ok(Content::Views(
                 view_part.map_or_else(Views::new, |attached| attached.views),
             ))
@@ -52,6 +56,7 @@ pub(super) fn validate_closure(
     package_value: &OpcPackage,
     scope: &Scope,
     content: &Content,
+    limits: crate::raw::Limits,
 ) -> Result<()> {
     let cache_names = match scope {
         Scope::Caches(_) => match content {
@@ -60,7 +65,7 @@ pub(super) fn validate_closure(
         },
         Scope::Views(_) => {
             let workbook = package_value.main_document_part()?.partname().clone();
-            return validate_views_against_caches(package_value, &workbook, content);
+            return validate_views_against_caches(package_value, &workbook, content, limits);
         },
     };
     let names = cache_name_set(cache_names.iter().map(|cache| cache.name.as_str()))?;
@@ -69,7 +74,7 @@ pub(super) fn validate_closure(
             .iter()
             .any(|relationship| relationship.reltype() == package::VIEWS_RELATIONSHIP_TYPE)
     }) {
-        let views = package::load_views(package_value, part.partname())?
+        let views = package::load_views(package_value, part.partname(), limits)?
             .map_or_else(Views::new, |attached| attached.views);
         if views
             .items
@@ -88,11 +93,12 @@ fn validate_views_against_caches(
     package_value: &OpcPackage,
     workbook: &PackURI,
     content: &Content,
+    limits: crate::raw::Limits,
 ) -> Result<()> {
     let Content::Views(views) = content else {
         return Err(scope_error("view"));
     };
-    let caches = package::load_caches(package_value, workbook)?;
+    let caches = package::load_caches(package_value, workbook, limits)?;
     let names = cache_name_set(caches.iter().map(|part| part.cache.name.as_str()))?;
     if views
         .items
@@ -106,14 +112,14 @@ fn validate_views_against_caches(
     Ok(())
 }
 
-pub(super) fn validate_content(content: &Content) -> Result<()> {
+pub(super) fn validate_content(content: &Content, limits: crate::raw::Limits) -> Result<()> {
     match content {
-        Content::Caches(caches) => validate_caches(caches),
-        Content::Views(views) => write_views(views).map(|_| ()),
+        Content::Caches(caches) => validate_caches(caches, limits),
+        Content::Views(views) => write_views(views, limits).map(|_| ()),
     }
 }
 
-pub(super) fn validate_caches(caches: &[Cache]) -> Result<()> {
+pub(super) fn validate_caches(caches: &[Cache], limits: crate::raw::Limits) -> Result<()> {
     if caches.len() > super::model::MAX_CACHES {
         return Err(Error::InvalidLength {
             expected: super::model::MAX_CACHES,
@@ -128,7 +134,7 @@ pub(super) fn validate_caches(caches: &[Cache]) -> Result<()> {
             source,
         })?;
     for cache in caches {
-        write_cache(cache)?;
+        write_cache(cache, limits)?;
         if !names.insert(Caseless::new(&cache.name)) {
             return Err(Error::InvalidFormat("duplicate slicer cache name"));
         }
@@ -156,13 +162,14 @@ pub(super) fn store(
     package_value: &mut OpcPackage,
     scope: &Scope,
     content: &Content,
+    limits: crate::raw::Limits,
 ) -> Result<()> {
     match (scope, content) {
         (Scope::Caches(workbook), Content::Caches(caches)) => {
-            package::store_caches(package_value, workbook, caches)
+            package::store_caches(package_value, workbook, caches, limits)
         },
         (Scope::Views(worksheet), Content::Views(views)) => {
-            package::store_views(package_value, worksheet, views)
+            package::store_views(package_value, worksheet, views, limits)
         },
         _ => Err(scope_error("matching")),
     }

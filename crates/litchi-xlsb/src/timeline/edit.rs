@@ -100,7 +100,13 @@ impl Edit {
     ///
     /// Returns the timeline graph and decoding errors.
     pub fn caches(&self) -> Result<Vec<Cache>> {
-        match inspect(self.staged.opc(), &Scope::Caches(self.workbook_uri()?))?.0 {
+        match inspect(
+            self.staged.opc(),
+            &Scope::Caches(self.workbook_uri()?),
+            self.staged.workbook().semantic_limits().xml_parts_value(),
+        )?
+        .0
+        {
             Content::Caches(caches) => Ok(caches),
             Content::Views(_) => Ok(Vec::new()),
         }
@@ -117,6 +123,7 @@ impl Edit {
         match inspect(
             self.staged.opc(),
             &Scope::Views(self.staged.worksheet(sheet)?),
+            self.staged.workbook().semantic_limits().xml_parts_value(),
         )?
         .0
         {
@@ -126,8 +133,9 @@ impl Edit {
     }
 
     fn stage(&mut self, scope: Scope, content: Content) -> Result<bool> {
-        validate_content(&content)?;
-        let (stored, canonical) = inspect(self.staged.opc(), &scope)?;
+        let xml_limits = self.staged.workbook().semantic_limits().xml_parts_value();
+        validate_content(&content, xml_limits)?;
+        let (stored, canonical) = inspect(self.staged.opc(), &scope, xml_limits)?;
         if stored == content {
             return Ok(false);
         }
@@ -144,13 +152,13 @@ impl Edit {
         }
         crate::signature_policy::ensure_unsigned(self.staged.opc())?;
         self.staged.update(|opc| {
-            store(opc, &scope, &content)?;
-            if inspect(opc, &scope)?.0 != content {
+            store(opc, &scope, &content, xml_limits)?;
+            if inspect(opc, &scope, xml_limits)?.0 != content {
                 return Err(crate::part_edit::invalid(
                     "timeline readback did not match the staged content",
                 ));
             }
-            validate_closure(opc, &scope, &content)
+            validate_closure(opc, &scope, &content, xml_limits)
         })?;
         Ok(true)
     }
@@ -164,7 +172,10 @@ impl Edit {
     /// still names, a shared target, and a changed edit of a signed
     /// workbook.
     pub fn set_caches(&mut self, caches: Vec<Cache>) -> Result<bool> {
-        validate_caches(&caches)?;
+        validate_caches(
+            &caches,
+            self.staged.workbook().semantic_limits().xml_parts_value(),
+        )?;
         let scope = Scope::Caches(self.workbook_uri()?);
         self.stage(scope, Content::Caches(caches))
     }
@@ -275,7 +286,12 @@ impl Edit {
     /// The errors of [`Self::set_views`].
     pub fn remove_views(&mut self, sheet: usize) -> Result<bool> {
         let worksheet = self.staged.worksheet(sheet)?;
-        let present = super::package::load_views(self.staged.opc(), &worksheet)?.is_some();
+        let present = super::package::load_views(
+            self.staged.opc(),
+            &worksheet,
+            self.staged.workbook().semantic_limits().xml_parts_value(),
+        )?
+        .is_some();
         self.set_views(sheet, Views::new())?;
         Ok(present)
     }

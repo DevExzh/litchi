@@ -87,7 +87,10 @@ impl Edit {
     /// stream.
     pub fn merged_cell_ranges(&self, sheet: usize) -> Result<Vec<MergedCell>> {
         let worksheet = self.staged.worksheet(sheet)?;
-        Ok(Workbook::inspect_merge_block(self.staged.blob(&worksheet)?)?.ranges)
+        Ok(
+            Workbook::inspect_merge_block(self.staged.blob(&worksheet)?, self.staged.raw_limits())?
+                .ranges,
+        )
     }
 
     /// Replace every merged range of a worksheet; an empty list removes the
@@ -102,9 +105,10 @@ impl Edit {
     pub fn set_merged_cell_ranges(&mut self, sheet: usize, ranges: &[MergedCell]) -> Result<bool> {
         let worksheet = self.staged.worksheet(sheet)?;
         let original = self.staged.blob(&worksheet)?;
-        let layout = Workbook::inspect_merge_block(original)?;
+        let raw_limits = self.staged.raw_limits();
+        let layout = Workbook::inspect_merge_block(original, raw_limits)?;
         let normalized = Workbook::normalize_merge_ranges(ranges)?;
-        let replacement = Workbook::serialize_merge_block(&normalized)?;
+        let replacement = Workbook::serialize_merge_block(&normalized, raw_limits)?;
         let (start, end) = layout
             .block_span
             .unwrap_or((layout.insertion_offset, layout.insertion_offset));
@@ -118,7 +122,7 @@ impl Edit {
         updated.extend_from_slice(&original[..start]);
         updated.extend_from_slice(&replacement);
         updated.extend_from_slice(&original[end..]);
-        Workbook::inspect_merge_block(&updated)?;
+        Workbook::inspect_merge_block(&updated, raw_limits)?;
         self.staged.replace_worksheet(&worksheet, updated)
     }
 

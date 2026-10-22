@@ -1,11 +1,11 @@
 use super::phonetic::{Alignment, Info, Type};
 use super::worksheet::read;
 use super::{Watch, Watches};
-use crate::raw::{Encoder, Kind, Records, kind};
+use crate::raw::{Encoder, Kind, Limits, Records, kind};
 
 fn stream(records: &[(Kind, &[u8])]) -> Vec<u8> {
     let mut output = Vec::new();
-    let mut writer = Encoder::new(&mut output, crate::raw::Limits::DEFAULT);
+    let mut writer = Encoder::new(&mut output, Limits::DEFAULT);
     for (record_kind, payload) in records {
         writer.write_record(*record_kind, payload).unwrap();
     }
@@ -60,7 +60,7 @@ fn worksheet_with_empty_collection() -> Vec<u8> {
 #[test]
 fn parses_typed_watches_and_phonetic_defaults() {
     let data = worksheet_with_owner();
-    let snapshot = read(&data).unwrap();
+    let snapshot = read(&data, Limits::DEFAULT).unwrap();
     assert_eq!(snapshot.watches().len(), 2);
     assert_eq!(snapshot.watches()[0].row(), 4);
     assert_eq!(snapshot.watches()[1].column(), 2);
@@ -79,7 +79,7 @@ fn parses_typed_watches_and_phonetic_defaults() {
 #[test]
 fn edit_preserves_opaque_order_and_commits_atomically() {
     let data = worksheet_with_owner();
-    let snapshot = read(&data).unwrap();
+    let snapshot = read(&data, Limits::DEFAULT).unwrap();
     let mut edit = snapshot.edit();
     assert!(edit.remove(crate::cell_watches::Reference::new(4, 7).unwrap()));
     edit.add(Watch::new(99, 4).unwrap()).unwrap();
@@ -88,7 +88,7 @@ fn edit_preserves_opaque_order_and_commits_atomically() {
     assert!(!commit.patch().is_empty());
 
     let output = commit.patch().apply(&data).unwrap();
-    let updated = read(&output).unwrap();
+    let updated = read(&output, Limits::DEFAULT).unwrap();
     assert_eq!(
         updated.watches(),
         &[Watch::new(12, 2).unwrap(), Watch::new(99, 4).unwrap()]
@@ -102,7 +102,7 @@ fn edit_preserves_opaque_order_and_commits_atomically() {
         &[0x80, 0x01, 0xFE]
     );
 
-    let kinds: Vec<_> = Records::new(&output, crate::raw::Limits::DEFAULT)
+    let kinds: Vec<_> = Records::new(&output, Limits::DEFAULT)
         .map(|record| record.unwrap().kind().get())
         .collect();
     let unknown = 0x1234;
@@ -125,12 +125,12 @@ fn edit_preserves_opaque_order_and_commits_atomically() {
 #[test]
 fn clear_keeps_opaque_collection_and_inverse_restores_bytes() {
     let data = worksheet_with_owner();
-    let snapshot = read(&data).unwrap();
+    let snapshot = read(&data, Limits::DEFAULT).unwrap();
     let mut edit = snapshot.edit();
     assert!(edit.clear());
     let commit = edit.commit().unwrap();
     let output = commit.patch().after().to_vec();
-    let updated = read(&output).unwrap();
+    let updated = read(&output, Limits::DEFAULT).unwrap();
     assert!(updated.watches().is_empty());
     assert!(updated.has_collection());
     assert!(updated.has_opaque_records());
@@ -140,14 +140,14 @@ fn clear_keeps_opaque_collection_and_inverse_restores_bytes() {
 #[test]
 fn empty_collection_survives_noop_and_unrelated_phonetic_edits() {
     let data = worksheet_with_empty_collection();
-    let snapshot = read(&data).unwrap();
+    let snapshot = read(&data, Limits::DEFAULT).unwrap();
     assert!(snapshot.has_collection());
     assert_eq!(snapshot.edit().commit().unwrap().patch().after(), data);
 
     let mut edit = snapshot.edit();
     edit.set_phonetic(Info::new(3, Type::AsEntered, Alignment::AllTextLeft));
     let output = edit.commit().unwrap().patch().after().to_vec();
-    let updated = read(&output).unwrap();
+    let updated = read(&output, Limits::DEFAULT).unwrap();
     assert!(updated.has_collection());
     assert_eq!(
         updated.phonetic(),
@@ -169,7 +169,34 @@ fn rejects_invalid_coordinates_domains_and_duplicate_watches() {
         (kind::PHONETIC_INFO, &invalid_type),
         (kind::END_SHEET, &[]),
     ]);
-    assert!(read(&data).is_err());
+    assert!(read(&data, Limits::DEFAULT).is_err());
+}
+
+#[test]
+fn strict_raw_limit_reaches_fixed_watch_payload_and_is_retained() {
+    let data = worksheet_with_owner();
+    let limits = Limits::new(10, 64);
+    let snapshot = read(&data, limits).unwrap();
+    assert_eq!(snapshot.limits(), limits);
+
+    let too_small = read(&data, Limits::new(7, 64)).unwrap_err();
+    assert!(matches!(
+        too_small,
+        crate::package::error::Error::Wire(crate::raw::Error::PayloadLimit {
+            length: 8,
+            limit: 7,
+            ..
+        })
+    ));
+
+    let mut edit = snapshot.edit();
+    edit.add(Watch::new(99, 4).unwrap()).unwrap();
+    let output = edit.commit().unwrap().patch().after().to_vec();
+    assert_eq!(read(&output, limits).unwrap().limits(), limits);
+    assert_eq!(
+        read(&output, limits).unwrap().opaque_records().unwrap()[0].payload(),
+        &[0x80, 0x01, 0xFE]
+    );
 }
 
 #[test]

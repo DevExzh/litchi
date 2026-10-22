@@ -16,11 +16,13 @@ impl<F: FormulaBinary> Validation<F> {
         data: &[u8],
         list_formula: Option<String>,
         formula_context: &R,
+        limits: crate::raw::Limits,
     ) -> Result<Self> {
         Self::parse_classic_with(
             data,
             list_formula,
             formula_context,
+            limits,
             &mut Tolerance::refusing(),
             0,
         )
@@ -33,10 +35,11 @@ impl<F: FormulaBinary> Validation<F> {
         data: &[u8],
         list_formula: Option<String>,
         formula_context: &R,
+        limits: crate::raw::Limits,
         tolerance: &mut Tolerance<'_>,
         location: u32,
     ) -> Result<Self> {
-        let mut cursor = ValidationCursor::new(data, "BrtDVal");
+        let mut cursor = ValidationCursor::new(data, "BrtDVal", limits)?;
         let (flags, repaired) = normalize_flags(
             cursor.read_u32()?,
             0xff00_0000,
@@ -72,9 +75,10 @@ impl<F: FormulaBinary> Validation<F> {
             )?;
         }
         let base = (ranges[0].0, ranges[0].2);
-        let parsed_formula1 = render_formula(formula1_binary.as_ref(), base, formula_context)?;
+        let parsed_formula1 =
+            render_formula(formula1_binary.as_ref(), base, formula_context, limits)?;
         let formula1 = list_formula.clone().or(parsed_formula1);
-        let formula2 = render_formula(formula2_binary.as_ref(), base, formula_context)?;
+        let formula2 = render_formula(formula2_binary.as_ref(), base, formula_context, limits)?;
 
         Ok(Self {
             validation_type,
@@ -100,18 +104,23 @@ impl<F: FormulaBinary> Validation<F> {
         })
     }
 
-    pub fn parse_extension14<R: Resolution>(data: &[u8], formula_context: &R) -> Result<Self> {
-        Self::parse_extension14_with(data, formula_context, &mut Tolerance::refusing(), 0)
+    pub fn parse_extension14<R: Resolution>(
+        data: &[u8],
+        formula_context: &R,
+        limits: crate::raw::Limits,
+    ) -> Result<Self> {
+        Self::parse_extension14_with(data, formula_context, limits, &mut Tolerance::refusing(), 0)
     }
 
     /// Parse a `BrtDVal14`; see [`Self::parse_classic_with`].
     pub(crate) fn parse_extension14_with<R: Resolution>(
         data: &[u8],
         formula_context: &R,
+        limits: crate::raw::Limits,
         tolerance: &mut Tolerance<'_>,
         location: u32,
     ) -> Result<Self> {
-        let mut cursor = ValidationCursor::new(data, "BrtDVal14");
+        let mut cursor = ValidationCursor::new(data, "BrtDVal14", limits)?;
         let header_flags = cursor.read_u32()?;
         if header_flags & !0x06 != 0 || header_flags & 0x02 == 0 {
             return Err(invalid("BrtDVal14", "invalid FRTHeader flags"));
@@ -184,8 +193,8 @@ impl<F: FormulaBinary> Validation<F> {
         let formula1_binary = if has_first { formulas.next() } else { None };
         let formula2_binary = if has_second { formulas.next() } else { None };
         let base = (ranges[0].0, ranges[0].2);
-        let formula1 = render_formula(formula1_binary.as_ref(), base, formula_context)?;
-        let formula2 = render_formula(formula2_binary.as_ref(), base, formula_context)?;
+        let formula1 = render_formula(formula1_binary.as_ref(), base, formula_context, limits)?;
+        let formula2 = render_formula(formula2_binary.as_ref(), base, formula_context, limits)?;
 
         Ok(Self {
             validation_type,
@@ -212,7 +221,19 @@ impl<F: FormulaBinary> Validation<F> {
     }
 }
 
-pub fn parse_collection_settings(data: &[u8], extension14: bool) -> Result<(Settings, u32)> {
+pub fn parse_collection_settings(
+    data: &[u8],
+    extension14: bool,
+    limits: crate::raw::Limits,
+) -> Result<(Settings, u32)> {
+    limits.validate()?;
+    if data.len() > limits.payload() {
+        return Err(Error::Wire(crate::raw::Error::PayloadLimit {
+            length: data.len(),
+            limit: limits.payload(),
+            offset: 0,
+        }));
+    }
     let expected = if extension14 { 22 } else { 18 };
     if data.len() != expected {
         return Err(Error::InvalidLength {
@@ -259,8 +280,8 @@ pub fn parse_collection_settings(data: &[u8], extension14: bool) -> Result<(Sett
     ))
 }
 
-pub fn parse_dval_list(data: &[u8]) -> Result<String> {
-    let mut cursor = ValidationCursor::new(data, "BrtDValList");
+pub fn parse_dval_list(data: &[u8], limits: crate::raw::Limits) -> Result<String> {
+    let mut cursor = ValidationCursor::new(data, "BrtDValList", limits)?;
     let value = cursor
         .read_nullable_string(usize::MAX, "list formula")?
         .ok_or_else(|| invalid("BrtDValList", "NULL list formula"))?;
@@ -332,12 +353,14 @@ fn render_formula<F: FormulaBinary, R: Resolution>(
     formula: Option<&F>,
     base: (u32, u32),
     context: &R,
+    limits: crate::raw::Limits,
 ) -> Result<Option<String>> {
     let Some(formula) = formula else {
         return Ok(None);
     };
     let tokens =
-        Parser::with_base_cell_and_extra(formula.rgce(), formula.rgcb(), base.0, base.1).parse()?;
+        Parser::with_base_cell_and_extra(formula.rgce(), formula.rgcb(), base.0, base.1, limits)
+            .parse()?;
     Ok(Some(Compiler::try_tokens_to_string_with_resolution(
         &tokens, context,
     )?))
@@ -456,15 +479,25 @@ struct ValidationCursor<'a> {
     data: &'a [u8],
     offset: usize,
     record: &'static str,
+    limits: crate::raw::Limits,
 }
 
 impl<'a> ValidationCursor<'a> {
-    fn new(data: &'a [u8], record: &'static str) -> Self {
-        Self {
+    fn new(data: &'a [u8], record: &'static str, limits: crate::raw::Limits) -> Result<Self> {
+        limits.validate()?;
+        if data.len() > limits.payload() {
+            return Err(Error::Wire(crate::raw::Error::PayloadLimit {
+                length: data.len(),
+                limit: limits.payload(),
+                offset: 0,
+            }));
+        }
+        Ok(Self {
             data,
             offset: 0,
             record,
-        }
+            limits,
+        })
     }
 
     fn read_u32(&mut self) -> Result<u32> {
@@ -532,6 +565,13 @@ impl<'a> ValidationCursor<'a> {
         }
         let count =
             usize::try_from(count).map_err(|_| invalid(self.record, "string length overflow"))?;
+        if count > self.limits.string_units() {
+            return Err(Error::Wire(crate::raw::Error::StringLimit {
+                units: count,
+                limit: self.limits.string_units(),
+                offset: self.offset.saturating_sub(4),
+            }));
+        }
         if count > maximum {
             return Err(invalid(self.record, "length exceeds"));
         }

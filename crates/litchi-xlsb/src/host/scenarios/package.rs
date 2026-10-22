@@ -20,8 +20,8 @@ struct Block<'a> {
     end: usize,
 }
 
-fn locate<'a>(data: &'a [u8]) -> Result<Option<Block<'a>>> {
-    let mut iterator = Records::new(data, crate::raw::Limits::DEFAULT);
+fn locate<'a>(data: &'a [u8], limits: crate::raw::Limits) -> Result<Option<Block<'a>>> {
+    let mut iterator = Records::new(data, limits);
     let mut begin = None;
     let mut header = None;
     let mut inner = Vec::new();
@@ -104,8 +104,8 @@ fn locate<'a>(data: &'a [u8]) -> Result<Option<Block<'a>>> {
     }))
 }
 
-fn end_sheet_offset(data: &[u8]) -> Result<usize> {
-    let mut iterator = Records::new(data, crate::raw::Limits::DEFAULT);
+fn end_sheet_offset(data: &[u8], limits: crate::raw::Limits) -> Result<usize> {
+    let mut iterator = Records::new(data, limits);
     let mut offset = None;
     while let Some(result) = iterator.next() {
         let record = result?;
@@ -125,11 +125,11 @@ fn end_sheet_offset(data: &[u8]) -> Result<usize> {
 }
 
 /// Parse the worksheet's Scenario Manager collection, if present.
-pub fn parse_worksheet(data: &[u8]) -> Result<Option<Manager>> {
-    let Some(block) = locate(data)? else {
+pub fn parse_worksheet(data: &[u8], limits: crate::raw::Limits) -> Result<Option<Manager>> {
+    let Some(block) = locate(data, limits)? else {
         return Ok(None);
     };
-    let manager = codec::parse_manager(block.header, &block.records)?;
+    let manager = codec::parse_manager(block.header, &block.records, limits)?;
     Ok(Some(manager))
 }
 
@@ -139,14 +139,18 @@ pub fn parse_worksheet(data: &[u8]) -> Result<Option<Manager>> {
 /// `BrtEndSheet` when absent, or replaces the existing balanced collection.
 /// Unknown records in an existing manager are retained only for an unchanged
 /// round trip; changing that manager is rejected as unsafe.
-pub fn replace_worksheet(data: &[u8], manager: Option<&Manager>) -> Result<Vec<u8>> {
-    let block = locate(data)?;
+pub fn replace_worksheet(
+    data: &[u8],
+    manager: Option<&Manager>,
+    limits: crate::raw::Limits,
+) -> Result<Vec<u8>> {
+    let block = locate(data, limits)?;
     let Some(block) = block else {
         let Some(manager) = manager else {
             return Ok(data.to_vec());
         };
-        let encoded = codec::write_manager(manager)?;
-        let offset = end_sheet_offset(data)?;
+        let encoded = codec::write_manager(manager, limits)?;
+        let offset = end_sheet_offset(data, limits)?;
         let capacity = data
             .len()
             .checked_add(encoded.len())
@@ -161,7 +165,7 @@ pub fn replace_worksheet(data: &[u8], manager: Option<&Manager>) -> Result<Vec<u
         return Ok(output);
     };
 
-    let original = codec::parse_manager(block.header, &block.records)?;
+    let original = codec::parse_manager(block.header, &block.records, limits)?;
     if manager.is_some_and(|candidate| candidate == &original) {
         return Ok(data.to_vec());
     }
@@ -185,7 +189,9 @@ pub fn replace_worksheet(data: &[u8], manager: Option<&Manager>) -> Result<Vec<u
 
     let start = block.begin;
     let end = block.end;
-    let replacement = manager.map(codec::write_manager).transpose()?;
+    let replacement = manager
+        .map(|manager| codec::write_manager(manager, limits))
+        .transpose()?;
     let replacement_len = replacement.as_ref().map_or(0, Vec::len);
     let removed = end.checked_sub(start).ok_or(Error::InvalidLength {
         expected: 0,

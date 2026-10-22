@@ -134,7 +134,13 @@ fn shared_string_owner_validates_declared_count() {
     .unwrap();
     let mut records = Records::new(&data, crate::raw::Limits::DEFAULT);
     let mut strings: Vec<SharedString> = Vec::new();
-    Workbook::read_shared_strings(&mut records, &mut strings, &mut Default::default()).unwrap();
+    Workbook::read_shared_strings(
+        &mut records,
+        &mut strings,
+        &mut Default::default(),
+        crate::raw::Limits::DEFAULT,
+    )
+    .unwrap();
     assert_eq!(strings.len(), 1);
     assert_eq!(strings[0].text, "value");
 }
@@ -151,7 +157,7 @@ fn pivot_cache_record_owner_preserves_relationship_identity() {
     ])
     .unwrap();
     assert_eq!(
-        Workbook::parse_pivot_cache_ids(&data).unwrap(),
+        Workbook::parse_pivot_cache_ids(&data, crate::raw::Limits::DEFAULT).unwrap(),
         vec![(12, "rIdCache".to_string())]
     );
 }
@@ -180,9 +186,13 @@ fn ordinary_table_owner_ignores_opaque_balanced_xml_map_extensions() {
     push_independent_record(&mut data, kind::END_LIST_COLS, &[]);
     push_independent_record(&mut data, kind::END_LIST, &[]);
 
-    let table =
-        Workbook::parse_table_definition(&data, 3, &mut crate::leniency::Tolerance::refusing())
-            .unwrap();
+    let table = Workbook::parse_table_definition(
+        &data,
+        3,
+        &mut crate::leniency::Tolerance::refusing(),
+        crate::raw::Limits::DEFAULT,
+    )
+    .unwrap();
     assert_eq!(table.table_id(), 7);
     assert_eq!(table.sheet_index(), 3);
     assert_eq!(table.display_name(), "MappedTable");
@@ -204,8 +214,13 @@ fn ordinary_table_owner_rejects_mismatched_xml_map_extensions() {
     push_independent_record(&mut data, kind::AC_END, &[]);
 
     assert!(
-        Workbook::parse_table_definition(&data, 0, &mut crate::leniency::Tolerance::refusing())
-            .is_err()
+        Workbook::parse_table_definition(
+            &data,
+            0,
+            &mut crate::leniency::Tolerance::refusing(),
+            crate::raw::Limits::DEFAULT,
+        )
+        .is_err()
     );
 }
 
@@ -229,7 +244,11 @@ fn workbook_sheet_name_index_expands_unicode_lowercase_without_normalizing() {
     let duplicate_data = record_stream(&duplicate_records).unwrap();
     let mut duplicate_iter = Records::new(&duplicate_data, crate::raw::Limits::DEFAULT);
     assert!(matches!(
-        Workbook::read_workbook(&mut duplicate_iter, &mut Default::default()),
+        Workbook::read_workbook(
+            &mut duplicate_iter,
+            &mut Default::default(),
+            crate::raw::Limits::DEFAULT,
+        ),
         Err(Error::Unrecognized { typ, .. }) if typ == "BrtBundleSh strName"
     ));
 
@@ -250,6 +269,11 @@ fn workbook_sheet_name_index_expands_unicode_lowercase_without_normalizing() {
         .collect::<Vec<_>>();
     let distinct_data = record_stream(&distinct_records).unwrap();
     let mut distinct_iter = Records::new(&distinct_data, crate::raw::Limits::DEFAULT);
-    let info = Workbook::read_workbook(&mut distinct_iter, &mut Default::default()).unwrap();
+    let info = Workbook::read_workbook(
+        &mut distinct_iter,
+        &mut Default::default(),
+        crate::raw::Limits::DEFAULT,
+    )
+    .unwrap();
     assert_eq!(info.worksheet_names, canonically_equivalent_names);
 }

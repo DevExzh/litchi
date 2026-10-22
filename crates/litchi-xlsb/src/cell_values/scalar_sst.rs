@@ -44,6 +44,7 @@ pub(super) fn reconcile_with_limits(
     let external_link_limits = workbook.external_link_limits();
     let drawing_load_policy = workbook.drawing_load_policy();
     let leniency = workbook.leniency();
+    let raw_limits = workbook.raw_limits_value();
     let mut worksheet_uris = Vec::new();
     worksheet_uris
         .try_reserve_exact(workbook.worksheet_count())
@@ -138,6 +139,7 @@ pub(super) fn reconcile_with_limits(
         external_link_limits,
         drawing_load_policy,
         leniency,
+        raw_limits,
     )?;
     super::structure::validate_all_worksheets(&candidate)?;
     Ok(candidate)

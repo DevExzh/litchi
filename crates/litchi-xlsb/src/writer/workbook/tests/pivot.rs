@@ -36,7 +36,8 @@ fn pivot_chart_round_trips_with_lossless_view_and_cache_graph() {
         writer.write_record(kind::END_SX_LOCATION, &[]).unwrap();
         writer.write_record(kind::END_SX_VIEW, &[]).unwrap();
     }
-    let view = crate::pivot_view::Part::from_bytes(view_bytes.clone()).unwrap();
+    let view = crate::pivot_view::Part::from_bytes(view_bytes.clone(), crate::raw::Limits::DEFAULT)
+        .unwrap();
 
     let chart = Chart::line_chart(
         "Revenue",

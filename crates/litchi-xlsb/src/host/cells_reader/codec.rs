@@ -44,6 +44,7 @@ where
         shared_strings: &'a [SharedString],
         formula_context: &'a Context,
         cell_xf_count: usize,
+        raw_limits: crate::raw::Limits,
         leniency: Leniency,
     ) -> Result<Self> {
         let mut buf = Vec::with_capacity(1024);
@@ -58,7 +59,7 @@ where
                 break;
             }
             if typ == kind::BEGIN_WS_VIEWS {
-                views = crate::package::sheet_view::read_views(&mut iter, &mut buf)?;
+                views = crate::package::sheet_view::read_views(&mut iter, &mut buf, raw_limits)?;
             }
         }
         if buf.len() != 16 {
@@ -88,7 +89,7 @@ where
                     Tolerance::recording(&mut tolerance),
                 )?);
             } else if typ == kind::BEGIN_WS_VIEWS {
-                views = crate::package::sheet_view::read_views(&mut iter, &mut buf)?;
+                views = crate::package::sheet_view::read_views(&mut iter, &mut buf, raw_limits)?;
             }
         }
 
@@ -97,6 +98,7 @@ where
             shared_strings,
             formula_context,
             cell_xf_count,
+            raw_limits,
             dimensions,
             current_row: 0,
             last_row: None,
@@ -205,7 +207,7 @@ where
                     // BrtCellRk
                     if self.buf.len() >= 12 => {
                         let header = required_cell_header(cell_header)?;
-                        let mut cursor = Cursor::new(&self.buf[8..], "BrtCellRk", crate::raw::Limits::DEFAULT);
+                        let mut cursor = Cursor::new(&self.buf[8..], "BrtCellRk", self.raw_limits);
                         let value = super::semantic::cell_value_from_number(cursor.read_rk()?);
                         return Ok(Some(Cell::new_styled(
                             self.current_row,
@@ -228,7 +230,7 @@ where
                     // BrtCellBool
                     if self.buf.len() >= 9 => {
                         let header = required_cell_header(cell_header)?;
-                        let mut cursor = Cursor::new(&self.buf[8..], "BrtCellBool", crate::raw::Limits::DEFAULT);
+                        let mut cursor = Cursor::new(&self.buf[8..], "BrtCellBool", self.raw_limits);
                         let row = self.current_row;
                         let value = Tolerance::recording(&mut self.tolerance)
                             .read_bool8(&mut cursor, typ, row)?;
@@ -260,6 +262,7 @@ where
                             &mut Tolerance::recording(&mut self.tolerance),
                             typ,
                             row,
+                            self.raw_limits,
                         )?;
                         return Ok(Some(Cell::new_styled(
                             self.current_row,
@@ -297,6 +300,7 @@ where
                         &mut Tolerance::recording(&mut self.tolerance),
                         typ,
                         row,
+                        self.raw_limits,
                     )?;
                     return Ok(Some(Cell::new_rich_string(
                         self.current_row,
@@ -319,6 +323,7 @@ where
                         &mut Tolerance::recording(&mut self.tolerance),
                         typ,
                         row,
+                        self.raw_limits,
                     )?;
                     let parsed =
                         self.parse_formula_cell(
@@ -352,7 +357,11 @@ where
                         });
                     }
                     let header = required_cell_header(cell_header)?;
-                    let mut cursor = Cursor::new(&self.buf[8..], "BrtFmlaBool cached value", crate::raw::Limits::DEFAULT);
+                    let mut cursor = Cursor::new(
+                        &self.buf[8..],
+                        "BrtFmlaBool cached value",
+                        self.raw_limits,
+                    );
                     let row = self.current_row;
                     let bool_value = Tolerance::recording(&mut self.tolerance)
                         .read_bool8(&mut cursor, typ, row)?;
@@ -463,7 +472,8 @@ where
             )?;
             flags &= GRBIT_FMLA_DEFINED;
         }
-        let (formula, consumed) = ParsedFormula::parse(&self.buf[formula_offset..])?;
+        let (formula, consumed) =
+            ParsedFormula::parse(&self.buf[formula_offset..], self.raw_limits)?;
         let trailing = self.buf.len().saturating_sub(formula_offset + consumed);
         tolerance.tolerate_trailing(record_type, row, trailing, || {
             Error::InvalidFormula("formula record has trailing bytes")
@@ -484,8 +494,8 @@ where
         let mut next_data = Vec::new();
         let _ = self.iter.fill_buffer(&mut next_data)?;
         let new_group = match next_type {
-            kind::ARR_FMLA => Some(Group::parse_array(&next_data)?),
-            kind::SHR_FMLA => Some(Group::parse_shared(&next_data)?),
+            kind::ARR_FMLA => Some(Group::parse_array(&next_data, self.raw_limits)?),
+            kind::SHR_FMLA => Some(Group::parse_shared(&next_data, self.raw_limits)?),
             _ => {
                 self.pending_record = Some((next_type, next_data));
                 None
@@ -541,6 +551,7 @@ where
                 parsed.flags,
                 group,
                 self.formula_context,
+                self.raw_limits,
             )?)
         } else if exp_cell.is_some() {
             Err(Error::InvalidFormula(
@@ -554,6 +565,7 @@ where
                 parsed.formula,
                 parsed.flags,
                 self.formula_context,
+                self.raw_limits,
             )?)
         }
     }
@@ -581,13 +593,13 @@ where
                 },
                 kind::MERGE_CELL => {
                     // BrtMergeCell - single merged cell
-                    if let Ok(merged) = MergedCell::parse(&self.buf) {
+                    if let Ok(merged) = MergedCell::parse(&self.buf, self.raw_limits) {
                         self.merged_cells.push(merged);
                     }
                 },
                 kind::H_LINK => {
                     // BrtHLink - hyperlink
-                    if let Ok(hyperlink) = Hyperlink::parse(&self.buf) {
+                    if let Ok(hyperlink) = Hyperlink::parse(&self.buf, self.raw_limits) {
                         self.hyperlinks.push(hyperlink);
                     }
                 },
@@ -646,7 +658,8 @@ where
                             val: "duplicate collection",
                         });
                     }
-                    let (settings, count) = parse_collection_settings(&self.buf, false)?;
+                    let (settings, count) =
+                        parse_collection_settings(&self.buf, false, self.raw_limits)?;
                     self.data_validation_settings = Some(settings);
                     self.consume_classic_data_validations(count)?;
                 },
@@ -657,18 +670,20 @@ where
                             val: "duplicate collection",
                         });
                     }
-                    let (settings, count) = parse_collection_settings(&self.buf, true)?;
+                    let (settings, count) =
+                        parse_collection_settings(&self.buf, true, self.raw_limits)?;
                     self.data_validation14_settings = Some(settings);
                     self.consume_extension_data_validations(count)?;
                 },
                 kind::BEGIN_COND_FORMATTING => {
-                    let (mut formatting, count, base) = parse_classic_header(&self.buf)?;
+                    let (mut formatting, count, base) =
+                        parse_classic_header(&self.buf, self.raw_limits)?;
                     self.consume_conditional_formatting(&mut formatting, count, base)?;
                     self.conditional_formattings.push(formatting);
                 },
                 kind::BEGIN_COND_FORMATTING14 => {
                     let (mut formatting, count, base) =
-                        Formatting::parse_extension14_header_with_base(&self.buf)?;
+                        Formatting::parse_extension14_header_with_base(&self.buf, self.raw_limits)?;
                     self.consume_extension_conditional_formatting(&mut formatting, count, base)?;
                     self.conditional_formattings.push(formatting);
                 },
@@ -716,9 +731,11 @@ where
                             val: "binding count exceeds 65,536",
                         });
                     }
-                    let binding = Binding::parse_payload(&self.buf, |index| {
-                        self.formula_context.is_internal_single_sheet_xti(index)
-                    })?;
+                    let binding = Binding::parse_payload(
+                        &self.buf,
+                        |index| self.formula_context.is_internal_single_sheet_xti(index),
+                        self.raw_limits,
+                    )?;
                     if !app_refs.insert(binding.application_reference.clone()) {
                         return Err(Error::Unrecognized {
                             typ: "WEBEXTENSIONS",
@@ -766,7 +783,7 @@ where
 
             if typ == kind::MERGE_CELL {
                 // BrtMergeCell
-                if let Ok(merged) = MergedCell::parse(&self.buf) {
+                if let Ok(merged) = MergedCell::parse(&self.buf, self.raw_limits) {
                     self.merged_cells.push(merged);
                 }
             }

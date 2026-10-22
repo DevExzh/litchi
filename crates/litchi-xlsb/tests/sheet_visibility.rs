@@ -200,7 +200,14 @@ fn durable_state_wire_round_trips_and_rejects_unknown_tags_and_states() {
     assert_eq!(
         Package::from_bytes(
             &package
-                .apply(&Patch::from_bytes(&wire, TransferLimits::DEFAULT).expect("decode"))
+                .apply(
+                    &Patch::from_bytes(
+                        &wire,
+                        TransferLimits::DEFAULT,
+                        litchi_xlsb::raw::Limits::DEFAULT
+                    )
+                    .expect("decode")
+                )
                 .map(litchi_xlsb::cell_values::structure::Commit::into_package)
                 .expect("replay")
                 .to_bytes()
@@ -218,11 +225,25 @@ fn durable_state_wire_round_trips_and_rejects_unknown_tags_and_states() {
 
     let mut invalid_tag = wire.clone();
     invalid_tag[offset] = 0xff;
-    assert!(Patch::from_bytes(&invalid_tag, TransferLimits::DEFAULT).is_err());
+    assert!(
+        Patch::from_bytes(
+            &invalid_tag,
+            TransferLimits::DEFAULT,
+            litchi_xlsb::raw::Limits::DEFAULT
+        )
+        .is_err()
+    );
 
     let mut invalid_state = wire;
     invalid_state[offset + 1 + 8] = 3;
-    assert!(Patch::from_bytes(&invalid_state, TransferLimits::DEFAULT).is_err());
+    assert!(
+        Patch::from_bytes(
+            &invalid_state,
+            TransferLimits::DEFAULT,
+            litchi_xlsb::raw::Limits::DEFAULT
+        )
+        .is_err()
+    );
 }
 
 // Reconstruct the historical BundleSh-only after image. New operations also
@@ -283,7 +304,12 @@ fn old_rename_wire_tag_and_worksheet_ordinal_remain_compatible() {
         "legacy rename payload addresses a worksheet ordinal"
     );
 
-    let decoded = Patch::from_bytes(&wire, TransferLimits::DEFAULT).expect("decode rename");
+    let decoded = Patch::from_bytes(
+        &wire,
+        TransferLimits::DEFAULT,
+        litchi_xlsb::raw::Limits::DEFAULT,
+    )
+    .expect("decode rename");
     let replayed = package
         .apply(&decoded)
         .map(litchi_xlsb::cell_values::structure::Commit::into_package)
@@ -1041,7 +1067,12 @@ fn every_catalog_kind_supports_name_patch_replay_and_inverse() {
         );
         let commit = edit.commit().unwrap();
         let wire = commit.patch().to_bytes(TransferLimits::DEFAULT).unwrap();
-        let patch = Patch::from_bytes(&wire, TransferLimits::DEFAULT).unwrap();
+        let patch = Patch::from_bytes(
+            &wire,
+            TransferLimits::DEFAULT,
+            litchi_xlsb::raw::Limits::DEFAULT,
+        )
+        .unwrap();
         let replay = package
             .apply(&patch)
             .map(litchi_xlsb::cell_values::structure::Commit::into_package)
@@ -1078,7 +1109,12 @@ fn legacy_and_canonical_name_patches_share_merge_identity() {
     let offset = operation_offset(&wire);
     wire[offset] = 1;
     wire[offset + 1..offset + 9].copy_from_slice(&0_u64.to_le_bytes());
-    let legacy = Patch::from_bytes(&wire, TransferLimits::DEFAULT).unwrap();
+    let legacy = Patch::from_bytes(
+        &wire,
+        TransferLimits::DEFAULT,
+        litchi_xlsb::raw::Limits::DEFAULT,
+    )
+    .unwrap();
     let canonical = legacy.to_bytes(TransferLimits::DEFAULT).unwrap();
     assert_eq!(canonical[operation_offset(&canonical)], 6);
     let mut right = package.edit().unwrap();
@@ -1096,7 +1132,12 @@ fn historical_catalog_name_patch_retains_metadata_only_after_image() {
     edit.set_sheet_name(1, "Renamed".into()).unwrap();
     let commit = edit.commit().unwrap();
     let wire = metadata_only_name_wire(&package, commit.patch());
-    let decoded = Patch::from_bytes(&wire, TransferLimits::DEFAULT).unwrap();
+    let decoded = Patch::from_bytes(
+        &wire,
+        TransferLimits::DEFAULT,
+        litchi_xlsb::raw::Limits::DEFAULT,
+    )
+    .unwrap();
     let replay = package
         .apply(&decoded)
         .map(litchi_xlsb::cell_values::structure::Commit::into_package)
@@ -1137,6 +1178,7 @@ fn dependency_name_patch_quotes_formulas_and_preserves_unrelated_payloads() {
     let patch = Patch::from_bytes(
         &commit.patch().to_bytes(TransferLimits::DEFAULT).unwrap(),
         TransferLimits::DEFAULT,
+        litchi_xlsb::raw::Limits::DEFAULT,
     )
     .unwrap();
     let replay = package

@@ -436,8 +436,12 @@ fn producer_reopen_transfers_sst_and_renames_on_a_durable_root() {
         .patch()
         .to_bytes(TransferLimits::DEFAULT)
         .expect("durable patch");
-    let decoded =
-        Patch::from_bytes(&encoded, TransferLimits::DEFAULT).expect("validated durable patch");
+    let decoded = Patch::from_bytes(
+        &encoded,
+        TransferLimits::DEFAULT,
+        litchi_xlsb::raw::Limits::DEFAULT,
+    )
+    .expect("validated durable patch");
     target
         .apply_structure(&decoded)
         .expect("atomic publication");
@@ -529,7 +533,13 @@ fn ordinary_root_authors_sst_rich_style_and_formula_resources() {
         0,
         formula_ref,
         2.0,
-        CellFormula::new(0, vec![0x1e, 2, 0], vec![]).expect("constant formula"),
+        CellFormula::new(
+            0,
+            vec![0x1e, 2, 0],
+            vec![],
+            litchi_xlsb::raw::Limits::DEFAULT,
+        )
+        .expect("constant formula"),
         &style,
     )
     .expect("formula authoring");
@@ -537,7 +547,13 @@ fn ordinary_root_authors_sst_rich_style_and_formula_resources() {
         0,
         formula_string_ref,
         Value::FormulaStringCache("two".to_string()),
-        CellFormula::new(0, vec![0x1e, 2, 0], vec![]).expect("constant string-cache formula"),
+        CellFormula::new(
+            0,
+            vec![0x1e, 2, 0],
+            vec![],
+            litchi_xlsb::raw::Limits::DEFAULT,
+        )
+        .expect("constant string-cache formula"),
         &style,
     )
     .expect("string-cache formula authoring");
@@ -545,6 +561,7 @@ fn ordinary_root_authors_sst_rich_style_and_formula_resources() {
         GIF_1X1.to_vec(),
         ImageFormat::Gif,
         ChartAnchor::new(0, 3, 2, 7),
+        &litchi_xlsb::package::drawing_image::Limits::DEFAULT,
     )
     .expect("valid image")
     .with_description("authored one-pixel image")
@@ -555,8 +572,12 @@ fn ordinary_root_authors_sst_rich_style_and_formula_resources() {
         .patch()
         .to_bytes(TransferLimits::DEFAULT)
         .expect("durable resources");
-    let patch =
-        Patch::from_bytes(&bytes, TransferLimits::DEFAULT).expect("durable resource replay");
+    let patch = Patch::from_bytes(
+        &bytes,
+        TransferLimits::DEFAULT,
+        litchi_xlsb::raw::Limits::DEFAULT,
+    )
+    .expect("durable resource replay");
     workbook.apply_structure(&patch).expect("publish resources");
 
     let snapshot = workbook.cell_values(0).expect("authored snapshot");
@@ -639,6 +660,7 @@ fn ordinary_root_authors_sst_rich_style_and_formula_resources() {
         GIF_1X1.to_vec(),
         ImageFormat::Gif,
         ChartAnchor::new(7, 4, 9, 8),
+        &litchi_xlsb::package::drawing_image::Limits::DEFAULT,
     )
     .expect("valid appended image")
     .with_description("appended image")
@@ -657,8 +679,12 @@ fn ordinary_root_authors_sst_rich_style_and_formula_resources() {
         .expect("durable appended image");
     publish_structure_patch(
         &mut transfer_target,
-        &Patch::from_bytes(&append_bytes, TransferLimits::DEFAULT)
-            .expect("decode appended image patch"),
+        &Patch::from_bytes(
+            &append_bytes,
+            TransferLimits::DEFAULT,
+            litchi_xlsb::raw::Limits::DEFAULT,
+        )
+        .expect("decode appended image patch"),
     );
     let appended_drawing = transfer_target.sheet_drawing(0).expect("appended drawing");
     assert_eq!(appended_drawing.images.len(), 2);
@@ -704,8 +730,12 @@ fn durable_drawing_transfer_closes_connector_graph_and_remaps_collisions() {
         .patch()
         .to_bytes(TransferLimits::DEFAULT)
         .expect("durable drawing patch");
-    let drawing_patch =
-        Patch::from_bytes(&durable, TransferLimits::DEFAULT).expect("drawing patch replay");
+    let drawing_patch = Patch::from_bytes(
+        &durable,
+        TransferLimits::DEFAULT,
+        litchi_xlsb::raw::Limits::DEFAULT,
+    )
+    .expect("drawing patch replay");
 
     let mut rename_edit = target.to_package().edit().expect("rename edit");
     rename_edit
@@ -810,6 +840,7 @@ fn ordinary_chart_graph_transfer_retains_existing_drawing_and_resource_payloads(
                 GIF_1X1.to_vec(),
                 ImageFormat::Gif,
                 ChartAnchor::new(8, 1, 10, 4),
+                &litchi_xlsb::package::drawing_image::Limits::DEFAULT,
             )
             .expect("target image")
             .with_description("retained target image")
@@ -837,7 +868,12 @@ fn ordinary_chart_graph_transfer_retains_existing_drawing_and_resource_payloads(
         .expect("durable chart graph");
     publish_structure_patch(
         &mut target,
-        &Patch::from_bytes(&durable, TransferLimits::DEFAULT).expect("chart graph replay"),
+        &Patch::from_bytes(
+            &durable,
+            TransferLimits::DEFAULT,
+            litchi_xlsb::raw::Limits::DEFAULT,
+        )
+        .expect("chart graph replay"),
     );
 
     let transferred_drawing_xml = standard_drawing_xml(&target);
@@ -906,8 +942,12 @@ fn genuine_shape_hyperlink_transfer_is_durable_mergeable_and_reversible() {
         .patch()
         .to_bytes(TransferLimits::DEFAULT)
         .expect("durable hyperlink patch");
-    let drawing_patch =
-        Patch::from_bytes(&durable, TransferLimits::DEFAULT).expect("durable hyperlink replay");
+    let drawing_patch = Patch::from_bytes(
+        &durable,
+        TransferLimits::DEFAULT,
+        litchi_xlsb::raw::Limits::DEFAULT,
+    )
+    .expect("durable hyperlink replay");
 
     let mut rename_edit = target.to_package().edit().expect("rename edit");
     rename_edit
@@ -1087,16 +1127,19 @@ fn durable_transfer_remaps_name_sheet_and_table_formula_dependencies() {
         .expect("unique contextual formula")
         .expect("contextual formula");
     let contextual_formula = contextual.formula().expect("formula payload");
-    let source_xti =
-        Parser::with_extra(contextual_formula.tokens(), contextual_formula.ancillary())
-            .parse()
-            .expect("parse contextual formula")
-            .into_iter()
-            .find_map(|token| match token {
-                Token::CellRef3d { sheet_index, .. } => Some(sheet_index),
-                _ => None,
-            })
-            .expect("Data XTI");
+    let source_xti = Parser::with_extra(
+        contextual_formula.tokens(),
+        contextual_formula.ancillary(),
+        litchi_xlsb::raw::Limits::DEFAULT,
+    )
+    .parse()
+    .expect("parse contextual formula")
+    .into_iter()
+    .find_map(|token| match token {
+        Token::CellRef3d { sheet_index, .. } => Some(sheet_index),
+        _ => None,
+    })
+    .expect("Data XTI");
     let (table_tokens, table_extra) = Token::TableReference(TableReference {
         sheet_index: source_xti,
         row_type: Some(TableRowType::Data),
@@ -1108,7 +1151,7 @@ fn durable_transfer_remaps_name_sheet_and_table_formula_dependencies() {
         list_index: Some(3),
         external: None,
     })
-    .to_extended_binary()
+    .to_extended_binary(litchi_xlsb::raw::Limits::DEFAULT)
     .expect("structured-reference encoding");
     let table_formula_ref = Reference::new(0, 1).expect("table formula reference");
     let rich_ref = Reference::new(0, 2).expect("rich resource reference");
@@ -1136,7 +1179,13 @@ fn durable_transfer_remaps_name_sheet_and_table_formula_dependencies() {
             source_summary,
             table_formula_ref,
             Value::FormulaNumberCache(42.5),
-            CellFormula::new(0, table_tokens, table_extra).expect("table cell formula"),
+            CellFormula::new(
+                0,
+                table_tokens,
+                table_extra,
+                litchi_xlsb::raw::Limits::DEFAULT,
+            )
+            .expect("table cell formula"),
             &rich_style,
         )
         .expect("table formula authoring");
@@ -1171,8 +1220,12 @@ fn durable_transfer_remaps_name_sheet_and_table_formula_dependencies() {
         .patch()
         .to_bytes(TransferLimits::DEFAULT)
         .expect("durable dependency patch");
-    let patch =
-        Patch::from_bytes(&durable, TransferLimits::DEFAULT).expect("decode dependency patch");
+    let patch = Patch::from_bytes(
+        &durable,
+        TransferLimits::DEFAULT,
+        litchi_xlsb::raw::Limits::DEFAULT,
+    )
+    .expect("decode dependency patch");
     target
         .apply_structure(&patch)
         .expect("publish dependency patch");
@@ -1184,9 +1237,13 @@ fn durable_transfer_remaps_name_sheet_and_table_formula_dependencies() {
         .expect("name target")
         .formula()
         .expect("name target formula");
-    let name_tokens = Parser::with_extra(name_formula.tokens(), name_formula.ancillary())
-        .parse()
-        .expect("parse remapped name formula");
+    let name_tokens = Parser::with_extra(
+        name_formula.tokens(),
+        name_formula.ancillary(),
+        litchi_xlsb::raw::Limits::DEFAULT,
+    )
+    .parse()
+    .expect("parse remapped name formula");
     assert!(
         name_tokens
             .iter()
@@ -1198,9 +1255,13 @@ fn durable_transfer_remaps_name_sheet_and_table_formula_dependencies() {
         .expect("table target")
         .formula()
         .expect("table target formula");
-    let table_tokens = Parser::with_extra(table_formula.tokens(), table_formula.ancillary())
-        .parse()
-        .expect("parse remapped table formula");
+    let table_tokens = Parser::with_extra(
+        table_formula.tokens(),
+        table_formula.ancillary(),
+        litchi_xlsb::raw::Limits::DEFAULT,
+    )
+    .parse()
+    .expect("parse remapped table formula");
     assert!(table_tokens.iter().any(|token| {
         matches!(
             token,
@@ -1329,15 +1390,25 @@ fn three_way_history_and_adversarial_envelope_remain_atomic() {
         .expect("encoded merge");
     let last = corrupt.len().checked_sub(1).expect("nonempty patch");
     corrupt[last] ^= 0x5a;
-    assert!(Patch::from_bytes(&corrupt, TransferLimits::DEFAULT).is_err());
+    assert!(
+        Patch::from_bytes(
+            &corrupt,
+            TransferLimits::DEFAULT,
+            litchi_xlsb::raw::Limits::DEFAULT
+        )
+        .is_err()
+    );
     assert_eq!(target.worksheet_names(), &["Target".to_string()]);
 
     target.apply_structure(&merged).expect("apply merge");
     assert_eq!(target.worksheet_names(), &["Merged".to_string()]);
-    assert!(
-        target.apply_structure(&merged).is_err(),
-        "stale reapply must fail"
-    );
+    let error = target
+        .apply_structure(&merged)
+        .expect_err("stale reapply must fail");
+    assert!(matches!(
+        error,
+        PackageError::PatchConflict { part: "workbook" }
+    ));
 
     let mut history = History::new(TransferLimits::DEFAULT).expect("history");
     history.push(merged).expect("retain patch");
@@ -1380,7 +1451,12 @@ fn structural_diagnostics_distinguish_images_from_operation_counts() {
         .patch()
         .to_bytes(TransferLimits::DEFAULT)
         .expect("wire");
-    let decoded = Patch::from_bytes(&wire, TransferLimits::DEFAULT).expect("decode");
+    let decoded = Patch::from_bytes(
+        &wire,
+        TransferLimits::DEFAULT,
+        litchi_xlsb::raw::Limits::DEFAULT,
+    )
+    .expect("decode");
     assert!(decoded.is_noop());
     workbook.apply_structure(&decoded).expect("no-op apply");
     assert_eq!(workbook.worksheet_names(), &["Original".to_owned()]);
@@ -1402,7 +1478,12 @@ fn structural_diagnostics_distinguish_images_from_operation_counts() {
     let wire = inverse
         .to_bytes(TransferLimits::DEFAULT)
         .expect("inverse wire");
-    let decoded = Patch::from_bytes(&wire, TransferLimits::DEFAULT).expect("inverse decode");
+    let decoded = Patch::from_bytes(
+        &wire,
+        TransferLimits::DEFAULT,
+        litchi_xlsb::raw::Limits::DEFAULT,
+    )
+    .expect("inverse decode");
     assert!(!decoded.is_noop());
     workbook.apply_structure(&decoded).expect("inverse apply");
     assert_eq!(workbook.worksheet_names(), &["Original".to_owned()]);
@@ -1424,7 +1505,12 @@ fn rename_preserves_tolerated_bundle_sheet_suffix() {
         .patch()
         .to_bytes(TransferLimits::DEFAULT)
         .expect("encode suffix patch");
-    let decoded = Patch::from_bytes(&wire, TransferLimits::DEFAULT).expect("decode suffix patch");
+    let decoded = Patch::from_bytes(
+        &wire,
+        TransferLimits::DEFAULT,
+        litchi_xlsb::raw::Limits::DEFAULT,
+    )
+    .expect("decode suffix patch");
     let replayed = workbook
         .to_package()
         .apply(&decoded)
@@ -1485,7 +1571,12 @@ fn same_tolerated_unpaired_name_is_an_exact_durable_noop() {
         .patch()
         .to_bytes(TransferLimits::DEFAULT)
         .expect("durable no-op");
-    let decoded = Patch::from_bytes(&wire, TransferLimits::DEFAULT).expect("decode no-op");
+    let decoded = Patch::from_bytes(
+        &wire,
+        TransferLimits::DEFAULT,
+        litchi_xlsb::raw::Limits::DEFAULT,
+    )
+    .expect("decode no-op");
     assert!(decoded.is_noop());
     let applied = workbook
         .to_package()
@@ -1543,7 +1634,8 @@ fn structural_quotas_return_typed_limit_errors() {
         LimitKind::Changes,
     );
     assert_limit(
-        Patch::from_bytes(&wire, operation_limits).expect_err("decoded operation quota"),
+        Patch::from_bytes(&wire, operation_limits, litchi_xlsb::raw::Limits::DEFAULT)
+            .expect_err("decoded operation quota"),
         LimitKind::Changes,
     );
 
@@ -1558,7 +1650,8 @@ fn structural_quotas_return_typed_limit_errors() {
         LimitKind::PatchBytes,
     );
     assert_limit(
-        Patch::from_bytes(&wire, byte_limits).expect_err("decoded byte quota"),
+        Patch::from_bytes(&wire, byte_limits, litchi_xlsb::raw::Limits::DEFAULT)
+            .expect_err("decoded byte quota"),
         LimitKind::PatchBytes,
     );
 

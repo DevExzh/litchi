@@ -49,7 +49,7 @@ use litchi_spreadsheet_drawing::objects;
 
 use crate::package::Package;
 use crate::package::error::Result;
-use crate::part_edit::{Rank, SheetLayout, Staged, family, invalid, record, splice};
+use crate::part_edit::{Rank, SheetLayout, Staged, family, invalid, splice};
 use crate::raw::{Encoder, kind};
 
 family!("drawing");
@@ -233,7 +233,8 @@ impl Edit {
             .get_part_mut(&worksheet)?
             .relate_to(&drawing.relative_ref(worksheet.base_uri()), rt::DRAWING);
         let bytes = self.staged.blob(&worksheet)?;
-        let layout = SheetLayout::scan(bytes)?;
+        let raw_limits = self.staged.raw_limits();
+        let layout = SheetLayout::scan_with_limits(bytes, raw_limits)?;
         if layout.units_of(kind::DRAWING).next().is_some() {
             return Err(invalid(
                 "the worksheet names a drawing it has no relationship to",
@@ -241,8 +242,12 @@ impl Edit {
         }
         let at = layout.insertion(Rank::Drawing);
         let mut payload = Vec::new();
-        Encoder::new(&mut payload, crate::raw::Limits::DEFAULT).write_wide_string(&id)?;
-        let updated = splice(bytes, at..at, &record(kind::DRAWING, &payload)?);
+        Encoder::new(&mut payload, raw_limits).write_wide_string(&id)?;
+        let updated = splice(
+            bytes,
+            at..at,
+            &crate::part_edit::record_with_limits(kind::DRAWING, &payload, raw_limits)?,
+        );
         self.staged.replace_worksheet(&worksheet, updated)?;
         self.staged.touch(&worksheet);
         Ok(drawing)

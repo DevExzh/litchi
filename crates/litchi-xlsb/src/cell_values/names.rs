@@ -43,14 +43,14 @@ struct Record {
     payload: Span<usize>,
 }
 
-fn records(stream: &[u8]) -> Result<Vec<Record>> {
+fn records(stream: &[u8], limits: RawLimits) -> Result<Vec<Record>> {
     let mut records = Vec::new();
-    for record in Records::new(stream, crate::raw::Limits::DEFAULT) {
+    for record in Records::new(stream, limits) {
         let record = record?;
         let source = stream.get(record.offset()..).ok_or(Error::InvalidFormat(
             "workbook record offset is outside the stream",
         ))?;
-        let (_, header) = Header::parse(source, RawLimits::DEFAULT)?;
+        let (_, header) = Header::parse(source, limits)?;
         let payload_start = record
             .offset()
             .checked_add(header)
@@ -75,9 +75,9 @@ fn records(stream: &[u8]) -> Result<Vec<Record>> {
     Ok(records)
 }
 
-fn encode(kind: Kind, payload: &[u8]) -> Result<Vec<u8>> {
+fn encode(kind: Kind, payload: &[u8], limits: RawLimits) -> Result<Vec<u8>> {
     let mut bytes = Vec::new();
-    Encoder::new(&mut bytes, crate::raw::Limits::DEFAULT).write_record(kind, payload)?;
+    Encoder::new(&mut bytes, limits).write_record(kind, payload)?;
     Ok(bytes)
 }
 
@@ -123,6 +123,7 @@ fn sheet_xti(
     records: &[Record],
     sheet: u32,
     splices: &mut Vec<Splice>,
+    limits: RawLimits,
 ) -> Result<u16> {
     let sheet = i32::try_from(sheet)
         .map_err(|_error| Error::InvalidFormat("sheet position exceeds the Xti field"))?;
@@ -147,10 +148,10 @@ fn sheet_xti(
         table.extend_from_slice(&0_u32.to_le_bytes());
         table.extend_from_slice(&sheet.to_le_bytes());
         table.extend_from_slice(&sheet.to_le_bytes());
-        let mut bytes = encode(kind::BEGIN_EXTERNALS, &[])?;
-        bytes.extend(encode(kind::SUP_SELF, &[])?);
-        bytes.extend(encode(kind::EXTERN_SHEET, &table)?);
-        bytes.extend(encode(kind::END_EXTERNALS, &[])?);
+        let mut bytes = encode(kind::BEGIN_EXTERNALS, &[], limits)?;
+        bytes.extend(encode(kind::SUP_SELF, &[], limits)?);
+        bytes.extend(encode(kind::EXTERN_SHEET, &table, limits)?);
+        bytes.extend(encode(kind::END_EXTERNALS, &[], limits)?);
         splices.push(Splice {
             span: at..at,
             bytes,
@@ -211,7 +212,7 @@ fn sheet_xti(
             // supporting-link indexes keep their meaning.
             splices.push(Splice {
                 span: table.span.start..table.span.start,
-                bytes: encode(kind::SUP_SELF, &[])?,
+                bytes: encode(kind::SUP_SELF, &[], limits)?,
             });
             supbooks.len()
         },
@@ -240,12 +241,12 @@ fn sheet_xti(
     rewritten.extend_from_slice(&sheet.to_le_bytes());
     splices.push(Splice {
         span: table.span.clone(),
-        bytes: encode(kind::EXTERN_SHEET, &rewritten)?,
+        bytes: encode(kind::EXTERN_SHEET, &rewritten, limits)?,
     });
     Ok(ixti)
 }
 
-fn area_formula(ixti: u16, range: Range) -> Result<Vec<u8>> {
+fn area_formula(ixti: u16, range: Range, raw_limits: crate::raw::Limits) -> Result<Vec<u8>> {
     let first_column = u16::try_from(range.col_first)
         .map_err(|_error| Error::InvalidCellReference("column exceeds the PtgArea3d field"))?;
     let last_column = u16::try_from(range.col_last)
@@ -269,7 +270,7 @@ fn area_formula(ixti: u16, range: Range) -> Result<Vec<u8>> {
         rgce,
         rgcb: Vec::new(),
     }
-    .to_bytes()?)
+    .to_bytes(raw_limits)?)
 }
 
 /// The offset of the formula and the end of the name in a `BrtName`
@@ -294,9 +295,10 @@ pub(super) fn apply(
     scope: Option<usize>,
     target: Option<(usize, Range)>,
 ) -> Result<bool> {
+    let raw_limits = workbook.raw_limits_value();
     let part = workbook.package.main_document_part()?;
     let stream = part.blob().to_vec();
-    let records = records(&stream)?;
+    let records = records(&stream, raw_limits)?;
     let scope_wire = match scope {
         Some(position) => u32::try_from(position)
             .map_err(|_error| Error::InvalidFormat("scope position exceeds the BrtName field"))?,
@@ -310,8 +312,10 @@ pub(super) fn apply(
         .collect::<Vec<_>>();
     let mut existing = None;
     for &index in &names {
-        let definition =
-            crate::named_ranges::Definition::parse(&stream[records[index].payload.clone()])?;
+        let definition = crate::named_ranges::Definition::parse(
+            &stream[records[index].payload.clone()],
+            raw_limits,
+        )?;
         if excel_name_eq(&definition.name, name)
             && definition.sheet_id.unwrap_or(u32::MAX) == scope_wire
         {
@@ -339,13 +343,13 @@ pub(super) fn apply(
         Some((sheet, range)) => {
             let sheet = u32::try_from(sheet)
                 .map_err(|_error| Error::InvalidFormat("sheet position exceeds the Xti field"))?;
-            let ixti = sheet_xti(&stream, &records, sheet, &mut splices)?;
-            let formula = area_formula(ixti, range)?;
+            let ixti = sheet_xti(&stream, &records, sheet, &mut splices, raw_limits)?;
+            let formula = area_formula(ixti, range, raw_limits)?;
             match existing {
                 Some(index) => {
                     let payload = &stream[records[index].payload.clone()];
                     let start = formula_offset(payload)?;
-                    let (_, consumed) = ParsedFormula::parse(&payload[start..])?;
+                    let (_, consumed) = ParsedFormula::parse(&payload[start..], raw_limits)?;
                     let old = payload
                         .get(start..start + consumed)
                         .ok_or(Error::InvalidFormat("BrtName formula is truncated"))?;
@@ -357,14 +361,14 @@ pub(super) fn apply(
                     rewritten.extend_from_slice(&payload[start + consumed..]);
                     splices.push(Splice {
                         span: records[index].span.clone(),
-                        bytes: encode(kind::NAME, &rewritten)?,
+                        bytes: encode(kind::NAME, &rewritten, raw_limits)?,
                     });
                 },
                 None => {
                     crate::named_ranges::validate_name(name)?;
                     let mut payload = Vec::new();
                     {
-                        let mut writer = Encoder::new(&mut payload, crate::raw::Limits::DEFAULT);
+                        let mut writer = Encoder::new(&mut payload, raw_limits);
                         writer.write_u32(0)?;
                         writer.write_u8(0)?;
                         writer.write_u32(scope_wire)?;
@@ -372,7 +376,7 @@ pub(super) fn apply(
                     }
                     payload.extend_from_slice(&formula);
                     payload.extend_from_slice(&u32::MAX.to_le_bytes());
-                    let bytes = encode(kind::NAME, &payload)?;
+                    let bytes = encode(kind::NAME, &payload, raw_limits)?;
                     let at = match names.last() {
                         Some(&last) => records[last].span.end,
                         None => match records

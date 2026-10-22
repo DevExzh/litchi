@@ -80,19 +80,22 @@ impl Worksheet {
         writer.write_record(kind::BEGIN_WS_VIEWS, &[])?;
         writer.write_record(
             kind::BEGIN_WS_VIEW,
-            &crate::package::sheet_view::write_view_payload(self.view.as_ref())?,
+            &crate::package::sheet_view::write_view_payload(self.view.as_ref(), writer.limits())?,
         )?;
         if let Some(view) = &self.view {
             if let Some(pane) = &view.pane {
                 writer.write_record(
                     kind::PANE,
-                    &crate::package::sheet_view::write_pane_payload(pane)?,
+                    &crate::package::sheet_view::write_pane_payload(pane, writer.limits())?,
                 )?;
             }
             for selection in &view.selections {
                 writer.write_record(
                     kind::SEL,
-                    &crate::package::sheet_view::write_selection_payload(selection)?,
+                    &crate::package::sheet_view::write_selection_payload(
+                        selection,
+                        writer.limits(),
+                    )?,
                 )?;
             }
         }
@@ -312,7 +315,7 @@ impl Worksheet {
                 GroupKind::Array => kind::ARR_FMLA,
                 GroupKind::Shared => kind::SHR_FMLA,
             };
-            writer.write_record(record_type, &group.to_record_data()?)?;
+            writer.write_record(record_type, &group.to_record_data(writer.limits())?)?;
         }
         Ok(())
     }
@@ -507,7 +510,7 @@ impl Worksheet {
             )?;
             &compiled
         };
-        let formula_bytes = parsed.to_bytes()?;
+        let formula_bytes = parsed.to_bytes(writer.limits())?;
         let cached = cached_value.unwrap_or(&CellValue::Float(0.0));
 
         let mut data = Vec::new();
@@ -697,7 +700,7 @@ impl Worksheet {
         writer.write_record(kind::BEGIN_MERGE_CELLS, &header)?;
 
         for merged in &self.merged_cells {
-            let data = merged.serialize();
+            let data = merged.serialize(writer.limits())?;
             writer.write_record(kind::MERGE_CELL, &data)?;
         }
 
@@ -754,7 +757,7 @@ impl Worksheet {
     /// Write hyperlinks
     pub(super) fn write_hyperlinks<W: Write>(&self, writer: &mut Encoder<W>) -> Result<()> {
         for hyperlink in &self.hyperlinks {
-            let data = hyperlink.try_serialize()?;
+            let data = hyperlink.serialize(writer.limits())?;
             writer.write_record(kind::H_LINK, &data)?;
         }
         Ok(())

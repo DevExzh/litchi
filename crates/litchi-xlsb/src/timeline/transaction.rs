@@ -23,15 +23,19 @@ pub(super) enum Scope {
     Views(PackURI),
 }
 
-pub(super) fn inspect(package_value: &OpcPackage, scope: &Scope) -> Result<(Content, bool)> {
+pub(super) fn inspect(
+    package_value: &OpcPackage,
+    scope: &Scope,
+    xml_limits: litchi_core::Limits,
+) -> Result<(Content, bool)> {
     match scope {
         Scope::Caches(workbook) => {
-            let parts = package::load_caches(package_value, workbook)?;
+            let parts = package::load_caches(package_value, workbook, xml_limits)?;
             let mut canonical = true;
             for part in &parts {
                 let uri = PackURI::new(&part.part_name)?;
-                canonical &=
-                    package_value.get_part(&uri)?.blob() == write_cache(&part.cache)?.as_slice();
+                canonical &= package_value.get_part(&uri)?.blob()
+                    == write_cache(&part.cache, xml_limits)?.as_slice();
             }
             let mut caches = Vec::new();
             caches
@@ -46,12 +50,12 @@ pub(super) fn inspect(package_value: &OpcPackage, scope: &Scope) -> Result<(Cont
             Ok((Content::Caches(caches), canonical))
         },
         Scope::Views(worksheet) => {
-            let view_part = package::load_views(package_value, worksheet)?;
+            let view_part = package::load_views(package_value, worksheet, xml_limits)?;
             let mut canonical = true;
             if let Some(attached) = &view_part {
                 let uri = PackURI::new(&attached.part_name)?;
                 canonical = package_value.get_part(&uri)?.blob()
-                    == write_views(&attached.views)?.as_slice();
+                    == write_views(&attached.views, xml_limits)?.as_slice();
             }
             Ok((
                 Content::Views(view_part.map_or_else(Views::new, |attached| attached.views)),
@@ -65,6 +69,7 @@ pub(super) fn validate_closure(
     package_value: &OpcPackage,
     scope: &Scope,
     content: &Content,
+    xml_limits: litchi_core::Limits,
 ) -> Result<()> {
     let cache_names = match scope {
         Scope::Caches(_) => match content {
@@ -73,7 +78,7 @@ pub(super) fn validate_closure(
         },
         Scope::Views(_) => {
             let workbook = package_value.main_document_part()?.partname().clone();
-            return validate_views_against_caches(package_value, &workbook, content);
+            return validate_views_against_caches(package_value, &workbook, content, xml_limits);
         },
     };
     let names = cache_name_set(cache_names.iter().map(|cache| cache.name.as_str()))?;
@@ -82,7 +87,7 @@ pub(super) fn validate_closure(
             .iter()
             .any(|relationship| relationship.reltype() == super::codec::VIEWS_RELATIONSHIP_TYPE)
     }) {
-        let views = package::load_views(package_value, part.partname())?
+        let views = package::load_views(package_value, part.partname(), xml_limits)?
             .map_or_else(Views::new, |attached| attached.views);
         if views
             .items
@@ -100,11 +105,12 @@ fn validate_views_against_caches(
     package_value: &OpcPackage,
     workbook: &PackURI,
     content: &Content,
+    xml_limits: litchi_core::Limits,
 ) -> Result<()> {
     let Content::Views(views) = content else {
         return Err(scope_error("view"));
     };
-    let caches = package::load_caches(package_value, workbook)?;
+    let caches = package::load_caches(package_value, workbook, xml_limits)?;
     let names = cache_name_set(caches.iter().map(|part| part.cache.name.as_str()))?;
     if views
         .items
@@ -117,14 +123,14 @@ fn validate_views_against_caches(
     }
     Ok(())
 }
-pub(super) fn validate_content(content: &Content) -> Result<()> {
+pub(super) fn validate_content(content: &Content, xml_limits: litchi_core::Limits) -> Result<()> {
     match content {
-        Content::Caches(caches) => validate_caches(caches),
-        Content::Views(views) => write_views(views).map(|_| ()),
+        Content::Caches(caches) => validate_caches(caches, xml_limits),
+        Content::Views(views) => write_views(views, xml_limits).map(|_| ()),
     }
 }
 
-pub(super) fn validate_caches(caches: &[Cache]) -> Result<()> {
+pub(super) fn validate_caches(caches: &[Cache], xml_limits: litchi_core::Limits) -> Result<()> {
     if caches.len() > super::model::MAX_CACHES {
         return Err(Error::InvalidLength {
             expected: super::model::MAX_CACHES,
@@ -139,7 +145,7 @@ pub(super) fn validate_caches(caches: &[Cache]) -> Result<()> {
             source,
         })?;
     for cache in caches {
-        write_cache(cache)?;
+        write_cache(cache, xml_limits)?;
         if !names.insert(Caseless::new(&cache.name)) {
             return Err(Error::InvalidFormat("duplicate timeline cache name"));
         }
@@ -166,13 +172,14 @@ pub(super) fn store(
     package_value: &mut OpcPackage,
     scope: &Scope,
     content: &Content,
+    xml_limits: litchi_core::Limits,
 ) -> Result<()> {
     match (scope, content) {
         (Scope::Caches(workbook), Content::Caches(caches)) => {
-            package::store_caches(package_value, workbook, caches)
+            package::store_caches(package_value, workbook, caches, xml_limits)
         },
         (Scope::Views(worksheet), Content::Views(views)) => {
-            package::store_views(package_value, worksheet, views)
+            package::store_views(package_value, worksheet, views, xml_limits)
         },
         _ => Err(scope_error("matching")),
     }

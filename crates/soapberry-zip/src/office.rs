@@ -8803,6 +8803,18 @@ impl<'data> LazyArchiveReader<'data> {
         self.cache_limits
     }
 
+    /// Return the exact immutable byte slice used to build this reader.
+    ///
+    /// This is a source-identity view only; it does not copy or validate the
+    /// archive. Package owners use it when transferring an already-admitted
+    /// physical reader into an owned, deferred package without rebuilding the
+    /// central-directory index.
+    #[inline]
+    #[must_use]
+    pub fn as_bytes(&self) -> &[u8] {
+        self.inner.archive.as_bytes()
+    }
+
     /// Whether any central-directory entry declares ZIP encryption through
     /// general-purpose flag bit zero or strong-encryption bit six. Lazy reads
     /// retain the same admission fact as the eager indexed archive so OPC

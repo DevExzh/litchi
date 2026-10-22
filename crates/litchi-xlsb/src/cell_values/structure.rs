@@ -20,7 +20,7 @@
 //! assert_eq!(commit.package().workbook()?.worksheet_names(), &["Renamed"]);
 //! let (package, patch) = commit.into_parts();
 //! let wire = patch.to_bytes(TransferLimits::DEFAULT)?;
-//! let decoded = Patch::from_bytes(&wire, TransferLimits::DEFAULT)?;
+//! let decoded = Patch::from_bytes(&wire, TransferLimits::DEFAULT, source.raw_limits_value())?;
 //! let applied = source.apply(&decoded)?.into_package();
 //! assert_eq!(package.to_bytes()?, applied.to_bytes()?);
 //! let restored = package.apply(&patch.inverse())?.into_package();
@@ -252,7 +252,14 @@ impl ImagePlan {
             self.to_row,
             self.to_row_offset,
         );
-        let image = crate::writer::Image::new(Arc::clone(&self.data), self.format, anchor)?;
+        // The bytes were admitted when the source workbook was opened; the
+        // copy is re-admitted under the format ceilings.
+        let image = crate::writer::Image::new(
+            Arc::clone(&self.data),
+            self.format,
+            anchor,
+            &crate::package::drawing_image::Limits::DEFAULT,
+        )?;
         match &self.description {
             Some(description) => image.with_description(description.clone()),
             None => Ok(image),
@@ -328,7 +335,7 @@ impl Operation {
 #[derive(Debug, Clone)]
 pub struct Edit {
     base: crate::Package,
-    before: Arc<[u8]>,
+    before: Arc<Vec<u8>>,
     sheet_catalog: Arc<[SheetTarget]>,
     operations: Vec<Operation>,
     operation_indexes: BTreeMap<Selection, Vec<usize>>,
@@ -351,7 +358,7 @@ impl Edit {
             .collect::<Vec<_>>();
         Ok(Self {
             base: package.clone(),
-            before: Arc::from(package.to_bytes()?),
+            before: Arc::new(package.to_bytes()?),
             sheet_catalog: sheet_catalog.into(),
             operations: Vec::new(),
             operation_indexes: BTreeMap::new(),
@@ -1364,8 +1371,12 @@ impl Edit {
                 "source sheet has no embedded image",
             )
         })?;
-        let image =
-            crate::writer::Image::new(Arc::clone(&embedded.data), embedded.format, target_anchor)?;
+        let image = crate::writer::Image::new(
+            Arc::clone(&embedded.data),
+            embedded.format,
+            target_anchor,
+            &crate::package::drawing_image::Limits::DEFAULT,
+        )?;
         let image = match &embedded.description {
             Some(description) => image.with_description(description.clone())?,
             None => image,
@@ -1435,7 +1446,11 @@ impl Edit {
         }
         let value = if shared {
             let mut package = donor.package.clone();
-            let index = super::resources::intern_shared_string_for_new_cell(&mut package, &string)?;
+            let index = super::resources::intern_shared_string_for_new_cell(
+                &mut package,
+                &string,
+                donor.raw_limits_value(),
+            )?;
             donor = donor.reparse_candidate(package)?;
             Value::SharedStringIndex(index)
         } else {
@@ -1452,13 +1467,13 @@ impl Edit {
     /// Returns an error when replay, complete workbook readback, or bounds fail.
     pub fn commit(self) -> Result<Commit> {
         let (after, package) = replay_package(&self.base, &self.before, &self.operations)?;
-        let after = Arc::from(after);
         let patch = Patch {
             before: self.before,
             after,
             operations: self.operations,
             external_link_limits: self.external_link_limits,
             drawing_load_policy: self.drawing_load_policy,
+            raw_limits: self.base.raw_limits_value(),
         };
         let _bounded_encoding = patch.to_bytes(self.limits)?;
         let diagnostics = Diagnostics {
@@ -1603,11 +1618,12 @@ impl Commit {
 /// An exact before/after workbook patch with semantic replay operations.
 #[derive(Debug, Clone)]
 pub struct Patch {
-    before: Arc<[u8]>,
-    after: Arc<[u8]>,
+    before: Arc<Vec<u8>>,
+    after: Arc<Vec<u8>>,
     operations: Vec<Operation>,
     external_link_limits: ExternalLinkLimits,
     drawing_load_policy: DrawingLoadPolicy,
+    raw_limits: RawLimits,
 }
 
 impl Patch {
@@ -1616,19 +1632,25 @@ impl Patch {
         let limits = package.opc_package().read_limits();
         // An owned image publishes its exact bytes, so an applied (or
         // inverted) patch reproduces its after image byte for byte.
-        let candidate = litchi_opc::OpcPackage::from_vec_with_limits(self.after.to_vec(), limits)?;
+        // The workbook projection below re-admits every BIFF12 record under
+        // the recipient's retained raw policy. A patch's decode profile
+        // describes how its wire image was read; it is not a reason to reject
+        // an equal-content image whose actual resources fit this owner. Keep
+        // the owned OPC path here: it preserves the exact source/provenance
+        // publication bytes used by the original package commit path.
+        let reader = admit_archive_before_copy(self.after.as_slice(), limits)?;
+        let candidate = litchi_opc::OpcPackage::from_shared_vec_with_admitted_reader(
+            Arc::clone(&self.after),
+            reader,
+        )?;
         let workbook = package.project_candidate(candidate)?;
         validate_all_worksheets(&workbook)?;
         Ok(workbook)
     }
 
     pub(crate) fn apply_to_package(&self, package: &crate::Package) -> Result<crate::Package> {
-        if package.to_bytes()?.as_slice() != self.before.as_ref() {
-            return Err(Error::refused(
-                litchi_core::edit::RefusalKind::UnsupportedContent,
-                "edit",
-                "workbook patch source is stale",
-            ));
+        if package.to_bytes()?.as_slice() != self.before.as_slice() {
+            return Err(Error::PatchConflict { part: "workbook" });
         }
         if self.is_noop() {
             return Ok(package.clone());
@@ -1649,13 +1671,13 @@ impl Patch {
     /// Canonical exact package image required before application.
     #[must_use]
     pub fn before(&self) -> &[u8] {
-        &self.before
+        self.before.as_slice()
     }
 
     /// Canonical validated package image published by application.
     #[must_use]
     pub fn after(&self) -> &[u8] {
-        &self.after
+        self.after.as_slice()
     }
 
     /// Number of semantic workbook operations retained for durable replay.
@@ -1669,17 +1691,13 @@ impl Patch {
     /// [`crate::Package::apply`]).
     #[cfg(test)]
     pub(crate) fn apply(&self, workbook: &mut Workbook) -> Result<()> {
-        if workbook_bytes(workbook)?.as_slice() != self.before.as_ref() {
-            return Err(Error::refused(
-                litchi_core::edit::RefusalKind::UnsupportedContent,
-                "edit",
-                "workbook patch source is stale",
-            ));
+        let package = crate::Package::from_workbook(workbook);
+        if workbook_bytes(workbook)?.as_slice() != self.before.as_slice() {
+            return Err(Error::PatchConflict { part: "workbook" });
         }
         if self.is_noop() {
             return Ok(());
         }
-        let package = crate::Package::from_workbook(workbook);
         let candidate = self.changed_candidate(&package)?;
         *workbook = candidate;
         Ok(())
@@ -1694,6 +1712,7 @@ impl Patch {
             operations: Vec::new(),
             external_link_limits: self.external_link_limits,
             drawing_load_policy: self.drawing_load_policy,
+            raw_limits: self.raw_limits,
         }
     }
 
@@ -1745,11 +1764,12 @@ impl Patch {
                 conflicts,
             });
         }
-        let after = Arc::from(replay(
-            &self.before,
+        let after = Arc::new(replay(
+            self.before.as_slice(),
             &merged,
             self.external_link_limits,
             self.drawing_load_policy,
+            self.raw_limits,
         )?);
         Ok(MergeOutcome {
             patch: Some(Self {
@@ -1758,6 +1778,7 @@ impl Patch {
                 operations: merged,
                 external_link_limits: self.external_link_limits,
                 drawing_load_policy: self.drawing_load_policy,
+                raw_limits: self.raw_limits,
             }),
             conflicts,
         })
@@ -1815,7 +1836,7 @@ impl Patch {
         output.extend_from_slice(&self.before);
         output.extend_from_slice(&self.after);
         for operation in &self.operations {
-            encode_operation(operation, &mut output)?;
+            encode_operation(operation, &mut output, self.raw_limits)?;
         }
         Ok(output)
     }
@@ -1830,28 +1851,38 @@ impl Patch {
     /// eager drawing decoding; use [`Self::from_bytes_without_drawing_parse`]
     /// for an explicit drawing-skipped projection. Exact-image inverse patches
     /// intentionally carry no forward operations and validate both package
-    /// endpoints instead.
-    pub fn from_bytes(data: &[u8], limits: TransferLimits) -> Result<Self> {
-        Self::from_bytes_with_external_link_limits(data, limits, ExternalLinkLimits::default())
+    /// endpoints instead. `raw_limits` is required because it bounds every
+    /// BIFF12 record and string decoded while validating the images.
+    pub fn from_bytes(data: &[u8], limits: TransferLimits, raw_limits: RawLimits) -> Result<Self> {
+        Self::from_bytes_with_external_link_limits(
+            data,
+            limits,
+            ExternalLinkLimits::default(),
+            raw_limits,
+        )
     }
 
     /// Decode a durable workbook patch with an explicit external-link policy.
     ///
     /// The caller profile governs validation of both package images and
-    /// semantic replay; no default-policy parse is performed first. Drawing
-    /// parts are decoded eagerly; use
+    /// semantic replay; no default-policy parse is performed first. The
+    /// required `raw_limits` profile likewise governs every BIFF12 record and
+    /// string decoded during that validation. Drawing parts are decoded
+    /// eagerly; use
     /// [`Self::from_bytes_without_drawing_parse_with_external_link_limits`]
     /// when the explicit skipped projection is required.
     pub fn from_bytes_with_external_link_limits(
         data: &[u8],
         limits: TransferLimits,
         external_link_limits: ExternalLinkLimits,
+        raw_limits: RawLimits,
     ) -> Result<Self> {
         Self::from_bytes_with_external_link_limits_and_drawing_policy(
             data,
             limits,
             external_link_limits,
             DrawingLoadPolicy::Eager,
+            raw_limits,
         )
     }
 
@@ -1862,12 +1893,18 @@ impl Patch {
     /// durable wire format has no drawing-policy field, so callers choose the
     /// projection at decode time; ordinary `from_bytes*` calls remain eager.
     /// Drawing authoring and transfer operations still fail closed when the
-    /// decoded patch is replayed under the skipped policy.
-    pub fn from_bytes_without_drawing_parse(data: &[u8], limits: TransferLimits) -> Result<Self> {
+    /// decoded patch is replayed under the skipped policy. `raw_limits` is
+    /// required for the BIFF12 record and string validation performed here.
+    pub fn from_bytes_without_drawing_parse(
+        data: &[u8],
+        limits: TransferLimits,
+        raw_limits: RawLimits,
+    ) -> Result<Self> {
         Self::from_bytes_without_drawing_parse_with_external_link_limits(
             data,
             limits,
             ExternalLinkLimits::default(),
+            raw_limits,
         )
     }
 
@@ -1877,12 +1914,14 @@ impl Patch {
         data: &[u8],
         limits: TransferLimits,
         external_link_limits: ExternalLinkLimits,
+        raw_limits: RawLimits,
     ) -> Result<Self> {
         Self::from_bytes_with_external_link_limits_and_drawing_policy(
             data,
             limits,
             external_link_limits,
             DrawingLoadPolicy::Skipped,
+            raw_limits,
         )
     }
 
@@ -1891,8 +1930,10 @@ impl Patch {
         limits: TransferLimits,
         external_link_limits: ExternalLinkLimits,
         drawing_load_policy: DrawingLoadPolicy,
+        raw_limits: RawLimits,
     ) -> Result<Self> {
         validate_limits(limits)?;
+        raw_limits.validate()?;
         if data.len() > limits.bytes() {
             return Err(Error::Limit {
                 kind: LimitKind::PatchBytes.into(),
@@ -1936,7 +1977,7 @@ impl Patch {
                 source,
             })?;
         for _ in 0..operation_count {
-            operations.push(decode_operation(data, &mut offset)?);
+            operations.push(decode_operation(data, &mut offset, raw_limits)?);
         }
         if offset != data.len() {
             return Err(Error::InvalidLength {
@@ -1944,12 +1985,13 @@ impl Patch {
                 found: data.len(),
             });
         }
-        let before = copy_arc(&data[32..before_end], "workbook patch before image")?;
-        let after = copy_arc(&data[before_end..after_end], "workbook patch after image")?;
+        let before = copy_vec_arc(&data[32..before_end], "workbook patch before image")?;
+        let after = copy_vec_arc(&data[before_end..after_end], "workbook patch after image")?;
         let validated_before = validated_workbook_with_external_link_limits_and_drawing_policy(
             &before,
             external_link_limits,
             drawing_load_policy,
+            raw_limits,
         )?;
         // Tag 1 predates the complete tab catalog and stores a worksheet-only
         // ordinal.  Resolve it against the immutable before image before any
@@ -1963,6 +2005,7 @@ impl Patch {
             &after,
             external_link_limits,
             drawing_load_policy,
+            raw_limits,
         )?;
         if !operations.is_empty()
             && replay(
@@ -1970,9 +2013,10 @@ impl Patch {
                 &operations,
                 external_link_limits,
                 drawing_load_policy,
+                raw_limits,
             )?
             .as_slice()
-                != after.as_ref()
+                != after.as_slice()
         {
             return Err(Error::InvalidFormat(
                 "durable workbook patch operations do not reconstruct its after image",
@@ -1984,6 +2028,7 @@ impl Patch {
             operations,
             external_link_limits,
             drawing_load_policy,
+            raw_limits,
         })
     }
 
@@ -2164,12 +2209,10 @@ impl History {
                 .get(self.cursor.saturating_sub(1))
                 .map(|entry| Arc::clone(&entry.after))
         };
-        if expected.is_some_and(|source| source.as_ref() != patch.before.as_ref()) {
-            return Err(Error::refused(
-                litchi_core::edit::RefusalKind::UnsupportedContent,
-                "edit",
-                "workbook history patch does not continue its exact source tip",
-            ));
+        if expected.is_some_and(|source| source.as_slice() != patch.before.as_slice()) {
+            return Err(Error::PatchConflict {
+                part: "workbook history",
+            });
         }
         while self.entries.len() > self.cursor {
             if let Some(removed) = self.entries.pop() {
@@ -2244,38 +2287,96 @@ fn replay(
     operations: &[Operation],
     external_link_limits: ExternalLinkLimits,
     drawing_load_policy: DrawingLoadPolicy,
+    raw_limits: RawLimits,
 ) -> Result<Vec<u8>> {
     let workbook = validated_workbook_with_external_link_limits_and_drawing_policy(
         before,
         external_link_limits,
         drawing_load_policy,
+        raw_limits,
     )?;
     replay_workbook(workbook, before, operations).map(|(bytes, _)| bytes)
 }
 
 fn replay_package(
     base: &crate::Package,
-    before: &[u8],
+    before: &Arc<Vec<u8>>,
     operations: &[Operation],
-) -> Result<(Vec<u8>, crate::Package)> {
+) -> Result<(Arc<Vec<u8>>, crate::Package)> {
     // Durable replay is defined against this exact serialized image, not the
     // in-memory graph's potentially different archive/layout provenance.
     let limits = base.opc_package().read_limits();
-    let graph = litchi_opc::OpcPackage::from_bytes_with_limits(before, limits)?;
+    let graph = litchi_opc::OpcPackage::from_bytes_with_limits(before.as_slice(), limits)?;
     let workbook = base.project_candidate(graph)?;
     validate_all_worksheets(&workbook)?;
-    let (bytes, mut workbook) = replay_workbook(workbook, before, operations)?;
-    let package = if bytes == before {
-        base.clone()
+    let (bytes, mut workbook) = replay_workbook(workbook, before.as_slice(), operations)?;
+    let bytes = if bytes == before.as_slice() {
+        return Ok((Arc::clone(before), base.clone()));
     } else {
         // Admit the generated physical image under the same finite policy
         // before publication. This also establishes the precise archive
         // lineage used by later edits/applications. The semantic workbook is
         // already validated by replay; do not parse that projection again.
-        workbook.package = litchi_opc::OpcPackage::from_vec_with_limits(bytes.clone(), limits)?;
-        workbook.into_package()
+        Arc::new(bytes)
     };
-    Ok((bytes, package))
+    let reader = admit_archive_before_copy(bytes.as_slice(), limits)?;
+    workbook.package =
+        litchi_opc::OpcPackage::from_shared_vec_with_admitted_reader(Arc::clone(&bytes), reader)?;
+    Ok((bytes, workbook.into_package()))
+}
+
+/// Admit the recipient's physical archive policy before taking ownership of
+/// an exact after-image. The returned reader checks input, archive/member
+/// counts, names, metadata, and declared ZIP sizes without copying the image;
+/// the admitted-reader handoff consumes that same reader while retaining the
+/// exact source for publication.
+fn admit_archive_before_copy<'data>(
+    bytes: &'data [u8],
+    limits: litchi_opc::SourceLimits,
+) -> Result<litchi_opc::phys_pkg::PhysPkgReader<'data>> {
+    let observed = u64::try_from(bytes.len()).map_err(|_error| Error::CapacityOverflow {
+        resource: "workbook archive input bytes",
+    })?;
+    let maximum = limits.max_input_bytes();
+    if observed > maximum {
+        return Err(Error::Opc(litchi_opc::OpcError::Limit {
+            kind: litchi_opc::SourceLimitKind::InputBytes,
+            observed,
+            maximum,
+        }));
+    }
+    Ok(litchi_opc::phys_pkg::PhysPkgReader::new_with_limits(
+        bytes, limits,
+    )?)
+}
+
+#[cfg(test)]
+mod replay_admission_tests {
+    use super::admit_archive_before_copy;
+    use crate::Package;
+    use litchi_opc::SourceLimits;
+
+    #[test]
+    fn archive_preflight_checks_member_budget_before_owned_handoff() {
+        let bytes = Package::new()
+            .expect("fixture package")
+            .to_bytes()
+            .expect("fixture bytes");
+        let limits = SourceLimits::builder()
+            .max_members(1)
+            .expect("member limit")
+            .max_parts(1)
+            .expect("part limit")
+            .max_relationship_parts(1)
+            .expect("relationship limit")
+            .build()
+            .expect("source limits");
+
+        assert!(
+            admit_archive_before_copy(&bytes, limits).is_err(),
+            "the borrowed preflight must reject an archive whose member count exceeds the recipient budget"
+        );
+    }
 }
 
 fn canonicalize_legacy_operations(
@@ -2530,10 +2631,11 @@ fn replay_workbook(
 }
 
 fn author_style(workbook: &mut Workbook, style: &AuthoredStyle) -> Result<super::StyleIndex> {
-    let plan = super::resources::plan_style(style)?;
+    let raw_limits = workbook.raw_limits_value();
+    let plan = super::resources::plan_style(style, raw_limits)?;
     crate::signature_policy::ensure_unsigned(&workbook.package)?;
     let mut package = workbook.package.clone();
-    let index = super::resources::intern_style_plan(&mut package, &plan)?;
+    let index = super::resources::intern_style_plan(&mut package, &plan, raw_limits)?;
     let validated = workbook.reparse_candidate(package)?;
     *workbook = validated;
     Ok(index)
@@ -2550,13 +2652,10 @@ fn insert_candidate_cell(
     let uri = workbook.worksheet_uri(sheet)?;
     let package = workbook.package.clone();
     let leniency = workbook.leniency();
-    let mut edit = super::workbook::read_with_limits_and_leniency(
-        &package,
-        &uri,
-        super::Limits::DEFAULT,
-        leniency,
-    )?
-    .draft();
+    let worksheet_limits = worksheet_limits_with_raw(workbook);
+    let mut edit =
+        super::workbook::read_with_limits_and_leniency(&package, &uri, worksheet_limits, leniency)?
+            .draft();
     if let Some(formula) = formula {
         edit.insert_formula(reference, style, value, formula)?;
     } else {
@@ -2571,6 +2670,7 @@ fn insert_candidate_cell(
         external_link_limits,
         workbook.drawing_load_policy(),
         leniency,
+        workbook.raw_limits_value(),
     )?;
     if let super::workbook::Applied::Published {
         workbook: validated,
@@ -2588,7 +2688,8 @@ fn add_image(workbook: &mut Workbook, sheet: usize, plan: &ImagePlan) -> Result<
     let worksheet_uri = workbook.worksheet_uri(sheet)?;
     let worksheet_source = workbook.package.get_part(&worksheet_uri)?.blob().to_vec();
     let mut drawing_rel_id = None;
-    for item in Records::new(&worksheet_source, crate::raw::Limits::DEFAULT) {
+    let raw_limits = workbook.raw_limits_value();
+    for item in Records::new(&worksheet_source, raw_limits) {
         let record = item?;
         if record.kind() == kind::DRAWING {
             if drawing_rel_id.is_some() {
@@ -2598,11 +2699,7 @@ fn add_image(workbook: &mut Workbook, sheet: usize, plan: &ImagePlan) -> Result<
                     "worksheet contains multiple BrtDrawing records",
                 ));
             }
-            let mut cursor = crate::raw::Cursor::new(
-                record.payload(),
-                "BrtDrawing",
-                crate::raw::Limits::DEFAULT,
-            );
+            let mut cursor = crate::raw::Cursor::new(record.payload(), "BrtDrawing", raw_limits);
             drawing_rel_id = Some(cursor.read_wide_string()?);
         }
     }
@@ -2666,6 +2763,7 @@ fn add_image(workbook: &mut Workbook, sheet: usize, plan: &ImagePlan) -> Result<
         &[],
         &[],
         &[],
+        litchi_core::Limits::for_profile(litchi_core::Profile::Server),
     )?;
     let mut package = workbook.package.clone();
     package.try_add_part(Box::new(BlobPart::new(
@@ -2700,18 +2798,22 @@ fn add_image(workbook: &mut Workbook, sheet: usize, plan: &ImagePlan) -> Result<
         },
     );
     let mut drawing_payload = Vec::new();
-    Encoder::new(&mut drawing_payload, crate::raw::Limits::DEFAULT)
-        .write_wide_string(&drawing_rel_id)?;
+    Encoder::new(&mut drawing_payload, raw_limits).write_wide_string(&drawing_rel_id)?;
     let mut worksheet_output = Vec::new();
     let mut inserted = false;
-    for item in Records::new(&worksheet_source, crate::raw::Limits::DEFAULT) {
+    for item in Records::new(&worksheet_source, raw_limits) {
         let record = item?;
         if !inserted && matches!(record.kind(), kind::BEGIN_LIST_PARTS | kind::END_SHEET) {
-            Encoder::new(&mut worksheet_output, crate::raw::Limits::DEFAULT)
+            Encoder::new(&mut worksheet_output, raw_limits)
                 .write_record(kind::DRAWING, &drawing_payload)?;
             inserted = true;
         }
-        copy_record(&worksheet_source, &record, &mut worksheet_output)?;
+        copy_record(
+            &worksheet_source,
+            &record,
+            raw_limits,
+            &mut worksheet_output,
+        )?;
     }
     if !inserted {
         return Err(Error::InvalidFormat(
@@ -2772,6 +2874,7 @@ fn append_image(
     let before_images = drawing.images.len();
     let object_id = crate::package::drawing_write::next_drawing_object_id(
         workbook.package.get_part(&drawing_uri)?.blob(),
+        litchi_core::Limits::for_profile(litchi_core::Profile::Server),
     )?;
     let media_index = free_media_index(&workbook.package, plan.format.extension())?;
     let media_uri = PackURI::new(format!(
@@ -2799,6 +2902,7 @@ fn append_image(
         image,
         object_id,
         &image_rel_id,
+        litchi_core::Limits::for_profile(litchi_core::Profile::Server),
     )?;
     drawing_part.set_blob(drawing_xml);
     let validated = workbook.reparse_candidate(package)?;
@@ -2872,10 +2976,12 @@ fn transfer_cell(
     target_sheet: usize,
     target_reference: Reference,
 ) -> Result<()> {
+    let worksheet_limits = worksheet_limits_with_raw(target);
     let source = validated_workbook_with_external_link_limits_and_drawing_policy(
         source_bytes,
         target.external_link_limits(),
         DrawingLoadPolicy::Skipped,
+        target.raw_limits_value(),
     )?;
     let source_snapshot = source.cell_values(source_sheet)?;
     let source_cell = source_snapshot
@@ -2894,8 +3000,13 @@ fn transfer_cell(
         ));
     }
     let mut package = target.package.clone();
-    let style =
-        super::resources::transfer_style(&source.package, &mut package, source_cell.style())?;
+    let style = super::resources::transfer_style(
+        &source.package,
+        &mut package,
+        source_cell.style(),
+        source.raw_limits_value(),
+        target.raw_limits_value(),
+    )?;
     let value = match source_cell.value() {
         Value::SharedStringIndex(index) => {
             let index = usize::try_from(*index).map_err(|_error| {
@@ -2907,17 +3018,25 @@ fn transfer_cell(
                 .ok_or(Error::InvalidCellReference(
                     "source shared-string index is absent",
                 ))?;
-            let string =
-                super::resources::transfer_string_fonts(&source.package, &mut package, string)?;
+            let string = super::resources::transfer_string_fonts(
+                &source.package,
+                &mut package,
+                string,
+                source.raw_limits_value(),
+                target.raw_limits_value(),
+            )?;
             Value::SharedStringIndex(super::resources::intern_shared_string_for_new_cell(
                 &mut package,
                 &string,
+                target.raw_limits_value(),
             )?)
         },
         Value::RichString(string) => Value::RichString(super::resources::transfer_string_fonts(
             &source.package,
             &mut package,
             string,
+            source.raw_limits_value(),
+            target.raw_limits_value(),
         )?),
         Value::Blank => Value::Blank,
         Value::RkNumber(value) => Value::RkNumber(*value),
@@ -2932,13 +3051,9 @@ fn transfer_cell(
     };
     let uri = target.worksheet_uri(target_sheet)?;
     let leniency = target.leniency();
-    let mut edit = super::workbook::read_with_limits_and_leniency(
-        &package,
-        &uri,
-        super::Limits::DEFAULT,
-        leniency,
-    )?
-    .draft();
+    let mut edit =
+        super::workbook::read_with_limits_and_leniency(&package, &uri, worksheet_limits, leniency)?
+            .draft();
     if let Some(formula) = source_cell.formula() {
         let formula =
             super::formula_transfer::remap(&source, target, source_sheet, target_sheet, formula)?;
@@ -2956,6 +3071,7 @@ fn transfer_cell(
         external_link_limits,
         target.drawing_load_policy(),
         leniency,
+        target.raw_limits_value(),
     )?;
     if let super::workbook::Applied::Published {
         workbook: validated,
@@ -2965,6 +3081,17 @@ fn transfer_cell(
         *target = *validated;
     }
     Ok(())
+}
+
+fn worksheet_limits_with_raw(workbook: &Workbook) -> super::Limits {
+    let semantic = workbook.semantic_limits().cell_values_value();
+    let raw = workbook.raw_limits_value();
+    super::Limits::new(
+        semantic.source_bytes(),
+        semantic.cells(),
+        raw.payload(),
+        raw.string_units(),
+    )
 }
 
 /// Author one blank worksheet and insert its complete-catalog entry.
@@ -2990,10 +3117,16 @@ fn insert_sheet(workbook: &mut Workbook, position: usize, name: &str, state: Sta
 
     let workbook_uri = workbook.package.main_document_part()?.partname().clone();
     let workbook_source = workbook.package.get_part(&workbook_uri)?.blob().to_vec();
-    let catalog = collect_bundle_records(&workbook_source, catalog_len, workbook.leniency())?;
+    let catalog = collect_bundle_records(
+        &workbook_source,
+        catalog_len,
+        workbook.leniency(),
+        workbook.raw_limits_value(),
+    )?;
     let tab_id = allocate_tab_id(&catalog)?;
     let (worksheet_uri, binary_index_uri) = allocate_worksheet_uris(&workbook.package)?;
-    let (worksheet_bytes, binary_index_bytes) = authored_blank_worksheet(name)?;
+    let raw_limits = workbook.raw_limits_value();
+    let (worksheet_bytes, binary_index_bytes) = authored_blank_worksheet(name, raw_limits)?;
 
     let (worksheet_relationship_type, worksheet_content_type) =
         worksheet_relationship_flavor(&workbook.package)?;
@@ -3026,13 +3159,14 @@ fn insert_sheet(workbook: &mut Workbook, position: usize, name: &str, state: Sta
             .r_id()
             .to_string()
     };
-    let new_bundle = bundle_sheet_payload(state, tab_id, &new_rel_id, name)?;
+    let new_bundle = bundle_sheet_payload(state, tab_id, &new_rel_id, name, raw_limits)?;
     let workbook_output = rewrite_workbook_insert(
         &workbook_source,
         position,
         catalog_len,
         &workbook.formula_context,
         &new_bundle,
+        raw_limits,
     )?;
 
     let tabs = workbook.sheets().collect::<Vec<_>>();
@@ -3068,7 +3202,9 @@ fn insert_sheet(workbook: &mut Workbook, position: usize, name: &str, state: Sta
     let volatile = crate::volatile_dependencies::reorder_owner(&package, catalog_len)?;
     if let Some(uri) = volatile {
         let source = package.get_part(&uri)?.blob();
-        if let Some(output) = rewrite_volatile_dependencies_insert(source, position, catalog_len)? {
+        if let Some(output) =
+            rewrite_volatile_dependencies_insert(source, position, catalog_len, raw_limits)?
+        {
             replacements.push((uri, output));
         }
     }
@@ -3078,7 +3214,10 @@ fn insert_sheet(workbook: &mut Workbook, position: usize, name: &str, state: Sta
     Ok(())
 }
 
-fn authored_blank_worksheet(name: &str) -> Result<(Vec<u8>, Vec<u8>)> {
+fn authored_blank_worksheet(
+    name: &str,
+    raw_limits: crate::raw::Limits,
+) -> Result<(Vec<u8>, Vec<u8>)> {
     let mut worksheet = crate::builder::Worksheet::new(name.to_owned());
     // `None` uses the legacy writer default, whose tab-selected flag is true.
     // An inserted tab must not become the active/selected tab implicitly.
@@ -3088,7 +3227,7 @@ fn authored_blank_worksheet(name: &str) -> Result<(Vec<u8>, Vec<u8>)> {
     });
     let mut source = Vec::new();
     worksheet.write_with_sparkline_block(
-        &mut Encoder::new(&mut source, crate::raw::Limits::DEFAULT),
+        &mut Encoder::new(&mut source, raw_limits),
         &mut crate::writer::SharedStringsWriter::new(),
         None,
     )?;
@@ -3153,6 +3292,7 @@ fn collect_bundle_records(
     source: &[u8],
     catalog_len: usize,
     leniency: crate::leniency::Leniency,
+    raw_limits: crate::raw::Limits,
 ) -> Result<Vec<crate::package::records::BundleSheetRecord>> {
     let mut records = Vec::new();
     records
@@ -3164,7 +3304,7 @@ fn collect_bundle_records(
     let mut open = false;
     let mut seen = false;
     let mut closed = false;
-    for item in Records::new(source, crate::raw::Limits::DEFAULT) {
+    for item in Records::new(source, raw_limits) {
         let record = item?;
         match record.kind() {
             kind::BEGIN_BUNDLE_SHS => {
@@ -3186,6 +3326,7 @@ fn collect_bundle_records(
                     record.payload(),
                     ordinal,
                     crate::leniency::Tolerance::recording_with(&mut tolerance_report, leniency),
+                    raw_limits,
                 )?;
                 records.push(parsed);
             },
@@ -3258,19 +3399,25 @@ fn allocate_tab_id(records: &[crate::package::records::BundleSheetRecord]) -> Re
     ))
 }
 
-fn bundle_sheet_payload(state: State, tab_id: u32, rel_id: &str, name: &str) -> Result<Vec<u8>> {
+fn bundle_sheet_payload(
+    state: State,
+    tab_id: u32,
+    rel_id: &str,
+    name: &str,
+    raw_limits: crate::raw::Limits,
+) -> Result<Vec<u8>> {
     if !(1..=u32::from(u16::MAX)).contains(&tab_id) || rel_id.is_empty() {
         return Err(Error::InvalidFormat(
             "new BrtBundleSh has an invalid stable identifier or relationship",
         ));
     }
     let mut payload = Vec::new();
-    let mut writer = Encoder::new(&mut payload, crate::raw::Limits::DEFAULT);
+    let mut writer = Encoder::new(&mut payload, raw_limits);
     writer.write_u32(u32::from(state_to_wire(state)))?;
     writer.write_u32(tab_id)?;
     writer.write_wide_string(rel_id)?;
     writer.write_wide_string(name)?;
-    let _ = crate::package::records::BundleSheetRecord::parse(&payload)?;
+    let _ = crate::package::records::BundleSheetRecord::parse(&payload, raw_limits)?;
     Ok(payload)
 }
 
@@ -3280,13 +3427,14 @@ fn rewrite_workbook_insert(
     catalog_len: usize,
     context: &crate::package::formula::Context,
     new_bundle_payload: &[u8],
+    raw_limits: crate::raw::Limits,
 ) -> Result<Vec<u8>> {
     if position > catalog_len {
         return Err(Error::InvalidFormat(
             "sheet insertion position exceeds the source catalog",
         ));
     }
-    let new_bundle_record = make_record(kind::BUNDLE_SH, new_bundle_payload)?;
+    let new_bundle_record = make_record(kind::BUNDLE_SH, new_bundle_payload, raw_limits)?;
     let output_capacity =
         source
             .len()
@@ -3306,9 +3454,9 @@ fn rewrite_workbook_insert(
     let mut saw_bundle_collection = false;
     let mut bundle_collection_closed = false;
     let mut inserted = false;
-    for item in Records::new(source, crate::raw::Limits::DEFAULT) {
+    for item in Records::new(source, raw_limits) {
         let record = item?;
-        let raw = record_bytes(source, &record)?;
+        let raw = record_bytes(source, &record, raw_limits)?;
         match record.kind() {
             kind::BEGIN_BUNDLE_SHS => {
                 if bundle_open || saw_bundle_collection || !record.payload().is_empty() {
@@ -3376,8 +3524,13 @@ fn rewrite_workbook_insert(
             | kind::EXTERN_SHEET
             | kind::NAME
             | kind::CALC_PROP => {
-                let rewritten =
-                    rewrite_workbook_record_insert(raw, position, catalog_len, context)?;
+                let rewritten = rewrite_workbook_record_insert(
+                    raw,
+                    position,
+                    catalog_len,
+                    context,
+                    raw_limits,
+                )?;
                 output.extend_from_slice(&rewritten);
             },
             _other => {
@@ -3406,9 +3559,13 @@ fn rewrite_workbook_insert(
     Ok(output)
 }
 
-fn make_record(record_kind: crate::raw::Kind, payload: &[u8]) -> Result<Vec<u8>> {
+fn make_record(
+    record_kind: crate::raw::Kind,
+    payload: &[u8],
+    raw_limits: crate::raw::Limits,
+) -> Result<Vec<u8>> {
     let mut output = Vec::new();
-    Encoder::new(&mut output, crate::raw::Limits::DEFAULT).write_record(record_kind, payload)?;
+    Encoder::new(&mut output, raw_limits).write_record(record_kind, payload)?;
     Ok(output)
 }
 
@@ -3417,8 +3574,9 @@ fn rewrite_workbook_record_insert(
     position: usize,
     catalog_len: usize,
     context: &crate::package::formula::Context,
+    raw_limits: crate::raw::Limits,
 ) -> Result<Vec<u8>> {
-    let (header, header_len) = Header::parse(raw, RawLimits::DEFAULT)?;
+    let (header, header_len) = Header::parse(raw, raw_limits)?;
     let payload = raw.get(header_len..).ok_or(Error::InvalidLength {
         expected: header_len,
         found: raw.len(),
@@ -3651,10 +3809,11 @@ fn rewrite_volatile_dependencies_insert(
     source: &[u8],
     position: usize,
     catalog_len: usize,
+    raw_limits: crate::raw::Limits,
 ) -> Result<Option<Vec<u8>>> {
     let mut output = source.to_vec();
     let mut changed = false;
-    for item in Records::new(source, crate::raw::Limits::DEFAULT) {
+    for item in Records::new(source, raw_limits) {
         let record = item?;
         if record.kind() != kind::VOL_REF {
             continue;
@@ -3690,7 +3849,7 @@ fn rewrite_volatile_dependencies_insert(
             source
                 .get(record.offset()..)
                 .ok_or(Error::InvalidFormat("BrtVolRef offset is outside its part"))?,
-            RawLimits::DEFAULT,
+            raw_limits,
         )?;
         output[record.offset() + header_len + 8..record.offset() + header_len + 12]
             .copy_from_slice(
@@ -3719,8 +3878,13 @@ fn apply_sheet_removal(workbook: &mut Workbook, positions: &[usize]) -> Result<b
 
     let workbook_uri = workbook.package.main_document_part()?.partname().clone();
     let workbook_source = workbook.package.get_part(&workbook_uri)?.blob().to_vec();
-    let bundle_records =
-        collect_bundle_records(&workbook_source, catalog_len, workbook.leniency())?;
+    let raw_limits = workbook.raw_limits_value();
+    let bundle_records = collect_bundle_records(
+        &workbook_source,
+        catalog_len,
+        workbook.leniency(),
+        raw_limits,
+    )?;
     let selected_rel_ids = bundle_records
         .iter()
         .enumerate()
@@ -3735,6 +3899,7 @@ fn apply_sheet_removal(workbook: &mut Workbook, positions: &[usize]) -> Result<b
         &modeled_parts,
         &bundle_records,
         &removed,
+        workbook.raw_limits_value(),
     )?;
     reject_sheet_xml_dependencies(&workbook.package, &modeled_parts, &bundle_records, &removed)?;
 
@@ -3748,9 +3913,13 @@ fn apply_sheet_removal(workbook: &mut Workbook, positions: &[usize]) -> Result<b
         let snapshot = workbook.cell_values(ordinal.get())?;
         for cell in snapshot.cells() {
             if let Some(formula) = cell.formula() {
-                let tokens = Parser::with_extra(formula.tokens(), formula.ancillary())
-                    .parse()
-                    .map_err(map_formula_error)?;
+                let tokens = Parser::with_extra(
+                    formula.tokens(),
+                    formula.ancillary(),
+                    workbook.raw_limits_value(),
+                )
+                .parse()
+                .map_err(map_formula_error)?;
                 reject_removed_formula_targets(
                     tokens,
                     &removed,
@@ -3769,6 +3938,7 @@ fn apply_sheet_removal(workbook: &mut Workbook, positions: &[usize]) -> Result<b
         catalog_len,
         &workbook.formula_context,
         &bundle_records,
+        workbook.raw_limits_value(),
     )?;
     let tabs = workbook.sheets().collect::<Vec<_>>();
     let titles = tabs
@@ -3805,6 +3975,7 @@ fn apply_sheet_removal(workbook: &mut Workbook, positions: &[usize]) -> Result<b
                 &removed,
                 &remaining,
                 catalog_len,
+                raw_limits,
             )? {
                 replacements.push((part.partname().clone(), output));
             }
@@ -3819,6 +3990,7 @@ fn apply_sheet_removal(workbook: &mut Workbook, positions: &[usize]) -> Result<b
         &bundle_records,
         &removed,
         &tabs,
+        raw_limits,
     )?;
     remove_modeled_sheet_parts(
         &mut package,
@@ -4103,6 +4275,7 @@ fn reject_surviving_binary_sheet_dependencies(
     removed_parts: &HashSet<PackURI>,
     records: &[crate::package::records::BundleSheetRecord],
     removed: &[bool],
+    raw_limits: crate::raw::Limits,
 ) -> Result<()> {
     for part in package.iter_parts() {
         if !part
@@ -4115,7 +4288,7 @@ fn reject_surviving_binary_sheet_dependencies(
             continue;
         }
         let source = package.get_part(part.partname())?.blob();
-        for item in Records::new(source, crate::raw::Limits::DEFAULT) {
+        for item in Records::new(source, raw_limits) {
             let record = item?;
             match record.kind() {
                 kind::FRT_BEGIN | kind::AC_BEGIN | kind::ARR_FMLA | kind::SHR_FMLA => {
@@ -4126,7 +4299,8 @@ fn reject_surviving_binary_sheet_dependencies(
                     ));
                 },
                 kind::H_LINK => {
-                    let hyperlink = crate::hyperlinks::Hyperlink::parse(record.payload())?;
+                    let hyperlink =
+                        crate::hyperlinks::Hyperlink::parse(record.payload(), raw_limits)?;
                     if !hyperlink.r_id.is_empty() {
                         let Some(relationship) = part.rels().get(&hyperlink.r_id) else {
                             return Err(Error::refused(
@@ -4385,12 +4559,13 @@ fn rewrite_workbook_remove(
     catalog_len: usize,
     context: &crate::package::formula::Context,
     bundle_records: &[crate::package::records::BundleSheetRecord],
+    raw_limits: crate::raw::Limits,
 ) -> Result<Vec<u8>> {
     let mut bundle_count = 0usize;
     let mut bundle_open = false;
     let mut saw_collection = false;
     let mut closed = false;
-    for item in Records::new(source, crate::raw::Limits::DEFAULT) {
+    for item in Records::new(source, raw_limits) {
         let record = item?;
         match record.kind() {
             kind::BEGIN_BUNDLE_SHS => {
@@ -4469,7 +4644,7 @@ fn rewrite_workbook_remove(
             "sheet-removal catalog metadata is inconsistent",
         ));
     }
-    removal_book_view_transitions(source, removed, bundle_records)?;
+    removal_book_view_transitions(source, removed, bundle_records, raw_limits)?;
     let mut output = Vec::new();
     output
         .try_reserve_exact(source.len())
@@ -4479,9 +4654,9 @@ fn rewrite_workbook_remove(
         })?;
     let mut bundle_index = 0usize;
     let mut open = false;
-    for item in Records::new(source, crate::raw::Limits::DEFAULT) {
+    for item in Records::new(source, raw_limits) {
         let record = item?;
-        let raw = record_bytes(source, &record)?;
+        let raw = record_bytes(source, &record, raw_limits)?;
         match record.kind() {
             kind::BEGIN_BUNDLE_SHS => {
                 open = true;
@@ -4508,6 +4683,7 @@ fn rewrite_workbook_remove(
                     catalog_len,
                     context,
                     bundle_records,
+                    raw_limits,
                 )?;
                 output.extend_from_slice(&rewritten);
             },
@@ -4523,8 +4699,9 @@ fn rewrite_workbook_record_remove(
     catalog_len: usize,
     context: &crate::package::formula::Context,
     bundle_records: &[crate::package::records::BundleSheetRecord],
+    raw_limits: crate::raw::Limits,
 ) -> Result<Vec<u8>> {
-    let (header, header_len) = Header::parse(raw, RawLimits::DEFAULT)?;
+    let (header, header_len) = Header::parse(raw, raw_limits)?;
     let payload = raw.get(header_len..).ok_or(Error::InvalidLength {
         expected: header_len,
         found: raw.len(),
@@ -4575,7 +4752,7 @@ fn rewrite_workbook_record_remove(
             }
         },
         kind::NAME => {
-            reject_name_formula_dependencies(payload, removed, context)?;
+            reject_name_formula_dependencies(payload, removed, context, raw_limits)?;
             if payload.len() < 9 {
                 return Err(Error::InvalidLength {
                     expected: 9,
@@ -4634,8 +4811,10 @@ fn reject_name_formula_dependencies(
     payload: &[u8],
     removed: &[bool],
     context: &crate::package::formula::Context,
+    raw_limits: crate::raw::Limits,
 ) -> Result<()> {
-    let definition = crate::named_ranges::parse(payload).map_err(map_named_range_error)?;
+    let definition =
+        crate::named_ranges::parse(payload, raw_limits).map_err(map_named_range_error)?;
     let Some(formula) = definition.formula.as_deref() else {
         return Ok(());
     };
@@ -4647,7 +4826,9 @@ fn reject_name_formula_dependencies(
             })
         })
         .transpose()?;
-    let tokens = Parser::new(formula).parse().map_err(map_formula_error)?;
+    let tokens = Parser::new(formula, raw_limits)
+        .parse()
+        .map_err(map_formula_error)?;
     reject_removed_formula_targets(tokens, removed, context, scope)
 }
 
@@ -4793,6 +4974,7 @@ fn map_formula_error(error: crate::formula::Error) -> Error {
             Error::UnresolvedDependency(dependency)
         },
         crate::formula::Error::Encoding(message) => Error::Encoding(message),
+        crate::formula::Error::Wire(error) => Error::Wire(error),
     }
 }
 
@@ -4820,10 +5002,11 @@ fn removal_book_view_transitions(
     source: &[u8],
     removed: &[bool],
     records: &[crate::package::records::BundleSheetRecord],
+    raw_limits: crate::raw::Limits,
 ) -> Result<Vec<(usize, usize)>> {
     let mut transitions = Vec::new();
     let mut book_view_count = 0usize;
-    for item in Records::new(source, crate::raw::Limits::DEFAULT) {
+    for item in Records::new(source, raw_limits) {
         let record = item?;
         if record.kind() != kind::BOOK_VIEW {
             continue;
@@ -4870,13 +5053,14 @@ fn apply_sheet_removal_view_dependencies(
     records: &[crate::package::records::BundleSheetRecord],
     removed: &[bool],
     tabs: &[crate::sheet::Tab<'_>],
+    raw_limits: crate::raw::Limits,
 ) -> Result<()> {
-    let transitions = removal_book_view_transitions(source, removed, records)?;
+    let transitions = removal_book_view_transitions(source, removed, records, raw_limits)?;
     let target = if let Some((_, target)) = transitions.first().copied() {
         target
     } else {
         let mut book_view_count = 0usize;
-        for item in Records::new(source, crate::raw::Limits::DEFAULT) {
+        for item in Records::new(source, raw_limits) {
             if item?.kind() == kind::BOOK_VIEW {
                 book_view_count = book_view_count.saturating_add(1);
             }
@@ -4953,7 +5137,7 @@ fn apply_sheet_removal_view_dependencies(
             ))?
     };
     let source_blob = package.get_part(&target_uri)?.blob();
-    if let Some(output) = rewrite_sheet_view_flags(source_blob, tab.kind(), true)? {
+    if let Some(output) = rewrite_sheet_view_flags(source_blob, tab.kind(), true, raw_limits)? {
         package.replace_part_payloads(vec![(target_uri, output)])?;
     }
     Ok(())
@@ -5086,10 +5270,11 @@ fn rewrite_volatile_dependencies_remove(
     removed: &[bool],
     remaining: &[usize],
     catalog_len: usize,
+    raw_limits: crate::raw::Limits,
 ) -> Result<Option<Vec<u8>>> {
     let mut output = source.to_vec();
     let mut changed = false;
-    for item in Records::new(source, crate::raw::Limits::DEFAULT) {
+    for item in Records::new(source, raw_limits) {
         let record = item?;
         if record.kind() != kind::VOL_REF {
             continue;
@@ -5126,7 +5311,7 @@ fn rewrite_volatile_dependencies_remove(
             source
                 .get(record.offset()..)
                 .ok_or(Error::InvalidFormat("BrtVolRef offset is outside its part"))?,
-            RawLimits::DEFAULT,
+            raw_limits,
         )?;
         output[record.offset() + header_len + 8..record.offset() + header_len + 12]
             .copy_from_slice(
@@ -5160,12 +5345,14 @@ fn apply_sheet_order(workbook: &mut Workbook, order: &[usize]) -> Result<bool> {
     let workbook_uri = workbook.package.main_document_part()?.partname().clone();
     let volatile = crate::volatile_dependencies::reorder_owner(&workbook.package, catalog_len)?;
     let workbook_source = workbook.package.get_part(&workbook_uri)?.blob().to_vec();
+    let raw_limits = workbook.raw_limits_value();
     let workbook_output = rewrite_workbook_order(
         &workbook_source,
         order,
         &inverse,
         catalog_len,
         &workbook.formula_context,
+        raw_limits,
     )?;
 
     let tabs = workbook.sheets().collect::<Vec<_>>();
@@ -5202,6 +5389,7 @@ fn apply_sheet_order(workbook: &mut Workbook, order: &[usize]) -> Result<bool> {
                 workbook.package.get_part(part.partname())?.blob(),
                 &inverse,
                 catalog_len,
+                raw_limits,
             )? {
                 replacements.push((part.partname().clone(), output));
             }
@@ -5328,6 +5516,7 @@ fn rewrite_workbook_order(
     inverse: &[usize],
     catalog_len: usize,
     context: &crate::package::formula::Context,
+    raw_limits: crate::raw::Limits,
 ) -> Result<Vec<u8>> {
     let mut bundle_records = Vec::new();
     bundle_records
@@ -5340,9 +5529,9 @@ fn rewrite_workbook_order(
     let mut bundle_open = false;
     let mut bundle_collection_closed = false;
     let mut records = Vec::new();
-    for item in Records::new(source, crate::raw::Limits::DEFAULT) {
+    for item in Records::new(source, raw_limits) {
         let record = item?;
-        let raw = record_bytes(source, &record)?;
+        let raw = record_bytes(source, &record, raw_limits)?;
         match record.kind() {
             kind::BEGIN_BUNDLE_SHS => {
                 if bundle_open || saw_bundle_collection {
@@ -5454,7 +5643,7 @@ fn rewrite_workbook_order(
             }
             continue;
         }
-        let raw = rewrite_workbook_record(raw, inverse, catalog_len, context)?;
+        let raw = rewrite_workbook_record(raw, inverse, catalog_len, context, raw_limits)?;
         output.extend_from_slice(&raw);
     }
     if !inserted_bundles {
@@ -5470,8 +5659,9 @@ fn rewrite_workbook_record(
     inverse: &[usize],
     catalog_len: usize,
     context: &crate::package::formula::Context,
+    raw_limits: crate::raw::Limits,
 ) -> Result<Vec<u8>> {
-    let (header, header_len) = Header::parse(raw, RawLimits::DEFAULT)?;
+    let (header, header_len) = Header::parse(raw, raw_limits)?;
     let payload = raw.get(header_len..).ok_or(Error::InvalidLength {
         expected: header_len,
         found: raw.len(),
@@ -5696,10 +5886,11 @@ fn rewrite_volatile_dependencies(
     source: &[u8],
     inverse: &[usize],
     catalog_len: usize,
+    raw_limits: crate::raw::Limits,
 ) -> Result<Option<Vec<u8>>> {
     let mut output = source.to_vec();
     let mut changed = false;
-    for item in Records::new(source, crate::raw::Limits::DEFAULT) {
+    for item in Records::new(source, raw_limits) {
         let record = item?;
         if record.kind() != kind::VOL_REF {
             continue;
@@ -5731,7 +5922,7 @@ fn rewrite_volatile_dependencies(
             source
                 .get(record.offset()..)
                 .ok_or(Error::InvalidFormat("BrtVolRef offset is outside its part"))?,
-            RawLimits::DEFAULT,
+            raw_limits,
         )?;
         output[record.offset() + header_len + 8..record.offset() + header_len + 12]
             .copy_from_slice(
@@ -5774,11 +5965,15 @@ fn replace_record_payload(
     Ok(output)
 }
 
-fn record_bytes<'a>(source: &'a [u8], record: &crate::raw::Record<'_>) -> Result<&'a [u8]> {
+fn record_bytes<'a>(
+    source: &'a [u8],
+    record: &crate::raw::Record<'_>,
+    raw_limits: crate::raw::Limits,
+) -> Result<&'a [u8]> {
     let record_source = source
         .get(record.offset()..)
         .ok_or(Error::InvalidFormat("record offset is outside its part"))?;
-    let (_, header_len) = Header::parse(record_source, RawLimits::DEFAULT)?;
+    let (_, header_len) = Header::parse(record_source, raw_limits)?;
     let end = record
         .offset()
         .checked_add(header_len)
@@ -5904,18 +6099,19 @@ fn apply_sheet_metadata(workbook: &mut Workbook, operations: &[Operation]) -> Re
     crate::signature_policy::ensure_unsigned(&workbook.package)?;
     let uri = workbook.package.main_document_part()?.partname().clone();
     let source = workbook.package.get_part(&uri)?.blob().to_vec();
+    let raw_limits = workbook.raw_limits_value();
     if names.is_empty() {
         let mut output = source.clone();
         let mut index = 0usize;
         let mut replaced = false;
-        for item in Records::new(&source, crate::raw::Limits::DEFAULT) {
+        for item in Records::new(&source, raw_limits) {
             let record = item?;
             if record.kind() == kind::BUNDLE_SH {
                 if let Some(state) = states.get(&index).copied() {
                     let header_source = source.get(record.offset()..).ok_or(
                         Error::InvalidFormat("record offset is outside workbook.bin"),
                     )?;
-                    let (_, header_len) = Header::parse(header_source, RawLimits::DEFAULT)?;
+                    let (_, header_len) = Header::parse(header_source, raw_limits)?;
                     let payload_start =
                         record
                             .offset()
@@ -5951,7 +6147,7 @@ fn apply_sheet_metadata(workbook: &mut Workbook, operations: &[Operation]) -> Re
     let mut output = Vec::with_capacity(source.len());
     let mut index = 0usize;
     let mut replaced = false;
-    for item in Records::new(&source, crate::raw::Limits::DEFAULT) {
+    for item in Records::new(&source, raw_limits) {
         let record = item?;
         if record.kind() == kind::BUNDLE_SH {
             let name = names.get(&index).copied();
@@ -5959,7 +6155,7 @@ fn apply_sheet_metadata(workbook: &mut Workbook, operations: &[Operation]) -> Re
             if name.is_some() || state.is_some() {
                 let mut payload = record.payload().to_vec();
                 if let Some(name) = name {
-                    payload = renamed_bundle_payload(&payload, name)?;
+                    payload = renamed_bundle_payload(&payload, name, raw_limits)?;
                 }
                 if let Some(state) = state {
                     let payload_len = payload.len();
@@ -5969,15 +6165,15 @@ fn apply_sheet_metadata(workbook: &mut Workbook, operations: &[Operation]) -> Re
                     })?;
                     state_bytes.copy_from_slice(&u32::from(state_to_wire(state)).to_le_bytes());
                 }
-                Encoder::new(&mut output, crate::raw::Limits::DEFAULT)
+                Encoder::new(&mut output, workbook.raw_limits_value())
                     .write_record(kind::BUNDLE_SH, &payload)?;
                 replaced = true;
             } else {
-                copy_record(&source, &record, &mut output)?;
+                copy_record(&source, &record, raw_limits, &mut output)?;
             }
             index = index.saturating_add(1);
         } else {
-            copy_record(&source, &record, &mut output)?;
+            copy_record(&source, &record, raw_limits, &mut output)?;
         }
     }
     if !replaced {
@@ -6106,7 +6302,8 @@ fn apply_sheet_view_dependencies(
     let workbook_source = package.get_part(&workbook_uri)?.blob().to_vec();
     let workbook_part = workbook.package.get_part(&workbook_uri)?;
     let mut workbook_output = workbook_source.clone();
-    let transitions = rewrite_book_views(&mut workbook_output, final_states)?;
+    let raw_limits = workbook.raw_limits_value();
+    let transitions = rewrite_book_views(&mut workbook_output, final_states, raw_limits)?;
     let mut relocated_target = None;
     for (_, new_active) in &transitions {
         if let Some(previous) = relocated_target
@@ -6160,12 +6357,14 @@ fn apply_sheet_view_dependencies(
 
     let mut sheet_parts = vec![None; kinds.len()];
     let mut catalog_position = 0usize;
-    for item in Records::new(&workbook_source, crate::raw::Limits::DEFAULT) {
+    let raw_limits = workbook.raw_limits_value();
+    for item in Records::new(&workbook_source, raw_limits) {
         let record = item?;
         if record.kind() != kind::BUNDLE_SH {
             continue;
         }
-        let bundle = crate::package::records::BundleSheetRecord::parse(record.payload())?;
+        let bundle =
+            crate::package::records::BundleSheetRecord::parse(record.payload(), raw_limits)?;
         if let Some(rel_id) = bundle.rel_id.as_deref() {
             let relationship = workbook_part
                 .rels()
@@ -6213,7 +6412,8 @@ fn apply_sheet_view_dependencies(
             continue;
         }
         let source = package.get_part(partname)?.blob().to_vec();
-        let Some(output) = rewrite_sheet_view_flags(&source, part_kind, selected)? else {
+        let Some(output) = rewrite_sheet_view_flags(&source, part_kind, selected, raw_limits)?
+        else {
             continue;
         };
         replacements.push((partname.clone(), output));
@@ -6222,7 +6422,11 @@ fn apply_sheet_view_dependencies(
     Ok(())
 }
 
-fn rewrite_book_views(output: &mut [u8], final_states: &[State]) -> Result<Vec<(usize, usize)>> {
+fn rewrite_book_views(
+    output: &mut [u8],
+    final_states: &[State],
+    raw_limits: crate::raw::Limits,
+) -> Result<Vec<(usize, usize)>> {
     if final_states.is_empty() {
         return Err(Error::refused(
             litchi_core::edit::RefusalKind::UnsupportedContent,
@@ -6233,7 +6437,7 @@ fn rewrite_book_views(output: &mut [u8], final_states: &[State]) -> Result<Vec<(
     let source = output.to_vec();
     let mut transitions = Vec::new();
     let mut saw_book_view = false;
-    for item in Records::new(&source, crate::raw::Limits::DEFAULT) {
+    for item in Records::new(&source, raw_limits) {
         let record = item?;
         if record.kind() != kind::BOOK_VIEW {
             continue;
@@ -6273,7 +6477,7 @@ fn rewrite_book_views(output: &mut [u8], final_states: &[State]) -> Result<Vec<(
         let header_source = source.get(record.offset()..).ok_or(Error::InvalidFormat(
             "book-view record offset is outside workbook.bin",
         ))?;
-        let (_, header_len) = Header::parse(header_source, RawLimits::DEFAULT)?;
+        let (_, header_len) = Header::parse(header_source, raw_limits)?;
         let payload_start = record
             .offset()
             .checked_add(header_len)
@@ -6306,17 +6510,15 @@ fn rewrite_book_views(output: &mut [u8], final_states: &[State]) -> Result<Vec<(
         return Ok(Vec::new());
     }
     if !transitions.is_empty() {
-        let book_view_count = Records::new(&source, crate::raw::Limits::DEFAULT).try_fold(
-            0usize,
-            |count, item| {
+        let book_view_count =
+            Records::new(&source, raw_limits).try_fold(0usize, |count, item| {
                 let record = item?;
                 Ok::<_, Error>(count.saturating_add(if record.kind() == kind::BOOK_VIEW {
                     1
                 } else {
                     0
                 }))
-            },
-        )?;
+            })?;
         if book_view_count > 1 {
             return Err(Error::refused(
                 litchi_core::edit::RefusalKind::UnsupportedContent,
@@ -6334,7 +6536,12 @@ fn next_visible_sheet(current: usize, states: &[State]) -> Option<usize> {
         .find(|position| states[*position] == State::Visible)
 }
 
-fn rewrite_sheet_view_flags(source: &[u8], kind: Kind, selected: bool) -> Result<Option<Vec<u8>>> {
+fn rewrite_sheet_view_flags(
+    source: &[u8],
+    kind: Kind,
+    selected: bool,
+    raw_limits: crate::raw::Limits,
+) -> Result<Option<Vec<u8>>> {
     let (record_kind, flag) = match kind {
         Kind::Worksheet => (kind::BEGIN_WS_VIEW, 0x0040u16),
         Kind::Chart => (kind::BEGIN_CS_VIEW, 0x0001u16),
@@ -6342,7 +6549,7 @@ fn rewrite_sheet_view_flags(source: &[u8], kind: Kind, selected: bool) -> Result
     };
     if selected {
         let mut view_count = 0usize;
-        for item in Records::new(source, crate::raw::Limits::DEFAULT) {
+        for item in Records::new(source, raw_limits) {
             if item?.kind() == record_kind {
                 view_count = view_count.saturating_add(1);
                 if view_count > 1 {
@@ -6364,7 +6571,7 @@ fn rewrite_sheet_view_flags(source: &[u8], kind: Kind, selected: bool) -> Result
     }
     let mut output = source.to_vec();
     let mut changed = false;
-    for item in Records::new(source, crate::raw::Limits::DEFAULT) {
+    for item in Records::new(source, raw_limits) {
         let record = item?;
         if record.kind() != record_kind {
             continue;
@@ -6382,7 +6589,7 @@ fn rewrite_sheet_view_flags(source: &[u8], kind: Kind, selected: bool) -> Result
         let header_source = source.get(record.offset()..).ok_or(Error::InvalidFormat(
             "sheet-view record offset is outside its part",
         ))?;
-        let (_, header_len) = Header::parse(header_source, RawLimits::DEFAULT)?;
+        let (_, header_len) = Header::parse(header_source, raw_limits)?;
         let payload_start =
             record
                 .offset()
@@ -6430,7 +6637,11 @@ fn validate_sheet_state_invariants(workbook: &Workbook) -> Result<()> {
     Ok(())
 }
 
-fn renamed_bundle_payload(source: &[u8], name: &str) -> Result<Vec<u8>> {
+fn renamed_bundle_payload(
+    source: &[u8],
+    name: &str,
+    raw_limits: crate::raw::Limits,
+) -> Result<Vec<u8>> {
     let current_id = litchi_core::binary::read_u32_le_at(source, 4)?;
     let strings_offset = if (1..=0xffff).contains(&current_id) {
         8
@@ -6444,7 +6655,7 @@ fn renamed_bundle_payload(source: &[u8], name: &str) -> Result<Vec<u8>> {
     let consumed = if litchi_core::binary::read_u32_le_at(strings, 0)? == u32::MAX {
         4
     } else {
-        crate::package::records::decode_string(strings)?.1
+        crate::package::records::decode_string(strings, raw_limits)?.1
     };
     let name_offset = strings_offset
         .checked_add(consumed)
@@ -6482,13 +6693,14 @@ fn renamed_bundle_payload(source: &[u8], name: &str) -> Result<Vec<u8>> {
             found: source.len(),
         })?
         .to_vec();
-    Encoder::new(&mut payload, crate::raw::Limits::DEFAULT).write_wide_string(name)?;
+    Encoder::new(&mut payload, raw_limits).write_wide_string(name)?;
     payload.extend_from_slice(suffix);
     let mut tolerance_report = crate::leniency::ToleranceReport::default();
     let _validated_record = crate::package::records::BundleSheetRecord::parse_with(
         &payload,
         0,
         crate::leniency::Tolerance::recording(&mut tolerance_report),
+        raw_limits,
     )?;
     Ok(payload)
 }
@@ -6623,11 +6835,13 @@ pub(crate) fn validate_all_worksheets(workbook: &Workbook) -> Result<()> {
 pub(super) fn validated_workbook_with_external_link_limits(
     bytes: &[u8],
     external_link_limits: ExternalLinkLimits,
+    raw_limits: RawLimits,
 ) -> Result<Workbook> {
     validated_workbook_with_external_link_limits_and_drawing_policy(
         bytes,
         external_link_limits,
         DrawingLoadPolicy::Eager,
+        raw_limits,
     )
 }
 
@@ -6635,8 +6849,10 @@ pub(super) fn validated_workbook_with_external_link_limits_and_drawing_policy(
     bytes: &[u8],
     external_link_limits: ExternalLinkLimits,
     drawing_load_policy: DrawingLoadPolicy,
+    raw_limits: RawLimits,
 ) -> Result<Workbook> {
-    let workbook = workbook_from_bytes(bytes, external_link_limits, drawing_load_policy)?;
+    let workbook =
+        workbook_from_bytes(bytes, external_link_limits, drawing_load_policy, raw_limits)?;
     validate_all_worksheets(&workbook)?;
     Ok(workbook)
 }
@@ -6645,6 +6861,7 @@ fn workbook_from_bytes(
     bytes: &[u8],
     external_link_limits: ExternalLinkLimits,
     drawing_load_policy: DrawingLoadPolicy,
+    raw_limits: RawLimits,
 ) -> Result<Workbook> {
     let package = litchi_opc::OpcPackage::from_bytes(bytes)?;
     Workbook::reparse_candidate_with_policy(
@@ -6652,6 +6869,7 @@ fn workbook_from_bytes(
         external_link_limits,
         drawing_load_policy,
         crate::Leniency::Strict,
+        raw_limits,
     )
 }
 
@@ -6666,6 +6884,15 @@ fn copy_arc(bytes: &[u8], resource: &'static str) -> Result<Arc<[u8]>> {
         .map_err(|source| Error::Allocation { resource, source })?;
     copied.extend_from_slice(bytes);
     Ok(Arc::from(copied))
+}
+
+fn copy_vec_arc(bytes: &[u8], resource: &'static str) -> Result<Arc<Vec<u8>>> {
+    let mut copied = Vec::new();
+    copied
+        .try_reserve_exact(bytes.len())
+        .map_err(|source| Error::Allocation { resource, source })?;
+    copied.extend_from_slice(bytes);
+    Ok(Arc::new(copied))
 }
 
 fn encoded_operation_length(operation: &Operation) -> Result<usize> {
@@ -6702,7 +6929,11 @@ fn encoded_operation_length(operation: &Operation) -> Result<usize> {
     })
 }
 
-fn encode_operation(operation: &Operation, output: &mut Vec<u8>) -> Result<()> {
+fn encode_operation(
+    operation: &Operation,
+    output: &mut Vec<u8>,
+    raw_limits: RawLimits,
+) -> Result<()> {
     match operation {
         Operation::RenameSheet { sheet, name } => {
             // Tag 1 is retained for wire compatibility with patches
@@ -6844,14 +7075,14 @@ fn encode_operation(operation: &Operation, output: &mut Vec<u8>) -> Result<()> {
             push_usize(output, *catalog_position)?;
             push_usize(output, ranges.len())?;
             for range in ranges.iter() {
-                output.extend_from_slice(&range.serialize());
+                output.extend_from_slice(&range.serialize(raw_limits)?);
             }
         },
     }
     Ok(())
 }
 
-fn decode_operation(data: &[u8], offset: &mut usize) -> Result<Operation> {
+fn decode_operation(data: &[u8], offset: &mut usize, raw_limits: RawLimits) -> Result<Operation> {
     let tag = read_slice(data, offset, 1)?[0];
     match tag {
         1 => {
@@ -7118,11 +7349,10 @@ fn decode_operation(data: &[u8], offset: &mut usize) -> Result<Operation> {
                     source,
                 })?;
             for _ in 0..count {
-                ranges.push(crate::merged_cells::MergedCell::parse(read_slice(
-                    data,
-                    offset,
-                    crate::merged_cells::LEN,
-                )?)?);
+                ranges.push(crate::merged_cells::MergedCell::parse(
+                    read_slice(data, offset, crate::merged_cells::LEN)?,
+                    raw_limits,
+                )?);
             }
             Ok(Operation::SetMergedRanges {
                 catalog_position,
@@ -7242,11 +7472,16 @@ fn state_from_wire(value: u8) -> Result<State> {
     }
 }
 
-fn copy_record(source: &[u8], record: &crate::raw::Record<'_>, output: &mut Vec<u8>) -> Result<()> {
+fn copy_record(
+    source: &[u8],
+    record: &crate::raw::Record<'_>,
+    raw_limits: crate::raw::Limits,
+    output: &mut Vec<u8>,
+) -> Result<()> {
     let record_source = source.get(record.offset()..).ok_or(Error::InvalidFormat(
         "record offset is outside workbook.bin",
     ))?;
-    let (_, header_len) = Header::parse(record_source, RawLimits::DEFAULT)?;
+    let (_, header_len) = Header::parse(record_source, raw_limits)?;
     let end = record
         .offset()
         .checked_add(header_len)

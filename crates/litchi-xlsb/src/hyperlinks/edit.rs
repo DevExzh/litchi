@@ -32,7 +32,7 @@ use litchi_opc::{PackURI, TargetMode};
 use super::Hyperlink;
 use crate::package::Package;
 use crate::package::error::Result;
-use crate::part_edit::{Rank, SheetLayout, Staged, family, invalid, record, splice};
+use crate::part_edit::{Rank, SheetLayout, Staged, family, invalid, record_with_limits, splice};
 use crate::raw::{Records, kind};
 
 family!("hyperlink");
@@ -84,14 +84,15 @@ pub(crate) fn read_layout(
     worksheet: &[u8],
     layout: &SheetLayout,
     relationships: &litchi_opc::Relationships,
+    raw_limits: crate::raw::Limits,
 ) -> Result<Vec<Hyperlink>> {
     let mut links = Vec::new();
     for unit in layout.units_of(kind::H_LINK) {
-        let item = Records::new(&worksheet[unit.span.clone()], crate::raw::Limits::DEFAULT)
+        let item = Records::new(&worksheet[unit.span.clone()], raw_limits)
             .next()
             .transpose()?
             .ok_or_else(|| invalid("an empty hyperlink record"))?;
-        let mut link = Hyperlink::parse(item.payload())?;
+        let mut link = Hyperlink::parse(item.payload(), raw_limits)?;
         if !link.r_id.is_empty() {
             let relationship = relationships
                 .get(&link.r_id)
@@ -130,8 +131,8 @@ impl Edit {
     fn sheet(&self, sheet: usize) -> Result<(PackURI, Vec<Hyperlink>, SheetLayout)> {
         let worksheet = self.staged.worksheet(sheet)?;
         let part = self.staged.opc().get_part(&worksheet)?;
-        let layout = SheetLayout::scan(part.blob())?;
-        let links = read_layout(part.blob(), &layout, part.rels())?;
+        let layout = SheetLayout::scan_with_limits(part.blob(), self.staged.raw_limits())?;
+        let links = read_layout(part.blob(), &layout, part.rels(), self.staged.raw_limits())?;
         Ok((worksheet, links, layout))
     }
 
@@ -150,6 +151,7 @@ impl Edit {
     /// relationship.
     fn encode(&mut self, worksheet: &PackURI, link: &Hyperlink) -> Result<Vec<u8>> {
         check(link)?;
+        let raw_limits = self.staged.raw_limits();
         let mut stored = link.clone();
         stored.r_id = String::new();
         if let Some(target) = &link.target {
@@ -171,7 +173,7 @@ impl Edit {
             )?;
             stored.r_id = id;
         }
-        record(kind::H_LINK, &stored.try_serialize()?)
+        record_with_limits(kind::H_LINK, &stored.serialize(raw_limits)?, raw_limits)
     }
 
     /// Drop the relationship of a removed or replaced link when no other

@@ -1026,7 +1026,9 @@ pub(crate) fn replace_source_xml_part(
 ) -> Result<()> {
     let source = package.source_xml_part(part_name)?;
     if source.bytes() != expected {
-        return Err(invalid("Theme XML source provenance is stale"));
+        return Err(Error::PatchConflict {
+            part: "theme XML part",
+        });
     }
     let (old_open, _) = root_element_ranges(source.bytes())?;
     let (_, new_full) = root_element_ranges(replacement)?;

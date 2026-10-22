@@ -31,12 +31,16 @@ impl From<owner::Error> for Error {
     }
 }
 
-pub(crate) fn parse_collection_settings(data: &[u8], extension14: bool) -> Result<(Settings, u32)> {
-    owner::parse_collection_settings(data, extension14).map_err(Into::into)
+pub(crate) fn parse_collection_settings(
+    data: &[u8],
+    extension14: bool,
+    limits: crate::raw::Limits,
+) -> Result<(Settings, u32)> {
+    owner::parse_collection_settings(data, extension14, limits).map_err(Into::into)
 }
 
-pub(crate) fn parse_dval_list(data: &[u8]) -> Result<String> {
-    owner::parse_dval_list(data).map_err(Into::into)
+pub(crate) fn parse_dval_list(data: &[u8], limits: crate::raw::Limits) -> Result<String> {
+    owner::parse_dval_list(data, limits).map_err(Into::into)
 }
 
 pub(crate) fn validate_dval_list_formula(value: &str) -> Result<()> {

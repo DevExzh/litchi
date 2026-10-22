@@ -340,7 +340,7 @@ impl Worksheet {
     pub fn set_formula_group_binary(&mut self, group: Group) -> Result<()> {
         // Validate both the range and parsed-formula framing before mutating
         // the worksheet.
-        let _ = group.to_record_data()?;
+        let _ = group.to_record_data(crate::raw::Limits::DEFAULT)?;
         if group.formula.exp_cell()?.is_some() {
             return Err(Error::InvalidFormula(
                 "array/shared formula definition cannot contain PtgExp",
@@ -377,14 +377,18 @@ impl Worksheet {
                 let style = self.cells.get(&(row, col)).map_or(0, |cell| cell.style);
                 let decoded = || -> Result<String> {
                     let tokens = match group.kind {
-                        GroupKind::Array => {
-                            Parser::with_extra(&group.formula.rgce, &group.formula.rgcb).parse()?
-                        },
+                        GroupKind::Array => Parser::with_extra(
+                            &group.formula.rgce,
+                            &group.formula.rgcb,
+                            crate::raw::Limits::DEFAULT,
+                        )
+                        .parse()?,
                         GroupKind::Shared => Parser::with_base_cell_and_extra(
                             &group.formula.rgce,
                             &group.formula.rgcb,
                             row,
                             col,
+                            crate::raw::Limits::DEFAULT,
                         )
                         .parse()?,
                     };
@@ -1231,7 +1235,7 @@ impl Worksheet {
     pub fn set_web_extension_bindings(&mut self, bindings: Vec<Binding>) -> Result<()> {
         let mut app_refs = HashSet::with_capacity(bindings.len());
         for binding in &bindings {
-            binding.to_payload()?;
+            binding.to_payload(crate::raw::Limits::DEFAULT)?;
             if !app_refs.insert(binding.application_reference.as_str()) {
                 return Err(Error::refused(
                     litchi_core::edit::RefusalKind::InvalidValue,

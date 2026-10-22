@@ -143,12 +143,14 @@ const FONT_HEIGHT: u16 = 0x0024;
 
 impl DifferentialStyle {
     /// Decode a `BrtDXF` payload ([MS-XLSB] sections 2.4.356, 2.5.159 and
-    /// 2.5.164).
+    /// 2.5.164) under an explicit raw profile.
     ///
     /// # Errors
     ///
-    /// Returns an error for a truncated property array.
-    pub fn parse(payload: &[u8]) -> Result<Self> {
+    /// Returns an error for a truncated property array, a payload above the
+    /// profile's payload ceiling or a font name above its UTF-16-unit ceiling.
+    pub fn parse(payload: &[u8], limits: crate::raw::Limits) -> Result<Self> {
+        let limits = admit_payload(payload.len(), limits)?;
         let short = || invalid("a differential format is truncated");
         let u16_at = |offset: usize| -> Result<u16> {
             payload
@@ -196,6 +198,13 @@ impl DifferentialStyle {
                     });
                 },
                 FONT_NAME => {
+                    if let Some(count) = data.get(..2) {
+                        admit_units(
+                            usize::from(u16::from_le_bytes([count[0], count[1]])),
+                            limits,
+                            offset + 4,
+                        )?;
+                    }
                     style.name = data.get(..2).and_then(|count| {
                         let units = usize::from(u16::from_le_bytes([count[0], count[1]]));
                         let text = data.get(2..2 + units * 2)?;
@@ -217,13 +226,15 @@ impl DifferentialStyle {
         Ok(style)
     }
 
-    /// Encode as a `BrtDXF` payload.
+    /// Encode as a `BrtDXF` payload under an explicit raw output profile.
     ///
     /// # Errors
     ///
     /// Returns an error for a color above `0xFFFFFF`, a size outside 1–409.55
-    /// points, or a font name longer than 32 characters.
-    pub fn encode(&self) -> Result<Vec<u8>> {
+    /// points, a font name longer than 32 characters, or output above the
+    /// profile's payload or UTF-16-unit ceilings.
+    pub fn encode(&self, limits: crate::raw::Limits) -> Result<Vec<u8>> {
+        let limits = limits.validate()?;
         let mut props: Vec<(u16, Vec<u8>)> = Vec::new();
         let color = |rgb: u32| -> Result<Vec<u8>> {
             if rgb > 0x00FF_FFFF {
@@ -244,6 +255,7 @@ impl DifferentialStyle {
             if units.is_empty() || units.len() > 32 {
                 return Err(invalid("a differential font name has 1 to 32 characters"));
             }
+            admit_units(units.len(), limits, 0)?;
             let mut data = u16::try_from(units.len())
                 .map_err(|_overflow| invalid("font name"))?
                 .to_le_bytes()
@@ -292,8 +304,19 @@ impl DifferentialStyle {
             payload.extend_from_slice(&size.to_le_bytes());
             payload.extend_from_slice(&data);
         }
+        admit_payload(payload.len(), limits)?;
         Ok(payload)
     }
+}
+
+/// Validate `limits` and admit a `BrtDXF` payload of `length` bytes.
+fn admit_payload(length: usize, limits: crate::raw::Limits) -> Result<crate::raw::Limits> {
+    Ok(limits.admit(length)?)
+}
+
+/// Refuse a font name above the profile's UTF-16-unit ceiling.
+fn admit_units(units: usize, limits: crate::raw::Limits, offset: usize) -> Result<()> {
+    Ok(limits.admit_units(units, offset)?)
 }
 
 /// A staged conditional-format edit. Dropping it discards it.
@@ -344,11 +367,20 @@ pub(crate) fn styles_part(package: &litchi_opc::OpcPackage) -> Result<Option<Pac
 }
 
 /// The differential formats of a styles stream.
-pub(crate) fn read_differentials(styles: &[u8]) -> Result<Vec<DifferentialStyle>> {
-    crate::cell_values::resources::collection(styles, kind::BEGIN_DXFS, kind::END_DXFS, kind::DXF)?
-        .iter()
-        .map(|payload| DifferentialStyle::parse(payload))
-        .collect()
+pub(crate) fn read_differentials(
+    styles: &[u8],
+    limits: crate::raw::Limits,
+) -> Result<Vec<DifferentialStyle>> {
+    crate::cell_values::resources::collection(
+        styles,
+        kind::BEGIN_DXFS,
+        kind::END_DXFS,
+        kind::DXF,
+        limits,
+    )?
+    .iter()
+    .map(|payload| DifferentialStyle::parse(payload, limits))
+    .collect()
 }
 
 /// The classic conditional formats of a worksheet, in stream order.
@@ -386,7 +418,9 @@ impl Edit {
     /// Returns an error for a malformed styles part.
     pub fn differential_formats(&self) -> Result<Vec<DifferentialStyle>> {
         match styles_part(self.staged.opc())? {
-            Some(styles) => read_differentials(self.staged.blob(&styles)?),
+            Some(styles) => {
+                read_differentials(self.staged.blob(&styles)?, self.staged.raw_limits())
+            },
             None => Ok(Vec::new()),
         }
     }
@@ -400,7 +434,7 @@ impl Edit {
     /// workbook without a styles part, more than [`MAX_DIFFERENTIALS`]
     /// formats, or a changed edit of a signed workbook.
     pub fn add_differential(&mut self, style: &DifferentialStyle) -> Result<u32> {
-        let payload = style.encode()?;
+        let payload = style.encode(self.staged.raw_limits())?;
         let styles = styles_part(self.staged.opc())?
             .ok_or_else(|| invalid("the workbook has no styles part"))?;
         let mut bytes = self.staged.blob(&styles)?.to_vec();
@@ -409,16 +443,18 @@ impl Edit {
             kind::BEGIN_DXFS,
             kind::END_DXFS,
             kind::DXF,
+            self.staged.raw_limits(),
         )?;
         if existing.len() >= MAX_DIFFERENTIALS {
             return Err(invalid(
                 "the styles part holds the most differential formats it can",
             ));
         }
-        if !Records::new(&bytes, crate::raw::Limits::DEFAULT)
+        let limits = self.staged.raw_limits();
+        if !Records::new(&bytes, limits)
             .any(|record| record.is_ok_and(|record| record.kind() == kind::BEGIN_DXFS))
         {
-            bytes = insert_dxfs(&bytes)?;
+            bytes = insert_dxfs(&bytes, limits)?;
         }
         let bytes = crate::cell_values::resources::append_collection_item(
             &bytes,
@@ -426,6 +462,7 @@ impl Edit {
             kind::END_DXFS,
             kind::DXF,
             &payload,
+            limits,
         )?;
         self.staged.replace_blob(&styles, bytes)?;
         u32::try_from(existing.len()).map_err(|_overflow| invalid("too many differential formats"))
@@ -494,7 +531,7 @@ impl Edit {
         }
         let mut out = Vec::new();
         write_conditional_formattings(
-            &mut Encoder::new(&mut out, crate::raw::Limits::DEFAULT),
+            &mut Encoder::new(&mut out, self.staged.raw_limits()),
             std::slice::from_ref(&format),
         )
         .map_err(map_authoring_error)?;
@@ -504,7 +541,7 @@ impl Edit {
     fn splice(&mut self, sheet: usize, index: Option<usize>, encoded: &[u8]) -> Result<bool> {
         let worksheet = self.staged.worksheet(sheet)?;
         let bytes = self.staged.blob(&worksheet)?;
-        let layout = SheetLayout::scan(bytes)?;
+        let layout = SheetLayout::scan_with_limits(bytes, self.staged.raw_limits())?;
         let units: Vec<_> = layout.units_of(kind::BEGIN_COND_FORMATTING).collect();
         let span = match index {
             Some(index) => units
@@ -611,10 +648,10 @@ fn first_cell(format: &Formatting) -> Result<(u32, u32)> {
 /// Insert an empty `BrtBeginDXFs` collection at its style-sheet position:
 /// before the table styles, the color palette, the future records or the
 /// end of the style sheet.
-fn insert_dxfs(styles: &[u8]) -> Result<Vec<u8>> {
+fn insert_dxfs(styles: &[u8], limits: crate::raw::Limits) -> Result<Vec<u8>> {
     const COLOR_PALETTE: u16 = 0x01D9;
     let mut at = None;
-    let mut records = Records::new(styles, crate::raw::Limits::DEFAULT);
+    let mut records = Records::new(styles, limits);
     while let Some(record) = records.next() {
         let record = record?;
         if matches!(
@@ -627,8 +664,13 @@ fn insert_dxfs(styles: &[u8]) -> Result<Vec<u8>> {
         }
     }
     let at = at.ok_or_else(|| invalid("the styles part has no end"))?;
-    let mut empty = crate::part_edit::record(kind::BEGIN_DXFS, &0u32.to_le_bytes())?;
-    empty.extend(crate::part_edit::record(kind::END_DXFS, &[])?);
+    let mut empty =
+        crate::part_edit::record_with_limits(kind::BEGIN_DXFS, &0u32.to_le_bytes(), limits)?;
+    empty.extend(crate::part_edit::record_with_limits(
+        kind::END_DXFS,
+        &[],
+        limits,
+    )?);
     Ok(splice(styles, at..at, &empty))
 }
 
@@ -650,8 +692,11 @@ mod tests {
             size: Some(11.5),
             name: Some("Calibri".to_owned()),
         };
-        let payload = style.encode().unwrap();
-        assert_eq!(DifferentialStyle::parse(&payload).unwrap(), style);
+        let payload = style.encode(crate::raw::Limits::DEFAULT).unwrap();
+        assert_eq!(
+            DifferentialStyle::parse(&payload, crate::raw::Limits::DEFAULT).unwrap(),
+            style
+        );
     }
 
     #[test]

@@ -37,6 +37,9 @@ pub enum Error {
     /// Text or primitive binary decoding failed.
     #[error("formula encoding: {0}")]
     Encoding(&'static str),
+    /// The caller's raw payload or string-unit profile refused the input or output.
+    #[error(transparent)]
+    Wire(#[from] crate::raw::Error),
 }
 
 /// Result type for standalone formula codecs.

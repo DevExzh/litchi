@@ -135,7 +135,9 @@ impl<'a> Compiler<'a> {
                 output.extend_from_slice(&index.to_le_bytes());
             },
             CompileExpr::TableReference(reference) => {
-                let (token, payload) = reference.to_extended_binary()?;
+                // The text compiler has no opened owner; it emits under the
+                // documented default authoring profile.
+                let (token, payload) = reference.to_extended_binary(crate::raw::Limits::DEFAULT)?;
                 output.extend_from_slice(&token);
                 extra.extend_from_slice(&payload);
             },

@@ -28,6 +28,7 @@ impl Workbook {
             sheet,
             self.leniency,
             select,
+            self.raw_limits,
         )
     }
 
@@ -42,7 +43,9 @@ impl Workbook {
         let worksheet = crate::part_edit::worksheet_uri(self, sheet)?;
         let part = self.package.get_part(&worksheet)?;
         match crate::comments::edit::comments_part(part.rels())? {
-            Some((_, name)) => crate::comments::edit::read(self.package.get_part(&name)?.blob()),
+            Some((_, name)) => {
+                crate::comments::edit::read(self.package.get_part(&name)?.blob(), self.raw_limits)
+            },
             None => Ok(Vec::new()),
         }
     }
@@ -80,6 +83,7 @@ impl Workbook {
         match crate::conditional_formatting::edit::styles_part(&self.package)? {
             Some(styles) => crate::conditional_formatting::edit::read_differentials(
                 self.package.get_part(&styles)?.blob(),
+                self.raw_limits,
             ),
             None => Ok(Vec::new()),
         }

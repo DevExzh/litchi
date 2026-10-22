@@ -39,7 +39,7 @@ impl crate::Package {
     ///
     /// Returns the owner graph, decoding and validation errors.
     pub fn shared_workbook(&self) -> Result<Snapshot> {
-        Snapshot::read(self.opc_package())
+        Snapshot::read(self.opc_package(), self.raw_limits_value())
     }
 
     /// Start a shared-workbook metadata edit. Starting one copies no part
@@ -49,7 +49,7 @@ impl crate::Package {
     ///
     /// Returns the owner graph, decoding and validation errors.
     pub fn edit_shared_workbook(&self) -> Result<Edit> {
-        let base = Snapshot::read(self.opc_package())?;
+        let base = Snapshot::read(self.opc_package(), self.raw_limits_value())?;
         Ok(Edit {
             staged: Staged::of_package(self)?,
             catalog: base.catalog.clone(),
@@ -77,9 +77,10 @@ pub struct Snapshot {
 }
 
 impl Snapshot {
-    /// Read and validate the shared-workbook owner from an OPC package.
-    pub fn read(package: &OpcPackage) -> Result<Self> {
-        let catalog = package::load(package)?;
+    /// Read and validate the shared-workbook owner from an OPC package under
+    /// the owner's raw profile.
+    pub(crate) fn read(package: &OpcPackage, raw_limits: crate::raw::Limits) -> Result<Self> {
+        let catalog = package::load(package, raw_limits)?;
         let source = SourceState::capture(package, &catalog)?;
         Ok(Self {
             catalog,
@@ -338,9 +339,10 @@ impl Edit {
         self.validate_candidate(&self.catalog)?;
         if self.catalog != self.base.catalog {
             let catalog = self.catalog.clone();
+            let raw_limits = self.staged.raw_limits();
             self.staged.update(|candidate| {
-                package::store(candidate, &catalog)?;
-                Snapshot::read(candidate).map(drop)
+                package::store(candidate, &catalog, raw_limits)?;
+                Snapshot::read(candidate, raw_limits).map(drop)
             })?;
         }
         Ok(Commit::new(self.staged.commit()?))
