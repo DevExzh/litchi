@@ -23,9 +23,10 @@ same commit and finish guards.
 
 The probe adds `doc/batch1k_leaf_write`, which stages 1,000 leaf body toggles,
 commits once, and writes the complete package with `Package::write_to`. The
-existing facade coalescing test continues to pin one facade commit. Direct
-format staging clears a retained render until commit; the final commit still
-uses the configured retention ceiling.
+`doc/leaf_write` supplies the ordinary one-toggle commit-and-write control, and
+the existing facade coalescing test continues to pin one facade commit.
+Direct format staging clears a retained render until commit; the final commit
+still uses the configured retention ceiling.
 
 ## Correctness
 
@@ -85,9 +86,55 @@ before build remain outside the repository:
   change.patch                 10,887 B  sha256 3fa783b7d2cc9febe4e7bffe38d0cf8122896182099f4d14e951f3b61ace5a6c
 ```
 
-No large evidence or executable is committed. Native qualification should be
-repeated on an isolated host if the coordinator requires a load-free timing
-claim.
+No large evidence or executable is committed. These shared-host wall-clock
+numbers are diagnostic only; native qualification on an isolated host remains
+required before this performance repair is accepted as qualified.
+
+## Deterministic profile
+
+The before executable was rebuilt from the base source at `81323113be7e` and
+the after executable from this change at `160a00559bb7`. Both included the
+same probe routes and were run with one harness sample under Valgrind 3.26.0.
+Callgrind instruction counts (`Ir`) and Massif peak heap totals were collected
+with the same command shape for each leg. Massif used `--pages-as-heap=no`;
+the peak is heap plus allocator overhead, excluding stacks.
+
+| Route | Before Ir | After Ir | Ir ratio | Before peak | After peak | Peak ratio |
+|---|---:|---:|---:|---:|---:|---:|
+| `doc/batch1k_leaf_write` | 21,183,223,373 | 6,436,404,593 | 0.304 | 113,171,296 B | 14,275,296 B | 0.126 |
+| `doc/leaf_write` | 5,426,409,220 | 1,737,517,721 | 0.320 | 104,778,760 B | 14,012,920 B | 0.134 |
+
+The ordinary route's shared-host wall-clock medians were 3,106.697 µs before
+and 3,684.751 µs after, but its matched instruction count and peak allocation
+both fell; the wall-clock difference is not a qualification result. Both
+routes produced the same output SHA on both legs.
+
+The compact profile summary is outside the repository at
+`/home/zhuhe/code/litchi-worktrees/.coord/doc-toggle/profile-summary.txt`
+(1,064 bytes, SHA-256
+`5c66fa441092b06e6d8355c5a542eddc0ee3db3dcffbee148051092e4db9efd1`). The
+matched profile binaries are also external: `before-with-single-route-legacy_w5_source_probe`
+(`d44a1b17a4377b87f88488def75ec158bbd425b4d849e4f6e969c288ae60a58d`,
+13,343,600 bytes) and `after-with-single-route-legacy_w5_source_probe`
+(`635d421259b36faf33141be8c8efb63b51f47736c33114b975e0609c05ccd4fc`,
+13,343,824 bytes).
+
+The profiling commands were:
+
+```text
+LITCHI_PROBE_ONLY=doc/batch1k_leaf_write \
+LITCHI_PROBE_BATCH_ROUNDS=1 \
+valgrind --tool=callgrind --callgrind-out-file=<leg>-batch.callgrind <binary> 1
+LITCHI_PROBE_ONLY=doc/leaf_write \
+LITCHI_PROBE_BATCH_ROUNDS=1 \
+valgrind --tool=callgrind --callgrind-out-file=<leg>-single.callgrind <binary> 1
+LITCHI_PROBE_ONLY=doc/batch1k_leaf_write \
+LITCHI_PROBE_BATCH_ROUNDS=1 \
+valgrind --tool=massif --pages-as-heap=no --massif-out-file=<leg>-batch.massif <binary> 1
+LITCHI_PROBE_ONLY=doc/leaf_write \
+LITCHI_PROBE_BATCH_ROUNDS=1 \
+valgrind --tool=massif --pages-as-heap=no --massif-out-file=<leg>-single.massif <binary> 1
+```
 
 ## Validation
 

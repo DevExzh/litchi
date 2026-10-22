@@ -17,11 +17,12 @@
 //!   paragraphs; the document is parsed outside the clock).
 //!
 //! DOC body batch (the 0359 follow-up): `doc/batch1k_ops` is one
-//! `File::edit_with_limits` of 1,000 `bold` sets, `doc/batch1k_leaf` the
+//! `File::edit_with_options` of 1,000 `bold` sets, `doc/batch1k_leaf` the
 //! leaf `Package::edit_with_options` with the transaction's operation bound
 //! raised to 1,000 and 1,000 `set_paragraph_bold` calls, and
 //! `doc/batch1k_leaf_write` repeats that leaf route through complete
-//! `Package::write_to` publication; all run
+//! `Package::write_to` publication. `doc/leaf_write` is the corresponding
+//! one-toggle commit-and-write route; all run
 //! `LITCHI_PROBE_BATCH_ROUNDS` rounds (default 7).
 //!
 //! `LITCHI_PROBE_ONLY=<prefix>` runs only the scenarios starting with it.
@@ -233,6 +234,12 @@ mod probe {
         });
         probe.output(&expected_leaf_write);
 
+        let expected_leaf = super::routes::doc_leaf_write(&bytes);
+        probe.time_rounds("doc/leaf_write", 1, batch_rounds, || {
+            assert_eq!(super::routes::doc_leaf_write(&bytes), expected_leaf);
+        });
+        probe.output(&expected_leaf);
+
         let bytes = xls(100, 10);
         for (scenario, cells) in [("xls/source_cells1", 1), ("xls/source_cells100", 100)] {
             let expected = super::routes::xls_source_cells(&bytes, cells, false);
@@ -333,6 +340,19 @@ mod routes {
             edit.set_paragraph_bold(Position::new(index), true)
                 .expect("bold");
         }
+        let package = edit.commit().expect("commit").into_package();
+        let mut output = Vec::new();
+        package.write_to(&mut output).expect("write");
+        output
+    }
+
+    /// Run one body toggle through complete DOC publication. This is the
+    /// ordinary leaf control for the 1k coalescing measurement.
+    pub(super) fn doc_leaf_write(bytes: &[u8]) -> Vec<u8> {
+        let package = litchi_doc::Package::from_bytes(bytes).expect("package");
+        let mut edit = package.edit().expect("edit");
+        edit.set_paragraph_bold(Position::new(500), true)
+            .expect("bold");
         let package = edit.commit().expect("commit").into_package();
         let mut output = Vec::new();
         package.write_to(&mut output).expect("write");
