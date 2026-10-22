@@ -155,27 +155,6 @@ impl DecodeOptions {
         }
     }
 
-    /// Alias for [`Self::with_output_and_title_limits`] for callers that use
-    /// the conventional `new_with_limits` naming.
-    #[must_use]
-    pub const fn new_with_limits(
-        max_message_bytes: usize,
-        max_fields: usize,
-        max_work_bytes: usize,
-        recursion_limit: u32,
-        max_output_bytes: usize,
-        max_title_bytes: usize,
-    ) -> Self {
-        Self::with_output_and_title_limits(
-            max_message_bytes,
-            max_fields,
-            max_work_bytes,
-            recursion_limit,
-            max_output_bytes,
-            max_title_bytes,
-        )
-    }
-
     fn buffa(self) -> BuffaDecodeOptions {
         BuffaDecodeOptions::new()
             .with_max_message_size(self.max_message_bytes)

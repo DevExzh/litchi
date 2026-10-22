@@ -16090,6 +16090,21 @@
       ]
     },
     {
+      "id": "iwa-detect",
+      "package": "litchi-iwa-detect",
+      "default_features": true,
+      "features": [],
+      "banned_names": [
+        {
+          "name": "_with_limits",
+          "scope": "litchi_iwa_detect",
+          "replacement": "raw detection and PreparedSource ingress take Limits on their canonical names (record 0351 \u00a72.5, record 0361l)",
+          "match": "suffix"
+        }
+      ],
+      "families": []
+    },
+    {
       "id": "numbers-minimal",
       "features": [],
       "package": "litchi-numbers",

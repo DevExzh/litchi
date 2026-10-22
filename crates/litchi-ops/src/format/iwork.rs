@@ -252,7 +252,7 @@ impl Iwork {
     pub(crate) fn detect_bytes(bytes: Vec<u8>, options: &OpenOptions) -> Result<Detected> {
         let shared: Arc<[u8]> = Arc::from(bytes);
         let prepared =
-            match litchi_iwa_detect::PreparedSource::from_shared_bytes(Arc::clone(&shared)) {
+            match litchi_iwa_detect::PreparedSource::from_shared_bytes(Arc::clone(&shared), litchi_iwa_detect::Limits::default()) {
                 Ok(Some(prepared)) => prepared,
                 // A container the iWork detector refuses is not claimed: the
                 // input is reported as unrecognized, as before iWork joined.
@@ -856,7 +856,7 @@ const fn iwork_format(format: litchi_iwa_detect::Format) -> FileFormat {
 
 /// Classify an iWork package directory (the app-authored bundle form).
 pub(crate) fn classify_directory(path: &Path) -> Option<FileFormat> {
-    match litchi_iwa_detect::path(path) {
+    match litchi_iwa_detect::path(path, litchi_iwa_detect::Limits::default()) {
         Ok(Some(format)) => Some(iwork_format(format)),
         _ => None,
     }

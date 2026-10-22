@@ -66,7 +66,7 @@ mod iwork_is_classified_last {
 
     fn iwork_leaf_says_pages(bytes: &[u8]) -> bool {
         matches!(
-            litchi_iwa_detect::bytes(bytes),
+            litchi_iwa_detect::bytes(bytes, litchi_iwa_detect::Limits::default()),
             Ok(Some(litchi_iwa_detect::Format::Pages))
         )
     }

@@ -597,7 +597,8 @@ mod tests {
             .replace_archive("Index/SyntheticCharts.iwa", &archive)
             .expect("synthetic archive");
         let bytes = package.to_bytes().expect("synthetic package");
-        let bundle = Bundle::from_bytes(&bytes).expect("synthetic bundle");
+        let bundle =
+            Bundle::from_bytes(&bytes, Default::default()).expect("synthetic bundle");
         let object_index = ObjectIndex::from_bundle(&bundle).expect("synthetic object index");
 
         let charts = ChartMetadataExtractor::new(&bundle, &object_index)
@@ -620,7 +621,8 @@ mod tests {
             .replace_archive("Index/MalformedCharts.iwa", &archive)
             .expect("synthetic archive");
         let bytes = package.to_bytes().expect("synthetic package");
-        let bundle = Bundle::from_bytes(&bytes).expect("synthetic bundle");
+        let bundle =
+            Bundle::from_bytes(&bytes, Default::default()).expect("synthetic bundle");
         let object_index = ObjectIndex::from_bundle(&bundle).expect("synthetic object index");
 
         assert!(

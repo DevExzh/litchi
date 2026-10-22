@@ -424,7 +424,7 @@ impl fmt::Debug for PreparedSource {
 }
 
 impl PreparedSource {
-    /// Prepare borrowed package bytes under the default detection profile.
+    /// Prepare borrowed package bytes under caller-selected detection limits.
     ///
     /// The bytes are copied once into immutable shared ownership. Use
     /// [`Self::from_shared_bytes`] when the caller already owns an `Arc`.
@@ -434,16 +434,7 @@ impl PreparedSource {
     /// Returns an error when the package is malformed, ambiguous, encrypted,
     /// or exceeds a physical resource ceiling. Non-ZIP and unrecognized iWork
     /// inputs return `Ok(None)`.
-    pub fn from_bytes(value: &[u8]) -> Result<Option<Self>> {
-        Self::from_bytes_with_limits(value, Limits::default())
-    }
-
-    /// Prepare borrowed package bytes under explicit detection limits.
-    ///
-    /// # Errors
-    ///
-    /// Returns the same errors as [`Self::from_bytes`].
-    pub fn from_bytes_with_limits(value: &[u8], limits: Limits) -> Result<Option<Self>> {
+    pub fn from_bytes(value: &[u8], limits: Limits) -> Result<Option<Self>> {
         if !check_prepared_candidate(value, limits)? {
             return Ok(None);
         }
@@ -461,7 +452,7 @@ impl PreparedSource {
     ///
     /// # Errors
     ///
-    /// Returns the same errors as [`Self::from_bytes_with_limits`], plus a
+    /// Returns the same errors as [`Self::from_bytes`], plus a
     /// refusal when a selected Pages metadata authority violates its physical
     /// profile.
     #[doc(hidden)]
@@ -482,11 +473,11 @@ impl PreparedSource {
     /// in the exact source allocation but are not materialized as package
     /// entries. This route is intended for read-only metadata, list, and
     /// one-query workflows; preserve-mode owners continue to use
-    /// [`Self::from_bytes_with_limits`].
+    /// [`Self::from_bytes`].
     ///
     /// # Errors
     ///
-    /// Returns the same errors as [`Self::from_bytes_with_limits`], plus a
+    /// Returns the same errors as [`Self::from_bytes`], plus a
     /// refusal when a selected semantic metadata authority violates its
     /// physical profile.
     #[doc(hidden)]
@@ -507,7 +498,7 @@ impl PreparedSource {
     ///
     /// # Errors
     ///
-    /// Returns the same errors as [`Self::from_bytes_with_limits`], plus a
+    /// Returns the same errors as [`Self::from_bytes`], plus a
     /// refusal when a selected canonical metadata authority violates its
     /// physical profile.
     #[doc(hidden)]
@@ -577,18 +568,8 @@ impl PreparedSource {
         }))
     }
 
-    /// Prepare already-owned immutable package bytes without copying them.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the package is malformed, ambiguous, encrypted,
-    /// or exceeds a physical resource ceiling. Non-ZIP and unrecognized iWork
-    /// inputs return `Ok(None)`.
-    pub fn from_shared_bytes(value: Arc<[u8]>) -> Result<Option<Self>> {
-        Self::from_shared_bytes_with_limits(value, Limits::default())
-    }
-
-    /// Prepare an immutable package under explicit physical limits.
+    /// Prepare already-owned immutable package bytes without copying them,
+    /// under caller-selected detection limits.
     ///
     /// The same checked profile is retained by the underlying catalog so a
     /// selected format owner cannot accidentally reinterpret already-validated
@@ -599,7 +580,7 @@ impl PreparedSource {
     /// Returns an error when the package is malformed, ambiguous, encrypted,
     /// or exceeds a physical resource ceiling. Non-ZIP and unrecognized iWork
     /// inputs return `Ok(None)`.
-    pub fn from_shared_bytes_with_limits(value: Arc<[u8]>, limits: Limits) -> Result<Option<Self>> {
+    pub fn from_shared_bytes(value: Arc<[u8]>, limits: Limits) -> Result<Option<Self>> {
         if !check_prepared_candidate(&value, limits)? {
             return Ok(None);
         }
@@ -613,7 +594,7 @@ impl PreparedSource {
     ///
     /// # Errors
     ///
-    /// Returns the same errors as [`Self::from_shared_bytes_with_limits`],
+    /// Returns the same errors as [`Self::from_shared_bytes`],
     /// plus a refusal when a selected Pages metadata authority violates its
     /// physical profile.
     #[doc(hidden)]
@@ -639,7 +620,7 @@ impl PreparedSource {
     ///
     /// # Errors
     ///
-    /// Returns the same errors as [`Self::from_shared_bytes_with_limits`],
+    /// Returns the same errors as [`Self::from_shared_bytes`],
     /// plus a refusal when a selected semantic metadata authority violates
     /// its physical profile.
     #[doc(hidden)]
@@ -660,7 +641,7 @@ impl PreparedSource {
     ///
     /// # Errors
     ///
-    /// Returns the same errors as [`Self::from_shared_bytes_with_limits`],
+    /// Returns the same errors as [`Self::from_shared_bytes`],
     /// plus a refusal when a selected canonical metadata authority violates
     /// its physical profile.
     #[doc(hidden)]
@@ -698,7 +679,8 @@ impl PreparedSource {
         Self::from_catalog(catalog, limits)
     }
 
-    /// Prepare an immutable, already-normalized logical entry snapshot.
+    /// Prepare immutable logical entries under caller-selected physical
+    /// limits.
     ///
     /// This explicitly unstable integration route performs no synthetic ZIP
     /// serialization and never claims exact-package provenance. The frozen
@@ -706,27 +688,17 @@ impl PreparedSource {
     /// classification, then is released before the selected format decoder
     /// receives the component-only semantic snapshot.
     ///
-    /// # Errors
-    ///
-    /// Returns an error when any entry is unsafe, ambiguous, encrypted,
-    /// malformed, or exceeds a physical resource ceiling. An entry set with
-    /// no recognized canonical application root returns `Ok(None)`.
-    #[doc(hidden)]
-    pub fn from_frozen_entries(value: FrozenEntryStore) -> Result<Option<Self>> {
-        Self::from_frozen_entries_with_limits(value, Limits::default())
-    }
-
-    /// Prepare immutable logical entries under explicit physical limits.
-    ///
     /// The input-byte ceiling is not reinterpreted as an expanded logical
     /// payload ceiling; per-entry and aggregate expanded ceilings govern the
     /// already-decoded member payloads.
     ///
     /// # Errors
     ///
-    /// Returns the same errors as [`Self::from_frozen_entries`].
+    /// Returns an error when any entry is unsafe, ambiguous, encrypted,
+    /// malformed, or exceeds a physical resource ceiling. An entry set with
+    /// no recognized canonical application root returns `Ok(None)`.
     #[doc(hidden)]
-    pub fn from_frozen_entries_with_limits(
+    pub fn from_frozen_entries(
         value: FrozenEntryStore,
         limits: Limits,
     ) -> Result<Option<Self>> {
@@ -752,7 +724,8 @@ impl PreparedSource {
         }))
     }
 
-    /// Prepare a packaged file or app-authored directory bundle.
+    /// Prepare a packaged file or app-authored directory bundle under
+    /// caller-selected physical limits.
     ///
     /// Regular files are opened once, read through a bounded stable file
     /// handle, and classified from the retained package catalog. Directories
@@ -766,17 +739,7 @@ impl PreparedSource {
     /// during capture, or exceeds a physical resource ceiling. An accessible
     /// regular file or directory that is not recognized as iWork returns
     /// `Ok(None)`.
-    pub fn from_path(value: impl AsRef<Path>) -> Result<Option<Self>> {
-        Self::from_path_with_limits(value, Limits::default())
-    }
-
-    /// Prepare a packaged file or app-authored directory bundle under
-    /// explicit physical limits.
-    ///
-    /// # Errors
-    ///
-    /// Returns the same errors as [`Self::from_path`].
-    pub fn from_path_with_limits(value: impl AsRef<Path>, limits: Limits) -> Result<Option<Self>> {
+    pub fn from_path(value: impl AsRef<Path>, limits: Limits) -> Result<Option<Self>> {
         Self::from_path_with_profile(value.as_ref(), limits, PathProfile::IndexOnly)
     }
 
@@ -817,7 +780,7 @@ impl PreparedSource {
     ///
     /// # Errors
     ///
-    /// Returns the same errors as [`Self::from_path_with_limits`], plus a
+    /// Returns the same errors as [`Self::from_path`], plus a
     /// refusal when a selected semantic metadata authority is unsafe.
     #[doc(hidden)]
     pub fn __from_path_with_semantic_metadata(
@@ -837,7 +800,7 @@ impl PreparedSource {
     ///
     /// # Errors
     ///
-    /// Returns the same errors as [`Self::from_path_with_limits`], plus a
+    /// Returns the same errors as [`Self::from_path`], plus a
     /// refusal when a selected canonical metadata authority is unsafe.
     #[doc(hidden)]
     pub fn __from_path_with_pages_metadata(
@@ -861,7 +824,7 @@ impl PreparedSource {
     ///
     /// # Errors
     ///
-    /// Returns the same errors as [`Self::from_path_with_limits`], plus a
+    /// Returns the same errors as [`Self::from_path`], plus a
     /// refusal when a selected canonical metadata authority is unsafe.
     #[doc(hidden)]
     pub fn __from_path_with_numbers_semantics(
@@ -908,7 +871,7 @@ impl PreparedSource {
                     },
                     PathProfile::KeynoteProperties => {
                         #[cfg(windows)]
-                        return Self::from_shared_bytes_with_limits(source.into(), limits);
+                        return Self::from_shared_bytes(source.into(), limits);
                         #[cfg(not(windows))]
                         Self::from_shared_bytes_with_catalog_profile(
                             source.into(),
@@ -922,7 +885,7 @@ impl PreparedSource {
                         // Windows, whose path adapter cannot promise the
                         // semantic profile's no-reparse capture invariant.
                         #[cfg(windows)]
-                        return Self::from_shared_bytes_with_limits(source.into(), limits);
+                        return Self::from_shared_bytes(source.into(), limits);
                         #[cfg(not(windows))]
                         Self::from_shared_bytes_with_catalog_profile(
                             source.into(),
@@ -932,7 +895,7 @@ impl PreparedSource {
                         )
                     },
                     PathProfile::IndexOnly | PathProfile::Properties => {
-                        Self::from_shared_bytes_with_limits(source.into(), limits)
+                        Self::from_shared_bytes(source.into(), limits)
                     },
                 }
             },
@@ -1572,18 +1535,8 @@ impl Default for Limits {
 /// # Errors
 ///
 /// Returns a typed error when the package is malformed, ambiguous, encrypted,
-/// or exceeds a configured resource ceiling.
-pub fn bytes(value: &[u8]) -> Result<Option<Format>> {
-    bytes_with_limits(value, Limits::default())
-}
-
-/// Detect an iWork application using caller-selected resource ceilings.
-///
-/// # Errors
-///
-/// Returns a typed error when the package is malformed, ambiguous, encrypted,
 /// or exceeds the supplied resource ceilings.
-pub fn bytes_with_limits(value: &[u8], limits: Limits) -> Result<Option<Format>> {
+pub fn bytes(value: &[u8], limits: Limits) -> Result<Option<Format>> {
     let input_size = u64::try_from(value.len()).unwrap_or(u64::MAX);
     if input_size > limits.max_input_bytes {
         return Err(Error::LimitExceeded {
@@ -1963,18 +1916,8 @@ fn root_format_archive(archive: &Archive) -> Result<Option<Format>> {
 /// # Errors
 ///
 /// Returns a typed error when the stream cannot be inspected, restored, or
-/// contains malformed or over-limit iWork input.
-pub fn reader<R: Read + Seek>(value: &mut R) -> Result<Option<Format>> {
-    reader_with_limits(value, Limits::default())
-}
-
-/// Detect an iWork application from a seekable stream under explicit limits.
-///
-/// # Errors
-///
-/// Returns a typed error when the stream cannot be inspected, restored, or
-/// contains malformed or over-limit iWork input.
-pub fn reader_with_limits<R: Read + Seek>(value: &mut R, limits: Limits) -> Result<Option<Format>> {
+/// contains malformed or over-limit iWork input under the supplied limits.
+pub fn reader<R: Read + Seek>(value: &mut R, limits: Limits) -> Result<Option<Format>> {
     let original = value.stream_position()?;
     let detected = (|| {
         let input_length = value.seek(SeekFrom::End(0))?;
@@ -2004,7 +1947,7 @@ pub fn reader_with_limits<R: Read + Seek>(value: &mut R, limits: Limits) -> Resu
                 "iWork detection source changed while it was being read".to_owned(),
             ));
         }
-        bytes_with_limits(&data, limits)
+        bytes(&data, limits)
     })();
     value.seek(SeekFrom::Start(original))?;
     detected
@@ -2018,21 +1961,11 @@ pub fn reader_with_limits<R: Read + Seek>(value: &mut R, limits: Limits) -> Resu
 /// # Errors
 ///
 /// Returns a typed error when the path is inaccessible, unsafe, malformed, or
-/// exceeds a configured resource ceiling.
-pub fn path(value: impl AsRef<Path>) -> Result<Option<Format>> {
-    path_with_limits(value, Limits::default())
-}
-
-/// Detect a packaged file or legacy directory bundle under explicit limits.
-///
-/// # Errors
-///
-/// Returns a typed error when the path is inaccessible, unsafe, malformed, or
 /// exceeds the supplied resource ceilings.
-pub fn path_with_limits(value: impl AsRef<Path>, limits: Limits) -> Result<Option<Format>> {
+pub fn path(value: impl AsRef<Path>, limits: Limits) -> Result<Option<Format>> {
     let path = value.as_ref();
     match kind(path)? {
-        Kind::File => reader_with_limits(&mut File::open(path)?, limits),
+        Kind::File => reader(&mut File::open(path)?, limits),
         Kind::Dir => directory(path, limits),
         Kind::Missing => Ok(None),
     }
@@ -2052,7 +1985,7 @@ fn directory(root: &Path, limits: Limits) -> Result<Option<Format>> {
 
     let index_zip = root.join("Index.zip");
     evidence = evidence.merge(match kind(&index_zip)? {
-        Kind::File => match reader_with_limits(&mut File::open(&index_zip)?, limits)? {
+        Kind::File => match reader(&mut File::open(&index_zip)?, limits)? {
             Some(format) => Outcome::Found(format),
             None => Outcome::Conflict,
         },
@@ -2653,7 +2586,7 @@ mod tests {
     #[test]
     fn detects_root_application_with_shared_table_components() {
         assert_eq!(
-            bytes(&document_package(Format::Pages, &[])).unwrap(),
+            bytes(&document_package(Format::Pages, &[]), Limits::default()).unwrap(),
             Some(Format::Pages)
         );
         assert_eq!(
@@ -2665,7 +2598,7 @@ mod tests {
                     "Index/TemplateSlide-31.iwa",
                     "Index/CalculationEngine-81.iwa"
                 ]
-            ))
+            ), Limits::default())
             .unwrap(),
             Some(Format::Keynote)
         );
@@ -2673,7 +2606,7 @@ mod tests {
             bytes(&document_package(
                 Format::Numbers,
                 &["Index/CalculationEngine-174.iwa"]
-            ))
+            ), Limits::default())
             .unwrap(),
             Some(Format::Numbers)
         );
@@ -2681,25 +2614,41 @@ mod tests {
             bytes(&document_package(
                 Format::Pages,
                 &["Index/CalculationEngine.iwa"]
-            ))
+            ), Limits::default())
             .unwrap(),
             Some(Format::Pages)
         );
-        assert!(bytes(&document_package(Format::Numbers, &["Index/Slide-1.iwa"])).is_err());
+        assert!(bytes(
+            &document_package(Format::Numbers, &["Index/Slide-1.iwa"]),
+            Limits::default()
+        )
+        .is_err());
         assert!(
             bytes(&document_package(
                 Format::Pages,
                 &["Index/MasterSlide-12.iwa"]
-            ))
+            ), Limits::default())
             .is_err()
         );
-        assert!(bytes(&package(&[("Index/Document.iwa", b"not iwa")])).is_err());
+        assert!(bytes(
+            &package(&[("Index/Document.iwa", b"not iwa")]),
+            Limits::default()
+        )
+        .is_err());
         assert_eq!(
-            bytes(&package(&[("Index/Unknown.iwa", b"iwa")])).unwrap(),
+            bytes(
+                &package(&[("Index/Unknown.iwa", b"iwa")]),
+                Limits::default()
+            )
+            .unwrap(),
             None
         );
         assert_eq!(
-            bytes(&package(&[("Data/image.png", b"iwa")])).unwrap(),
+            bytes(
+                &package(&[("Data/image.png", b"iwa")]),
+                Limits::default()
+            )
+            .unwrap(),
             None
         );
 
@@ -2740,7 +2689,7 @@ mod tests {
             );
             assert_eq!(
                 component_catalog(source.components()).unwrap(),
-                super::bytes(&bytes).unwrap()
+                super::bytes(&bytes, Limits::default()).unwrap()
             );
         }
 
@@ -2777,7 +2726,7 @@ mod tests {
         )
         .unwrap();
 
-        let prepared = PreparedSource::from_shared_bytes_with_limits(Arc::clone(&bytes), limits)
+        let prepared = PreparedSource::from_shared_bytes(Arc::clone(&bytes), limits)
             .unwrap()
             .unwrap();
         assert_eq!(prepared.format(), Format::Pages);
@@ -2919,13 +2868,14 @@ mod tests {
     fn frozen_logical_preparation_matches_packaged_classification() {
         for expected in [Format::Pages, Format::Numbers, Format::Keynote] {
             let bytes = document_package(expected, &[]);
-            let prepared = PreparedSource::from_frozen_entries(frozen_package(&bytes))
+            let prepared = PreparedSource::from_frozen_entries(frozen_package(&bytes), Limits::default())
                 .unwrap()
                 .expect("recognized logical source");
             assert_eq!(prepared.format(), expected);
             assert!(prepared.__into_source_catalog().is_none());
 
-            let component_prepared = PreparedSource::from_frozen_entries(frozen_package(&bytes))
+            let component_prepared =
+                PreparedSource::from_frozen_entries(frozen_package(&bytes), Limits::default())
                 .unwrap()
                 .expect("recognized logical source");
             let (logical, retained_limits) = component_prepared.__into_components();
@@ -2948,10 +2898,13 @@ mod tests {
     #[test]
     fn frozen_logical_preparation_skips_operation_storage() {
         let root = document(Format::Pages);
-        let prepared = PreparedSource::from_frozen_entries(frozen_entries(&[
-            ("Index/Document.iwa", &root),
-            ("Index/OperationStorage.iwa", b"bvxn operation log"),
-        ]))
+        let prepared = PreparedSource::from_frozen_entries(
+            frozen_entries(&[
+                ("Index/Document.iwa", &root),
+                ("Index/OperationStorage.iwa", b"bvxn operation log"),
+            ]),
+            Limits::default(),
+        )
         .unwrap()
         .expect("recognized Pages source");
         let (components, _limits) = prepared.__into_components();
@@ -2995,7 +2948,7 @@ mod tests {
             ),
         ];
         for (entries, limits, expected) in cases {
-            let error = PreparedSource::from_frozen_entries_with_limits(entries, limits)
+            let error = PreparedSource::from_frozen_entries(entries, limits)
                 .expect_err("logical limit must be retained");
             assert!(matches!(
                 error,
@@ -3007,11 +2960,17 @@ mod tests {
     #[test]
     fn frozen_logical_preparation_rejects_encryption_and_unexpanded_indexes() {
         assert!(matches!(
-            PreparedSource::from_frozen_entries(frozen_entries(&[("Metadata/.iwpv2", b"marker")])),
+            PreparedSource::from_frozen_entries(
+                frozen_entries(&[("Metadata/.iwpv2", b"marker")]),
+                Limits::default(),
+            ),
             Err(Error::Encrypted)
         ));
         assert!(matches!(
-            PreparedSource::from_frozen_entries(frozen_entries(&[("legacy/Index.zip", b"nested")])),
+            PreparedSource::from_frozen_entries(
+                frozen_entries(&[("legacy/Index.zip", b"nested")]),
+                Limits::default(),
+            ),
             Err(Error::Archive(_))
         ));
     }
@@ -3019,7 +2978,7 @@ mod tests {
     #[test]
     fn prepared_source_leaves_unrecognized_inputs_unclaimed() {
         assert!(
-            PreparedSource::from_bytes(b"not a ZIP package")
+            PreparedSource::from_bytes(b"not a ZIP package", Limits::default())
                 .unwrap()
                 .is_none()
         );
@@ -3044,7 +3003,7 @@ mod tests {
         )
         .into();
 
-        let prepared = PreparedSource::from_shared_bytes(Arc::clone(&bytes))
+        let prepared = PreparedSource::from_shared_bytes(Arc::clone(&bytes), Limits::default())
             .unwrap()
             .expect("fixture has a Pages root");
         let semantic = prepared
@@ -3305,7 +3264,7 @@ mod tests {
         patch_zip_member_compression_to_opaque(&mut bytes, "Metadata/BuildVersionHistory.plist");
         patch_zip_member_compression_to_opaque(&mut bytes, "Metadata/DocumentIdentifier");
 
-        let prepared = PreparedSource::from_bytes(&bytes)
+        let prepared = PreparedSource::from_bytes(&bytes, Limits::default())
             .unwrap()
             .expect("fixture has a Keynote root");
         let (_components, _limits, captured) = prepared
@@ -3323,7 +3282,7 @@ mod tests {
             );
             patch_zip_member_compression_to_opaque(&mut bytes, authority);
 
-            let prepared = PreparedSource::from_bytes(&bytes)
+            let prepared = PreparedSource::from_bytes(&bytes, Limits::default())
                 .unwrap()
                 .expect("fixture has a Pages root");
             let error = prepared
@@ -3342,7 +3301,7 @@ mod tests {
         for authority in SEMANTIC_METADATA_AUTHORITIES.map(|(authority, _sidecar)| authority) {
             let exact = vec![b'x'; MAX_PROPERTIES_BYTES];
             let accepted = document_package_with_members(Format::Pages, &[(authority, &exact)]);
-            let prepared = PreparedSource::from_bytes(&accepted)
+            let prepared = PreparedSource::from_bytes(&accepted, Limits::default())
                 .unwrap()
                 .expect("fixture has a Pages root");
             let sidecars = prepared
@@ -3360,7 +3319,7 @@ mod tests {
 
             let oversized = vec![b'x'; MAX_PROPERTIES_BYTES + 1];
             let rejected = document_package_with_members(Format::Pages, &[(authority, &oversized)]);
-            let prepared = PreparedSource::from_bytes(&rejected)
+            let prepared = PreparedSource::from_bytes(&rejected, Limits::default())
                 .unwrap()
                 .expect("fixture has a Pages root");
             assert!(matches!(
@@ -3393,7 +3352,7 @@ mod tests {
         fs::write(bundle.join("Metadata/DocumentIdentifier"), identifier)?;
         fs::write(bundle.join("Metadata/Properties.plist.bak"), b"decoy")?;
 
-        let generic = PreparedSource::from_path(&bundle)
+        let generic = PreparedSource::from_path(&bundle, Limits::default())
             .unwrap()
             .expect("fixture has a Pages root")
             .__into_pages_semantic_source()
@@ -3489,23 +3448,29 @@ mod tests {
         let root = document(Format::Pages);
         let index = package(&[("Document.iwa", &root)]);
         let outer = package(&[("legacy.pages/Index.zip", &index)]);
-        assert_eq!(bytes(&outer).unwrap(), Some(Format::Pages));
+        assert_eq!(
+            bytes(&outer, Limits::default()).unwrap(),
+            Some(Format::Pages)
+        );
 
         let mixed = package(&[
             ("legacy.pages/Index.zip", &index),
             ("Index/CalculationEngine.iwa", b"iwa"),
         ]);
-        assert!(bytes(&mixed).is_err());
+        assert!(bytes(&mixed, Limits::default()).is_err());
 
         let ambiguous = package(&[("a/Index.zip", &index), ("b/Index.zip", &index)]);
-        assert!(bytes(&ambiguous).is_err());
+        assert!(bytes(&ambiguous, Limits::default()).is_err());
 
         let root = document(Format::Pages);
         let encrypted = package(&[
             ("Index/Document.iwa", &root),
             ("Metadata/.iwpv2", b"encryption metadata"),
         ]);
-        assert!(matches!(bytes(&encrypted), Err(Error::Encrypted)));
+        assert!(matches!(
+            bytes(&encrypted, Limits::default()),
+            Err(Error::Encrypted)
+        ));
     }
 
     #[test]
@@ -3589,7 +3554,7 @@ mod tests {
         let valid = document_package(Format::Pages, &[]);
         let defaults = Limits::default();
         assert_eq!(
-            bytes_with_limits(&valid, defaults).unwrap(),
+            bytes(&valid, defaults).unwrap(),
             Some(Format::Pages)
         );
         assert_eq!(defaults.max_input_bytes(), Limits::HARD_MAX_INPUT_BYTES);
@@ -3602,7 +3567,7 @@ mod tests {
         );
 
         let input_bound = Limits::new(1, 1, 1, 1, 1).unwrap();
-        assert!(bytes_with_limits(&valid, input_bound).is_err());
+        assert!(bytes(&valid, input_bound).is_err());
 
         let stream_bound = Limits::new(
             Limits::HARD_MAX_INPUT_BYTES,
@@ -3612,7 +3577,7 @@ mod tests {
             1,
         )
         .unwrap();
-        assert!(bytes_with_limits(&valid, stream_bound).is_err());
+        assert!(bytes(&valid, stream_bound).is_err());
     }
 
     #[test]
@@ -3633,12 +3598,15 @@ mod tests {
     fn reader_restores_nonzero_cursor_on_success_and_rejection() {
         let mut valid = Cursor::new(document_package(Format::Pages, &[]));
         valid.set_position(9);
-        assert_eq!(reader(&mut valid).unwrap(), Some(Format::Pages));
+        assert_eq!(
+            reader(&mut valid, Limits::default()).unwrap(),
+            Some(Format::Pages)
+        );
         assert_eq!(valid.position(), 9);
 
         let mut invalid = Cursor::new(b"not an iWork package".to_vec());
         invalid.set_position(4);
-        assert_eq!(reader(&mut invalid).unwrap(), None);
+        assert_eq!(reader(&mut invalid, Limits::default()).unwrap(), None);
         assert_eq!(invalid.position(), 4);
     }
 
@@ -3648,12 +3616,18 @@ mod tests {
 
         let packaged = temp.0.join("document.pages");
         fs::write(&packaged, document_package(Format::Pages, &[]))?;
-        assert_eq!(path(&packaged).unwrap(), Some(Format::Pages));
+        assert_eq!(
+            path(&packaged, Limits::default()).unwrap(),
+            Some(Format::Pages)
+        );
 
         let legacy = temp.0.join("legacy.key");
         fs::create_dir(&legacy)?;
         fs::write(legacy.join("index.apxl"), [])?;
-        assert_eq!(path(&legacy).unwrap(), Some(Format::Keynote));
+        assert_eq!(
+            path(&legacy, Limits::default()).unwrap(),
+            Some(Format::Keynote)
+        );
 
         let bundle = temp.0.join("sheet.numbers");
         fs::create_dir(&bundle)?;
@@ -3661,7 +3635,10 @@ mod tests {
             bundle.join("Index.zip"),
             document_package(Format::Numbers, &["Index/CalculationEngine-174.iwa"]),
         )?;
-        assert_eq!(path(&bundle).unwrap(), Some(Format::Numbers));
+        assert_eq!(
+            path(&bundle, Limits::default()).unwrap(),
+            Some(Format::Numbers)
+        );
 
         let agreeing = temp.0.join("agreeing.pages");
         fs::create_dir(&agreeing)?;
@@ -3670,7 +3647,10 @@ mod tests {
             agreeing.join("Index.zip"),
             document_package(Format::Pages, &[]),
         )?;
-        assert_eq!(path(&agreeing).unwrap(), Some(Format::Pages));
+        assert_eq!(
+            path(&agreeing, Limits::default()).unwrap(),
+            Some(Format::Pages)
+        );
 
         let unpacked = temp.0.join("unpacked.key");
         fs::create_dir_all(unpacked.join("Index"))?;
@@ -3679,11 +3659,14 @@ mod tests {
             document(Format::Keynote),
         )?;
         fs::write(unpacked.join("Index/Slide-1.iwa"), [])?;
-        assert_eq!(path(&unpacked).unwrap(), Some(Format::Keynote));
+        assert_eq!(
+            path(&unpacked, Limits::default()).unwrap(),
+            Some(Format::Keynote)
+        );
 
         let tight = Limits::new(1, 1, 1, 1, 1).unwrap();
-        assert!(path_with_limits(&packaged, tight).is_err());
-        assert!(path_with_limits(&unpacked, tight).is_err());
+        assert!(path(&packaged, tight).is_err());
+        assert!(path(&unpacked, tight).is_err());
         Ok(())
     }
 
@@ -3703,7 +3686,7 @@ mod tests {
             Limits::HARD_MAX_IWA_STREAM_SIZE,
         )
         .unwrap();
-        let error = path_with_limits(&unpacked, limits).unwrap_err();
+        let error = path(&unpacked, limits).unwrap_err();
         assert!(error.to_string().contains("more than the 1 entry limit"));
         Ok(())
     }
@@ -3725,7 +3708,7 @@ mod tests {
             Limits::HARD_MAX_IWA_STREAM_SIZE,
         )
         .unwrap();
-        let error = path_with_limits(&unpacked, limits).unwrap_err();
+        let error = path(&unpacked, limits).unwrap_err();
         assert!(error.to_string().contains("iWork index directory contains"));
         assert!(error.to_string().contains("byte limit"));
         Ok(())
@@ -3738,20 +3721,20 @@ mod tests {
         let generic = temp.0.join("generic");
         fs::create_dir_all(generic.join("Index"))?;
         fs::write(generic.join("Index/Unknown.iwa"), [])?;
-        assert!(path(&generic).is_err());
+        assert!(path(&generic, Limits::default()).is_err());
 
         let media = temp.0.join("media-only");
         fs::create_dir_all(media.join("Data"))?;
         fs::create_dir(media.join("Assets"))?;
         fs::write(media.join("theme-preview.jpg"), [])?;
-        assert_eq!(path(&media).unwrap(), None);
+        assert_eq!(path(&media, Limits::default()).unwrap(), None);
 
         let conflict = temp.0.join("conflict");
         fs::create_dir_all(conflict.join("Index"))?;
         fs::write(conflict.join("Index/Document.iwa"), document(Format::Pages))?;
         fs::write(conflict.join("Index/Slide.iwa"), [])?;
         fs::write(conflict.join("Index/CalculationEngine.iwa"), [])?;
-        assert!(path(&conflict).is_err());
+        assert!(path(&conflict, Limits::default()).is_err());
 
         let legacy_conflict = temp.0.join("legacy-conflict");
         fs::create_dir(&legacy_conflict)?;
@@ -3760,7 +3743,7 @@ mod tests {
             legacy_conflict.join("Index.zip"),
             document_package(Format::Numbers, &[]),
         )?;
-        assert!(path(&legacy_conflict).is_err());
+        assert!(path(&legacy_conflict, Limits::default()).is_err());
 
         let representation_conflict = temp.0.join("representation-conflict");
         fs::create_dir_all(representation_conflict.join("Index"))?;
@@ -3773,7 +3756,7 @@ mod tests {
             document(Format::Keynote),
         )?;
         fs::write(representation_conflict.join("Index/Slide-1.iwa"), [])?;
-        assert!(path(&representation_conflict).is_err());
+        assert!(path(&representation_conflict, Limits::default()).is_err());
         Ok(())
     }
 

@@ -202,7 +202,7 @@ impl PackageLimits {
 
     /// Build checked package-ingress ceilings.
     pub fn new(max_entries: usize, max_entry_bytes: u64, max_total_bytes: u64) -> Result<Self> {
-        Self::new_with_limits(
+        Self::from_values(
             Self::MAX_INPUT_BYTES,
             max_entries,
             max_entry_bytes,
@@ -213,7 +213,7 @@ impl PackageLimits {
 
     /// Build checked package-ingress ceilings, including filesystem and IWA
     /// decompression budgets.
-    pub fn new_with_limits(
+    pub fn from_values(
         max_input_bytes: u64,
         max_entries: usize,
         max_entry_bytes: u64,
@@ -1494,7 +1494,7 @@ mod tests {
         let compressed =
             SnappyStream::compress(&archive().to_bytes(Default::default())?, Default::default())?;
         let source = zip(&[("Index/Document.iwa", &compressed)]);
-        let profile = PackageLimits::new_with_limits(8_192, 2, 1_024, 4_096, 2_048)?;
+        let profile = PackageLimits::from_values(8_192, 2, 1_024, 4_096, 2_048)?;
         let package = Package::from_bytes_with_limits(&source, profile)?;
         let cached = package.parsed_archive("Index/Document.iwa")?;
         let weak = Arc::downgrade(&cached);
@@ -1701,7 +1701,7 @@ mod tests {
         assert!(PackageLimits::new(1, 0, 1).is_err());
         assert!(PackageLimits::new(1, 1, 0).is_err());
         assert!(
-            PackageLimits::new_with_limits(
+            PackageLimits::from_values(
                 0,
                 PackageLimits::MAX_ENTRIES,
                 PackageLimits::MAX_ENTRY_BYTES,
@@ -1711,11 +1711,11 @@ mod tests {
             .is_err()
         );
         assert!(
-            PackageLimits::new_with_limits(PackageLimits::MAX_INPUT_BYTES + 1, 1, 1, 1, 1,)
+            PackageLimits::from_values(PackageLimits::MAX_INPUT_BYTES + 1, 1, 1, 1, 1,)
                 .is_err()
         );
         assert!(
-            PackageLimits::new_with_limits(
+            PackageLimits::from_values(
                 PackageLimits::MAX_INPUT_BYTES,
                 1,
                 1,
