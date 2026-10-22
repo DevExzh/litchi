@@ -1618,14 +1618,20 @@ impl Patch {
         Ok(bytes)
     }
 
-    /// Decode and fully validate a deterministic patch envelope.
+    /// Decode and fully validate a deterministic patch envelope under the
+    /// caller's required raw BIFF12 policy.
+    ///
+    /// The raw policy embedded in the envelope is the producer's profile. It
+    /// is intersected with `raw_limits` before either image is admitted, so a
+    /// wire profile can never authorize a wider read than the caller chose.
     ///
     /// # Errors
     ///
     /// Returns an error for an unknown version, truncation, trailing bytes,
     /// exceeded limits, or invalid before/after worksheet images.
-    pub fn from_bytes(data: &[u8], limits: TransferLimits) -> Result<Self> {
+    pub fn from_bytes(data: &[u8], limits: TransferLimits, raw_limits: RawLimits) -> Result<Self> {
         limits.validate()?;
+        raw_limits.validate()?;
         if data.len() > limits.bytes {
             return Err(Error::InvalidLength {
                 expected: limits.bytes,
@@ -1664,7 +1670,17 @@ impl Patch {
                 found: data.len(),
             });
         }
-        let worksheet_limits = Limits::new(lengths[2], lengths[3], lengths[4], lengths[5]);
+        let wire_limits = Limits::new(lengths[2], lengths[3], lengths[4], lengths[5]);
+        wire_limits.validate()?;
+        let worksheet_limits = Limits::new(
+            wire_limits.source_bytes(),
+            wire_limits.cells(),
+            wire_limits.raw().payload().min(raw_limits.payload()),
+            wire_limits
+                .raw()
+                .string_units()
+                .min(raw_limits.string_units()),
+        );
         worksheet_limits.validate()?;
         let before = Arc::from(data[offset..end_before].to_vec());
         let after = Arc::from(data[end_before..end_after].to_vec());
@@ -3810,7 +3826,12 @@ mod tests {
         left_edit.set_number(left_ref, 10.0).expect("left edit");
         let left = left_edit.commit().expect("left commit").patch().clone();
         let encoded = left.to_bytes(TransferLimits::DEFAULT).expect("serialize");
-        let decoded = Patch::from_bytes(&encoded, TransferLimits::DEFAULT).expect("decode");
+        let decoded = Patch::from_bytes(
+            &encoded,
+            TransferLimits::DEFAULT,
+            crate::raw::Limits::DEFAULT,
+        )
+        .expect("decode");
         assert_eq!(decoded.apply(&before).expect("apply"), left.after());
 
         let mut right_edit = base.draft();
@@ -3858,6 +3879,40 @@ mod tests {
         let undone = history.undo(&after).expect("undo");
         assert_eq!(undone, before);
         assert_eq!(history.redo(&undone).expect("redo"), after);
+    }
+
+    #[test]
+    fn durable_transfer_decode_uses_the_callers_raw_policy() {
+        let before = stream();
+        let base = read(&before).expect("base");
+        let reference = Reference::new(3, 2).expect("reference");
+        let mut edit = base.draft();
+        edit.set_number(reference, 12.0).expect("edit");
+        let patch = edit.commit().expect("commit").patch().clone();
+        let encoded = patch.to_bytes(TransferLimits::DEFAULT).expect("serialize");
+
+        let fitting = Patch::from_bytes(
+            &encoded,
+            TransferLimits::DEFAULT,
+            RawLimits::new(RawLimits::DEFAULT.payload(), 4),
+        )
+        .expect("four-unit strings fit the caller policy");
+        assert_eq!(fitting.apply(&before).expect("apply"), patch.after());
+
+        let error = Patch::from_bytes(
+            &encoded,
+            TransferLimits::DEFAULT,
+            RawLimits::new(RawLimits::DEFAULT.payload(), 3),
+        )
+        .expect_err("the caller policy rejects the four-unit rich string");
+        assert!(matches!(
+            error,
+            Error::Wire(crate::raw::Error::StringLimit {
+                units: 4,
+                limit: 3,
+                ..
+            })
+        ));
     }
 
     #[test]

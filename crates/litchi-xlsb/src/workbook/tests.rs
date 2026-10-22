@@ -120,10 +120,14 @@ fn durable_patch_decode_can_opt_into_skipped_drawing_projection() {
 }
 
 #[test]
-fn durable_patch_rejects_a_broader_decode_policy_on_a_narrower_owner() {
+fn durable_patch_replays_when_decoded_policy_is_wider_but_content_fits_owner() {
     let workbook = generated_workbook();
     let package = workbook.to_package();
-    let commit = package.edit().unwrap().commit().unwrap();
+    let mut edit = package.edit().unwrap();
+    edit.set_sheet_name(0, "Renamed".to_owned())
+        .expect("stage sheet rename")
+        .expect("worksheet selector");
+    let commit = edit.commit().unwrap();
     let encoded = commit
         .patch()
         .to_bytes(crate::cell_values::TransferLimits::DEFAULT)
@@ -138,8 +142,57 @@ fn durable_patch_rejects_a_broader_decode_policy_on_a_narrower_owner() {
         broad_raw,
     )
     .unwrap();
-    let error = package.apply(&decoded).unwrap_err();
-    assert!(matches!(error, crate::package::PackageError::Refused(_)));
+    let applied = package
+        .apply(&decoded)
+        .expect("the after image fits the recipient raw policy")
+        .into_package();
+    assert_eq!(
+        applied.to_bytes().expect("applied bytes"),
+        commit.package().to_bytes().expect("committed bytes")
+    );
+}
+
+#[test]
+fn durable_patch_rejects_after_image_that_exceeds_recipient_raw_policy() {
+    let workbook = generated_workbook();
+    let source = workbook.to_package().to_bytes().expect("source bytes");
+    let broad = crate::Package::from_bytes_with_options(
+        &source,
+        crate::OpenOptions::new().raw_limits(crate::raw::Limits::DEFAULT),
+    )
+    .expect("broad owner");
+    // The generated workbook's initial metadata uses seven UTF-16 units. The
+    // narrow recipient admits that base but not the eight-unit replacement.
+    let narrow_raw = crate::raw::Limits::new(crate::raw::Limits::DEFAULT.payload(), 7);
+    let narrow = crate::Package::from_bytes_with_options(
+        &source,
+        crate::OpenOptions::new().raw_limits(narrow_raw),
+    )
+    .expect("narrow owner admits the before image");
+    let mut edit = broad.edit().unwrap();
+    edit.set_sheet_name(0, "Renamed8".to_owned())
+        .expect("stage sheet rename")
+        .expect("worksheet selector");
+    let commit = edit.commit().unwrap();
+    let encoded = commit
+        .patch()
+        .to_bytes(crate::cell_values::TransferLimits::DEFAULT)
+        .unwrap();
+    let decoded = crate::cell_values::structure::Patch::from_bytes(
+        &encoded,
+        crate::cell_values::TransferLimits::DEFAULT,
+        crate::raw::Limits::DEFAULT,
+    )
+    .unwrap();
+    let error = narrow.apply(&decoded).unwrap_err();
+    assert!(matches!(
+        error,
+        crate::package::PackageError::Wire(crate::raw::Error::StringLimit {
+            units: 8,
+            limit: 7,
+            ..
+        })
+    ));
 }
 
 #[test]

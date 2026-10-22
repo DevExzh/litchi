@@ -1633,6 +1633,12 @@ impl Patch {
         let limits = package.opc_package().read_limits();
         // An owned image publishes its exact bytes, so an applied (or
         // inverted) patch reproduces its after image byte for byte.
+        // The workbook projection below re-admits every BIFF12 record under
+        // the recipient's retained raw policy. A patch's decode profile
+        // describes how its wire image was read; it is not a reason to reject
+        // an equal-content image whose actual resources fit this owner. Keep
+        // the owned OPC path here: it preserves the exact source/provenance
+        // publication bytes used by the original package commit path.
         let candidate = litchi_opc::OpcPackage::from_vec_with_limits(self.after.to_vec(), limits)?;
         let workbook = package.project_candidate(candidate)?;
         validate_all_worksheets(&workbook)?;
@@ -1640,7 +1646,6 @@ impl Patch {
     }
 
     pub(crate) fn apply_to_package(&self, package: &crate::Package) -> Result<crate::Package> {
-        ensure_replay_raw_policy(package, self.raw_limits)?;
         if package.to_bytes()?.as_slice() != self.before.as_ref() {
             return Err(Error::refused(
                 litchi_core::edit::RefusalKind::UnsupportedContent,
@@ -1688,7 +1693,6 @@ impl Patch {
     #[cfg(test)]
     pub(crate) fn apply(&self, workbook: &mut Workbook) -> Result<()> {
         let package = crate::Package::from_workbook(workbook);
-        ensure_replay_raw_policy(&package, self.raw_limits)?;
         if workbook_bytes(workbook)?.as_slice() != self.before.as_ref() {
             return Err(Error::refused(
                 litchi_core::edit::RefusalKind::UnsupportedContent,
@@ -2324,20 +2328,6 @@ fn replay_package(
         workbook.into_package()
     };
     Ok((bytes, package))
-}
-
-fn ensure_replay_raw_policy(package: &crate::Package, patch_limits: RawLimits) -> Result<()> {
-    let owner_limits = package.raw_limits_value();
-    if patch_limits.payload() > owner_limits.payload()
-        || patch_limits.string_units() > owner_limits.string_units()
-    {
-        return Err(Error::refused(
-            litchi_core::edit::RefusalKind::InvalidValue,
-            "apply",
-            "workbook patch raw policy exceeds the recipient policy",
-        ));
-    }
-    Ok(())
 }
 
 fn canonicalize_legacy_operations(
