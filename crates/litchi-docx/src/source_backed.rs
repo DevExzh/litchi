@@ -1355,6 +1355,7 @@ impl Package {
             variables::ensure_source_backed_rewrite_safe(
                 current.snapshot.xml_bytes(),
                 current.snapshot.variables(),
+                &current.snapshot.limits(),
             )?;
         }
         Ok((current.partname, target.shared_xml()))
@@ -2200,14 +2201,15 @@ impl Package {
         }
         let data = settings_part.data()?;
         let raw = data.into_arc()?;
-        if raw.len() > variables::MAX_DOCUMENT_VARIABLE_XML_BYTES {
+        let variable_limits = variables::raw::Limits::default();
+        if raw.len() > variable_limits.max_xml_bytes() {
             return Err(Error::InvalidFormat(format!(
                 "settings XML exceeds the {} byte document-variable limit",
-                variables::MAX_DOCUMENT_VARIABLE_XML_BYTES
+                variable_limits.max_xml_bytes()
             )));
         }
         admit_settings_source(raw.as_slice(), operation)?;
-        let policy = variables::inspect_source_policy(raw.as_slice())?;
+        let policy = variables::inspect_source_policy(raw.as_slice(), &variable_limits)?;
         let settings_strict = relationship.reltype() == STRICT_SETTINGS;
         let root_strict = policy.dialect == variables::SettingsDialect::Strict;
         if package_strict != Some(settings_strict) || settings_strict != root_strict {
@@ -2221,6 +2223,7 @@ impl Package {
             snapshot: variables::Snapshot::from_source_xml(
                 raw,
                 self.physical_package()?.source_version()?,
+                variable_limits,
             )?,
             protected: policy.protected,
             unique_inbound_owner: inbound_owners == 1,

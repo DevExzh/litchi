@@ -386,7 +386,14 @@ fn document_variable_transactions_admit_every_fixture() {
         let snapshot = package
             .document_variables_snapshot()
             .unwrap_or_else(|error| panic!("{name}: {error}"));
-        assert!(snapshot.try_edit().is_ok(), "{name}");
+        assert!(
+            litchi_docx::variables::raw::Tree::from_xml(
+                snapshot.xml_bytes().to_vec(),
+                litchi_docx::variables::raw::Limits::default(),
+            )
+            .is_ok(),
+            "{name}"
+        );
     }
 }
 

@@ -4,6 +4,8 @@
 )]
 use crate::{Error, Result};
 
+use super::raw::Limits;
+
 /// Maximum number of document variables accepted by the bounded codec.
 pub const MAX_DOCUMENT_VARIABLES: usize = 4096;
 /// Maximum XML input accepted by the bounded document-variable codec.
@@ -83,9 +85,18 @@ impl Variables {
         name: impl Into<String>,
         value: impl Into<String>,
     ) -> Result<Option<String>> {
+        self.insert_with_limits(name, value, &Limits::default())
+    }
+
+    pub(crate) fn insert_with_limits(
+        &mut self,
+        name: impl Into<String>,
+        value: impl Into<String>,
+        limits: &Limits,
+    ) -> Result<Option<String>> {
         let name = name.into();
         let value = value.into();
-        validate_document_variable(&name, &value)?;
+        validate_document_variable_with_limits(&name, &value, limits)?;
         if let Some((_, existing)) = self
             .variables
             .iter_mut()
@@ -93,9 +104,10 @@ impl Variables {
         {
             return Ok(Some(std::mem::replace(existing, value)));
         }
-        if self.variables.len() >= MAX_DOCUMENT_VARIABLES {
+        if self.variables.len() >= limits.max_variables() {
             return Err(invalid(format!(
-                "document variables exceed the {MAX_DOCUMENT_VARIABLES} entry limit"
+                "document variables exceed the {} entry limit",
+                limits.max_variables()
             )));
         }
         self.variables
@@ -128,22 +140,33 @@ impl Variables {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn validate(&self) -> Result<()> {
-        if self.variables.len() > MAX_DOCUMENT_VARIABLES {
+        self.validate_with_limits(&Limits::default())
+    }
+
+    pub(crate) fn validate_with_limits(&self, limits: &Limits) -> Result<()> {
+        if self.variables.len() > limits.max_variables() {
             return Err(invalid(format!(
-                "document variables exceed the {MAX_DOCUMENT_VARIABLES} entry limit"
+                "document variables exceed the {} entry limit",
+                limits.max_variables()
             )));
         }
         for (name, value) in &self.variables {
-            validate_document_variable(name, value)?;
+            validate_document_variable_with_limits(name, value, limits)?;
         }
         Ok(())
     }
 
-    pub(super) fn push_parsed(&mut self, name: String, value: String) -> Result<()> {
-        validate_document_variable(&name, &value)?;
-        if self.variables.len() >= MAX_DOCUMENT_VARIABLES {
+    pub(super) fn push_parsed_with_limits(
+        &mut self,
+        name: String,
+        value: String,
+        limits: &Limits,
+    ) -> Result<()> {
+        validate_document_variable_with_limits(&name, &value, limits)?;
+        if self.variables.len() >= limits.max_variables() {
             return Err(invalid(format!(
-                "document variables exceed the {MAX_DOCUMENT_VARIABLES} entry limit"
+                "document variables exceed the {} entry limit",
+                limits.max_variables()
             )));
         }
         self.variables
@@ -177,16 +200,18 @@ impl Default for Variables {
     }
 }
 
-fn validate_document_variable(name: &str, value: &str) -> Result<()> {
+fn validate_document_variable_with_limits(name: &str, value: &str, limits: &Limits) -> Result<()> {
     let name_chars = name.chars().count();
-    if !(1..=MAX_DOCUMENT_VARIABLE_NAME_CHARS).contains(&name_chars) {
+    if !(1..=limits.max_name_chars()).contains(&name_chars) {
         return Err(invalid(format!(
-            "document variable name must contain 1 to {MAX_DOCUMENT_VARIABLE_NAME_CHARS} characters"
+            "document variable name must contain 1 to {} characters",
+            limits.max_name_chars()
         )));
     }
-    if value.chars().count() > MAX_DOCUMENT_VARIABLE_VALUE_CHARS {
+    if value.chars().count() > limits.max_value_chars() {
         return Err(invalid(format!(
-            "document variable value exceeds {MAX_DOCUMENT_VARIABLE_VALUE_CHARS} characters"
+            "document variable value exceeds {} characters",
+            limits.max_value_chars()
         )));
     }
     Ok(())
