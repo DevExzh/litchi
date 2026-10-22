@@ -308,7 +308,13 @@ fn real_fixture_structural_crud_and_length_changing_formula_and_string_reopen() 
             formula_ref,
             StyleIndex::new(0).expect("style"),
             Value::FormulaNumberCache(2.0),
-            CellFormula::new(0, vec![0x1E, 2, 0], vec![]).expect("integer formula"),
+            CellFormula::new(
+                0,
+                vec![0x1E, 2, 0],
+                vec![],
+                litchi_xlsb::raw::Limits::DEFAULT,
+            )
+            .expect("integer formula"),
         )
         .expect("insert formula");
     let created = create.commit().expect("create commit");
@@ -326,7 +332,13 @@ fn real_fixture_structural_crud_and_length_changing_formula_and_string_reopen() 
     change
         .set_formula(
             formula_ref,
-            CellFormula::new(0x0002, number_formula, vec![]).expect("number formula"),
+            CellFormula::new(
+                0x0002,
+                number_formula,
+                vec![],
+                litchi_xlsb::raw::Limits::DEFAULT,
+            )
+            .expect("number formula"),
         )
         .expect("length-changing formula tokens");
     change

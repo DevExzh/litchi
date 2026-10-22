@@ -474,7 +474,12 @@ where
             let _ = self.iter.fill_buffer(&mut self.buf)?;
             match typ {
                 kind::BEGIN_CF_RULE => {
-                    let mut rule = Rule::parse_with_context(&self.buf, base, self.formula_context)?;
+                    let mut rule = Rule::parse_with_context(
+                        &self.buf,
+                        base,
+                        self.formula_context,
+                        self.raw_limits,
+                    )?;
                     if formatting
                         .rules
                         .iter()
@@ -531,6 +536,7 @@ where
                         &self.buf,
                         base,
                         self.formula_context,
+                        self.raw_limits,
                     )?;
                     let signed_priority = rule
                         .extension14
@@ -716,7 +722,8 @@ where
                             val: "duplicate record",
                         });
                     }
-                    rule.classic_extension_guid = Some(parse_rule_extension_guid(&self.buf)?);
+                    rule.classic_extension_guid =
+                        Some(parse_rule_extension_guid(&self.buf, self.raw_limits)?);
                 },
                 kind::END_CF_RULE => {
                     if !self.buf.is_empty() {
@@ -768,8 +775,9 @@ where
                     &self.buf,
                     base,
                     self.formula_context,
+                    self.raw_limits,
                 )?),
-                kind::COLOR => colors.push(Color::parse(&self.buf)?),
+                kind::COLOR => colors.push(Color::parse(&self.buf, self.raw_limits)?),
                 kind::END_COLOR_SCALE if self.buf.is_empty() => break,
                 _ => {
                     return Err(Error::Unrecognized {
@@ -836,10 +844,15 @@ where
             let typ = self.iter.read_type()?;
             let _ = self.iter.fill_buffer(&mut self.buf)?;
             match typ {
-                kind::CFVO14 if colors.is_empty() => cfvos.push(
-                    Value::parse_extension14_with_context(&self.buf, base, self.formula_context)?,
-                ),
-                kind::COLOR14 => colors.push(Color::parse_extension14(&self.buf)?),
+                kind::CFVO14 if colors.is_empty() => {
+                    cfvos.push(Value::parse_extension14_with_context(
+                        &self.buf,
+                        base,
+                        self.formula_context,
+                        self.raw_limits,
+                    )?)
+                },
+                kind::COLOR14 => colors.push(Color::parse_extension14(&self.buf, self.raw_limits)?),
                 kind::END_COLOR_SCALE14 if self.buf.is_empty() => break,
                 _ => {
                     return Err(Error::Unrecognized {
@@ -870,8 +883,11 @@ where
                     &self.buf,
                     base,
                     self.formula_context,
+                    self.raw_limits,
                 )?),
-                kind::COLOR if color.is_none() => color = Some(Color::parse(&self.buf)?),
+                kind::COLOR if color.is_none() => {
+                    color = Some(Color::parse(&self.buf, self.raw_limits)?)
+                },
                 kind::END_DATABAR if self.buf.is_empty() => break,
                 _ => {
                     return Err(Error::Unrecognized {
@@ -919,7 +935,7 @@ where
         base: (u32, u32),
         priority: i32,
     ) -> Result<Bar14> {
-        let header = Bar14::parse_header(begin)?;
+        let header = Bar14::parse_header(begin, self.raw_limits)?;
         let mut cfvos = Vec::new();
         let mut colors = Vec::new();
         loop {
@@ -927,10 +943,15 @@ where
             let typ = self.iter.read_type()?;
             let _ = self.iter.fill_buffer(&mut self.buf)?;
             match typ {
-                kind::CFVO14 if colors.is_empty() => cfvos.push(
-                    Value::parse_extension14_with_context(&self.buf, base, self.formula_context)?,
-                ),
-                kind::COLOR14 => colors.push(Color::parse_extension14(&self.buf)?),
+                kind::CFVO14 if colors.is_empty() => {
+                    cfvos.push(Value::parse_extension14_with_context(
+                        &self.buf,
+                        base,
+                        self.formula_context,
+                        self.raw_limits,
+                    )?)
+                },
+                kind::COLOR14 => colors.push(Color::parse_extension14(&self.buf, self.raw_limits)?),
                 kind::END_DATABAR14 if self.buf.is_empty() => break,
                 _ => {
                     return Err(Error::Unrecognized {
@@ -1024,6 +1045,7 @@ where
                     &self.buf,
                     base,
                     self.formula_context,
+                    self.raw_limits,
                 )?),
                 kind::END_ICON_SET if self.buf.is_empty() => break,
                 _ => {
@@ -1062,7 +1084,7 @@ where
         begin: &[u8],
         base: (u32, u32),
     ) -> Result<IconSet14> {
-        let header = IconSet14::parse_header(begin)?;
+        let header = IconSet14::parse_header(begin, self.raw_limits)?;
         let expected = icon_count14(header.icon_set_type);
         let mut cfvos = Vec::new();
         let mut icons = Vec::new();
@@ -1071,10 +1093,15 @@ where
             let typ = self.iter.read_type()?;
             let _ = self.iter.fill_buffer(&mut self.buf)?;
             match typ {
-                kind::CFVO14 if icons.is_empty() => cfvos.push(
-                    Value::parse_extension14_with_context(&self.buf, base, self.formula_context)?,
-                ),
-                kind::CF_ICON => icons.push(Icon::parse(&self.buf)?),
+                kind::CFVO14 if icons.is_empty() => {
+                    cfvos.push(Value::parse_extension14_with_context(
+                        &self.buf,
+                        base,
+                        self.formula_context,
+                        self.raw_limits,
+                    )?)
+                },
+                kind::CF_ICON => icons.push(Icon::parse(&self.buf, self.raw_limits)?),
                 kind::END_ICON_SET14 if self.buf.is_empty() => break,
                 _ => {
                     return Err(Error::Unrecognized {

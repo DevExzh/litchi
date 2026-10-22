@@ -760,7 +760,8 @@ fn range_from_formula(formula: &ParsedFormula) -> Result<Range> {
             "binding formula root must use the REFERENCE operand class",
         ));
     }
-    let tokens = Parser::with_extra(&formula.rgce, &formula.rgcb).parse()?;
+    let tokens =
+        Parser::with_extra(&formula.rgce, &formula.rgcb, crate::raw::Limits::DEFAULT).parse()?;
     if tokens.len() != 1 {
         return Err(invalid(
             "BrtWebExtension",

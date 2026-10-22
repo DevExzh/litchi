@@ -75,9 +75,10 @@ impl<F: FormulaBinary> Validation<F> {
             )?;
         }
         let base = (ranges[0].0, ranges[0].2);
-        let parsed_formula1 = render_formula(formula1_binary.as_ref(), base, formula_context)?;
+        let parsed_formula1 =
+            render_formula(formula1_binary.as_ref(), base, formula_context, limits)?;
         let formula1 = list_formula.clone().or(parsed_formula1);
-        let formula2 = render_formula(formula2_binary.as_ref(), base, formula_context)?;
+        let formula2 = render_formula(formula2_binary.as_ref(), base, formula_context, limits)?;
 
         Ok(Self {
             validation_type,
@@ -192,8 +193,8 @@ impl<F: FormulaBinary> Validation<F> {
         let formula1_binary = if has_first { formulas.next() } else { None };
         let formula2_binary = if has_second { formulas.next() } else { None };
         let base = (ranges[0].0, ranges[0].2);
-        let formula1 = render_formula(formula1_binary.as_ref(), base, formula_context)?;
-        let formula2 = render_formula(formula2_binary.as_ref(), base, formula_context)?;
+        let formula1 = render_formula(formula1_binary.as_ref(), base, formula_context, limits)?;
+        let formula2 = render_formula(formula2_binary.as_ref(), base, formula_context, limits)?;
 
         Ok(Self {
             validation_type,
@@ -352,12 +353,14 @@ fn render_formula<F: FormulaBinary, R: Resolution>(
     formula: Option<&F>,
     base: (u32, u32),
     context: &R,
+    limits: crate::raw::Limits,
 ) -> Result<Option<String>> {
     let Some(formula) = formula else {
         return Ok(None);
     };
     let tokens =
-        Parser::with_base_cell_and_extra(formula.rgce(), formula.rgcb(), base.0, base.1).parse()?;
+        Parser::with_base_cell_and_extra(formula.rgce(), formula.rgcb(), base.0, base.1, limits)
+            .parse()?;
     Ok(Some(Compiler::try_tokens_to_string_with_resolution(
         &tokens, context,
     )?))

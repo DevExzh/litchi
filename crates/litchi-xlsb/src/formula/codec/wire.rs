@@ -28,6 +28,32 @@ fn read_bytes(data: &[u8], offset: usize, length: usize) -> Result<&[u8]> {
     })
 }
 
+/// Refuse a stream or output longer than the caller's raw payload ceiling.
+fn admit_len(length: usize, limits: crate::raw::Limits) -> Result<()> {
+    if length > limits.payload() {
+        return Err(crate::raw::Error::PayloadLimit {
+            length,
+            limit: limits.payload(),
+            offset: 0,
+        }
+        .into());
+    }
+    Ok(())
+}
+
+/// Refuse an emitted string longer than the caller's UTF-16-unit ceiling.
+fn admit_units(units: usize, limits: crate::raw::Limits) -> Result<()> {
+    if units > limits.string_units() {
+        return Err(crate::raw::Error::StringLimit {
+            units,
+            limit: limits.string_units(),
+            offset: 0,
+        }
+        .into());
+    }
+    Ok(())
+}
+
 pub(super) fn read_u16_le_at(data: &[u8], offset: usize) -> Result<u16> {
     let bytes = read_bytes(data, offset, 2)?;
     Ok(u16::from_le_bytes([bytes[0], bytes[1]]))
@@ -41,8 +67,13 @@ pub(super) fn read_f64_le_at(data: &[u8], offset: usize) -> Result<f64> {
 }
 
 impl ParsedFormula {
-    /// Parse a `ParsedFormula`, returning the structure and bytes consumed.
-    pub fn parse(data: &[u8]) -> Result<(Self, usize)> {
+    /// Parse a `ParsedFormula` under an explicit raw profile, returning the
+    /// structure and bytes consumed.
+    ///
+    /// Both declared stream lengths are admitted against `limits` before the
+    /// streams are copied.
+    pub fn parse(data: &[u8], limits: crate::raw::Limits) -> Result<(Self, usize)> {
+        let limits = limits.validate()?;
         if data.len() < 4 {
             return Err(Error::InvalidLength {
                 expected: 4,
@@ -54,6 +85,7 @@ impl ParsedFormula {
         if cce > MAX_CELL_FORMULA_BYTES {
             return Err(Error::InvalidFormula("cell formula token length exceeds"));
         }
+        admit_len(cce, limits)?;
         let cb_offset = 4usize
             .checked_add(cce)
             .ok_or(Error::InvalidFormula("cell formula token length overflow"))?;
@@ -65,6 +97,7 @@ impl ParsedFormula {
         }
 
         let cb = read_u32_le_at(data, cb_offset)? as usize;
+        admit_len(cb, limits)?;
         let end = cb_offset
             .checked_add(4)
             .and_then(|offset| offset.checked_add(cb))
@@ -87,8 +120,10 @@ impl ParsedFormula {
         ))
     }
 
-    /// Serialize this formula with its two length prefixes.
-    pub fn to_bytes(&self) -> Result<Vec<u8>> {
+    /// Serialize this formula with its two length prefixes under an explicit
+    /// raw output profile.
+    pub fn to_bytes(&self, limits: crate::raw::Limits) -> Result<Vec<u8>> {
+        let limits = limits.validate()?;
         if self.rgce.len() > MAX_CELL_FORMULA_BYTES {
             return Err(Error::InvalidFormula("cell formula token length exceeds"));
         }
@@ -96,6 +131,12 @@ impl ParsedFormula {
             .map_err(|_| Error::InvalidFormula("formula is too large"))?;
         let cb = u32::try_from(self.rgcb.len())
             .map_err(|_| Error::InvalidFormula("formula ancillary data is too large"))?;
+        admit_len(
+            8_usize
+                .saturating_add(self.rgce.len())
+                .saturating_add(self.rgcb.len()),
+            limits,
+        )?;
         let mut bytes = Vec::with_capacity(8 + self.rgce.len() + self.rgcb.len());
         bytes.extend_from_slice(&cce.to_le_bytes());
         bytes.extend_from_slice(&self.rgce);
@@ -139,7 +180,9 @@ impl ParsedFormula {
 }
 
 impl Group {
-    pub fn parse_array(data: &[u8]) -> Result<Self> {
+    /// Parse a `BrtArrFmla` payload under an explicit raw profile.
+    pub fn parse_array(data: &[u8], limits: crate::raw::Limits) -> Result<Self> {
+        admit_len(data.len(), limits.validate()?)?;
         if data.len() < 17 {
             return Err(Error::InvalidLength {
                 expected: 17,
@@ -149,8 +192,8 @@ impl Group {
         if data[16] & !1 != 0 {
             return Err(Error::InvalidFormula("BrtArrFmla has reserved flag bits"));
         }
-        let range = Range::parse_binary(data)?;
-        let (formula, consumed) = ParsedFormula::parse(&data[17..])?;
+        let range = Range::parse_binary(data, limits)?;
+        let (formula, consumed) = ParsedFormula::parse(&data[17..], limits)?;
         if 17 + consumed != data.len() {
             return Err(Error::InvalidFormula("BrtArrFmla has trailing bytes"));
         }
@@ -162,15 +205,17 @@ impl Group {
         })
     }
 
-    pub fn parse_shared(data: &[u8]) -> Result<Self> {
+    /// Parse a `BrtShrFmla` payload under an explicit raw profile.
+    pub fn parse_shared(data: &[u8], limits: crate::raw::Limits) -> Result<Self> {
+        admit_len(data.len(), limits.validate()?)?;
         if data.len() < 16 {
             return Err(Error::InvalidLength {
                 expected: 16,
                 found: data.len(),
             });
         }
-        let range = Range::parse_binary(data)?;
-        let (formula, consumed) = ParsedFormula::parse(&data[16..])?;
+        let range = Range::parse_binary(data, limits)?;
+        let (formula, consumed) = ParsedFormula::parse(&data[16..], limits)?;
         if 16 + consumed != data.len() {
             return Err(Error::InvalidFormula("BrtShrFmla has trailing bytes"));
         }
@@ -182,10 +227,12 @@ impl Group {
         })
     }
 
-    pub fn to_record_data(&self) -> Result<Vec<u8>> {
+    /// Serialize the group record payload under an explicit raw output profile.
+    pub fn to_record_data(&self, limits: crate::raw::Limits) -> Result<Vec<u8>> {
         self.range.validate()?;
-        let formula = self.formula.to_bytes()?;
+        let formula = self.formula.to_bytes(limits)?;
         let flag_len = usize::from(self.kind == GroupKind::Array);
+        admit_len((16 + flag_len).saturating_add(formula.len()), limits)?;
         let mut data = Vec::with_capacity(16 + flag_len + formula.len());
         data.extend_from_slice(&self.range.to_binary());
         if self.kind == GroupKind::Array {
@@ -201,7 +248,7 @@ impl Token {
     ///
     /// The first vector is the `Rgce` token and the second is its corresponding
     /// `RgbExtra` payload. Other token families are intentionally rejected.
-    pub fn to_extended_binary(&self) -> Result<(Vec<u8>, Vec<u8>)> {
+    pub fn to_extended_binary(&self, limits: crate::raw::Limits) -> Result<(Vec<u8>, Vec<u8>)> {
         match self {
             Self::PivotName(index) => {
                 let mut token = Vec::with_capacity(6);
@@ -209,7 +256,7 @@ impl Token {
                 token.extend_from_slice(&index.to_le_bytes());
                 Ok((token, Vec::new()))
             },
-            Self::TableReference(reference) => reference.to_extended_binary(),
+            Self::TableReference(reference) => reference.to_extended_binary(limits),
             _ => Err(Error::InvalidFormula(
                 "token is not an extended PtgList/PtgSxName token",
             )),
@@ -218,7 +265,10 @@ impl Token {
 }
 
 impl TableReference {
-    pub fn to_extended_binary(&self) -> Result<(Vec<u8>, Vec<u8>)> {
+    /// Encode this `PtgList` token and its `RgbExtra` payload under an
+    /// explicit raw output profile.
+    pub fn to_extended_binary(&self, limits: crate::raw::Limits) -> Result<(Vec<u8>, Vec<u8>)> {
+        let limits = limits.validate()?;
         let external = self.external.as_ref();
         if self.invalid {
             if self.row_type.is_some()
@@ -300,15 +350,20 @@ impl TableReference {
         token.extend_from_slice(&first.to_le_bytes());
         token.extend_from_slice(&last.to_le_bytes());
         let extra = external
-            .map(write_extra_list)
+            .map(|reference| write_extra_list(reference, limits))
             .transpose()?
             .unwrap_or_default();
+        admit_len(extra.len(), limits)?;
         Ok((token, extra))
     }
 }
 
-fn write_extra_list(reference: &ExternalTableReference) -> Result<Vec<u8>> {
+fn write_extra_list(
+    reference: &ExternalTableReference,
+    limits: crate::raw::Limits,
+) -> Result<Vec<u8>> {
     let table_units = reference.table.encode_utf16().count();
+    admit_units(table_units, limits)?;
     if table_units == 0 || table_units >= 256 {
         return Err(Error::InvalidFormula(
             "PtgExtraList table length is outside 1255",
@@ -324,19 +379,25 @@ fn write_extra_list(reference: &ExternalTableReference) -> Result<Vec<u8>> {
         TableNamedColumns::All => {},
         TableNamedColumns::One(name) => {
             extra.extend([0, 0, 1]);
-            write_sxos(&mut extra, false, name)?;
+            write_sxos(&mut extra, false, name, limits)?;
         },
         TableNamedColumns::Range { first, last } => {
             extra.extend([0, 0, 2]);
-            write_sxos(&mut extra, true, first)?;
-            write_sxos(&mut extra, false, last)?;
+            write_sxos(&mut extra, true, first, limits)?;
+            write_sxos(&mut extra, false, last, limits)?;
         },
     }
     Ok(extra)
 }
 
-fn write_sxos(output: &mut Vec<u8>, not_last: bool, name: &str) -> Result<()> {
+fn write_sxos(
+    output: &mut Vec<u8>,
+    not_last: bool,
+    name: &str,
+    limits: crate::raw::Limits,
+) -> Result<()> {
     let units = name.encode_utf16().count();
+    admit_units(units, limits)?;
     if units == 0 || units > 1_048_576 {
         return Err(Error::InvalidFormula(
             "structured-reference column length is outside 11048576",

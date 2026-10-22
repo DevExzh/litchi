@@ -18,12 +18,12 @@ use super::super::semantic::{
 };
 use super::super::{Error, Result, invalid};
 use super::wire::{
-    CfCursor, cell_reference, parse_cell_reference, parse_formula_header, parse_sqref_header,
-    serialize_formula_header, serialize_sqref_header, write_nullable_string,
+    CfCursor, admit_payload, cell_reference, parse_cell_reference, parse_formula_header,
+    parse_sqref_header, serialize_formula_header, serialize_sqref_header, write_nullable_string,
 };
 
 impl Value {
-    pub fn parse(data: &[u8]) -> Result<Self> {
+    pub fn parse(data: &[u8], limits: crate::raw::Limits) -> Result<Self> {
         if data.len() < 24 {
             return Err(Error::InvalidLength {
                 expected: 24,
@@ -31,15 +31,16 @@ impl Value {
             });
         }
         let context = EmptyFormulaResolution;
-        Self::parse_with_context(data, (0, 0), &context)
+        Self::parse_with_context(data, (0, 0), &context, limits)
     }
 
     pub fn parse_with_context(
         data: &[u8],
         base: (u32, u32),
         context: &impl Resolution,
+        limits: crate::raw::Limits,
     ) -> Result<Self> {
-        let mut cursor = CfCursor::new(data, "BrtCFVO");
+        let mut cursor = CfCursor::new(data, "BrtCFVO", limits)?;
         let cfvo_type = u8::try_from(cursor.read_u32()?)
             .map_err(|_| invalid("BrtCFVO", "CFVO type overflow"))?;
         if !matches!(cfvo_type, 1 | 2 | 3 | 4 | 5 | 7) {
@@ -75,7 +76,7 @@ impl Value {
             return Err(invalid("BrtCFVO", "formula threshold omits its formula"));
         }
         let value = if let Some(formula) = &formula_binary {
-            Some(render_formula(formula, base, context)?)
+            Some(render_formula(formula, base, context, limits)?)
         } else if matches!(cfvo_type, 1 | 4 | 5) {
             Some(format_number(numeric_value))
         } else {
@@ -92,18 +93,19 @@ impl Value {
     }
 
     /// Parse an Office 2013 `BrtCFVO14` record.
-    pub fn parse_extension14(data: &[u8]) -> Result<Self> {
+    pub fn parse_extension14(data: &[u8], limits: crate::raw::Limits) -> Result<Self> {
         let context = EmptyFormulaResolution;
-        Self::parse_extension14_with_context(data, (0, 0), &context)
+        Self::parse_extension14_with_context(data, (0, 0), &context, limits)
     }
 
     pub fn parse_extension14_with_context(
         data: &[u8],
         base: (u32, u32),
         context: &impl Resolution,
+        limits: crate::raw::Limits,
     ) -> Result<Self> {
-        let (formulas, header_size) = parse_formula_header(data, "BrtCFVO14", 1)?;
-        let mut cursor = CfCursor::new(&data[header_size..], "BrtCFVO14");
+        let (formulas, header_size) = parse_formula_header(data, "BrtCFVO14", 1, limits)?;
+        let mut cursor = CfCursor::new(&data[header_size..], "BrtCFVO14", limits)?;
         let cfvo_type = u8::try_from(cursor.read_u32()?)
             .map_err(|_| invalid("BrtCFVO14", "CFVO type overflow"))?;
         if !matches!(cfvo_type, 1 | 2 | 3 | 4 | 5 | 7 | 8 | 9) {
@@ -144,7 +146,7 @@ impl Value {
             return Err(invalid("BrtCFVO14", "percentage parameter outside 0..=100"));
         }
         let value = if let Some(formula) = &formula_binary {
-            Some(render_formula(formula, base, context)?)
+            Some(render_formula(formula, base, context, limits)?)
         } else if matches!(cfvo_type, 1 | 4 | 5) {
             Some(format_number(numeric_value))
         } else {
@@ -161,11 +163,12 @@ impl Value {
     }
 
     /// Serialize an Office 2013 `BrtCFVO14` payload using its binary formula.
-    pub fn serialize_extension14(&self) -> Result<Vec<u8>> {
+    pub fn serialize_extension14(&self, limits: crate::raw::Limits) -> Result<Vec<u8>> {
         self.serialize_extension14_with(
             self.formula_binary.as_ref(),
             self.numeric_value,
             self.save_greater_than_or_equal,
+            limits,
         )
     }
 
@@ -174,6 +177,7 @@ impl Value {
         formula_binary: Option<&ParsedFormula>,
         numeric_value: f64,
         save_greater_than_or_equal: bool,
+        limits: crate::raw::Limits,
     ) -> Result<Vec<u8>> {
         if !matches!(self.cfvo_type, 1 | 2 | 3 | 4 | 5 | 7 | 8 | 9) {
             return Err(invalid("BrtCFVO14", "invalid type"));
@@ -197,7 +201,7 @@ impl Value {
             return Err(invalid("BrtCFVO14", "formula threshold omits its formula"));
         }
         let formulas = formula_binary.map_or(&[][..], std::slice::from_ref);
-        let mut data = serialize_formula_header(formulas, 1)?;
+        let mut data = serialize_formula_header(formulas, 1, limits)?;
         data.extend_from_slice(&u32::from(self.cfvo_type).to_le_bytes());
         data.extend_from_slice(&numeric_value.to_le_bytes());
         data.extend_from_slice(&u32::from(save_greater_than_or_equal).to_le_bytes());
@@ -207,6 +211,7 @@ impl Value {
                 .map_err(|_| Error::InvalidFormula("formula is too large"))?
                 .to_le_bytes(),
         );
+        admit_payload(data.len(), limits)?;
         Ok(data)
     }
 }
@@ -226,7 +231,9 @@ impl Color {
         })
     }
 
-    pub fn parse(data: &[u8]) -> Result<Self> {
+    /// Parse a fixed 8-byte `Color` under an explicit raw profile.
+    pub fn parse(data: &[u8], limits: crate::raw::Limits) -> Result<Self> {
+        admit_payload(data.len(), limits)?;
         if data.len() != 8 {
             return Err(Error::InvalidLength {
                 expected: 8,
@@ -266,7 +273,7 @@ impl Color {
         })
     }
 
-    pub fn to_bytes(self) -> Result<[u8; 8]> {
+    pub fn to_bytes(self, limits: crate::raw::Limits) -> Result<[u8; 8]> {
         if self.color_type > 3 || (self.color_type == 3 && self.index > 0x0b) {
             return Err(invalid("BrtColor", "invalid color type or theme index"));
         }
@@ -276,7 +283,7 @@ impl Color {
         if self.color_type != 2 && self.argb.is_some() {
             return Err(invalid("BrtColor", "non-direct color has an ARGB value"));
         }
-        let parsed_raw = Self::parse(&self.raw).ok();
+        let parsed_raw = Self::parse(&self.raw, limits).ok();
         if parsed_raw.as_ref().is_some_and(|raw| {
             raw.color_type == self.color_type
                 && raw.index == self.index
@@ -307,7 +314,7 @@ impl Color {
     }
 
     /// Parse an Office 2013 `BrtColor14` payload.
-    pub fn parse_extension14(data: &[u8]) -> Result<Self> {
+    pub fn parse_extension14(data: &[u8], limits: crate::raw::Limits) -> Result<Self> {
         if data.len() != 12 {
             return Err(Error::InvalidLength {
                 expected: 12,
@@ -317,13 +324,14 @@ impl Color {
         if data[..4] != [0; 4] {
             return Err(invalid("BrtColor14", "nonzero FRTBlank"));
         }
-        Self::parse(&data[4..])
+        Self::parse(&data[4..], limits)
     }
 
     /// Serialize an Office 2013 `BrtColor14` payload.
-    pub fn serialize_extension14(self) -> Result<[u8; 12]> {
+    pub fn serialize_extension14(self, limits: crate::raw::Limits) -> Result<[u8; 12]> {
         let mut data = [0; 12];
-        data[4..].copy_from_slice(&self.to_bytes()?);
+        data[4..].copy_from_slice(&self.to_bytes(limits)?);
+        admit_payload(data.len(), limits)?;
         Ok(data)
     }
 }
@@ -351,8 +359,8 @@ impl AxisPosition14 {
 }
 
 impl Bar14 {
-    pub fn parse_header(data: &[u8]) -> Result<BarHeader14> {
-        let mut cursor = CfCursor::new(data, "BrtBeginDatabar14");
+    pub fn parse_header(data: &[u8], limits: crate::raw::Limits) -> Result<BarHeader14> {
+        let mut cursor = CfCursor::new(data, "BrtBeginDatabar14", limits)?;
         if cursor.read_u32()? != 0 {
             return Err(invalid("BrtBeginDatabar14", "nonzero FRTBlank"));
         }
@@ -385,7 +393,7 @@ impl Bar14 {
         })
     }
 
-    pub fn serialize_header(&self) -> Result<Vec<u8>> {
+    pub fn serialize_header(&self, limits: crate::raw::Limits) -> Result<Vec<u8>> {
         if self.min_length > self.max_length
             || self.max_length > 100
             || self.unused_flags & 0x0f != 0
@@ -407,13 +415,14 @@ impl Bar14 {
             self.axis_position as u8,
         ]);
         data.extend_from_slice(&flags.to_le_bytes());
+        admit_payload(data.len(), limits)?;
         Ok(data)
     }
 }
 
 impl Icon {
-    pub fn parse(data: &[u8]) -> Result<Self> {
-        let mut cursor = CfCursor::new(data, "BrtCFIcon");
+    pub fn parse(data: &[u8], limits: crate::raw::Limits) -> Result<Self> {
+        let mut cursor = CfCursor::new(data, "BrtCFIcon", limits)?;
         if cursor.read_u32()? != 0 {
             return Err(invalid("BrtCFIcon", "nonzero FRTBlank"));
         }
@@ -426,11 +435,13 @@ impl Icon {
         Ok(value)
     }
 
-    pub fn serialize(self) -> Result<[u8; 12]> {
+    /// Serialize the fixed 12-byte `BrtCFIcon` payload under an explicit raw profile.
+    pub fn serialize(self, limits: crate::raw::Limits) -> Result<[u8; 12]> {
         self.validate()?;
         let mut data = [0; 12];
         data[4..8].copy_from_slice(&self.icon_set.to_le_bytes());
         data[8..].copy_from_slice(&self.index.to_le_bytes());
+        admit_payload(data.len(), limits)?;
         Ok(data)
     }
 
@@ -450,8 +461,8 @@ impl Icon {
 }
 
 impl IconSet14 {
-    pub fn parse_header(data: &[u8]) -> Result<IconHeader14> {
-        let mut cursor = CfCursor::new(data, "BrtBeginIconSet14");
+    pub fn parse_header(data: &[u8], limits: crate::raw::Limits) -> Result<IconHeader14> {
+        let mut cursor = CfCursor::new(data, "BrtBeginIconSet14", limits)?;
         if cursor.read_u32()? != 0 {
             return Err(invalid("BrtBeginIconSet14", "nonzero FRTBlank"));
         }
@@ -474,7 +485,7 @@ impl IconSet14 {
         })
     }
 
-    pub fn serialize_header(&self) -> Result<Vec<u8>> {
+    pub fn serialize_header(&self, limits: crate::raw::Limits) -> Result<Vec<u8>> {
         if self.icon_set_type > 19 || self.unused_flags & !0x78 != 0 {
             return Err(invalid("BrtBeginIconSet14", "invalid icon-set header"));
         }
@@ -486,22 +497,24 @@ impl IconSet14 {
         data.extend_from_slice(&0u32.to_le_bytes());
         data.extend_from_slice(&u32::from(self.icon_set_type).to_le_bytes());
         data.extend_from_slice(&flags.to_le_bytes());
+        admit_payload(data.len(), limits)?;
         Ok(data)
     }
 }
 
 impl Rule {
-    pub fn parse(data: &[u8]) -> Result<Self> {
+    pub fn parse(data: &[u8], limits: crate::raw::Limits) -> Result<Self> {
         let context = EmptyFormulaResolution;
-        Self::parse_with_context(data, (0, 0), &context)
+        Self::parse_with_context(data, (0, 0), &context, limits)
     }
 
     pub fn parse_with_context(
         data: &[u8],
         base: (u32, u32),
         context: &impl Resolution,
+        limits: crate::raw::Limits,
     ) -> Result<Self> {
-        let mut cursor = CfCursor::new(data, "BrtBeginCFRule");
+        let mut cursor = CfCursor::new(data, "BrtBeginCFRule", limits)?;
         let rule_type_raw = cursor.read_u32()?;
         let rule_type = RuleType::from_u32(rule_type_raw)
             .ok_or_else(|| invalid("BrtBeginCFRule", "invalid rule type"))?;
@@ -596,7 +609,7 @@ impl Rule {
         for formula in formula_slots.into_iter().flatten() {
             formulas.push(formula.rgce.clone());
             formula_extras.push(formula.rgcb.clone());
-            formula_texts.push(render_formula(&formula, base, context)?);
+            formula_texts.push(render_formula(&formula, base, context, limits)?);
         }
         let operator = (rule_type == RuleType::CellIs)
             .then(|| u8::try_from(parameter).ok())
@@ -635,18 +648,19 @@ impl Rule {
     }
 
     /// Parse an Office 2013 `BrtBeginCFRule14` payload.
-    pub fn parse_extension14(data: &[u8]) -> Result<Self> {
+    pub fn parse_extension14(data: &[u8], limits: crate::raw::Limits) -> Result<Self> {
         let context = EmptyFormulaResolution;
-        Self::parse_extension14_with_context(data, (0, 0), &context)
+        Self::parse_extension14_with_context(data, (0, 0), &context, limits)
     }
 
     pub fn parse_extension14_with_context(
         data: &[u8],
         base: (u32, u32),
         context: &impl Resolution,
+        limits: crate::raw::Limits,
     ) -> Result<Self> {
-        let (formulas, header_size) = parse_formula_header(data, "BrtBeginCFRule14", 2)?;
-        let mut cursor = CfCursor::new(&data[header_size..], "BrtBeginCFRule14");
+        let (formulas, header_size) = parse_formula_header(data, "BrtBeginCFRule14", 2, limits)?;
+        let mut cursor = CfCursor::new(&data[header_size..], "BrtBeginCFRule14", limits)?;
         let rule_type_raw = cursor.read_u32()?;
         let rule_type = RuleType::from_u32(rule_type_raw)
             .ok_or_else(|| invalid("BrtBeginCFRule14", "invalid rule type"))?;
@@ -758,7 +772,7 @@ impl Rule {
         for formula in formula_slots.into_iter().flatten() {
             binary_formulas.push(formula.rgce.clone());
             formula_extras.push(formula.rgcb.clone());
-            formula_texts.push(render_formula(&formula, base, context)?);
+            formula_texts.push(render_formula(&formula, base, context, limits)?);
         }
         let operator = (rule_type == RuleType::CellIs)
             .then(|| u8::try_from(parameter).ok())
@@ -797,7 +811,7 @@ impl Rule {
     }
 
     /// Serialize an Office 2013 `BrtBeginCFRule14` payload.
-    pub fn serialize_extension14(&self) -> Result<Vec<u8>> {
+    pub fn serialize_extension14(&self, limits: crate::raw::Limits) -> Result<Vec<u8>> {
         let metadata = self.extension14.ok_or_else(|| {
             invalid(
                 "BrtBeginCFRule14",
@@ -857,7 +871,7 @@ impl Rule {
         let owned_slots = slots.each_ref().map(|formula| formula.cloned());
         validate_formula_slots(self.rule_type, self.template, parameter, &owned_slots)?;
 
-        let mut payload = serialize_formula_header(&formulas, 2)?;
+        let mut payload = serialize_formula_header(&formulas, 2, limits)?;
         payload.extend_from_slice(&(self.rule_type as u32).to_le_bytes());
         payload.extend_from_slice(&self.template.to_le_bytes());
         let raw_dxf = if metadata.priority == -1 {
@@ -886,22 +900,37 @@ impl Rule {
         payload.extend_from_slice(&metadata.unused.to_le_bytes());
         payload.extend_from_slice(&metadata.guid);
         payload.extend_from_slice(&u32::from(metadata.guid_present).to_le_bytes());
-        write_nullable_string(&mut payload, self.text.as_deref())?;
+        write_nullable_string(&mut payload, self.text.as_deref(), limits)?;
+        admit_payload(payload.len(), limits)?;
         Ok(payload)
     }
 }
 
 impl Formatting {
     /// Parse an Office 2013 `BrtBeginConditionalFormatting14` payload.
-    pub fn parse_extension14_header(data: &[u8]) -> Result<(Self, u32)> {
-        let (formatting, count, _) = Self::parse_extension14_header_with_base(data)?;
+    pub fn parse_extension14_header(
+        data: &[u8],
+        limits: crate::raw::Limits,
+    ) -> Result<(Self, u32)> {
+        let (formatting, count, _) = Self::parse_extension14_header_with_base(data, limits)?;
         Ok((formatting, count))
     }
 
-    pub fn parse_extension14_header_with_base(data: &[u8]) -> Result<(Self, u32, (u32, u32))> {
-        let (ranges, header_size) =
-            parse_sqref_header(data, "BrtBeginConditionalFormatting14", i32::MAX as usize)?;
-        let mut cursor = CfCursor::new(&data[header_size..], "BrtBeginConditionalFormatting14");
+    pub fn parse_extension14_header_with_base(
+        data: &[u8],
+        limits: crate::raw::Limits,
+    ) -> Result<(Self, u32, (u32, u32))> {
+        let (ranges, header_size) = parse_sqref_header(
+            data,
+            "BrtBeginConditionalFormatting14",
+            i32::MAX as usize,
+            limits,
+        )?;
+        let mut cursor = CfCursor::new(
+            &data[header_size..],
+            "BrtBeginConditionalFormatting14",
+            limits,
+        )?;
         let count = cursor.read_u32()?;
         let pivot_only = cursor.read_bool32()?;
         cursor.finish()?;
@@ -931,7 +960,7 @@ impl Formatting {
     }
 
     /// Serialize an Office 2013 `BrtBeginConditionalFormatting14` payload.
-    pub fn serialize_extension14_header(&self) -> Result<Vec<u8>> {
+    pub fn serialize_extension14_header(&self, limits: crate::raw::Limits) -> Result<Vec<u8>> {
         let mut ranges = Vec::new();
         for range_list in &self.ranges {
             for range in range_list
@@ -944,19 +973,23 @@ impl Formatting {
                 ranges.push((first_row, last_row, first_col, last_col));
             }
         }
-        let mut data = serialize_sqref_header(&ranges)?;
+        let mut data = serialize_sqref_header(&ranges, limits)?;
         data.extend_from_slice(
             &u32::try_from(self.rules.len())
                 .map_err(|_| invalid("BrtBeginConditionalFormatting14", "rule count overflow"))?
                 .to_le_bytes(),
         );
         data.extend_from_slice(&u32::from(self.pivot_only).to_le_bytes());
+        admit_payload(data.len(), limits)?;
         Ok(data)
     }
 }
 
-pub fn parse_classic_header(data: &[u8]) -> Result<(Formatting, u32, (u32, u32))> {
-    let mut cursor = CfCursor::new(data, "BrtBeginConditionalFormatting");
+pub fn parse_classic_header(
+    data: &[u8],
+    limits: crate::raw::Limits,
+) -> Result<(Formatting, u32, (u32, u32))> {
+    let mut cursor = CfCursor::new(data, "BrtBeginConditionalFormatting", limits)?;
     let count = cursor.read_u32()?;
     let pivot_only = cursor.read_bool32()?;
     let ranges = cursor.read_ranges(1, 8_192)?;

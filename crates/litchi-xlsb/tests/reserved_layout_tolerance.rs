@@ -93,7 +93,7 @@ fn name_record(flags: u32, name: &str) -> Vec<u8> {
             rgce: vec![litchi_xlsb::ptg_types::PTG_INT, 1, 0],
             rgcb: Vec::new(),
         }
-        .to_bytes()
+        .to_bytes(litchi_xlsb::raw::Limits::DEFAULT)
         .unwrap(),
     );
     data.extend_from_slice(&u32::MAX.to_le_bytes());

@@ -160,8 +160,9 @@ impl Cell {
         formula: ParsedFormula,
         formula_flags: u16,
         formula_context: &Context,
+        raw_limits: crate::raw::Limits,
     ) -> Result<Self> {
-        let resolution = Parser::with_extra(&formula.rgce, &formula.rgcb)
+        let resolution = Parser::with_extra(&formula.rgce, &formula.rgcb, raw_limits)
             .parse()
             .map_err(Error::from)
             .and_then(|tokens| {
@@ -213,16 +214,18 @@ impl Cell {
         formula_flags: u16,
         group: Arc<Group>,
         formula_context: &Context,
+        raw_limits: crate::raw::Limits,
     ) -> Result<Self> {
         let resolution = match group.kind {
             GroupKind::Array => {
-                Parser::with_extra(&group.formula.rgce, &group.formula.rgcb).parse()
+                Parser::with_extra(&group.formula.rgce, &group.formula.rgcb, raw_limits).parse()
             },
             GroupKind::Shared => Parser::with_base_cell_and_extra(
                 &group.formula.rgce,
                 &group.formula.rgcb,
                 row,
                 header.col,
+                raw_limits,
             )
             .parse(),
         }
@@ -692,6 +695,7 @@ mod tests {
             formula,
             0x0002,
             &Context::default(),
+            crate::raw::Limits::DEFAULT,
         )
         .unwrap();
 
@@ -738,6 +742,7 @@ mod tests {
             formula,
             0,
             &Context::default(),
+            crate::raw::Limits::DEFAULT,
         )
         .unwrap();
 
@@ -766,6 +771,7 @@ mod tests {
             formula,
             0,
             &Context::default(),
+            crate::raw::Limits::DEFAULT,
         )
         .unwrap();
 
@@ -791,6 +797,7 @@ mod tests {
             },
             0,
             &Context::default(),
+            crate::raw::Limits::DEFAULT,
         );
 
         assert!(matches!(result, Err(Error::InvalidFormula(_))));
@@ -809,6 +816,7 @@ mod tests {
             formula,
             0,
             &Context::default(),
+            crate::raw::Limits::DEFAULT,
         )
         .unwrap();
 
@@ -877,6 +885,7 @@ mod tests {
             0x0002,
             Arc::new(resolved_group.clone()),
             &context,
+            crate::raw::Limits::DEFAULT,
         )
         .unwrap();
         assert_eq!(
@@ -929,6 +938,7 @@ mod tests {
             0,
             Arc::new(opaque_group.clone()),
             &context,
+            crate::raw::Limits::DEFAULT,
         )
         .unwrap();
         assert_eq!(

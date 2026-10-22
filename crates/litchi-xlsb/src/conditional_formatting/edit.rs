@@ -143,12 +143,14 @@ const FONT_HEIGHT: u16 = 0x0024;
 
 impl DifferentialStyle {
     /// Decode a `BrtDXF` payload ([MS-XLSB] sections 2.4.356, 2.5.159 and
-    /// 2.5.164).
+    /// 2.5.164) under an explicit raw profile.
     ///
     /// # Errors
     ///
-    /// Returns an error for a truncated property array.
-    pub fn parse(payload: &[u8]) -> Result<Self> {
+    /// Returns an error for a truncated property array, a payload above the
+    /// profile's payload ceiling or a font name above its UTF-16-unit ceiling.
+    pub fn parse(payload: &[u8], limits: crate::raw::Limits) -> Result<Self> {
+        let limits = admit_payload(payload.len(), limits)?;
         let short = || invalid("a differential format is truncated");
         let u16_at = |offset: usize| -> Result<u16> {
             payload
@@ -196,6 +198,13 @@ impl DifferentialStyle {
                     });
                 },
                 FONT_NAME => {
+                    if let Some(count) = data.get(..2) {
+                        admit_units(
+                            usize::from(u16::from_le_bytes([count[0], count[1]])),
+                            limits,
+                            offset + 4,
+                        )?;
+                    }
                     style.name = data.get(..2).and_then(|count| {
                         let units = usize::from(u16::from_le_bytes([count[0], count[1]]));
                         let text = data.get(2..2 + units * 2)?;
@@ -217,13 +226,15 @@ impl DifferentialStyle {
         Ok(style)
     }
 
-    /// Encode as a `BrtDXF` payload.
+    /// Encode as a `BrtDXF` payload under an explicit raw output profile.
     ///
     /// # Errors
     ///
     /// Returns an error for a color above `0xFFFFFF`, a size outside 1–409.55
-    /// points, or a font name longer than 32 characters.
-    pub fn encode(&self) -> Result<Vec<u8>> {
+    /// points, a font name longer than 32 characters, or output above the
+    /// profile's payload or UTF-16-unit ceilings.
+    pub fn encode(&self, limits: crate::raw::Limits) -> Result<Vec<u8>> {
+        let limits = limits.validate()?;
         let mut props: Vec<(u16, Vec<u8>)> = Vec::new();
         let color = |rgb: u32| -> Result<Vec<u8>> {
             if rgb > 0x00FF_FFFF {
@@ -244,6 +255,7 @@ impl DifferentialStyle {
             if units.is_empty() || units.len() > 32 {
                 return Err(invalid("a differential font name has 1 to 32 characters"));
             }
+            admit_units(units.len(), limits, 0)?;
             let mut data = u16::try_from(units.len())
                 .map_err(|_overflow| invalid("font name"))?
                 .to_le_bytes()
@@ -292,8 +304,36 @@ impl DifferentialStyle {
             payload.extend_from_slice(&size.to_le_bytes());
             payload.extend_from_slice(&data);
         }
+        admit_payload(payload.len(), limits)?;
         Ok(payload)
     }
+}
+
+/// Validate `limits` and admit a `BrtDXF` payload of `length` bytes.
+fn admit_payload(length: usize, limits: crate::raw::Limits) -> Result<crate::raw::Limits> {
+    let limits = limits.validate()?;
+    if length > limits.payload() {
+        return Err(crate::raw::Error::PayloadLimit {
+            length,
+            limit: limits.payload(),
+            offset: 0,
+        }
+        .into());
+    }
+    Ok(limits)
+}
+
+/// Refuse a font name above the profile's UTF-16-unit ceiling.
+fn admit_units(units: usize, limits: crate::raw::Limits, offset: usize) -> Result<()> {
+    if units > limits.string_units() {
+        return Err(crate::raw::Error::StringLimit {
+            units,
+            limit: limits.string_units(),
+            offset,
+        }
+        .into());
+    }
+    Ok(())
 }
 
 /// A staged conditional-format edit. Dropping it discards it.
@@ -356,7 +396,7 @@ pub(crate) fn read_differentials(
         limits,
     )?
     .iter()
-    .map(|payload| DifferentialStyle::parse(payload))
+    .map(|payload| DifferentialStyle::parse(payload, limits))
     .collect()
 }
 
@@ -411,7 +451,7 @@ impl Edit {
     /// workbook without a styles part, more than [`MAX_DIFFERENTIALS`]
     /// formats, or a changed edit of a signed workbook.
     pub fn add_differential(&mut self, style: &DifferentialStyle) -> Result<u32> {
-        let payload = style.encode()?;
+        let payload = style.encode(self.staged.raw_limits())?;
         let styles = styles_part(self.staged.opc())?
             .ok_or_else(|| invalid("the workbook has no styles part"))?;
         let mut bytes = self.staged.blob(&styles)?.to_vec();
@@ -508,7 +548,7 @@ impl Edit {
         }
         let mut out = Vec::new();
         write_conditional_formattings(
-            &mut Encoder::new(&mut out, crate::raw::Limits::DEFAULT),
+            &mut Encoder::new(&mut out, self.staged.raw_limits()),
             std::slice::from_ref(&format),
         )
         .map_err(map_authoring_error)?;
@@ -669,8 +709,11 @@ mod tests {
             size: Some(11.5),
             name: Some("Calibri".to_owned()),
         };
-        let payload = style.encode().unwrap();
-        assert_eq!(DifferentialStyle::parse(&payload).unwrap(), style);
+        let payload = style.encode(crate::raw::Limits::DEFAULT).unwrap();
+        assert_eq!(
+            DifferentialStyle::parse(&payload, crate::raw::Limits::DEFAULT).unwrap(),
+            style
+        );
     }
 
     #[test]

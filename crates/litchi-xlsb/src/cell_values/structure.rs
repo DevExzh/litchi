@@ -3774,9 +3774,13 @@ fn apply_sheet_removal(workbook: &mut Workbook, positions: &[usize]) -> Result<b
         let snapshot = workbook.cell_values(ordinal.get())?;
         for cell in snapshot.cells() {
             if let Some(formula) = cell.formula() {
-                let tokens = Parser::with_extra(formula.tokens(), formula.ancillary())
-                    .parse()
-                    .map_err(map_formula_error)?;
+                let tokens = Parser::with_extra(
+                    formula.tokens(),
+                    formula.ancillary(),
+                    workbook.raw_limits_value(),
+                )
+                .parse()
+                .map_err(map_formula_error)?;
                 reject_removed_formula_targets(
                     tokens,
                     &removed,
@@ -4681,7 +4685,9 @@ fn reject_name_formula_dependencies(
             })
         })
         .transpose()?;
-    let tokens = Parser::new(formula).parse().map_err(map_formula_error)?;
+    let tokens = Parser::new(formula, raw_limits)
+        .parse()
+        .map_err(map_formula_error)?;
     reject_removed_formula_targets(tokens, removed, context, scope)
 }
 
@@ -4827,6 +4833,7 @@ fn map_formula_error(error: crate::formula::Error) -> Error {
             Error::UnresolvedDependency(dependency)
         },
         crate::formula::Error::Encoding(message) => Error::Encoding(message),
+        crate::formula::Error::Wire(error) => Error::Wire(error),
     }
 }
 

@@ -435,8 +435,13 @@ fn formula_assignment_refuses_transitional_and_strict_calculation_chains() {
             b1(),
             style_zero(),
             Value::FormulaNumberCache(1.0),
-            litchi_xlsb::cell_values::CellFormula::new(0, vec![0x1E, 1, 0], Vec::new())
-                .expect("formula"),
+            litchi_xlsb::cell_values::CellFormula::new(
+                0,
+                vec![0x1E, 1, 0],
+                Vec::new(),
+                litchi_xlsb::raw::Limits::DEFAULT,
+            )
+            .expect("formula"),
         )
         .expect("staged insertion");
         assert!(edit.remove(b1()).expect("cancel insertion"));

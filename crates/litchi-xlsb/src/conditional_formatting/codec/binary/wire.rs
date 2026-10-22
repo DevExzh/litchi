@@ -158,8 +158,9 @@ pub(super) fn parse_sqref_header(
     data: &[u8],
     record: &'static str,
     maximum_ranges: usize,
+    limits: crate::raw::Limits,
 ) -> Result<(Vec<FrtRange>, usize)> {
-    let mut cursor = FrtCursor::new(data, record);
+    let mut cursor = FrtCursor::new(data, record, limits)?;
     if cursor.read_u32()? != 0x02 {
         return Err(invalid(record, "FRTHeader is not sqref-only"));
     }
@@ -193,10 +194,14 @@ pub(super) fn parse_sqref_header(
     Ok((ranges, cursor.offset))
 }
 
-pub(super) fn serialize_sqref_header(ranges: &[FrtRange]) -> Result<Vec<u8>> {
+pub(super) fn serialize_sqref_header(
+    ranges: &[FrtRange],
+    limits: crate::raw::Limits,
+) -> Result<Vec<u8>> {
     if ranges.is_empty() || ranges.len() > i32::MAX as usize {
         return Err(invalid("FRTHeader", "invalid range count"));
     }
+    admit_payload(ranges.len().saturating_mul(16).saturating_add(16), limits)?;
     let mut data = Vec::with_capacity(16 + ranges.len() * 16);
     data.extend_from_slice(&2u32.to_le_bytes());
     data.extend_from_slice(&1u32.to_le_bytes());
@@ -221,8 +226,9 @@ pub(crate) fn parse_formula_header(
     data: &[u8],
     record: &'static str,
     maximum_formulas: usize,
+    limits: crate::raw::Limits,
 ) -> Result<(Vec<ParsedFormula>, usize)> {
-    let mut cursor = FrtCursor::new(data, record);
+    let mut cursor = FrtCursor::new(data, record, limits)?;
     let flags = cursor.read_u32()?;
     if flags & !0x04 != 0 {
         return Err(invalid(record, "invalid FRTHeader flags"));
@@ -250,6 +256,7 @@ pub(crate) fn parse_formula_header(
 pub(super) fn serialize_formula_header(
     formulas: &[ParsedFormula],
     maximum_formulas: usize,
+    limits: crate::raw::Limits,
 ) -> Result<Vec<u8>> {
     if formulas.len() > maximum_formulas {
         return Err(invalid("FRTHeader", "formula count exceeds"));
@@ -284,6 +291,7 @@ pub(super) fn serialize_formula_header(
         data.extend_from_slice(&formula.rgce);
         data.extend_from_slice(&formula.rgcb);
     }
+    admit_payload(data.len(), limits)?;
     Ok(data)
 }
 
@@ -294,12 +302,17 @@ struct FrtCursor<'a> {
 }
 
 impl<'a> FrtCursor<'a> {
-    pub(super) fn new(data: &'a [u8], record: &'static str) -> Self {
-        Self {
+    pub(super) fn new(
+        data: &'a [u8],
+        record: &'static str,
+        limits: crate::raw::Limits,
+    ) -> Result<Self> {
+        admit_payload(data.len(), limits)?;
+        Ok(Self {
             data,
             offset: 0,
             record,
-        }
+        })
     }
 
     fn take(&mut self, count: usize) -> Result<&'a [u8]> {
@@ -350,7 +363,9 @@ impl<'a> FrtCursor<'a> {
     }
 }
 
-pub fn parse_rule_extension_guid(data: &[u8]) -> Result<[u8; 16]> {
+/// Parse the fixed 20-byte `BrtCFRuleExt` payload under an explicit raw profile.
+pub fn parse_rule_extension_guid(data: &[u8], limits: crate::raw::Limits) -> Result<[u8; 16]> {
+    admit_payload(data.len(), limits)?;
     if data.len() != 20 {
         return Err(Error::InvalidLength {
             expected: 20,
@@ -369,12 +384,17 @@ pub fn serialize_rule_extension_guid(guid: [u8; 16]) -> [u8; 20] {
     data
 }
 
-pub(super) fn write_nullable_string(data: &mut Vec<u8>, value: Option<&str>) -> Result<()> {
+pub(super) fn write_nullable_string(
+    data: &mut Vec<u8>,
+    value: Option<&str>,
+    limits: crate::raw::Limits,
+) -> Result<()> {
     let Some(value) = value else {
         data.extend_from_slice(&u32::MAX.to_le_bytes());
         return Ok(());
     };
     let units = value.encode_utf16().collect::<Vec<_>>();
+    admit_units(units.len(), limits, 0)?;
     data.extend_from_slice(
         &u32::try_from(units.len())
             .map_err(|_| invalid("XLNullableWideString", "string length overflow"))?
@@ -390,15 +410,23 @@ pub(crate) struct CfCursor<'a> {
     data: &'a [u8],
     offset: usize,
     record: &'static str,
+    limits: crate::raw::Limits,
 }
 
 impl<'a> CfCursor<'a> {
-    pub(crate) fn new(data: &'a [u8], record: &'static str) -> Self {
-        Self {
+    /// Admit one record payload under the caller's raw profile.
+    pub(crate) fn new(
+        data: &'a [u8],
+        record: &'static str,
+        limits: crate::raw::Limits,
+    ) -> Result<Self> {
+        let limits = admit_payload(data.len(), limits)?;
+        Ok(Self {
             data,
             offset: 0,
             record,
-        }
+            limits,
+        })
     }
 
     fn take(&mut self, size: usize) -> Result<&'a [u8]> {
@@ -476,6 +504,7 @@ impl<'a> CfCursor<'a> {
             return Ok(None);
         }
         let count = count as usize;
+        admit_units(count, self.limits, self.offset.saturating_sub(4))?;
         let bytes = self.take(
             count
                 .checked_mul(2)
@@ -546,4 +575,34 @@ impl<'a> CfCursor<'a> {
             })
         }
     }
+}
+
+/// Validate `limits` and admit one payload or output of `length` bytes.
+pub(crate) fn admit_payload(
+    length: usize,
+    limits: crate::raw::Limits,
+) -> Result<crate::raw::Limits> {
+    let limits = limits.validate()?;
+    if length > limits.payload() {
+        return Err(crate::raw::Error::PayloadLimit {
+            length,
+            limit: limits.payload(),
+            offset: 0,
+        }
+        .into());
+    }
+    Ok(limits)
+}
+
+/// Refuse a declared or emitted string longer than the UTF-16-unit ceiling.
+pub(crate) fn admit_units(units: usize, limits: crate::raw::Limits, offset: usize) -> Result<()> {
+    if units > limits.string_units() {
+        return Err(crate::raw::Error::StringLimit {
+            units,
+            limit: limits.string_units(),
+            offset,
+        }
+        .into());
+    }
+    Ok(())
 }

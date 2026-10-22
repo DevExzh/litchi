@@ -529,7 +529,13 @@ fn ordinary_root_authors_sst_rich_style_and_formula_resources() {
         0,
         formula_ref,
         2.0,
-        CellFormula::new(0, vec![0x1e, 2, 0], vec![]).expect("constant formula"),
+        CellFormula::new(
+            0,
+            vec![0x1e, 2, 0],
+            vec![],
+            litchi_xlsb::raw::Limits::DEFAULT,
+        )
+        .expect("constant formula"),
         &style,
     )
     .expect("formula authoring");
@@ -537,7 +543,13 @@ fn ordinary_root_authors_sst_rich_style_and_formula_resources() {
         0,
         formula_string_ref,
         Value::FormulaStringCache("two".to_string()),
-        CellFormula::new(0, vec![0x1e, 2, 0], vec![]).expect("constant string-cache formula"),
+        CellFormula::new(
+            0,
+            vec![0x1e, 2, 0],
+            vec![],
+            litchi_xlsb::raw::Limits::DEFAULT,
+        )
+        .expect("constant string-cache formula"),
         &style,
     )
     .expect("string-cache formula authoring");
@@ -1087,16 +1099,19 @@ fn durable_transfer_remaps_name_sheet_and_table_formula_dependencies() {
         .expect("unique contextual formula")
         .expect("contextual formula");
     let contextual_formula = contextual.formula().expect("formula payload");
-    let source_xti =
-        Parser::with_extra(contextual_formula.tokens(), contextual_formula.ancillary())
-            .parse()
-            .expect("parse contextual formula")
-            .into_iter()
-            .find_map(|token| match token {
-                Token::CellRef3d { sheet_index, .. } => Some(sheet_index),
-                _ => None,
-            })
-            .expect("Data XTI");
+    let source_xti = Parser::with_extra(
+        contextual_formula.tokens(),
+        contextual_formula.ancillary(),
+        litchi_xlsb::raw::Limits::DEFAULT,
+    )
+    .parse()
+    .expect("parse contextual formula")
+    .into_iter()
+    .find_map(|token| match token {
+        Token::CellRef3d { sheet_index, .. } => Some(sheet_index),
+        _ => None,
+    })
+    .expect("Data XTI");
     let (table_tokens, table_extra) = Token::TableReference(TableReference {
         sheet_index: source_xti,
         row_type: Some(TableRowType::Data),
@@ -1108,7 +1123,7 @@ fn durable_transfer_remaps_name_sheet_and_table_formula_dependencies() {
         list_index: Some(3),
         external: None,
     })
-    .to_extended_binary()
+    .to_extended_binary(litchi_xlsb::raw::Limits::DEFAULT)
     .expect("structured-reference encoding");
     let table_formula_ref = Reference::new(0, 1).expect("table formula reference");
     let rich_ref = Reference::new(0, 2).expect("rich resource reference");
@@ -1136,7 +1151,13 @@ fn durable_transfer_remaps_name_sheet_and_table_formula_dependencies() {
             source_summary,
             table_formula_ref,
             Value::FormulaNumberCache(42.5),
-            CellFormula::new(0, table_tokens, table_extra).expect("table cell formula"),
+            CellFormula::new(
+                0,
+                table_tokens,
+                table_extra,
+                litchi_xlsb::raw::Limits::DEFAULT,
+            )
+            .expect("table cell formula"),
             &rich_style,
         )
         .expect("table formula authoring");
@@ -1184,9 +1205,13 @@ fn durable_transfer_remaps_name_sheet_and_table_formula_dependencies() {
         .expect("name target")
         .formula()
         .expect("name target formula");
-    let name_tokens = Parser::with_extra(name_formula.tokens(), name_formula.ancillary())
-        .parse()
-        .expect("parse remapped name formula");
+    let name_tokens = Parser::with_extra(
+        name_formula.tokens(),
+        name_formula.ancillary(),
+        litchi_xlsb::raw::Limits::DEFAULT,
+    )
+    .parse()
+    .expect("parse remapped name formula");
     assert!(
         name_tokens
             .iter()
@@ -1198,9 +1223,13 @@ fn durable_transfer_remaps_name_sheet_and_table_formula_dependencies() {
         .expect("table target")
         .formula()
         .expect("table target formula");
-    let table_tokens = Parser::with_extra(table_formula.tokens(), table_formula.ancillary())
-        .parse()
-        .expect("parse remapped table formula");
+    let table_tokens = Parser::with_extra(
+        table_formula.tokens(),
+        table_formula.ancillary(),
+        litchi_xlsb::raw::Limits::DEFAULT,
+    )
+    .parse()
+    .expect("parse remapped table formula");
     assert!(table_tokens.iter().any(|token| {
         matches!(
             token,

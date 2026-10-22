@@ -55,7 +55,7 @@ pub(crate) fn read(stream: &[u8], context: &Context, limits: Limits) -> Result<V
             })
             .transpose()?;
         let formula = definition.formula.as_deref().and_then(|rgce| {
-            let tokens = Parser::new(rgce).parse().ok()?;
+            let tokens = Parser::new(rgce, limits).parse().ok()?;
             let context = match scope {
                 Some(sheet) => context.for_sheet(sheet),
                 None => context.clone(),

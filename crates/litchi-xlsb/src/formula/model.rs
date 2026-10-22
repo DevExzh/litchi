@@ -48,7 +48,11 @@ impl Range {
         Self::new(row_first, row_last, col_first, col_last)
     }
 
-    pub fn parse_binary(data: &[u8]) -> Result<Self> {
+    /// Parse a fixed 16-byte `RfX` range under an explicit raw profile.
+    ///
+    /// The width is fixed, so the profile adds no budget beyond its validity.
+    pub fn parse_binary(data: &[u8], limits: crate::raw::Limits) -> Result<Self> {
+        limits.validate()?;
         if data.len() < 16 {
             return Err(Error::InvalidLength {
                 expected: 16,

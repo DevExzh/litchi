@@ -246,7 +246,7 @@ fn sheet_xti(
     Ok(ixti)
 }
 
-fn area_formula(ixti: u16, range: Range) -> Result<Vec<u8>> {
+fn area_formula(ixti: u16, range: Range, raw_limits: crate::raw::Limits) -> Result<Vec<u8>> {
     let first_column = u16::try_from(range.col_first)
         .map_err(|_error| Error::InvalidCellReference("column exceeds the PtgArea3d field"))?;
     let last_column = u16::try_from(range.col_last)
@@ -270,7 +270,7 @@ fn area_formula(ixti: u16, range: Range) -> Result<Vec<u8>> {
         rgce,
         rgcb: Vec::new(),
     }
-    .to_bytes()?)
+    .to_bytes(raw_limits)?)
 }
 
 /// The offset of the formula and the end of the name in a `BrtName`
@@ -344,12 +344,12 @@ pub(super) fn apply(
             let sheet = u32::try_from(sheet)
                 .map_err(|_error| Error::InvalidFormat("sheet position exceeds the Xti field"))?;
             let ixti = sheet_xti(&stream, &records, sheet, &mut splices, raw_limits)?;
-            let formula = area_formula(ixti, range)?;
+            let formula = area_formula(ixti, range, raw_limits)?;
             match existing {
                 Some(index) => {
                     let payload = &stream[records[index].payload.clone()];
                     let start = formula_offset(payload)?;
-                    let (_, consumed) = ParsedFormula::parse(&payload[start..])?;
+                    let (_, consumed) = ParsedFormula::parse(&payload[start..], raw_limits)?;
                     let old = payload
                         .get(start..start + consumed)
                         .ok_or(Error::InvalidFormat("BrtName formula is truncated"))?;

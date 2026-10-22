@@ -123,7 +123,7 @@ pub(crate) fn parse_with(
 
     let formula_start = cursor.position();
     let (parsed_formula, formula_bytes) =
-        ParsedFormula::parse(&data[formula_start..]).map_err(Error::from)?;
+        ParsedFormula::parse(&data[formula_start..], parse_limits).map_err(Error::from)?;
     cursor.skip(formula_bytes)?;
 
     let comment = tolerance.read_nullable_wide_string(&mut cursor, kind::NAME, ordinal)?;

@@ -490,7 +490,12 @@ impl Edit {
                 error
             }
         })?;
-        let formula = CellFormula::new(0x0002, parsed.rgce, parsed.rgcb)?;
+        let formula = CellFormula::new(
+            0x0002,
+            parsed.rgce,
+            parsed.rgcb,
+            self.base.raw_limits_value(),
+        )?;
         self.raw.scalar_assignment_guard(reference)?;
         if self.raw.is_removed(reference) {
             return Err(Error::refused(

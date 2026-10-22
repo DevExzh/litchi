@@ -465,7 +465,8 @@ where
             )?;
             flags &= GRBIT_FMLA_DEFINED;
         }
-        let (formula, consumed) = ParsedFormula::parse(&self.buf[formula_offset..])?;
+        let (formula, consumed) =
+            ParsedFormula::parse(&self.buf[formula_offset..], self.raw_limits)?;
         let trailing = self.buf.len().saturating_sub(formula_offset + consumed);
         tolerance.tolerate_trailing(record_type, row, trailing, || {
             Error::InvalidFormula("formula record has trailing bytes")
@@ -486,8 +487,8 @@ where
         let mut next_data = Vec::new();
         let _ = self.iter.fill_buffer(&mut next_data)?;
         let new_group = match next_type {
-            kind::ARR_FMLA => Some(Group::parse_array(&next_data)?),
-            kind::SHR_FMLA => Some(Group::parse_shared(&next_data)?),
+            kind::ARR_FMLA => Some(Group::parse_array(&next_data, self.raw_limits)?),
+            kind::SHR_FMLA => Some(Group::parse_shared(&next_data, self.raw_limits)?),
             _ => {
                 self.pending_record = Some((next_type, next_data));
                 None
@@ -543,6 +544,7 @@ where
                 parsed.flags,
                 group,
                 self.formula_context,
+                self.raw_limits,
             )?)
         } else if exp_cell.is_some() {
             Err(Error::InvalidFormula(
@@ -556,6 +558,7 @@ where
                 parsed.formula,
                 parsed.flags,
                 self.formula_context,
+                self.raw_limits,
             )?)
         }
     }
@@ -666,13 +669,14 @@ where
                     self.consume_extension_data_validations(count)?;
                 },
                 kind::BEGIN_COND_FORMATTING => {
-                    let (mut formatting, count, base) = parse_classic_header(&self.buf)?;
+                    let (mut formatting, count, base) =
+                        parse_classic_header(&self.buf, self.raw_limits)?;
                     self.consume_conditional_formatting(&mut formatting, count, base)?;
                     self.conditional_formattings.push(formatting);
                 },
                 kind::BEGIN_COND_FORMATTING14 => {
                     let (mut formatting, count, base) =
-                        Formatting::parse_extension14_header_with_base(&self.buf)?;
+                        Formatting::parse_extension14_header_with_base(&self.buf, self.raw_limits)?;
                     self.consume_extension_conditional_formatting(&mut formatting, count, base)?;
                     self.conditional_formattings.push(formatting);
                 },

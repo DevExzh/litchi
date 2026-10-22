@@ -312,7 +312,7 @@ impl Worksheet {
                 GroupKind::Array => kind::ARR_FMLA,
                 GroupKind::Shared => kind::SHR_FMLA,
             };
-            writer.write_record(record_type, &group.to_record_data()?)?;
+            writer.write_record(record_type, &group.to_record_data(writer.limits())?)?;
         }
         Ok(())
     }
@@ -507,7 +507,7 @@ impl Worksheet {
             )?;
             &compiled
         };
-        let formula_bytes = parsed.to_bytes()?;
+        let formula_bytes = parsed.to_bytes(writer.limits())?;
         let cached = cached_value.unwrap_or(&CellValue::Float(0.0));
 
         let mut data = Vec::new();

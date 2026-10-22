@@ -489,9 +489,11 @@ impl CellFormula {
     ///
     /// # Errors
     ///
-    /// Returns an error for reserved flag bits, an oversized token stream, or
-    /// structurally invalid token/ancillary bytes.
-    pub fn new(flags: u16, tokens: Vec<u8>, ancillary: Vec<u8>) -> Result<Self> {
+    /// Returns an error for reserved flag bits, an oversized token stream,
+    /// streams above the caller's raw profile, or structurally invalid
+    /// token/ancillary bytes.
+    pub fn new(flags: u16, tokens: Vec<u8>, ancillary: Vec<u8>, limits: RawLimits) -> Result<Self> {
+        let limits = limits.validate()?;
         let value = Self::from_source(flags, tokens, ancillary)?;
         let encoded_bytes = value
             .tokens
@@ -501,13 +503,13 @@ impl CellFormula {
             .ok_or(Error::CapacityOverflow {
                 resource: "cell formula bytes",
             })?;
-        if encoded_bytes > RawLimits::DEFAULT.payload() {
+        if encoded_bytes > limits.payload() {
             return Err(Error::InvalidLength {
-                expected: RawLimits::DEFAULT.payload(),
+                expected: limits.payload(),
                 found: encoded_bytes,
             });
         }
-        crate::formula::Parser::with_extra(&value.tokens, &value.ancillary).parse()?;
+        crate::formula::Parser::with_extra(&value.tokens, &value.ancillary, limits).parse()?;
         Ok(value)
     }
 
@@ -2075,7 +2077,7 @@ fn scan_source_metadata(source: &[u8], limits: Limits) -> Result<SourceMetadata>
                 let range = record
                     .payload()
                     .get(..16)
-                    .and_then(|payload| Range::parse_binary(payload).ok());
+                    .and_then(|payload| Range::parse_binary(payload, limits.raw).ok());
                 if record.payload().len() < minimum_payload {
                     formula_group_metadata_invalid = true;
                 }
@@ -2084,11 +2086,12 @@ fn scan_source_metadata(source: &[u8], limits: Limits) -> Result<SourceMetadata>
                         if kind != FormulaGroupKind::Table {
                             let parsed = match kind {
                                 FormulaGroupKind::Array => {
-                                    crate::formula::Group::parse_array(record.payload())
+                                    crate::formula::Group::parse_array(record.payload(), limits.raw)
                                 },
-                                FormulaGroupKind::Shared => {
-                                    crate::formula::Group::parse_shared(record.payload())
-                                },
+                                FormulaGroupKind::Shared => crate::formula::Group::parse_shared(
+                                    record.payload(),
+                                    limits.raw,
+                                ),
                                 FormulaGroupKind::Table => unreachable!(),
                             };
                             if parsed.is_err() {
@@ -2247,14 +2250,18 @@ fn parse_value(
             };
             Ok((
                 value,
-                Some(parse_formula(kind_value, payload, 16, row, tolerance)?),
+                Some(parse_formula(
+                    kind_value, payload, 16, row, tolerance, limits,
+                )?),
             ))
         },
         kind::FMLA_BOOL => {
             require_at_least(payload, 19)?;
             Ok((
                 Value::FormulaBooleanCache(parse_bool(payload[8], tolerance, kind_value, row)?),
-                Some(parse_formula(kind_value, payload, 9, row, tolerance)?),
+                Some(parse_formula(
+                    kind_value, payload, 9, row, tolerance, limits,
+                )?),
             ))
         },
         kind::FMLA_ERROR => {
@@ -2263,7 +2270,9 @@ fn parse_value(
                 Value::FormulaErrorCache(CellError::from_code_with(
                     payload[8], tolerance, kind_value, row,
                 )?),
-                Some(parse_formula(kind_value, payload, 9, row, tolerance)?),
+                Some(parse_formula(
+                    kind_value, payload, 9, row, tolerance, limits,
+                )?),
             ))
         },
         _ => Err(Error::InvalidRecordType(kind_value.get())),
@@ -2312,6 +2321,7 @@ fn parse_string_value(
             flags_offset,
             row,
             tolerance,
+            limits,
         )?)
     } else {
         None
@@ -2332,6 +2342,7 @@ fn parse_formula(
     flags_offset: usize,
     row: u32,
     tolerance: &mut Tolerance<'_>,
+    limits: RawLimits,
 ) -> Result<CellFormula> {
     let formula_offset = flags_offset.checked_add(2).ok_or(Error::CapacityOverflow {
         resource: "cell formula offset",
@@ -2350,7 +2361,8 @@ fn parse_formula(
         )?;
         flags &= GRBIT_FMLA_DEFINED;
     }
-    let (parsed, consumed) = crate::formula::ParsedFormula::parse(&payload[formula_offset..])?;
+    let (parsed, consumed) =
+        crate::formula::ParsedFormula::parse(&payload[formula_offset..], limits)?;
     let trailing = payload
         .len()
         .saturating_sub(formula_offset.saturating_add(consumed));
@@ -3724,8 +3736,13 @@ mod tests {
             Value::Number(42.0),
         )
         .expect("insert new row");
-        let replacement_formula =
-            CellFormula::new(0x0002, vec![0x1E, 0x02, 0x00], vec![]).expect("constant formula");
+        let replacement_formula = CellFormula::new(
+            0x0002,
+            vec![0x1E, 0x02, 0x00],
+            vec![],
+            crate::raw::Limits::DEFAULT,
+        )
+        .expect("constant formula");
         edit.set_formula(formula_ref, replacement_formula.clone())
             .expect("formula tokens");
         let commit = edit.commit().expect("commit");

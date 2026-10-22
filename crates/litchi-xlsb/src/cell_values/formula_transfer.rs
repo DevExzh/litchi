@@ -55,9 +55,13 @@ pub(super) fn remap(
         .formula_context
         .for_sheet(target.catalog_position_for_worksheet(target_sheet)?);
     let mut tokens = formula.tokens().to_vec();
-    let parsed = Parser::with_extra(formula.tokens(), formula.ancillary())
-        .parse_spanned()
-        .map_err(formula_error)?;
+    let parsed = Parser::with_extra(
+        formula.tokens(),
+        formula.ancillary(),
+        source.raw_limits_value(),
+    )
+    .parse_spanned()
+    .map_err(formula_error)?;
 
     for (token, span) in parsed {
         match token {
@@ -153,7 +157,12 @@ pub(super) fn remap(
         }
     }
 
-    CellFormula::new(formula.flags(), tokens, formula.ancillary().to_vec())
+    CellFormula::new(
+        formula.flags(),
+        tokens,
+        formula.ancillary().to_vec(),
+        target.raw_limits_value(),
+    )
 }
 
 fn map_name(source: &Workbook, target: &Workbook, index: u32) -> Result<u32> {

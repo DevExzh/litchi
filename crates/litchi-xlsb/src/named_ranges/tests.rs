@@ -22,7 +22,7 @@ fn name_record(flags: u32, ch_key: u8, name: &str) -> Vec<u8> {
             rgce: vec![ptg_types::PTG_INT, 1, 0],
             rgcb: Vec::new(),
         }
-        .to_bytes()
+        .to_bytes(Limits::DEFAULT)
         .unwrap(),
     );
     data.extend_from_slice(&u32::MAX.to_le_bytes());

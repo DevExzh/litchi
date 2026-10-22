@@ -34,7 +34,7 @@ fn bool_formula_worksheet(formula: &ParsedFormula) -> Vec<u8> {
     let mut cell = vec![0; 8];
     cell.push(1);
     cell.extend_from_slice(&0u16.to_le_bytes());
-    cell.extend_from_slice(&formula.to_bytes().unwrap());
+    cell.extend_from_slice(&formula.to_bytes(crate::raw::Limits::DEFAULT).unwrap());
     writer.write_record(kind::FMLA_BOOL, &cell).unwrap();
     writer.write_record(kind::END_SHEET_DATA, &[]).unwrap();
     writer.write_record(kind::END_SHEET, &[]).unwrap();
@@ -376,25 +376,39 @@ fn reads_office_2013_conditional_formatting_visualizations() {
     writer
         .write_record(
             kind::BEGIN_COND_FORMATTING14,
-            &formatting.serialize_extension14_header().unwrap(),
+            &formatting
+                .serialize_extension14_header(crate::raw::Limits::DEFAULT)
+                .unwrap(),
         )
         .unwrap();
 
     writer
         .write_record(
             kind::BEGIN_CF_RULE14,
-            &color_rule.serialize_extension14().unwrap(),
+            &color_rule
+                .serialize_extension14(crate::raw::Limits::DEFAULT)
+                .unwrap(),
         )
         .unwrap();
     writer.write_record(kind::BEGIN_COLOR_SCALE14, &[]).unwrap();
     for threshold in &color_thresholds {
         writer
-            .write_record(kind::CFVO14, &threshold.serialize_extension14().unwrap())
+            .write_record(
+                kind::CFVO14,
+                &threshold
+                    .serialize_extension14(crate::raw::Limits::DEFAULT)
+                    .unwrap(),
+            )
             .unwrap();
     }
     for color in color_records {
         writer
-            .write_record(kind::COLOR14, &color.serialize_extension14().unwrap())
+            .write_record(
+                kind::COLOR14,
+                &color
+                    .serialize_extension14(crate::raw::Limits::DEFAULT)
+                    .unwrap(),
+            )
             .unwrap();
     }
     writer.write_record(kind::END_COLOR_SCALE14, &[]).unwrap();
@@ -403,20 +417,35 @@ fn reads_office_2013_conditional_formatting_visualizations() {
     writer
         .write_record(
             kind::BEGIN_CF_RULE14,
-            &bar_rule.serialize_extension14().unwrap(),
+            &bar_rule
+                .serialize_extension14(crate::raw::Limits::DEFAULT)
+                .unwrap(),
         )
         .unwrap();
     writer
-        .write_record(kind::BEGIN_DATABAR14, &bar.serialize_header().unwrap())
+        .write_record(
+            kind::BEGIN_DATABAR14,
+            &bar.serialize_header(crate::raw::Limits::DEFAULT).unwrap(),
+        )
         .unwrap();
     for threshold in [&bar.min_cfvo, &bar.max_cfvo] {
         writer
-            .write_record(kind::CFVO14, &threshold.serialize_extension14().unwrap())
+            .write_record(
+                kind::CFVO14,
+                &threshold
+                    .serialize_extension14(crate::raw::Limits::DEFAULT)
+                    .unwrap(),
+            )
             .unwrap();
     }
     for color in [bar.positive_color, bar.axis_color].into_iter().flatten() {
         writer
-            .write_record(kind::COLOR14, &color.serialize_extension14().unwrap())
+            .write_record(
+                kind::COLOR14,
+                &color
+                    .serialize_extension14(crate::raw::Limits::DEFAULT)
+                    .unwrap(),
+            )
             .unwrap();
     }
     writer.write_record(kind::END_DATABAR14, &[]).unwrap();
@@ -425,18 +454,27 @@ fn reads_office_2013_conditional_formatting_visualizations() {
     writer
         .write_record(
             kind::BEGIN_CF_RULE14,
-            &icon_rule.serialize_extension14().unwrap(),
+            &icon_rule
+                .serialize_extension14(crate::raw::Limits::DEFAULT)
+                .unwrap(),
         )
         .unwrap();
     writer
         .write_record(
             kind::BEGIN_ICON_SET14,
-            &icon_set.serialize_header().unwrap(),
+            &icon_set
+                .serialize_header(crate::raw::Limits::DEFAULT)
+                .unwrap(),
         )
         .unwrap();
     for threshold in &icon_thresholds {
         writer
-            .write_record(kind::CFVO14, &threshold.serialize_extension14().unwrap())
+            .write_record(
+                kind::CFVO14,
+                &threshold
+                    .serialize_extension14(crate::raw::Limits::DEFAULT)
+                    .unwrap(),
+            )
             .unwrap();
     }
     writer.write_record(kind::END_ICON_SET14, &[]).unwrap();

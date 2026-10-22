@@ -1458,7 +1458,7 @@ fn resolves_external_formula_tokens_from_package_relationships() {
     assert_eq!(link.sheet_names(), &["Data Sheet".to_string()]);
     assert_eq!(link.defined_names()[0].name(), "Rate");
 
-    let reference = Parser::new(&[0x5A, 0, 0, 0, 0, 0, 0, 0, 0])
+    let reference = Parser::new(&[0x5A, 0, 0, 0, 0, 0, 0, 0, 0], crate::raw::Limits::DEFAULT)
         .parse()
         .unwrap();
     assert_eq!(
@@ -1466,7 +1466,9 @@ fn resolves_external_formula_tokens_from_package_relationships() {
             .unwrap(),
         "'[Book.xlsx]Data Sheet'!$A$1"
     );
-    let name = Parser::new(&[0x59, 0, 0, 1, 0, 0, 0]).parse().unwrap();
+    let name = Parser::new(&[0x59, 0, 0, 1, 0, 0, 0], crate::raw::Limits::DEFAULT)
+        .parse()
+        .unwrap();
     assert_eq!(
         Compiler::try_tokens_to_string_with_resolution(&name, &workbook.formula_context).unwrap(),
         "'[Book.xlsx]'!Rate"

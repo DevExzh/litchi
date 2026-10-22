@@ -60,7 +60,7 @@ impl Builder {
 
             temp_writer.write_u32(named_range.sheet_id.unwrap_or(u32::MAX))?;
             temp_writer.write_wide_string(&named_range.name)?;
-            for byte in parsed_formula.to_bytes()? {
+            for byte in parsed_formula.to_bytes(temp_writer.limits())? {
                 temp_writer.write_u8(byte)?;
             }
             temp_writer.write_u32(u32::MAX)?; // NULL comment
