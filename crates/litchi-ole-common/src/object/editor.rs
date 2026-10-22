@@ -286,13 +286,10 @@ impl Edit {
             Arc::clone(&self.state.targets),
             self.state.limits,
             self.state.cfb_limits,
-            // A Package is the immutable publication of this edit.  Its
-            // source identity must therefore be the bytes it publishes,
-            // rather than the editor's older base.  `PackageState::original`
-            // is the editor base and the package's current publication at
-            // the same time, so one handle preserves O(1) source sharing and
-            // lets a later Package::edit use the published content as its
-            // replay base.
+            // A Package is an immutable publication of the supplied source
+            // handle.  Keep that handle separate from the editor's older
+            // copy-through base: the published package owns its capture, and
+            // a later Package::edit records that capture as its new base.
             Arc::clone(&current),
             // A published package is a fresh immutable base. Do not carry
             // the editor's historical base or its `changed` marker into a
