@@ -172,10 +172,11 @@ pub mod shapes;
 
 pub use document::Document;
 pub use drawable_order::DrawableLayerMove;
-pub use media::{EmbeddedMediaAsset, MediaAsset, MediaAssetId, MediaManager, MediaStats};
-pub use litchi_iwa_archive::LimitKind;
 pub use litchi_core::edit::Diagnostics;
-pub use package::{Commit, Edit, Package, Patch};
+pub use litchi_iwa_archive::LimitKind;
+pub use litchi_iwa_archive::package::Patch;
+pub use media::{EmbeddedMediaAsset, MediaAsset, MediaAssetId, MediaManager, MediaStats};
+pub use package::{Commit, Edit, Package};
 /// The host package under its crate-internal name, distinct from the leaf
 /// crates' `Package` types that host modules import alongside it.
 pub(crate) use package::Package as HostPackage;

@@ -9,7 +9,7 @@ the body-storage exclusion and slot-preservation contract reachable in every
 campaign while still letting mutations vary physical object order, drawable
 permutations, unknown fields, preview payloads, and the requested movement.
 
-The target runs `Package::from_bytes_with_limits`, reads the semantic handles,
+The target runs `Package::from_bytes_with_options`, reads the semantic handles,
 stages either a selector move or an exact handle permutation, reopens the
 candidate, checks native order and body-slot invariants, and applies the
 source-bound inverse when a commit succeeds. It also probes arbitrary bounded
