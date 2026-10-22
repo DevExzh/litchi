@@ -3539,13 +3539,13 @@ impl RevisionEditor {
         Ok(())
     }
 
-    /// Publishes a final pending CHPX edit by transferring the owned stream
-    /// buffers into the object editor. `finish_unchecked` consumes the
-    /// revision editor, so retaining the clone-first `commit` above for every
-    /// reusable edit would only copy these buffers once more immediately
-    /// before rendering. This path is private to the consuming finish route;
-    /// all reusable mutation paths keep the failure-atomic clone-and-publish
-    /// behavior of `commit`.
+    /// Publishes a final pending CHPX edit from the owned stream buffers.
+    /// `finish_unchecked` consumes the revision editor, so retaining the
+    /// clone-first `commit` above for every reusable edit would allocate and
+    /// copy an intermediate `Vec` once more before `Arc<[u8]>` performs its
+    /// required allocation and copy. This path is private to the consuming
+    /// finish route; all reusable mutation paths keep the failure-atomic
+    /// clone-and-publish behavior of `commit`.
     fn commit_consuming(mut self) -> Result<Self> {
         self.flush_pending_chpx()?;
         self.protection_policy.authorize(self.protection)?;
@@ -3554,18 +3554,12 @@ impl RevisionEditor {
         let mut replacements: SmallVec<[(&[String], Arc<[u8]>); 3]> = SmallVec::new();
         let word = Arc::<[u8]>::from(std::mem::take(&mut self.word));
         let table = Arc::<[u8]>::from(std::mem::take(&mut self.table));
-        replacements.push((
-            self.word_path.as_slice(),
-            word,
-        ));
+        replacements.push((self.word_path.as_slice(), word));
         replacements.push((self.table_path.as_slice(), table));
         if self.data_changed {
             if self.package.stream(&self.data_path).is_some() {
                 let data = Arc::<[u8]>::from(std::mem::take(&mut self.data));
-                replacements.push((
-                    self.data_path.as_slice(),
-                    data,
-                ));
+                replacements.push((self.data_path.as_slice(), data));
             } else {
                 self.package
                     .add_stream(self.data_path.clone(), std::mem::take(&mut self.data))

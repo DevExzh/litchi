@@ -11,11 +11,13 @@
 
 The deferred CHPX path now has a consuming publication seam for the final
 render. `RevisionEditor::finish_unchecked` already owns the editor at that
-point, so its private `commit_consuming` helper moves the owned `WordDocument`,
-table, and (when present) `Data` buffers into the lower object editor's
-`Arc<[u8]>` replacements. This removes the final stream-buffer copies that
-the ordinary one-toggle route otherwise performs immediately before its
-validated render.
+point, so its private `commit_consuming` helper takes the owned
+`WordDocument`, table, and (when present) `Data` vectors before constructing
+the lower object editor's `Arc<[u8]>` replacements. This removes the extra
+`Vec::clone` allocation and copy that the ordinary one-toggle route otherwise
+performs immediately before the `Arc` conversion. The `Vec` to `Arc<[u8]>`
+conversion still allocates and copies once, as required by the object-editor
+representation.
 
 The reusable `RevisionEditor::commit` path is unchanged: it flushes pending
 CHPX, authorizes the edit, clones replacements, and publishes them through the
