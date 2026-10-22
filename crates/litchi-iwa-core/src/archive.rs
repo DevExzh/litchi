@@ -953,6 +953,9 @@ fn check_archive_info_constructor(info: &ArchiveInfo, limits: Limits) -> Result<
             limits.max_messages_per_object(),
         ));
     }
+    if info.should_merge.is_none() && info.message_infos.iter().all(is_minimal_message_info) {
+        return check_minimal_archive_info_constructor(info, limits);
+    }
     let mut metadata_items = message_count;
     let mut header_fields = usize::from(info.identifier.is_some());
     header_fields = header_fields
@@ -982,6 +985,70 @@ fn check_archive_info_constructor(info: &ArchiveInfo, limits: Limits) -> Result<
         header_memory = checked_memory_add(header_memory, message_info_memory(message_info)?)?;
     }
     let header_length = archive_info_encoded_len(info)?;
+    check_constructor_header(
+        header_length,
+        header_fields,
+        header_nesting,
+        header_memory,
+        metadata_items,
+        limits,
+    )?;
+    Ok(header_length)
+}
+
+#[inline]
+fn is_minimal_message_info(info: &MessageInfo) -> bool {
+    info.versions == DEFAULT_MESSAGE_VERSIONS
+        && info.field_infos.is_empty()
+        && info.object_references.is_empty()
+        && info.data_references.is_empty()
+        && info.base_message_index.is_none()
+        && info.diff_merge_version.is_empty()
+        && info.diff_field_path.is_none()
+        && info.fields_to_remove.is_empty()
+        && info.diff_read_version.is_empty()
+}
+
+/// Admit the conventional records produced by [`MessageInfo::new`] without
+/// entering the general metadata encoder. The generic path remains the
+/// authority for any caller-mutated `MessageInfo`.
+#[inline]
+fn check_minimal_archive_info_constructor(info: &ArchiveInfo, limits: Limits) -> Result<usize> {
+    let identifier = info
+        .identifier
+        .ok_or_else(|| Error::invalid_archive(0, "object is missing its archive identifier"))?;
+    let message_count = info.message_infos.len();
+    let mut metadata_items = message_count;
+    let header_fields = 1usize
+        .checked_add(message_count)
+        .and_then(|value| value.checked_add(message_count.checked_mul(3)?))
+        .ok_or_else(|| Error::invalid_archive(0, "ArchiveInfo field count overflow"))?;
+    let header_nesting = usize::from(message_count != 0);
+    let message_memory = minimal_message_info_memory()?;
+    let mut header_memory = size_of::<ArchiveInfo>();
+    header_memory = header_memory
+        .checked_add(
+            message_count
+                .checked_mul(message_memory)
+                .ok_or_else(|| Error::invalid_archive(0, "message metadata memory overflow"))?,
+        )
+        .ok_or_else(|| Error::invalid_archive(0, "neutral metadata memory overflow"))?;
+    let mut header_length = varint_field_length(1, identifier)?;
+    for message_info in &info.message_infos {
+        message_info.validate(limits)?;
+        add_limited(
+            &mut metadata_items,
+            DEFAULT_MESSAGE_VERSIONS.len(),
+            LimitKind::MetadataItems,
+            limits.max_metadata_items(),
+        )?;
+        let message_length =
+            minimal_message_info_encoded_length(message_info.type_, message_info.length)?;
+        header_length = checked_encoded_add(
+            header_length,
+            length_delimited_field_length(2, message_length)?,
+        )?;
+    }
     check_constructor_header(
         header_length,
         header_fields,

@@ -251,6 +251,7 @@ impl Limits {
     ///
     /// Returns an error if any configured budget is zero or if a narrower
     /// budget exceeds the aggregate budget that contains it.
+    #[inline]
     pub fn validate(self) -> Result<Self> {
         if self.max_archive_bytes == 0
             || self.max_objects == 0
