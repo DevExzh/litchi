@@ -188,6 +188,31 @@ fn equal_values_commit_nothing_even_on_a_signed_package() {
 }
 
 #[test]
+fn an_exact_no_op_patch_rejects_a_different_property_owner() {
+    let source = full();
+    let snapshot = Snapshot::read(&source, Host::Word).unwrap();
+    let (_, no_op, diagnostics) = snapshot.plan().finish().unwrap();
+    assert!(!diagnostics.changed());
+    assert!(no_op.is_noop());
+
+    let mut changed_plan = snapshot.plan();
+    changed_plan
+        .update_metadata(|metadata| metadata.title = Some("Different".into()))
+        .unwrap();
+    let (_, changed, diagnostics) = changed_plan.finish().unwrap();
+    assert!(diagnostics.changed());
+    let mut different = source.clone();
+    changed.apply(&mut different).unwrap();
+    assert!(matches!(
+        no_op.apply(&mut different),
+        Err(Error::Conflict(_))
+    ));
+
+    let mut exact = source.clone();
+    assert!(!no_op.apply(&mut exact).unwrap());
+}
+
+#[test]
 fn fields_no_family_stores_are_refused_not_dropped() {
     let snapshot = Snapshot::read(&full(), Host::Word).unwrap();
     let updates: [(Field, fn(&mut Metadata)); 3] = [

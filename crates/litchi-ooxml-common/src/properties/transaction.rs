@@ -532,6 +532,54 @@ fn family_state<P: PackageMetadata>(
     })
 }
 
+/// Capture the complete document-properties graph for an exact no-op patch.
+///
+/// Changed patches carry before bytes only for the families they replace.
+/// An empty patch has no changed family to authenticate, so it records every
+/// property family instead. The synthetic relationship ID for an absent
+/// family is chosen from the source's free IDs; `check_change` then verifies
+/// that it remains free on the recipient.
+fn snapshot_scope(snapshot: &Snapshot) -> Result<Box<[Change]>> {
+    [Family::Core, Family::App, Family::Custom]
+        .into_iter()
+        .map(|family| {
+            let state = snapshot.family(family);
+            let (relationship_id, part, relationship_type, relationship_target, before, after) =
+                match &state.present {
+                    Some(present) => (
+                        present.relationship_id.clone(),
+                        present.part.clone(),
+                        present.relationship_type.clone(),
+                        present.relationship_target.clone(),
+                        Some(Arc::clone(&present.bytes)),
+                        Some(Arc::clone(&present.bytes)),
+                    ),
+                    None => (
+                        next_relationship_id(&snapshot.relationship_ids)?,
+                        state.new_part.clone(),
+                        match family {
+                            Family::Core => rt::CORE_PROPERTIES.to_owned(),
+                            Family::App => rt::EXTENDED_PROPERTIES.to_owned(),
+                            Family::Custom => rt::CUSTOM_PROPERTIES.to_owned(),
+                        },
+                        state.new_part.as_str().trim_start_matches('/').to_owned(),
+                        None,
+                        None,
+                    ),
+                };
+            Ok(Change {
+                family,
+                part,
+                relationship_id,
+                relationship_type,
+                relationship_target,
+                before,
+                after,
+            })
+        })
+        .collect()
+}
+
 /// A detached plan of a change of a [`Snapshot`]'s document properties.
 ///
 /// A plan stages like an [`Edit`] but holds no package: [`Plan::finish`]
@@ -774,10 +822,20 @@ impl Plan {
         if changes.is_empty() {
             changed_fields.clear();
         }
+        // An empty patch still has to authenticate the package it came from.
+        // Keep the complete document-properties scope separate from the
+        // changed-family list so `is_noop()` and diagnostics remain truthful
+        // while replay can reject an equal-looking patch on another owner.
+        let scope = if changes.is_empty() {
+            Some(snapshot_scope(&base)?)
+        } else {
+            None
+        };
         Ok((
             after,
             Patch {
                 changes: changes.into_boxed_slice(),
+                scope,
             },
             Diagnostics {
                 families,
@@ -1096,6 +1154,10 @@ impl Change {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Patch {
     changes: Box<[Change]>,
+    /// The recorded before state for an exact no-op. Changed patches already
+    /// carry their before state in `changes`; an empty patch needs the full
+    /// property-family scope or it could be replayed onto any package.
+    scope: Option<Box<[Change]>>,
 }
 
 impl Patch {
@@ -1116,7 +1178,12 @@ impl Patch {
     pub fn inverse(&self) -> Self {
         Self {
             changes: self.changes.iter().map(Change::inverse).collect(),
+            scope: self.scope.clone(),
         }
+    }
+
+    fn check_changes(&self) -> &[Change] {
+        self.scope.as_deref().unwrap_or(&self.changes)
     }
 
     /// What replaying this patch changes: its families, in [`Family`]
@@ -1131,7 +1198,7 @@ impl Patch {
     }
 
     /// Check that an owning package is in this patch's before state: each
-    /// family's graph selects exactly the recorded part through the
+    /// recorded family's graph selects exactly the recorded part through the
     /// recorded relationship with the recorded bytes, or (for a creation)
     /// holds no such family and the recorded relationship ID and part name
     /// are free; and a removed part has no other inbound relationship.
@@ -1141,7 +1208,7 @@ impl Patch {
     /// Returns [`Error::Conflict`] naming the first family whose state
     /// differs, and the graph errors of the family inspections.
     pub fn check(&self, package: &OpcPackage) -> Result<()> {
-        for change in &self.changes {
+        for change in self.check_changes() {
             let graph = owning_graph(package, change.family)?;
             let bytes = match &graph.0 {
                 Some(part) => Some(
@@ -1157,8 +1224,8 @@ impl Patch {
         Ok(())
     }
 
-    /// Apply the patch to an owning package after [`Self::check`]. Returns
-    /// whether the package changed.
+    /// Check and apply the patch to an owning package. Returns whether the
+    /// package changed.
     ///
     /// An empty patch changes nothing, so a signed package keeps its
     /// signature. A changed patch refuses a signed package before anything is
@@ -1170,10 +1237,10 @@ impl Patch {
     /// Returns [`Error::Signed`] for a signed package, and the errors of
     /// [`Self::check`].
     pub fn apply(&self, package: &mut OpcPackage) -> Result<bool> {
+        self.check(package)?;
         if self.is_noop() {
             return Ok(false);
         }
-        self.check(package)?;
         refuse_signed_change(package)?;
         let mut candidate = package.clone();
         for change in &self.changes {
@@ -1271,13 +1338,27 @@ impl Patch {
                 changes.push(composed);
             }
         }
+        let is_noop = changes.is_empty();
+        let scope = if is_noop {
+            self.scope
+                .clone()
+                .or_else(|| next.scope.clone())
+                // A changed patch followed by its inverse has no scope of
+                // its own. Preserve the affected before images so the
+                // composed no-op cannot cross-copy onto another family
+                // state.
+                .or_else(|| (!self.changes.is_empty()).then(|| self.changes.clone()))
+        } else {
+            None
+        };
         Ok(Self {
             changes: changes.into_boxed_slice(),
+            scope,
         })
     }
 
     /// Check that a source-backed package is in this patch's before state,
-    /// with the rules of [`Self::check`]. Only the changed families' parts
+    /// with the rules of [`Self::check`]. Only the recorded families' parts
     /// are read, inside the package's source-freshness checks.
     ///
     /// # Errors
@@ -1286,7 +1367,7 @@ impl Patch {
     /// error.
     pub fn check_source_backed(&self, package: &SourceBackedPackage) -> Result<()> {
         package.check_execution()?;
-        for change in &self.changes {
+        for change in self.check_changes() {
             let graph = source_graph(package, change.family)?;
             let bytes = match &graph.0 {
                 Some(part) => Some(package.part(part)?.data()?),
@@ -1321,8 +1402,8 @@ impl Patch {
     /// source, limit and allocation errors.
     pub fn prepare_source_backed(&self, package: &SourceBackedPackage) -> Result<PreparedTopology> {
         let mut plan = SourceTopologyPlan::new();
+        self.check_source_backed(package)?;
         if !self.is_noop() {
-            self.check_source_backed(package)?;
             if package.has_signature_infrastructure() {
                 return Err(Error::Signed);
             }
