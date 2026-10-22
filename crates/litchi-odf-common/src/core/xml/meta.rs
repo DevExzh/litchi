@@ -8,6 +8,7 @@ use litchi_core::Result;
 #[derive(Debug)]
 pub struct Meta {
     xml: XmlPart,
+    limits: XmlStreamLimits,
 }
 
 impl Meta {
@@ -24,6 +25,7 @@ impl Meta {
         super::part::admit_raw(bytes.len(), limits)?;
         Ok(Self {
             xml: XmlPart::copy(bytes)?,
+            limits,
         })
     }
 
@@ -40,6 +42,7 @@ impl Meta {
         super::part::admit_raw(bytes.len(), limits)?;
         Ok(Self {
             xml: XmlPart::adopt(bytes)?,
+            limits,
         })
     }
 
@@ -55,7 +58,7 @@ impl Meta {
     ///
     /// Returns an error when the metadata XML is malformed or invalid.
     pub fn odf_metadata(&self) -> Result<crate::core::metadata::Metadata> {
-        crate::core::metadata::Metadata::from_xml(self.xml.content())
+        crate::core::metadata::Metadata::from_xml(self.xml.content(), self.limits)
     }
 
     /// Extract common metadata while preserving parse failures.

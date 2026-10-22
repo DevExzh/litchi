@@ -2,6 +2,7 @@
 
 use super::{Content, Meta, OwnedPackage, SourceLimits, Styles, package::zeroizing_password};
 use super::{binding_tracker::BindingTracker, content_validation::ContentDocumentValidator};
+use crate::XmlStreamLimits;
 use crate::leniency::ToleranceReport;
 use litchi_core::{Error, Metadata, Result};
 use quick_xml::events::Event;
@@ -76,6 +77,7 @@ pub struct Package {
     content: Content,
     styles: Option<Styles>,
     metadata: Option<Metadata>,
+    xml_limits: XmlStreamLimits,
     tolerance: ToleranceReport,
 }
 
@@ -248,6 +250,7 @@ impl Package {
             mimetype,
             body_marker,
             family_name,
+            XmlStreamLimits::owner_default_value(),
         )
     }
 
@@ -258,12 +261,14 @@ impl Package {
         mimetype: &str,
         body_marker: &str,
         family_name: &str,
+        xml_limits: XmlStreamLimits,
     ) -> Result<Self> {
-        Self::from_owned_package(
+        Self::from_owned_package_with_xml_limits(
             OwnedPackage::from_bytes_with_zeroizing_password(bytes, limits, password)?,
             mimetype,
             body_marker,
             family_name,
+            xml_limits,
         )
     }
 
@@ -278,6 +283,22 @@ impl Package {
         mimetype: &str,
         body_marker: &str,
         family_name: &str,
+    ) -> Result<Self> {
+        Self::from_owned_package_with_xml_limits(
+            archive,
+            mimetype,
+            body_marker,
+            family_name,
+            XmlStreamLimits::owner_default_value(),
+        )
+    }
+
+    fn from_owned_package_with_xml_limits(
+        archive: OwnedPackage,
+        mimetype: &str,
+        body_marker: &str,
+        family_name: &str,
+        xml_limits: XmlStreamLimits,
     ) -> Result<Self> {
         let mut tolerance = archive.tolerance_report().clone();
         let found = archive.mimetype()?;
@@ -341,7 +362,7 @@ impl Package {
             .has_file("meta.xml")?
             .then(|| archive.get_file("meta.xml"))
             .transpose()?
-            .map(|bytes| Meta::from_bytes(&bytes, crate::XmlStreamLimits::owner_default_value()))
+            .map(|bytes| Meta::from_bytes(&bytes, xml_limits))
             .transpose()?
             .map(|meta| meta.try_extract_metadata())
             .transpose()?;
@@ -351,6 +372,7 @@ impl Package {
             content,
             styles,
             metadata,
+            xml_limits,
             tolerance,
         })
     }
@@ -453,6 +475,7 @@ impl Package {
             mimetype,
             body_marker,
             family_name,
+            options.xml_limits_value(),
         )
         .map_err(crate::Error::from)
         .and_then(|package| {
@@ -490,11 +513,12 @@ impl Package {
                 crate::SemanticLimitKind::StylesBytes,
             )?;
         }
-        Ok(Self::from_owned_package(
+        Ok(Self::from_owned_package_with_xml_limits(
             archive,
             mimetype,
             body_marker,
             family_name,
+            options.xml_limits_value(),
         )?)
     }
 
@@ -547,6 +571,12 @@ impl Package {
     #[must_use]
     pub fn metadata(&self) -> Option<&Metadata> {
         self.metadata.as_ref()
+    }
+
+    /// Return the raw XML policy retained by this package owner.
+    #[must_use]
+    pub fn xml_limits_value(&self) -> XmlStreamLimits {
+        self.xml_limits
     }
 
     /// Borrow the owned package for family-specific package edits.

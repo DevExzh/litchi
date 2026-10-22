@@ -8,6 +8,7 @@ use crate::{
     surface::{Surface, SurfaceLocation},
 };
 use litchi_core::{Error, Metadata, Result};
+use litchi_odf_common::XmlStreamLimits;
 use litchi_odf_common::{
     compact_xml,
     core::{PackageWriter, family::Package},
@@ -36,6 +37,7 @@ pub(crate) enum StylesReplacement<'a> {
 
 struct State {
     package: Package,
+    xml_limits: XmlStreamLimits,
     content: crate::flat::Image,
     resources: Vec<Resource>,
     resource_graph: Graph,
@@ -56,20 +58,20 @@ impl Snapshot {
     }
 
     pub(crate) fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        Self::from_package(Package::from_bytes(bytes, MIMETYPE, BODY_MARKER, "ODI")?)
+        Self::from_package(
+            Package::from_bytes(bytes, MIMETYPE, BODY_MARKER, "ODI")?,
+            XmlStreamLimits::owner_default_value(),
+        )
     }
 
     pub(crate) fn open_with_options(
         path: impl AsRef<Path>,
         options: litchi_odf_common::OpenOptions,
     ) -> std::result::Result<Self, litchi_odf_common::Error> {
-        Ok(Self::from_package(Package::open_with_options(
-            path,
-            options,
-            MIMETYPE,
-            BODY_MARKER,
-            "ODI",
-        )?)?)
+        Ok(Self::from_package(
+            Package::open_with_options(path, options, MIMETYPE, BODY_MARKER, "ODI")?,
+            options.xml_limits_value(),
+        )?)
     }
 
     pub(crate) fn open_with_password_and_options(
@@ -86,6 +88,7 @@ impl Snapshot {
                 BODY_MARKER,
                 "ODI",
             )?,
+            options.xml_limits_value(),
         )?)
     }
 
@@ -93,13 +96,10 @@ impl Snapshot {
         bytes: Vec<u8>,
         options: litchi_odf_common::OpenOptions,
     ) -> std::result::Result<Self, litchi_odf_common::Error> {
-        Ok(Self::from_package(Package::from_bytes_with_options(
-            bytes,
-            options,
-            MIMETYPE,
-            BODY_MARKER,
-            "ODI",
-        )?)?)
+        Ok(Self::from_package(
+            Package::from_bytes_with_options(bytes, options, MIMETYPE, BODY_MARKER, "ODI")?,
+            options.xml_limits_value(),
+        )?)
     }
 
     pub(crate) fn from_bytes_with_password_and_options(
@@ -116,6 +116,7 @@ impl Snapshot {
                 BODY_MARKER,
                 "ODI",
             )?,
+            options.xml_limits_value(),
         )?)
     }
 
@@ -123,13 +124,10 @@ impl Snapshot {
         reader: impl std::io::Read,
         options: litchi_odf_common::OpenOptions,
     ) -> std::result::Result<Self, litchi_odf_common::Error> {
-        Ok(Self::from_package(Package::from_reader_with_options(
-            reader,
-            options,
-            MIMETYPE,
-            BODY_MARKER,
-            "ODI",
-        )?)?)
+        Ok(Self::from_package(
+            Package::from_reader_with_options(reader, options, MIMETYPE, BODY_MARKER, "ODI")?,
+            options.xml_limits_value(),
+        )?)
     }
 
     pub(crate) fn from_owned_package_with_options(
@@ -144,12 +142,15 @@ impl Snapshot {
                 BODY_MARKER,
                 "ODI",
             )?,
+            options.xml_limits_value(),
         )?)
     }
 
-    fn from_package(package: Package) -> Result<Self> {
-        let content =
-            crate::flat::Image::from_content_xml(package.content_xml().as_bytes().to_vec())?;
+    fn from_package(package: Package, xml_limits: XmlStreamLimits) -> Result<Self> {
+        let content = crate::flat::Image::from_content_xml(
+            package.content_xml().as_bytes().to_vec(),
+            xml_limits,
+        )?;
         let resources = scan_resources(&package)?;
         let resource_graph = build_resource_graph(&package, &resources)?;
         let files = package.files()?;
@@ -203,6 +204,7 @@ impl Snapshot {
         }
         Ok(Self(Arc::new(State {
             package,
+            xml_limits,
             content,
             resources,
             resource_graph,
@@ -223,6 +225,10 @@ impl Snapshot {
 
     pub(crate) fn metadata(&self) -> Option<&Metadata> {
         self.0.package.metadata()
+    }
+
+    pub(crate) fn xml_limits_value(&self) -> XmlStreamLimits {
+        self.0.xml_limits
     }
 
     pub(crate) fn meta_xml(&self) -> Result<Option<String>> {
@@ -417,7 +423,11 @@ impl Snapshot {
                 writer.add_file_with_media_type(replacement.path, bytes, replacement.media_type)?;
             }
         }
-        Self::from_bytes(writer.finish_to_bounded_bytes()?)
+        Self::from_bytes_with_options(
+            writer.finish_to_bounded_bytes()?,
+            litchi_odf_common::OpenOptions::new().xml_limits(self.0.xml_limits),
+        )
+        .map_err(Error::from)
     }
 }
 

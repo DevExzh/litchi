@@ -270,7 +270,7 @@ impl Workbook {
                 "flat ODS scenario metadata inspection failed: {error}"
             ))
         })?;
-        let odf_metadata = OdfMetadata::from_xml(&source)?;
+        let odf_metadata = OdfMetadata::from_xml(&source, limits.options.xml_limits_value())?;
         let metadata = odf_metadata.clone().into();
         Ok(Self {
             state: Arc::new(State {

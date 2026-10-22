@@ -89,11 +89,12 @@ impl<'source> Edit<'source> {
         let source_meta_xml = self
             .source_meta_xml
             .ok_or_else(|| invalid("ODM title editing requires an existing UTF-8 meta.xml part"))?;
-        let source_metadata = OdfMetadata::from_xml(&source_meta_xml)?;
+        let source_metadata =
+            OdfMetadata::from_xml(&source_meta_xml, self.source.xml_limits_value())?;
         let mut current = Metadata::from(source_metadata.clone());
         current.title.clone_from(&self.after);
         let patch = MetaXmlPatch::preserve_all().diff_simple_fields(&source_metadata, &current);
-        let meta_xml = patch_meta_xml(&source_meta_xml, &patch)?
+        let meta_xml = patch_meta_xml(&source_meta_xml, &patch, self.source.xml_limits_value())?
             .ok_or_else(|| invalid("ODM title editing requires an office:meta container"))?;
         if meta_xml.len() > source_meta_xml.len().saturating_add(MAX_TITLE_BYTES * 5) {
             return Err(invalid("ODM patched meta.xml exceeds the title edit limit"));

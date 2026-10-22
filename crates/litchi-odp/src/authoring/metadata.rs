@@ -6,11 +6,11 @@
 //! patcher does not own is refused before any package bytes move.
 
 use litchi_core::{Error, Metadata as CoreMetadata, Result};
-use litchi_odf_common::core::metadata::Metadata as OdfMetadata;
 use litchi_odf_common::core::{
     AuthoredXmlFragment, MetaXmlPatch, Structure, XmlSourcePart, XmlSplicePublication,
     patch_meta_xml,
 };
+use litchi_odf_common::{XmlStreamLimits, core::metadata::Metadata as OdfMetadata};
 
 use crate::core::OwnedPackage;
 
@@ -20,11 +20,17 @@ const MAX_OUTPUT_BYTES: usize = 128 * 1024 * 1024;
 /// The metadata `source` projects, with its parsed ODF form and source XML.
 fn source_metadata(source: &OwnedPackage) -> Result<(Option<String>, OdfMetadata)> {
     if !source.has_file(META)? {
-        return Ok((None, OdfMetadata::from_xml(&Structure::default_meta_xml())?));
+        return Ok((
+            None,
+            OdfMetadata::from_xml(
+                &Structure::default_meta_xml(),
+                XmlStreamLimits::owner_default_value(),
+            )?,
+        ));
     }
     let xml = String::from_utf8(source.get_file(META)?)
         .map_err(|error| Error::InvalidFormat(format!("ODP meta.xml is not UTF-8: {error}")))?;
-    let metadata = OdfMetadata::from_xml(&xml)?;
+    let metadata = OdfMetadata::from_xml(&xml, XmlStreamLimits::owner_default_value())?;
     Ok((Some(xml), metadata))
 }
 
@@ -79,13 +85,14 @@ fn publish_one(source: &OwnedPackage, metadata: &CoreMetadata) -> Result<Vec<u8>
     let (xml, odf) = source_metadata(source)?;
     let base = xml.clone().unwrap_or_else(Structure::default_meta_xml);
     let patch = MetaXmlPatch::preserve_all().diff_simple_fields(&odf, metadata);
-    let patched = patch_meta_xml(&base, &patch)?.unwrap_or(base);
+    let patched =
+        patch_meta_xml(&base, &patch, XmlStreamLimits::owner_default_value())?.unwrap_or(base);
     if patched.len() > MAX_OUTPUT_BYTES {
         return Err(Error::InvalidFormat(
             "patched ODP meta.xml exceeds the size limit".to_string(),
         ));
     }
-    OdfMetadata::from_xml(&patched)?;
+    OdfMetadata::from_xml(&patched, XmlStreamLimits::owner_default_value())?;
     if let Some(xml) = &xml {
         let part = XmlSourcePart::load(source, META)?;
         if part.bytes() != xml.as_bytes() {

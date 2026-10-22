@@ -1,6 +1,7 @@
 //! Malformed-input hardening for format-neutral ODF parsers.
 
 use litchi_core::Error;
+use litchi_odf_common::core::metadata::Metadata as OdfMetadata;
 use litchi_odf_common::package::{Archive, parse_manifest, read_manifest};
 use litchi_odf_common::{Error as OdfError, XmlStreamLimits, chart, drawing, embedded, media};
 use std::io::{Cursor, Write as _};
@@ -35,7 +36,7 @@ fn package() -> Result<Vec<u8>, Box<dyn std::error::Error>> {
 
 fn exercise_archive(bytes: &[u8]) {
     if let Ok(archive) = Archive::new(bytes) {
-        drop(read_manifest(&archive));
+        drop(read_manifest(&archive, XmlStreamLimits::default()));
     }
 }
 
@@ -137,6 +138,39 @@ fn drawing_resource_parsers_report_the_required_raw_xml_policy() {
 }
 
 #[test]
+fn metadata_and_manifest_report_the_required_raw_xml_policy() {
+    let metadata_xml = r#"<office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"><office:meta/></office:document-meta>"#;
+    let manifest_xml = r#"<m:manifest xmlns:m="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><m:file-entry m:full-path="/"/></m:manifest>"#;
+    let limits =
+        XmlStreamLimits::new(64, 256, 4_000, 1_000, 64 * 1024).expect("test policy is finite");
+    let expected = |error: OdfError, input_len: usize| {
+        assert!(matches!(
+            error,
+            OdfError::Limit {
+                kind: litchi_odf_common::LimitKind::RawXml(
+                    litchi_odf_common::RawXmlLimitKind::InputBytes
+                ),
+                observed,
+                maximum,
+            } if observed == input_len as u64 && maximum == 64
+        ));
+    };
+    expected(
+        OdfError::from(
+            OdfMetadata::from_xml(metadata_xml, limits)
+                .expect_err("metadata input must be bounded"),
+        ),
+        metadata_xml.len(),
+    );
+    expected(
+        OdfError::from(
+            parse_manifest(manifest_xml, limits).expect_err("manifest input must be bounded"),
+        ),
+        manifest_xml.len(),
+    );
+}
+
+#[test]
 fn shared_media_and_object_scanners_are_hardened() -> Result<(), Error> {
     let images = media::scan_flat(FLAT_MEDIA_SEED)?;
     let objects = embedded::scan_flat(FLAT_MEDIA_SEED)?;
@@ -178,12 +212,14 @@ fn archive_and_manifest_malformed_sweeps_never_panic() -> Result<(), Box<dyn std
     assert_invalid(
         parse_manifest(
             r#"<m:manifest xmlns:m="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><m:file-entry m:full-path="x"/><m:file-entry m:full-path="x"/></m:manifest>"#,
+            XmlStreamLimits::default(),
         ),
         "duplicate manifest path",
     );
     assert_invalid(
         parse_manifest(
             r#"<m:manifest xmlns:m="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><m:file-entry m:full-path="x" m:size="invalid"/></m:manifest>"#,
+            XmlStreamLimits::default(),
         ),
         "invalid manifest size",
     );

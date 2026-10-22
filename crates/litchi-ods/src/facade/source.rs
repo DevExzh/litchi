@@ -283,7 +283,7 @@ impl SourceBackedSpreadsheet {
             } else {
                 None
             };
-            let metadata = crate::metadata::Snapshot::from_source(metadata_source)?;
+            let metadata = crate::metadata::Snapshot::from_source(metadata_source, xml_limits)?;
             let (settings, outputs) = open_parse.finish()?;
             // The location spans are validated by the fused parse (including
             // the semantic/XML disagreement check) but are not retained by

@@ -231,7 +231,7 @@ impl Archive {
         } else {
             None
         };
-        crate::metadata::Snapshot::from_source(source)
+        crate::metadata::Snapshot::from_source(source, self.xml_limits)
     }
 
     /// Read the ordered named-definition catalog from `content.xml`.

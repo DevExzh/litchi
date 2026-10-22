@@ -42,6 +42,10 @@ impl Package {
         self.package.owned_package()
     }
 
+    pub(crate) fn xml_limits_value(&self) -> litchi_odf_common::XmlStreamLimits {
+        self.package.xml_limits_value()
+    }
+
     pub(crate) fn from_snapshot(package: crate::package::Snapshot) -> Self {
         Self { package }
     }

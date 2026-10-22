@@ -1367,7 +1367,7 @@ fn patch_metadata(source: &Image, values: &MetadataFields) -> Result<String> {
     let source_xml = source.meta_xml()?.ok_or_else(|| {
         Error::InvalidFormat("ODI metadata editing requires an existing meta.xml part".to_string())
     })?;
-    let parsed = OdfMetadata::from_xml(&source_xml)?;
+    let parsed = OdfMetadata::from_xml(&source_xml, source.package.xml_limits_value())?;
     let mut target = Metadata::from(parsed.clone());
     target.title.clone_from(&values.title);
     target.author.clone_from(&values.author);
@@ -1375,7 +1375,7 @@ fn patch_metadata(source: &Image, values: &MetadataFields) -> Result<String> {
     target.description.clone_from(&values.description);
     target.keywords.clone_from(&values.keywords);
     let patch = MetaXmlPatch::preserve_all().diff_simple_fields(&parsed, &target);
-    patch_meta_xml(&source_xml, &patch)?.ok_or_else(|| {
+    patch_meta_xml(&source_xml, &patch, source.package.xml_limits_value())?.ok_or_else(|| {
         Error::InvalidFormat("ODI metadata editing requires an office:meta container".to_string())
     })
 }

@@ -4,11 +4,12 @@ use super::model::{
     AutoReloadMetadata, DocumentStatistics, HyperlinkBehaviourMetadata, Metadata, TemplateMetadata,
     UserDefinedMetadata, UserDefinedValueType,
 };
+use crate::core::{ResolvedReader, XmlStreamLimits};
+use crate::map_resolved_reader_error;
 use litchi_core::{Error, Metadata as CoreMetadata, Result, xml::escape_xml};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesEnd, BytesStart, BytesText, Event};
 use quick_xml::name::{Namespace, ResolveResult};
-use quick_xml::reader::NsReader;
 use quick_xml::writer::Writer;
 
 const OFFICE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
@@ -68,8 +69,9 @@ impl Metadata {
     ///
     /// Returns an error when the XML is malformed or contains invalid ODF
     /// metadata values.
-    pub fn from_xml(xml_content: &str) -> Result<Self> {
-        let mut reader = NsReader::from_str(xml_content);
+    pub fn from_xml(xml_content: &str, limits: XmlStreamLimits) -> Result<Self> {
+        let mut reader = ResolvedReader::from_xml(xml_content, limits)
+            .map_err(|error| map_resolved_reader_error(error, "XML parsing error in metadata"))?;
         let mut buf = Vec::new();
         let mut metadata = Metadata::default();
         let mut depth = 0usize;
@@ -78,7 +80,7 @@ impl Metadata {
         loop {
             let (resolved_namespace, event) = reader
                 .read_resolved_event_into(&mut buf)
-                .map_err(metadata_xml_error)?;
+                .map_err(metadata_reader_error)?;
             let namespace = known_namespace(&resolved_namespace);
             match event {
                 Event::Start(ref element) => {
@@ -383,7 +385,7 @@ impl PatchField {
 
 impl MetaNamespacePrefixes {
     /// Record the relevant bindings declared on the root element.
-    fn observe(&mut self, element: &BytesStart<'_>, reader: &NsReader<&[u8]>) -> Result<()> {
+    fn observe(&mut self, element: &BytesStart<'_>, reader: &ResolvedReader<'_>) -> Result<()> {
         for raw_attribute in element.attributes() {
             let attribute = raw_attribute.map_err(metadata_xml_error)?;
             let bound_prefix = if attribute.key.as_ref() == b"xmlns" {
@@ -563,8 +565,13 @@ fn patch_field(namespace: KnownNamespace, local_name: &[u8]) -> Option<PatchFiel
 ///
 /// Returns an error when the source XML cannot be read or the rewritten XML
 /// cannot be emitted as UTF-8.
-pub fn patch_meta_xml(source: &str, patch: &MetaXmlPatch) -> Result<Option<String>> {
-    let mut reader = NsReader::from_str(source);
+pub fn patch_meta_xml(
+    source: &str,
+    patch: &MetaXmlPatch,
+    limits: XmlStreamLimits,
+) -> Result<Option<String>> {
+    let mut reader = ResolvedReader::from_xml(source, limits)
+        .map_err(|error| map_resolved_reader_error(error, "XML parsing error in metadata"))?;
     let mut buffer = Vec::new();
     let mut writer = Writer::new(Vec::with_capacity(source.len()));
     let mut edits = patch.clone();
@@ -577,7 +584,7 @@ pub fn patch_meta_xml(source: &str, patch: &MetaXmlPatch) -> Result<Option<Strin
     loop {
         let (resolved_namespace, event) = reader
             .read_resolved_event_into(&mut buffer)
-            .map_err(metadata_xml_error)?;
+            .map_err(metadata_reader_error)?;
         let namespace = known_namespace(&resolved_namespace);
         match event {
             Event::Start(ref element) => {
@@ -748,13 +755,13 @@ fn write_event(writer: &mut Writer<Vec<u8>>, event: Event<'_>) -> Result<()> {
 
 /// Skip events through the end tag of the element whose start tag was just
 /// consumed, returning that end tag.
-fn skip_element_body(reader: &mut NsReader<&[u8]>) -> Result<BytesEnd<'static>> {
+fn skip_element_body(reader: &mut ResolvedReader<'_>) -> Result<BytesEnd<'static>> {
     let mut buffer = Vec::new();
     let mut depth = 1usize;
     loop {
-        let event = reader
-            .read_event_into(&mut buffer)
-            .map_err(metadata_xml_error)?;
+        let (_, event) = reader
+            .read_resolved_event_into(&mut buffer)
+            .map_err(metadata_reader_error)?;
         match event {
             Event::Start(_) => depth = checked_depth_add(depth)?,
             Event::End(end) => {
@@ -789,13 +796,13 @@ fn element_name(element: &BytesStart<'_>) -> Result<String> {
     try_copy_string(name, "ODF metadata element name")
 }
 
-fn extract_text_content(reader: &mut NsReader<&[u8]>) -> Result<String> {
+fn extract_text_content(reader: &mut ResolvedReader<'_>) -> Result<String> {
     let mut buffer = Vec::new();
     let mut content = String::new();
     loop {
-        let event = reader
-            .read_event_into(&mut buffer)
-            .map_err(metadata_xml_error)?;
+        let (_, event) = reader
+            .read_resolved_event_into(&mut buffer)
+            .map_err(metadata_reader_error)?;
         match event {
             Event::Text(text) => {
                 let value = text
@@ -869,7 +876,7 @@ fn parse_metadata_attributes(
     namespace: KnownNamespace,
     local_name: &[u8],
     element: &BytesStart<'_>,
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
 ) -> Result<()> {
     if namespace != KnownNamespace::Meta {
         return Ok(());
@@ -912,7 +919,7 @@ fn parse_metadata_attributes(
 
 fn parse_document_statistics(
     element: &BytesStart<'_>,
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
 ) -> Result<DocumentStatistics> {
     let mut statistics = DocumentStatistics::default();
     for raw_attribute in element.attributes() {
@@ -956,7 +963,7 @@ fn parse_document_statistics(
 
 fn parse_user_defined_property(
     element: &BytesStart<'_>,
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     value: String,
 ) -> Result<UserDefinedMetadata> {
     let name = attribute_value(element, reader, META_NAMESPACE, b"name")?.ok_or_else(|| {
@@ -986,7 +993,7 @@ fn parse_user_defined_property(
 
 fn attribute_value(
     element: &BytesStart<'_>,
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     expected_namespace: &[u8],
     expected_local_name: &[u8],
 ) -> Result<Option<String>> {
@@ -1013,4 +1020,8 @@ fn checked_depth_add(depth: usize) -> Result<usize> {
 
 fn metadata_xml_error(error: impl std::fmt::Display) -> Error {
     Error::InvalidFormat(format!("XML parsing error in metadata: {error}"))
+}
+
+fn metadata_reader_error(error: crate::Error) -> Error {
+    map_resolved_reader_error(error, "XML parsing error in metadata")
 }

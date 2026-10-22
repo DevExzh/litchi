@@ -3,7 +3,10 @@
 use std::borrow::Cow;
 
 use litchi_core::{Error, Metadata as CoreMetadata, Result};
-use litchi_odf_common::core::{MetaXmlPatch, Structure, metadata::Metadata};
+use litchi_odf_common::{
+    XmlStreamLimits,
+    core::{MetaXmlPatch, Structure, metadata::Metadata},
+};
 
 use super::model::Snapshot;
 
@@ -14,6 +17,7 @@ pub(crate) struct Transaction<'source> {
     original: CoreMetadata,
     draft: CoreMetadata,
     remove_part: bool,
+    xml_limits: XmlStreamLimits,
 }
 
 impl<'source> Transaction<'source> {
@@ -24,6 +28,7 @@ impl<'source> Transaction<'source> {
             original: snapshot.value.clone(),
             draft: snapshot.value.clone(),
             remove_part: false,
+            xml_limits: snapshot.xml_limits,
         }
     }
 
@@ -84,17 +89,17 @@ impl<'source> Transaction<'source> {
         let source_metadata = if self.source.is_some() {
             self.source_odf
         } else {
-            Metadata::from_xml(&source)?
+            Metadata::from_xml(&source, self.xml_limits)?
         };
         let patch = MetaXmlPatch::preserve_all().diff_simple_fields(&source_metadata, &self.draft);
-        let xml = litchi_odf_common::core::patch_meta_xml(&source, &patch)?
+        let xml = litchi_odf_common::core::patch_meta_xml(&source, &patch, self.xml_limits)?
             .unwrap_or_else(Structure::default_meta_xml);
         if xml.len() > super::model::MAX_XML_BYTES {
             return Err(Error::InvalidFormat(
                 "patched ODS meta.xml exceeds the size limit".to_string(),
             ));
         }
-        Metadata::from_xml(&xml)?;
+        Metadata::from_xml(&xml, self.xml_limits)?;
         Ok(XmlCommit {
             xml: Some(Cow::Owned(xml)),
             changed: true,

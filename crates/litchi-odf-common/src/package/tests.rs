@@ -6,6 +6,7 @@
 
 use super::{Archive, read_manifest};
 use super::{Entry, Manifest, is_media_path, parse_manifest};
+use crate::XmlStreamLimits;
 
 #[test]
 fn archive_reads_a_real_package_without_family_models() {
@@ -14,7 +15,7 @@ fn archive_reads_a_real_package_without_family_models() {
     assert!(archive.contains("mimetype"));
     assert!(archive.contains("content.xml"));
     assert!(archive.is_stored("mimetype").unwrap());
-    let manifest = read_manifest(&archive).expect("neutral manifest");
+    let manifest = read_manifest(&archive, XmlStreamLimits::default()).expect("neutral manifest");
     assert_eq!(manifest.get_media_type("content.xml"), Some("text/xml"));
 }
 
@@ -32,7 +33,7 @@ fn parses_neutral_entries_without_interpreting_encryption() {
       </m:file-entry>
     </m:manifest>"#;
 
-    let manifest = parse_manifest(xml).expect("neutral manifest");
+    let manifest = parse_manifest(xml, XmlStreamLimits::default()).expect("neutral manifest");
     assert_eq!(manifest.mimetype, "application/vnd.oasis.opendocument.text");
     assert_eq!(manifest.get_media_type("content.xml"), Some("text/xml"));
     assert_eq!(
@@ -47,10 +48,10 @@ fn parses_neutral_entries_without_interpreting_encryption() {
 #[test]
 fn rejects_duplicate_entries_and_invalid_sizes() {
     let duplicate = r#"<m:manifest xmlns:m="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><m:file-entry m:full-path="x"/><m:file-entry m:full-path="x"/></m:manifest>"#;
-    assert!(parse_manifest(duplicate).is_err());
+    assert!(parse_manifest(duplicate, XmlStreamLimits::default()).is_err());
 
     let invalid_size = r#"<m:manifest xmlns:m="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><m:file-entry m:full-path="x" m:size="nope"/></m:manifest>"#;
-    assert!(parse_manifest(invalid_size).is_err());
+    assert!(parse_manifest(invalid_size, XmlStreamLimits::default()).is_err());
 }
 
 #[test]

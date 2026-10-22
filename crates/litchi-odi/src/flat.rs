@@ -41,7 +41,7 @@ pub use litchi_odf_common::Error;
 /// The dimension named by [`Error::Limit`] and [`Error::InvalidLimit`].
 pub use litchi_odf_common::LimitKind;
 pub use litchi_odf_common::OpenOptions;
-use litchi_odf_common::{SemanticLimitKind, SemanticLimits};
+use litchi_odf_common::{SemanticLimitKind, SemanticLimits, XmlStreamLimits};
 
 const OFFICE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const DRAW: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:drawing:1.0";
@@ -353,8 +353,8 @@ impl Image {
 
     /// Parses a packaged ODI `content.xml` part with the same bounded frame
     /// inventory and lossless edit-site scanner used for flat documents.
-    pub(crate) fn from_content_xml(bytes: Vec<u8>) -> Result<Self> {
-        let bounds = Bounds::default();
+    pub(crate) fn from_content_xml(bytes: Vec<u8>, xml_limits: XmlStreamLimits) -> Result<Self> {
+        let bounds = Bounds::new(OpenOptions::new().xml_limits(xml_limits));
         if bytes.len() > MAX_BYTES {
             return Err(invalid("ODI content.xml exceeds the input size limit"));
         }
@@ -948,7 +948,11 @@ impl Edit {
             .metadata
             .map(|(before, after)| crate::MetadataChange::new(before, after));
         if let Some(change) = &metadata_change {
-            bytes = patch_flat_metadata(&bytes, change.after())?;
+            bytes = patch_flat_metadata(
+                &bytes,
+                change.after(),
+                self.source.0.bounds.options.xml_limits_value(),
+            )?;
         }
         compact_xml::validate(&bytes, compact_xml::Limits::default())?;
         let snapshot = Image::from_root_bytes(bytes, self.source.0.root, self.source.0.bounds)?;
@@ -1248,7 +1252,10 @@ fn parse(input_bytes: Vec<u8>, root: Root, bounds: Bounds) -> Result<State> {
         frames.push(frame);
     }
     let metadata = if has_office_meta(xml)? {
-        Some(Metadata::from(OdfMetadata::from_xml(xml)?))
+        Some(Metadata::from(OdfMetadata::from_xml(
+            xml,
+            bounds.options.xml_limits_value(),
+        )?))
     } else {
         None
     };
@@ -1371,10 +1378,14 @@ fn has_office_meta(xml: &str) -> Result<bool> {
     }
 }
 
-fn patch_flat_metadata(bytes: &[u8], values: &crate::MetadataFields) -> Result<Vec<u8>> {
+fn patch_flat_metadata(
+    bytes: &[u8],
+    values: &crate::MetadataFields,
+    xml_limits: XmlStreamLimits,
+) -> Result<Vec<u8>> {
     let source = std::str::from_utf8(bytes)
         .map_err(|error| invalid(format!("flat ODI metadata source is not UTF-8: {error}")))?;
-    let parsed = OdfMetadata::from_xml(source)?;
+    let parsed = OdfMetadata::from_xml(source, xml_limits)?;
     let mut target = Metadata::from(parsed.clone());
     target.title = values.title().map(str::to_owned);
     target.author = values.author().map(str::to_owned);
@@ -1382,7 +1393,7 @@ fn patch_flat_metadata(bytes: &[u8], values: &crate::MetadataFields) -> Result<V
     target.description = values.description().map(str::to_owned);
     target.keywords = values.keywords().to_vec();
     let patch = MetaXmlPatch::preserve_all().diff_simple_fields(&parsed, &target);
-    patch_meta_xml(source, &patch)?
+    patch_meta_xml(source, &patch, xml_limits)?
         .map(String::into_bytes)
         .ok_or_else(|| invalid("flat ODI metadata edit lost office:meta"))
 }

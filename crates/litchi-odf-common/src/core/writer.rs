@@ -2687,7 +2687,11 @@ mod tests {
         let archive = ArchiveReader::new(&bytes).unwrap();
         let manifest_xml = archive.read("META-INF/manifest.xml").unwrap();
         let manifest_text = std::str::from_utf8(&manifest_xml).unwrap();
-        let manifest = super::super::manifest::Manifest::parse(manifest_text).unwrap();
+        let manifest = super::super::manifest::Manifest::parse(
+            manifest_text,
+            super::super::XmlStreamLimits::owner_default_value(),
+        )
+        .unwrap();
         let mut audited = Vec::new();
         for name in archive.file_names() {
             let media_type = manifest.get_media_type(name).unwrap_or_default();

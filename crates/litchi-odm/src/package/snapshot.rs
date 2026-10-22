@@ -2,7 +2,7 @@
 
 use litchi_core::{Error, Metadata, Result};
 use litchi_odf_common::core::{OwnedPackage, PackageWriter, family::Package};
-use litchi_odf_common::{Error as PackageError, OpenOptions, SemanticLimitKind};
+use litchi_odf_common::{Error as PackageError, OpenOptions, SemanticLimitKind, XmlStreamLimits};
 use std::{path::Path, sync::Arc};
 
 pub(crate) const MIMETYPE: &str = "application/vnd.oasis.opendocument.text-master";
@@ -16,6 +16,7 @@ const MAX_ACTIVE_XML_BYTES: usize = 256 * 1024 * 1024;
 
 struct State {
     package: Package,
+    xml_limits: XmlStreamLimits,
     semantics: crate::codec::Semantics,
     styles: Vec<crate::style::Definition>,
     resources: crate::resource::Graph,
@@ -112,12 +113,12 @@ impl Snapshot {
 
     pub(crate) fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
         let package = Package::from_bytes(bytes, MIMETYPE, BODY_MARKER, "ODM")?;
-        Self::from_package(package)
+        Self::from_package(package, XmlStreamLimits::owner_default_value())
     }
 
     pub(crate) fn from_shared_bytes(bytes: Arc<Vec<u8>>) -> Result<Self> {
         let package = Package::from_shared_bytes(bytes, MIMETYPE, BODY_MARKER, "ODM")?;
-        Self::from_package(package)
+        Self::from_package(package, XmlStreamLimits::owner_default_value())
     }
 
     /// Project a validated package, then bound its direct body items by the
@@ -126,7 +127,7 @@ impl Snapshot {
         package: Package,
         options: OpenOptions,
     ) -> std::result::Result<Self, PackageError> {
-        let snapshot = Self::from_package(package)?;
+        let snapshot = Self::from_package(package, options.xml_limits_value())?;
         let units = u64::try_from(snapshot.structure().items().len()).unwrap_or(u64::MAX);
         options
             .semantic_limits_value()
@@ -134,13 +135,14 @@ impl Snapshot {
         Ok(snapshot)
     }
 
-    fn from_package(package: Package) -> Result<Self> {
+    fn from_package(package: Package, xml_limits: XmlStreamLimits) -> Result<Self> {
         let semantics = crate::codec::parse(package.content_xml())?;
         let styles = crate::codec::parse_catalog(package.content_xml(), package.styles_xml())?;
         let resources = build_resource_graph(&package, semantics.references())?;
         let security = build_security_state(&package, &semantics)?;
         Ok(Self(Arc::new(State {
             package,
+            xml_limits,
             semantics,
             styles,
             resources,
@@ -255,11 +257,19 @@ impl Snapshot {
         for write in resource_writes {
             writer.add_file_with_media_type(&write.path, &write.bytes, &write.media_type)?;
         }
-        Self::from_bytes(writer.finish_to_bounded_bytes()?)
+        Self::from_bytes_with_options(
+            writer.finish_to_bounded_bytes()?,
+            OpenOptions::new().xml_limits(self.0.xml_limits),
+        )
+        .map_err(Error::from)
     }
 
     pub(crate) fn as_bytes(&self) -> &[u8] {
         self.0.package.as_bytes()
+    }
+
+    pub(crate) fn xml_limits_value(&self) -> XmlStreamLimits {
+        self.0.xml_limits
     }
 
     pub(crate) fn shared_bytes(&self) -> Arc<Vec<u8>> {

@@ -65,7 +65,11 @@ impl Container {
             #[cfg(any(feature = "odt", feature = "ods", feature = "odp", odf_objects))]
             Self::Odf { bytes } => {
                 let archive = litchi_odf_common::package::Archive::new(bytes)?;
-                let manifest = litchi_odf_common::package::read_manifest(&archive).ok();
+                let manifest = litchi_odf_common::package::read_manifest(
+                    &archive,
+                    litchi_odf_common::XmlStreamLimits::owner_default_value(),
+                )
+                .ok();
                 let mut parts: Vec<PartInfo> = archive
                     .file_names()
                     .filter(|name| !name.ends_with('/'))
@@ -104,7 +108,11 @@ impl Container {
             Self::Odf { bytes } => {
                 let archive = litchi_odf_common::package::Archive::new(bytes)?;
                 let member = odf_member(&archive, spec)?;
-                let manifest = litchi_odf_common::package::read_manifest(&archive).ok();
+                let manifest = litchi_odf_common::package::read_manifest(
+                    &archive,
+                    litchi_odf_common::XmlStreamLimits::owner_default_value(),
+                )
+                .ok();
                 let content_type = manifest
                     .as_ref()
                     .and_then(|manifest| manifest.get_media_type(&member))

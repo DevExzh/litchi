@@ -6,6 +6,7 @@
     )
 )]
 
+use litchi_odf_common::XmlStreamLimits;
 use litchi_odf_common::core::{
     Cipher, Kdf, Manifest, OwnedPackage, PackageWriter, Profile, StartKey,
 };
@@ -76,7 +77,7 @@ fn emits_typed_manifest_descriptors_and_fresh_randomness() {
     let package = OwnedPackage::from_bytes(first).unwrap();
     let manifest_xml =
         String::from_utf8(package.get_file("META-INF/manifest.xml").unwrap()).unwrap();
-    let manifest = Manifest::parse(&manifest_xml).unwrap();
+    let manifest = Manifest::parse(&manifest_xml, XmlStreamLimits::default()).unwrap();
     let content = manifest.get_entry("content.xml").unwrap();
     assert_eq!(content.size, Some(CONTENT.len() as u64));
     assert!(content.encryption.as_ref().unwrap().checksum.is_some());
