@@ -2253,3 +2253,44 @@ See [0063](0063-source-pptx-modern-comments.md).
   performance returns, corpus dispositions, final inventory/glossary closure
   and the complete assembled gate remain required. Only the comprehensive
   redaction audit is deferred. Nothing has been pushed.
+
+- Coordinator checkpoint (2026-10-22, extended assembly and policy returns):
+  The integration branch reaches `c48e382321`, adding reviewed XLSX raw
+  admission/reader state, XLSB raw policy/admitted-reader reuse, consuming
+  DOC body publication, and RTF shared replay storage. The original signed
+  no-op return remains unresolved; candidate `2ed47bf56e` still retains a
+  changed native patch behind an endpoint marker and is returned again.
+  The repair must produce a genuine native no-op bound to the signed source,
+  retain admission guards, and cover supported paragraph/run/story routes.
+
+  Record 0362uf preserves the assembled consumer checks. The first stopped
+  before compilation on the new ODF dependency's lock state; an offline
+  refresh corrects the generated workspace lock and the tracked harness
+  dependency edge. The next check reached XLSX and found a raw-budget plan
+  type mismatch and ambiguous closure error. The correction keeps original
+  owner metrics separate from the proposed relationship edit. These runs do
+  not count as completed consumer validation. Fifty-six glossary/iWork
+  checker unit tests pass; the earlier 1,578-test receipt remains tied to
+  `c2122e2678`.
+
+  Independent review returns two additional policy gaps. DOCX restored
+  replay must retain recipient semantic/source/cache/execution policy on
+  every path, including deferred endpoints, without losing proven same-owner
+  fast paths (0362rn). XLSX externally supplied packages must retain custom
+  cache policy and both package/facade execution contexts through deferred
+  materialization (0360aea). Both are being repaired and require tests.
+
+  OPC required-limit ingress and DOCX raw codec/helper migrations have source
+  commits and are under integration review; all consumers must move together.
+  The ODP lazy append-fact repair has no definite static correctness blocker,
+  but needs exact-source lifecycle qualification. RTF final-source allocation
+  and instruction measurements are running. Fair iWork constructor evidence
+  identifies required current-field admission costs; complete consumer
+  lifecycle qualification and safe optimization remain required.
+
+  Resource recovery removed 8.1 GB of proven unmeasured debug artifacts after
+  retaining hashes/provenance, and relocated the inactive root release cache
+  intact outside the target. No measured executable was deleted. Native
+  qualification, corpus dispositions, final inventory/glossary and the full
+  assembled gate remain open. Only the comprehensive redaction audit is
+  deferred. Nothing has been pushed.
