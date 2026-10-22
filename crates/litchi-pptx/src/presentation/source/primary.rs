@@ -334,26 +334,25 @@ impl Package {
         Ok(self.replay_content_fingerprint()? == other.replay_content_fingerprint()?)
     }
 
-    fn replay_content_fingerprint(&self) -> Result<[u8; 32]> {
+    fn replay_content_fingerprint(&self) -> Result<(u64, [u8; 32])> {
         let effective = self.effective()?;
         if !std::ptr::eq(effective, self) {
             return effective.replay_content_fingerprint();
         }
         self.check()?;
         if self.is_pristine() {
-            return Ok(self
-                .owner
-                .package
-                .source_artifact()
-                .fingerprint()
-                .map_err(Error::from)?
-                .into_sha256());
+            let artifact = self.owner.package.source_artifact();
+            return Ok((
+                artifact.len(),
+                artifact.fingerprint().map_err(Error::from)?.into_sha256(),
+            ));
         }
         let mut sink = ReplayHashWriter {
             digest: Sha256::new(),
+            bytes: 0,
         };
         self.write_to(&mut sink)?;
-        Ok(sink.digest.finalize().into())
+        Ok((sink.bytes, sink.digest.finalize().into()))
     }
 
     /// Rebase a replayed artifact onto this package's source policy.
@@ -822,11 +821,26 @@ impl Package {
 
 struct ReplayHashWriter {
     digest: Sha256,
+    bytes: u64,
 }
 
 impl Write for ReplayHashWriter {
     fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
         self.digest.update(bytes);
+        self.bytes = self
+            .bytes
+            .checked_add(u64::try_from(bytes.len()).map_err(|_| {
+                std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    "replay content length exceeds u64",
+                )
+            })?)
+            .ok_or_else(|| {
+                std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    "replay content length overflows u64",
+                )
+            })?;
         Ok(bytes.len())
     }
 
