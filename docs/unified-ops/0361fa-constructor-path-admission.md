@@ -51,3 +51,15 @@ the guard interrupted them before finalization, and those raw files are kept
 unchanged. The refreshed evidence inventory records both runner logs and all
 artifacts by path, size and SHA-256. Worker holds were released after the
 second interruption so engineering and bounded validation could continue.
+
+Two further attempts used the same protected binaries and unchanged runner.
+`native-a3` exited 1 during field-path calibration after a Litchi XLSX worker
+started its formatter/test sequence before the coordinator released the hold.
+That sequence was stopped, its partial validation logs were retained, and all
+workers confirmed the hold before retrying. `native-a4` exited 1 during the
+third leg of its first field-path block when an independent
+`peculiar-adblock` test started. Neither attempt completed a qualified block.
+Their calibration, warmup and incomplete block output remain unqualified;
+both ended runners retain their original `running` manifests. The refreshed
+inventory includes all four attempts, and engineering holds were released
+after the fourth interruption. No latency acceptance is claimed.
