@@ -758,12 +758,13 @@ impl Package {
         let main = self.physical_package()?.main_document_part()?;
         validate_document_main_content_type(main.content_type())?;
         let declared = main.declared_uncompressed_size()?;
-        let declared = usize::try_from(declared).unwrap_or(usize::MAX);
-        if declared > limits.max_document_bytes() {
+        let maximum = u64::try_from(limits.max_document_bytes()).unwrap_or(u64::MAX);
+        if declared > maximum {
+            let actual = usize::try_from(declared).unwrap_or(usize::MAX);
             return Err(Error::ExternalHyperlinkDetachmentLimit {
                 kind: sanitize::LimitKind::MainDocumentXmlBytes,
                 maximum: limits.max_document_bytes(),
-                actual: declared,
+                actual,
             });
         }
         Ok(())

@@ -1551,11 +1551,12 @@ fn preflight_story_part(
     current_relationships: usize,
 ) -> Result<(usize, usize, usize, usize)> {
     let declared = part.declared_uncompressed_size()?;
-    let declared = usize::try_from(declared)
-        .map_err(|_| invalid("story hyperlink declared byte count does not fit usize"))?;
-    if declared > limits.story.max_story_bytes {
+    let maximum = u64::try_from(limits.story.max_story_bytes).unwrap_or(u64::MAX);
+    if declared > maximum {
         return Err(invalid("story hyperlink story byte limit exceeded"));
     }
+    let declared = usize::try_from(declared)
+        .map_err(|_| invalid("story hyperlink declared byte count does not fit usize"))?;
     let total_story_bytes = current_story_bytes
         .checked_add(declared)
         .ok_or_else(|| invalid("story hyperlink aggregate story byte overflow"))?;
