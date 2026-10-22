@@ -4282,6 +4282,14 @@ impl SourceArtifact {
         self.snapshot.length == 0
     }
 
+    /// Return whether this artifact can use its source-owned fingerprint
+    /// memo. Managed sources still authenticate through their execution
+    /// context, so their owner boundary supplies the version-keyed memo.
+    #[must_use]
+    pub const fn has_fingerprint_memo(&self) -> bool {
+        self.fingerprint_memo.is_some() && self.snapshot.context.is_none()
+    }
+
     /// Hash the exact current artifact without materializing it.
     pub fn fingerprint(&self) -> Result<SourceArtifactFingerprint> {
         self.snapshot.ensure_current()?;

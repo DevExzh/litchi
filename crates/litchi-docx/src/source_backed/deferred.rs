@@ -13,7 +13,7 @@ use std::sync::{Arc, OnceLock};
 
 use litchi_opc::{SourceBackedPackage, SourceLimits};
 
-use super::Package;
+use super::{ArtifactFingerprintMemo, Package};
 use crate::{Error, Result};
 
 /// Writes the committed artifact to a sink.
@@ -135,29 +135,42 @@ impl Package {
             } else {
                 let physical = self.physical_source()?;
                 let version = physical.source_version()?;
-                if let Some((_cached_version, fingerprint)) = self
-                    .artifact_fingerprint
-                    .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner)
-                    .as_ref()
-                    .copied()
-                    .filter(|(cached_version, _)| *cached_version == version)
-                {
-                    return Ok((physical.source_artifact().len(), fingerprint));
-                }
                 let artifact = physical.source_artifact();
+                if let Some(ArtifactFingerprintMemo::Source(memo)) =
+                    self.artifact_fingerprint.as_ref()
+                    && let Some((_cached_version, fingerprint)) = memo
+                        .lock()
+                        .unwrap_or_else(std::sync::PoisonError::into_inner)
+                        .as_ref()
+                        .copied()
+                        .filter(|(cached_version, _)| *cached_version == version)
+                {
+                    return Ok((artifact.len(), fingerprint));
+                }
                 let fingerprint = artifact.fingerprint()?.into_sha256();
-                *self
-                    .artifact_fingerprint
-                    .lock()
-                    .unwrap_or_else(std::sync::PoisonError::into_inner) =
-                    Some((version, fingerprint));
+                if let Some(ArtifactFingerprintMemo::Source(memo)) =
+                    self.artifact_fingerprint.as_ref()
+                {
+                    *memo
+                        .lock()
+                        .unwrap_or_else(std::sync::PoisonError::into_inner) =
+                        Some((version, fingerprint));
+                }
                 return Ok((artifact.len(), fingerprint));
             }
+        }
+        self.check_source()?;
+        if let Some(ArtifactFingerprintMemo::Effective(memo)) = self.artifact_fingerprint.as_ref()
+            && let Some(artifact) = memo.get()
+        {
+            return Ok(*artifact);
         }
         let mut sink = Hashing(<sha2::Sha256 as sha2::Digest>::new(), 0);
         self.write_to(&mut sink)?;
         let artifact = (sink.1, sha2::Digest::finalize(sink.0).into());
+        if let Some(ArtifactFingerprintMemo::Effective(memo)) = self.artifact_fingerprint.as_ref() {
+            let _ = memo.set(artifact);
+        }
         if let (None, Some(deferred)) = (&self.effective, &self.deferred) {
             let _ = deferred.fingerprint.set(artifact);
         }

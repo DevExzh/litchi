@@ -225,7 +225,6 @@ impl Package {
             opc: opc.into(),
             paragraph_index_cache: Arc::new(ParagraphIndexCache::new()),
             main_admission: Arc::new(std::sync::Mutex::new(std::sync::Weak::new())),
-            artifact_fingerprint: Arc::new(std::sync::Mutex::new(None)),
             properties: properties.into(),
             custom_props: custom_props.into(),
             semantic_limits: Arc::default(),

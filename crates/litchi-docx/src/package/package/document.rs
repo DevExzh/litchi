@@ -71,18 +71,8 @@ impl Package {
     }
 
     fn artifact_fingerprint(&self) -> Result<[u8; 32], crate::document::Error> {
-        let current = self.opc.weak();
-        let generation = self.opc.generation();
-        if let Some((cached, cached_generation, fingerprint)) = self
-            .artifact_fingerprint
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .as_ref()
-            && cached.strong_count() != 0
-            && cached.ptr_eq(&current)
-            && *cached_generation == generation
-        {
-            return Ok(*fingerprint);
+        if let Some(fingerprint) = self.opc.fingerprint() {
+            return Ok(fingerprint);
         }
         let mut writer = ArtifactFingerprintWriter {
             hasher: Sha256::new(),
@@ -91,11 +81,10 @@ impl Package {
         let digest = writer.hasher.finalize();
         let mut fingerprint = [0_u8; 32];
         fingerprint.copy_from_slice(&digest);
-        *self
-            .artifact_fingerprint
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner) =
-            Some((current, generation, fingerprint));
+        // `SharedOpc` keeps this memo inline with the immutable graph state;
+        // cloning the package copies the memo while a later mutation clears
+        // only that branch.
+        self.opc.remember_fingerprint(fingerprint);
         Ok(fingerprint)
     }
 

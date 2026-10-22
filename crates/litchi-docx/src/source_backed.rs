@@ -168,12 +168,26 @@ pub struct Package {
     /// The pending output of a committed package (record 0355a); its
     /// physical source is the materialized output.
     deferred: Option<Arc<deferred::Deferred>>,
-    /// A complete-artifact fingerprint for the current physical source.
-    /// Generic positional sources do not have the OPC owned-source memo, so
-    /// retain the digest at this owner boundary and key it by the source
-    /// version. A changed source therefore invalidates the memo before a
-    /// composition can use it.
-    artifact_fingerprint: Arc<Mutex<Option<(SourceVersion, [u8; 32])>>>,
+    /// A complete-artifact fingerprint memo for a generic source or an
+    /// immutable effective topology. Owned physical sources use the memo
+    /// already retained by `SourceArtifact` and keep this field empty.
+    artifact_fingerprint: Option<ArtifactFingerprintMemo>,
+}
+
+#[derive(Clone)]
+enum ArtifactFingerprintMemo {
+    Source(Arc<Mutex<Option<(SourceVersion, [u8; 32])>>>),
+    Effective(Arc<OnceLock<(u64, [u8; 32])>>),
+}
+
+impl ArtifactFingerprintMemo {
+    fn source() -> Self {
+        Self::Source(Arc::new(Mutex::new(None)))
+    }
+
+    fn effective() -> Self {
+        Self::Effective(Arc::new(OnceLock::new()))
+    }
 }
 
 /// A checked selector for one active `w:altChunk` anchor in the main story.
@@ -452,7 +466,11 @@ impl Package {
             main_admission: Arc::new(Mutex::new(None)),
             main_snapshot: Arc::new(Mutex::new(None)),
             deferred: None,
-            artifact_fingerprint: Arc::new(Mutex::new(None)),
+            artifact_fingerprint: if package.source_artifact().has_fingerprint_memo() {
+                None
+            } else {
+                Some(ArtifactFingerprintMemo::source())
+            },
         })
     }
 
@@ -1264,11 +1282,12 @@ impl Package {
         )?)
     }
 
-    /// Load the exact raw main-document bytes as a semantic transaction
-    /// snapshot.
+    /// Load the exact raw main-document bytes as the source for the canonical
+    /// owner edit. Standalone XML changes use [`crate::document::raw::Tree`]
+    /// with a required [`crate::document::raw::Limits`] policy.
     ///
-    /// The snapshot edits and publishes the source bytes while readers see
-    /// the markup-compatibility projection, so a document is admitted only
+    /// The owner edits and publishes the retained source bytes while readers
+    /// see the markup-compatibility projection, so a document is admitted only
     /// when the two agree on everything either reads (one bounded proof, no
     /// projection built): it never mentions the markup-compatibility
     /// namespace, binds it and uses nothing in it, or carries one valid
