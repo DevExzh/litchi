@@ -730,6 +730,22 @@ impl Package {
         }
     }
 
+    fn preflight_external_hyperlink_document_xml(&self, limits: sanitize::Limits) -> Result<()> {
+        let main = self.physical_package()?.main_document_part()?;
+        validate_document_main_content_type(main.content_type())?;
+        let declared = main.declared_uncompressed_size()?;
+        let maximum = u64::try_from(limits.max_document_bytes()).unwrap_or(u64::MAX);
+        if declared > maximum {
+            let actual = usize::try_from(declared).unwrap_or(usize::MAX);
+            return Err(Error::ExternalHyperlinkDetachmentLimit {
+                kind: sanitize::LimitKind::MainDocumentXmlBytes,
+                maximum: limits.max_document_bytes(),
+                actual,
+            });
+        }
+        Ok(())
+    }
+
     /// Stream visible main-document paragraphs to a caller-owned sink.
     ///
     /// Resolves the current main part from the effective graph after a commit,
@@ -1342,8 +1358,10 @@ impl Package {
         let target = patch.apply_content(&current.snapshot)?;
         if !patch.is_empty() {
             if !current.unique_inbound_owner {
-                return Err(Error::DocumentVariablesPreservation(
-                    "the settings Part has an additional internal inbound relationship",
+                return Err(Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedContent,
+                    operation,
+                    "document-variable markup cannot be preserved for this settings owner",
                 ));
             }
             if current.protected {
@@ -1438,6 +1456,7 @@ impl Package {
         &self,
         limits: sanitize::Limits,
     ) -> Result<sanitize::Snapshot> {
+        self.preflight_external_hyperlink_document_xml(limits)?;
         let (_, document) = self
             .main_document_snapshot("external_hyperlink_sanitization_snapshot", false)
             .map_err(transaction_error_to_document)?;
@@ -1495,6 +1514,7 @@ impl Package {
         &self,
         limits: sanitize::Limits,
     ) -> Result<redact::Snapshot> {
+        self.preflight_external_hyperlink_document_xml(limits)?;
         let (_, document) = self
             .main_document_snapshot("external_hyperlink_redaction_snapshot", false)
             .map_err(transaction_error_to_document)?;
@@ -1582,7 +1602,7 @@ impl Package {
     /// document and return the main part (record 0355a).
     pub(crate) fn external_hyperlink_redaction_target(
         &self,
-        commit: &redact::Commit,
+        patch: &redact::IrreversibleRedactionPatch,
     ) -> Result<PackURI> {
         self.trim_clean_paragraph_index_for_operation();
         let main = self
@@ -1590,9 +1610,8 @@ impl Package {
             .main_document_part()?
             .partname()
             .clone();
-        let current =
-            self.external_hyperlink_redaction_snapshot_bounded(commit.patch().limits())?;
-        commit.patch().validate_source(&current)?;
+        let current = self.external_hyperlink_redaction_snapshot_bounded(patch.limits())?;
+        patch.validate_source(&current)?;
         Ok(main)
     }
 
@@ -1602,9 +1621,9 @@ impl Package {
         &self,
         writer: &mut dyn Write,
         main: &PackURI,
-        commit: &redact::Commit,
+        patch: &redact::IrreversibleRedactionPatch,
     ) -> Result<()> {
-        let (replacement, removed_ids) = redact::publication_parts(commit);
+        let (replacement, removed_ids) = redact::publication_parts(patch);
         self.physical_package()?
             .clone()
             .write_part_overlay_with_external_relationship_removals_to_stream(
@@ -1667,13 +1686,11 @@ impl Package {
     /// 0355a).
     pub(crate) fn story_hyperlink_redaction_admit(
         &self,
-        commit: &crate::story_hyperlinks::Commit,
+        patch: &crate::story_hyperlinks::ForwardOnlyPatch,
     ) -> Result<()> {
         self.trim_clean_paragraph_index_for_operation();
         self.physical_package()?.check_execution()?;
-        commit
-            .patch()
-            .validate_source_identity(self.physical_package()?)
+        patch.validate_source_identity(self.physical_package()?)
     }
 
     /// Write this package with a story-hyperlink redaction's story
@@ -1681,9 +1698,9 @@ impl Package {
     pub(crate) fn write_story_hyperlink_redaction(
         &self,
         writer: &mut dyn Write,
-        commit: &crate::story_hyperlinks::Commit,
+        patch: &crate::story_hyperlinks::ForwardOnlyPatch,
     ) -> Result<()> {
-        let parts = crate::story_hyperlinks::publication_parts(commit)?;
+        let parts = crate::story_hyperlinks::publication_parts(patch)?;
         self.physical_package()?
             .clone()
             .write_part_overlays_with_external_relationship_removals_to_stream(writer, parts)?;

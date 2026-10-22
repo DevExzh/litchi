@@ -1297,9 +1297,6 @@ impl Classify for litchi_docx::Error {
             Self::Mce(error) if mce_limit(error) => Class::of(Code::LimitExceeded),
             Self::OutOfBounds { .. } => Class::of(Code::OutOfRange),
             Self::Refused(refusal) => refusal.classify(),
-            Self::ExternalHyperlinkDetachmentConflict
-            | Self::ExternalHyperlinkRedactionConflict
-            | Self::DocumentVariablesConflict => Class::of(Code::InvalidInput),
             Self::PatchConflict { .. } => Class::of(Code::InvalidInput),
             Self::Allocation { .. }
             | Self::RevisionAllocation { .. }

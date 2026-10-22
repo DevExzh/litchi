@@ -36,6 +36,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Some(selector) if selector == std::ffi::OsStr::new("docx-managed-read-ahead") => {
             litchi_perf_baseline::docx_managed_read_ahead::run_from_args(args)
         },
+        Some(selector) if selector == std::ffi::OsStr::new("docx-raw-codec") => {
+            litchi_perf_baseline::docx_raw_codec::run_from_args(args)
+        },
         Some(selector) if selector == std::ffi::OsStr::new("docx-owned-attribution") => {
             litchi_perf_baseline::docx_owned_attribution::run_from_args(args)
         },

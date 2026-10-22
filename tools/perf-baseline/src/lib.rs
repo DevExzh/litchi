@@ -17,6 +17,7 @@ pub mod docx_managed_read_ahead;
 pub mod docx_owned_attribution;
 pub mod docx_plain_paragraph_tail_append;
 pub mod docx_provider_lifecycle;
+pub mod docx_raw_codec;
 mod docx_read_ahead;
 pub mod docx_replayable_tail_append;
 pub mod docx_section_retention;

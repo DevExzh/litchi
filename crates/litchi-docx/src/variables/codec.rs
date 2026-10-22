@@ -475,8 +475,10 @@ pub(crate) fn ensure_source_backed_rewrite_safe(
     let capacity = document_variables_element_len(&layout, before, limits)?;
     let canonical = document_variables_element_fallible(&layout, before, capacity, limits)?;
     if xml[range.clone()] != *canonical.as_bytes() {
-        return Err(Error::DocumentVariablesPreservation(
-            "the selected docVars owner is not in the exact preservation-safe form",
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "document_variables",
+            "selected document-variable markup cannot be preserved",
         ));
     }
     Ok(())

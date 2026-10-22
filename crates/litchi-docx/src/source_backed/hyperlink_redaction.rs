@@ -20,10 +20,10 @@ use crate::source_backed::deferred::{Change, source_family};
 /// The sealed forward redaction, or its inverse.
 #[derive(Clone)]
 pub(crate) enum RedactionChange {
-    Forward(Arc<record::Commit>),
+    Forward(Arc<record::IrreversibleRedactionPatch>),
     Inverse {
         noop: bool,
-        forward: Arc<record::Commit>,
+        forward: Arc<record::IrreversibleRedactionPatch>,
     },
 }
 
@@ -32,16 +32,16 @@ impl Change for RedactionChange {
 
     fn is_noop(&self) -> bool {
         match self {
-            Self::Forward(commit) => commit.patch().is_noop(),
+            Self::Forward(patch) => patch.is_noop(),
             Self::Inverse { noop, .. } => *noop,
         }
     }
 
     fn inverse(&self) -> Self {
         match self {
-            Self::Forward(commit) => Self::Inverse {
-                noop: commit.patch().is_noop(),
-                forward: Arc::clone(commit),
+            Self::Forward(patch) => Self::Inverse {
+                noop: patch.is_noop(),
+                forward: Arc::clone(patch),
             },
             Self::Inverse { forward, .. } => Self::Forward(Arc::clone(forward)),
         }
@@ -49,29 +49,33 @@ impl Change for RedactionChange {
 
     fn publish(&self, package: &Package) -> Result<Package> {
         match self {
-            Self::Forward(commit) => {
-                let main = package.external_hyperlink_redaction_target(commit)?;
-                if commit.patch().is_noop() {
+            Self::Forward(patch) => {
+                let main = package.external_hyperlink_redaction_target(patch)?;
+                if patch.is_noop() {
                     return Ok(package.clone());
                 }
                 let base = package.clone();
-                let commit = Arc::clone(commit);
+                let patch = Arc::clone(patch);
                 package.deferred(move |writer| {
-                    base.write_external_hyperlink_redaction(writer, &main, &commit)
+                    base.write_external_hyperlink_redaction(writer, &main, &patch)
                 })
             },
             Self::Inverse { noop: true, .. } => Ok(package.clone()),
             // Only the commit's own package can be restored.
-            Self::Inverse { .. } => Err(crate::Error::ExternalHyperlinkRedactionConflict),
+            Self::Inverse { .. } => Err(crate::Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "external_hyperlink_redaction",
+                "forward-only redaction cannot be inverted on another package",
+            )),
         }
     }
 }
 
 source_family!("external-hyperlink redaction", RedactionChange);
 
-impl From<record::Commit> for Patch {
+impl From<record::IrreversibleRedactionPatch> for Patch {
     /// Replay a sealed record commit onto the exact source it was planned on.
-    fn from(commit: record::Commit) -> Self {
+    fn from(commit: record::IrreversibleRedactionPatch) -> Self {
         Self {
             change: RedactionChange::Forward(Arc::new(commit)),
             restore: None,
@@ -117,8 +121,8 @@ impl Edit {
     ///
     /// Returns the redaction, source, protection or signature errors.
     pub fn commit(self) -> Result<Commit> {
-        let commit = self.plan.apply()?;
-        commit_change(&self.package, RedactionChange::Forward(Arc::new(commit)))
+        let patch = self.plan.apply()?;
+        commit_change(&self.package, RedactionChange::Forward(Arc::new(patch)))
     }
 }
 
@@ -140,9 +144,8 @@ impl Package {
     ///
     /// # Errors
     ///
-    /// Returns [`crate::Error::ExternalHyperlinkRedactionConflict`] for another
-    /// source, or for an inverse applied to anything but its commit's
-    /// package.
+    /// Returns [`crate::Error::PatchConflict`] for another source, or a typed
+    /// refusal for an inverse applied to anything but its commit's package.
     pub fn apply_external_hyperlink_redaction(&self, patch: &Patch) -> Result<Commit> {
         apply_change(self, patch)
     }

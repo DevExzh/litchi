@@ -326,7 +326,10 @@ impl Patch {
         if source.xml.as_slice() != self.before.xml.as_slice()
             || source.variables != self.before.variables
         {
-            return Err(Error::DocumentVariablesConflict);
+            return Err(Error::conflict(
+                "document_variables",
+                "the patch base does not match the supplied source",
+            ));
         }
         Ok(self.after.clone())
     }
@@ -338,7 +341,10 @@ impl Patch {
     /// Returns an error if the operation cannot be completed.
     pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
         if !source.same_source(&self.before) {
-            return Err(Error::DocumentVariablesConflict);
+            return Err(Error::conflict(
+                "document_variables",
+                "the patch base does not match the supplied source",
+            ));
         }
         Ok(self.after.clone())
     }

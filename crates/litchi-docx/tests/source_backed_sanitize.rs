@@ -170,17 +170,18 @@ fn plan_is_non_mutating_and_detaches_first_middle_last_while_retaining_text() {
     assert_eq!(plan.effect_report().referenced_external_relationships(), 2);
     assert_eq!(plan.effect_report().retained_relationships(), 2);
 
-    let commit = plan.apply().unwrap();
+    let patch = plan.apply().unwrap();
+    let sanitized_snapshot = patch.apply(&source).unwrap();
     assert_eq!(source.xml_bytes(), source_xml);
-    assert_eq!(commit.snapshot().external_hyperlink_count(), 0);
-    let sanitized = std::str::from_utf8(commit.snapshot().xml_bytes()).unwrap();
+    assert_eq!(sanitized_snapshot.external_hyperlink_count(), 0);
+    let sanitized = std::str::from_utf8(sanitized_snapshot.xml_bytes()).unwrap();
     assert!(!sanitized.contains("r:id=\"rOne\""));
     assert!(!sanitized.contains("r:id=\"rTwo\""));
     assert!(sanitized.contains("<w:hyperlink w:anchor=\"local\">"));
     assert!(sanitized.contains("<w:commentRangeStart w:id=\"8\"/>"));
     assert!(sanitized.contains("<x:opaque x:value=\"keep\"><![CDATA[a < b]]></x:opaque>"));
     let parsed = litchi_docx::document::raw::Tree::from_xml(
-        commit.snapshot().xml_bytes().to_vec(),
+        sanitized_snapshot.xml_bytes().to_vec(),
         litchi_docx::document::raw::Limits::default(),
     )
     .unwrap();
@@ -199,13 +200,13 @@ fn plan_is_non_mutating_and_detaches_first_middle_last_while_retaining_text() {
         comments.clone(),
         vba.clone(),
     ));
-    let fresh_plan = package.plan_external_hyperlink_detachment().unwrap();
-    let fresh_commit = fresh_plan.apply().unwrap();
-    let mut output = Vec::new();
-    package
-        .apply_external_hyperlink_detachment(&fresh_commit.patch().clone().into())
-        .and_then(|committed| committed.package().write_to(&mut output))
+    let fresh_commit = package
+        .edit_external_hyperlink_detachment()
+        .unwrap()
+        .commit()
         .unwrap();
+    let mut output = Vec::new();
+    fresh_commit.package().write_to(&mut output).unwrap();
     let reopened = OpcPackage::from_bytes(&output).unwrap();
     let main = reopened.main_document_part().unwrap();
     assert_eq!(
@@ -267,15 +268,20 @@ fn exact_noop_shares_snapshot_and_reproduces_signed_source_bytes() {
     );
     let package = open_source(bytes.clone());
     let source = package.external_hyperlink_sanitization_snapshot().unwrap();
-    let commit = source.plan().apply().unwrap();
-    assert!(commit.effect_report().is_noop());
-    assert!(commit.patch().is_noop());
-    assert!(source.shares_xml_allocation_with(commit.snapshot()));
+    let patch = source.plan().apply().unwrap();
+    let applied = patch.apply(&source).unwrap();
+    assert!(patch.effect_report().is_noop());
+    assert!(patch.is_noop());
+    assert!(source.shares_xml_allocation_with(&applied));
 
     let mut output = Vec::new();
     package
-        .apply_external_hyperlink_detachment(&commit.patch().clone().into())
-        .and_then(|committed| committed.package().write_to(&mut output))
+        .edit_external_hyperlink_detachment()
+        .unwrap()
+        .commit()
+        .unwrap()
+        .package()
+        .write_to(&mut output)
         .unwrap();
     assert_eq!(output, bytes);
 }
@@ -289,12 +295,15 @@ fn patch_inverse_is_exact_and_foreign_xml_or_relationships_conflict() {
     let first = open_source(first_bytes)
         .external_hyperlink_sanitization_snapshot()
         .unwrap();
-    let commit = first.plan().apply().unwrap();
-    let applied = commit.patch().apply(&first).unwrap();
-    assert_eq!(applied.xml_bytes(), commit.snapshot().xml_bytes());
-    let restored = commit.patch().inverse().apply(&applied).unwrap();
+    let patch = first.plan().apply().unwrap();
+    let applied = patch.apply(&first).unwrap();
+    assert_eq!(
+        applied.xml_bytes(),
+        patch.apply(&first).unwrap().xml_bytes()
+    );
+    let restored = patch.inverse().apply(&applied).unwrap();
     assert_eq!(restored.xml_bytes(), first.xml_bytes());
-    let inverse_report = commit.patch().inverse().effect_report();
+    let inverse_report = patch.inverse().effect_report();
     assert_eq!(inverse_report.detached_hyperlinks(), 0);
     assert_eq!(inverse_report.restored_hyperlinks(), 1);
     assert!(!inverse_report.is_noop());
@@ -306,8 +315,8 @@ fn patch_inverse_is_exact_and_foreign_xml_or_relationships_conflict() {
     .external_hyperlink_sanitization_snapshot()
     .unwrap();
     assert!(matches!(
-        commit.patch().apply(&foreign_xml),
-        Err(Error::ExternalHyperlinkDetachmentConflict)
+        patch.apply(&foreign_xml),
+        Err(Error::PatchConflict { .. })
     ));
 
     let foreign_relationship = open_source(fixture(
@@ -317,8 +326,47 @@ fn patch_inverse_is_exact_and_foreign_xml_or_relationships_conflict() {
     .external_hyperlink_sanitization_snapshot()
     .unwrap();
     assert!(matches!(
-        commit.patch().apply(&foreign_relationship),
-        Err(Error::ExternalHyperlinkDetachmentConflict)
+        patch.apply(&foreign_relationship),
+        Err(Error::PatchConflict { .. })
+    ));
+}
+
+#[test]
+fn canonical_replay_rejects_an_unrelated_part_mutation() {
+    let document = external_document("visible");
+    let original_comments = format!(
+        r#"<w:comments xmlns:w="{W}"><w:comment w:id="1"><w:p><w:r><w:t>original</w:t></w:r></w:p></w:comment></w:comments>"#
+    )
+    .into_bytes();
+    let original = fixture(
+        document.clone(),
+        FixtureOptions {
+            relationships: external_options("https://one.invalid/").relationships,
+            comments: Some(original_comments),
+            ..FixtureOptions::default()
+        },
+    );
+    let commit = open_source(original)
+        .edit_external_hyperlink_detachment()
+        .unwrap()
+        .commit()
+        .unwrap();
+
+    let changed_comments = format!(
+        r#"<w:comments xmlns:w="{W}"><w:comment w:id="1"><w:p><w:r><w:t>changed</w:t></w:r></w:p></w:comment></w:comments>"#
+    )
+    .into_bytes();
+    let changed = fixture(
+        document,
+        FixtureOptions {
+            relationships: external_options("https://one.invalid/").relationships,
+            comments: Some(changed_comments),
+            ..FixtureOptions::default()
+        },
+    );
+    assert!(matches!(
+        open_source(changed).apply_external_hyperlink_detachment(commit.patch()),
+        Err(Error::PatchConflict { .. })
     ));
 }
 
@@ -338,7 +386,7 @@ fn protected_malformed_active_and_over_limit_sources_fail_closed() {
         },
     );
     assert!(matches!(
-        open_source(protected).plan_external_hyperlink_detachment(),
+        open_source(protected).edit_external_hyperlink_detachment(),
         Err(Error::Refused(_))
     ));
 
@@ -354,7 +402,7 @@ fn protected_malformed_active_and_over_limit_sources_fail_closed() {
         },
     );
     assert!(matches!(
-        open_source(write_protected).plan_external_hyperlink_detachment(),
+        open_source(write_protected).edit_external_hyperlink_detachment(),
         Err(Error::Refused(_))
     ));
 
@@ -374,7 +422,7 @@ fn protected_malformed_active_and_over_limit_sources_fail_closed() {
         },
     );
     assert!(matches!(
-        open_source(strict_write_protected).plan_external_hyperlink_detachment(),
+        open_source(strict_write_protected).edit_external_hyperlink_detachment(),
         Err(Error::Refused(_))
     ));
 
@@ -384,14 +432,14 @@ fn protected_malformed_active_and_over_limit_sources_fail_closed() {
     .into_bytes();
     assert!(matches!(
         open_source(fixture(mce, external_options("https://one.invalid/"),))
-            .plan_external_hyperlink_detachment(),
+            .edit_external_hyperlink_detachment(),
         Err(Error::Refused(_))
     ));
 
     let missing = fixture(external_document("missing"), FixtureOptions::default());
     assert!(
         open_source(missing)
-            .plan_external_hyperlink_detachment()
+            .edit_external_hyperlink_detachment()
             .is_err()
     );
 
@@ -401,7 +449,7 @@ fn protected_malformed_active_and_over_limit_sources_fail_closed() {
     .into_bytes();
     assert!(
         open_source(fixture(nested, external_options("https://one.invalid/"),))
-            .plan_external_hyperlink_detachment()
+            .edit_external_hyperlink_detachment()
             .is_err()
     );
 
@@ -416,7 +464,7 @@ fn protected_malformed_active_and_over_limit_sources_fail_closed() {
                 litchi_docx::SemanticLimits::default()
                     .hyperlinks(Limits::default().with_max_external_hyperlinks(3).unwrap())
             )
-            .plan_external_hyperlink_detachment()
+            .edit_external_hyperlink_detachment()
             .unwrap()
             .effect_report()
             .detached_hyperlinks(),
@@ -428,13 +476,44 @@ fn protected_malformed_active_and_over_limit_sources_fail_closed() {
                 litchi_docx::SemanticLimits::default()
                     .hyperlinks(Limits::default().with_max_external_hyperlinks(2).unwrap())
             )
-            .plan_external_hyperlink_detachment(),
+            .edit_external_hyperlink_detachment(),
         Err(Error::ExternalHyperlinkDetachmentLimit {
             kind: litchi_docx::sanitize::LimitKind::ExternalHyperlinks,
             maximum: 2,
             actual: 3,
         })
     ));
+}
+
+#[test]
+fn main_declared_size_is_preflighted_before_raw_hyperlink_payload_reads() {
+    let package = open_source(fixture(
+        external_document("preflight"),
+        external_options("https://one.invalid/"),
+    ));
+    let before = package.cache_diagnostics();
+    let limits = Limits::default().with_max_document_bytes(1).unwrap();
+    let bounded =
+        package.with_semantic_limits(litchi_docx::SemanticLimits::default().hyperlinks(limits));
+    assert!(matches!(
+        bounded.external_hyperlink_sanitization_snapshot(),
+        Err(Error::ExternalHyperlinkDetachmentLimit {
+            kind: litchi_docx::sanitize::LimitKind::MainDocumentXmlBytes,
+            maximum: 1,
+            actual,
+        }) if actual > 1
+    ));
+    assert!(matches!(
+        bounded.external_hyperlink_redaction_snapshot(),
+        Err(Error::ExternalHyperlinkDetachmentLimit {
+            kind: litchi_docx::sanitize::LimitKind::MainDocumentXmlBytes,
+            maximum: 1,
+            actual,
+        }) if actual > 1
+    ));
+    let after = package.cache_diagnostics();
+    assert_eq!(after.cold_loads, before.cold_loads);
+    assert_eq!(after.successful_loads, before.successful_loads);
 }
 
 #[test]
@@ -448,7 +527,7 @@ fn wrapper_scoped_namespaces_xml_attributes_and_unknown_attributes_refuse_detach
             wrapper_scoped_prefix,
             external_options("https://one.invalid/"),
         ))
-        .plan_external_hyperlink_detachment(),
+        .edit_external_hyperlink_detachment(),
         Err(Error::Refused(_))
     ));
 
@@ -461,7 +540,7 @@ fn wrapper_scoped_namespaces_xml_attributes_and_unknown_attributes_refuse_detach
             wrapper_scoped_relationship_prefix,
             external_options("https://one.invalid/"),
         ))
-        .plan_external_hyperlink_detachment(),
+        .edit_external_hyperlink_detachment(),
         Err(Error::Refused(_))
     ));
 
@@ -471,7 +550,7 @@ fn wrapper_scoped_namespaces_xml_attributes_and_unknown_attributes_refuse_detach
     .into_bytes();
     assert!(matches!(
         open_source(fixture(xml_scope, external_options("https://one.invalid/"),))
-            .plan_external_hyperlink_detachment(),
+            .edit_external_hyperlink_detachment(),
         Err(Error::Refused(_))
     ));
 
@@ -481,7 +560,7 @@ fn wrapper_scoped_namespaces_xml_attributes_and_unknown_attributes_refuse_detach
     .into_bytes();
     assert!(matches!(
         open_source(fixture(unknown, external_options("https://one.invalid/"),))
-            .plan_external_hyperlink_detachment(),
+            .edit_external_hyperlink_detachment(),
         Err(Error::Refused(_))
     ));
 
@@ -489,14 +568,17 @@ fn wrapper_scoped_namespaces_xml_attributes_and_unknown_attributes_refuse_detach
         r#"<w:document xmlns:w="{W}" xmlns:r="{R}"><w:body><w:p><w:hyperlink r:id="rLink" w:tooltip="drop with wrapper" w:history="1"><w:r><w:t>visible</w:t></w:r></w:hyperlink></w:p></w:body></w:document>"#
     )
     .into_bytes();
-    let commit = open_source(fixture(known, external_options("https://one.invalid/")))
-        .plan_external_hyperlink_detachment()
-        .unwrap()
-        .apply()
+    let package = open_source(fixture(known, external_options("https://one.invalid/")));
+    let edit = package.edit_external_hyperlink_detachment().unwrap();
+    assert_eq!(edit.effect_report().detached_hyperlinks(), 1);
+    let commit = edit.commit().unwrap();
+    let mut output = Vec::new();
+    commit.package().write_to(&mut output).unwrap();
+    let snapshot = open_source(output)
+        .external_hyperlink_sanitization_snapshot()
         .unwrap();
-    assert_eq!(commit.effect_report().detached_hyperlinks(), 1);
     assert!(
-        !std::str::from_utf8(commit.snapshot().xml_bytes())
+        !std::str::from_utf8(snapshot.xml_bytes())
             .unwrap()
             .contains("tooltip")
     );
@@ -513,19 +595,14 @@ fn changed_signed_publication_and_partial_sink_are_typed_failures() {
         },
     );
     let package = open_source(signed);
-    let commit = package
-        .plan_external_hyperlink_detachment()
+    let result = package
+        .edit_external_hyperlink_detachment()
         .unwrap()
-        .apply()
-        .unwrap();
-    let mut output = Vec::new();
+        .commit();
     assert!(matches!(
-        package
-            .apply_external_hyperlink_detachment(&commit.patch().clone().into())
-            .and_then(|committed| committed.package().write_to(&mut output)),
+        result,
         Err(Error::Opc(OpcError::SignedSourceRequiresExplicitPolicy))
     ));
-    assert!(output.is_empty());
 
     let bytes = fixture(
         external_document("sink"),
@@ -533,18 +610,16 @@ fn changed_signed_publication_and_partial_sink_are_typed_failures() {
     );
     let package = open_source(bytes);
     let commit = package
-        .plan_external_hyperlink_detachment()
+        .edit_external_hyperlink_detachment()
         .unwrap()
-        .apply()
+        .commit()
         .unwrap();
     let mut sink = FailingSink {
         accepted: 0,
         limit: 128,
     };
     assert!(matches!(
-        package
-            .apply_external_hyperlink_detachment(&commit.patch().clone().into())
-            .and_then(|committed| committed.package().write_to(&mut sink)),
+        commit.package().write_to(&mut sink),
         Err(Error::Opc(OpcError::IncompleteOutput { .. }))
     ));
     assert_eq!(sink.accepted, 128);

@@ -40,6 +40,12 @@ impl Change for DetachmentChange {
 
 source_family!("external-hyperlink detachment", DetachmentChange);
 
+impl Patch {
+    fn restore_pair(&self) -> Option<(&Package, &Package)> {
+        self.restore.as_ref().map(|(before, after)| (before, after))
+    }
+}
+
 impl From<record::Patch> for Patch {
     /// Replay a detached record patch onto a package whose main document
     /// and relationships hold its before state.
@@ -89,7 +95,7 @@ impl Edit {
     /// Returns an error when the rewrite would change visible text or keep a
     /// selected wrapper, and the source, protection or signature errors.
     pub fn commit(self) -> Result<Commit> {
-        let patch = self.plan.apply()?.patch().clone();
+        let patch = self.plan.apply()?;
         commit_change(&self.package, DetachmentChange(patch))
     }
 }
@@ -113,9 +119,22 @@ impl Package {
     ///
     /// # Errors
     ///
-    /// Returns [`crate::Error::ExternalHyperlinkDetachmentConflict`] for
-    /// another main-document or relationship state.
+    /// Returns [`crate::Error::PatchConflict`] for another main-document or
+    /// relationship state.
     pub fn apply_external_hyperlink_detachment(&self, patch: &Patch) -> Result<Commit> {
+        if let Some((before, after)) = patch.restore_pair() {
+            if !self.same_artifact(before)? {
+                return Err(crate::Error::conflict(
+                    "external_hyperlink_detachment",
+                    "the patch base does not match the supplied source",
+                ));
+            }
+            return Ok(Commit::new(
+                self.restored(before, after)?,
+                patch.clone(),
+                Diagnostics::new(!patch.is_noop()),
+            ));
+        }
         apply_change(self, patch)
     }
 }

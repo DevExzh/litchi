@@ -338,14 +338,6 @@ fn row_other_io_and_source_changes_are_io_error() {
 fn docx_recorded_replay_conflicts_are_invalid_input() {
     use litchi_docx::Error as DocxError;
 
-    let conflicts: [fn() -> DocxError; 3] = [
-        || DocxError::ExternalHyperlinkDetachmentConflict,
-        || DocxError::ExternalHyperlinkRedactionConflict,
-        || DocxError::DocumentVariablesConflict,
-    ];
-    for make_conflict in conflicts {
-        assert_code(make_conflict(), Code::InvalidInput);
-    }
     assert_code(
         DocxError::PatchConflict {
             operation: "apply_section_layout",
@@ -374,11 +366,13 @@ fn docx_recorded_replay_conflicts_are_invalid_input() {
         Code::IoError,
     );
 
-    // This safety error is not a recorded-base mismatch and stays malformed
-    // until its own preservation semantics are reviewed.
     assert_code(
-        DocxError::DocumentVariablesPreservation("unsafe preservation"),
-        Code::CorruptFile,
+        DocxError::Refused(litchi_core::edit::Refusal::new(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "document_variables",
+            "selected markup cannot be preserved",
+        )),
+        Code::UnsupportedType,
     );
 }
 
@@ -2171,6 +2165,20 @@ fn docx_refusals_classify_by_kind_and_patch_conflicts_are_invalid_input() {
         },
         Code::InvalidInput,
     );
+    for operation in [
+        "external_hyperlink_detachment",
+        "external_hyperlink_redaction",
+        "story_hyperlink_redaction",
+        "document_variables",
+    ] {
+        assert_code(
+            litchi_docx::Error::PatchConflict {
+                operation,
+                reason: "the patch base does not match the supplied source",
+            },
+            Code::InvalidInput,
+        );
+    }
     assert_code(
         litchi_docx::Error::Internal {
             operation: "edit",

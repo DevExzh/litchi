@@ -195,14 +195,24 @@ fn inventories_and_irreversibly_redacts_duplicate_target_ids_first_middle_last()
     assert_eq!(plan.effect_report().selected_targets(), 1);
     assert_eq!(plan.effect_report().removed_relationships(), 2);
     assert_eq!(plan.effect_report().unwrapped_hyperlinks(), 2);
-    let commit = plan.apply().unwrap();
-    assert!(!commit.patch().is_noop());
+    let patch = plan.apply().unwrap();
+    assert!(!patch.is_noop());
+
+    let commit = package
+        .edit_external_hyperlink_redaction(&["https://remove.invalid/"])
+        .unwrap()
+        .commit()
+        .unwrap();
+
+    let inverse = commit.patch().inverse();
+    assert!(matches!(
+        package.apply_external_hyperlink_redaction(&inverse),
+        Err(Error::Refused(refusal))
+            if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedOperation
+    ));
 
     let mut output = Vec::new();
-    package
-        .apply_external_hyperlink_redaction(&commit.clone().into())
-        .and_then(|committed| committed.package().write_to(&mut output))
-        .unwrap();
+    commit.package().write_to(&mut output).unwrap();
     assert!(!contains_bytes(&output, b"https://remove.invalid/"));
     let reopened = OpcPackage::from_bytes(&output).unwrap();
     let main = reopened.main_document_part().unwrap();
@@ -244,25 +254,25 @@ fn zero_is_an_exact_noop_and_one_removes_the_only_link() {
         .unwrap()
         .apply()
         .unwrap();
-    assert!(noop.patch().is_noop());
-    let mut identical = Vec::new();
-    package
-        .apply_external_hyperlink_redaction(&noop.clone().into())
-        .and_then(|committed| committed.package().write_to(&mut identical))
+    assert!(noop.is_noop());
+    let noop_commit = package
+        .edit_external_hyperlink_redaction(&[])
+        .unwrap()
+        .commit()
         .unwrap();
+    assert!(noop_commit.patch().is_noop());
+    let mut identical = Vec::new();
+    noop_commit.package().write_to(&mut identical).unwrap();
     assert_eq!(identical, bytes);
 
     let package = open(bytes);
     let commit = package
-        .plan_external_hyperlink_redaction(&["https://one.invalid/"])
+        .edit_external_hyperlink_redaction(&["https://one.invalid/"])
         .unwrap()
-        .apply()
+        .commit()
         .unwrap();
     let mut output = Vec::new();
-    package
-        .apply_external_hyperlink_redaction(&commit.clone().into())
-        .and_then(|committed| committed.package().write_to(&mut output))
-        .unwrap();
+    commit.package().write_to(&mut output).unwrap();
     let reopened = OpcPackage::from_bytes(&output).unwrap();
     let main = reopened.main_document_part().unwrap();
     assert!(main.rels().is_empty());
@@ -271,7 +281,7 @@ fn zero_is_an_exact_noop_and_one_removes_the_only_link() {
 }
 
 #[test]
-fn selection_bounds_unknown_targets_and_foreign_sources_refuse_before_output() {
+fn selection_bounds_unknown_targets_and_matching_sources_replay_before_output() {
     let links = (0..65)
         .map(|index| link(&format!("r{index}"), &format!("https://{index}.invalid/")))
         .collect::<Vec<_>>();
@@ -317,20 +327,18 @@ fn selection_bounds_unknown_targets_and_foreign_sources_refuse_before_output() {
             .is_err()
     );
 
-    let commit = snapshot
-        .plan_target_urls(&["https://0.invalid/"])
+    let commit = package
+        .edit_external_hyperlink_redaction(&["https://0.invalid/"])
         .unwrap()
-        .apply()
+        .commit()
         .unwrap();
     let foreign = open(bytes);
     let mut output = Vec::new();
-    assert!(matches!(
-        foreign
-            .apply_external_hyperlink_redaction(&commit.clone().into())
-            .and_then(|committed| committed.package().write_to(&mut output)),
-        Err(Error::ExternalHyperlinkRedactionConflict)
-    ));
-    assert!(output.is_empty());
+    foreign
+        .apply_external_hyperlink_redaction(commit.patch())
+        .and_then(|committed| committed.package().write_to(&mut output))
+        .unwrap();
+    assert!(!output.is_empty());
 }
 
 #[test]
@@ -339,9 +347,9 @@ fn full_artifact_fingerprint_defeats_colliding_custom_source_versions() {
     let original = fixture(one_document(), links, false, false);
     let package = open_colliding(original.clone());
     let commit = package
-        .plan_external_hyperlink_redaction(&["https://one.invalid/"])
+        .edit_external_hyperlink_redaction(&["https://one.invalid/"])
         .unwrap()
-        .apply()
+        .commit()
         .unwrap();
 
     let mut foreign = OpcPackage::from_bytes(&original).unwrap();
@@ -354,9 +362,9 @@ fn full_artifact_fingerprint_defeats_colliding_custom_source_versions() {
     let mut output = Vec::new();
     assert!(matches!(
         colliding
-            .apply_external_hyperlink_redaction(&commit.clone().into())
+            .apply_external_hyperlink_redaction(commit.patch())
             .and_then(|committed| committed.package().write_to(&mut output)),
-        Err(Error::ExternalHyperlinkRedactionConflict)
+        Err(Error::PatchConflict { .. })
     ));
     assert!(output.is_empty());
 }
@@ -404,18 +412,16 @@ fn refuses_non_main_shared_owners_fields_and_partial_sink_is_typed() {
 
     let package = open(fixture(one_document(), one, false, false));
     let commit = package
-        .plan_external_hyperlink_redaction(&["https://shared.invalid/"])
+        .edit_external_hyperlink_redaction(&["https://shared.invalid/"])
         .unwrap()
-        .apply()
+        .commit()
         .unwrap();
     let mut sink = FailingSink {
         accepted: 0,
         maximum: 128,
     };
     assert!(matches!(
-        package
-            .apply_external_hyperlink_redaction(&commit.clone().into())
-            .and_then(|committed| committed.package().write_to(&mut sink)),
+        commit.package().write_to(&mut sink),
         Err(Error::Opc(OpcError::IncompleteOutput { .. }))
     ));
     assert_eq!(sink.accepted, 128);

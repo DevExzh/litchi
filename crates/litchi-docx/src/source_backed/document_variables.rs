@@ -166,8 +166,8 @@ impl Package {
     ///
     /// # Errors
     ///
-    /// Returns [`crate::Error::DocumentVariablesConflict`] for another settings
-    /// state, and the errors of [`Edit::commit`].
+    /// Returns [`crate::Error::PatchConflict`] for another settings state,
+    /// and the errors of [`Edit::commit`].
     pub fn apply_document_variables(&self, patch: &Patch) -> Result<Commit> {
         apply_change(self, patch)
     }
