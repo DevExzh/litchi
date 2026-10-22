@@ -5923,19 +5923,19 @@
         },
         {
           "name": "save",
-          "scope": "litchi_xlsb::writer::Builder",
+          "scope": "litchi_xlsb::builder::Builder",
           "replacement": "use Builder::build then Package publication",
           "recursive": false
         },
         {
           "name": "to_bytes",
-          "scope": "litchi_xlsb::writer::Builder",
+          "scope": "litchi_xlsb::builder::Builder",
           "replacement": "use Builder::build then Package publication",
           "recursive": false
         },
         {
           "name": "write_to",
-          "scope": "litchi_xlsb::writer::Builder",
+          "scope": "litchi_xlsb::builder::Builder",
           "replacement": "use Builder::build then Package publication",
           "recursive": false
         },
@@ -6212,24 +6212,78 @@
           "name": "into_snapshot",
           "scope": "litchi_xlsb",
           "replacement": "Commit::into_package publishes a Package; no part-level snapshot publication (record 0351)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_xlsb",
+          "replacement": "use the family Edit; it commits a new Package (record 0360b)",
+          "match": "suffix"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_xlsb",
+          "replacement": "use Edit::changed or Commit::diagnostics().changed() (record 0360b)"
+        },
+        {
+          "name": "_with_limits",
+          "scope": "litchi_xlsb",
+          "replacement": "configure limits through OpenOptions::semantic_limits or the family EditOptions (record 0351 §2.5)",
+          "match": "suffix"
+        },
+        {
+          "name": "Mutable",
+          "scope": "litchi_xlsb",
+          "replacement": "stage changes in an Edit (opened) or a builder draft (fresh); no Mutable* draft types (record 0351)",
+          "match": "prefix"
+        },
+        {
+          "name": "into_workbook",
+          "scope": "litchi_xlsb::Package",
+          "replacement": "Package is the owner; use Package::workbook() for the projection",
+          "recursive": false
+        },
+        {
+          "name": "into_workbook",
+          "scope": "litchi_xlsb::cell_values::structure::Commit",
+          "replacement": "use Commit::into_package()",
+          "recursive": false
         }
       ],
       "families": [
         "litchi_xlsb::metadata",
         "litchi_xlsb::cell_values",
         "litchi_xlsb::cell_values::structure",
-        "litchi_xlsb::cell_values::worksheet",
         "litchi_xlsb::page_breaks::edit",
         "litchi_xlsb::auto_filter::edit",
         "litchi_xlsb::hyperlinks::edit",
         "litchi_xlsb::data_validation::edit",
         "litchi_xlsb::conditional_formatting::edit",
         "litchi_xlsb::comments::edit",
-        "litchi_xlsb::drawing::edit"
+        "litchi_xlsb::drawing::edit",
+        "litchi_xlsb::opc",
+        "litchi_xlsb::merged_cells::edit",
+        "litchi_xlsb::scenarios",
+        "litchi_xlsb::slicer",
+        "litchi_xlsb::timeline",
+        "litchi_xlsb::task_panes",
+        "litchi_xlsb::ribbon",
+        "litchi_xlsb::package::connections",
+        "litchi_xlsb::custom_data",
+        "litchi_xlsb::theme",
+        "litchi_xlsb::sparkline::edit",
+        "litchi_xlsb::cell_watches",
+        "litchi_xlsb::calculation_chain",
+        "litchi_xlsb::data_model",
+        "litchi_xlsb::xml_maps",
+        "litchi_xlsb::volatile_dependencies",
+        "litchi_xlsb::comments::threaded::edit",
+        "litchi_xlsb::shared_workbook"
       ],
       "immutable_owners": [
-        "litchi_xlsb::Package"
-      ]
+        "litchi_xlsb::Package",
+        "litchi_xlsb::Workbook"
+      ],
+      "family_methods": true
     },
     {
       "id": "xlsb-full",
@@ -6387,19 +6441,19 @@
         },
         {
           "name": "save",
-          "scope": "litchi_xlsb::writer::Builder",
+          "scope": "litchi_xlsb::builder::Builder",
           "replacement": "use Builder::build then Package publication",
           "recursive": false
         },
         {
           "name": "to_bytes",
-          "scope": "litchi_xlsb::writer::Builder",
+          "scope": "litchi_xlsb::builder::Builder",
           "replacement": "use Builder::build then Package publication",
           "recursive": false
         },
         {
           "name": "write_to",
-          "scope": "litchi_xlsb::writer::Builder",
+          "scope": "litchi_xlsb::builder::Builder",
           "replacement": "use Builder::build then Package publication",
           "recursive": false
         },
@@ -6676,24 +6730,79 @@
           "name": "into_snapshot",
           "scope": "litchi_xlsb",
           "replacement": "Commit::into_package publishes a Package; no part-level snapshot publication (record 0351)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_xlsb",
+          "replacement": "use the family Edit; it commits a new Package (record 0360b)",
+          "match": "suffix"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_xlsb",
+          "replacement": "use Edit::changed or Commit::diagnostics().changed() (record 0360b)"
+        },
+        {
+          "name": "_with_limits",
+          "scope": "litchi_xlsb",
+          "replacement": "configure limits through OpenOptions::semantic_limits or the family EditOptions (record 0351 §2.5)",
+          "match": "suffix"
+        },
+        {
+          "name": "Mutable",
+          "scope": "litchi_xlsb",
+          "replacement": "stage changes in an Edit (opened) or a builder draft (fresh); no Mutable* draft types (record 0351)",
+          "match": "prefix"
+        },
+        {
+          "name": "into_workbook",
+          "scope": "litchi_xlsb::Package",
+          "replacement": "Package is the owner; use Package::workbook() for the projection",
+          "recursive": false
+        },
+        {
+          "name": "into_workbook",
+          "scope": "litchi_xlsb::cell_values::structure::Commit",
+          "replacement": "use Commit::into_package()",
+          "recursive": false
         }
       ],
       "families": [
         "litchi_xlsb::metadata",
         "litchi_xlsb::cell_values",
         "litchi_xlsb::cell_values::structure",
-        "litchi_xlsb::cell_values::worksheet",
         "litchi_xlsb::page_breaks::edit",
         "litchi_xlsb::auto_filter::edit",
         "litchi_xlsb::hyperlinks::edit",
         "litchi_xlsb::data_validation::edit",
         "litchi_xlsb::conditional_formatting::edit",
         "litchi_xlsb::comments::edit",
-        "litchi_xlsb::drawing::edit"
+        "litchi_xlsb::drawing::edit",
+        "litchi_xlsb::opc",
+        "litchi_xlsb::merged_cells::edit",
+        "litchi_xlsb::scenarios",
+        "litchi_xlsb::slicer",
+        "litchi_xlsb::timeline",
+        "litchi_xlsb::task_panes",
+        "litchi_xlsb::ribbon",
+        "litchi_xlsb::package::connections",
+        "litchi_xlsb::custom_data",
+        "litchi_xlsb::theme",
+        "litchi_xlsb::sparkline::edit",
+        "litchi_xlsb::cell_watches",
+        "litchi_xlsb::calculation_chain",
+        "litchi_xlsb::data_model",
+        "litchi_xlsb::xml_maps",
+        "litchi_xlsb::volatile_dependencies",
+        "litchi_xlsb::comments::threaded::edit",
+        "litchi_xlsb::shared_workbook",
+        "litchi_xlsb::vba"
       ],
       "immutable_owners": [
-        "litchi_xlsb::Package"
-      ]
+        "litchi_xlsb::Package",
+        "litchi_xlsb::Workbook"
+      ],
+      "family_methods": true
     },
     {
       "id": "drawingml",

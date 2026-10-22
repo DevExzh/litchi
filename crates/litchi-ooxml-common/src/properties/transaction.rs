@@ -447,6 +447,97 @@ impl Snapshot {
         }
     }
 
+    /// Read the snapshot that would result from replaying `patch` over a
+    /// source-backed package.
+    ///
+    /// This keeps source-backed replay deferred: only the three property
+    /// parts named by the patch are loaded, while every other package member
+    /// remains in the retained source. The patch is checked against the
+    /// source before any replacement is admitted.
+    pub fn read_source_backed_after(
+        package: &SourceBackedPackage,
+        host: Host,
+        patch: &Patch,
+    ) -> Result<Self> {
+        patch.check_source_backed(package)?;
+        let mut snapshot = Self::read_source_backed(package, host)?;
+        for change in &patch.changes {
+            snapshot.apply_change(change)?;
+        }
+        package.source_version()?;
+        Ok(snapshot)
+    }
+
+    fn apply_change(&mut self, change: &Change) -> Result<()> {
+        let state = self.family_mut(change.family);
+        let present = match (&change.before, &change.after) {
+            (Some(_), Some(after)) => Some(Present {
+                part: change.part.clone(),
+                relationship_id: change.relationship_id.clone(),
+                relationship_type: change.relationship_type.clone(),
+                relationship_target: change.relationship_target.clone(),
+                bytes: Arc::clone(after),
+            }),
+            (Some(_), None) => None,
+            (None, Some(after)) => Some(Present {
+                part: change.part.clone(),
+                relationship_id: change.relationship_id.clone(),
+                relationship_type: change.relationship_type.clone(),
+                relationship_target: change.relationship_target.clone(),
+                bytes: Arc::clone(after),
+            }),
+            (None, None) => return Ok(()),
+        };
+        if change.before.is_none() {
+            state.new_part = change.part.clone();
+        }
+        state.present = present;
+        state.shared_by = None;
+        match change.before.is_some() {
+            true if change.after.is_none() => {
+                self.relationship_ids.remove(&change.relationship_id);
+            },
+            false if change.after.is_some() => {
+                self.relationship_ids.insert(change.relationship_id.clone());
+            },
+            _ => {},
+        }
+
+        match change.family {
+            Family::Core => {
+                if let Some(after) = change.after.as_deref() {
+                    let dialect =
+                        if change.relationship_type == super::STRICT_CORE_PROPERTIES_RELATIONSHIP {
+                            Dialect::Strict
+                        } else {
+                            Dialect::Transitional
+                        };
+                    let mut report = ToleranceReport::default();
+                    self.core_value = Some(read::decode_selected(
+                        after,
+                        change.part.as_str(),
+                        Some(dialect),
+                        &mut report,
+                    )?);
+                    self.core_dialect = Some(dialect);
+                    self.core_report = report;
+                } else {
+                    self.core_value = None;
+                    self.core_dialect = None;
+                    self.core_report = ToleranceReport::default();
+                }
+            },
+            Family::Custom => {
+                self.custom_value = match change.after.as_deref() {
+                    Some(after) => custom::Props::decode_for(after, &change.part, self.host)?,
+                    None => custom::Props::new(),
+                };
+            },
+            Family::App => {},
+        }
+        Ok(())
+    }
+
     fn family(&self, family: Family) -> &FamilyState {
         match family {
             Family::Core => &self.core,

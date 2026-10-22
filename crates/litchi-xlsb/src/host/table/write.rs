@@ -40,10 +40,10 @@ const FORMULA_ARRAY: u8 = 1 << 1;
 /// Leading blank field of `BrtList14` (MS-XLSB 2.4.705).
 const FRT_BLANK_LEN: usize = 4;
 
-fn malformed(context: &str, detail: impl Into<String>) -> Error {
+fn malformed(context: &'static str, detail: &'static str) -> Error {
     Error::Unrecognized {
-        typ: context.to_string(),
-        val: detail.into(),
+        typ: context,
+        val: detail,
     }
 }
 
@@ -165,7 +165,7 @@ fn style_client_payload(style: &StyleInfo) -> Vec<u8> {
 /// Serialize one table into its complete table-part stream.
 pub(crate) fn write_table_part(table: &Table) -> Result<Vec<u8>> {
     let mut data = Vec::with_capacity(256);
-    let mut writer = Encoder::new(&mut data);
+    let mut writer = Encoder::new(&mut data, crate::raw::Limits::DEFAULT);
     writer.write_record(rt::BEGIN_LIST, &list_payload(table))?;
 
     if !table.columns.is_empty() {
@@ -310,7 +310,7 @@ mod tests {
     fn serialized_list_parts_round_trip_through_rel_id_reader() {
         // Wrap in a worksheet-shaped stream: sheet begin, list parts, sheet end.
         let mut stream = Vec::new();
-        let mut writer = Encoder::new(&mut stream);
+        let mut writer = Encoder::new(&mut stream, crate::raw::Limits::DEFAULT);
         writer.write_record(rt::BEGIN_SHEET, &[]).unwrap();
         writer
             .write_record(rt::BEGIN_LIST_PARTS, &2u32.to_le_bytes())

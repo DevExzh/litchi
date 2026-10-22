@@ -410,7 +410,7 @@ const STATUSES: [&str; 2] = ["open", "closed"];
 /// An XLSB workbook shaped like the XLSX corpus: a `Data` sheet with a
 /// header row and `rows` rows of (region, sales, status).
 fn xlsb_workbook(rows: usize) -> Vec<u8> {
-    let mut sheet = litchi_xlsb::writer::MutableWorksheet::new("Data");
+    let mut sheet = litchi_xlsb::builder::Worksheet::new("Data");
     for (column, header) in ["Region", "Sales", "Status"].into_iter().enumerate() {
         sheet.set_cell(0, column as u32, header.to_string());
     }

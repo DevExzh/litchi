@@ -12,17 +12,14 @@ pub(super) fn validate_definition(definition: &PivotCacheDefinition) -> Result<(
     validate_count(definition.calculated_items.len(), "BrtBeginPCDCalcItems")?;
     validate_count(definition.calculated_members.len(), "BrtBeginPCDCalcMems")?;
 
-    for (field_index, field) in definition.fields.iter().enumerate() {
-        for (item_index, item) in field.shared_items.items.iter().enumerate() {
+    for field in definition.fields.iter() {
+        for item in field.shared_items.items.iter() {
             if let PivotCacheItemValue::Index(index) = &item.value
                 && usize::try_from(*index)
                     .ok()
                     .is_some_and(|index| index >= field.shared_items.items.len())
             {
-                return Err(malformed(
-                    "BrtPCDIIndex",
-                    format!("field {field_index} item {item_index} references {index}"),
-                ));
+                return Err(malformed("BrtPCDIIndex", "field item references"));
             }
         }
     }
@@ -82,11 +79,7 @@ pub(super) fn validate_records(
     if u64::from(records.record_count) != records.records.len() as u64 {
         return Err(malformed(
             "BrtBeginPivotCacheRecords",
-            format!(
-                "declared {} records, found {}",
-                records.record_count,
-                records.records.len()
-            ),
+            "declared records, found",
         ));
     }
     let source_field_count = definition
@@ -94,16 +87,9 @@ pub(super) fn validate_records(
         .iter()
         .filter(|field| field.source_field)
         .count();
-    for (row_index, record) in records.records.iter().enumerate() {
+    for record in records.records.iter() {
         if record.values.len() != source_field_count {
-            return Err(malformed(
-                "BrtPCRRecord",
-                format!(
-                    "row {row_index} has {} values, expected {}",
-                    record.values.len(),
-                    source_field_count
-                ),
-            ));
+            return Err(malformed("BrtPCRRecord", "row has values, expected"));
         }
         let mut source_fields = definition.fields.iter().filter(|field| field.source_field);
         for (value, field) in record.values.iter().zip(&mut source_fields) {
@@ -114,7 +100,7 @@ pub(super) fn validate_records(
             {
                 return Err(malformed(
                     "BrtPCDIIndex",
-                    format!("record row {row_index} references shared item {index}"),
+                    "record row references shared item",
                 ));
             }
         }

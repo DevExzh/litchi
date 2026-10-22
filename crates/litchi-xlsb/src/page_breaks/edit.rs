@@ -1,7 +1,7 @@
 //! Immutable page-break edits of an XLSB [`Package`] (unified-ops record
 //! 0322).
 //!
-//! [`Package::edit_page_breaks`] (or [`Workbook::edit_page_breaks`]) starts
+//! [`Package::edit_page_breaks`] starts
 //! an [`Edit`]; [`Edit::set_page_breaks`] replaces, inserts or removes a
 //! worksheet's `BrtBeginRwBrk` and `BrtBeginColBrk` collections, and every
 //! other worksheet record keeps its bytes. [`Edit::commit`] returns a
@@ -21,13 +21,12 @@
 //! assert!(edit.set_page_breaks(0, &breaks)?);
 //! let (after, patch) = edit.commit()?.into_parts();
 //! assert_eq!(after.edit_page_breaks()?.page_breaks(0)?, breaks);
-//! assert_eq!(package.apply_page_breaks(&patch)?.to_bytes()?, after.to_bytes()?);
+//! assert_eq!(package.apply_page_breaks(&patch)?.package().to_bytes()?, after.to_bytes()?);
 //! # Ok(())
 //! # }
 //! ```
 
 use super::{PageBreaks, encode, read_layout};
-use crate::Workbook;
 use crate::package::Package;
 use crate::package::error::Result;
 use crate::part_edit::{Rank, SheetLayout, Staged, family, splice};
@@ -44,9 +43,9 @@ pub enum LimitKind {
 }
 
 /// A staged page-break edit. Dropping it discards it.
-#[derive(Debug)]
-pub struct Edit<'a> {
-    staged: Staged<'a>,
+#[derive(Debug, Clone)]
+pub struct Edit {
+    staged: Staged,
 }
 
 impl Package {
@@ -55,7 +54,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns the workbook materialization errors of this package.
-    pub fn edit_page_breaks(&self) -> Result<Edit<'_>> {
+    pub fn edit_page_breaks(&self) -> Result<Edit> {
         Ok(Edit {
             staged: Staged::of_package(self)?,
         })
@@ -68,22 +67,17 @@ impl Package {
     /// Returns [`Error::PatchConflict`] when this package is not the patch's
     /// before state and [`Error::Signed`] for a changed patch of a signed
     /// workbook.
-    pub fn apply_page_breaks(&self, patch: &Patch) -> Result<Self> {
-        patch.0.apply(self)
+    pub fn apply_page_breaks(&self, patch: &Patch) -> Result<Commit> {
+        Ok(Commit::new((patch.0.apply(self)?, patch.0.clone())))
     }
 }
 
-impl Workbook {
-    /// Start a page-break edit of this workbook without first copying it
-    /// into a package.
-    pub fn edit_page_breaks(&self) -> Edit<'_> {
-        Edit {
-            staged: Staged::of_workbook(self),
-        }
+impl Edit {
+    /// Discard every staged change.
+    pub fn reset(&mut self) {
+        self.staged.reset();
     }
-}
 
-impl Edit<'_> {
     /// The staged page breaks of the worksheet at complete-catalog position
     /// `sheet`.
     ///
@@ -168,6 +162,7 @@ mod tests {
         assert_eq!(
             package
                 .apply_page_breaks(&patch)
+                .map(|commit| commit.into_package())
                 .unwrap()
                 .to_bytes()
                 .unwrap(),
@@ -186,6 +181,7 @@ mod tests {
         assert_eq!(
             after
                 .apply_page_breaks(&patch.inverse())
+                .map(|commit| commit.into_package())
                 .unwrap()
                 .to_bytes()
                 .unwrap(),

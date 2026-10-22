@@ -47,7 +47,6 @@ use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcPackage, PackURI};
 use litchi_spreadsheet_drawing::objects;
 
-use crate::Workbook;
 use crate::package::Package;
 use crate::package::error::Result;
 use crate::part_edit::{Rank, SheetLayout, Staged, family, invalid, record, splice};
@@ -172,7 +171,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns the workbook materialization errors of this package.
-    pub fn edit_drawings(&self) -> Result<Edit<'_>> {
+    pub fn edit_drawings(&self) -> Result<Edit> {
         Ok(Edit {
             staged: Staged::of_package(self)?,
         })
@@ -186,28 +185,23 @@ impl Package {
     /// Returns [`Error::PatchConflict`] when this package is not the patch's
     /// before state and [`Error::Signed`] for a changed patch of a signed
     /// workbook.
-    pub fn apply_drawings(&self, patch: &Patch) -> Result<Self> {
-        patch.0.apply(self)
-    }
-}
-
-impl Workbook {
-    /// Start a worksheet drawing edit of this workbook without first copying
-    /// it into a package.
-    pub fn edit_drawings(&self) -> Edit<'_> {
-        Edit {
-            staged: Staged::of_workbook(self),
-        }
+    pub fn apply_drawings(&self, patch: &Patch) -> Result<Commit> {
+        Ok(Commit::new((patch.0.apply(self)?, patch.0.clone())))
     }
 }
 
 /// A staged worksheet drawing edit. Dropping it discards it.
-#[derive(Debug)]
-pub struct Edit<'a> {
-    staged: Staged<'a>,
+#[derive(Debug, Clone)]
+pub struct Edit {
+    staged: Staged,
 }
 
-impl Edit<'_> {
+impl Edit {
+    /// Discard every staged change.
+    pub fn reset(&mut self) {
+        self.staged.reset();
+    }
+
     /// The staged elements of the worksheet at `sheet`.
     ///
     /// # Errors
@@ -247,7 +241,7 @@ impl Edit<'_> {
         }
         let at = layout.insertion(Rank::Drawing);
         let mut payload = Vec::new();
-        Encoder::new(&mut payload).write_wide_string(&id)?;
+        Encoder::new(&mut payload, crate::raw::Limits::DEFAULT).write_wide_string(&id)?;
         let updated = splice(bytes, at..at, &record(kind::DRAWING, &payload)?);
         self.staged.replace_worksheet(&worksheet, updated)?;
         self.staged.touch(&worksheet);
@@ -449,7 +443,12 @@ mod tests {
         assert_eq!(picture.description.as_deref(), Some("logo"));
         assert_eq!(picture.image.as_ref().unwrap().content_type, "image/png");
         assert_eq!(
-            package.apply_drawings(&patch).unwrap().to_bytes().unwrap(),
+            package
+                .apply_drawings(&patch)
+                .map(|commit| commit.into_package())
+                .unwrap()
+                .to_bytes()
+                .unwrap(),
             after.to_bytes().unwrap()
         );
 

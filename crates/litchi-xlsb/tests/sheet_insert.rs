@@ -20,6 +20,7 @@ use litchi_core::sheet::{CellValue, WorkbookTrait as _};
 use litchi_opc::constants::{content_type, relationship_type};
 use litchi_opc::{BlobPart, PackURI, TargetMode};
 use litchi_xlsb::Package;
+use litchi_xlsb::builder::{self, Builder};
 use litchi_xlsb::cell_values::TransferLimits;
 use litchi_xlsb::cell_values::structure::Patch;
 use litchi_xlsb::chart::{Anchor, Chart};
@@ -37,7 +38,6 @@ use litchi_xlsb::volatile_dependencies::{
     CONTENT_TYPE as VOLATILE_CONTENT_TYPE, CachedValue, CellReference, DEFAULT_PART_NAME,
     Dependencies, DependencyKind, MainTopic, Topic, VolatileType,
 };
-use litchi_xlsb::writer::{Builder, MutableChartSheet, MutableWorksheet};
 
 #[derive(Debug, Clone)]
 struct BundleEntry {
@@ -50,7 +50,7 @@ struct BundleEntry {
 fn worksheets(names: &[&str]) -> Package {
     let mut builder = Builder::new();
     for (index, name) in names.iter().enumerate() {
-        let mut sheet = MutableWorksheet::new(*name);
+        let mut sheet = builder::Worksheet::new(*name);
         sheet.set_cell(0, 0, format!("{name} identity {index}"));
         builder.add_worksheet(sheet);
     }
@@ -69,12 +69,12 @@ fn chart_first_package() -> Package {
     .expect("chart fixture");
     let mut builder = Builder::new();
     builder
-        .add_chart_sheet(MutableChartSheet::new("Chart", chart))
+        .add_chart_sheet(builder::ChartSheet::new("Chart", chart))
         .expect("chart sheet fixture");
-    let mut data = MutableWorksheet::new("Data");
+    let mut data = builder::Worksheet::new("Data");
     data.set_cell(0, 0, "data identity");
     builder.add_worksheet(data);
-    let mut tail = MutableWorksheet::new("Tail");
+    let mut tail = builder::Worksheet::new("Tail");
     tail.set_cell(0, 0, "tail identity");
     builder.add_worksheet(tail);
     builder.build().expect("chart-first package")
@@ -124,7 +124,7 @@ fn bundle_entries(package: &Package) -> Vec<BundleEntry> {
         .opc_package()
         .get_part(&workbook_uri)
         .expect("workbook part");
-    Records::new(workbook.blob())
+    Records::new(workbook.blob(), litchi_xlsb::raw::Limits::DEFAULT)
         .map(|item| item.expect("workbook record"))
         .filter(|record| record.kind() == kind::BUNDLE_SH)
         .map(|record| {
@@ -241,8 +241,8 @@ where
     F: FnMut(Kind, &[u8], &mut Encoder<&mut Vec<u8>>),
 {
     let mut output = Vec::new();
-    let mut writer = Encoder::new(&mut output);
-    for item in Records::new(source) {
+    let mut writer = Encoder::new(&mut output, litchi_xlsb::raw::Limits::DEFAULT);
+    for item in Records::new(source, litchi_xlsb::raw::Limits::DEFAULT) {
         let record = item.expect("workbook record");
         rewrite(record.kind(), record.payload(), &mut writer);
     }
@@ -266,7 +266,7 @@ fn with_book_view_indices(package: &Package, first: u32, active: u32) -> Package
 }
 
 fn book_view_indices(package: &Package) -> Vec<(u32, u32)> {
-    Records::new(&workbook_blob(package))
+    Records::new(&workbook_blob(package), litchi_xlsb::raw::Limits::DEFAULT)
         .filter_map(|item| {
             let record = item.expect("workbook record");
             (record.kind() == kind::BOOK_VIEW).then(|| {
@@ -285,10 +285,10 @@ fn with_opaque_sheet_record(package: &Package, name: &str) -> Package {
     let original = opc.get_part(&part).expect("sheet part").blob().to_vec();
     let opaque_kind = Kind::new(0x0ffe).expect("opaque worksheet record kind");
     let mut opaque = Vec::new();
-    Encoder::new(&mut opaque)
+    Encoder::new(&mut opaque, litchi_xlsb::raw::Limits::DEFAULT)
         .write_record(opaque_kind, b"opaque-insert-preservation")
         .expect("opaque record");
-    let end_sheet = Records::new(&original)
+    let end_sheet = Records::new(&original, litchi_xlsb::raw::Limits::DEFAULT)
         .map(|item| item.expect("sheet record"))
         .find(|record| record.kind() == kind::END_SHEET)
         .expect("end sheet record")
@@ -304,7 +304,7 @@ fn with_opaque_sheet_record(package: &Package, name: &str) -> Package {
 }
 
 fn named_range_scopes(package: &Package) -> Vec<(String, u32)> {
-    Records::new(&workbook_blob(package))
+    Records::new(&workbook_blob(package), litchi_xlsb::raw::Limits::DEFAULT)
         .filter_map(|item| {
             let record = item.expect("workbook record");
             (record.kind() == kind::NAME).then(|| {
@@ -319,7 +319,7 @@ fn named_range_scopes(package: &Package) -> Vec<(String, u32)> {
 fn with_extern_sheet_fixture(first: i32, last: i32) -> Package {
     let mut builder = Builder::new();
     for name in ["A", "B", "C"] {
-        builder.add_worksheet(MutableWorksheet::new(name));
+        builder.add_worksheet(builder::Worksheet::new(name));
     }
     builder
         .add_external_link(
@@ -356,7 +356,7 @@ fn with_extern_sheet_fixture(first: i32, last: i32) -> Package {
 }
 
 fn extern_sheet_entries(package: &Package) -> Vec<(u32, i32, i32)> {
-    Records::new(&workbook_blob(package))
+    Records::new(&workbook_blob(package), litchi_xlsb::raw::Limits::DEFAULT)
         .find_map(|item| {
             let record = item.expect("workbook record");
             (record.kind() == kind::EXTERN_SHEET).then(|| {
@@ -381,7 +381,7 @@ fn extern_sheet_entries(package: &Package) -> Vec<(u32, i32, i32)> {
 }
 
 fn extern_sheet_record_count(package: &Package) -> usize {
-    Records::new(&workbook_blob(package))
+    Records::new(&workbook_blob(package), litchi_xlsb::raw::Limits::DEFAULT)
         .filter_map(|item| item.ok())
         .filter(|record| record.kind() == kind::EXTERN_SHEET)
         .count()
@@ -390,9 +390,9 @@ fn extern_sheet_record_count(package: &Package) -> usize {
 fn with_unknown_workbook_record(package: &Package) -> Package {
     replace_workbook(package, |source, output| {
         let unknown = Kind::new(0x3ffe).expect("unknown workbook record kind");
-        let mut writer = Encoder::new(output);
+        let mut writer = Encoder::new(output, litchi_xlsb::raw::Limits::DEFAULT);
         let mut inserted = false;
-        for item in Records::new(source) {
+        for item in Records::new(source, litchi_xlsb::raw::Limits::DEFAULT) {
             let record = item.expect("workbook record");
             if !inserted && record.kind() == kind::END_BOOK {
                 writer
@@ -411,7 +411,7 @@ fn with_unknown_workbook_record(package: &Package) -> Package {
 fn package_with_data_model() -> Package {
     let mut builder = Builder::new();
     for name in ["A", "B", "C"] {
-        builder.add_worksheet(MutableWorksheet::new(name));
+        builder.add_worksheet(builder::Worksheet::new(name));
     }
     builder
         .set_data_model(Model::from_bytes(Definition::default(), vec![1, 2, 3, 4]).unwrap())
@@ -422,7 +422,7 @@ fn package_with_data_model() -> Package {
 fn package_with_connections() -> Package {
     let mut builder = Builder::new();
     for name in ["A", "B", "C"] {
-        builder.add_worksheet(MutableWorksheet::new(name));
+        builder.add_worksheet(builder::Worksheet::new(name));
     }
     builder
         .set_connections(Connections {
@@ -482,7 +482,7 @@ fn package_with_vba_project() -> Package {
 }
 
 fn package_with_shared_workbook() -> Package {
-    let mut opc = worksheets(&["A", "B", "C"]).into_opc();
+    let source = worksheets(&["A", "B", "C"]);
     let guid = Guid::from_bytes([7; 16]);
     let date = ShortDateTime {
         year: 2024,
@@ -528,8 +528,9 @@ fn package_with_shared_workbook() -> Package {
             b"opaque-log".to_vec(),
         )])],
     };
-    litchi_xlsb::shared_workbook::store(&mut opc, &catalog).unwrap();
-    Package::from_opc(opc).unwrap()
+    let mut edit = source.edit_shared_workbook().unwrap();
+    edit.replace(catalog).unwrap();
+    edit.commit().unwrap().into_package()
 }
 
 fn package_with_volatile_dependencies() -> Package {
@@ -551,7 +552,10 @@ fn package_with_volatile_dependencies() -> Package {
     let mut edit = package.edit_volatile_dependencies().unwrap();
     edit.set_dependencies(dependencies).unwrap();
     let commit = edit.commit().unwrap();
-    package.apply_volatile_dependencies(&commit).unwrap()
+    package
+        .apply_volatile_dependencies(commit.patch())
+        .map(litchi_core::edit::Commit::into_package)
+        .unwrap()
 }
 
 fn volatile_ref_indices(package: &Package) -> Vec<u32> {
@@ -561,7 +565,7 @@ fn volatile_ref_indices(package: &Package) -> Vec<u32> {
         .get_part(&uri)
         .expect("volatile owner")
         .blob();
-    Records::new(blob)
+    Records::new(blob, litchi_xlsb::raw::Limits::DEFAULT)
         .filter_map(|item| {
             let record = item.ok()?;
             (record.kind() == kind::VOL_REF)
@@ -756,11 +760,19 @@ fn durable_tag9_replay_inverse_and_malformed_fields_are_rejected() {
     let offset = operation_offset(&wire);
     assert_eq!(wire[offset], 9, "insert operation tag");
     let patch = Patch::from_bytes(&wire, TransferLimits::DEFAULT).unwrap();
-    let replay = source.apply(&patch).unwrap();
+    let replay = source
+        .apply(&patch)
+        .map(litchi_xlsb::cell_values::structure::Commit::into_package)
+        .unwrap();
     assert_eq!(catalog_names(&replay), vec!["A", "Inserted", "B"]);
     assert_eq!(catalog(&replay)[1].2, State::Hidden);
     assert_eq!(
-        replay.apply(&patch.inverse()).unwrap().to_bytes().unwrap(),
+        replay
+            .apply(&patch.inverse())
+            .map(litchi_xlsb::cell_values::structure::Commit::into_package)
+            .unwrap()
+            .to_bytes()
+            .unwrap(),
         before
     );
 
@@ -814,7 +826,7 @@ fn insertion_merge_conflicts_on_topology_and_preserves_both_sources() {
 fn named_range_scopes_and_xti_endpoints_shift_with_an_insertion() {
     let mut builder = Builder::new();
     for name in ["A", "B", "C"] {
-        builder.add_worksheet(MutableWorksheet::new(name));
+        builder.add_worksheet(builder::Worksheet::new(name));
     }
     builder.add_named_range(
         NamedRange::new("Scoped".to_owned(), Some(1)).with_formula(vec![
@@ -859,7 +871,7 @@ fn insertion_inside_a_three_d_range_refuses_without_broadening_the_old_set() {
     let mut edit = source.edit().unwrap();
     assert!(matches!(
         edit.insert_sheet(Position::new(1), "Inserted".to_owned(), State::Visible),
-        Err(PackageError::UnsupportedFeature(_))
+        Err(PackageError::Refused(_))
     ));
     assert!(edit.commit().unwrap().patch().is_noop());
     assert_eq!(source.to_bytes().unwrap(), before);
@@ -896,7 +908,7 @@ fn assert_insert_guard(package: Package, label: &str) {
         if label == "orphan volatile owner" {
             matches!(error, PackageError::InvalidFormat(_))
         } else {
-            matches!(error, PackageError::UnsupportedFeature(_))
+            matches!(error, PackageError::Refused(_))
         },
         "{label}: expected typed dependency error, got {error:?}"
     );
@@ -943,6 +955,7 @@ fn modeled_volatile_owner_shifts_inserted_sheet_references_and_inverse_is_exact(
         commit
             .package()
             .apply(&commit.patch().inverse())
+            .map(litchi_xlsb::cell_values::structure::Commit::into_package)
             .unwrap()
             .to_bytes()
             .unwrap(),

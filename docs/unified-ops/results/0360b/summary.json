@@ -1,0 +1,177 @@
+{
+  "leaf/open": {
+    "before_us": 72.39439999999999,
+    "after_us": 70.8364,
+    "ratio": 0.9784789983755651
+  },
+  "leaf/set": {
+    "before_us": 424.2465,
+    "after_us": 432.86350000000004,
+    "ratio": 1.0203113048663925
+  },
+  "leaf/set_save": {
+    "before_us": 423.5815,
+    "after_us": 427.0036,
+    "ratio": 1.008078964732879
+  },
+  "leaf/batch1k": {
+    "before_us": 1316.558,
+    "after_us": 1255.203,
+    "ratio": 0.9533974196351395
+  },
+  "source/open_get": {
+    "before_us": 158.9888,
+    "after_us": 164.03300000000002,
+    "ratio": 1.0317267631430642
+  },
+  "source/set": {
+    "before_us": 762.5944999999999,
+    "after_us": 705.9411,
+    "ratio": 0.9257096661462941
+  },
+  "source/set_save": {
+    "before_us": 760.0454,
+    "after_us": 706.7352000000001,
+    "ratio": 0.9298591899904928
+  },
+  "source/format": {
+    "before_us": 1649.6058000000003,
+    "after_us": 1570.4062000000001,
+    "ratio": 0.9519887721054326
+  },
+  "source/metadata": {
+    "before_us": 18.6432,
+    "after_us": 18.666199999999996,
+    "ratio": 1.0012336937864743
+  },
+  "source/batch1k": {
+    "before_us": 2554.6945,
+    "after_us": 2465.734,
+    "ratio": 0.9651776366998088
+  },
+  "eager/open_get": {
+    "before_us": 191.70420000000001,
+    "after_us": 183.44310000000002,
+    "ratio": 0.9569070474199314
+  },
+  "eager/set": {
+    "before_us": 413.66740000000004,
+    "after_us": 353.258,
+    "ratio": 0.8539662540485422
+  },
+  "eager/set_save": {
+    "before_us": 411.3494,
+    "after_us": 351.0641,
+    "ratio": 0.8534450275118913
+  },
+  "eager/format": {
+    "before_us": 1167.0338,
+    "after_us": 1075.3683999999998,
+    "ratio": 0.9214543743291753
+  },
+  "eager/metadata": {
+    "before_us": 34.989200000000004,
+    "after_us": 35.3642,
+    "ratio": 1.0107175928572243
+  },
+  "eager/batch1k": {
+    "before_us": 1987.012,
+    "after_us": 1897.741,
+    "ratio": 0.9550727423890747
+  },
+  "eager/comment": {
+    "before_us": 45.8972,
+    "after_us": 47.477199999999996,
+    "ratio": 1.0344247579373034
+  },
+  "eager/hyperlink": {
+    "before_us": 40.582300000000004,
+    "after_us": 41.9403,
+    "ratio": 1.0334628643521928
+  },
+  "eager/name": {
+    "before_us": 1765.9463999999998,
+    "after_us": 1829.4587,
+    "ratio": 1.035965021361917
+  },
+  "eager/merge": {
+    "before_us": 963.6206999999999,
+    "after_us": 957.4586,
+    "ratio": 0.9936052639799042
+  },
+  "eager/chain": {
+    "before_us": 2959.9643,
+    "after_us": 2774.3093,
+    "ratio": 0.9372779597375549
+  },
+  "cell/xlsb": {
+    "before_us": 799.6100000000001,
+    "after_us": 828.33,
+    "ratio": 1.0359175097860205
+  },
+  "cell_value/xlsb": {
+    "before_us": 799.325,
+    "after_us": 802.175,
+    "ratio": 1.0035655083977104
+  },
+  "cells/xlsb": {
+    "before_us": 296.8815,
+    "after_us": 293.502,
+    "ratio": 0.98861667028764
+  },
+  "evaluate/xlsb": {
+    "before_us": 1739.075,
+    "after_us": 1761.21,
+    "ratio": 1.0127280307059787
+  },
+  "recalculate/xlsb": {
+    "before_us": 5355.6765000000005,
+    "after_us": 5447.586499999999,
+    "ratio": 1.0171612307054019
+  },
+  "recalculate_heavy/xlsb": {
+    "before_us": 6368.2925,
+    "after_us": 5970.385,
+    "ratio": 0.9375173957540425
+  },
+  "crud/open_identify": {
+    "before_us": 975.4755,
+    "after_us": 643.4290000000001,
+    "ratio": 0.6596054949611754
+  },
+  "crud/worksheet_catalog": {
+    "before_us": 517.9480000000001,
+    "after_us": 513.943,
+    "ratio": 0.9922675635391968
+  },
+  "crud/selected_worksheet_cell": {
+    "before_us": 526.3585,
+    "after_us": 519.9680000000001,
+    "ratio": 0.9878590352392904
+  },
+  "crud/full_stored_cell_scan": {
+    "before_us": 522.528,
+    "after_us": 519.673,
+    "ratio": 0.9945361779655827
+  },
+  "crud/full_text": {
+    "before_us": 164.531,
+    "after_us": 162.966,
+    "ratio": 0.9904881147017888
+  },
+  "crud/noop_transaction_commit_save": {
+    "before_us": 924.0350000000001,
+    "after_us": 573.923,
+    "ratio": 0.6211052611643498
+  },
+  "crud/edit_one_existing_scalar_save": {
+    "before_us": 2486.4494999999997,
+    "after_us": 2145.1369999999997,
+    "ratio": 0.8627309744275924
+  },
+  "crud/edit_ceil_one_percent_existing_cells_save": {
+    "before_us": 2485.5645000000004,
+    "after_us": 2148.0325,
+    "ratio": 0.8642030814328091
+  }
+}

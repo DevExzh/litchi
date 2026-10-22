@@ -48,7 +48,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     fn workbook(cells: u32) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-        let mut sheet = xlsb::writer::MutableWorksheet::new("Data");
+        let mut sheet = xlsb::builder::Worksheet::new("Data");
         for index in 0..cells {
             sheet.set_cell(index / 10, index % 10, f64::from(index) + 0.5);
         }

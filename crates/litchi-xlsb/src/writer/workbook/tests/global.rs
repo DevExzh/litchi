@@ -9,7 +9,7 @@ use super::super::Builder;
 use crate::calc::{Delta, Mode, Opts, Threads};
 use crate::comments::{Record, Run};
 use crate::raw::kind;
-use crate::writer::{MutableChartSheet, MutableWorksheet};
+use crate::writer::{ChartSheet, Worksheet};
 use litchi_core::sheet::{CellValue, WorkbookTrait, Worksheet as _};
 use litchi_opc::constants::relationship_type as rel;
 use litchi_opc::{OpcPackage, PackURI};
@@ -23,7 +23,7 @@ fn external_links_round_trip_with_inert_package_topology() {
     };
 
     let mut workbook = Builder::new();
-    workbook.add_worksheet(MutableWorksheet::new("Host"));
+    workbook.add_worksheet(Worksheet::new("Host"));
     let external_formula = NameFormula::cell_reference(CellReference::new(
         SheetRange::sheets(0, 0).unwrap(),
         CellLocation::new(3, 2),
@@ -116,7 +116,7 @@ fn external_links_round_trip_with_inert_package_topology() {
         })
         .collect::<Vec<_>>();
     let mut support_relationship_ids = Vec::new();
-    for record in crate::raw::Records::new(workbook_part.blob()) {
+    for record in crate::raw::Records::new(workbook_part.blob(), crate::raw::Limits::DEFAULT) {
         let record = record.unwrap();
         if record.kind() == kind::SUP_BOOK_SRC {
             let (relationship_id, consumed) =
@@ -278,7 +278,7 @@ fn chart_sheet_metadata_chart_and_printer_settings_round_trip_in_sheet_order() {
         Anchor::new(0, 0, 10, 20),
     )
     .unwrap();
-    let mut chart_sheet = MutableChartSheet::new("Sales Chart", chart);
+    let mut chart_sheet = ChartSheet::new("Sales Chart", chart);
     {
         let metadata = chart_sheet.metadata_mut();
         metadata.state = State::Hidden;
@@ -328,11 +328,11 @@ fn chart_sheet_metadata_chart_and_printer_settings_round_trip_in_sheet_order() {
         .unwrap();
 
     let mut workbook = Builder::new();
-    let mut data = MutableWorksheet::new("Data");
+    let mut data = Worksheet::new("Data");
     data.set_cell(0, 0, 42.0);
     workbook.add_worksheet(data);
     workbook.add_chart_sheet(chart_sheet).unwrap();
-    let mut tail = MutableWorksheet::new("Tail");
+    let mut tail = Worksheet::new("Tail");
     tail.set_cell(0, 0, "tail marker");
     tail.set_cell(
         0,
@@ -446,21 +446,21 @@ fn chart_sheet_validation_is_lossless_or_refuse() {
     )
     .unwrap();
     let mut workbook = Builder::new();
-    workbook.add_worksheet(MutableWorksheet::new("Data"));
+    workbook.add_worksheet(Worksheet::new("Data"));
     workbook
-        .add_chart_sheet(MutableChartSheet::new("Chart", chart.clone()))
+        .add_chart_sheet(ChartSheet::new("Chart", chart.clone()))
         .unwrap();
     assert!(
         workbook
-            .add_chart_sheet(MutableChartSheet::new("chart", chart.clone()))
+            .add_chart_sheet(ChartSheet::new("chart", chart.clone()))
             .is_err()
     );
 
-    let mut invalid = MutableChartSheet::new("Invalid", chart.clone());
+    let mut invalid = ChartSheet::new("Invalid", chart.clone());
     invalid.metadata_mut().views[0].scale = 401;
     assert!(workbook.add_chart_sheet(invalid).is_err());
 
-    let mut invalid_color = MutableChartSheet::new("Invalid Color", chart);
+    let mut invalid_color = ChartSheet::new("Invalid Color", chart);
     invalid_color.metadata_mut().tab_color = Color {
         valid_rgb: false,
         color_type: ColorType::Indexed,
@@ -493,7 +493,7 @@ fn calc_survives_package_roundtrip() {
             true,
         )
         .unwrap();
-    workbook.add_worksheet(MutableWorksheet::new("Sheet1"));
+    workbook.add_worksheet(Worksheet::new("Sheet1"));
 
     let expected = workbook.calc().clone();
     let mut output = Cursor::new(Vec::new());
@@ -539,7 +539,7 @@ fn connections_round_trip_through_save_and_read() {
     };
 
     let mut workbook = Builder::new();
-    workbook.add_worksheet(MutableWorksheet::new("Sheet1"));
+    workbook.add_worksheet(Worksheet::new("Sheet1"));
     workbook.set_connections(connections.clone()).unwrap();
     // Validation: zero id, duplicate id, duplicate name (case-insensitive).
     assert!(
@@ -646,7 +646,7 @@ fn structured_tables_round_trip_through_save_and_read() {
     };
 
     let mut workbook = Builder::new();
-    let mut sheet = MutableWorksheet::new("Sheet1");
+    let mut sheet = Worksheet::new("Sheet1");
     sheet.set_cell(0, 0, "Region");
     sheet.set_cell(0, 1, "Amount");
     sheet.set_cell(1, 0, "North");
@@ -708,7 +708,7 @@ fn structured_tables_round_trip_through_save_and_read() {
 #[test]
 fn comments_survive_package_roundtrip() {
     let mut workbook = Builder::new();
-    let mut sheet = MutableWorksheet::new("Notes");
+    let mut sheet = Worksheet::new("Notes");
     let mut first = Record::new(2, 3, "Author".to_string(), "formatted note".to_string());
     first.runs = vec![Run {
         character_index: 0,

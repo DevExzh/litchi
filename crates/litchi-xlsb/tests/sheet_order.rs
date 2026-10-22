@@ -17,6 +17,7 @@ use litchi_core::sheet::{Cell as _, Worksheet as _};
 use litchi_core::sheet::{CellValue, WorkbookTrait as _};
 use litchi_opc::PackURI;
 use litchi_xlsb::Package;
+use litchi_xlsb::builder::{self, Builder};
 use litchi_xlsb::cell_values::TransferLimits;
 use litchi_xlsb::cell_values::structure::Patch;
 use litchi_xlsb::chart::{Anchor, Chart};
@@ -24,7 +25,6 @@ use litchi_xlsb::named_ranges::Definition as NamedRange;
 use litchi_xlsb::package::PackageError;
 use litchi_xlsb::raw::{Encoder, Records, kind};
 use litchi_xlsb::sheet::{Kind, Selector};
-use litchi_xlsb::writer::{Builder, MutableChartSheet, MutableWorksheet};
 
 fn chart_first_package() -> Package {
     let chart = Chart::bar_chart_with_cache(
@@ -38,12 +38,12 @@ fn chart_first_package() -> Package {
     .expect("chart fixture");
     let mut builder = Builder::new();
     builder
-        .add_chart_sheet(MutableChartSheet::new("Chart", chart))
+        .add_chart_sheet(builder::ChartSheet::new("Chart", chart))
         .expect("chart sheet fixture");
-    let mut data = MutableWorksheet::new("Data");
+    let mut data = builder::Worksheet::new("Data");
     data.set_cell(0, 0, "data identity");
     builder.add_worksheet(data);
-    let mut tail = MutableWorksheet::new("Tail");
+    let mut tail = builder::Worksheet::new("Tail");
     tail.set_cell(0, 0, "tail identity");
     builder.add_worksheet(tail);
     builder.build().expect("chart-first package")
@@ -52,7 +52,7 @@ fn chart_first_package() -> Package {
 fn worksheets(names: &[&str]) -> Package {
     let mut builder = Builder::new();
     for (index, name) in names.iter().enumerate() {
-        let mut sheet = MutableWorksheet::new(*name);
+        let mut sheet = builder::Worksheet::new(*name);
         sheet.set_cell(0, 0, format!("{name} identity {index}"));
         builder.add_worksheet(sheet);
     }
@@ -127,8 +127,8 @@ where
 {
     let mut output = Vec::new();
     let mut ordinal = 0usize;
-    let mut writer = Encoder::new(&mut output);
-    for item in Records::new(source) {
+    let mut writer = Encoder::new(&mut output, litchi_xlsb::raw::Limits::DEFAULT);
+    for item in Records::new(source, litchi_xlsb::raw::Limits::DEFAULT) {
         let record = item.expect("workbook record");
         rewrite(record.kind(), record.payload(), ordinal, &mut writer);
         ordinal = ordinal.saturating_add(1);
@@ -154,7 +154,7 @@ fn with_book_view_indices(package: &Package, first: u32, active: u32) -> Package
 
 fn book_view_indices(package: &Package) -> Vec<(u32, u32)> {
     let blob = workbook_blob(package);
-    Records::new(&blob)
+    Records::new(&blob, litchi_xlsb::raw::Limits::DEFAULT)
         .filter_map(|item| {
             let record = item.expect("workbook record");
             if record.kind() == kind::BOOK_VIEW {
@@ -173,7 +173,7 @@ fn book_view_indices(package: &Package) -> Vec<(u32, u32)> {
 fn with_extern_sheet_fixture(first: i32, last: i32) -> Package {
     let mut builder = Builder::new();
     for name in ["A", "B", "C"] {
-        builder.add_worksheet(MutableWorksheet::new(name));
+        builder.add_worksheet(builder::Worksheet::new(name));
     }
     builder
         .add_external_link(
@@ -216,7 +216,7 @@ fn with_extern_sheet_fixture(first: i32, last: i32) -> Package {
 
 fn extern_sheet_entries(package: &Package) -> Vec<(u32, i32, i32)> {
     let blob = workbook_blob(package);
-    Records::new(&blob)
+    Records::new(&blob, litchi_xlsb::raw::Limits::DEFAULT)
         .find_map(|item| {
             let record = item.expect("workbook record");
             (record.kind() == kind::EXTERN_SHEET).then(|| {
@@ -245,8 +245,8 @@ fn with_unknown_between_bundle_sheets(package: &Package) -> Package {
         let unknown = litchi_xlsb::raw::Kind::new(0x3ffe).expect("unknown record kind");
         let mut inserted = false;
         let mut bundles = 0usize;
-        let mut writer = Encoder::new(output);
-        for item in Records::new(source) {
+        let mut writer = Encoder::new(output, litchi_xlsb::raw::Limits::DEFAULT);
+        for item in Records::new(source, litchi_xlsb::raw::Limits::DEFAULT) {
             let record = item.expect("workbook record");
             if record.kind() == kind::BUNDLE_SH {
                 if bundles == 1 && !inserted {
@@ -267,7 +267,7 @@ fn with_unknown_between_bundle_sheets(package: &Package) -> Package {
 
 fn named_range_scopes(package: &Package) -> Vec<(String, u32)> {
     let blob = workbook_blob(package);
-    Records::new(&blob)
+    Records::new(&blob, litchi_xlsb::raw::Limits::DEFAULT)
         .filter_map(|item| {
             let record = item.expect("workbook record");
             (record.kind() == kind::NAME).then(|| {
@@ -379,7 +379,10 @@ fn durable_tag8_replay_and_inverse_preserve_the_complete_catalog() {
         .expect("durable patch");
     assert_eq!(wire[operation_offset(&wire)], 8, "reorder operation tag");
     let patch = Patch::from_bytes(&wire, TransferLimits::DEFAULT).expect("decode tag8");
-    let replay = source.apply(&patch).expect("replay tag8");
+    let replay = source
+        .apply(&patch)
+        .map(litchi_xlsb::cell_values::structure::Commit::into_package)
+        .expect("replay tag8");
     assert_eq!(
         catalog(&replay),
         vec![
@@ -391,6 +394,7 @@ fn durable_tag8_replay_and_inverse_preserve_the_complete_catalog() {
     assert_eq!(
         replay
             .apply(&patch.inverse())
+            .map(litchi_xlsb::cell_values::structure::Commit::into_package)
             .expect("inverse")
             .to_bytes()
             .expect("inverse bytes"),
@@ -506,7 +510,7 @@ fn book_view_first_and_active_indices_follow_the_physical_tab() {
 fn defined_name_scope_remaps_but_global_scope_stays_global() {
     let mut builder = Builder::new();
     for name in ["A", "B", "C"] {
-        builder.add_worksheet(MutableWorksheet::new(name));
+        builder.add_worksheet(builder::Worksheet::new(name));
     }
     builder.add_named_range(
         NamedRange::new("Scoped".to_owned(), Some(1)).with_formula(vec![
@@ -563,7 +567,7 @@ fn noncontiguous_internal_three_d_range_refuses_atomically() {
     edit.reorder_sheets(&order_by_names(&["B", "C", "A"]))
         .expect("stage reorder");
     let error = edit.commit().expect_err("noncontiguous range must refuse");
-    assert!(matches!(error, PackageError::UnsupportedFeature(_)));
+    assert!(matches!(error, PackageError::Refused(_)));
     assert_eq!(source.to_bytes().expect("source remains"), before);
 }
 
@@ -581,8 +585,8 @@ fn unknown_record_between_bundle_tabs_is_a_safe_reorder_barrier() {
 #[test]
 fn unknown_workbook_record_outside_catalog_refuses_changed_order_only() {
     let source = replace_workbook(&worksheets(&["A", "B"]), |source, output| {
-        let mut writer = Encoder::new(output);
-        for item in Records::new(source) {
+        let mut writer = Encoder::new(output, litchi_xlsb::raw::Limits::DEFAULT);
+        for item in Records::new(source, litchi_xlsb::raw::Limits::DEFAULT) {
             let record = item.expect("record");
             if record.kind() == kind::END_BOOK {
                 writer
@@ -597,10 +601,7 @@ fn unknown_workbook_record_outside_catalog_refuses_changed_order_only() {
     let bytes = source.to_bytes().unwrap();
     let mut edit = source.edit().unwrap();
     edit.reorder_sheets(&order_by_names(&["B", "A"])).unwrap();
-    assert!(matches!(
-        edit.commit(),
-        Err(PackageError::UnsupportedFeature(_))
-    ));
+    assert!(matches!(edit.commit(), Err(PackageError::Refused(_))));
     let mut edit = source.edit().unwrap();
     assert!(!edit.reorder_sheets(&order_by_names(&["A", "B"])).unwrap());
     assert_eq!(edit.commit().unwrap().package().to_bytes().unwrap(), bytes);

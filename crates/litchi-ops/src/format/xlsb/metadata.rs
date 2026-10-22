@@ -67,7 +67,7 @@ fn native(error: xlsb::metadata::Error) -> crate::Error {
 
 /// Commit `update` to `package`'s metadata.
 fn commit(
-    edit: std::result::Result<xlsb::metadata::Edit<'_>, xlsb::metadata::Error>,
+    edit: std::result::Result<xlsb::metadata::Edit, xlsb::metadata::Error>,
     update: impl FnOnce(&mut Metadata),
     custom: Option<&Assignments>,
 ) -> Result<(xlsb::Package, xlsb::metadata::Patch, Metadata)> {
@@ -117,7 +117,7 @@ impl Xlsb {
         let (after, after_file) = if patch.is_noop() {
             (self.clone(), None)
         } else {
-            let after = self.adopt_metadata(target.into_workbook()?, metadata);
+            let after = self.adopt_metadata(target, metadata)?;
             (after.clone(), Some(after))
         };
         self.check_source()?;
@@ -182,7 +182,7 @@ impl Xlsb {
     }
 
     /// [`Self::adopt_package`] with the committed metadata.
-    fn adopt_metadata(&self, workbook: xlsb::Workbook, metadata: Metadata) -> Self {
+    fn adopt_metadata(&self, package: xlsb::Package, metadata: Metadata) -> Result<Self> {
         let options = OpenOptions::new()
             .retain_source(self.0.retain_source)
             .ooxml_limits(self.0.ooxml_limits);
@@ -190,14 +190,14 @@ impl Xlsb {
             super::Signature::RemovalAuthorized => super::Signature::Unsigned,
             signature => signature,
         };
-        Self::with_owner(
-            XlsbOwner::Eager(Box::new(workbook)),
+        Ok(Self::with_owner(
+            super::eager_package(package)?,
             metadata,
             self.0.metadata_repairs.clone(),
             &options,
         )
         .with_origin(self.origin())
-        .with_signature(signature)
+        .with_signature(signature))
     }
 }
 

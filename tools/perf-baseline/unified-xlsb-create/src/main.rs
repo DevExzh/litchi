@@ -27,15 +27,16 @@ struct Config {
     rounds: usize,
 }
 
-fn native_create() -> Result<litchi_xlsb::Workbook> {
-    Ok(litchi_xlsb::Package::new()?.into_workbook()?)
+fn native_create() -> Result<litchi_xlsb::Package> {
+    Ok(litchi_xlsb::Package::new()?)
 }
 
 fn unified_create() -> Result<File> {
     Ok(litchi_ops::create(FileFormat::Xlsb)?)
 }
 
-fn verify_native_ready(workbook: &litchi_xlsb::Workbook) -> Result<()> {
+fn verify_native_ready(package: &litchi_xlsb::Package) -> Result<()> {
+    let workbook = package.workbook()?;
     let names = WorkbookTrait::worksheet_names(workbook);
     if names.len() != 1 || names.first().map(String::as_str) != Some(SHEET_NAME) {
         return Err(format!("native creation returned worksheet names {names:?}").into());
@@ -71,8 +72,8 @@ fn verify_unified_ready(file: &File) -> Result<()> {
     Ok(())
 }
 
-fn native_bytes(workbook: litchi_xlsb::Workbook) -> Result<Vec<u8>> {
-    Ok(workbook.into_package().to_bytes()?)
+fn native_bytes(package: litchi_xlsb::Package) -> Result<Vec<u8>> {
+    Ok(package.to_bytes()?)
 }
 
 fn unified_bytes(file: &File) -> Result<Vec<u8>> {

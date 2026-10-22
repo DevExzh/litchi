@@ -1,7 +1,8 @@
 //! Package facade for the Workbook-owned Volatile Dependencies owner.
 
-use super::{Commit, Edit, Patch, SemanticLimits, Snapshot};
+use super::{Commit, Edit, EditOptions, Patch, Snapshot};
 use crate::package::error::Result;
+use litchi_core::edit::Diagnostics;
 
 impl crate::Package {
     /// Read the optional Workbook Volatile Dependencies part.
@@ -22,41 +23,45 @@ impl crate::Package {
     /// # }
     /// ```
     pub fn volatile_dependencies(&self) -> Result<Snapshot> {
-        self.volatile_dependencies_with_limits(SemanticLimits::DEFAULT)
+        Snapshot::read_with_limits(
+            self.opc_package(),
+            self.semantic_limits().volatile_dependencies_value(),
+        )
     }
 
-    /// Read Volatile Dependencies with explicit finite semantic limits.
-    pub fn volatile_dependencies_with_limits(&self, limits: SemanticLimits) -> Result<Snapshot> {
-        Snapshot::read_with_limits(self.opc_package(), limits)
-    }
-
-    /// Start a detached source-bound Volatile Dependencies transaction.
+    /// Start a Volatile Dependencies edit under the package's limits.
+    /// Missing owners can be created through `replace` on the edit.
     pub fn edit_volatile_dependencies(&self) -> Result<Edit> {
-        Ok(self.volatile_dependencies()?.edit())
+        self.edit_volatile_dependencies_with_options(EditOptions::default())
     }
 
-    /// Start a detached transaction with explicit finite semantic limits.
-    pub fn edit_volatile_dependencies_with_limits(&self, limits: SemanticLimits) -> Result<Edit> {
-        Ok(self.volatile_dependencies_with_limits(limits)?.edit())
+    /// Start a Volatile Dependencies edit with explicit options.
+    pub fn edit_volatile_dependencies_with_options(&self, options: EditOptions) -> Result<Edit> {
+        let limits = options
+            .limits_value()
+            .unwrap_or_else(|| self.semantic_limits().volatile_dependencies_value());
+        Ok(Edit::new(
+            self.clone(),
+            Snapshot::read_with_limits(self.opc_package(), limits)?,
+        ))
     }
 
-    /// Apply a Volatile Dependencies commit to a cloned package.
-    pub fn apply_volatile_dependencies(&self, commit: &Commit) -> Result<Self> {
-        self.apply_volatile_dependencies_patch(commit.patch())
-    }
-
-    /// Apply a source-checked Volatile Dependencies patch atomically.
-    pub fn apply_volatile_dependencies_patch(&self, patch: &Patch) -> Result<Self> {
-        let mut candidate = self.clone().into_opc();
+    /// Apply a source-checked Volatile Dependencies patch to a new package;
+    /// this one is unchanged.
+    pub fn apply_volatile_dependencies(&self, patch: &Patch) -> Result<Commit> {
+        let mut candidate = self.opc_package().clone();
         patch.apply(&mut candidate)?;
-        self.reparse_candidate(candidate)
-    }
-
-    /// Explicitly remove package signatures before planning a changed
-    /// Volatile Dependencies publication.
-    pub fn without_signatures(&self) -> Result<Self> {
-        let mut candidate = self.clone().into_opc();
-        candidate.unsign();
-        self.reparse_candidate(candidate)
+        if patch.is_noop() {
+            return Ok(Commit::new(
+                self.clone(),
+                patch.clone(),
+                Diagnostics::UNCHANGED,
+            ));
+        }
+        Ok(Commit::new(
+            self.reparse_candidate(candidate)?,
+            patch.clone(),
+            Diagnostics::CHANGED,
+        ))
     }
 }

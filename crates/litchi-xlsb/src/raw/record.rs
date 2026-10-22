@@ -251,15 +251,9 @@ pub struct Records<'a> {
 }
 
 impl<'a> Records<'a> {
-    /// Iterate with safe default limits.
-    #[must_use]
-    pub const fn new(input: &'a [u8]) -> Self {
-        Self::with_limits(input, Limits::DEFAULT)
-    }
-
     /// Iterate with explicit finite limits.
     #[must_use]
-    pub const fn with_limits(input: &'a [u8], limits: Limits) -> Self {
+    pub const fn new(input: &'a [u8], limits: Limits) -> Self {
         Self {
             input,
             offset: 0,
@@ -269,9 +263,9 @@ impl<'a> Records<'a> {
     }
 
     /// Construct an iterator after validating its raw limit profile.
-    pub fn try_with_limits(input: &'a [u8], limits: Limits) -> Result<Self> {
+    pub fn bounded(input: &'a [u8], limits: Limits) -> Result<Self> {
         match limits.validate() {
-            Ok(limits) => Ok(Self::with_limits(input, limits)),
+            Ok(limits) => Ok(Self::new(input, limits)),
             Err(error) => Err(error),
         }
     }

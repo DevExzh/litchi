@@ -13,18 +13,22 @@ use std::io::Cursor;
 
 use litchi_core::sheet::{Cell as _, CellValue};
 use litchi_opc::{OpcPackage, PackURI};
+use litchi_xlsb::builder::{self, Builder};
 use litchi_xlsb::cell_values::{CellError, Reference, Value};
 use litchi_xlsb::raw::{Encoder, Kind, Records, kind};
-use litchi_xlsb::writer::{Builder, MutableWorksheet};
 use litchi_xlsb::{
     CachedNumberDefect, Defect, Leniency, SourceBackedWorkbook, ToleranceReport, Workbook,
 };
+
+#[path = "support/projection.rs"]
+mod projection;
+use projection::OwnedWorkbook as _;
 
 const SHEET1: &str = "/xl/worksheets/sheet1.bin";
 
 /// One sheet with `1.5` at A1 and `2.5` at B1, both stored as `BrtCellReal`.
 fn numbers_workbook() -> Vec<u8> {
-    let mut sheet = MutableWorksheet::new("Numbers");
+    let mut sheet = builder::Worksheet::new("Numbers");
     sheet.set_cell(0, 0, 1.5);
     sheet.set_cell(0, 1, 2.5);
     let mut writer = Builder::new();
@@ -42,12 +46,15 @@ fn numbers_workbook() -> Vec<u8> {
 fn with_cached_number(source: &[u8], record_type: Kind, value: f64) -> Vec<u8> {
     let mut package = OpcPackage::from_reader(Cursor::new(source)).unwrap();
     let uri = PackURI::new(SHEET1).unwrap();
-    let mut stream: Vec<(Kind, Vec<u8>)> = Records::new(package.get_part(&uri).unwrap().blob())
-        .map(|record| {
-            let record = record.unwrap();
-            (record.kind(), record.payload().to_vec())
-        })
-        .collect();
+    let mut stream: Vec<(Kind, Vec<u8>)> = Records::new(
+        package.get_part(&uri).unwrap().blob(),
+        litchi_xlsb::raw::Limits::DEFAULT,
+    )
+    .map(|record| {
+        let record = record.unwrap();
+        (record.kind(), record.payload().to_vec())
+    })
+    .collect();
     let payload = &mut stream
         .iter_mut()
         .find(|(kind, _)| *kind == record_type)
@@ -55,7 +62,7 @@ fn with_cached_number(source: &[u8], record_type: Kind, value: f64) -> Vec<u8> {
         .1;
     payload[8..16].copy_from_slice(&value.to_le_bytes());
     let mut blob = Vec::new();
-    let mut writer = Encoder::new(&mut blob);
+    let mut writer = Encoder::new(&mut blob, litchi_xlsb::raw::Limits::DEFAULT);
     for (kind, payload) in &stream {
         writer.write_record(*kind, payload).unwrap();
     }
@@ -245,27 +252,15 @@ fn a_tolerant_snapshot_still_commits_edits_to_other_cells() {
         litchi_xlsb::OpenOptions::new().leniency(Leniency::TolerateCachedNumbers),
     )
     .unwrap();
-    let mut edit = workbook.cell_values(0).unwrap().edit();
-    edit.set_value(b1(), Value::Number(3.5)).unwrap();
-    let commit = edit.commit().unwrap();
+    let mut draft = workbook.cell_values(0).unwrap().draft();
+    draft.set_value(b1(), Value::Number(3.5)).unwrap();
+    let (snapshot, _) = draft.finish().unwrap();
     assert_eq!(
-        commit
-            .snapshot()
-            .cell(b1())
-            .unwrap()
-            .unwrap()
-            .value()
-            .clone(),
+        snapshot.cell(b1()).unwrap().unwrap().value().clone(),
         Value::Number(3.5)
     );
     assert_eq!(
-        commit
-            .snapshot()
-            .cell(a1())
-            .unwrap()
-            .unwrap()
-            .value()
-            .clone(),
+        snapshot.cell(a1()).unwrap().unwrap().value().clone(),
         Value::Error(CellError::Number)
     );
 }
@@ -301,12 +296,8 @@ fn package_adoption_and_publication_keep_opt_in_cached_number_reads() {
     )
     .unwrap();
     let package = workbook.into_package();
-    let projected = package.workbook().unwrap();
-    let published = package
-        .without_signatures()
-        .unwrap()
-        .into_workbook()
-        .unwrap();
+    let projected = package.owned_workbook().unwrap();
+    let published = package.unsign().owned_workbook().unwrap();
     for workbook in [projected, published] {
         let snapshot = workbook.cell_values(0).unwrap();
         assert_eq!(
@@ -322,7 +313,7 @@ fn package_adoption_and_publication_keep_opt_in_cached_number_reads() {
     }
     let strict = litchi_xlsb::Package::from_bytes(&bytes)
         .unwrap()
-        .into_workbook()
+        .owned_workbook()
         .unwrap();
     assert!(strict.cell_values(0).is_err());
 }

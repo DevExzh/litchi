@@ -33,7 +33,11 @@ fn exact_payload_round_trip_preserves_every_field() {
     assert_eq!(props.opts(), opts);
 
     let mut written = Vec::new();
-    calc::write(&props, &mut Encoder::new(&mut written)).unwrap();
+    calc::write(
+        &props,
+        &mut Encoder::new(&mut written, litchi_xlsb::raw::Limits::DEFAULT),
+    )
+    .unwrap();
     assert_eq!(written, bytes);
 }
 
@@ -55,7 +59,11 @@ fn accepts_excel_12_single_byte_options_and_writes_canonical_form() {
     assert!(!props.has(Opts::IGNORE_DEPS));
 
     let mut canonical = Vec::new();
-    calc::write(&props, &mut Encoder::new(&mut canonical)).unwrap();
+    calc::write(
+        &props,
+        &mut Encoder::new(&mut canonical, litchi_xlsb::raw::Limits::DEFAULT),
+    )
+    .unwrap();
     assert_eq!(canonical, full);
 }
 

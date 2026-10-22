@@ -7,19 +7,19 @@
 //! Merged ranges through the primary workbook transaction (record 0261).
 
 use litchi_xlsb::Package;
+use litchi_xlsb::builder::{self, Builder};
 use litchi_xlsb::cell_values::TransferLimits;
 use litchi_xlsb::cell_values::structure::Patch;
 use litchi_xlsb::merged_cells::MergedCell;
 use litchi_xlsb::package::PackageError;
-use litchi_xlsb::writer::{Builder, MutableWorksheet};
 
 fn package() -> Package {
-    let mut first = MutableWorksheet::new("First");
+    let mut first = builder::Worksheet::new("First");
     first.set_cell(0, 0, "title");
     first.set_cell(0, 1, 2.0_f64);
     let mut builder = Builder::new();
     builder.add_worksheet(first);
-    builder.add_worksheet(MutableWorksheet::new("Second"));
+    builder.add_worksheet(builder::Worksheet::new("Second"));
     builder.build().unwrap()
 }
 
@@ -68,11 +68,21 @@ fn merges_and_unmerges_publish_and_replay_exactly() {
     let wire = patch.to_bytes(TransferLimits::DEFAULT).unwrap();
     let decoded = Patch::from_bytes(&wire, TransferLimits::DEFAULT).unwrap();
     assert_eq!(
-        source.apply(&decoded).unwrap().to_bytes().unwrap(),
+        source
+            .apply(&decoded)
+            .map(litchi_xlsb::cell_values::structure::Commit::into_package)
+            .unwrap()
+            .to_bytes()
+            .unwrap(),
         merged.to_bytes().unwrap()
     );
     assert_eq!(
-        merged.apply(&patch.inverse()).unwrap().to_bytes().unwrap(),
+        merged
+            .apply(&patch.inverse())
+            .map(litchi_xlsb::cell_values::structure::Commit::into_package)
+            .unwrap()
+            .to_bytes()
+            .unwrap(),
         source.to_bytes().unwrap()
     );
 
@@ -118,11 +128,11 @@ fn overlapping_and_single_cell_ranges_are_refused_before_staging() {
     edit.merge_cells(0, MergedCell::new(0, 1, 0, 1)).unwrap();
     assert!(matches!(
         edit.merge_cells(0, MergedCell::new(1, 2, 1, 2)),
-        Err(PackageError::UnsupportedFeature(_))
+        Err(PackageError::Refused(_))
     ));
     assert!(matches!(
         edit.unmerge_cells(0, MergedCell::new(1, 2, 1, 2)),
-        Err(PackageError::UnsupportedFeature(_))
+        Err(PackageError::Refused(_))
     ));
     assert!(matches!(
         edit.merge_cells(0, MergedCell::new(3, 3, 3, 3)),

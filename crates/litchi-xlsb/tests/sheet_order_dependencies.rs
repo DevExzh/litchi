@@ -14,6 +14,7 @@
 use litchi_opc::constants::{content_type, relationship_type};
 use litchi_opc::{BlobPart, PackURI, TargetMode};
 use litchi_xlsb::Package;
+use litchi_xlsb::builder::{self, Builder};
 use litchi_xlsb::data_model::{Definition, Model, Table};
 use litchi_xlsb::package::PackageError;
 use litchi_xlsb::package::connections::{Connection, Connections, SourceType};
@@ -27,12 +28,11 @@ use litchi_xlsb::volatile_dependencies::{
     Dependencies, DependencyKind, MainTopic, RELATIONSHIP_TYPE as VOLATILE_RELATIONSHIP_TYPE,
     Topic, VolatileType,
 };
-use litchi_xlsb::writer::{Builder, MutableWorksheet};
 
 fn worksheets(names: &[&str]) -> Package {
     let mut builder = Builder::new();
     for name in names {
-        builder.add_worksheet(MutableWorksheet::new(*name));
+        builder.add_worksheet(builder::Worksheet::new(*name));
     }
     builder.build().expect("worksheet package")
 }
@@ -80,12 +80,13 @@ fn package_with_volatile_dependencies() -> Package {
         .expect("stage volatile dependencies");
     let commit = edit.commit().expect("commit volatile dependencies");
     package
-        .apply_volatile_dependencies(&commit)
+        .apply_volatile_dependencies(commit.patch())
+        .map(litchi_core::edit::Commit::into_package)
         .expect("publish volatile dependencies")
 }
 
 fn records(bytes: &[u8]) -> Vec<(Kind, Vec<u8>)> {
-    Records::new(bytes)
+    Records::new(bytes, litchi_xlsb::raw::Limits::DEFAULT)
         .map(|record| {
             let record = record.expect("BIFF12 record");
             (record.kind(), record.payload().to_vec())
@@ -176,7 +177,7 @@ fn package_with_vba_project() -> Package {
 fn package_with_connections() -> Package {
     let mut builder = Builder::new();
     for name in ["A", "B", "C"] {
-        builder.add_worksheet(MutableWorksheet::new(name));
+        builder.add_worksheet(builder::Worksheet::new(name));
     }
     builder
         .set_connections(Connections {
@@ -194,7 +195,7 @@ fn package_with_connections() -> Package {
 fn package_with_data_model_and_connections() -> Package {
     let mut builder = Builder::new();
     for name in ["A", "B", "C"] {
-        builder.add_worksheet(MutableWorksheet::new(name));
+        builder.add_worksheet(builder::Worksheet::new(name));
     }
     builder
         .set_connections(Connections {
@@ -230,7 +231,7 @@ fn package_with_data_model_and_connections() -> Package {
 fn package_with_data_model() -> Package {
     let mut builder = Builder::new();
     for name in ["A", "B", "C"] {
-        builder.add_worksheet(MutableWorksheet::new(name));
+        builder.add_worksheet(builder::Worksheet::new(name));
     }
     builder
         .set_data_model(Model::from_bytes(Definition::default(), vec![1, 2, 3, 4]).expect("model"))
@@ -239,7 +240,7 @@ fn package_with_data_model() -> Package {
 }
 
 fn package_with_shared_workbook() -> Package {
-    let mut opc = worksheets(&["A", "B", "C"]).into_opc();
+    let source = worksheets(&["A", "B", "C"]);
     let guid = Guid::from_bytes([7; 16]);
     let date = ShortDateTime {
         year: 2024,
@@ -285,8 +286,9 @@ fn package_with_shared_workbook() -> Package {
             b"opaque-log".to_vec(),
         )])],
     };
-    litchi_xlsb::shared_workbook::store(&mut opc, &catalog).expect("shared-workbook owner");
-    Package::from_opc(opc).expect("shared-workbook package")
+    let mut edit = source.edit_shared_workbook().unwrap();
+    edit.replace(catalog).unwrap();
+    edit.commit().unwrap().into_package()
 }
 
 fn assert_reorder_guard(package: Package, label: &str) {
@@ -309,7 +311,7 @@ fn assert_reorder_guard(package: Package, label: &str) {
         .expect("stage reorder");
     let error = edit.commit().expect_err("dependency guard");
     assert!(
-        matches!(error, PackageError::UnsupportedFeature(_)),
+        matches!(error, PackageError::Refused(_)),
         "{label}: expected typed unsupported error, got {error:?}"
     );
     assert_eq!(package.to_bytes().expect("unchanged source"), before);
@@ -338,6 +340,7 @@ fn volatile_reference_ordinals_remap_and_inverse_restores_every_byte() {
         commit
             .package()
             .apply(&commit.patch().inverse())
+            .map(litchi_xlsb::cell_values::structure::Commit::into_package)
             .expect("structural inverse")
             .to_bytes()
             .expect("structural inverse bytes"),
@@ -396,8 +399,8 @@ fn opaque_volatile_record_blocks_reordering_but_retains_exact_noop() {
     let mut opc = source.opc_package().clone();
     let before = owner_blob(&source);
     let mut output = Vec::new();
-    let mut writer = litchi_xlsb::raw::Encoder::new(&mut output);
-    for record in Records::new(&before) {
+    let mut writer = litchi_xlsb::raw::Encoder::new(&mut output, litchi_xlsb::raw::Limits::DEFAULT);
+    for record in Records::new(&before, litchi_xlsb::raw::Limits::DEFAULT) {
         let record = record.unwrap();
         writer
             .write_record(record.kind(), record.payload())

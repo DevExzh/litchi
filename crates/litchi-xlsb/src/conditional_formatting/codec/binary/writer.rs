@@ -36,10 +36,7 @@ pub fn write_conditional_formattings<W: Write>(
                 i64::from(metadata.priority)
             });
         if priority > 0 && !priorities.insert(priority) {
-            return Err(invalid(
-                "BrtBeginCFRule priority",
-                format!("duplicate {priority}"),
-            ));
+            return Err(invalid("BrtBeginCFRule priority", "duplicate"));
         }
     }
     for formatting in cond_fmts {
@@ -98,7 +95,7 @@ pub(crate) fn serialize_cond_formatting_header(formatting: &Formatting) -> Resul
     if ranges.is_empty() || ranges.len() > 8_192 {
         return Err(invalid(
             "BrtBeginConditionalFormatting",
-            format!("classic range count {} is outside 1..=8192", ranges.len()),
+            "classic range count is outside 1..=8192",
         ));
     }
     let mut payload = Vec::with_capacity(12 + ranges.len() * 16);
@@ -151,8 +148,8 @@ pub(crate) fn serialize_cf_rule(rule: &Rule) -> Result<Vec<u8>> {
     payload.extend_from_slice(&flags.to_le_bytes());
     for formula in &slots {
         let size = formula.map_or(0, |formula| formula.rgce.len());
-        let size = u32::try_from(size)
-            .map_err(|_| Error::InvalidFormula("formula is too large".to_string()))?;
+        let size =
+            u32::try_from(size).map_err(|_| Error::InvalidFormula("formula is too large"))?;
         payload.extend_from_slice(&size.to_le_bytes());
     }
     write_nullable_wide_string(&mut payload, rule.text.as_deref())?;
@@ -199,10 +196,7 @@ fn write_rule_visualization<W: Write>(writer: &mut Encoder<W>, rule: &Rule) -> R
             let set = rule.icon_set.as_ref().expect("validated icon set");
             let expected = icon_count(set.icon_set_type)?;
             if set.cfvos.len() != expected {
-                return Err(invalid(
-                    "BrtBeginIconSet",
-                    format!("expected {expected} thresholds, found {}", set.cfvos.len()),
-                ));
+                return Err(invalid("BrtBeginIconSet", "expected thresholds, found"));
             }
             if set.cfvos.iter().any(|cfvo| matches!(cfvo.cfvo_type, 2 | 3)) {
                 return Err(invalid(
@@ -369,10 +363,7 @@ fn write_color14<W: Write>(writer: &mut Encoder<W>, record: Color, legacy_argb: 
 
 fn write_cfvo<W: Write>(writer: &mut Encoder<W>, cfvo: &Value, icon_set: bool) -> Result<()> {
     if !matches!(cfvo.cfvo_type, 1 | 2 | 3 | 4 | 5 | 7) {
-        return Err(invalid(
-            "BrtCFVO",
-            format!("invalid type {}", cfvo.cfvo_type),
-        ));
+        return Err(invalid("BrtCFVO", "invalid type"));
     }
     let formula = effective_cfvo_formula(cfvo)?;
     if matches!(cfvo.cfvo_type, 2 | 3) && formula.is_some() {
@@ -405,7 +396,7 @@ fn write_cfvo<W: Write>(writer: &mut Encoder<W>, cfvo: &Value, icon_set: bool) -
     let formula_size = formula.as_ref().map_or(0, |formula| formula.rgce.len());
     payload.extend_from_slice(
         &u32::try_from(formula_size)
-            .map_err(|_| Error::InvalidFormula("formula is too large".to_string()))?
+            .map_err(|_| Error::InvalidFormula("formula is too large"))?
             .to_le_bytes(),
     );
     if let Some(formula) = formula {
@@ -434,7 +425,7 @@ fn write_nullable_wide_string(payload: &mut Vec<u8>, value: Option<&str>) -> Res
     let units = value.encode_utf16().count();
     payload.extend_from_slice(
         &u32::try_from(units)
-            .map_err(|_| Error::Encoding("conditional-format text is too long".to_string()))?
+            .map_err(|_| Error::Encoding("conditional-format text is too long"))?
             .to_le_bytes(),
     );
     payload.reserve(units.saturating_mul(2));

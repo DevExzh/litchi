@@ -44,13 +44,11 @@ pub(super) fn parse_pivot_cache_records_binary(
         }
     }
 
-    Err(Error::UnexpectedEndOfStream(
-        "BrtEndPivotCacheRecords".to_string(),
-    ))
+    Err(Error::UnexpectedEndOfStream("BrtEndPivotCacheRecords"))
 }
 
 fn read_count(data: &[u8], context: &'static str) -> Result<u32> {
-    let mut cursor = Cursor::new(data, context);
+    let mut cursor = Cursor::new(data, context, crate::raw::Limits::DEFAULT);
     let count = cursor.read_u32()?;
     cursor.finish()?;
     Ok(count)
@@ -60,14 +58,14 @@ fn validate_record_count(declared: u32, actual: usize) -> Result<()> {
     if u64::from(declared) != actual as u64 {
         return Err(malformed(
             "BrtBeginPivotCacheRecords",
-            format!("declared {declared} records, found {actual}"),
+            "declared records, found",
         ));
     }
     Ok(())
 }
 
 fn parse_direct_record(data: &[u8], definition: &PivotCacheDefinition) -> Result<PivotCacheRecord> {
-    let mut cursor = Cursor::new(data, "BrtPCRRecord");
+    let mut cursor = Cursor::new(data, "BrtPCRRecord", crate::raw::Limits::DEFAULT);
     let mut values = Vec::with_capacity(source_field_count(definition));
     for field in source_fields(definition) {
         values.push(read_direct_value(&mut cursor, field)?);
@@ -114,12 +112,11 @@ fn read_direct_value(
         return Ok(PivotCacheItemValue::Index(cursor.read_u32()?));
     }
 
-    let stats = field.shared_items.stats.as_ref().ok_or_else(|| {
-        malformed(
-            "BrtPCRRecord",
-            format!("field {:?} has no type metadata", field.name),
-        )
-    })?;
+    let stats = field
+        .shared_items
+        .stats
+        .as_ref()
+        .ok_or_else(|| malformed("BrtPCRRecord", "field has no type metadata"))?;
     if stats.numeric_field {
         Ok(PivotCacheItemValue::Number(cursor.read_f64()?))
     } else if stats.date_in_field && !stats.has_text_item {
@@ -138,7 +135,11 @@ fn read_record_dt_value(
     data: &[u8],
     field: &PivotCacheField,
 ) -> Result<PivotCacheItemValue> {
-    let mut cursor = Cursor::new(data, "BrtPCDI cache record value");
+    let mut cursor = Cursor::new(
+        data,
+        "BrtPCDI cache record value",
+        crate::raw::Limits::DEFAULT,
+    );
     let value = if !field.shared_items.items.is_empty() {
         if record_type != rt::PCDI_INDEX {
             return Err(Error::UnexpectedRecord {
@@ -148,12 +149,11 @@ fn read_record_dt_value(
         }
         PivotCacheItemValue::Index(cursor.read_u32()?)
     } else {
-        let stats = field.shared_items.stats.as_ref().ok_or_else(|| {
-            malformed(
-                "BrtPCRRecordDt",
-                format!("field {:?} has no type metadata", field.name),
-            )
-        })?;
+        let stats = field
+            .shared_items
+            .stats
+            .as_ref()
+            .ok_or_else(|| malformed("BrtPCRRecordDt", "field has no type metadata"))?;
         let expected = if stats.numeric_field {
             rt::PCDI_NUMBER
         } else if stats.date_in_field && !stats.has_text_item {

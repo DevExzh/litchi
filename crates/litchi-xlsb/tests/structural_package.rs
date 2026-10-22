@@ -32,13 +32,24 @@ fn package_edit_commit_apply_and_inverse_are_immutable() {
         .to_bytes(TransferLimits::DEFAULT)
         .expect("wire");
     let patch = Patch::from_bytes(&bytes, TransferLimits::DEFAULT).expect("decode");
-    let applied = source.apply(&patch).expect("immutable apply");
+    let applied = source
+        .apply(&patch)
+        .map(litchi_xlsb::cell_values::structure::Commit::into_package)
+        .expect("immutable apply");
     assert_eq!(
         applied.to_bytes().expect("applied bytes"),
         commit.patch().after()
     );
-    assert!(applied.apply(&patch).is_err());
-    let reverted = applied.apply(&patch.inverse()).expect("inverse");
+    assert!(
+        applied
+            .apply(&patch)
+            .map(litchi_xlsb::cell_values::structure::Commit::into_package)
+            .is_err()
+    );
+    let reverted = applied
+        .apply(&patch.inverse())
+        .map(litchi_xlsb::cell_values::structure::Commit::into_package)
+        .expect("inverse");
     assert_eq!(reverted.to_bytes().expect("restored bytes"), original);
     let (package, patch) = commit.into_parts();
     assert_eq!(package.to_bytes().expect("consumed bytes"), patch.after());
@@ -62,6 +73,7 @@ fn noop_and_failed_edits_keep_the_package_source() {
     assert_eq!(
         source
             .apply(commit.patch())
+            .map(litchi_xlsb::cell_values::structure::Commit::into_package)
             .expect("apply no-op")
             .to_bytes()
             .expect("bytes"),
@@ -120,7 +132,10 @@ fn retained_input_budget_is_checked_before_commit_and_allows_bounded_chaining() 
             .expect("stage rename")
             .expect("resolved worksheet selector");
         let commit = edit.commit().expect("bounded commit");
-        let applied = package.apply(commit.patch()).expect("same-policy apply");
+        let applied = package
+            .apply(commit.patch())
+            .map(litchi_xlsb::cell_values::structure::Commit::into_package)
+            .expect("same-policy apply");
         assert_eq!(
             applied.to_bytes().expect("apply bytes"),
             commit.package().to_bytes().expect("commit bytes")

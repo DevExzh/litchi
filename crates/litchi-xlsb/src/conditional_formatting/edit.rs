@@ -44,9 +44,8 @@ use litchi_opc::PackURI;
 use litchi_opc::constants::relationship_type;
 
 use super::{Formatting, RecordKind, write_conditional_formattings};
-use crate::Workbook;
 use crate::package::Package;
-use crate::package::error::Result;
+use crate::package::error::{Error as PackageError, Result};
 use crate::part_edit::{Rank, SheetLayout, Staged, family, invalid, splice};
 use crate::raw::{Encoder, Records, kind};
 
@@ -298,9 +297,9 @@ impl DifferentialStyle {
 }
 
 /// A staged conditional-format edit. Dropping it discards it.
-#[derive(Debug)]
-pub struct Edit<'a> {
-    staged: Staged<'a>,
+#[derive(Debug, Clone)]
+pub struct Edit {
+    staged: Staged,
 }
 
 impl Package {
@@ -309,7 +308,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns the workbook materialization errors of this package.
-    pub fn edit_conditional_formats(&self) -> Result<Edit<'_>> {
+    pub fn edit_conditional_formats(&self) -> Result<Edit> {
         Ok(Edit {
             staged: Staged::of_package(self)?,
         })
@@ -323,18 +322,8 @@ impl Package {
     /// Returns [`Error::PatchConflict`] when this package is not the patch's
     /// before state and [`Error::Signed`] for a changed patch of a signed
     /// workbook.
-    pub fn apply_conditional_formats(&self, patch: &Patch) -> Result<Self> {
-        patch.0.apply(self)
-    }
-}
-
-impl Workbook {
-    /// Start a conditional-format edit of this workbook without first
-    /// copying it into a package.
-    pub fn edit_conditional_formats(&self) -> Edit<'_> {
-        Edit {
-            staged: Staged::of_workbook(self),
-        }
+    pub fn apply_conditional_formats(&self, patch: &Patch) -> Result<Commit> {
+        Ok(Commit::new((patch.0.apply(self)?, patch.0.clone())))
     }
 }
 
@@ -370,7 +359,12 @@ pub(crate) fn classic(formats: Vec<Formatting>) -> Vec<Formatting> {
         .collect()
 }
 
-impl Edit<'_> {
+impl Edit {
+    /// Discard every staged change.
+    pub fn reset(&mut self) {
+        self.staged.reset();
+    }
+
     /// The staged classic conditional formats of the worksheet at
     /// complete-catalog position `sheet`, in stream order.
     ///
@@ -421,7 +415,7 @@ impl Edit<'_> {
                 "the styles part holds the most differential formats it can",
             ));
         }
-        if !Records::new(&bytes)
+        if !Records::new(&bytes, crate::raw::Limits::DEFAULT)
             .any(|record| record.is_ok_and(|record| record.kind() == kind::BEGIN_DXFS))
         {
             bytes = insert_dxfs(&bytes)?;
@@ -499,7 +493,11 @@ impl Edit<'_> {
             }
         }
         let mut out = Vec::new();
-        write_conditional_formattings(&mut Encoder::new(&mut out), std::slice::from_ref(&format))?;
+        write_conditional_formattings(
+            &mut Encoder::new(&mut out, crate::raw::Limits::DEFAULT),
+            std::slice::from_ref(&format),
+        )
+        .map_err(map_authoring_error)?;
         Ok(out)
     }
 
@@ -578,6 +576,25 @@ impl Edit<'_> {
     }
 }
 
+fn map_authoring_error(error: super::Error) -> PackageError {
+    match error {
+        super::Error::UnsupportedFeature(_) | super::Error::Unrecognized { .. } => {
+            PackageError::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit_conditional_formats",
+                "the conditional format contains unsupported authored content",
+            )
+        },
+        error @ (super::Error::InvalidLength { .. }
+        | super::Error::InvalidFormula(_)
+        | super::Error::InvalidCellReference(_)
+        | super::Error::Encoding(_)
+        | super::Error::Wire(_)
+        | super::Error::Formula(_)
+        | super::Error::Io(_)) => error.into(),
+    }
+}
+
 /// The top-left cell `(row, column)` of a format's first range.
 fn first_cell(format: &Formatting) -> Result<(u32, u32)> {
     let first = format
@@ -597,7 +614,7 @@ fn first_cell(format: &Formatting) -> Result<(u32, u32)> {
 fn insert_dxfs(styles: &[u8]) -> Result<Vec<u8>> {
     const COLOR_PALETTE: u16 = 0x01D9;
     let mut at = None;
-    let mut records = Records::new(styles);
+    let mut records = Records::new(styles, crate::raw::Limits::DEFAULT);
     while let Some(record) = records.next() {
         let record = record?;
         if matches!(
@@ -668,6 +685,7 @@ mod tests {
         assert_eq!(
             package
                 .apply_conditional_formats(&patch)
+                .map(|commit| commit.into_package())
                 .unwrap()
                 .to_bytes()
                 .unwrap(),

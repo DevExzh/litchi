@@ -92,8 +92,8 @@ impl Workbook {
                     }
                     if book_views_seen || book_views_open {
                         return Err(crate::package::error::Error::Unrecognized {
-                            typ: "BrtBeginBookViews".to_string(),
-                            val: "duplicate or nested book-view block".to_string(),
+                            typ: "BrtBeginBookViews",
+                            val: "duplicate or nested book-view block",
                         });
                     }
                     book_views_seen = true;
@@ -108,8 +108,8 @@ impl Workbook {
                     }
                     if !book_views_open {
                         return Err(crate::package::error::Error::Unrecognized {
-                            typ: "BrtEndBookViews".to_string(),
-                            val: "book-view block has no matching begin record".to_string(),
+                            typ: "BrtEndBookViews",
+                            val: "book-view block has no matching begin record",
                         });
                     }
                     book_views_open = false;
@@ -117,8 +117,8 @@ impl Workbook {
                 kind::BOOK_VIEW => {
                     if !book_views_open {
                         return Err(crate::package::error::Error::Unrecognized {
-                            typ: "BrtBookView".to_string(),
-                            val: "record is outside the book-view block".to_string(),
+                            typ: "BrtBookView",
+                            val: "record is outside the book-view block",
                         });
                     }
                     const BOOK_VIEW_PAYLOAD_LEN: usize = 29;
@@ -132,13 +132,13 @@ impl Workbook {
                     let first =
                         usize::try_from(binary::read_u32_le_at(data, 20)?).map_err(|_| {
                             crate::package::error::Error::InvalidFormula(
-                                "BrtBookView itabFirst does not fit usize".to_string(),
+                                "BrtBookView itabFirst does not fit usize",
                             )
                         })?;
                     let active =
                         usize::try_from(binary::read_u32_le_at(data, 24)?).map_err(|_| {
                             crate::package::error::Error::InvalidFormula(
-                                "BrtBookView itabCur does not fit usize".to_string(),
+                                "BrtBookView itabCur does not fit usize",
                             )
                         })?;
                     let maximum = first.max(active);
@@ -160,8 +160,8 @@ impl Workbook {
                 kind::CALC_PROP => {
                     if info.calc.is_some() {
                         return Err(crate::package::error::Error::Unrecognized {
-                            typ: "BrtCalcProp".to_string(),
-                            val: "duplicate record".to_string(),
+                            typ: "BrtCalcProp",
+                            val: "duplicate record",
                         });
                     }
                     info.calc = Some(calc::read_with(
@@ -178,8 +178,8 @@ impl Workbook {
                     let name_key = worksheet_name_key(&bundle_sh.name)?;
                     if worksheet_name_keys.contains(&name_key) {
                         return Err(crate::package::error::Error::Unrecognized {
-                            typ: "BrtBundleSh strName".to_string(),
-                            val: format!("duplicate sheet name {:?}", bundle_sh.name),
+                            typ: "BrtBundleSh strName",
+                            val: "duplicate sheet name",
                         });
                     }
                     worksheet_name_keys.try_reserve(1).map_err(|source| {
@@ -204,7 +204,7 @@ impl Workbook {
                         crate::package::records::decode_string(record.payload())?;
                     if rel_id.is_empty() || consumed != record.payload().len() {
                         return Err(crate::package::error::Error::InvalidFormula(
-                            "BrtSupBookSrc has an invalid relationship ID".to_string(),
+                            "BrtSupBookSrc has an invalid relationship ID",
                         ));
                     }
                     external_link_rel_ids.try_reserve(1).map_err(|source| {
@@ -220,9 +220,7 @@ impl Workbook {
                         }
                     })?;
                     let book_index = u32::try_from(external_link_rel_ids.len()).map_err(|_| {
-                        crate::package::error::Error::InvalidFormula(
-                            "external-link count overflow".to_string(),
-                        )
+                        crate::package::error::Error::InvalidFormula("external-link count overflow")
                     })?;
                     external_link_rel_ids.push(rel_id);
                     supporting_links.push(SupportingLink::ExternalWorkbook(book_index));
@@ -243,10 +241,9 @@ impl Workbook {
                         .sheet_id
                         .is_some_and(|index| index as usize >= worksheet_names.len())
                     {
-                        return Err(crate::package::error::Error::InvalidFormula(format!(
-                            "BrtName {} has invalid sheet scope {:?}",
-                            named_range.name, named_range.sheet_id
-                        )));
+                        return Err(crate::package::error::Error::InvalidFormula(
+                            "BrtName has invalid sheet scope",
+                        ));
                     }
                     defined_names.push(named_range.name);
                 },
@@ -257,17 +254,16 @@ impl Workbook {
         }
         if book_views_open {
             return Err(crate::package::error::Error::Unrecognized {
-                typ: "BrtBeginBookViews".to_string(),
-                val: "missing BrtEndBookViews record".to_string(),
+                typ: "BrtBeginBookViews",
+                val: "missing BrtEndBookViews record",
             });
         }
         if let Some(maximum) = max_book_view_catalog_position
             && maximum >= worksheet_names.len()
         {
-            return Err(crate::package::error::Error::InvalidFormula(format!(
-                "BrtBookView sheet position {maximum} exceeds the {} available sheets",
-                worksheet_names.len()
-            )));
+            return Err(crate::package::error::Error::InvalidFormula(
+                "BrtBookView sheet position exceeds the available sheets",
+            ));
         }
         Ok(info)
     }
@@ -280,26 +276,20 @@ impl Workbook {
             });
         }
         let count = usize::try_from(binary::read_u32_le_at(data, 0)?).map_err(|_| {
-            crate::package::error::Error::InvalidFormula(
-                "BrtExternSheet count overflow".to_string(),
-            )
+            crate::package::error::Error::InvalidFormula("BrtExternSheet count overflow")
         })?;
         if count >= 65_536 {
-            return Err(crate::package::error::Error::InvalidFormula(format!(
-                "BrtExternSheet count {count} exceeds 65,535"
-            )));
+            return Err(crate::package::error::Error::InvalidFormula(
+                "BrtExternSheet count exceeds 65,535",
+            ));
         }
         let expected = 4usize
-            .checked_add(count.checked_mul(12).ok_or_else(|| {
-                crate::package::error::Error::InvalidFormula(
-                    "BrtExternSheet size overflow".to_string(),
-                )
-            })?)
-            .ok_or_else(|| {
-                crate::package::error::Error::InvalidFormula(
-                    "BrtExternSheet size overflow".to_string(),
-                )
-            })?;
+            .checked_add(count.checked_mul(12).ok_or(
+                crate::package::error::Error::InvalidFormula("BrtExternSheet size overflow"),
+            )?)
+            .ok_or(crate::package::error::Error::InvalidFormula(
+                "BrtExternSheet size overflow",
+            ))?;
         if data.len() != expected {
             return Err(crate::package::error::Error::InvalidLength {
                 expected,
@@ -339,13 +329,13 @@ impl Workbook {
         let mut open_cache = false;
         let mut ended = false;
         let mut caches = Vec::new();
-        for record in Records::new(data) {
+        for record in Records::new(data, crate::raw::Limits::DEFAULT) {
             let record = record?;
             match record.kind() {
                 kind::BEGIN_PIVOT_CACHE_IDS => {
                     if in_collection || ended {
                         return Err(crate::package::error::Error::InvalidFormula(
-                            "duplicate BrtBeginPivotCacheIDs collection".to_string(),
+                            "duplicate BrtBeginPivotCacheIDs collection",
                         ));
                     }
                     in_collection = true;
@@ -353,7 +343,7 @@ impl Workbook {
                 kind::BEGIN_PIVOT_CACHE_ID => {
                     if !in_collection || open_cache || record.payload().len() < 8 {
                         return Err(crate::package::error::Error::InvalidFormula(
-                            "malformed BrtBeginPivotCacheID nesting or payload".to_string(),
+                            "malformed BrtBeginPivotCacheID nesting or payload",
                         ));
                     }
                     let cache_id = binary::read_u32_le_at(record.payload(), 0)?;
@@ -366,9 +356,9 @@ impl Workbook {
                             .iter()
                             .any(|(existing, _): &(u32, String)| *existing == cache_id)
                     {
-                        return Err(crate::package::error::Error::InvalidFormula(format!(
-                            "invalid or duplicate PivotCache ID {cache_id}"
-                        )));
+                        return Err(crate::package::error::Error::InvalidFormula(
+                            "invalid or duplicate PivotCache ID",
+                        ));
                     }
                     caches.push((cache_id, rel_id));
                     open_cache = true;
@@ -376,7 +366,7 @@ impl Workbook {
                 kind::END_PIVOT_CACHE_ID => {
                     if !open_cache || !record.payload().is_empty() {
                         return Err(crate::package::error::Error::InvalidFormula(
-                            "unbalanced BrtEndPivotCacheID".to_string(),
+                            "unbalanced BrtEndPivotCacheID",
                         ));
                     }
                     open_cache = false;
@@ -384,7 +374,7 @@ impl Workbook {
                 kind::END_PIVOT_CACHE_IDS => {
                     if !in_collection || open_cache || !record.payload().is_empty() {
                         return Err(crate::package::error::Error::InvalidFormula(
-                            "unbalanced BrtEndPivotCacheIDs".to_string(),
+                            "unbalanced BrtEndPivotCacheIDs",
                         ));
                     }
                     in_collection = false;
@@ -395,7 +385,7 @@ impl Workbook {
         }
         if in_collection || open_cache {
             return Err(crate::package::error::Error::InvalidFormula(
-                "unterminated PivotCache ID collection".to_string(),
+                "unterminated PivotCache ID collection",
             ));
         }
         Ok(caches)
@@ -403,30 +393,28 @@ impl Workbook {
 
     pub(in crate::workbook) fn parse_pivot_view(data: &[u8], sheet_index: usize) -> Result<View> {
         let mut view = None;
-        for record in Records::new(data) {
+        for record in Records::new(data, crate::raw::Limits::DEFAULT) {
             let record = record?;
             if record.kind() != kind::BEGIN_SX_VIEW {
                 continue;
             }
             if view.is_some() || record.payload().len() < 36 {
                 return Err(crate::package::error::Error::InvalidFormula(
-                    "PivotTable part has duplicate or truncated BrtBeginSXView".to_string(),
+                    "PivotTable part has duplicate or truncated BrtBeginSXView",
                 ));
             }
             let cache_id = binary::read_u32_le_at(record.payload(), 28)?;
             let (name, consumed) = crate::package::records::decode_string(&record.payload()[32..])?;
             if consumed > record.payload().len() - 32 {
                 return Err(crate::package::error::Error::InvalidFormula(
-                    "PivotTable view name overruns BrtBeginSXView".to_string(),
+                    "PivotTable view name overruns BrtBeginSXView",
                 ));
             }
             view = Some(View::try_new(cache_id, sheet_index, name)?);
         }
-        view.ok_or_else(|| {
-            crate::package::error::Error::InvalidFormula(
-                "PivotTable part omits BrtBeginSXView".to_string(),
-            )
-        })
+        view.ok_or(crate::package::error::Error::InvalidFormula(
+            "PivotTable part omits BrtBeginSXView",
+        ))
     }
 
     /// Parse the formula-context view of one table part, ignoring and
@@ -451,12 +439,12 @@ impl Workbook {
         let mut xml_extension_depth = 0usize;
         let mut ended_columns = false;
         let mut ended_table = false;
-        let mut iter = Records::new(data);
+        let mut iter = Records::new(data, crate::raw::Limits::DEFAULT);
         for record in iter.by_ref() {
             let record = record?;
             if ended_table {
                 return Err(crate::package::error::Error::InvalidFormula(
-                    "XLSB table part contains records after BrtEndList".to_string(),
+                    "XLSB table part contains records after BrtEndList",
                 ));
             }
             if in_xml_properties {
@@ -464,7 +452,7 @@ impl Workbook {
                     kind::FRT_BEGIN | kind::AC_BEGIN => {
                         if xml_extension_depth == MAX_XML_EXTENSION_DEPTH {
                             return Err(crate::package::error::Error::InvalidFormula(
-                                "BrtBeginListXmlCPr extension nesting exceeds 64".to_string(),
+                                "BrtBeginListXmlCPr extension nesting exceeds 64",
                             ));
                         }
                         xml_extension_stack[xml_extension_depth] = record.kind();
@@ -473,7 +461,7 @@ impl Workbook {
                     kind::FRT_END | kind::AC_END => {
                         let Some(depth) = xml_extension_depth.checked_sub(1) else {
                             return Err(crate::package::error::Error::InvalidFormula(
-                                "unmatched extension end in BrtBeginListXmlCPr".to_string(),
+                                "unmatched extension end in BrtBeginListXmlCPr",
                             ));
                         };
                         let begin = xml_extension_stack[depth];
@@ -484,7 +472,7 @@ impl Workbook {
                         };
                         if record.kind() != expected {
                             return Err(crate::package::error::Error::InvalidFormula(
-                                "mismatched extension wrapper in BrtBeginListXmlCPr".to_string(),
+                                "mismatched extension wrapper in BrtBeginListXmlCPr",
                             ));
                         }
                         xml_extension_depth = depth;
@@ -492,7 +480,7 @@ impl Workbook {
                     kind::END_LIST_XML_CPR if xml_extension_depth == 0 => {
                         if !record.payload().is_empty() {
                             return Err(crate::package::error::Error::InvalidFormula(
-                                "nonempty BrtEndListXmlCPr".to_string(),
+                                "nonempty BrtEndListXmlCPr",
                             ));
                         }
                         in_xml_properties = false;
@@ -507,7 +495,7 @@ impl Workbook {
                         if xml_extension_depth == 0 =>
                     {
                         return Err(crate::package::error::Error::InvalidFormula(
-                            "table structure occurs inside BrtBeginListXmlCPr".to_string(),
+                            "table structure occurs inside BrtBeginListXmlCPr",
                         ));
                     },
                     _ => {
@@ -523,7 +511,7 @@ impl Workbook {
                 kind::BEGIN_LIST => {
                     if table_header.is_some() {
                         return Err(crate::package::error::Error::InvalidFormula(
-                            "XLSB table part contains duplicate BrtBeginList".to_string(),
+                            "XLSB table part contains duplicate BrtBeginList",
                         ));
                     }
                     table_header = Some(Self::parse_table_header(
@@ -533,33 +521,33 @@ impl Workbook {
                     )?);
                 },
                 kind::BEGIN_LIST_COLS => {
-                    let (_, _, range_columns) = table_header.as_ref().ok_or_else(|| {
+                    let (_, _, range_columns) = table_header.as_ref().ok_or({
                         crate::package::error::Error::InvalidFormula(
-                            "BrtBeginListCols precedes BrtBeginList".to_string(),
+                            "BrtBeginListCols precedes BrtBeginList",
                         )
                     })?;
                     if expected_columns.is_some() || record.payload().len() != 4 {
                         return Err(crate::package::error::Error::InvalidFormula(
-                            "invalid or duplicate BrtBeginListCols".to_string(),
+                            "invalid or duplicate BrtBeginListCols",
                         ));
                     }
                     let count = usize::try_from(binary::read_u32_le_at(record.payload(), 0)?)
                         .map_err(|_| {
                             crate::package::error::Error::InvalidFormula(
-                                "table column count overflow".to_string(),
+                                "table column count overflow",
                             )
                         })?;
                     if count == 0 || count > 16_384 || count != *range_columns {
-                        return Err(crate::package::error::Error::InvalidFormula(format!(
-                            "table column count {count} disagrees with range width {range_columns}"
-                        )));
+                        return Err(crate::package::error::Error::InvalidFormula(
+                            "table column count disagrees with range width",
+                        ));
                     }
                     expected_columns = Some(count);
                 },
                 kind::BEGIN_LIST_COL => {
                     if expected_columns.is_none() || ended_columns || in_column {
                         return Err(crate::package::error::Error::InvalidFormula(
-                            "BrtBeginListCol occurs outside its column collection".to_string(),
+                            "BrtBeginListCol occurs outside its column collection",
                         ));
                     }
                     columns.push(Self::parse_table_column(
@@ -574,8 +562,7 @@ impl Workbook {
                 kind::BEGIN_LIST_XML_CPR => {
                     if !in_column || saw_xml_properties {
                         return Err(crate::package::error::Error::InvalidFormula(
-                            "BrtBeginListXmlCPr occurs outside a column or is duplicated"
-                                .to_string(),
+                            "BrtBeginListXmlCPr occurs outside a column or is duplicated",
                         ));
                     }
                     in_xml_properties = true;
@@ -583,13 +570,13 @@ impl Workbook {
                 },
                 kind::END_LIST_XML_CPR => {
                     return Err(crate::package::error::Error::InvalidFormula(
-                        "unmatched BrtEndListXmlCPr".to_string(),
+                        "unmatched BrtEndListXmlCPr",
                     ));
                 },
                 kind::END_LIST_COL => {
                     if !in_column || !record.payload().is_empty() {
                         return Err(crate::package::error::Error::InvalidFormula(
-                            "unmatched or nonempty BrtEndListCol".to_string(),
+                            "unmatched or nonempty BrtEndListCol",
                         ));
                     }
                     in_column = false;
@@ -601,7 +588,7 @@ impl Workbook {
                         || !record.payload().is_empty()
                     {
                         return Err(crate::package::error::Error::InvalidFormula(
-                            "invalid BrtEndListCols".to_string(),
+                            "invalid BrtEndListCols",
                         ));
                     }
                     ended_columns = true;
@@ -609,7 +596,7 @@ impl Workbook {
                 kind::END_LIST => {
                     if !ended_columns || in_column || !record.payload().is_empty() {
                         return Err(crate::package::error::Error::InvalidFormula(
-                            "invalid BrtEndList".to_string(),
+                            "invalid BrtEndList",
                         ));
                     }
                     ended_table = true;
@@ -617,21 +604,16 @@ impl Workbook {
                 _ => {},
             }
         }
-        let (table_id, display_name, _) = table_header.ok_or_else(|| {
-            crate::package::error::Error::InvalidFormula(
-                "XLSB table part omits BrtBeginList".to_string(),
-            )
-        })?;
-        let expected = expected_columns.ok_or_else(|| {
-            crate::package::error::Error::InvalidFormula(
-                "XLSB table part omits BrtBeginListCols".to_string(),
-            )
-        })?;
+        let (table_id, display_name, _) = table_header.ok_or(
+            crate::package::error::Error::InvalidFormula("XLSB table part omits BrtBeginList"),
+        )?;
+        let expected = expected_columns.ok_or(crate::package::error::Error::InvalidFormula(
+            "XLSB table part omits BrtBeginListCols",
+        ))?;
         if !ended_table || columns.len() != expected {
-            return Err(crate::package::error::Error::InvalidFormula(format!(
-                "XLSB table contains {} of {expected} declared columns or is unterminated",
-                columns.len()
-            )));
+            return Err(crate::package::error::Error::InvalidFormula(
+                "XLSB table contains of declared columns or is unterminated",
+            ));
         }
         TableDefinition::try_new(table_id, sheet_index, display_name, columns)
     }
@@ -657,13 +639,13 @@ impl Workbook {
             || col_last >= 16_384
         {
             return Err(crate::package::error::Error::InvalidFormula(
-                "BrtBeginList contains an invalid table range".to_string(),
+                "BrtBeginList contains an invalid table range",
             ));
         }
         for offset in [24, 28] {
             if binary::read_u32_le_at(data, offset)? > 1 {
                 return Err(crate::package::error::Error::InvalidFormula(
-                    "BrtBeginList contains a non-Boolean row flag".to_string(),
+                    "BrtBeginList contains a non-Boolean row flag",
                 ));
             }
         }
@@ -672,24 +654,21 @@ impl Workbook {
         let mut strings = Vec::with_capacity(6);
         for _ in 0..6 {
             let (value, consumed) = Self::parse_nullable_wide_string(&data[offset..])?;
-            offset = offset.checked_add(consumed).ok_or_else(|| {
-                crate::package::error::Error::InvalidFormula(
-                    "BrtBeginList string size overflow".to_string(),
-                )
-            })?;
+            offset = offset.checked_add(consumed).ok_or(
+                crate::package::error::Error::InvalidFormula("BrtBeginList string size overflow"),
+            )?;
             strings.push(value);
         }
         let trailing = data.len().saturating_sub(offset);
         tolerance.tolerate_trailing(kind::BEGIN_LIST, location, trailing, || {
-            crate::package::error::Error::InvalidFormula(format!(
-                "BrtBeginList has {trailing} trailing bytes"
-            ))
+            crate::package::error::Error::InvalidFormula("BrtBeginList has trailing bytes")
         })?;
-        let display_name = strings[1].clone().ok_or_else(|| {
-            crate::package::error::Error::InvalidFormula(
-                "BrtBeginList has a NULL display name".to_string(),
-            )
-        })?;
+        let display_name =
+            strings[1]
+                .clone()
+                .ok_or(crate::package::error::Error::InvalidFormula(
+                    "BrtBeginList has a NULL display name",
+                ))?;
         Ok((
             table_id,
             display_name,
@@ -699,39 +678,34 @@ impl Workbook {
 
     fn parse_table_column(
         data: &[u8],
-        index: usize,
+        _index: usize,
         location: u32,
         tolerance: &mut Tolerance<'_>,
     ) -> Result<String> {
         if data.len() < 24 || binary::read_u32_le_at(data, 0)? == 0 {
-            return Err(crate::package::error::Error::InvalidFormula(format!(
-                "BrtBeginListCol {index} has an invalid header"
-            )));
+            return Err(crate::package::error::Error::InvalidFormula(
+                "BrtBeginListCol has an invalid header",
+            ));
         }
         let mut offset = 24;
         let mut strings = Vec::with_capacity(6);
         for _ in 0..6 {
             let (value, consumed) = Self::parse_nullable_wide_string(&data[offset..])?;
-            offset = offset.checked_add(consumed).ok_or_else(|| {
+            offset = offset.checked_add(consumed).ok_or(
                 crate::package::error::Error::InvalidFormula(
-                    "BrtBeginListCol string size overflow".to_string(),
-                )
-            })?;
+                    "BrtBeginListCol string size overflow",
+                ),
+            )?;
             strings.push(value);
         }
         let trailing = data.len().saturating_sub(offset);
         tolerance.tolerate_trailing(kind::BEGIN_LIST_COL, location, trailing, || {
-            crate::package::error::Error::InvalidFormula(format!(
-                "BrtBeginListCol has {trailing} trailing bytes"
-            ))
+            crate::package::error::Error::InvalidFormula("BrtBeginListCol has trailing bytes")
         })?;
-        strings[0]
-            .clone()
-            .or_else(|| strings[1].clone())
-            .ok_or_else(|| {
-                crate::package::error::Error::InvalidFormula(format!(
-                    "BrtBeginListCol {index} has neither a name nor caption"
-                ))
-            })
+        strings[0].clone().or_else(|| strings[1].clone()).ok_or({
+            crate::package::error::Error::InvalidFormula(
+                "BrtBeginListCol has neither a name nor caption",
+            )
+        })
     }
 }

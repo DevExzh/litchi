@@ -3,14 +3,14 @@
 #![allow(clippy::all)]
 
 use litchi::sheet::CellValue;
+use litchi::xlsb::builder::{self, Builder};
 use litchi::xlsb::hyperlinks::Hyperlink;
 use litchi::xlsb::merged_cells::MergedCell;
-use litchi::xlsb::writer::{Builder, MutableWorksheet};
 use std::fs::File;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut workbook = Builder::new();
-    let mut sheet = MutableWorksheet::new("Data");
+    let mut sheet = builder::Worksheet::new("Data");
 
     // Title row (merged)
     sheet.set_cell(0, 0, CellValue::String("Sales Report".to_string()));

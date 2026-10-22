@@ -58,7 +58,7 @@ fn typed_stream_round_trips_without_execution() {
 #[test]
 fn reserved_bits_are_opaque_and_scalar_domains_are_rejected() {
     let mut bytes = Vec::new();
-    let mut writer = Encoder::new(&mut bytes);
+    let mut writer = Encoder::new(&mut bytes, crate::raw::Limits::DEFAULT);
     writer
         .write_record(kind::BEGIN_VOL_DEPS, &[])
         .expect("begin");
@@ -106,7 +106,8 @@ fn absent_owner_can_be_created_and_removed_reversibly() {
     );
     let commit = transaction.commit().expect("commit");
     let package = package
-        .apply_volatile_dependencies(&commit)
+        .apply_volatile_dependencies(commit.patch())
+        .map(litchi_core::edit::Commit::into_package)
         .expect("publish");
     assert_eq!(
         package
@@ -118,7 +119,8 @@ fn absent_owner_can_be_created_and_removed_reversibly() {
 
     let inverse = commit.patch().inverse();
     let restored = package
-        .apply_volatile_dependencies_patch(&inverse)
+        .apply_volatile_dependencies(&inverse)
+        .map(litchi_core::edit::Commit::into_package)
         .expect("inverse");
     assert_eq!(restored.to_bytes().expect("restored bytes"), before_bytes);
     assert!(
@@ -146,9 +148,10 @@ fn exact_noop_shares_source_and_stale_owner_is_rejected() {
     let before_bytes = package.to_bytes().expect("before bytes");
     let snapshot = package.volatile_dependencies().expect("snapshot");
     let commit = snapshot.edit().commit().expect("noop commit");
-    assert!(!commit.changed());
+    assert!(!commit.diagnostics().changed());
     let no_op = package
-        .apply_volatile_dependencies(&commit)
+        .apply_volatile_dependencies(commit.patch())
+        .map(litchi_core::edit::Commit::into_package)
         .expect("noop apply");
     assert_eq!(no_op.to_bytes().expect("noop bytes"), before_bytes);
 
@@ -165,14 +168,19 @@ fn exact_noop_shares_source_and_stale_owner_is_rejected() {
     replacement.types[0].mains[0].first = "Replacement".to_string();
     changed.set_dependencies(replacement).expect("stage change");
     let changed = changed.commit().expect("changed commit");
-    assert!(stale.apply_volatile_dependencies(&changed).is_err());
+    assert!(
+        stale
+            .apply_volatile_dependencies(changed.patch())
+            .map(litchi_core::edit::Commit::into_package)
+            .is_err()
+    );
 }
 
 #[test]
 fn unsupported_records_are_read_but_typed_rewrite_is_refused() {
     let mut bytes = codec::write(&sample_dependencies(), SemanticLimits::DEFAULT, 1).expect("base");
     let mut records = Vec::new();
-    for record in crate::raw::Records::new(&bytes) {
+    for record in crate::raw::Records::new(&bytes, crate::raw::Limits::DEFAULT) {
         let record = record.expect("record");
         records.push((record.kind(), record.payload().to_vec()));
     }
@@ -181,7 +189,7 @@ fn unsupported_records_are_read_but_typed_rewrite_is_refused() {
         (crate::raw::Kind::new(0x3ff).expect("kind"), vec![9, 8, 7]),
     );
     bytes.clear();
-    let mut writer = Encoder::new(&mut bytes);
+    let mut writer = Encoder::new(&mut bytes, crate::raw::Limits::DEFAULT);
     for (record_kind, payload) in records {
         writer.write_record(record_kind, &payload).expect("record");
     }
@@ -192,5 +200,5 @@ fn unsupported_records_are_read_but_typed_rewrite_is_refused() {
     let error = edit
         .set_dependencies(sample_dependencies())
         .expect_err("refusal");
-    assert!(matches!(error, Error::UnsupportedFeature(_)));
+    assert!(matches!(error, Error::Refused(_)));
 }

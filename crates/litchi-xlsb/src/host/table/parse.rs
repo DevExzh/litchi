@@ -90,7 +90,7 @@ fn parse_table(mut walker: RecordWalker<'_, '_>) -> Result<Table> {
             other => walker.skip_unhandled(other, "Table stream")?,
         }
     }
-    Err(Error::UnexpectedEndOfStream("BrtEndList".to_string()))
+    Err(Error::UnexpectedEndOfStream("BrtEndList"))
 }
 
 /// Extract the Table part relationship identifiers a worksheet declares in
@@ -129,7 +129,7 @@ fn parse_list_parts(
     data: &[u8],
     rel_ids: &mut Vec<String>,
 ) -> Result<()> {
-    let mut cursor = Cursor::new(data, "BrtBeginListParts");
+    let mut cursor = Cursor::new(data, "BrtBeginListParts", crate::raw::Limits::DEFAULT);
     let declared = cursor.read_u32()?;
     walker.finish(&cursor)?;
     let mut found = 0u32;
@@ -139,7 +139,7 @@ fn parse_list_parts(
                 if found != declared {
                     return Err(malformed(
                         "BrtBeginListParts",
-                        format!("declared {declared} BrtListPart records, found {found}"),
+                        "declared BrtListPart records, found",
                     ));
                 }
                 return Ok(());
@@ -148,19 +148,20 @@ fn parse_list_parts(
                 found = found
                     .checked_add(1)
                     .ok_or_else(|| malformed("BrtBeginListParts", "BrtListPart count overflow"))?;
-                let mut cursor = Cursor::new(record.payload(), "BrtListPart");
+                let mut cursor =
+                    Cursor::new(record.payload(), "BrtListPart", crate::raw::Limits::DEFAULT);
                 rel_ids.push(cursor.read_wide_string()?);
                 walker.finish(&cursor)?;
             },
             other => walker.skip_unhandled(other, "BrtBeginListParts collection")?,
         }
     }
-    Err(Error::UnexpectedEndOfStream("BrtEndListParts".to_string()))
+    Err(Error::UnexpectedEndOfStream("BrtEndListParts"))
 }
 
 /// `BrtBeginList` payload (MS-XLSB 2.4.100).
 fn parse_list_payload(walker: &mut RecordWalker<'_, '_>, data: &[u8]) -> Result<Table> {
-    let mut cursor = Cursor::new(data, "BrtBeginList");
+    let mut cursor = Cursor::new(data, "BrtBeginList", crate::raw::Limits::DEFAULT);
     let range = Range {
         first_row: cursor.read_u32()?,
         last_row: cursor.read_u32()?,
@@ -219,7 +220,7 @@ fn parse_list_payload(walker: &mut RecordWalker<'_, '_>, data: &[u8]) -> Result<
 
 /// `BrtBeginListCols` collection (MS-XLSB 2.4.102).
 fn parse_columns(walker: &mut RecordWalker<'_, '_>, data: &[u8], table: &mut Table) -> Result<()> {
-    let mut cursor = Cursor::new(data, "BrtBeginListCols");
+    let mut cursor = Cursor::new(data, "BrtBeginListCols", crate::raw::Limits::DEFAULT);
     let declared = cursor.read_u32()?;
     walker.finish(&cursor)?;
     while let Some(record) = walker.next()? {
@@ -228,10 +229,7 @@ fn parse_columns(walker: &mut RecordWalker<'_, '_>, data: &[u8], table: &mut Tab
                 let found = u32::try_from(table.columns.len())
                     .map_err(|_| malformed("BrtBeginListCols", "column count overflow"))?;
                 if found != declared {
-                    return Err(malformed(
-                        "BrtBeginListCols",
-                        format!("declared {declared} columns, found {found}"),
-                    ));
+                    return Err(malformed("BrtBeginListCols", "declared columns, found"));
                 }
                 return Ok(());
             },
@@ -241,7 +239,7 @@ fn parse_columns(walker: &mut RecordWalker<'_, '_>, data: &[u8], table: &mut Tab
             other => walker.skip_unhandled(other, "BrtBeginListCols collection")?,
         }
     }
-    Err(Error::UnexpectedEndOfStream("BrtEndListCols".to_string()))
+    Err(Error::UnexpectedEndOfStream("BrtEndListCols"))
 }
 
 /// `BrtBeginListCol` collection (MS-XLSB 2.4.101).
@@ -259,12 +257,12 @@ fn parse_column(walker: &mut RecordWalker<'_, '_>, data: &[u8]) -> Result<Column
             other => walker.skip_unhandled(other, "BrtBeginListCol collection")?,
         }
     }
-    Err(Error::UnexpectedEndOfStream("BrtEndListCol".to_string()))
+    Err(Error::UnexpectedEndOfStream("BrtEndListCol"))
 }
 
 /// `BrtBeginListCol` payload (MS-XLSB 2.4.101).
 fn parse_column_payload(walker: &mut RecordWalker<'_, '_>, data: &[u8]) -> Result<Column> {
-    let mut cursor = Cursor::new(data, "BrtBeginListCol");
+    let mut cursor = Cursor::new(data, "BrtBeginListCol", crate::raw::Limits::DEFAULT);
     let id = cursor.read_u32()?;
     let totals_row_function = TotalsRowFunction::try_from(cursor.read_u32()?)?;
     let header_dxf_id = cursor.read_dxf_id()?;
@@ -298,7 +296,7 @@ fn parse_column_payload(walker: &mut RecordWalker<'_, '_>, data: &[u8]) -> Resul
 /// `BrtListCCFmla`/`BrtListTrFmla` payload: a flag byte followed by a
 /// `ListParsedFormula` (MS-XLSB 2.4.706, 2.4.708, 2.5.98.11), stored verbatim.
 fn parse_formula(walker: &mut RecordWalker<'_, '_>, data: &[u8]) -> Result<Formula> {
-    let mut cursor = Cursor::new(data, "BrtList formula");
+    let mut cursor = Cursor::new(data, "BrtList formula", crate::raw::Limits::DEFAULT);
     let flags = cursor.read_u8()?;
     let tokens = cursor.read_blob()?;
     let extra = cursor.read_blob()?;
@@ -312,7 +310,7 @@ fn parse_formula(walker: &mut RecordWalker<'_, '_>, data: &[u8]) -> Result<Formu
 
 /// `BrtTableStyleClient` payload (MS-XLSB 2.4.847).
 fn parse_style_client(walker: &mut RecordWalker<'_, '_>, data: &[u8]) -> Result<StyleInfo> {
-    let mut cursor = Cursor::new(data, "BrtTableStyleClient");
+    let mut cursor = Cursor::new(data, "BrtTableStyleClient", crate::raw::Limits::DEFAULT);
     let flags = cursor.read_u16()?;
     let name = cursor.read_nullable_wide_string()?;
     walker.finish(&cursor)?;
@@ -327,7 +325,7 @@ fn parse_style_client(walker: &mut RecordWalker<'_, '_>, data: &[u8]) -> Result<
 
 /// `BrtList14` payload (MS-XLSB 2.4.705): table alternate text.
 fn parse_list14(walker: &mut RecordWalker<'_, '_>, data: &[u8], table: &mut Table) -> Result<()> {
-    let mut cursor = Cursor::new(data, "BrtList14");
+    let mut cursor = Cursor::new(data, "BrtList14", crate::raw::Limits::DEFAULT);
     cursor.guard(FRT_BLANK_LEN)?;
     cursor.skip(FRT_BLANK_LEN)?;
     table.alternate_text = cursor.read_nullable_wide_string()?;

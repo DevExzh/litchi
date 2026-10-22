@@ -226,10 +226,10 @@ fn column_name(mut col: u32) -> String {
 #[cfg(feature = "xlsb")]
 fn xlsb(counts: &[usize]) -> Result<Vec<Case<'static>>> {
     use litchi_xlsb::cell_values::{Reference, Scalar};
-    use litchi_xlsb::writer::{Builder, MutableWorksheet};
+    use litchi_xlsb::builder::{self, Builder};
     let max = counts.iter().copied().max().unwrap_or(0);
     let mut writer = Builder::new();
-    let mut sheet = MutableWorksheet::new("Sheet1");
+    let mut sheet = builder::Worksheet::new("Sheet1");
     for i in 0..max {
         sheet.set_cell((i / 32) as u32, (i % 32) as u32, i as f64 + 0.5);
     }

@@ -60,7 +60,7 @@ impl Compiler {
                 Token::Parenthesis => {
                     let Some(expression) = stack.pop() else {
                         return Err(Error::InvalidFormula(
-                            "PtgParen has no preceding expression".to_string(),
+                            "PtgParen has no preceding expression",
                         ));
                     };
                     stack.push(format!("({expression})"));
@@ -68,12 +68,9 @@ impl Compiler {
                 Token::Attribute(_) => {},
                 Token::Array { rows, cols, values } => {
                     let expected = usize::try_from(u64::from(*rows) * u64::from(*cols))
-                        .map_err(|_| Error::InvalidFormula("array is too large".to_string()))?;
+                        .map_err(|_| Error::InvalidFormula("array is too large"))?;
                     if values.len() != expected {
-                        return Err(Error::InvalidFormula(format!(
-                            "array dimensions require {expected} values, found {}",
-                            values.len()
-                        )));
+                        return Err(Error::InvalidFormula("array dimensions require values"));
                     }
                     let mut text = String::from("{");
                     for row in 0..*rows {
@@ -86,9 +83,7 @@ impl Compiler {
                             }
                             let index =
                                 usize::try_from(u64::from(row) * u64::from(*cols) + u64::from(col))
-                                    .map_err(|_| {
-                                        Error::InvalidFormula("array index overflow".to_string())
-                                    })?;
+                                    .map_err(|_| Error::InvalidFormula("array index overflow"))?;
                             match &values[index] {
                                 ArrayValue::Number(value) => {
                                     text.push_str(&value.to_string());
@@ -124,12 +119,12 @@ impl Compiler {
                     row_relative,
                     col_relative,
                 } => {
-                    let col = (*col).checked_add(1).ok_or_else(|| {
-                        Error::InvalidFormula("cell column index overflow".to_string())
-                    })?;
-                    let row = (*row).checked_add(1).ok_or_else(|| {
-                        Error::InvalidFormula("cell row index overflow".to_string())
-                    })?;
+                    let col = (*col)
+                        .checked_add(1)
+                        .ok_or(Error::InvalidFormula("cell column index overflow"))?;
+                    let row = (*row)
+                        .checked_add(1)
+                        .ok_or(Error::InvalidFormula("cell row index overflow"))?;
                     let col_str = column_index_to_name(col);
                     let col_prefix = if *col_relative { "" } else { "$" };
                     let row_prefix = if *row_relative { "" } else { "$" };
@@ -166,9 +161,9 @@ impl Compiler {
                     row_relative,
                     col_relative,
                 } => {
-                    let context = context.ok_or_else(|| {
+                    let context = context.ok_or({
                         Error::UnresolvedDependency(
-                            "PtgRef3d requires workbook extern-sheet resolution".to_string(),
+                            "PtgRef3d requires workbook extern-sheet resolution",
                         )
                     })?;
                     let prefix = context.sheet_prefix(*sheet_index)?;
@@ -187,9 +182,9 @@ impl Compiler {
                     col_first_relative,
                     col_last_relative,
                 } => {
-                    let context = context.ok_or_else(|| {
+                    let context = context.ok_or({
                         Error::UnresolvedDependency(
-                            "PtgArea3d requires workbook extern-sheet resolution".to_string(),
+                            "PtgArea3d requires workbook extern-sheet resolution",
                         )
                     })?;
                     let prefix = context.sheet_prefix(*sheet_index)?;
@@ -211,7 +206,7 @@ impl Compiler {
                 Token::BinaryOp(op) => {
                     if stack.len() < 2 {
                         return Err(Error::InvalidFormula(
-                            "binary operator has fewer than two operands".to_string(),
+                            "binary operator has fewer than two operands",
                         ));
                     }
                     let right = stack.pop().expect("length checked");
@@ -221,9 +216,7 @@ impl Compiler {
                 },
                 Token::UnaryOp(op) => {
                     let Some(operand) = stack.pop() else {
-                        return Err(Error::InvalidFormula(
-                            "unary operator has no operand".to_string(),
-                        ));
+                        return Err(Error::InvalidFormula("unary operator has no operand"));
                     };
                     match op {
                         UnaryOperator::Plus => stack.push(format!("+({})", operand)),
@@ -237,20 +230,14 @@ impl Compiler {
                     is_command,
                 } => {
                     if *is_command {
-                        return Err(Error::UnsupportedFeature(format!(
-                            "XLSB command function index {index}"
-                        )));
+                        return Err(Error::UnsupportedFeature("XLSB command function index"));
                     }
                     let Some(function) = builtin_function_by_index(*index) else {
-                        return Err(Error::UnsupportedFeature(format!(
-                            "XLSB built-in function index {index}"
-                        )));
+                        return Err(Error::UnsupportedFeature("XLSB built-in function index"));
                     };
                     let func_name = function.name;
                     if stack.len() < usize::from(*arg_count) {
-                        return Err(Error::InvalidFormula(format!(
-                            "function {func_name} requires {arg_count} stack operands"
-                        )));
+                        return Err(Error::InvalidFormula("function requires stack operands"));
                     }
                     let mut args = Vec::new();
                     for _ in 0..*arg_count {
@@ -261,10 +248,10 @@ impl Compiler {
                     stack.push(format!("{}({})", func_name, args.join(",")));
                 },
                 Token::Name(idx) => {
-                    let context = context.ok_or_else(|| {
-                        Error::UnresolvedDependency(format!(
-                            "XLSB defined name index {idx} requires workbook name resolution"
-                        ))
+                    let context = context.ok_or({
+                        Error::UnresolvedDependency(
+                            "XLSB defined name index requires workbook name resolution",
+                        )
                     })?;
                     stack.push(context.defined_name(*idx)?);
                 },
@@ -272,9 +259,9 @@ impl Compiler {
                     sheet_index,
                     name_index,
                 } => {
-                    let context = context.ok_or_else(|| {
+                    let context = context.ok_or({
                         Error::UnresolvedDependency(
-                            "PtgNameX requires workbook external-link resolution".to_string(),
+                            "PtgNameX requires workbook external-link resolution",
                         )
                     })?;
                     stack.push(context.external_name(*sheet_index, *name_index)?);
@@ -283,35 +270,29 @@ impl Compiler {
                     stack.push("#REF!".to_string())
                 },
                 Token::TableReference(reference) => {
-                    let context = context.ok_or_else(|| {
-                        Error::UnresolvedDependency(format!(
-                            "structured table reference on Xti {} requires table-definition resolution",
-                            reference.sheet_index
-                        ))
-                    })?;
+                    let context = context.ok_or(Error::UnresolvedDependency(
+                        "structured table reference on Xti requires table-definition resolution",
+                    ))?;
                     stack.push(context.table_reference(reference)?);
                 },
                 Token::PivotName(index) => {
-                    let context = context.ok_or_else(|| {
+                    let context = context.ok_or({
                         Error::UnresolvedDependency(
-                            "PtgSxName requires pivot-cache calculated-name metadata".to_string(),
+                            "PtgSxName requires pivot-cache calculated-name metadata",
                         )
                     })?;
                     stack.push(context.pivot_name(*index)?);
                 },
-                Token::Unknown(t) => {
-                    return Err(Error::UnsupportedFeature(format!(
-                        "XLSB formula token 0x{t:02X}"
-                    )));
+                Token::Unknown(_t) => {
+                    return Err(Error::UnsupportedFeature("XLSB formula token"));
                 },
             }
         }
 
         if stack.len() != 1 {
-            return Err(Error::InvalidFormula(format!(
-                "formula leaves {} values on the evaluation stack",
-                stack.len()
-            )));
+            return Err(Error::InvalidFormula(
+                "formula leaves values on the evaluation stack",
+            ));
         }
         Ok(stack.pop().expect("length checked"))
     }
@@ -324,10 +305,10 @@ impl Compiler {
     ) -> Result<String> {
         let col = col
             .checked_add(1)
-            .ok_or_else(|| Error::InvalidFormula("cell column index overflow".to_string()))?;
+            .ok_or(Error::InvalidFormula("cell column index overflow"))?;
         let row = row
             .checked_add(1)
-            .ok_or_else(|| Error::InvalidFormula("cell row index overflow".to_string()))?;
+            .ok_or(Error::InvalidFormula("cell row index overflow"))?;
         let col_str = column_index_to_name(col);
         Ok(format!(
             "{}{}{}{}",

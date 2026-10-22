@@ -80,19 +80,16 @@ const PARAM_DATA_DOUBLE: u32 = 1;
 const PARAM_DATA_STRING: u32 = 2;
 const PARAM_DATA_BOOLEAN: u32 = 4;
 
-fn malformed(context: &str, detail: impl Into<String>) -> Error {
+fn malformed(context: &'static str, detail: &'static str) -> Error {
     Error::Unrecognized {
-        typ: context.to_string(),
-        val: detail.into(),
+        typ: context,
+        val: detail,
     }
 }
 
-fn validate_string(value: &str, context: &str, max_utf16_units: usize) -> Result<()> {
+fn validate_string(value: &str, context: &'static str, max_utf16_units: usize) -> Result<()> {
     if value.encode_utf16().count() > max_utf16_units {
-        return Err(malformed(
-            context,
-            format!("string exceeds {max_utf16_units} UTF-16 code units"),
-        ));
+        return Err(malformed(context, "string exceeds UTF-16 code units"));
     }
     Ok(())
 }
@@ -117,7 +114,7 @@ pub(crate) fn validate_connections(connections: &Connections) -> Result<()> {
         if !ids.insert(connection.connection_id) {
             return Err(malformed(
                 "BrtBeginExtConnection",
-                format!("duplicate connection id {}", connection.connection_id),
+                "duplicate connection id",
             ));
         }
         let name_len = connection.name.encode_utf16().count();
@@ -130,7 +127,7 @@ pub(crate) fn validate_connections(connections: &Connections) -> Result<()> {
         if !names.insert(connection.name.to_lowercase()) {
             return Err(malformed(
                 "BrtBeginExtConnection",
-                format!("duplicate connection name '{}'", connection.name),
+                "duplicate connection name",
             ));
         }
         for (context, value) in [
@@ -520,7 +517,7 @@ pub(crate) fn write_connections_part_with_unknown(
         ));
     }
     let mut data = Vec::with_capacity(512);
-    let mut writer = Encoder::new(&mut data);
+    let mut writer = Encoder::new(&mut data, crate::raw::Limits::DEFAULT);
     writer.write_record(rt::BEGIN_EXT_CONNECTIONS, &[])?;
     for connection in &connections.connections {
         if connection.name.is_empty() {

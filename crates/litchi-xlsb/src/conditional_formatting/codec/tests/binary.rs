@@ -678,8 +678,12 @@ mod tests {
         formatting.add_rule(icons);
 
         let mut bytes = Vec::new();
-        write_conditional_formattings(&mut Encoder::new(&mut bytes), &[formatting]).unwrap();
-        let records = Records::new(&bytes);
+        write_conditional_formattings(
+            &mut Encoder::new(&mut bytes, crate::raw::Limits::DEFAULT),
+            &[formatting],
+        )
+        .unwrap();
+        let records = Records::new(&bytes, crate::raw::Limits::DEFAULT);
         let mut found = Vec::new();
         for record in records {
             found.push(record.unwrap().kind());
@@ -705,7 +709,11 @@ mod tests {
         let mut second = Formatting::new(vec!["B1".into()]);
         second.add_rule(rule);
         assert!(
-            write_conditional_formattings(&mut Encoder::new(Vec::new()), &[first, second]).is_err()
+            write_conditional_formattings(
+                &mut Encoder::new(Vec::new(), crate::raw::Limits::DEFAULT),
+                &[first, second]
+            )
+            .is_err()
         );
     }
 
@@ -729,8 +737,12 @@ mod tests {
         formatting.add_rule(rule);
 
         let mut bytes = Vec::new();
-        write_conditional_formattings(&mut Encoder::new(&mut bytes), &[formatting]).unwrap();
-        let found = Records::new(&bytes)
+        write_conditional_formattings(
+            &mut Encoder::new(&mut bytes, crate::raw::Limits::DEFAULT),
+            &[formatting],
+        )
+        .unwrap();
+        let found = Records::new(&bytes, crate::raw::Limits::DEFAULT)
             .map(|record| record.unwrap().kind())
             .collect::<Vec<_>>();
         assert_eq!(
@@ -769,7 +781,11 @@ mod tests {
         ));
         extension.add_rule(rule);
         assert!(
-            write_conditional_formattings(&mut Encoder::new(Vec::new()), &[extension]).is_err()
+            write_conditional_formattings(
+                &mut Encoder::new(Vec::new(), crate::raw::Limits::DEFAULT),
+                &[extension]
+            )
+            .is_err()
         );
 
         let mut classic = Formatting::new(vec!["A1".into()]);
@@ -781,6 +797,12 @@ mod tests {
             0xff44_72c4,
         ));
         classic.add_rule(bar);
-        assert!(write_conditional_formattings(&mut Encoder::new(Vec::new()), &[classic]).is_err());
+        assert!(
+            write_conditional_formattings(
+                &mut Encoder::new(Vec::new(), crate::raw::Limits::DEFAULT),
+                &[classic]
+            )
+            .is_err()
+        );
     }
 }

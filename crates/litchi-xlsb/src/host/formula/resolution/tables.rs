@@ -16,7 +16,7 @@ impl Context {
                 || reference.list_index.is_some()
             {
                 return Err(Error::InvalidFormula(
-                    "nonresident structured reference also contains resident metadata".to_string(),
+                    "nonresident structured reference also contains resident metadata",
                 ));
             }
             validate_table_name(&external.table)?;
@@ -34,67 +34,63 @@ impl Context {
             ));
         }
 
-        let table_id = reference.list_index.ok_or_else(|| {
-            Error::InvalidFormula("resident structured reference omits table ID".to_string())
-        })?;
-        let row_type = reference.row_type.ok_or_else(|| {
-            Error::InvalidFormula("resident structured reference omits row type".to_string())
-        })?;
-        let columns = reference.columns.ok_or_else(|| {
-            Error::InvalidFormula("resident structured reference omits columns".to_string())
-        })?;
+        let table_id = reference.list_index.ok_or(Error::InvalidFormula(
+            "resident structured reference omits table ID",
+        ))?;
+        let row_type = reference.row_type.ok_or(Error::InvalidFormula(
+            "resident structured reference omits row type",
+        ))?;
+        let columns = reference.columns.ok_or(Error::InvalidFormula(
+            "resident structured reference omits columns",
+        ))?;
         let sheet = self.resolve_table_sheet(reference.sheet_index)?;
         let mut matches = self
             .tables
             .iter()
             .filter(|table| table.table_id == table_id);
-        let table = matches.next().ok_or_else(|| {
-            Error::UnresolvedDependency(format!(
-                "structured reference names missing table ID {table_id}"
-            ))
-        })?;
+        let table = matches.next().ok_or(Error::UnresolvedDependency(
+            "structured reference names missing table ID",
+        ))?;
         if matches.next().is_some() {
-            return Err(Error::UnresolvedDependency(format!(
-                "structured reference table ID {table_id} is ambiguous"
-            )));
+            return Err(Error::UnresolvedDependency(
+                "structured reference table ID is ambiguous",
+            ));
         }
         if table.sheet_index != sheet {
-            return Err(Error::InvalidFormula(format!(
-                "structured reference locates table ID {table_id} on worksheet {sheet}, but metadata places it on {}",
-                table.sheet_index
-            )));
+            return Err(Error::InvalidFormula(
+                "structured reference locates table ID on worksheet, but metadata places it on",
+            ));
         }
-        let named_columns = match columns {
-            TableColumns::All => TableNamedColumns::All,
-            TableColumns::One(index) => {
-                let name = table.columns.get(usize::from(index)).ok_or_else(|| {
-                    Error::UnresolvedDependency(format!(
-                        "structured-reference column {index} exceeds {} columns in table {:?}",
-                        table.columns.len(),
-                        table.display_name
-                    ))
-                })?;
-                TableNamedColumns::One(name.clone())
-            },
-            TableColumns::Range { first, last } => {
-                let first_name = table.columns.get(usize::from(first)).ok_or_else(|| {
-                    Error::UnresolvedDependency(format!(
-                        "structured-reference first column {first} exceeds {} columns",
-                        table.columns.len()
-                    ))
-                })?;
-                let last_name = table.columns.get(usize::from(last)).ok_or_else(|| {
-                    Error::UnresolvedDependency(format!(
-                        "structured-reference last column {last} exceeds {} columns",
-                        table.columns.len()
-                    ))
-                })?;
-                TableNamedColumns::Range {
-                    first: first_name.clone(),
-                    last: last_name.clone(),
-                }
-            },
-        };
+        let named_columns =
+            match columns {
+                TableColumns::All => TableNamedColumns::All,
+                TableColumns::One(index) => {
+                    let name = table.columns.get(usize::from(index)).ok_or({
+                        Error::UnresolvedDependency(
+                            "structured-reference column exceeds columns in table",
+                        )
+                    })?;
+                    TableNamedColumns::One(name.clone())
+                },
+                TableColumns::Range { first, last } => {
+                    let first_name = table.columns.get(usize::from(first)).ok_or(
+                        Error::UnresolvedDependency(
+                            "structured-reference first column exceeds columns",
+                        ),
+                    )?;
+                    let last_name =
+                        table
+                            .columns
+                            .get(usize::from(last))
+                            .ok_or(Error::UnresolvedDependency(
+                                "structured-reference last column exceeds columns",
+                            ))?;
+                    TableNamedColumns::Range {
+                        first: first_name.clone(),
+                        last: last_name.clone(),
+                    }
+                },
+            };
         Ok(format_structured_reference(
             &table.display_name,
             row_type,

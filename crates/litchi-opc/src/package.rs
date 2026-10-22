@@ -21,6 +21,7 @@ use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::io::{Read, Write};
 use std::path::Path;
+use std::sync::atomic::{AtomicU8, Ordering as AtomicOrdering};
 use std::sync::{Arc, OnceLock};
 
 mod content_types;
@@ -41,6 +42,51 @@ fn same_optional_manifest_bytes(left: Option<&[u8]>, right: Option<&[u8]>) -> bo
         (None, None) => true,
         (Some(left), Some(right)) => left == right,
         (Some(_), None) | (None, Some(_)) => false,
+    }
+}
+
+/// Memoized state for the admitted content-types source binding.
+///
+/// The binding is invalidated conservatively whenever a mutable package view
+/// can change part or relationship metadata. A clone receives its own state,
+/// so a staged edit cannot change the source package's memo. `Unknown` keeps
+/// the exact source publication behavior: the next query recomputes coverage
+/// before deciding whether the retained bytes are still authoritative.
+#[derive(Debug)]
+struct ContentTypesSourceState(AtomicU8);
+
+impl ContentTypesSourceState {
+    const UNKNOWN: u8 = 0;
+    const VALID: u8 = 1;
+    const INVALID: u8 = 2;
+
+    fn unknown() -> Self {
+        Self(AtomicU8::new(Self::UNKNOWN))
+    }
+
+    fn load(&self) -> Option<bool> {
+        match self.0.load(AtomicOrdering::Relaxed) {
+            Self::VALID => Some(true),
+            Self::INVALID => Some(false),
+            _ => None,
+        }
+    }
+
+    fn store(&self, valid: bool) {
+        self.0.store(
+            if valid { Self::VALID } else { Self::INVALID },
+            AtomicOrdering::Relaxed,
+        );
+    }
+
+    fn reset(&self) {
+        self.0.store(Self::UNKNOWN, AtomicOrdering::Relaxed);
+    }
+}
+
+impl Clone for ContentTypesSourceState {
+    fn clone(&self) -> Self {
+        Self(AtomicU8::new(self.0.load(AtomicOrdering::Relaxed)))
     }
 }
 
@@ -445,6 +491,7 @@ pub struct OpcPackage {
     /// remain available after a reversible part edit.
     source_content_types_xml: Option<Arc<Vec<u8>>>,
     source_content_types: Option<Arc<ContentTypeMap>>,
+    content_types_source_state: ContentTypesSourceState,
 
     /// Clone-local authorization for exact whole-source publication.
     exact_source_authorized: bool,
@@ -554,6 +601,7 @@ impl OpcPackage {
             source_relationships_xml: HashMap::new(),
             source_content_types_xml: None,
             source_content_types: None,
+            content_types_source_state: ContentTypesSourceState::unknown(),
             source_archive: None,
             source_limits: SourceLimits::default(),
             transfer_index: None,
@@ -664,8 +712,12 @@ impl OpcPackage {
             (Some(bytes), Some(map)) => (bytes.as_slice(), map.as_ref()),
             _ => return Ok(None),
         };
-        self.source_content_types_matches_current_parts(map)
-            .map(|matches| matches.then_some((bytes, map)))
+        if let Some(valid) = self.content_types_source_state.load() {
+            return Ok(valid.then_some((bytes, map)));
+        }
+        let matches = self.source_content_types_matches_current_parts(map)?;
+        self.content_types_source_state.store(matches);
+        Ok(matches.then_some((bytes, map)))
     }
 
     /// Whether `content_type` is exactly what the retained source manifest
@@ -784,6 +836,21 @@ impl OpcPackage {
         Ok(true)
     }
 
+    /// Record the result that is already known when a new part's declared
+    /// type is absent from the retained source binding.  The full coverage
+    /// walk remains necessary for a type that is covered: relationship
+    /// overrides and other existing graph changes can still affect source
+    /// publication.  This fast path only records a definitive invalidation.
+    fn mark_content_types_invalid_if_uncovered(&self, part: &dyn Part) {
+        if self.source_content_types.as_ref().is_some_and(|source| {
+            source
+                .lookup(part.partname())
+                .is_none_or(|content_type| content_type.as_str() != part.content_type())
+        }) {
+            self.content_types_source_state.store(false);
+        }
+    }
+
     /// Capture the current `[Content_Types].xml` publication view.
     ///
     /// Compatible admitted source bytes are retained exactly. After an edit
@@ -812,21 +879,14 @@ impl OpcPackage {
         }
     }
 
-    /// Share the original content-types member, even when structural edits
-    /// have made its coverage incompatible with the current graph. This is
-    /// provenance data, not the current publication view or a replacement
-    /// token. No XML is parsed or authored.
+    /// Share the admitted source content-types bytes even when a structural
+    /// edit has made their binding incompatible with the current part graph.
+    /// This is provenance only; publication uses the authored fallback until
+    /// the graph matches the source binding again, and callers still need the
+    /// validating replacement API to install new bytes.
     #[must_use]
     pub fn content_types_source_bytes(&self) -> Option<Arc<Vec<u8>>> {
         self.source_content_types_xml.clone()
-    }
-
-    /// Whether this package still carries an admitted source content-types
-    /// member, even when a structural edit temporarily makes its coverage
-    /// incompatible with the current part graph.
-    #[must_use]
-    pub fn has_content_types_source(&self) -> bool {
-        self.source_content_types_xml.is_some() && self.source_content_types.is_some()
     }
 
     /// Serialize the typed content-type graph under required output limits.
@@ -913,10 +973,15 @@ impl OpcPackage {
                 "stale content-types source replacement".to_owned(),
             ));
         }
-        if current.bytes() == replacement.as_slice() {
+        let source_differs = self
+            .source_content_types_xml
+            .as_ref()
+            .is_some_and(|source| source.as_slice() != replacement.as_slice());
+        let signed = self.is_signed() || self.requires_signature_edit_policy();
+        if current.bytes() == replacement.as_slice() && (!source_differs || signed) {
             return Ok(false);
         }
-        if self.is_signed() || self.requires_signature_edit_policy() {
+        if signed {
             return Err(OpcError::SignedSourceRequiresExplicitPolicy);
         }
         let name = PackURI::new(CONTENT_TYPES_URI).map_err(OpcError::InvalidPackUri)?;
@@ -975,10 +1040,15 @@ impl OpcPackage {
                 "content-types replacement has an invalid owner or content type".to_owned(),
             ));
         }
-        if current.bytes() == replacement.bytes() {
+        let source_differs = self
+            .source_content_types_xml
+            .as_ref()
+            .is_some_and(|source| source.as_slice() != replacement.bytes());
+        let signed = self.is_signed() || self.requires_signature_edit_policy();
+        if current.bytes() == replacement.bytes() && (!source_differs || signed) {
             return Ok(false);
         }
-        if self.is_signed() || self.requires_signature_edit_policy() {
+        if signed {
             return Err(OpcError::SignedSourceRequiresExplicitPolicy);
         }
 
@@ -1015,6 +1085,7 @@ impl OpcPackage {
             limits.max_content_types_bytes(),
         )?;
         self.revoke_exact_source();
+        self.content_types_source_state.reset();
         self.source_content_types_xml = Some(Arc::clone(&replacement.xml.bytes));
         self.source_content_types = Some(Arc::clone(&replacement.binding));
         Ok(true)
@@ -1124,12 +1195,34 @@ impl OpcPackage {
             (Some(left), Some(right)) => Ok((!left.is_empty()
                 || self.source_relationships_member_present(owner))
                 == (!right.is_empty() || other.source_relationships_member_present(owner))
-                && same_optional_manifest_bytes(
-                    self.source_relationships_xml(owner, left)?,
-                    other.source_relationships_xml(owner, right)?,
-                )),
+                && (!self.source_relationships_member_present(owner)
+                    && !other.source_relationships_member_present(owner)
+                    || left.same_source_capture(right)
+                    || same_optional_manifest_bytes(
+                        self.source_relationships_xml(owner, left)?,
+                        other.source_relationships_xml(owner, right)?,
+                    ))),
             _ => Ok(false),
         }
+    }
+
+    /// Whether the retained relationship-member captures have the same
+    /// publication bytes. Clones share each capture allocation; comparing the
+    /// map once lets patch capture skip an owner-by-owner provenance walk when
+    /// no raw relationship member was replaced.
+    #[doc(hidden)]
+    #[must_use]
+    pub fn same_relationship_source_captures(&self, other: &Self) -> bool {
+        self.source_relationships_xml.len() == other.source_relationships_xml.len()
+            && self.source_relationships_xml.iter().all(|(owner, left)| {
+                other
+                    .source_relationships_xml
+                    .get(owner)
+                    .is_some_and(|right| {
+                        Arc::ptr_eq(&left.bytes, &right.bytes)
+                            || left.bytes.as_slice() == right.bytes.as_slice()
+                    })
+            })
     }
 
     /// Compare the retained publication manifests without serializing them.
@@ -1919,6 +2012,7 @@ impl OpcPackage {
     /// Returns `OpcError::PartNotFound` if no part with `partname` exists.
     pub fn get_part_mut(&mut self, partname: &PackURI) -> Result<&mut dyn Part> {
         self.revoke_exact_source();
+        self.content_types_source_state.reset();
         // A mutable Part exposes its relationship collection, so retain the
         // signature audit even when the caller edits that collection directly.
         self.signature_graph_tracked = true;
@@ -2063,7 +2157,9 @@ impl OpcPackage {
     /// * `part` - The part to add
     pub fn add_part(&mut self, part: Box<dyn Part + Send + Sync>) {
         self.revoke_exact_source();
+        self.content_types_source_state.reset();
         self.signature_graph_tracked = true;
+        self.mark_content_types_invalid_if_uncovered(&*part);
         let partname = part.partname().clone();
         self.source_xml_parts.remove(&partname);
         self.source_relationships_xml.remove(&partname);
@@ -2077,9 +2173,11 @@ impl OpcPackage {
     /// existing part name; the existing part is left untouched.
     pub fn try_add_part(&mut self, part: Box<dyn Part + Send + Sync>) -> Result<()> {
         self.revoke_exact_source();
+        self.content_types_source_state.reset();
         self.signature_graph_tracked = true;
         let partname = part.partname().clone();
         self.validate_new_part_name(&partname)?;
+        self.mark_content_types_invalid_if_uncovered(&*part);
         self.parts
             .try_reserve(1)
             .map_err(|source| OpcError::Allocation {
@@ -2266,6 +2364,7 @@ impl OpcPackage {
             })?;
 
         self.revoke_exact_source();
+        self.content_types_source_state.reset();
         self.signature_graph_tracked = true;
         for part in parts {
             let name = part.partname().clone();
@@ -2317,6 +2416,7 @@ impl OpcPackage {
     pub(crate) fn try_add_source_part(&mut self, part: Box<dyn Part + Send + Sync>) -> Result<()> {
         self.revoke_exact_source();
         self.signature_graph_tracked = true;
+        self.content_types_source_state.reset();
         let partname = part.partname().clone();
         self.validate_new_part_name(&partname)?;
         self.parts
@@ -2462,6 +2562,7 @@ impl OpcPackage {
     pub fn remove_part(&mut self, partname: &PackURI) -> bool {
         self.revoke_exact_source();
         self.signature_graph_tracked = true;
+        self.content_types_source_state.reset();
         self.source_xml_parts.remove(partname);
         self.source_relationships_xml.remove(partname);
         self.parts.remove(partname).is_some()
@@ -2574,6 +2675,7 @@ impl OpcPackage {
     pub fn rels_mut(&mut self) -> &mut Relationships {
         let was_signed = self.is_signed();
         self.revoke_exact_source();
+        self.content_types_source_state.reset();
         self.signature_graph_tracked = true;
         if !was_signed && !self.source_ingress {
             self.signature_policy_authorized = true;
@@ -2642,6 +2744,7 @@ impl OpcPackage {
         let signature_policy_required = self.signature_policy_required;
         let signature_api_authored = self.signature_api_authored;
         self.revoke_exact_source();
+        self.content_types_source_state.reset();
         let result = crate::sign::sign(self, signer, &litchi_sign::Limits::standard());
         if result.is_ok() {
             self.signature_graph_tracked = true;
@@ -2675,6 +2778,7 @@ impl OpcPackage {
         let signature_policy_required = self.signature_policy_required;
         let signature_api_authored = self.signature_api_authored;
         self.revoke_exact_source();
+        self.content_types_source_state.reset();
         let result = crate::sign::sign(self, signer, limits);
         if result.is_ok() {
             self.signature_graph_tracked = true;
@@ -2704,6 +2808,7 @@ impl OpcPackage {
         let signature_policy_required = self.signature_policy_required;
         let signature_api_authored = self.signature_api_authored;
         self.revoke_exact_source();
+        self.content_types_source_state.reset();
         let result = crate::sign::resign(self, signer, &litchi_sign::Limits::standard());
         if result.is_ok() {
             self.signature_graph_tracked = true;
@@ -2737,6 +2842,7 @@ impl OpcPackage {
         let signature_policy_required = self.signature_policy_required;
         let signature_api_authored = self.signature_api_authored;
         self.revoke_exact_source();
+        self.content_types_source_state.reset();
         let result = crate::sign::resign(self, signer, limits);
         if result.is_ok() {
             self.signature_graph_tracked = true;
@@ -2777,6 +2883,7 @@ impl OpcPackage {
     pub fn relate_to(&mut self, partname: &str, reltype: &str) -> String {
         let was_signed = self.is_signed();
         self.revoke_exact_source();
+        self.content_types_source_state.reset();
         let r_id = self.rels.get_or_add(reltype, partname).r_id().to_string();
         self.signature_graph_tracked = true;
         if !was_signed && !self.source_ingress && is_signature_relationship(reltype) {
@@ -2796,6 +2903,7 @@ impl OpcPackage {
     pub fn relate_to_external(&mut self, target_url: &str, reltype: &str) -> String {
         let was_signed = self.is_signed();
         self.revoke_exact_source();
+        self.content_types_source_state.reset();
         let r_id = self.rels.get_or_add_ext_rel(reltype, target_url);
         self.signature_graph_tracked = true;
         if !was_signed && !self.source_ingress && is_signature_relationship(reltype) {
@@ -2810,6 +2918,7 @@ impl OpcPackage {
     pub fn relationships_mut(&mut self) -> &mut Relationships {
         let was_signed = self.is_signed();
         self.revoke_exact_source();
+        self.content_types_source_state.reset();
         self.signature_graph_tracked = true;
         if !was_signed && !self.source_ingress {
             self.signature_policy_authorized = true;
@@ -2956,6 +3065,7 @@ impl OpcPackage {
 
     pub(crate) fn strip_signature_graph(&mut self) {
         self.revoke_exact_source();
+        self.content_types_source_state.reset();
         let infrastructure: HashSet<PackURI> = self
             .parts
             .values()
@@ -3189,6 +3299,7 @@ impl OpcPackage {
         if let (Some(xml), Some(binding)) = (source_content_types_xml, source_content_types) {
             self.source_content_types_xml = Some(xml);
             self.source_content_types = Some(binding);
+            self.content_types_source_state.reset();
         }
         let preservation = PreservationProvenance::from_package(source.as_slice(), self);
         if !exact && preservation.is_none() {
@@ -3968,6 +4079,132 @@ mod tests {
     }
 
     #[test]
+    fn content_types_source_state_is_clone_local_and_tracks_mutation_routes() {
+        let source = create_minimal_docx();
+        let document = PackURI::new("/word/document.xml").unwrap();
+        let extra = PackURI::new("/word/extra.xml").unwrap();
+        let base = OpcPackage::from_bytes(&source).unwrap();
+        assert_eq!(base.content_types_source_state.load(), None);
+        assert!(base.retained_content_types_xml().unwrap().is_some());
+        assert_eq!(base.content_types_source_state.load(), Some(true));
+
+        // A clone owns an independent memo. Mutating its payload resets only
+        // the clone, while the source package keeps its proven binding.
+        let mut payload = base.clone();
+        payload
+            .get_part_mut(&document)
+            .unwrap()
+            .set_blob(b"<changed/>".to_vec());
+        assert_eq!(payload.content_types_source_state.load(), None);
+        assert_eq!(base.content_types_source_state.load(), Some(true));
+        assert!(payload.retained_content_types_xml().unwrap().is_some());
+        assert_eq!(payload.content_types_source_state.load(), Some(true));
+
+        // Adding a new default-typed part with no relationship member resets
+        // the memo; recomputation proves the admitted source remains valid.
+        let mut added = base.clone();
+        added.add_part(Box::new(BlobPart::new(
+            extra,
+            crate::constants::content_type::XML.to_owned(),
+            b"<extra/>".to_vec(),
+        )));
+        assert_eq!(added.content_types_source_state.load(), None);
+        assert!(added.retained_content_types_xml().unwrap().is_some());
+        assert_eq!(added.content_types_source_state.load(), Some(true));
+
+        // Replacing an existing URI with a different content type invalidates
+        // the memo and cannot retain the old lexical manifest.
+        let mut replaced = base.clone();
+        replaced.add_part(Box::new(BlobPart::new(
+            document.clone(),
+            "application/example+xml".to_owned(),
+            b"<replacement/>".to_vec(),
+        )));
+        assert_eq!(replaced.content_types_source_state.load(), Some(false));
+        assert!(replaced.retained_content_types_xml().unwrap().is_none());
+        assert_eq!(replaced.content_types_source_state.load(), Some(false));
+
+        // A rejected duplicate must not memoize an invalid result for the
+        // unchanged package.
+        let mut rejected = base.clone();
+        assert!(
+            rejected
+                .try_add_part(Box::new(BlobPart::new(
+                    document.clone(),
+                    "application/example+xml".to_owned(),
+                    b"<rejected/>".to_vec(),
+                )))
+                .is_err()
+        );
+        assert!(rejected.retained_content_types_xml().unwrap().is_some());
+
+        // A part relationship invalidates the memo. The source's `rels`
+        // default covers the newly present member, so recomputation still
+        // proves that the retained manifest remains authoritative.
+        let mut part_relationship = base.clone();
+        part_relationship
+            .get_part_mut(&document)
+            .unwrap()
+            .rels_mut()
+            .try_add_relationship(
+                "urn:test:relationship".to_owned(),
+                "../extra.xml".to_owned(),
+                "rId1".to_owned(),
+                crate::TargetMode::Internal,
+            )
+            .unwrap();
+        assert_eq!(part_relationship.content_types_source_state.load(), None);
+        assert!(
+            part_relationship
+                .retained_content_types_xml()
+                .unwrap()
+                .is_some()
+        );
+        assert_eq!(
+            part_relationship.content_types_source_state.load(),
+            Some(true)
+        );
+
+        // Package-level relationship edits are covered by the same reset,
+        // but remain content-type compatible because the member is already
+        // declared by the source's `rels` default.
+        let mut root_relationship = base.clone();
+        root_relationship
+            .rels_mut()
+            .try_add_relationship(
+                "urn:test:external".to_owned(),
+                "https://example.invalid/".to_owned(),
+                "rId2".to_owned(),
+                crate::TargetMode::External,
+            )
+            .unwrap();
+        assert_eq!(root_relationship.content_types_source_state.load(), None);
+        assert!(
+            root_relationship
+                .retained_content_types_xml()
+                .unwrap()
+                .is_some()
+        );
+        assert_eq!(
+            root_relationship.content_types_source_state.load(),
+            Some(true)
+        );
+
+        let mut removed = base.clone();
+        assert!(removed.remove_part(&document));
+        assert_eq!(removed.content_types_source_state.load(), None);
+        assert!(removed.retained_content_types_xml().unwrap().is_none());
+
+        // Unsigning runs the signature-graph removal path even when this
+        // source has no signature infrastructure. Its reset is therefore
+        // independently covered without requiring a signing key fixture.
+        let mut unsigned = base.clone();
+        unsigned.unsign();
+        assert_eq!(unsigned.content_types_source_state.load(), None);
+        assert!(unsigned.retained_content_types_xml().unwrap().is_some());
+    }
+
+    #[test]
     fn compact_manifest_views_match_tokens_and_bound_authored_output() {
         let mut package = OpcPackage::from_bytes(&create_minimal_docx()).unwrap();
         let limits = package.read_limits();
@@ -4059,6 +4296,7 @@ mod tests {
 
         let mut removed = original.clone();
         assert!(removed.remove_part(&document));
+        assert_eq!(removed.content_types_source_state.load(), None);
         let output = crate::PackageWriter::to_bytes(&removed).unwrap();
         let mut reopened = OpcPackage::from_bytes(&output).unwrap();
         let current_after_removal = reopened.source_content_types().unwrap();
@@ -4075,11 +4313,21 @@ mod tests {
                     .to_vec(),
             )))
             .unwrap();
+        assert_eq!(reopened.content_types_source_state.load(), None);
         let current = reopened.source_content_types().unwrap();
         assert!(
             reopened
                 .try_replace_content_types(current.bytes(), &token)
                 .unwrap()
+        );
+        assert_eq!(reopened.content_types_source_state.load(), None);
+        assert_eq!(
+            reopened
+                .retained_content_types_xml()
+                .unwrap()
+                .unwrap()
+                .as_slice(),
+            token.bytes()
         );
         let restored = crate::PackageWriter::to_bytes(&reopened).unwrap();
         let archive = soapberry_zip::office::ArchiveReader::new(&restored).unwrap();

@@ -12,10 +12,10 @@ use std::io::Cursor;
 use litchi_core::sheet::CellValue;
 use litchi_opc::PackURI;
 use litchi_xlsb::Package;
+use litchi_xlsb::builder::{self, Builder};
 use litchi_xlsb::cell_values::{Limits, Reference, Scalar, StyleIndex, Value};
 use litchi_xlsb::formula::ParsedFormula;
 use litchi_xlsb::raw::{Encoder, Records, kind};
-use litchi_xlsb::writer::{Builder, MutableWorksheet};
 
 fn a1() -> Reference {
     Reference::new(0, 0).expect("A1")
@@ -42,7 +42,7 @@ fn style_zero() -> StyleIndex {
 }
 
 fn package_with_scalars() -> Package {
-    let mut sheet = MutableWorksheet::new("Sheet1");
+    let mut sheet = builder::Worksheet::new("Sheet1");
     sheet.set_cell(0, 0, 1.0_f64);
     sheet.set_cell(0, 1, true);
     sheet.set_cell(0, 2, "same");
@@ -59,7 +59,7 @@ fn package_with_scalars() -> Package {
 }
 
 fn package_with_grouped_formula() -> Package {
-    let mut sheet = MutableWorksheet::new("Sheet1");
+    let mut sheet = builder::Worksheet::new("Sheet1");
     sheet
         .set_shared_formula(0, 0, 0, 1, "1")
         .expect("formula fixture");
@@ -85,7 +85,7 @@ fn package_with_missing_group_follower() -> Package {
         .to_vec();
     let mut output = Vec::new();
     let mut row = None;
-    for item in Records::new(&source) {
+    for item in Records::new(&source, litchi_xlsb::raw::Limits::DEFAULT) {
         let record = item.expect("worksheet record");
         if record.kind() == kind::ROW_HDR {
             row = Some(u32::from_le_bytes(
@@ -103,7 +103,7 @@ fn package_with_missing_group_follower() -> Package {
                     .expect("formula cell payload"),
             ) == 1;
         if !drop_follower {
-            Encoder::new(&mut output)
+            Encoder::new(&mut output, litchi_xlsb::raw::Limits::DEFAULT)
                 .write_record(record.kind(), record.payload())
                 .expect("copy worksheet record");
         }
@@ -115,7 +115,7 @@ fn package_with_missing_group_follower() -> Package {
 }
 
 fn package_with_ordinary_formula() -> Package {
-    let mut sheet = MutableWorksheet::new("Sheet1");
+    let mut sheet = builder::Worksheet::new("Sheet1");
     let formula = ParsedFormula {
         rgce: vec![0x1E, 2, 0],
         rgcb: Vec::new(),
@@ -133,7 +133,7 @@ fn package_with_ordinary_formula() -> Package {
 }
 
 fn package_with_typed_formula_caches() -> Package {
-    let mut sheet = MutableWorksheet::new("Sheet1");
+    let mut sheet = builder::Worksheet::new("Sheet1");
     let formula = ParsedFormula {
         rgce: vec![0x1E, 1, 0],
         rgcb: Vec::new(),
@@ -465,7 +465,7 @@ fn removal_is_idempotent_and_inverse_restores_exact_package() {
         .opc_package()
         .get_part(&sst)
         .expect("retained SST envelope");
-    let begin = Records::new(part.blob())
+    let begin = Records::new(part.blob(), litchi_xlsb::raw::Limits::DEFAULT)
         .next()
         .expect("SST begin")
         .expect("record");
@@ -475,6 +475,7 @@ fn removal_is_idempotent_and_inverse_restores_exact_package() {
         after
             .apply_cell_values(&patch.inverse())
             .expect("inverse")
+            .package()
             .to_bytes()
             .expect("restored"),
         before
@@ -534,13 +535,13 @@ fn semantic_mutation_refuses_unmodeled_cell_families_without_guessing_coordinate
     let bytes = opc.get_part(&uri).expect("sheet").blob().to_vec();
     let mut output = Vec::new();
     let mut inserted = false;
-    for item in Records::new(&bytes) {
+    for item in Records::new(&bytes, litchi_xlsb::raw::Limits::DEFAULT) {
         let record = item.expect("record");
-        Encoder::new(&mut output)
+        Encoder::new(&mut output, litchi_xlsb::raw::Limits::DEFAULT)
             .write_record(record.kind(), record.payload())
             .expect("copy");
         if !inserted && record.kind() == kind::ROW_HDR {
-            Encoder::new(&mut output)
+            Encoder::new(&mut output, litchi_xlsb::raw::Limits::DEFAULT)
                 .write_record(
                     litchi_xlsb::raw::Kind::new(0x000C).expect("reserved kind"),
                     &[0; 12],
@@ -555,11 +556,11 @@ fn semantic_mutation_refuses_unmodeled_cell_families_without_guessing_coordinate
     let mut edit = source.edit_cell_values(0).expect("edit").expect("sheet");
     assert!(matches!(
         edit.remove(e1()),
-        Err(litchi_xlsb::package::PackageError::UnsupportedFeature(_))
+        Err(litchi_xlsb::package::PackageError::Refused(_))
     ));
     assert!(matches!(
         edit.set_scalar(e1(), Scalar::Blank),
-        Err(litchi_xlsb::package::PackageError::UnsupportedFeature(_))
+        Err(litchi_xlsb::package::PackageError::Refused(_))
     ));
     assert_eq!(source.to_bytes().expect("unchanged"), before);
 }

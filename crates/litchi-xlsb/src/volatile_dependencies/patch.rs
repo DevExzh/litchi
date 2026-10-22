@@ -36,8 +36,8 @@ impl Patch {
         &self.after
     }
 
-    /// Whether this patch changes owner bytes or graph topology.
-    pub const fn is_empty(&self) -> bool {
+    /// Whether this patch changes no owner byte or graph topology.
+    pub const fn is_noop(&self) -> bool {
         !self.changed
     }
 
@@ -59,24 +59,21 @@ impl Patch {
         let current = Snapshot::read_with_limits(package, self.limits())?;
         if !current.same_source(&self.before) {
             return Err(Error::InvalidFormat(
-                "Volatile Dependencies patch source is stale".to_string(),
+                "Volatile Dependencies patch source is stale",
             ));
         }
-        if self.is_empty() {
+        if self.is_noop() {
             return Ok(current);
         }
         if package.is_signed() || package.requires_signature_edit_policy() {
-            return Err(Error::Opc(
-                litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy,
-            ));
+            return Err(Error::Signed);
         }
         let mut candidate = package.clone();
         materialize_source(&mut candidate, &self.before, &self.after)?;
         let resulting = Snapshot::read_with_limits(&candidate, self.limits())?;
         if !resulting.same_state(&self.after) {
             return Err(Error::InvalidFormat(
-                "Volatile Dependencies publication changed the planned semantic or owned graph"
-                    .to_string(),
+                "Volatile Dependencies publication changed the planned semantic or owned graph",
             ));
         }
         *package = candidate;
@@ -84,39 +81,9 @@ impl Patch {
     }
 }
 
-/// A detached transaction result containing a planned snapshot and patch.
-#[derive(Clone, Debug)]
-pub struct Commit {
-    patch: Patch,
-    changed: bool,
-}
-
-impl Commit {
-    pub(crate) fn new(patch: Patch, changed: bool) -> Self {
-        Self { patch, changed }
-    }
-
-    /// Whether the transaction changes owner bytes or topology.
-    pub const fn changed(&self) -> bool {
-        self.changed
-    }
-
-    /// Planned resulting snapshot.
-    pub fn snapshot(&self) -> &Snapshot {
-        self.patch.after()
-    }
-
-    /// Reversible source-checked patch.
-    pub fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Consume the commit into its snapshot and patch.
-    pub fn into_parts(self) -> (Snapshot, Patch) {
-        let snapshot = self.patch.after().clone();
-        (snapshot, self.patch)
-    }
-}
+/// The result of a Volatile Dependencies edit's `commit`: the new package,
+/// the patch and the diagnostics.
+pub type Commit = litchi_core::edit::Commit<crate::Package, Patch>;
 
 pub(crate) fn materialize(
     package: &mut OpcPackage,
@@ -126,14 +93,14 @@ pub(crate) fn materialize(
     let workbook_name = package.main_document_part()?.partname().clone();
     if workbook_name.as_str() != before.source().workbook.name.as_str() {
         return Err(Error::InvalidFormat(
-            "Volatile Dependencies Workbook owner changed".to_string(),
+            "Volatile Dependencies Workbook owner changed",
         ));
     }
     let current_graph = package::discover_graph(package, &workbook_name, before.limits())?;
     let expected_graph = graph_from_source(before.source())?;
     if current_graph != expected_graph {
         return Err(Error::InvalidFormat(
-            "Volatile Dependencies owner graph changed while staging".to_string(),
+            "Volatile Dependencies owner graph changed while staging",
         ));
     }
     match (current_graph, dependencies) {
@@ -142,7 +109,7 @@ pub(crate) fn materialize(
             let part = package.get_part_mut(&graph.part_name)?;
             if part.content_type() != CONTENT_TYPE || !part.rels().is_empty() {
                 return Err(Error::InvalidFormat(
-                    "Volatile Dependencies target is no longer relationship-free".to_string(),
+                    "Volatile Dependencies target is no longer relationship-free",
                 ));
             }
             part.set_blob(payload);
@@ -183,21 +150,21 @@ fn materialize_source(package: &mut OpcPackage, before: &Snapshot, after: &Snaps
     let workbook_name = package.main_document_part()?.partname().clone();
     if workbook_name.as_str() != before.source().workbook.name.as_str() {
         return Err(Error::InvalidFormat(
-            "Volatile Dependencies Workbook owner changed".to_string(),
+            "Volatile Dependencies Workbook owner changed",
         ));
     }
     let current_graph = package::discover_graph(package, &workbook_name, before.limits())?;
     if current_graph != graph_from_source(before.source())? {
         return Err(Error::InvalidFormat(
-            "Volatile Dependencies owner graph changed while applying patch".to_string(),
+            "Volatile Dependencies owner graph changed while applying patch",
         ));
     }
     let after_graph = graph_from_source(after.source())?;
     match (current_graph, after_graph.as_ref()) {
         (Some(current), Some(target)) if current.part_name == target.part_name => {
-            let after_part = after.source().owner.as_ref().ok_or_else(|| {
-                Error::InvalidFormat("Volatile Dependencies target source is missing".to_string())
-            })?;
+            let after_part = after.source().owner.as_ref().ok_or(Error::InvalidFormat(
+                "Volatile Dependencies target source is missing",
+            ))?;
             let part = package.get_part_mut(&current.part_name)?;
             part.set_content_type(after_part.content_type.clone())?;
             part.set_blob_shared(after_part.bytes.clone());
@@ -234,9 +201,9 @@ fn add_owner(
     after: &Snapshot,
     limits: SemanticLimits,
 ) -> Result<()> {
-    let owner = after.source().owner.as_ref().ok_or_else(|| {
-        Error::InvalidFormat("Volatile Dependencies target source is missing".to_string())
-    })?;
+    let owner = after.source().owner.as_ref().ok_or(Error::InvalidFormat(
+        "Volatile Dependencies target source is missing",
+    ))?;
     package.validate_new_part_name(&graph.part_name)?;
     package::reject_inbound_relationships(package, &graph.part_name, limits)?;
     package.try_add_part(Box::new(BlobPart::new_shared(
@@ -257,21 +224,18 @@ fn restore_lexical_tokens(
     package: &mut OpcPackage,
     source: &super::snapshot::SourceState,
 ) -> Result<()> {
-    let root_name =
-        litchi_opc::PackURI::new("/").map_err(|error| Error::InvalidUri(error.to_string()))?;
+    let root_name = litchi_opc::PackURI::new("/")?;
     let current_root = package.source_relationships(&root_name)?;
     if current_root != source.root_relationships {
         package.try_replace_relationships(&current_root, &source.root_relationships)?;
     }
-    let workbook_name = litchi_opc::PackURI::new(&source.workbook.name)
-        .map_err(|error| Error::InvalidUri(error.to_string()))?;
+    let workbook_name = litchi_opc::PackURI::new(&source.workbook.name)?;
     let current_workbook = package.source_relationships(&workbook_name)?;
     if current_workbook != source.workbook_relationships {
         package.try_replace_relationships(&current_workbook, &source.workbook_relationships)?;
     }
     if let Some(owner) = source.owner.as_ref() {
-        let owner_name = litchi_opc::PackURI::new(&owner.name)
-            .map_err(|error| Error::InvalidUri(error.to_string()))?;
+        let owner_name = litchi_opc::PackURI::new(&owner.name)?;
         let current_owner = package.source_relationships(&owner_name)?;
         if current_owner != owner.relationships {
             package.try_replace_relationships(&current_owner, &owner.relationships)?;

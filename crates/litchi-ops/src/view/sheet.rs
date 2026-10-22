@@ -508,7 +508,7 @@ pub(crate) enum WorksheetsInner<'a> {
     #[cfg(feature = "xls")]
     Xls(crate::format::xls::Worksheets<'a>),
     /// Yields one error, then ends.
-    #[cfg(feature = "ods")]
+    #[cfg(any(feature = "ods", feature = "xlsb"))]
     Refused(Option<crate::Error>),
     #[allow(
         dead_code,
@@ -539,7 +539,7 @@ impl<'a> Iterator for Worksheets<'a> {
                 .map_err(Into::into),
             #[cfg(feature = "xls")]
             WorksheetsInner::Xls(sheets) => sheets.next()?.map(SheetInner::Xls),
-            #[cfg(feature = "ods")]
+            #[cfg(any(feature = "ods", feature = "xlsb"))]
             WorksheetsInner::Refused(error) => return error.take().map(Err),
             WorksheetsInner::Never(never, _) => match *never {},
         };

@@ -8,17 +8,17 @@ use crate::raw::{Records, kind};
 /// One defined name of a workbook: its scope and its formula as text.
 ///
 /// ```
-/// use litchi_xlsb::writer::{Builder, MutableWorksheet};
+/// use litchi_xlsb::builder::{self, Builder};
 /// use litchi_xlsb::named_ranges::{Definition, area3d_formula};
 ///
 /// let mut builder = Builder::new();
-/// builder.add_worksheet(MutableWorksheet::new("Data"));
+/// builder.add_worksheet(builder::Worksheet::new("Data"));
 /// builder.add_named_range(
 ///     Definition::new("Totals".to_owned(), None)
 ///         .with_formula(area3d_formula(0, 0, 4, 1, 1)?),
 /// );
-/// let workbook = builder.build()?.workbook()?;
-/// let names = workbook.defined_name_entries()?;
+/// let package = builder.build()?;
+/// let names = package.workbook()?.defined_name_entries()?;
 /// assert_eq!(names[0].name, "Totals");
 /// assert_eq!(names[0].formula.as_deref(), Some("Data!$B$1:$B$5"));
 /// # Ok::<(), Box<dyn std::error::Error>>(())
@@ -41,19 +41,17 @@ pub struct Entry {
 /// Read every `BrtName` record of a workbook stream in record order.
 pub(crate) fn read(stream: &[u8], context: &Context) -> Result<Vec<Entry>> {
     let mut entries = Vec::new();
-    for record in Records::new(stream) {
+    for record in Records::new(stream, crate::raw::Limits::DEFAULT) {
         let record = record?;
         if record.kind() != kind::NAME {
             continue;
         }
-        let definition = super::Definition::parse(record.payload())
-            .map_err(|error| Error::InvalidFormula(error.to_string()))?;
+        let definition = super::Definition::parse(record.payload())?;
         let scope = definition
             .sheet_id
             .map(|id| {
-                usize::try_from(id).map_err(|_error| {
-                    Error::InvalidFormat("name scope exceeds this platform".to_string())
-                })
+                usize::try_from(id)
+                    .map_err(|_error| Error::InvalidFormat("name scope exceeds this platform"))
             })
             .transpose()?;
         let formula = definition.formula.as_deref().and_then(|rgce| {

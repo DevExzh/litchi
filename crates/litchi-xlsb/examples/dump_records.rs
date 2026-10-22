@@ -20,7 +20,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             .unwrap_or_else(|| OsString::from("dump_records")),
     })?;
     let bytes = fs::read(&path)?;
-    for (index, record) in Records::new(&bytes).enumerate() {
+    for (index, record) in Records::new(&bytes, litchi_xlsb::raw::Limits::DEFAULT).enumerate() {
         let record = record?;
         println!(
             "{index:08} offset={:#010x} kind={} len={}",

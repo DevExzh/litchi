@@ -25,30 +25,32 @@ impl Workbook {
             .formula_context
             .worksheet_names
             .get(catalog_position)
-            .ok_or_else(|| {
-                crate::package::error::Error::InvalidFormat(format!(
-                    "Worksheet catalog position {catalog_position} out of bounds"
-                ))
+            .ok_or({
+                crate::package::error::Error::InvalidFormat(
+                    "Worksheet catalog position out of bounds",
+                )
             })?;
         let rel_id = self
             .worksheet_rel_ids
             .get(catalog_position)
             .and_then(Option::as_deref)
-            .ok_or_else(|| {
-                crate::package::error::Error::UnsupportedFeature(format!(
-                    "sheet {name:?} has no worksheet relationship"
-                ))
+            .ok_or({
+                crate::package::error::Error::UnsupportedFeature(
+                    "sheet has no worksheet relationship",
+                )
             })?;
         let workbook_part = self.package.main_document_part()?;
-        let relationship = workbook_part.rels().get(rel_id).ok_or_else(|| {
-            crate::package::error::Error::FileNotFound(format!(
-                "relationship {rel_id:?} for sheet {name:?}"
-            ))
-        })?;
+        let relationship =
+            workbook_part
+                .rels()
+                .get(rel_id)
+                .ok_or(crate::package::error::Error::FileNotFound(
+                    "relationship for sheet",
+                ))?;
         if relationship.is_external() {
-            return Err(crate::package::error::Error::UnsupportedFeature(format!(
-                "sheet {name:?} has an external worksheet relationship"
-            )));
+            return Err(crate::package::error::Error::UnsupportedFeature(
+                "sheet has an external worksheet relationship",
+            ));
         }
         let sheet_uri = relationship.target_partname()?;
 
@@ -61,14 +63,14 @@ impl Workbook {
             let first = relationships.next();
             if relationships.next().is_some() {
                 return Err(crate::package::error::Error::Unrecognized {
-                    typ: "worksheet comments relationship".to_string(),
-                    val: "multiple relationships".to_string(),
+                    typ: "worksheet comments relationship",
+                    val: "multiple relationships",
                 });
             }
             match first {
                 Some(rel) if rel.is_external() => {
                     return Err(crate::package::error::Error::UnsupportedFeature(
-                        "external XLSB comments part".to_string(),
+                        "external XLSB comments part",
                     ));
                 },
                 Some(rel) => Some(rel.target_partname()?),
@@ -98,8 +100,8 @@ impl Workbook {
             let part = self.package.get_part(&uri)?;
             if !part.rels().is_empty() {
                 return Err(crate::package::error::Error::Unrecognized {
-                    typ: "Comments part".to_string(),
-                    val: "relationships are not permitted".to_string(),
+                    typ: "Comments part",
+                    val: "relationships are not permitted",
                 });
             }
             for comment in
@@ -126,8 +128,8 @@ impl Workbook {
                 kind::BEGIN_SST => {
                     if expected_unique.is_some() {
                         return Err(crate::package::error::Error::Unrecognized {
-                            typ: "BrtBeginSst".to_string(),
-                            val: "duplicate record".to_string(),
+                            typ: "BrtBeginSst",
+                            val: "duplicate record",
                         });
                     }
                     if record.payload().len() != 8 {
@@ -140,24 +142,24 @@ impl Workbook {
                     let unique = binary::read_u32_le_at(record.payload(), 4)?;
                     if total > 0x7FFF_FFFF || unique > total {
                         return Err(crate::package::error::Error::Unrecognized {
-                            typ: "BrtBeginSst counts".to_string(),
-                            val: format!("total={total}, unique={unique}"),
+                            typ: "BrtBeginSst counts",
+                            val: "total=, unique=",
                         });
                     }
                     expected_unique = Some(unique as usize);
                 },
                 kind::SST_ITEM => {
-                    let expected = expected_unique.ok_or_else(|| {
+                    let expected = expected_unique.ok_or({
                         crate::package::error::Error::Unrecognized {
-                            typ: "BrtSSTItem".to_string(),
-                            val: "record before BrtBeginSst".to_string(),
+                            typ: "BrtSSTItem",
+                            val: "record before BrtBeginSst",
                         }
                     })?;
                     let found = strings.len() - initial_count;
                     if found >= expected {
                         return Err(crate::package::error::Error::Unrecognized {
-                            typ: "BrtSSTItem count".to_string(),
-                            val: format!("more than declared {expected}"),
+                            typ: "BrtSSTItem count",
+                            val: "more than declared",
                         });
                     }
                     let location = u32::try_from(found).unwrap_or(u32::MAX);
@@ -175,17 +177,17 @@ impl Workbook {
                             found: record.payload().len(),
                         });
                     }
-                    let expected = expected_unique.ok_or_else(|| {
+                    let expected = expected_unique.ok_or({
                         crate::package::error::Error::Unrecognized {
-                            typ: "BrtEndSst".to_string(),
-                            val: "record before BrtBeginSst".to_string(),
+                            typ: "BrtEndSst",
+                            val: "record before BrtBeginSst",
                         }
                     })?;
                     let found = strings.len() - initial_count;
                     if found != expected {
                         return Err(crate::package::error::Error::Unrecognized {
-                            typ: "BrtSSTItem count".to_string(),
-                            val: format!("declared {expected}, found {found}"),
+                            typ: "BrtSSTItem count",
+                            val: "declared",
                         });
                     }
                     ended = true;
@@ -198,14 +200,14 @@ impl Workbook {
         }
         if expected_unique.is_none() {
             return Err(crate::package::error::Error::Unrecognized {
-                typ: "SST stream".to_string(),
-                val: "missing BrtBeginSst".to_string(),
+                typ: "SST stream",
+                val: "missing BrtBeginSst",
             });
         }
         if !ended {
             return Err(crate::package::error::Error::Unrecognized {
-                typ: "SST stream".to_string(),
-                val: "missing BrtEndSst".to_string(),
+                typ: "SST stream",
+                val: "missing BrtEndSst",
             });
         }
         Ok(())

@@ -1249,11 +1249,13 @@ dependencies = [
  "litchi-ppt",
  "litchi-pptx",
  "litchi-rtf",
+ "litchi-sheet-text",
  "litchi-sign",
  "litchi-xls",
  "litchi-xlsb",
  "litchi-xlsx",
  "memchr",
+ "quick-xml",
  "serde",
  "serde_json",
  "unicode-normalization",
@@ -1276,6 +1278,7 @@ dependencies = [
  "once_cell",
  "quick-xml",
  "serde_json",
+ "sha2 0.11.0",
  "url",
  "zerocopy",
  "zerocopy-derive",
@@ -1323,6 +1326,15 @@ name = "litchi-sheet"
 version = "0.0.1"
 dependencies = [
  "litchi-core",
+ "thiserror",
+]
+
+[[package]]
+name = "litchi-sheet-text"
+version = "0.0.1"
+dependencies = [
+ "litchi-core",
+ "litchi-sheet",
  "thiserror",
 ]
 
@@ -1413,6 +1425,7 @@ dependencies = [
  "litchi-xldm",
  "once_cell",
  "quick-xml",
+ "sha2 0.11.0",
  "thiserror",
 ]
 

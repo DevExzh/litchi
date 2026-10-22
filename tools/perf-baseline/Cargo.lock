@@ -1451,6 +1451,7 @@ dependencies = [
  "litchi-xldm",
  "once_cell",
  "quick-xml",
+ "sha2 0.11.0",
  "thiserror",
 ]
 

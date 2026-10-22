@@ -38,7 +38,7 @@ fn wide_string(value: &str) -> Vec<u8> {
 
 fn external_link_records(records: &[(RawKind, Vec<u8>)]) -> Vec<u8> {
     let mut data = Vec::new();
-    let mut writer = Encoder::new(&mut data);
+    let mut writer = Encoder::new(&mut data, crate::raw::Limits::DEFAULT);
     for (record_type, payload) in records {
         writer.write_record(*record_type, payload).unwrap();
     }
@@ -69,12 +69,13 @@ fn empty_workbook() -> Workbook {
         connections: None,
         tolerance: crate::leniency::ToleranceReport::default(),
         leniency: crate::leniency::Leniency::Strict,
+        semantic_limits: crate::SemanticLimits::new(),
     }
 }
 
 fn generated_workbook() -> Workbook {
     let mut writer = crate::writer::Builder::new();
-    writer.add_worksheet(crate::writer::MutableWorksheet::new("Sheet1"));
+    writer.add_worksheet(crate::builder::Worksheet::new("Sheet1"));
     let mut bytes = Cursor::new(Vec::new());
     writer.build().unwrap().write_to(&mut bytes).unwrap();
     Workbook::new(Cursor::new(bytes.into_inner())).unwrap()
@@ -119,7 +120,7 @@ fn durable_patch_decode_can_opt_into_skipped_drawing_projection() {
 #[test]
 fn workbook_ingress_honors_exact_read_limits() {
     let mut writer = crate::writer::Builder::new();
-    writer.add_worksheet(crate::writer::MutableWorksheet::new("Sheet1"));
+    writer.add_worksheet(crate::builder::Worksheet::new("Sheet1"));
     let mut output = Cursor::new(Vec::new());
     writer
         .build()
@@ -210,8 +211,8 @@ fn raw_opc_edit_rejects_invalid_workbook_without_publishing() {
 }
 
 #[test]
-fn task_pane_facade_round_trips_common_model() {
-    let mut workbook = empty_workbook();
+fn task_pane_family_round_trips_common_model() {
+    let package = crate::Package::new().unwrap();
     let add_in = web::AddIn::new(
         "add-in-1",
         web::Reference::new("ref-1", "1", web::Store::Registry).unwrap(),
@@ -220,13 +221,21 @@ fn task_pane_facade_round_trips_common_model() {
     let mut panes = web::Panes::new();
     panes.push(web::Pane::new(add_in)).unwrap();
 
-    workbook
-        .put_task_panes(panes, web::Conformance::Transitional)
+    let mut edit = package
+        .edit_task_panes_with_options(
+            crate::task_panes::EditOptions::default().conformance(web::Conformance::Transitional),
+        )
         .unwrap();
-    let loaded = workbook.task_panes().unwrap().unwrap();
+    edit.replace(panes).unwrap();
+    let with_panes = edit.commit().unwrap().into_package();
+    let loaded = with_panes.task_panes().unwrap().unwrap();
     assert_eq!(loaded.get("add-in-1").unwrap().add_in().id(), "add-in-1");
-    assert!(workbook.remove_task_panes().unwrap());
-    assert!(workbook.task_panes().unwrap().is_none());
+    assert!(package.task_panes().unwrap().is_none());
+
+    let mut edit = with_panes.edit_task_panes().unwrap();
+    assert!(edit.clear().unwrap());
+    let cleared = edit.commit().unwrap().into_package();
+    assert!(cleared.task_panes().unwrap().is_none());
 }
 
 fn parse_external_link(records: &[(RawKind, Vec<u8>)]) -> Result<ExternalBook> {
@@ -276,6 +285,7 @@ fn parse_external_link_with_relationship_type(
         connections: None,
         tolerance: crate::leniency::ToleranceReport::default(),
         leniency: crate::leniency::Leniency::Strict,
+        semantic_limits: crate::SemanticLimits::new(),
     };
     let mut budget = ExternalLinkLimits::default().budget();
     workbook.load_external_book_with_budget(&uri, &mut budget)
@@ -283,7 +293,7 @@ fn parse_external_link_with_relationship_type(
 
 fn parse_shared_string_records(records: &[(RawKind, Vec<u8>)]) -> Result<Vec<SharedString>> {
     let data = external_link_records(records);
-    let mut iter = Records::new(data.as_slice());
+    let mut iter = Records::new(data.as_slice(), crate::raw::Limits::DEFAULT);
     let mut strings = Vec::new();
     Workbook::read_shared_strings(&mut iter, &mut strings, &mut Default::default())?;
     Ok(strings)
@@ -440,7 +450,7 @@ fn package_with_external_links<'a>(links: &[ExternalLinkFixture<'a>]) -> OpcPack
     let workbook_uri = PackURI::new("/xl/workbook.bin").unwrap();
     let mut workbook_data = Vec::new();
     {
-        let mut writer = Encoder::new(&mut workbook_data);
+        let mut writer = Encoder::new(&mut workbook_data, crate::raw::Limits::DEFAULT);
         for (workbook_relationship_id, _, _) in links {
             writer
                 .write_record(kind::SUP_BOOK_SRC, &wide_string(workbook_relationship_id))
@@ -691,7 +701,7 @@ fn eager_external_link_limits_are_atomic_and_reconstruct_with_policy() {
         vec!["Book1.xlsx", "Book2.xlsx"]
     );
 
-    let reconstructed = package.clone().into_workbook().unwrap();
+    let reconstructed = package.clone().materialize_workbook().unwrap();
     assert_eq!(reconstructed.external_link_limits(), permissive);
     assert_eq!(
         reconstructed
@@ -1228,6 +1238,7 @@ fn reads_external_book_metadata_from_local_fixture() {
         connections: None,
         tolerance: crate::leniency::ToleranceReport::default(),
         leniency: crate::leniency::Leniency::Strict,
+        semantic_limits: crate::SemanticLimits::new(),
     };
     let uri = PackURI::new("/xl/externalLinks/externalLink1.bin").unwrap();
     let mut budget = ExternalLinkLimits::default().budget();
@@ -1357,7 +1368,7 @@ fn resolves_external_formula_tokens_from_package_relationships() {
     let workbook_uri = PackURI::new("/xl/workbook.bin").unwrap();
     let mut workbook_data = Vec::new();
     {
-        let mut writer = Encoder::new(&mut workbook_data);
+        let mut writer = Encoder::new(&mut workbook_data, crate::raw::Limits::DEFAULT);
         writer
             .write_record(kind::SUP_BOOK_SRC, &wide_string("rIdExternal"))
             .unwrap();
@@ -1639,6 +1650,7 @@ fn workbook_projection(workbook: &Workbook) -> String {
         connections,
         tolerance,
         leniency,
+        semantic_limits,
     } = workbook;
     let package = package_digest(package).join("\n  ");
     let styles = styles_projection(styles);
@@ -1656,7 +1668,8 @@ fn workbook_projection(workbook: &Workbook) -> String {
          pivot_cache_definitions={pivot_cache_definitions:?}\n\
          structured_tables={structured_tables:?}\nchart_sheets={chart_sheets:?}\n\
          sheet_drawings={sheet_drawings:?}\ndrawing_load_policy={drawing_load_policy:?}\n\
-         connections={connections:?}\ntolerance={tolerance:?}\nleniency={leniency:?}"
+         connections={connections:?}\ntolerance={tolerance:?}\nleniency={leniency:?}\n\
+         semantic_limits={semantic_limits:?}"
     )
 }
 
@@ -1691,7 +1704,7 @@ fn exact_noop_cell_value_commit_publishes_nothing() {
     );
     let published = commit.into_package();
     assert_eq!(published.to_bytes().unwrap(), before_bytes);
-    workbook = published.into_workbook().unwrap();
+    workbook = published.materialize_workbook().unwrap();
     assert_eq!(workbook_projection(&workbook), before);
     assert_eq!(
         workbook_projection(&workbook),
@@ -1724,7 +1737,7 @@ fn cell_value_publication_installs_the_parse_that_validated_it() {
     let commit = edit.commit().unwrap();
     assert!(!commit.patch().is_noop());
 
-    workbook = commit.into_package().into_workbook().unwrap();
+    workbook = commit.into_package().materialize_workbook().unwrap();
 
     assert_ne!(workbook_projection(&workbook), before);
     assert_eq!(

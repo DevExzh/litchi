@@ -4,18 +4,17 @@ use crate::package::error::{Error, Result};
 use crate::raw::{Encoder, kind};
 use std::io::Write;
 
-use super::model::MutableWorksheet;
+use super::model::Worksheet;
 
-impl MutableWorksheet {
+impl Worksheet {
     /// Validate and fully encode the optional sparkline block without
     /// publishing any worksheet or relationship state.
     pub(crate) fn stage_sparkline_block(&self) -> Result<Option<Vec<u8>>> {
         self.sparkline_groups
             .as_ref()
             .map(|groups| {
-                crate::sparkline::encode_block(groups, self.sparkline_limits).map_err(|error| {
-                    Error::InvalidFormula(format!("unable to encode sparkline groups: {error}"))
-                })
+                crate::sparkline::encode_block(groups, self.sparkline_limits)
+                    .map_err(|_error| Error::InvalidFormula("unable to encode sparkline groups"))
             })
             .transpose()
     }
@@ -27,7 +26,7 @@ impl MutableWorksheet {
     pub(crate) fn write<W: Write>(
         &self,
         writer: &mut Encoder<W>,
-        shared_strings: &mut crate::writer::MutableSharedStringsWriter,
+        shared_strings: &mut crate::writer::SharedStringsWriter,
     ) -> Result<()> {
         let sparkline_block = self.stage_sparkline_block()?;
         self.write_with_sparkline_block(writer, shared_strings, sparkline_block.as_deref())
@@ -37,7 +36,7 @@ impl MutableWorksheet {
     pub(crate) fn write_with_sparkline_block<W: Write>(
         &self,
         writer: &mut Encoder<W>,
-        shared_strings: &mut crate::writer::MutableSharedStringsWriter,
+        shared_strings: &mut crate::writer::SharedStringsWriter,
         sparkline_block: Option<&[u8]>,
     ) -> Result<()> {
         // Write BrtBeginSheet
@@ -95,7 +94,22 @@ impl MutableWorksheet {
             crate::conditional_formatting::write_conditional_formattings(
                 writer,
                 &self.conditional_formattings,
-            )?;
+            )
+            .map_err(|error| match error {
+                crate::conditional_formatting::Error::UnsupportedFeature(_)
+                | crate::conditional_formatting::Error::Unrecognized { .. } => Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedContent,
+                    "build_xlsb",
+                    "the conditional format contains unsupported authored content",
+                ),
+                error @ (crate::conditional_formatting::Error::InvalidLength { .. }
+                | crate::conditional_formatting::Error::InvalidFormula(_)
+                | crate::conditional_formatting::Error::InvalidCellReference(_)
+                | crate::conditional_formatting::Error::Encoding(_)
+                | crate::conditional_formatting::Error::Wire(_)
+                | crate::conditional_formatting::Error::Formula(_)
+                | crate::conditional_formatting::Error::Io(_)) => error.into(),
+            })?;
         }
 
         if !self.web_extension_bindings.is_empty() {
@@ -107,13 +121,11 @@ impl MutableWorksheet {
         }
 
         if self.has_drawing_objects() {
-            let rel_id = self.drawing_rel_id.as_deref().ok_or_else(|| {
-                Error::InvalidFormula(
-                    "worksheet drawing objects lack a Drawings relationship ID".to_string(),
-                )
-            })?;
+            let rel_id = self.drawing_rel_id.as_deref().ok_or(Error::InvalidFormula(
+                "worksheet drawing objects lack a Drawings relationship ID",
+            ))?;
             let mut payload = Vec::with_capacity(4 + rel_id.len() * 2);
-            Encoder::new(&mut payload).write_wide_string(rel_id)?;
+            Encoder::new(&mut payload, crate::raw::Limits::DEFAULT).write_wide_string(rel_id)?;
             writer.write_record(kind::DRAWING, &payload)?;
         }
 
@@ -122,7 +134,7 @@ impl MutableWorksheet {
         if !self.tables.is_empty() {
             if self.table_rel_ids.len() != self.tables.len() {
                 return Err(Error::InvalidFormula(
-                    "worksheet tables lack relationship IDs from the workbook writer".to_string(),
+                    "worksheet tables lack relationship IDs from the workbook writer",
                 ));
             }
             crate::package::table::write::write_list_parts(writer, &self.table_rel_ids)?;

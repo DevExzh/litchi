@@ -271,7 +271,7 @@ impl SheetHandle {
     fn eager(&self) -> Result<&xlsb::Workbook> {
         match self {
             Self::Eager { file, .. } => match &file.0.owner {
-                XlsbOwner::Eager(workbook) => Ok(workbook),
+                XlsbOwner::Eager(package) => super::projection(package),
                 XlsbOwner::Source(_) => Err(lost_owner()),
             },
             Self::Source { .. } => Err(lost_owner()),
@@ -317,7 +317,7 @@ fn lost_owner() -> Error {
 /// format is listed.
 fn differential_formats(file: &Xlsb) -> Result<Vec<DifferentialStyle>> {
     Ok(match &file.0.owner {
-        XlsbOwner::Eager(workbook) => workbook.differential_formats()?,
+        XlsbOwner::Eager(package) => super::projection(package)?.differential_formats()?,
         XlsbOwner::Source(workbook) => workbook.workbook().differential_formats()?,
     })
 }

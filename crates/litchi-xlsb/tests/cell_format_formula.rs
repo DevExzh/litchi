@@ -9,21 +9,21 @@
 //! (record 0261).
 
 use litchi_core::sheet::{Cell as _, CellValue};
+use litchi_xlsb::builder::{self, Builder};
 use litchi_xlsb::cell_values::{BorderLine, Format, Reference};
 use litchi_xlsb::package::PackageError;
 use litchi_xlsb::package::styles as read;
 use litchi_xlsb::styles::{BorderStyle, HorizontalAlignment, VerticalAlignment};
-use litchi_xlsb::writer::{Builder, MutableWorksheet};
 use litchi_xlsb::{Package, Workbook};
 
 fn package() -> Package {
-    let mut sheet = MutableWorksheet::new("Data");
+    let mut sheet = builder::Worksheet::new("Data");
     sheet.set_cell(0, 0, 1.5_f64);
     sheet.set_cell(0, 1, "label");
     sheet.set_cell(1, 0, 2.0_f64);
     let mut builder = Builder::new();
     builder.add_worksheet(sheet);
-    builder.add_worksheet(MutableWorksheet::new("Other"));
+    builder.add_worksheet(builder::Worksheet::new("Other"));
     builder.build().unwrap()
 }
 
@@ -73,12 +73,12 @@ fn a_format_change_is_interned_and_reads_back() {
     let (after, patch) = commit.into_parts();
 
     let workbook = after.workbook().unwrap();
-    let xf_index = style(&workbook, 0, 0);
+    let xf_index = style(workbook, 0, 0);
     assert_ne!(xf_index, 0);
-    assert_eq!(style(&workbook, 4, 4), xf_index, "one interned XF");
+    assert_eq!(style(workbook, 4, 4), xf_index, "one interned XF");
     assert_eq!(
-        style(&workbook, 1, 0),
-        style(&source.workbook().unwrap(), 1, 0)
+        style(workbook, 1, 0),
+        style(source.workbook().unwrap(), 1, 0)
     );
     let styles = workbook.styles();
     let xf = styles.get_cell_format(xf_index as usize).unwrap();
@@ -117,6 +117,7 @@ fn a_format_change_is_interned_and_reads_back() {
         source
             .apply_cell_values(&patch)
             .unwrap()
+            .package()
             .to_bytes()
             .unwrap(),
         after.to_bytes().unwrap()
@@ -125,6 +126,7 @@ fn a_format_change_is_interned_and_reads_back() {
         after
             .apply_cell_values(&patch.inverse())
             .unwrap()
+            .package()
             .to_bytes()
             .unwrap(),
         source.to_bytes().unwrap()
@@ -146,7 +148,7 @@ fn a_partial_change_keeps_every_other_attribute() {
     let workbook = after.workbook().unwrap();
     let styles = workbook.styles();
     let xf = styles
-        .get_cell_format(style(&workbook, 0, 0) as usize)
+        .get_cell_format(style(workbook, 0, 0) as usize)
         .unwrap();
     let font = styles.get_font(xf.font_id as usize).unwrap();
     assert!(!font.bold && font.italic && font.underline);
@@ -194,7 +196,7 @@ fn built_in_number_formats_keep_their_identifier_and_invalid_values_are_refused(
     let workbook = after.workbook().unwrap();
     let xf = workbook
         .styles()
-        .get_cell_format(style(&workbook, 0, 0) as usize)
+        .get_cell_format(style(workbook, 0, 0) as usize)
         .unwrap()
         .clone();
     assert_eq!(xf.num_fmt_id, 10);
@@ -246,11 +248,11 @@ fn formula_text_compiles_into_new_value_and_formula_cells() {
     assert!(edit.set_formula_text(at(1, 0), "A1+1").unwrap());
     let after = edit.commit().unwrap().into_package();
     let workbook = after.workbook().unwrap();
-    let (text, cache) = formula(&workbook, 2, 0);
+    let (text, cache) = formula(workbook, 2, 0);
     // Reads render binary operators fully parenthesized.
     assert_eq!(text, "(SUM(A1:A2)*2)");
     assert_eq!(cache, Some(CellValue::String(String::new())));
-    let (text, cache) = formula(&workbook, 1, 0);
+    let (text, cache) = formula(workbook, 1, 0);
     assert_eq!(text, "(A1+1)");
     assert_eq!(cache, Some(CellValue::Float(2.0)), "the value is the cache");
     let sheet = workbook.worksheet(0).unwrap();
@@ -261,7 +263,7 @@ fn formula_text_compiles_into_new_value_and_formula_cells() {
     assert!(!edit.set_formula_text(at(1, 0), "A1+1").unwrap());
     assert!(edit.set_formula_text(at(1, 0), "A1+2").unwrap());
     let replaced = edit.commit().unwrap().into_package();
-    let (text, cache) = formula(&replaced.workbook().unwrap(), 1, 0);
+    let (text, cache) = formula(replaced.workbook().unwrap(), 1, 0);
     assert_eq!(text, "(A1+2)");
     assert_eq!(cache, Some(CellValue::Float(2.0)));
 }
@@ -275,7 +277,7 @@ fn formulas_needing_workbook_context_are_refused_before_staging() {
         assert!(
             matches!(
                 error,
-                PackageError::UnsupportedFeature(_) | PackageError::InvalidFormula(_)
+                PackageError::Refused(_) | PackageError::InvalidFormula(_)
             ),
             "{text}: {error:?}"
         );

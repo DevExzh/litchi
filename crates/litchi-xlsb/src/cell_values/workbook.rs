@@ -15,30 +15,6 @@ use litchi_opc::{OpcPackage, PackURI, Part};
 
 const WORKSHEET_CONTENT_TYPE: &str = "application/vnd.ms-excel.worksheet";
 
-/// Read editable cell values from one binary worksheet part with safe limits.
-///
-/// # Errors
-///
-/// Returns an error when the part is missing, not a worksheet, or has an
-/// invalid BIFF12 record stream.
-pub fn read(package: &OpcPackage, worksheet: &PackURI) -> Result<Snapshot> {
-    read_with_limits(package, worksheet, Limits::DEFAULT)
-}
-
-/// Read editable cell values with an explicit finite policy.
-///
-/// # Errors
-///
-/// Returns an error when the part is missing, not a worksheet, exceeds a
-/// selected limit, or has an invalid BIFF12 record stream.
-pub fn read_with_limits(
-    package: &OpcPackage,
-    worksheet: &PackURI,
-    limits: Limits,
-) -> Result<Snapshot> {
-    read_with_limits_and_leniency(package, worksheet, limits, crate::Leniency::Strict)
-}
-
 /// Read editable cell values under an explicit [`crate::Leniency`].
 pub(crate) fn read_with_limits_and_leniency(
     package: &OpcPackage,
@@ -49,67 +25,6 @@ pub(crate) fn read_with_limits_and_leniency(
     let part = package.get_part(worksheet)?;
     require_worksheet(part)?;
     super::worksheet::read_with_limits_and_leniency(part.blob(), limits, leniency)
-}
-
-/// Apply one source-checked cell-value commit atomically to an OPC package.
-///
-/// Only the selected worksheet part is changed. The complete XLSB workbook is
-/// reparsed before publication, so invalid candidates never escape this
-/// boundary and every untouched part remains owned by the existing lossless
-/// OPC package machinery.
-///
-/// # Errors
-///
-/// Returns an error for a stale patch, a non-worksheet target, or a candidate
-/// that fails complete XLSB workbook validation.
-pub fn apply(package: &mut OpcPackage, worksheet: &PackURI, commit: &Commit) -> Result<Snapshot> {
-    apply_with_external_link_limits(package, worksheet, commit, ExternalLinkLimits::default())
-}
-
-/// Apply one source-checked cell-value commit while validating candidate
-/// workbook reparses with an explicit external-link policy.
-pub fn apply_with_external_link_limits(
-    package: &mut OpcPackage,
-    worksheet: &PackURI,
-    commit: &Commit,
-    external_link_limits: ExternalLinkLimits,
-) -> Result<Snapshot> {
-    apply_with_external_link_limits_and_drawing_policy(
-        package,
-        worksheet,
-        commit,
-        external_link_limits,
-        DrawingLoadPolicy::Eager,
-    )
-}
-
-/// Apply a cell commit while retaining the caller's typed drawing boundary.
-///
-/// Workbook-level publication uses this internal seam so a skipped drawing
-/// projection validates only the selected worksheet dependency closure and
-/// leaves unrelated drawing XML opaque.
-pub(crate) fn apply_with_external_link_limits_and_drawing_policy(
-    package: &mut OpcPackage,
-    worksheet: &PackURI,
-    commit: &Commit,
-    external_link_limits: ExternalLinkLimits,
-    drawing_load_policy: DrawingLoadPolicy,
-) -> Result<Snapshot> {
-    let applied = apply_retaining_parse(
-        package,
-        worksheet,
-        commit,
-        external_link_limits,
-        drawing_load_policy,
-        crate::Leniency::Strict,
-    )?;
-    match applied {
-        Applied::Unchanged(snapshot) => Ok(snapshot),
-        Applied::Published { snapshot, workbook } => {
-            *package = workbook.into_opc_package();
-            Ok(snapshot)
-        },
-    }
 }
 
 /// The outcome of one validated cell-value publication.
@@ -123,11 +38,9 @@ pub(crate) enum Applied {
     /// The patch reproduced the stored worksheet bytes exactly, so there is no
     /// candidate: nothing was cloned, nothing was parsed, and the caller's
     /// package is already the published package.
-    Unchanged(Snapshot),
+    Unchanged,
     /// The patch changed the worksheet and the candidate passed every check.
     Published {
-        /// The published snapshot, identical to the committed one.
-        snapshot: Snapshot,
         /// The validated candidate workbook. Its package carries the updated
         /// worksheet part; a signed source is refused before any candidate is
         /// built. Boxed because a parsed workbook is far larger than a
@@ -161,7 +74,7 @@ pub(crate) fn apply_retaining_parse(
     require_worksheet(part)?;
     let updated = commit.patch().apply(part.blob())?;
     if updated.as_slice() == part.blob() {
-        return Ok(Applied::Unchanged(commit.snapshot().clone()));
+        return Ok(Applied::Unchanged);
     }
     crate::signature_policy::ensure_unsigned(package)?;
 
@@ -182,13 +95,12 @@ pub(crate) fn apply_retaining_parse(
                 .filter(|candidate_uri| candidate_uri == worksheet)
                 .map(|_| index)
         })
-        .ok_or_else(|| {
-            Error::WorksheetNotFound(format!("candidate worksheet part {}", worksheet.as_str()))
-        })?;
+        .ok_or(Error::InvalidFormat(
+            "the candidate worksheet part is missing",
+        ))?;
     let _ = parsed.worksheet(worksheet_index)?;
     validate_dependencies(commit.snapshot(), &parsed)?;
     Ok(Applied::Published {
-        snapshot: commit.snapshot().clone(),
         workbook: Box::new(parsed),
     })
 }
@@ -197,20 +109,16 @@ fn validate_dependencies(snapshot: &Snapshot, workbook: &crate::Workbook) -> Res
     for cell in snapshot.cells() {
         let reference = cell.reference();
         let style = usize::try_from(cell.style().get()).map_err(|_| {
-            Error::InvalidCellReference(format!(
-                "cell ({}, {}) style index does not fit this platform",
-                reference.row(),
-                reference.column()
-            ))
+            Error::InvalidCellReference("cell (, ) style index does not fit this platform")
         })?;
-        let format = workbook.styles().get_cell_format(style).ok_or_else(|| {
-            Error::InvalidCellReference(format!(
-                "cell ({}, {}) references missing style index {style}",
-                reference.row(),
-                reference.column()
-            ))
-        })?;
-        for (resource, index, present) in [
+        let format =
+            workbook
+                .styles()
+                .get_cell_format(style)
+                .ok_or(Error::InvalidCellReference(
+                    "cell (, ) references missing style index",
+                ))?;
+        for (_resource, _index, present) in [
             (
                 "font",
                 format.font_id,
@@ -243,29 +151,25 @@ fn validate_dependencies(snapshot: &Snapshot, workbook: &crate::Workbook) -> Res
             ),
         ] {
             if !present {
-                return Err(Error::InvalidCellReference(format!(
-                    "cell ({}, {}) style {style} references missing {resource} {index}",
-                    reference.row(),
-                    reference.column()
-                )));
+                return Err(Error::InvalidCellReference(
+                    "cell (, ) style references missing",
+                ));
             }
         }
         match cell.value() {
             Value::SharedStringIndex(index) => {
                 let index = usize::try_from(*index).map_err(|_| {
-                    Error::InvalidCellReference(format!(
-                        "cell ({}, {}) shared-string index does not fit this platform",
-                        reference.row(),
-                        reference.column()
-                    ))
+                    Error::InvalidCellReference(
+                        "cell (, ) shared-string index does not fit this platform",
+                    )
                 })?;
-                let string = workbook.shared_strings().get(index).ok_or_else(|| {
-                    Error::InvalidCellReference(format!(
-                        "cell ({}, {}) references missing shared-string index {index}",
-                        reference.row(),
-                        reference.column()
-                    ))
-                })?;
+                let string =
+                    workbook
+                        .shared_strings()
+                        .get(index)
+                        .ok_or(Error::InvalidCellReference(
+                            "cell (, ) references missing shared-string index",
+                        ))?;
                 validate_string_fonts(string, workbook, reference)?;
             },
             Value::RichString(string) => validate_string_fonts(string, workbook, reference)?,
@@ -278,7 +182,7 @@ fn validate_dependencies(snapshot: &Snapshot, workbook: &crate::Workbook) -> Res
 fn validate_string_fonts(
     string: &crate::package::shared_strings::SharedString,
     workbook: &crate::Workbook,
-    reference: super::Reference,
+    _reference: super::Reference,
 ) -> Result<()> {
     for font_id in string
         .runs
@@ -287,11 +191,9 @@ fn validate_string_fonts(
         .chain(string.phonetic.iter().map(|phonetic| phonetic.font_id))
     {
         if workbook.styles().get_font(usize::from(font_id)).is_none() {
-            return Err(Error::InvalidCellReference(format!(
-                "cell ({}, {}) rich string references missing font {font_id}",
-                reference.row(),
-                reference.column()
-            )));
+            return Err(Error::InvalidCellReference(
+                "cell (, ) rich string references missing font",
+            ));
         }
     }
     Ok(())
@@ -302,8 +204,7 @@ fn require_worksheet(part: &dyn Part) -> Result<()> {
         Ok(())
     } else {
         Err(Error::InvalidContentType {
-            expected: WORKSHEET_CONTENT_TYPE.to_string(),
-            got: part.content_type().to_string(),
+            expected: WORKSHEET_CONTENT_TYPE,
         })
     }
 }

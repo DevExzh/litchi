@@ -198,15 +198,12 @@ impl UnknownRecord {
 
     pub(crate) fn new(kind: u16, payload: &[u8]) -> Result<Self> {
         if kind > 0x3fff {
-            return Err(validation::invalid(
-                "unknown scenario record kind",
-                format!("0x{kind:04X}"),
-            ));
+            return Err(validation::invalid("unknown scenario record kind", "0x"));
         }
         if payload.len() > MAX_UNKNOWN_PAYLOAD {
             return Err(validation::invalid(
                 "unknown scenario record",
-                format!("payload exceeds {MAX_UNKNOWN_PAYLOAD} bytes"),
+                "payload exceeds bytes",
             ));
         }
         Ok(Self {
@@ -359,7 +356,7 @@ impl Scenario {
         if self.changed_cells.get(index).is_none() {
             return Err(validation::invalid(
                 "scenario edit",
-                format!("changed-cell index {index} is out of bounds"),
+                "changed-cell index is out of bounds",
             ));
         }
         let previous = std::mem::replace(&mut self.changed_cells[index], cell);
@@ -534,7 +531,7 @@ impl Manager {
         if self.scenarios.get(index).is_none() {
             return Err(validation::invalid(
                 "scenario edit",
-                format!("scenario index {index} is out of bounds"),
+                "scenario index is out of bounds",
             ));
         }
         let previous = std::mem::replace(&mut self.scenarios[index], scenario);

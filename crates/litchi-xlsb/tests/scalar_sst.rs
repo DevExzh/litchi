@@ -10,9 +10,9 @@ use std::io::Cursor;
 
 use litchi_opc::{BlobPart, OpcPackage, PackURI};
 use litchi_xlsb::Package;
+use litchi_xlsb::builder::{self, Builder};
 use litchi_xlsb::cell_values::{Reference, Scalar, Value};
 use litchi_xlsb::raw::{Encoder, Kind, Records, kind};
-use litchi_xlsb::writer::{Builder, MutableWorksheet};
 
 const SHARED_STRINGS_CONTENT_TYPE: &str = "application/vnd.ms-excel.sharedStrings";
 
@@ -25,11 +25,11 @@ fn b1() -> Reference {
 }
 
 fn generated_package() -> Package {
-    let mut first = MutableWorksheet::new("First");
+    let mut first = builder::Worksheet::new("First");
     first.set_cell(0, 0, "drop");
     first.set_cell(0, 1, "keep");
 
-    let mut second = MutableWorksheet::new("Second");
+    let mut second = builder::Worksheet::new("Second");
     second.set_cell(0, 0, "keep");
     second.set_cell(0, 1, "later");
 
@@ -46,11 +46,11 @@ fn generated_package() -> Package {
 }
 
 fn generated_unique_package() -> Package {
-    let mut first = MutableWorksheet::new("First");
+    let mut first = builder::Worksheet::new("First");
     first.set_cell(0, 0, "drop");
     first.set_cell(0, 1, "keep");
 
-    let mut second = MutableWorksheet::new("Second");
+    let mut second = builder::Worksheet::new("Second");
     second.set_cell(0, 0, "later");
 
     let mut writer = Builder::new();
@@ -103,7 +103,7 @@ fn sst_counts(opc: &OpcPackage) -> (u32, u32, usize) {
     let bytes = opc.get_part(&uri).expect("shared-string part").blob();
     let mut counts = None;
     let mut items = 0_usize;
-    for item in Records::new(bytes) {
+    for item in Records::new(bytes, litchi_xlsb::raw::Limits::DEFAULT) {
         let record = item.expect("shared-string record");
         match record.kind() {
             kind::BEGIN_SST => {
@@ -202,6 +202,7 @@ fn scalar_patch_inverse_restores_the_exact_preclosure_package() {
     let changed = commit.package().clone();
     let restored = changed
         .apply_cell_values(&commit.patch().inverse())
+        .map(litchi_xlsb::cell_values::Commit::into_package)
         .expect("inverse patch");
     assert_eq!(restored.to_bytes().expect("restored bytes"), before);
 }
@@ -265,7 +266,7 @@ fn opaque_sst_suffix_survives_entry_compaction() {
     let uri = shared_strings_uri(&opc);
     let mut bytes = opc.get_part(&uri).expect("SST").blob().to_vec();
     let opaque_kind = Kind::new(0x0f00).expect("opaque kind");
-    Encoder::new(&mut bytes)
+    Encoder::new(&mut bytes, litchi_xlsb::raw::Limits::DEFAULT)
         .write_record(opaque_kind, b"opaque-sst-suffix")
         .expect("opaque suffix");
     opc.get_part_mut(&uri).expect("mutable SST").set_blob(bytes);
@@ -286,10 +287,12 @@ fn opaque_sst_suffix_survives_entry_compaction() {
         .expect("SST")
         .blob()
         .to_vec();
-    assert!(Records::new(&bytes).any(|record| {
-        let record = record.expect("opaque record");
-        record.kind() == opaque_kind && record.payload() == b"opaque-sst-suffix"
-    }));
+    assert!(
+        Records::new(&bytes, litchi_xlsb::raw::Limits::DEFAULT).any(|record| {
+            let record = record.expect("opaque record");
+            record.kind() == opaque_kind && record.payload() == b"opaque-sst-suffix"
+        })
+    );
 }
 
 #[test]
@@ -307,14 +310,14 @@ fn unsupported_low_cell_family_is_refused_before_remapping() {
     let mut payload = Vec::from([0_u8; 12]);
     payload[8..12].copy_from_slice(&0_u32.to_le_bytes());
     let mut bytes = Vec::new();
-    for item in Records::new(&source_bytes) {
+    for item in Records::new(&source_bytes, litchi_xlsb::raw::Limits::DEFAULT) {
         let record = item.expect("worksheet record");
         if record.kind() == kind::END_SHEET_DATA {
-            Encoder::new(&mut bytes)
+            Encoder::new(&mut bytes, litchi_xlsb::raw::Limits::DEFAULT)
                 .write_record(opaque_cell_family, &payload)
                 .expect("unsupported cell record");
         }
-        Encoder::new(&mut bytes)
+        Encoder::new(&mut bytes, litchi_xlsb::raw::Limits::DEFAULT)
             .write_record(record.kind(), record.payload())
             .expect("copy worksheet record");
     }
@@ -335,7 +338,7 @@ fn unsupported_low_cell_family_is_refused_before_remapping() {
         .and_then(|_| edit.commit());
     assert!(matches!(
         result,
-        Err(litchi_xlsb::package::PackageError::UnsupportedFeature(_))
+        Err(litchi_xlsb::package::PackageError::Refused(_))
     ));
     assert_eq!(source.to_bytes().expect("source remains"), before);
 }
@@ -356,20 +359,20 @@ fn shared_string_cell_inside_opaque_frt_is_refused() {
     payload[..4].copy_from_slice(&100_u32.to_le_bytes());
     payload[8..12].copy_from_slice(&0_u32.to_le_bytes());
     let mut bytes = Vec::new();
-    for item in Records::new(&source_bytes) {
+    for item in Records::new(&source_bytes, litchi_xlsb::raw::Limits::DEFAULT) {
         let record = item.expect("worksheet record");
         if record.kind() == kind::END_SHEET_DATA {
-            Encoder::new(&mut bytes)
+            Encoder::new(&mut bytes, litchi_xlsb::raw::Limits::DEFAULT)
                 .write_record(kind::FRT_BEGIN, &[0; 4])
                 .expect("FRT begin");
-            Encoder::new(&mut bytes)
+            Encoder::new(&mut bytes, litchi_xlsb::raw::Limits::DEFAULT)
                 .write_record(opaque_cell_family, &payload)
                 .expect("unsupported cell record");
-            Encoder::new(&mut bytes)
+            Encoder::new(&mut bytes, litchi_xlsb::raw::Limits::DEFAULT)
                 .write_record(kind::FRT_END, &[])
                 .expect("FRT end");
         }
-        Encoder::new(&mut bytes)
+        Encoder::new(&mut bytes, litchi_xlsb::raw::Limits::DEFAULT)
             .write_record(record.kind(), record.payload())
             .expect("copy worksheet record");
     }
@@ -392,13 +395,16 @@ fn inconsistent_source_sst_count_is_not_silently_repaired() {
     let mut opc = generated_package().into_opc();
     let uri = shared_strings_uri(&opc);
     let mut output = Vec::new();
-    for item in Records::new(opc.get_part(&uri).expect("SST").blob()) {
+    for item in Records::new(
+        opc.get_part(&uri).expect("SST").blob(),
+        litchi_xlsb::raw::Limits::DEFAULT,
+    ) {
         let record = item.expect("record");
         let mut payload = record.payload().to_vec();
         if record.kind() == kind::BEGIN_SST {
             payload[..4].copy_from_slice(&100_u32.to_le_bytes());
         }
-        Encoder::new(&mut output)
+        Encoder::new(&mut output, litchi_xlsb::raw::Limits::DEFAULT)
             .write_record(record.kind(), &payload)
             .expect("record");
     }

@@ -2890,6 +2890,14 @@
   {
    "record": "0360",
    "reason": "in-progress naming and revision-limit verification receipts only; W4 ABBA measurements and acceptance remain required (record 0360). Remove this entry when its benchmark rows are added."
+  },
+  {
+   "record": "0360c",
+   "reason": "Integration correctness and command-log verification only; no new performance measurement or acceptance."
+  },
+  {
+   "record": "0360d",
+   "reason": "Integration correctness, typed error preservation and command-log verification only; no new performance measurement or acceptance."
   }
  ]
 }

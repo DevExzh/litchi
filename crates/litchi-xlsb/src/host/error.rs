@@ -40,6 +40,8 @@ pub enum Error {
     MergedCell(crate::merged_cells::Error),
     /// Typed hyperlink record error.
     Hyperlink(crate::hyperlinks::Error),
+    /// Typed sparkline record error.
+    Sparkline(crate::sparkline::Error),
     /// Invalid checked cell coordinate supplied by a caller.
     Coordinate(litchi_sheet::CoordinateError),
     /// Invalid checked cell rectangle supplied by a caller.
@@ -60,45 +62,35 @@ pub enum Error {
         /// Found length
         found: usize,
     },
-    /// A format-owned resource exceeded its explicit finite caller limit.
-    LimitExceeded {
-        /// Resource whose caller ceiling was crossed.
-        resource: &'static str,
-        /// Observed or requested amount.
-        actual: usize,
-        /// Configured maximum.
-        maximum: usize,
-    },
     /// End of stream reached unexpectedly
-    UnexpectedEndOfStream(String),
+    UnexpectedEndOfStream(&'static str),
     /// Invalid formula
-    InvalidFormula(String),
+    InvalidFormula(&'static str),
     /// Invalid cell reference
-    InvalidCellReference(String),
-    /// Worksheet not found
-    WorksheetNotFound(String),
+    InvalidCellReference(&'static str),
+    /// No worksheet matches the selector: the zero-based position when the
+    /// selector was positional, `None` for a name (which is not echoed).
+    WorksheetNotFound(Option<usize>),
     /// File not found in ZIP
-    FileNotFound(String),
+    FileNotFound(&'static str),
     /// Unsupported feature
-    UnsupportedFeature(String),
+    UnsupportedFeature(&'static str),
     /// Formula text requires workbook metadata that is missing or ambiguous.
-    UnresolvedDependency(String),
+    UnresolvedDependency(&'static str),
     /// A drawing transfer was refused before any package mutation.
     DrawingTransfer(crate::cell_values::DrawingTransferRefusal),
     /// Encoding error
-    Encoding(String),
+    Encoding(&'static str),
     /// Invalid package or DrawingML structure.
-    InvalidFormat(String),
+    InvalidFormat(&'static str),
     /// Invalid OPC part URI.
-    InvalidUri(String),
+    InvalidUri(&'static str),
     /// Invalid relationship metadata.
-    InvalidRelationship(String),
+    InvalidRelationship(&'static str),
     /// Part content type did not match the XLSB graph contract.
     InvalidContentType {
-        /// Expected content type.
-        expected: String,
-        /// Actual content type.
-        got: String,
+        /// Expected content type; the actual one is not echoed.
+        expected: &'static str,
     },
     /// A bounded host-side operation could not reserve required memory.
     Allocation {
@@ -132,14 +124,14 @@ pub enum Error {
     /// A source-checked Custom Data patch was applied to a different closure.
     PatchConflict {
         /// Human-readable closure name.
-        part: String,
+        part: &'static str,
     },
     /// The package contains a signature/edit policy that forbids this change.
     Signed,
     /// A recognized Custom Data storage still has inbound BIFF12 references.
     CustomDataReferenced {
-        /// Decoded Custom Data UID.
-        id: String,
+        /// Catalog position of the storage.
+        storage: usize,
         /// Number of recognized references.
         connections: usize,
     },
@@ -156,16 +148,19 @@ pub enum Error {
     /// Unrecognized data
     Unrecognized {
         /// Data type
-        typ: String,
+        typ: &'static str,
         /// Value found
-        val: String,
+        val: &'static str,
     },
     /// Workbook is password protected
     PasswordProtected,
-    /// A caller-selected cell-values transaction bound was exceeded.
+    /// A well-formed request this route refuses (record 0351 §2.4),
+    /// classified by its [`litchi_core::edit::RefusalKind`].
+    Refused(litchi_core::edit::Refusal),
+    /// A configured budget was exceeded.
     Limit {
         /// The bounded dimension.
-        kind: crate::cell_values::LimitKind,
+        kind: LimitKind,
         /// The observed (or first refused) amount.
         observed: usize,
         /// The configured maximum.
@@ -176,6 +171,142 @@ pub enum Error {
         /// The refused policy.
         policy: crate::OpenPolicy,
     },
+    /// A configured limit is not valid.
+    InvalidLimit {
+        /// The configured dimension.
+        kind: LimitKind,
+        /// The configured value.
+        value: usize,
+        /// The largest value the dimension admits.
+        maximum: usize,
+    },
+}
+
+/// A bounded dimension of an XLSB package operation.
+///
+/// Each variant wraps the typed `LimitKind` of the family that owns the
+/// bound.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum LimitKind {
+    /// Cell-value and primary workbook transactions
+    /// ([`crate::cell_values::LimitKind`]).
+    CellValues(crate::cell_values::LimitKind),
+    /// Raw OPC edits ([`crate::opc::LimitKind`]).
+    Opc(crate::opc::LimitKind),
+    /// Worksheet binary indexes ([`crate::binary_index::LimitKind`]).
+    BinaryIndex(crate::binary_index::LimitKind),
+    /// The Calculation Chain family ([`crate::calculation_chain::LimitKind`]).
+    CalculationChain(crate::calculation_chain::LimitKind),
+    /// The External Data Connections family ([`crate::package::connections::LimitKind`]).
+    Connections(crate::package::connections::LimitKind),
+    /// The Custom Data family ([`crate::custom_data::LimitKind`]).
+    CustomData(crate::custom_data::LimitKind),
+    /// The Data Model family ([`crate::data_model::LimitKind`]).
+    DataModel(crate::data_model::LimitKind),
+    /// The Theme family ([`crate::theme::LimitKind`]).
+    Theme(crate::theme::LimitKind),
+    /// The Volatile Dependencies family ([`crate::volatile_dependencies::LimitKind`]).
+    VolatileDependencies(crate::volatile_dependencies::LimitKind),
+    /// Source-backed workbook indexing ([`crate::workbook::LimitKind`]).
+    Workbook(crate::workbook::LimitKind),
+}
+
+impl fmt::Display for LimitKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::CellValues(kind) => fmt::Display::fmt(kind, f),
+            Self::Opc(crate::opc::LimitKind::Parts) => f.write_str("changed package parts"),
+            Self::BinaryIndex(kind) => fmt::Display::fmt(kind, f),
+            Self::CalculationChain(kind) => fmt::Display::fmt(kind, f),
+            Self::Connections(kind) => fmt::Display::fmt(kind, f),
+            Self::CustomData(kind) => fmt::Display::fmt(kind, f),
+            Self::DataModel(kind) => fmt::Display::fmt(kind, f),
+            Self::Theme(kind) => fmt::Display::fmt(kind, f),
+            Self::VolatileDependencies(kind) => fmt::Display::fmt(kind, f),
+            Self::Workbook(kind) => fmt::Display::fmt(kind, f),
+        }
+    }
+}
+
+impl From<crate::cell_values::LimitKind> for LimitKind {
+    fn from(kind: crate::cell_values::LimitKind) -> Self {
+        Self::CellValues(kind)
+    }
+}
+
+impl From<crate::binary_index::LimitKind> for LimitKind {
+    fn from(kind: crate::binary_index::LimitKind) -> Self {
+        Self::BinaryIndex(kind)
+    }
+}
+
+impl From<crate::calculation_chain::LimitKind> for LimitKind {
+    fn from(kind: crate::calculation_chain::LimitKind) -> Self {
+        Self::CalculationChain(kind)
+    }
+}
+
+impl From<crate::package::connections::LimitKind> for LimitKind {
+    fn from(kind: crate::package::connections::LimitKind) -> Self {
+        Self::Connections(kind)
+    }
+}
+
+impl From<crate::custom_data::LimitKind> for LimitKind {
+    fn from(kind: crate::custom_data::LimitKind) -> Self {
+        Self::CustomData(kind)
+    }
+}
+
+impl From<crate::data_model::LimitKind> for LimitKind {
+    fn from(kind: crate::data_model::LimitKind) -> Self {
+        Self::DataModel(kind)
+    }
+}
+
+impl From<crate::theme::LimitKind> for LimitKind {
+    fn from(kind: crate::theme::LimitKind) -> Self {
+        Self::Theme(kind)
+    }
+}
+
+impl From<crate::volatile_dependencies::LimitKind> for LimitKind {
+    fn from(kind: crate::volatile_dependencies::LimitKind) -> Self {
+        Self::VolatileDependencies(kind)
+    }
+}
+
+impl From<crate::workbook::LimitKind> for LimitKind {
+    fn from(kind: crate::workbook::LimitKind) -> Self {
+        Self::Workbook(kind)
+    }
+}
+
+impl From<crate::opc::LimitKind> for LimitKind {
+    fn from(kind: crate::opc::LimitKind) -> Self {
+        Self::Opc(kind)
+    }
+}
+
+impl Error {
+    /// A typed budget refusal.
+    pub(crate) fn limit(kind: impl Into<LimitKind>, observed: usize, maximum: usize) -> Self {
+        Self::Limit {
+            kind: kind.into(),
+            observed,
+            maximum,
+        }
+    }
+
+    /// A content-free refusal of a well-formed request.
+    pub(crate) const fn refused(
+        kind: litchi_core::edit::RefusalKind,
+        operation: &'static str,
+        reason: &'static str,
+    ) -> Self {
+        Self::Refused(litchi_core::edit::Refusal::new(kind, operation, reason))
+    }
 }
 
 impl fmt::Display for Error {
@@ -188,6 +319,7 @@ impl fmt::Display for Error {
             Error::Calc(e) => write!(f, "XLSB calculation-property error: {e}"),
             Error::MergedCell(e) => write!(f, "XLSB merged-cell error: {e}"),
             Error::Hyperlink(e) => write!(f, "XLSB hyperlink error: {e}"),
+            Error::Sparkline(e) => write!(f, "XLSB sparkline error: {e}"),
             Error::Coordinate(e) => write!(f, "XLSB coordinate error: {e}"),
             Error::Range(e) => write!(f, "XLSB range error: {e}"),
             Error::InvalidRecordType(rt) => write!(f, "Invalid record type: 0x{:04X}", rt),
@@ -201,14 +333,6 @@ impl fmt::Display for Error {
             Error::InvalidLength { expected, found } => {
                 write!(f, "Invalid length: expected {}, found {}", expected, found)
             },
-            Error::LimitExceeded {
-                resource,
-                actual,
-                maximum,
-            } => write!(
-                f,
-                "{resource} limit exceeded: actual {actual}, maximum {maximum}"
-            ),
             Error::UnexpectedEndOfStream(context) => {
                 write!(f, "Unexpected end of stream: {}", context)
             },
@@ -218,12 +342,11 @@ impl fmt::Display for Error {
             Error::InvalidCellReference(ref_str) => {
                 write!(f, "Invalid cell reference: {}", ref_str)
             },
-            Error::WorksheetNotFound(name) => {
-                write!(f, "Worksheet '{}' not found", name)
+            Error::WorksheetNotFound(Some(position)) => {
+                write!(f, "no worksheet at position {position}")
             },
-            Error::FileNotFound(file) => {
-                write!(f, "File '{}' not found in ZIP", file)
-            },
+            Error::WorksheetNotFound(None) => write!(f, "no worksheet has the requested name"),
+            Error::FileNotFound(part) => write!(f, "the {part} part is missing from the package"),
             Error::UnsupportedFeature(feature) => {
                 write!(f, "Unsupported feature: {}", feature)
             },
@@ -237,8 +360,8 @@ impl fmt::Display for Error {
             Error::InvalidFormat(msg) => write!(f, "Invalid format: {msg}"),
             Error::InvalidUri(uri) => write!(f, "Invalid URI: {uri}"),
             Error::InvalidRelationship(msg) => write!(f, "Invalid relationship: {msg}"),
-            Error::InvalidContentType { expected, got } => {
-                write!(f, "Invalid content type: expected {expected}, got {got}")
+            Error::InvalidContentType { expected } => {
+                write!(f, "a part does not have the content type {expected}")
             },
             Error::Allocation { resource, source } => {
                 write!(f, "allocation failed for {resource}: {source}")
@@ -260,9 +383,12 @@ impl fmt::Display for Error {
             Error::Execution(error) => write!(f, "execution policy error: {error}"),
             Error::PatchConflict { part } => write!(f, "source patch conflict: {part}"),
             Error::Signed => write!(f, "package signature/edit policy forbids this change"),
-            Error::CustomDataReferenced { id, connections } => write!(
+            Error::CustomDataReferenced {
+                storage,
+                connections,
+            } => write!(
                 f,
-                "Custom Data storage '{id}' is referenced by {connections} connection(s)"
+                "Custom Data storage {storage} is referenced by {connections} connection(s)"
             ),
             #[cfg(feature = "vba-inspection")]
             Error::Vba(error) => write!(f, "VBA error: {error}"),
@@ -290,6 +416,15 @@ impl fmt::Display for Error {
             Error::UnsupportedOpenPolicy { policy } => {
                 write!(f, "this XLSB open route does not support {policy}")
             },
+            Error::Refused(refusal) => fmt::Display::fmt(refusal, f),
+            Error::InvalidLimit {
+                kind,
+                value,
+                maximum,
+            } => write!(
+                f,
+                "invalid XLSB {kind} limit {value}: the maximum is {maximum}"
+            ),
         }
     }
 }
@@ -304,6 +439,7 @@ impl std::error::Error for Error {
             Error::Calc(e) => Some(e),
             Error::MergedCell(e) => Some(e),
             Error::Hyperlink(e) => Some(e),
+            Error::Sparkline(e) => Some(e),
             Error::Coordinate(e) => Some(e),
             Error::Range(e) => Some(e),
             Error::DrawingTransfer(refusal) => Some(refusal),
@@ -317,7 +453,6 @@ impl std::error::Error for Error {
             Error::InvalidRecordType(_)
             | Error::UnexpectedRecord { .. }
             | Error::InvalidLength { .. }
-            | Error::LimitExceeded { .. }
             | Error::UnexpectedEndOfStream(_)
             | Error::InvalidFormula(_)
             | Error::InvalidCellReference(_)
@@ -336,6 +471,8 @@ impl std::error::Error for Error {
             | Error::Unrecognized { .. }
             | Error::PasswordProtected
             | Error::Limit { .. }
+            | Error::InvalidLimit { .. }
+            | Error::Refused(_)
             | Error::UnsupportedOpenPolicy { .. } => None,
             Error::PatchConflict { .. } | Error::Signed | Error::CustomDataReferenced { .. } => {
                 None
@@ -357,14 +494,14 @@ impl From<quick_xml::Error> for Error {
 }
 
 impl From<litchi_ooxml_common::XmlError> for Error {
-    fn from(error: litchi_ooxml_common::XmlError) -> Self {
-        Self::Encoding(error.to_string())
+    fn from(_error: litchi_ooxml_common::XmlError) -> Self {
+        Self::Encoding("the text cannot be decoded")
     }
 }
 
 impl From<litchi_ooxml_common::mce::Error> for Error {
-    fn from(error: litchi_ooxml_common::mce::Error) -> Self {
-        Self::Encoding(error.to_string())
+    fn from(_error: litchi_ooxml_common::mce::Error) -> Self {
+        Self::Encoding("the text cannot be decoded")
     }
 }
 
@@ -465,8 +602,8 @@ impl From<crate::conditional_formatting::Error> for Error {
 }
 
 impl From<litchi_core::binary::BinaryError> for Error {
-    fn from(err: litchi_core::binary::BinaryError) -> Self {
-        Error::Encoding(err.to_string())
+    fn from(_err: litchi_core::binary::BinaryError) -> Self {
+        Error::Encoding("the text cannot be decoded")
     }
 }
 
@@ -480,11 +617,15 @@ impl From<litchi_spreadsheet_drawing::Error> for Error {
     fn from(error: litchi_spreadsheet_drawing::Error) -> Self {
         match error {
             litchi_spreadsheet_drawing::Error::Drawing(error) => Self::Drawing(error),
-            litchi_spreadsheet_drawing::Error::Invalid(message) => Self::InvalidFormat(message),
-            litchi_spreadsheet_drawing::Error::Encoding(message) => Self::Encoding(message),
-            other @ (litchi_spreadsheet_drawing::Error::Mce(_)
+            litchi_spreadsheet_drawing::Error::Invalid(_) => {
+                Self::InvalidFormat("the drawing is not valid")
+            },
+            litchi_spreadsheet_drawing::Error::Encoding(_) => {
+                Self::Encoding("the drawing text cannot be decoded")
+            },
+            _other @ (litchi_spreadsheet_drawing::Error::Mce(_)
             | litchi_spreadsheet_drawing::Error::Xml(_)
-            | _) => Self::InvalidFormat(other.to_string()),
+            | _) => Self::InvalidFormat("the package structure is not valid"),
         }
     }
 }
@@ -515,8 +656,8 @@ impl From<litchi_core::ExecutionError> for Error {
 }
 
 impl From<String> for Error {
-    fn from(err: String) -> Self {
-        Error::Encoding(err)
+    fn from(_err: String) -> Self {
+        Error::Encoding("the text cannot be decoded")
     }
 }
 
@@ -560,8 +701,9 @@ impl From<Error> for litchi_core::sheet::Error {
                 RefusalKind::UnsupportedContent,
                 "the XLSB workbook uses an unsupported feature",
             ),
-            Error::LimitExceeded { .. }
-            | Error::Limit { .. }
+            Error::Refused(refusal) => Self::Refused(refusal),
+            Error::Limit { .. }
+            | Error::InvalidLimit { .. }
             | Error::ExternalLinkLimitExceeded { .. }
             | Error::Allocation { .. }
             | Error::CapacityOverflow { .. } => refused(
@@ -583,6 +725,7 @@ impl From<Error> for litchi_core::sheet::Error {
             | Error::Calc(_)
             | Error::MergedCell(_)
             | Error::Hyperlink(_)
+            | Error::Sparkline(_)
             | Error::InvalidRecordType(_)
             | Error::UnexpectedRecord { .. }
             | Error::InvalidLength { .. }

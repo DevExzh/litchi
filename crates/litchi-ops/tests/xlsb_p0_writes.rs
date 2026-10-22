@@ -8,15 +8,15 @@ use std::io::Cursor;
 use litchi_ops::{Code, File, OpenOptions, Props, SourceMode, props};
 
 fn fixture() -> Vec<u8> {
-    use litchi_xlsb::writer::{Builder, MutableWorksheet};
+    use litchi_xlsb::builder::{self, Builder};
 
     let mut builder = Builder::new();
-    let mut data = MutableWorksheet::new("Data");
+    let mut data = builder::Worksheet::new("Data");
     data.set_cell(0, 0, 1.5_f64);
     data.set_cell(1, 0, 2.5_f64);
     data.set_cell(0, 1, "label");
     builder.add_worksheet(data);
-    builder.add_worksheet(MutableWorksheet::new("Other"));
+    builder.add_worksheet(builder::Worksheet::new("Other"));
     let mut output = Cursor::new(Vec::new());
     builder
         .build()

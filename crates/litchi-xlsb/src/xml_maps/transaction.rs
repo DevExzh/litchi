@@ -23,9 +23,13 @@ const SINGLE_CELLS_CONTENT_TYPE: &str = "application/vnd.ms-excel.tableSingleCel
 const SINGLE_CELLS_REL: &str =
     "http://schemas.openxmlformats.org/officeDocument/2006/relationships/tableSingleCells";
 
-/// A validated draft whose commit remains bound to the exact source graph.
+crate::part_edit::limits_options!(super::SemanticLimits, "Custom XML Maps");
+
+/// A staged Custom XML Maps edit of one package, bound to its exact source
+/// graph. Dropping it discards it.
 #[derive(Clone, Debug)]
 pub struct Edit {
+    source: crate::Package,
     before: Snapshot,
     catalog: Option<XmlMapInfo>,
     conformance: XmlMapConformance,
@@ -34,8 +38,9 @@ pub struct Edit {
 }
 
 impl Edit {
-    pub(crate) fn new(before: Snapshot) -> Self {
+    pub(crate) fn new(source: crate::Package, before: Snapshot) -> Self {
         Self {
+            source,
             catalog: before.map_info().cloned(),
             conformance: before.conformance(),
             mapped_tables: before.mapped_tables().to_vec(),
@@ -102,7 +107,7 @@ impl Edit {
             .maps
             .iter_mut()
             .find(|map| map.id == map_id)
-            .ok_or_else(|| invalid(format!("XML map ID {map_id} was not found")))?;
+            .ok_or_else(|| invalid("XML map ID was not"))?;
         if map.name == name {
             return Ok(false);
         }
@@ -140,7 +145,7 @@ impl Edit {
             .maps
             .iter()
             .position(|map| map.id == map_id)
-            .ok_or_else(|| invalid(format!("XML map ID {map_id} was not found")))?;
+            .ok_or_else(|| invalid("XML map ID was not"))?;
         let before = catalog.maps[index].clone();
         if let Err(error) = edit(&mut catalog.maps[index]) {
             catalog.maps[index] = before;
@@ -186,7 +191,7 @@ impl Edit {
         let values = self
             .single_cell_bindings
             .get(sheet_index)
-            .ok_or_else(|| Error::WorksheetNotFound(sheet_index.to_string()))?;
+            .ok_or(Error::WorksheetNotFound(Some(sheet_index)))?;
         let mut values = values.as_ref().cloned().unwrap_or_default();
         if let Some(index) = values
             .iter()
@@ -228,7 +233,7 @@ impl Edit {
         let Some(values) = self
             .single_cell_bindings
             .get(sheet_index)
-            .ok_or_else(|| Error::WorksheetNotFound(sheet_index.to_string()))?
+            .ok_or(Error::WorksheetNotFound(Some(sheet_index)))?
             .as_ref()
         else {
             return Ok(None);
@@ -288,8 +293,7 @@ impl Edit {
             })?;
             columns.push(binding);
         }
-        let replacement =
-            MappedTable::new_with_limits(table_id, columns, self.before.limits().bindings)?;
+        let replacement = MappedTable::bounded(table_id, columns, self.before.limits().bindings)?;
         let source = self.source_table(table_id, column_id)?;
         patch_table_bindings(&source, &replacement, self.before.limits().bindings)?;
         let previous = if let Some(index) = table_index {
@@ -336,7 +340,7 @@ impl Edit {
             .mapped_tables
             .iter()
             .position(|table| table.table_id() == table_id)
-            .ok_or_else(|| invalid(format!("mapped table ID {table_id} was not found")))?;
+            .ok_or_else(|| invalid("mapped table ID was not"))?;
         let mut columns = self.mapped_tables[table_index].columns().to_vec();
         let Some(column_index) = columns
             .iter()
@@ -345,8 +349,7 @@ impl Edit {
             return Ok(None);
         };
         let removed = columns.remove(column_index);
-        let replacement =
-            MappedTable::new_with_limits(table_id, columns, self.before.limits().bindings)?;
+        let replacement = MappedTable::bounded(table_id, columns, self.before.limits().bindings)?;
         let previous = std::mem::replace(&mut self.mapped_tables[table_index], replacement);
         match validate_draft(
             self.catalog.as_ref(),
@@ -365,6 +368,17 @@ impl Edit {
 
     /// Build a reversible source-bound commit without touching a workbook.
     pub fn commit(self) -> Result<Commit> {
+        let source = self.source.clone();
+        let patch = self.plan()?;
+        source.apply_xml_maps(&patch)
+    }
+
+    /// Discard every staged change.
+    pub fn reset(&mut self) {
+        *self = Self::new(self.source.clone(), self.before.clone());
+    }
+
+    fn plan(self) -> Result<Patch> {
         validate_draft(
             self.catalog.as_ref(),
             &self.mapped_tables,
@@ -377,8 +391,7 @@ impl Edit {
             && self.before.mapped_tables() == self.mapped_tables
             && self.before.binding_groups_equal(&self.single_cell_bindings)
         {
-            let patch = Patch::new(self.before.clone(), self.before.clone());
-            return Ok(Commit::new(patch, false));
+            return Ok(Patch::new(self.before.clone(), self.before.clone()));
         }
 
         let mut source = self.before.source().clone();
@@ -406,7 +419,7 @@ impl Edit {
             })
             .map(|part| {
                 parse_xml_map_info(part.bytes(), &self.before.limits().xml_maps)
-                    .map_err(|error| invalid(error.to_string()))
+                    .map_err(|_error| invalid("the Custom XML Maps part is not valid"))
             })
             .transpose()?;
         let projected_conformance = if projected_catalog.is_some() {
@@ -422,8 +435,7 @@ impl Edit {
             self.single_cell_bindings,
             source,
         )?;
-        let patch = Patch::new(self.before, after);
-        Ok(Commit::new(patch, true))
+        Ok(Patch::new(self.before, after))
     }
 
     fn materialize_catalog(&self, source: &mut SourceState) -> Result<()> {
@@ -443,7 +455,7 @@ impl Edit {
                     &self.before.limits().xml_maps,
                 )?;
                 parse_xml_map_info(&xml, &self.before.limits().xml_maps)
-                    .map_err(|error| invalid(error.to_string()))?;
+                    .map_err(|_error| invalid("the Custom XML Maps part is not valid"))?;
                 source.dependencies[index].bytes = Arc::new(xml);
                 let map_name = source.dependencies[index].part_name.clone();
                 if self.before.conformance() != self.conformance {
@@ -529,14 +541,10 @@ impl Edit {
                 continue;
             }
             if host.table_type != crate::package::table::Type::Xml || host.single_cell {
-                return Err(invalid(format!(
-                    "table ID {table_id} is not an ordinary LTXML Table"
-                )));
+                return Err(invalid("table ID is not an ordinary LTXML Table"));
             }
             if !host.columns.iter().any(|column| column.id == column_id) {
-                return Err(invalid(format!(
-                    "column {column_id} is absent from physical table ID {table_id}"
-                )));
+                return Err(invalid("column is absent from physical table ID"));
             }
             let parsed =
                 match super::parse_table_bindings(part.bytes(), self.before.limits().bindings) {
@@ -544,24 +552,17 @@ impl Edit {
                     Err(error) => return Err(error),
                 };
             if parsed.value().table_id() != host.id {
-                return Err(invalid(format!(
-                    "host Table ID {} disagrees with XML binding table ID {}",
-                    host.id,
-                    parsed.value().table_id()
-                )));
+                return Err(invalid("host Table ID disagrees with XML binding table ID"));
             }
             if found.is_some() {
-                return Err(invalid(format!(
-                    "mapped table ID {table_id} is ambiguous across LTXML Table parts"
-                )));
+                return Err(invalid(
+                    "mapped table ID is ambiguous across LTXML Table parts",
+                ));
             }
             found = Some(parsed);
         }
-        found.ok_or_else(|| {
-            invalid(format!(
-                "mapped table ID {table_id} was not found in an existing LTXML Table part"
-            ))
-        })
+        found
+            .ok_or_else(|| invalid("mapped table ID was not found in an existing LTXML Table part"))
     }
 
     fn materialize_tables(&self, source: &mut SourceState) -> Result<()> {
@@ -583,7 +584,10 @@ impl Edit {
             let parsed =
                 match super::parse_table_bindings(part.bytes(), self.before.limits().bindings) {
                     Ok(parsed) => parsed,
-                    Err(Error::Unrecognized { typ, .. }) if typ == "mapped table type" => continue,
+                    Err(Error::Unrecognized {
+                        typ: "mapped table type",
+                        ..
+                    }) => continue,
                     Err(error) => return Err(error),
                 };
             let Some(table) = tables.get(&parsed.value().table_id()).copied() else {
@@ -613,7 +617,9 @@ impl Edit {
                     && relationship.mode == TargetMode::Internal
                 {
                     PackURI::from_rel_ref(worksheet.part_name.base_uri(), &relationship.target)
-                        .map_err(|error| invalid(error))?;
+                        .map_err(|_error| {
+                            invalid("a single-cell relationship target is not a valid part name")
+                        })?;
                 }
             }
         }
@@ -838,16 +844,10 @@ fn validate_draft(
         }
     }
     if total_bindings > limits.max_total_bindings {
-        return Err(invalid(format!(
-            "aggregate XML binding count {total_bindings} exceeds {}",
-            limits.max_total_bindings
-        )));
+        return Err(invalid("aggregate XML binding count exceeds"));
     }
     if total_xpath_units > limits.max_total_xpath_units {
-        return Err(invalid(format!(
-            "aggregate XML binding XPath units {total_xpath_units} exceeds {}",
-            limits.max_total_xpath_units
-        )));
+        return Err(invalid("aggregate XML binding XPath units exceeds"));
     }
 
     let mut map_ids = HashSet::new();
@@ -879,16 +879,10 @@ fn validate_draft(
         .flat_map(|values| values.iter())
     {
         if !map_ids.contains(&binding.map_id()) {
-            return Err(invalid(format!(
-                "single-cell binding references absent XML map ID {}",
-                binding.map_id()
-            )));
+            return Err(invalid("single-cell binding references absent XML map ID"));
         }
         if !table_ids.insert(binding.table_id()) {
-            return Err(invalid(format!(
-                "duplicate XML mapping table ID {}",
-                binding.table_id()
-            )));
+            return Err(invalid("duplicate XML mapping table ID"));
         }
     }
     Ok(())
@@ -951,7 +945,7 @@ fn serialize_catalog(
         conformance,
         &limits.xml_maps,
     )
-    .map_err(|error| invalid(error.to_string()))
+    .map_err(Error::Common)
 }
 
 fn next_relationship_id(relationships: &[SourceRelationship]) -> String {
@@ -967,8 +961,8 @@ fn next_relationship_id(relationships: &[SourceRelationship]) -> String {
     unreachable!("len + 1 guarantees an unused relationship ID")
 }
 
-fn invalid(message: impl Into<String>) -> Error {
-    Error::InvalidFormat(message.into())
+fn invalid(message: &'static str) -> Error {
+    Error::InvalidFormat(message)
 }
 
 #[allow(
@@ -986,17 +980,19 @@ mod transaction_tests {
     fn absent_catalog_conformance_is_an_exact_signed_no_op() {
         let snapshot = Snapshot::empty_transaction_fixture(true);
         let before = snapshot.source().clone();
-        let mut transaction = snapshot.edit();
+        let mut transaction = Edit::new(
+            crate::Package::from(litchi_opc::OpcPackage::new()),
+            snapshot,
+        );
         assert!(
             !transaction
                 .set_conformance(XmlMapConformance::Strict)
                 .expect("absent catalog conformance is inert")
         );
-        let commit = transaction.commit().expect("commit no-op");
-        assert!(!commit.changed());
-        assert!(commit.patch().is_empty());
-        assert_eq!(commit.patch().before().source(), &before);
-        assert_eq!(commit.patch().after().source(), &before);
+        let patch = transaction.plan().expect("plan no-op");
+        assert!(patch.is_noop());
+        assert_eq!(patch.before().source(), &before);
+        assert_eq!(patch.after().source(), &before);
     }
 
     #[test]
@@ -1123,6 +1119,7 @@ mod transaction_tests {
         )
         .expect("binding");
         let mut transaction = Edit {
+            source: crate::Package::from(litchi_opc::OpcPackage::new()),
             before,
             catalog: Some(fixture_catalog()),
             conformance: XmlMapConformance::Transitional,
@@ -1155,7 +1152,10 @@ mod transaction_tests {
     fn additive_binding_refuses_a_non_xml_table_without_mutating_the_draft() {
         let snapshot = Snapshot::non_xml_table_transaction_fixture();
         let source = snapshot.source().clone();
-        let mut transaction = snapshot.edit();
+        let mut transaction = Edit::new(
+            crate::Package::from(litchi_opc::OpcPackage::new()),
+            snapshot,
+        );
         let binding = ColumnBinding::new(
             1,
             7,

@@ -5,20 +5,20 @@
 )]
 
 //! Changed publications refuse a signed workbook (ADR 0006; unified-ops
-//! record 0013). Removing a signature is explicit (`Workbook::unsign`, or
-//! `OpcPackage::unsign` inside `edit_opc`); an exact no-op keeps the source
-//! bytes, signature included.
+//! record 0013). Removing a signature is explicit (`Package::unsign`, or
+//! `OpcPackage::unsign` inside an `edit_opc` update); an exact no-op keeps
+//! the source bytes, signature included.
 
 use litchi_core::sheet::WorkbookTrait as _;
 use std::io::Cursor;
 use std::path::PathBuf;
 
 use litchi_opc::{BlobPart, OpcError, OpcPackage, PackURI, PackageWriter, Part as _, TargetMode};
+use litchi_xlsb::Package;
 use litchi_xlsb::cell_values::{Reference, StyleIndex, Value};
 use litchi_xlsb::cell_watches::Watch;
 use litchi_xlsb::merged_cells::MergedCell;
 use litchi_xlsb::package::PackageError;
-use litchi_xlsb::{Package, Workbook};
 
 fn fixture(name: &str) -> Vec<u8> {
     std::fs::read(
@@ -108,19 +108,16 @@ fn signed(plain: &[u8]) -> Vec<u8> {
     bytes
 }
 
-fn signed_workbook() -> (Vec<u8>, Workbook) {
+fn signed_package() -> (Vec<u8>, Package) {
     let bytes = signed(&fixture("Simple.xlsb"));
-    let workbook = Package::from_bytes(&bytes)
-        .unwrap()
-        .into_workbook()
-        .unwrap();
-    assert!(workbook.is_signed());
-    (bytes, workbook)
+    let package = Package::from_bytes(&bytes).unwrap();
+    assert!(package.is_signed());
+    (bytes, package)
 }
 
-fn save(workbook: &Workbook) -> Vec<u8> {
+fn save(package: &Package) -> Vec<u8> {
     let mut output = Cursor::new(Vec::new());
-    workbook.to_package().write_to(&mut output).unwrap();
+    package.write_to(&mut output).unwrap();
     output.into_inner()
 }
 
@@ -154,9 +151,8 @@ fn assert_signed_refusal(error: &PackageError) {
 
 #[test]
 fn changed_cell_values_on_a_signed_workbook_are_refused() {
-    let (bytes, workbook) = signed_workbook();
-    let package = workbook.to_package();
-    let name = workbook.worksheet_names()[0].clone();
+    let (bytes, package) = signed_package();
+    let name = package.workbook().unwrap().worksheet_names()[0].clone();
     let mut edit = package
         .edit_cell_values(name)
         .unwrap()
@@ -165,32 +161,29 @@ fn changed_cell_values_on_a_signed_workbook_are_refused() {
     edit.insert(reference, style, value).unwrap();
     let error = edit.commit().unwrap_err();
     assert!(matches!(error, PackageError::Signed), "{error:?}");
-    // Nothing was published: the workbook still saves its signed source.
-    assert!(workbook.is_signed());
-    assert_eq!(save(&workbook), bytes);
+    // Nothing was published: the package still saves its signed source.
+    assert!(package.is_signed());
+    assert_eq!(save(&package), bytes);
 }
 
 #[test]
 fn exact_noop_cell_values_keep_the_signature_bytes() {
-    let (bytes, mut workbook) = signed_workbook();
-    let package = workbook.to_package();
-    let name = workbook.worksheet_names()[0].clone();
+    let (bytes, package) = signed_package();
+    let name = package.workbook().unwrap().worksheet_names()[0].clone();
     let edit = package
         .edit_cell_values(name)
         .unwrap()
         .expect("worksheet selector");
     let commit = edit.commit().unwrap();
     assert!(commit.patch().is_noop());
-    workbook = commit.into_package().into_workbook().unwrap();
-    assert_eq!(save(&workbook), bytes);
+    assert_eq!(save(commit.package()), bytes);
 }
 
 #[test]
 fn explicit_unsign_authorizes_a_changed_edit() {
-    let (_, mut workbook) = signed_workbook();
-    workbook.unsign();
-    let package = workbook.to_package();
-    let name = workbook.worksheet_names()[0].clone();
+    let (_, signed) = signed_package();
+    let package = signed.unsign();
+    let name = package.workbook().unwrap().worksheet_names()[0].clone();
     let mut edit = package
         .edit_cell_values(name)
         .unwrap()
@@ -198,42 +191,31 @@ fn explicit_unsign_authorizes_a_changed_edit() {
     let (reference, style, value) = new_cell();
     edit.insert(reference, style, value).unwrap();
     let commit = edit.commit().unwrap();
-    workbook = commit.into_package().into_workbook().unwrap();
-    let output = save(&workbook);
+    let output = save(commit.package());
     assert!(!carries_signature(&output));
-    let reopened = Package::from_bytes(&output)
-        .unwrap()
-        .into_workbook()
-        .unwrap();
-    let cell = reopened.cell_values(0).unwrap();
+    let reopened = Package::from_bytes(&output).unwrap();
+    let cell = reopened.workbook().unwrap().cell_values(0).unwrap();
     assert!(cell.cell(reference).unwrap().is_some());
 }
 
 #[test]
 fn workbook_structure_changes_are_refused_and_noops_kept() {
-    use litchi_core::sheet::traits::WorkbookTrait as _;
-
-    let (bytes, mut workbook) = signed_workbook();
-    let mut edit = workbook.to_package().edit().unwrap();
+    let (bytes, package) = signed_package();
+    let mut edit = package.edit().unwrap();
     edit.set_sheet_name(0, "Renamed".to_owned())
         .unwrap()
         .expect("resolved worksheet selector");
     let error = edit.commit().unwrap_err();
     assert!(matches!(error, PackageError::Signed), "{error:?}");
 
-    let commit = workbook.to_package().edit().unwrap().commit().unwrap();
+    let commit = package.edit().unwrap().commit().unwrap();
     assert!(!commit.diagnostics().changed());
     assert!(commit.patch().is_noop());
-    workbook = workbook
-        .to_package()
-        .apply(commit.patch())
-        .unwrap()
-        .into_workbook()
-        .unwrap();
-    assert_eq!(save(&workbook), bytes);
+    let replayed = package.apply(commit.patch()).unwrap();
+    assert_eq!(save(replayed.package()), bytes);
 
-    let name = workbook.worksheet_names()[0].clone();
-    let mut same_name = workbook.to_package().edit().unwrap();
+    let name = package.workbook().unwrap().worksheet_names()[0].clone();
+    let mut same_name = package.edit().unwrap();
     same_name
         .set_sheet_name(0, name)
         .unwrap()
@@ -242,59 +224,53 @@ fn workbook_structure_changes_are_refused_and_noops_kept() {
     assert!(!same_name_commit.diagnostics().changed());
     assert!(same_name_commit.patch().is_noop());
     assert_eq!(same_name_commit.patch().operation_count(), 1);
-    workbook = workbook
-        .to_package()
-        .apply(same_name_commit.patch())
-        .unwrap()
-        .into_workbook()
-        .unwrap();
-    assert!(workbook.is_signed());
-    assert_eq!(save(&workbook), bytes);
+    let replayed = package.apply(same_name_commit.patch()).unwrap();
+    assert!(replayed.package().is_signed());
+    assert_eq!(save(replayed.package()), bytes);
 }
 
 #[test]
 fn cell_watch_changes_are_refused() {
-    let (bytes, mut workbook) = signed_workbook();
-    let mut edit = workbook.edit_cell_watches(0).unwrap();
-    edit.add(Watch::new(3, 5).unwrap()).unwrap();
-    let commit = edit.commit().unwrap();
-    let error = workbook.apply_cell_watches(0, &commit).unwrap_err();
+    let (bytes, package) = signed_package();
+    let mut edit = package.edit_cell_watches().unwrap();
+    let staged = edit.add(0, Watch::new(3, 5).unwrap());
+    let error = staged.and_then(|()| edit.commit().map(|_| ())).unwrap_err();
     assert!(matches!(error, PackageError::Signed), "{error:?}");
-    assert_eq!(save(&workbook), bytes);
+    assert_eq!(save(&package), bytes);
 }
 
 #[test]
 fn raw_opc_edits_keep_the_signature_policy() {
-    let (bytes, mut workbook) = signed_workbook();
-    // A closure that changes nothing keeps the signature byte for byte;
-    // `edit_opc` used to drop it unconditionally.
-    workbook.edit_opc(|_| Ok(())).unwrap();
-    assert_eq!(save(&workbook), bytes);
+    let (bytes, package) = signed_package();
+    // An operation that changes nothing keeps the signature byte for byte.
+    let mut edit = package.edit_opc().unwrap();
+    edit.update(|_| Ok(())).unwrap();
+    assert_eq!(save(edit.commit().unwrap().package()), bytes);
 
-    // Typed setters that publish through `edit_opc` refuse a change.
-    let error = workbook
+    // Typed families refuse a change.
+    let mut merged = package.edit_merged_cells().unwrap();
+    let error = merged
         .set_merged_cell_ranges(0, &[MergedCell::new(20, 21, 0, 1)])
+        .and_then(|_| merged.commit().map(|_| ()))
         .unwrap_err();
     assert_signed_refusal(&error);
-    let error = workbook.set_slicer_caches(Vec::new()).unwrap_err();
-    assert_signed_refusal(&error);
-    assert_eq!(save(&workbook), bytes);
+    assert_eq!(save(&package), bytes);
 
-    // Removing the signature inside the closure is an explicit disposition.
+    // Removing the signature inside the update is an explicit disposition.
     let uri = PackURI::new("/docProps/litchi-probe.xml").unwrap();
-    workbook
-        .edit_opc(|package| {
-            package.unsign();
-            package
-                .try_add_part(Box::new(BlobPart::new(
-                    uri.clone(),
-                    "application/xml".to_owned(),
-                    b"<probe/>".to_vec(),
-                )))
-                .map_err(PackageError::from)
-        })
-        .unwrap();
-    assert!(!carries_signature(&save(&workbook)));
+    let mut edit = package.edit_opc().unwrap();
+    edit.update(|package| {
+        package.unsign();
+        package
+            .try_add_part(Box::new(BlobPart::new(
+                uri.clone(),
+                "application/xml".to_owned(),
+                b"<probe/>".to_vec(),
+            )))
+            .map_err(PackageError::from)
+    })
+    .unwrap();
+    assert!(!carries_signature(&save(edit.commit().unwrap().package())));
 }
 
 #[test]
@@ -302,51 +278,50 @@ fn connections_refuse_a_signed_workbook() {
     use litchi_xlsb::package::connections::{
         CommandType, Connection, Connections, DbProperties, Properties, SourceType,
     };
-    let (bytes, mut workbook) = signed_workbook();
-    let error = workbook
-        .set_connections(Connections {
-            connections: vec![Connection {
-                connection_id: 42,
-                source_type: SourceType::Odbc,
-                name: "Sales".to_owned(),
-                properties: Properties::Database(DbProperties {
-                    command_type: CommandType::Sql,
-                    connection_string: "Driver={Generated};Server=example.invalid".to_owned(),
-                    command: Some("SELECT 1".to_owned()),
-                    server_command: None,
-                }),
-                ..Connection::default()
-            }],
-        })
-        .unwrap_err();
+    let (bytes, package) = signed_package();
+    let mut edit = package.edit_connections().unwrap();
+    edit.replace(Some(Connections {
+        connections: vec![Connection {
+            connection_id: 42,
+            source_type: SourceType::Odbc,
+            name: "Sales".to_owned(),
+            properties: Properties::Database(DbProperties {
+                command_type: CommandType::Sql,
+                connection_string: "Driver={Generated};Server=example.invalid".to_owned(),
+                command: Some("SELECT 1".to_owned()),
+                server_command: None,
+            }),
+            ..Connection::default()
+        }],
+    }))
+    .unwrap();
+    let error = edit.commit().unwrap_err();
     assert!(matches!(error, PackageError::Signed), "{error:?}");
-    assert!(!workbook.remove_connections().unwrap());
-    assert_eq!(save(&workbook), bytes);
+    let mut edit = package.edit_connections().unwrap();
+    assert!(!edit.replace(None).unwrap());
+    assert_eq!(save(edit.commit().unwrap().package()), bytes);
 }
 
 #[test]
-fn raw_threaded_comment_stores_refuse_a_signed_package() {
-    let bytes = signed(&fixture("Simple.xlsb"));
-    // Owned ingress retains the exact source, so an unchanged signed package
-    // republishes it.
-    let mut package = OpcPackage::from_reader(Cursor::new(bytes.clone())).unwrap();
-    let worksheet = PackURI::new("/xl/worksheets/sheet1.bin").unwrap();
-    let error = litchi_xlsb::comments::threaded::store_on_worksheet(
-        &mut package,
-        &worksheet,
-        &litchi_xlsb::comments::threaded::Comments::default(),
+fn threaded_comment_edits_refuse_a_signed_package() {
+    let (bytes, package) = signed_package();
+    let mut edit = package.edit_threaded_comments().unwrap();
+    edit.set_worksheet(
+        "/xl/worksheets/sheet1.bin",
+        litchi_xlsb::comments::threaded::Comments::default(),
     )
-    .unwrap_err();
+    .unwrap();
+    let error = edit.commit().unwrap_err();
     assert!(matches!(error, PackageError::Signed), "{error:?}");
-    // Removing an absent graph changes nothing and is not refused.
-    assert!(!litchi_xlsb::comments::threaded::remove_graph(&mut package).unwrap());
-    assert_eq!(PackageWriter::to_bytes(&package).unwrap(), bytes);
+    // Clearing an absent graph changes nothing and is not refused.
+    let mut edit = package.edit_threaded_comments().unwrap();
+    assert!(!edit.clear());
+    assert_eq!(save(edit.commit().unwrap().package()), bytes);
 }
 
 /// Follow-up F2 of record 0013: task panes and the Ribbon refuse a change to a
-/// signed workbook up front, with the typed signed error. Task panes used to
-/// refuse with the shared OOXML owner's `SignedSourceRequiresExplicitPolicy`
-/// wrapped as `PackageError::Common`; the Ribbon used to remove the signature.
+/// signed workbook with the typed signed error; the Ribbon used to remove the
+/// signature.
 mod task_panes_and_ribbon {
     use super::*;
     use litchi_ooxml_common::ribbon::{Family, Version};
@@ -369,19 +344,42 @@ mod task_panes_and_ribbon {
     }
 
     /// `Simple.xlsb` edited by `edit` while unsigned, then signed.
-    fn signed_workbook_with(edit: impl FnOnce(&mut Workbook)) -> (Vec<u8>, Workbook) {
-        let mut plain = Package::from_bytes(&fixture("Simple.xlsb"))
-            .unwrap()
-            .into_workbook()
-            .unwrap();
-        edit(&mut plain);
-        let bytes = signed(&save(&plain));
-        let workbook = Package::from_bytes(&bytes)
-            .unwrap()
-            .into_workbook()
-            .unwrap();
-        assert!(workbook.is_signed());
-        (bytes, workbook)
+    fn signed_package_with(edit: impl FnOnce(&Package) -> Package) -> (Vec<u8>, Package) {
+        let plain = Package::from_bytes(&fixture("Simple.xlsb")).unwrap();
+        let bytes = signed(&save(&edit(&plain)));
+        let package = Package::from_bytes(&bytes).unwrap();
+        assert!(package.is_signed());
+        (bytes, package)
+    }
+
+    fn put_panes(package: &Package, id: &str) -> litchi_xlsb::package::PackageResult<Package> {
+        let mut edit = package.edit_task_panes_with_options(
+            litchi_xlsb::task_panes::EditOptions::default()
+                .conformance(web::Conformance::Transitional),
+        )?;
+        edit.replace(panes(id))?;
+        Ok(edit.commit()?.into_package())
+    }
+
+    fn clear_panes(package: &Package) -> litchi_xlsb::package::PackageResult<(bool, Package)> {
+        let mut edit = package.edit_task_panes()?;
+        let removed = edit.clear()?;
+        Ok((removed, edit.commit()?.into_package()))
+    }
+
+    fn put_ribbon(package: &Package, xml: &[u8]) -> litchi_xlsb::package::PackageResult<Package> {
+        let mut edit = package.edit_ribbon()?;
+        edit.put(Version::V2007, xml.to_vec())?;
+        Ok(edit.commit()?.into_package())
+    }
+
+    fn remove_ribbon(
+        package: &Package,
+        family: Family,
+    ) -> litchi_xlsb::package::PackageResult<(bool, Package)> {
+        let mut edit = package.edit_ribbon()?;
+        let removed = edit.remove(family)?;
+        Ok((removed, edit.commit()?.into_package()))
     }
 
     #[track_caller]
@@ -392,69 +390,52 @@ mod task_panes_and_ribbon {
 
     #[test]
     fn task_pane_changes_are_refused_up_front_and_noops_kept() {
-        let (bytes, mut workbook) = signed_workbook();
-        assert_signed(workbook.put_task_panes(panes("add-in-1"), web::Conformance::Transitional));
-        assert!(!workbook.remove_task_panes().unwrap());
-        assert_eq!(save(&workbook), bytes);
+        let (bytes, package) = signed_package();
+        assert_signed(put_panes(&package, "add-in-1"));
+        let (removed, same) = clear_panes(&package).unwrap();
+        assert!(!removed);
+        assert_eq!(save(&same), bytes);
 
-        let (bytes, mut workbook) = signed_workbook_with(|plain| {
-            plain
-                .put_task_panes(panes("add-in-1"), web::Conformance::Transitional)
-                .unwrap();
-        });
+        let (bytes, package) = signed_package_with(|plain| put_panes(plain, "add-in-1").unwrap());
         // Equal panes publish nothing.
-        workbook
-            .put_task_panes(panes("add-in-1"), web::Conformance::Transitional)
-            .unwrap();
-        assert_eq!(save(&workbook), bytes);
-        assert_signed(workbook.put_task_panes(panes("add-in-2"), web::Conformance::Transitional));
-        assert_signed(workbook.remove_task_panes());
-        assert!(workbook.is_signed());
-        assert_eq!(save(&workbook), bytes);
+        assert_eq!(save(&put_panes(&package, "add-in-1").unwrap()), bytes);
+        assert_signed(put_panes(&package, "add-in-2"));
+        assert_signed(clear_panes(&package));
+        assert!(package.is_signed());
+        assert_eq!(save(&package), bytes);
 
-        workbook.unsign();
-        assert!(workbook.remove_task_panes().unwrap());
-        let output = save(&workbook);
+        let (removed, unsigned) = clear_panes(&package.unsign()).unwrap();
+        assert!(removed);
+        let output = save(&unsigned);
         assert!(!carries_signature(&output));
-        let reopened = Package::from_bytes(&output)
-            .unwrap()
-            .into_workbook()
-            .unwrap();
+        let reopened = Package::from_bytes(&output).unwrap();
         assert!(reopened.task_panes().unwrap().is_none());
     }
 
     #[test]
     fn ribbon_changes_are_refused_up_front_and_noops_kept() {
-        let (bytes, mut workbook) = signed_workbook();
-        assert_signed(workbook.put_ribbon(Version::V2007, UI_2007.to_vec()));
-        assert!(!workbook.remove_ribbon(Family::Legacy).unwrap());
-        assert_eq!(save(&workbook), bytes);
+        let (bytes, package) = signed_package();
+        assert_signed(put_ribbon(&package, UI_2007));
+        let (removed, same) = remove_ribbon(&package, Family::Legacy).unwrap();
+        assert!(!removed);
+        assert_eq!(save(&same), bytes);
 
-        let (bytes, mut workbook) = signed_workbook_with(|plain| {
-            plain.put_ribbon(Version::V2007, UI_2007.to_vec()).unwrap();
-        });
+        let (bytes, package) = signed_package_with(|plain| put_ribbon(plain, UI_2007).unwrap());
         // The stored version and bytes publish nothing; an absent family is
         // not removed.
-        workbook
-            .put_ribbon(Version::V2007, UI_2007.to_vec())
-            .unwrap();
-        assert!(!workbook.remove_ribbon(Family::Modern).unwrap());
-        assert_eq!(save(&workbook), bytes);
-        assert_signed(workbook.put_ribbon(Version::V2007, UI_2007_CHANGED.to_vec()));
-        assert_signed(workbook.remove_ribbon(Family::Legacy));
-        assert!(workbook.is_signed());
-        assert_eq!(save(&workbook), bytes);
+        assert_eq!(save(&put_ribbon(&package, UI_2007).unwrap()), bytes);
+        let (removed, same) = remove_ribbon(&package, Family::Modern).unwrap();
+        assert!(!removed);
+        assert_eq!(save(&same), bytes);
+        assert_signed(put_ribbon(&package, UI_2007_CHANGED));
+        assert_signed(remove_ribbon(&package, Family::Legacy));
+        assert!(package.is_signed());
+        assert_eq!(save(&package), bytes);
 
-        workbook.unsign();
-        workbook
-            .put_ribbon(Version::V2007, UI_2007_CHANGED.to_vec())
-            .unwrap();
-        let output = save(&workbook);
+        let unsigned = put_ribbon(&package.unsign(), UI_2007_CHANGED).unwrap();
+        let output = save(&unsigned);
         assert!(!carries_signature(&output));
-        let reopened = Package::from_bytes(&output)
-            .unwrap()
-            .into_workbook()
-            .unwrap();
+        let reopened = Package::from_bytes(&output).unwrap();
         assert_eq!(
             reopened.ribbon().unwrap().legacy().unwrap().xml(),
             UI_2007_CHANGED
@@ -463,12 +444,12 @@ mod task_panes_and_ribbon {
 }
 
 #[test]
-fn consuming_workbook_into_package_preserves_signed_source() {
-    let (bytes, workbook) = signed_workbook();
-    let package = workbook.into_package();
-    assert!(package.opc_package().is_signed());
-    assert_eq!(package.to_bytes().unwrap(), bytes);
-    assert_eq!(save(&package.into_workbook().unwrap()), bytes);
+fn workbook_projection_round_trip_preserves_signed_source() {
+    let (bytes, package) = signed_package();
+    let adopted = package.workbook().unwrap().to_package();
+    assert!(adopted.opc_package().is_signed());
+    assert_eq!(adopted.to_bytes().unwrap(), bytes);
+    assert_eq!(save(&adopted), bytes);
 }
 
 #[test]

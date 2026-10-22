@@ -18,7 +18,7 @@ pub(super) fn parse(data: &[u8]) -> Result<Hyperlink> {
         });
     }
 
-    let mut cursor = Cursor::new(data, "BrtHLink");
+    let mut cursor = Cursor::new(data, "BrtHLink", crate::raw::Limits::DEFAULT);
     let row_first = cursor.read_u32()?;
     let row_last = cursor.read_u32()?;
     let col_first = cursor.read_u32()?;
@@ -44,7 +44,7 @@ pub(super) fn parse(data: &[u8]) -> Result<Hyperlink> {
 
 /// Serialize one `BrtHLink` payload with checked raw-kernel limits.
 pub(super) fn serialize(value: &Hyperlink) -> Result<Vec<u8>> {
-    let mut writer = Encoder::new(Vec::new());
+    let mut writer = Encoder::new(Vec::new(), crate::raw::Limits::DEFAULT);
     writer.write_u32(value.row_first)?;
     writer.write_u32(value.row_last)?;
     writer.write_u32(value.col_first)?;

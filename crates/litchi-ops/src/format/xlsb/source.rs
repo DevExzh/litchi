@@ -155,7 +155,7 @@ impl SourceWorkbook {
             .active_worksheet_ordinal
             .ok_or_else(|| {
                 Error::from(xlsb::package::PackageError::UnsupportedFeature(
-                    "XLSB active sheet is not a worksheet".to_string(),
+                    "XLSB active sheet is not a worksheet",
                 ))
             })
             .and_then(|index| self.worksheet_current(index));

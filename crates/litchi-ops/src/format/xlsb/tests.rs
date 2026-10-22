@@ -268,8 +268,8 @@ fn workbook_trait_surface_matches_across_owner_states() {
 // --- Builder-built workbooks (xlsb_facade.rs) -----------------------------
 
 fn mixed_chart_tabs() -> Vec<u8> {
+    use xlsb::builder::{self, Builder};
     use xlsb::chart::{Anchor, Chart};
-    use xlsb::writer::{Builder, MutableChartSheet, MutableWorksheet};
 
     let chart = Chart::bar_chart_with_cache(
         "Sales",
@@ -280,14 +280,14 @@ fn mixed_chart_tabs() -> Vec<u8> {
         Anchor::new(0, 0, 10, 20),
     )
     .unwrap();
-    let mut data = MutableWorksheet::new("Data");
+    let mut data = builder::Worksheet::new("Data");
     data.set_cell(0, 0, "DATA");
-    let mut tail = MutableWorksheet::new("Tail");
+    let mut tail = builder::Worksheet::new("Tail");
     tail.set_cell(0, 0, "TAIL");
     let mut writer = Builder::new();
     writer.add_worksheet(data);
     writer
-        .add_chart_sheet(MutableChartSheet::new("Sales Chart", chart))
+        .add_chart_sheet(builder::ChartSheet::new("Sales Chart", chart))
         .unwrap();
     writer.add_worksheet(tail);
     let mut output = Cursor::new(Vec::new());
@@ -305,8 +305,8 @@ fn rewrite_active_book_view(bytes: &[u8], active_catalog_position: u32) -> Vec<u
     let original = package.get_part(&workbook_uri).unwrap().blob().to_vec();
     let mut rewritten = Vec::new();
     {
-        let mut writer = xlsb::raw::Encoder::new(&mut rewritten);
-        for record in xlsb::raw::Records::new(&original) {
+        let mut writer = xlsb::raw::Encoder::new(&mut rewritten, xlsb::raw::Limits::DEFAULT);
+        for record in xlsb::raw::Records::new(&original, xlsb::raw::Limits::DEFAULT) {
             let record = record.unwrap();
             let mut payload = record.payload().to_vec();
             if record.kind() == xlsb::raw::kind::BOOK_VIEW {
@@ -573,11 +573,10 @@ fn source_handles_materialize_the_eager_editor_from_the_same_package() {
     let editor = handle.editor().expect("materialize the eager editor");
     assert!(matches!(editor, XlsbEditor::Materialized(_)));
     assert_eq!(
-        WorkbookTrait::worksheet_names(&*editor),
+        WorkbookTrait::worksheet_names(editor.workbook().unwrap()),
         ["Sheet1", "Sheet2", "Sheet3"]
     );
     editor
-        .to_package()
         .edit_cell_values(0)
         .expect("eager cell-value edit")
         .expect("worksheet selector resolves");
@@ -588,7 +587,6 @@ fn source_handles_materialize_the_eager_editor_from_the_same_package() {
     let editor = eager.editor().unwrap();
     assert!(matches!(editor, XlsbEditor::Eager(_)));
     editor
-        .to_package()
         .edit_cell_values(0)
         .expect("eager cell-value edit")
         .expect("worksheet selector resolves");
@@ -651,7 +649,7 @@ impl ReadAt for Versioned {
 /// Observations of `selector`'s second full run over a generated `Data`
 /// sheet of `rows` numbers (1, 2, ...), and its match count.
 fn observed_query(rows: u32, selector: &str) -> (usize, usize) {
-    let mut sheet = xlsb::writer::MutableWorksheet::new("Data");
+    let mut sheet = xlsb::builder::Worksheet::new("Data");
     for row in 0..rows {
         sheet.set_cell(row, 0, f64::from(row + 1));
     }

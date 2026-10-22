@@ -66,8 +66,7 @@ pub(crate) fn discover_graph_with_probe(
     let part = package.get_part(&part_name)?;
     if part.content_type() != CONTENT_TYPE {
         return Err(Error::InvalidContentType {
-            expected: CONTENT_TYPE.to_string(),
-            got: part.content_type().to_string(),
+            expected: CONTENT_TYPE,
         });
     }
     if !part.rels().is_empty() {
@@ -117,11 +116,11 @@ pub(crate) fn preflight_metadata(package: &OpcPackage, limits: SemanticLimits) -
     let opc_limits = litchi_opc::SourceLimits::default();
     let part_count = package.part_count();
     if part_count > limits.max_graph_parts {
-        return Err(Error::LimitExceeded {
-            resource: "Calculation Chain graph parts",
-            actual: part_count,
-            maximum: limits.max_graph_parts,
-        });
+        return Err(Error::limit(
+            crate::calculation_chain::LimitKind::GraphParts,
+            part_count,
+            limits.max_graph_parts,
+        ));
     }
 
     let mut relationship_count = 0usize;
@@ -228,11 +227,11 @@ fn preflight_relationship(
             resource: "Calculation Chain relationships",
         })?;
     if *relationship_count > limits.max_relationships {
-        return Err(Error::LimitExceeded {
-            resource: "Calculation Chain relationships",
-            actual: *relationship_count,
-            maximum: limits.max_relationships,
-        });
+        return Err(Error::limit(
+            crate::calculation_chain::LimitKind::Relationships,
+            *relationship_count,
+            limits.max_relationships,
+        ));
     }
 
     preflight_xml_attribute(
@@ -407,10 +406,9 @@ fn scan_relationship_graph(
             if relationship.reltype() == RELATIONSHIP_TYPE
                 && !source.partname().is_equivalent_to(workbook_name)
             {
-                return Err(invalid(format!(
-                    "Calculation Chain relationship on unexpected source part '{}'",
-                    source.partname().as_str()
-                )));
+                return Err(invalid(
+                    "Calculation Chain relationship on unexpected source part",
+                ));
             }
             if let Some(target) = target {
                 if relationship.target_mode() == TargetMode::Internal
@@ -435,11 +433,11 @@ fn checked_relationship_count(current: usize, limits: SemanticLimits) -> Result<
         resource: "Calculation Chain relationships",
     })?;
     if actual > limits.max_relationships {
-        return Err(Error::LimitExceeded {
-            resource: "Calculation Chain relationships",
+        return Err(Error::limit(
+            crate::calculation_chain::LimitKind::Relationships,
             actual,
-            maximum: limits.max_relationships,
-        });
+            limits.max_relationships,
+        ));
     }
     Ok(actual)
 }
@@ -449,15 +447,15 @@ fn checked_graph_part_count(current: usize, limits: SemanticLimits) -> Result<us
         resource: "Calculation Chain graph parts",
     })?;
     if actual > limits.max_graph_parts {
-        return Err(Error::LimitExceeded {
-            resource: "Calculation Chain graph parts",
+        return Err(Error::limit(
+            crate::calculation_chain::LimitKind::GraphParts,
             actual,
-            maximum: limits.max_graph_parts,
-        });
+            limits.max_graph_parts,
+        ));
     }
     Ok(actual)
 }
 
-fn invalid(message: impl Into<String>) -> Error {
-    Error::InvalidFormat(message.into())
+fn invalid(message: &'static str) -> Error {
+    Error::InvalidFormat(message)
 }

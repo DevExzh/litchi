@@ -52,9 +52,9 @@ fn mixed_chart_tabs_with_sparkline_bytes() -> Vec<u8> {
 }
 
 fn mixed_chart_tabs_bytes_with_sparkline(with_sparkline: bool) -> Vec<u8> {
+    use xlsb::builder::{self, Builder};
     use xlsb::chart::{Anchor, Chart};
     use xlsb::sparkline::{Color as SparkColor, Colors, Group, Groups, Location, Sparkline};
-    use xlsb::writer::{Builder, MutableChartSheet, MutableWorksheet};
 
     let chart = Chart::bar_chart_with_cache(
         "Sales",
@@ -65,19 +65,24 @@ fn mixed_chart_tabs_bytes_with_sparkline(with_sparkline: bool) -> Vec<u8> {
         Anchor::new(0, 0, 10, 20),
     )
     .unwrap();
-    let mut data = MutableWorksheet::new("Data");
+    let mut data = builder::Worksheet::new("Data");
     data.set_cell(0, 0, "DATA");
-    let mut tail = MutableWorksheet::new("Tail");
+    let mut tail = builder::Worksheet::new("Tail");
     tail.set_cell(0, 0, "TAIL");
     if with_sparkline {
-        let groups = Groups::new(vec![
-            Group::new(
-                xlsb::sparkline::SparklineType::Stacked,
-                Colors::uniform(SparkColor::rgb(20, 40, 60, 255, 0)),
-                vec![Sparkline::new(Location::new(0, 0).unwrap(), None)],
-            )
-            .unwrap(),
-        ])
+        let limits = xlsb::sparkline::Limits::default();
+        let groups = Groups::new(
+            vec![
+                Group::new(
+                    xlsb::sparkline::SparklineType::Stacked,
+                    Colors::uniform(SparkColor::rgb(20, 40, 60, 255, 0)),
+                    vec![Sparkline::new(Location::new(0, 0).unwrap(), None)],
+                    limits,
+                )
+                .unwrap(),
+            ],
+            limits,
+        )
         .unwrap();
         tail.set_sparkline_groups(groups).unwrap();
     }
@@ -85,7 +90,7 @@ fn mixed_chart_tabs_bytes_with_sparkline(with_sparkline: bool) -> Vec<u8> {
     let mut writer = Builder::new();
     writer.add_worksheet(data);
     writer
-        .add_chart_sheet(MutableChartSheet::new("Sales Chart", chart))
+        .add_chart_sheet(builder::ChartSheet::new("Sales Chart", chart))
         .unwrap();
     writer.add_worksheet(tail);
 
@@ -95,11 +100,11 @@ fn mixed_chart_tabs_bytes_with_sparkline(with_sparkline: bool) -> Vec<u8> {
 }
 
 fn all_worksheet_bytes() -> Vec<u8> {
-    use xlsb::writer::{Builder, MutableWorksheet};
+    use xlsb::builder::{self, Builder};
 
-    let mut first = MutableWorksheet::new("First");
+    let mut first = builder::Worksheet::new("First");
     first.set_cell(0, 0, "FIRST");
-    let mut tail = MutableWorksheet::new("Tail");
+    let mut tail = builder::Worksheet::new("Tail");
     tail.set_cell(0, 0, "TAIL");
 
     let mut writer = Builder::new();
@@ -112,8 +117,8 @@ fn all_worksheet_bytes() -> Vec<u8> {
 }
 
 fn chart_first_tabs_bytes() -> Vec<u8> {
+    use xlsb::builder::{self, Builder};
     use xlsb::chart::{Anchor, Chart};
-    use xlsb::writer::{Builder, MutableChartSheet, MutableWorksheet};
 
     let chart = Chart::bar_chart_with_cache(
         "Sales",
@@ -124,12 +129,12 @@ fn chart_first_tabs_bytes() -> Vec<u8> {
         Anchor::new(0, 0, 10, 20),
     )
     .unwrap();
-    let mut data = MutableWorksheet::new("Data");
+    let mut data = builder::Worksheet::new("Data");
     data.set_cell(0, 0, "DATA");
 
     let mut writer = Builder::new();
     writer
-        .add_chart_sheet(MutableChartSheet::new("Sales Chart", chart))
+        .add_chart_sheet(builder::ChartSheet::new("Sales Chart", chart))
         .unwrap();
     writer.add_worksheet(data);
 
@@ -145,8 +150,8 @@ fn rewrite_active_book_view(bytes: &[u8], active_catalog_position: u32) -> Vec<u
     let mut rewritten = Vec::new();
     let mut book_view_count = 0;
     {
-        let mut writer = xlsb::raw::Encoder::new(&mut rewritten);
-        for record in xlsb::raw::Records::new(&original) {
+        let mut writer = xlsb::raw::Encoder::new(&mut rewritten, xlsb::raw::Limits::default());
+        for record in xlsb::raw::Records::new(&original, xlsb::raw::Limits::default()) {
             let record = record.unwrap();
             let mut payload = record.payload().to_vec();
             if record.kind() == xlsb::raw::kind::BOOK_VIEW {
@@ -176,7 +181,7 @@ fn active_book_view_catalog_position(bytes: &[u8]) -> u32 {
     let workbook_uri = PackURI::new("/xl/workbook.bin").unwrap();
     let workbook = package.get_part(&workbook_uri).unwrap();
     let mut active_catalog_position = None;
-    for record in xlsb::raw::Records::new(workbook.blob()) {
+    for record in xlsb::raw::Records::new(workbook.blob(), xlsb::raw::Limits::default()) {
         let record = record.unwrap();
         if record.kind() != xlsb::raw::kind::BOOK_VIEW {
             continue;
@@ -672,12 +677,12 @@ fn source_backed_facade_strictly_refuses_sparkline_materialization() {
             .value(),
         &CellValue::String("TAIL".to_string())
     );
-    let eager = xlsb::Package::from_bytes(&bytes)
-        .and_then(xlsb::Package::into_workbook)
+    let package = xlsb::Package::from_bytes(&bytes)
         .expect("explicit eager XLSB API should support sparkline-bearing sheets");
-    assert_eq!(eager_text(&eager), "DATA\nTAIL\n");
+    let eager = package.workbook().expect("eager projection");
+    assert_eq!(eager_text(eager), "DATA\nTAIL\n");
     assert_eq!(
-        WorkbookTrait::worksheet_by_name(&eager, "Tail")
+        WorkbookTrait::worksheet_by_name(eager, "Tail")
             .expect("eager tail worksheet")
             .cell_by_coordinate("A1")
             .expect("eager tail cell")
@@ -756,7 +761,7 @@ fn eager_and_dynamic_facade_reject_active_chart_as_active_worksheet() {
         matches!(
             &eager_error,
             xlsb::package::error::Error::UnsupportedFeature(message)
-                if message == "XLSB active sheet is not a worksheet"
+                if *message == "XLSB active sheet is not a worksheet"
         ),
         "active chart failure must retain the typed XLSB package error"
     );
@@ -770,7 +775,7 @@ fn eager_and_dynamic_facade_reject_active_chart_as_active_worksheet() {
         matches!(
             dynamic_error.leaf(),
             Source::Xlsb(xlsb::package::error::Error::UnsupportedFeature(message))
-                if message == "XLSB active sheet is not a worksheet"
+                if *message == "XLSB active sheet is not a worksheet"
         ),
         "active chart failure must retain the typed XLSB package error: {dynamic_error:?}"
     );
@@ -860,7 +865,7 @@ fn path_facade_reports_typed_error_for_active_chart_and_source_change_takes_prec
         matches!(
             error.leaf(),
             Source::Xlsb(xlsb::package::error::Error::UnsupportedFeature(message))
-                if message == "XLSB active sheet is not a worksheet"
+                if *message == "XLSB active sheet is not a worksheet"
         ),
         "path facade active-chart failure must retain the typed XLSB error: {error:?}"
     );

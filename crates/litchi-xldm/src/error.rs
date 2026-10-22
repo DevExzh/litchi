@@ -51,6 +51,10 @@ pub(crate) fn panic_error_invariant(message: &str, error: impl std::fmt::Display
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum LimitKind {
+    /// Bytes of rewritten storage or metadata payloads.
+    OutputBytes,
+    /// UTF-8 bytes of a table XML name.
+    PathTextBytes,
     /// Visited records and XML nodes ([`crate::OlapProofLimits::max_items`]).
     Items,
     /// UTF-8 bytes examined and retained
@@ -67,6 +71,8 @@ impl LimitKind {
     #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
+            Self::OutputBytes => "XLDM rewrite output bytes",
+            Self::PathTextBytes => "XLDM path text bytes",
             Self::Items => "OLAP proof items",
             Self::StringBytes => "OLAP proof string bytes",
             Self::SourceBytes => "OLAP proof source bytes",

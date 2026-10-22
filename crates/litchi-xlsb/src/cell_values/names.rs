@@ -45,11 +45,11 @@ struct Record {
 
 fn records(stream: &[u8]) -> Result<Vec<Record>> {
     let mut records = Vec::new();
-    for record in Records::new(stream) {
+    for record in Records::new(stream, crate::raw::Limits::DEFAULT) {
         let record = record?;
-        let source = stream.get(record.offset()..).ok_or_else(|| {
-            Error::InvalidFormat("workbook record offset is outside the stream".to_string())
-        })?;
+        let source = stream.get(record.offset()..).ok_or(Error::InvalidFormat(
+            "workbook record offset is outside the stream",
+        ))?;
         let (_, header) = Header::parse(source, RawLimits::DEFAULT)?;
         let payload_start = record
             .offset()
@@ -77,14 +77,14 @@ fn records(stream: &[u8]) -> Result<Vec<Record>> {
 
 fn encode(kind: Kind, payload: &[u8]) -> Result<Vec<u8>> {
     let mut bytes = Vec::new();
-    Encoder::new(&mut bytes).write_record(kind, payload)?;
+    Encoder::new(&mut bytes, crate::raw::Limits::DEFAULT).write_record(kind, payload)?;
     Ok(bytes)
 }
 
 fn read_u32(payload: &[u8], offset: usize) -> Result<u32> {
     let bytes = payload
         .get(offset..offset + 4)
-        .ok_or_else(|| Error::InvalidFormat("BrtExternSheet is truncated".to_string()))?;
+        .ok_or(Error::InvalidFormat("BrtExternSheet is truncated"))?;
     Ok(u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
 }
 
@@ -106,9 +106,7 @@ fn apply_splices(stream: &[u8], mut splices: Vec<Splice>) -> Result<Vec<u8>> {
     let mut cursor = 0;
     for splice in splices {
         if splice.span.start < cursor {
-            return Err(Error::InvalidFormat(
-                "overlapping workbook stream splices".to_string(),
-            ));
+            return Err(Error::InvalidFormat("overlapping workbook stream splices"));
         }
         output.extend_from_slice(&stream[cursor..splice.span.start]);
         output.extend_from_slice(&splice.bytes);
@@ -126,9 +124,8 @@ fn sheet_xti(
     sheet: u32,
     splices: &mut Vec<Splice>,
 ) -> Result<u16> {
-    let sheet = i32::try_from(sheet).map_err(|_error| {
-        Error::InvalidFormat("sheet position exceeds the Xti field".to_string())
-    })?;
+    let sheet = i32::try_from(sheet)
+        .map_err(|_error| Error::InvalidFormat("sheet position exceeds the Xti field"))?;
     let begin = records
         .iter()
         .position(|record| record.kind == kind::BEGIN_EXTERNALS);
@@ -138,9 +135,9 @@ fn sheet_xti(
         let anchor = records
             .iter()
             .position(|record| record.kind == kind::END_BUNDLE_SHS)
-            .ok_or_else(|| {
-                Error::InvalidFormat("workbook stream has no BrtEndBundleShs".to_string())
-            })?;
+            .ok_or(Error::InvalidFormat(
+                "workbook stream has no BrtEndBundleShs",
+            ))?;
         let at = records[anchor + 1..]
             .iter()
             .find(|record| matches!(record.kind, kind::NAME | kind::CALC_PROP | kind::END_BOOK))
@@ -166,7 +163,11 @@ fn sheet_xti(
         .position(|record| record.kind == kind::EXTERN_SHEET)
         .map(|index| &block[index])
         .ok_or_else(|| {
-            Error::UnsupportedFeature("the externals block has no BrtExternSheet".to_string())
+            Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit",
+                "the externals block has no BrtExternSheet",
+            )
         })?;
     let supbooks = block
         .iter()
@@ -182,12 +183,11 @@ fn sheet_xti(
     let self_book = supbooks.iter().position(|kind| *kind == kind::SUP_SELF);
     let payload = &stream[table.payload.clone()];
     let count = read_u32(payload, 0)?;
-    let count_usize = usize::try_from(count).map_err(|_error| {
-        Error::InvalidFormat("BrtExternSheet count exceeds this platform".to_string())
-    })?;
+    let count_usize = usize::try_from(count)
+        .map_err(|_error| Error::InvalidFormat("BrtExternSheet count exceeds this platform"))?;
     if let Some(book) = self_book {
         let book = u32::try_from(book)
-            .map_err(|_error| Error::InvalidFormat("supporting link index overflow".to_string()))?;
+            .map_err(|_error| Error::InvalidFormat("supporting link index overflow"))?;
         for index in 0..count_usize {
             let base = 4 + index * 12;
             if read_u32(payload, base)? == book
@@ -195,7 +195,11 @@ fn sheet_xti(
                 && read_u32(payload, base + 8)? == sheet.cast_unsigned()
             {
                 return u16::try_from(index).map_err(|_error| {
-                    Error::UnsupportedFeature("the Xti index exceeds 65,535".to_string())
+                    Error::refused(
+                        litchi_core::edit::RefusalKind::UnsupportedContent,
+                        "edit",
+                        "the Xti index exceeds 65,535",
+                    )
                 });
             }
         }
@@ -213,12 +217,21 @@ fn sheet_xti(
         },
     };
     let book = u32::try_from(book)
-        .map_err(|_error| Error::InvalidFormat("supporting link index overflow".to_string()))?;
-    let next = count
-        .checked_add(1)
-        .ok_or_else(|| Error::UnsupportedFeature("the Xti table is full".to_string()))?;
-    let ixti = u16::try_from(count)
-        .map_err(|_error| Error::UnsupportedFeature("the Xti index exceeds 65,535".to_string()))?;
+        .map_err(|_error| Error::InvalidFormat("supporting link index overflow"))?;
+    let next = count.checked_add(1).ok_or_else(|| {
+        Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "edit",
+            "the Xti table is full",
+        )
+    })?;
+    let ixti = u16::try_from(count).map_err(|_error| {
+        Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "edit",
+            "the Xti index exceeds 65,535",
+        )
+    })?;
     let mut rewritten = Vec::new();
     rewritten.extend_from_slice(&next.to_le_bytes());
     rewritten.extend_from_slice(payload.get(4..).unwrap_or_default());
@@ -233,12 +246,10 @@ fn sheet_xti(
 }
 
 fn area_formula(ixti: u16, range: Range) -> Result<Vec<u8>> {
-    let first_column = u16::try_from(range.col_first).map_err(|_error| {
-        Error::InvalidCellReference("column exceeds the PtgArea3d field".to_string())
-    })?;
-    let last_column = u16::try_from(range.col_last).map_err(|_error| {
-        Error::InvalidCellReference("column exceeds the PtgArea3d field".to_string())
-    })?;
+    let first_column = u16::try_from(range.col_first)
+        .map_err(|_error| Error::InvalidCellReference("column exceeds the PtgArea3d field"))?;
+    let last_column = u16::try_from(range.col_last)
+        .map_err(|_error| Error::InvalidCellReference("column exceeds the PtgArea3d field"))?;
     let mut rgce = Vec::with_capacity(15);
     if range.row_first == range.row_last && first_column == last_column {
         // One cell is a `PtgRef3d`, as Excel stores it.
@@ -265,14 +276,13 @@ fn area_formula(ixti: u16, range: Range) -> Result<Vec<u8>> {
 /// payload: flags (4), chKey (1), itab (4), then the name string.
 fn formula_offset(payload: &[u8]) -> Result<usize> {
     let units = read_u32(payload, 9)?;
-    let units = usize::try_from(units).map_err(|_error| {
-        Error::InvalidFormat("BrtName name length exceeds this platform".to_string())
-    })?;
+    let units = usize::try_from(units)
+        .map_err(|_error| Error::InvalidFormat("BrtName name length exceeds this platform"))?;
     units
         .checked_mul(2)
         .and_then(|bytes| bytes.checked_add(13))
         .filter(|end| *end <= payload.len())
-        .ok_or_else(|| Error::InvalidFormat("BrtName name is truncated".to_string()))
+        .ok_or(Error::InvalidFormat("BrtName name is truncated"))
 }
 
 /// Set (`Some`) or remove (`None`) the defined name `name` of `scope`
@@ -288,9 +298,8 @@ pub(super) fn apply(
     let stream = part.blob().to_vec();
     let records = records(&stream)?;
     let scope_wire = match scope {
-        Some(position) => u32::try_from(position).map_err(|_error| {
-            Error::InvalidFormat("scope position exceeds the BrtName field".to_string())
-        })?,
+        Some(position) => u32::try_from(position)
+            .map_err(|_error| Error::InvalidFormat("scope position exceeds the BrtName field"))?,
         None => u32::MAX,
     };
     let names = records
@@ -302,8 +311,7 @@ pub(super) fn apply(
     let mut existing = None;
     for &index in &names {
         let definition =
-            crate::named_ranges::Definition::parse(&stream[records[index].payload.clone()])
-                .map_err(|error| Error::InvalidFormula(error.to_string()))?;
+            crate::named_ranges::Definition::parse(&stream[records[index].payload.clone()])?;
         if excel_name_eq(&definition.name, name)
             && definition.sheet_id.unwrap_or(u32::MAX) == scope_wire
         {
@@ -317,9 +325,10 @@ pub(super) fn apply(
                 return Ok(false);
             };
             if names.last() != Some(&index) {
-                return Err(Error::UnsupportedFeature(
-                    "only the last defined name can be removed without renumbering name references"
-                        .to_string(),
+                return Err(Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedContent,
+                    "edit",
+                    "only the last defined name can be removed without renumbering name references",
                 ));
             }
             splices.push(Splice {
@@ -328,9 +337,8 @@ pub(super) fn apply(
             });
         },
         Some((sheet, range)) => {
-            let sheet = u32::try_from(sheet).map_err(|_error| {
-                Error::InvalidFormat("sheet position exceeds the Xti field".to_string())
-            })?;
+            let sheet = u32::try_from(sheet)
+                .map_err(|_error| Error::InvalidFormat("sheet position exceeds the Xti field"))?;
             let ixti = sheet_xti(&stream, &records, sheet, &mut splices)?;
             let formula = area_formula(ixti, range)?;
             match existing {
@@ -338,9 +346,9 @@ pub(super) fn apply(
                     let payload = &stream[records[index].payload.clone()];
                     let start = formula_offset(payload)?;
                     let (_, consumed) = ParsedFormula::parse(&payload[start..])?;
-                    let old = payload.get(start..start + consumed).ok_or_else(|| {
-                        Error::InvalidFormat("BrtName formula is truncated".to_string())
-                    })?;
+                    let old = payload
+                        .get(start..start + consumed)
+                        .ok_or(Error::InvalidFormat("BrtName formula is truncated"))?;
                     if old == formula.as_slice() {
                         return Ok(false);
                     }
@@ -353,11 +361,10 @@ pub(super) fn apply(
                     });
                 },
                 None => {
-                    crate::named_ranges::validate_name(name)
-                        .map_err(|error| Error::InvalidFormula(error.to_string()))?;
+                    crate::named_ranges::validate_name(name)?;
                     let mut payload = Vec::new();
                     {
-                        let mut writer = Encoder::new(&mut payload);
+                        let mut writer = Encoder::new(&mut payload, crate::raw::Limits::DEFAULT);
                         writer.write_u32(0)?;
                         writer.write_u8(0)?;
                         writer.write_u32(scope_wire)?;
@@ -379,11 +386,9 @@ pub(super) fn apply(
                                 .iter()
                                 .find(|splice| splice.span.is_empty())
                                 .map(|splice| splice.span.end)
-                                .ok_or_else(|| {
-                                    Error::InvalidFormat(
-                                        "no position for a new defined name".to_string(),
-                                    )
-                                })?,
+                                .ok_or(Error::InvalidFormat(
+                                    "no position for a new defined name",
+                                ))?,
                         },
                     };
                     splices.push(Splice {

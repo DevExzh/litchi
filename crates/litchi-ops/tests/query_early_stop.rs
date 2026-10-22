@@ -39,7 +39,7 @@ const SELECTORS: &[&str] = &[
 /// The XLSB workbook of the XLSX fixture's shape: a header and `rows` rows
 /// of region, sales, status.
 fn xlsb_workbook(rows: usize) -> Vec<u8> {
-    let mut sheet = litchi_xlsb::writer::MutableWorksheet::new("Data");
+    let mut sheet = litchi_xlsb::builder::Worksheet::new("Data");
     for (column, header) in ["Region", "Sales", "Status"].into_iter().enumerate() {
         sheet.set_cell(0, column as u32, header.to_string());
     }

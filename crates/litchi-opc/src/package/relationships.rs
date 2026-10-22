@@ -1502,6 +1502,137 @@ impl OpcPackage {
         self.try_replace_relationships_with_limits(expected, &replacement, limits)
     }
 
+    /// Replace relationship XML from a bounded byte snapshot without first
+    /// constructing an [`OwnedRelationships`] token for the expected side.
+    ///
+    /// The expected owner bytes and physical-member bit must still match the
+    /// current publication view. Replacement bytes are parsed, audited and
+    /// retained only after those stale-source and signature checks succeed.
+    pub fn try_replace_relationships_source_bytes(
+        &mut self,
+        owner: &PackURI,
+        expected: &[u8],
+        expected_member_present: bool,
+        replacement: Arc<Vec<u8>>,
+        member_present: bool,
+        limits: SourceLimits,
+    ) -> Result<bool> {
+        let relationship_uri = owner.rels_uri().map_err(OpcError::InvalidPackUri)?;
+        let graph = if owner.as_str() == "/" {
+            self.rels()
+        } else {
+            self.get_part(owner)?.rels()
+        };
+        OwnedXmlPart::check_derived_capture_member_name(owner, limits)?;
+        check_relationship_capture_limits(graph, limits)?;
+        let (current, current_member_present) =
+            if let Some((bytes, member_present)) = self.retained_relationships_xml(owner)? {
+                limits.check(
+                    SourceLimitKind::RelationshipXmlBytes,
+                    bytes.len() as u64,
+                    limits.max_relationship_xml_bytes() as u64,
+                )?;
+                limits.check(
+                    SourceLimitKind::TotalRelationshipXmlBytes,
+                    bytes.len() as u64,
+                    limits.max_total_relationship_xml_bytes() as u64,
+                )?;
+                limits.check(
+                    SourceLimitKind::PartBytes,
+                    bytes.len() as u64,
+                    limits.max_part_bytes(),
+                )?;
+                OwnedXmlPart::check_capture_size(&relationship_uri, bytes.len(), limits)?;
+                (bytes, member_present)
+            } else {
+                let member_present = if owner.as_str() == "/" {
+                    true
+                } else {
+                    match self.get_part(owner) {
+                        Ok(part) => !part.rels().is_empty(),
+                        Err(OpcError::PartNotFound(_)) => false,
+                        Err(error) => return Err(error),
+                    }
+                };
+                (
+                    self.authored_relationships_xml(owner, limits)?,
+                    member_present,
+                )
+            };
+        crate::pkgreader::PackageReader::parse_owned_relationships_with_limits(
+            &current, owner, limits,
+        )?;
+        if current.as_slice() != expected || current_member_present != expected_member_present {
+            return Err(invalid("stale relationship replacement"));
+        }
+        if expected == replacement.as_slice() && expected_member_present == member_present {
+            return Ok(false);
+        }
+        if self.is_signed() || self.requires_signature_edit_policy() {
+            return Err(OpcError::SignedSourceRequiresExplicitPolicy);
+        }
+        if !member_present && owner.as_str() == "/" {
+            return Err(invalid("package-root relationship member cannot be absent"));
+        }
+        OwnedXmlPart::check_capture_size(&relationship_uri, replacement.len(), limits)?;
+        limits.check(
+            SourceLimitKind::TotalRelationshipXmlBytes,
+            replacement.len() as u64,
+            limits.max_total_relationship_xml_bytes() as u64,
+        )?;
+        let relationships = crate::pkgreader::PackageReader::parse_owned_relationships_with_limits(
+            &replacement,
+            owner,
+            limits,
+        )?;
+        if !member_present {
+            if !relationships.is_empty() {
+                return Err(invalid("absent relationship member has edges"));
+            }
+            let canonical = relationships.plan_canonical(limits)?.materialize(limits)?;
+            if replacement.as_slice() != canonical.as_slice() {
+                return Err(invalid(
+                    "absent relationship member requires its canonical empty view",
+                ));
+            }
+        }
+        if member_present {
+            // The bytes become the owner's retained `.rels` source, which the
+            // writer publishes without its audit (change 0665). Audit them
+            // before mutating the package (ADR 0006).
+            super::verified_metadata_token(
+                &relationship_uri,
+                Arc::clone(&replacement),
+                limits.max_relationship_xml_bytes(),
+            )?;
+        }
+        let binding = RelationshipBinding::from_relationships(&relationships)?;
+        self.source_relationships_xml
+            .try_reserve(1)
+            .map_err(|source| OpcError::Allocation {
+                resource: "owned relationship provenance",
+                source,
+            })?;
+        let source = Arc::new(SourceRelationshipsXml {
+            bytes: Arc::clone(&replacement),
+            binding,
+        });
+        if owner.as_str() == "/" {
+            self.revoke_exact_source();
+            self.content_types_source_state.reset();
+            self.signature_graph_tracked = true;
+            self.rels = relationships;
+        } else {
+            *self.get_part_mut(owner)?.rels_mut() = relationships;
+        }
+        if member_present {
+            self.source_relationships_xml.insert(owner.clone(), source);
+        } else {
+            self.source_relationships_xml.remove(owner);
+        }
+        Ok(true)
+    }
+
     /// Replace an exact expected relationship snapshot with a source-derived token.
     ///
     /// Owner, XML bytes and member presence must still match. Stale snapshots,
@@ -1576,6 +1707,7 @@ impl OpcPackage {
         });
         if replacement.owner.as_str() == "/" {
             self.revoke_exact_source();
+            self.content_types_source_state.reset();
             self.signature_graph_tracked = true;
             self.rels = relationships;
         } else {

@@ -29,7 +29,7 @@ pub(crate) fn read_layout(worksheet: &[u8], layout: &SheetLayout) -> Result<Opti
     if units.next().is_some() {
         return Err(invalid("a worksheet has more than one auto-filter"));
     }
-    let header = Records::new(&worksheet[unit.span.clone()])
+    let header = Records::new(&worksheet[unit.span.clone()], crate::raw::Limits::DEFAULT)
         .next()
         .transpose()?
         .ok_or_else(|| invalid("an empty auto-filter collection"))?;

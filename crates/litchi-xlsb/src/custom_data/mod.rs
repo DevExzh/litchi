@@ -9,6 +9,7 @@ mod package;
 
 pub(crate) mod bindings;
 
+pub use crate::package::PackageError as Error;
 pub use litchi_ooxml_common::custom_data::{
     CustomData, CustomDataView, DATA_CONTENT_TYPE, DATA_RELATIONSHIP_TYPE, ExtensionList,
     PROPERTIES_CONTENT_TYPE, PROPERTIES_RELATIONSHIP_TYPE, Properties, RemovalDisposition,
@@ -17,7 +18,7 @@ pub use litchi_ooxml_common::custom_data::{
     parse_properties, validate_workbook_root, write_properties,
 };
 pub use model::{Part, Storage, StorageId, StorageSelector, StorageSelectorInput};
-pub use package::{Commit, Edit, Limits, Patch, Snapshot};
+pub use package::{Commit, Diagnostics, Edit, EditOptions, LimitKind, Limits, Patch, Snapshot};
 
 /// Result type for XLSB Custom Data operations.
 pub type Result<T> = crate::package::error::Result<T>;

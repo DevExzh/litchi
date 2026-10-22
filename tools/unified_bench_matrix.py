@@ -2993,6 +2993,75 @@ def p0359a():
     return out
 
 
+W4B_XLSB_OPS = {"open": "open", "open_get": "open", "set": "set", "set_save": "save", "format": "set",
+                "metadata": "metadata", "batch1k": "batch", "comment": "add", "hyperlink": "add",
+                "name": "add", "merge": "set", "chain": "set"}
+
+
+def w4b_legs(base: Path):
+    """The (before, after) medians per scenario of one record 0360b
+    A-B-B-A run: the probe, the 0353a XLSB sheet scenarios and xlsb_crud."""
+    legs: dict = {"before": {}, "after": {}}
+    for path in sorted(base.glob("probe-*-*.json")):
+        for r in load_json(path):
+            legs[path.name.split("-")[1]].setdefault(r["scenario"], []).append(r["median_us"])
+    for path in sorted(base.glob("sheet-*-*.txt")):
+        for name, v in load_json(path)["scenarios"].items():
+            if name.endswith("/xlsb"):
+                legs[path.name.split("-")[1]].setdefault("sheet/" + name, []).append(v["median_us"])
+    for path in sorted(base.glob("crud-*-*.json")):
+        for case in load_json(path)["cases"]:
+            legs[path.name.split("-")[1]].setdefault("crud/" + case["case"], []).append(
+                case["statistics"]["p50_ns"] / 1000.0)
+    return legs
+
+
+@needs("0360b")
+def p0360b():
+    """Record 0360b §6 (W4 XLSB contract): xlsb_w4b_probe (leaf and unified
+    routes with calls stable across the wave), sheet_dispatch_bench (the
+    0353a XLSB scenarios) and perf-baseline xlsb_crud, base and head built
+    in release and run A-B-B-A twice pinned (run 1 `results/0360b/`, run 2
+    `results/0360b/run2/`); plus the head's unified 1k batch against the
+    one-commit leaf edit."""
+    base = RES / "0360b"
+    runs = [w4b_legs(base), w4b_legs(base / "run2")]
+    paths = sorted(base.glob("*-*-*.json")) + sorted(base.glob("sheet-*-*.txt"))
+    out = []
+    for scen, after in runs[0]["after"].items():
+        before = runs[0]["before"].get(scen)
+        if not before:
+            continue
+        b, a = med(before), med(after)
+        ratios = [med(legs["after"][scen]) / med(legs["before"][scen]) for legs in runs
+                  if scen in legs["after"] and scen in legs["before"]]
+        if scen.startswith("sheet/"):
+            op, fmt = scen[len("sheet/"):].split("/")
+            scenario, size, series = f"sheet trait {op} (0353a), W4b head vs base", "2k rows", "sheet_dispatch_bench"
+            op = "read"
+        elif scen.startswith("crud/"):
+            fmt, op = "xlsb", "edit" if "save" in scen else "read"
+            scenario, size, series = f"xlsb_crud {scen[5:]}, W4b head vs base", "testVarious.xlsb", "xlsb_crud"
+        else:
+            owner, name = scen.split("/")
+            fmt, op = "xlsb", W4B_XLSB_OPS.get(name, name)
+            what = "leaf Package" if owner == "leaf" else f"File ({owner} owner)"
+            scenario = f"{what} {name.replace('_', ' ')}, W4b head vs base"
+            size, series = ("1k ops" if name == "batch1k" else "100×10 cells"), "xlsb_w4b_probe"
+        out.append(row("0360b", fmt, op, scenario, size, b, a, ratios, regression("0360b"),
+                       f"{series}:{scen}:after-before", src(paths), comparison="after/before"))
+    for owner in ("eager", "source"):
+        ratios = [med(legs["after"][f"{owner}/batch1k"]) / med(legs["after"]["leaf/batch1k"])
+                  for legs in runs]
+        legs = runs[0]
+        out.append(row("0360b", "xlsb", "batch",
+                       f"File::edit, 1,000 cell sets ({owner} owner) vs one leaf edit_cell_values commit",
+                       "1k ops", med(legs["after"]["leaf/batch1k"]), med(legs["after"][f"{owner}/batch1k"]),
+                       ratios, BATCH, f"xlsb_w4b_probe:{owner}/batch1k:unified-leaf",
+                       src(sorted(base.glob("probe-after-*.json")))))
+    return out
+
+
 @needs("0357a")
 def p0357a():
     """Record 0357a: record-sized scoped-family patches (1,000 retained
@@ -3121,7 +3190,7 @@ PARSERS = [p0250, p0251, p0251f, p0252, p0253, p0254, p0255, p0256, p0258, p0259
            p0313, p0314, p0315, p0316, p0317, p0318, p0323, p0324, p0325, p0326,
            p0328, p0329, p0330, p0333, p0335, p0336, p0337, p0338, p0340, p0342, p0345, p0346,
            p0347, p0348, p0355, p0355a, p0356, p0356a, p0356b, p0356c, p0357, p0357a, p0357b, p0358, p0358a,
-           p0359, p0359a, p0359b, p0361, p0361a, p0362]
+           p0359, p0359a, p0359b, p0360b, p0361, p0361a, p0362]
 
 
 

@@ -66,6 +66,8 @@ pub struct Workbook {
     pub(super) tolerance: crate::leniency::ToleranceReport,
     /// Opt-in repair policy applied to lazily parsed worksheet content.
     pub(super) leniency: crate::leniency::Leniency,
+    /// The semantic budgets of the family reads of this projection.
+    pub(super) semantic_limits: crate::SemanticLimits,
 }
 
 impl std::fmt::Debug for Workbook {
@@ -146,7 +148,8 @@ impl Workbook {
     ///
     /// ```
     /// # fn main() -> litchi_xlsb::package::PackageResult<()> {
-    /// let workbook = litchi_xlsb::Package::new()?.into_workbook()?;
+    /// let bytes = litchi_xlsb::Package::new()?.to_bytes()?;
+    /// let workbook = litchi_xlsb::Workbook::new(std::io::Cursor::new(bytes))?;
     /// let package = workbook.into_package();
     /// assert_eq!(package.leniency(), litchi_xlsb::Leniency::Strict);
     /// assert!(package.drawings_parsed());
@@ -162,9 +165,14 @@ impl Workbook {
         self.leniency = leniency;
     }
 
-    /// Consume the workbook and keep only its open-time repair report.
-    pub(crate) fn into_tolerance_report(self) -> crate::leniency::ToleranceReport {
-        self.tolerance
+    pub(crate) fn set_semantic_limits(&mut self, limits: crate::SemanticLimits) {
+        self.semantic_limits = limits;
+    }
+
+    /// The semantic budgets of this projection's family reads.
+    #[must_use]
+    pub const fn semantic_limits(&self) -> crate::SemanticLimits {
+        self.semantic_limits
     }
 
     /// Return the drawing projection boundary selected when this workbook was
@@ -203,11 +211,9 @@ impl Workbook {
         &self,
         index: usize,
     ) -> crate::package::error::Result<usize> {
-        self.worksheet_positions.get(index).copied().ok_or_else(|| {
-            crate::package::error::Error::InvalidFormat(format!(
-                "Worksheet index {index} out of bounds"
-            ))
-        })
+        self.worksheet_positions.get(index).copied().ok_or(
+            crate::package::error::Error::InvalidFormat("Worksheet index out of bounds"),
+        )
     }
 
     /// Every workbook tab in workbook order, including chart, dialog, and
@@ -254,7 +260,7 @@ impl Workbook {
         };
         let Some(position) = tab.worksheet_position() else {
             return Err(crate::package::error::Error::UnsupportedFeature(
-                "selected XLSB tab has no worksheet grid".to_string(),
+                "selected XLSB tab has no worksheet grid",
             ));
         };
         // `Tab::worksheet_position` is the worksheet-only ordinal. The
@@ -493,11 +499,11 @@ impl litchi_core::sheet::WorkbookTrait for Workbook {
     }
 
     fn active_worksheet(&self) -> crate::package::error::Result<Arc<Worksheet>> {
-        let index = self.active_worksheet_index().ok_or_else(|| {
+        let index = self.active_worksheet_index().ok_or(
             crate::package::error::Error::UnsupportedFeature(
-                "XLSB active sheet is not a worksheet".to_string(),
-            )
-        })?;
+                "XLSB active sheet is not a worksheet",
+            ),
+        )?;
         self.worksheet_by_index(index)
     }
 
@@ -520,10 +526,7 @@ impl litchi_core::sheet::WorkbookTrait for Workbook {
                 return self.worksheet_by_index(i);
             }
         }
-        Err(crate::package::error::Error::InvalidFormat(format!(
-            "Worksheet '{}' not found",
-            name
-        )))
+        Err(crate::package::error::Error::InvalidFormat("Worksheet not"))
     }
 
     fn worksheets(&self) -> Worksheets<'_> {

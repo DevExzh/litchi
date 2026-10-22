@@ -27,7 +27,7 @@ fn fixture() -> Vec<u8> {
 }
 
 fn fixture_with_count(count: usize) -> Vec<u8> {
-    use litchi_xlsb::writer::{Builder, MutableWorksheet};
+    use litchi_xlsb::builder::{self, Builder};
 
     let mut writer = Builder::new();
     let names = ["Data", "Archive", "Report", "Tail", "Spare", "Keep"];
@@ -35,7 +35,7 @@ fn fixture_with_count(count: usize) -> Vec<u8> {
         let name = names
             .get(index - 1)
             .map_or_else(|| format!("Tab{index}"), ToString::to_string);
-        let mut sheet = MutableWorksheet::new(name);
+        let mut sheet = builder::Worksheet::new(name);
         sheet.set_cell(0, 0, format!("seed-{index}"));
         writer.add_worksheet(sheet);
     }
@@ -50,8 +50,8 @@ fn fixture_with_count(count: usize) -> Vec<u8> {
 }
 
 fn worksheet_chart_worksheet_fixture() -> Vec<u8> {
+    use litchi_xlsb::builder::{self, Builder};
     use litchi_xlsb::chart::{Anchor, Chart};
-    use litchi_xlsb::writer::{Builder, MutableChartSheet, MutableWorksheet};
 
     let chart = Chart::bar_chart_with_cache(
         "Sales",
@@ -63,11 +63,11 @@ fn worksheet_chart_worksheet_fixture() -> Vec<u8> {
     )
     .expect("chart fixture");
     let mut writer = Builder::new();
-    writer.add_worksheet(MutableWorksheet::new("Data"));
+    writer.add_worksheet(builder::Worksheet::new("Data"));
     writer
-        .add_chart_sheet(MutableChartSheet::new("Sales Chart", chart))
+        .add_chart_sheet(builder::ChartSheet::new("Sales Chart", chart))
         .expect("chart tab");
-    writer.add_worksheet(MutableWorksheet::new("Tail"));
+    writer.add_worksheet(builder::Worksheet::new("Tail"));
 
     let mut output = Cursor::new(Vec::new());
     writer
@@ -153,8 +153,8 @@ fn without_chart_views(bytes: &[u8]) -> Vec<u8> {
     let mut in_views = false;
     let mut removed = false;
     {
-        let mut writer = Encoder::new(&mut rewritten);
-        for item in Records::new(&original) {
+        let mut writer = Encoder::new(&mut rewritten, litchi_xlsb::raw::Limits::DEFAULT);
+        for item in Records::new(&original, litchi_xlsb::raw::Limits::DEFAULT) {
             let record = item.expect("chart record");
             if record.kind() == kind::BEGIN_CS_VIEWS {
                 in_views = true;
@@ -188,7 +188,7 @@ fn worksheet_selected(bytes: &[u8], index: usize) -> bool {
     let package = OpcPackage::from_bytes(bytes).expect("parse XLSB package");
     let uri = PackURI::new(format!("/xl/worksheets/sheet{index}.bin")).expect("worksheet URI");
     let part = package.get_part(&uri).expect("worksheet part");
-    let record = Records::new(part.blob())
+    let record = Records::new(part.blob(), litchi_xlsb::raw::Limits::DEFAULT)
         .map(Result::unwrap)
         .find(|record| record.kind() == kind::BEGIN_WS_VIEW)
         .expect("worksheet view record");

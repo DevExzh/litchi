@@ -147,7 +147,7 @@ impl SourceBackedWorksheet {
         let stage = (|| {
             if !matches!(self.metadata().kind, Kind::Worksheet) {
                 return Err(Error::UnsupportedFeature(
-                    "source-backed XLSB cell cursors require a worksheet tab".to_string(),
+                    "source-backed XLSB cell cursors require a worksheet tab",
                 ));
             }
             if self
@@ -366,7 +366,7 @@ impl std::fmt::Debug for CellCursor {
 fn cells_ascend(data: &[u8]) -> Result<bool> {
     let mut row = 0_u32;
     let mut last: Option<(u32, u32)> = None;
-    for record in Records::new(data) {
+    for record in Records::new(data, crate::raw::Limits::DEFAULT) {
         let record = record?;
         let kind = record.kind();
         let is_cell = (kind::CELL_BLANK.get()..=kind::FMLA_ERROR.get()).contains(&kind.get())
@@ -476,7 +476,7 @@ mod tests {
     }
 
     fn generated(rows: u32, order: impl IntoIterator<Item = u32>) -> SourceBackedWorkbook {
-        let mut sheet = crate::writer::MutableWorksheet::new("Data");
+        let mut sheet = crate::builder::Worksheet::new("Data");
         for row in order.into_iter().take(rows as usize) {
             sheet.set_cell(row, 0, f64::from(row) + 0.5);
             sheet.set_cell(row, 1, format!("text {row}"));
@@ -545,7 +545,7 @@ mod tests {
     fn records(records: &[(crate::raw::Kind, &[u8])]) -> Vec<u8> {
         let mut out = Vec::new();
         let mut encoder =
-            crate::raw::Encoder::try_with_limits(&mut out, crate::raw::Limits::DEFAULT).unwrap();
+            crate::raw::Encoder::bounded(&mut out, crate::raw::Limits::DEFAULT).unwrap();
         for (kind, payload) in records {
             encoder.write_record(*kind, payload).unwrap();
         }

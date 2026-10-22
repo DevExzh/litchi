@@ -6,10 +6,10 @@
 use std::io::Cursor;
 
 use litchi_opc::{BlobPart, OpcPackage, PackURI};
+use litchi_xlsb::Package;
+use litchi_xlsb::builder::{self, Builder};
 use litchi_xlsb::data_model::{Definition, Model, Table};
 use litchi_xlsb::package::connections::{Connection, Connections, SourceType};
-use litchi_xlsb::writer::{Builder, MutableWorksheet};
-use litchi_xlsb::{Package, Workbook};
 
 const WORKBOOK_PART_NAME: &str = "/xl/workbook.bin";
 const CONNECTIONS_CONTENT_TYPE: &str = "application/vnd.ms-excel.connections";
@@ -46,7 +46,7 @@ fn package_with_connections(names: &[&str]) -> Package {
 fn package_with_model_connection(names: &[&str], model_connection: &str) -> Package {
     assert!(!names.is_empty());
     let mut writer = Builder::new();
-    writer.add_worksheet(MutableWorksheet::new("Sheet1"));
+    writer.add_worksheet(builder::Worksheet::new("Sheet1"));
     writer
         .set_connections(Connections {
             connections: names
@@ -187,29 +187,22 @@ fn add_connections_outbound_relationship(package: &mut OpcPackage) {
         );
 }
 
-fn saved_workbook(workbook: &Workbook) -> Vec<u8> {
+fn saved_package(package: &Package) -> Vec<u8> {
     let mut output = Cursor::new(Vec::new());
-    workbook
-        .to_package()
-        .write_to(&mut output)
-        .expect("workbook bytes");
+    package.write_to(&mut output).expect("workbook bytes");
     output.into_inner()
 }
 
-fn assert_rejected_edit_preserves_bytes(
-    mut workbook: Workbook,
-    mutate: impl FnOnce(&mut OpcPackage),
-) {
-    let before = saved_workbook(&workbook);
-    assert!(
-        workbook
-            .edit_opc(|package| {
-                mutate(package);
-                Ok(())
-            })
-            .is_err()
-    );
-    assert_eq!(saved_workbook(&workbook), before);
+fn assert_rejected_edit_preserves_bytes(package: Package, mutate: impl FnOnce(&mut OpcPackage)) {
+    let before = saved_package(&package);
+    let mut edit = package.edit_opc().expect("raw edit");
+    edit.update(|package| {
+        mutate(package);
+        Ok(())
+    })
+    .expect("staged graph change");
+    assert!(edit.commit().is_err());
+    assert_eq!(saved_package(&package), before);
 }
 
 #[test]
@@ -243,7 +236,7 @@ fn model_connection_binding_is_case_insensitive() {
 #[test]
 fn case_variant_connection_names_are_rejected_as_ambiguous_owners() {
     let mut writer = Builder::new();
-    writer.add_worksheet(MutableWorksheet::new("Sheet1"));
+    writer.add_worksheet(builder::Worksheet::new("Sheet1"));
     writer
         .set_data_model(Model::from_bytes(definition("alpha"), vec![1, 2, 3, 4]).expect("model"))
         .expect("stage model before owner");
@@ -374,19 +367,13 @@ fn ambiguous_model_table_connection_names_are_rejected() {
 fn rejected_connection_graph_edits_preserve_workbook_bytes() {
     let package = package_with_connections(&["Alpha"]);
 
-    assert_rejected_edit_preserves_bytes(
-        package.clone().into_workbook().expect("workbook"),
-        |package| {
-            add_duplicate_connections_relationship(package);
-        },
-    );
-    assert_rejected_edit_preserves_bytes(
-        package.clone().into_workbook().expect("workbook"),
-        |package| {
-            add_connections_outbound_relationship(package);
-        },
-    );
-    assert_rejected_edit_preserves_bytes(package.into_workbook().expect("workbook"), |package| {
+    assert_rejected_edit_preserves_bytes(package.clone(), |package| {
+        add_duplicate_connections_relationship(package);
+    });
+    assert_rejected_edit_preserves_bytes(package.clone(), |package| {
+        add_connections_outbound_relationship(package);
+    });
+    assert_rejected_edit_preserves_bytes(package, |package| {
         replace_connections_relationship_with_external(package);
     });
 }

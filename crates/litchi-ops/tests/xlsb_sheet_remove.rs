@@ -19,8 +19,8 @@ const SECOND: &str = "/sheet[2]";
 const THIRD: &str = "/sheet[3]";
 
 fn mixed_fixture() -> Vec<u8> {
+    use litchi_xlsb::builder::{self, Builder};
     use litchi_xlsb::chart::{Anchor, Chart};
-    use litchi_xlsb::writer::{Builder, MutableChartSheet, MutableWorksheet};
 
     let chart = Chart::bar_chart_with_cache(
         "Sales",
@@ -33,15 +33,15 @@ fn mixed_fixture() -> Vec<u8> {
     .expect("build chart fixture");
     let mut builder = Builder::new();
     builder
-        .add_chart_sheet(MutableChartSheet::new("Sales Chart", chart))
+        .add_chart_sheet(builder::ChartSheet::new("Sales Chart", chart))
         .expect("add chart tab");
-    let mut data = MutableWorksheet::new("Data");
+    let mut data = builder::Worksheet::new("Data");
     data.set_cell(0, 0, "data");
     builder.add_worksheet(data);
-    let mut archive = MutableWorksheet::new("Archive");
+    let mut archive = builder::Worksheet::new("Archive");
     archive.set_cell(0, 0, "archive");
     builder.add_worksheet(archive);
-    let mut tail = MutableWorksheet::new("Tail");
+    let mut tail = builder::Worksheet::new("Tail");
     tail.set_cell(0, 0, "tail");
     builder.add_worksheet(tail);
 
@@ -55,11 +55,11 @@ fn mixed_fixture() -> Vec<u8> {
 }
 
 fn two_sheet_fixture() -> Vec<u8> {
-    use litchi_xlsb::writer::{Builder, MutableWorksheet};
+    use litchi_xlsb::builder::{self, Builder};
 
     let mut builder = Builder::new();
     for (name, value) in [("Visible", "visible"), ("Hidden", "hidden")] {
-        let mut sheet = MutableWorksheet::new(name);
+        let mut sheet = builder::Worksheet::new(name);
         sheet.set_cell(0, 0, value);
         builder.add_worksheet(sheet);
     }
@@ -73,11 +73,11 @@ fn two_sheet_fixture() -> Vec<u8> {
 }
 
 fn many_sheet_fixture(count: usize) -> Vec<u8> {
-    use litchi_xlsb::writer::{Builder, MutableWorksheet};
+    use litchi_xlsb::builder::{self, Builder};
 
     let mut builder = Builder::new();
     for index in 0..count {
-        let mut sheet = MutableWorksheet::new(format!("S{index:02}"));
+        let mut sheet = builder::Worksheet::new(format!("S{index:02}"));
         sheet.set_cell(0, 0, format!("value-{index}"));
         builder.add_worksheet(sheet);
     }
@@ -208,8 +208,8 @@ fn dependency_free_chart_fixture() -> Vec<u8> {
     };
     let mut rewritten_blob = Vec::new();
     {
-        let mut writer = Encoder::new(&mut rewritten_blob);
-        for record in Records::new(&original_blob) {
+        let mut writer = Encoder::new(&mut rewritten_blob, litchi_xlsb::raw::Limits::DEFAULT);
+        for record in Records::new(&original_blob, litchi_xlsb::raw::Limits::DEFAULT) {
             let record = record.expect("read chart sheet record");
             if record.kind() != kind::DRAWING {
                 writer

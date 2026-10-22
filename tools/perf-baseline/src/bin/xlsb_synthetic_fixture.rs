@@ -8,7 +8,7 @@
 //! scale against. The output is a scratch fixture: it is reproducible from
 //! this binary and its arguments, and is not checked in.
 
-use litchi_xlsb::writer::{Builder, MutableWorksheet};
+use litchi_xlsb::builder::{self, Builder};
 use sha2::{Digest, Sha256};
 use std::env;
 use std::fs;
@@ -57,7 +57,7 @@ fn main() -> Result<()> {
 
     let mut writer = Builder::new();
     for sheet in 0..sheets {
-        let mut worksheet = MutableWorksheet::new(format!("Sheet{}", sheet + 1));
+        let mut worksheet = builder::Worksheet::new(format!("Sheet{}", sheet + 1));
         for row in 0..rows {
             for column in 0..columns {
                 // Leave a deterministic hole in one cell of every sixteen so

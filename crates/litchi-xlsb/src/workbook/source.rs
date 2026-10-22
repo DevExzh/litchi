@@ -120,6 +120,8 @@ struct SourceInner {
     tolerance: Mutex<ToleranceReport>,
     /// Opt-in repair policy applied to lazily read worksheet content.
     leniency: Leniency,
+    /// The semantic budgets of the family reads of this owner.
+    semantic_limits: crate::SemanticLimits,
 }
 
 /// What reading one worksheet stream needs ([`SourceBackedWorksheet`]).
@@ -270,25 +272,23 @@ impl SourceBackedIndexedWorksheet {
             let mut seen_sheet_data = false;
             let mut current_row = None;
             let mut record_count = 0usize;
-            for record_result in
-                Records::try_with_limits(self.worksheet.as_bytes(), self.limits.raw)?
-            {
+            for record_result in Records::bounded(self.worksheet.as_bytes(), self.limits.raw)? {
                 let record = record_result?;
                 record_count = record_count.checked_add(1).ok_or(Error::CapacityOverflow {
                     resource: "indexed worksheet record count",
                 })?;
                 if record_count > self.limits.max_records {
-                    return Err(Error::LimitExceeded {
-                        resource: "indexed worksheet records",
-                        actual: record_count,
-                        maximum: self.limits.max_records,
-                    });
+                    return Err(Error::limit(
+                        crate::workbook::LimitKind::IndexedRecords,
+                        record_count,
+                        self.limits.max_records,
+                    ));
                 }
                 match record.kind() {
                     kind::BEGIN_SHEET_DATA => {
                         if in_sheet_data || seen_sheet_data || !record.payload().is_empty() {
                             return Err(Error::InvalidFormat(
-                                "indexed worksheet has invalid sheet-data framing".to_string(),
+                                "indexed worksheet has invalid sheet-data framing",
                             ));
                         }
                         in_sheet_data = true;
@@ -298,45 +298,40 @@ impl SourceBackedIndexedWorksheet {
                     kind::END_SHEET_DATA => {
                         if !in_sheet_data || !record.payload().is_empty() {
                             return Err(Error::InvalidFormat(
-                                "indexed worksheet has invalid sheet-data framing".to_string(),
+                                "indexed worksheet has invalid sheet-data framing",
                             ));
                         }
                         in_sheet_data = false;
                         current_row = None;
                     },
                     kind::ROW_HDR if in_sheet_data => {
-                        let bytes = record.payload().get(..4).ok_or_else(|| {
-                            Error::InvalidFormat(
-                                "indexed worksheet row header is truncated".to_string(),
-                            )
-                        })?;
+                        let bytes = record.payload().get(..4).ok_or(Error::InvalidFormat(
+                            "indexed worksheet row header is truncated",
+                        ))?;
                         let row = u32::from_le_bytes(bytes.try_into().map_err(|_error| {
-                            Error::InvalidFormat(
-                                "indexed worksheet row header is truncated".to_string(),
-                            )
+                            Error::InvalidFormat("indexed worksheet row header is truncated")
                         })?);
                         if row > crate::binary_index::MAX_ROW_INDEX {
                             return Err(Error::InvalidFormat(
-                                "indexed worksheet row is outside the BIFF12 grid".to_string(),
+                                "indexed worksheet row is outside the BIFF12 grid",
                             ));
                         }
                         current_row = Some(row);
                     },
                     cell_kind if in_sheet_data && crate::binary_index::is_cell_kind(cell_kind) => {
-                        let row = current_row.ok_or_else(|| {
-                            Error::InvalidFormat(
-                                "indexed worksheet cell has no row header".to_string(),
-                            )
-                        })?;
-                        let bytes = record.payload().get(..4).ok_or_else(|| {
-                            Error::InvalidFormat("indexed worksheet cell is truncated".to_string())
-                        })?;
+                        let row = current_row.ok_or(Error::InvalidFormat(
+                            "indexed worksheet cell has no row header",
+                        ))?;
+                        let bytes = record
+                            .payload()
+                            .get(..4)
+                            .ok_or(Error::InvalidFormat("indexed worksheet cell is truncated"))?;
                         let column = u32::from_le_bytes(bytes.try_into().map_err(|_error| {
-                            Error::InvalidFormat("indexed worksheet cell is truncated".to_string())
+                            Error::InvalidFormat("indexed worksheet cell is truncated")
                         })?);
                         if column > crate::binary_index::MAX_COLUMN_INDEX {
                             return Err(Error::InvalidFormat(
-                                "indexed worksheet column is outside the BIFF12 grid".to_string(),
+                                "indexed worksheet column is outside the BIFF12 grid",
                             ));
                         }
                         let value = crate::binary_index::decode_cached_value(
@@ -366,7 +361,7 @@ impl SourceBackedIndexedWorksheet {
             }
             if !seen_sheet_data || in_sheet_data {
                 return Err(Error::InvalidFormat(
-                    "indexed worksheet sheet-data framing is incomplete".to_string(),
+                    "indexed worksheet sheet-data framing is incomplete",
                 ));
             }
             Ok(ControlFlow::Continue(()))
@@ -392,20 +387,18 @@ impl SourceBackedIndexedWorksheet {
             Value::SharedStringIndex(index) => {
                 let strings = self.inner.shared_strings()?;
                 let index = usize::try_from(index).map_err(|_error| {
-                    Error::InvalidFormat("shared-string index exceeds platform size".to_string())
+                    Error::InvalidFormat("shared-string index exceeds platform size")
                 })?;
-                let string = strings.get(index).ok_or_else(|| {
-                    Error::InvalidFormat(
-                        "indexed cell refers to a missing shared string".to_string(),
-                    )
-                })?;
+                let string = strings.get(index).ok_or(Error::InvalidFormat(
+                    "indexed cell refers to a missing shared string",
+                ))?;
                 let units = string.text.encode_utf16().count();
                 if units > self.limits.raw.string_units() {
-                    return Err(Error::LimitExceeded {
-                        resource: "indexed shared-string code units",
-                        actual: units,
-                        maximum: self.limits.raw.string_units(),
-                    });
+                    return Err(Error::limit(
+                        crate::workbook::LimitKind::IndexedStringUnits,
+                        units,
+                        self.limits.raw.string_units(),
+                    ));
                 }
                 let mut text = String::new();
                 text.try_reserve_exact(string.text.len())
@@ -490,6 +483,7 @@ impl SourceBackedWorkbook {
             SourceBackedPackage::from_reader_with_limits(reader, options.source_limits)?,
             options.external_link_limits,
             options.leniency,
+            options.semantic_limits,
         )
     }
 
@@ -522,30 +516,40 @@ impl SourceBackedWorkbook {
                 cache_limits,
             )?,
         };
-        Self::build(package, options.external_link_limits, options.leniency)
+        Self::build(
+            package,
+            options.external_link_limits,
+            options.leniency,
+            options.semantic_limits,
+        )
     }
 
     /// Build a lazy XLSB catalog from an already validated deferred OPC package.
     pub fn from_source_backed_package(package: SourceBackedPackage) -> Result<Self> {
-        Self::build(package, ExternalLinkLimits::default(), Leniency::Strict)
+        Self::build(
+            package,
+            ExternalLinkLimits::default(),
+            Leniency::Strict,
+            crate::SemanticLimits::new(),
+        )
     }
 
     fn build(
         package: SourceBackedPackage,
         external_link_limits: ExternalLinkLimits,
         leniency: Leniency,
+        semantic_limits: crate::SemanticLimits,
     ) -> Result<Self> {
         let _ = preflight_package(&package)?;
         let workbook_part = package.main_document_part()?;
         if workbook_part.content_type() != content_type::XLSB_BIN {
             return Err(Error::InvalidContentType {
-                expected: content_type::XLSB_BIN.to_string(),
-                got: workbook_part.content_type().to_string(),
+                expected: content_type::XLSB_BIN,
             });
         }
 
         let workbook_data = workbook_part.data()?;
-        let mut records = Records::new(workbook_data.as_bytes());
+        let mut records = Records::new(workbook_data.as_bytes(), crate::raw::Limits::DEFAULT);
         // The packaging repairs of the OPC read come first in discovery order.
         let mut tolerance = ToleranceReport::from_package(package.tolerance_report());
         let info = Workbook::read_workbook(&mut records, &mut tolerance)?;
@@ -553,12 +557,12 @@ impl SourceBackedWorkbook {
             (!info.worksheet_names.is_empty()).then_some(info.active_catalog_position.unwrap_or(0));
         if info.worksheet_names.len() != info.worksheet_rel_ids.len() {
             return Err(Error::InvalidRelationship(
-                "XLSB sheet names and relationship identifiers have different lengths".to_string(),
+                "XLSB sheet names and relationship identifiers have different lengths",
             ));
         }
         if info.worksheet_names.len() != info.worksheet_states.len() {
             return Err(Error::InvalidFormat(
-                "XLSB sheet names and visibility states have different lengths".to_string(),
+                "XLSB sheet names and visibility states have different lengths",
             ));
         }
 
@@ -587,24 +591,25 @@ impl SourceBackedWorkbook {
             })?;
         for relationship_id in &info.external_link_rel_ids {
             let _ = preflight_package(&package)?;
-            let relationship = workbook_part.rels().get(relationship_id).ok_or_else(|| {
-                Error::InvalidRelationship(format!(
-                    "BrtSupBookSrc relationship {relationship_id:?} is missing"
-                ))
-            })?;
+            let relationship =
+                workbook_part
+                    .rels()
+                    .get(relationship_id)
+                    .ok_or(Error::InvalidRelationship(
+                        "BrtSupBookSrc relationship is missing",
+                    ))?;
             if relationship.is_external() {
-                return Err(Error::InvalidRelationship(format!(
-                    "BrtSupBookSrc relationship {relationship_id:?} is external"
-                )));
+                return Err(Error::InvalidRelationship(
+                    "BrtSupBookSrc relationship is external",
+                ));
             }
             if !matches!(
                 relationship.reltype(),
                 relationship_type::EXTERNAL_LINK | relationship_type::STRICT_EXTERNAL_LINK
             ) {
-                return Err(Error::InvalidRelationship(format!(
-                    "BrtSupBookSrc relationship {relationship_id:?} has invalid type {:?}",
-                    relationship.reltype()
-                )));
+                return Err(Error::InvalidRelationship(
+                    "BrtSupBookSrc relationship has invalid type",
+                ));
             }
             let partname = relationship.target_partname()?;
             let part = package.part(&partname)?;
@@ -655,7 +660,7 @@ impl SourceBackedWorkbook {
             let Some(relationship_id) = relationship_id.as_deref() else {
                 if state != State::VeryHidden {
                     return Err(Error::InvalidRelationship(
-                        "XLSB unbound sheet tabs must be very hidden".to_string(),
+                        "XLSB unbound sheet tabs must be very hidden",
                     ));
                 }
                 sheets.push(SheetMetadata {
@@ -671,18 +676,22 @@ impl SourceBackedWorkbook {
                 });
                 continue;
             };
-            let relationship = workbook_part.rels().get(relationship_id).ok_or_else(|| {
-                Error::InvalidRelationship("XLSB sheet relationship is missing".to_string())
-            })?;
+            let relationship =
+                workbook_part
+                    .rels()
+                    .get(relationship_id)
+                    .ok_or(Error::InvalidRelationship(
+                        "XLSB sheet relationship is missing",
+                    ))?;
             if relationship.is_external() {
                 return Err(Error::InvalidRelationship(
-                    "XLSB sheet has an external relationship".to_string(),
+                    "XLSB sheet has an external relationship",
                 ));
             }
             let partname = relationship.target_partname()?;
             if !sheet_targets.insert(partname.as_str().to_ascii_lowercase()) {
                 return Err(Error::InvalidRelationship(
-                    "multiple XLSB sheets resolve to one physical target".to_string(),
+                    "multiple XLSB sheets resolve to one physical target",
                 ));
             }
             let sheet_part = package.part(&partname)?;
@@ -699,7 +708,7 @@ impl SourceBackedWorkbook {
                     ) {
                         if relationship.is_external() {
                             return Err(Error::InvalidRelationship(
-                                "XLSB worksheet has an external table relationship".to_string(),
+                                "XLSB worksheet has an external table relationship",
                             ));
                         }
                         let table_partname = relationship.target_partname()?;
@@ -744,7 +753,7 @@ impl SourceBackedWorkbook {
                     },
                     _ => {
                         return Err(Error::InvalidRelationship(
-                            "XLSB sheet relationship type is unsupported".to_string(),
+                            "XLSB sheet relationship type is unsupported",
                         ));
                     },
                 }
@@ -813,8 +822,15 @@ impl SourceBackedWorkbook {
                 cached_value_cache: WorksheetCache::with_limits(CACHED_VALUE_CACHE_LIMITS),
                 tolerance: Mutex::new(tolerance),
                 leniency,
+                semantic_limits,
             }),
         })
+    }
+
+    /// The semantic budgets this owner keeps for its family reads.
+    #[must_use]
+    pub fn semantic_limits(&self) -> crate::SemanticLimits {
+        self.inner.semantic_limits
     }
 
     /// A snapshot of every workbook-scope repair applied so far.
@@ -1280,18 +1296,12 @@ impl SourceBackedWorkbook {
     /// view. Image relationships remain inert; their payloads are not read.
     /// Source freshness and cancellation are checked around the operation.
     /// Retain the returned view for repeated color and font queries.
-    pub fn theme(&self) -> Result<Option<crate::theme::View>> {
-        self.theme_with_limits(crate::theme::Limits::default())
-    }
-
-    /// Read the optional theme with explicit resource ceilings.
     ///
-    /// The selected part's declared size is checked before payload loading;
-    /// decoded XML and publication bounds remain enforced by the theme owner.
-    pub fn theme_with_limits(
-        &self,
-        limits: crate::theme::Limits,
-    ) -> Result<Option<crate::theme::View>> {
+    /// The owner's [`crate::SemanticLimits::theme_value`] bound the read: the
+    /// selected part's declared size is checked before payload loading, and
+    /// decoded XML bounds remain enforced by the theme owner.
+    pub fn theme(&self) -> Result<Option<crate::theme::View>> {
+        let limits = self.inner.semantic_limits.theme_value();
         let _ = preflight_package(&self.inner.package)?;
         let theme = crate::theme::read_source(&self.inner.package, limits);
         postflight_package(&self.inner.package)?;
@@ -1305,19 +1315,11 @@ impl SourceBackedWorkbook {
     /// payload views remain deferred; reading a payload is an explicit,
     /// fallible operation on the returned entry rather than part of this
     /// inventory call.
-    pub fn embedded(&self) -> Result<Vec<litchi_ooxml_common::embedded::SourceEntry<'_>>> {
-        self.embedded_with_limits(&litchi_ooxml_common::embedded::Limits::default())
-    }
-
-    /// Inventory embedded relationships with explicit resource limits.
     ///
-    /// This is a catalog-only operation over the retained source-backed OPC
-    /// package. Payload bytes are not read or materialized; callers must use
-    /// the deferred fallible payload operation on each returned entry.
-    pub fn embedded_with_limits(
-        &self,
-        limits: &litchi_ooxml_common::embedded::Limits,
-    ) -> Result<Vec<litchi_ooxml_common::embedded::SourceEntry<'_>>> {
+    /// The owner's [`crate::SemanticLimits::embedded_value`] bound the
+    /// inventory.
+    pub fn embedded(&self) -> Result<Vec<litchi_ooxml_common::embedded::SourceEntry<'_>>> {
+        let limits = &self.inner.semantic_limits.embedded_value();
         let _ = preflight_package(&self.inner.package)?;
         let entries = litchi_ooxml_common::embedded::scan_source(&self.inner.package, limits);
         postflight_package(&self.inner.package)?;
@@ -1427,7 +1429,7 @@ impl SourceBackedWorkbook {
         check_text_state(&self.inner)?;
         String::from_utf8(collector.take_bytes()).map_err(|error| {
             drop(error);
-            Error::Encoding("XLSB text output was not valid UTF-8".to_string())
+            Error::Encoding("XLSB text output was not valid UTF-8")
         })
     }
 }
@@ -1456,22 +1458,18 @@ impl SourceBackedWorksheet {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// The owner's [`crate::SemanticLimits::binary_index_value`] bound the
+    /// worksheet and index validation.
     pub fn indexed_values(&self) -> Result<Option<SourceBackedIndexedWorksheet>> {
-        self.indexed_values_with_limits(crate::binary_index::Limits::DEFAULT)
-    }
-
-    /// Open indexed values with explicit worksheet and index validation limits.
-    pub fn indexed_values_with_limits(
-        &self,
-        limits: crate::binary_index::Limits,
-    ) -> Result<Option<SourceBackedIndexedWorksheet>> {
+        let limits = self.inner.semantic_limits.binary_index_value();
         let _ = preflight_package(&self.inner.package)?;
         let result = (|| {
             let limits = limits.validate()?;
             let metadata = self.metadata();
             if !matches!(metadata.kind, Kind::Worksheet) {
                 return Err(Error::UnsupportedFeature(
-                    "binary-index value lookup requires an XLSB worksheet".to_string(),
+                    "binary-index value lookup requires an XLSB worksheet",
                 ));
             }
             let partname = self.physical_partname()?;
@@ -1488,7 +1486,7 @@ impl SourceBackedWorksheet {
             require_content_type(&index_part, "application/vnd.ms-excel.binIndexWs")?;
             if !index_part.rels().is_empty() {
                 return Err(Error::InvalidRelationship(
-                    "worksheet binary index part must not have relationships".to_string(),
+                    "worksheet binary index part must not have relationships",
                 ));
             }
             preflight_indexed_part(
@@ -1496,9 +1494,13 @@ impl SourceBackedWorksheet {
                 limits
                     .source_bytes
                     .min(crate::binary_index::MAX_INDEX_STREAM_BYTES),
-                "binary-index bytes",
+                crate::binary_index::LimitKind::Bytes.into(),
             )?;
-            preflight_indexed_part(&part, limits.source_bytes, "indexed worksheet bytes")?;
+            preflight_indexed_part(
+                &part,
+                limits.source_bytes,
+                crate::workbook::LimitKind::IndexedPartBytes.into(),
+            )?;
             let index_data = index_part.data()?;
             let worksheet = part.data()?;
             let _ = preflight_package(&self.inner.package)?;
@@ -1595,7 +1597,7 @@ impl SourceBackedWorksheet {
         let result = (|| {
             if !matches!(self.metadata().kind, Kind::Worksheet) {
                 return Err(Error::UnsupportedFeature(
-                    "source-backed XLSB tables require a worksheet tab".to_string(),
+                    "source-backed XLSB tables require a worksheet tab",
                 ));
             }
             let worksheet_position = self
@@ -1604,8 +1606,7 @@ impl SourceBackedWorksheet {
                 .binary_search(&self.catalog_position)
                 .map_err(|_error| {
                     Error::InvalidRelationship(
-                        "source-backed XLSB worksheet catalog is internally inconsistent"
-                            .to_string(),
+                        "source-backed XLSB worksheet catalog is internally inconsistent",
                     )
                 })?;
             let count = self
@@ -1676,7 +1677,7 @@ impl SourceBackedWorksheet {
         let metadata = self.metadata();
         if !matches!(metadata.kind, Kind::Worksheet) {
             return Err(Error::UnsupportedFeature(
-                "source-backed XLSB cached values require a worksheet tab".to_string(),
+                "source-backed XLSB cached values require a worksheet tab",
             ));
         }
         // The cache hit still crosses the source fence before the snapshot
@@ -1694,9 +1695,9 @@ impl SourceBackedWorksheet {
             postflight_package(&self.inner.package)?;
             return Ok(Grid::from_arc(worksheet));
         }
-        let indexed = self.indexed_values()?.ok_or_else(|| {
+        let indexed = self.indexed_values()?.ok_or({
             Error::UnsupportedFeature(
-                "source-backed XLSB worksheet has no indexed cached-value projection".to_string(),
+                "source-backed XLSB worksheet has no indexed cached-value projection",
             )
         })?;
         let mut worksheet = Worksheet::new(metadata.name.clone());
@@ -1741,7 +1742,7 @@ impl SourceBackedWorksheet {
         let metadata = self.metadata();
         if !matches!(metadata.kind, Kind::Worksheet) {
             return Err(Error::UnsupportedFeature(
-                "source-backed XLSB non-worksheet materialization is not supported".to_string(),
+                "source-backed XLSB non-worksheet materialization is not supported",
             ));
         }
         let partname = self.physical_partname()?.clone();
@@ -1824,8 +1825,7 @@ impl SourceBackedWorksheet {
     fn materialization_inputs(&self, partname: PackURI) -> Result<MaterializationInputs> {
         if self.inner.incomplete_formula_context {
             return Err(Error::UnsupportedFeature(
-                "source-backed XLSB worksheet materialization requires deferred PivotTable formula owners"
-                    .to_string(),
+                "source-backed XLSB worksheet materialization requires deferred PivotTable formula owners",
             ));
         }
         let metadata = self.metadata();
@@ -1837,8 +1837,7 @@ impl SourceBackedWorksheet {
                 || relationship.reltype().contains("/timeline")
         }) {
             return Err(Error::UnsupportedFeature(
-                "source-backed XLSB worksheet materialization does not yet include slicer or timeline views"
-                    .to_string(),
+                "source-backed XLSB worksheet materialization does not yet include slicer or timeline views",
             ));
         }
         let comments_part = optional_related_part(
@@ -1850,11 +1849,10 @@ impl SourceBackedWorksheet {
             "comments",
         )?;
         let worksheet_data = worksheet_part.data()?;
-        for record in Records::new(worksheet_data.as_bytes()) {
+        for record in Records::new(worksheet_data.as_bytes(), crate::raw::Limits::DEFAULT) {
             if record?.kind() == kind::BEGIN_SPARKLINE_GROUPS {
                 return Err(Error::UnsupportedFeature(
-                    "source-backed XLSB worksheet materialization does not yet include sparkline groups"
-                        .to_string(),
+                    "source-backed XLSB worksheet materialization does not yet include sparkline groups",
                 ));
             }
         }
@@ -1884,7 +1882,7 @@ impl SourceBackedWorksheet {
         require_content_type(&comments_part, XLSB_COMMENTS_CONTENT_TYPE)?;
         if !comments_part.rels().is_empty() {
             return Err(Error::InvalidRelationship(
-                "XLSB comments parts cannot own relationships".to_string(),
+                "XLSB comments parts cannot own relationships",
             ));
         }
         let comments_data = comments_part.data()?;
@@ -1899,11 +1897,12 @@ impl SourceBackedWorksheet {
     }
 
     fn physical_partname(&self) -> Result<&PackURI> {
-        self.metadata().partname.as_ref().ok_or_else(|| {
-            Error::UnsupportedFeature(
-                "selected XLSB sheet tab has no physical sheet part".to_string(),
-            )
-        })
+        self.metadata()
+            .partname
+            .as_ref()
+            .ok_or(Error::UnsupportedFeature(
+                "selected XLSB sheet tab has no physical sheet part",
+            ))
     }
 }
 
@@ -2002,7 +2001,7 @@ impl SourceInner {
                 let data = self.package.part(partname)?.data()?;
                 self.package.check_execution()?;
                 self.package.source_version()?;
-                let mut records = Records::new(data.as_bytes());
+                let mut records = Records::new(data.as_bytes(), crate::raw::Limits::DEFAULT);
                 Workbook::read_shared_strings(&mut records, &mut strings, &mut report)?;
                 self.package.check_execution()?;
                 self.package.source_version()?;
@@ -2082,9 +2081,7 @@ impl SourceInner {
                     .iter()
                     .any(|existing: &Definition| existing.table_id() == table.table_id())
                 {
-                    Some(Error::InvalidFormula(
-                        "duplicate workbook table ID".to_string(),
-                    ))
+                    Some(Error::InvalidFormula("duplicate workbook table ID"))
                 } else if tables.iter().any(|existing: &Definition| {
                     crate::package::formula::excel_name_eq(
                         existing.display_name(),
@@ -2092,7 +2089,7 @@ impl SourceInner {
                     )
                 }) {
                     Some(Error::InvalidFormula(
-                        "duplicate workbook table display name".to_string(),
+                        "duplicate workbook table display name",
                     ))
                 } else {
                     None
@@ -2248,9 +2245,9 @@ fn map_text_output_error(error: TextOutputError<Error>, allocation: Option<Error
         },
         TextOutputError::Sink { source, .. } => allocation.unwrap_or(Error::Io(source)),
         TextOutputError::NonDeterministicFragments { .. } => {
-            Error::InvalidFormat("XLSB text fragments were not deterministic".to_string())
+            Error::InvalidFormat("XLSB text fragments were not deterministic")
         },
-        _ => Error::InvalidFormat("unsupported XLSB text output error".to_string()),
+        _ => Error::InvalidFormat("unsupported XLSB text output error"),
     }
 }
 
@@ -2259,17 +2256,17 @@ fn worksheet_dimensions(worksheet: &Worksheet) -> Result<(usize, usize)> {
         SheetWorksheet::dimensions(worksheet).unwrap_or((0, 0, 0, 0));
     if min_row > max_row || min_column > max_column {
         return Err(Error::InvalidFormat(
-            "XLSB worksheet dimensions are reversed".to_string(),
+            "XLSB worksheet dimensions are reversed",
         ));
     }
     if max_row > XLSB_MAX_ROW_INDEX {
         return Err(Error::InvalidFormat(
-            "XLSB worksheet row dimension exceeds the BIFF12 bound".to_string(),
+            "XLSB worksheet row dimension exceeds the BIFF12 bound",
         ));
     }
     if max_column > XLSB_MAX_COLUMN_INDEX {
         return Err(Error::InvalidFormat(
-            "XLSB worksheet column dimension exceeds the BIFF12 bound".to_string(),
+            "XLSB worksheet column dimension exceeds the BIFF12 bound",
         ));
     }
     let row_count = max_row.checked_add(1).ok_or(Error::CapacityOverflow {
@@ -2478,7 +2475,7 @@ where
         })?;
     render(output).map_err(|error| {
         let _ = error;
-        Error::InvalidFormat("XLSB text formatting failed".to_string())
+        Error::InvalidFormat("XLSB text formatting failed")
     })
 }
 
@@ -2516,7 +2513,7 @@ fn append_cell_text(output: &mut String, value: &CellValue) -> Result<()> {
 fn optional_related_part(
     workbook_part: &PartView<'_>,
     relationship_types: &[&str],
-    owner: &str,
+    _owner: &str,
 ) -> Result<Option<PackURI>> {
     let mut relationships = workbook_part
         .rels()
@@ -2526,24 +2523,21 @@ fn optional_related_part(
         return Ok(None);
     };
     if relationships.next().is_some() {
-        return Err(Error::InvalidRelationship(format!(
-            "XLSB workbook has multiple {owner} relationships"
-        )));
+        return Err(Error::InvalidRelationship(
+            "XLSB workbook has multiple relationships",
+        ));
     }
     if relationship.is_external() {
-        return Err(Error::InvalidRelationship(format!(
-            "XLSB workbook {owner} relationship is external"
-        )));
+        return Err(Error::InvalidRelationship(
+            "XLSB workbook relationship is external",
+        ));
     }
     relationship.target_partname().map(Some).map_err(Into::into)
 }
 
-fn require_content_type(part: &PartView<'_>, expected: &str) -> Result<()> {
+fn require_content_type(part: &PartView<'_>, expected: &'static str) -> Result<()> {
     if part.content_type() != expected {
-        return Err(Error::InvalidContentType {
-            expected: expected.to_string(),
-            got: part.content_type().to_string(),
-        });
+        return Err(Error::InvalidContentType { expected });
     }
     Ok(())
 }
@@ -2551,34 +2545,34 @@ fn require_content_type(part: &PartView<'_>, expected: &str) -> Result<()> {
 fn preflight_indexed_part(
     part: &PartView<'_>,
     maximum: usize,
-    resource: &'static str,
+    kind: crate::package::LimitKind,
 ) -> Result<()> {
-    let actual = usize::try_from(part.declared_uncompressed_size()?)
-        .map_err(|_error| Error::CapacityOverflow { resource })?;
+    let actual = usize::try_from(part.declared_uncompressed_size()?).map_err(|_error| {
+        Error::CapacityOverflow {
+            resource: "indexed part size",
+        }
+    })?;
     if actual > maximum {
-        return Err(Error::LimitExceeded {
-            resource,
-            actual,
-            maximum,
-        });
+        return Err(Error::limit(kind, actual, maximum));
     }
     Ok(())
 }
 
 /// Classify a failure to plan a document-property revision over the source.
 fn publication_error(error: crate::metadata::Error) -> Error {
-    let message = error.to_string();
     match error {
         crate::metadata::Error::Package(litchi_ooxml_common::Error::Opc(error)) => {
             Error::Opc(error)
         },
         crate::metadata::Error::Package(error) => Error::Common(error),
         crate::metadata::Error::Signed => Error::Signed,
-        crate::metadata::Error::Conflict(part) => Error::PatchConflict { part },
+        crate::metadata::Error::Conflict(_) => Error::PatchConflict {
+            part: "the document-property parts",
+        },
         crate::metadata::Error::Unsupported { .. }
         | crate::metadata::Error::Invalid(_)
         | crate::metadata::Error::Limit { .. }
-        | _ => Error::InvalidFormat(message),
+        | _ => Error::InvalidFormat("the package structure is not valid"),
     }
 }
 

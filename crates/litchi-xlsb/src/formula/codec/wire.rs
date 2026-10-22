@@ -21,7 +21,7 @@ use super::validation::table_row_type_raw;
 fn read_bytes(data: &[u8], offset: usize, length: usize) -> Result<&[u8]> {
     let end = offset
         .checked_add(length)
-        .ok_or_else(|| Error::InvalidFormula("formula binary offset overflow".to_string()))?;
+        .ok_or(Error::InvalidFormula("formula binary offset overflow"))?;
     data.get(offset..end).ok_or(Error::InvalidLength {
         expected: end,
         found: data.len(),
@@ -52,13 +52,11 @@ impl ParsedFormula {
 
         let cce = read_u32_le_at(data, 0)? as usize;
         if cce > MAX_CELL_FORMULA_BYTES {
-            return Err(Error::InvalidFormula(format!(
-                "cell formula token length {cce} exceeds {MAX_CELL_FORMULA_BYTES}"
-            )));
+            return Err(Error::InvalidFormula("cell formula token length exceeds"));
         }
-        let cb_offset = 4usize.checked_add(cce).ok_or_else(|| {
-            Error::InvalidFormula("cell formula token length overflow".to_string())
-        })?;
+        let cb_offset = 4usize
+            .checked_add(cce)
+            .ok_or(Error::InvalidFormula("cell formula token length overflow"))?;
         if data.len() < cb_offset + 4 {
             return Err(Error::InvalidLength {
                 expected: cb_offset + 4,
@@ -70,9 +68,9 @@ impl ParsedFormula {
         let end = cb_offset
             .checked_add(4)
             .and_then(|offset| offset.checked_add(cb))
-            .ok_or_else(|| {
-                Error::InvalidFormula("cell formula ancillary length overflow".to_string())
-            })?;
+            .ok_or(Error::InvalidFormula(
+                "cell formula ancillary length overflow",
+            ))?;
         if data.len() < end {
             return Err(Error::InvalidLength {
                 expected: end,
@@ -92,16 +90,12 @@ impl ParsedFormula {
     /// Serialize this formula with its two length prefixes.
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
         if self.rgce.len() > MAX_CELL_FORMULA_BYTES {
-            return Err(Error::InvalidFormula(format!(
-                "cell formula token length {} exceeds {MAX_CELL_FORMULA_BYTES}",
-                self.rgce.len()
-            )));
+            return Err(Error::InvalidFormula("cell formula token length exceeds"));
         }
         let cce = u32::try_from(self.rgce.len())
-            .map_err(|_| Error::InvalidFormula("formula is too large".to_string()))?;
-        let cb = u32::try_from(self.rgcb.len()).map_err(|_| {
-            Error::InvalidFormula("formula ancillary data is too large".to_string())
-        })?;
+            .map_err(|_| Error::InvalidFormula("formula is too large"))?;
+        let cb = u32::try_from(self.rgcb.len())
+            .map_err(|_| Error::InvalidFormula("formula ancillary data is too large"))?;
         let mut bytes = Vec::with_capacity(8 + self.rgce.len() + self.rgcb.len());
         bytes.extend_from_slice(&cce.to_le_bytes());
         bytes.extend_from_slice(&self.rgce);
@@ -114,9 +108,7 @@ impl ParsedFormula {
     /// cell record.
     pub fn exp(row: u32, col: u32) -> Result<Self> {
         if row >= 1_048_576 || col >= 16_384 {
-            return Err(Error::InvalidCellReference(format!(
-                "grouped formula cell ({row}, {col})"
-            )));
+            return Err(Error::InvalidCellReference("grouped formula cell (, )"));
         }
         let mut rgce = Vec::with_capacity(5);
         rgce.push(ptg_types::PTG_EXP);
@@ -133,18 +125,14 @@ impl ParsedFormula {
             return Ok(None);
         }
         if self.rgce.len() != 5 || self.rgcb.len() != 4 {
-            return Err(Error::InvalidFormula(format!(
-                "PtgExp requires 5 rgce bytes and 4 rgcb bytes, found {} and {}",
-                self.rgce.len(),
-                self.rgcb.len()
-            )));
+            return Err(Error::InvalidFormula(
+                "PtgExp requires 5 rgce bytes and 4 rgcb bytes",
+            ));
         }
         let row = read_u32_le_at(&self.rgce, 1)?;
         let col = read_u32_le_at(&self.rgcb, 0)?;
         if row >= 1_048_576 || col >= 16_384 {
-            return Err(Error::InvalidCellReference(format!(
-                "PtgExp target ({row}, {col})"
-            )));
+            return Err(Error::InvalidCellReference("PtgExp target (, )"));
         }
         Ok(Some((row, col)))
     }
@@ -159,18 +147,12 @@ impl Group {
             });
         }
         if data[16] & !1 != 0 {
-            return Err(Error::InvalidFormula(format!(
-                "BrtArrFmla has reserved flag bits 0x{:02X}",
-                data[16] & !1
-            )));
+            return Err(Error::InvalidFormula("BrtArrFmla has reserved flag bits"));
         }
         let range = Range::parse_binary(data)?;
         let (formula, consumed) = ParsedFormula::parse(&data[17..])?;
         if 17 + consumed != data.len() {
-            return Err(Error::InvalidFormula(format!(
-                "BrtArrFmla has {} trailing bytes",
-                data.len() - 17 - consumed
-            )));
+            return Err(Error::InvalidFormula("BrtArrFmla has trailing bytes"));
         }
         Ok(Self {
             kind: GroupKind::Array,
@@ -190,10 +172,7 @@ impl Group {
         let range = Range::parse_binary(data)?;
         let (formula, consumed) = ParsedFormula::parse(&data[16..])?;
         if 16 + consumed != data.len() {
-            return Err(Error::InvalidFormula(format!(
-                "BrtShrFmla has {} trailing bytes",
-                data.len() - 16 - consumed
-            )));
+            return Err(Error::InvalidFormula("BrtShrFmla has trailing bytes"));
         }
         Ok(Self {
             kind: GroupKind::Shared,
@@ -232,7 +211,7 @@ impl Token {
             },
             Self::TableReference(reference) => reference.to_extended_binary(),
             _ => Err(Error::InvalidFormula(
-                "token is not an extended PtgList/PtgSxName token".to_string(),
+                "token is not an extended PtgList/PtgSxName token",
             )),
         }
     }
@@ -248,18 +227,18 @@ impl TableReference {
                 || external.is_some()
             {
                 return Err(Error::InvalidFormula(
-                    "invalid PtgList cannot carry resident or external table metadata".to_string(),
+                    "invalid PtgList cannot carry resident or external table metadata",
                 ));
             }
         } else if external.is_some() {
             if self.row_type.is_some() || self.columns.is_some() || self.list_index.is_some() {
                 return Err(Error::InvalidFormula(
-                    "nonresident PtgList cannot carry resident table metadata".to_string(),
+                    "nonresident PtgList cannot carry resident table metadata",
                 ));
             }
         } else if self.row_type.is_none() || self.columns.is_none() || self.list_index.is_none() {
             return Err(Error::InvalidFormula(
-                "resident PtgList is missing table metadata".to_string(),
+                "resident PtgList is missing table metadata",
             ));
         }
 
@@ -285,9 +264,9 @@ impl TableReference {
             (self.row_type, self.columns, self.list_index)
         {
             if list_index == 0 || list_index == u32::MAX {
-                return Err(Error::InvalidFormula(format!(
-                    "PtgList has invalid table identifier {list_index}"
-                )));
+                return Err(Error::InvalidFormula(
+                    "PtgList has invalid table identifier",
+                ));
             }
             flags |= u16::from(table_row_type_raw(row_type)) << 2;
             match columns {
@@ -295,7 +274,7 @@ impl TableReference {
                 TableColumns::One(column) => {
                     if column >= 16_384 {
                         return Err(Error::InvalidFormula(
-                            "PtgList column is outside worksheet bounds".to_string(),
+                            "PtgList column is outside worksheet bounds",
                         ));
                     }
                     flags |= 1;
@@ -303,9 +282,7 @@ impl TableReference {
                 },
                 TableColumns::Range { first, last } => {
                     if first > last || last >= 16_384 {
-                        return Err(Error::InvalidFormula(
-                            "PtgList column range is invalid".to_string(),
-                        ));
+                        return Err(Error::InvalidFormula("PtgList column range is invalid"));
                     }
                     flags |= 2;
                     (list_index, first, last)
@@ -333,9 +310,9 @@ impl TableReference {
 fn write_extra_list(reference: &ExternalTableReference) -> Result<Vec<u8>> {
     let table_units = reference.table.encode_utf16().count();
     if table_units == 0 || table_units >= 256 {
-        return Err(Error::InvalidFormula(format!(
-            "PtgExtraList table length {table_units} is outside 1..=255"
-        )));
+        return Err(Error::InvalidFormula(
+            "PtgExtraList table length is outside 1255",
+        ));
     }
     let has_columns = !matches!(reference.columns, TableNamedColumns::All);
     let mut extra = Vec::new();
@@ -361,9 +338,9 @@ fn write_extra_list(reference: &ExternalTableReference) -> Result<Vec<u8>> {
 fn write_sxos(output: &mut Vec<u8>, not_last: bool, name: &str) -> Result<()> {
     let units = name.encode_utf16().count();
     if units == 0 || units > 1_048_576 {
-        return Err(Error::InvalidFormula(format!(
-            "structured-reference column length {units} is outside 1..=1048576"
-        )));
+        return Err(Error::InvalidFormula(
+            "structured-reference column length is outside 11048576",
+        ));
     }
     output.push(u8::from(not_last));
     output.extend_from_slice(&2u16.to_le_bytes());

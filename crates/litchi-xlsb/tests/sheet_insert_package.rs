@@ -18,10 +18,10 @@ use litchi_core::Position;
 use litchi_opc::constants::relationship_type;
 use litchi_opc::{BlobPart, PackURI, Part as _, TargetMode};
 use litchi_xlsb::Package;
+use litchi_xlsb::builder::{self, Builder};
 use litchi_xlsb::chart::{Anchor, Chart};
 use litchi_xlsb::raw::{Encoder, Records, kind};
 use litchi_xlsb::sheet::State;
-use litchi_xlsb::writer::{Builder, MutableChartSheet, MutableWorksheet};
 
 const BINARY_INDEX_RELATIONSHIP: &str =
     "http://schemas.microsoft.com/office/2006/relationships/xlBinaryIndex";
@@ -37,7 +37,7 @@ struct BundleEntry {
 fn worksheets(names: &[&str]) -> Package {
     let mut builder = Builder::new();
     for name in names {
-        builder.add_worksheet(MutableWorksheet::new(*name));
+        builder.add_worksheet(builder::Worksheet::new(*name));
     }
     builder.build().expect("worksheet package")
 }
@@ -54,9 +54,9 @@ fn chart_first_package() -> Package {
     .expect("chart fixture");
     let mut builder = Builder::new();
     builder
-        .add_chart_sheet(MutableChartSheet::new("Chart", chart))
+        .add_chart_sheet(builder::ChartSheet::new("Chart", chart))
         .expect("chart sheet fixture");
-    builder.add_worksheet(MutableWorksheet::new("Data"));
+    builder.add_worksheet(builder::Worksheet::new("Data"));
     builder.build().expect("chart-first package")
 }
 
@@ -85,7 +85,7 @@ fn bundle_entries(package: &Package) -> Vec<BundleEntry> {
         .opc_package()
         .get_part(&workbook_uri)
         .expect("workbook part");
-    Records::new(workbook.blob())
+    Records::new(workbook.blob(), litchi_xlsb::raw::Limits::DEFAULT)
         .map(|item| item.expect("workbook record"))
         .filter(|record| record.kind() == kind::BUNDLE_SH)
         .map(|record| {
@@ -160,7 +160,7 @@ fn sheet_view_flags(package: &Package, name: &str) -> u16 {
         .get_part(&part)
         .expect("worksheet part")
         .blob();
-    Records::new(blob)
+    Records::new(blob, litchi_xlsb::raw::Limits::DEFAULT)
         .map(|item| item.expect("worksheet record"))
         .find(|record| record.kind() == kind::BEGIN_WS_VIEW)
         .map(|record| {
@@ -177,7 +177,7 @@ fn sheet_view_flags(package: &Package, name: &str) -> u16 {
 }
 
 fn book_view_indices(package: &Package) -> Vec<(u32, u32)> {
-    Records::new(&workbook_blob(package))
+    Records::new(&workbook_blob(package), litchi_xlsb::raw::Limits::DEFAULT)
         .filter_map(|item| {
             let record = item.expect("workbook record");
             (record.kind() == kind::BOOK_VIEW).then(|| {
@@ -195,8 +195,8 @@ fn with_book_view_indices(package: &Package, first: u32, active: u32) -> Package
     let uri = workbook_uri(package);
     let source = opc.get_part(&uri).expect("workbook part").blob().to_vec();
     let mut output = Vec::new();
-    let mut writer = Encoder::new(&mut output);
-    for item in Records::new(&source) {
+    let mut writer = Encoder::new(&mut output, litchi_xlsb::raw::Limits::DEFAULT);
+    for item in Records::new(&source, litchi_xlsb::raw::Limits::DEFAULT) {
         let record = item.expect("workbook record");
         let mut payload = record.payload().to_vec();
         if record.kind() == kind::BOOK_VIEW {

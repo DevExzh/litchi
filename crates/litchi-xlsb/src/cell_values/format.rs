@@ -149,7 +149,7 @@ impl Format {
             let units = name.encode_utf16().count();
             if !(1..=31).contains(&units) || name.contains('\0') {
                 return Err(Error::InvalidFormat(
-                    "a font name must hold 1..=31 UTF-16 units and no NUL".to_string(),
+                    "a font name must hold 1..=31 UTF-16 units and no NUL",
                 ));
             }
         }
@@ -157,7 +157,7 @@ impl Format {
             let units = code.encode_utf16().count();
             if !(1..=255).contains(&units) || code.contains('\0') {
                 return Err(Error::InvalidFormat(
-                    "a number format must hold 1..=255 UTF-16 units and no NUL".to_string(),
+                    "a number format must hold 1..=255 UTF-16 units and no NUL",
                 ));
             }
         }
@@ -165,17 +165,13 @@ impl Format {
             .rotation
             .is_some_and(|value| value > 180 && value != 255)
         {
-            return Err(Error::InvalidFormat(
-                "text rotation must be 0..=180 or 255".to_string(),
-            ));
+            return Err(Error::InvalidFormat("text rotation must be 0..=180 or 255"));
         }
         if self.indent.is_some_and(|value| value > 250) {
-            return Err(Error::InvalidFormat("indent must be 0..=250".to_string()));
+            return Err(Error::InvalidFormat("indent must be 0250"));
         }
         if self.reading_order.is_some_and(|value| value > 2) {
-            return Err(Error::InvalidFormat(
-                "reading order must be 0, 1 or 2".to_string(),
-            ));
+            return Err(Error::InvalidFormat("reading order must be 0, 1 or 2"));
         }
         Ok(())
     }
@@ -210,9 +206,7 @@ const BORDER_LEN: usize = 51;
 fn font_height(points: f64) -> Result<u16> {
     let twips = (points * 20.0).round();
     if !points.is_finite() || !(20.0..=8180.0).contains(&twips) {
-        return Err(Error::InvalidFormat(
-            "a font size must be 1..=409 points".to_string(),
-        ));
+        return Err(Error::InvalidFormat("a font size must be 1..=409 points"));
     }
     #[allow(
         clippy::cast_possible_truncation,
@@ -237,26 +231,23 @@ fn color_bytes(color: Option<u32>) -> [u8; 8] {
 fn field<'a>(
     payload: &'a mut [u8],
     range: std::ops::Range<usize>,
-    what: &str,
+    _what: &str,
 ) -> Result<&'a mut [u8]> {
-    let len = payload.len();
     payload
         .get_mut(range)
-        .ok_or_else(|| Error::InvalidFormat(format!("{what} record is truncated ({len} bytes)")))
+        .ok_or(Error::InvalidFormat("record is truncated"))
 }
 
 fn read_index(payload: &[u8], offset: usize) -> Result<usize> {
     let bytes = payload
         .get(offset..offset + 2)
-        .ok_or_else(|| Error::InvalidFormat("BrtXF record is truncated".to_string()))?;
+        .ok_or(Error::InvalidFormat("BrtXF record is truncated"))?;
     Ok(usize::from(u16::from_le_bytes([bytes[0], bytes[1]])))
 }
 
 fn patch_font(font: &mut Vec<u8>, format: &Format) -> Result<()> {
     if font.len() < FONT_NAME {
-        return Err(Error::InvalidFormat(
-            "BrtFont record is truncated".to_string(),
-        ));
+        return Err(Error::InvalidFormat("BrtFont record is truncated"));
     }
     if let Some(size) = format.font_size {
         field(font, 0..2, "BrtFont")?.copy_from_slice(&font_height(size)?.to_le_bytes());
@@ -289,16 +280,14 @@ fn patch_font(font: &mut Vec<u8>, format: &Format) -> Result<()> {
     }
     if let Some(name) = &format.font_name {
         font.truncate(FONT_NAME);
-        Encoder::new(&mut *font).write_wide_string(name)?;
+        Encoder::new(&mut *font, crate::raw::Limits::DEFAULT).write_wide_string(name)?;
     }
     Ok(())
 }
 
 fn patch_border(border: &mut [u8], format: &Format) -> Result<()> {
     if border.len() < BORDER_LEN {
-        return Err(Error::InvalidFormat(
-            "BrtBorder record is truncated".to_string(),
-        ));
+        return Err(Error::InvalidFormat("BrtBorder record is truncated"));
     }
     for (offset, change) in [
         (1, format.border_top),
@@ -374,17 +363,14 @@ fn builtin_number_format(code: &str) -> Option<u16> {
 pub(super) fn restyle(styles: &mut Vec<u8>, old: u32, format: &Format) -> Result<u32> {
     let xfs =
         super::resources::collection(styles, kind::BEGIN_CELL_XFS, kind::END_CELL_XFS, kind::XF)?;
-    let old_index = usize::try_from(old).map_err(|_error| {
-        Error::InvalidFormat("cell XF index exceeds this platform".to_string())
-    })?;
+    let old_index = usize::try_from(old)
+        .map_err(|_error| Error::InvalidFormat("cell XF index exceeds this platform"))?;
     let mut xf = xfs
         .get(old_index)
         .cloned()
-        .ok_or_else(|| Error::InvalidFormat(format!("cell XF {old} is not in the styles part")))?;
+        .ok_or(Error::InvalidFormat("cell XF is not in the styles part"))?;
     if xf.len() < XF_LEN {
-        return Err(Error::InvalidFormat(
-            "BrtXF record is truncated".to_string(),
-        ));
+        return Err(Error::InvalidFormat("BrtXF record is truncated"));
     }
     let mut applied = 0_u8;
     if format.changes_font() {
@@ -393,7 +379,7 @@ pub(super) fn restyle(styles: &mut Vec<u8>, old: u32, format: &Format) -> Result
         let mut font = fonts
             .get(read_index(&xf, XF_FONT)?)
             .cloned()
-            .ok_or_else(|| Error::InvalidFormat("the cell XF names a missing font".to_string()))?;
+            .ok_or(Error::InvalidFormat("the cell XF names a missing font"))?;
         patch_font(&mut font, format)?;
         let index = super::resources::intern_payload(
             styles,
@@ -435,9 +421,7 @@ pub(super) fn restyle(styles: &mut Vec<u8>, old: u32, format: &Format) -> Result
         let mut border = borders
             .get(read_index(&xf, XF_BORDER)?)
             .cloned()
-            .ok_or_else(|| {
-                Error::InvalidFormat("the cell XF names a missing border".to_string())
-            })?;
+            .ok_or(Error::InvalidFormat("the cell XF names a missing border"))?;
         patch_border(&mut border, format)?;
         let index = super::resources::intern_payload(
             styles,

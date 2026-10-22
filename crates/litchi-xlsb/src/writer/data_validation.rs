@@ -145,7 +145,7 @@ fn write_extension14_collection<W: Write>(
 pub(crate) fn encode_classic_records(dv: &Validation) -> Result<Vec<u8>> {
     validate_rule(dv)?;
     let mut out = Vec::new();
-    let mut writer = Encoder::new(&mut out);
+    let mut writer = Encoder::new(&mut out, crate::raw::Limits::DEFAULT);
     if let Some(list_formula) = &dv.list_formula {
         let mut payload = Vec::new();
         write_xl_wide_string(&mut payload, list_formula);
@@ -378,9 +378,9 @@ fn compile_string_list(text: &str) -> Result<ParsedFormula> {
         .unwrap_or(text);
     let length = value.encode_utf16().count();
     if length > 255 {
-        return Err(Error::InvalidFormula(format!(
-            "inline validation string list has {length} UTF-16 units; maximum is 255 (use list_formula for BrtDValList)"
-        )));
+        return Err(Error::InvalidFormula(
+            "inline validation string list has UTF-16 units; maximum is 255 (use list_formula for BrtDValList)",
+        ));
     }
     let mut rgce = Vec::new();
     build_ptg_for_value(text, &mut rgce);
@@ -392,19 +392,16 @@ fn compile_string_list(text: &str) -> Result<ParsedFormula> {
 
 fn validate_rule(dv: &Validation) -> Result<()> {
     if dv.validation_type > 7 {
-        return Err(invalid(format!(
-            "validation type {} exceeds 7",
-            dv.validation_type
-        )));
+        return Err(invalid("validation type exceeds 7"));
     }
     if dv.error_style > 2 {
-        return Err(invalid(format!("error style {} exceeds 2", dv.error_style)));
+        return Err(invalid("error style exceeds 2"));
     }
     if dv.ime_mode > 10 {
-        return Err(invalid(format!("IME mode {} exceeds 10", dv.ime_mode)));
+        return Err(invalid("IME mode exceeds 10"));
     }
     if !matches!(dv.validation_type, 0 | 3 | 7) && dv.operator > 7 {
-        return Err(invalid(format!("operator {} exceeds 7", dv.operator)));
+        return Err(invalid("operator exceeds 7"));
     }
     if dv.record_kind == RecordKind::Extension14 && dv.list_formula.is_some() {
         return Err(invalid(
@@ -421,33 +418,26 @@ fn validate_rule(dv: &Validation) -> Result<()> {
     {
         let _ = compile_string_list(formula)?;
     }
-    for (name, value, maximum) in [
+    for (_name, value, maximum) in [
         ("error title", dv.error_title.as_deref(), 32),
         ("error message", dv.error_text.as_deref(), 225),
         ("prompt title", dv.input_title.as_deref(), 32),
         ("prompt message", dv.input_text.as_deref(), 255),
     ] {
         if value.is_some_and(|text| text.encode_utf16().count() > maximum) {
-            return Err(invalid(format!(
-                "{name} exceeds {maximum} UTF-16 code units"
-            )));
+            return Err(invalid("exceeds UTF-16 code units"));
         }
     }
-    for (name, formula) in [
+    for (_name, formula) in [
         ("formula1", dv.formula1_binary.as_ref()),
         ("formula2", dv.formula2_binary.as_ref()),
     ] {
         if let Some(formula) = formula {
             if formula.rgce.is_empty() || formula.rgce.len() > 16_384 {
-                return Err(Error::InvalidFormula(format!(
-                    "{name} token length {} is outside 1..=16,384",
-                    formula.rgce.len()
-                )));
+                return Err(Error::InvalidFormula("token length is outside 116,384"));
             }
             if formula.rgcb.len() > u32::MAX as usize {
-                return Err(Error::InvalidFormula(format!(
-                    "{name} ancillary stream is too large"
-                )));
+                return Err(Error::InvalidFormula("ancillary stream is too large"));
             }
         }
     }
@@ -472,10 +462,9 @@ fn validate_rule(dv: &Validation) -> Result<()> {
         _ => (true, false),
     };
     if (first, second) != required {
-        return Err(Error::InvalidFormula(format!(
-            "validation formula presence {first}/{second} does not match required {}/{}",
-            required.0, required.1
-        )));
+        return Err(Error::InvalidFormula(
+            "validation formula presence / does not match required /",
+        ));
     }
     let ranges = parse_range_list(&dv.cell_ranges)?;
     let maximum = if dv.record_kind == RecordKind::Classic {
@@ -484,10 +473,9 @@ fn validate_rule(dv: &Validation) -> Result<()> {
         usize::MAX
     };
     if ranges.is_empty() || ranges.len() > maximum {
-        return Err(invalid(format!(
-            "validation range count {} is outside 1..={maximum}",
-            ranges.len()
-        )));
+        return Err(invalid(
+            "validation range count is outside its allowed range",
+        ));
     }
     if ranges.iter().any(|range| {
         range.row_first > range.row_last
@@ -500,11 +488,12 @@ fn validate_rule(dv: &Validation) -> Result<()> {
     Ok(())
 }
 
-fn invalid(value: impl Into<String>) -> Error {
-    Error::Unrecognized {
-        typ: "BrtDVal".to_string(),
-        val: value.into(),
-    }
+fn invalid(_value: &'static str) -> Error {
+    Error::refused(
+        litchi_core::edit::RefusalKind::InvalidValue,
+        "build_xlsb",
+        "the data-validation value is outside the XLSB vocabulary",
+    )
 }
 
 /// Build the most appropriate PTG token for a formula value string.
@@ -684,7 +673,7 @@ mod tests {
     #[test]
     fn test_write_data_validations_empty() {
         let mut buffer = Vec::new();
-        let mut writer = Encoder::new(&mut buffer);
+        let mut writer = Encoder::new(&mut buffer, crate::raw::Limits::DEFAULT);
         let validations: Vec<Validation> = vec![];
 
         let result = write_data_validations(
@@ -700,7 +689,7 @@ mod tests {
     #[test]
     fn test_write_data_validations_single() {
         let mut buffer = Vec::new();
-        let mut writer = Encoder::new(&mut buffer);
+        let mut writer = Encoder::new(&mut buffer, crate::raw::Limits::DEFAULT);
         let validations = vec![Validation {
             validation_type: 3, // list
             operator: 0,

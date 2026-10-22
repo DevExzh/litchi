@@ -31,7 +31,7 @@ pub enum Error {
     InvalidLength { expected: usize, found: usize },
     /// A defined-name invariant is invalid.
     #[error("invalid formula: {0}")]
-    InvalidFormula(String),
+    InvalidFormula(&'static str),
 }
 
 pub use codec::{MAX_RECORD_BYTES, area3d_formula, parse};

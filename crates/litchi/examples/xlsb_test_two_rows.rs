@@ -6,14 +6,14 @@
 //! ```
 
 use litchi::sheet::CellValue;
-use litchi::xlsb::writer::{Builder, MutableWorksheet};
+use litchi::xlsb::builder::{self, Builder};
 use std::fs::File;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Test 4: Creating XLSB with two rows...");
 
     let mut workbook = Builder::new();
-    let mut sheet = MutableWorksheet::new("Sheet1");
+    let mut sheet = builder::Worksheet::new("Sheet1");
     sheet.set_cell(0, 0, CellValue::String("A1".to_string()));
     sheet.set_cell(1, 0, CellValue::String("A2".to_string()));
     workbook.add_worksheet(sheet);

@@ -122,9 +122,9 @@ impl State {
             0 => Ok(Self::Visible),
             1 => Ok(Self::Hidden),
             2 => Ok(Self::VeryHidden),
-            other => Err(Error::Unrecognized {
-                typ: "BrtBundleSh hsState".to_string(),
-                val: other.to_string(),
+            _other => Err(Error::Unrecognized {
+                typ: "BrtBundleSh hsState",
+                val: "unexpected value",
             }),
         }
     }

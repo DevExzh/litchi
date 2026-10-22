@@ -392,12 +392,10 @@ fn changed_commit(file: &File) -> (Vec<u8>, String) {
         File::Xlsb(handle) => {
             use litchi_xlsb::cell_values::{Reference, StyleIndex, Value};
 
-            let Ok(crate::format::xlsb::XlsbEditor::Materialized(workbook)) = handle.editor()
-            else {
+            let Ok(crate::format::xlsb::XlsbEditor::Materialized(package)) = handle.editor() else {
                 panic!("an unsigned XLSB builds an owning unsigned copy");
             };
-            let mut edit = (*workbook)
-                .into_package()
+            let mut edit = package
                 .edit_cell_values(0)
                 .unwrap()
                 .expect("worksheet selector resolves");

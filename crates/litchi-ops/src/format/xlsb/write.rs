@@ -1537,8 +1537,8 @@ fn duplicate_cell_property(property: &'static str) -> Error {
 
 pub(super) fn package_from_editor(editor: XlsbEditor<'_>) -> litchi_xlsb::Package {
     match editor {
-        XlsbEditor::Eager(workbook) => workbook.to_package(),
-        XlsbEditor::Materialized(workbook) => workbook.into_package(),
+        XlsbEditor::Eager(package) => package.clone(),
+        XlsbEditor::Materialized(package) => *package,
     }
 }
 
@@ -2150,8 +2150,7 @@ pub(crate) fn write_to<W: Write>(file: &Xlsb, mut sink: W) -> Result<()> {
     file.0.owner.finish(|| {
         if file.signature() == super::Signature::RemovalAuthorized {
             return file
-                .unsigned_workbook()?
-                .into_package()
+                .unsigned_package()?
                 .write_to(&mut sink)
                 .map_err(native_error);
         }
@@ -2160,10 +2159,7 @@ pub(crate) fn write_to<W: Write>(file: &Xlsb, mut sink: W) -> Result<()> {
                 .workbook()
                 .write_to(&mut sink)
                 .map_err(native_error),
-            XlsbOwner::Eager(workbook) => workbook
-                .to_package()
-                .write_to(&mut sink)
-                .map_err(native_error),
+            XlsbOwner::Eager(package) => package.write_to(&mut sink).map_err(native_error),
         }
     })
 }

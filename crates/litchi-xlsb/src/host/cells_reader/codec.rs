@@ -30,9 +30,9 @@ use std::sync::Arc;
 const GRBIT_FMLA_DEFINED: u16 = 0x0002;
 
 fn required_cell_header(header: Option<CellHeader>) -> Result<CellHeader> {
-    header.ok_or_else(|| {
-        Error::InvalidFormat("cell record was classified without a cell header".to_string())
-    })
+    header.ok_or(Error::InvalidFormat(
+        "cell record was classified without a cell header",
+    ))
 }
 
 impl<'a, RS> CellsReader<'a, RS>
@@ -205,7 +205,7 @@ where
                     // BrtCellRk
                     if self.buf.len() >= 12 => {
                         let header = required_cell_header(cell_header)?;
-                        let mut cursor = Cursor::new(&self.buf[8..], "BrtCellRk");
+                        let mut cursor = Cursor::new(&self.buf[8..], "BrtCellRk", crate::raw::Limits::DEFAULT);
                         let value = super::semantic::cell_value_from_number(cursor.read_rk()?);
                         return Ok(Some(Cell::new_styled(
                             self.current_row,
@@ -228,7 +228,7 @@ where
                     // BrtCellBool
                     if self.buf.len() >= 9 => {
                         let header = required_cell_header(cell_header)?;
-                        let mut cursor = Cursor::new(&self.buf[8..], "BrtCellBool");
+                        let mut cursor = Cursor::new(&self.buf[8..], "BrtCellBool", crate::raw::Limits::DEFAULT);
                         let row = self.current_row;
                         let value = Tolerance::recording(&mut self.tolerance)
                             .read_bool8(&mut cursor, typ, row)?;
@@ -352,7 +352,7 @@ where
                         });
                     }
                     let header = required_cell_header(cell_header)?;
-                    let mut cursor = Cursor::new(&self.buf[8..], "BrtFmlaBool cached value");
+                    let mut cursor = Cursor::new(&self.buf[8..], "BrtFmlaBool cached value", crate::raw::Limits::DEFAULT);
                     let row = self.current_row;
                     let bool_value = Tolerance::recording(&mut self.tolerance)
                         .read_bool8(&mut cursor, typ, row)?;
@@ -384,8 +384,7 @@ where
                 },
                 kind::ARR_FMLA | kind::SHR_FMLA => {
                     return Err(Error::InvalidFormula(
-                        "array/shared formula definition is not immediately preceded by a formula cell"
-                            .to_string(),
+                        "array/shared formula definition is not immediately preceded by a formula cell",
                     ));
                 },
                 _ => {
@@ -407,7 +406,7 @@ where
                 record_type,
                 row,
                 u32::from(code),
-                || Error::InvalidFormat(format!("invalid BErr value 0x{code:02X}")),
+                || Error::InvalidFormat("invalid BErr value"),
             )?;
         }
         Ok(text)
@@ -425,7 +424,7 @@ where
         let mut tolerance = Tolerance::recording_with(&mut self.tolerance, self.leniency);
         Ok(
             match tolerance.cached_number(value, record_type, row, || {
-                Error::InvalidFormat("non-normal cached number".to_string())
+                Error::InvalidFormat("non-normal cached number")
             })? {
                 CachedNumber::Number(value) => CellValue::Float(value),
                 CachedNumber::NumError => CellValue::Error("#NUM!".to_string()),
@@ -442,7 +441,7 @@ where
     ) -> Result<ParsedFormulaCell> {
         let formula_offset = flags_offset
             .checked_add(2)
-            .ok_or_else(|| Error::InvalidFormula("formula record offset overflow".to_string()))?;
+            .ok_or(Error::InvalidFormula("formula record offset overflow"))?;
         if self.buf.len() < formula_offset {
             return Err(Error::InvalidLength {
                 expected: formula_offset,
@@ -460,14 +459,14 @@ where
                 record_type,
                 row,
                 u32::from(flags & !GRBIT_FMLA_DEFINED),
-                || Error::InvalidFormula(format!("invalid GrbitFmla flags 0x{flags:04X}")),
+                || Error::InvalidFormula("invalid GrbitFmla flags"),
             )?;
             flags &= GRBIT_FMLA_DEFINED;
         }
         let (formula, consumed) = ParsedFormula::parse(&self.buf[formula_offset..])?;
         let trailing = self.buf.len().saturating_sub(formula_offset + consumed);
         tolerance.tolerate_trailing(record_type, row, trailing, || {
-            Error::InvalidFormula(format!("formula record has {trailing} trailing bytes"))
+            Error::InvalidFormula("formula record has trailing bytes")
         })?;
         Ok(ParsedFormulaCell {
             header,
@@ -495,39 +494,26 @@ where
 
         let group = if let Some(group) = new_group {
             if exp_cell.is_none() {
-                return Err(Error::InvalidFormula(format!(
-                    "{:?} formula definition is not preceded by PtgExp",
-                    group.kind
-                )));
+                return Err(Error::InvalidFormula(
+                    "formula definition is not preceded by PtgExp",
+                ));
             }
             if exp_cell != Some(position) {
-                return Err(Error::InvalidFormula(format!(
-                    "group definition at ({}, {}) is referenced by PtgExp ({}, {})",
-                    position.0,
-                    position.1,
-                    exp_cell.map_or(u32::MAX, |target| target.0),
-                    exp_cell.map_or(u32::MAX, |target| target.1)
-                )));
+                return Err(Error::InvalidFormula(
+                    "group definition at (, ) is referenced by PtgExp (, )",
+                ));
             }
             if group.formula.rgce.first() == Some(&crate::package::formula::ptg_types::PTG_EXP) {
                 return Err(Error::InvalidFormula(
-                    "array/shared formula definition cannot contain PtgExp".to_string(),
+                    "array/shared formula definition cannot contain PtgExp",
                 ));
             }
             match group.kind {
                 GroupKind::Array if group.range.top_left() != position => {
-                    return Err(Error::InvalidFormula(format!(
-                        "BrtArrFmla range {} is not anchored at {}",
-                        group.range.to_a1(),
-                        crate::package::utils::cell_reference(position.0, position.1)
-                    )));
+                    return Err(Error::InvalidFormula("BrtArrFmla range is not anchored"));
                 },
                 GroupKind::Shared if group.range.top_left() != position => {
-                    return Err(Error::InvalidFormula(format!(
-                        "BrtShrFmla range {} is not anchored at {}",
-                        group.range.to_a1(),
-                        crate::package::utils::cell_reference(position.0, position.1)
-                    )));
+                    return Err(Error::InvalidFormula("BrtShrFmla range is not anchored"));
                 },
                 _ => {},
             }
@@ -557,10 +543,9 @@ where
                 self.formula_context,
             )?)
         } else if exp_cell.is_some() {
-            Err(Error::InvalidFormula(format!(
-                "PtgExp cell {} has no array/shared formula definition",
-                crate::package::utils::cell_reference(position.0, position.1)
-            )))
+            Err(Error::InvalidFormula(
+                "PtgExp cell has no array/shared formula definition",
+            ))
         } else {
             Ok(Cell::new_formula_binary(
                 position.0,
@@ -609,8 +594,8 @@ where
                 kind::BEGIN_A_FILTER => {
                     if self.auto_filter.is_some() {
                         return Err(Error::Unrecognized {
-                            typ: "BrtBeginAFilter".to_string(),
-                            val: "duplicate worksheet AutoFilter".to_string(),
+                            typ: "BrtBeginAFilter",
+                            val: "duplicate worksheet AutoFilter",
                         });
                     }
                     self.auto_filter = Some(Self::parse_auto_filter(&self.buf)?);
@@ -619,8 +604,8 @@ where
                 kind::SHEET_PROTECTION => {
                     if self.sheet_protection.is_some() {
                         return Err(Error::Unrecognized {
-                            typ: "BrtSheetProtection".to_string(),
-                            val: "duplicate record".to_string(),
+                            typ: "BrtSheetProtection",
+                            val: "duplicate record",
                         });
                     }
                     self.sheet_protection = Some(Self::parse_sheet_protection(&self.buf)?);
@@ -628,8 +613,8 @@ where
                 kind::SHEET_PROTECTION_ISO => {
                     if self.sheet_protection.is_some() || self.strong_sheet_protection.is_some() {
                         return Err(Error::Unrecognized {
-                            typ: "BrtSheetProtectionIso".to_string(),
-                            val: "duplicate protection record".to_string(),
+                            typ: "BrtSheetProtectionIso",
+                            val: "duplicate protection record",
                         });
                     }
                     let (strong, iso_flags) = Self::parse_strong_sheet_protection(&self.buf)?;
@@ -638,8 +623,8 @@ where
                     let _ = self.iter.fill_buffer(&mut self.buf)?;
                     if next_type != kind::SHEET_PROTECTION {
                         return Err(Error::Unrecognized {
-                            typ: "BrtSheetProtectionIso".to_string(),
-                            val: "not immediately followed by BrtSheetProtection".to_string(),
+                            typ: "BrtSheetProtectionIso",
+                            val: "not immediately followed by BrtSheetProtection",
                         });
                     }
                     let base = Self::parse_sheet_protection(&self.buf)?;
@@ -647,8 +632,8 @@ where
                         || Self::sheet_protection_flags(&base) != iso_flags
                     {
                         return Err(Error::Unrecognized {
-                            typ: "BrtSheetProtectionIso".to_string(),
-                            val: "following protection record does not match".to_string(),
+                            typ: "BrtSheetProtectionIso",
+                            val: "following protection record does not match",
                         });
                     }
                     self.sheet_protection = Some(base);
@@ -657,8 +642,8 @@ where
                 kind::BEGIN_D_VALS => {
                     if self.data_validation_settings.is_some() {
                         return Err(Error::Unrecognized {
-                            typ: "BrtBeginDVals".to_string(),
-                            val: "duplicate collection".to_string(),
+                            typ: "BrtBeginDVals",
+                            val: "duplicate collection",
                         });
                     }
                     let (settings, count) = parse_collection_settings(&self.buf, false)?;
@@ -668,8 +653,8 @@ where
                 kind::BEGIN_D_VALS14 => {
                     if self.data_validation14_settings.is_some() {
                         return Err(Error::Unrecognized {
-                            typ: "BrtBeginDVals14".to_string(),
-                            val: "duplicate collection".to_string(),
+                            typ: "BrtBeginDVals14",
+                            val: "duplicate collection",
                         });
                     }
                     let (settings, count) = parse_collection_settings(&self.buf, true)?;
@@ -690,14 +675,14 @@ where
                 kind::BEGIN_WEB_EXTENSIONS => {
                     if self.saw_web_extension_collection {
                         return Err(Error::Unrecognized {
-                            typ: "BrtBeginWebExtensions".to_string(),
-                            val: "duplicate collection".to_string(),
+                            typ: "BrtBeginWebExtensions",
+                            val: "duplicate collection",
                         });
                     }
                     if !self.buf.is_empty() {
                         return Err(Error::Unrecognized {
-                            typ: "BrtBeginWebExtensions".to_string(),
-                            val: "begin record must be empty".to_string(),
+                            typ: "BrtBeginWebExtensions",
+                            val: "begin record must be empty",
                         });
                     }
                     self.saw_web_extension_collection = true;
@@ -727,8 +712,8 @@ where
                 kind::WEB_EXTENSION => {
                     if self.web_extension_bindings.len() == 65_536 {
                         return Err(Error::Unrecognized {
-                            typ: "WEBEXTENSIONS".to_string(),
-                            val: "binding count exceeds 65,536".to_string(),
+                            typ: "WEBEXTENSIONS",
+                            val: "binding count exceeds 65,536",
                         });
                     }
                     let binding = Binding::parse_payload(&self.buf, |index| {
@@ -736,8 +721,8 @@ where
                     })?;
                     if !app_refs.insert(binding.application_reference.clone()) {
                         return Err(Error::Unrecognized {
-                            typ: "WEBEXTENSIONS".to_string(),
-                            val: "duplicate binding appRef".to_string(),
+                            typ: "WEBEXTENSIONS",
+                            val: "duplicate binding appRef",
                         });
                     }
                     self.web_extension_bindings.push(binding);
@@ -745,22 +730,22 @@ where
                 kind::END_WEB_EXTENSIONS => {
                     if !self.buf.is_empty() {
                         return Err(Error::Unrecognized {
-                            typ: "BrtEndWebExtensions".to_string(),
-                            val: "end record must be empty".to_string(),
+                            typ: "BrtEndWebExtensions",
+                            val: "end record must be empty",
                         });
                     }
                     if self.web_extension_bindings.is_empty() {
                         return Err(Error::Unrecognized {
-                            typ: "WEBEXTENSIONS".to_string(),
-                            val: "collection requires at least one binding".to_string(),
+                            typ: "WEBEXTENSIONS",
+                            val: "collection requires at least one binding",
                         });
                     }
                     return Ok(());
                 },
-                other => {
+                _other => {
                     return Err(Error::Unrecognized {
-                        typ: "WEBEXTENSIONS".to_string(),
-                        val: format!("unexpected record 0x{other:04X}"),
+                        typ: "WEBEXTENSIONS",
+                        val: "unexpected record",
                     });
                 },
             }

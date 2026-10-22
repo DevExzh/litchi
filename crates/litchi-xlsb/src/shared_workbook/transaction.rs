@@ -1,7 +1,13 @@
-//! Source-checked snapshot edits for shared-workbook revision metadata.
+//! Immutable edits of shared-workbook revision metadata (record 0360b).
 //!
-//! The transaction owns metadata and opaque BIFF12 record envelopes only. It
-//! never coordinates users, acquires locks, or applies revision records.
+//! [`crate::Package::edit_shared_workbook`] starts an [`Edit`] that owns
+//! metadata and opaque BIFF12 record envelopes only: it never coordinates
+//! users, acquires locks, or applies revision records. [`Edit::commit`]
+//! stores the staged catalog, reads it back and returns a [`Commit`] with the
+//! new package, the exact part-level [`Patch`] and the [`Diagnostics`];
+//! [`crate::Package::apply_shared_workbook`] replays a patch onto an equal
+//! package. An unchanged catalog publishes nothing, and a changed edit of a
+//! signed workbook is refused with [`crate::shared_workbook::Error::Signed`].
 
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -12,7 +18,56 @@ use super::model::{
     Catalog, Header, Info, RawRecord, RevisionHeaders, RevisionLog, User, UserNames,
 };
 use super::{Result, package, validation};
-use crate::package::error::Error;
+use crate::part_edit::{Staged, family};
+
+family!("shared-workbook", shared_error);
+
+/// A bounded dimension of this family.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum LimitKind {
+    /// Revision logs of the workbook.
+    Revisions,
+    /// Users of the current-user log.
+    Users,
+}
+
+impl crate::Package {
+    /// The shared-workbook revision metadata of this package.
+    ///
+    /// # Errors
+    ///
+    /// Returns the owner graph, decoding and validation errors.
+    pub fn shared_workbook(&self) -> Result<Snapshot> {
+        Snapshot::read(self.opc_package())
+    }
+
+    /// Start a shared-workbook metadata edit. Starting one copies no part
+    /// payload.
+    ///
+    /// # Errors
+    ///
+    /// Returns the owner graph, decoding and validation errors.
+    pub fn edit_shared_workbook(&self) -> Result<Edit> {
+        let base = Snapshot::read(self.opc_package())?;
+        Ok(Edit {
+            staged: Staged::of_package(self)?,
+            catalog: base.catalog.clone(),
+            base,
+        })
+    }
+
+    /// Apply a shared-workbook patch to a new package; this one is unchanged.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::shared_workbook::Error::PatchConflict`] when this package is not the patch's
+    /// before state and [`crate::shared_workbook::Error::Signed`] for a changed patch of a signed
+    /// workbook.
+    pub fn apply_shared_workbook(&self, patch: &Patch) -> Result<Commit> {
+        Ok(Commit::new((patch.0.apply(self)?, patch.0.clone())))
+    }
+}
 
 /// An immutable shared-workbook metadata snapshot bound to package source.
 #[derive(Debug, Clone)]
@@ -75,15 +130,6 @@ impl Snapshot {
     pub fn is_empty(&self) -> bool {
         self.catalog == Catalog::empty()
     }
-
-    /// Start a detached transaction against this snapshot.
-    #[must_use]
-    pub fn edit(&self) -> Edit {
-        Edit {
-            base: self.clone(),
-            catalog: self.catalog.clone(),
-        }
-    }
 }
 
 impl PartialEq for Snapshot {
@@ -94,14 +140,20 @@ impl PartialEq for Snapshot {
 
 impl Eq for Snapshot {}
 
-/// A detached, failure-atomic metadata transaction.
+/// A staged shared-workbook metadata edit. Dropping it discards it.
 #[derive(Debug, Clone)]
 pub struct Edit {
+    staged: Staged,
     base: Snapshot,
     catalog: Catalog,
 }
 
 impl Edit {
+    /// Discard every staged change.
+    pub fn reset(&mut self) {
+        self.catalog = self.base.catalog.clone();
+    }
+
     /// Borrow the currently staged metadata graph.
     #[must_use]
     pub const fn catalog(&self) -> &Catalog {
@@ -274,25 +326,24 @@ impl Edit {
         Ok(Some(value))
     }
 
-    /// Validate and produce a source-checked commit.
-    pub fn commit(self) -> Result<Commit> {
+    /// Validate the staged catalog, store it, check that the result reads
+    /// back and publish a new package. An unchanged catalog returns the source package.
+    ///
+    /// # Errors
+    ///
+    /// Returns the catalog validation errors, [`crate::shared_workbook::Error::Signed`] for a changed
+    /// edit of a signed workbook and the workbook validation errors of the
+    /// result.
+    pub fn commit(mut self) -> Result<Commit> {
         self.validate_candidate(&self.catalog)?;
-        let source =
-            Arc::clone(self.base.source.as_ref().ok_or_else(|| {
-                super::unsupported("shared-workbook snapshot is not source bound")
-            })?);
-        let changed = self.catalog != self.base.catalog;
-        Ok(Commit {
-            snapshot: Snapshot {
-                catalog: self.catalog.clone(),
-                source: (!changed).then_some(Arc::clone(&source)),
-            },
-            patch: Patch {
-                before: source,
-                after: self.catalog,
-                changed,
-            },
-        })
+        if self.catalog != self.base.catalog {
+            let catalog = self.catalog.clone();
+            self.staged.update(|candidate| {
+                package::store(candidate, &catalog)?;
+                Snapshot::read(candidate).map(drop)
+            })?;
+        }
+        Ok(Commit::new(self.staged.commit()?))
     }
 
     fn apply_candidate(&mut self, candidate: Catalog) -> Result<()> {
@@ -318,82 +369,6 @@ impl Edit {
             )),
         }
     }
-}
-
-/// A successful immutable transaction result.
-#[derive(Debug, Clone)]
-pub struct Commit {
-    snapshot: Snapshot,
-    patch: Patch,
-}
-
-impl Commit {
-    /// Borrow the committed semantic snapshot.
-    #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
-    }
-
-    /// Borrow the source-checked package patch.
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Consume the commit into its snapshot and patch.
-    #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch) {
-        (self.snapshot, self.patch)
-    }
-}
-
-/// A clone-staged patch guarded by the exact owner source image.
-#[derive(Debug, Clone)]
-pub struct Patch {
-    before: Arc<SourceState>,
-    after: Catalog,
-    changed: bool,
-}
-
-impl Patch {
-    /// Whether applying this patch is a source-preserving no-op.
-    #[must_use]
-    pub const fn is_empty(&self) -> bool {
-        !self.changed
-    }
-
-    /// Apply the patch atomically after checking its owner source image.
-    pub fn apply(&self, package: &mut OpcPackage) -> Result<Snapshot> {
-        let current = SourceState::capture_current(package)?;
-        if current != *self.before {
-            return Err(Error::UnsupportedFeature(
-                "shared-workbook patch source snapshot does not match".to_string(),
-            ));
-        }
-        if !self.changed {
-            return Snapshot::read(package);
-        }
-        let mut candidate = package.clone();
-        package::store(&mut candidate, &self.after)?;
-        let snapshot = Snapshot::read(&candidate)?;
-        *package = candidate;
-        Ok(snapshot)
-    }
-
-    /// Commit this source-checked patch to the package.
-    pub fn commit(&self, package: &mut OpcPackage) -> Result<Snapshot> {
-        self.apply(package)
-    }
-}
-
-/// Read shared-workbook metadata from an OPC package.
-pub fn read(package: &OpcPackage) -> Result<Snapshot> {
-    Snapshot::read(package)
-}
-
-/// Apply a source-checked shared-workbook patch atomically.
-pub fn apply(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> {
-    patch.apply(package)
 }
 
 fn validate_new_graph(catalog: &Catalog) -> Result<()> {
@@ -468,7 +443,7 @@ impl SourceState {
             });
         }
         for name in names {
-            let uri = litchi_opc::PackURI::new(&name).map_err(Error::InvalidUri)?;
+            let uri = litchi_opc::PackURI::new(&name)?;
             let part = package.get_part(&uri)?;
             parts.push(SourcePart {
                 part_name: part.partname().to_string(),
@@ -479,11 +454,6 @@ impl SourceState {
         }
         parts.sort_by(|left, right| left.part_name.cmp(&right.part_name));
         Ok(Self { parts })
-    }
-
-    fn capture_current(package: &OpcPackage) -> Result<Self> {
-        let catalog = package::load(package)?;
-        Self::capture(package, &catalog)
     }
 }
 

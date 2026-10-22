@@ -22804,12 +22804,12 @@ fn verify_xlsb_corpus(corpus: &Corpus, shape: XlsbShape) -> Result<(), Box<dyn E
 }
 
 fn build_xlsb_corpus(shape: XlsbShape) -> Result<Corpus, Box<dyn Error>> {
-    use litchi_xlsb::writer::{Builder, MutableWorksheet};
+    use litchi_xlsb::builder::{self, Builder};
 
     let expected = xlsb_expected_cells(shape)?;
     let mut writer = Builder::new();
     for sheet in 0..shape.sheet_count() {
-        let mut worksheet = MutableWorksheet::new(format!("Sheet{sheet:02}"));
+        let mut worksheet = builder::Worksheet::new(format!("Sheet{sheet:02}"));
         for row in 0..shape.row_count() {
             for column in 0..shape.column_count() {
                 if shape.stores_cell(row, column) {

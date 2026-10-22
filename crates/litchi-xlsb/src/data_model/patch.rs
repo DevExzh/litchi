@@ -32,7 +32,7 @@ impl Patch {
     }
 
     /// Whether publication changes no workbook or model-part source bytes.
-    pub fn is_empty(&self) -> bool {
+    pub fn is_noop(&self) -> bool {
         self.before.same_source(&self.after)
     }
 
@@ -58,15 +58,13 @@ impl Patch {
     }
 
     /// Apply this patch directly to an OPC package after an exact source check.
-    pub fn apply(&self, package: &mut OpcPackage) -> Result<Snapshot> {
+    pub(crate) fn apply(&self, package: &mut OpcPackage) -> Result<Snapshot> {
         let current = self.check_source(package)?;
-        if self.is_empty() {
+        if self.is_noop() {
             return Ok(current);
         }
         if package.is_signed() || package.requires_signature_edit_policy() {
-            return Err(Error::Opc(
-                litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy,
-            ));
+            return Err(Error::Signed);
         }
         let mut candidate = package.clone();
         self.materialize(&mut candidate)?;
@@ -81,7 +79,7 @@ impl Patch {
     }
 
     pub(crate) fn materialize(&self, package: &mut OpcPackage) -> Result<()> {
-        if self.is_empty() {
+        if self.is_noop() {
             return Ok(());
         }
         materialize_models(package, &self.before, self.after.model())?;
@@ -98,8 +96,7 @@ pub(crate) fn materialize_models(
         let workbook = package.main_document_part()?;
         workbook.partname().clone()
     };
-    let expected_workbook = PackURI::new(before.source().workbook_name())
-        .map_err(|error| Error::InvalidUri(error.to_string()))?;
+    let expected_workbook = PackURI::new(before.source().workbook_name())?;
     if !workbook_name.is_equivalent_to(&expected_workbook) {
         return Err(invalid("Data Model workbook owner changed"));
     }
@@ -124,8 +121,7 @@ pub(crate) fn materialize_models(
                 .source()
                 .model_part()
                 .map(|part| PackURI::new(&part.name))
-                .transpose()
-                .map_err(|error| Error::InvalidUri(error.to_string()))?;
+                .transpose()?;
             if let Some(current_name) = current_name {
                 let current = package.get_part(&current_name)?;
                 let physical_name = current.partname().clone();
@@ -144,8 +140,7 @@ pub(crate) fn materialize_models(
                 part.set_blob_shared(Arc::clone(&after_part.bytes));
                 part.set_content_type(after_part.content_type.clone())?;
             } else {
-                let uri = PackURI::new(&after_part.part_name)
-                    .map_err(|error| Error::InvalidUri(error.to_string()))?;
+                let uri = PackURI::new(&after_part.part_name)?;
                 reject_inbound_relationships(package, &uri)?;
                 let part = BlobPart::new_shared(
                     uri.clone(),
@@ -157,8 +152,7 @@ pub(crate) fn materialize_models(
         },
         None => {
             if let Some(before_part) = before.source().model_part() {
-                let requested = PackURI::new(&before_part.name)
-                    .map_err(|error| Error::InvalidUri(error.to_string()))?;
+                let requested = PackURI::new(&before_part.name)?;
                 let physical_name = package.get_part(&requested)?.partname().clone();
                 reject_inbound_relationships(package, &physical_name)?;
                 if !package.remove_part(&physical_name) {
@@ -176,7 +170,7 @@ fn restore_source_tokens(
     limits: super::SemanticLimits,
 ) -> Result<()> {
     let opc_limits = super::package::opc_capture_limits(limits)?;
-    let root = PackURI::new("/").map_err(|error| Error::InvalidUri(error.to_string()))?;
+    let root = PackURI::new("/")?;
     let current_root = package.source_relationships_with_limits(&root, opc_limits)?;
     if current_root != source.root_relationships {
         package.try_replace_relationships_with_limits(
@@ -185,8 +179,7 @@ fn restore_source_tokens(
             opc_limits,
         )?;
     }
-    let workbook = PackURI::new(source.workbook_name())
-        .map_err(|error| Error::InvalidUri(error.to_string()))?;
+    let workbook = PackURI::new(source.workbook_name())?;
     let current_workbook = package.source_relationships_with_limits(&workbook, opc_limits)?;
     if current_workbook != source.workbook_relationships {
         package.try_replace_relationships_with_limits(
@@ -196,8 +189,7 @@ fn restore_source_tokens(
         )?;
     }
     if let Some(model) = source.model_part() {
-        let owner =
-            PackURI::new(&model.name).map_err(|error| Error::InvalidUri(error.to_string()))?;
+        let owner = PackURI::new(&model.name)?;
         let current_owner = package.source_relationships_with_limits(&owner, opc_limits)?;
         if current_owner != model.relationships {
             package.try_replace_relationships_with_limits(
@@ -218,40 +210,10 @@ fn restore_source_tokens(
     Ok(())
 }
 
-/// Detached result containing a planned snapshot and reversible patch.
-#[derive(Clone, Debug)]
-pub struct Commit {
-    patch: Patch,
-    changed: bool,
-}
+/// The result of a Data Model edit's `commit`: the new package, the patch
+/// and the diagnostics.
+pub type Commit = litchi_core::edit::Commit<crate::Package, Patch>;
 
-impl Commit {
-    pub(crate) fn new(patch: Patch, changed: bool) -> Self {
-        Self { patch, changed }
-    }
-
-    /// Whether the transaction changes owned bytes or topology.
-    pub fn changed(&self) -> bool {
-        self.changed
-    }
-
-    /// Planned resulting snapshot.
-    pub fn snapshot(&self) -> &Snapshot {
-        self.patch.after()
-    }
-
-    /// Reversible source-checked patch.
-    pub fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Consume the result into its planned snapshot and patch.
-    pub fn into_parts(self) -> (Snapshot, Patch) {
-        let snapshot = self.patch.after().clone();
-        (snapshot, self.patch)
-    }
-}
-
-fn invalid(message: impl Into<String>) -> Error {
-    Error::InvalidFormat(message.into())
+fn invalid(message: &'static str) -> Error {
+    Error::InvalidFormat(message)
 }

@@ -21,6 +21,10 @@ use std::collections::BTreeMap;
 use std::io::Cursor;
 use std::path::PathBuf;
 
+#[path = "support/projection.rs"]
+mod projection;
+use projection::{InPlace as _, OwnedWorkbook as _};
+
 const DRAWING_CONTENT_TYPE: &str = "application/vnd.openxmlformats-officedocument.drawing+xml";
 const FIXTURE: &str = "test-data/poi/test-data/spreadsheet/testVarious.xlsb";
 
@@ -81,7 +85,7 @@ fn package_blobs(workbook: &Workbook) -> BTreeMap<String, Vec<u8>> {
 fn add_unrelated_malformed_drawing(workbook: &mut Workbook) -> PackURI {
     let uri = PackURI::new("/xl/drawings/unrelated-malformed.xml").expect("orphan URI");
     workbook
-        .edit_opc(|package| {
+        .edit_opc_in_place(|package| {
             package.add_part(Box::new(BlobPart::new(
                 uri.clone(),
                 DRAWING_CONTENT_TYPE.to_owned(),
@@ -95,7 +99,7 @@ fn add_unrelated_malformed_drawing(workbook: &mut Workbook) -> PackURI {
 
 fn corrupt_referenced_drawing(workbook: &mut Workbook, uri: &PackURI) {
     workbook
-        .edit_opc(|package| {
+        .edit_opc_in_place(|package| {
             package
                 .get_part_mut(uri)?
                 .set_blob(b"<broken-drawing/>".to_vec());
@@ -143,7 +147,7 @@ fn skipped_projection_keeps_opaque_graph_across_noop_reparse_and_save() {
 
     let before_noop = package_blobs(&workbook);
     workbook
-        .edit_opc(|_| Ok(()))
+        .edit_opc_in_place(|_| Ok(()))
         .expect("exact package no-op publication");
     assert!(workbook.sheet_drawings().is_empty());
     assert_eq!(package_blobs(&workbook), before_noop);
@@ -174,7 +178,7 @@ fn skipped_projection_cell_noop_and_scalar_change_keep_malformed_drawings_opaque
     assert!(no_op.patch().is_noop());
     workbook = no_op
         .into_package()
-        .into_workbook()
+        .owned_workbook()
         .expect("cell no-op publication");
     assert!(workbook.sheet_drawings().is_empty());
     assert_eq!(package_blobs(&workbook), before);
@@ -196,7 +200,7 @@ fn skipped_projection_cell_noop_and_scalar_change_keep_malformed_drawings_opaque
     let commit = edit.commit().expect("scalar commit");
     workbook = commit
         .into_package()
-        .into_workbook()
+        .owned_workbook()
         .expect("scalar publication");
 
     assert!(workbook.sheet_drawings().is_empty());
@@ -252,8 +256,8 @@ fn skipped_malformed_donor_transfers_to_eager_target_without_drawing_parse() {
         .expect("decode durable transfer patch");
 
     let mut published = Workbook::new(Cursor::new(original.clone())).expect("published target");
-    decoded
-        .apply(&mut published)
+    published
+        .apply_structure(&decoded)
         .expect("publish durable transfer");
     assert!(
         !published.sheet_drawings().is_empty(),
@@ -275,8 +279,8 @@ fn skipped_malformed_donor_transfers_to_eager_target_without_drawing_parse() {
     }
 
     let inverse = decoded.inverse();
-    inverse
-        .apply(&mut published)
+    published
+        .apply_structure(&inverse)
         .expect("inverse durable transfer");
     assert!(
         published
@@ -315,7 +319,9 @@ fn workbook_patch_respects_skipped_target_and_durable_decode_boundary() {
         .expect("decode valid durable workbook patch");
 
     let mut target = skipped(&original);
-    decoded.apply(&mut target).expect("apply decoded patch");
+    target
+        .apply_structure(&decoded)
+        .expect("apply decoded patch");
     assert!(target.sheet_drawings().is_empty());
     assert_eq!(target.worksheet_names()[0], format!("{old_name}_patched"));
     assert_eq!(part_bytes(&target, &drawing_uri), drawing_before);
@@ -345,8 +351,8 @@ fn workbook_patch_respects_skipped_target_and_durable_decode_boundary() {
         Patch::from_bytes_without_drawing_parse(&malformed_durable, TransferLimits::DEFAULT)
             .expect("decode malformed-image patch through explicit skipped projection");
     let mut durable_skipped_target = skipped(&malformed_before);
-    decoded_skipped
-        .apply(&mut durable_skipped_target)
+    durable_skipped_target
+        .apply_structure(&decoded_skipped)
         .expect("apply decoded skipped patch");
     assert!(durable_skipped_target.sheet_drawings().is_empty());
     assert_eq!(
@@ -359,9 +365,8 @@ fn workbook_patch_respects_skipped_target_and_durable_decode_boundary() {
     );
 
     let mut malformed_target = skipped(&malformed_before);
-    malformed_commit
-        .patch()
-        .apply(&mut malformed_target)
+    malformed_target
+        .apply_structure(malformed_commit.patch())
         .expect("apply in-memory patch to skipped target");
     assert!(malformed_target.sheet_drawings().is_empty());
     assert_eq!(
@@ -382,14 +387,12 @@ fn package_conversion_and_publication_retain_skipped_drawings() {
     assert!(!package.drawings_parsed());
     let projected = package.workbook().expect("skipped package projection");
     assert!(!projected.drawings_parsed());
-    assert_eq!(package_blobs(&projected), original);
+    assert_eq!(package_blobs(projected), original);
 
     // Even an unrelated package publication must not enter the drawing parser.
-    let published = package
-        .without_signatures()
-        .expect("policy-preserving publication");
+    let published = package.unsign();
     assert!(!published.drawings_parsed());
-    let reopened = published.into_workbook().expect("consuming projection");
+    let reopened = published.owned_workbook().expect("consuming projection");
     assert!(!reopened.drawings_parsed());
     assert_eq!(package_blobs(&reopened), original);
     assert_eq!(part_bytes(&reopened, &referenced), b"<broken-drawing/>");

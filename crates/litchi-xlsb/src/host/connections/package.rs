@@ -23,10 +23,10 @@ struct ConnectionsGraph {
     part_name: PackURI,
 }
 
-fn invalid(detail: impl Into<String>) -> Error {
+fn invalid(detail: &'static str) -> Error {
     Error::Unrecognized {
-        typ: "External Data Connections package graph".to_string(),
-        val: detail.into(),
+        typ: "External Data Connections package graph",
+        val: detail,
     }
 }
 
@@ -72,17 +72,15 @@ pub(crate) fn preflight(
     };
     let part = package.get_part(&graph.part_name)?;
     if part.blob().len() > max_part_bytes {
-        return Err(Error::LimitExceeded {
-            resource: "External Data Connections bytes",
-            actual: part.blob().len(),
-            maximum: max_part_bytes,
-        });
+        return Err(Error::limit(
+            crate::package::connections::LimitKind::PartBytes,
+            part.blob().len(),
+            max_part_bytes,
+        ));
     }
     let raw_limit = max_part_bytes.min(crate::raw::MAX_WIRE_PAYLOAD);
-    let mut records = crate::raw::Records::try_with_limits(
-        part.blob(),
-        crate::raw::Limits::new(raw_limit, 1_048_576),
-    )?;
+    let mut records =
+        crate::raw::Records::bounded(part.blob(), crate::raw::Limits::new(raw_limit, 1_048_576))?;
     let mut connection_count = 0_usize;
     for record in &mut records {
         if record?.kind() == crate::raw::kind::BEGIN_EXT_CONNECTION {
@@ -92,11 +90,11 @@ pub(crate) fn preflight(
                     resource: "External Data Connections",
                 })?;
             if connection_count > max_connections {
-                return Err(Error::LimitExceeded {
-                    resource: "External Data Connections",
-                    actual: connection_count,
-                    maximum: max_connections,
-                });
+                return Err(Error::limit(
+                    crate::package::connections::LimitKind::Connections,
+                    connection_count,
+                    max_connections,
+                ));
             }
         }
     }
@@ -128,7 +126,7 @@ pub(crate) fn store_on_workbook(
     };
     // Treat the reader as a post-serialization grammar oracle before mutation.
     let canonical_model = parse_connections_part(&payload)?;
-    let canonical_part = PackURI::new(CONNECTIONS_PART_NAME).map_err(Error::Encoding)?;
+    let canonical_part = PackURI::new(CONNECTIONS_PART_NAME)?;
     if existing
         .as_ref()
         .is_none_or(|graph| !graph.part_name.is_equivalent_to(&canonical_part))
@@ -236,38 +234,6 @@ pub(crate) fn capture_source(package: &OpcPackage) -> Result<SourceImage> {
     })
 }
 
-pub(crate) fn restore_source(package: &mut OpcPackage, source: &SourceImage) -> Result<()> {
-    let workbook_name = package.main_document_part()?.partname().clone();
-    if !workbook_name.is_equivalent_to(&source.workbook_name) {
-        return Err(invalid("workbook part identity changed"));
-    }
-    if let Some(graph) = discover_graph(package, &workbook_name)? {
-        package
-            .get_part_mut(&workbook_name)?
-            .rels_mut()
-            .remove(&graph.relationship_id);
-        package.remove_part(&graph.part_name);
-    }
-    if let (Some(part), Some(relationship)) = (&source.connection, &source.connection_relationship)
-    {
-        package.try_add_part(Box::new(BlobPart::new(
-            part.part_name.clone(),
-            part.content_type.clone(),
-            part.bytes.as_ref().clone(),
-        )))?;
-        package
-            .get_part_mut(&workbook_name)?
-            .rels_mut()
-            .add_relationship(
-                relationship.relationship_type.clone(),
-                relationship.target.clone(),
-                relationship.id.clone(),
-                relationship.external,
-            );
-    }
-    validate_graph(package).map(|_| ())
-}
-
 fn relationship_images(part: &dyn Part) -> Vec<RelationshipImage> {
     let mut values = part
         .rels()
@@ -332,11 +298,7 @@ fn discover_graph(
     // restored.
     let part_name = part.partname().clone();
     if part.content_type() != CONNECTIONS_CONTENT_TYPE {
-        return Err(invalid(format!(
-            "connections part '{}' has content type '{}'",
-            part_name.as_str(),
-            part.content_type()
-        )));
+        return Err(invalid("connections part has content type"));
     }
     if !part.rels().is_empty() {
         return Err(invalid("connections part must not have relationships"));
@@ -418,20 +380,18 @@ fn ensure_exclusive_inbound_relationship(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::Package;
+    use crate::builder::{self, Builder};
     use crate::merged_cells::MergedCell;
-    use crate::package::Workbook;
     use crate::package::connections::{
         CommandType, Connection, CredentialMethod, DbProperties, Properties, SourceType,
     };
-    use crate::writer::{Builder, MutableWorksheet};
-    use std::io::Cursor;
 
-    fn generated_workbook() -> Workbook {
+    fn generated_package() -> Package {
         let mut writer = Builder::new();
-        writer.add_worksheet(MutableWorksheet::new("Sheet1"));
-        let mut bytes = Cursor::new(Vec::new());
-        writer.build().unwrap().write_to(&mut bytes).unwrap();
-        Workbook::new(Cursor::new(bytes.into_inner())).unwrap()
+        writer.add_worksheet(builder::Worksheet::new("Sheet1"));
+        let bytes = writer.build().unwrap().to_bytes().unwrap();
+        Package::from_bytes(&bytes).unwrap()
     }
 
     fn connections(id: u32, name: &str) -> Connections {
@@ -453,72 +413,87 @@ mod tests {
         }
     }
 
-    fn saved(workbook: &Workbook) -> Vec<u8> {
-        let mut bytes = Cursor::new(Vec::new());
-        workbook.save(&mut bytes).unwrap();
-        bytes.into_inner()
+    fn set_connections(package: &Package, value: Option<Connections>) -> Result<Package> {
+        let mut edit = package.edit_connections()?;
+        edit.replace(value)?;
+        Ok(edit.commit()?.into_package())
+    }
+
+    fn reopened(package: &Package) -> Package {
+        Package::from_bytes(&package.to_bytes().unwrap()).unwrap()
     }
 
     #[test]
     fn parsed_workbook_adds_replaces_preserves_and_removes_connections() {
-        let mut workbook = generated_workbook();
         let first = connections(7, "Generated warehouse");
-        workbook.set_connections(first.clone()).unwrap();
-        assert_eq!(workbook.connections(), Some(&first));
+        let package = set_connections(&generated_package(), Some(first.clone())).unwrap();
+        assert_eq!(package.workbook().unwrap().connections(), Some(&first));
 
         // An unrelated binary worksheet mutation must preserve the package graph.
         let merged = MergedCell::new(0, 0, 0, 1);
-        workbook
-            .set_merged_cell_ranges(0, std::slice::from_ref(&merged))
+        let mut edit = package.edit_merged_cells().unwrap();
+        edit.set_merged_cell_ranges(0, std::slice::from_ref(&merged))
             .unwrap();
+        let package = edit.commit().unwrap().into_package();
 
         let replacement = connections(9, "Replacement");
-        workbook.set_connections(replacement.clone()).unwrap();
-        let mut reopened = Workbook::new(Cursor::new(saved(&workbook))).unwrap();
-        assert_eq!(reopened.connections(), Some(&replacement));
-        assert_eq!(reopened.merged_cell_ranges(0).unwrap(), vec![merged]);
+        let package = set_connections(&package, Some(replacement.clone())).unwrap();
+        let reopened_package = reopened(&package);
+        let workbook = reopened_package.workbook().unwrap();
+        assert_eq!(workbook.connections(), Some(&replacement));
+        assert_eq!(workbook.merged_cell_ranges(0).unwrap(), vec![merged]);
 
-        assert!(reopened.remove_connections().unwrap());
-        assert!(reopened.connections().is_none());
-        assert!(!reopened.remove_connections().unwrap());
-        let reopened = Workbook::new(Cursor::new(saved(&reopened))).unwrap();
-        assert!(reopened.connections().is_none());
+        let mut edit = reopened_package.edit_connections().unwrap();
+        assert!(edit.replace(None).unwrap());
+        let removed = edit.commit().unwrap().into_package();
+        assert!(removed.workbook().unwrap().connections().is_none());
+        let mut edit = removed.edit_connections().unwrap();
+        assert!(!edit.replace(None).unwrap());
+        assert!(!edit.commit().unwrap().diagnostics().changed());
+        assert!(
+            reopened(&removed)
+                .workbook()
+                .unwrap()
+                .connections()
+                .is_none()
+        );
     }
 
     #[test]
     fn raw_opc_edit_preserves_the_validated_connections_graph() {
-        let mut workbook = generated_workbook();
         let original = connections(7, "Raw edit connection");
-        workbook.set_connections(original.clone()).unwrap();
+        let package = set_connections(&generated_package(), Some(original.clone())).unwrap();
         let marker = PackURI::new("/xl/raw-edit-marker.bin").unwrap();
 
-        workbook
-            .edit_opc(|package| {
-                package.try_add_part(Box::new(BlobPart::new(
-                    marker.clone(),
-                    "application/octet-stream".to_string(),
-                    b"preserve connections".to_vec(),
-                )))?;
-                Ok::<_, Error>(())
-            })
-            .unwrap();
+        let mut edit = package.edit_opc().unwrap();
+        edit.update(|package| {
+            package.try_add_part(Box::new(BlobPart::new(
+                marker.clone(),
+                "application/octet-stream".to_string(),
+                b"preserve connections".to_vec(),
+            )))?;
+            Ok::<_, Error>(())
+        })
+        .unwrap();
+        let package = edit.commit().unwrap().into_package();
 
-        assert_eq!(workbook.connections(), Some(&original));
+        assert_eq!(package.workbook().unwrap().connections(), Some(&original));
         assert_eq!(
-            workbook.opc_package().get_part(&marker).unwrap().blob(),
+            package.opc_package().get_part(&marker).unwrap().blob(),
             b"preserve connections"
         );
-        let reopened = Workbook::new(Cursor::new(saved(&workbook))).unwrap();
-        assert_eq!(reopened.connections(), Some(&original));
+        assert_eq!(
+            reopened(&package).workbook().unwrap().connections(),
+            Some(&original)
+        );
     }
 
     #[test]
     fn invalid_replacement_is_rejected_before_package_mutation() {
-        let mut workbook = generated_workbook();
         let original = connections(7, "Original");
-        workbook.set_connections(original.clone()).unwrap();
+        let package = set_connections(&generated_package(), Some(original.clone())).unwrap();
         let uri = PackURI::new(CONNECTIONS_PART_NAME).unwrap();
-        let original_payload = workbook
+        let original_payload = package
             .opc_package()
             .get_part(&uri)
             .unwrap()
@@ -527,55 +502,46 @@ mod tests {
 
         let mut invalid = connections(8, "Invalid");
         invalid.connections[0].refresh_interval_minutes = 32_768;
-        assert!(workbook.set_connections(invalid).is_err());
-        assert_eq!(workbook.connections(), Some(&original));
+        assert!(set_connections(&package, Some(invalid)).is_err());
+        assert_eq!(package.workbook().unwrap().connections(), Some(&original));
         assert_eq!(
-            workbook.opc_package().get_part(&uri).unwrap().blob(),
+            package.opc_package().get_part(&uri).unwrap().blob(),
             original_payload
         );
 
         let mut invalid = connections(8, "Invalid");
         invalid.connections[0].description = Some("x".repeat(256));
-        assert!(workbook.set_connections(invalid).is_err());
-        assert_eq!(workbook.connections(), Some(&original));
+        assert!(set_connections(&package, Some(invalid)).is_err());
+        assert_eq!(package.workbook().unwrap().connections(), Some(&original));
         assert_eq!(
-            workbook.opc_package().get_part(&uri).unwrap().blob(),
+            package.opc_package().get_part(&uri).unwrap().blob(),
             original_payload
         );
     }
 
     #[test]
     fn malformed_existing_graph_is_not_replaced() {
-        let mut workbook = generated_workbook();
         let original = connections(7, "Original");
-        workbook.set_connections(original.clone()).unwrap();
+        let package = set_connections(&generated_package(), Some(original.clone())).unwrap();
         let uri = PackURI::new(CONNECTIONS_PART_NAME).unwrap();
-        workbook
-            .opc_package_mut()
-            .get_part_mut(&uri)
-            .unwrap()
-            .rels_mut()
-            .add_relationship(
-                "urn:generated:forbidden".to_string(),
-                "child.bin".to_string(),
-                "rIdForbidden".to_string(),
-                false,
-            );
-        let original_payload = workbook
+        let mut opc = package.opc_package().clone();
+        opc.get_part_mut(&uri).unwrap().rels_mut().add_relationship(
+            "urn:generated:forbidden".to_string(),
+            "child.bin".to_string(),
+            "rIdForbidden".to_string(),
+            false,
+        );
+        let malformed = Package::from(opc);
+        let original_payload = malformed
             .opc_package()
             .get_part(&uri)
             .unwrap()
             .blob()
             .to_vec();
 
-        assert!(
-            workbook
-                .set_connections(connections(9, "Replacement"))
-                .is_err()
-        );
-        assert_eq!(workbook.connections(), Some(&original));
+        assert!(set_connections(&malformed, Some(connections(9, "Replacement"))).is_err());
         assert_eq!(
-            workbook.opc_package().get_part(&uri).unwrap().blob(),
+            malformed.opc_package().get_part(&uri).unwrap().blob(),
             original_payload
         );
     }

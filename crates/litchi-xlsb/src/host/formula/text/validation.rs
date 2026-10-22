@@ -2,14 +2,14 @@
 
 use super::super::{Error, Result};
 
-pub(super) fn validate_xnum(value: f64, context: &str) -> Result<()> {
+pub(super) fn validate_xnum(value: f64, _context: &str) -> Result<()> {
     if !value.is_finite()
         || (value == 0.0 && value.is_sign_negative())
         || (value != 0.0 && !value.is_normal())
     {
-        return Err(Error::InvalidFormula(format!(
-            "{context} contains a non-finite, denormalized, or negative-zero Xnum"
-        )));
+        return Err(Error::InvalidFormula(
+            "contains a non-finite, denormalized, or negative-zero Xnum",
+        ));
     }
     Ok(())
 }

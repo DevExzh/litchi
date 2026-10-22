@@ -25,15 +25,18 @@ pub enum Error {
     #[error("invalid length: expected {expected}, found {found}")]
     InvalidLength { expected: usize, found: usize },
     #[error("invalid formula: {0}")]
-    InvalidFormula(String),
+    InvalidFormula(&'static str),
     #[error("invalid cell reference: {0}")]
-    InvalidCellReference(String),
+    InvalidCellReference(&'static str),
     #[error("encoding error: {0}")]
-    Encoding(String),
+    Encoding(&'static str),
     #[error("unsupported feature: {0}")]
-    UnsupportedFeature(String),
+    UnsupportedFeature(&'static str),
     #[error("unrecognized {typ}: {val}")]
-    Unrecognized { typ: String, val: String },
+    Unrecognized {
+        typ: &'static str,
+        val: &'static str,
+    },
     #[error(transparent)]
     Wire(#[from] crate::raw::Error),
     #[error(transparent)]
@@ -42,11 +45,8 @@ pub enum Error {
     Io(#[from] std::io::Error),
 }
 
-pub(super) fn invalid(typ: impl Into<String>, val: impl Into<String>) -> Error {
-    Error::Unrecognized {
-        typ: typ.into(),
-        val: val.into(),
-    }
+pub(super) fn invalid(typ: &'static str, val: &'static str) -> Error {
+    Error::Unrecognized { typ, val }
 }
 
 pub use binary::{

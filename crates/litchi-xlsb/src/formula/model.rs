@@ -12,7 +12,7 @@ use super::{Error, Result};
 pub(super) fn read_u32_le_at(data: &[u8], offset: usize) -> Result<u32> {
     let end = offset
         .checked_add(4)
-        .ok_or_else(|| Error::InvalidFormula("formula binary offset overflow".to_string()))?;
+        .ok_or(Error::InvalidFormula("formula binary offset overflow"))?;
     let bytes = data.get(offset..end).ok_or(Error::InvalidLength {
         expected: end,
         found: data.len(),
@@ -97,7 +97,7 @@ impl Range {
             || self.col_last >= 16_384
         {
             return Err(match self.to_a1_checked() {
-                Ok(reference) => Error::InvalidCellReference(reference),
+                Ok(_reference) => Error::InvalidCellReference("the cell reference is not valid"),
                 Err(error) => error,
             });
         }
@@ -127,16 +127,12 @@ pub(super) fn column_index_to_name(mut column: u32) -> String {
 }
 
 fn cell_reference(row: u32, column: u32) -> Result<String> {
-    let row = row.checked_add(1).ok_or_else(|| {
-        Error::InvalidCellReference(format!(
-            "row coordinate {row} cannot be represented in an A1 reference"
-        ))
-    })?;
-    let column = column.checked_add(1).ok_or_else(|| {
-        Error::InvalidCellReference(format!(
-            "column coordinate {column} cannot be represented in an A1 reference"
-        ))
-    })?;
+    let row = row.checked_add(1).ok_or(Error::InvalidCellReference(
+        "row coordinate cannot be represented in an A1 reference",
+    ))?;
+    let column = column.checked_add(1).ok_or(Error::InvalidCellReference(
+        "column coordinate cannot be represented in an A1 reference",
+    ))?;
     Ok(format!("{}{}", column_index_to_name(column), row))
 }
 
@@ -148,31 +144,41 @@ fn parse_cell_reference(value: &str) -> Result<(u32, u32)> {
     for character in normalized.chars() {
         if character.is_ascii_alphabetic() {
             if digit_seen {
-                return Err(Error::InvalidCellReference(normalized));
+                return Err(Error::InvalidCellReference(
+                    "the cell reference is not valid",
+                ));
             }
             column.push(character);
         } else if character.is_ascii_digit() {
             digit_seen = true;
             row.push(character);
         } else {
-            return Err(Error::InvalidCellReference(normalized));
+            return Err(Error::InvalidCellReference(
+                "the cell reference is not valid",
+            ));
         }
     }
     if column.is_empty() || row.is_empty() {
-        return Err(Error::InvalidCellReference(normalized));
+        return Err(Error::InvalidCellReference(
+            "the cell reference is not valid",
+        ));
     }
     let mut column_index = 0_u32;
     for character in column.bytes() {
         column_index = column_index
             .checked_mul(26)
             .and_then(|value| value.checked_add(u32::from(character - b'A' + 1)))
-            .ok_or_else(|| Error::InvalidCellReference(normalized.clone()))?;
+            .ok_or(Error::InvalidCellReference(
+                "the cell reference is not valid",
+            ))?;
     }
     let row_index = row
         .parse::<u32>()
-        .map_err(|_| Error::InvalidCellReference(normalized.clone()))?;
+        .map_err(|_| Error::InvalidCellReference("the cell reference is not valid"))?;
     if row_index == 0 || column_index == 0 {
-        return Err(Error::InvalidCellReference(normalized));
+        return Err(Error::InvalidCellReference(
+            "the cell reference is not valid",
+        ));
     }
     Ok((row_index - 1, column_index - 1))
 }

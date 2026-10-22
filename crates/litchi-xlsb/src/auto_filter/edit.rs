@@ -1,7 +1,7 @@
 //! Immutable auto-filter edits of an XLSB [`Package`] (unified-ops record
 //! 0322).
 //!
-//! [`Package::edit_auto_filter`] (or [`Workbook::edit_auto_filter`]) starts
+//! [`Package::edit_auto_filter`] starts
 //! an [`Edit`]. [`Edit::set_auto_filter`] replaces the filter range in place
 //! (the `BrtBeginAFilter` payload; filter columns that still fall inside the
 //! range keep their bytes), inserts a new collection at its stream position,
@@ -26,7 +26,6 @@
 //! ```
 
 use super::{AutoFilter, encode_range, read_layout};
-use crate::Workbook;
 use crate::package::Package;
 use crate::package::error::Result;
 use crate::part_edit::{Rank, SheetLayout, Staged, family, record, splice};
@@ -43,9 +42,9 @@ pub enum LimitKind {
 }
 
 /// A staged auto-filter edit. Dropping it discards it.
-#[derive(Debug)]
-pub struct Edit<'a> {
-    staged: Staged<'a>,
+#[derive(Debug, Clone)]
+pub struct Edit {
+    staged: Staged,
 }
 
 impl Package {
@@ -54,7 +53,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns the workbook materialization errors of this package.
-    pub fn edit_auto_filter(&self) -> Result<Edit<'_>> {
+    pub fn edit_auto_filter(&self) -> Result<Edit> {
         Ok(Edit {
             staged: Staged::of_package(self)?,
         })
@@ -67,22 +66,17 @@ impl Package {
     /// Returns [`Error::PatchConflict`] when this package is not the patch's
     /// before state and [`Error::Signed`] for a changed patch of a signed
     /// workbook.
-    pub fn apply_auto_filter(&self, patch: &Patch) -> Result<Self> {
-        patch.0.apply(self)
+    pub fn apply_auto_filter(&self, patch: &Patch) -> Result<Commit> {
+        Ok(Commit::new((patch.0.apply(self)?, patch.0.clone())))
     }
 }
 
-impl Workbook {
-    /// Start an auto-filter edit of this workbook without first copying it
-    /// into a package.
-    pub fn edit_auto_filter(&self) -> Edit<'_> {
-        Edit {
-            staged: Staged::of_workbook(self),
-        }
+impl Edit {
+    /// Discard every staged change.
+    pub fn reset(&mut self) {
+        self.staged.reset();
     }
-}
 
-impl Edit<'_> {
     /// The staged auto-filter range of the worksheet at complete-catalog
     /// position `sheet`.
     ///
@@ -152,7 +146,7 @@ impl Edit<'_> {
 /// (`dwCol`) is at most `last`, with their exact bytes.
 fn columns_inside(unit: &[u8], last: u32) -> Result<Vec<u8>> {
     let mut out = Vec::new();
-    let mut records = Records::new(unit);
+    let mut records = Records::new(unit, crate::raw::Limits::DEFAULT);
     let _header = records.next().transpose()?;
     let mut keep = false;
     let mut depth = 0usize;
@@ -209,6 +203,7 @@ mod tests {
         assert_eq!(
             package
                 .apply_auto_filter(&patch)
+                .map(|commit| commit.into_package())
                 .unwrap()
                 .to_bytes()
                 .unwrap(),

@@ -27,20 +27,23 @@ pub enum Error {
     InvalidLength { expected: usize, found: usize },
     /// A formula stream violates the bounded BIFF12 formula contract.
     #[error("invalid formula: {0}")]
-    InvalidFormula(String),
+    InvalidFormula(&'static str),
     /// A cell or target range is outside the worksheet grid.
     #[error("invalid cell reference: {0}")]
-    InvalidCellReference(String),
+    InvalidCellReference(&'static str),
     /// UTF-16 or other text encoding failed.
     #[error("encoding error: {0}")]
-    Encoding(String),
+    Encoding(&'static str),
     /// A text formula construct is valid XLSB but not supported by the owner
     /// fallback compiler; callers may use the host compiler bridge.
     #[error("unsupported feature: {0}")]
-    UnsupportedFeature(String),
+    UnsupportedFeature(&'static str),
     /// A record invariant or reserved field is invalid.
     #[error("unrecognized {typ}: {val}")]
-    Unrecognized { typ: String, val: String },
+    Unrecognized {
+        typ: &'static str,
+        val: &'static str,
+    },
     /// A raw BIFF12 boundary check failed.
     #[error(transparent)]
     Wire(#[from] crate::raw::Error),

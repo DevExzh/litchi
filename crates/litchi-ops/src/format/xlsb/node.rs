@@ -1007,7 +1007,7 @@ fn unsupported(message: &'static str) -> Error {
 fn catalog_count(file: &Xlsb) -> Result<usize> {
     match &file.0.owner {
         XlsbOwner::Source(workbook) => workbook.workbook().sheet_count().map_err(Into::into),
-        XlsbOwner::Eager(workbook) => Ok(workbook.sheets().len()),
+        XlsbOwner::Eager(package) => Ok(super::projection(package)?.sheets().len()),
     }
 }
 
@@ -1214,7 +1214,9 @@ fn workbook_value(
 fn date_1904(file: &Xlsb) -> bool {
     match &file.0.owner {
         XlsbOwner::Source(workbook) => workbook.date1904(),
-        XlsbOwner::Eager(workbook) => workbook.is_1904_date_system(),
+        XlsbOwner::Eager(package) => {
+            super::projection(package).is_ok_and(WorkbookTrait::is_1904_date_system)
+        },
     }
 }
 

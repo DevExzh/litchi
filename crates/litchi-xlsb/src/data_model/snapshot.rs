@@ -31,13 +31,8 @@ impl PartialEq for Snapshot {
 impl Eq for Snapshot {}
 
 impl Snapshot {
-    /// Read a Data Model snapshot with conservative finite limits.
-    pub fn read(package: &OpcPackage) -> Result<Self> {
-        Self::read_with_limits(package, SemanticLimits::DEFAULT)
-    }
-
     /// Read a Data Model snapshot with explicit finite limits.
-    pub fn read_with_limits(package: &OpcPackage, limits: SemanticLimits) -> Result<Self> {
+    pub(crate) fn read_with_limits(package: &OpcPackage, limits: SemanticLimits) -> Result<Self> {
         let limits = limits.validate()?;
         super::package::preflight_metadata(package, limits)?;
         crate::package::connections::package::preflight(
@@ -47,11 +42,11 @@ impl Snapshot {
         )?;
         let workbook = package.main_document_part()?;
         if workbook.blob().len() > limits.max_part_bytes {
-            return Err(Error::LimitExceeded {
-                resource: "Data Model Workbook bytes",
-                actual: workbook.blob().len(),
-                maximum: limits.max_part_bytes,
-            });
+            return Err(Error::limit(
+                crate::data_model::LimitKind::WorkbookBytes,
+                workbook.blob().len(),
+                limits.max_part_bytes,
+            ));
         }
         let parsed = codec::parse_workbook(workbook.blob(), limits)?;
         let part = inspect_model_part(package)?;
@@ -63,11 +58,11 @@ impl Snapshot {
             let actual = connections
                 .as_ref()
                 .map_or(0, |value| value.connections.len());
-            return Err(Error::LimitExceeded {
-                resource: "Data Model External Data Connections",
+            return Err(Error::limit(
+                crate::data_model::LimitKind::Connections,
                 actual,
-                maximum: limits.max_connections,
-            });
+                limits.max_connections,
+            ));
         }
         let connection_source = crate::package::connections::package::capture_source(package)?;
         let model = match (parsed.definition, part) {
@@ -152,12 +147,6 @@ impl Snapshot {
         self.model.is_some()
     }
 
-    /// Begin a detached, source-bound Data Model transaction.
-    #[must_use]
-    pub fn edit(&self) -> super::Edit {
-        super::Edit::new(self.clone())
-    }
-
     /// Exact finite limits used to inspect and edit this snapshot.
     #[must_use]
     pub const fn limits(&self) -> SemanticLimits {
@@ -205,8 +194,7 @@ impl SourceState {
         limits: SemanticLimits,
     ) -> Result<Self> {
         let opc_limits = super::package::opc_capture_limits(limits)?;
-        let root_name =
-            litchi_opc::PackURI::new("/").map_err(|error| Error::InvalidUri(error.to_string()))?;
+        let root_name = litchi_opc::PackURI::new("/")?;
         let workbook_name = workbook.partname();
         let root_relationships =
             package.source_relationships_with_limits(&root_name, opc_limits)?;
@@ -215,8 +203,7 @@ impl SourceState {
         let content_types = package.source_content_types_with_limits(opc_limits)?;
         let model_part = model
             .map(|model| {
-                let part_name = litchi_opc::PackURI::new(&model.part.part_name)
-                    .map_err(|error| Error::InvalidUri(error.to_string()))?;
+                let part_name = litchi_opc::PackURI::new(&model.part.part_name)?;
                 Ok::<SourcePart, Error>(SourcePart {
                     name: model.part.part_name.clone(),
                     content_type: model.part.content_type.clone(),
@@ -246,6 +233,6 @@ impl SourceState {
     }
 }
 
-fn invalid(message: impl Into<String>) -> Error {
-    Error::InvalidFormat(message.into())
+fn invalid(message: &'static str) -> Error {
+    Error::InvalidFormat(message)
 }

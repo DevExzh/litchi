@@ -13,19 +13,19 @@
 //! ```
 
 use litchi::sheet::CellValue;
+use litchi::xlsb::builder::{self, Builder};
 use litchi::xlsb::conditional_formatting::{Formatting, Rule, RuleType, Scale, Value};
 use litchi::xlsb::data_validation::Validation;
 use litchi::xlsb::hyperlinks::Hyperlink;
 use litchi::xlsb::merged_cells::MergedCell;
 use litchi::xlsb::named_ranges::{Definition, area3d_formula};
-use litchi::xlsb::writer::{Builder, MutableWorksheet};
 use std::fs::File;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Test Comprehensive: Creating XLSB with all advanced features...");
 
     let mut workbook = Builder::new();
-    let mut sheet = MutableWorksheet::new("Dashboard");
+    let mut sheet = builder::Worksheet::new("Dashboard");
 
     // === TITLE ROW WITH MERGED CELLS ===
     sheet.set_cell(0, 0, CellValue::String("Sales Dashboard 2024".to_string()));

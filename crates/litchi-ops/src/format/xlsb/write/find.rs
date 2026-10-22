@@ -76,7 +76,7 @@ pub(crate) fn find_replace(
         })?;
         let cells = read(file, &scopes)?;
         let editor = file.editor()?;
-        let rich = rich_texts(&editor);
+        let rich = rich_texts(super::super::projection(&editor)?);
         let runs = runs(&cells, &rich);
         let (changes, matches) = surface::find(&runs, spec, replacement, FileFormat::Xlsb, limits)?;
         let commit = commit(file, package_from_editor(editor), &cells, changes, limits)?;
@@ -102,7 +102,7 @@ pub(crate) fn merge(
             .collect();
         let cells = read(file, &scopes)?;
         let editor = file.editor()?;
-        let rich = rich_texts(&editor);
+        let rich = rich_texts(super::super::projection(&editor)?);
         let runs = runs(&cells, &rich);
         let mut planner = Planner::new(record, options, limits);
         let changes = surface::merge(&runs, &mut planner, true, FileFormat::Xlsb, limits)?;

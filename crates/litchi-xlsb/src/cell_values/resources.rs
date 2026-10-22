@@ -47,7 +47,7 @@ pub(super) fn plan_style(style: &super::structure::AuthoredStyle) -> Result<Styl
         .is_some_and(|value| value.rotation > 180 || value.indent > 250 || value.text_direction > 2)
     {
         return Err(Error::InvalidFormat(
-            "authored style alignment is outside BIFF12 bounds".to_string(),
+            "authored style alignment is outside BIFF12 bounds",
         ));
     }
     let mut xf_tail = [0_u8; 6];
@@ -63,7 +63,7 @@ pub(super) fn plan_style(style: &super::structure::AuthoredStyle) -> Result<Styl
         let units = code.encode_utf16().count();
         if !(1..=255).contains(&units) || code.contains('\0') {
             return Err(Error::InvalidFormat(
-                "authored number format must contain 1..=255 UTF-16 units and no NUL".to_string(),
+                "authored number format must contain 1..=255 UTF-16 units and no NUL",
             ));
         }
     }
@@ -78,17 +78,19 @@ pub(super) fn plan_style(style: &super::structure::AuthoredStyle) -> Result<Styl
 
 fn encode_authored_border(border: &crate::styles::Border) -> Result<Vec<u8>> {
     if border.vertical.is_some() || border.horizontal.is_some() {
-        return Err(Error::UnsupportedFeature(
-            "vertical and horizontal table borders are not BrtBorder fields".to_string(),
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "edit",
+            "vertical and horizontal table borders are not BrtBorder fields",
         ));
     }
     if (border.diagonal_down || border.diagonal_up) && border.diagonal.is_none() {
         return Err(Error::InvalidFormat(
-            "authored diagonal direction requires a diagonal border".to_string(),
+            "authored diagonal direction requires a diagonal border",
         ));
     }
     let mut data = Vec::new();
-    let mut writer = Encoder::new(&mut data);
+    let mut writer = Encoder::new(&mut data, crate::raw::Limits::DEFAULT);
     writer.write_u8(u8::from(border.diagonal_down) | (u8::from(border.diagonal_up) << 1))?;
     write_authored_border_side(&mut writer, border.top.as_ref())?;
     write_authored_border_side(&mut writer, border.bottom.as_ref())?;
@@ -234,7 +236,8 @@ fn ensure_styles_part(package: &mut OpcPackage) -> Result<()> {
     };
     if missing {
         let mut bytes = Vec::new();
-        crate::writer::StylesWriter::new().write(&mut Encoder::new(&mut bytes))?;
+        crate::writer::StylesWriter::new()
+            .write(&mut Encoder::new(&mut bytes, crate::raw::Limits::DEFAULT))?;
         package.try_add_part(Box::new(BlobPart::new(
             uri,
             "application/vnd.ms-excel.styles".to_string(),
@@ -309,8 +312,13 @@ pub(super) fn intern_payload(
         *styles = append_collection_item(styles, begin, end, item, payload)?;
         values.len()
     };
-    u16::try_from(index)
-        .map_err(|_| Error::UnsupportedFeature("authored style resource index exceeds u16".into()))
+    u16::try_from(index).map_err(|_| {
+        Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "edit",
+            "authored style resource index exceeds u16",
+        )
+    })
 }
 
 pub(super) fn intern_number_format(styles: &mut Vec<u8>, code: &str) -> Result<u16> {
@@ -319,7 +327,11 @@ pub(super) fn intern_number_format(styles: &mut Vec<u8>, code: &str) -> Result<u
         let (id, existing) = crate::styles::parse_num_fmt(payload).map_err(map_style_error)?;
         if existing == code {
             return u16::try_from(id).map_err(|_| {
-                Error::UnsupportedFeature("number-format ID exceeds u16".to_string())
+                Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedContent,
+                    "edit",
+                    "number-format ID exceeds u16",
+                )
             });
         }
     }
@@ -330,9 +342,15 @@ pub(super) fn intern_number_format(styles: &mut Vec<u8>, code: &str) -> Result<u
         .collect::<std::collections::BTreeSet<_>>();
     let id = (164_u16..=382)
         .find(|id| !used.contains(id))
-        .ok_or_else(|| Error::UnsupportedFeature("no custom number-format ID remains".into()))?;
+        .ok_or_else(|| {
+            Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit",
+                "no custom number-format ID remains",
+            )
+        })?;
     let mut payload = id.to_le_bytes().to_vec();
-    Encoder::new(&mut payload).write_wide_string(code)?;
+    Encoder::new(&mut payload, crate::raw::Limits::DEFAULT).write_wide_string(code)?;
     *styles = append_collection_item(
         styles,
         kind::BEGIN_FMTS,
@@ -393,8 +411,10 @@ pub(super) fn transfer_style(
             return if source_index.get() == 0 {
                 StyleIndex::new(0)
             } else {
-                Err(Error::UnsupportedFeature(
-                    "source workbook omits styles.bin for a nonzero style".to_string(),
+                Err(Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedContent,
+                    "edit",
+                    "source workbook omits styles.bin for a nonzero style",
                 ))
             };
         },
@@ -409,13 +429,18 @@ pub(super) fn transfer_style(
         kind::XF,
     )?;
     let source_slot = usize::try_from(source_index.get()).map_err(|_| {
-        Error::UnsupportedFeature("source style index does not fit this platform".to_string())
+        Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "edit",
+            "source style index does not fit this platform",
+        )
     })?;
     let source_xf = source_cell_xfs.get(source_slot).ok_or_else(|| {
-        Error::UnsupportedFeature(format!(
-            "source style index {} is absent",
-            source_index.get()
-        ))
+        Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "edit",
+            "source style index is absent",
+        )
     })?;
     let rewritten = transfer_xf_dependencies(&source_blob, &mut target_blob, source_xf, false)?;
     let target_cell_xfs = collection(
@@ -440,7 +465,11 @@ pub(super) fn transfer_style(
         target_cell_xfs.len()
     };
     let wire_index = u32::try_from(index).map_err(|_| {
-        Error::UnsupportedFeature("transferred style index exceeds u32".to_string())
+        Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "edit",
+            "transferred style index exceeds u32",
+        )
     })?;
     let style = StyleIndex::new(wire_index)?;
     target.get_part_mut(&source_uri)?.set_blob(target_blob);
@@ -457,15 +486,19 @@ pub(super) fn transfer_string_fonts(
     }
     let styles_uri = PackURI::new(STYLES_URI)?;
     let source_blob = source.get_part(&styles_uri).map_err(|_| {
-        Error::UnsupportedFeature(
-            "source rich string references fonts but omits styles.bin".to_string(),
+        Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "edit",
+            "source rich string references fonts but omits styles.bin",
         )
     })?;
     let mut target_blob = target
         .get_part(&styles_uri)
         .map_err(|_| {
-            Error::UnsupportedFeature(
-                "target rich-string transfer requires an existing styles.bin".to_string(),
+            Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit",
+                "target rich-string transfer requires an existing styles.bin",
             )
         })?
         .blob()
@@ -503,7 +536,11 @@ fn transfer_font_index(
     }
     let source_fonts = collection(source, kind::BEGIN_FONTS, kind::END_FONTS, kind::FONT)?;
     let payload = source_fonts.get(usize::from(source_index)).ok_or_else(|| {
-        Error::UnsupportedFeature(format!("rich-string font index {source_index} is absent"))
+        Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "edit",
+            "rich-string font index is absent",
+        )
     })?;
     let target_fonts = collection(target, kind::BEGIN_FONTS, kind::END_FONTS, kind::FONT)?;
     let target_index = if let Some(index) = target_fonts.iter().position(|font| font == payload) {
@@ -518,8 +555,13 @@ fn transfer_font_index(
         )?;
         target_fonts.len()
     };
-    let target_index = u16::try_from(target_index)
-        .map_err(|_| Error::UnsupportedFeature("font index exceeds u16".to_string()))?;
+    let target_index = u16::try_from(target_index).map_err(|_| {
+        Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "edit",
+            "font index exceeds u16",
+        )
+    })?;
     mapped.insert(source_index, target_index);
     Ok(target_index)
 }
@@ -532,7 +574,7 @@ fn append_or_reuse_sst(
     let mut total = None;
     let mut unique = None;
     let mut items = Vec::new();
-    for item in Records::new(source) {
+    for item in Records::new(source, crate::raw::Limits::DEFAULT) {
         let record = item?;
         match record.kind() {
             kind::BEGIN_SST => {
@@ -549,14 +591,17 @@ fn append_or_reuse_sst(
             _ => {},
         }
     }
-    let total = total.ok_or_else(|| Error::InvalidFormat("SST has no BrtBeginSst".to_string()))?;
-    let unique =
-        unique.ok_or_else(|| Error::InvalidFormat("SST has no unique count".to_string()))?;
+    let total = total.ok_or(Error::InvalidFormat("SST has no BrtBeginSst"))?;
+    let unique = unique.ok_or(Error::InvalidFormat("SST has no unique count"))?;
     let new_total = total
         .checked_add(1)
         .filter(|count| *count <= MAX_SST_COUNT)
         .ok_or_else(|| {
-            Error::UnsupportedFeature("shared-string occurrence count overflow".to_string())
+            Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit",
+                "shared-string occurrence count overflow",
+            )
         })?;
     let existing = items.iter().position(|item| item == value);
     let new_unique = if existing.is_some() {
@@ -566,7 +611,11 @@ fn append_or_reuse_sst(
             .checked_add(1)
             .filter(|count| *count <= new_total)
             .ok_or_else(|| {
-                Error::UnsupportedFeature("shared-string unique count overflow".to_string())
+                Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedContent,
+                    "edit",
+                    "shared-string unique count overflow",
+                )
             })?
     };
     let index = existing.unwrap_or(items.len());
@@ -576,17 +625,22 @@ fn append_or_reuse_sst(
         new_unique,
         existing.is_none().then_some(encoded),
     )?;
-    let index = u32::try_from(index)
-        .map_err(|_| Error::UnsupportedFeature("shared-string index exceeds u32".to_string()))?;
+    let index = u32::try_from(index).map_err(|_| {
+        Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "edit",
+            "shared-string index exceeds u32",
+        )
+    })?;
     Ok((bytes, index))
 }
 
 fn new_sst(encoded: &[u8]) -> Result<Vec<u8>> {
     let mut bytes = Vec::new();
     let mut header = Vec::new();
-    Encoder::new(&mut header).write_u32(1)?;
-    Encoder::new(&mut header).write_u32(1)?;
-    let mut writer = Encoder::new(&mut bytes);
+    Encoder::new(&mut header, crate::raw::Limits::DEFAULT).write_u32(1)?;
+    Encoder::new(&mut header, crate::raw::Limits::DEFAULT).write_u32(1)?;
+    let mut writer = Encoder::new(&mut bytes, crate::raw::Limits::DEFAULT);
     writer.write_record(kind::BEGIN_SST, &header)?;
     writer.write_record(kind::SST_ITEM, encoded)?;
     writer.write_record(kind::END_SST, &[])?;
@@ -595,18 +649,20 @@ fn new_sst(encoded: &[u8]) -> Result<Vec<u8>> {
 
 fn rewrite_sst(source: &[u8], total: u32, unique: u32, appended: Option<&[u8]>) -> Result<Vec<u8>> {
     let mut output = Vec::new();
-    for item in Records::new(source) {
+    for item in Records::new(source, crate::raw::Limits::DEFAULT) {
         let record = item?;
         match record.kind() {
             kind::BEGIN_SST => {
                 let mut payload = record.payload().to_vec();
                 payload[..4].copy_from_slice(&total.to_le_bytes());
                 payload[4..8].copy_from_slice(&unique.to_le_bytes());
-                Encoder::new(&mut output).write_record(kind::BEGIN_SST, &payload)?;
+                Encoder::new(&mut output, crate::raw::Limits::DEFAULT)
+                    .write_record(kind::BEGIN_SST, &payload)?;
             },
             kind::END_SST => {
                 if let Some(payload) = appended {
-                    Encoder::new(&mut output).write_record(kind::SST_ITEM, payload)?;
+                    Encoder::new(&mut output, crate::raw::Limits::DEFAULT)
+                        .write_record(kind::SST_ITEM, payload)?;
                 }
                 copy_record(source, &record, &mut output)?;
             },
@@ -670,7 +726,11 @@ fn transfer_xf_dependencies(
             kind::XF,
         )?;
         let parent_payload = source_parents.get(usize::from(parent)).ok_or_else(|| {
-            Error::UnsupportedFeature(format!("source cell-style XF {parent} is absent"))
+            Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit",
+                "source cell-style XF is absent",
+            )
         })?;
         let transferred = transfer_xf_dependencies(source, target, parent_payload, true)?;
         let target_parents = collection(
@@ -695,7 +755,11 @@ fn transfer_xf_dependencies(
             target_parents.len()
         };
         let target_parent = u16::try_from(target_parent).map_err(|_| {
-            Error::UnsupportedFeature("cell-style XF index exceeds u16".to_string())
+            Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit",
+                "cell-style XF index exceeds u16",
+            )
         })?;
         rewritten[..2].copy_from_slice(&target_parent.to_le_bytes());
     }
@@ -717,7 +781,11 @@ fn transfer_indexed_resource(
         source_items_index_byte(source_xf, xf_offset + 1)?,
     ]);
     let payload = source_items.get(usize::from(source_index)).ok_or_else(|| {
-        Error::UnsupportedFeature(format!("style resource index {source_index} is absent"))
+        Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "edit",
+            "style resource index is absent",
+        )
     })?;
     let target_items = collection(target, begin, end, item)?;
     let index = if let Some(index) = target_items.iter().position(|value| value == payload) {
@@ -726,8 +794,13 @@ fn transfer_indexed_resource(
         *target = append_collection_item(target, begin, end, item, payload)?;
         target_items.len()
     };
-    u16::try_from(index)
-        .map_err(|_| Error::UnsupportedFeature("style resource index exceeds u16".to_string()))
+    u16::try_from(index).map_err(|_| {
+        Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "edit",
+            "style resource index exceeds u16",
+        )
+    })
 }
 
 fn source_items_index_byte(source_xf: &[u8], offset: usize) -> Result<u8> {
@@ -752,7 +825,11 @@ fn transfer_number_format(source: &[u8], target: &mut Vec<u8>, xf: &mut [u8]) ->
         let (id, code) = crate::styles::parse_num_fmt(payload).map_err(map_style_error)?;
         if code == source_code {
             let id = u16::try_from(id).map_err(|_| {
-                Error::UnsupportedFeature("number-format ID exceeds u16".to_string())
+                Error::refused(
+                    litchi_core::edit::RefusalKind::UnsupportedContent,
+                    "edit",
+                    "number-format ID exceeds u16",
+                )
             })?;
             xf[2..4].copy_from_slice(&id.to_le_bytes());
             return Ok(());
@@ -766,7 +843,11 @@ fn transfer_number_format(source: &[u8], target: &mut Vec<u8>, xf: &mut [u8]) ->
     let new_id = (164_u16..=382)
         .find(|id| !used.contains(id))
         .ok_or_else(|| {
-            Error::UnsupportedFeature("no custom number-format ID remains".to_string())
+            Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit",
+                "no custom number-format ID remains",
+            )
         })?;
     let mut payload = source_payload.clone();
     payload[..2].copy_from_slice(&new_id.to_le_bytes());
@@ -789,7 +870,7 @@ pub(crate) fn collection(
 ) -> Result<Vec<Vec<u8>>> {
     let mut in_collection = false;
     let mut values = Vec::new();
-    for record in Records::new(source) {
+    for record in Records::new(source, crate::raw::Limits::DEFAULT) {
         let record = record?;
         match record.kind() {
             found if found == begin => in_collection = true,
@@ -811,7 +892,7 @@ pub(crate) fn append_collection_item(
     let mut output = Vec::new();
     let mut in_collection = false;
     let mut inserted = false;
-    for record in Records::new(source) {
+    for record in Records::new(source, crate::raw::Limits::DEFAULT) {
         let record = record?;
         if record.kind() == begin {
             if record.payload().len() < 4 {
@@ -824,13 +905,17 @@ pub(crate) fn append_collection_item(
             let next = binary::read_u32_le_at(&count, 0)?
                 .checked_add(1)
                 .ok_or_else(|| {
-                    Error::UnsupportedFeature("style collection count overflow".to_string())
+                    Error::refused(
+                        litchi_core::edit::RefusalKind::UnsupportedContent,
+                        "edit",
+                        "style collection count overflow",
+                    )
                 })?;
             count[..4].copy_from_slice(&next.to_le_bytes());
-            Encoder::new(&mut output).write_record(begin, &count)?;
+            Encoder::new(&mut output, crate::raw::Limits::DEFAULT).write_record(begin, &count)?;
             in_collection = true;
         } else if record.kind() == end && in_collection {
-            Encoder::new(&mut output).write_record(item, payload)?;
+            Encoder::new(&mut output, crate::raw::Limits::DEFAULT).write_record(item, payload)?;
             copy_record(source, &record, &mut output)?;
             in_collection = false;
             inserted = true;
@@ -839,17 +924,15 @@ pub(crate) fn append_collection_item(
         }
     }
     if !inserted {
-        return Err(Error::InvalidFormat(format!(
-            "style collection {begin}..{end} is absent"
-        )));
+        return Err(Error::InvalidFormat("style collection.. is absent"));
     }
     Ok(output)
 }
 
 fn copy_record(source: &[u8], record: &crate::raw::Record<'_>, output: &mut Vec<u8>) -> Result<()> {
-    let record_source = source.get(record.offset()..).ok_or_else(|| {
-        Error::InvalidFormat("record offset is outside its source part".to_string())
-    })?;
+    let record_source = source.get(record.offset()..).ok_or(Error::InvalidFormat(
+        "record offset is outside its source part",
+    ))?;
     let (_, header_len) = Header::parse(record_source, RawLimits::DEFAULT)?;
     let end = record
         .offset()
@@ -858,14 +941,18 @@ fn copy_record(source: &[u8], record: &crate::raw::Record<'_>, output: &mut Vec<
         .ok_or(Error::CapacityOverflow {
             resource: "resource record range",
         })?;
-    output.extend_from_slice(source.get(record.offset()..end).ok_or_else(|| {
-        Error::InvalidFormat("record range is outside its source part".to_string())
-    })?);
+    output.extend_from_slice(
+        source
+            .get(record.offset()..end)
+            .ok_or(Error::InvalidFormat(
+                "record range is outside its source part",
+            ))?,
+    );
     Ok(())
 }
 
-fn map_style_error(error: crate::styles::Error) -> Error {
-    Error::InvalidFormat(format!("style resource transfer: {error}"))
+fn map_style_error(_error: crate::styles::Error) -> Error {
+    Error::InvalidFormat("style resource transfer")
 }
 
 #[cfg(test)]

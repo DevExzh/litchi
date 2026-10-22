@@ -74,7 +74,7 @@ const MAX_GROUP_DEPTH: usize = 32;
 ///
 /// Construct with [`ShapeSpec::text_box`] (or [`ShapeSpec::shape`]
 /// for a non-text-box shape), then adjust `properties`, `paragraphs`,
-/// or flags before handing it to `MutableWorksheet::add_shape`.
+/// or flags before handing it to `builder::Worksheet::add_shape`.
 #[derive(Clone, PartialEq)]
 pub struct ShapeSpec {
     /// Shape name written to `xdr:cNvPr@name`.

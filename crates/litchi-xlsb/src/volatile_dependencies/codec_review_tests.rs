@@ -24,7 +24,7 @@ type Record = (Kind, Vec<u8>);
 
 fn encode(records: &[Record]) -> Vec<u8> {
     let mut bytes = Vec::new();
-    let mut writer = Encoder::new(&mut bytes);
+    let mut writer = Encoder::new(&mut bytes, crate::raw::Limits::DEFAULT);
     for (record_kind, payload) in records {
         writer
             .write_record(*record_kind, payload)
@@ -187,18 +187,18 @@ fn assert_wire_or_format_error(result: Result<codec::Parsed, Error>, label: &str
     }
 }
 
-fn assert_limit(error: Error, resource: &'static str, actual: usize, maximum: usize) {
-    if let Error::LimitExceeded {
-        resource: got_resource,
-        actual: got_actual,
+fn assert_limit(error: Error, kind: super::LimitKind, actual: usize, maximum: usize) {
+    if let Error::Limit {
+        kind: got_kind,
+        observed: got_actual,
         maximum: got_maximum,
     } = error
     {
-        assert_eq!(got_resource, resource);
+        assert_eq!(got_kind, kind.into());
         assert_eq!(got_actual, actual);
         assert_eq!(got_maximum, maximum);
     } else {
-        panic!("expected {resource} limit error, got {error:?}");
+        panic!("expected {kind} limit error, got {error:?}");
     }
 }
 
@@ -436,7 +436,7 @@ fn strict_utf16_and_length_sentinels_are_not_accepted() {
         replace_payload(&mut records, kind::BEGIN_VOL_MAIN, payload);
         let result = codec::read(&encode(&records), SemanticLimits::DEFAULT, 1);
         if is_limit {
-            assert!(matches!(result, Err(Error::LimitExceeded { .. })), "{name}");
+            assert!(matches!(result, Err(Error::Limit { .. })), "{name}");
         } else {
             assert_wire_or_format_error(result, name);
         }
@@ -542,7 +542,7 @@ fn aggregate_quotas_are_global_with_exact_boundary_and_plus_one_refusal() {
     struct Case {
         name: &'static str,
         boundary: usize,
-        resource: &'static str,
+        resource: super::LimitKind,
         set_limit: fn(&mut SemanticLimits, usize),
         records: fn() -> Vec<Record>,
         dependencies: fn() -> Dependencies,
@@ -552,7 +552,7 @@ fn aggregate_quotas_are_global_with_exact_boundary_and_plus_one_refusal() {
         Case {
             name: "types",
             boundary: 2,
-            resource: "Volatile Dependencies type collections",
+            resource: super::LimitKind::TypeCollections,
             set_limit: set_max_types,
             records: two_type_records,
             dependencies: two_type_dependencies,
@@ -560,7 +560,7 @@ fn aggregate_quotas_are_global_with_exact_boundary_and_plus_one_refusal() {
         Case {
             name: "mains",
             boundary: 2,
-            resource: "Volatile main collections",
+            resource: super::LimitKind::MainCollections,
             set_limit: set_max_mains,
             records: aggregate_records,
             dependencies: aggregate_dependencies,
@@ -568,7 +568,7 @@ fn aggregate_quotas_are_global_with_exact_boundary_and_plus_one_refusal() {
         Case {
             name: "topics",
             boundary: 2,
-            resource: "Volatile topic collections",
+            resource: super::LimitKind::TopicCollections,
             set_limit: set_max_topics,
             records: aggregate_records,
             dependencies: aggregate_dependencies,
@@ -576,7 +576,7 @@ fn aggregate_quotas_are_global_with_exact_boundary_and_plus_one_refusal() {
         Case {
             name: "subtopics",
             boundary: 2,
-            resource: "Volatile subtopic records",
+            resource: super::LimitKind::SubtopicRecords,
             set_limit: set_max_subtopics,
             records: aggregate_records,
             dependencies: aggregate_dependencies,
@@ -584,7 +584,7 @@ fn aggregate_quotas_are_global_with_exact_boundary_and_plus_one_refusal() {
         Case {
             name: "references",
             boundary: 2,
-            resource: "Volatile cell references",
+            resource: super::LimitKind::CellReferences,
             set_limit: set_max_references,
             records: aggregate_records,
             dependencies: aggregate_dependencies,
@@ -592,7 +592,7 @@ fn aggregate_quotas_are_global_with_exact_boundary_and_plus_one_refusal() {
         Case {
             name: "one string",
             boundary: 1,
-            resource: "Volatile UTF-16 string",
+            resource: super::LimitKind::StringUnits,
             set_limit: set_max_string_units,
             records: aggregate_records,
             dependencies: aggregate_dependencies,
@@ -600,7 +600,7 @@ fn aggregate_quotas_are_global_with_exact_boundary_and_plus_one_refusal() {
         Case {
             name: "all strings",
             boundary: 4,
-            resource: "Volatile UTF-16 strings",
+            resource: super::LimitKind::TotalStringUnits,
             set_limit: set_max_total_string_units,
             records: aggregate_records,
             dependencies: aggregate_dependencies,
@@ -630,13 +630,13 @@ fn aggregate_quotas_are_global_with_exact_boundary_and_plus_one_refusal() {
         let error = codec::write(&dependencies, write_refused, 1)
             .expect_err("quota plus-one model must be refused");
         let write_resource = match case.name {
-            "types" => "volatile type collections",
-            "mains" => "volatile main collections",
-            "topics" => "volatile topic collections",
-            "subtopics" => "volatile subtopic records",
-            "references" => "volatile cell references",
-            "one string" => "volatile first string",
-            "all strings" => "volatile UTF-16 strings",
+            "types" => super::LimitKind::TypeCollections,
+            "mains" => super::LimitKind::MainCollections,
+            "topics" => super::LimitKind::TopicCollections,
+            "subtopics" => super::LimitKind::SubtopicRecords,
+            "references" => super::LimitKind::CellReferences,
+            "one string" => super::LimitKind::StringUnits,
+            "all strings" => super::LimitKind::TotalStringUnits,
             _ => unreachable!("covered table case"),
         };
         assert_limit(error, write_resource, case.boundary, case.boundary - 1);
@@ -651,12 +651,7 @@ fn aggregate_quotas_are_global_with_exact_boundary_and_plus_one_refusal() {
     let mut refused = SemanticLimits::DEFAULT;
     refused.max_records = boundary - 1;
     let error = codec::read(&bytes, refused, 1).expect_err("record quota plus-one");
-    assert_limit(
-        error,
-        "Volatile Dependencies records",
-        boundary,
-        boundary - 1,
-    );
+    assert_limit(error, super::LimitKind::Records, boundary, boundary - 1);
 }
 
 #[test]
@@ -672,7 +667,7 @@ fn quota_checks_precede_later_malformed_or_oversized_strings() {
     limits.max_mains = 1;
     let error = codec::read(&encode(&main_count_records), limits, 1)
         .expect_err("main count must fail before sentinel string");
-    assert_limit(error, "Volatile main collections", 2, 1);
+    assert_limit(error, super::LimitKind::MainCollections, 2, 1);
 
     let malformed_later_string = vec![
         (kind::BEGIN_VOL_DEPS, Vec::new()),
@@ -685,7 +680,7 @@ fn quota_checks_precede_later_malformed_or_oversized_strings() {
     limits.max_total_string_units = 1;
     let error = codec::read(&encode(&malformed_later_string), limits, 1)
         .expect_err("aggregate string count must fail before truncated payload");
-    assert_limit(error, "Volatile UTF-16 strings", 2, 1);
+    assert_limit(error, super::LimitKind::TotalStringUnits, 2, 1);
 }
 
 #[test]
@@ -699,5 +694,5 @@ fn writer_preflights_record_quota_for_empty_streams() {
     too_small.max_records = 1;
     let error = codec::write(&dependencies, too_small, 1)
         .expect_err("writer must reject the second record before allocation");
-    assert_limit(error, "Volatile Dependencies records", 2, 1);
+    assert_limit(error, super::LimitKind::Records, 2, 1);
 }

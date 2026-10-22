@@ -113,10 +113,10 @@ pub fn parse_xlsb_web_extension_bindings(
     records: &[u8],
     mut valid_external_sheet: impl FnMut(u16) -> bool,
 ) -> Result<Vec<Binding>> {
-    let mut iterator = Records::new(records);
+    let mut iterator = Records::new(records, crate::raw::Limits::DEFAULT);
     let begin = iterator
         .next()
-        .ok_or_else(|| Error::UnexpectedEndOfStream("WEBEXTENSIONS".to_string()))??;
+        .ok_or(Error::UnexpectedEndOfStream("WEBEXTENSIONS"))??;
     if begin.kind() != kind::BEGIN_WEB_EXTENSIONS || !begin.payload().is_empty() {
         return Err(invalid(
             "WEBEXTENSIONS",
@@ -128,7 +128,7 @@ pub fn parse_xlsb_web_extension_bindings(
     loop {
         let record = iterator
             .next()
-            .ok_or_else(|| Error::UnexpectedEndOfStream("WEBEXTENSIONS".to_string()))??;
+            .ok_or(Error::UnexpectedEndOfStream("WEBEXTENSIONS"))??;
         match record.kind() {
             kind::WEB_EXTENSION => {
                 if bindings.len() == MAX_BINDINGS {
@@ -159,11 +159,8 @@ pub fn parse_xlsb_web_extension_bindings(
                 }
                 return Ok(bindings);
             },
-            other => {
-                return Err(invalid(
-                    "WEBEXTENSIONS",
-                    format!("unexpected record 0x{other:04X}"),
-                ));
+            _other => {
+                return Err(invalid("WEBEXTENSIONS", "unexpected record 0x"));
             },
         }
     }
@@ -173,7 +170,7 @@ pub fn parse_xlsb_web_extension_bindings(
 pub fn write_xlsb_web_extension_bindings(bindings: &[Binding]) -> Result<Vec<u8>> {
     validate_bindings(bindings, None)?;
     let mut output = Vec::new();
-    let mut writer = Encoder::new(&mut output);
+    let mut writer = Encoder::new(&mut output, crate::raw::Limits::DEFAULT);
     writer.write_record(kind::BEGIN_WEB_EXTENSIONS, &[])?;
     for binding in bindings {
         writer.write_record(kind::WEB_EXTENSION, &binding.to_payload()?)?;
@@ -295,10 +292,11 @@ impl Snapshot {
         validate_xlsb_web_extension_apprefs(&self.bindings, package_bindings)
     }
 
-    /// Start a detached, failure-atomic transaction.
+    /// Start a detached, failure-atomic byte-level draft of this collection;
+    /// [`Draft::finish`] returns its exact, reversible [`Patch`].
     #[must_use]
-    pub fn edit(&self) -> Edit {
-        Edit {
+    pub fn draft(&self) -> Draft {
+        Draft {
             source: self.clone(),
             bindings: self.bindings.clone(),
             valid_external_sheets: self.valid_external_sheets.clone(),
@@ -326,19 +324,19 @@ impl PartialEq for Snapshot {
 
 impl Eq for Snapshot {}
 
-/// A detached, typed edit over one worksheet `WEBEXTENSIONS` snapshot.
+/// A detached, typed draft over one worksheet `WEBEXTENSIONS` snapshot.
 #[derive(Debug, Clone)]
-pub struct Edit {
+pub struct Draft {
     source: Snapshot,
     bindings: Vec<Binding>,
     valid_external_sheets: ValidExternalSheets,
 }
 
-impl Edit {
-    /// Construct an edit from a validated source snapshot.
+impl Draft {
+    /// Construct a draft from a validated source snapshot.
     #[must_use]
     pub fn new(source: Snapshot) -> Self {
-        source.edit()
+        source.draft()
     }
 
     /// Borrow the immutable source snapshot used for conflict checks.
@@ -367,7 +365,7 @@ impl Edit {
 
     /// Whether staged serialization differs from the source semantics.
     #[must_use]
-    pub fn is_changed(&self) -> bool {
+    pub fn changed(&self) -> bool {
         self.bindings != self.source.bindings
     }
 
@@ -495,7 +493,7 @@ impl Edit {
     }
 
     /// Materialize the currently staged collection as a validated snapshot.
-    pub fn snapshot(&self) -> Result<Snapshot> {
+    pub fn preview(&self) -> Result<Snapshot> {
         let bytes = write_xlsb_web_extension_bindings(&self.bindings)?;
         if bytes.as_slice() == self.source.source_bytes() {
             return Ok(self.source.clone());
@@ -506,55 +504,17 @@ impl Edit {
         )
     }
 
-    /// Validate and publish the staged collection as a reversible patch.
-    pub fn commit(self) -> Result<Commit> {
-        let snapshot = self.snapshot()?;
+    /// Validate the staged collection and return its snapshot and its exact,
+    /// reversible patch.
+    pub fn finish(self) -> Result<(Snapshot, Patch)> {
+        let snapshot = self.preview()?;
         let patch = Patch {
             before: Arc::clone(&self.source.source),
             after: Arc::clone(&snapshot.source),
             before_external_sheets: self.source.valid_external_sheets,
             after_external_sheets: snapshot.valid_external_sheets.clone(),
         };
-        let changed = !patch.is_empty();
-        Ok(Commit {
-            snapshot,
-            patch,
-            changed,
-        })
-    }
-}
-
-/// A successful source-checked worksheet collection publication.
-#[derive(Debug, Clone)]
-pub struct Commit {
-    snapshot: Snapshot,
-    patch: Patch,
-    changed: bool,
-}
-
-impl Commit {
-    /// Whether publication changed any record byte.
-    #[must_use]
-    pub const fn changed(&self) -> bool {
-        self.changed
-    }
-
-    /// Borrow the post-edit snapshot.
-    #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
-    }
-
-    /// Borrow the reversible source-checked patch.
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Consume the publication into its snapshot and patch.
-    #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch) {
-        (self.snapshot, self.patch)
+        Ok((snapshot, patch))
     }
 }
 
@@ -570,14 +530,8 @@ pub struct Patch {
 impl Patch {
     /// Whether this patch preserves the exact source record stream.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
-        self.before == self.after
-    }
-
-    /// Alias for [`Self::is_empty`].
-    #[must_use]
     pub fn is_noop(&self) -> bool {
-        self.is_empty()
+        self.before == self.after
     }
 
     /// Borrow the exact source record stream required by this patch.
@@ -602,7 +556,7 @@ impl Patch {
                 "source snapshot does not match the patch base",
             ));
         }
-        if self.is_empty() {
+        if self.is_noop() {
             return Ok(source.clone());
         }
         Snapshot::from_source(Arc::clone(&self.after), self.after_external_sheets.clone())
@@ -616,15 +570,10 @@ impl Patch {
                 "source bytes do not match the patch base",
             ));
         }
-        if !self.is_empty() {
+        if !self.is_noop() {
             Snapshot::from_source(Arc::clone(&self.after), self.after_external_sheets.clone())?;
         }
         Ok(self.after.to_vec())
-    }
-
-    /// Alias for [`Self::apply`].
-    pub fn commit(&self, source: &Snapshot) -> Result<Snapshot> {
-        self.apply(source)
     }
 
     /// Apply the exact inverse to the committed target snapshot.
@@ -792,10 +741,7 @@ impl<'a> PackageAppRefs<'a> {
             if !self.values.contains(binding.application_reference.as_str()) {
                 return Err(invalid(
                     "BrtWebExtension.appRef",
-                    format!(
-                        "'{}' has no matching MS-OWEXML binding",
-                        binding.application_reference
-                    ),
+                    "has no matching MS-OWEXML binding",
                 ));
             }
         }
@@ -955,15 +901,43 @@ fn write_wide_string(output: &mut Vec<u8>, value: &str) -> Result<()> {
     Ok(())
 }
 
-fn invalid(typ: impl Into<String>, val: impl Into<String>) -> Error {
-    Error::Unrecognized {
-        typ: typ.into(),
-        val: val.into(),
-    }
+fn invalid(typ: &'static str, val: &'static str) -> Error {
+    Error::Unrecognized { typ, val }
 }
 
 #[cfg(test)]
 mod tests {
+    /// The snapshot and patch of a finished draft, under one name.
+    struct Commit {
+        snapshot: Snapshot,
+        patch: Patch,
+    }
+
+    impl Commit {
+        fn changed(&self) -> bool {
+            !self.patch.is_noop()
+        }
+
+        fn snapshot(&self) -> &Snapshot {
+            &self.snapshot
+        }
+
+        fn patch(&self) -> &Patch {
+            &self.patch
+        }
+    }
+
+    trait FinishCommit {
+        fn commit(self) -> Result<Commit>;
+    }
+
+    impl FinishCommit for Draft {
+        fn commit(self) -> Result<Commit> {
+            let (snapshot, patch) = self.finish()?;
+            Ok(Commit { snapshot, patch })
+        }
+    }
+
     use super::*;
     use crate::package::formula::text::Compiler as TextCompiler;
 
@@ -1040,14 +1014,14 @@ mod tests {
         let source = write_xlsb_web_extension_bindings(&[binding()]).unwrap();
         let snapshot = Snapshot::read(&source, |index| index == 0).unwrap();
 
-        let noop = snapshot.edit().commit().unwrap();
+        let noop = snapshot.draft().commit().unwrap();
         assert!(!noop.changed());
-        assert!(noop.patch().is_empty());
+        assert!(noop.patch().is_noop());
         assert_eq!(noop.patch().before(), source.as_slice());
         assert_eq!(noop.patch().after(), source.as_slice());
         assert_eq!(noop.patch().apply(&snapshot).unwrap(), snapshot);
 
-        let mut transaction = snapshot.edit();
+        let mut transaction = snapshot.draft();
         assert!(
             transaction
                 .set_application_reference(0, "expenses-table")
@@ -1099,7 +1073,7 @@ mod tests {
         assert!(Snapshot::read(&source[..source.len() - 1], |_| true).is_err());
         assert!(Snapshot::read_with_external_sheet_indices(&source, []).is_err());
 
-        let mut transaction = Snapshot::read(&source, |index| index == 0).unwrap().edit();
+        let mut transaction = Snapshot::read(&source, |index| index == 0).unwrap().draft();
         let mut invalid = binding();
         invalid.application_reference.clear();
         assert!(transaction.set(0, invalid).is_err());

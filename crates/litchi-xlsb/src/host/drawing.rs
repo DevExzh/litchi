@@ -226,12 +226,12 @@ pub struct EmbeddedChart {
     pub additional_relationships: Vec<crate::chart::Relationship>,
 }
 
-fn invalid(message: impl Into<String>) -> Error {
-    Error::InvalidFormat(message.into())
+fn invalid(message: &'static str) -> Error {
+    Error::InvalidFormat(message)
 }
 
-fn limit(what: &str) -> Error {
-    Error::InvalidFormat(format!("drawing XML exceeds {what} limit"))
+fn limit(_what: &str) -> Error {
+    Error::InvalidFormat("drawing XML exceeds limit")
 }
 
 /// Parse one SpreadsheetDrawing part into its anchored-object inventory.
@@ -246,8 +246,8 @@ fn parse_drawing_part_xml(xml_bytes: &[u8]) -> Result<Drawing> {
     if xml_bytes.len() > MAX_DRAWING_XML_BYTES {
         return Err(limit("drawing part bytes"));
     }
-    let xml = std::str::from_utf8(xml_bytes)
-        .map_err(|error| invalid(format!("drawing part is not UTF-8: {error}")))?;
+    let xml =
+        std::str::from_utf8(xml_bytes).map_err(|_error| invalid("drawing part is not UTF-8"))?;
     let xml = litchi_ooxml_common::mce::process_str(xml)?;
     Parser::parse(xml.as_ref())
 }
@@ -271,17 +271,6 @@ enum MarkerField {
     RowOffset,
 }
 
-impl MarkerField {
-    fn description(self) -> &'static str {
-        match self {
-            MarkerField::Column => "marker column",
-            MarkerField::ColumnOffset => "marker column offset",
-            MarkerField::Row => "marker row",
-            MarkerField::RowOffset => "marker row offset",
-        }
-    }
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ParsedAnchorKind {
     TwoCell,
@@ -299,51 +288,44 @@ struct PendingMarker {
 
 impl PendingMarker {
     fn assign(&mut self, field: MarkerField, text: &str) -> Result<()> {
-        let description = field.description();
         let trimmed = text.trim();
         match field {
             MarkerField::Column | MarkerField::Row => {
-                let value: u32 = trimmed
-                    .parse()
-                    .map_err(|_| invalid(format!("invalid {description} value '{trimmed}'")))?;
+                let value: u32 = trimmed.parse().map_err(|_| invalid("invalid value"))?;
                 let target = match field {
                     MarkerField::Column => &mut self.column,
                     _ => &mut self.row,
                 };
                 if target.replace(value).is_some() {
-                    return Err(invalid(format!("{description} is duplicated")));
+                    return Err(invalid("is duplicated"));
                 }
             },
             MarkerField::ColumnOffset | MarkerField::RowOffset => {
-                let value: i64 = trimmed
-                    .parse()
-                    .map_err(|_| invalid(format!("invalid {description} value '{trimmed}'")))?;
+                let value: i64 = trimmed.parse().map_err(|_| invalid("invalid value"))?;
                 let target = match field {
                     MarkerField::ColumnOffset => &mut self.column_offset,
                     _ => &mut self.row_offset,
                 };
                 if target.replace(value).is_some() {
-                    return Err(invalid(format!("{description} is duplicated")));
+                    return Err(invalid("is duplicated"));
                 }
             },
         }
         Ok(())
     }
 
-    fn finish(self, description: &str) -> Result<CellMarker> {
+    fn finish(self, _description: &str) -> Result<CellMarker> {
         Ok(CellMarker {
             column: self
                 .column
-                .ok_or_else(|| invalid(format!("{description} is missing its column")))?,
+                .ok_or_else(|| invalid("is missing its column"))?,
             column_offset: self
                 .column_offset
-                .ok_or_else(|| invalid(format!("{description} is missing its column offset")))?,
-            row: self
-                .row
-                .ok_or_else(|| invalid(format!("{description} is missing its row")))?,
+                .ok_or_else(|| invalid("is missing its column offset"))?,
+            row: self.row.ok_or_else(|| invalid("is missing its row"))?,
             row_offset: self
                 .row_offset
-                .ok_or_else(|| invalid(format!("{description} is missing its row offset")))?,
+                .ok_or_else(|| invalid("is missing its row offset"))?,
         })
     }
 }
@@ -393,7 +375,7 @@ impl PendingObject {
             self.non_visual.id = match unqualified_attribute_value(element, b"id", decoder)? {
                 Some(value) => value
                     .parse()
-                    .map_err(|_| invalid(format!("invalid drawing object id '{value}'")))?,
+                    .map_err(|_| invalid("invalid drawing object id"))?,
                 None => 0,
             };
             self.non_visual.name =
@@ -516,10 +498,7 @@ impl Parser {
         let mut closed_root = false;
         loop {
             let decoder = reader.decoder();
-            let event = reader
-                .read_event()
-                .map_err(|error| Error::Encoding(error.to_string()))?
-                .into_owned();
+            let event = reader.read_event()?.into_owned();
             let resolver = reader.resolver().clone();
             let (namespace, event) = resolver.resolve_event(event);
             match event {
@@ -561,7 +540,7 @@ impl Parser {
                     if matches!(stack.last(), Some(Context::Marker(_))) {
                         let decoded = text
                             .xml_content(XmlVersion::Explicit1_0)
-                            .map_err(|error| Error::Encoding(error.to_string()))?;
+                            .map_err(|_error| Error::Encoding("the text cannot be decoded"))?;
                         parser.marker_text.push_str(&decoded);
                     }
                 },
@@ -771,7 +750,8 @@ fn relationship_attribute(
     resolver: &NamespaceResolver,
 ) -> Result<Option<String>> {
     for attribute in element.checked_attributes() {
-        let attribute = attribute.map_err(|error| Error::Encoding(error.to_string()))?;
+        let attribute =
+            attribute.map_err(|_error| Error::Encoding("the text cannot be decoded"))?;
         let (namespace, _) = resolver.resolve_attribute(attribute.key);
         let is_rel = matches!(
             namespace,
@@ -785,8 +765,7 @@ fn relationship_attribute(
         {
             return Ok(Some(
                 attribute
-                    .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
-                    .map_err(|error| Error::Encoding(error.to_string()))?
+                    .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)?
                     .into_owned(),
             ));
         }
@@ -795,15 +774,11 @@ fn relationship_attribute(
 }
 
 fn emu_attribute(element: &BytesStart<'_>, name: &[u8], decoder: Decoder) -> Result<i64> {
-    let value = unqualified_attribute_value(element, name, decoder)?.ok_or_else(|| {
-        invalid(format!(
-            "drawing coordinate is missing '{}'",
-            String::from_utf8_lossy(name)
-        ))
-    })?;
+    let value = unqualified_attribute_value(element, name, decoder)?
+        .ok_or_else(|| invalid("drawing coordinate is missing"))?;
     value
         .parse()
-        .map_err(|_| invalid(format!("invalid drawing coordinate value '{value}'")))
+        .map_err(|_| invalid("invalid drawing coordinate value"))
 }
 
 #[cfg(test)]

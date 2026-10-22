@@ -11,7 +11,7 @@ pub(crate) fn resolve_authored_pivot_source_name(
     let (sheet_prefix, table_name) = split_pivot_source_name(pivot_source_name);
     if table_name.is_empty() {
         return Err(Error::InvalidFormat(
-            "authored pivot chart has an empty pivot-table name".to_string(),
+            "authored pivot chart has an empty pivot-table name",
         ));
     }
     let folded = table_name.to_lowercase();
@@ -25,11 +25,9 @@ pub(crate) fn resolve_authored_pivot_source_name(
             let wanted = prefix.to_lowercase();
             candidates()
                 .find(|(_, sheet)| sheet.to_lowercase() == wanted)
-                .ok_or_else(|| {
-                    Error::InvalidFormat(format!(
-                        "authored pivot chart references pivot table '{table_name}' on sheet '{prefix}', which does not host it"
-                    ))
-                })?
+                .ok_or(Error::InvalidFormat(
+                    "authored pivot chart references pivot table on sheet, which does not host it",
+                ))?
         },
         None => {
             let host = host_sheet_name.to_lowercase();
@@ -40,14 +38,14 @@ pub(crate) fn resolve_authored_pivot_source_name(
                 match (matches.next(), matches.next()) {
                     (Some(found), None) => found,
                     (None, _) => {
-                        return Err(Error::InvalidFormat(format!(
-                            "authored pivot chart references missing pivot table '{table_name}'"
-                        )));
+                        return Err(Error::InvalidFormat(
+                            "authored pivot chart references missing pivot table",
+                        ));
                     },
                     (Some(_), Some(_)) => {
-                        return Err(Error::InvalidFormat(format!(
-                            "authored pivot chart pivot-table name '{table_name}' is ambiguous"
-                        )));
+                        return Err(Error::InvalidFormat(
+                            "authored pivot chart pivot-table name is ambiguous",
+                        ));
                     },
                 }
             }

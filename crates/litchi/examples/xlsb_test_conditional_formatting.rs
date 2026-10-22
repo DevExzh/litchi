@@ -9,15 +9,15 @@
 //! ```
 
 use litchi::sheet::CellValue;
+use litchi::xlsb::builder::{self, Builder};
 use litchi::xlsb::conditional_formatting::{Formatting, Rule, RuleType};
-use litchi::xlsb::writer::{Builder, MutableWorksheet};
 use std::fs::File;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Test CF: Creating XLSB with conditional formatting...");
 
     let mut workbook = Builder::new();
-    let mut sheet = MutableWorksheet::new("Formatting");
+    let mut sheet = builder::Worksheet::new("Formatting");
 
     // Create headers
     sheet.set_cell(0, 0, CellValue::String("Sales Q1".to_string()));

@@ -25,11 +25,11 @@ const ARCHIVE_B1: &str = "/sheet[2]/B1";
 
 fn fixture() -> Vec<u8> {
     use litchi_core::sheet::CellValue;
+    use litchi_xlsb::builder::{self, Builder};
     use litchi_xlsb::formula::ParsedFormula;
-    use litchi_xlsb::writer::{Builder, MutableWorksheet};
 
     let mut writer = Builder::new();
-    let mut data = MutableWorksheet::new("Data");
+    let mut data = builder::Worksheet::new("Data");
     data.set_cell(0, 0, "seed");
     data.set_cell(0, 1, 2.5_f64);
     data.set_cell(0, 2, true);
@@ -48,7 +48,7 @@ fn fixture() -> Vec<u8> {
     data.set_cell(1, 1, 4_i32);
     writer.add_worksheet(data);
 
-    let mut archive = MutableWorksheet::new("Archive");
+    let mut archive = builder::Worksheet::new("Archive");
     archive.set_cell(0, 0, "untouched");
     archive.set_cell(0, 1, 9_i32);
     writer.add_worksheet(archive);
@@ -63,10 +63,10 @@ fn fixture() -> Vec<u8> {
 }
 
 fn grouped_formula_fixture() -> Vec<u8> {
-    use litchi_xlsb::writer::{Builder, MutableWorksheet};
+    use litchi_xlsb::builder::{self, Builder};
 
     let mut writer = Builder::new();
-    let mut data = MutableWorksheet::new("Data");
+    let mut data = builder::Worksheet::new("Data");
     data.set_shared_formula(0, 4, 0, 5, "1")
         .expect("install shared formula group");
     data.set_cell(1, 0, "untouched");

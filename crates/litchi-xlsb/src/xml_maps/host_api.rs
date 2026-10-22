@@ -10,8 +10,8 @@ use litchi_ooxml_common::spreadsheet_xml_maps as common;
 
 use super::{Error, Result, XmlMapConformance, XmlMapInfo, XmlMapLimits};
 
-fn contextualize(operation: &str, error: litchi_ooxml_common::Error) -> Error {
-    Error::InvalidFormat(format!("XLSB Custom XML Maps {operation}: {error}"))
+fn contextualize(_operation: &str, _error: litchi_ooxml_common::Error) -> Error {
+    Error::InvalidFormat("XLSB Custom XML Maps")
 }
 
 /// Parse a bounded, namespace-aware XLSB Custom XML Maps catalog under

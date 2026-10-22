@@ -19,15 +19,9 @@ pub struct Cursor<'a> {
 }
 
 impl<'a> Cursor<'a> {
-    /// Read with safe default limits.
-    #[must_use]
-    pub const fn new(data: &'a [u8], context: &'static str) -> Self {
-        Self::with_limits(data, context, Limits::DEFAULT)
-    }
-
     /// Read with explicit finite limits.
     #[must_use]
-    pub const fn with_limits(data: &'a [u8], context: &'static str, limits: Limits) -> Self {
+    pub const fn new(data: &'a [u8], context: &'static str, limits: Limits) -> Self {
         Self {
             data,
             offset: 0,
@@ -37,9 +31,9 @@ impl<'a> Cursor<'a> {
     }
 
     /// Construct a cursor after validating its raw limit profile.
-    pub fn try_with_limits(data: &'a [u8], context: &'static str, limits: Limits) -> Result<Self> {
+    pub fn bounded(data: &'a [u8], context: &'static str, limits: Limits) -> Result<Self> {
         match limits.validate() {
-            Ok(limits) => Ok(Self::with_limits(data, context, limits)),
+            Ok(limits) => Ok(Self::new(data, context, limits)),
             Err(error) => Err(error),
         }
     }

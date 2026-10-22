@@ -1,10 +1,10 @@
 //! Focused PivotCache binary-writer tests.
 
 use super::semantic::write_pivot_cache_definition;
+use crate::builder::{self, Builder};
 use crate::package::error::Error;
 use crate::package::pivot::model::*;
 use crate::package::pivot::parse_pivot_cache_definition;
-use crate::writer::{Builder, MutableWorksheet};
 use std::io::Cursor;
 
 fn field(name: &str) -> PivotCacheField {
@@ -642,7 +642,7 @@ fn written_caches_round_trip_through_the_package() {
     };
 
     let mut workbook = Builder::new();
-    workbook.add_worksheet(MutableWorksheet::new("Sheet1"));
+    workbook.add_worksheet(builder::Worksheet::new("Sheet1"));
     let first_id = workbook.add_pivot_cache(&first).unwrap();
     let second_id = workbook.add_pivot_cache(&second).unwrap();
     assert_eq!(first_id, 1);
@@ -676,7 +676,7 @@ fn add_pivot_cache_surfaces_serializer_refusals() {
     broken.fields = vec![broken_field];
 
     let mut workbook = Builder::new();
-    workbook.add_worksheet(MutableWorksheet::new("Sheet1"));
+    workbook.add_worksheet(builder::Worksheet::new("Sheet1"));
     assert!(matches!(
         workbook.add_pivot_cache(&broken),
         Err(Error::Unrecognized { .. })

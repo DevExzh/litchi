@@ -15,10 +15,14 @@ use std::io::Cursor;
 
 use litchi_core::sheet::WorkbookTrait as _;
 use litchi_opc::{OpcPackage, PackURI, SourceLimits};
+use litchi_xlsb::builder::{self, Builder};
 use litchi_xlsb::cell_values::{CellError, Reference, StyleIndex, Value};
 use litchi_xlsb::raw::{Encoder, Records, kind};
-use litchi_xlsb::writer::{Builder, MutableWorksheet};
 use litchi_xlsb::{Leniency, Package, Workbook};
+
+#[path = "support/projection.rs"]
+mod projection;
+use projection::OwnedWorkbook as _;
 
 const SHEET1: &str = "/xl/worksheets/sheet1.bin";
 
@@ -35,7 +39,7 @@ fn style_zero() -> StyleIndex {
 }
 
 fn numbers_workbook() -> Vec<u8> {
-    let mut sheet = MutableWorksheet::new("Numbers");
+    let mut sheet = builder::Worksheet::new("Numbers");
     sheet.set_cell(0, 0, 1.5);
     sheet.set_cell(0, 1, 2.5);
     let mut writer = Builder::new();
@@ -56,9 +60,9 @@ fn nan_workbook() -> Vec<u8> {
     let uri = PackURI::new(SHEET1).expect("worksheet URI");
     let source_sheet = package.get_part(&uri).expect("worksheet part").blob();
     let mut output = Vec::new();
-    let mut writer = Encoder::new(&mut output);
+    let mut writer = Encoder::new(&mut output, litchi_xlsb::raw::Limits::DEFAULT);
     let mut replaced = false;
-    for item in Records::new(source_sheet) {
+    for item in Records::new(source_sheet, litchi_xlsb::raw::Limits::DEFAULT) {
         let record = item.expect("fixture worksheet record");
         let mut payload = record.payload().to_vec();
         if !replaced && record.kind() == kind::CELL_REAL {
@@ -111,7 +115,7 @@ fn changed_cell_commit_projects_to_the_exact_patch_image() {
     let package = commit.into_package();
     assert_eq!(package.to_bytes().expect("candidate bytes"), expected);
 
-    let workbook = package.into_workbook().expect("candidate workbook");
+    let workbook = package.owned_workbook().expect("candidate workbook");
     assert_eq!(
         workbook
             .to_package()
@@ -133,12 +137,12 @@ fn cloned_commit_and_follow_up_edit_do_not_use_a_stale_projection() {
 
     let first = cached
         .clone()
-        .into_workbook()
+        .owned_workbook()
         .expect("first commit projection");
     let second = cloned_commit
         .into_package()
         .clone()
-        .into_workbook()
+        .owned_workbook()
         .expect("cloned commit projection");
     assert_eq!(
         first.to_package().to_bytes().expect("first bytes"),
@@ -164,7 +168,7 @@ fn cloned_commit_and_follow_up_edit_do_not_use_a_stale_projection() {
     let follow_up_expected = follow_up.patch().after().to_vec();
     let follow_up_workbook = follow_up
         .into_package()
-        .into_workbook()
+        .owned_workbook()
         .expect("follow-up projection");
     assert_eq!(
         follow_up_workbook
@@ -197,7 +201,7 @@ fn no_op_cell_commit_projection_preserves_the_exact_source() {
 
     let workbook = commit
         .into_package()
-        .into_workbook()
+        .owned_workbook()
         .expect("no-op projection");
     assert_eq!(
         workbook.to_package().to_bytes().expect("no-op bytes"),
@@ -231,7 +235,7 @@ fn changed_cell_commit_retains_tolerant_cached_number_policy() {
 
     let published = commit
         .into_package()
-        .into_workbook()
+        .owned_workbook()
         .expect("tolerant commit projection");
     assert_eq!(published.leniency(), Leniency::TolerateCachedNumbers);
     let snapshot = published.cell_values(0).expect("tolerant cell snapshot");
@@ -283,7 +287,7 @@ fn changed_cell_commit_retains_read_limits_and_skipped_drawing_policy() {
     let commit = edit.commit().expect("bounded cell commit");
     let published = commit
         .into_package()
-        .into_workbook()
+        .owned_workbook()
         .expect("bounded commit projection");
 
     assert!(!published.drawings_parsed());

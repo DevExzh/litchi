@@ -578,9 +578,9 @@ fn row_resource_limits_are_limit_exceeded() {
     #[cfg(feature = "xlsb")]
     {
         check(
-            litchi_xlsb::package::PackageError::LimitExceeded {
-                resource: "cells",
-                actual: 11,
+            litchi_xlsb::package::PackageError::Limit {
+                kind: litchi_xlsb::cell_values::LimitKind::Cells.into(),
+                observed: 11,
                 maximum: 10,
             }
             .into(),
@@ -678,7 +678,7 @@ fn row_unsupported_operations_are_unsupported_capability() {
     }
     #[cfg(feature = "xlsb")]
     assert_code(
-        litchi_xlsb::package::PackageError::UnsupportedFeature("decrypt".into()),
+        litchi_xlsb::package::PackageError::UnsupportedFeature("decrypt"),
         Code::UnsupportedCapability,
     );
     #[cfg(feature = "docx")]
@@ -1050,6 +1050,36 @@ fn xlsx_refusals_conflicts_and_limits_have_their_codes() {
     );
 }
 
+#[cfg(feature = "xlsb")]
+#[test]
+fn xlsb_refusals_conflicts_and_invalid_limits_classify_by_kind() {
+    use litchi_core::edit::{Refusal, RefusalKind};
+    use litchi_xlsb::package::PackageError;
+
+    assert_code(
+        PackageError::Refused(Refusal::new(
+            RefusalKind::UnsupportedContent,
+            "edit_timelines",
+            "non-canonical source",
+        )),
+        Code::UnsupportedCapability,
+    );
+    assert_code(
+        PackageError::PatchConflict {
+            part: "Custom Data source closure",
+        },
+        Code::InvalidInput,
+    );
+    assert_code(
+        PackageError::InvalidLimit {
+            kind: litchi_xlsb::package::LimitKind::Opc(litchi_xlsb::opc::LimitKind::Parts),
+            value: 0,
+            maximum: 1,
+        },
+        Code::InvalidArgument,
+    );
+}
+
 #[cfg(feature = "xlsx")]
 #[test]
 fn wildcard_xlsx_errors_are_corrupt_file() {
@@ -1387,9 +1417,7 @@ fn docx_encryption_policy_refusal_retains_typed_source() {
 #[test]
 fn xlsb_diagnostics_hide_authored_payloads_but_retain_typed_causes() {
     let secret = "private workbook formula and sheet name";
-    let error = Error::from(litchi_xlsb::package::PackageError::InvalidFormat(
-        secret.into(),
-    ));
+    let error = Error::from(litchi_xlsb::package::PackageError::InvalidFormat(secret));
     for diagnostic in [
         error.message().to_owned(),
         error.to_string(),

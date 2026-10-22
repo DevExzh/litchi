@@ -13,6 +13,10 @@ use litchi_opc::SourceBackedPackage;
 use litchi_opc::leniency::{Defect as OpcDefect, RelationshipDefect};
 use litchi_xlsb::{Defect, Package, SourceBackedWorkbook, ToleranceReport, Workbook};
 
+#[path = "support/projection.rs"]
+mod projection;
+use projection::OwnedWorkbook as _;
+
 const WORKBOOK_RELS: &str = "xl/_rels/workbook.bin.rels";
 const DUPLICATE: &str = r#"<Relationship Id="rId4" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme" Target="theme/theme1.xml"/>"#;
 
@@ -88,7 +92,7 @@ fn duplicate_relationship_id_is_listed_in_the_workbook_report_on_every_route() {
 
     let owned = Package::from_bytes(&bytes).unwrap();
     assert_duplicate_recorded(owned.tolerance_report(), "owned package");
-    let adopted = owned.into_workbook().unwrap();
+    let adopted = owned.owned_workbook().unwrap();
     assert_duplicate_recorded(adopted.tolerance_report(), "owned package workbook");
 
     let source = SourceBackedWorkbook::from_reader(Cursor::new(bytes.clone())).unwrap();

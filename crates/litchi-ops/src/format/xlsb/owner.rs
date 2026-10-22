@@ -285,7 +285,7 @@ impl SheetHandle {
         }
         match self {
             Self::Eager { file, tab } => match &file.0.owner {
-                XlsbOwner::Eager(workbook) => workbook
+                XlsbOwner::Eager(package) => super::projection(package)?
                     .grid(Selector::Position(tab.position()))?
                     .map(|leaf| GridRead {
                         leaf,
@@ -325,9 +325,9 @@ impl SheetHandle {
             .get();
         match self {
             Self::Eager { file, .. } => match &file.0.owner {
-                XlsbOwner::Eager(workbook) => {
+                XlsbOwner::Eager(package) => {
                     let mut tables = Vec::new();
-                    for (index, table) in workbook.structured_tables() {
+                    for (index, table) in super::projection(package)?.structured_tables() {
                         if *index == worksheet_position {
                             tables.push(table.clone());
                         }
@@ -349,9 +349,12 @@ impl SheetHandle {
     pub(crate) fn style_for_cell(&self, cell: &Cell) -> Result<Option<ResolvedStyle>> {
         match self {
             Self::Eager { file, .. } => match &file.0.owner {
-                XlsbOwner::Eager(workbook) => Ok(workbook
-                    .style_for_cell(cell)
-                    .map(|xf| ResolvedStyle::resolve(xf.clone(), workbook.styles()))),
+                XlsbOwner::Eager(package) => {
+                    let workbook = super::projection(package)?;
+                    Ok(workbook
+                        .style_for_cell(cell)
+                        .map(|xf| ResolvedStyle::resolve(xf.clone(), workbook.styles())))
+                },
                 XlsbOwner::Source(_) => Err(internal("XLSB eager handle lost its owner state")),
             },
             Self::Source { sheet, .. } => {
@@ -404,7 +407,8 @@ impl XlsbOwner {
     /// without moving catalog policy into the node layer.
     pub(crate) fn build_catalog(&self) -> Result<Catalog> {
         match self {
-            Self::Eager(workbook) => {
+            Self::Eager(package) => {
+                let workbook = super::projection(package)?;
                 let mut tabs = Vec::new();
                 tabs.try_reserve_exact(workbook.sheets().len())
                     .map_err(|_| internal("could not reserve the XLSB semantic tab catalog"))?;
@@ -473,7 +477,9 @@ impl Xlsb {
                 .active_catalog_position()
                 .map(|position| position.map(Position::new))
                 .map_err(Into::into),
-            XlsbOwner::Eager(workbook) => Ok(workbook.active_catalog_position().map(Position::new)),
+            XlsbOwner::Eager(package) => Ok(super::projection(package)?
+                .active_catalog_position()
+                .map(Position::new)),
         })
     }
 
@@ -485,7 +491,9 @@ impl Xlsb {
                 .workbook()
                 .defined_name_entries()
                 .map_err(Into::into),
-            XlsbOwner::Eager(workbook) => workbook.defined_name_entries().map_err(Into::into),
+            XlsbOwner::Eager(package) => super::projection(package)?
+                .defined_name_entries()
+                .map_err(Into::into),
         })
     }
 
@@ -499,7 +507,9 @@ impl Xlsb {
                 XlsbOwner::Source(workbook) => {
                     workbook.workbook().defined_names().map_err(Into::into)
                 },
-                XlsbOwner::Eager(workbook) => Ok(workbook.defined_names().to_vec().into()),
+                XlsbOwner::Eager(package) => {
+                    Ok(super::projection(package)?.defined_names().to_vec().into())
+                },
             })?;
             Arc::clone(self.0.defined_names.get_or_init(|| candidate))
         };

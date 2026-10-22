@@ -30,10 +30,10 @@ pub type Result<T> = std::result::Result<T, Error>;
 pub enum Error {
     /// A semantic or relationship invariant was violated.
     #[error("invalid threaded-comment graph: {0}")]
-    Invalid(String),
+    Invalid(&'static str),
     /// A timestamp, GUID, reference, or XML value could not be encoded.
     #[error("threaded-comment encoding error: {0}")]
-    Encoding(String),
+    Encoding(&'static str),
     /// A bounded collection could not reserve its requested memory.
     #[error("allocation failed for {resource}: {source}")]
     Allocation {
@@ -67,7 +67,7 @@ pub fn validate_people(people: &People) -> Result<()> {
         validate_attributes(&person.attributes)?;
         validate_extensions(&person.extensions)?;
         if !ids.insert(person.id.as_str()) {
-            return Err(invalid(format!("duplicate person ID '{}'", person.id)));
+            return Err(invalid("duplicate person ID"));
         }
     }
     Ok(())
@@ -111,38 +111,27 @@ pub fn validate_comments(comments: &Comments) -> Result<()> {
             continue;
         };
         if parent_id == comment.id {
-            return Err(invalid(format!(
-                "threaded comment '{}' cannot parent itself",
-                comment.id
-            )));
+            return Err(invalid("threaded comment cannot parent itself"));
         }
         if !comment_ids.contains(parent_id) {
-            return Err(invalid(format!(
-                "threaded comment '{}' references missing parent '{}'",
-                comment.id, parent_id
-            )));
+            return Err(invalid("threaded comment references missing parent"));
         }
     }
 
     let mut roots = HashSet::new();
     for comment in &comments.comments {
         if comment.is_root() {
-            let cell = comment.cell_ref.as_deref().ok_or_else(|| {
-                invalid(format!(
-                    "threaded-comment root '{}' is missing its cell reference",
-                    comment.id
-                ))
-            })?;
+            let cell = comment
+                .cell_ref
+                .as_deref()
+                .ok_or_else(|| invalid("threaded-comment root is missing its cell reference"))?;
             if !roots.insert(cell) {
-                return Err(invalid(format!(
-                    "worksheet has multiple threaded-comment roots at {cell}"
-                )));
+                return Err(invalid("worksheet has multiple threaded-comment roots"));
             }
         } else if comment.cell_ref.is_some() {
-            return Err(invalid(format!(
-                "threaded-comment reply '{}' must not carry a cell reference",
-                comment.id
-            )));
+            return Err(invalid(
+                "threaded-comment reply must not carry a cell reference",
+            ));
         }
     }
 
@@ -157,10 +146,9 @@ pub fn validate_comments(comments: &Comments) -> Result<()> {
             .iter()
             .any(|comment| comment.is_root() && comment.id == parent)
         {
-            return Err(invalid(format!(
-                "threaded-comment reply '{}' must reference a root in the same worksheet",
-                reply.id
-            )));
+            return Err(invalid(
+                "threaded-comment reply must reference a root in the same worksheet",
+            ));
         }
     }
     Ok(())
@@ -191,29 +179,17 @@ pub fn validate_graph(graph: &Graph) -> Result<()> {
         validate_comments(&worksheet.comments)?;
         for comment in &worksheet.comments.comments {
             if !comment_ids.insert(comment.id.as_str()) {
-                return Err(invalid(format!(
-                    "duplicate workbook threaded-comment ID '{}'",
-                    comment.id
-                )));
+                return Err(invalid("duplicate workbook threaded-comment ID"));
             }
             if !person_ids.contains(comment.person_id.as_str()) {
-                return Err(invalid(format!(
-                    "threaded comment '{}' references missing person '{}'",
-                    comment.id, comment.person_id
-                )));
+                return Err(invalid("threaded comment references missing person"));
             }
             for mention in &comment.mentions {
                 if !person_ids.contains(mention.mention_person_id.as_str()) {
-                    return Err(invalid(format!(
-                        "mention '{}' references missing person '{}'",
-                        mention.mention_id, mention.mention_person_id
-                    )));
+                    return Err(invalid("mention references missing person"));
                 }
                 if !mention_ids.insert(mention.mention_id.as_str()) {
-                    return Err(invalid(format!(
-                        "duplicate workbook mention ID '{}'",
-                        mention.mention_id
-                    )));
+                    return Err(invalid("duplicate workbook mention ID"));
                 }
             }
         }
@@ -242,12 +218,10 @@ pub fn group_threads(comments: &Comments) -> Result<Vec<Thread>> {
         let Some(parent) = comment.parent_id.as_deref() else {
             continue;
         };
-        let index = by_root.get(parent).copied().ok_or_else(|| {
-            invalid(format!(
-                "threaded comment '{}' does not reference a root",
-                comment.id
-            ))
-        })?;
+        let index = by_root
+            .get(parent)
+            .copied()
+            .ok_or_else(|| invalid("threaded comment does not reference a root"))?;
         threads[index].replies.push(comment.clone());
     }
     Ok(threads)
@@ -269,25 +243,16 @@ fn validate_comment<'a>(
     validate_timestamp(comment.date_time.as_deref())?;
     if let Some(text) = comment.text.as_deref() {
         if text.encode_utf16().count() > MAX_TEXT_UTF16 {
-            return Err(invalid(format!(
-                "threaded-comment '{}' text is too long",
-                comment.id
-            )));
+            return Err(invalid("threaded-comment text is too long"));
         }
         validate_xml_chars(text, "threaded-comment text")?;
     } else if !comment.mentions.is_empty() {
-        return Err(invalid(format!(
-            "threaded-comment '{}' has mentions but no text",
-            comment.id
-        )));
+        return Err(invalid("threaded-comment has mentions but no text"));
     }
     validate_attributes(&comment.attributes)?;
     validate_extensions(&comment.extensions)?;
     if !comment_ids.insert(comment.id.as_str()) {
-        return Err(invalid(format!(
-            "duplicate threaded-comment ID '{}'",
-            comment.id
-        )));
+        return Err(invalid("duplicate threaded-comment ID"));
     }
     for mention in &comment.mentions {
         validate_guid_value(&mention.mention_person_id, "mention person ID")?;
@@ -300,37 +265,29 @@ fn validate_comment<'a>(
             let text_len = u32::try_from(text.encode_utf16().count())
                 .map_err(|_| invalid("threaded-comment text length overflows"))?;
             if end > text_len {
-                return Err(invalid(format!(
-                    "mention '{}' range exceeds threaded-comment text",
-                    mention.mention_id
-                )));
+                return Err(invalid("mention range exceeds threaded-comment text"));
             }
         }
         validate_attributes(&mention.attributes)?;
         validate_extensions(&mention.extensions)?;
         if !mention_ids.insert(mention.mention_id.as_str()) {
-            return Err(invalid(format!(
-                "duplicate mention ID '{}'",
-                mention.mention_id
-            )));
+            return Err(invalid("duplicate mention ID"));
         }
     }
     Ok(())
 }
 
-fn validate_guid_value(value: &str, name: &str) -> Result<()> {
+fn validate_guid_value(value: &str, _name: &str) -> Result<()> {
     if valid_guid(value) {
         Ok(())
     } else {
-        Err(invalid(format!("invalid {name} GUID '{value}'")))
+        Err(invalid("invalid GUID"))
     }
 }
 
 fn validate_identity(value: &str, name: &str) -> Result<()> {
     if value.is_empty() || value.len() > MAX_IDENTITY_BYTES {
-        return Err(invalid(format!(
-            "{name} must contain between one and {MAX_IDENTITY_BYTES} bytes"
-        )));
+        return Err(invalid("must contain between one and bytes"));
     }
     validate_xml_chars(value, name)?;
     Ok(())
@@ -346,43 +303,37 @@ fn validate_timestamp(value: Option<&str>) -> Result<()> {
     {
         Ok(())
     } else {
-        Err(invalid(format!(
-            "invalid threaded-comment timestamp '{value}'"
-        )))
+        Err(invalid("invalid threaded-comment timestamp"))
     }
 }
 
 fn validate_cell_ref(reference: &str) -> Result<()> {
     let bytes = reference.as_bytes();
     let Some(column_end) = bytes.iter().position(u8::is_ascii_digit) else {
-        return Err(invalid(format!("invalid cell reference '{reference}'")));
+        return Err(invalid("invalid cell reference"));
     };
     if column_end == 0 || column_end == bytes.len() {
-        return Err(invalid(format!("invalid cell reference '{reference}'")));
+        return Err(invalid("invalid cell reference"));
     }
     let mut column = 0u32;
     for byte in &bytes[..column_end] {
         if !byte.is_ascii_alphabetic() {
-            return Err(invalid(format!("invalid cell reference '{reference}'")));
+            return Err(invalid("invalid cell reference"));
         }
         column = column
             .checked_mul(26)
             .and_then(|value| value.checked_add(u32::from(byte.to_ascii_uppercase() - b'A' + 1)))
-            .ok_or_else(|| invalid(format!("cell reference '{reference}' overflows")))?;
+            .ok_or_else(|| invalid("cell reference overflows"))?;
     }
     if column == 0 || column > 16_384 {
-        return Err(invalid(format!(
-            "cell reference '{reference}' exceeds XLSB columns"
-        )));
+        return Err(invalid("cell reference exceeds XLSB columns"));
     }
     let row = std::str::from_utf8(&bytes[column_end..])
-        .map_err(|_| invalid(format!("invalid cell reference '{reference}'")))?
+        .map_err(|_| invalid("invalid cell reference"))?
         .parse::<u32>()
-        .map_err(|_| invalid(format!("invalid cell reference '{reference}'")))?;
+        .map_err(|_| invalid("invalid cell reference"))?;
     if row == 0 || row > 1_048_576 {
-        return Err(invalid(format!(
-            "cell reference '{reference}' exceeds XLSB rows"
-        )));
+        return Err(invalid("cell reference exceeds XLSB rows"));
     }
     Ok(())
 }
@@ -401,10 +352,7 @@ fn validate_attributes(attributes: &[RawAttribute]) -> Result<()> {
         }
         validate_xml_chars(&attribute.value, "preserved XML attribute value")?;
         if !names.insert(attribute.name.as_str()) {
-            return Err(invalid(format!(
-                "duplicate preserved XML attribute '{}'",
-                attribute.name
-            )));
+            return Err(invalid("duplicate preserved XML attribute"));
         }
     }
     Ok(())
@@ -456,20 +404,18 @@ fn valid_name_part(value: &str) -> bool {
         })
 }
 
-fn validate_xml_chars(value: &str, description: &str) -> Result<()> {
+fn validate_xml_chars(value: &str, _description: &str) -> Result<()> {
     if value
         .chars()
         .any(|character| !matches!(character, '\t' | '\n' | '\r') && character < '\u{20}')
     {
-        return Err(invalid(format!(
-            "{description} contains an XML control character"
-        )));
+        return Err(invalid("contains an XML control character"));
     }
     Ok(())
 }
 
 fn validate_fragment(bytes: &[u8]) -> Result<()> {
-    std::str::from_utf8(bytes).map_err(|error| Error::Encoding(error.to_string()))?;
+    std::str::from_utf8(bytes).map_err(|_error| Error::Encoding("the text cannot be decoded"))?;
     let mut reader = Reader::from_reader(bytes);
     reader.config_mut().trim_text(false);
     let mut depth = 0usize;
@@ -479,7 +425,7 @@ fn validate_fragment(bytes: &[u8]) -> Result<()> {
     loop {
         let event = reader
             .read_event()
-            .map_err(|error| Error::Encoding(error.to_string()))?;
+            .map_err(|_error| Error::Encoding("the text cannot be decoded"))?;
         match event {
             Event::Start(_) => {
                 if root_closed {
@@ -514,7 +460,7 @@ fn validate_fragment(bytes: &[u8]) -> Result<()> {
             Event::Text(text) => {
                 let value = text
                     .decode()
-                    .map_err(|error| Error::Encoding(error.to_string()))?;
+                    .map_err(|_error| Error::Encoding("the text cannot be decoded"))?;
                 validate_xml_chars(&value, "preserved XML text")?;
                 if depth == 0 && !value.trim().is_empty() {
                     return Err(invalid("preserved XML has character data outside its root"));
@@ -523,7 +469,7 @@ fn validate_fragment(bytes: &[u8]) -> Result<()> {
             Event::CData(text) => {
                 let value = text
                     .decode()
-                    .map_err(|error| Error::Encoding(error.to_string()))?;
+                    .map_err(|_error| Error::Encoding("the text cannot be decoded"))?;
                 validate_xml_chars(&value, "preserved XML CDATA")?;
                 if depth == 0 && !value.trim().is_empty() {
                     return Err(invalid("preserved XML has character data outside its root"));
@@ -548,8 +494,8 @@ fn validate_fragment(bytes: &[u8]) -> Result<()> {
     }
 }
 
-fn invalid(value: impl Into<String>) -> Error {
-    Error::Invalid(value.into())
+fn invalid(value: &'static str) -> Error {
+    Error::Invalid(value)
 }
 
 fn allocation(resource: &'static str, source: TryReserveError) -> Error {

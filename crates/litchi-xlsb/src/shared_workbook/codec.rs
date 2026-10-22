@@ -280,7 +280,7 @@ fn parse_records(data: &[u8], context: &'static str) -> Result<Vec<RawRecord>> {
         )));
     }
     let mut records = Vec::new();
-    for record in Records::with_limits(data, Limits::new(MAX_PART_BYTES, MAX_STRING_UNITS)) {
+    for record in Records::new(data, Limits::new(MAX_PART_BYTES, MAX_STRING_UNITS)) {
         if records.len() >= MAX_RECORDS {
             return Err(invalid(format!("{context} has too many BIFF12 records")));
         }
@@ -299,7 +299,7 @@ fn write_records(records: &[RawRecord]) -> Result<Vec<u8>> {
     }
     let mut output = Vec::new();
     {
-        let mut writer = Encoder::new(&mut output);
+        let mut writer = Encoder::new(&mut output, Limits::DEFAULT);
         for record in records {
             let projected = writer
                 .get_ref()
@@ -320,7 +320,7 @@ fn write_records(records: &[RawRecord]) -> Result<Vec<u8>> {
 }
 
 fn parse_user(payload: &[u8]) -> Result<User> {
-    let mut cursor = Cursor::with_limits(
+    let mut cursor = Cursor::new(
         payload,
         "BrtUsr",
         Limits::new(MAX_PART_BYTES, MAX_STRING_UNITS),
@@ -354,7 +354,7 @@ fn encode_user(user: &User) -> Result<Vec<u8>> {
 }
 
 fn parse_info(payload: &[u8]) -> Result<Info> {
-    let mut cursor = Cursor::new(payload, "BrtInfo");
+    let mut cursor = Cursor::new(payload, "BrtInfo", Limits::DEFAULT);
     let flags = cursor.read_u16().map_err(map_raw)?;
     if flags & !0x000f != 0 || flags & 0x000d != 0x000d {
         return Err(invalid("BrtInfo has invalid reserved flags"));
@@ -408,7 +408,7 @@ fn encode_info(info: &Info) -> Result<Vec<u8>> {
 }
 
 fn parse_header(payload: &[u8]) -> Result<Header> {
-    let mut cursor = Cursor::new(payload, "BrtRRHeader");
+    let mut cursor = Cursor::new(payload, "BrtRRHeader", Limits::DEFAULT);
     let unused = cursor.read_u32().map_err(map_raw)?;
     let revision_id = cursor.read_u32().map_err(map_raw)?;
     let revision_type = cursor.read_u16().map_err(map_raw)?;

@@ -37,9 +37,8 @@ use litchi_opc::constants::{content_type, relationship_type};
 use litchi_opc::{BlobPart, PackURI};
 
 use super::{MAX_COLUMNS, MAX_ROWS, MAX_TEXT_UNITS, Record};
-use crate::Workbook;
 use crate::package::Package;
-use crate::package::error::Result;
+use crate::package::error::{Error as PackageError, Result};
 use crate::part_edit::{Rank, SheetLayout, Staged, family, invalid, record, splice};
 use crate::raw::{Encoder, Records, kind};
 use litchi_spreadsheet_drawing::vml;
@@ -61,9 +60,9 @@ pub const MAX_COMMENTS: usize = 65_530;
 const COMMENTS_CONTENT_TYPE: &str = "application/vnd.ms-excel.comments";
 
 /// A staged note edit. Dropping it discards it.
-#[derive(Debug)]
-pub struct Edit<'a> {
-    staged: Staged<'a>,
+#[derive(Debug, Clone)]
+pub struct Edit {
+    staged: Staged,
 }
 
 impl Package {
@@ -72,7 +71,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns the workbook materialization errors of this package.
-    pub fn edit_comments(&self) -> Result<Edit<'_>> {
+    pub fn edit_comments(&self) -> Result<Edit> {
         Ok(Edit {
             staged: Staged::of_package(self)?,
         })
@@ -85,18 +84,8 @@ impl Package {
     /// Returns [`Error::PatchConflict`] when this package is not the patch's
     /// before state and [`Error::Signed`] for a changed patch of a signed
     /// workbook.
-    pub fn apply_comments(&self, patch: &Patch) -> Result<Self> {
-        patch.0.apply(self)
-    }
-}
-
-impl Workbook {
-    /// Start a note edit of this workbook without first copying it into a
-    /// package.
-    pub fn edit_comments(&self) -> Edit<'_> {
-        Edit {
-            staged: Staged::of_workbook(self),
-        }
+    pub fn apply_comments(&self, patch: &Patch) -> Result<Commit> {
+        Ok(Commit::new((patch.0.apply(self)?, patch.0.clone())))
     }
 }
 
@@ -138,7 +127,7 @@ fn layout(bytes: &[u8]) -> Result<Layout> {
     let mut list_end = None;
     let mut note_start: Option<usize> = None;
     let mut cell = None;
-    let mut records = Records::new(bytes);
+    let mut records = Records::new(bytes, crate::raw::Limits::DEFAULT);
     while let Some(item) = records.next() {
         let item = item?;
         let start = item.offset();
@@ -211,7 +200,12 @@ fn check(row: u32, col: u32, author: &str, text: &str) -> Result<()> {
     Ok(())
 }
 
-impl Edit<'_> {
+impl Edit {
+    /// Discard every staged change.
+    pub fn reset(&mut self) {
+        self.staged.reset();
+    }
+
     fn part(&self, worksheet: &PackURI) -> Result<Option<(String, PackURI)>> {
         comments_part(self.staged.opc().get_part(worksheet)?.rels())
     }
@@ -296,7 +290,10 @@ impl Edit<'_> {
             // The first note: a new comments part.
             let note = Record::new(row, col, author.to_owned(), text.to_owned());
             let mut bytes = Vec::new();
-            super::write(&mut Encoder::new(&mut bytes), std::slice::from_ref(&note))?;
+            super::write(
+                &mut Encoder::new(&mut bytes, crate::raw::Limits::DEFAULT),
+                std::slice::from_ref(&note),
+            )?;
             let name = self.staged.free_name("/xl/comments", ".bin")?;
             self.staged.add_part(BlobPart::new(
                 name.clone(),
@@ -324,9 +321,7 @@ impl Edit<'_> {
                 return Ok(false);
             }
         } else if notes.len() >= MAX_COMMENTS {
-            return Err(invalid(format!(
-                "a worksheet holds at most {MAX_COMMENTS} notes"
-            )));
+            return Err(invalid("a worksheet holds at most notes"));
         }
         // The author index, appending a new author.
         let (author_index, author_record) =
@@ -352,7 +347,24 @@ impl Edit<'_> {
         note.author = author.to_owned();
         note.text = text.to_owned();
         let mut encoded = Vec::new();
-        super::codec::write_comment(&mut Encoder::new(&mut encoded), &note, author_index)?;
+        super::codec::write_comment(
+            &mut Encoder::new(&mut encoded, crate::raw::Limits::DEFAULT),
+            &note,
+            author_index,
+        )
+        .map_err(|error| match error {
+            super::codec::Error::UnsupportedFeature(_) => PackageError::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "edit_comments",
+                "the note contains unsupported rich-text metadata",
+            ),
+            error @ (super::codec::Error::Wire(_)
+            | super::codec::Error::InvalidRecordType(_)
+            | super::codec::Error::InvalidLength { .. }
+            | super::codec::Error::Unrecognized { .. }
+            | super::codec::Error::Encoding(_)
+            | super::codec::Error::Allocation { .. }) => error.into(),
+        })?;
         let span = match current {
             Some(index) => {
                 let (span, _) = &layout.notes[index];
@@ -429,11 +441,15 @@ impl Edit<'_> {
         let Some(unit) = layout.units_of(kind::LEGACY_DRAWING).next() else {
             return Ok(None);
         };
-        let item = Records::new(&bytes[unit.span.clone()])
+        let item = Records::new(&bytes[unit.span.clone()], crate::raw::Limits::DEFAULT)
             .next()
             .transpose()?
             .ok_or_else(|| invalid("an empty legacy-drawing record"))?;
-        let mut cursor = crate::raw::Cursor::new(item.payload(), "BrtLegacyDrawing");
+        let mut cursor = crate::raw::Cursor::new(
+            item.payload(),
+            "BrtLegacyDrawing",
+            crate::raw::Limits::DEFAULT,
+        );
         let id = cursor.read_wide_string()?;
         let part = self.staged.opc().get_part(worksheet)?;
         let relationship = part
@@ -487,7 +503,7 @@ impl Edit<'_> {
                 let layout = SheetLayout::scan(bytes)?;
                 let at = layout.insertion(Rank::LegacyDrawing);
                 let mut payload = Vec::new();
-                Encoder::new(&mut payload).write_wide_string(&id)?;
+                Encoder::new(&mut payload, crate::raw::Limits::DEFAULT).write_wide_string(&id)?;
                 let updated = splice(bytes, at..at, &record(kind::LEGACY_DRAWING, &payload)?);
                 self.staged.replace_worksheet(worksheet, updated)?;
                 self.staged.touch(worksheet);
@@ -555,7 +571,7 @@ pub(crate) fn read(bytes: &[u8]) -> Result<Vec<Record>> {
 
 /// The offset of the `BrtBeginComment` inside a note's span.
 fn header_offset(bytes: &[u8], span: Range<usize>) -> Result<usize> {
-    let mut records = Records::new(&bytes[span.clone()]);
+    let mut records = Records::new(&bytes[span.clone()], crate::raw::Limits::DEFAULT);
     while let Some(item) = records.next() {
         let item = item?;
         if item.kind() == kind::BEGIN_COMMENT {
@@ -594,7 +610,12 @@ mod tests {
         let vml = String::from_utf8(part(&after, "/xl/drawings/vmlDrawing1.vml").unwrap()).unwrap();
         assert_eq!(vml.matches("ObjectType=\"Note\"").count(), 2);
         assert_eq!(
-            package.apply_comments(&patch).unwrap().to_bytes().unwrap(),
+            package
+                .apply_comments(&patch)
+                .map(|commit| commit.into_package())
+                .unwrap()
+                .to_bytes()
+                .unwrap(),
             after.to_bytes().unwrap()
         );
         // The opened workbook reads the notes.

@@ -15,13 +15,87 @@
 use litchi_drawingml::theme::{Color, Face, FontSet, Palette, Slot, codec};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, PackURI, TargetMode};
-use litchi_xlsb::Workbook;
+use litchi_xlsb::builder::{self, Builder};
 use litchi_xlsb::theme::{
     Commit as ThemeCommit, Limits as ThemeLimits, Snapshot as ThemeSnapshot, Theme,
 };
-use litchi_xlsb::writer::{Builder, MutableWorksheet};
+use litchi_xlsb::{Package, Workbook};
 use std::io::Cursor;
 use std::path::PathBuf;
+
+#[path = "support/projection.rs"]
+mod projection;
+use projection::{InPlace as _, OwnedWorkbook as _, Reprojected as _};
+
+/// The Theme state of a workbook: the present Theme, and the part name it
+/// lives at or a new one is created at.
+struct ThemeState {
+    snapshot: Option<ThemeSnapshot>,
+    part_name: String,
+}
+
+impl ThemeState {
+    fn is_present(&self) -> bool {
+        self.snapshot.is_some()
+    }
+
+    fn source_xml(&self) -> Option<&[u8]> {
+        self.snapshot.as_ref().map(ThemeSnapshot::source_xml)
+    }
+
+    fn part_name(&self) -> &str {
+        &self.part_name
+    }
+
+    fn theme(&self) -> Option<&Theme> {
+        self.snapshot.as_ref().map(ThemeSnapshot::theme)
+    }
+}
+
+/// Package-route steps on an owned workbook projection (record 0360b).
+trait ThemeSteps {
+    fn reprojected_theme(
+        &self,
+        limits: litchi_xlsb::theme::Limits,
+    ) -> litchi_xlsb::package::PackageResult<Option<litchi_xlsb::theme::Snapshot>>;
+    fn theme_edit(&self) -> litchi_xlsb::package::PackageResult<litchi_xlsb::theme::Edit>;
+    fn theme_state(&self) -> litchi_xlsb::package::PackageResult<ThemeState>;
+    fn publish_theme(
+        &mut self,
+        patch: &litchi_xlsb::theme::Patch,
+    ) -> litchi_xlsb::package::PackageResult<ThemeState>;
+}
+
+impl ThemeSteps for Workbook {
+    fn reprojected_theme(
+        &self,
+        limits: litchi_xlsb::theme::Limits,
+    ) -> litchi_xlsb::package::PackageResult<Option<litchi_xlsb::theme::Snapshot>> {
+        self.reprojected(litchi_xlsb::SemanticLimits::new().theme(limits))?
+            .theme()
+    }
+
+    fn theme_edit(&self) -> litchi_xlsb::package::PackageResult<litchi_xlsb::theme::Edit> {
+        self.to_package().edit_theme()
+    }
+
+    fn theme_state(&self) -> litchi_xlsb::package::PackageResult<ThemeState> {
+        let package = self.to_package();
+        Ok(ThemeState {
+            snapshot: package.theme()?,
+            part_name: package.edit_theme()?.part_name().to_owned(),
+        })
+    }
+
+    fn publish_theme(
+        &mut self,
+        patch: &litchi_xlsb::theme::Patch,
+    ) -> litchi_xlsb::package::PackageResult<ThemeState> {
+        let published = self.to_package().apply_theme(patch)?.into_package();
+        *self = published.owned_workbook()?;
+        self.theme_state()
+    }
+}
 
 const FIXTURE: &str = "test-data/poi/test-data/spreadsheet/testVarious.xlsb";
 const THEME_NAME: &str = "/xl/theme/theme1.xml";
@@ -160,7 +234,7 @@ fn custom_theme() -> Theme {
 
 fn replace_theme_blob(workbook: &mut Workbook, replacement: Vec<u8>) {
     workbook
-        .edit_opc(|opc| {
+        .edit_opc_in_place(|opc| {
             opc.get_part_mut(&theme_uri())
                 .expect("theme part")
                 .set_blob(replacement);
@@ -193,9 +267,10 @@ fn authored_palette(theme: &ThemeSnapshot, value: &str) -> Palette {
     palette
 }
 
-fn changed_commit(theme: &ThemeSnapshot, value: &str) -> ThemeCommit {
-    let mut edit = theme.edit();
-    edit.set_palette(authored_palette(theme, value))
+fn changed_commit(workbook: &Workbook, value: &str) -> ThemeCommit {
+    let theme = typed_theme(workbook);
+    let mut edit = workbook.theme_edit().expect("Theme edit");
+    edit.set_palette(authored_palette(&theme, value))
         .expect("stage typed palette");
     edit.commit().expect("commit typed palette")
 }
@@ -381,16 +456,22 @@ fn authored_typed_theme_survives_save_and_reopen() {
     let mut workbook = native_workbook();
     replace_theme_blob(&mut workbook, authored_theme_xml());
     let before = typed_theme(&workbook);
-    let mut edit = workbook.edit_theme().expect("start workbook theme edit");
+    let mut edit = workbook.theme_edit().expect("start workbook theme edit");
     edit.set_name("Litchi Authored Theme")
         .expect("stage authored display name");
     edit.set_palette(authored_palette(&before, "4472C4"))
         .expect("stage authored palette");
     let commit = edit.commit().expect("commit authored theme");
-    assert!(commit.changed());
-    let expected = commit.snapshot().source_xml().to_vec();
+    assert!(commit.diagnostics().changed());
+    let expected = commit
+        .package()
+        .theme()
+        .expect("committed Theme")
+        .expect("present Theme")
+        .source_xml()
+        .to_vec();
     workbook
-        .apply_theme(&commit)
+        .publish_theme(commit.patch())
         .expect("publish authored theme");
 
     let saved = saved_bytes(&workbook);
@@ -418,9 +499,9 @@ fn typed_change_retains_opaque_xml_and_inverse_is_exact() {
             .any(|window| window == b"x:opaque marker=\"keep\"")
     );
 
-    let commit = changed_commit(&before, "FF0000");
+    let commit = changed_commit(&workbook, "FF0000");
     workbook
-        .apply_theme(&commit)
+        .publish_theme(commit.patch())
         .expect("publish typed theme change");
     let changed = theme_bytes(&workbook);
     assert_ne!(changed, extended);
@@ -434,15 +515,22 @@ fn typed_change_retains_opaque_xml_and_inverse_is_exact() {
         Some(&Color::Rgb("FF0000".to_owned()))
     );
 
-    assert_eq!(commit.patch().inverse().after().source_xml(), extended);
-    let changed_snapshot = typed_theme(&workbook);
-    let mut inverse_edit = changed_snapshot.edit();
+    assert_eq!(
+        commit
+            .patch()
+            .inverse()
+            .after()
+            .expect("restored Theme")
+            .source_xml(),
+        extended
+    );
+    let mut inverse_edit = workbook.theme_edit().expect("Theme edit");
     inverse_edit
-        .replace(before.theme().clone())
+        .set_theme(before.theme().clone())
         .expect("stage original typed theme");
     let inverse_commit = inverse_edit.commit().expect("commit exact inverse");
     workbook
-        .apply_theme(&inverse_commit)
+        .publish_theme(inverse_commit.patch())
         .expect("publish exact inverse");
     assert_eq!(theme_bytes(&workbook), extended);
 }
@@ -451,17 +539,20 @@ fn typed_change_retains_opaque_xml_and_inverse_is_exact() {
 fn typed_noop_is_exact_and_stale_publication_is_atomic() {
     let mut workbook = native_workbook();
     let original = theme_bytes(&workbook);
-    let before = typed_theme(&workbook);
-    let noop = before.edit().commit().expect("commit no-op");
-    assert!(!noop.changed());
-    assert!(noop.patch().is_empty());
-    workbook.apply_theme(&noop).expect("publish no-op");
+    let noop = workbook
+        .theme_edit()
+        .expect("Theme edit")
+        .commit()
+        .expect("commit no-op");
+    assert!(!noop.diagnostics().changed());
+    assert!(noop.patch().is_noop());
+    workbook.publish_theme(noop.patch()).expect("publish no-op");
     assert_eq!(theme_bytes(&workbook), original);
 
-    let stale_commit = changed_commit(&before, "00B050");
+    let stale_commit = changed_commit(&workbook, "00B050");
     replace_theme_blob(&mut workbook, authored_theme_xml());
     let current = theme_bytes(&workbook);
-    assert!(workbook.apply_theme(&stale_commit).is_err());
+    assert!(workbook.publish_theme(stale_commit.patch()).is_err());
     assert_eq!(theme_bytes(&workbook), current);
 }
 
@@ -489,12 +580,12 @@ fn malformed_and_oversized_theme_payloads_are_refused() {
     let exact = theme_bytes(&workbook).len();
     assert!(
         workbook
-            .theme_with_limits(ThemeLimits::new(exact - 1, 100_000, 128))
+            .reprojected_theme(ThemeLimits::new(exact - 1, 100_000, 128))
             .is_err()
     );
     assert!(
         workbook
-            .theme_with_limits(ThemeLimits::new(exact, 100_000, 128))
+            .reprojected_theme(ThemeLimits::new(exact, 100_000, 128))
             .expect("exact eager theme limit")
             .is_some()
     );
@@ -624,9 +715,9 @@ fn theme_image_relationship_is_owned_and_preserved_by_typed_edit() {
         .blob()
         .to_vec();
     assert!(before.source_xml().starts_with(b"<?xml"));
-    let commit = changed_commit(&before, "7030A0");
+    let commit = changed_commit(&workbook, "7030A0");
     workbook
-        .apply_theme(&commit)
+        .publish_theme(commit.patch())
         .expect("publish theme with image relationship");
 
     let theme = workbook
@@ -656,7 +747,7 @@ fn theme_image_relationship_is_owned_and_preserved_by_typed_edit() {
 fn writer_custom_theme_is_created_and_round_trips_as_typed_metadata() {
     let custom = custom_theme();
     let mut writer = Builder::new();
-    writer.add_worksheet(MutableWorksheet::new("Sheet1"));
+    writer.add_worksheet(builder::Worksheet::new("Sheet1"));
     writer
         .set_theme(custom.clone())
         .expect("validate custom writer theme");
@@ -691,7 +782,7 @@ fn typed_theme_owner_remove_inverse_restores_xml_graph_and_resources() {
     let (mut workbook, image_uri) = image_bearing_theme_workbook();
 
     let owner = workbook
-        .theme_owner()
+        .theme_state()
         .expect("read image-bearing Theme owner");
     assert!(owner.is_present());
     let before_xml = owner.source_xml().expect("present Theme XML").to_vec();
@@ -712,18 +803,18 @@ fn typed_theme_owner_remove_inverse_restores_xml_graph_and_resources() {
         .bytes()
         .to_vec();
 
-    let mut removal = owner.edit();
+    let mut removal = workbook.theme_edit().expect("Theme edit");
     assert!(removal.remove().expect("stage Theme owner removal"));
     let removal = removal.commit().expect("commit Theme owner removal");
-    assert!(removal.changed());
+    assert!(removal.diagnostics().changed());
     let removed = workbook
-        .apply_theme_owner(&removal)
+        .publish_theme(removal.patch())
         .expect("publish Theme owner removal");
     assert!(!removed.is_present());
     assert!(workbook.opc_package().get_part(&theme_uri()).is_err());
 
     let restored = workbook
-        .apply_theme_owner_patch(&removal.patch().inverse())
+        .publish_theme(&removal.patch().inverse())
         .expect("publish exact inverse Theme owner patch");
     assert!(restored.is_present());
     assert_eq!(restored.source_xml(), Some(before_xml.as_slice()));
@@ -764,28 +855,30 @@ fn typed_theme_owner_remove_inverse_restores_xml_graph_and_resources() {
 #[test]
 fn typed_theme_owner_rejects_lexically_stale_theme_relationships_atomically() {
     let (mut workbook, _) = image_bearing_theme_workbook();
-    let owner = workbook
-        .theme_owner()
-        .expect("read image-bearing Theme owner");
     let before_relationships = relationship_fingerprint(&workbook, &theme_uri());
-    let mut edit = owner.edit();
+    let mut edit = workbook.theme_edit().expect("Theme edit");
     assert!(edit.set_name("Stale Theme Edit").expect("stage Theme edit"));
     let commit = edit.commit().expect("commit Theme edit");
 
-    workbook
-        .edit_opc(|package| {
-            replace_theme_relationship_source_lexically(package);
-            Ok(())
-        })
-        .expect("publish semantically unchanged Theme relationship spelling");
+    // A lexical-only relationship respelling is no semantic part change, so
+    // the raw OPC family would publish it as a no-op: open the respelled
+    // graph as a new source instead.
+    let source_relationship_xml = relationship_xml(&workbook, &theme_uri());
+    let mut respelled = workbook.opc_package().clone();
+    replace_theme_relationship_source_lexically(&mut respelled);
+    workbook = Package::from_opc(respelled)
+        .expect("open semantically unchanged Theme relationship spelling")
+        .owned_workbook()
+        .expect("respelled projection");
     let stale_relationship_xml = relationship_xml(&workbook, &theme_uri());
+    assert_ne!(stale_relationship_xml, source_relationship_xml);
     assert_eq!(
         relationship_fingerprint(&workbook, &theme_uri()),
         before_relationships
     );
     let stale_theme_xml = theme_bytes(&workbook);
 
-    assert!(workbook.apply_theme_owner(&commit).is_err());
+    assert!(workbook.publish_theme(commit.patch()).is_err());
     assert_eq!(
         relationship_xml(&workbook, &theme_uri()),
         stale_relationship_xml
@@ -794,11 +887,49 @@ fn typed_theme_owner_rejects_lexically_stale_theme_relationships_atomically() {
 }
 
 #[test]
+fn raw_opc_lexical_relationship_edit_is_reversible() {
+    let (workbook, _) = image_bearing_theme_workbook();
+    let package = workbook.to_package();
+    let before = package.to_bytes().expect("source bytes");
+    let before_relationship_xml = relationship_xml(&workbook, &theme_uri());
+
+    let mut edit = package.edit_opc().expect("raw OPC edit");
+    edit.update(|package| {
+        replace_theme_relationship_source_lexically(package);
+        Ok(())
+    })
+    .expect("stage lexical relationship edit");
+    let commit = edit.commit().expect("commit lexical relationship edit");
+    assert!(commit.diagnostics().changed());
+    assert!(!commit.patch().is_noop());
+
+    let after_workbook = commit.package().workbook().expect("committed workbook");
+    let after_relationship_xml = relationship_xml(after_workbook, &theme_uri());
+    assert_ne!(after_relationship_xml, before_relationship_xml);
+
+    let replayed = package
+        .apply_opc(commit.patch())
+        .expect("replay lexical relationship edit")
+        .into_package();
+    assert_eq!(
+        replayed.to_bytes().expect("replayed bytes"),
+        commit.package().to_bytes().expect("committed bytes")
+    );
+
+    let restored = commit
+        .package()
+        .apply_opc(&commit.patch().inverse())
+        .expect("inverse lexical relationship edit")
+        .into_package();
+    assert_eq!(restored.to_bytes().expect("restored bytes"), before);
+}
+
+#[test]
 fn typed_theme_owner_uses_theme2_when_theme1_is_occupied() {
     let absent_package = remove_workbook_theme(native_workbook().opc_package().clone());
     let mut absent = Workbook::from_opc_package(absent_package).expect("open absent-theme host");
     absent
-        .edit_opc(|package| {
+        .edit_opc_in_place(|package| {
             package.add_part(Box::new(BlobPart::new(
                 theme_uri(),
                 ct::PNG.to_owned(),
@@ -808,11 +939,11 @@ fn typed_theme_owner_uses_theme2_when_theme1_is_occupied() {
         })
         .expect("occupy theme1 with unrelated part");
 
-    let owner = absent.theme_owner().expect("read absent Theme owner");
+    let owner = absent.theme_state().expect("read absent Theme owner");
     assert!(!owner.is_present());
     assert_eq!(owner.part_name(), "/xl/theme/theme2.xml");
     let custom = custom_theme();
-    let mut create = owner.edit();
+    let mut create = absent.theme_edit().expect("Theme edit");
     assert!(
         create
             .set_theme(custom.clone())
@@ -820,7 +951,7 @@ fn typed_theme_owner_uses_theme2_when_theme1_is_occupied() {
     );
     let create = create.commit().expect("commit Theme creation");
     let created = absent
-        .apply_theme_owner(&create)
+        .publish_theme(create.patch())
         .expect("publish Theme creation at theme2");
     assert!(created.is_present());
     assert_eq!(created.part_name(), "/xl/theme/theme2.xml");
@@ -834,11 +965,11 @@ fn typed_theme_owner_uses_theme2_when_theme1_is_occupied() {
         ct::PNG
     );
 
-    let mut remove = created.edit();
+    let mut remove = absent.theme_edit().expect("Theme edit");
     assert!(remove.remove().expect("stage Theme2 removal"));
     let remove = remove.commit().expect("commit Theme2 removal");
     let absent_again = absent
-        .apply_theme_owner(&remove)
+        .publish_theme(remove.patch())
         .expect("publish Theme2 removal");
     assert!(!absent_again.is_present());
     assert!(
@@ -848,7 +979,7 @@ fn typed_theme_owner_uses_theme2_when_theme1_is_occupied() {
             .is_err()
     );
 
-    let mut recreate = absent_again.edit();
+    let mut recreate = absent.theme_edit().expect("Theme edit");
     assert!(
         recreate
             .set_theme(custom.clone())
@@ -856,7 +987,7 @@ fn typed_theme_owner_uses_theme2_when_theme1_is_occupied() {
     );
     let recreate = recreate.commit().expect("commit Theme2 recreation");
     let recreated = absent
-        .apply_theme_owner(&recreate)
+        .publish_theme(recreate.patch())
         .expect("publish Theme2 recreation");
     assert_eq!(recreated.part_name(), "/xl/theme/theme2.xml");
     assert_eq!(recreated.theme(), Some(&custom));
@@ -866,21 +997,21 @@ fn typed_theme_owner_uses_theme2_when_theme1_is_occupied() {
 fn newly_created_theme_inverse_rejects_changed_empty_relationship_member() {
     let absent_package = remove_workbook_theme(native_workbook().opc_package().clone());
     let mut workbook = Workbook::from_opc_package(absent_package).expect("open absent-theme host");
-    let owner = workbook.theme_owner().expect("read absent Theme owner");
+    let owner = workbook.theme_state().expect("read absent Theme owner");
     assert!(!owner.is_present());
 
     let custom = custom_theme();
-    let mut create = owner.edit();
+    let mut create = workbook.theme_edit().expect("Theme edit");
     assert!(create.set_theme(custom).expect("stage Theme creation"));
     let create = create.commit().expect("commit Theme creation");
     let created = workbook
-        .apply_theme_owner(&create)
+        .publish_theme(create.patch())
         .expect("publish Theme creation");
     assert!(created.is_present());
     let created_theme_uri = PackURI::new(created.part_name()).expect("created Theme part URI");
     let image_uri = PackURI::new("/xl/media/theme-empty-rels.png").expect("image URI");
     workbook
-        .edit_opc(|package| {
+        .edit_opc_in_place(|package| {
             package.add_part(Box::new(BlobPart::new(
                 image_uri.clone(),
                 ct::PNG.to_owned(),
@@ -915,14 +1046,12 @@ fn newly_created_theme_inverse_rejects_changed_empty_relationship_member() {
     let theme_xml = theme_bytes(&workbook);
 
     assert!(
-        workbook
-            .apply_theme_owner_patch(&create.patch().inverse())
-            .is_err(),
+        workbook.publish_theme(&create.patch().inverse()).is_err(),
         "inverse must reject a newly authored physical empty .rels change"
     );
     assert!(
         workbook
-            .theme_owner()
+            .theme_state()
             .expect("read unchanged owner")
             .is_present()
     );
@@ -946,14 +1075,13 @@ fn absent_theme_owner_remove_noop_preserves_source_bytes() {
         .to_vec();
     let before_package = saved_bytes(&workbook);
 
-    let owner = workbook.theme_owner().expect("read absent Theme owner");
-    let mut remove = owner.edit();
+    let mut remove = workbook.theme_edit().expect("Theme edit");
     assert!(!remove.remove().expect("stage absent Theme no-op"));
     let noop = remove.commit().expect("commit absent Theme no-op");
-    assert!(!noop.changed());
-    assert!(noop.patch().is_empty());
+    assert!(!noop.diagnostics().changed());
+    assert!(noop.patch().is_noop());
     let applied = workbook
-        .apply_theme_owner(&noop)
+        .publish_theme(noop.patch())
         .expect("publish absent Theme no-op");
     assert!(!applied.is_present());
     assert_eq!(

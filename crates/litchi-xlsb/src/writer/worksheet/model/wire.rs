@@ -10,7 +10,7 @@ use crate::package::error::{Error, Result};
 use crate::package::formula::{CompilationContext, GroupKind, ParsedFormula, Range};
 use litchi_core::sheet::CellValue;
 
-use super::semantic::MutableWorksheet;
+use super::semantic::Worksheet;
 
 /// Cell data for storage
 #[derive(Debug, Clone)]
@@ -122,7 +122,7 @@ pub(crate) fn formula_requires_context_free_authoring(error: &Error) -> bool {
     matches!(error, Error::UnresolvedDependency(_))
 }
 
-impl MutableWorksheet {
+impl Worksheet {
     pub(crate) fn compile_contextual_formulas(
         &mut self,
         context: &CompilationContext<'_>,
@@ -164,12 +164,9 @@ impl MutableWorksheet {
                 .iter()
                 .any(|group| group.range.contains(position.0, position.1));
             let is_array_anchor = if *is_array && cell.formula_binary.is_none() {
-                let range_text = array_range.as_deref().ok_or_else(|| {
-                    Error::InvalidFormula(format!(
-                        "array formula at row {}, column {} is missing its range",
-                        position.0, position.1
-                    ))
-                })?;
+                let range_text = array_range.as_deref().ok_or(Error::InvalidFormula(
+                    "array formula at row, column is missing its range",
+                ))?;
                 Range::parse_a1(range_text)?.top_left() == position
             } else {
                 false

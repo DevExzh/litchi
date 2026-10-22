@@ -3,16 +3,16 @@
 #![allow(clippy::all)]
 
 use litchi::sheet::CellValue;
+use litchi::xlsb::builder::{self, Builder};
 use litchi::xlsb::hyperlinks::Hyperlink;
 use litchi::xlsb::merged_cells::MergedCell;
-use litchi::xlsb::writer::{Builder, MutableWorksheet};
 use std::fs::File;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Test: Merged cells + hyperlinks combined...");
 
     let mut workbook = Builder::new();
-    let mut sheet = MutableWorksheet::new("Dashboard");
+    let mut sheet = builder::Worksheet::new("Dashboard");
 
     // Title row with merged cells
     sheet.set_cell(0, 0, CellValue::String("Sales Dashboard".to_string()));

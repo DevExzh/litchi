@@ -9,9 +9,18 @@ fn black() -> Color {
 
 fn one_group() -> Groups {
     let item = Sparkline::new(Location::new(0, 0).unwrap(), None);
-    Groups::new(vec![
-        Group::new(SparklineType::Line, Colors::uniform(black()), vec![item]).unwrap(),
-    ])
+    Groups::new(
+        vec![
+            Group::new(
+                SparklineType::Line,
+                Colors::uniform(black()),
+                vec![item],
+                Limits::DEFAULT,
+            )
+            .unwrap(),
+        ],
+        Limits::DEFAULT,
+    )
     .unwrap()
 }
 
@@ -42,7 +51,7 @@ fn hard_coded_fixture() -> Vec<u8> {
 }
 
 fn group_payload(bytes: &[u8]) -> Vec<u8> {
-    crate::raw::Records::new(bytes)
+    crate::raw::Records::new(bytes, crate::raw::Limits::DEFAULT)
         .map(|record| record.unwrap())
         .find(|record| record.kind() == crate::raw::kind::BEGIN_SPARKLINE_GROUP)
         .unwrap()
@@ -72,8 +81,7 @@ fn hard_coded_spec_fixture_roundtrips_exactly() {
 
 #[test]
 fn semantic_options_colors_state_and_formulas_roundtrip() {
-    let formula =
-        Formula::with_limits(vec![0x23, 1, 0, 0, 0], vec![0xAA], Limits::DEFAULT).unwrap();
+    let formula = Formula::new(vec![0x23, 1, 0, 0, 0], vec![0xAA], Limits::DEFAULT).unwrap();
     let state = FrtState::new(true, true, true, true);
     let item = Sparkline::new(
         Location::with_state(4, 7, state).unwrap(),
@@ -83,6 +91,7 @@ fn semantic_options_colors_state_and_formulas_roundtrip() {
         SparklineType::Stacked,
         Colors::uniform(Color::theme(11, -12).unwrap()),
         vec![item],
+        Limits::DEFAULT,
     )
     .unwrap()
     .with_empty_cells(EmptyCells::Span)
@@ -92,7 +101,7 @@ fn semantic_options_colors_state_and_formulas_roundtrip() {
     .with_line_weight(1.25)
     .unwrap()
     .with_date_axis(formula);
-    let groups = Groups::new(vec![group]).unwrap();
+    let groups = Groups::new(vec![group], Limits::DEFAULT).unwrap();
     let encoded = encode_block(&groups, Limits::DEFAULT).unwrap();
     let (parsed, consumed) = parse_block(&encoded, Limits::DEFAULT).unwrap();
     assert_eq!(consumed, encoded.len());
@@ -133,25 +142,26 @@ fn strict_grammar_rejects_unknown_internal_records_and_nonempty_delimiters() {
 
 #[test]
 fn formulas_reject_extra_tokens_reserved_class_and_non_vectors() {
-    assert!(Formula::new(vec![0x23, 1, 0, 0, 0, 0], vec![]).is_err());
-    assert!(Formula::new(vec![0x03, 1, 0, 0, 0], vec![]).is_err());
+    assert!(Formula::new(vec![0x23, 1, 0, 0, 0, 0], vec![], Limits::DEFAULT).is_err());
+    assert!(Formula::new(vec![0x03, 1, 0, 0, 0], vec![], Limits::DEFAULT).is_err());
 
     let mut area = vec![0x3B, 0, 0];
     area.extend_from_slice(&0u32.to_le_bytes());
     area.extend_from_slice(&1u32.to_le_bytes());
     area.extend_from_slice(&0u16.to_le_bytes());
     area.extend_from_slice(&1u16.to_le_bytes());
-    assert!(Formula::new(area, vec![]).is_err());
+    assert!(Formula::new(area, vec![], Limits::DEFAULT).is_err());
 }
 
 #[test]
 fn all_allowed_formula_tokens_have_structural_accessors() {
-    let name = Formula::new(vec![0x23, 9, 0, 0, 0], vec![]).unwrap();
+    let name = Formula::new(vec![0x23, 9, 0, 0, 0], vec![], Limits::DEFAULT).unwrap();
     assert_eq!(name.kind(), FormulaKind::Name);
     assert_eq!(name.name_index(), Some(9));
     assert_eq!(name.ixti(), None);
 
-    let external = Formula::new(vec![0x39, 0x34, 0x12, 7, 0, 0, 0], vec![]).unwrap();
+    let external =
+        Formula::new(vec![0x39, 0x34, 0x12, 7, 0, 0, 0], vec![], Limits::DEFAULT).unwrap();
     assert_eq!(external.kind(), FormulaKind::ExternalName);
     assert_eq!(external.ixti(), Some(0x1234));
     assert_eq!(external.name_index(), Some(7));
@@ -159,7 +169,7 @@ fn all_allowed_formula_tokens_have_structural_accessors() {
     let mut reference = vec![0x3A, 3, 0];
     reference.extend_from_slice(&42u32.to_le_bytes());
     reference.extend_from_slice(&(0xC000u16 | 11).to_le_bytes());
-    let reference = Formula::new(reference, vec![]).unwrap();
+    let reference = Formula::new(reference, vec![], Limits::DEFAULT).unwrap();
     assert_eq!(reference.kind(), FormulaKind::Reference3d);
     assert_eq!(reference.ixti(), Some(3));
     let cell = reference.reference().unwrap();
@@ -167,7 +177,7 @@ fn all_allowed_formula_tokens_have_structural_accessors() {
     assert!(cell.row_relative());
     assert!(cell.column_relative());
 
-    let area = Formula::new(area_token((5, 5), (2, 8), 4), vec![]).unwrap();
+    let area = Formula::new(area_token((5, 5), (2, 8), 4), vec![], Limits::DEFAULT).unwrap();
     assert_eq!(area.kind(), FormulaKind::Area3d);
     assert_eq!(area.ixti(), Some(4));
     let range = area.area().unwrap();
@@ -185,12 +195,40 @@ fn all_allowed_formula_tokens_have_structural_accessors() {
 #[test]
 fn area3d_relative_masks_follow_rgce_column_bit_layout() {
     // A one-row source requires equal fRwRel (0x4000); differing fColRel is allowed.
-    assert!(Formula::new(area_token((1, 1), (0x0001, 0x8002), 0), vec![]).is_ok());
-    assert!(Formula::new(area_token((1, 1), (0x0001, 0x4002), 0), vec![]).is_err());
+    assert!(
+        Formula::new(
+            area_token((1, 1), (0x0001, 0x8002), 0),
+            vec![],
+            Limits::DEFAULT
+        )
+        .is_ok()
+    );
+    assert!(
+        Formula::new(
+            area_token((1, 1), (0x0001, 0x4002), 0),
+            vec![],
+            Limits::DEFAULT
+        )
+        .is_err()
+    );
 
     // A one-column source requires equal fColRel (0x8000); differing fRwRel is allowed.
-    assert!(Formula::new(area_token((1, 2), (0x0001, 0x4001), 0), vec![]).is_ok());
-    assert!(Formula::new(area_token((1, 2), (0x0001, 0x8001), 0), vec![]).is_err());
+    assert!(
+        Formula::new(
+            area_token((1, 2), (0x0001, 0x4001), 0),
+            vec![],
+            Limits::DEFAULT
+        )
+        .is_ok()
+    );
+    assert!(
+        Formula::new(
+            area_token((1, 2), (0x0001, 0x8001), 0),
+            vec![],
+            Limits::DEFAULT
+        )
+        .is_err()
+    );
 }
 
 #[test]
@@ -205,6 +243,7 @@ fn colors_axes_and_line_weight_enforce_wire_domains() {
         SparklineType::Line,
         Colors::uniform(black()),
         vec![Sparkline::new(Location::new(0, 0).unwrap(), None)],
+        Limits::DEFAULT,
     )
     .unwrap();
     assert!(group.clone().with_line_weight(-0.0).is_err());
@@ -227,9 +266,10 @@ fn palette_rgb_theme_and_all_distinct_color_slots_roundtrip_exactly() {
         SparklineType::Column,
         colors,
         vec![Sparkline::new(Location::new(0, 0).unwrap(), None)],
+        Limits::DEFAULT,
     )
     .unwrap();
-    let groups = Groups::new(vec![group]).unwrap();
+    let groups = Groups::new(vec![group], Limits::DEFAULT).unwrap();
     let encoded = encode_block(&groups, Limits::DEFAULT).unwrap();
     let (parsed, _) = parse_block(&encoded, Limits::DEFAULT).unwrap();
     assert_eq!(parsed.as_slice()[0].colors(), colors);
@@ -254,11 +294,16 @@ fn every_option_and_shared_enum_roundtrips_through_exact_wire_flags() {
             SparklineType::Line,
             Colors::uniform(black()),
             vec![Sparkline::new(Location::new(0, 0).unwrap(), None)],
+            Limits::DEFAULT,
         )
         .unwrap()
         .with_options(option)
         .unwrap();
-        let encoded = encode_block(&Groups::new(vec![group]).unwrap(), Limits::DEFAULT).unwrap();
+        let encoded = encode_block(
+            &Groups::new(vec![group], Limits::DEFAULT).unwrap(),
+            Limits::DEFAULT,
+        )
+        .unwrap();
         let payload = group_payload(&encoded);
         assert_ne!(u16::from_le_bytes([payload[4], payload[5]]) & wire, 0);
     }
@@ -279,11 +324,12 @@ fn every_option_and_shared_enum_roundtrips_through_exact_wire_flags() {
                     kind,
                     Colors::uniform(black()),
                     vec![Sparkline::new(Location::new(0, 0).unwrap(), None)],
+                    Limits::DEFAULT,
                 )
                 .unwrap()
                 .with_empty_cells(empty)
                 .with_axes(bound, bound);
-                let groups = Groups::new(vec![group]).unwrap();
+                let groups = Groups::new(vec![group], Limits::DEFAULT).unwrap();
                 let encoded = encode_block(&groups, Limits::DEFAULT).unwrap();
                 let (parsed, _) = parse_block(&encoded, Limits::DEFAULT).unwrap();
                 let parsed = &parsed.as_slice()[0];
@@ -302,6 +348,7 @@ fn unknown_semantic_option_bits_are_rejected() {
         SparklineType::Line,
         Colors::uniform(black()),
         vec![Sparkline::new(Location::new(0, 0).unwrap(), None)],
+        Limits::DEFAULT,
     )
     .unwrap();
     assert!(
@@ -317,6 +364,7 @@ fn date_axis_flag_and_formula_presence_are_independent_wire_state() {
         SparklineType::Line,
         Colors::uniform(black()),
         vec![Sparkline::new(Location::new(0, 0).unwrap(), None)],
+        Limits::DEFAULT,
     )
     .unwrap()
     .with_date_axis_enabled(true);
@@ -324,10 +372,11 @@ fn date_axis_flag_and_formula_presence_are_independent_wire_state() {
         SparklineType::Line,
         Colors::uniform(black()),
         vec![Sparkline::new(Location::new(0, 1).unwrap(), None)],
+        Limits::DEFAULT,
     )
     .unwrap()
-    .with_date_formula(Some(Formula::name(1).unwrap()));
-    let groups = Groups::new(vec![flag_only, formula_only]).unwrap();
+    .with_date_formula(Some(Formula::name(1, Limits::DEFAULT).unwrap()));
+    let groups = Groups::new(vec![flag_only, formula_only], Limits::DEFAULT).unwrap();
     let encoded = encode_block(&groups, Limits::DEFAULT).unwrap();
     let (parsed, _) = parse_block(&encoded, Limits::DEFAULT).unwrap();
     assert!(parsed.as_slice()[0].date_axis());
@@ -345,15 +394,17 @@ fn worksheet_grid_is_strict_and_duplicate_destinations_are_preserved() {
         SparklineType::Line,
         Colors::uniform(black()),
         vec![Sparkline::new(location, None)],
+        Limits::DEFAULT,
     )
     .unwrap();
     let second = Group::new(
         SparklineType::Column,
         Colors::uniform(black()),
         vec![Sparkline::new(location, None)],
+        Limits::DEFAULT,
     )
     .unwrap();
-    let groups = Groups::new(vec![first, second]).unwrap();
+    let groups = Groups::new(vec![first, second], Limits::DEFAULT).unwrap();
     let encoded = encode_block(&groups, Limits::DEFAULT).unwrap();
     let (parsed, _) = parse_block(&encoded, Limits::DEFAULT).unwrap();
     assert_eq!(parsed, groups);
@@ -374,14 +425,18 @@ fn exact_and_plus_one_collection_limits_are_enforced() {
 
     let location = Location::new(0, 1).unwrap();
     let extra = Sparkline::new(location, None);
-    let two = Groups::new(vec![
-        Group::new(
-            SparklineType::Line,
-            Colors::uniform(black()),
-            vec![Sparkline::new(Location::new(0, 0).unwrap(), None), extra],
-        )
-        .unwrap(),
-    ])
+    let two = Groups::new(
+        vec![
+            Group::new(
+                SparklineType::Line,
+                Colors::uniform(black()),
+                vec![Sparkline::new(Location::new(0, 0).unwrap(), None), extra],
+                Limits::DEFAULT,
+            )
+            .unwrap(),
+        ],
+        Limits::DEFAULT,
+    )
     .unwrap();
     let per_group_only = exact.with_total(2).unwrap();
     assert!(matches!(
@@ -419,16 +474,21 @@ fn parser_enforces_group_and_per_group_limits_before_growth() {
         SparklineType::Line,
         Colors::uniform(black()),
         vec![Sparkline::new(Location::new(0, 0).unwrap(), None)],
+        Limits::DEFAULT,
     )
     .unwrap();
     let second = Group::new(
         SparklineType::Column,
         Colors::uniform(black()),
         vec![Sparkline::new(Location::new(0, 1).unwrap(), None)],
+        Limits::DEFAULT,
     )
     .unwrap();
-    let encoded_groups =
-        encode_block(&Groups::new(vec![first, second]).unwrap(), Limits::DEFAULT).unwrap();
+    let encoded_groups = encode_block(
+        &Groups::new(vec![first, second], Limits::DEFAULT).unwrap(),
+        Limits::DEFAULT,
+    )
+    .unwrap();
     let one_group = Limits::DEFAULT.with_groups(1).unwrap();
     assert!(matches!(
         parse_block(&encoded_groups, one_group),
@@ -446,9 +506,14 @@ fn parser_enforces_group_and_per_group_limits_before_growth() {
             Sparkline::new(Location::new(0, 0).unwrap(), None),
             Sparkline::new(Location::new(0, 1).unwrap(), None),
         ],
+        Limits::DEFAULT,
     )
     .unwrap();
-    let encoded_items = encode_block(&Groups::new(vec![group]).unwrap(), Limits::DEFAULT).unwrap();
+    let encoded_items = encode_block(
+        &Groups::new(vec![group], Limits::DEFAULT).unwrap(),
+        Limits::DEFAULT,
+    )
+    .unwrap();
     let one_item = Limits::DEFAULT
         .with_per_group(1)
         .unwrap()
@@ -471,9 +536,9 @@ fn exact_and_plus_one_formula_limits_are_enforced() {
         .unwrap()
         .with_formula_ancillary(1)
         .unwrap();
-    assert!(Formula::with_limits(vec![0x23, 1, 0, 0, 0], vec![1], exact).is_ok());
+    assert!(Formula::new(vec![0x23, 1, 0, 0, 0], vec![1], exact).is_ok());
     assert!(matches!(
-        Formula::with_limits(vec![0x23, 1, 0, 0, 0], vec![1, 2], exact),
+        Formula::new(vec![0x23, 1, 0, 0, 0], vec![1, 2], exact),
         Err(Error::Limit {
             resource: "formula ancillary bytes",
             actual: 2,
@@ -481,7 +546,7 @@ fn exact_and_plus_one_formula_limits_are_enforced() {
         })
     ));
     assert!(matches!(
-        Formula::with_limits(
+        Formula::new(
             vec![0x23, 1, 0, 0, 0],
             vec![],
             exact.with_formula_tokens(4).unwrap()
@@ -548,14 +613,15 @@ fn multi_item_block_budget_is_checked_at_each_internal_record() {
             Sparkline::new(Location::new(0, 0).unwrap(), None),
             Sparkline::new(Location::new(0, 1).unwrap(), None),
         ],
+        Limits::DEFAULT,
     )
     .unwrap();
-    let groups = Groups::new(vec![group]).unwrap();
+    let groups = Groups::new(vec![group], Limits::DEFAULT).unwrap();
     let encoded = encode_block(&groups, Limits::DEFAULT).unwrap();
     let exact = Limits::DEFAULT.with_block_bytes(encoded.len()).unwrap();
     parse_block(&encoded, exact).unwrap();
 
-    let mut records = crate::raw::Records::new(&encoded);
+    let mut records = crate::raw::Records::new(&encoded, crate::raw::Limits::DEFAULT);
     let mut seen = 0;
     let mut second_end = 0;
     while let Some(record) = records.next() {
@@ -606,11 +672,21 @@ fn begin_groups_header_obeys_one_two_exact_and_plus_one_block_limits() {
 fn malformed_declared_formula_lengths_are_rejected() {
     let item = Sparkline::new(
         Location::new(0, 0).unwrap(),
-        Some(Formula::with_limits(vec![0x23, 1, 0, 0, 0], vec![0xAA], Limits::DEFAULT).unwrap()),
+        Some(Formula::new(vec![0x23, 1, 0, 0, 0], vec![0xAA], Limits::DEFAULT).unwrap()),
     );
-    let group = Group::new(SparklineType::Line, Colors::uniform(black()), vec![item]).unwrap();
-    let encoded = encode_block(&Groups::new(vec![group]).unwrap(), Limits::DEFAULT).unwrap();
-    let payload_offset = crate::raw::Records::new(&encoded)
+    let group = Group::new(
+        SparklineType::Line,
+        Colors::uniform(black()),
+        vec![item],
+        Limits::DEFAULT,
+    )
+    .unwrap();
+    let encoded = encode_block(
+        &Groups::new(vec![group], Limits::DEFAULT).unwrap(),
+        Limits::DEFAULT,
+    )
+    .unwrap();
+    let payload_offset = crate::raw::Records::new(&encoded, crate::raw::Limits::DEFAULT)
         .map(|record| record.unwrap())
         .find(|record| record.kind() == crate::raw::kind::SPARKLINE)
         .map(|record| record.payload().as_ptr() as usize - encoded.as_ptr() as usize)

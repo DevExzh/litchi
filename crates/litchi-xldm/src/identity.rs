@@ -221,11 +221,12 @@ impl Xldm140RenameError {
         match error {
             super::codec::VariableRewriteError::Codec(error) => Self::from_codec(error),
             super::codec::VariableRewriteError::CallerLimit { actual, maximum } => {
-                Self::limit_with_bounds(
+                Self::limit_with_resource(
                     format!(
                         "rewritten storage caller output bytes {actual} exceed limit {maximum}"
                     ),
                     Some((actual, maximum)),
+                    Some(crate::LimitKind::OutputBytes),
                 )
             },
         }
@@ -1194,9 +1195,10 @@ impl<'storage, 'source> Xldm140Closure<'storage, 'source> {
             ));
         }
         if new_name.len() > super::model::MAX_PATH_BYTES {
-            return Err(Xldm140RenameError::limit_with_bounds(
+            return Err(Xldm140RenameError::limit_with_resource(
                 "XLDM table XML name exceeds the bounded path-text limit",
                 Some((new_name.len(), super::model::MAX_PATH_BYTES)),
+                Some(crate::LimitKind::PathTextBytes),
             ));
         }
         let table = self.projection.table(table_id).ok_or_else(|| {
@@ -1309,9 +1311,10 @@ impl<'storage, 'source> Xldm140Closure<'storage, 'source> {
             }
         }
         if rewrite_output_bytes > super::model::MAX_STORAGE_BYTES {
-            return Err(Xldm140RenameError::limit_with_bounds(
+            return Err(Xldm140RenameError::limit_with_resource(
                 "table rename output-byte budget exceeds the XLDM storage limit",
                 Some((rewrite_output_bytes, super::model::MAX_STORAGE_BYTES)),
+                Some(crate::LimitKind::OutputBytes),
             ));
         }
         super::codec::preflight_variable_size_payloads(
@@ -4469,6 +4472,19 @@ mod tests {
             .expect_err("one byte below the final size must report a caller limit");
         assert_eq!(under.kind(), Xldm140RenameErrorKind::LimitExceeded);
         assert_eq!(under.limit_bounds(), Some((exact, exact - 1)));
+        assert_eq!(under.limit_kind(), Some(crate::LimitKind::OutputBytes));
+        let oversized_name = "x".repeat(super::super::model::MAX_PATH_BYTES + 1);
+        let name_limit = closure
+            .rename_table_name_with_relationships_with_limit("T1", &oversized_name, exact)
+            .expect_err("the table XML name must retain its own bounded dimension");
+        assert_eq!(
+            name_limit.limit_kind(),
+            Some(crate::LimitKind::PathTextBytes)
+        );
+        assert_eq!(
+            name_limit.limit_bounds(),
+            Some((oversized_name.len(), super::super::model::MAX_PATH_BYTES))
+        );
         assert_eq!(
             closure
                 .rename_table_name_with_relationships_with_limit("T1", "", exact)
