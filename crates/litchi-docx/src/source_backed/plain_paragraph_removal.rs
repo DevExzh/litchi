@@ -9,7 +9,8 @@ use litchi_core::Position;
 
 use crate::source_backed::Package;
 use crate::source_backed::deferred::{Change, source_family};
-use crate::source_backed::paragraph_copy::{self as record, RemovalEffectReport as EffectReport};
+use crate::source_backed::paragraph_copy::raw;
+use crate::source_backed::paragraph_copy_record as record;
 
 /// The record patch the family publishes.
 #[derive(Clone)]
@@ -36,9 +37,22 @@ impl Change for RemovalChange {
     }
 }
 
-source_family!("plain-paragraph removal", RemovalChange, record::Error);
+source_family!("plain-paragraph removal", RemovalChange, raw::Error);
+
+pub use raw::{LimitKind, RemovalEffectReport as EffectReport};
 
 impl Patch {
+    /// Return the deterministic exact-removal effect.
+    #[must_use]
+    pub fn effect_report(&self) -> EffectReport {
+        self.change.0.effect_report()
+    }
+
+    /// Encode the durable record patch under the caller policy.
+    pub fn to_bytes(&self, limits: raw::Limits) -> Result<Vec<u8>, Error> {
+        self.durable()?.to_bytes(limits)
+    }
+
     /// The durable record patch of this change, bound to the complete
     /// artifact it applies to: for a commit's patch, the artifact of the
     /// package it was committed on; for its inverse, the committed
@@ -48,29 +62,27 @@ impl Patch {
     /// # Errors
     ///
     /// Returns a source or resource error while fingerprinting the artifact.
-    pub fn durable(&self) -> Result<record::RemovalPatch, Error> {
-        Ok(match &self.restore {
+    pub fn durable(&self) -> Result<raw::RemovalPatch, Error> {
+        Ok(raw::RemovalPatch::from_record(match &self.restore {
             Some((before, _)) => self.change.0.clone().rebound(before.output_fingerprint()?),
             None => self.change.0.clone(),
-        })
+        }))
     }
 }
 
-impl From<record::RemovalPatch> for Patch {
+impl From<raw::RemovalPatch> for Patch {
     /// Replay a record patch onto a package whose main document holds its
     /// before bytes.
-    fn from(patch: record::RemovalPatch) -> Self {
+    fn from(patch: raw::RemovalPatch) -> Self {
         Self {
-            change: RemovalChange(patch),
+            change: RemovalChange(patch.into_record()),
             restore: None,
         }
     }
 }
 
-/// The budgets of this family, reported by [`record::Error::Limit`].
-pub use crate::source_backed::paragraph_copy::LimitKind;
-
-/// A staged removal of one plain paragraph. The source is never changed:
+/// A staged removal of one plain paragraph. Its resource errors carry a
+/// [`LimitKind`] dimension. The source is never changed:
 /// [`Self::commit`] returns a new package.
 #[derive(Clone)]
 pub struct Edit {
@@ -93,8 +105,8 @@ impl Edit {
 
     /// The projected main story.
     #[must_use]
-    pub const fn projected(&self) -> &record::Snapshot {
-        self.inner.projected()
+    pub fn projected(&self) -> raw::Tree {
+        raw::Tree::from_record(self.inner.projected().clone())
     }
 
     /// Remove the direct paragraph at `position`, in source order.
@@ -129,7 +141,7 @@ impl Package {
     ///
     /// # Errors
     ///
-    /// Returns the errors of [`Self::plain_paragraph_removal_snapshot`].
+    /// Returns the errors of the package's bounded plain-paragraph admission.
     pub fn edit_plain_paragraph_removal(&self) -> Result<Edit, Error> {
         Ok(Edit {
             package: self.clone(),
@@ -141,7 +153,7 @@ impl Package {
     ///
     /// # Errors
     ///
-    /// Returns [`record::Error::PatchConflict`] for another main story.
+    /// Returns a patch-conflict error for another main story.
     pub fn apply_plain_paragraph_removal(&self, patch: &Patch) -> Result<Commit, Error> {
         apply_change(self, patch)
     }

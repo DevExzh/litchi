@@ -27,9 +27,10 @@ use std::{
 };
 
 use litchi_core::{OwnedSource, Position, ReadAt, SourceVersion};
-use litchi_docx::source_backed::paragraph_copy::{
-    Commit, Edit, Error as CopyError, Limits, Patch, Snapshot,
+use litchi_docx::source_backed::paragraph_copy::raw::{
+    Error as CopyError, Limits, Patch as RawPatch,
 };
+use litchi_docx::source_backed::plain_paragraph_copy::{Commit, Edit};
 use litchi_docx::{Package as OwnedDocxPackage, source_backed};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter};
@@ -710,34 +711,50 @@ fn build_candidate(
 ) -> BenchResult<(Vec<u8>, Vec<u8>, PatchOracle)> {
     let source: Arc<dyn ReadAt> = Arc::new(OwnedSource::new(source_archive_bytes.to_vec()));
     let package = source_backed::Package::from_read_at(source)?;
-    let snapshot = package
+    let mut edit = package
         .with_semantic_limits(litchi_docx::SemanticLimits::default().paragraph_copy(limits))
-        .plain_paragraph_copy_snapshot()?;
-    if snapshot.paragraph_count() != count || snapshot.xml_bytes() != source_xml_bytes {
+        .edit_plain_paragraph_copy()?;
+    if edit.projected().paragraph_count() != count || edit.projected().xml_bytes() != source_xml_bytes
+    {
         return Err("DOCX source snapshot differs from generated main XML".into());
     }
-    let mut edit = snapshot.edit();
     edit.copy_plain_paragraph(Position::new(0), Position::new(count))?;
-    let commit = edit.commit();
-    let candidate_xml = commit.projected().xml_bytes().to_vec();
-    let effect = commit.effect_report();
+    let commit = edit.commit()?;
+    let candidate_xml = commit
+        .package()
+        .edit_plain_paragraph_copy()?
+        .projected()
+        .xml_bytes()
+        .to_vec();
+    let effect = commit.patch().effect_report();
     let wire = commit.patch().to_bytes(limits)?;
-    let durable = Patch::from_bytes(&wire, limits)?;
-    let replayed = durable.apply(&snapshot)?;
-    let replay_verified = replayed.xml_bytes() == candidate_xml;
-    let inverse_verified = durable.inverse().apply(&replayed)?.xml_bytes() == source_xml_bytes;
+    let durable = RawPatch::from_bytes(&wire, limits)?;
+    let replayed = package.apply_plain_paragraph_copy(&durable.clone().into())?;
+    let replayed_xml = replayed
+        .package()
+        .edit_plain_paragraph_copy()?
+        .projected()
+        .xml_bytes()
+        .to_vec();
+    let replay_verified = replayed_xml == candidate_xml;
+    let inverse_replayed = commit
+        .package()
+        .apply_plain_paragraph_copy(&commit.patch().inverse())?;
+    let inverse_verified = inverse_replayed
+        .package()
+        .edit_plain_paragraph_copy()?
+        .projected()
+        .xml_bytes()
+        == source_xml_bytes;
     let canonical = durable.to_bytes(limits)? == wire;
 
     let stale_archive = source_archive(source_xml_bytes, 1)?;
     let stale_source: Arc<dyn ReadAt> = Arc::new(OwnedSource::new(stale_archive));
     let stale_package = source_backed::Package::from_read_at(stale_source)?;
-    let stale_snapshot = stale_package
+    let stale_result = stale_package
         .with_semantic_limits(litchi_docx::SemanticLimits::default().paragraph_copy(limits))
-        .plain_paragraph_copy_snapshot()?;
-    let stale_source_refusal_verified = matches!(
-        durable.apply(&stale_snapshot),
-        Err(CopyError::PatchConflict)
-    );
+        .apply_plain_paragraph_copy(&durable.clone().into());
+    let stale_source_refusal_verified = matches!(stale_result, Err(CopyError::PatchConflict));
 
     let mut candidate_archive = Vec::new();
     let publication =
@@ -929,14 +946,13 @@ fn run_total_iteration(
     let (sink, reads) = {
         let source = Arc::new(MeasureSource::new(Arc::clone(&corpus.source_archive)));
         let package = source_backed::Package::from_read_at(Arc::clone(&source) as Arc<dyn ReadAt>)?;
-        let snapshot = package
+        let mut edit = package
             .with_semantic_limits(
                 litchi_docx::SemanticLimits::default().paragraph_copy(corpus.limits),
             )
-            .plain_paragraph_copy_snapshot()?;
-        let mut edit = snapshot.edit();
+            .edit_plain_paragraph_copy()?;
         edit.copy_plain_paragraph(Position::new(0), Position::new(corpus.count))?;
-        let commit = edit.commit();
+        let commit = edit.commit()?;
         let mut output = HashingSink::new();
         let _publication = package.publish_plain_paragraph_copy_to_stream(&mut output, &commit)?;
         let sink = output.finish();
@@ -954,7 +970,7 @@ fn run_total_iteration(
 struct PhaseState {
     source: Option<Arc<MeasureSource>>,
     package: Option<source_backed::Package>,
-    snapshot: Option<Snapshot>,
+    snapshot: Option<Edit>,
     edit: Option<Edit>,
     commit: Option<Commit>,
     publication: Option<crate::docx_family_publication::CopyPublication>,
@@ -1013,7 +1029,7 @@ fn run_phase_iteration(corpus: &Corpus) -> BenchResult<(PhaseLifecycleSample, Ph
                 .with_semantic_limits(
                     litchi_docx::SemanticLimits::default().paragraph_copy(corpus.limits),
                 )
-                .plain_paragraph_copy_snapshot()?;
+                .edit_plain_paragraph_copy()?;
             state.snapshot = Some(snapshot);
             Ok(state
                 .source
@@ -1029,9 +1045,8 @@ fn run_phase_iteration(corpus: &Corpus) -> BenchResult<(PhaseLifecycleSample, Ph
         || {
             let mut edit = state
                 .snapshot
-                .as_ref()
-                .ok_or("phase stage has no snapshot")?
-                .edit();
+                .take()
+                .ok_or("phase stage has no snapshot")?;
             edit.copy_plain_paragraph(Position::new(0), Position::new(corpus.count))?;
             state.edit = Some(edit);
             Ok(state
@@ -1047,7 +1062,7 @@ fn run_phase_iteration(corpus: &Corpus) -> BenchResult<(PhaseLifecycleSample, Ph
             .map_or(ReadObservation::default(), |source| source.reads()),
         || {
             let edit = state.edit.take().ok_or("phase commit has no edit")?;
-            state.commit = Some(edit.commit());
+            state.commit = Some(edit.commit()?);
             Ok(state
                 .source
                 .as_ref()
@@ -1358,28 +1373,25 @@ mod tests {
         let archive = source_archive(&xml, 0).expect("archive");
         let source: Arc<dyn ReadAt> = Arc::new(OwnedSource::new(archive));
         let package = source_backed::Package::from_read_at(source).expect("package");
-        let snapshot = package
+        let package = package
             .with_semantic_limits(
                 litchi_docx::SemanticLimits::default()
                     .paragraph_copy(limits_for(2, xml.len()).unwrap()),
-            )
-            .plain_paragraph_copy_snapshot()
-            .expect("snapshot");
-        let mut edit = snapshot.edit();
+            );
+        let mut edit = package.edit_plain_paragraph_copy().expect("edit");
         edit.copy_plain_paragraph(Position::new(0), Position::new(2))
             .expect("first operation");
         assert!(matches!(
             edit.copy_plain_paragraph(Position::new(1), Position::new(2)),
             Err(CopyError::Limit {
-                kind: litchi_docx::source_backed::paragraph_copy::LimitKind::Operations,
+                kind: litchi_docx::source_backed::paragraph_copy::raw::LimitKind::Operations,
                 max: 1,
                 actual: 2
             })
         ));
+        let mut bounds = package.edit_plain_paragraph_copy().expect("bounds edit");
         assert!(matches!(
-            snapshot
-                .edit()
-                .copy_plain_paragraph(Position::new(2), Position::new(2)),
+            bounds.copy_plain_paragraph(Position::new(2), Position::new(2)),
             Err(CopyError::OutOfBounds { .. })
         ));
     }
@@ -1399,7 +1411,7 @@ mod tests {
                     litchi_docx::SemanticLimits::default()
                         .paragraph_copy(limits_for(1, xml.len()).unwrap())
                 )
-                .plain_paragraph_copy_snapshot(),
+                .edit_plain_paragraph_copy(),
             Err(CopyError::Refused(_))
         ));
     }

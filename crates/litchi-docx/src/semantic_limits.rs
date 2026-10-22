@@ -35,7 +35,7 @@ pub struct SemanticLimits {
     hyperlinks: crate::sanitize::Limits,
     story_hyperlinks: crate::story_hyperlinks::Limits,
     story_text: crate::source_backed::story_text::Limits,
-    paragraph_copy: crate::source_backed::paragraph_copy::Limits,
+    paragraph_copy: crate::source_backed::paragraph_copy::raw::Limits,
     tail_append: crate::source_backed::tail_append::Limits,
     embedded: litchi_ooxml_common::embedded::Limits,
 }
@@ -133,7 +133,7 @@ impl SemanticLimits {
     copy_limit!(
         paragraph_copy,
         paragraph_copy_value,
-        crate::source_backed::paragraph_copy::Limits,
+        crate::source_backed::paragraph_copy::raw::Limits,
         "source-backed plain-paragraph copy and removal"
     );
     copy_limit!(

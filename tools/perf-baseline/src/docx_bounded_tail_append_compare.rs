@@ -29,7 +29,7 @@ use std::{
 };
 
 use litchi_core::{OwnedSource, Position, ReadAt, SourceVersion};
-use litchi_docx::source_backed::paragraph_copy::Limits as CopyLimits;
+use litchi_docx::source_backed::paragraph_copy::raw::{Limits as CopyLimits, Patch as CopyRawPatch};
 // The DOCX owner follows the source-backed ODF append shape: an edit retains
 // only caller text and the indexed source, `plan` proves the source/candidate,
 // and publication writes the preserved package to a sequential sink.  Keep
@@ -931,23 +931,43 @@ fn build_materialized_candidate(
 ) -> BenchResult<(Vec<u8>, bool, bool)> {
     let source: Arc<dyn ReadAt> = Arc::new(OwnedSource::new(source_archive_bytes.to_vec()));
     let package = litchi_docx::source_backed::Package::from_read_at(source)?;
-    let snapshot = package
+    let mut edit = package
         .with_semantic_limits(litchi_docx::SemanticLimits::default().paragraph_copy(limits))
-        .plain_paragraph_copy_snapshot()?;
-    if snapshot.paragraph_count() != count || snapshot.xml_bytes() != source_xml_bytes {
+        .edit_plain_paragraph_copy()?;
+    if edit.projected().paragraph_count() != count || edit.projected().xml_bytes() != source_xml_bytes
+    {
         return Err("materialized source snapshot differs from generated XML".into());
     }
-    let mut edit = snapshot.edit();
     edit.copy_plain_paragraph(Position::new(0), Position::new(count))?;
-    let commit = edit.commit();
+    let commit = edit.commit()?;
     let expected = independent_candidate_xml(source_xml_bytes, &append_text(count))?;
-    let output_xml = commit.projected().xml_bytes();
+    let output_xml = commit
+        .package()
+        .edit_plain_paragraph_copy()?
+        .projected()
+        .xml_bytes()
+        .to_vec();
     let candidate_xml_expected = output_xml == expected.as_slice();
     let wire = commit.patch().to_bytes(limits)?;
-    let durable = litchi_docx::source_backed::paragraph_copy::Patch::from_bytes(&wire, limits)?;
-    let replayed = durable.apply(&snapshot)?;
-    let replay_verified = replayed.xml_bytes() == output_xml;
-    if !candidate_xml_expected || !replay_verified {
+    let durable = CopyRawPatch::from_bytes(&wire, limits)?;
+    let replayed = package.apply_plain_paragraph_copy(&durable.clone().into())?;
+    let replayed_xml = replayed
+        .package()
+        .edit_plain_paragraph_copy()?
+        .projected()
+        .xml_bytes()
+        .to_vec();
+    let replay_verified = replayed_xml == output_xml;
+    let inverse_replayed = commit
+        .package()
+        .apply_plain_paragraph_copy(&commit.patch().inverse())?;
+    let inverse_verified = inverse_replayed
+        .package()
+        .edit_plain_paragraph_copy()?
+        .projected()
+        .xml_bytes()
+        == source_xml_bytes;
+    if !candidate_xml_expected || !replay_verified || !inverse_verified {
         return Err("materialized candidate XML or patch replay oracle failed".into());
     }
     let mut output = Vec::new();
@@ -1014,12 +1034,11 @@ fn materialized_stale_source_refusal(
     let source = Arc::new(MeasureSource::new(Arc::from(source_archive_bytes.to_vec())));
     let package =
         litchi_docx::source_backed::Package::from_read_at(Arc::clone(&source) as Arc<dyn ReadAt>)?;
-    let snapshot = package
+    let mut edit = package
         .with_semantic_limits(litchi_docx::SemanticLimits::default().paragraph_copy(limits))
-        .plain_paragraph_copy_snapshot()?;
-    let mut edit = snapshot.edit();
+        .edit_plain_paragraph_copy()?;
     edit.copy_plain_paragraph(Position::new(0), Position::new(count))?;
-    let commit = edit.commit();
+    let commit = edit.commit()?;
     source.bump_revision();
     let mut output = Vec::new();
     let result = package.publish_plain_paragraph_copy_to_stream(&mut output, &commit);
@@ -1314,14 +1333,13 @@ fn run_materialized_iteration(
         let package = litchi_docx::source_backed::Package::from_read_at(
             Arc::clone(&source) as Arc<dyn ReadAt>
         )?;
-        let snapshot = package
+        let mut edit = package
             .with_semantic_limits(
                 litchi_docx::SemanticLimits::default().paragraph_copy(corpus.copy_limits),
             )
-            .plain_paragraph_copy_snapshot()?;
-        let mut edit = snapshot.edit();
+            .edit_plain_paragraph_copy()?;
         edit.copy_plain_paragraph(Position::new(0), Position::new(corpus.count))?;
-        let commit = edit.commit();
+        let commit = edit.commit()?;
         let mut output = HashingSink::new();
         let _publication = package.publish_plain_paragraph_copy_to_stream(&mut output, &commit)?;
         let sink = output.finish();

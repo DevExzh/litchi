@@ -10,8 +10,8 @@
 use std::io::Write;
 use std::path::Path;
 
-use litchi_docx::source_backed::paragraph_copy::{
-    Commit as CopyRecordCommit, Error as CopyError, Patch as CopyRecordPatch,
+use litchi_docx::source_backed::paragraph_copy::raw::{
+    Error as CopyError, Patch as CopyRecordPatch,
 };
 use litchi_docx::source_backed::tail_append::Error as TailAppendError;
 use litchi_docx::source_backed::tail_append_stream::patch::ParagraphStreamPatch;
@@ -44,11 +44,11 @@ impl CopyPublication {
 
 /// Plain-paragraph copy publication through the family.
 pub(crate) trait CopyPublish {
-    /// Commit a detached record commit's patch onto this package and write it.
+    /// Commit a plain-paragraph copy family commit onto this package and write it.
     fn publish_plain_paragraph_copy_to_stream(
         &self,
         writer: impl Write,
-        commit: &CopyRecordCommit,
+        commit: &plain_paragraph_copy::Commit,
     ) -> Result<CopyPublication, CopyError>;
 
     /// Replay a durable record patch onto this package and write it.
@@ -71,9 +71,11 @@ impl CopyPublish for source_backed::Package {
     fn publish_plain_paragraph_copy_to_stream(
         &self,
         writer: impl Write,
-        commit: &CopyRecordCommit,
+        commit: &plain_paragraph_copy::Commit,
     ) -> Result<CopyPublication, CopyError> {
-        self.publish_plain_paragraph_copy_patch_to_stream(writer, commit.patch())
+        let committed = self.apply_plain_paragraph_copy(commit.patch())?;
+        committed.package().write_to(writer)?;
+        Ok(CopyPublication { commit: committed })
     }
 
     fn publish_plain_paragraph_copy_patch_to_stream(

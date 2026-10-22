@@ -10,10 +10,10 @@ assembly.
 The detached DOCX paragraph-copy records are raw durable records. Their public
 codec methods now require the caller's policy:
 
-- `source_backed::paragraph_copy::Patch::to_bytes(&self, limits: Limits)`
-- `source_backed::paragraph_copy::Patch::from_bytes(bytes, limits: Limits)`
-- `source_backed::paragraph_copy::RemovalPatch::to_bytes(&self, limits: Limits)`
-- `source_backed::paragraph_copy::RemovalPatch::from_bytes(bytes, limits: Limits)`
+- `source_backed::paragraph_copy::raw::Patch::to_bytes(&self, limits: Limits)`
+- `source_backed::paragraph_copy::raw::Patch::from_bytes(bytes, limits: Limits)`
+- `source_backed::paragraph_copy::raw::RemovalPatch::to_bytes(&self, limits: Limits)`
+- `source_backed::paragraph_copy::raw::RemovalPatch::from_bytes(bytes, limits: Limits)`
 
 Encoding checks the caller's `max_durable_bytes` before reserving the output,
 then keeps the embedded edit policy check. Decoding checks the caller's input
