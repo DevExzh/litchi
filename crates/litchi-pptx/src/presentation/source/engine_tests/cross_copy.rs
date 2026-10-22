@@ -5682,6 +5682,22 @@ fn cross_slide_copy_family_publishes_a_source_backed_package() -> TestResult {
     let reopened = Package::from_read_at(Arc::new(OwnedSource::new(destination_bytes.clone())))?;
     let replayed = reopened.apply_cross_slide_copy(&patch)?.into_package();
     assert_eq!(replayed.to_bytes()?, streamed);
+
+    // An independently opened recipient may carry a tighter source policy;
+    // replay must retain that policy while proving the recorded bytes.
+    let recipient_limits = SourceLimits::builder()
+        .max_input_bytes(destination_bytes.len() as u64)
+        .map_err(|error| Error::Invalid(error.to_string()))?
+        .build()?;
+    let strict_reopened = Package::from_read_at_with_options(
+        Arc::new(OwnedSource::new(destination_bytes.clone())),
+        crate::OpenOptions::default().source_limits(recipient_limits),
+    )?;
+    let strict_replayed = strict_reopened
+        .apply_cross_slide_copy(&patch)?
+        .into_package();
+    assert_eq!(strict_replayed.to_bytes()?, streamed);
+
     let reopened_after = Package::from_read_at(Arc::new(OwnedSource::new(streamed.clone())))?;
     let restored = reopened_after
         .apply_cross_slide_copy(&patch.inverse())?

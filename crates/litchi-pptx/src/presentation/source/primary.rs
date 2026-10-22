@@ -849,6 +849,26 @@ impl Write for ReplayHashWriter {
     }
 }
 
+#[cfg(test)]
+mod replay_hash_tests {
+    use super::ReplayHashWriter;
+    use sha2::{Digest, Sha256};
+    use std::io::Write;
+
+    #[test]
+    fn replay_hash_writer_rejects_length_overflow() {
+        let mut writer = ReplayHashWriter {
+            digest: Sha256::new(),
+            bytes: u64::MAX,
+        };
+        let error = writer
+            .write_all(b"x")
+            .expect_err("a length past u64::MAX must be refused");
+        assert_eq!(error.kind(), std::io::ErrorKind::Other);
+        assert_eq!(error.to_string(), "replay content length overflows u64");
+    }
+}
+
 /// Owned read-only presentation over one immutable source package revision.
 #[derive(Clone)]
 pub struct Presentation {
