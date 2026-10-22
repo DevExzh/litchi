@@ -1938,3 +1938,37 @@ See [0063](0063-source-pptx-modern-comments.md).
   implementation; commit-time target validation must remain intact. Native
   qualification, remaining integrations, the complete inventory/glossary
   sweep and final 53-check gate remain required. Nothing has been pushed.
+
+- Coordinator checkpoint (2026-10-22, return contracts and metadata scope):
+  `0dfb00b590` lands the return-type gate and inventory on trunk. Registered
+  local edits must return their family's Commit, and registered owner replay
+  must publish that owner. DOCX minimal/full profiles now verify 39/40 replay
+  returns. Record 0362q retains 38 focused tests within 1,332 passing tooling
+  tests and both fresh DOCX rustdoc profiles. Its full inventory still has
+  35 rows, including four replay returns; the remaining raw/model/projection
+  rows require migration or documented contract classification.
+
+  The metadata integration candidate is committed as `5532099873` on
+  `uo2/coordinator-metadata-integration`. It combines DOCX/PPTX Commit replay
+  with the shared-property repairs through `9f9fa3930a`, preserving the W4b
+  deferred snapshot helpers. All 17 common transaction tests pass, including
+  the two regressions returned by 0360ab and creation-ID/removal-inbound
+  guards. The fresh run passes 472 common tests, 230 focused format tests,
+  five-package all-target/all-feature Clippy and formatting. Record 0362o
+  retains the exact source proof and all command logs by size/hash. This
+  closes the correctness return; performance qualification and trunk
+  integration remain open.
+
+  Primary PPTX/DOCX/RTF replay Commit migration is committed separately as
+  `1c7eb1e84c` (0362p), with migrated crate/tool consumers and locked harness
+  checks. Its coordinator integration and result-rule registrations remain.
+  ODF policy propagation `747cfd072d` is returned by 0362nb because its raw
+  reader exposes a core error and reconstructs the precise ODF dimension
+  after conversion. Repair `1042fd7ecc` returns the crate error directly;
+  raw tests and affected checks pass, with full post-repair validation still
+  underway. No performance acceptance is claimed for either ODF revision.
+
+  Three workers continue W4 cold-reader allocation repair, ODF/XLSB raw-policy
+  work and the remaining DOCX API audit. Native qualification, remaining
+  integrations, the complete inventory/glossary sweep and final 53-check gate
+  remain required. Nothing has been pushed.
