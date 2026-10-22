@@ -2525,6 +2525,277 @@
             "failed": 0,
             "ignored": 0
           }
+        },
+        {
+          "command": [
+            "cargo",
+            "test",
+            "--offline",
+            "--locked",
+            "-p",
+            "litchi-ops",
+            "--all-features",
+            "--lib",
+            "xlsb"
+          ],
+          "exit": 0,
+          "seconds": 299.20866226393264,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/w4-integration-review/w4b-cargo-v9/check-3.log",
+          "bytes": 10089,
+          "sha256": "e5503f33fe609016b4c35bfbabdbb9f5ef9a49b2c78a46db058f32d9d50df21a",
+          "test_result_groups": 1,
+          "test_totals": {
+            "passed": 36,
+            "failed": 0,
+            "ignored": 0
+          }
+        },
+        {
+          "command": [
+            "cargo",
+            "fmt",
+            "--all",
+            "--",
+            "--check"
+          ],
+          "exit": 0,
+          "seconds": 26.79403611505404,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/w4-integration-review/w4b-cargo-v9/check-4.log",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "group": "w4b-final-v1",
+      "commands": [
+        {
+          "command": [
+            "cargo",
+            "clippy",
+            "--offline",
+            "--locked",
+            "-p",
+            "litchi-ops",
+            "--no-default-features",
+            "--features",
+            "xlsb",
+            "--all-targets",
+            "--",
+            "-D",
+            "warnings"
+          ],
+          "exit": 0,
+          "seconds": 50.78770443005487,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/w4-integration-review/w4b-final-v1/check-0.log",
+          "bytes": 2761,
+          "sha256": "c3be6533a8164113907588500cdbdbab42f792ba0badf8fdb42c1a6a041cabfa"
+        },
+        {
+          "command": [
+            "cargo",
+            "check",
+            "--offline",
+            "--locked",
+            "--manifest-path",
+            "tools/perf-baseline/Cargo.toml",
+            "--all-targets"
+          ],
+          "exit": 0,
+          "seconds": 134.55980533303227,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/w4-integration-review/w4b-final-v1/check-1.log",
+          "bytes": 5460,
+          "sha256": "596a9fef7355d824a9987de3ad9e26576e1288cf29b1711f05aa0af2fe24a558"
+        },
+        {
+          "command": [
+            "cargo",
+            "check",
+            "--offline",
+            "--locked",
+            "--manifest-path",
+            "tools/perf-baseline/unified-xlsb-cell-value/Cargo.toml",
+            "--all-targets"
+          ],
+          "exit": 0,
+          "seconds": 25.663263945956714,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/w4-integration-review/w4b-final-v1/check-2.log",
+          "bytes": 2919,
+          "sha256": "1457845a0df003df6a1bc16209ac1eedeaac19e78ee50961446c96c7742c2c9d"
+        },
+        {
+          "command": [
+            "cargo",
+            "check",
+            "--offline",
+            "--locked",
+            "--manifest-path",
+            "tools/perf-baseline/unified-xlsb-create/Cargo.toml",
+            "--all-targets"
+          ],
+          "exit": 0,
+          "seconds": 0.27085134910885245,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/w4-integration-review/w4b-final-v1/check-3.log",
+          "bytes": 216,
+          "sha256": "4879861ab55ae320955f2c877661412162783a4e39abf16904d92168588c04d1"
+        },
+        {
+          "command": [
+            "cargo",
+            "check",
+            "--offline",
+            "--locked",
+            "--manifest-path",
+            "tools/perf-baseline/unified-xlsb-remove/Cargo.toml",
+            "--all-targets"
+          ],
+          "exit": 0,
+          "seconds": 0.3206626159371808,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/w4-integration-review/w4b-final-v1/check-4.log",
+          "bytes": 216,
+          "sha256": "e7040d2da4e7f37c5445108be7722cf022dbcc408814e05d01555548ca421805"
+        },
+        {
+          "command": [
+            "cargo",
+            "check",
+            "--offline",
+            "--locked",
+            "--manifest-path",
+            "tools/perf-baseline/unified-xlsb-sheet-batch/Cargo.toml",
+            "--all-targets"
+          ],
+          "exit": 0,
+          "seconds": 0.3051101960008964,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/w4-integration-review/w4b-final-v1/check-5.log",
+          "bytes": 226,
+          "sha256": "85029e1d09d20bddf5763b60954da40d9e94c77982707155d3a96212d5538344"
+        },
+        {
+          "command": [
+            "cargo",
+            "check",
+            "--offline",
+            "--locked",
+            "--manifest-path",
+            "tools/perf-baseline/unified-xlsb-sheet-insert/Cargo.toml",
+            "--all-targets"
+          ],
+          "exit": 0,
+          "seconds": 0.3234825920080766,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/w4-integration-review/w4b-final-v1/check-6.log",
+          "bytes": 228,
+          "sha256": "dba676f22d10b8617a7043964bec4836d5e840ba5ae2cb962bb2ffdff5f46909"
+        },
+        {
+          "command": [
+            "cargo",
+            "check",
+            "--offline",
+            "--locked",
+            "--manifest-path",
+            "tools/perf-baseline/unified-xlsb-sheet-name/Cargo.toml",
+            "--all-targets"
+          ],
+          "exit": 0,
+          "seconds": 0.30215919902548194,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/w4-integration-review/w4b-final-v1/check-7.log",
+          "bytes": 224,
+          "sha256": "d3485d2e9d109d44d0a86b44a916cbf150f09e2ca2b452849ace66795579416c"
+        },
+        {
+          "command": [
+            "cargo",
+            "check",
+            "--offline",
+            "--locked",
+            "--manifest-path",
+            "tools/perf-baseline/unified-xlsb-sheet-order/Cargo.toml",
+            "--all-targets"
+          ],
+          "exit": 0,
+          "seconds": 0.31073932896833867,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/w4-integration-review/w4b-final-v1/check-8.log",
+          "bytes": 226,
+          "sha256": "3d463c69deb4398d1d02141876cd0b4002d889e1fdddea814fb15f4ae506e60c"
+        },
+        {
+          "command": [
+            "cargo",
+            "check",
+            "--offline",
+            "--locked",
+            "--manifest-path",
+            "tools/perf-baseline/unified-xlsb-sheet-remove/Cargo.toml",
+            "--all-targets"
+          ],
+          "exit": 0,
+          "seconds": 0.3151188240153715,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/w4-integration-review/w4b-final-v1/check-9.log",
+          "bytes": 228,
+          "sha256": "a0397459b29bf5cf032bab9f1fa401dd74ef07ab6b0e42e585f923d7472c86ab"
+        },
+        {
+          "command": [
+            "cargo",
+            "check",
+            "--offline",
+            "--locked",
+            "--manifest-path",
+            "tools/perf-baseline/unified-xlsb-visibility/Cargo.toml",
+            "--all-targets"
+          ],
+          "exit": 0,
+          "seconds": 0.29521948006004095,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/w4-integration-review/w4b-final-v1/check-10.log",
+          "bytes": 224,
+          "sha256": "b6998ca5452d78f5623dbb3e811cdb5bc53326324078b2f0e44c65ab400f7aca"
+        },
+        {
+          "command": [
+            "python3",
+            "tools/check_api_glossary.py",
+            "--profile",
+            "xlsb-minimal",
+            "--target-dir",
+            "/home/zhuhe/code/litchi-worktrees/unified-ops-api/target"
+          ],
+          "exit": 0,
+          "seconds": 14.122594433021732,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/w4-integration-review/w4b-final-v1/check-11.log",
+          "bytes": 1468,
+          "sha256": "055e2196cfc1b50004a9a15751a2f3e7e39b610790006e298c4159ddfb56f157"
+        },
+        {
+          "command": [
+            "python3",
+            "tools/check_api_glossary.py",
+            "--profile",
+            "xlsb-full",
+            "--target-dir",
+            "/home/zhuhe/code/litchi-worktrees/unified-ops-api/target"
+          ],
+          "exit": 0,
+          "seconds": 24.23343896190636,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/w4-integration-review/w4b-final-v1/check-12.log",
+          "bytes": 2894,
+          "sha256": "51c96fb3197e4166bf41f7f307913847614e827703e7b15d62b4c7f1c958f58d"
+        },
+        {
+          "command": [
+            "cargo",
+            "fmt",
+            "--manifest-path",
+            "tools/perf-baseline/Cargo.toml",
+            "--all",
+            "--",
+            "--check"
+          ],
+          "exit": 0,
+          "seconds": 28.42979554599151,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/w4-integration-review/w4b-final-v1/check-13.log",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
         }
       ]
     },
@@ -2637,6 +2908,11 @@
       "path": "/home/zhuhe/code/litchi-worktrees/.coord/w4-integration-review/w4b-cache-prune-v1.json",
       "bytes": 253,
       "sha256": "2270fa3951896e8cdfedb7a442c07b5ceec3a6a1a421e3e0ccde6a4cb666dd93"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/w4-integration-review/w4b-cache-prune-v2.json",
+      "bytes": 14182,
+      "sha256": "5531c25d2a4b93a8f94f97db24f64929a9cb52873492f6dfe5682d8a336f0284"
     }
   ],
   "interpretation": "Earlier failed attempts are retained. Test totals overlap across reruns; they are not a distinct-test sum. Historical worker ABBA does not qualify this assembled source."
