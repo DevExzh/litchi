@@ -7,7 +7,7 @@ use litchi_core::{
     Error, Metadata, Result, SequentialTextWriter, TextOutputError, TextOutputOptions,
     TextOutputReport,
 };
-use litchi_odf_common::{constants::ODF_PRESENTATION, core::PreparedPackage};
+use litchi_odf_common::{XmlStreamLimits, constants::ODF_PRESENTATION, core::PreparedPackage};
 use std::io::Write;
 use std::sync::{Arc, OnceLock};
 
@@ -383,7 +383,13 @@ impl Presentation {
     ) -> Result<litchi_odf_common::drawing::resources::fill_image::Collection> {
         self.inner.package.styles_xml().map_or_else(
             || Ok(litchi_odf_common::drawing::resources::fill_image::Collection::default()),
-            litchi_odf_common::drawing::resources::fill_image::parse_drawing_fill_images,
+            |styles| {
+                litchi_odf_common::drawing::resources::fill_image::parse_drawing_fill_images(
+                    styles,
+                    XmlStreamLimits::owner_default_value(),
+                )
+                .map_err(Error::from)
+            },
         )
     }
 
@@ -396,7 +402,13 @@ impl Presentation {
     ) -> Result<litchi_odf_common::drawing::resources::gradient::Collection> {
         self.inner.package.styles_xml().map_or_else(
             || Ok(litchi_odf_common::drawing::resources::gradient::Collection::default()),
-            litchi_odf_common::drawing::resources::gradient::parse_drawing_gradients,
+            |styles| {
+                litchi_odf_common::drawing::resources::gradient::parse_drawing_gradients(
+                    styles,
+                    XmlStreamLimits::owner_default_value(),
+                )
+                .map_err(Error::from)
+            },
         )
     }
 
@@ -409,7 +421,13 @@ impl Presentation {
     ) -> Result<litchi_odf_common::drawing::resources::hatch::Collection> {
         self.inner.package.styles_xml().map_or_else(
             || Ok(litchi_odf_common::drawing::resources::hatch::Collection::default()),
-            litchi_odf_common::drawing::resources::hatch::parse_drawing_hatches,
+            |styles| {
+                litchi_odf_common::drawing::resources::hatch::parse_drawing_hatches(
+                    styles,
+                    XmlStreamLimits::owner_default_value(),
+                )
+                .map_err(Error::from)
+            },
         )
     }
 
@@ -422,7 +440,13 @@ impl Presentation {
     ) -> Result<litchi_odf_common::drawing::resources::marker::Collection> {
         self.inner.package.styles_xml().map_or_else(
             || Ok(litchi_odf_common::drawing::resources::marker::Collection::default()),
-            litchi_odf_common::drawing::resources::marker::parse_drawing_markers,
+            |styles| {
+                litchi_odf_common::drawing::resources::marker::parse_drawing_markers(
+                    styles,
+                    XmlStreamLimits::owner_default_value(),
+                )
+                .map_err(Error::from)
+            },
         )
     }
 
@@ -435,7 +459,13 @@ impl Presentation {
     ) -> Result<litchi_odf_common::drawing::resources::opacity::Collection> {
         self.inner.package.styles_xml().map_or_else(
             || Ok(litchi_odf_common::drawing::resources::opacity::Collection::default()),
-            litchi_odf_common::drawing::resources::opacity::parse_drawing_opacities,
+            |styles| {
+                litchi_odf_common::drawing::resources::opacity::parse_drawing_opacities(
+                    styles,
+                    XmlStreamLimits::owner_default_value(),
+                )
+                .map_err(Error::from)
+            },
         )
     }
 
@@ -448,7 +478,13 @@ impl Presentation {
     ) -> Result<litchi_odf_common::drawing::resources::stroke_dash::Collection> {
         self.inner.package.styles_xml().map_or_else(
             || Ok(litchi_odf_common::drawing::resources::stroke_dash::Collection::default()),
-            litchi_odf_common::drawing::resources::stroke_dash::parse_drawing_stroke_dashes,
+            |styles| {
+                litchi_odf_common::drawing::resources::stroke_dash::parse_drawing_stroke_dashes(
+                    styles,
+                    XmlStreamLimits::owner_default_value(),
+                )
+                .map_err(Error::from)
+            },
         )
     }
 

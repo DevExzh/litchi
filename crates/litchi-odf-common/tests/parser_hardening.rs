@@ -2,7 +2,7 @@
 
 use litchi_core::Error;
 use litchi_odf_common::package::{Archive, parse_manifest, read_manifest};
-use litchi_odf_common::{chart, embedded, media};
+use litchi_odf_common::{Error as OdfError, XmlStreamLimits, chart, drawing, embedded, media};
 use std::io::{Cursor, Write as _};
 
 const CHART_SEED: &str = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:chart="urn:oasis:names:tc:opendocument:xmlns:chart:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" office:version="1.3"><office:body><office:chart><chart:chart chart:class="chart:bar"><chart:title><text:p>Revenue</text:p></chart:title><chart:legend chart:legend-position="end"/><chart:plot-area><chart:axis chart:dimension="x" chart:name="primary-x"/><chart:axis chart:dimension="y" chart:name="primary-y"/><chart:series chart:values-cell-range-address="Sheet1.$B$1:.$B$3"><chart:data-point chart:repeated="2"/></chart:series><table:table table:name="local-table"/></chart:plot-area></chart:chart></office:chart></office:body></office:document-content>"#;
@@ -80,6 +80,63 @@ fn chart_malformed_inputs_yield_typed_errors() {
 }
 
 #[test]
+fn drawing_resource_parsers_report_the_required_raw_xml_policy() {
+    let xml = "<draw:gradient/><draw:hatch/><draw:marker/><draw:stroke-dash/><draw:opacity/><draw:fill-image/>"
+        .repeat(2);
+    let limits =
+        XmlStreamLimits::new(64, 256, 4_000, 1_000, 64 * 1024).expect("test policy is finite");
+    let expected = |error: OdfError, input_len: usize| {
+        assert!(matches!(
+            error,
+            OdfError::Limit {
+                kind: litchi_odf_common::LimitKind::RawXml(
+                    litchi_odf_common::RawXmlLimitKind::InputBytes
+                ),
+                observed,
+                maximum,
+            } if observed == input_len as u64 && maximum == 64
+        ));
+    };
+    expected(
+        drawing::resources::gradient::parse_drawing_gradients(&xml, limits)
+            .expect_err("gradient input must be bounded"),
+        xml.len(),
+    );
+    expected(
+        drawing::resources::hatch::parse_drawing_hatches(&xml, limits)
+            .expect_err("hatch input must be bounded"),
+        xml.len(),
+    );
+    expected(
+        drawing::resources::marker::parse_drawing_markers(&xml, limits)
+            .expect_err("marker input must be bounded"),
+        xml.len(),
+    );
+    expected(
+        drawing::resources::stroke_dash::parse_drawing_stroke_dashes(&xml, limits)
+            .expect_err("stroke-dash input must be bounded"),
+        xml.len(),
+    );
+    expected(
+        drawing::resources::opacity::parse_drawing_opacities(&xml, limits)
+            .expect_err("opacity input must be bounded"),
+        xml.len(),
+    );
+    expected(
+        drawing::resources::fill_image::parse_drawing_fill_images(&xml, limits)
+            .expect_err("fill-image input must be bounded"),
+        xml.len(),
+    );
+
+    let unrelated = "x".repeat(65);
+    expected(
+        drawing::resources::gradient::parse_drawing_gradients(&unrelated, limits)
+            .expect_err("unrelated input must still be bounded"),
+        unrelated.len(),
+    );
+}
+
+#[test]
 fn shared_media_and_object_scanners_are_hardened() -> Result<(), Error> {
     let images = media::scan_flat(FLAT_MEDIA_SEED)?;
     let objects = embedded::scan_flat(FLAT_MEDIA_SEED)?;
@@ -134,5 +191,5 @@ fn archive_and_manifest_malformed_sweeps_never_panic() -> Result<(), Box<dyn std
 }
 
 fn chart_read(xml: &str) -> Result<chart::Element, Error> {
-    chart::read(xml, litchi_odf_common::XmlStreamLimits::default()).map_err(Error::from)
+    chart::read(xml, XmlStreamLimits::default()).map_err(Error::from)
 }

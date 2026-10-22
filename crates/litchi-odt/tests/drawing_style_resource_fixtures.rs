@@ -1,4 +1,9 @@
+use litchi_odf_common::XmlStreamLimits;
 use litchi_odt::drawing::resources::{fill_image, gradient, hatch, marker, opacity, stroke_dash};
+
+fn limits() -> XmlStreamLimits {
+    XmlStreamLimits::default()
+}
 
 const MULTICOLOR_GRADIENT: &str =
     include_str!("../../../test-data/odf/drawing/multicolor-gradient.fodp");
@@ -15,14 +20,14 @@ const OPACITY_EXTENSION_STOPS: &str =
 
 #[test]
 fn local_gradient_fixture_preserves_multicolor_roundtrip_coverage() {
-    let gradients = gradient::parse_drawing_gradients(MULTICOLOR_GRADIENT).unwrap();
+    let gradients = gradient::parse_drawing_gradients(MULTICOLOR_GRADIENT, limits()).unwrap();
     assert!(gradients.gradients.len() >= 6);
     let gradient::Definition::Legacy(first) = &gradients.gradients[0] else {
         panic!("local fixture should begin with a legacy gradient");
     };
     assert_eq!(first.extension_stops.len(), 2);
     assert!(
-        !gradient::parse_drawing_gradients(&gradients.to_xml().unwrap())
+        !gradient::parse_drawing_gradients(&gradients.to_xml().unwrap(), limits())
             .unwrap()
             .gradients
             .is_empty()
@@ -31,7 +36,7 @@ fn local_gradient_fixture_preserves_multicolor_roundtrip_coverage() {
 
 #[test]
 fn local_hatch_fixture_preserves_angle_units() {
-    let hatches = hatch::parse_drawing_hatches(HATCH_ANGLES).unwrap();
+    let hatches = hatch::parse_drawing_hatches(HATCH_ANGLES, limits()).unwrap();
     assert_eq!(hatches.hatches.len(), 4);
     assert_eq!(
         hatches.hatches[0].rotation.as_ref().unwrap().as_str(),
@@ -50,7 +55,7 @@ fn local_hatch_fixture_preserves_angle_units() {
         "585"
     );
     assert_eq!(
-        hatch::parse_drawing_hatches(&hatches.to_xml().unwrap())
+        hatch::parse_drawing_hatches(&hatches.to_xml().unwrap(), limits())
             .unwrap()
             .hatches
             .len(),
@@ -60,7 +65,7 @@ fn local_hatch_fixture_preserves_angle_units() {
 
 #[test]
 fn local_dash_fixture_preserves_segments() {
-    let parsed = stroke_dash::parse_drawing_stroke_dashes(DASHED_LINE).unwrap();
+    let parsed = stroke_dash::parse_drawing_stroke_dashes(DASHED_LINE, limits()).unwrap();
     let dash = parsed.get("DoubleDashDotDot").unwrap();
     assert_eq!(dash.dots1, Some(1));
     assert_eq!(dash.dots2, Some(2));

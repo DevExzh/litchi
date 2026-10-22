@@ -101,7 +101,13 @@ impl MutableDocument {
     ) -> Result<crate::drawing::resources::gradient::Collection> {
         self.styles_xml.as_deref().map_or_else(
             || Ok(Default::default()),
-            crate::drawing::resources::gradient::parse_drawing_gradients,
+            |styles| {
+                crate::drawing::resources::gradient::parse_drawing_gradients(
+                    styles,
+                    self.xml_limits,
+                )
+                .map_err(litchi_core::Error::from)
+            },
         )
     }
 
@@ -112,7 +118,10 @@ impl MutableDocument {
     pub(crate) fn drawing_hatches(&self) -> Result<crate::drawing::resources::hatch::Collection> {
         self.styles_xml.as_deref().map_or_else(
             || Ok(Default::default()),
-            crate::drawing::resources::hatch::parse_drawing_hatches,
+            |styles| {
+                crate::drawing::resources::hatch::parse_drawing_hatches(styles, self.xml_limits)
+                    .map_err(litchi_core::Error::from)
+            },
         )
     }
 
@@ -125,7 +134,13 @@ impl MutableDocument {
     ) -> Result<crate::drawing::resources::stroke_dash::Collection> {
         self.styles_xml.as_deref().map_or_else(
             || Ok(Default::default()),
-            crate::drawing::resources::stroke_dash::parse_drawing_stroke_dashes,
+            |styles| {
+                crate::drawing::resources::stroke_dash::parse_drawing_stroke_dashes(
+                    styles,
+                    self.xml_limits,
+                )
+                .map_err(litchi_core::Error::from)
+            },
         )
     }
 
@@ -138,7 +153,13 @@ impl MutableDocument {
     ) -> Result<crate::drawing::resources::fill_image::Collection> {
         self.styles_xml.as_deref().map_or_else(
             || Ok(Default::default()),
-            crate::drawing::resources::fill_image::parse_drawing_fill_images,
+            |styles| {
+                crate::drawing::resources::fill_image::parse_drawing_fill_images(
+                    styles,
+                    self.xml_limits,
+                )
+                .map_err(litchi_core::Error::from)
+            },
         )
     }
 
@@ -149,7 +170,10 @@ impl MutableDocument {
     pub(crate) fn drawing_markers(&self) -> Result<crate::drawing::resources::marker::Collection> {
         self.styles_xml.as_deref().map_or_else(
             || Ok(Default::default()),
-            crate::drawing::resources::marker::parse_drawing_markers,
+            |styles| {
+                crate::drawing::resources::marker::parse_drawing_markers(styles, self.xml_limits)
+                    .map_err(litchi_core::Error::from)
+            },
         )
     }
 
@@ -162,7 +186,10 @@ impl MutableDocument {
     ) -> Result<crate::drawing::resources::opacity::Collection> {
         self.styles_xml.as_deref().map_or_else(
             || Ok(Default::default()),
-            crate::drawing::resources::opacity::parse_drawing_opacities,
+            |styles| {
+                crate::drawing::resources::opacity::parse_drawing_opacities(styles, self.xml_limits)
+                    .map_err(litchi_core::Error::from)
+            },
         )
     }
 

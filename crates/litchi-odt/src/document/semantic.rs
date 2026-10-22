@@ -336,7 +336,11 @@ impl Document {
         self.state.styles.as_ref().map_or_else(
             || Ok(Default::default()),
             |styles| {
-                crate::drawing::resources::gradient::parse_drawing_gradients(styles.xml_content())
+                crate::drawing::resources::gradient::parse_drawing_gradients(
+                    styles.xml_content(),
+                    self.state.xml_limits,
+                )
+                .map_err(litchi_core::Error::from)
             },
         )
     }
@@ -348,7 +352,13 @@ impl Document {
     pub fn drawing_hatches(&self) -> Result<crate::drawing::resources::hatch::Collection> {
         self.state.styles.as_ref().map_or_else(
             || Ok(Default::default()),
-            |styles| crate::drawing::resources::hatch::parse_drawing_hatches(styles.xml_content()),
+            |styles| {
+                crate::drawing::resources::hatch::parse_drawing_hatches(
+                    styles.xml_content(),
+                    self.state.xml_limits,
+                )
+                .map_err(litchi_core::Error::from)
+            },
         )
     }
 
@@ -364,7 +374,9 @@ impl Document {
             |styles| {
                 crate::drawing::resources::stroke_dash::parse_drawing_stroke_dashes(
                     styles.xml_content(),
+                    self.state.xml_limits,
                 )
+                .map_err(litchi_core::Error::from)
             },
         )
     }
@@ -379,7 +391,9 @@ impl Document {
             |styles| {
                 crate::drawing::resources::fill_image::parse_drawing_fill_images(
                     styles.xml_content(),
+                    self.state.xml_limits,
                 )
+                .map_err(litchi_core::Error::from)
             },
         )
     }
@@ -391,7 +405,13 @@ impl Document {
     pub fn drawing_markers(&self) -> Result<crate::drawing::resources::marker::Collection> {
         self.state.styles.as_ref().map_or_else(
             || Ok(Default::default()),
-            |styles| crate::drawing::resources::marker::parse_drawing_markers(styles.xml_content()),
+            |styles| {
+                crate::drawing::resources::marker::parse_drawing_markers(
+                    styles.xml_content(),
+                    self.state.xml_limits,
+                )
+                .map_err(litchi_core::Error::from)
+            },
         )
     }
 
@@ -403,7 +423,11 @@ impl Document {
         self.state.styles.as_ref().map_or_else(
             || Ok(Default::default()),
             |styles| {
-                crate::drawing::resources::opacity::parse_drawing_opacities(styles.xml_content())
+                crate::drawing::resources::opacity::parse_drawing_opacities(
+                    styles.xml_content(),
+                    self.state.xml_limits,
+                )
+                .map_err(litchi_core::Error::from)
             },
         )
     }

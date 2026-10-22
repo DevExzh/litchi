@@ -1,17 +1,16 @@
 //! Typed, inert ODF drawing stroke-dash resources.
 
+use crate::core::{ResolvedReader, XmlStreamLimits};
 use litchi_core::{Error, Result};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::ResolveResult;
-use quick_xml::reader::NsReader;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::str::FromStr;
 
 const OFFICE_NS: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const DRAW_NS: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:drawing:1.0";
-const MAX_XML_BYTES: usize = 64 * 1_048_576;
 const MAX_DEPTH: usize = 256;
 const MAX_DASHES: usize = 65_536;
 const MAX_VALUE_BYTES: usize = 65_536;
@@ -273,15 +272,15 @@ type Attributes = HashMap<(NamespaceKind, String), String>;
 ///
 /// Returns an error when the XML is malformed, violates the ODF resource grammar, or exceeds a
 /// configured resource limit.
-pub fn parse_drawing_stroke_dashes(xml: &str) -> Result<Collection> {
+pub fn parse_drawing_stroke_dashes(
+    xml: &str,
+    limits: XmlStreamLimits,
+) -> std::result::Result<Collection, crate::Error> {
+    let mut reader = ResolvedReader::from_xml(xml, limits)?;
     if !xml.contains("stroke-dash") {
         return Ok(Collection::default());
     }
-    if xml.len() > MAX_XML_BYTES {
-        return invalid("drawing stroke-dash XML exceeds 64 MiB");
-    }
 
-    let mut reader = NsReader::from_str(xml);
     reader.config_mut().check_end_names = true;
     let mut buffer = Vec::new();
     let mut stack = Vec::<Frame>::new();
@@ -290,21 +289,19 @@ pub fn parse_drawing_stroke_dashes(xml: &str) -> Result<Collection> {
     let mut aggregate = 0usize;
 
     loop {
-        let (resolved, event) = reader
-            .read_resolved_event_into(&mut buffer)
-            .map_err(|error| make_error(format!("invalid drawing stroke-dash XML: {error}")))?;
+        let (resolved, event) = reader.read_resolved_event_into(&mut buffer)?;
         let namespace = namespace_kind(&resolved)?;
         match event {
             Event::Start(ref element) => {
                 let local = decode(element.local_name().as_ref(), "element name")?;
                 reject_spoofed_name(namespace, &local)?;
                 if active.is_some() {
-                    return invalid("draw:stroke-dash cannot contain child elements");
+                    return invalid_odf("draw:stroke-dash cannot contain child elements");
                 }
                 if namespace == NamespaceKind::Draw && local == "stroke-dash" {
                     ensure_location(&stack)?;
                     if result.dashes.len() >= MAX_DASHES {
-                        return invalid(format!(
+                        return invalid_odf(format!(
                             "drawing styles exceed {MAX_DASHES} stroke dashes"
                         ));
                     }
@@ -315,7 +312,7 @@ pub fn parse_drawing_stroke_dashes(xml: &str) -> Result<Collection> {
                 }
                 stack.push(Frame { namespace, local });
                 if stack.len() > MAX_DEPTH {
-                    return invalid(format!(
+                    return invalid_odf(format!(
                         "drawing stroke-dash XML exceeds {MAX_DEPTH} levels"
                     ));
                 }
@@ -324,12 +321,12 @@ pub fn parse_drawing_stroke_dashes(xml: &str) -> Result<Collection> {
                 let local = decode(element.local_name().as_ref(), "element name")?;
                 reject_spoofed_name(namespace, &local)?;
                 if active.is_some() {
-                    return invalid("draw:stroke-dash cannot contain child elements");
+                    return invalid_odf("draw:stroke-dash cannot contain child elements");
                 }
                 if namespace == NamespaceKind::Draw && local == "stroke-dash" {
                     ensure_location(&stack)?;
                     if result.dashes.len() >= MAX_DASHES {
-                        return invalid(format!(
+                        return invalid_odf(format!(
                             "drawing styles exceed {MAX_DASHES} stroke dashes"
                         ));
                     }
@@ -347,7 +344,7 @@ pub fn parse_drawing_stroke_dashes(xml: &str) -> Result<Collection> {
                     .is_some_and(|dash| dash.parent_depth == stack.len())
                 {
                     if frame.namespace != NamespaceKind::Draw || frame.local != "stroke-dash" {
-                        return invalid("unexpected drawing stroke-dash end element");
+                        return invalid_odf("unexpected drawing stroke-dash end element");
                     }
                     let dash = active.take().ok_or_else(|| {
                         make_error("drawing stroke-dash ended without an active definition")
@@ -360,14 +357,14 @@ pub fn parse_drawing_stroke_dashes(xml: &str) -> Result<Collection> {
                     .xml_content(XmlVersion::Explicit1_0)
                     .map_err(|error| make_error(format!("invalid stroke-dash text: {error}")))?;
                 if !value.chars().all(char::is_whitespace) {
-                    return invalid("draw:stroke-dash must be empty");
+                    return invalid_odf("draw:stroke-dash must be empty");
                 }
             },
             Event::CData(_) | Event::GeneralRef(_) if active.is_some() => {
-                return invalid("draw:stroke-dash cannot contain character data");
+                return invalid_odf("draw:stroke-dash cannot contain character data");
             },
             Event::DocType(_) | Event::PI(_) => {
-                return invalid(
+                return invalid_odf(
                     "DTDs and processing instructions are prohibited in stroke-dash XML",
                 );
             },
@@ -381,14 +378,14 @@ pub fn parse_drawing_stroke_dashes(xml: &str) -> Result<Collection> {
         buffer.clear();
     }
     if !stack.is_empty() || active.is_some() {
-        return invalid("unterminated drawing stroke-dash XML");
+        return invalid_odf("unterminated drawing stroke-dash XML");
     }
     result.validate()?;
     Ok(result)
 }
 
 fn parse_dash(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     element: &BytesStart<'_>,
     aggregate: &mut usize,
 ) -> Result<Definition> {
@@ -442,7 +439,7 @@ fn take_measure(values: &mut Attributes, local: &str) -> Result<Option<Measure>>
 }
 
 fn attributes(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     element: &BytesStart<'_>,
     aggregate: &mut usize,
 ) -> Result<Attributes> {
@@ -652,6 +649,10 @@ fn decode(value: &[u8], what: &str) -> Result<String> {
 
 fn invalid<T>(message: impl Into<String>) -> Result<T> {
     Err(make_error(message))
+}
+
+fn invalid_odf<T>(message: impl Into<String>) -> std::result::Result<T, crate::Error> {
+    Err(crate::Error::from(make_error(message)))
 }
 
 fn make_error(message: impl Into<String>) -> Error {
