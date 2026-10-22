@@ -1773,7 +1773,7 @@ mod tests {
     use super::*;
     use litchi_core::{OwnedSource, ReadAt};
     use litchi_odf_common::constants::ODF_PRESENTATION;
-    use litchi_odf_common::core::{OwnedPackage, PackageWriter};
+    use litchi_odf_common::core::OwnedPackage;
     use soapberry_zip::office::StreamingArchiveWriter;
 
     use super::super::Presentation;
