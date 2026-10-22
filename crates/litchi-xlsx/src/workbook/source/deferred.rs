@@ -61,6 +61,11 @@ pub(crate) struct Deferred {
     /// pending output is still alive. The endpoint keeps only the pending
     /// token, avoiding one repeated owner weak pointer per retained patch.
     owner: Weak<super::SourceInner>,
+    /// Cached exact endpoint shared by this pending owner. The endpoint is
+    /// referenced by the commit that produced this owner and by the next
+    /// commit's before side, so keeping one handle avoids duplicating the
+    /// endpoint state in adjacent patch records.
+    endpoint: OnceLock<Arc<RestoreEndpoint>>,
 }
 
 /// The compact exact-artifact endpoint retained by a source-backed patch.
@@ -130,20 +135,23 @@ impl std::fmt::Debug for RestoreEndpoint {
 }
 
 impl RestoreEndpoint {
-    pub(crate) fn from_workbook(workbook: &SourceBackedWorkbook) -> Self {
-        let inner = Arc::downgrade(&workbook.inner);
-        match &workbook.pending {
-            None => Self::Opened {
-                artifact: workbook.inner.package.source_artifact(),
-                inner,
-            },
-            Some(pending) => Self::Deferred {
-                package: workbook.inner.package_handle(),
-                publisher: Arc::clone(&pending.publish),
-                fingerprint: OnceLock::new(),
-                pending: Arc::downgrade(pending),
-            },
+    pub(crate) fn from_workbook(workbook: &SourceBackedWorkbook) -> Arc<Self> {
+        if let Some(pending) = &workbook.pending {
+            return Arc::clone(pending.endpoint.get_or_init(|| {
+                Arc::new(Self::Deferred {
+                    package: workbook.inner.package_handle(),
+                    publisher: Arc::clone(&pending.publish),
+                    fingerprint: OnceLock::new(),
+                    pending: Arc::downgrade(pending),
+                })
+            }));
         }
+        Arc::clone(workbook.inner.restore_endpoint.get_or_init(|| {
+            Arc::new(Self::Opened {
+                artifact: workbook.inner.package.source_artifact(),
+                inner: Arc::downgrade(&workbook.inner),
+            })
+        }))
     }
 
     pub(crate) fn output_artifact(&self) -> Result<(u64, [u8; 32])> {
@@ -276,6 +284,7 @@ impl SourceBackedWorkbook {
                 fingerprint: OnceLock::new(),
                 catalog,
                 owner: Arc::downgrade(&base.inner),
+                endpoint: OnceLock::new(),
             })),
         }
     }
@@ -517,6 +526,7 @@ impl SourceBackedWorkbook {
             fingerprint: OnceLock::new(),
             catalog,
             owner: Arc::downgrade(&next.inner),
+            endpoint: OnceLock::new(),
         }));
         Ok(next)
     }
@@ -545,6 +555,7 @@ impl SourceBackedWorkbook {
                 fingerprint: OnceLock::new(),
                 catalog,
                 owner: Arc::downgrade(&base.inner),
+                endpoint: OnceLock::new(),
             })),
         })
     }
@@ -832,8 +843,8 @@ macro_rules! source_family {
         pub struct Patch(
             pub(crate) std::sync::Arc<$change>,
             pub(crate) Option<(
-                crate::workbook::source::deferred::RestoreEndpoint,
-                crate::workbook::source::deferred::RestoreEndpoint,
+                std::sync::Arc<crate::workbook::source::deferred::RestoreEndpoint>,
+                std::sync::Arc<crate::workbook::source::deferred::RestoreEndpoint>,
             )>,
         );
 
@@ -853,7 +864,10 @@ macro_rules! source_family {
                     )),
                     self.1
                         .as_ref()
-                        .map(|(before, after)| (after.clone(), before.clone())),
+                        .map(|(before, after)| (
+                            std::sync::Arc::clone(after),
+                            std::sync::Arc::clone(before),
+                        )),
                 )
             }
         }

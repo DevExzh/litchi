@@ -120,6 +120,15 @@ pub(crate) struct SourceCatalogProof {
 
 pub(crate) struct SourceInner {
     package: SourceBackedPackage,
+    /// One exact replay endpoint shared by every patch that observes this
+    /// opened source owner. Adjacent deferred patches otherwise retain the
+    /// same endpoint state twice: the earlier patch's `after` and the next
+    /// patch's `before` are the same pending owner.
+    pub(crate) restore_endpoint: OnceLock<Arc<deferred::RestoreEndpoint>>,
+    /// The immutable tab-state source closure captured for this owner. A
+    /// source-backed edit does not mutate that closure, so repeated edits can
+    /// share its parsed graph, relationships and source payload metadata.
+    pub(crate) tab_state_snapshot: OnceLock<Arc<crate::tab_state::Snapshot>>,
     /// One shared package handle for exact replay endpoints. Keeping this
     /// lazy leaves ordinary read-only opens allocation-free while letting a
     /// retained patch refer to one package owner per source lineage instead
@@ -486,6 +495,8 @@ impl SourceBackedWorkbook {
         Ok(Self {
             inner: Arc::new(SourceInner {
                 package,
+                restore_endpoint: OnceLock::new(),
+                tab_state_snapshot: OnceLock::new(),
                 package_handle: OnceLock::new(),
                 merge_source_states: Mutex::new(HashMap::new()),
                 execution,
@@ -559,6 +570,10 @@ impl SourceBackedWorkbook {
 
     pub(crate) fn shared_catalog_proof(&self) -> Arc<SourceCatalogProof> {
         self.current().catalog_proof()
+    }
+
+    pub(crate) fn tab_state_snapshot(&self) -> &OnceLock<Arc<crate::tab_state::Snapshot>> {
+        &self.current().tab_state_snapshot
     }
 
     /// Content-free diagnostics of the workbook's semantic cache.

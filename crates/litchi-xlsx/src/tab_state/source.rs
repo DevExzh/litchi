@@ -296,11 +296,30 @@ impl SourceBackedWorkbook {
 
     /// Begin an isolated tab-state edit with explicit XML audit limits.
     pub fn edit_tab_state_with_options(&self, options: EditOptions) -> Result<Edit> {
-        let package = self.edit_package()?;
-        let shared_catalog = self.shared_catalog_proof();
-        let before =
-            Snapshot::load_source_backed_with_catalog(package, Arc::new(()), shared_catalog)?;
-        Edit::new(self.clone(), before, options.limits.unwrap_or_default())
+        let view = self.view()?;
+        let package = view.edit_package()?;
+        // `Snapshot::load_source_backed_with_catalog` used to perform this
+        // freshness check on every edit. Keep the same source fence when a
+        // cached immutable closure is reused.
+        package.source_version()?;
+        let shared_catalog = view.shared_catalog_proof();
+        let snapshot_cache = view.tab_state_snapshot();
+        let before = match snapshot_cache.get() {
+            Some(snapshot) => Arc::clone(snapshot),
+            None => {
+                let snapshot = Arc::new(Snapshot::load_source_backed_with_catalog(
+                    package,
+                    Arc::new(()),
+                    shared_catalog,
+                )?);
+                Arc::clone(snapshot_cache.get_or_init(|| snapshot))
+            },
+        };
+        Edit::new(
+            self.clone(),
+            (*before).clone(),
+            options.limits.unwrap_or_default(),
+        )
     }
 
     /// Replay a tab-state patch onto this workbook.
