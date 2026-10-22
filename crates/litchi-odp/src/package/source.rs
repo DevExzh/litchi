@@ -894,10 +894,6 @@ impl SourceBackedPresentation {
         max_slides: usize,
         options: &SourceContentPublicationOptions,
     ) -> Result<Option<ScanFacts>> {
-        self.check_source()?;
-        if options.execution_context().is_some() || options.cancellation().is_some() {
-            return Ok(None);
-        }
         // Keep the cache path's error timing aligned with `scan_source`: an
         // out-of-envelope source limit must fail before authored-fragment
         // construction, even when the owner already has structural facts.
@@ -906,6 +902,10 @@ impl SourceBackedPresentation {
         {
             return Ok(None);
         }
+        if options.execution_context().is_some() || options.cancellation().is_some() {
+            return Ok(None);
+        }
+        self.check_source()?;
         let Some(facts) = self.append_facts.as_ref() else {
             return Ok(None);
         };
