@@ -59,3 +59,11 @@ history routes retain 129 packages and 128 patches through their snapshots;
 live bytes are equal for DOC and increase by 24 bytes for XLS, with peak
 bytes increasing by 56 bytes for XLS.  Native timing remains pending a quiet
 coordinator grant.
+
+The subsequent source-only repair at `75bae6d478` makes the target snapshot's
+source-version retag consume its freshly opened `Inner`: when that `Arc` is
+unique, the version is updated in place instead of allocating and cloning the
+snapshot metadata.  The previous clone path remains as a copy-on-write
+fallback for snapshots shared by another owner, and a unit regression checks
+both branches' bytes and retained limits.  This repair has not been rebuilt or
+measured yet, so the residual cell/stage/history differences remain unresolved.
