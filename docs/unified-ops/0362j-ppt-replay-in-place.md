@@ -31,6 +31,14 @@ integrated source files match the measured candidate byte-for-byte.
 commands, log hashes, source comparison, normalized lock and protected binary.
 These are targeted checks; they do not replace the final integrated gate.
 
+The File classifier also handles the now non-exhaustive PPT slide-order
+error. The fallback classifies future unknown variants as `internal_error`;
+the existing explicit classifications are unchanged. This consumer migration
+was caught by the subsequent workspace check and folded into this unpublished
+commit. The all-target/all-feature `litchi-ops` check and all 957 File library
+tests pass ([consumer receipts](results/0362j/consumer-validation.json)).
+No measured PPT source changed during this correction.
+
 ## Native qualification
 
 Five complete ABBA blocks run against each protected reference using the

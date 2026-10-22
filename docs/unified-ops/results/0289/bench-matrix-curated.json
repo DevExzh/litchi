@@ -2842,6 +2842,62 @@
   {
    "record": "0362d",
    "reason": "ODraw standalone picture-package before/after ownership and streaming probes, not a leaf-versus-facade operation pair. The record retains timing/allocation evidence and the raw-source migration remains required."
+  },
+  {
+   "record": "0360ab",
+   "reason": "Correctness review with two failing metadata composition assertions, source hashes and command receipts. No timing, allocation or leaf-versus-facade comparison is claimed."
+  },
+  {
+   "record": "0361b",
+   "reason": "Non-exhaustive shared iWork error declarations; validation and source-equivalence receipts contain no paired timing or changed success path."
+  },
+  {
+   "record": "0361c",
+   "reason": "Non-exhaustive physical IWA/archive/text/adapter error declarations; validation and unchanged-current-variant review contain no paired timing."
+  },
+  {
+   "record": "0361d",
+   "reason": "Canonical raw IWA, archive and Snappy required-policy before/after qualification, not a leaf-versus-facade pair. The record retains the rejected native attempt and accepted repaired measurements, exact-output checks and allocation receipts."
+  },
+  {
+   "record": "0361g",
+   "reason": "Canonical raw text-wire naming/required-argument migration. Source-body equivalence and validation receipts contain no new paired performance measurement."
+  },
+  {
+   "record": "0361h",
+   "reason": "Raw character-style before/after qualification, not a leaf-versus-facade pair. Records 0361h/0361ha retain rejected buffer growth, repaired allocation results, all interrupted and complete native attempts, and acceptance of the repaired source."
+  },
+  {
+   "record": "0361j",
+   "reason": "Pages registry failure-translation repair. Success-path source bytes are identical; validation receipts cover actual resource kinds/counts and contain no paired timing."
+  },
+  {
+   "record": "0362f",
+   "reason": "Returned native PPT replay candidate compared with native source references, not a leaf-versus-facade pair. The record retains its regressions; accepted replacement evidence is in 0362j."
+  },
+  {
+   "record": "0362g",
+   "reason": "Returned native PPT inverse-replay candidate compared with native source references, not a leaf-versus-facade pair. The record retains its regressions; accepted replacement evidence is in 0362j."
+  },
+  {
+   "record": "0362h",
+   "reason": "Qualification probe and guarded runner source only; the corrected protocol is recorded in 0362ha. No accepted measurements exist for this replacement unified/leaf matrix yet."
+  },
+  {
+   "record": "0362i",
+   "reason": "Canonical ODraw resource-kind naming slice. Source-equivalence and validation receipts contain no new paired performance measurement."
+  },
+  {
+   "record": "0362j",
+   "reason": "Native PPT first-commit, publication and forward/inverse replay comparisons against two native source references, not a leaf-versus-facade pair. The record retains accepted ABBA/allocation evidence and supersedes returned 0362f/0362g candidates."
+  },
+  {
+   "record": "0362q",
+   "reason": "Rustdoc return-contract gate and DOCX policy registrations; validation and remaining inventory contain no paired performance measurement."
+  },
+  {
+   "record": "0362qa",
+   "reason": "Return-contract tooling validation and real rustdoc fixtures only; no runtime measurement or performance acceptance."
   }
  ]
 }

@@ -23,8 +23,8 @@ use litchi_iwa_archive::package::{EntryEdit, OwnedExactArtifacts, SharedBytes};
 use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
 use litchi_iwa_protos::package_metadata_codec::{
     Batch, ComponentDescriptor, ComponentSelector, ExternalReferenceAddition, ObjectUuidAddition,
-    ObjectUuidDescriptor, PackageMetadataVisitor, RewriteError, RewriteOptions, UuidBits,
-    inspect_package_metadata_with_visitor, rewrite_package_metadata,
+    ObjectUuidDescriptor, PackageMetadataVisitor, RewriteError, RewriteLimit, RewriteOptions,
+    UuidBits, inspect_package_metadata_with_visitor, rewrite_package_metadata,
 };
 use litchi_iwa_text::TextSpan;
 use litchi_iwa_text_wire::CharacterProperties;
@@ -55,6 +55,18 @@ pub enum LimitKind {
     Identifiers,
     /// Bytes of the package registry.
     RegistryBytes,
+    /// Wire fields inspected or emitted in the package registry.
+    RegistryFields,
+    /// Work performed while inspecting or rewriting the package registry.
+    RegistryWork,
+    /// Nested wire messages in the package registry.
+    RegistryNesting,
+    /// Components inspected in the package registry.
+    RegistryComponents,
+    /// References inspected in the package registry.
+    RegistryReferences,
+    /// Additions staged in the package registry.
+    RegistryAdditions,
     /// A bounded character-style wire operation.
     Wire(litchi_iwa_common::LimitKind),
 }
@@ -64,6 +76,12 @@ impl fmt::Display for LimitKind {
         formatter.write_str(match self {
             Self::Identifiers => "object identifiers",
             Self::RegistryBytes => "registry bytes",
+            Self::RegistryFields => "registry fields",
+            Self::RegistryWork => "registry work",
+            Self::RegistryNesting => "registry nesting",
+            Self::RegistryComponents => "registry components",
+            Self::RegistryReferences => "registry references",
+            Self::RegistryAdditions => "registry additions",
             Self::Wire(kind) => return kind.fmt(formatter),
         })
     }
@@ -197,14 +215,44 @@ fn map_rewrite(error: &RewriteError) -> Error {
     if let Some(amount) = error.allocation_request() {
         return Error::Allocation { amount };
     }
-    if error.resource_limit().is_some() {
-        return Error::Limit {
-            kind: LimitKind::RegistryBytes,
-            observed: 0,
-            maximum: 0,
-        };
+    let (kind, observed, maximum) = match error.resource_limit() {
+        Some(
+            RewriteLimit::InputBytes { observed, maximum }
+            | RewriteLimit::OutputBytes { observed, maximum },
+        ) => (LimitKind::RegistryBytes, observed as u64, maximum as u64),
+        Some(RewriteLimit::Fields { observed, maximum }) => {
+            (LimitKind::RegistryFields, observed as u64, maximum as u64)
+        },
+        Some(RewriteLimit::Work { observed, maximum }) => {
+            (LimitKind::RegistryWork, observed as u64, maximum as u64)
+        },
+        Some(RewriteLimit::Nesting { observed, maximum }) => (
+            LimitKind::RegistryNesting,
+            u64::from(observed),
+            u64::from(maximum),
+        ),
+        Some(RewriteLimit::Components { observed, maximum }) => (
+            LimitKind::RegistryComponents,
+            observed as u64,
+            maximum as u64,
+        ),
+        Some(RewriteLimit::References { observed, maximum }) => (
+            LimitKind::RegistryReferences,
+            observed as u64,
+            maximum as u64,
+        ),
+        Some(RewriteLimit::Additions { observed, maximum }) => (
+            LimitKind::RegistryAdditions,
+            observed as u64,
+            maximum as u64,
+        ),
+        _ => return Error::InvalidSource,
+    };
+    Error::Limit {
+        kind,
+        observed,
+        maximum,
     }
-    Error::InvalidSource
 }
 
 /// One run of a section's text and the character properties its style
@@ -1130,7 +1178,62 @@ fn resolve(package: &Package, selector: SectionSelector<'_>) -> Result<Position,
 
 #[cfg(test)]
 mod wire_error_tests {
-    use super::{Error, LimitKind};
+    use super::{Error, LimitKind, Registry, RewriteOptions, map_rewrite};
+    use litchi_iwa_protos::package_metadata_codec::inspect_package_metadata_with_visitor;
+
+    #[test]
+    fn registry_limits_keep_the_codec_resource_and_counts() {
+        // A last-object identifier and an unknown varint field are valid
+        // registry wire data. Both count toward the explicit wire policy.
+        let source = [8, 1, 0xa0, 1, 7];
+        let inspect = |input, fields, work| {
+            inspect_package_metadata_with_visitor(
+                &source,
+                RewriteOptions::new(input, 100, fields, work, 64, 10, 10, 10),
+                &mut Registry::default(),
+            )
+        };
+        let report = inspect(source.len(), 100, 1_000)
+            .expect("bounded registry inspection")
+            .report();
+        // The codec charges both its preflight and visitor passes.
+        inspect(source.len(), report.fields(), report.work_bytes())
+            .expect("exact aggregate limits");
+        let input = inspect(source.len() - 1, report.fields(), report.work_bytes()).unwrap_err();
+        assert!(matches!(
+            map_rewrite(&input),
+            Error::Limit {
+                kind: LimitKind::RegistryBytes,
+                observed: 5,
+                maximum: 4,
+            }
+        ));
+        let fields = inspect(source.len(), report.fields() - 1, report.work_bytes()).unwrap_err();
+        assert!(matches!(
+            map_rewrite(&fields),
+            Error::Limit {
+                kind: LimitKind::RegistryFields,
+                observed,
+                maximum,
+            } if observed == report.fields() as u64 && maximum == (report.fields() - 1) as u64
+        ));
+        let work = inspect(source.len(), report.fields(), report.work_bytes() - 1).unwrap_err();
+        assert!(matches!(
+            map_rewrite(&work),
+            Error::Limit {
+                kind: LimitKind::RegistryWork,
+                observed,
+                maximum,
+            } if observed == report.work_bytes() as u64 && maximum == (report.work_bytes() - 1) as u64
+        ));
+        let malformed = inspect_package_metadata_with_visitor(
+            &[0],
+            RewriteOptions::new(10, 100, 10, 1_000, 64, 10, 10, 10),
+            &mut Registry::default(),
+        )
+        .unwrap_err();
+        assert!(matches!(map_rewrite(&malformed), Error::InvalidSource));
+    }
 
     #[test]
     fn character_style_resource_errors_survive_the_owner_boundary() {
