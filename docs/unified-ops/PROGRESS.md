@@ -2150,3 +2150,32 @@ See [0063](0063-source-pptx-modern-comments.md).
   boundaries, final inventory/glossary, corpus dispositions, native performance
   qualification and the complete assembled gate remain required. Only the
   comprehensive redaction audit is deferred. Nothing has been pushed.
+
+- Coordinator checkpoint (2026-10-22, completed combined checks and next returns):
+  Record 0362ud commits all seven passing checks on `8d50e23436`: 183 semantic
+  and facade tests, strict DOCX/DOC/ops all-target/all-feature Clippy, and the
+  locked all-feature performance harness check. The integration branch then
+  advances to `6571179db7`, merging the corrected DOC probe selection and
+  seven typed legacy raw replay conflicts. These later changes still require
+  combined validation; record 0362ud describes its exact earlier source head.
+
+  The ODP freshness candidate preserves progress and secondary diagnostics
+  with its original error layout, but boundary review found missing facade
+  plumbing and lossy save/materialization conversion. The additional return
+  is recorded in 0362rha; 0362rhb is repairing it. Record 0362yda returns the
+  matched ODP allocation/instruction increases and requires route-level
+  attribution and semantic output checks. Native qualification is still open;
+  noisy timing attempts are retained without an acceptance claim.
+
+  DOCX story projection sharing passes its focused checks, but original
+  consuming-Commit baseline measurements and independent raw replay chains
+  remain required. Redaction/sanitize review found admission after allocation
+  and caller-controlled relationship IDs in changed public errors; 0362rga
+  is repairing them while preserving artifact-bound inverse capability.
+  XLSX raw admission reaches `2d44bc4c55`, with independent review, strict
+  Clippy and matched insertion costs still pending. DOC's public body-text
+  conflict variant also needs the canonical PatchConflict name (0359sc).
+
+  All previous remaining engineering, corpus, inventory/glossary, native
+  performance and final assembled-gate requirements still apply. Nothing
+  has been pushed.
