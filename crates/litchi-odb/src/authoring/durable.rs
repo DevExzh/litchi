@@ -405,7 +405,5 @@ fn invalid_wire_error() -> Error {
 }
 
 fn source_mismatch<T>() -> Result<T> {
-    Err(Error::InvalidFormat(
-        "ODB durable patch source does not match".to_string(),
-    ))
+    Err(Error::PatchConflict)
 }

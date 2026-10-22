@@ -6,8 +6,9 @@ use litchi_odb::{
     Patch, ProtectionDecision, ProtectionOperation, ProtectionRefusal, ProtectionSupport, Query,
     QueryDependencyReason, QueryDependencySupport, QueryJoinKind, QueryParameterKind,
     QueryRelationRole, QueryStatementKind, QueryUpdateTarget, RelationResolution, SealedPatch,
-    SignaturePolicy, Table, TableKind,
+    SignaturePolicy, SubEdit, Table, TableKind,
 };
+use litchi_core::Error as CoreError;
 
 const SOURCE: &str = r#"<?xml version="1.0" encoding="UTF-8"?><o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:d="urn:oasis:names:tc:opendocument:xmlns:database:1.0" xmlns:x="http://www.w3.org/1999/xlink"><o:body><o:database><d:data-source/><d:queries/></o:database></o:body></o:document-content>"#;
 
@@ -77,7 +78,10 @@ fn durable_semantic_patch_is_canonical_reversible_sealable_and_stale_checked() {
         decoded.inverse().apply(&applied).unwrap().as_bytes(),
         source.as_bytes()
     );
-    assert!(decoded.apply(&applied).is_err());
+    assert!(matches!(
+        decoded.apply(&applied),
+        Err(CoreError::PatchConflict)
+    ));
 
     let sealed_json = decoded.seal().to_deterministic_json().unwrap();
     let sealed = SealedPatch::from_deterministic_json(&sealed_json).unwrap();
@@ -85,7 +89,10 @@ fn durable_semantic_patch_is_canonical_reversible_sealable_and_stale_checked() {
         sealed.apply(&source).unwrap().as_bytes(),
         applied.as_bytes()
     );
-    assert!(sealed.apply(&applied).is_err());
+    assert!(matches!(
+        sealed.apply(&applied),
+        Err(CoreError::PatchConflict)
+    ));
 }
 
 #[test]
@@ -122,6 +129,35 @@ fn independent_edits_join_deterministically_and_overlap_is_structured() {
     assert!(matches!(
         error.failure(),
         litchi_core::SubEditJoinFailure::Overlap(values) if !values.is_empty()
+    ));
+}
+
+#[test]
+#[expect(clippy::unwrap_used, reason = "unexpected fixture failure")]
+fn composition_rejects_a_joined_payload_from_another_source() {
+    let source = source();
+    let alpha = query_patch(&source, "alpha", "SELECT 1");
+    let other = {
+        let mut edit = source.edit();
+        edit.add_query(Query::new("foreign-base", "SELECT 9")).unwrap();
+        edit.commit().unwrap().into_package()
+    };
+    let foreign = query_patch(&other, "foreign", "SELECT 2");
+    let lineage = alpha.prepare("alpha", limits()).unwrap().lineage().clone();
+    let mut joined = JoinedEdits::new(lineage.clone(), limits());
+    let forged = SubEdit::new(
+        lineage,
+        limits(),
+        "forged",
+        Vec::<String>::new(),
+        vec!["foreign".to_owned()],
+        foreign,
+    )
+    .unwrap();
+    joined.join(forged).unwrap();
+    assert!(matches!(
+        Patch::compose(joined),
+        Err(CoreError::PatchConflict)
     ));
 }
 

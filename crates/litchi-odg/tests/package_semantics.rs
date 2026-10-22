@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used, reason = "test assertions use unwrap for clarity")]
 
-use litchi_core::{CompositionLimits, HistoryLimits, MergeChoice, SubEditJoinFailure};
+use litchi_core::{CompositionLimits, Error, HistoryLimits, MergeChoice, SubEditJoinFailure};
 use litchi_odf_common::{
     compact_xml,
     core::{OwnedPackage, PackageWriter},
@@ -658,7 +658,10 @@ fn durable_semantic_patch_roundtrips_inverts_and_refuses_stale_sources() {
     );
 
     let stale = Package::from_bytes(&package(&CONTENT.replace("Photo", "Changed"))).unwrap();
-    assert!(reopened.apply(&stale).is_err());
+    assert!(matches!(
+        reopened.apply(&stale),
+        Err(Error::PatchConflict)
+    ));
 }
 
 #[test]
@@ -945,6 +948,20 @@ fn joined_edits_are_deterministic_disjoint_and_conflict_aware() {
         .join(conflicting_commit.patch().prepare("right", limits).unwrap())
         .unwrap_err();
     assert!(matches!(error.failure(), SubEditJoinFailure::Overlap(_)));
+
+    let foreign = Package::from_bytes(&package(&CONTENT.replace("Photo", "Changed"))).unwrap();
+    let mut stale_joined = source.joined_edits(limits);
+    stale_joined
+        .join(text_commit.patch().prepare("stale", limits).unwrap())
+        .unwrap();
+    assert!(matches!(
+        foreign.apply_joined(stale_joined),
+        Err(Error::PatchConflict)
+    ));
+    assert!(matches!(
+        text_commit.patch().then(name_commit.patch()),
+        Err(Error::PatchConflict)
+    ));
 }
 
 #[test]

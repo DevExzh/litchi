@@ -124,6 +124,13 @@ pub enum Error {
     /// The common insertion owner reported a typed sink/source failure after
     /// or during publication.
     Publication(SourceContentInsertionError),
+    /// The positional source changed after the append captured its proof.
+    SourceChanged {
+        /// Source identity and revision captured before the operation.
+        expected: SourceVersion,
+        /// Source identity and revision observed during the operation.
+        observed: SourceVersion,
+    },
     /// A patch was applied to a presentation it was not made on.
     PatchConflict {
         /// The replay operation that detected the conflict.
@@ -140,6 +147,10 @@ impl fmt::Display for Error {
             Self::SourceMember(error) => error.fmt(formatter),
             Self::Plan(error) => error.fmt(formatter),
             Self::Publication(error) => error.fmt(formatter),
+            Self::SourceChanged { expected, observed } => write!(
+                formatter,
+                "ODP source changed (expected {expected:?}, observed {observed:?})"
+            ),
             Self::PatchConflict { operation, reason } => {
                 write!(formatter, "ODP patch conflict in {operation}: {reason}")
             },
@@ -154,7 +165,7 @@ impl std::error::Error for Error {
             Self::SourceMember(error) => Some(error),
             Self::Plan(error) => Some(error),
             Self::Publication(error) => Some(error),
-            Self::PatchConflict { .. } => None,
+            Self::SourceChanged { .. } | Self::PatchConflict { .. } => None,
         }
     }
 }
@@ -166,13 +177,49 @@ impl Error {
         match self {
             Self::Plan(error) => Some(error.progress()),
             Self::Publication(error) => Some(error.progress()),
-            Self::Invalid(_) | Self::SourceMember(_) | Self::PatchConflict { .. } => None,
+            Self::Invalid(_)
+            | Self::SourceMember(_)
+            | Self::SourceChanged { .. }
+            | Self::PatchConflict { .. } => None,
         }
     }
 }
 
 fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(CoreError::InvalidFormat(message.into()))
+}
+
+fn source_error(error: CoreError) -> Error {
+    match error {
+        CoreError::SourceChanged { expected, observed } => {
+            Error::SourceChanged { expected, observed }
+        },
+        other => Error::Invalid(other),
+    }
+}
+
+fn publication_error(error: SourceContentPublicationError) -> Error {
+    match error {
+        SourceContentPublicationError::SourceChanged {
+            expected, observed, ..
+        }
+        | SourceContentPublicationError::Core(CoreError::SourceChanged { expected, observed })
+        | SourceContentPublicationError::Source {
+            source: CoreError::SourceChanged { expected, observed },
+            ..
+        } => Error::SourceChanged { expected, observed },
+        other => Error::Plan(other),
+    }
+}
+
+fn source_member_error(error: SourceMemberReaderError<CoreError>) -> Error {
+    match error {
+        SourceMemberReaderError::Core {
+            error: CoreError::SourceChanged { expected, observed },
+            ..
+        } => Error::SourceChanged { expected, observed },
+        other => Error::SourceMember(other),
+    }
 }
 
 fn check_plan_options(options: &SourceContentPublicationOptions) -> std::result::Result<(), Error> {
@@ -480,7 +527,7 @@ impl SourceBackedPresentation {
     /// source proof captured by the patch.
     pub fn apply_tail_append(&self, patch: &Patch) -> std::result::Result<Commit, Error> {
         if self.same_share(&patch.before) {
-            self.check_source().map_err(Error::Invalid)?;
+            self.check_source().map_err(source_error)?;
             return Ok(Commit::new(
                 patch.after.share(),
                 patch.clone(),
@@ -498,8 +545,8 @@ fn rebase_patch(
     recipient: &SourceBackedPresentation,
     patch: &Patch,
 ) -> std::result::Result<Commit, Error> {
-    recipient.check_source().map_err(Error::Invalid)?;
-    let base = recipient.effective().map_err(Error::Invalid)?;
+    recipient.check_source().map_err(source_error)?;
+    let base = recipient.effective().map_err(source_error)?;
     let expected = &patch.before_proof;
     let package = Arc::clone(&base.package);
     let facts = scan_source(&package, patch.limits, &patch.options)?;
@@ -558,7 +605,7 @@ fn rebase_patch(
         &patch.options,
         |_event, _tracker| Ok(()),
     )
-    .map_err(Error::Plan)?;
+    .map_err(publication_error)?;
     if common.source_content_sha256() != patch.source_content_sha256
         || common.target_content_sha256() != patch.target_content_sha256
         || common.source_content_length() != expected.content_bytes
@@ -577,7 +624,7 @@ fn rebase_patch(
         after: Arc::new(package.share()),
         ..patch.clone()
     };
-    recipient.check_source().map_err(Error::Invalid)?;
+    recipient.check_source().map_err(source_error)?;
     Ok(Commit::new(
         package,
         rebased,
@@ -629,13 +676,13 @@ impl<'a> Edit<'a> {
             limits,
             options,
         } = self;
-        let base = source.effective().map_err(Error::Invalid)?;
+        let base = source.effective().map_err(source_error)?;
         let package = Arc::clone(&base.package);
         check_plan_options(&options)?;
-        let source_version = package.source_version().map_err(Error::Invalid)?;
+        let source_version = package.source_version().map_err(source_error)?;
         let content_bytes = package
             .member_materialized_size(ODF_CONTENT)
-            .map_err(Error::Invalid)?
+            .map_err(source_error)?
             .ok_or_else(|| invalid("ODP package has no content.xml"))?;
         if content_bytes > limits.max_content_xml_bytes {
             return Err(invalid("ODP content.xml exceeds the source append limit"));
@@ -695,7 +742,7 @@ impl<'a> Edit<'a> {
             &options,
             |event, tracker| validator.observe(event, tracker),
         )
-        .map_err(Error::Plan)?;
+        .map_err(publication_error)?;
 
         Ok(Plan {
             source,
@@ -811,7 +858,7 @@ impl Plan<'_> {
             limits,
             proof,
         } = self;
-        let base = source.effective().map_err(Error::Invalid)?;
+        let base = source.effective().map_err(source_error)?;
         let source_content_sha256 = common.source_content_sha256();
         let target_content_sha256 = common.target_content_sha256();
         let fragment: Arc<[u8]> = Arc::from(common.authored_fragment_bytes());
@@ -908,8 +955,8 @@ fn scan_source(
         },
     )
     .map_err(|error| match error {
-        SourceContentScanError::Publication(error) => Error::Plan(error),
-        SourceContentScanError::SourceMember(error) => Error::SourceMember(error),
+        SourceContentScanError::Publication(error) => publication_error(error),
+        SourceContentScanError::SourceMember(error) => source_member_error(error),
         _ => Error::Invalid(CoreError::InvalidFormat(
             "unknown source-content scan failure".to_string(),
         )),
@@ -1755,6 +1802,8 @@ mod tests {
     use litchi_core::{OwnedSource, ReadAt};
     use litchi_odf_common::constants::ODF_PRESENTATION;
     use litchi_odf_common::core::{OwnedPackage, PackageWriter};
+    use std::io;
+    use std::sync::atomic::{AtomicU64, Ordering};
 
     use super::super::Presentation;
 
@@ -1763,11 +1812,58 @@ mod tests {
     const PRESENTATION_NAMESPACE_UTF8: &str =
         "urn:oasis:names:tc:opendocument:xmlns:presentation:1.0";
 
-    fn source_package(content: &str) -> Arc<dyn ReadAt> {
+    fn source_package_bytes(content: &str) -> Vec<u8> {
         let mut writer = PackageWriter::new();
         writer.set_mimetype(ODF_PRESENTATION).unwrap();
         writer.add_file(ODF_CONTENT, content.as_bytes()).unwrap();
-        Arc::new(OwnedSource::new(writer.finish_to_bytes().unwrap()))
+        writer.finish_to_bytes().unwrap()
+    }
+
+    fn source_package(content: &str) -> Arc<dyn ReadAt> {
+        Arc::new(OwnedSource::new(source_package_bytes(content)))
+    }
+
+    struct VersionedSource {
+        bytes: Arc<Vec<u8>>,
+        revision: AtomicU64,
+    }
+
+    impl VersionedSource {
+        fn new(bytes: Vec<u8>) -> Self {
+            Self {
+                bytes: Arc::new(bytes),
+                revision: AtomicU64::new(0),
+            }
+        }
+
+        fn bump(&self) {
+            self.revision.fetch_add(1, Ordering::Relaxed);
+        }
+    }
+
+    impl ReadAt for VersionedSource {
+        fn len(&self) -> io::Result<u64> {
+            u64::try_from(self.bytes.len())
+                .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "source length overflow"))
+        }
+
+        fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
+            let offset = usize::try_from(offset)
+                .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "source offset overflow"))?;
+            if offset >= self.bytes.len() {
+                return Ok(0);
+            }
+            let count = output.len().min(self.bytes.len() - offset);
+            output[..count].copy_from_slice(&self.bytes[offset..offset + count]);
+            Ok(count)
+        }
+
+        fn version(&self) -> io::Result<SourceVersion> {
+            Ok(SourceVersion::new(
+                0x4f44_505f_7461_696c,
+                self.revision.load(Ordering::Relaxed),
+            ))
+        }
     }
 
     #[test]
@@ -2023,6 +2119,30 @@ mod tests {
         assert!(matches!(
             chained.package().apply_tail_append(commit.patch()),
             Err(Error::PatchConflict { .. })
+        ));
+    }
+
+    #[test]
+    fn stale_source_is_reported_separately_from_patch_conflict() {
+        let content = format!(
+            r#"<office:document-content xmlns:office="{OFFICE_NAMESPACE_UTF8}" xmlns:draw="{DRAW_NAMESPACE_UTF8}"><office:body><office:presentation><draw:page draw:name="page1"/></office:presentation></office:body></office:document-content>"#,
+        );
+        let source = Arc::new(VersionedSource::new(source_package_bytes(&content)));
+        let owner = SourceBackedPresentation::from_read_at(source.clone()).unwrap();
+        let commit = owner
+            .edit_tail_append("title", "body")
+            .unwrap()
+            .commit()
+            .unwrap();
+
+        source.bump();
+        assert!(matches!(
+            owner.apply_tail_append(commit.patch()),
+            Err(Error::SourceChanged { .. })
+        ));
+        assert!(matches!(
+            owner.edit_tail_append("later", "body").unwrap().prepare(),
+            Err(Error::SourceChanged { .. })
         ));
     }
 

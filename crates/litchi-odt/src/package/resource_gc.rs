@@ -194,7 +194,7 @@ impl EmbeddedResourceGcPlan {
     /// is fully reopened before a reversible package commit is returned.
     pub fn apply(&self, source: &Package) -> Result<Commit> {
         if source.as_bytes() != self.source.as_bytes() {
-            return invalid("ODT embedded-resource GC plan source does not match");
+            return Err(litchi_core::Error::PatchConflict);
         }
         if !self.is_applicable() {
             return Err(Error::Refused(litchi_core::edit::Refusal::new(

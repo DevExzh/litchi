@@ -6317,11 +6317,11 @@ fn invalid_durable_patch() -> CoreError {
 }
 
 fn durable_source_mismatch() -> CoreError {
-    CoreError::InvalidFormat("ODT durable patch source does not match".to_string())
+    CoreError::PatchConflict
 }
 
 fn stale_history_error() -> CoreError {
-    CoreError::InvalidFormat("ODT history edit is stale relative to the current head".to_string())
+    CoreError::PatchConflict
 }
 
 fn bounded_semantic_text(value: String, field: &str) -> Result<String> {
