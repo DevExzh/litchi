@@ -220,12 +220,39 @@ fn composed_no_op_scopes_are_checked_instead_of_dropped() {
     let (changed_state, changed) = edited(&snapshot, "Changed");
     let (_, changed_no_op, _) = changed_state.plan().finish().unwrap();
 
-    // A generated no-op authenticates all three property families. It cannot
-    // be silently reduced to the changed family's before image in either
-    // composition order.
-    assert!(matches!(no_op.compose(&changed), Err(Error::Conflict(_))));
+    // A generated no-op authenticates all three property families. The
+    // composed changed patch retains that complete before scope instead of
+    // reducing authentication to the changed family.
+    let no_op_then_changed = no_op.compose(&changed).unwrap();
+    let mut direct = source.clone();
+    no_op_then_changed.apply(&mut direct).unwrap();
+    let mut sequential = source.clone();
+    changed.apply(&mut sequential).unwrap();
+    assert_eq!(
+        bytes(&direct, "/docProps/core.xml"),
+        bytes(&sequential, "/docProps/core.xml")
+    );
+
+    let changed_then_no_op = changed.compose(&changed_no_op).unwrap();
+    let mut direct = source.clone();
+    changed_then_no_op.apply(&mut direct).unwrap();
+    assert_eq!(
+        bytes(&direct, "/docProps/core.xml"),
+        bytes(&sequential, "/docProps/core.xml")
+    );
+
+    // The untouched application family remains authenticated by the
+    // composed scope.
+    let mut app_plan = snapshot.plan();
+    app_plan.set_app_props(Some(app::Props {
+        company: Some("Other".into()),
+        ..app::Props::default()
+    }));
+    let (_app_state, app_patch, _) = app_plan.finish().unwrap();
+    let mut different = source.clone();
+    app_patch.apply(&mut different).unwrap();
     assert!(matches!(
-        changed.compose(&changed_no_op),
+        no_op_then_changed.apply(&mut different),
         Err(Error::Conflict(_))
     ));
 
@@ -260,8 +287,17 @@ fn composed_no_op_scope_authenticates_absent_property_families() {
     let mut exact = empty.clone();
     assert!(!no_op.apply(&mut exact).unwrap());
 
-    let (changed_state, _) = edited(&snapshot, "Created");
+    let (changed_state, changed) = edited(&snapshot, "Created");
     let (_, changed_no_op, _) = changed_state.plan().finish().unwrap();
+    let composed = no_op.compose(&changed).unwrap();
+    let mut composed_package = empty.clone();
+    composed.apply(&mut composed_package).unwrap();
+    let mut expected = empty.clone();
+    changed.apply(&mut expected).unwrap();
+    assert_eq!(
+        bytes(&composed_package, "/docProps/core.xml"),
+        bytes(&expected, "/docProps/core.xml")
+    );
     assert!(matches!(
         no_op.compose(&changed_no_op),
         Err(Error::Conflict(_))
