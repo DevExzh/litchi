@@ -2263,13 +2263,12 @@ fn rewrite_metadata_entry(
     if serialized.len() != serialized_capacity {
         return Err(Error::Verification);
     }
-    let compressed_capacity =
-        SnappyStream::maximum_compressed_len(serialized.len(), Default::default())
-            .map_err(|_| Error::InvalidSource)?;
+    let compressed_capacity = SnappyStream::maximum_compressed_len(serialized.len(), snappy_limits)
+        .map_err(|_| Error::InvalidSource)?;
     budget.wire_work(compressed_capacity)?;
     budget.allocation(compressed_capacity)?;
-    let compressed = SnappyStream::compress(&serialized, Default::default())
-        .map_err(|_| Error::InvalidSource)?;
+    let compressed =
+        SnappyStream::compress(&serialized, snappy_limits).map_err(|_| Error::InvalidSource)?;
     if compressed.len() > compressed_capacity {
         return Err(Error::Verification);
     }

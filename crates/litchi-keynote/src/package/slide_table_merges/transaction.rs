@@ -618,6 +618,7 @@ fn rewrite_merges(
         ));
     }
     let physical_limits = source.state.options.archive();
+    let snappy_limits = physical_limits.snappy_limits().map_err(map_archive_error)?;
     let archive_limits = physical_limits
         .effective_archive_limits()
         .map_err(map_archive_error)?;
@@ -728,7 +729,7 @@ fn rewrite_merges(
     let encoded_bound = archive
         .encoded_len(archive_limits)
         .map_err(map_native_error)?;
-    let compressed_bound = SnappyStream::maximum_compressed_len(encoded_bound, Default::default())
+    let compressed_bound = SnappyStream::maximum_compressed_len(encoded_bound, snappy_limits)
         .map_err(map_native_error)?;
     budget
         .output(
@@ -754,8 +755,7 @@ fn rewrite_merges(
     if bytes.len() != encoded_bound {
         return Err(Error::Verification);
     }
-    let compressed =
-        SnappyStream::compress(&bytes, Default::default()).map_err(map_native_error)?;
+    let compressed = SnappyStream::compress(&bytes, snappy_limits).map_err(map_native_error)?;
     if compressed.len() > compressed_bound {
         return Err(Error::Verification);
     }

@@ -979,8 +979,8 @@ fn rewrite_model(
             archive_limits,
         )
         .map_err(map_core_error)?;
-    let compressed =
-        page_layout::compress_archive(archive, archive_limits).map_err(map_page_layout_error)?;
+    let compressed = page_layout::compress_archive(source, archive, archive_limits)
+        .map_err(map_page_layout_error)?;
     if compressed.len() > bounds.compressed_bound {
         return Err(Error::Verification);
     }

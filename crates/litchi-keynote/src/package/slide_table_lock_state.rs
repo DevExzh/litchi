@@ -1316,13 +1316,13 @@ fn rewrite_lock(
         return Err(Error::Verification);
     }
     budget.work(bytes.len())?;
-    let compressed_bound = SnappyStream::maximum_compressed_len(encoded_len, Default::default())
-        .map_err(map_core_error)?;
+    let compressed_bound =
+        SnappyStream::maximum_compressed_len(encoded_len, snappy_limits).map_err(map_core_error)?;
     budget.output(compressed_bound)?;
     budget.allocations(1)?;
     budget.retained(compressed_bound)?;
     budget.scratch(compressed_bound)?;
-    let compressed = SnappyStream::compress(&bytes, Default::default()).map_err(map_core_error)?;
+    let compressed = SnappyStream::compress(&bytes, snappy_limits).map_err(map_core_error)?;
     if compressed.len() > compressed_bound {
         return Err(Error::Verification);
     }

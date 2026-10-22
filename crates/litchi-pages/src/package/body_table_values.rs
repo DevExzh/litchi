@@ -555,6 +555,9 @@ fn publish(edit: &Edit<'_>) -> Result<Package, Error> {
     let archive_limits = limits
         .effective_archive_limits()
         .map_err(|_error| Error::Refused(Refusal::UnsupportedSource))?;
+    let snappy_limits = limits
+        .snappy_limits()
+        .map_err(|_error| Error::Refused(Refusal::UnsupportedSource))?;
     let mut members: BTreeMap<String, Archive> = BTreeMap::new();
     for (identifier, (message_type, payload)) in staged.payloads {
         let member = component_name_of(package, identifier).map_err(style_error)?;
@@ -581,10 +584,7 @@ fn publish(edit: &Edit<'_>) -> Result<Package, Error> {
     let mut encoded: Vec<(String, Vec<u8>)> = Vec::new();
     for (name, archive) in &members {
         let bytes = archive.to_bytes(archive_limits)?;
-        encoded.push((
-            name.clone(),
-            SnappyStream::compress(&bytes, Default::default())?,
-        ));
+        encoded.push((name.clone(), SnappyStream::compress(&bytes, snappy_limits)?));
     }
     let edits: Vec<EntryEdit<'_>> = encoded
         .iter()

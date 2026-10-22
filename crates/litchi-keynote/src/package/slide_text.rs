@@ -1319,6 +1319,7 @@ pub(super) fn rewrite_owned_storage_text(
     let archive_limits = physical_limits
         .effective_archive_limits()
         .map_err(map_archive_error)?;
+    let snappy_limits = physical_limits.snappy_limits().map_err(map_archive_error)?;
     let mut component_names = Vec::new();
     component_names
         .try_reserve_exact(2)
@@ -1408,7 +1409,7 @@ pub(super) fn rewrite_owned_storage_text(
         }
         let archive_bytes = archive.to_bytes(archive_limits).map_err(map_core_error)?;
         let compressed =
-            SnappyStream::compress(&archive_bytes, Default::default()).map_err(map_core_error)?;
+            SnappyStream::compress(&archive_bytes, snappy_limits).map_err(map_core_error)?;
         compressed_components.push((*component_name, compressed));
     }
     if !storage_changed || !node_changed {

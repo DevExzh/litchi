@@ -1587,6 +1587,12 @@ fn rewrite(
         .archive()
         .effective_archive_limits()
         .map_err(|_| Error::InvalidSource)?;
+    let snappy_limits = source
+        .state
+        .options
+        .archive()
+        .snappy_limits()
+        .map_err(|_| Error::InvalidSource)?;
     let mut component_names = vec![
         selection.tile.component.as_ref(),
         selection.format.component.as_ref(),
@@ -1640,9 +1646,8 @@ fn rewrite(
         let encoded_bound = archive
             .encoded_len(archive_limits)
             .map_err(map_core_native_error)?;
-        let compressed_bound =
-            SnappyStream::maximum_compressed_len(encoded_bound, Default::default())
-                .map_err(map_core_native_error)?;
+        let compressed_bound = SnappyStream::maximum_compressed_len(encoded_bound, snappy_limits)
+            .map_err(map_core_native_error)?;
         budget
             .output(
                 encoded_bound
@@ -1661,8 +1666,7 @@ fn rewrite(
         if bytes.len() != encoded_bound {
             return Err(Error::Verification);
         }
-        let bytes =
-            SnappyStream::compress(&bytes, Default::default()).map_err(map_core_native_error)?;
+        let bytes = SnappyStream::compress(&bytes, snappy_limits).map_err(map_core_native_error)?;
         if bytes.len() > compressed_bound {
             return Err(Error::Verification);
         }

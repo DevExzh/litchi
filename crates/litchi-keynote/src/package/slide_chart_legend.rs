@@ -659,6 +659,12 @@ fn rewrite_chart_legend(
         .archive()
         .effective_archive_limits()
         .map_err(map_archive_error)?;
+    let snappy_limits = source
+        .state
+        .options
+        .archive()
+        .snappy_limits()
+        .map_err(map_archive_error)?;
     let stream = SnappyStream::decompress(
         entry.data(),
         source
@@ -706,7 +712,7 @@ fn rewrite_chart_legend(
         )
         .map_err(map_core_error)?;
     let bytes = archive.to_bytes(archive_limits).map_err(map_core_error)?;
-    let compressed = SnappyStream::compress(&bytes, Default::default()).map_err(map_core_error)?;
+    let compressed = SnappyStream::compress(&bytes, snappy_limits).map_err(map_core_error)?;
     let edit = EntryEdit::new(
         selection.non_style_component_name.as_str(),
         compressed.as_slice(),

@@ -1783,6 +1783,9 @@ fn rewrite_physical(
     let path = selection.path();
     let catalog = core::physical_catalog(source).map_err(|error| map_core(error, path))?;
     let physical_limits = source.state.options.archive();
+    let snappy_limits = physical_limits
+        .snappy_limits()
+        .map_err(|_| Error::InvalidSource { path })?;
     let archive_limits = physical_limits
         .effective_archive_limits()
         .map_err(|_| Error::InvalidSource { path })?;
@@ -2186,9 +2189,8 @@ fn rewrite_physical(
             .archive
             .encoded_len(archive_limits)
             .map_err(|_| Error::InvalidSource { path })?;
-        let compressed_bound =
-            SnappyStream::maximum_compressed_len(encoded_len, Default::default())
-                .map_err(|_| Error::InvalidSource { path })?;
+        let compressed_bound = SnappyStream::maximum_compressed_len(encoded_len, snappy_limits)
+            .map_err(|_| Error::InvalidSource { path })?;
         budget
             .output(
                 encoded_len
@@ -2221,7 +2223,7 @@ fn rewrite_physical(
         budget
             .scratch(compressed_bound)
             .map_err(|error| map_core(error, path))?;
-        let compressed = SnappyStream::compress(&decoded, Default::default())
+        let compressed = SnappyStream::compress(&decoded, snappy_limits)
             .map_err(|_| Error::InvalidSource { path })?;
         if compressed.len() > compressed_bound {
             return Err(Error::Verification { path });

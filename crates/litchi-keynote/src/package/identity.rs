@@ -253,7 +253,7 @@ fn rewrite_package_metadata(package: &Package, identity: &Identity) -> ReadResul
         )
         .map_err(core_error)?;
     let bytes = archive.to_bytes(archive_limits).map_err(core_error)?;
-    SnappyStream::compress(&bytes, Default::default()).map_err(core_error)
+    SnappyStream::compress(&bytes, limits.snappy_limits()?).map_err(core_error)
 }
 
 /// Rewrite the single occurrence of length-delimited `field` in a protobuf

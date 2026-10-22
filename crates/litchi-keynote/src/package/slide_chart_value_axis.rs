@@ -496,7 +496,8 @@ fn snappy_output_plan(
     let chunk_size = SnappyStream::WRITE_CHUNK_SIZE.min(limits.max_uncompressed_chunk());
     let frame_count = input_len.div_ceil(chunk_size);
     // The encoder allocates a raw frame before checking its actual compressed
-    // length. Its temporary allocation is independent of the output ceiling.
+    // length. Its temporary allocation is independent of the output ceiling,
+    // so this scratch bound deliberately uses the uncapped frame profile.
     let maximum_frame = if input_len == 0 {
         0
     } else {
