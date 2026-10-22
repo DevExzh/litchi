@@ -151,10 +151,24 @@ The sink's ordinary input-length conversion and checked addition therefore
 cannot silently wrap; the content proof remains the `(u64 length, SHA-256)`
 pair required by 0355a §1.
 
+Commit `df86770cf6` maps that private sink source at the
+`replay_content_fingerprint` write boundary to the public
+`litchi_pptx::Error::CapacityOverflow` variant. It maps both the direct
+`Error::Io` and nested `OpcError::IoError` wrappers, while preserving true
+destination/source I/O errors unchanged. Focused boundary tests cover both
+wrappers and unchanged sink state on overflow; the unified classifier maps
+the structural capacity variant to `internal_error` without fabricating a
+limit observation.
+The boundary-focused command was `cargo test -p litchi-pptx replay_hash_ --lib
+--offline --locked` (four tests, exit `0`), followed by
+`cargo test -p litchi-ops row_allocation_commit_and_other_are_internal_error
+--all-features --lib --offline --locked` (one test, exit `0`).
+
 All runs used the capped environment above, whose target was
 `/home/zhuhe/code/litchi-worktrees/uo2-w8-file/target`; it measured 6.4 GiB
 after completion. The lockfile used by the runs is 139,521 bytes with
 SHA-256 `2c10b15dfc669fffc555913731171ccd507691659d3226c77a162ecafc3d2b72`.
 The source commits in this validation slice are `ebfc35fc31`, `d100f18016`,
-`5fbed7708a`, `cdc2696e89`, `f965b0f9c1`, `51120e13bf`, `55d4795feb`, and
-`a1b479f025`; no native performance qualification is claimed here.
+`5fbed7708a`, `cdc2696e89`, `f965b0f9c1`, `51120e13bf`, `55d4795feb`,
+`a1b479f025`, and `df86770cf6`; no native performance qualification is
+claimed here.
