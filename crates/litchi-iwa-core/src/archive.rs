@@ -1168,7 +1168,7 @@ fn check_archive_info_constructor(
     }
     if info.should_merge.is_none() && info.message_infos.iter().all(is_minimal_message_info) {
         if limits == Limits::default() {
-            return check_minimal_archive_info_default(info);
+            return check_minimal_archive_info_default(info, limits);
         }
         return check_minimal_archive_info_constructor(info, limits);
     }
@@ -1225,7 +1225,10 @@ fn check_archive_info_constructor(
 /// provenance and uses checked operations so an oversized caller-owned vector
 /// cannot bypass the contract.
 #[inline]
-fn check_minimal_archive_info_default(info: &ArchiveInfo) -> Result<ArchiveInfoAdmission> {
+fn check_minimal_archive_info_default(
+    info: &ArchiveInfo,
+    limits: Limits,
+) -> Result<ArchiveInfoAdmission> {
     let identifier = info
         .identifier
         .ok_or_else(|| Error::invalid_archive(0, "object is missing its archive identifier"))?;
@@ -1246,6 +1249,9 @@ fn check_minimal_archive_info_default(info: &ArchiveInfo) -> Result<ArchiveInfoA
     let mut header_length = varint_field_length(1, identifier)?;
     let mut metadata_items = message_count;
     for message_info in &info.message_infos {
+        let message_length = usize::try_from(message_info.length)
+            .map_err(|_| Error::invalid_archive(0, "message length exceeds usize"))?;
+        check_message_length(message_length, limits)?;
         metadata_items = metadata_items
             .checked_add(DEFAULT_MESSAGE_VERSIONS.len())
             .ok_or_else(|| Error::invalid_archive(0, "ArchiveInfo metadata count overflow"))?;
@@ -9422,6 +9428,45 @@ mod tests {
                 } if observed == exact && maximum == exact - 1));
             }
         }
+        Ok(())
+    }
+
+    #[test]
+    fn default_archive_info_admission_checks_public_message_length_mutations() -> Result<()> {
+        let limits = Limits::default();
+        let mut message = MessageInfo::new(7, 1, limits)?;
+        message.length = u32::try_from(Limits::MAX_MESSAGE_BYTES + 1)
+            .expect("the hard message limit fits in the wire u32");
+        let info = ArchiveInfo {
+            identifier: Some(0),
+            message_infos: vec![message],
+            should_merge: None,
+        };
+
+        let error = ArchiveInfo::new(0, info.message_infos.clone(), limits)
+            .expect_err("constructor admission must inspect public message length");
+        assert!(matches!(
+            error,
+            Error::Limit {
+                kind: LimitKind::MessageBytes,
+                observed,
+                maximum,
+            } if observed == Limits::MAX_MESSAGE_BYTES + 1
+                && maximum == Limits::MAX_MESSAGE_BYTES
+        ));
+
+        let encoded = encode_archive_info(&info, limits)?;
+        let error = ArchiveInfo::decode(&encoded, limits)
+            .expect_err("decoded minimal metadata must enforce message length");
+        assert!(matches!(
+            error,
+            Error::Limit {
+                kind: LimitKind::MessageBytes,
+                observed,
+                maximum,
+            } if observed == Limits::MAX_MESSAGE_BYTES + 1
+                && maximum == Limits::MAX_MESSAGE_BYTES
+        ));
         Ok(())
     }
 
