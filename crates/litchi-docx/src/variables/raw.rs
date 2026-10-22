@@ -180,14 +180,20 @@ impl Tree {
     }
 
     /// Set or replace one variable without serializing the whole settings XML.
-    pub fn set(
-        &mut self,
-        name: impl Into<String>,
-        value: impl Into<String>,
-        limits: Limits,
-    ) -> Result<Option<String>> {
+    pub fn set<N, V>(&mut self, name: N, value: V, limits: Limits) -> Result<Option<String>>
+    where
+        N: AsRef<str> + Into<String>,
+        V: AsRef<str> + Into<String>,
+    {
         self.validate_variables_if_tighter(limits)?;
-        let previous = self.variables.insert_with_limits(name, value, &limits)?;
+        super::model::validate_document_variable_with_limits(
+            name.as_ref(),
+            value.as_ref(),
+            &limits,
+        )?;
+        let previous = self
+            .variables
+            .insert_prevalidated(name.into(), value.into(), &limits)?;
         self.admitted_variables = VariableLimits::from_limits(limits);
         Ok(previous)
     }
@@ -386,5 +392,35 @@ mod tests {
         let tighter = Limits::new(8 * 1024 * 1024, 64, 1_200, 32, 3).unwrap();
         assert!(tree.set("name-0", "tight", tighter).is_err());
         assert_eq!(crate::variables::model::validation_count(), 1);
+    }
+
+    #[test]
+    fn borrowed_over_limit_values_are_rejected_before_ownership_conversion() {
+        struct BorrowedInput(&'static str);
+
+        impl AsRef<str> for BorrowedInput {
+            fn as_ref(&self) -> &str {
+                self.0
+            }
+        }
+
+        impl Into<String> for BorrowedInput {
+            fn into(self) -> String {
+                panic!("invalid raw input must not be owned before admission")
+            }
+        }
+
+        let policy = Limits::new(1024, 64, 4, 8, 3).unwrap();
+        let source = format!(r#"<w:settings xmlns:w="{W}"/>"#);
+        let mut tree = Tree::from_xml(source.into_bytes(), policy).unwrap();
+        let error = tree.set(BorrowedInput("name"), BorrowedInput("value"), policy);
+        assert!(matches!(
+            error,
+            Err(Error::SettingsLimit {
+                kind: crate::settings::LimitKind::DocumentVariableValueChars,
+                ..
+            })
+        ));
+        assert!(!tree.changed());
     }
 }

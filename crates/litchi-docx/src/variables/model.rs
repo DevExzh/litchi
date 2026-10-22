@@ -115,6 +115,15 @@ impl Variables {
         let name = name.into();
         let value = value.into();
         validate_document_variable_with_limits(&name, &value, limits)?;
+        self.insert_prevalidated(name, value, limits)
+    }
+
+    pub(super) fn insert_prevalidated(
+        &mut self,
+        name: String,
+        value: String,
+        limits: &Limits,
+    ) -> Result<Option<String>> {
         if let Some((_, existing)) = self
             .variables
             .iter_mut()
@@ -223,7 +232,11 @@ impl Default for Variables {
     }
 }
 
-fn validate_document_variable_with_limits(name: &str, value: &str, limits: &Limits) -> Result<()> {
+pub(super) fn validate_document_variable_with_limits(
+    name: &str,
+    value: &str,
+    limits: &Limits,
+) -> Result<()> {
     let name_chars = name.chars().count();
     if !(1..=limits.max_name_chars()).contains(&name_chars) {
         return Err(limit_error(

@@ -56,6 +56,13 @@ collection validations, then observes one validation for a tighter value
 policy. `to_bytes` still rechecks the complete collection, source depth, and
 source XML bytes for every caller policy, including an unchanged tree.
 
+`Tree::set` admits `AsRef<str> + Into<String>` inputs before taking ownership.
+An oversized borrowed name or value therefore returns its typed limit error
+without first allocating a caller-sized `String`; an already-owned `String`
+still moves into the collection without a second copy. The focused
+`borrowed_over_limit_values_are_rejected_before_ownership_conversion` test
+uses an input whose ownership conversion would panic to prove this ordering.
+
 ## Validation
 
 Commands were run from `/home/zhuhe/code/litchi-worktrees/uo2-w8-docx-variables`
@@ -70,7 +77,7 @@ cargo test --offline --locked -p litchi-docx \
 cargo clippy --offline --locked -p litchi-docx --all-targets --all-features -- -D warnings
 ```
 
-The final variables run passed 17 tests. The retained source-backed run passed
+The final variables run passed 18 tests. The retained source-backed run passed
 18 + 9 + 6 tests. The final all-target/all-feature Clippy run finished with
 `Finished dev profile` and no diagnostics. The first all-target attempt is
 retained because it caught the now-migrated integration consumer that called
