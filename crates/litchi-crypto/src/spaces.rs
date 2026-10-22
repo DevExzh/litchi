@@ -56,6 +56,7 @@ pub const ENCRYPTION_ID: &str = "{FF9A3F03-56EF-4613-BDD5-5A41C1D07246}";
 pub const ENCRYPTION_NAME: &str = "Microsoft.Container.EncryptionTransform";
 
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum Error {
     /// The recipient does not match the patch's recorded base snapshot.
     PatchConflict,
