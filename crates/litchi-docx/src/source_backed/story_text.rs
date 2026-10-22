@@ -1197,8 +1197,8 @@ impl Patch {
     /// admitted under the recipient policy and carries the recipient source
     /// identity, so a subsequent raw edit cannot inherit the author's fence.
     pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
-        self.check_content(source)?;
         source.check_execution()?;
+        self.check_content(source)?;
         self.rebased_target(source)
     }
 
@@ -5150,8 +5150,8 @@ impl GlossaryBatchPatch {
     /// package publication performs complete-artifact and source-freshness
     /// checks separately.
     pub fn apply(&self, source: &GlossaryBatchSnapshot) -> Result<GlossaryBatchSnapshot> {
-        self.check_content(source)?;
         source.check_execution()?;
+        self.check_content(source)?;
         self.rebased_target(source)
     }
 

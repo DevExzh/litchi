@@ -654,8 +654,29 @@ fn patches_accept_matching_copy_and_reject_stale_snapshots_and_cancel_before_out
         Err(story_text::Error::PatchConflict)
     ));
 
-    let (_budget, cancellation, package) = managed_open(source);
+    let (_budget, cancellation, package) = managed_open(source.clone());
+    let cancelled_snapshot = package
+        .story_text_snapshot(story_text::Selector::Main)
+        .unwrap();
     cancellation.cancel();
+    assert!(matches!(
+        patch.apply(&cancelled_snapshot),
+        Err(story_text::Error::Document(Error::Opc(
+            litchi_opc::OpcError::Cancelled
+        )))
+    ));
+    let noop = snapshot
+        .raw_tree(snapshot.limits_value())
+        .unwrap()
+        .patch()
+        .unwrap();
+    assert!(noop.is_noop());
+    assert!(matches!(
+        noop.apply(&cancelled_snapshot),
+        Err(story_text::Error::Document(Error::Opc(
+            litchi_opc::OpcError::Cancelled
+        )))
+    ));
     let output: Vec<u8> = Vec::new();
     assert!(
         package

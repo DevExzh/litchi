@@ -1577,6 +1577,12 @@ fn glossary_batch_rejects_stale_managed_cancelled_signed_and_sink_paths_and_acce
     edit.replace_paragraph_text(0, Position::new(0), "changed")
         .unwrap();
     let patch = edit.patch().unwrap();
+    let noop = snapshot
+        .raw_tree(snapshot.limits_value())
+        .unwrap()
+        .patch()
+        .unwrap();
+    assert!(noop.is_noop());
     versioned
         .revision
         .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
@@ -1666,6 +1672,18 @@ fn glossary_batch_rejects_stale_managed_cancelled_signed_and_sink_paths_and_acce
         .unwrap();
     cancel_source.cancel();
     assert!(captured.entry_count().is_err());
+    assert!(matches!(
+        patch.apply(&captured),
+        Err(story_text::Error::Document(litchi_docx::Error::Opc(
+            litchi_opc::OpcError::Cancelled
+        )))
+    ));
+    assert!(matches!(
+        noop.apply(&captured),
+        Err(story_text::Error::Document(litchi_docx::Error::Opc(
+            litchi_opc::OpcError::Cancelled
+        )))
+    ));
     assert!(
         cancelled
             .glossary_text_batch_snapshot(glossary_triplet())
