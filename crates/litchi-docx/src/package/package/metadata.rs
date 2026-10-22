@@ -42,7 +42,7 @@ impl Package {
         Edit::new(self.clone(), self.metadata().cloned())
     }
 
-    /// Replay a metadata patch onto this snapshot and return a new package.
+    /// Replay a metadata patch onto this snapshot and return its commit.
     ///
     /// ```
     /// use litchi_docx::Package;
@@ -51,7 +51,7 @@ impl Package {
     /// let mut edit = package.edit_metadata();
     /// edit.update(|props| props.title = Some("Draft".to_owned()));
     /// let (changed, patch) = edit.commit()?.into_parts();
-    /// let restored = changed.apply_metadata(&patch.inverse())?;
+    /// let restored = changed.apply_metadata(&patch.inverse())?.into_package();
     /// assert_eq!(restored.metadata(), package.metadata());
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
@@ -59,14 +59,18 @@ impl Package {
     /// # Errors
     ///
     /// Returns [`Error::PatchConflict`] when this package's core properties
-    /// differ from the patch's base, and the [`Edit::commit`] errors
+    /// differ from the patch's base, and the metadata publication errors
     /// otherwise.
-    pub fn apply_metadata(&self, patch: &Patch) -> Result<Self> {
+    pub fn apply_metadata(&self, patch: &Patch) -> Result<crate::metadata::Commit> {
         if self.metadata() != patch.base() {
             return Err(Error::PatchConflict);
         }
-        self.publish_metadata(patch.target(), patch.parts())
-            .map(|(package, _)| package)
+        let (package, changed) = self.publish_metadata(patch.target(), patch.parts())?;
+        Ok(crate::metadata::Commit::new(
+            package,
+            patch.clone(),
+            litchi_core::edit::Diagnostics::new(changed),
+        ))
     }
 
     /// The application properties (`docProps/app.xml`), when present.
@@ -116,7 +120,15 @@ impl Package {
         parts: &families::Patch,
     ) -> Result<(Self, bool)> {
         let core = self.metadata() != target;
-        if !core && parts.is_noop() {
+        let parts_noop = parts.is_noop();
+        // A no-op patch from the shared properties planner carries a complete
+        // property-family scope. Authenticate it before a core edit changes
+        // the package; applying it after that edit would compare the scope
+        // against the new core bytes and reject a valid combined edit.
+        if parts_noop {
+            parts.check(&self.opc)?;
+        }
+        if !core && parts_noop {
             return Ok((self.clone(), false));
         }
         if core && let Some(props) = target {
@@ -134,11 +146,13 @@ impl Package {
                     None => litchi_ooxml_common::properties::clear(opc)?,
                 };
             }
-            if let Err(error) = parts.apply(opc) {
-                failure = Some(error);
-                return Err(crate::Error::InvalidFormat(
-                    "document-property parts refused the patch".to_owned(),
-                ));
+            if !parts_noop {
+                if let Err(error) = parts.apply(opc) {
+                    failure = Some(error);
+                    return Err(crate::Error::InvalidFormat(
+                        "document-property parts refused the patch".to_owned(),
+                    ));
+                }
             }
             Ok(())
         });

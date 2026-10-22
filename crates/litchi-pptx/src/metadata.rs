@@ -110,54 +110,17 @@ impl Edit<'_> {
         let diagnostics = commit.diagnostics().clone();
         let (opc, patch) = commit.into_parts();
         // An exact no-op publishes the source graph itself.
-        let package = self.package.with_metadata_opc(opc);
-        Ok(Commit {
-            package,
-            patch,
-            diagnostics,
-        })
+        let package = if patch.is_noop() {
+            self.package.duplicate()
+        } else {
+            self.package.with_metadata_opc(opc)
+        };
+        Ok(Commit::new(package, patch, diagnostics))
     }
 }
 
 /// The result of [`Edit::commit`].
-#[derive(Debug)]
-pub struct Commit {
-    package: Package,
-    patch: Patch,
-    diagnostics: Diagnostics,
-}
-
-impl Commit {
-    /// The package after the edit.
-    #[must_use]
-    pub const fn package(&self) -> &Package {
-        &self.package
-    }
-
-    /// Consume the commit into the package after the edit.
-    #[must_use]
-    pub fn into_package(self) -> Package {
-        self.package
-    }
-
-    /// The exact, reversible patch.
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// What the edit changed.
-    #[must_use]
-    pub const fn diagnostics(&self) -> &Diagnostics {
-        &self.diagnostics
-    }
-
-    /// Consume the commit into the package and the patch.
-    #[must_use]
-    pub fn into_parts(self) -> (Package, Patch) {
-        (self.package, self.patch)
-    }
-}
+pub type Commit = litchi_core::edit::Commit<Package, Patch, Diagnostics>;
 
 impl Package {
     fn metadata_snapshot(&self) -> Result<Snapshot> {
@@ -195,7 +158,7 @@ impl Package {
         })
     }
 
-    /// Apply a metadata patch to a new package; this package is unchanged.
+    /// Apply a metadata patch and return its commit; this package is unchanged.
     ///
     /// An empty patch returns an equal package, a signed one included.
     ///
@@ -204,10 +167,18 @@ impl Package {
     /// Returns [`Error::Conflict`] when this package is not the patch's
     /// before state and [`Error::Signed`] for a changed patch of a signed
     /// package.
-    pub fn apply_metadata(&self, patch: &Patch) -> Result<Self> {
-        let mut opc = (*self.opc).clone();
-        patch.apply(&mut opc)?;
-        Ok(self.with_metadata_opc(opc))
+    pub fn apply_metadata(&self, patch: &Patch) -> Result<Commit> {
+        let package = if patch.is_noop() {
+            // The shared patch scope authenticates an exact no-op without
+            // cloning the package graph. This also preserves signed bytes.
+            patch.check(self.opc.as_ref())?;
+            self.duplicate()
+        } else {
+            let mut opc = (*self.opc).clone();
+            patch.apply(&mut opc)?;
+            self.with_metadata_opc(opc)
+        };
+        Ok(Commit::new(package, patch.clone(), patch.diagnostics()))
     }
 
     /// This package with `opc`, whose document properties changed.
@@ -247,8 +218,13 @@ mod tests {
         assert_eq!(package.metadata().unwrap().author, None);
 
         let replayed = package.apply_metadata(&patch).unwrap();
+        assert!(replayed.diagnostics().changed());
+        let replayed = replayed.into_package();
         assert_eq!(replayed.metadata().unwrap(), after.metadata().unwrap());
-        let restored = after.apply_metadata(&patch.inverse()).unwrap();
+        let restored = after
+            .apply_metadata(&patch.inverse())
+            .unwrap()
+            .into_package();
         assert_eq!(restored.metadata().unwrap(), package.metadata().unwrap());
         assert!(matches!(
             package.apply_metadata(&patch.inverse()),
@@ -268,5 +244,20 @@ mod tests {
                 field: litchi_core::metadata::Field::Codepage
             })
         ));
+    }
+
+    #[test]
+    fn an_unchanged_metadata_patch_replays_as_an_exact_noop() {
+        let package = Package::new().unwrap();
+        let commit = package.edit_metadata().unwrap().commit().unwrap();
+        assert!(!commit.diagnostics().changed());
+        assert!(commit.patch().is_noop());
+        let replayed = package.apply_metadata(commit.patch()).unwrap();
+        assert!(!replayed.diagnostics().changed());
+        assert!(replayed.patch().is_noop());
+        assert_eq!(
+            replayed.package().to_bytes().unwrap(),
+            package.to_bytes().unwrap()
+        );
     }
 }

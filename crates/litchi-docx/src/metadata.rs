@@ -57,6 +57,7 @@
 //! ```
 
 pub use litchi_core::Metadata;
+pub use litchi_core::edit::Diagnostics;
 use litchi_ooxml_common::custom::Props as CustomProps;
 use litchi_ooxml_common::properties::{self as families, app};
 
@@ -122,20 +123,6 @@ pub enum Error {
     },
 }
 
-/// What a metadata commit changed.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub struct Diagnostics {
-    changed: bool,
-}
-
-impl Diagnostics {
-    /// Whether the commit published a different core-properties value.
-    #[must_use]
-    pub const fn changed(&self) -> bool {
-        self.changed
-    }
-}
-
 /// A replayable document-properties change: the core-properties value the
 /// edit started from and the value it published (`None` is an absent
 /// core-properties part), and the exact part changes of the application and
@@ -184,53 +171,7 @@ impl Patch {
 }
 
 /// A published metadata change.
-#[derive(Clone)]
-pub struct Commit {
-    package: Package,
-    patch: Patch,
-    diagnostics: Diagnostics,
-}
-
-impl Commit {
-    /// The package with the staged core properties.
-    #[must_use]
-    pub const fn package(&self) -> &Package {
-        &self.package
-    }
-
-    /// The replayable change.
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// What the commit changed.
-    #[must_use]
-    pub const fn diagnostics(&self) -> Diagnostics {
-        self.diagnostics
-    }
-
-    /// The published package.
-    #[must_use]
-    pub fn into_package(self) -> Package {
-        self.package
-    }
-
-    /// The published package and its patch.
-    #[must_use]
-    pub fn into_parts(self) -> (Package, Patch) {
-        (self.package, self.patch)
-    }
-}
-
-impl std::fmt::Debug for Commit {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        formatter
-            .debug_struct("Commit")
-            .field("diagnostics", &self.diagnostics)
-            .finish_non_exhaustive()
-    }
-}
+pub type Commit = litchi_core::edit::Commit<Package, Patch>;
 
 /// A staged core-properties change over one package snapshot.
 ///
@@ -343,11 +284,7 @@ impl Edit {
         let (package, changed) = self
             .source
             .publish_metadata(patch.target.as_ref(), &patch.parts)?;
-        Ok(Commit {
-            package,
-            patch,
-            diagnostics: Diagnostics { changed },
-        })
+        Ok(Commit::new(package, patch, Diagnostics::new(changed)))
     }
 }
 
@@ -446,6 +383,10 @@ mod tests {
             package.clone().to_bytes()?,
             commit.package().clone().to_bytes()?
         );
+        let replayed = package.apply_metadata(commit.patch())?;
+        assert!(!replayed.diagnostics().changed());
+        assert!(replayed.patch().is_noop());
+        assert_eq!(replayed.package().to_bytes()?, package.to_bytes()?);
         Ok(())
     }
 
@@ -456,7 +397,7 @@ mod tests {
         edit.clear();
         let (cleared, patch) = edit.commit()?.into_parts();
         assert!(cleared.metadata().is_none());
-        let restored = cleared.apply_metadata(&patch.inverse())?;
+        let restored = cleared.apply_metadata(&patch.inverse())?.into_package();
         assert_eq!(restored.metadata(), package.metadata());
         Ok(())
     }
@@ -475,6 +416,8 @@ mod tests {
             Err(Error::PatchConflict)
         ));
         let replayed = package.apply_metadata(&patch)?;
+        assert!(replayed.diagnostics().changed());
+        let replayed = replayed.into_package();
         assert_eq!(
             replayed.metadata().and_then(|props| props.title.as_deref()),
             Some("two")
@@ -515,9 +458,9 @@ mod tests {
             reopened.app_props()?.and_then(|props| props.company),
             Some("Acme".to_owned())
         );
-        let replayed = package.apply_metadata(&patch)?;
+        let replayed = package.apply_metadata(&patch)?.into_package();
         assert_eq!(replayed.app_props()?, next.app_props()?);
-        let restored = next.apply_metadata(&patch.inverse())?;
+        let restored = next.apply_metadata(&patch.inverse())?.into_package();
         assert_eq!(restored.to_bytes()?, original);
         Ok(())
     }

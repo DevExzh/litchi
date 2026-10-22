@@ -52,9 +52,15 @@ fn metadata_patch_replays_and_inverts_on_reopened_bytes() {
     let reopened = Package::from_bytes(&changed.to_bytes().unwrap()).unwrap();
     assert_eq!(reopened.metadata(), patch.target());
 
-    let replay = package.apply_metadata(&patch).expect("replay");
+    let replay = package
+        .apply_metadata(&patch)
+        .expect("replay")
+        .into_package();
     assert_eq!(replay.metadata(), patch.target());
-    let inverse = reopened.apply_metadata(&patch.inverse()).expect("inverse");
+    let inverse = reopened
+        .apply_metadata(&patch.inverse())
+        .expect("inverse")
+        .into_package();
     assert_eq!(inverse.metadata(), package.metadata());
     assert!(matches!(
         package.apply_metadata(&patch.inverse()),
