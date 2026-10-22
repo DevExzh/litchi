@@ -40,7 +40,7 @@ owners keep the same source association.
 Regression coverage pins malformed XML open fallback with semantic-read
 failure, DOCTYPE open acceptance with append refusal, and the fact that open
 leaves the append scan deferred until a successful prepare.  The source
-repair is staged for commit on branch `uo2/odp-heap-repair`; the earlier
+repair is commit `b8a41e01a5` on branch `uo2/odp-heap-repair`; the earlier
 structural-facts commits `126a2bb945`, `f58aa3b76c`, and `3178136432` remain
 returned evidence.
 
