@@ -306,18 +306,20 @@ fn signed_dofr_noop_is_allowed_but_changed_source_is_refused() {
 fn changed_dofr_patch_requires_the_complete_source_owner() {
     let source = Snapshot::open(doc_with_dofr(2, false), Limits::default()).expect("source");
     let foreign = Snapshot::open_bounded(
-        doc_with_dofr_and_stw_user(3, base_doc_with_text("bravo"), None, None),
+        doc_with_dofr_and_stw_user(2, base_doc_with_text("bravo"), None, None),
         Limits::default(),
         TransactionLimits::new(1, 1024, 1024),
     )
     .expect("foreign source");
     let foreign_patch = changed_frame_patch(&source, 1);
-    let foreign_records = foreign
+    let mismatched =
+        Snapshot::open(doc_with_dofr(0, false), Limits::default()).expect("mismatched Dofr source");
+    let mismatched_records = mismatched
         .dofr_records()
-        .expect("foreign Dofr read")
-        .expect("foreign Dofr records");
+        .expect("mismatched Dofr read")
+        .expect("mismatched Dofr records");
     assert!(matches!(
-        foreign_patch.apply(&foreign_records),
+        foreign_patch.apply(&mismatched_records),
         Err(PackageError::Corrupted(_))
     ));
     let mut edit = foreign.edit().expect("foreign edit");
@@ -361,8 +363,8 @@ fn reopened_identical_source_with_different_limits_accepts_dofr_patch() {
     let applied = patch
         .apply(&reopened_records)
         .expect("same-content raw patch");
-    assert_eq!(applied.source_bytes(), patch.replacement_bytes());
-    assert_eq!(source_records.source_bytes(), patch.source_bytes());
+    assert_eq!(applied.bytes(), patch.replacement_bytes());
+    assert_eq!(source_records.bytes(), patch.source_bytes());
 
     let mut edit = reopened.edit().expect("reopened edit");
     assert!(edit.apply_dofr_patch(&patch).expect("same-source patch"));

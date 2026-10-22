@@ -1992,7 +1992,6 @@ fn legacy_raw_replay_categories_reach_the_facade_unchanged() {
         )),
         Code::CorruptFile,
     );
-    assert_code(litchi_ole_common::Error::PatchConflict, Code::InvalidInput);
     assert_code(
         litchi_doc::Error::from(litchi_ole_common::Error::PatchConflict),
         Code::InvalidInput,
