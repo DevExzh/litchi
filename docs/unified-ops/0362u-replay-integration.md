@@ -90,3 +90,13 @@ TailChange Clippy failure retained in 0362ua. Receipts and external capture
 hashes are in `results/0362u/ink-integration.json`. The six-route matched
 allocation repair remains recorded in 0362lc; native timing and full assembly
 acceptance remain required.
+
+ZIP integration through `a4d69035be` preserves the historical typed prefill
+refusal without widening a rejected read. The spill threshold retains the
+64 KiB recommendation for small declared directories; valid larger records
+still use bounded spill storage. On the combined source, the full
+all-feature ZIP suite passes 657 tests with 2 existing ignored tests,
+including ZIP64 promotion and rustdoc; strict all-target/all-feature Clippy
+and the benchmark evidence matrix also pass. The exact receipts are in
+`results/0362u/zip-integration.json`. This closes that reproduced old-gate
+failure, while the final combined workspace gate remains required.

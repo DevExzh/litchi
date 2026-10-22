@@ -474,6 +474,13 @@ fn an_oversized_variable_field_keeps_its_typed_refusal() {
         ArchiveLimits::default(),
     )
     .expect_err("an oversized variable field must fail closed");
+    let requests = source.log();
+    assert!(
+        requests
+            .iter()
+            .all(|(_, requested, _)| *requested <= directory),
+        "the rejected variable field must not trigger an unbounded read: {requests:?}"
+    );
     assert_eq!(format!("{:?}", error.kind()), expected);
     assert!(
         matches!(error.kind(), ErrorKind::BufferTooSmall),

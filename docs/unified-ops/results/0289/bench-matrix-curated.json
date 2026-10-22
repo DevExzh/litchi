@@ -2950,6 +2950,10 @@
   {
    "record": "0362ub",
    "reason": "Detector doctest and native-resave lock consumer fixes, with failed old-gate and successful current checks. Runtime source is unchanged; no paired performance measurement."
+  },
+  {
+   "record": "0362x",
+   "reason": "ZIP prefill refusal-classification repair and bounded-read validation; no paired performance measurement or native acceptance."
   }
  ]
 }

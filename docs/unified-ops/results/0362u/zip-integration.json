@@ -1,0 +1,59 @@
+{
+  "source_parents": [
+    "557577e512",
+    "a4d69035be"
+  ],
+  "checks": [
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "soapberry-zip",
+        "--all-features"
+      ],
+      "exit": 0,
+      "seconds": 61.97083445102908,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/zip-integration-v1/check-0.log",
+      "bytes": 57574,
+      "sha256": "4b7a69b13d54b387e500286c5f4492da2b333ccbeb3fa109add40b589717a803"
+    },
+    {
+      "command": [
+        "cargo",
+        "clippy",
+        "--offline",
+        "--locked",
+        "-p",
+        "soapberry-zip",
+        "--all-targets",
+        "--all-features",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0,
+      "seconds": 13.901746227988042,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/zip-integration-v1/check-1.log",
+      "bytes": 989,
+      "sha256": "e04104bc34385365bba8d96f9ba0344771b07170eaeb9de8df007ee30e5a664a"
+    },
+    {
+      "command": [
+        "python3",
+        "tools/unified_bench_matrix.py",
+        "--check"
+      ],
+      "exit": 0,
+      "seconds": 2.129288297961466,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/zip-integration-v1/check-2.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "passed": 657,
+  "ignored": 2,
+  "performance": "Classification repair; no native performance claim."
+}
