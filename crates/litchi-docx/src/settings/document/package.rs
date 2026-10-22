@@ -44,7 +44,8 @@ pub(crate) fn extract_document_variables(part: &dyn Part) -> Result<Variables> {
         });
     }
     let xml = litchi_ooxml_common::mce::process_part(part)?;
-    crate::parse_variables(xml.as_ref())
+    let variable_limits = crate::variables::raw::Limits::default();
+    crate::parse_variables(xml.as_ref(), &variable_limits)
 }
 
 impl DocumentSettings {

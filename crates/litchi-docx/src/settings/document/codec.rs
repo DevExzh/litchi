@@ -894,12 +894,13 @@ pub(crate) fn patch_mail_merge(
 
 pub(crate) fn patch_document_variables(xml: &[u8], variables: &Variables) -> Result<Vec<u8>> {
     variables.validate()?;
-    Variables::from_xml(xml)?;
+    let variable_limits = crate::variables::raw::Limits::default();
+    Variables::from_xml(xml, &variable_limits)?;
     let layout = scan_settings_xml_layout(xml)?;
     let replacement = if variables.is_empty() {
         String::new()
     } else {
-        document_variables_element(&layout, variables)
+        document_variables_element(&layout, variables)?
     };
 
     if let Some(range) = layout.doc_vars_range {
@@ -1397,7 +1398,7 @@ fn is_after_doc_vars(local_name: &[u8]) -> bool {
     )
 }
 
-fn document_variables_element(layout: &SettingsXmlLayout, variables: &Variables) -> String {
+fn document_variables_element(layout: &SettingsXmlLayout, variables: &Variables) -> Result<String> {
     let prefix = layout
         .word_prefix
         .as_deref()
@@ -1415,9 +1416,10 @@ fn document_variables_element(layout: &SettingsXmlLayout, variables: &Variables)
         ));
     }
     output.push('>');
-    variables.write_entries(&mut output, &prefix);
+    let variable_limits = crate::variables::raw::Limits::default();
+    variables.write_entries(&mut output, &prefix, &variable_limits)?;
     output.push_str(&format!("</{prefix}:docVars>"));
-    output
+    Ok(output)
 }
 
 #[allow(

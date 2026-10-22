@@ -321,7 +321,8 @@ fn inspect_settings_source(
 
     // This existing source-policy inspection validates the root dialect and
     // the direct protection markers without creating a projected MCE buffer.
-    let source_policy = variables::inspect_source_policy(xml)?;
+    let variable_limits = variables::raw::Limits::default();
+    let source_policy = variables::inspect_source_policy(xml, &variable_limits)?;
     let source_strict = matches!(source_policy.dialect, SettingsDialect::Strict);
     if source_strict != expected_strict {
         return Err(Error::InvalidRelationship(

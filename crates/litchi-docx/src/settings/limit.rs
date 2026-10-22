@@ -9,6 +9,14 @@
 pub enum LimitKind {
     /// Settings XML bytes for document variables.
     DocumentVariableXmlBytes,
+    /// Document-variable XML nesting depth.
+    DocumentVariableDepth,
+    /// Number of document variables.
+    DocumentVariableCount,
+    /// Unicode scalar values in one document-variable name.
+    DocumentVariableNameChars,
+    /// Unicode scalar values in one document-variable value.
+    DocumentVariableValueChars,
     /// Settings extensions.
     Extensions,
     /// Opaque settings extension bytes.
@@ -31,6 +39,10 @@ impl LimitKind {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::DocumentVariableXmlBytes => "settings XML bytes for document variables",
+            Self::DocumentVariableDepth => "document-variable XML depth",
+            Self::DocumentVariableCount => "document-variable count",
+            Self::DocumentVariableNameChars => "document-variable name characters",
+            Self::DocumentVariableValueChars => "document-variable value characters",
             Self::Extensions => "settings extensions",
             Self::OpaqueExtensionBytes => "opaque settings extension bytes",
             Self::OpaqueExtensionDepth => "opaque settings extension depth",
