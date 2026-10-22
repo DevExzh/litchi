@@ -517,18 +517,14 @@ fn inventories_all_relationship_owned_story_kinds_and_redacts_them() {
             .all(|relationship| relationship.wrapper_count() == 1)
     );
 
-    let commit = package
-        .plan_story_hyperlink_redaction(&["https://shared.invalid/"], Mode::Strict)
-        .unwrap()
-        .apply()
+    let edit = package
+        .edit_story_hyperlink_redaction(&["https://shared.invalid/"], Mode::Strict)
         .unwrap();
-    assert_eq!(commit.effect_report().removed_relationships(), 7);
-    assert_eq!(commit.effect_report().unwrapped_hyperlinks(), 7);
+    assert_eq!(edit.effect_report().removed_relationships(), 7);
+    assert_eq!(edit.effect_report().unwrapped_hyperlinks(), 7);
+    let commit = edit.commit().unwrap();
     let mut output = Vec::new();
-    package
-        .apply_story_hyperlink_redaction(&commit.clone().into())
-        .and_then(|committed| committed.package().write_to(&mut output))
-        .unwrap();
+    commit.package().write_to(&mut output).unwrap();
     let reopened = OpcPackage::from_bytes(&output).unwrap();
     for name in [
         "document.xml",
@@ -551,7 +547,7 @@ fn inventories_all_relationship_owned_story_kinds_and_redacts_them() {
 fn duplicate_target_selectors_are_deduplicated_and_missing_targets_are_typed() {
     let package = open(fixture(false));
     let plan = package
-        .plan_story_hyperlink_redaction(
+        .edit_story_hyperlink_redaction(
             &["https://shared.invalid/", "https://shared.invalid/"],
             Mode::Strict,
         )
@@ -560,7 +556,7 @@ fn duplicate_target_selectors_are_deduplicated_and_missing_targets_are_typed() {
     assert_eq!(plan.effect_report().removed_relationships(), 7);
 
     assert!(matches!(
-        package.plan_story_hyperlink_redaction(&["https://missing.invalid/"], Mode::Strict),
+        package.edit_story_hyperlink_redaction(&["https://missing.invalid/"], Mode::Strict),
         Err(Error::InvalidFormat(message)) if message.contains("target is not present")
     ));
 }
@@ -575,40 +571,37 @@ fn empty_relationship_inventory_fails_closed_and_publishes_an_exact_noop() {
     assert!(snapshot.inventory().is_complete());
 
     assert!(matches!(
-        package.plan_story_hyperlink_redaction(&["https://missing.invalid/"], Mode::Strict),
+        package.edit_story_hyperlink_redaction(&["https://missing.invalid/"], Mode::Strict),
         Err(Error::InvalidFormat(message)) if message.contains("target is not present")
     ));
-    let commit = package
-        .plan_story_hyperlink_redaction(&[], Mode::Strict)
-        .unwrap()
-        .apply()
+    let edit = package
+        .edit_story_hyperlink_redaction(&[], Mode::Strict)
         .unwrap();
-    assert!(commit.effect_report().is_noop());
+    assert!(edit.effect_report().is_noop());
+    let commit = edit.commit().unwrap();
+    assert!(commit.patch().is_noop());
     let mut output = Vec::new();
-    package
-        .apply_story_hyperlink_redaction(&commit.clone().into())
-        .and_then(|committed| committed.package().write_to(&mut output))
-        .unwrap();
+    commit.package().write_to(&mut output).unwrap();
     assert_eq!(output, bytes);
 }
 
 #[test]
-fn stale_and_foreign_commits_fail_before_output() {
+fn stale_commits_fail_and_matching_sources_replay_before_output() {
     let source = Arc::new(VersionedSource {
         bytes: fixture(false),
         revision: AtomicU64::new(0),
     });
     let package = source_backed::Package::from_read_at(source.clone()).unwrap();
     let commit = package
-        .plan_story_hyperlink_redaction(&["https://shared.invalid/"], Mode::Strict)
+        .edit_story_hyperlink_redaction(&["https://shared.invalid/"], Mode::Strict)
         .unwrap()
-        .apply()
+        .commit()
         .unwrap();
     source.revision.fetch_add(1, Ordering::SeqCst);
     let mut output = Vec::new();
     assert!(matches!(
         package
-            .apply_story_hyperlink_redaction(&commit.clone().into())
+            .apply_story_hyperlink_redaction(commit.patch())
             .and_then(|committed| committed.package().write_to(&mut output)),
         Err(Error::Opc(litchi_opc::OpcError::SourceChanged { .. }))
             | Err(Error::ExternalHyperlinkRedactionConflict)
@@ -619,18 +612,16 @@ fn stale_and_foreign_commits_fail_before_output() {
     let first = open(bytes.clone());
     let second = open(bytes);
     let commit = first
-        .plan_story_hyperlink_redaction(&["https://shared.invalid/"], Mode::Strict)
+        .edit_story_hyperlink_redaction(&["https://shared.invalid/"], Mode::Strict)
         .unwrap()
-        .apply()
+        .commit()
         .unwrap();
     let mut output = Vec::new();
-    assert!(matches!(
-        second
-            .apply_story_hyperlink_redaction(&commit.clone().into())
-            .and_then(|committed| committed.package().write_to(&mut output)),
-        Err(Error::ExternalHyperlinkRedactionConflict)
-    ));
-    assert!(output.is_empty());
+    second
+        .apply_story_hyperlink_redaction(commit.patch())
+        .and_then(|committed| committed.package().write_to(&mut output))
+        .unwrap();
+    assert!(!output.is_empty());
 }
 
 #[test]
@@ -644,7 +635,7 @@ fn redaction_limits_cover_selected_relationships_and_changed_stories() {
             .with_semantic_limits(
                 litchi_docx::SemanticLimits::default().story_hyperlinks(selected_limit)
             )
-            .plan_story_hyperlink_redaction(&["https://shared.invalid/"], Mode::Strict),
+            .edit_story_hyperlink_redaction(&["https://shared.invalid/"], Mode::Strict),
         Err(Error::ExternalHyperlinkRedactionLimit {
             kind: litchi_docx::redact::LimitKind::SelectedStoryHyperlinkRelationships,
             maximum: 6,
@@ -660,7 +651,7 @@ fn redaction_limits_cover_selected_relationships_and_changed_stories() {
             .with_semantic_limits(
                 litchi_docx::SemanticLimits::default().story_hyperlinks(changed_story_limit)
             )
-            .plan_story_hyperlink_redaction(&["https://shared.invalid/"], Mode::Strict),
+            .edit_story_hyperlink_redaction(&["https://shared.invalid/"], Mode::Strict),
         Err(Error::ExternalHyperlinkRedactionLimit {
             kind: litchi_docx::redact::LimitKind::ChangedStoryParts,
             maximum: 6,
@@ -673,17 +664,14 @@ fn redaction_limits_cover_selected_relationships_and_changed_stories() {
 fn exact_noop_copies_source_and_strict_fields_refuse_before_output() {
     let bytes = fixture(false);
     let package = open(bytes.clone());
-    let commit = package
-        .plan_story_hyperlink_redaction(&[], Mode::Strict)
-        .unwrap()
-        .apply()
+    let edit = package
+        .edit_story_hyperlink_redaction(&[], Mode::Strict)
         .unwrap();
-    assert!(commit.effect_report().is_noop());
+    assert!(edit.effect_report().is_noop());
+    let commit = edit.commit().unwrap();
+    assert!(commit.patch().is_noop());
     let mut output = Vec::new();
-    package
-        .apply_story_hyperlink_redaction(&commit.clone().into())
-        .and_then(|committed| committed.package().write_to(&mut output))
-        .unwrap();
+    commit.package().write_to(&mut output).unwrap();
     assert_eq!(output, bytes);
 
     let field = open(fixture(true));
@@ -696,7 +684,7 @@ fn exact_noop_copies_source_and_strict_fields_refuse_before_output() {
     );
     assert!(
         field
-            .plan_story_hyperlink_redaction(&["https://shared.invalid/"], Mode::Strict)
+            .edit_story_hyperlink_redaction(&["https://shared.invalid/"], Mode::Strict)
             .is_err()
     );
 }
@@ -713,7 +701,7 @@ fn nested_story_owner_is_inventory_diagnostic_and_strict_refusal() {
     );
     assert!(
         package
-            .plan_story_hyperlink_redaction(&["https://shared.invalid/"], Mode::Strict)
+            .edit_story_hyperlink_redaction(&["https://shared.invalid/"], Mode::Strict)
             .is_err()
     );
 }
@@ -838,7 +826,7 @@ fn mixed_strict_child_qname_is_rejected_and_root_signature_is_diagnosed() {
     );
     assert!(
         signed
-            .plan_story_hyperlink_redaction(&["https://shared.invalid/"], Mode::Strict)
+            .edit_story_hyperlink_redaction(&["https://shared.invalid/"], Mode::Strict)
             .is_err()
     );
 }
@@ -869,63 +857,53 @@ fn late_custom_inbound_story_owner_is_diagnosed_and_refused() {
     );
     assert!(
         package
-            .plan_story_hyperlink_redaction(&["https://shared.invalid/"], Mode::Strict)
+            .edit_story_hyperlink_redaction(&["https://shared.invalid/"], Mode::Strict)
             .is_err()
     );
 }
 
 #[test]
-fn foreign_identical_source_lineage_cannot_publish_a_noop_commit() {
+fn matching_source_lineage_can_publish_a_noop_commit() {
     let bytes = fixture(false);
     let first = open(bytes.clone());
     let second = open(bytes);
     let commit = first
-        .plan_story_hyperlink_redaction(&[], Mode::Strict)
+        .edit_story_hyperlink_redaction(&[], Mode::Strict)
         .unwrap()
-        .apply()
+        .commit()
         .unwrap();
     let mut output = Vec::new();
-    assert!(
-        second
-            .apply_story_hyperlink_redaction(&commit.clone().into())
-            .and_then(|committed| committed.package().write_to(&mut output))
-            .is_err()
-    );
-    assert!(output.is_empty());
+    second
+        .apply_story_hyperlink_redaction(commit.patch())
+        .and_then(|committed| committed.package().write_to(&mut output))
+        .unwrap();
+    assert_eq!(output, fixture(false));
 }
 
 #[test]
 fn empty_selector_copies_signed_source_exactly_despite_security_diagnostics() {
     let bytes = package_signature_fixture();
     let package = open(bytes.clone());
-    let commit = package
-        .plan_story_hyperlink_redaction(&[], Mode::Strict)
-        .unwrap()
-        .apply()
+    let edit = package
+        .edit_story_hyperlink_redaction(&[], Mode::Strict)
         .unwrap();
-    assert!(commit.effect_report().is_noop());
-    assert!(!commit.report().is_complete());
+    assert!(edit.effect_report().is_noop());
+    assert!(!edit.report().is_complete());
+    let commit = edit.commit().unwrap();
     let mut output = Vec::new();
-    package
-        .apply_story_hyperlink_redaction(&commit.clone().into())
-        .and_then(|committed| committed.package().write_to(&mut output))
-        .unwrap();
+    commit.package().write_to(&mut output).unwrap();
     assert_eq!(output, bytes);
 
     let bytes = protected_fixture();
     let package = open(bytes.clone());
-    let commit = package
-        .plan_story_hyperlink_redaction(&[], Mode::Strict)
-        .unwrap()
-        .apply()
+    let edit = package
+        .edit_story_hyperlink_redaction(&[], Mode::Strict)
         .unwrap();
-    assert!(commit.effect_report().is_noop());
-    assert!(!commit.report().is_complete());
+    assert!(edit.effect_report().is_noop());
+    assert!(!edit.report().is_complete());
+    let commit = edit.commit().unwrap();
     let mut output = Vec::new();
-    package
-        .apply_story_hyperlink_redaction(&commit.clone().into())
-        .and_then(|committed| committed.package().write_to(&mut output))
-        .unwrap();
+    commit.package().write_to(&mut output).unwrap();
     assert_eq!(output, bytes);
 }
 
@@ -934,21 +912,18 @@ fn signed_exact_noop_is_byte_exact_and_changed_plan_has_empty_output() {
     let bytes = package_signature_fixture();
     let package = open(bytes.clone());
     let commit = package
-        .plan_story_hyperlink_redaction(&[], Mode::Strict)
+        .edit_story_hyperlink_redaction(&[], Mode::Strict)
         .unwrap()
-        .apply()
+        .commit()
         .unwrap();
     let mut output = Vec::new();
-    package
-        .apply_story_hyperlink_redaction(&commit.clone().into())
-        .and_then(|committed| committed.package().write_to(&mut output))
-        .unwrap();
+    commit.package().write_to(&mut output).unwrap();
     assert_eq!(output, bytes);
 
     let package = open(package_signature_fixture());
     let output = Vec::<u8>::new();
     assert!(matches!(
-        package.plan_story_hyperlink_redaction(&["https://shared.invalid/"], Mode::Strict),
+        package.edit_story_hyperlink_redaction(&["https://shared.invalid/"], Mode::Strict),
         Err(Error::Refused(_))
     ));
     assert!(output.is_empty());
@@ -978,7 +953,7 @@ fn untyped_non_part_security_surfaces_are_diagnosed_and_refused() {
     );
     assert!(
         package
-            .plan_story_hyperlink_redaction(&["https://untyped.invalid/"], Mode::Strict)
+            .edit_story_hyperlink_redaction(&["https://untyped.invalid/"], Mode::Strict)
             .is_err()
     );
 }
@@ -1000,7 +975,7 @@ fn root_level_embeddings_non_part_is_diagnosed_and_refused() {
     );
     assert!(
         package
-            .plan_story_hyperlink_redaction(&["https://untyped.invalid/"], Mode::Strict)
+            .edit_story_hyperlink_redaction(&["https://untyped.invalid/"], Mode::Strict)
             .is_err()
     );
 }
@@ -1022,7 +997,7 @@ fn root_level_activex_non_part_is_diagnosed_and_refused() {
     );
     assert!(
         package
-            .plan_story_hyperlink_redaction(&["https://untyped.invalid/"], Mode::Strict)
+            .edit_story_hyperlink_redaction(&["https://untyped.invalid/"], Mode::Strict)
             .is_err()
     );
 }

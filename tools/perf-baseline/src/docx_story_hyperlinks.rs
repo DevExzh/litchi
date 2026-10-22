@@ -9,6 +9,7 @@
 use super::{Case, CaseResult, Corpus as BaseCorpus, CorpusManifest, SourceSummary};
 use litchi_core::{OwnedSource, ReadAt};
 use litchi_docx::source_backed;
+use litchi_docx::story_hyperlinks::Mode;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter, Part, TargetMode};
 use serde::Serialize;
@@ -427,16 +428,16 @@ fn prepare(corpus: &Corpus) -> Result<Prepared, Box<dyn std::error::Error>> {
         return Err("DOCX story hyperlink selector guards are not verified".into());
     }
 
-    let commit = plan.apply()?;
+    let commit = package
+        .edit_story_hyperlink_redaction(&[target], Mode::Strict)?
+        .commit()?;
     let mut output = Vec::new();
     reserve_exact(
         &mut output,
         corpus.base.archive.len(),
         "DOCX story hyperlink output",
     )?;
-    package
-        .apply_story_hyperlink_redaction(&commit.clone().into())
-        .and_then(|committed| committed.package().write_to(&mut output))?;
+    commit.package().write_to(&mut output)?;
     let output_sha256 = super::sha256_hex(&output);
     let output_parts_verified = verify_output_parts(&output)?;
     let output_package = source_package(owned_source(&output)?)?;
@@ -458,12 +459,10 @@ fn prepare(corpus: &Corpus) -> Result<Prepared, Box<dyn std::error::Error>> {
         "DOCX repeated story hyperlink output",
     )?;
     let second_package = source_package(owned_source(&corpus.base.archive)?)?;
-    let second_snapshot = second_package.story_hyperlinks_only_snapshot()?;
-    let second_plan = second_snapshot.plan_target_urls(&[target])?;
-    let second_commit = second_plan.apply()?;
-    second_package
-        .apply_story_hyperlink_redaction(&second_commit.clone().into())
-        .and_then(|committed| committed.package().write_to(&mut second_output))?;
+    let second_commit = second_package
+        .edit_story_hyperlink_redaction(&[target], Mode::Strict)?
+        .commit()?;
+    second_commit.package().write_to(&mut second_output)?;
     let deterministic_output_verified = second_output == output;
     let publication_verified = output_inventory_verified
         && output_relationships_verified

@@ -16,10 +16,10 @@ use crate::story_hyperlinks::{self as record, EffectReport, Mode, Report};
 /// The sealed forward redaction, or its inverse.
 #[derive(Clone)]
 pub(crate) enum StoryRedactionChange {
-    Forward(Arc<record::Commit>),
+    Forward(Arc<record::ForwardOnlyPatch>),
     Inverse {
         noop: bool,
-        forward: Arc<record::Commit>,
+        forward: Arc<record::ForwardOnlyPatch>,
     },
 }
 
@@ -28,16 +28,16 @@ impl Change for StoryRedactionChange {
 
     fn is_noop(&self) -> bool {
         match self {
-            Self::Forward(commit) => commit.effect_report().is_noop(),
+            Self::Forward(patch) => patch.effect_report().is_noop(),
             Self::Inverse { noop, .. } => *noop,
         }
     }
 
     fn inverse(&self) -> Self {
         match self {
-            Self::Forward(commit) => Self::Inverse {
-                noop: commit.effect_report().is_noop(),
-                forward: Arc::clone(commit),
+            Self::Forward(patch) => Self::Inverse {
+                noop: patch.effect_report().is_noop(),
+                forward: Arc::clone(patch),
             },
             Self::Inverse { forward, .. } => Self::Forward(Arc::clone(forward)),
         }
@@ -45,15 +45,14 @@ impl Change for StoryRedactionChange {
 
     fn publish(&self, package: &Package) -> Result<Package> {
         match self {
-            Self::Forward(commit) => {
-                package.story_hyperlink_redaction_admit(commit)?;
-                if commit.effect_report().is_noop() {
+            Self::Forward(patch) => {
+                package.story_hyperlink_redaction_admit(patch)?;
+                if patch.effect_report().is_noop() {
                     return Ok(package.clone());
                 }
                 let base = package.clone();
-                let commit = Arc::clone(commit);
-                package
-                    .deferred(move |writer| base.write_story_hyperlink_redaction(writer, &commit))
+                let patch = Arc::clone(patch);
+                package.deferred(move |writer| base.write_story_hyperlink_redaction(writer, &patch))
             },
             Self::Inverse { noop: true, .. } => Ok(package.clone()),
             Self::Inverse { .. } => Err(crate::Error::ExternalHyperlinkRedactionConflict),
@@ -63,11 +62,11 @@ impl Change for StoryRedactionChange {
 
 source_family!("story-hyperlink redaction", StoryRedactionChange);
 
-impl From<record::Commit> for Patch {
+impl From<record::ForwardOnlyPatch> for Patch {
     /// Replay a sealed record commit onto the exact source it was planned on.
-    fn from(commit: record::Commit) -> Self {
+    fn from(patch: record::ForwardOnlyPatch) -> Self {
         Self {
-            change: StoryRedactionChange::Forward(Arc::new(commit)),
+            change: StoryRedactionChange::Forward(Arc::new(patch)),
             restore: None,
         }
     }
@@ -116,10 +115,10 @@ impl Edit {
     ///
     /// Returns the redaction, source, protection or signature errors.
     pub fn commit(self) -> Result<Commit> {
-        let commit = self.plan.apply()?;
+        let patch = self.plan.apply()?;
         commit_change(
             &self.package,
-            StoryRedactionChange::Forward(Arc::new(commit)),
+            StoryRedactionChange::Forward(Arc::new(patch)),
         )
     }
 }

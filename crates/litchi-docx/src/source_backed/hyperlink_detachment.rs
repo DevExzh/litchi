@@ -89,7 +89,7 @@ impl Edit {
     /// Returns an error when the rewrite would change visible text or keep a
     /// selected wrapper, and the source, protection or signature errors.
     pub fn commit(self) -> Result<Commit> {
-        let patch = self.plan.apply()?.patch().clone();
+        let patch = self.plan.apply()?;
         commit_change(&self.package, DetachmentChange(patch))
     }
 }

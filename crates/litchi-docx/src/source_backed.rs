@@ -1579,7 +1579,7 @@ impl Package {
     /// document and return the main part (record 0355a).
     pub(crate) fn external_hyperlink_redaction_target(
         &self,
-        commit: &redact::Commit,
+        patch: &redact::IrreversibleRedactionPatch,
     ) -> Result<PackURI> {
         self.trim_clean_paragraph_index_for_operation();
         let main = self
@@ -1587,9 +1587,8 @@ impl Package {
             .main_document_part()?
             .partname()
             .clone();
-        let current =
-            self.external_hyperlink_redaction_snapshot_bounded(commit.patch().limits())?;
-        commit.patch().validate_source(&current)?;
+        let current = self.external_hyperlink_redaction_snapshot_bounded(patch.limits())?;
+        patch.validate_source(&current)?;
         Ok(main)
     }
 
@@ -1599,9 +1598,9 @@ impl Package {
         &self,
         writer: &mut dyn Write,
         main: &PackURI,
-        commit: &redact::Commit,
+        patch: &redact::IrreversibleRedactionPatch,
     ) -> Result<()> {
-        let (replacement, removed_ids) = redact::publication_parts(commit);
+        let (replacement, removed_ids) = redact::publication_parts(patch);
         self.physical_package()?
             .clone()
             .write_part_overlay_with_external_relationship_removals_to_stream(
@@ -1664,13 +1663,11 @@ impl Package {
     /// 0355a).
     pub(crate) fn story_hyperlink_redaction_admit(
         &self,
-        commit: &crate::story_hyperlinks::Commit,
+        patch: &crate::story_hyperlinks::ForwardOnlyPatch,
     ) -> Result<()> {
         self.trim_clean_paragraph_index_for_operation();
         self.physical_package()?.check_execution()?;
-        commit
-            .patch()
-            .validate_source_identity(self.physical_package()?)
+        patch.validate_source_identity(self.physical_package()?)
     }
 
     /// Write this package with a story-hyperlink redaction's story
@@ -1678,9 +1675,9 @@ impl Package {
     pub(crate) fn write_story_hyperlink_redaction(
         &self,
         writer: &mut dyn Write,
-        commit: &crate::story_hyperlinks::Commit,
+        patch: &crate::story_hyperlinks::ForwardOnlyPatch,
     ) -> Result<()> {
-        let parts = crate::story_hyperlinks::publication_parts(commit)?;
+        let parts = crate::story_hyperlinks::publication_parts(patch)?;
         self.physical_package()?
             .clone()
             .write_part_overlays_with_external_relationship_removals_to_stream(writer, parts)?;

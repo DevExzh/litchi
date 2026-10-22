@@ -239,7 +239,7 @@ impl StoryInfo {
 }
 
 /// One external hyperlink relationship owned by a Word story.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct ExternalHyperlinkRelationship {
     part_name: String,
     kind: StoryKind,
@@ -277,6 +277,19 @@ impl ExternalHyperlinkRelationship {
     #[must_use]
     pub const fn wrapper_count(&self) -> usize {
         self.wrapper_count
+    }
+}
+
+impl std::fmt::Debug for ExternalHyperlinkRelationship {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("ExternalHyperlinkRelationship")
+            .field("part_name", &self.part_name)
+            .field("kind", &self.kind)
+            .field("relationship_id_bytes", &self.relationship_id.len())
+            .field("target_url_bytes", &self.target_url.len())
+            .field("wrapper_count", &self.wrapper_count)
+            .finish_non_exhaustive()
     }
 }
 
@@ -441,7 +454,7 @@ struct StoryOwnerSource {
 }
 
 /// Exact source-bound story inventory.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Snapshot {
     source_version: SourceVersion,
     source_lineage: SourceLineage,
@@ -625,9 +638,7 @@ impl Snapshot {
                 })
                 .is_ok();
             if !present {
-                return Err(invalid(format!(
-                    "story hyperlink target is not present: {target}"
-                )));
+                return Err(invalid("story hyperlink target is not present"));
             }
         }
         if removed_relationships > self.limits.max_selected_relationships {
@@ -668,7 +679,7 @@ struct StorySelection {
 }
 
 /// Non-mutating source-bound redaction plan.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Plan {
     source: Snapshot,
     selections: Vec<StorySelection>,
@@ -689,7 +700,7 @@ impl Plan {
     }
 
     /// Apply the plan and seal a forward-only commit.
-    pub fn apply(self) -> Result<Commit> {
+    pub fn apply(self) -> Result<ForwardOnlyPatch> {
         if !self.selections.is_empty()
             && self.report.mode == Mode::BestEffort
             && !self.report.is_complete()
@@ -805,51 +816,41 @@ impl Plan {
                 removed_ids,
             });
         }
-        Ok(Commit {
-            patch: ForwardOnlyPatch {
-                source: self.source,
-                replacements: Arc::new(replacements),
-                report: self.report.clone(),
-            },
+        Ok(ForwardOnlyPatch {
+            source: self.source,
+            replacements: Arc::new(replacements),
+            report: self.report.clone(),
         })
     }
 }
 
-/// Successful forward-only story redaction.
-#[derive(Clone, Debug)]
-pub struct Commit {
-    patch: ForwardOnlyPatch,
-}
-
-impl Commit {
-    /// Deterministic effects applied by this commit.
-    #[must_use]
-    pub const fn effect_report(&self) -> EffectReport {
-        self.patch.report.effect
-    }
-
-    /// Borrow the explicit report, including incomplete diagnostics.
-    #[must_use]
-    pub const fn report(&self) -> &Report {
-        &self.patch.report
-    }
-
-    /// Borrow the sealed forward-only patch for the source-backed publisher.
-    #[must_use]
-    pub(crate) const fn patch(&self) -> &ForwardOnlyPatch {
-        &self.patch
-    }
-}
-
-/// Private source/artifact-bound forward-only patch.
-#[derive(Clone, Debug)]
-pub(crate) struct ForwardOnlyPatch {
+/// Source/artifact-bound forward-only raw patch.
+#[derive(Clone)]
+pub struct ForwardOnlyPatch {
     source: Snapshot,
     replacements: Arc<Vec<StoryReplacement>>,
     report: Report,
 }
 
 impl ForwardOnlyPatch {
+    /// Deterministic effects captured by this patch.
+    #[must_use]
+    pub const fn effect_report(&self) -> EffectReport {
+        self.report.effect
+    }
+
+    /// Borrow the completeness report, including explicit diagnostics.
+    #[must_use]
+    pub const fn report(&self) -> &Report {
+        &self.report
+    }
+
+    /// Whether this patch removes no wrappers or relationships.
+    #[must_use]
+    pub const fn is_noop(&self) -> bool {
+        self.report.effect.is_noop()
+    }
+
     pub(crate) fn validate_source_identity(&self, package: &SourceBackedPackage) -> Result<()> {
         package.check_execution()?;
         let current_version = package.source_version()?;
@@ -874,6 +875,17 @@ impl ForwardOnlyPatch {
         package.check_execution()?;
         Ok(())
     }
+
+    fn validate_snapshot(&self, snapshot: &Snapshot) -> Result<()> {
+        if self.source.source_version == snapshot.source_version
+            && self.source.source_lineage == snapshot.source_lineage
+            && self.source.source_fingerprint == snapshot.source_fingerprint
+        {
+            Ok(())
+        } else {
+            Err(Error::ExternalHyperlinkRedactionConflict)
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -883,15 +895,17 @@ struct StoryReplacement {
     removed_ids: Vec<String>,
 }
 
-pub(crate) fn publication_parts(commit: &Commit) -> Result<Vec<(PackURI, Vec<u8>, Vec<String>)>> {
+pub(crate) fn publication_parts(
+    patch: &ForwardOnlyPatch,
+) -> Result<Vec<(PackURI, Vec<u8>, Vec<String>)>> {
     let mut parts = Vec::new();
     parts
-        .try_reserve_exact(commit.patch.replacements.len())
+        .try_reserve_exact(patch.replacements.len())
         .map_err(|source| Error::Allocation {
             resource: "story hyperlink publication parts",
             source,
         })?;
-    for replacement in commit.patch.replacements.iter() {
+    for replacement in patch.replacements.iter() {
         let mut xml = Vec::new();
         xml.try_reserve_exact(replacement.xml.len())
             .map_err(|source| Error::Allocation {
@@ -914,6 +928,194 @@ pub(crate) fn publication_parts(commit: &Commit) -> Result<Vec<(PackURI, Vec<u8>
         parts.push((clone_uri(&replacement.part)?, xml, ids));
     }
     Ok(parts)
+}
+
+impl std::fmt::Debug for Snapshot {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("Snapshot")
+            .field("stories", &self.stories.len())
+            .field("relationships", &self.inventory.relationships().len())
+            .field("diagnostics", &self.inventory.diagnostics().len())
+            .finish_non_exhaustive()
+    }
+}
+
+impl std::fmt::Debug for Plan {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("Plan")
+            .field("effect_report", &self.effect_report())
+            .field("mode", &self.report.mode())
+            .finish_non_exhaustive()
+    }
+}
+
+impl std::fmt::Debug for ForwardOnlyPatch {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("ForwardOnlyPatch")
+            .field("noop", &self.is_noop())
+            .field("effect_report", &self.effect_report())
+            .field("changed_stories", &self.replacements.len())
+            .finish_non_exhaustive()
+    }
+}
+
+/// Standalone bounded story-overlay codec.
+pub mod raw {
+    use super::{Error, ForwardOnlyPatch, Limits, Mode, Plan, Result, Snapshot};
+    use litchi_opc::PackURI;
+
+    /// One story replacement and its relationship removals.
+    #[derive(Clone)]
+    pub struct Part {
+        name: PackURI,
+        xml: Vec<u8>,
+        removed_relationship_ids: Vec<String>,
+    }
+
+    impl Part {
+        /// Story part name.
+        #[must_use]
+        pub const fn name(&self) -> &PackURI {
+            &self.name
+        }
+
+        /// Current story XML bytes.
+        #[must_use]
+        pub fn xml(&self) -> &[u8] {
+            &self.xml
+        }
+
+        /// Relationship IDs removed from this story by the patch.
+        #[must_use]
+        pub fn removed_relationship_ids(&self) -> &[String] {
+            &self.removed_relationship_ids
+        }
+    }
+
+    impl std::fmt::Debug for Part {
+        fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            formatter
+                .debug_struct("Part")
+                .field("name", &self.name)
+                .field("xml_bytes", &self.xml.len())
+                .field(
+                    "removed_relationships",
+                    &self.removed_relationship_ids.len(),
+                )
+                .finish_non_exhaustive()
+        }
+    }
+
+    /// Mutable bounded raw story overlay state.
+    #[derive(Clone)]
+    pub struct Codec {
+        snapshot: Snapshot,
+        parts: Vec<Part>,
+        applied: bool,
+        limits: Limits,
+    }
+
+    impl std::fmt::Debug for Codec {
+        fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            formatter
+                .debug_struct("Codec")
+                .field("stories", &self.parts.len())
+                .field("applied", &self.applied)
+                .finish_non_exhaustive()
+        }
+    }
+
+    impl Codec {
+        /// Adopt an inventory snapshot under the required finite policy.
+        pub fn from_snapshot(snapshot: Snapshot, limits: Limits) -> Result<Self> {
+            if snapshot.limits() != limits {
+                return Err(super::invalid(
+                    "raw story hyperlink limits do not match the snapshot",
+                ));
+            }
+            let mut parts = Vec::new();
+            parts
+                .try_reserve_exact(snapshot.stories.len())
+                .map_err(|source| Error::Allocation {
+                    resource: "raw story hyperlink codec parts",
+                    source,
+                })?;
+            for story in snapshot.stories.iter() {
+                let mut xml = Vec::new();
+                xml.try_reserve_exact(story.xml.as_bytes().len())
+                    .map_err(|source| Error::Allocation {
+                        resource: "raw story hyperlink codec XML",
+                        source,
+                    })?;
+                xml.extend_from_slice(story.xml.as_bytes());
+                parts.push(Part {
+                    name: story.part.clone(),
+                    xml,
+                    removed_relationship_ids: Vec::new(),
+                });
+            }
+            Ok(Self {
+                snapshot,
+                parts,
+                applied: false,
+                limits,
+            })
+        }
+
+        /// Borrow the original inventory snapshot.
+        #[must_use]
+        pub const fn snapshot(&self) -> &Snapshot {
+            &self.snapshot
+        }
+
+        /// Borrow all current story outputs in package order.
+        #[must_use]
+        pub fn parts(&self) -> &[Part] {
+            &self.parts
+        }
+
+        /// Build a plan over the original source closure.
+        pub fn plan(&self, target_urls: &[&str], mode: Mode) -> Result<Plan> {
+            self.snapshot.plan_target_urls_with_mode(target_urls, mode)
+        }
+
+        /// Apply one forward-only patch to the mutable raw output.
+        pub fn apply(&mut self, patch: &ForwardOnlyPatch) -> Result<()> {
+            if self.applied {
+                return Err(super::invalid(
+                    "raw story hyperlink codec accepts one forward patch",
+                ));
+            }
+            patch.validate_snapshot(&self.snapshot)?;
+            for replacement in patch.replacements.iter() {
+                let part = self
+                    .parts
+                    .iter_mut()
+                    .find(|part| part.name == replacement.part)
+                    .ok_or(Error::ExternalHyperlinkRedactionConflict)?;
+                part.xml = replacement.xml.as_ref().clone();
+                part.removed_relationship_ids = replacement.removed_ids.clone();
+            }
+            self.applied = true;
+            Ok(())
+        }
+
+        /// Plan and apply one forward-only story redaction.
+        pub fn redact(&mut self, target_urls: &[&str], mode: Mode) -> Result<ForwardOnlyPatch> {
+            let patch = self.plan(target_urls, mode)?.apply()?;
+            self.apply(&patch)?;
+            Ok(patch)
+        }
+
+        /// Bounds retained by this raw codec.
+        #[must_use]
+        pub const fn limits(&self) -> Limits {
+            self.limits
+        }
+    }
 }
 
 #[cfg(test)]
