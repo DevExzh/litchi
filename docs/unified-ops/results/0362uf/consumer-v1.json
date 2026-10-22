@@ -1,0 +1,24 @@
+{
+  "source": "d98a99f2dd3a3fd46dad1c31dcfffd746c237214",
+  "checks": [
+    {
+      "command": [
+        "cargo",
+        "check",
+        "--offline",
+        "--locked",
+        "--workspace",
+        "--all-targets",
+        "--all-features"
+      ],
+      "exit": 101,
+      "seconds": 5.2681328360922635,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/api-assembly-consumers-v1/check-0.log",
+      "bytes": 276,
+      "sha256": "d87f847102ad06f8bd586b06457d5a500770488479de9c805352a179f9426c2a",
+      "target_bytes_before": 18982781886,
+      "completed_test_executables_pruned": []
+    }
+  ],
+  "note": "Stopped before compilation; generated workspace lock plus tracked harness dependency edge refreshed offline."
+}
