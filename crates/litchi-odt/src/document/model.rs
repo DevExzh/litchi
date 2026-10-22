@@ -2,7 +2,7 @@
 
 use crate::core::{Content, Meta, OwnedPackage, Styles};
 use crate::elements::style::StyleRegistry;
-use litchi_odf_common::leniency::ToleranceReport;
+use litchi_odf_common::{XmlStreamLimits, leniency::ToleranceReport};
 use std::sync::Arc;
 
 /// The read-only semantic projection of an `OpenDocument` text package.
@@ -30,6 +30,8 @@ pub(crate) struct State {
     pub(crate) style_registry: StyleRegistry,
     /// Repairs tolerated while the package was opened.
     pub(crate) tolerance: ToleranceReport,
+    /// The caller-selected raw XML policy retained for reparses and edits.
+    pub(crate) xml_limits: XmlStreamLimits,
     /// The structural body index, built on first use.
     pub(crate) body: std::sync::OnceLock<crate::body::Tree>,
 }

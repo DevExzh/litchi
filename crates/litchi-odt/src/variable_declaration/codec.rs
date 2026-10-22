@@ -1,12 +1,14 @@
 //! XML codec and lossless mutation for ODF variable declarations.
 
+#![cfg_attr(test, allow(dead_code))]
+
 use super::{
     Body, DateValue, Declaration, Declarations, Group, HeaderFooter, Kind, MAX_AGGREGATE_BYTES,
     MAX_DECLARATIONS, MAX_DEPTH, MAX_GROUPS, MAX_NAME_BYTES, MAX_VALUE_BYTES, MAX_XML_BYTES,
     OFFICE, Part, STYLE, Scope, TEXT, Value, ValueType,
 };
-use crate::core::ResolvedReader;
 use crate::core::{AuthoredXmlFragment, OwnedPackage, XmlSourcePart, XmlSplicePublication};
+use crate::core::{ResolvedReader, XmlStreamLimits};
 use crate::datatype::{Boolean, Date};
 use crate::generic::{ChargedXml, FlatMutationBudget, allocate_xml};
 use litchi_core::{Error, Resource, ResourceLimit, Result};
@@ -31,6 +33,24 @@ struct ScopeScan {
     groups: Vec<GroupSpan>,
     first_other_child: Option<usize>,
     empty_parent: Option<EmptyParentSpan>,
+}
+
+pub(super) fn xml_limits_with_policy(policy: XmlStreamLimits) -> Result<XmlStreamLimits> {
+    XmlStreamLimits::new(
+        policy.max_bytes().min(MAX_XML_BYTES as u64),
+        policy.max_depth().min(MAX_DEPTH),
+        policy.max_events().min(4_000_000),
+        policy.max_attributes().min(1_000_000),
+        policy.max_token_bytes().min(MAX_VALUE_BYTES),
+    )?
+    .namespace_limits(
+        policy.max_namespace_scope_depth().min(MAX_DEPTH),
+        policy.max_namespace_declarations().min(1_000_000),
+        policy.max_namespace_bindings().min(MAX_DECLARATIONS),
+        policy.max_namespace_bytes().min(MAX_VALUE_BYTES),
+        policy.max_namespace_prefix_bytes().min(MAX_VALUE_BYTES),
+        policy.max_namespace_uri_bytes().min(MAX_VALUE_BYTES),
+    )
 }
 
 struct EmptyParentSpan {
@@ -59,6 +79,19 @@ impl Group {
         maximum: usize,
         budget: Option<&FlatMutationBudget>,
     ) -> Result<ChargedXml> {
+        self.to_xml_with_limit_and_budget_and_xml_limits(
+            maximum,
+            budget,
+            XmlStreamLimits::default(),
+        )
+    }
+
+    pub(crate) fn to_xml_with_limit_and_budget_and_xml_limits(
+        &self,
+        maximum: usize,
+        budget: Option<&FlatMutationBudget>,
+        xml_limits: XmlStreamLimits,
+    ) -> Result<ChargedXml> {
         let output_len = group_output_len(self, budget)?;
         bounded_output_len_with_limit(output_len, "variable declaration serialization", maximum)?;
         let (mut xml, memory) =
@@ -69,7 +102,7 @@ impl Group {
         // already charged fragment. Keep that validation scratch under the
         // same caller-selected output ceiling as the emitted fragment and
         // edited document below.
-        validate_serialized_group(self, &xml, maximum, budget)?;
+        validate_serialized_group(self, &xml, maximum, budget, xml_limits)?;
         Ok(ChargedXml { xml, memory })
     }
 }
@@ -83,18 +116,54 @@ pub fn set_xml(xml: &str, group: &Group) -> Result<String> {
     set_xml_with_limit(xml, group, MAX_XML_BYTES)
 }
 
-/// Insert or replace one declaration container under an exact output limit.
-pub(crate) fn set_xml_with_limit(xml: &str, group: &Group, maximum: usize) -> Result<String> {
-    set_xml_with_limit_and_budget(xml, group, maximum, None).map(ChargedXml::into_string)
+pub(crate) fn set_xml_with_xml_limits(
+    xml: &str,
+    group: &Group,
+    xml_limits: XmlStreamLimits,
+) -> Result<String> {
+    set_xml_with_limit_and_xml_limits(xml, group, MAX_XML_BYTES, xml_limits)
 }
 
+/// Insert or replace one declaration container under an exact output limit.
+pub(crate) fn set_xml_with_limit(xml: &str, group: &Group, maximum: usize) -> Result<String> {
+    set_xml_with_limit_and_xml_limits(xml, group, maximum, XmlStreamLimits::default())
+}
+
+pub(crate) fn set_xml_with_limit_and_xml_limits(
+    xml: &str,
+    group: &Group,
+    maximum: usize,
+    xml_limits: XmlStreamLimits,
+) -> Result<String> {
+    set_xml_with_limit_and_budget_and_xml_limits(xml, group, maximum, None, xml_limits)
+        .map(ChargedXml::into_string)
+}
+
+#[cfg(test)]
 pub(crate) fn set_xml_with_limit_and_budget(
     xml: &str,
     group: &Group,
     maximum: usize,
     budget: Option<&FlatMutationBudget>,
 ) -> Result<ChargedXml> {
-    let replacement = group.to_xml_with_limit_and_budget(maximum, budget)?;
+    set_xml_with_limit_and_budget_and_xml_limits(
+        xml,
+        group,
+        maximum,
+        budget,
+        XmlStreamLimits::default(),
+    )
+}
+
+pub(crate) fn set_xml_with_limit_and_budget_and_xml_limits(
+    xml: &str,
+    group: &Group,
+    maximum: usize,
+    budget: Option<&FlatMutationBudget>,
+    xml_limits: XmlStreamLimits,
+) -> Result<ChargedXml> {
+    let replacement =
+        group.to_xml_with_limit_and_budget_and_xml_limits(maximum, budget, xml_limits)?;
     let _scan_memory = budget
         .map(|budget| {
             super::package::parser_memory_plan(&[(xml, Part::Flat)], Some(budget)).and_then(
@@ -102,7 +171,8 @@ pub(crate) fn set_xml_with_limit_and_budget(
             )
         })
         .transpose()?;
-    let scan = scan_scope_with_optional_budget(xml, &group.scope, budget)?;
+    let scan =
+        scan_scope_with_optional_budget_and_xml_limits(xml, &group.scope, budget, xml_limits)?;
     if let Some(parent) = scan.empty_parent.as_ref() {
         return expand_empty_parent_with_limit_and_budget(
             xml,
@@ -144,13 +214,16 @@ pub(crate) fn splice_publication(
     candidate: &str,
     scope: &Scope,
     kind: Kind,
+    xml_limits: XmlStreamLimits,
 ) -> Result<XmlSplicePublication> {
     let source = XmlSourcePart::load(package, path)?;
     let source_xml = std::str::from_utf8(source.bytes()).map_err(|error| {
         Error::InvalidFormat(format!("invalid UTF-8 in source {path}: {error}"))
     })?;
-    let source_scan = scan_scope(source_xml, scope)?;
-    let candidate_scan = scan_scope(candidate, scope)?;
+    let source_scan =
+        scan_scope_with_optional_budget_and_xml_limits(source_xml, scope, None, xml_limits)?;
+    let candidate_scan =
+        scan_scope_with_optional_budget_and_xml_limits(candidate, scope, None, xml_limits)?;
     let source_group = source_scan.groups.iter().find(|group| group.kind == kind);
     let candidate_group = candidate_scan
         .groups
@@ -221,6 +294,15 @@ pub fn remove_xml(xml: &str, scope: &Scope, kind: Kind) -> Result<String> {
     remove_xml_with_limit(xml, scope, kind, MAX_XML_BYTES)
 }
 
+pub(crate) fn remove_xml_with_xml_limits(
+    xml: &str,
+    scope: &Scope,
+    kind: Kind,
+    xml_limits: XmlStreamLimits,
+) -> Result<String> {
+    remove_xml_with_limit_and_xml_limits(xml, scope, kind, MAX_XML_BYTES, xml_limits)
+}
+
 /// Remove one declaration container under an exact output limit.
 pub(crate) fn remove_xml_with_limit(
     xml: &str,
@@ -228,15 +310,45 @@ pub(crate) fn remove_xml_with_limit(
     kind: Kind,
     maximum: usize,
 ) -> Result<String> {
-    remove_xml_with_limit_and_budget(xml, scope, kind, maximum, None).map(ChargedXml::into_string)
+    remove_xml_with_limit_and_xml_limits(xml, scope, kind, maximum, XmlStreamLimits::default())
 }
 
+pub(crate) fn remove_xml_with_limit_and_xml_limits(
+    xml: &str,
+    scope: &Scope,
+    kind: Kind,
+    maximum: usize,
+    xml_limits: XmlStreamLimits,
+) -> Result<String> {
+    remove_xml_with_limit_and_budget_and_xml_limits(xml, scope, kind, maximum, None, xml_limits)
+        .map(ChargedXml::into_string)
+}
+
+#[cfg(test)]
 pub(crate) fn remove_xml_with_limit_and_budget(
     xml: &str,
     scope: &Scope,
     kind: Kind,
     maximum: usize,
     budget: Option<&FlatMutationBudget>,
+) -> Result<ChargedXml> {
+    remove_xml_with_limit_and_budget_and_xml_limits(
+        xml,
+        scope,
+        kind,
+        maximum,
+        budget,
+        XmlStreamLimits::default(),
+    )
+}
+
+pub(crate) fn remove_xml_with_limit_and_budget_and_xml_limits(
+    xml: &str,
+    scope: &Scope,
+    kind: Kind,
+    maximum: usize,
+    budget: Option<&FlatMutationBudget>,
+    xml_limits: XmlStreamLimits,
 ) -> Result<ChargedXml> {
     let _scan_memory = budget
         .map(|budget| {
@@ -245,7 +357,7 @@ pub(crate) fn remove_xml_with_limit_and_budget(
             )
         })
         .transpose()?;
-    let scan = scan_scope_with_optional_budget(xml, scope, budget)?;
+    let scan = scan_scope_with_optional_budget_and_xml_limits(xml, scope, budget, xml_limits)?;
     let existing = scan
         .groups
         .iter()
@@ -570,6 +682,7 @@ fn validate_serialized_group(
     xml: &str,
     maximum: usize,
     budget: Option<&FlatMutationBudget>,
+    xml_limits: XmlStreamLimits,
 ) -> Result<()> {
     let prefix =
         format!(r#"<office:document-content xmlns:office="{OFFICE}"><office:body><office:text>"#);
@@ -601,9 +714,10 @@ fn validate_serialized_group(
     append_budgeted(&mut document, suffix, budget)?;
     let parsed = match budget {
         Some(budget) => {
-            let (parsed, memory) = super::package::parse_parts_with_budget(
+            let (parsed, memory) = super::package::parse_parts_with_budget_and_xml_limits(
                 &[(document.as_str(), group.part)],
                 budget,
+                xml_limits,
             )?;
             // The parsed projection is used only for this consistency check;
             // retain its lease until the owned values are dropped.
@@ -621,7 +735,10 @@ fn validate_serialized_group(
             drop(memory);
             return result;
         },
-        None => super::package::parse_parts(&[(document.as_str(), group.part)])?,
+        None => super::package::parse_parts_with_xml_limits(
+            &[(document.as_str(), group.part)],
+            xml_limits,
+        )?,
     };
     if parsed.groups.len() != 1
         || parsed.groups[0].kind != group.kind
@@ -739,19 +856,16 @@ fn bounded_output_len_with_limit(length: usize, operation: &str, maximum: usize)
     Ok(())
 }
 
-fn scan_scope(xml: &str, scope: &Scope) -> Result<ScopeScan> {
-    scan_scope_with_optional_budget(xml, scope, None)
-}
-
-fn scan_scope_with_optional_budget(
+fn scan_scope_with_optional_budget_and_xml_limits(
     xml: &str,
     scope: &Scope,
     budget: Option<&FlatMutationBudget>,
+    xml_limits: XmlStreamLimits,
 ) -> Result<ScopeScan> {
     if xml.len() > MAX_XML_BYTES {
         return Err(invalid("variable declaration XML exceeds 64 MiB"));
     }
-    let mut reader = ResolvedReader::from_xml(xml);
+    let mut reader = ResolvedReader::from_xml(xml, xml_limits_with_policy(xml_limits)?)?;
     let mut buffer = Vec::new();
     let mut stack = Vec::<Frame>::new();
     let mut depth = 0usize;
@@ -769,7 +883,9 @@ fn scan_scope_with_optional_budget(
         }
         let (resolved, event) = reader
             .read_resolved_event_into(&mut buffer)
-            .map_err(|error| invalid(format!("invalid variable declaration XML: {error}")))?;
+            .map_err(|error| {
+                crate::core::map_resolved_reader_error(error, "invalid variable declaration XML")
+            })?;
         match event {
             Event::Start(ref element) => {
                 let namespace = namespace_uri(&resolved)?;
@@ -1000,8 +1116,9 @@ pub(super) fn parse_part(
     aggregate: &mut usize,
     declaration_count: &mut usize,
     budget: Option<&FlatMutationBudget>,
+    xml_limits: XmlStreamLimits,
 ) -> Result<()> {
-    let mut reader = ResolvedReader::from_xml(xml);
+    let mut reader = ResolvedReader::from_xml(xml, xml_limits)?;
     let mut buffer = Vec::new();
     let mut depth = 0usize;
     let mut stack = Vec::<Frame>::new();
@@ -1013,7 +1130,9 @@ pub(super) fn parse_part(
         }
         let (namespace, event) = reader
             .read_resolved_event_into(&mut buffer)
-            .map_err(|error| invalid(format!("invalid variable declaration XML: {error}")))?;
+            .map_err(|error| {
+                crate::core::map_resolved_reader_error(error, "invalid variable declaration XML")
+            })?;
         match event {
             Event::Start(ref element) => {
                 if pending.is_some() {

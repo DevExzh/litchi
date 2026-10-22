@@ -3,6 +3,7 @@
 use std::{fmt, sync::Arc};
 
 use litchi_core::{Error, Position, Result};
+use litchi_odf_common::XmlStreamLimits;
 use litchi_odf_common::rdf::{Graph, Triple};
 
 use crate::package::Archive;
@@ -12,6 +13,7 @@ use crate::package::Archive;
 pub struct Snapshot {
     source: Arc<[u8]>,
     graphs: Arc<[Graph]>,
+    xml_limits: XmlStreamLimits,
 }
 
 impl fmt::Debug for Snapshot {
@@ -31,13 +33,24 @@ impl Snapshot {
     ///
     /// Returns an error when the package, manifest, or a declared graph is invalid.
     pub fn from_bytes(source: Vec<u8>) -> Result<Self> {
-        Self::from_arc(Arc::from(source))
+        Self::from_bytes_with_xml_limits(source, XmlStreamLimits::owner_default_value())
     }
 
-    fn from_arc(source: Arc<[u8]>) -> Result<Self> {
-        let package = Archive::from_bytes(source.as_ref().to_vec())?;
+    pub(crate) fn from_bytes_with_xml_limits(
+        source: Vec<u8>,
+        xml_limits: XmlStreamLimits,
+    ) -> Result<Self> {
+        Self::from_arc_with_xml_limits(Arc::from(source), xml_limits)
+    }
+
+    fn from_arc_with_xml_limits(source: Arc<[u8]>, xml_limits: XmlStreamLimits) -> Result<Self> {
+        let package = Archive::from_bytes_with_xml_limits(source.as_ref().to_vec(), xml_limits)?;
         let graphs = Arc::from(litchi_odf_common::rdf::graphs(package.package())?);
-        Ok(Self { source, graphs })
+        Ok(Self {
+            source,
+            graphs,
+            xml_limits,
+        })
     }
 
     /// Borrow the exact package bytes captured by this snapshot.
@@ -95,8 +108,8 @@ impl Edit {
         let package = self.package()?;
         let (bytes, path) =
             litchi_odf_common::rdf::add_graph(package.package(), preferred_path, triples)?;
-        validate_authored_xml(&bytes, Some(&path))?;
-        self.candidate = Snapshot::from_bytes(bytes)?;
+        validate_authored_xml(&bytes, Some(&path), self.candidate.xml_limits)?;
+        self.candidate = Snapshot::from_bytes_with_xml_limits(bytes, self.candidate.xml_limits)?;
         Ok(path)
     }
 
@@ -115,8 +128,8 @@ impl Edit {
         }
         let package = self.package()?;
         let bytes = litchi_odf_common::rdf::replace_graph(package.package(), path, triples)?;
-        validate_authored_xml(&bytes, Some(path))?;
-        self.candidate = Snapshot::from_bytes(bytes)?;
+        validate_authored_xml(&bytes, Some(path), self.candidate.xml_limits)?;
+        self.candidate = Snapshot::from_bytes_with_xml_limits(bytes, self.candidate.xml_limits)?;
         Ok(())
     }
 
@@ -128,8 +141,8 @@ impl Edit {
     pub fn remove_graph(&mut self, path: &str) -> Result<()> {
         let package = self.package()?;
         let bytes = litchi_odf_common::rdf::remove_graph(package.package(), path)?;
-        validate_authored_xml(&bytes, None)?;
-        self.candidate = Snapshot::from_bytes(bytes)?;
+        validate_authored_xml(&bytes, None, self.candidate.xml_limits)?;
+        self.candidate = Snapshot::from_bytes_with_xml_limits(bytes, self.candidate.xml_limits)?;
         Ok(())
     }
 
@@ -142,8 +155,8 @@ impl Edit {
         self.require_compact_graph(path)?;
         let package = self.package()?;
         let (bytes, index) = litchi_odf_common::rdf::add_triple(package.package(), path, triple)?;
-        validate_authored_xml(&bytes, Some(path))?;
-        self.candidate = Snapshot::from_bytes(bytes)?;
+        validate_authored_xml(&bytes, Some(path), self.candidate.xml_limits)?;
+        self.candidate = Snapshot::from_bytes_with_xml_limits(bytes, self.candidate.xml_limits)?;
         Ok(Position::new(index))
     }
 
@@ -170,8 +183,8 @@ impl Edit {
             position.get(),
             triple,
         )?;
-        validate_authored_xml(&bytes, Some(path))?;
-        self.candidate = Snapshot::from_bytes(bytes)?;
+        validate_authored_xml(&bytes, Some(path), self.candidate.xml_limits)?;
+        self.candidate = Snapshot::from_bytes_with_xml_limits(bytes, self.candidate.xml_limits)?;
         Ok(())
     }
 
@@ -184,8 +197,8 @@ impl Edit {
         self.require_compact_graph(path)?;
         let package = self.package()?;
         let bytes = litchi_odf_common::rdf::remove_triple(package.package(), path, position.get())?;
-        validate_authored_xml(&bytes, Some(path))?;
-        self.candidate = Snapshot::from_bytes(bytes)?;
+        validate_authored_xml(&bytes, Some(path), self.candidate.xml_limits)?;
+        self.candidate = Snapshot::from_bytes_with_xml_limits(bytes, self.candidate.xml_limits)?;
         Ok(())
     }
 
@@ -205,8 +218,8 @@ impl Edit {
         let package = self.package()?;
         let bytes =
             litchi_odf_common::rdf::move_triple(package.package(), path, from.get(), to.get())?;
-        validate_authored_xml(&bytes, Some(path))?;
-        self.candidate = Snapshot::from_bytes(bytes)?;
+        validate_authored_xml(&bytes, Some(path), self.candidate.xml_limits)?;
+        self.candidate = Snapshot::from_bytes_with_xml_limits(bytes, self.candidate.xml_limits)?;
         Ok(())
     }
 
@@ -229,7 +242,10 @@ impl Edit {
     }
 
     fn package(&self) -> Result<Archive> {
-        Archive::from_bytes(self.candidate.source.as_ref().to_vec())
+        Archive::from_bytes_with_xml_limits(
+            self.candidate.source.as_ref().to_vec(),
+            self.candidate.xml_limits,
+        )
     }
 
     fn graph_or_error(&self, path: &str) -> Result<&Graph> {
@@ -290,7 +306,10 @@ impl Patch {
                 "ODS RDF patch source snapshot does not match".to_string(),
             ));
         }
-        let target = Snapshot::from_arc(self.target.clone())?;
+        let target = Snapshot::from_bytes_with_xml_limits(
+            self.target.as_ref().to_vec(),
+            snapshot.xml_limits,
+        )?;
         Ok(Commit {
             snapshot: target,
             patch: self.clone(),
@@ -342,8 +361,12 @@ fn check_position(position: Position, length: usize) -> Result<()> {
     }
 }
 
-fn validate_authored_xml(bytes: &[u8], graph_path: Option<&str>) -> Result<()> {
-    let package = Archive::from_bytes(bytes.to_vec())?;
+fn validate_authored_xml(
+    bytes: &[u8],
+    graph_path: Option<&str>,
+    xml_limits: XmlStreamLimits,
+) -> Result<()> {
+    let package = Archive::from_bytes_with_xml_limits(bytes.to_vec(), xml_limits)?;
     let manifest = package.package().get_file("META-INF/manifest.xml")?;
     litchi_odf_common::compact_xml::validate(
         &manifest,

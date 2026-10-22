@@ -13,6 +13,7 @@
 
 use std::fmt;
 
+use crate::core::XmlStreamLimits;
 use crate::package::ArchiveLimits;
 
 const MIB: u64 = 1024 * 1024;
@@ -39,6 +40,111 @@ pub enum SourceLimitKind {
     MimetypeBytes,
     /// Bytes of the `META-INF/manifest.xml` member.
     ManifestBytes,
+}
+
+/// The bounded raw-XML dimension named by an ODF parser failure.
+///
+/// These dimensions describe parser work and retained namespace state, not
+/// semantic document objects.  In particular, namespace scope depth is kept
+/// separate from declaration count so a deep document cannot be reported as
+/// a declaration overflow.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum RawXmlLimitKind {
+    /// Total XML input bytes admitted to one raw parser.
+    InputBytes,
+    /// Element nesting depth observed by the parser.
+    Depth,
+    /// Number of parser events delivered.
+    Events,
+    /// Aggregate XML attributes observed by the parser.
+    Attributes,
+    /// One lexical token's bytes.
+    TokenBytes,
+    /// Namespace scope frames retained by the resolver.
+    NamespaceScopeDepth,
+    /// Namespace declarations on one element.
+    NamespaceDeclarations,
+    /// Active namespace bindings retained across open scopes.
+    NamespaceBindings,
+    /// Prefix and URI bytes retained by active namespace bindings.
+    NamespaceBytes,
+    /// One namespace prefix's lexical bytes.
+    NamespacePrefixBytes,
+    /// One namespace URI's normalized bytes.
+    NamespaceUriBytes,
+}
+
+impl RawXmlLimitKind {
+    /// Every raw XML dimension in stable display order.
+    pub const ALL: [Self; 11] = [
+        Self::InputBytes,
+        Self::Depth,
+        Self::Events,
+        Self::Attributes,
+        Self::TokenBytes,
+        Self::NamespaceScopeDepth,
+        Self::NamespaceDeclarations,
+        Self::NamespaceBindings,
+        Self::NamespaceBytes,
+        Self::NamespacePrefixBytes,
+        Self::NamespaceUriBytes,
+    ];
+
+    /// The fixed common-core scope used for typed conversion.
+    #[must_use]
+    pub const fn scope(self) -> &'static str {
+        match self {
+            Self::InputBytes => "ODF raw XML input bytes",
+            Self::Depth => "ODF raw XML depth",
+            Self::Events => "ODF raw XML events",
+            Self::Attributes => "ODF raw XML attributes",
+            Self::TokenBytes => "ODF raw XML token bytes",
+            Self::NamespaceScopeDepth => "ODF raw XML namespace scope depth",
+            Self::NamespaceDeclarations => "ODF raw XML namespace declarations",
+            Self::NamespaceBindings => "ODF raw XML namespace bindings",
+            Self::NamespaceBytes => "ODF raw XML namespace bytes",
+            Self::NamespacePrefixBytes => "ODF raw XML namespace prefix bytes",
+            Self::NamespaceUriBytes => "ODF raw XML namespace URI bytes",
+        }
+    }
+
+    /// Classify a common-core resource-limit scope without string inference.
+    pub(crate) fn from_scope(scope: &str) -> Option<Self> {
+        Some(match scope {
+            "ODF raw XML input bytes" => Self::InputBytes,
+            "ODF raw XML depth" => Self::Depth,
+            "ODF raw XML events" => Self::Events,
+            "ODF raw XML attributes" => Self::Attributes,
+            "ODF raw XML token bytes" => Self::TokenBytes,
+            "ODF raw XML namespace scope depth" => Self::NamespaceScopeDepth,
+            "ODF raw XML namespace declarations" => Self::NamespaceDeclarations,
+            "ODF raw XML namespace bindings" => Self::NamespaceBindings,
+            "ODF raw XML namespace bytes" => Self::NamespaceBytes,
+            "ODF raw XML namespace prefix bytes" => Self::NamespacePrefixBytes,
+            "ODF raw XML namespace URI bytes" => Self::NamespaceUriBytes,
+            _ => return None,
+        })
+    }
+}
+
+impl fmt::Display for RawXmlLimitKind {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let name = match self {
+            Self::InputBytes => "raw_xml_input_bytes",
+            Self::Depth => "raw_xml_depth",
+            Self::Events => "raw_xml_events",
+            Self::Attributes => "raw_xml_attributes",
+            Self::TokenBytes => "raw_xml_token_bytes",
+            Self::NamespaceScopeDepth => "raw_xml_namespace_scope_depth",
+            Self::NamespaceDeclarations => "raw_xml_namespace_declarations",
+            Self::NamespaceBindings => "raw_xml_namespace_bindings",
+            Self::NamespaceBytes => "raw_xml_namespace_bytes",
+            Self::NamespacePrefixBytes => "raw_xml_namespace_prefix_bytes",
+            Self::NamespaceUriBytes => "raw_xml_namespace_uri_bytes",
+        };
+        formatter.write_str(name)
+    }
 }
 
 impl SourceLimitKind {
@@ -1109,6 +1215,8 @@ pub enum LimitKind {
     Source(SourceLimitKind),
     /// A semantic projection dimension.
     Semantic(SemanticLimitKind),
+    /// A raw XML parser dimension.
+    RawXml(RawXmlLimitKind),
 }
 
 impl fmt::Display for LimitKind {
@@ -1116,6 +1224,7 @@ impl fmt::Display for LimitKind {
         match self {
             Self::Source(kind) => kind.fmt(formatter),
             Self::Semantic(kind) => kind.fmt(formatter),
+            Self::RawXml(kind) => kind.fmt(formatter),
         }
     }
 }
@@ -1132,16 +1241,29 @@ impl From<SemanticLimitKind> for LimitKind {
     }
 }
 
+impl From<RawXmlLimitKind> for LimitKind {
+    fn from(kind: RawXmlLimitKind) -> Self {
+        Self::RawXml(kind)
+    }
+}
+
 /// Configuration for one packaged ODF ingress.
 ///
 /// Setters consume already validated policy values and perform no I/O.
 /// Passwords are supplied to the password-bearing routes and never retained
 /// here.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[must_use]
 pub struct OpenOptions {
     source_limits: SourceLimits,
     semantic_limits: SemanticLimits,
+    xml_limits: XmlStreamLimits,
+}
+
+impl Default for OpenOptions {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl OpenOptions {
@@ -1150,6 +1272,11 @@ impl OpenOptions {
         Self {
             source_limits: SourceLimits::DEFAULT,
             semantic_limits: SemanticLimits::DEFAULT,
+            // Packaged owners historically admit their complete bounded XML
+            // member.  Keep the direct raw scanner's narrow `Default`
+            // separate; an explicit `.xml_limits(...)` always replaces this
+            // owner ingress profile exactly.
+            xml_limits: XmlStreamLimits::owner_default_value(),
         }
     }
 
@@ -1165,6 +1292,17 @@ impl OpenOptions {
         self
     }
 
+    /// Select the bounded raw XML parser policy retained by an opened owner.
+    ///
+    /// The policy is independent of physical package admission and semantic
+    /// projection limits.  Keeping it in the ingress envelope ensures that
+    /// a later projection or edit does not silently fall back to a parser
+    /// default.
+    pub const fn xml_limits(mut self, limits: XmlStreamLimits) -> Self {
+        self.xml_limits = limits;
+        self
+    }
+
     /// The selected physical source limits.
     #[must_use]
     pub const fn source_limits_value(&self) -> SourceLimits {
@@ -1175,6 +1313,12 @@ impl OpenOptions {
     #[must_use]
     pub const fn semantic_limits_value(&self) -> SemanticLimits {
         self.semantic_limits
+    }
+
+    /// The selected bounded raw XML parser policy.
+    #[must_use]
+    pub const fn xml_limits_value(&self) -> XmlStreamLimits {
+        self.xml_limits
     }
 }
 

@@ -7,15 +7,15 @@
 //! keeps the original event bytes and source positions while applying the
 //! same resolver operations to normalized declaration values.
 
+use litchi_core::{Error, Resource, ResourceLimit, Result};
 use quick_xml::{
-    errors::Result,
     events::{BytesStart, Event},
-    name::{
-        DEFAULT_MAX_DECLARATIONS_PER_ELEMENT, Namespace, NamespaceError, NamespaceResolver,
-        PrefixDeclaration, ResolveResult,
-    },
+    name::{Namespace, NamespaceResolver, PrefixDeclaration, ResolveResult},
     reader::Reader,
 };
+use std::{io, sync::Arc};
+
+use super::stream_xml::XmlStreamLimits;
 
 /// A source-backed XML reader that resolves namespace declarations after XML
 /// attribute-value normalization.
@@ -33,22 +33,37 @@ pub struct ResolvedReader<'a> {
     active_bytes: usize,
     scope_bindings: Vec<usize>,
     scope_bytes: Vec<usize>,
+    attributes: usize,
+    events: usize,
+    limits: XmlStreamLimits,
+    check_attribute_errors: bool,
+    allow_empty_prefixed_namespace: bool,
 }
 
-// A document can legitimately inherit a declaration at each nested element,
-// but an untrusted source must not be able to make the resolver's active table
-// grow without bound.  This keeps the adapter's retained namespace state
-// bounded while leaving the per-element quick-xml limit intact.
-const MAX_ACTIVE_NAMESPACE_BINDINGS: usize =
-    DEFAULT_MAX_DECLARATIONS_PER_ELEMENT.saturating_mul(1024);
-const MAX_ACTIVE_NAMESPACE_BYTES: usize = 16 * 1024 * 1024;
-const MAX_NAMESPACE_SCOPE_DEPTH: usize = 1024;
+/// Preserve typed reader failures while adding a stable parser context to
+/// malformed-wire errors.  In particular, resource-limit and allocation
+/// failures must not be flattened into a generic invalid-format message by a
+/// family codec that consumes this reader.
+#[must_use]
+pub fn map_resolved_reader_error(error: Error, context: &'static str) -> Error {
+    match error {
+        Error::InvalidFormat(message) => Error::InvalidFormat(format!("{context}: {message}")),
+        Error::ParseError(message) => Error::ParseError(format!("{context}: {message}")),
+        other => other,
+    }
+}
 
 impl<'a> ResolvedReader<'a> {
-    /// Construct a reader over one UTF-8 XML source.
-    #[must_use]
-    pub fn from_xml(source: &'a str) -> Self {
-        Self {
+    /// Construct a reader over one UTF-8 XML source under an explicit policy.
+    pub fn from_xml(source: &'a str, limits: XmlStreamLimits) -> Result<Self> {
+        if source.len() as u64 > limits.max_bytes() {
+            return Err(limit_error(
+                RawXmlDimension::InputBytes,
+                source.len() as u64,
+                limits.max_bytes(),
+            ));
+        }
+        Ok(Self {
             reader: Reader::from_str(source),
             resolver: NamespaceResolver::default(),
             pending_pop: false,
@@ -56,7 +71,12 @@ impl<'a> ResolvedReader<'a> {
             active_bytes: 0,
             scope_bindings: Vec::new(),
             scope_bytes: Vec::new(),
-        }
+            attributes: 0,
+            events: 0,
+            limits,
+            check_attribute_errors: true,
+            allow_empty_prefixed_namespace: false,
+        })
     }
 
     /// Return the parser configuration.
@@ -98,7 +118,13 @@ impl<'a> ResolvedReader<'a> {
         buffer: &'b mut Vec<u8>,
     ) -> Result<(ResolveResult<'_>, Event<'b>)> {
         self.pop_pending_scope();
-        let event = self.reader.read_event_into(buffer)?;
+        self.admit_event()?;
+        let start = self.reader.buffer_position();
+        let event = self
+            .reader
+            .read_event_into(buffer)
+            .map_err(map_reader_error)?;
+        self.check_token_bytes(start)?;
         self.resolve_event(event)
     }
 
@@ -109,8 +135,61 @@ impl<'a> ResolvedReader<'a> {
     /// callers whose event buffer is already the original input slice.
     pub fn read_resolved_event(&mut self) -> Result<(ResolveResult<'_>, Event<'a>)> {
         self.pop_pending_scope();
-        let event = self.reader.read_event()?;
+        self.admit_event()?;
+        let start = self.reader.buffer_position();
+        let event = self.reader.read_event().map_err(map_reader_error)?;
+        self.check_token_bytes(start)?;
         self.resolve_event(event)
+    }
+
+    /// Return the policy carried by this reader.
+    #[must_use]
+    pub const fn limits(&self) -> XmlStreamLimits {
+        self.limits
+    }
+
+    /// Configure whether malformed attributes abort the read.
+    ///
+    /// Namespace-aware callers normally leave this enabled. A legacy source
+    /// scanner may deliberately stop namespace discovery at the first
+    /// malformed attribute and let its enclosing validator preserve that
+    /// scanner's historical error precedence.
+    pub const fn set_attribute_error_checks(&mut self, enabled: bool) {
+        self.check_attribute_errors = enabled;
+    }
+
+    /// Configure whether an empty URI may shadow a named prefix.
+    ///
+    /// XML namespace readers normally reject this form.  A legacy ODF
+    /// scanner can retain it as an unbound prefix while preserving the
+    /// historical deep-event behavior.
+    pub const fn set_allow_empty_prefixed_namespace(&mut self, enabled: bool) {
+        self.allow_empty_prefixed_namespace = enabled;
+    }
+
+    fn admit_event(&mut self) -> Result<()> {
+        let observed = self.events.saturating_add(1);
+        if observed > self.limits.max_events() {
+            return Err(limit_error(
+                RawXmlDimension::Events,
+                observed as u64,
+                self.limits.max_events() as u64,
+            ));
+        }
+        self.events = observed;
+        Ok(())
+    }
+
+    fn check_token_bytes(&self, start: u64) -> Result<()> {
+        let observed = self.reader.buffer_position().saturating_sub(start);
+        if observed > self.limits.max_token_bytes() as u64 {
+            return Err(limit_error(
+                RawXmlDimension::TokenBytes,
+                observed,
+                self.limits.max_token_bytes() as u64,
+            ));
+        }
+        Ok(())
     }
 
     fn pop_pending_scope(&mut self) {
@@ -139,59 +218,110 @@ impl<'a> ResolvedReader<'a> {
     }
 
     fn push(&mut self, element: &BytesStart<'_>) -> Result<()> {
-        if self.scope_bindings.len() >= MAX_NAMESPACE_SCOPE_DEPTH {
-            return Err(NamespaceError::TooManyDeclarations(MAX_NAMESPACE_SCOPE_DEPTH).into());
+        let attempted_depth = self.scope_bindings.len().saturating_add(1);
+        if attempted_depth > self.limits.max_depth() {
+            return Err(limit_error(
+                RawXmlDimension::Depth,
+                attempted_depth as u64,
+                self.limits.max_depth() as u64,
+            ));
+        }
+        if attempted_depth > self.limits.max_namespace_scope_depth() {
+            return Err(limit_error(
+                RawXmlDimension::NamespaceScopeDepth,
+                attempted_depth as u64,
+                self.limits.max_namespace_scope_depth() as u64,
+            ));
         }
         self.scope_bindings
             .try_reserve(1)
-            .map_err(|error| allocation_error("ODF namespace scope", error))?;
+            .map_err(|source| Error::Allocation {
+                resource: "ODF namespace scope",
+                source,
+            })?;
         self.scope_bytes
             .try_reserve(1)
-            .map_err(|error| allocation_error("ODF namespace scope bytes", error))?;
-        let next_level =
-            self.resolver
-                .level()
-                .checked_add(1)
-                .ok_or(NamespaceError::TooManyDeclarations(
-                    MAX_ACTIVE_NAMESPACE_BINDINGS,
-                ))?;
+            .map_err(|source| Error::Allocation {
+                resource: "ODF namespace scope bytes",
+                source,
+            })?;
+        let next_level = self.resolver.level().checked_add(1).ok_or_else(|| {
+            limit_error(
+                RawXmlDimension::NamespaceScopeDepth,
+                attempted_depth as u64,
+                self.limits.max_namespace_scope_depth() as u64,
+            )
+        })?;
         self.resolver.set_level(next_level);
         let mut declarations = 0usize;
         let mut declaration_bytes = 0usize;
-        for attribute in element.attributes().with_checks(true) {
-            let attribute = attribute?;
+        let mut attributes = element.attributes();
+        attributes.with_checks(self.check_attribute_errors);
+        for attribute in attributes {
+            let attribute = match attribute {
+                Ok(attribute) => attribute,
+                Err(_error) if !self.check_attribute_errors => break,
+                Err(error) => {
+                    return Err(Error::InvalidFormat(format!(
+                        "XML attribute parsing error: {error}"
+                    )));
+                },
+            };
+            let observed_attributes = self.attributes.saturating_add(1);
+            if observed_attributes > self.limits.max_attributes() {
+                return Err(limit_error(
+                    RawXmlDimension::Attributes,
+                    observed_attributes as u64,
+                    self.limits.max_attributes() as u64,
+                ));
+            }
+            self.attributes = observed_attributes;
             let Some(prefix) = attribute.key.as_namespace_binding() else {
                 continue;
             };
-            if declarations >= DEFAULT_MAX_DECLARATIONS_PER_ELEMENT {
-                return Err(NamespaceError::TooManyDeclarations(
-                    DEFAULT_MAX_DECLARATIONS_PER_ELEMENT,
-                )
-                .into());
+            let observed_declarations = declarations.saturating_add(1);
+            if observed_declarations > self.limits.max_namespace_declarations() {
+                return Err(limit_error(
+                    RawXmlDimension::NamespaceDeclarations,
+                    observed_declarations as u64,
+                    self.limits.max_namespace_declarations() as u64,
+                ));
             }
-            declarations += 1;
+            declarations = observed_declarations;
             let prefix_bytes = match prefix {
                 PrefixDeclaration::Default => None,
                 PrefixDeclaration::Named(value) => {
                     if value.is_empty() {
-                        return Err(NamespaceError::InvalidPrefixForXml(Vec::new()).into());
+                        return Err(Error::InvalidFormat(
+                            "ODF namespace declaration has an empty prefix".to_string(),
+                        ));
                     }
-                    if value.len() > crate::namespace::MAX_NAMESPACE_URI_BYTES {
-                        return Err(namespace_limit_error(
-                            "ODF namespace prefix exceeds the namespace byte limit",
+                    if value.len() > self.limits.max_namespace_prefix_bytes() {
+                        return Err(limit_error(
+                            RawXmlDimension::NamespacePrefixBytes,
+                            value.len() as u64,
+                            self.limits.max_namespace_prefix_bytes() as u64,
                         ));
                     }
                     Some(value)
                 },
             };
-            if self
-                .active_bindings
-                .checked_add(declarations)
-                .is_none_or(|value| value > MAX_ACTIVE_NAMESPACE_BINDINGS)
-            {
-                return Err(
-                    NamespaceError::TooManyDeclarations(MAX_ACTIVE_NAMESPACE_BINDINGS).into(),
-                );
+            let active_bindings =
+                self.active_bindings
+                    .checked_add(declarations)
+                    .ok_or_else(|| {
+                        limit_error(
+                            RawXmlDimension::NamespaceBindings,
+                            u64::MAX,
+                            self.limits.max_namespace_bindings() as u64,
+                        )
+                    })?;
+            if active_bindings > self.limits.max_namespace_bindings() {
+                return Err(limit_error(
+                    RawXmlDimension::NamespaceBindings,
+                    active_bindings as u64,
+                    self.limits.max_namespace_bindings() as u64,
+                ));
             }
             // Normalize from the lexical bytes before constructing the
             // resolver namespace.  In particular, this admits escaped URI
@@ -201,32 +331,59 @@ impl<'a> ResolvedReader<'a> {
                 attribute.value.as_ref(),
                 self.reader.decoder(),
                 "ODF namespace declaration",
-            )
-            .map_err(namespace_error)?;
+                self.limits.max_namespace_uri_bytes(),
+            )?;
             let binding_bytes = prefix_bytes
                 .map_or(0, |prefix| prefix.len())
                 .checked_add(normalized.len())
-                .ok_or_else(|| namespace_limit_error("ODF namespace byte count overflow"))?;
+                .ok_or_else(|| {
+                    limit_error(
+                        RawXmlDimension::NamespaceBytes,
+                        u64::MAX,
+                        self.limits.max_namespace_bytes() as u64,
+                    )
+                })?;
             declaration_bytes = declaration_bytes
                 .checked_add(binding_bytes)
-                .ok_or_else(|| namespace_limit_error("ODF namespace byte count overflow"))?;
-            if self
+                .ok_or_else(|| {
+                    limit_error(
+                        RawXmlDimension::NamespaceBytes,
+                        u64::MAX,
+                        self.limits.max_namespace_bytes() as u64,
+                    )
+                })?;
+            let active_bytes = self
                 .active_bytes
                 .checked_add(declaration_bytes)
-                .is_none_or(|value| value > MAX_ACTIVE_NAMESPACE_BYTES)
-            {
-                return Err(namespace_limit_error(
-                    "ODF active namespace bindings exceed their byte limit",
+                .ok_or_else(|| {
+                    limit_error(
+                        RawXmlDimension::NamespaceBytes,
+                        u64::MAX,
+                        self.limits.max_namespace_bytes() as u64,
+                    )
+                })?;
+            if active_bytes > self.limits.max_namespace_bytes() {
+                return Err(limit_error(
+                    RawXmlDimension::NamespaceBytes,
+                    active_bytes as u64,
+                    self.limits.max_namespace_bytes() as u64,
                 ));
             }
-            crate::namespace::validate_normalized_namespace_binding(
-                prefix_bytes,
-                normalized.as_ref(),
-                "ODF namespace declaration",
-            )
-            .map_err(namespace_error)?;
+            if !(self.allow_empty_prefixed_namespace
+                && prefix_bytes.is_some()
+                && normalized.is_empty())
+            {
+                crate::namespace::validate_normalized_namespace_binding(
+                    prefix_bytes,
+                    normalized.as_ref(),
+                    "ODF namespace declaration",
+                )?;
+            }
             self.resolver
-                .add(prefix, Namespace(normalized.as_bytes()))?;
+                .add(prefix, Namespace(normalized.as_bytes()))
+                .map_err(|error| {
+                    Error::InvalidFormat(format!("ODF namespace declaration: {error}"))
+                })?;
         }
         self.active_bindings += declarations;
         self.active_bytes += declaration_bytes;
@@ -246,21 +403,59 @@ impl<'a> ResolvedReader<'a> {
     }
 }
 
-fn namespace_error(error: litchi_core::Error) -> quick_xml::Error {
-    std::io::Error::new(std::io::ErrorKind::InvalidData, error.to_string()).into()
+#[derive(Clone, Copy)]
+enum RawXmlDimension {
+    InputBytes,
+    Depth,
+    Events,
+    Attributes,
+    TokenBytes,
+    NamespaceScopeDepth,
+    NamespaceDeclarations,
+    NamespaceBindings,
+    NamespaceBytes,
+    NamespacePrefixBytes,
 }
 
-fn namespace_limit_error(message: &str) -> quick_xml::Error {
-    std::io::Error::new(std::io::ErrorKind::InvalidData, message.to_owned()).into()
+fn limit_error(dimension: RawXmlDimension, observed: u64, maximum: u64) -> Error {
+    let scope = match dimension {
+        RawXmlDimension::InputBytes => "ODF raw XML input bytes",
+        RawXmlDimension::Depth => "ODF raw XML depth",
+        RawXmlDimension::Events => "ODF raw XML events",
+        RawXmlDimension::Attributes => "ODF raw XML attributes",
+        RawXmlDimension::TokenBytes => "ODF raw XML token bytes",
+        RawXmlDimension::NamespaceScopeDepth => "ODF raw XML namespace scope depth",
+        RawXmlDimension::NamespaceDeclarations => "ODF raw XML namespace declarations",
+        RawXmlDimension::NamespaceBindings => "ODF raw XML namespace bindings",
+        RawXmlDimension::NamespaceBytes => "ODF raw XML namespace bytes",
+        RawXmlDimension::NamespacePrefixBytes => "ODF raw XML namespace prefix bytes",
+    };
+    Error::ResourceLimit(ResourceLimit {
+        resource: match dimension {
+            RawXmlDimension::InputBytes => Resource::InputBytes,
+            RawXmlDimension::Depth | RawXmlDimension::NamespaceScopeDepth => Resource::Depth,
+            RawXmlDimension::Events
+            | RawXmlDimension::Attributes
+            | RawXmlDimension::NamespaceDeclarations
+            | RawXmlDimension::NamespaceBindings => Resource::Objects,
+            RawXmlDimension::TokenBytes
+            | RawXmlDimension::NamespaceBytes
+            | RawXmlDimension::NamespacePrefixBytes => Resource::Memory,
+        },
+        observed,
+        limit: maximum,
+        scope: Arc::from(scope),
+    })
 }
 
-fn allocation_error(
-    resource: &'static str,
-    error: std::collections::TryReserveError,
-) -> quick_xml::Error {
-    std::io::Error::new(
-        std::io::ErrorKind::OutOfMemory,
-        format!("allocation failed for {resource}: {error}"),
-    )
-    .into()
+fn map_reader_error(error: quick_xml::Error) -> Error {
+    match error {
+        quick_xml::Error::Io(source) => {
+            Error::Io(io::Error::new(source.kind(), source.to_string()))
+        },
+        quick_xml::Error::Encoding(source) => {
+            Error::InvalidFormat(format!("XML encoding error: {source}"))
+        },
+        other => Error::InvalidFormat(format!("XML parsing error: {other}")),
+    }
 }

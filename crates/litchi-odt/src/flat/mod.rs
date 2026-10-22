@@ -14,7 +14,7 @@ use std::ops::Range;
 use std::path::Path;
 use std::sync::Arc;
 
-use crate::core::ResolvedReader;
+use crate::core::{ResolvedReader, XmlStreamLimits};
 use litchi_core::{Error as CoreError, Metadata, Resource, ResourceLimit, Result};
 use litchi_odf_common::SemanticLimitKind;
 use quick_xml::events::Event;
@@ -174,13 +174,17 @@ impl Document {
                 "flat ODT input",
             )
         })?;
-        let document =
-            FlatDocument::from_reader_with_limit(reader, maximum).map_err(|error| match error {
-                CoreError::ResourceLimit(limit) if limit.resource == Resource::InputBytes => {
-                    limits.input_exceeded(usize::try_from(limit.observed).unwrap_or(usize::MAX))
-                },
-                other => other,
-            })?;
+        let document = FlatDocument::from_reader_with_limit_and_xml_limits(
+            reader,
+            maximum,
+            limits.options.xml_limits_value(),
+        )
+        .map_err(|error| match error {
+            CoreError::ResourceLimit(limit) if limit.resource == Resource::InputBytes => {
+                limits.input_exceeded(usize::try_from(limit.observed).unwrap_or(usize::MAX))
+            },
+            other => other,
+        })?;
         if document.family() != Family::Text {
             return invalid("flat document is not an OpenDocument Text document");
         }
@@ -231,7 +235,11 @@ impl Document {
                 "flat ODT input",
             )
         })?;
-        let document = FlatDocument::from_bytes_with_limit(bytes, maximum)?;
+        let document = FlatDocument::from_bytes_with_limit_and_xml_limits(
+            bytes,
+            maximum,
+            limits.options.xml_limits_value(),
+        )?;
         if document.family() != Family::Text {
             return invalid("flat document is not an OpenDocument Text document");
         }
@@ -658,7 +666,28 @@ fn render_paragraph_edits(
 }
 
 fn index_direct_paragraphs(xml: &str, limits: Limits) -> Result<Vec<ParagraphSite>> {
-    let mut reader = ResolvedReader::from_xml(xml);
+    let retained = limits.options.xml_limits_value();
+    let max_document_bytes = u64::try_from(limits.max_document_bytes).map_err(|_| {
+        CoreError::InvalidFormat("flat ODT input limit exceeds platform limits".to_string())
+    })?;
+    let xml_limits = XmlStreamLimits::new(
+        retained.max_bytes().min(max_document_bytes),
+        retained.max_depth().min(limits.max_xml_depth),
+        retained.max_events().min(4_000_000),
+        retained.max_attributes().min(1_000_000),
+        retained.max_token_bytes().min(64 * 1024),
+    )?
+    .namespace_limits(
+        retained
+            .max_namespace_scope_depth()
+            .min(limits.max_xml_depth),
+        retained.max_namespace_declarations().min(256),
+        retained.max_namespace_bindings().min(256 * 1024),
+        retained.max_namespace_bytes().min(16 * 1024 * 1024),
+        retained.max_namespace_prefix_bytes().min(64 * 1024),
+        retained.max_namespace_uri_bytes().min(64 * 1024),
+    )?;
+    let mut reader = ResolvedReader::from_xml(xml, xml_limits)?;
     reader.config_mut().check_end_names = true;
     let mut buffer = Vec::new();
     let mut depth = 0usize;
@@ -668,7 +697,9 @@ fn index_direct_paragraphs(xml: &str, limits: Limits) -> Result<Vec<ParagraphSit
     loop {
         let (namespace, event) = reader
             .read_resolved_event_into(&mut buffer)
-            .map_err(|error| CoreError::InvalidFormat(format!("invalid flat ODT XML: {error}")))?;
+            .map_err(|error| {
+                crate::core::map_resolved_reader_error(error, "invalid flat ODT XML")
+            })?;
         let is_office = crate::elements::xml::normalized_namespace_matches(
             &namespace,
             OFFICE_NAMESPACE,
@@ -763,9 +794,9 @@ fn classify_paragraph_end(
                 "flat ODT XML position",
             )
         })?;
-        let (_, event) = reader
-            .read_resolved_event_into(buffer)
-            .map_err(|error| CoreError::InvalidFormat(format!("invalid flat ODT XML: {error}")))?;
+        let (_, event) = reader.read_resolved_event_into(buffer).map_err(|error| {
+            crate::core::map_resolved_reader_error(error, "invalid flat ODT XML")
+        })?;
         match event {
             Event::End(_) if nested_depth == 0 => {
                 return Ok(if opaque {

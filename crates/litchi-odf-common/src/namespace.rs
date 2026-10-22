@@ -14,14 +14,14 @@
 //!
 //! - `odfpy`: `odf/namespaces.py` (lines 24–111)
 
-use litchi_core::{Error, Result};
+use litchi_core::{Error, Resource, ResourceLimit, Result};
 use phf::{Map, phf_map};
 use quick_xml::XmlVersion;
 use quick_xml::events::BytesStart;
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
 use std::borrow::Cow;
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 // ============================================================================
 // NAMESPACE CONSTANTS
@@ -708,7 +708,7 @@ pub fn resolved_namespace_uri<'uri>(
             "the namespace prefix is not bound",
         )),
         ResolveResult::Bound(Namespace(raw)) => {
-            let uri = decode_namespace_uri(raw, decoder, context)?;
+            let uri = decode_namespace_uri(raw, decoder, context, MAX_NAMESPACE_URI_BYTES)?;
             if uri.as_ref() == XMLNS_DECLARATION_NAMESPACE {
                 return Err(invalid_namespace(
                     context,
@@ -843,8 +843,9 @@ pub fn normalize_namespace_uri<'uri>(
     raw: &'uri [u8],
     decoder: quick_xml::Decoder,
     context: &str,
+    max_uri_bytes: usize,
 ) -> Result<Cow<'uri, str>> {
-    decode_namespace_uri(raw, decoder, context)
+    decode_namespace_uri(raw, decoder, context, max_uri_bytes)
 }
 
 fn invalid_namespace(context: &str, reason: &str) -> Error {
@@ -855,13 +856,19 @@ fn decode_namespace_uri<'uri>(
     raw: &'uri [u8],
     decoder: quick_xml::Decoder,
     context: &str,
+    max_uri_bytes: usize,
 ) -> Result<Cow<'uri, str>> {
+    if max_uri_bytes == 0 || max_uri_bytes > MAX_NAMESPACE_URI_BYTES {
+        return Err(Error::InvalidLimit {
+            kind: Resource::Memory,
+            value: max_uri_bytes as u64,
+            maximum: MAX_NAMESPACE_URI_BYTES as u64,
+            scope: "ODF raw XML namespace URI bytes",
+        });
+    }
     ensure_utf8_decoder(decoder, context)?;
-    if raw.len() > MAX_NAMESPACE_URI_BYTES {
-        return Err(invalid_namespace(
-            context,
-            "the lexical value exceeds the namespace URI limit",
-        ));
+    if raw.len() > max_uri_bytes {
+        return Err(namespace_limit(raw.len(), max_uri_bytes));
     }
     if raw.contains(&b'<') {
         return Err(invalid_namespace(
@@ -876,19 +883,13 @@ fn decode_namespace_uri<'uri>(
             &format!("the value is not valid in the XML encoding: {error}"),
         )
     })?;
-    if decoded.len() > MAX_NAMESPACE_URI_BYTES {
-        return Err(invalid_namespace(
-            context,
-            "the decoded value exceeds the namespace URI limit",
-        ));
+    if decoded.len() > max_uri_bytes {
+        return Err(namespace_limit(decoded.len(), max_uri_bytes));
     }
 
     let (normalized_len, changed) = namespace_normalized_len(&decoded, context)?;
-    if normalized_len > MAX_NAMESPACE_URI_BYTES {
-        return Err(invalid_namespace(
-            context,
-            "entity expansion exceeds the namespace URI limit",
-        ));
+    if normalized_len > max_uri_bytes {
+        return Err(namespace_limit(normalized_len, max_uri_bytes));
     }
     if !changed {
         return Ok(decoded);
@@ -904,6 +905,15 @@ fn decode_namespace_uri<'uri>(
     append_normalized_namespace(&mut output, &decoded, context)?;
     debug_assert_eq!(output.len(), normalized_len);
     Ok(Cow::Owned(output))
+}
+
+fn namespace_limit(observed: usize, maximum: usize) -> Error {
+    Error::ResourceLimit(ResourceLimit {
+        resource: Resource::Memory,
+        observed: observed as u64,
+        limit: maximum as u64,
+        scope: Arc::from("ODF raw XML namespace URI bytes"),
+    })
 }
 
 fn ensure_utf8_decoder(decoder: quick_xml::Decoder, context: &str) -> Result<()> {

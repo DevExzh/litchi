@@ -116,6 +116,7 @@ pub struct Workbook {
 
 struct State {
     package: Arc<crate::package::Archive>,
+    xml_limits: litchi_odf_common::XmlStreamLimits,
     definitions: Vec<Definition>,
     sheets: Vec<crate::worksheet::Sheet>,
     metadata: crate::metadata::Snapshot,
@@ -168,17 +169,21 @@ impl Workbook {
     }
 
     pub(crate) fn from_package(package: crate::package::Archive) -> Result<Self> {
-        Self::from_shared_package(Arc::new(package))
+        let xml_limits = package.xml_limits_value();
+        Self::from_shared_package(Arc::new(package), xml_limits)
     }
 
-    pub(crate) fn from_shared_package(package: Arc<crate::package::Archive>) -> Result<Self> {
+    pub(crate) fn from_shared_package(
+        package: Arc<crate::package::Archive>,
+        xml_limits: litchi_odf_common::XmlStreamLimits,
+    ) -> Result<Self> {
         // Keep ordinary and source-backed opening on the same namespace-aware
         // content reader.  Besides avoiding five independent tokenizations,
         // this admits semantically normalized namespace declarations (for
         // example an entity-escaped `xmlns:xml` URI) without changing the
         // source bytes retained by the package.
         let (settings, outputs) =
-            crate::open_parse::OpenParse::run(package.content_xml())?.finish()?;
+            crate::open_parse::OpenParse::run(package.content_xml(), xml_limits)?.finish()?;
         let definitions = outputs.definitions;
         let mut sheets = outputs.sheets;
         let mut tolerance = package.tolerance_report().clone();
@@ -187,11 +192,16 @@ impl Workbook {
         // description are deliberately applied in the small metadata pass
         // shared with the source-backed facade.  Keep this post-pass here so
         // ordinary and source-backed opens expose the same Sheet metadata.
-        crate::worksheet::codec::apply_table_metadata(package.content_xml(), &mut sheets)?;
+        crate::worksheet::codec::apply_table_metadata(
+            package.content_xml(),
+            &mut sheets,
+            xml_limits,
+        )?;
         let metadata = package.metadata_snapshot()?;
         Ok(Self {
             inner: Arc::new(State {
                 package,
+                xml_limits,
                 definitions,
                 sheets,
                 metadata,
@@ -646,7 +656,10 @@ impl Workbook {
     /// # Errors
     /// Returns an error when the operation cannot be completed.
     pub fn data_pilot_snapshot(&self) -> Result<crate::data_pilot::Snapshot> {
-        crate::data_pilot::Snapshot::from_bytes(self.inner.package.package().as_bytes().to_vec())
+        crate::data_pilot::Snapshot::from_bytes_with_xml_limits(
+            self.inner.package.package().as_bytes().to_vec(),
+            self.inner.xml_limits,
+        )
     }
 
     /// Discover inert database-range declarations owned by this spreadsheet.
@@ -696,7 +709,11 @@ impl Workbook {
             transaction.commit()?
         };
         if commit.changed() {
-            *self = Self::from_bytes(commit.into_owned_bytes())?;
+            let package = crate::package::Archive::from_bytes_with_xml_limits(
+                commit.into_owned_bytes(),
+                self.inner.xml_limits,
+            )?;
+            *self = Self::from_package(package)?;
         }
         Ok(())
     }
@@ -714,7 +731,10 @@ impl Workbook {
     /// Returns an error when the retained package or worksheet graph is invalid.
     pub fn worksheet_snapshot(&self) -> Result<crate::worksheet::Snapshot> {
         let package = self.inner.package.clone_without_password()?;
-        crate::worksheet::Snapshot::from_shared_package(Arc::new(package))
+        crate::worksheet::Snapshot::from_shared_package_with_xml_limits(
+            Arc::new(package),
+            self.inner.xml_limits,
+        )
     }
 
     /// Discover embedded charts in content-level drawing order.
@@ -752,9 +772,10 @@ impl Workbook {
         &self,
         limits: crate::charts::Limits,
     ) -> Result<crate::charts::Snapshot> {
-        crate::charts::Snapshot::from_bytes_with(
+        crate::charts::Snapshot::from_bytes_with_xml_limits(
             self.inner.package.package().as_bytes().to_vec(),
             limits,
+            self.inner.xml_limits,
         )
     }
 
@@ -954,7 +975,10 @@ impl Workbook {
     ///
     /// Returns an error when the retained package cannot be reparsed.
     pub fn definitions_snapshot(&self) -> Result<crate::definitions::Snapshot> {
-        crate::definitions::Snapshot::from_bytes(self.inner.package.package().as_bytes().to_vec())
+        crate::definitions::Snapshot::from_bytes_with_xml_limits(
+            self.inner.package.package().as_bytes().to_vec(),
+            self.inner.xml_limits,
+        )
     }
 
     /// Return named ranges in their document order.
@@ -1102,8 +1126,9 @@ impl Workbook {
     ///
     /// Returns an error when the package, manifest, or a declared graph is invalid.
     pub fn rdf_snapshot(&self) -> Result<crate::metadata_graphs::Snapshot> {
-        crate::metadata_graphs::Snapshot::from_bytes(
+        crate::metadata_graphs::Snapshot::from_bytes_with_xml_limits(
             self.inner.package.package().as_bytes().to_vec(),
+            self.inner.xml_limits,
         )
     }
 
@@ -1219,7 +1244,11 @@ impl Workbook {
     fn publish_rdf_commit(&mut self, commit: crate::metadata_graphs::Commit) -> Result<()> {
         if commit.changed() {
             let snapshot = commit.into_snapshot();
-            *self = Self::from_bytes(snapshot.as_bytes().to_vec())?;
+            let package = crate::package::Archive::from_bytes_with_xml_limits(
+                snapshot.as_bytes().to_vec(),
+                self.inner.xml_limits,
+            )?;
+            *self = Self::from_package(package)?;
         }
         Ok(())
     }

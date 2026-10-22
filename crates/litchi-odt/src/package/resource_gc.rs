@@ -208,7 +208,7 @@ impl EmbeddedResourceGcPlan {
         let after = if bytes.as_slice() == source.as_bytes() {
             source.clone()
         } else {
-            Package::from_vec(bytes)?
+            Package::from_vec_with_xml_limits(bytes, source.xml_limits_value())?
         };
         Ok(crate::transaction::embedded_resource_gc_commit(
             source.clone(),

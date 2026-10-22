@@ -3,6 +3,7 @@
 use std::{fmt, sync::Arc};
 
 use litchi_core::{Error, Position, Result};
+use litchi_odf_common::XmlStreamLimits;
 
 use super::{Cell, Sheet, validation};
 use crate::package::Archive;
@@ -75,6 +76,7 @@ pub struct Snapshot {
     source: Arc<Vec<u8>>,
     package: Arc<Archive>,
     sheets: Arc<[Sheet]>,
+    xml_limits: XmlStreamLimits,
 }
 
 impl fmt::Debug for Snapshot {
@@ -98,25 +100,41 @@ impl Snapshot {
     }
 
     fn from_arc(source: Arc<Vec<u8>>) -> Result<Self> {
-        let package = Archive::from_shared_bytes(Arc::clone(&source))?;
-        Self::from_package(package)
+        Self::from_arc_with_xml_limits(source, XmlStreamLimits::owner_default_value())
+    }
+
+    fn from_arc_with_xml_limits(source: Arc<Vec<u8>>, xml_limits: XmlStreamLimits) -> Result<Self> {
+        let package = Archive::from_shared_bytes_with_xml_limits(Arc::clone(&source), xml_limits)?;
+        Self::from_package_with_xml_limits(package, xml_limits)
     }
 
     /// Adopt a package that has already passed the ODS package boundary.
     ///
     /// Worksheet graph parsing and validation remain mandatory; only the
     /// immutable ZIP/archive ownership is reused.
+    #[cfg(test)]
     pub(crate) fn from_package(package: Archive) -> Result<Self> {
-        Self::from_shared_package(Arc::new(package))
+        Self::from_package_with_xml_limits(package, XmlStreamLimits::owner_default_value())
     }
 
-    pub(crate) fn from_shared_package(package: Arc<Archive>) -> Result<Self> {
+    pub(crate) fn from_package_with_xml_limits(
+        package: Archive,
+        xml_limits: XmlStreamLimits,
+    ) -> Result<Self> {
+        Self::from_shared_package_with_xml_limits(Arc::new(package), xml_limits)
+    }
+
+    pub(crate) fn from_shared_package_with_xml_limits(
+        package: Arc<Archive>,
+        xml_limits: XmlStreamLimits,
+    ) -> Result<Self> {
         let source = package.shared_bytes_owner();
-        let sheets = Arc::from(package.sheets()?);
+        let sheets = Arc::from(package.sheets_with_xml_limits(xml_limits)?);
         Ok(Self {
             source,
             package,
             sheets,
+            xml_limits,
         })
     }
 
@@ -397,7 +415,8 @@ impl Edit {
                 (package.replace_content_xml(&content)?, false)
             },
         };
-        let target = Snapshot::from_package(target_package)?;
+        let target =
+            Snapshot::from_package_with_xml_limits(target_package, self.before.xml_limits)?;
         if target.sheets() != self.draft {
             return Err(Error::InvalidFormat(
                 "ODS worksheet typed readback does not match the staged edit".to_string(),

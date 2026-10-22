@@ -32,7 +32,6 @@ pub mod signature;
 pub mod style;
 pub mod validation;
 
-pub use core::ResolvedReader;
 pub use core::{
     ArchiveLimits, OwnedPackage, PreparedPackage, SourceBackedPackage, SourceMemberReaderError,
 };
@@ -40,6 +39,7 @@ pub use core::{
     GeneratedXmlEnvelope, GeneratedXmlLimitExceeded, GeneratedXmlLimitResource, GeneratedXmlLimits,
     GeneratedXmlReport, XmlStreamLimits,
 };
+pub use core::{ResolvedReader, map_resolved_reader_error};
 pub use core::{
     SourceContentInsertionCallbackError, SourceContentInsertionError, SourceContentInsertionPlan,
     SourceContentPublicationError, SourceContentPublicationOptions,
@@ -52,8 +52,8 @@ pub use leniency::{
     ToleratedDefect,
 };
 pub use limits::{
-    LimitKind, OpenOptions, SemanticLimitKind, SemanticLimits, SemanticLimitsBuilder,
-    SourceLimitKind, SourceLimits, SourceLimitsBuilder,
+    LimitKind, OpenOptions, RawXmlLimitKind, SemanticLimitKind, SemanticLimits,
+    SemanticLimitsBuilder, SourceLimitKind, SourceLimits, SourceLimitsBuilder,
 };
 pub use repair::{
     Destructive, MIMETYPE_LOCAL_EXTRA_ISSUE, MIMETYPE_LOCAL_EXTRA_REPAIR,

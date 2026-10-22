@@ -14,13 +14,16 @@ use std::path::Path;
 #[cfg(any(unix, windows))]
 use litchi_core::FileSource;
 use litchi_core::{Error, ReadAt, Result, SourceVersion};
+use litchi_odf_common::XmlStreamLimits;
 use litchi_odf_common::{
     core::SourceBackedPackage,
     package::{is_media_path, resolve_package_path},
 };
 use zeroize::Zeroizing;
 
+#[cfg(test)]
 use super::open_parse::run_catalog;
+use super::open_parse::run_catalog_with_xml_limits;
 use crate::elements::text::{Block, Kind, TextElements};
 use litchi_odf_common::{Error as OdfError, OpenOptions, SemanticLimitKind};
 
@@ -68,6 +71,8 @@ pub struct SourceBackedDocumentCatalog {
     source: Arc<dyn ReadAt>,
     source_version: SourceVersion,
     entries: Arc<[TextBlockCatalogEntry]>,
+    /// The caller-selected raw XML policy retained for materialization.
+    xml_limits: XmlStreamLimits,
 }
 
 impl fmt::Debug for SourceBackedDocumentCatalog {
@@ -195,6 +200,7 @@ impl SourceBackedDocumentCatalog {
     ) -> std::result::Result<Self, OdfError> {
         let limits = options.source_limits_value();
         let semantic = options.semantic_limits_value();
+        let xml_limits = options.xml_limits_value();
         let package = match password {
             Some(password) => {
                 let mut password = Zeroizing::new(password);
@@ -218,7 +224,7 @@ impl SourceBackedDocumentCatalog {
                 )));
             }
             let content = read_content(&package)?;
-            let kinds = run_catalog(&content)?;
+            let kinds = run_catalog_with_xml_limits(&content, xml_limits)?;
             let mut entries = Vec::new();
             entries
                 .try_reserve_exact(kinds.len())
@@ -242,6 +248,7 @@ impl SourceBackedDocumentCatalog {
             source,
             source_version,
             entries: Arc::from(entries),
+            xml_limits,
         })
     }
 
@@ -360,11 +367,14 @@ impl SourceBackedDocumentCatalog {
         let source = Arc::clone(&self.source);
         let source_version = self.source_version;
         let package = prefer_current(source.as_ref(), source_version, self.package.materialize())?;
-        prefer_current(
-            source.as_ref(),
-            source_version,
-            super::Document::from_owned_package(package).map(crate::Package::from_parsed),
+        let materialized = super::Document::from_owned_package_with_limits(
+            package,
+            litchi_odf_common::SemanticLimits::DEFAULT,
+            self.xml_limits,
         )
+        .map(crate::Package::from_parsed)
+        .map_err(Error::from);
+        prefer_current(source.as_ref(), source_version, materialized)
     }
 }
 
@@ -431,23 +441,6 @@ mod tests {
         actual.unwrap_or_else(|error| panic!("{label}: expected success, got {error}"))
     }
 
-    fn assert_error_matches_oracle(label: &str, xml: &str, expected_error: &str) {
-        let expected = sequential(xml).map_err(|error| error.to_string());
-        let actual = run_catalog(xml).map_err(|error| error.to_string());
-        assert_eq!(
-            actual, expected,
-            "{label}: fused catalog differs from sequential oracle"
-        );
-        let error = match actual {
-            Ok(_) => panic!("{label}: expected an error"),
-            Err(error) => error,
-        };
-        assert_eq!(
-            error, expected_error,
-            "{label}: unexpected content-depth error"
-        );
-    }
-
     fn deep_document() -> String {
         let nested_open = "<x>".repeat(4_093);
         let nested_close = "</x>".repeat(4_093);
@@ -490,10 +483,21 @@ mod tests {
     #[test]
     fn catalog_fusion_enforces_shared_content_depth_limit() {
         let depth_error = deep_document();
-        assert_error_matches_oracle(
-            "content depth error",
-            &depth_error,
-            "Invalid format: ODT content.xml nesting exceeds maximum depth of 4096",
+        let expected =
+            sequential(&depth_error).expect_err("the historical oracle must reject depth");
+        assert_eq!(
+            expected.to_string(),
+            "Invalid format: ODT content.xml nesting exceeds maximum depth of 4096"
         );
+        let actual =
+            run_catalog(&depth_error).expect_err("the bounded fused reader must reject depth");
+        assert!(matches!(
+            actual,
+            litchi_core::Error::ResourceLimit(limit)
+                if limit.resource == litchi_core::Resource::Depth
+                    && limit.observed == 4_097
+                    && limit.limit == 4_096
+                    && limit.scope.as_ref() == "ODF raw XML depth"
+        ));
     }
 }

@@ -5,7 +5,7 @@ use super::{
     STYLE, TEXT,
     model::{Connections, Declaration, Use},
 };
-use crate::core::ResolvedReader;
+use crate::core::{ResolvedReader, XmlStreamLimits};
 use crate::generic::FlatMutationBudget;
 use crate::variable_declaration::{Body, HeaderFooter, Part, Scope};
 use litchi_core::{Error, Result};
@@ -41,8 +41,9 @@ pub(super) fn parse_part(
     containers: &mut HashSet<(Part, Scope)>,
     aggregate: &mut usize,
     budget: Option<&FlatMutationBudget>,
+    xml_limits: XmlStreamLimits,
 ) -> Result<()> {
-    let mut reader = ResolvedReader::from_xml(xml);
+    let mut reader = ResolvedReader::from_xml(xml, xml_limits)?;
     reader.config_mut().check_end_names = true;
     let mut buffer = Vec::new();
     let mut depth = 0usize;
@@ -57,7 +58,9 @@ pub(super) fn parse_part(
         }
         let (namespace, event) = reader
             .read_resolved_event_into(&mut buffer)
-            .map_err(|error| make_error(format!("invalid DDE connection XML: {error}")))?;
+            .map_err(|error| {
+                crate::core::map_resolved_reader_error(error, "invalid DDE connection XML")
+            })?;
         match event {
             Event::Start(ref element) => {
                 if pending_declaration.is_some() || pending_use.is_some() {

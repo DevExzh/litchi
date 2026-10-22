@@ -3,6 +3,7 @@
 use super::{Limits, Part, Selector, inventory, model::Chart, package};
 use crate::package::Archive;
 use litchi_core::{Error, Result};
+use litchi_odf_common::XmlStreamLimits;
 
 /// Immutable embedded-chart inventory tied to exact ODS package bytes.
 #[derive(Clone, Debug)]
@@ -10,6 +11,7 @@ pub struct Snapshot {
     source: Vec<u8>,
     limits: Limits,
     charts: Vec<Chart>,
+    xml_limits: XmlStreamLimits,
 }
 
 impl Snapshot {
@@ -26,12 +28,21 @@ impl Snapshot {
     /// # Errors
     /// Returns an error when the operation cannot be completed.
     pub fn from_bytes_with(source: Vec<u8>, limits: Limits) -> Result<Self> {
-        let package = Archive::from_bytes(source.clone())?;
+        Self::from_bytes_with_xml_limits(source, limits, XmlStreamLimits::owner_default_value())
+    }
+
+    pub(crate) fn from_bytes_with_xml_limits(
+        source: Vec<u8>,
+        limits: Limits,
+        xml_limits: XmlStreamLimits,
+    ) -> Result<Self> {
+        let package = Archive::from_bytes_with_xml_limits(source.clone(), xml_limits)?;
         let charts = inventory(&package, limits)?.charts;
         Ok(Self {
             source,
             limits,
             charts,
+            xml_limits,
         })
     }
 
@@ -126,9 +137,16 @@ impl Edit {
     pub(crate) fn commit(self) -> Result<Commit> {
         let changed = self.before.charts != self.draft;
         let snapshot = if changed {
-            let package_source = Archive::from_bytes(self.before.source.clone())?;
+            let package_source = Archive::from_bytes_with_xml_limits(
+                self.before.source.clone(),
+                self.before.xml_limits,
+            )?;
             let bytes = package::replace(&package_source, &self.before.charts, &self.draft)?;
-            let result = Snapshot::from_bytes_with(bytes, self.before.limits)?;
+            let result = Snapshot::from_bytes_with_xml_limits(
+                bytes,
+                self.before.limits,
+                self.before.xml_limits,
+            )?;
             if result.charts != self.draft {
                 return Err(Error::InvalidFormat(
                     "ODS chart commit failed typed readback".to_string(),

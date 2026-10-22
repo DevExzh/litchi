@@ -6,6 +6,7 @@ use crate::model::hyperlink::{Actuate, Link, Show};
 use crate::model::source::CellRange;
 use litchi_core::{Error, Result, xml::escape_xml};
 use litchi_odf_common::leniency::{ContentDefect, DefectLocation, ToleranceReport};
+use litchi_odf_common::{ResolvedReader, XmlStreamLimits};
 use quick_xml::{
     XmlVersion,
     encoding::Decoder,
@@ -546,18 +547,34 @@ fn reserve_parser_push<T>(
 /// open, or an editor's own output. A read that owns no such report uses
 /// [`parse_recording`].
 pub(crate) fn parse(xml: &str) -> Result<Vec<Sheet>> {
-    parse_impl(xml, true, &mut ToleranceReport::default())
+    parse_with_xml_limits(xml, XmlStreamLimits::owner_default_value())
 }
 
-/// [`parse`], appending every content repair to `tolerance`.
-pub(crate) fn parse_recording(xml: &str, tolerance: &mut ToleranceReport) -> Result<Vec<Sheet>> {
-    parse_impl(xml, true, tolerance)
+/// Parse a worksheet graph under the raw XML policy retained by an opened
+/// package owner.
+pub(crate) fn parse_with_xml_limits(xml: &str, xml_limits: XmlStreamLimits) -> Result<Vec<Sheet>> {
+    parse_impl(xml, true, &mut ToleranceReport::default(), xml_limits)
+}
+
+/// Parse a worksheet graph and retain content repairs under the owner's XML
+/// policy.
+pub(crate) fn parse_recording_with_xml_limits(
+    xml: &str,
+    tolerance: &mut ToleranceReport,
+    xml_limits: XmlStreamLimits,
+) -> Result<Vec<Sheet>> {
+    parse_impl(xml, true, tolerance, xml_limits)
 }
 
 /// Parse flat spreadsheet tables while retaining duplicate names for
 /// selector-time ambiguity reporting.
 pub(crate) fn parse_flat(xml: &str, tolerance: &mut ToleranceReport) -> Result<Vec<Sheet>> {
-    parse_impl(xml, false, tolerance)
+    parse_impl(
+        xml,
+        false,
+        tolerance,
+        XmlStreamLimits::owner_default_value(),
+    )
 }
 
 /// Shared worksheet parse over one dedicated reader.
@@ -569,6 +586,7 @@ fn parse_impl(
     xml: &str,
     require_unique_names: bool,
     tolerance: &mut ToleranceReport,
+    xml_limits: XmlStreamLimits,
 ) -> Result<Vec<Sheet>> {
     validation::validate_content_xml_size(xml)?;
     let mut reader = NsReader::from_str(xml);
@@ -991,7 +1009,7 @@ fn parse_impl(
             "ODS content ended with an unfinished worksheet object".to_string(),
         ));
     }
-    apply_table_metadata(xml, &mut sheets)?;
+    apply_table_metadata(xml, &mut sheets, xml_limits)?;
     if require_unique_names {
         validation::validate_sheets(&sheets)?;
     } else {
@@ -1028,12 +1046,16 @@ struct OpenTableMetadata {
 /// These two text-only children are nevertheless part of the public worksheet
 /// model, so they get a small bounded pass of their own.  The pass is strict
 /// about the ODF shape and never evaluates or otherwise interprets text.
-pub(crate) fn apply_table_metadata(xml: &str, sheets: &mut [Sheet]) -> Result<()> {
+pub(crate) fn apply_table_metadata(
+    xml: &str,
+    sheets: &mut [Sheet],
+    xml_limits: XmlStreamLimits,
+) -> Result<()> {
     // Keep metadata admission on the same normalized namespace reader as the
     // fused worksheet pass.  In particular, escaped namespace declaration
     // values must resolve semantically while the original source bytes remain
     // untouched for source-backed publication.
-    let mut reader = litchi_odf_common::core::ResolvedReader::from_xml(xml);
+    let mut reader = ResolvedReader::from_xml(xml, xml_limits)?;
     reader.config_mut().check_end_names = true;
     reader.config_mut().trim_text(false);
     let mut buffer = Vec::new();
@@ -1044,7 +1066,9 @@ pub(crate) fn apply_table_metadata(xml: &str, sheets: &mut [Sheet]) -> Result<()
     loop {
         let (resolved, event) = reader
             .read_resolved_event_into(&mut buffer)
-            .map_err(|error| Error::InvalidFormat(format!("invalid ODS XML: {error}")))?;
+            .map_err(|error| {
+                litchi_odf_common::map_resolved_reader_error(error, "invalid ODS XML")
+            })?;
         let namespace = namespace_kind(&resolved);
         match event {
             Event::Start(element) => {

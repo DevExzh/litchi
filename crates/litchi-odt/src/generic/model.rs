@@ -1,6 +1,7 @@
 //! Typed snapshots for format-neutral ODF package and flat-document access.
 
 use crate::core::OwnedPackage;
+use litchi_odf_common::XmlStreamLimits;
 
 /// The crate-internal name of the flat owner ([`Document`]).
 pub(crate) use self::Document as FlatDocument;
@@ -42,6 +43,7 @@ pub struct Package {
     pub(super) family: Family,
     pub(super) template: bool,
     pub(super) mimetype: String,
+    pub(super) xml_limits: XmlStreamLimits,
 }
 
 /// Validated flat `OpenDocument` XML file.
@@ -60,4 +62,5 @@ pub struct Document {
     pub(super) max_document_bytes: usize,
     pub(super) execution_context: litchi_core::ExecutionContext,
     pub(super) source_memory: super::flat::MemoryLease,
+    pub(super) xml_limits: XmlStreamLimits,
 }

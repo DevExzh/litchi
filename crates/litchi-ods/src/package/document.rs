@@ -1,4 +1,5 @@
 use litchi_core::{Error, Result};
+use litchi_odf_common::XmlStreamLimits;
 use litchi_odf_common::calculation::Settings;
 use litchi_odf_common::core::{
     OwnedPackage, PackageWriter, PreparedPackage, XmlSplicePublication, family,
@@ -57,6 +58,7 @@ const BODY_MARKER: &str = "<office:spreadsheet";
 /// semantic snapshots and byte slices.
 pub(crate) struct Archive {
     inner: Arc<family::Package>,
+    xml_limits: XmlStreamLimits,
 }
 
 impl fmt::Debug for Archive {
@@ -77,10 +79,18 @@ impl Archive {
     /// # Errors
     /// Returns an error when the operation cannot be completed.
     pub(crate) fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
+        Self::from_bytes_with_xml_limits(bytes, XmlStreamLimits::owner_default_value())
+    }
+
+    pub(crate) fn from_bytes_with_xml_limits(
+        bytes: Vec<u8>,
+        xml_limits: XmlStreamLimits,
+    ) -> Result<Self> {
         let package = family::Package::from_bytes(bytes, MIMETYPE, BODY_MARKER, "ODS")?;
         crate::authoring::validate_content_xml(package.content_xml())?;
         Ok(Self {
             inner: Arc::new(package),
+            xml_limits,
         })
     }
 
@@ -90,6 +100,16 @@ impl Archive {
     /// checked, so a mismatched family is reported without exposing or
     /// rebuilding the underlying archive index.
     pub(crate) fn from_prepared_package(prepared: PreparedPackage) -> Result<Self> {
+        Self::from_prepared_package_with_xml_limits(
+            prepared,
+            XmlStreamLimits::owner_default_value(),
+        )
+    }
+
+    pub(crate) fn from_prepared_package_with_xml_limits(
+        prepared: PreparedPackage,
+        xml_limits: XmlStreamLimits,
+    ) -> Result<Self> {
         if prepared.format() != litchi_core::detection::FileFormat::Ods {
             return Err(Error::InvalidFormat(
                 "prepared ODF package is not an ODS family document".to_string(),
@@ -104,6 +124,7 @@ impl Archive {
         crate::authoring::validate_content_xml(package.content_xml())?;
         Ok(Self {
             inner: Arc::new(package),
+            xml_limits,
         })
     }
 
@@ -111,19 +132,36 @@ impl Archive {
     /// bytes.  This is the explicit handoff from the positional source owner
     /// to the established mutable package facade.
     pub(crate) fn from_owned_package(archive: OwnedPackage) -> Result<Self> {
+        Self::from_owned_package_with_xml_limits(archive, XmlStreamLimits::owner_default_value())
+    }
+
+    pub(crate) fn from_owned_package_with_xml_limits(
+        archive: OwnedPackage,
+        xml_limits: XmlStreamLimits,
+    ) -> Result<Self> {
         let package = family::Package::from_owned_package(archive, MIMETYPE, BODY_MARKER, "ODS")?;
         crate::authoring::validate_content_xml(package.content_xml())?;
         Ok(Self {
             inner: Arc::new(package),
+            xml_limits,
         })
     }
 
     /// Adopt shared ODS bytes for an internal source-bound transaction.
+    #[cfg(test)]
     pub(crate) fn from_shared_bytes(bytes: Arc<Vec<u8>>) -> Result<Self> {
+        Self::from_shared_bytes_with_xml_limits(bytes, XmlStreamLimits::owner_default_value())
+    }
+
+    pub(crate) fn from_shared_bytes_with_xml_limits(
+        bytes: Arc<Vec<u8>>,
+        xml_limits: XmlStreamLimits,
+    ) -> Result<Self> {
         let package = family::Package::from_shared_bytes(bytes, MIMETYPE, BODY_MARKER, "ODS")?;
         crate::authoring::validate_content_xml(package.content_xml())?;
         Ok(Self {
             inner: Arc::new(package),
+            xml_limits,
         })
     }
 
@@ -141,7 +179,13 @@ impl Archive {
         crate::authoring::validate_content_xml(package.content_xml())?;
         Ok(Self {
             inner: Arc::new(package),
+            xml_limits: self.xml_limits,
         })
+    }
+
+    #[must_use]
+    pub(crate) const fn xml_limits_value(&self) -> XmlStreamLimits {
+        self.xml_limits
     }
 
     #[must_use]
@@ -198,10 +242,12 @@ impl Archive {
         crate::codec::names::parse(self.content_xml())
     }
 
-    /// Decode the public typed worksheet graph without expanding repetition
-    /// runs into one object per logical row or cell.
-    pub(crate) fn sheets(&self) -> Result<Vec<crate::worksheet::Sheet>> {
-        crate::worksheet::codec::parse(self.content_xml())
+    /// Decode worksheets under the policy retained by the owning package.
+    pub(crate) fn sheets_with_xml_limits(
+        &self,
+        xml_limits: XmlStreamLimits,
+    ) -> Result<Vec<crate::worksheet::Sheet>> {
+        crate::worksheet::codec::parse_with_xml_limits(self.content_xml(), xml_limits)
     }
 
     #[cfg(test)]
@@ -225,7 +271,7 @@ impl Archive {
                 Cow::Borrowed(_) => return Err(error),
             },
         };
-        Self::from_bytes(bytes)
+        Self::from_bytes_with_xml_limits(bytes, self.xml_limits)
     }
 
     /// Rebuild this package from exact checked `content.xml` source ranges.
@@ -235,7 +281,7 @@ impl Archive {
         publication: XmlSplicePublication,
     ) -> Result<Self> {
         let bytes = replace_content_xml_spliced(self.package(), content_xml, publication)?;
-        Self::from_bytes(bytes)
+        Self::from_bytes_with_xml_limits(bytes, self.xml_limits)
     }
 
     /// Publish an exact-source checked tracked-change commit.
@@ -279,7 +325,7 @@ impl Archive {
             vec!["meta.xml".to_string()],
             Vec::<String>::new(),
         )?;
-        Self::from_bytes(bytes)
+        Self::from_bytes_with_xml_limits(bytes, self.xml_limits)
     }
 
     /// Replace the content-level calculation-settings owner atomically.
@@ -292,11 +338,14 @@ impl Archive {
         }
         let commit = transaction.commit()?;
         if !commit.changed() {
-            return Self::from_bytes(self.inner.as_bytes().to_vec());
+            return Self::from_bytes_with_xml_limits(
+                self.inner.as_bytes().to_vec(),
+                self.xml_limits,
+            );
         }
         let content_xml = commit.into_owned();
         let bytes = self.rebuild(&content_xml, Part::Preserve, Part::Preserve, Part::Preserve)?;
-        Self::from_bytes(bytes)
+        Self::from_bytes_with_xml_limits(bytes, self.xml_limits)
     }
 
     /// Replace or remove the document styles part while preserving every
@@ -308,7 +357,7 @@ impl Archive {
             Part::Preserve,
             Part::Preserve,
         )?;
-        Self::from_bytes(bytes)
+        Self::from_bytes_with_xml_limits(bytes, self.xml_limits)
     }
 
     fn rebuild(

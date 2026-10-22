@@ -3,23 +3,44 @@
 //! Parsing each XML part remains a codec concern; this boundary owns the
 //! document-wide declaration/reference inventory and its cross-part limits.
 
+#![cfg_attr(test, allow(dead_code))]
+
 use super::{Kind, MAX_XML_BYTES, Part, Scope, codec, model::Declarations};
 use crate::core::ResolvedReader;
 use crate::generic::{FlatMutationBudget, MemoryLease};
 use litchi_core::Result;
+use litchi_odf_common::XmlStreamLimits;
 use quick_xml::events::Event;
 use quick_xml::name::ResolveResult;
 use std::collections::HashSet;
 use std::mem::size_of;
 
 /// Parse content, styles, or flat XML parts as one validated document view.
+#[cfg(test)]
 pub(crate) fn parse_parts(parts: &[(&str, Part)]) -> Result<Declarations> {
-    parse_parts_with_optional_budget(parts, None)
+    parse_parts_with_xml_limits(parts, XmlStreamLimits::default())
 }
 
+/// Parse declarations under the raw XML policy retained by an opened owner.
+pub(crate) fn parse_parts_with_xml_limits(
+    parts: &[(&str, Part)],
+    xml_limits: XmlStreamLimits,
+) -> Result<Declarations> {
+    parse_parts_with_optional_budget_and_limits(parts, None, xml_limits)
+}
+
+#[cfg(test)]
 fn parse_parts_with_optional_budget(
     parts: &[(&str, Part)],
     budget: Option<&FlatMutationBudget>,
+) -> Result<Declarations> {
+    parse_parts_with_optional_budget_and_limits(parts, budget, XmlStreamLimits::default())
+}
+
+fn parse_parts_with_optional_budget_and_limits(
+    parts: &[(&str, Part)],
+    budget: Option<&FlatMutationBudget>,
+    xml_limits: XmlStreamLimits,
 ) -> Result<Declarations> {
     let total = parts.iter().try_fold(0usize, |size, (xml, _)| {
         size.checked_add(xml.len())
@@ -48,6 +69,7 @@ fn parse_parts_with_optional_budget(
             &mut aggregate,
             &mut declaration_count,
             budget,
+            xml_limits,
         )?;
     }
     for (kind, name) in all_uses {
@@ -65,7 +87,9 @@ fn parse_parts_with_optional_budget(
         budget.check()?;
         budget.consume_objects(1)?;
     }
-    let dde = crate::dde_connection::parse_dde_connection_parts_with_budget(parts, budget)?;
+    let dde = crate::dde_connection::parse_dde_connection_parts_with_budget_and_xml_limits(
+        parts, budget, xml_limits,
+    )?;
     result.dde_connections = dde.declarations;
     result.dde_connection_uses = dde.uses;
     if let Some(budget) = budget {
@@ -73,15 +97,17 @@ fn parse_parts_with_optional_budget(
         budget.consume_objects(1)?;
     }
     result.bibliography_configuration =
-        crate::bibliography_configuration::parse_bibliography_configuration_parts_with_budget(
-            parts, budget,
+        crate::bibliography_configuration::parse_bibliography_configuration_parts_with_budget_and_xml_limits(
+            parts, budget, xml_limits,
         )?;
     if let Some(budget) = budget {
         budget.check()?;
         budget.consume_objects(1)?;
     }
     result.auto_mark_files =
-        crate::auto_mark_file::parse_auto_mark_file_parts_with_budget(parts, budget)?;
+        crate::auto_mark_file::parse_auto_mark_file_parts_with_budget_and_xml_limits(
+            parts, budget, xml_limits,
+        )?;
     if let Some(budget) = budget {
         budget.check()?;
         budget.consume_objects(1)?;
@@ -97,14 +123,23 @@ fn parse_parts_with_optional_budget(
 /// attribute, text, vector-slot, and set-entry storage from a borrowed event
 /// pass before the allocating parser runs.  It remains independent of the
 /// final edited-document byte limit.
+#[cfg(test)]
 pub(crate) fn parse_parts_with_budget(
     parts: &[(&str, Part)],
     budget: &FlatMutationBudget,
 ) -> Result<(Declarations, MemoryLease)> {
+    parse_parts_with_budget_and_xml_limits(parts, budget, XmlStreamLimits::default())
+}
+
+pub(crate) fn parse_parts_with_budget_and_xml_limits(
+    parts: &[(&str, Part)],
+    budget: &FlatMutationBudget,
+    xml_limits: XmlStreamLimits,
+) -> Result<(Declarations, MemoryLease)> {
     budget.check()?;
-    let amount = parser_memory_plan(parts, Some(budget))?;
+    let amount = parser_memory_plan_with_xml_limits(parts, Some(budget), xml_limits)?;
     let reservation = budget.reserve_bytes(amount, "ODT variable declaration parser projection")?;
-    match parse_parts_with_optional_budget(parts, Some(budget)) {
+    match parse_parts_with_optional_budget_and_limits(parts, Some(budget), xml_limits) {
         Ok(parsed) => Ok((parsed, MemoryLease::new(reservation))),
         Err(error) => {
             drop(reservation);
@@ -133,6 +168,14 @@ pub(crate) fn parser_memory_plan(
     parts: &[(&str, Part)],
     budget: Option<&FlatMutationBudget>,
 ) -> Result<usize> {
+    parser_memory_plan_with_xml_limits(parts, budget, XmlStreamLimits::default())
+}
+
+pub(crate) fn parser_memory_plan_with_xml_limits(
+    parts: &[(&str, Part)],
+    budget: Option<&FlatMutationBudget>,
+    xml_limits: XmlStreamLimits,
+) -> Result<usize> {
     let total = parts.iter().try_fold(0usize, |size, (xml, _)| {
         size.checked_add(xml.len())
             .ok_or_else(|| codec::invalid("variable declaration XML size overflow"))
@@ -145,7 +188,7 @@ pub(crate) fn parser_memory_plan(
         if xml.len() > MAX_XML_BYTES {
             return Err(codec::invalid("variable declaration XML exceeds 64 MiB"));
         }
-        let mut reader = ResolvedReader::from_xml(xml);
+        let mut reader = ResolvedReader::from_xml(xml, codec::xml_limits_with_policy(xml_limits)?)?;
         reader.config_mut().check_end_names = true;
         let mut depth = 0usize;
         loop {
@@ -154,7 +197,7 @@ pub(crate) fn parser_memory_plan(
             }
             let start = reader.buffer_position() as usize;
             let (resolved, event) = reader.read_resolved_event().map_err(|error| {
-                codec::invalid(format!("invalid variable declaration XML: {error}"))
+                crate::core::map_resolved_reader_error(error, "invalid variable declaration XML")
             })?;
             let namespace_len = match &resolved {
                 ResolveResult::Bound(value) => value.as_ref().len(),
