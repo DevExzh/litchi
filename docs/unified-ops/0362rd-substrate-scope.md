@@ -56,7 +56,7 @@ The resulting classification is:
 |---|---|---|
 | Public format-facing re-export, alias or leak | 0350’s every-format requirement; 0351 W5/W6 owned paths; ADR 0034 §1’s one-name/no-alias rule. Examples are the W5 `Revision`/`Snapshot` aliases and the W6 writer’s public ZIP limit/error types. | Required in the owning format wave. The three W5 removals in this branch are this category. A public ODF path cannot be excused as “generic ZIP”; the concrete ODF repair must still distinguish a canonical re-export from a migration alias. |
 | Office-specific OPC surface | ADR 0034 §5 explicitly names OPC `ReadLimits` → `SourceLimits` and says OOXML re-exports follow (`docs/adr/0034-unified-api-glossary-and-default-policies.md:169-181`); 0343’s closure also records OPC stream-verb renames. The W4 brief fixes the raw `Package::edit_opc` boundary. | Required canonicalization for the Office package substrate, but it should be one atomic OPC lane with DOCX/PPTX/XLSX/XLSB consumers. Its absence from the 0351 wave table is a scheduling qualification, not a permanent exception. |
-| Standalone CFB or soapberry-ZIP methods with no public format leak | 0350 names format crates and `File`; 0351’s inventory and ownership table do not include these implementation crates. ADR 0034’s vocabulary policy does not assign their independent transport surface to W5/W6. | Separate scope requiring an explicit owner/coordinator lane. Do not claim the entire generic API is mandatory in the current format wave solely because formats depend on it. Any method re-exported through an owned format surface moves back into the first row and is required there. |
+| Standalone CFB or soapberry-ZIP methods with no public format operation or free foreign-result signature | 0350 names format crates and `File`; 0351’s inventory and ownership table do not include these implementation crates. ADR 0034’s vocabulary policy does not assign their independent transport surface to W5/W6. A typed foreign causal source nested in a crate-owned error is a separate, permitted boundary shape. | Separate scope requiring an explicit owner/coordinator lane. Do not claim the entire generic API is mandatory in the current format wave solely because formats depend on it. Any method re-exported through an owned format surface moves back into the first row and is required there. |
 
 This distinction is narrower than a blanket exemption. For example,
 `litchi-ole-common::source_backed_overlay` publicly accepts and returns
@@ -251,10 +251,18 @@ The OPC alias debt is separate from the limit migration:
   `deflate_payload_bytes_read`, `decompressed_deflate_bytes_produced` and
   `decompressed_deflate_bytes_accepted`.
 
-No public OPC signature found in this survey exposes a `soapberry_zip` type;
-those types are kept in private fields/wrappers. Thus the dedicated OPC lane
-is required by the raw limit and alias rules, while a blanket ZIP API rewrite
-is not justified by an accidental public type leak.
+The survey found no public OPC operation or free `Result` signature whose
+return or argument type is a `soapberry_zip` transport type. The public,
+crate-owned `OpcError` does retain typed causal sources: `ParallelRead` carries
+`#[source] soapberry_zip::Error` (`crates/litchi-opc/src/error.rs:166-168`),
+while `XmlPublication` carries `xml_minifier::audit::Error` and
+`QuickXmlError` carries `quick_xml::Error` (`error.rs:145-152,304-305`). The
+private `ArchiveAccess` and worker helpers also use foreign `Result` types, but
+they do not enter the OPC public surface. Under the settled error reading, a
+foreign causal payload inside the crate-owned `OpcError` is a typed source, not
+a free transport API leak; it requires no wrapper or string-flattening rewrite.
+Thus the dedicated OPC lane is required by the raw limit and alias rules, while
+a blanket ZIP API rewrite is not justified by these retained causes.
 
 ### `litchi-cfb`: dedicated CFB substrate lane
 
@@ -321,11 +329,12 @@ with all consumers and streaming/deflate ABBA measurements; they do not
 justify changing generic APIs opportunistically during an ODF or OPC owner
 wave.
 
-The public-leak audit found no public `soapberry_zip` type in OPC signatures.
-ODF source-publication uses of `PreservationIndex` are `pub(crate)`. The
-public ODF writer re-exports the ZIP limit and error types above, so W6 must
-make the canonical-name and error-boundary decisions even though the remaining
-ZIP surface waits for its own lane. Internal calls such as
+The public-leak audit found no public free `soapberry_zip` operation or result
+signature in OPC; it did find the typed causal sources nested in the public
+`OpcError` described above. ODF source-publication uses of `PreservationIndex`
+are `pub(crate)`. The public ODF writer re-exports the ZIP limit and error types
+above, so W6 must make the canonical-name and error-boundary decisions even
+though the remaining ZIP surface waits for its own lane. Internal calls such as
 `litchi-odf-common/src/core/writer.rs:1309` using
 `write_deflated_reader` belong to that eventual generic alias migration but
 do not by themselves expand the current ODF owner scope.
