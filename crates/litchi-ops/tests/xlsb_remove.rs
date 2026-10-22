@@ -425,7 +425,12 @@ fn partial_formula_group_removal_is_a_typed_failure_and_is_atomic() {
         let error = original
             .remove("Data!E1")
             .expect_err("partial shared-formula removal must be refused");
-        assert_eq!(error.code(), Code::UnsupportedCapability);
+        assert_eq!(error.code(), Code::UnsupportedType);
+        assert!(matches!(
+            error.leaf(),
+            Source::Xlsb(litchi_xlsb::package::PackageError::Refused(refusal))
+                if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedTarget
+        ));
         assert_eq!(
             original.to_bytes().expect("source after formula refusal"),
             before

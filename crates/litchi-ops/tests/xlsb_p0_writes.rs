@@ -5,7 +5,10 @@
 
 use std::io::Cursor;
 
+use litchi_core::edit::RefusalKind;
+use litchi_ops::error::Source;
 use litchi_ops::{Code, File, OpenOptions, Props, SourceMode, props};
+use litchi_xlsb::package::PackageError;
 
 fn fixture() -> Vec<u8> {
     use litchi_xlsb::builder::{self, Builder};
@@ -274,14 +277,29 @@ fn merges_set_read_back_and_unmerge_exactly() {
             .expect("equal merge");
         assert_eq!(again.to_bytes().unwrap(), merged.to_bytes().unwrap());
 
+        let before_refusal = merged.to_bytes().unwrap();
         let error = merged
             .set("/Data/B2:C3", props! { "merge" => true })
             .expect_err("overlap");
-        assert_eq!(error.code(), Code::InvalidArgument, "{error:?}");
+        assert_eq!(error.code(), Code::InvalidValue, "{error:?}");
+        assert!(
+            matches!(error.leaf(), Source::Xlsb(PackageError::Refused(refusal))
+            if refusal.kind() == RefusalKind::InvalidValue)
+        );
+        assert_eq!(error.property(), Some("merge"));
+        assert!(error.suggestion().is_some());
+        assert_eq!(merged.to_bytes().unwrap(), before_refusal);
         let error = merged
             .set("/Data/A1:A3", props! { "merge" => false })
             .expect_err("partial unmerge");
-        assert_eq!(error.code(), Code::InvalidArgument, "{error:?}");
+        assert_eq!(error.code(), Code::UnsupportedType, "{error:?}");
+        assert!(
+            matches!(error.leaf(), Source::Xlsb(PackageError::Refused(refusal))
+            if refusal.kind() == RefusalKind::UnsupportedTarget)
+        );
+        assert_eq!(error.property(), Some("merge"));
+        assert!(error.suggestion().is_some());
+        assert_eq!(merged.to_bytes().unwrap(), before_refusal);
         let error = merged
             .set("/Data/A1", props! { "merge" => true })
             .expect_err("a cell is not a range");

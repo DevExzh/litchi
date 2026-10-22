@@ -1059,7 +1059,7 @@ impl Edit {
             (true, Some(_)) | (false, None) => {
                 if !merge && current.iter().any(|existing| existing.overlaps(&range)) {
                     return Err(Error::refused(
-                        litchi_core::edit::RefusalKind::UnsupportedContent,
+                        litchi_core::edit::RefusalKind::UnsupportedTarget,
                         "edit",
                         "the range overlaps a different merge; name that merge exactly",
                     ));
@@ -1069,7 +1069,7 @@ impl Edit {
             (true, None) => {
                 if current.iter().any(|existing| existing.overlaps(&range)) {
                     return Err(Error::refused(
-                        litchi_core::edit::RefusalKind::UnsupportedContent,
+                        litchi_core::edit::RefusalKind::InvalidValue,
                         "edit",
                         "the range overlaps an existing merge",
                     ));
@@ -7187,7 +7187,7 @@ fn canonical_merge_ranges(
             .any(|next| next.overlaps(range))
         {
             return Err(Error::refused(
-                litchi_core::edit::RefusalKind::UnsupportedContent,
+                litchi_core::edit::RefusalKind::InvalidValue,
                 "edit",
                 "merged ranges must not overlap",
             ));

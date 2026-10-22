@@ -189,10 +189,12 @@ fn resolve_ranges(
     Ok(targets)
 }
 
-/// A refused merge names the caller's range: an overlap or an invalid range
-/// is an argument error, other failures keep their class.
+/// Preserve typed refusal classification while attaching merge guidance.
 fn merge_error(error: litchi_xlsb::package::PackageError) -> Error {
     match error {
+        error @ litchi_xlsb::package::PackageError::Refused(_) => native_error(error)
+            .with_property("merge")
+            .with_suggestion("name an existing merge exactly, or a range clear of other merges"),
         litchi_xlsb::package::PackageError::UnsupportedFeature(_)
         | litchi_xlsb::package::PackageError::MergedCell(_)
         | litchi_xlsb::package::PackageError::InvalidFormat(_) => Error::new(

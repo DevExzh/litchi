@@ -2926,6 +2926,14 @@
   {
    "record": "0362qa",
    "reason": "Return-contract tooling validation and real rustdoc fixtures only; no runtime measurement or performance acceptance."
+  },
+  {
+   "record": "0362u",
+   "reason": "Merged replay/API source validation and test command receipts only; native performance qualification remains required."
+  },
+  {
+   "record": "0362ua",
+   "reason": "XLSB refusal-kind and failure-atomicity validation only; no changed success path or paired performance measurement."
   }
  ]
 }
