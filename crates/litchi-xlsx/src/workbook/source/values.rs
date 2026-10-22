@@ -193,16 +193,6 @@ impl ValueCache {
         }
     }
 
-    /// Diagnostics for a cache that has not been initialized yet. Keep the
-    /// public ceilings visible without allocating the lazy reader state.
-    pub(super) fn empty_diagnostics() -> CacheDiagnostics {
-        CacheDiagnostics {
-            max_weight: max_retained_weight(),
-            max_entries: MAX_RETAINED_ENTRIES,
-            ..CacheDiagnostics::default()
-        }
-    }
-
     fn lock(&self) -> MutexGuard<'_, State> {
         // A panic while the lock was held cannot leave a half-published
         // entry: every mutation completes before the guard is released.

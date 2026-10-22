@@ -85,7 +85,7 @@ impl SourceBackedWorkbook {
     /// The table is a clean cached value: releasing it changes no result, and
     /// the next formatting read parses the styles part again.
     pub fn release_cached_formats(&self) -> bool {
-        self.current().reader().formats.trim_clean()
+        self.current().formats.trim_clean()
     }
 }
 
@@ -226,20 +226,17 @@ impl SourceInner {
         let part = self.package.part(uri)?;
         let version = self.package.source_version()?;
         let limits = self.package.read_limits();
-        let table = self
-            .reader()
-            .formats
-            .get_or_build(FormatKey::source(version), || {
-                let data = part.data()?;
-                let table = FormatTable::parse_with_limits(data.as_bytes(), limits)?;
-                // `get_or_build` publishes the successful callback result before
-                // returning. Fence the value while the cache still owns only the
-                // local result, so cancellation or source replacement cannot
-                // publish a stale format table.
-                self.execution_check()?;
-                self.package.source_version()?;
-                Ok(table)
-            })?;
+        let table = self.formats.get_or_build(FormatKey::source(version), || {
+            let data = part.data()?;
+            let table = FormatTable::parse_with_limits(data.as_bytes(), limits)?;
+            // `get_or_build` publishes the successful callback result before
+            // returning. Fence the value while the cache still owns only the
+            // local result, so cancellation or source replacement cannot
+            // publish a stale format table.
+            self.execution_check()?;
+            self.package.source_version()?;
+            Ok(table)
+        })?;
         self.execution_check()?;
         self.package.source_version()?;
         Ok(Some(table))
@@ -432,7 +429,7 @@ mod tests {
         assert_eq!(bold.font().unwrap().bold(), Some(true));
         assert_eq!(bold.font().unwrap().size(), Some(9.0));
 
-        let diagnostics = workbook.inner.reader().formats.diagnostics();
+        let diagnostics = workbook.inner.formats.diagnostics();
         assert_eq!((diagnostics.builds, diagnostics.hits), (1, 1));
         assert!(diagnostics.pinned);
 

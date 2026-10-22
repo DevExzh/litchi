@@ -402,7 +402,7 @@ impl SourceWorksheet {
         self.owner.execution_check()?;
         self.owner.package.source_version()?;
         let weight = blocks.weight_bytes();
-        match self.owner.reader().values.publish(
+        match self.owner.values().publish(
             self.data.position,
             Cached::Blocks(Arc::new(blocks)),
             weight,
@@ -417,8 +417,7 @@ impl SourceWorksheet {
     fn cached_blocks(&self, record_miss: bool) -> Option<Arc<Blocks>> {
         match self
             .owner
-            .reader()
-            .values
+            .values()
             .get(self.data.position, Axis::Blocks, record_miss)?
         {
             Cached::Blocks(blocks) => Some(blocks),
