@@ -5,7 +5,7 @@ use std::{
     io::{self, Write},
 };
 
-use super::{Id, JpegFlavor, Kind, Point, Rect, Uid};
+use super::{Id, JpegFlavor, Kind, Limits, Point, Rect, Uid};
 use crate::write::{self as record_write, Atom, Container};
 
 /// Physical placement of a BLIP selected by an FBSE.
@@ -201,8 +201,15 @@ impl<'data> BlipBuilder<'data> {
     ///
     /// Returns an error if the BLIP kind has no writable record type, if a
     /// length exceeds `u32`, or if the writer fails.
-    pub fn write<W: Write>(&self, writer: &mut W) -> io::Result<()> {
-        record_write::atom_header(writer, self.instance()?, self.atom()?, self.body_len()?)?;
+    pub fn write<W: Write>(&self, writer: &mut W, limits: Limits) -> io::Result<()> {
+        let body_len = bounded_blip_len(self.body_len()?, limits)?;
+        record_write::atom_header(
+            writer,
+            self.instance()?,
+            self.atom()?,
+            body_len,
+            limits.records,
+        )?;
         let uid = self.uid();
         writer.write_all(uid.as_bytes())?;
         if self.two_uids {
@@ -339,13 +346,14 @@ impl<'data> EntryBuilder<'data> {
             .ok_or_else(|| invalid("FBSE record length exceeds u32"))
     }
 
-    fn write<W: Write>(&self, writer: &mut W, delay_offset: u32) -> io::Result<()> {
-        let body_len = self.body_len()?;
+    fn write<W: Write>(&self, writer: &mut W, delay_offset: u32, limits: Limits) -> io::Result<()> {
+        let body_len = bounded_record_len(self.body_len()?, limits, "FBSE body")?;
         record_write::atom_header(
             writer,
             u16::from(self.blip.kind().raw()),
             Atom::Bse,
             body_len,
+            limits.records,
         )?;
         writer.write_all(&[self.win.raw(), self.mac.raw()])?;
         writer.write_all(self.blip.uid().as_bytes())?;
@@ -365,7 +373,7 @@ impl<'data> EntryBuilder<'data> {
             writer.write_all(&0u16.to_le_bytes())?;
         }
         if self.placement == Placement::Embedded {
-            self.blip.write(writer)?;
+            self.blip.write(writer, limits)?;
         }
         Ok(())
     }
@@ -464,18 +472,25 @@ impl<'data> StoreBuilder<'data> {
     ///
     /// Returns an error if the entry count exceeds 4095, if a length or offset
     /// computation exceeds `u32`, or if the writer fails.
-    pub fn write_store<W: Write>(&self, writer: &mut W) -> io::Result<()> {
+    pub fn write_store<W: Write>(&self, writer: &mut W, limits: Limits) -> io::Result<()> {
         let count = u16::try_from(self.entries.len())
             .map_err(|_err| invalid("BStore entry count exceeds u16"))?;
         if count > 0x0FFF {
             return Err(invalid("BStore entry count exceeds 4095"));
         }
+        if count > limits.max_store_entries {
+            return Err(invalid("BStore entry count exceeds the configured limit"));
+        }
         let body_len = self.store_body_len()?;
+        bounded_record_len(body_len, limits, "BStore body")?;
+        // `BStoreDelay` is a headerless sequence rather than one record.  Its
+        // aggregate size may exceed the per-record ceiling; each delayed BLIP
+        // is checked by `BlipBuilder::write` below.
         self.delay_body_len()?;
-        record_write::container_header(writer, count, Container::BStore, body_len)?;
+        record_write::container_header(writer, count, Container::BStore, body_len, limits.records)?;
         let mut delay_offset = 0u32;
         for entry in &self.entries {
-            entry.write(writer, delay_offset)?;
+            entry.write(writer, delay_offset, limits)?;
             if entry.placement == Placement::Delay {
                 delay_offset = delay_offset
                     .checked_add(entry.blip.wire_len()?)
@@ -491,11 +506,19 @@ impl<'data> StoreBuilder<'data> {
     ///
     /// Returns an error if a length computation exceeds `u32` or if the writer
     /// fails.
-    pub fn write_delay<W: Write>(&self, writer: &mut W) -> io::Result<()> {
+    pub fn write_delay<W: Write>(&self, writer: &mut W, limits: Limits) -> io::Result<()> {
+        let count = u16::try_from(self.entries.len())
+            .map_err(|_err| invalid("BStore entry count exceeds u16"))?;
+        if count > 0x0FFF || count > limits.max_store_entries {
+            return Err(invalid("BStore entry count exceeds the configured limit"));
+        }
+        // The delay stream has no enclosing length field.  Check each BLIP's
+        // record body while streaming it rather than imposing an aggregate
+        // ceiling on an otherwise valid sequence.
         self.delay_body_len()?;
         for entry in &self.entries {
             if entry.placement == Placement::Delay {
-                entry.blip.write(writer)?;
+                entry.blip.write(writer, limits)?;
             }
         }
         Ok(())
@@ -508,8 +531,9 @@ impl<'data> StoreBuilder<'data> {
 ///
 /// Returns an error if the record kind is not a known BLIP atom, or if the
 /// writer fails.
-pub fn copy<W: Write>(writer: &mut W, blip: &super::Blip<'_>) -> io::Result<()> {
+pub fn copy<W: Write>(writer: &mut W, blip: &super::Blip<'_>, limits: Limits) -> io::Result<()> {
     let record = blip.record();
+    bounded_blip_len(record.len(), limits)?;
     let atom = match record.raw_kind() {
         0xF01A => Atom::BlipEmf,
         0xF01B => Atom::BlipWmf,
@@ -521,8 +545,32 @@ pub fn copy<W: Write>(writer: &mut W, blip: &super::Blip<'_>) -> io::Result<()> 
         0xF02A => Atom::BlipJpeg2,
         raw => Atom::unknown(raw, record.version())?,
     };
-    record_write::atom_header(writer, record.instance(), atom, record.len())?;
+    record_write::atom_header(
+        writer,
+        record.instance(),
+        atom,
+        record.len(),
+        limits.records,
+    )?;
     writer.write_all(record.data())
+}
+
+fn bounded_record_len(body_len: u32, limits: Limits, label: &'static str) -> io::Result<u32> {
+    if body_len > limits.records.max_record_bytes {
+        return Err(invalid(match label {
+            "BStore body" => "BStore body exceeds the configured record limit",
+            _ => "OfficeArt record body exceeds the configured record limit",
+        }));
+    }
+    Ok(body_len)
+}
+
+fn bounded_blip_len(body_len: u32, limits: Limits) -> io::Result<u32> {
+    bounded_record_len(body_len, limits, "BLIP body")?;
+    if body_len > limits.max_blip_bytes {
+        return Err(invalid("BLIP body exceeds the configured image limit"));
+    }
+    Ok(body_len)
 }
 
 /// Computes the RFC1320 MD4 digest used for `OfficeArt` image UIDs.
@@ -642,7 +690,7 @@ mod tests {
         )
         .unwrap();
         let mut bytes = Vec::new();
-        blip.write(&mut bytes).unwrap();
+        blip.write(&mut bytes, Limits::default()).unwrap();
         let Blip::Wmf(parsed) = Blip::parse(&bytes, Default::default()).unwrap() else {
             panic!("expected WMF")
         };
@@ -659,7 +707,7 @@ mod tests {
             .unwrap()
             .two_uids();
         let mut bytes = Vec::new();
-        blip.write(&mut bytes).unwrap();
+        blip.write(&mut bytes, Limits::default()).unwrap();
         let Blip::Jpeg(parsed) = Blip::parse(&bytes, Default::default()).unwrap() else {
             panic!("expected JPEG")
         };
@@ -678,8 +726,12 @@ mod tests {
             .unwrap();
         let mut store_bytes = Vec::new();
         let mut delay_bytes = Vec::new();
-        builder.write_store(&mut store_bytes).unwrap();
-        builder.write_delay(&mut delay_bytes).unwrap();
+        builder
+            .write_store(&mut store_bytes, Limits::default())
+            .unwrap();
+        builder
+            .write_delay(&mut delay_bytes, Limits::default())
+            .unwrap();
 
         let store = Store::parse(&store_bytes, Default::default()).unwrap();
         assert!(matches!(

@@ -198,7 +198,7 @@ fn collect_officeart_owner_ids(
     record_count: &mut usize,
     depth: usize,
 ) -> Result<()> {
-    for record in litchi_odraw::Parser::new(data).records() {
+    for record in litchi_odraw::Parser::new(data, litchi_odraw::Limits::default()).records() {
         let parsed_record = record?;
         collect_officeart_record(&parsed_record, limits, owner_ids, record_count, depth)?;
     }

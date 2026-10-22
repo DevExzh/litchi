@@ -100,7 +100,7 @@ pub(crate) struct Drawing<'data> {
 impl<'data> Drawing<'data> {
     /// Parses one complete `OfficeArt` container without copying its payloads.
     pub(crate) fn parse(data: &'data [u8]) -> Result<Self, Error> {
-        let root = Parser::new(data)
+        let root = Parser::new(data, litchi_odraw::Limits::default())
             .root()
             .map_err(map_wire_error)?
             .ok_or_else(|| invalid_data("OfficeArt stream has no container root"))?;

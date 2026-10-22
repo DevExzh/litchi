@@ -251,7 +251,8 @@ fn text_boxes_write_valid_client_textbox_links() {
     fn collect_txids(data: &[u8], txids: &mut Vec<u32>) {
         let mut offset = 0;
         while offset + 8 <= data.len() {
-            let Ok((record, size)) = Record::parse(data, offset) else {
+            let Ok((record, size)) = Record::parse(data, offset, litchi_odraw::Limits::default())
+            else {
                 break;
             };
             if record.raw_kind() == RECORD_CLIENT_TEXTBOX {
@@ -265,7 +266,7 @@ fn text_boxes_write_valid_client_textbox_links() {
     }
     let mut txids = Vec::new();
     // Top level: DggContainer, then a dgglbl byte before the DgContainer.
-    let (first, first_size) = Record::parse(dgg, 0).unwrap();
+    let (first, first_size) = Record::parse(dgg, 0, litchi_odraw::Limits::default()).unwrap();
     collect_txids(first.data(), &mut txids);
     collect_txids(&dgg[first_size + 1..], &mut txids);
     assert_eq!(txids, vec![0x0001_0000, 0x0002_0000]);

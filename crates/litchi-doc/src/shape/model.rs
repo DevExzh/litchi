@@ -536,7 +536,7 @@ fn collect_unknown_properties(shape: &OfficeArtShape<'_>) -> io::Result<Vec<Unkn
             RecordKind::TertiaryOpt => PropertyTable::Tertiary,
             _ => continue,
         };
-        let props = Props::parse(&child).map_err(invalid_data)?;
+        let props = Props::parse(&child, child.limits()).map_err(invalid_data)?;
         properties.extend(
             props
                 .iter()
@@ -587,7 +587,8 @@ mod tests {
         for coordinate in [-120_i32, 40, 960, 880] {
             bytes.extend_from_slice(&coordinate.to_le_bytes());
         }
-        let (record, consumed) = Record::parse(&bytes, 0).expect("valid FSPGR record");
+        let (record, consumed) =
+            Record::parse(&bytes, 0, litchi_odraw::Limits::default()).expect("valid FSPGR record");
         assert_eq!(consumed, bytes.len());
         let bounds = Bounds::from_record(&record).expect("typed FSPGR bounds");
         assert_eq!(bounds, Bounds::new(-120, 40, 960, 880));
@@ -603,7 +604,8 @@ mod tests {
             0x03, 0x00, 0x00, 0x00, // payload length
             0xA5, 0x00, 0xFE,
         ];
-        let (record, consumed) = Record::parse(&bytes, 0).expect("valid unknown record");
+        let (record, consumed) = Record::parse(&bytes, 0, litchi_odraw::Limits::default())
+            .expect("valid unknown record");
         assert_eq!(consumed, bytes.len());
         let unknown = UnknownRecord::from_record(&record);
         assert_eq!(unknown.bytes(), bytes);

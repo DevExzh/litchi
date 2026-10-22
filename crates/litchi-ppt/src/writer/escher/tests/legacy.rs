@@ -633,7 +633,8 @@ fn typed_interactions_coexist_in_client_data_grammar_order() {
     };
 
     let bytes = create_user_shape_container(45, &shape).unwrap();
-    let (root_record, consumed) = Record::parse(&bytes, 0).unwrap();
+    let (root_record, consumed) =
+        Record::parse(&bytes, 0, litchi_odraw::Limits::default()).unwrap();
     assert_eq!(consumed, bytes.len());
     let root = Container::try_new(root_record).expect("shape container");
     let record = root
@@ -830,14 +831,15 @@ fn test_freeform_geometry_round_trips_through_opt_record() {
     };
 
     let bytes = create_user_shape_container(45, &shape).unwrap();
-    let (root_record, consumed) = Record::parse(&bytes, 0).expect("shape container record");
+    let (root_record, consumed) =
+        Record::parse(&bytes, 0, litchi_odraw::Limits::default()).expect("shape container record");
     assert_eq!(consumed, bytes.len());
     let root = Container::try_new(root_record).expect("shape container");
     let opt = root
         .find(RecordKind::Opt)
         .expect("valid shape container")
         .expect("OPT record");
-    let properties = Props::parse(&opt).expect("valid OPT properties");
+    let properties = Props::parse(&opt, opt.limits()).expect("valid OPT properties");
 
     assert_eq!(
         extract_geometry_rect(&properties),

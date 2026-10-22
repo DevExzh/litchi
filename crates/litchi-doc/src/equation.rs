@@ -151,8 +151,13 @@ impl Editor {
         options: MtefEquationWriteOptions,
     ) -> Result<Reference> {
         let mut picture_data = Vec::new();
-        write_picture_block(&options.preview, options.storage_id, &mut picture_data)
-            .map_err(|error| PackageError::Corrupted(error.to_string()))?;
+        write_picture_block(
+            &options.preview,
+            options.storage_id,
+            &mut picture_data,
+            litchi_odraw::image::Limits::default(),
+        )
+        .map_err(|error| PackageError::Corrupted(error.to_string()))?;
         let compound_file = equation_compound_file(options.equation)?;
         self.add(WriteOptions {
             storage_id: options.storage_id,

@@ -58,10 +58,11 @@ fn decodes_picture_name_and_retains_reserved_flags() {
         ),
         (Id::BlipFlags.raw(), 0x8000_0009_u32.cast_signed(), None),
     ]);
-    let (record, consumed) = Record::parse(&bytes, 0).expect("picture Opt");
+    let (record, consumed) =
+        Record::parse(&bytes, 0, crate::Limits::default()).expect("picture Opt");
     assert_eq!(consumed, bytes.len());
 
-    let props = Props::parse(&record).expect("properties");
+    let props = Props::parse(&record, crate::Limits::default()).expect("properties");
     let metadata = props
         .picture(Limits::default())
         .expect("picture metadata")
@@ -198,7 +199,7 @@ fn validates_utf16_bounds_and_flag_dependencies() {
         i32::try_from(odd.len()).expect("name length"),
         Some(&odd),
     )]);
-    let (record, _) = Record::parse(&bytes, 0).expect("picture Opt");
+    let (record, _) = Record::parse(&bytes, 0, crate::Limits::default()).expect("picture Opt");
     assert!(matches!(
         View::parse(&record, Limits::default()),
         Err(Error::Format(crate::Error::MalformedProperties {
@@ -212,7 +213,8 @@ fn validates_utf16_bounds_and_flag_dependencies() {
         i32::try_from(interior_nul.len()).expect("name length"),
         Some(&interior_nul),
     )]);
-    let (interior_record, _) = Record::parse(&interior_bytes, 0).expect("picture Opt");
+    let (interior_record, _) =
+        Record::parse(&interior_bytes, 0, crate::Limits::default()).expect("picture Opt");
     assert!(matches!(
         View::parse(&interior_record, Limits::default()),
         Err(Error::Format(crate::Error::MalformedProperties {
@@ -226,7 +228,8 @@ fn validates_utf16_bounds_and_flag_dependencies() {
         i32::try_from(too_long.len()).expect("name length"),
         Some(&too_long),
     )]);
-    let (too_long_record, _) = Record::parse(&too_long_bytes, 0).expect("picture Opt");
+    let (too_long_record, _) =
+        Record::parse(&too_long_bytes, 0, crate::Limits::default()).expect("picture Opt");
     assert!(matches!(
         View::parse(&too_long_record, Limits::default()),
         Err(Error::Limit {

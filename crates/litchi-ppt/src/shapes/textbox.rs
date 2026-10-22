@@ -294,12 +294,12 @@ impl<'a> TextBox<'a> {
         let secondary = shape
             .meta()
             .find(RecordKind::SecondaryOpt)?
-            .map(|record| Props::parse(&record))
+            .map(|record| Props::parse(&record, record.limits()))
             .transpose()?;
         let tertiary = shape
             .meta()
             .find(RecordKind::TertiaryOpt)?
-            .map(|record| Props::parse(&record))
+            .map(|record| Props::parse(&record, record.limits()))
             .transpose()?;
         let property = |id| {
             shape
@@ -383,7 +383,10 @@ impl<'a> TextBox<'a> {
     /// # Example
     ///
     /// ```ignore
-    /// let props = litchi_odraw::prop::Props::parse(&opt_record)?;
+    /// let props = litchi_odraw::prop::Props::parse(
+    ///     &opt_record,
+    ///     litchi_odraw::Limits::default(),
+    /// )?;
     /// let (size, color, bold, italic, underline) = TextBox::format_from_props(&props);
     /// ```
     #[must_use]

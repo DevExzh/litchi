@@ -154,8 +154,11 @@ impl PictureBullet {
     ) -> Result<litchi_odraw::image::Blip<'data>> {
         use litchi_odraw::image::{Blip, Context, Delay, Entry};
 
-        let (record, consumed) = litchi_odraw::Record::parse(&self.officeart_record, 0)
-            .map_err(|error| Error::Corrupted(format!("Invalid picture-bullet BLIP: {error}")))?;
+        let (record, consumed) =
+            litchi_odraw::Record::parse(&self.officeart_record, 0, litchi_odraw::Limits::default())
+                .map_err(|error| {
+                    Error::Corrupted(format!("Invalid picture-bullet BLIP: {error}"))
+                })?;
         if consumed != self.officeart_record.len() {
             return Err(Error::Corrupted(
                 "Picture-bullet BLIP was only partially parsed".to_string(),
@@ -513,7 +516,8 @@ fn validate_officeart_record(
             Error::Corrupted("picture-bullet OfficeArt record is truncated".into())
         });
     }
-    let (image_record, consumed) = litchi_odraw::Record::parse(officeart_record, 0)?;
+    let (image_record, consumed) =
+        litchi_odraw::Record::parse(officeart_record, 0, litchi_odraw::Limits::default())?;
     if consumed != officeart_record.len() {
         return Err(Error::Corrupted(
             "Picture-bullet OfficeArt record has an invalid size".to_string(),
@@ -1793,22 +1797,51 @@ mod tests {
         let mut shape_children = Vec::new();
         ShapeBuilder::new(1, 1)
             .with_flags(0x0A00u32)
-            .write(&mut shape_children)
+            .write(&mut shape_children, Default::default())
             .unwrap();
         crate::Anchor::full(0, 0, 1, 1)
             .unwrap()
             .write_to(&mut shape_children)
             .unwrap();
-        write_container(&mut shape_children, 0, record_type::CLIENT_DATA, &tags).unwrap();
+        write_container(
+            &mut shape_children,
+            0,
+            record_type::CLIENT_DATA,
+            &tags,
+            Default::default(),
+        )
+        .unwrap();
 
         let mut shape = Vec::new();
-        write_container(&mut shape, 0, record_type::SP_CONTAINER, &shape_children).unwrap();
+        write_container(
+            &mut shape,
+            0,
+            record_type::SP_CONTAINER,
+            &shape_children,
+            Default::default(),
+        )
+        .unwrap();
 
         let mut drawing_body = Vec::new();
-        write_atom(&mut drawing_body, 0, 0, record_type::DG, &[0; 8]).unwrap();
+        write_atom(
+            &mut drawing_body,
+            0,
+            0,
+            record_type::DG,
+            &[0; 8],
+            Default::default(),
+        )
+        .unwrap();
         drawing_body.extend_from_slice(&shape);
         let mut drawing = Vec::new();
-        write_container(&mut drawing, 0, record_type::DG_CONTAINER, &drawing_body).unwrap();
+        write_container(
+            &mut drawing,
+            0,
+            record_type::DG_CONTAINER,
+            &drawing_body,
+            Default::default(),
+        )
+        .unwrap();
         drawing
     }
 

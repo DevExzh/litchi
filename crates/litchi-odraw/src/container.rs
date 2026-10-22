@@ -5,6 +5,8 @@ use crate::{Error, LimitKind, Record, RecordKind, Result};
 /// Resource ceilings for recursive `OfficeArt` traversal.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Limits {
+    /// Largest record body accepted by the raw framing parser.
+    pub max_record_bytes: u32,
     /// Maximum nested-container depth.
     pub max_depth: u16,
     /// Maximum records visited during one traversal.
@@ -14,8 +16,34 @@ pub struct Limits {
 impl Default for Limits {
     fn default() -> Self {
         Self {
+            max_record_bytes: 256 * 1024 * 1024,
             max_depth: 64,
             max_records: 1_000_000,
+        }
+    }
+}
+
+impl Limits {
+    /// Intersects two raw framing and traversal policies before a borrowed
+    /// record is handed to a narrower consumer.
+    #[must_use]
+    pub const fn constrained_by(self, other: Self) -> Self {
+        Self {
+            max_record_bytes: if self.max_record_bytes < other.max_record_bytes {
+                self.max_record_bytes
+            } else {
+                other.max_record_bytes
+            },
+            max_depth: if self.max_depth < other.max_depth {
+                self.max_depth
+            } else {
+                other.max_depth
+            },
+            max_records: if self.max_records < other.max_records {
+                self.max_records
+            } else {
+                other.max_records
+            },
         }
     }
 }
@@ -24,6 +52,7 @@ impl Default for Limits {
 #[derive(Debug, Clone)]
 pub struct Children<'data> {
     data: &'data [u8],
+    limits: Limits,
     offset: usize,
     done: bool,
 }
@@ -31,9 +60,10 @@ pub struct Children<'data> {
 impl<'data> Children<'data> {
     /// Creates an iterator over a validated container body or record sequence.
     #[must_use]
-    pub const fn new(data: &'data [u8]) -> Self {
+    pub const fn new(data: &'data [u8], limits: Limits) -> Self {
         Self {
             data,
+            limits,
             offset: 0,
             done: false,
         }
@@ -56,7 +86,7 @@ impl<'data> Iterator for Children<'data> {
             }));
         }
 
-        match Record::parse(self.data, self.offset) {
+        match Record::parse(self.data, self.offset, self.limits) {
             Ok((record, consumed)) => {
                 if let Some(next) = self.offset.checked_add(consumed) {
                     self.offset = next;
@@ -85,6 +115,58 @@ impl<'data> Iterator for Children<'data> {
 }
 
 impl std::iter::FusedIterator for Children<'_> {}
+
+/// A compact traversal cursor used by recursive searches.  Unlike the public
+/// [`Children`] iterator it keeps the effective policy in the traversal
+/// argument, so each stack frame only retains its source range and cursor.
+#[derive(Clone, Copy)]
+pub(crate) struct Frame<'data> {
+    data: &'data [u8],
+    offset: usize,
+    done: bool,
+}
+
+impl<'data> Frame<'data> {
+    pub(crate) const fn new(data: &'data [u8]) -> Self {
+        Self {
+            data,
+            offset: 0,
+            done: false,
+        }
+    }
+
+    pub(crate) fn next(&mut self, limits: Limits) -> Option<Result<Record<'data>>> {
+        if self.done || self.offset == self.data.len() {
+            return None;
+        }
+
+        if self.data.len().saturating_sub(self.offset) < 8 {
+            self.done = true;
+            return Some(Err(Error::TruncatedHeader {
+                offset: self.offset,
+                available: self.data.len().saturating_sub(self.offset),
+            }));
+        }
+
+        match Record::parse(self.data, self.offset, limits) {
+            Ok((record, consumed)) => {
+                if let Some(next) = self.offset.checked_add(consumed) {
+                    self.offset = next;
+                    Some(Ok(record))
+                } else {
+                    self.done = true;
+                    Some(Err(Error::ArithmeticOverflow {
+                        context: "child-record cursor",
+                    }))
+                }
+            },
+            Err(error) => {
+                self.done = true;
+                Some(Err(error))
+            },
+        }
+    }
+}
 
 /// A record proven to be an `OfficeArt` container.
 #[derive(Debug, Clone)]
@@ -118,7 +200,19 @@ impl<'data> Container<'data> {
     /// Lazily visits direct children without copying their payloads.
     #[must_use]
     pub const fn children(&self) -> Children<'data> {
-        Children::new(self.record.data())
+        Children::new(self.record.data(), self.record.limits())
+    }
+
+    /// Lazily visits direct children under an explicit caller policy.
+    ///
+    /// This is crate-private because public projections use the limits retained
+    /// by the record at admission.  Typed decoders use it when a caller has
+    /// supplied a narrower traversal policy for an already-admitted record.
+    pub(crate) const fn children_under(&self, limits: Limits) -> Children<'data> {
+        Children::new(
+            self.record.data(),
+            self.record.limits().constrained_by(limits),
+        )
     }
 
     /// Finds the first direct child of `kind`.
@@ -166,21 +260,24 @@ impl<'data> Container<'data> {
     /// `Error::LimitExceeded` when `limits.max_records` or `limits.max_depth`
     /// is exceeded during traversal.
     pub fn find_recursive(&self, kind: RecordKind, limits: Limits) -> Result<Vec<Record<'data>>> {
+        let limits = self.record.limits().constrained_by(limits);
         let mut matches = Vec::new();
-        let mut children = self.children();
+        let mut frame = Frame::new(self.record.data());
         let mut stack = Vec::new();
         let mut visited = 0_u32;
 
         loop {
-            match children.next() {
+            match frame.next(limits) {
                 Some(Ok(child)) => {
                     visited = visited.checked_add(1).ok_or(Error::LimitExceeded {
                         limit: LimitKind::Records,
+                        observed: u64::from(visited) + 1,
                         maximum: limits.max_records,
                     })?;
                     if visited > limits.max_records {
                         return Err(Error::LimitExceeded {
                             limit: LimitKind::Records,
+                            observed: u64::from(visited),
                             maximum: limits.max_records,
                         });
                     }
@@ -193,16 +290,17 @@ impl<'data> Container<'data> {
                         if depth >= limits.max_depth {
                             return Err(Error::LimitExceeded {
                                 limit: LimitKind::Depth,
+                                observed: u64::from(depth),
                                 maximum: u32::from(limits.max_depth),
                             });
                         }
-                        stack.push(children);
-                        children = Children::new(child.data());
+                        stack.push(frame);
+                        frame = Frame::new(child.data());
                     }
                 },
                 Some(Err(error)) => return Err(error),
                 None => match stack.pop() {
-                    Some(parent) => children = parent,
+                    Some(parent) => frame = parent,
                     None => break,
                 },
             }
@@ -241,7 +339,7 @@ mod tests {
     #[test]
     fn constructor_is_checked() {
         let bytes = atom(RecordKind::Sp.raw(), &[]);
-        let (record, _) = Record::parse(&bytes, 0).expect("valid atom");
+        let (record, _) = Record::parse(&bytes, 0, Limits::default()).expect("valid atom");
 
         assert!(matches!(
             Container::try_new(record),
@@ -256,7 +354,7 @@ mod tests {
     fn iterates_children_without_copying() {
         let mut children = atom(RecordKind::Sp.raw(), &[1, 2, 3, 4]);
         children.extend_from_slice(&atom(RecordKind::Opt.raw(), &[5, 6]));
-        let records: Result<Vec<_>> = Children::new(&children).collect();
+        let records: Result<Vec<_>> = Children::new(&children, Limits::default()).collect();
         let parsed = records.expect("valid children");
 
         assert_eq!(parsed.len(), 2);
@@ -271,7 +369,7 @@ mod tests {
         bytes.extend_from_slice(&[0x00, 0x00, 0x0B, 0xF0, 32, 0, 0, 0, 1]);
         bytes.extend_from_slice(&atom(RecordKind::Dg.raw(), &[]));
 
-        let mut children = Children::new(&bytes);
+        let mut children = Children::new(&bytes, Limits::default());
         assert!(matches!(children.next(), Some(Ok(_))));
         assert!(matches!(
             children.next(),
@@ -289,6 +387,7 @@ mod tests {
                 0x0F, 0x00, 0x04, 0xF0, 8, 0, 0, 0, 0, 0, 0x0A, 0xF0, 1, 0, 0, 0,
             ],
             0,
+            Limits::default(),
         )
         .expect("outer record is valid")
         .0;
@@ -317,10 +416,12 @@ mod tests {
         body.extend_from_slice(&wrap(&middle));
         body.extend_from_slice(&atom(RecordKind::Sp.raw(), &[5]));
         let bytes = wrap(&body);
-        let root = Container::try_new(Record::parse(&bytes, 0).unwrap().0).unwrap();
+        let root =
+            Container::try_new(Record::parse(&bytes, 0, Limits::default()).unwrap().0).unwrap();
         let limits = Limits {
             max_depth: 3,
             max_records: 7,
+            ..Limits::default()
         };
         let records = root.find_recursive(RecordKind::Sp, limits).unwrap();
         assert_eq!(
@@ -337,7 +438,8 @@ mod tests {
             ),
             Err(Error::LimitExceeded {
                 limit: LimitKind::Records,
-                maximum: 6
+                maximum: 6,
+                ..
             })
         ));
         assert!(matches!(
@@ -350,17 +452,20 @@ mod tests {
             ),
             Err(Error::LimitExceeded {
                 limit: LimitKind::Depth,
-                maximum: 2
+                maximum: 2,
+                ..
             })
         ));
         let flat = wrap(&atom(RecordKind::Sp.raw(), &[9]));
-        let root = Container::try_new(Record::parse(&flat, 0).unwrap().0).unwrap();
+        let root =
+            Container::try_new(Record::parse(&flat, 0, Limits::default()).unwrap().0).unwrap();
         assert_eq!(
             root.find_recursive(
                 RecordKind::Sp,
                 Limits {
                     max_depth: 0,
-                    max_records: 1
+                    max_records: 1,
+                    ..Limits::default()
                 }
             )
             .unwrap()[0]
@@ -381,7 +486,9 @@ mod tests {
         root.extend_from_slice(&nested_length.to_le_bytes());
         root.extend_from_slice(&nested);
 
-        let record = Record::parse(&root, 0).expect("valid root").0;
+        let record = Record::parse(&root, 0, Limits::default())
+            .expect("valid root")
+            .0;
         let container = Container::try_new(record).expect("container");
         assert!(matches!(
             container.find_recursive(
@@ -389,6 +496,7 @@ mod tests {
                 Limits {
                     max_depth: 1,
                     max_records: 10,
+                    ..Limits::default()
                 },
             ),
             Err(Error::LimitExceeded {
@@ -402,10 +510,55 @@ mod tests {
                 Limits {
                     max_depth: 10,
                     max_records: 0,
+                    ..Limits::default()
                 },
             ),
             Err(Error::LimitExceeded {
                 limit: LimitKind::Records,
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn recursive_traversal_intersects_the_retained_root_policy() {
+        let mut body = atom(RecordKind::Sp.raw(), &[]);
+        body.extend_from_slice(&atom(RecordKind::Sp.raw(), &[]));
+        let mut root = vec![0x0F, 0x00, 0x04, 0xF0];
+        root.extend_from_slice(&u32::try_from(body.len()).unwrap().to_le_bytes());
+        root.extend_from_slice(&body);
+        let origin = Limits {
+            max_records: 1,
+            ..Limits::default()
+        };
+        let record = Record::parse(&root, 0, origin).unwrap().0;
+        let container = Container::try_new(record).unwrap();
+        assert!(matches!(
+            container.find_recursive(RecordKind::Sp, Limits::default()),
+            Err(Error::LimitExceeded {
+                limit: LimitKind::Records,
+                maximum: 1,
+                ..
+            })
+        ));
+
+        let mut nested = vec![0x0F, 0x00, 0x04, 0xF0];
+        nested.extend_from_slice(&8_u32.to_le_bytes());
+        nested.extend_from_slice(&atom(RecordKind::Sp.raw(), &[]));
+        let mut root = vec![0x0F, 0x00, 0x04, 0xF0];
+        root.extend_from_slice(&u32::try_from(nested.len()).unwrap().to_le_bytes());
+        root.extend_from_slice(&nested);
+        let origin = Limits {
+            max_depth: 1,
+            ..Limits::default()
+        };
+        let record = Record::parse(&root, 0, origin).unwrap().0;
+        let container = Container::try_new(record).unwrap();
+        assert!(matches!(
+            container.find_recursive(RecordKind::Sp, Limits::default()),
+            Err(Error::LimitExceeded {
+                limit: LimitKind::Depth,
+                maximum: 1,
                 ..
             })
         ));

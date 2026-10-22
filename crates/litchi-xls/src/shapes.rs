@@ -172,7 +172,9 @@ impl WorkbookDrawing {
         let mut result = Vec::new();
         let mut offset = 0usize;
         while offset < self.officeart.len() {
-            let (root, size) = Record::parse(&self.officeart, offset).map_err(invalid_data)?;
+            let (root, size) =
+                Record::parse(&self.officeart, offset, litchi_odraw::Limits::default())
+                    .map_err(invalid_data)?;
             if root.kind() != RecordKind::DgContainer {
                 return Err(invalid_data(
                     "XLS MSODRAWING sequence does not start with a DgContainer",
@@ -201,7 +203,7 @@ fn standalone_textbox(data: &[u8]) -> std::io::Result<bool> {
     if data.len() < 8 {
         return Ok(false);
     }
-    let Ok((record, size)) = Record::parse(data, 0) else {
+    let Ok((record, size)) = Record::parse(data, 0, litchi_odraw::Limits::default()) else {
         return Ok(false);
     };
     if size != data.len() || record.kind() != RecordKind::ClientTextbox {
@@ -606,15 +608,31 @@ mod tests {
         let mut children = Vec::new();
         write::ShapeBuilder::new(Native::RECTANGLE, 42)
             .with_flags(Flags::HAVE_ANCHOR | Flags::HAVE_SPT)
-            .write(&mut children)
+            .write(&mut children, Default::default())
             .unwrap();
-        write::PropertyBuilder::new().write(&mut children).unwrap();
+        write::PropertyBuilder::new()
+            .write(&mut children, Default::default())
+            .unwrap();
         children.extend_from_slice(&expected.to_record_bytes());
-        write::atom(&mut children, 0, write::Atom::ClientData, &[]).unwrap();
+        write::atom(
+            &mut children,
+            0,
+            write::Atom::ClientData,
+            &[],
+            Default::default(),
+        )
+        .unwrap();
 
         let mut bytes = Vec::new();
-        write::container(&mut bytes, 0, write::Container::Sp, &children).unwrap();
-        let (record, consumed) = Record::parse(&bytes, 0).unwrap();
+        write::container(
+            &mut bytes,
+            0,
+            write::Container::Sp,
+            &children,
+            Default::default(),
+        )
+        .unwrap();
+        let (record, consumed) = Record::parse(&bytes, 0, litchi_odraw::Limits::default()).unwrap();
         assert_eq!(consumed, bytes.len());
         let parsed = DrawShape::from_record(record, Default::default()).unwrap();
         let projected = Shape::from_odraw(&parsed, &mut VecDeque::new()).unwrap();
@@ -626,9 +644,16 @@ mod tests {
         use litchi_odraw::write;
 
         let mut children = Vec::new();
-        write::dg(&mut children, 0, 0).unwrap();
+        write::dg(&mut children, 0, 0, litchi_odraw::Limits::default()).unwrap();
         let mut officeart = Vec::new();
-        write::container(&mut officeart, 0, write::Container::Dg, &children).unwrap();
+        write::container(
+            &mut officeart,
+            0,
+            write::Container::Dg,
+            &children,
+            Default::default(),
+        )
+        .unwrap();
         let mut workbook = biff(MSO_DRAWING, &officeart[..5]);
         workbook.extend_from_slice(&biff(CONTINUE, &officeart[5..]));
 

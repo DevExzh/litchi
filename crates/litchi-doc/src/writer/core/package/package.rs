@@ -338,6 +338,7 @@ impl Builder {
                         &entry.picture,
                         entry.shape_id,
                         &mut data_stream,
+                        litchi_odraw::image::Limits::default(),
                     )?;
                     if entry.floating.is_some() {
                         floating_anchors.push((
@@ -495,6 +496,7 @@ impl Builder {
                 &entry.picture,
                 entry.shape_id,
                 &mut data_stream,
+                litchi_odraw::image::Limits::default(),
             )?;
             header_pic_offsets.push(pic_offset);
         }
@@ -1118,6 +1120,7 @@ impl Builder {
                 &floating_shapes,
                 &header_floating_shapes,
                 total_shapes,
+                litchi_odraw::image::Limits::default(),
             )?;
             fib.set_dgg_info(table_offset, dgg_info.len() as u32);
             table_stream.extend_from_slice(&dgg_info);

@@ -1,4 +1,4 @@
-use crate::{Error, Record, RecordKind, Result};
+use crate::{Error, LimitKind, Limits, Record, RecordKind, Result};
 use std::collections::HashMap;
 
 use super::model::{Anchor, Array, Id, Prop, Value};
@@ -24,7 +24,14 @@ impl<'data> Props<'data> {
     /// overlapping headers and complex payloads, repeats a property
     /// identifier, or leaves unclaimed trailing bytes, and
     /// `Error::ArithmeticOverflow` when a computed offset overflows.
-    pub fn parse(opt: &Record<'data>) -> Result<Self> {
+    pub fn parse(opt: &Record<'data>, limits: Limits) -> Result<Self> {
+        if opt.len() > limits.max_record_bytes {
+            return Err(Error::LimitExceeded {
+                limit: LimitKind::RecordBytes,
+                observed: u64::from(opt.len()),
+                maximum: limits.max_record_bytes,
+            });
+        }
         if !matches!(
             opt.kind(),
             RecordKind::Opt | RecordKind::SecondaryOpt | RecordKind::TertiaryOpt
@@ -40,6 +47,13 @@ impl<'data> Props<'data> {
         }
 
         let count = usize::from(opt.instance());
+        if u64::try_from(count).unwrap_or(u64::MAX) > u64::from(limits.max_records) {
+            return Err(Error::LimitExceeded {
+                limit: LimitKind::Records,
+                observed: u64::try_from(count).unwrap_or(u64::MAX),
+                maximum: limits.max_records,
+            });
+        }
         let data = opt.data();
         let header_size = count.checked_mul(6).ok_or(Error::ArithmeticOverflow {
             context: "property-header table length",

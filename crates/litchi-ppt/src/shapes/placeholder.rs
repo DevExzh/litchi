@@ -253,7 +253,11 @@ impl<'a> Placeholder<'a> {
         let (placeholder_type, size, index) = if container.raw_data.is_empty() {
             (PlaceholderType::Body, None, None)
         } else {
-            let (record, consumed) = litchi_odraw::Record::parse(&container.raw_data, 0)?;
+            let (record, consumed) = litchi_odraw::Record::parse(
+                &container.raw_data,
+                0,
+                litchi_odraw::Limits::default(),
+            )?;
             if consumed != container.raw_data.len() {
                 return Err(super::super::package::Error::Corrupted(
                     "placeholder container has trailing OfficeArt records".to_owned(),
