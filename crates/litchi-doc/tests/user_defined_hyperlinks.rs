@@ -112,7 +112,7 @@ fn seeded() -> Package {
     assert!(
         transaction
             .edit_user_defined_properties(|section| {
-                let mut edit = Edit::new(section)?;
+                let mut edit = Edit::new(section, Limits::default())?;
                 edit.set_link_base(LinkBase::new("https://base.example/")?)?;
                 edit.set_hyperlinks(Hyperlinks::new(vec![
                     Hyperlink::new(-1, 41, 0, "shape-target", "shape-location")?,
@@ -160,13 +160,15 @@ fn snapshot_with_real_hyperlink_field() -> (Package, FieldsTable) {
     assert!(
         transaction
             .edit_user_defined_properties(|section| {
-                Edit::new(section)?.set_hyperlinks(Hyperlinks::new(vec![Hyperlink::new(
-                    i32::try_from(index).unwrap(),
-                    0,
-                    0,
-                    "https://example.invalid/target",
-                    "stored-location",
-                )?]))
+                Edit::new(section, Limits::default())?.set_hyperlinks(Hyperlinks::new(vec![
+                    Hyperlink::new(
+                        i32::try_from(index).unwrap(),
+                        0,
+                        0,
+                        "https://example.invalid/target",
+                        "stored-location",
+                    )?,
+                ]))
             })
             .unwrap()
     );
@@ -540,7 +542,7 @@ fn removing_hyperlinks_is_targeted_and_a_dropped_edit_keeps_the_exact_source() {
 
     let section = committed.user_defined_properties().unwrap().unwrap();
     assert_eq!(
-        Properties::new(&section)
+        Properties::new(&section, Limits::default())
             .unwrap()
             .link_base()
             .unwrap()

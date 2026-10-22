@@ -1988,7 +1988,7 @@ mod tests {
                 .position(|window| window == marker)
                 .ok_or_else(|| {
                     litchi_xlsb::package::error::Error::InvalidFormat(
-                        "drawing marker missing".to_owned(),
+                        "drawing marker missing",
                     )
                 })?;
             blob.splice(

@@ -5,9 +5,22 @@ mod lazy_auxiliary_tests {
     use crate::builder::Builder;
     use crate::parts::fib::FileInformationBlock;
     use crate::raw::Reader;
-    use crate::tracked_revision::Limits;
-    use litchi_ole_common::object::{Edit as PackageEditor, Targets};
+    use litchi_ole_common::object::{
+        Edit as PackageEditor, Limits, OpenOptions, Package as ObjectPackage, Targets,
+    };
     use std::io::Cursor;
+
+    fn open_object(bytes: Vec<u8>) -> PackageEditor {
+        ObjectPackage::open_with_options(
+            bytes,
+            OpenOptions::new()
+                .targets(Targets::default())
+                .limits(Limits::default()),
+        )
+        .unwrap()
+        .edit()
+        .unwrap()
+    }
 
     #[test]
     fn malformed_optional_auxiliary_tables_are_deferred_until_access() {
@@ -19,9 +32,7 @@ mod lazy_auxiliary_tests {
             .unwrap()
             .write_to(&mut output)
             .expect("fixture DOC");
-        let mut package =
-            PackageEditor::open(output.into_inner(), Targets::default(), Limits::default())
-                .expect("fixture package");
+        let mut package = open_object(output.into_inner());
         let word_path = ["WordDocument".to_string()];
         let mut word = package
             .stream(&word_path)
@@ -43,7 +54,7 @@ mod lazy_auxiliary_tests {
         package
             .put_stream(&word_path, word)
             .expect("malformed optional pointers");
-        let bytes = package.finish().expect("fixture package finish");
+        let bytes = crate::package::object_edit_bytes(&package).expect("fixture package finish");
 
         let mut package = Reader::from_reader(Cursor::new(bytes)).expect("package open");
         let document = package
@@ -95,9 +106,7 @@ mod lazy_auxiliary_tests {
             .unwrap()
             .write_to(&mut output)
             .expect("fixture DOC");
-        let mut package =
-            PackageEditor::open(output.into_inner(), Targets::default(), Limits::default())
-                .expect("fixture package");
+        let mut package = open_object(output.into_inner());
         let word_path = ["WordDocument".to_string()];
         let mut word = package
             .stream(&word_path)
@@ -133,7 +142,7 @@ mod lazy_auxiliary_tests {
         word[pointer + 4..pointer + 8]
             .copy_from_slice(&(u32::try_from(pgp.len()).expect("PGP length")).to_le_bytes());
         package.put_stream(&word_path, word).expect("PGP pointer");
-        let bytes = package.finish().expect("fixture package finish");
+        let bytes = crate::package::object_edit_bytes(&package).expect("fixture package finish");
 
         let mut package = Reader::from_reader(Cursor::new(bytes)).expect("package open");
         let document = package.document().expect("document open");

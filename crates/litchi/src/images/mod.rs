@@ -92,11 +92,11 @@ pub fn doc(path: impl AsRef<std::path::Path>) -> Result<Vec<File<'static>>> {
 }
 
 /// Discovers borrowed images in an OfficeArt record sequence.
-pub fn scan(data: &[u8]) -> Result<Vec<File<'_>>> {
-    art::scan(data).map_err(office_art)
+pub fn scan(data: &[u8], limits: art::Limits) -> Result<Vec<File<'_>>> {
+    art::scan(data, limits).map_err(office_art)
 }
 
 /// Finds the unique borrowed BStore in an OfficeArt drawing sequence.
-pub fn store(data: &[u8]) -> Result<Option<art::Store<'_>>> {
-    art::store(data).map_err(office_art)
+pub fn store(data: &[u8], limits: art::Limits) -> Result<Option<art::Store<'_>>> {
+    art::store(data, limits).map_err(office_art)
 }

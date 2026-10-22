@@ -175,6 +175,7 @@ impl Transaction {
     pub(crate) fn update_link<F>(
         &mut self,
         storage_id: u32,
+        limits: litchi_ole_common::object::link::Limits,
         edit: F,
     ) -> Result<(), TransactionError>
     where
@@ -183,7 +184,7 @@ impl Transaction {
         ) -> Result<(), litchi_ole_common::Error>,
     {
         self.editor
-            .update_link(storage_id, edit)
+            .update_link(storage_id, limits, edit)
             .map_err(TransactionError::Invalid)
     }
 

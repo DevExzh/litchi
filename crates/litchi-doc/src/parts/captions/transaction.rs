@@ -198,6 +198,7 @@ pub use litchi_core::edit::Diagnostics;
 
 /// Errors produced while staging or applying a caption edit.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum Error {
     /// The candidate violates a bounded caption invariant.
     Invalid(PackageError),

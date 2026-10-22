@@ -10,7 +10,7 @@ use std::sync::Arc;
 
 use litchi_core::{Resource, ResourceLimit};
 
-use crate::limits::{LimitKind, SourceLimitKind};
+use crate::limits::{LimitKind, RawXmlLimitKind, SourceLimitKind};
 
 /// An ODF package ingress, egress or publication failure.
 ///
@@ -115,7 +115,8 @@ impl From<litchi_core::Error> for Error {
                     .or_else(|| {
                         crate::limits::SemanticLimitKind::from_scope(&limit.scope)
                             .map(LimitKind::Semantic)
-                    });
+                    })
+                    .or_else(|| RawXmlLimitKind::from_scope(&limit.scope).map(LimitKind::RawXml));
                 match kind {
                     Some(kind) => Self::Limit {
                         kind,
@@ -194,6 +195,16 @@ impl From<Error> for litchi_core::Error {
                 resource: match kind {
                     LimitKind::Source(SourceLimitKind::Members) => Resource::Objects,
                     LimitKind::Semantic(kind) => kind.resource(),
+                    LimitKind::RawXml(RawXmlLimitKind::Events)
+                    | LimitKind::RawXml(RawXmlLimitKind::Attributes)
+                    | LimitKind::RawXml(RawXmlLimitKind::NamespaceDeclarations)
+                    | LimitKind::RawXml(RawXmlLimitKind::NamespaceBindings) => Resource::Objects,
+                    LimitKind::RawXml(RawXmlLimitKind::Depth)
+                    | LimitKind::RawXml(RawXmlLimitKind::NamespaceScopeDepth) => Resource::Depth,
+                    LimitKind::RawXml(RawXmlLimitKind::TokenBytes)
+                    | LimitKind::RawXml(RawXmlLimitKind::NamespaceBytes)
+                    | LimitKind::RawXml(RawXmlLimitKind::NamespacePrefixBytes)
+                    | LimitKind::RawXml(RawXmlLimitKind::NamespaceUriBytes) => Resource::Memory,
                     _ => Resource::InputBytes,
                 },
                 observed,
@@ -201,6 +212,7 @@ impl From<Error> for litchi_core::Error {
                 scope: Arc::from(match kind {
                     LimitKind::Source(kind) => kind.scope(),
                     LimitKind::Semantic(kind) => kind.scope(),
+                    LimitKind::RawXml(kind) => kind.scope(),
                 }),
             }),
             invalid @ Error::InvalidLimit { .. } => Self::InvalidFormat(invalid.to_string()),

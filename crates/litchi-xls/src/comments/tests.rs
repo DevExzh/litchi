@@ -284,7 +284,7 @@ fn reads_poi_comment_fixtures() {
 #[test]
 fn generic_commit_publishes_the_artifact_a_second_render_would_produce() {
     use crate::cell_values::{Reference, Selector};
-    use litchi_ole_common::object::{Edit, Limits, Targets};
+    use litchi_ole_common::object::{Limits, OpenOptions, Package, Targets};
     use std::io::Cursor;
     use std::sync::Arc;
 
@@ -316,11 +316,14 @@ fn generic_commit_publishes_the_artifact_a_second_render_would_produce() {
         )
         .unwrap();
         let commit = edit.commit_record().unwrap();
-        let mut rerendered = Edit::open(
+        let mut rerendered = Package::open_with_options(
             source.bytes().to_vec(),
-            Targets::default(),
-            Limits::default(),
+            OpenOptions::new()
+                .targets(Targets::default())
+                .limits(Limits::default()),
         )
+        .unwrap()
+        .edit()
         .unwrap();
         rerendered
             .put_stream_shared(
@@ -330,7 +333,9 @@ fn generic_commit_publishes_the_artifact_a_second_render_would_produce() {
             .unwrap();
         assert_eq!(
             commit.snapshot().bytes(),
-            rerendered.finish().unwrap().as_slice()
+            crate::scoped::object_editor_bytes(&rerendered)
+                .unwrap()
+                .as_slice()
         );
     }
 }

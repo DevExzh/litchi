@@ -9,6 +9,7 @@ use smallvec::SmallVec;
 
 /// Error returned when a `grpprl` is not an exact sequence of SPRMs.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[non_exhaustive]
 pub enum Error {
     /// The input ended partway through a two-byte opcode.
     #[error("truncated SPRM opcode at byte {at}: {remaining} byte(s) remain")]

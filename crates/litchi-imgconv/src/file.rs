@@ -118,7 +118,12 @@ mod tests {
     #[test]
     fn native_bitmap_decode_stays_borrowed() {
         let record = png_blip(b"png");
-        let file = File::new(Blip::parse(&record, Default::default()).unwrap(), None, 0);
+        let file = File::new(
+            Blip::parse(&record, Default::default()).unwrap(),
+            None,
+            0,
+            Default::default(),
+        );
         let decoded = file.decode(Limits::default()).unwrap();
         assert!(matches!(&decoded, Cow::Borrowed(_)));
         assert_eq!(decoded.as_ref(), b"png");
@@ -131,6 +136,7 @@ mod tests {
             Blip::parse(&record, Default::default()).unwrap(),
             Some("../../CON.old".to_string()),
             0,
+            Default::default(),
         );
         assert_eq!(file.extract(Options::default()).unwrap(), b"png");
         assert_eq!(file.out_name(), "CON_.png");
@@ -139,7 +145,12 @@ mod tests {
     #[test]
     fn native_extraction_honors_output_limit() {
         let record = png_blip(b"png");
-        let file = File::new(Blip::parse(&record, Default::default()).unwrap(), None, 0);
+        let file = File::new(
+            Blip::parse(&record, Default::default()).unwrap(),
+            None,
+            0,
+            Default::default(),
+        );
         let limits = Limits {
             max_output_bytes: 2,
             ..Limits::default()

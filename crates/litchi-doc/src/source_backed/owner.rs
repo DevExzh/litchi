@@ -2646,7 +2646,9 @@ mod tests {
     )]
 
     use super::*;
-    use litchi_ole_common::object::{Edit as ObjectEditor, Targets};
+    use litchi_ole_common::object::{
+        Edit as ObjectEditor, OpenOptions as ObjectOpenOptions, Package as ObjectPackage, Targets,
+    };
     use std::sync::{
         Mutex,
         atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
@@ -2661,11 +2663,13 @@ mod tests {
     }
 
     fn object_editor(bytes: &[u8]) -> ObjectEditor {
-        ObjectEditor::open(
+        ObjectPackage::open_with_options(
             bytes.to_vec(),
-            Targets::default(),
-            crate::tracked_revision::Limits::default(),
+            ObjectOpenOptions::new()
+                .targets(Targets::default())
+                .limits(crate::tracked_revision::Limits::default()),
         )
+        .and_then(|package| package.edit())
         .expect("fixture object editor")
     }
 
@@ -2695,7 +2699,7 @@ mod tests {
         package
             .put_stream(&table_path, table)
             .expect("table stream");
-        package.finish().expect("fixture publication")
+        crate::package::object_edit_bytes(&package).expect("fixture publication")
     }
 
     /// The table-stream range of the DOP (FIB pointer 31).
@@ -3369,7 +3373,9 @@ mod tests {
         stripped
             .remove_streams(others.iter().map(Vec::as_slice))
             .expect("stream removal");
-        let opened = object_editor(&stripped.finish().expect("stripped fixture"));
+        let stripped_bytes =
+            crate::package::object_edit_bytes(&stripped).expect("stripped fixture");
+        let opened = object_editor(&stripped_bytes);
         let word = opened
             .stream(&[WORD_DOCUMENT.to_string()])
             .expect("WordDocument")

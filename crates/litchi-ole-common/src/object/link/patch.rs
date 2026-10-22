@@ -1,7 +1,7 @@
 //! Source-checked, reversible link patches.
 
 use super::{Link, Revision, Snapshot};
-use litchi_cfb::OleError;
+use crate::Error;
 use std::sync::Arc;
 
 /// The typed before/after values represented by a link patch.
@@ -45,6 +45,7 @@ pub struct Patch {
     before: Arc<[u8]>,
     after: Arc<[u8]>,
     change: Option<Change>,
+    limits: super::Limits,
 }
 
 impl Patch {
@@ -56,6 +57,7 @@ impl Patch {
             before: before.link.bytes_shared(),
             after: after.link.bytes_shared(),
             change,
+            limits: before.limits,
         }
     }
 
@@ -132,13 +134,11 @@ impl Patch {
     /// Returns an error when `source` does not match the patch's exact base
     /// bytes and revision, or when its target bytes no longer parse as OLEDS
     /// link metadata.
-    pub fn apply(&self, source: &Snapshot) -> Result<Snapshot, OleError> {
+    pub fn apply(&self, source: &Snapshot) -> Result<Snapshot, Error> {
         if source.revision != self.base || source.bytes() != self.before.as_ref() {
-            return Err(OleError::InvalidFormat(
-                "OLE link patch source does not match its base snapshot".into(),
-            ));
+            return Err(Error::PatchConflict);
         }
-        Snapshot::parse_shared(Arc::clone(&self.after))
+        Snapshot::parse_shared(Arc::clone(&self.after), self.limits)
     }
 
     /// Returns the exact inverse replacement.
@@ -153,6 +153,7 @@ impl Patch {
                 before: change.after.clone(),
                 after: change.before.clone(),
             }),
+            limits: self.limits,
         }
     }
 }

@@ -11441,6 +11441,11 @@
           "match": "suffix"
         },
         {
+          "name": "with_limits",
+          "scope": "litchi_ole_common::property_set::user_defined",
+          "replacement": "pass the typed overlay limits to Properties::new or Edit::new (record 0359h)"
+        },
+        {
           "name": "UnsafeEdit",
           "scope": "litchi_ole_common",
           "replacement": "use Refused(Refusal), PatchConflict or Internal (record 0359)"
@@ -11458,6 +11463,10 @@
         }
       ],
       "families": [],
+      "immutable_owners": [
+        "litchi_ole_common::object::Package",
+        "litchi_ole_common::property_set::user_defined::Properties"
+      ],
       "family_methods": true
     },
     {

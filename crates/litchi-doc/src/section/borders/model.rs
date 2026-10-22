@@ -26,6 +26,7 @@ pub enum Offset {
 
 /// Validation failure for a page-border value.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Error {
     /// `Brc80.dptSpace` is a five-bit value.
     InvalidSpacing(u8),

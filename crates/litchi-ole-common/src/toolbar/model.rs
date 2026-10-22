@@ -22,6 +22,7 @@ pub use self::text_icon::{ButtonFlags, ButtonState, HyperlinkType, TextIcon, WSt
 
 /// A malformed or semantically invalid [MS-OSHARED] toolbar structure.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Error {
     /// The input ended before the named field was complete.
     Truncated(&'static str),

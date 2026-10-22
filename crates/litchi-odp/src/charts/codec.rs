@@ -254,7 +254,13 @@ impl Part {
         if xml.is_empty() || xml.len() > max_bytes {
             return invalid("ODP chart content is empty or exceeds its byte limit");
         }
-        let chart = read(&xml)?;
+        // ODP owners retain no raw XML policy yet; chart parts are read under
+        // the documented owner default, inside the part byte limit above.
+        let chart = read(
+            &xml,
+            litchi_odf_common::XmlStreamLimits::owner_default_value(),
+        )
+        .map_err(Error::from)?;
         Ok(Self {
             xml: Arc::from(xml),
             chart: Arc::new(chart),

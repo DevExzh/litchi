@@ -14,6 +14,20 @@ use std::io::Cursor;
 
 use crate::Package;
 use crate::error::{Error, Result};
+use litchi_ole_common::object::{Edit as ObjectEditor, Package as ObjectPackage};
+
+/// Collects a common OLE package through its bounded streaming output API.
+pub(crate) fn object_package_bytes(package: &ObjectPackage) -> Result<Vec<u8>> {
+    let mut bytes = Vec::new();
+    package.write_to(&mut bytes).map_err(Error::from)?;
+    Ok(bytes)
+}
+
+/// Commits a cloned common OLE editor and collects its immutable package.
+pub(crate) fn object_editor_bytes(editor: &ObjectEditor) -> Result<Vec<u8>> {
+    let commit = editor.clone().commit().map_err(Error::from)?;
+    object_package_bytes(commit.package())
+}
 
 /// The names of the compound-file entries that carry a document signature.
 const SIGNATURE_ENTRIES: [&str; 4] = [
@@ -89,6 +103,7 @@ pub(crate) fn package_error(error: crate::package::Error) -> Error {
     match error {
         PackageError::Reader(error) => error,
         PackageError::Cfb(error) => Error::Cfb(error),
+        PackageError::Object(error) => Error::Object(error),
         PackageError::Io(error) => Error::Io(error),
         PackageError::Allocation { resource, .. } => Error::Allocation(resource),
         PackageError::EncryptionPolicy => Error::refused(

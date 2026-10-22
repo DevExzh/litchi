@@ -2,9 +2,9 @@ use crate::model::database_range::Range as DatabaseRange;
 use crate::model::names::{Definition, Expression, Range};
 use crate::worksheet::{Cell, Sheet};
 use litchi_core::{Error, Result};
-use litchi_odf_common::ResolvedReader;
 use litchi_odf_common::calculation::Settings;
 use litchi_odf_common::core::PackageWriter;
+use litchi_odf_common::{ResolvedReader, XmlStreamLimits};
 use quick_xml::{
     events::Event,
     name::{Namespace, ResolveResult},
@@ -381,7 +381,11 @@ impl Builder {
             crate::codec::names::replace(&self.content_xml, &self.definitions)?
         };
         if let Some(settings) = &self.settings {
-            let snapshot = crate::settings::Snapshot::from_content_xml(&content_xml)?;
+            // Authored content is admitted under the documented owner default.
+            let snapshot = crate::settings::Snapshot::from_content_xml(
+                &content_xml,
+                XmlStreamLimits::owner_default_value(),
+            )?;
             let mut transaction = snapshot.transaction();
             transaction.replace(settings.clone())?;
             content_xml = transaction.commit()?.into_owned();
@@ -418,7 +422,14 @@ impl Builder {
 pub(crate) fn validate_content_xml(xml: &str) -> Result<()> {
     validate_size(xml)?;
 
-    let mut reader = ResolvedReader::from_xml(xml);
+    let xml_limits = XmlStreamLimits::new(
+        MAX_CONTENT_XML_BYTES as u64,
+        MAX_CONTENT_XML_DEPTH,
+        4_000_000,
+        1_000_000,
+        MAX_CONTENT_XML_BYTES,
+    )?;
+    let mut reader = ResolvedReader::from_xml(xml, xml_limits)?;
     reader.config_mut().check_end_names = true;
     let mut buffer = Vec::new();
     let mut depth = 0usize;
@@ -430,7 +441,9 @@ pub(crate) fn validate_content_xml(xml: &str) -> Result<()> {
     loop {
         let (namespace, event) = reader
             .read_resolved_event_into(&mut buffer)
-            .map_err(|error| Error::InvalidFormat(format!("invalid ODS content.xml: {error}")))?;
+            .map_err(|error| {
+                litchi_odf_common::map_resolved_reader_error(error, "invalid ODS content.xml")
+            })?;
 
         match event {
             Event::Start(element) => {

@@ -16,14 +16,20 @@ impl Budget {
         Self { limits, records: 0 }
     }
 
+    pub(crate) const fn limits(&self) -> crate::Limits {
+        self.limits
+    }
+
     pub(crate) fn visit(&mut self) -> Result<()> {
         self.records = self.records.checked_add(1).ok_or(Error::LimitExceeded {
             limit: LimitKind::Records,
+            observed: u64::from(self.records) + 1,
             maximum: self.limits.max_records,
         })?;
         if self.records > self.limits.max_records {
             return Err(Error::LimitExceeded {
                 limit: LimitKind::Records,
+                observed: u64::from(self.records),
                 maximum: self.limits.max_records,
             });
         }
@@ -34,6 +40,7 @@ impl Budget {
         if depth > self.limits.max_depth {
             return Err(Error::LimitExceeded {
                 limit: LimitKind::Depth,
+                observed: u64::from(depth),
                 maximum: u32::from(self.limits.max_depth),
             });
         }
@@ -84,7 +91,7 @@ pub(crate) fn scan_meta<'data>(
 ) -> Result<Meta<'data>> {
     validate_container_header(container, RecordKind::SpContainer)?;
     let mut meta = Meta::new();
-    for child_result in container.children() {
+    for child_result in container.children_under(budget.limits()) {
         let child = child_result?;
         budget.visit()?;
         match child.kind() {
@@ -97,15 +104,15 @@ pub(crate) fn scan_meta<'data>(
                 insert(&mut meta.spgr, child)?;
             },
             RecordKind::Opt => {
-                let props = Props::parse(&child)?;
+                let props = Props::parse(&child, child.limits())?;
                 insert(&mut meta.primary, props)?;
             },
             RecordKind::SecondaryOpt => {
-                let props = Props::parse(&child)?;
+                let props = Props::parse(&child, child.limits())?;
                 insert(&mut meta.secondary, props)?;
             },
             RecordKind::TertiaryOpt => {
-                let props = Props::parse(&child)?;
+                let props = Props::parse(&child, child.limits())?;
                 insert(&mut meta.tertiary, props)?;
             },
             RecordKind::ChildAnchor => {
@@ -324,6 +331,7 @@ pub(crate) fn validate_atom_kind(
 pub(crate) fn next_depth(depth: u16) -> Result<u16> {
     depth.checked_add(1).ok_or(Error::LimitExceeded {
         limit: LimitKind::Depth,
+        observed: u64::from(depth) + 1,
         maximum: u32::from(u16::MAX),
     })
 }

@@ -4,6 +4,7 @@ use crate::core::OwnedPackage;
 use crate::elements::table::Table;
 use crate::elements::text::{Heading, List, Paragraph};
 use litchi_core::Metadata;
+use litchi_odf_common::XmlStreamLimits;
 
 /// Document element type used to retain top-level insertion order.
 #[derive(Debug, Clone)]
@@ -36,6 +37,8 @@ pub(crate) struct MutableDocument {
     pub(super) content_xml: Option<String>,
     /// Authored picture payloads written into the package on save.
     pub(super) pending_images: Vec<crate::frame::Part>,
+    /// Retained raw XML policy from the immutable owner.
+    pub(super) xml_limits: XmlStreamLimits,
     /// Monotonic counter for authored frame names.
     pub(super) next_frame_number: usize,
 }
@@ -51,6 +54,7 @@ impl MutableDocument {
             source_package: None,
             content_xml: None,
             pending_images: Vec::new(),
+            xml_limits: XmlStreamLimits::default(),
             next_frame_number: 1,
         }
     }

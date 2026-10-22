@@ -1,6 +1,6 @@
 //! Semantic OLEDS object-link values.
 
-use crate::property_set::Guid;
+use crate::{Error, property_set::Guid};
 use litchi_cfb::OleError;
 use std::ops::Range;
 use std::sync::Arc;
@@ -143,8 +143,9 @@ impl Link {
     ///
     /// Returns an error when the stream is malformed or exceeds the OLEDS
     /// metadata limit.
-    pub fn parse(bytes: &[u8]) -> Result<Self, OleError> {
-        codec::parse(Arc::<[u8]>::from(bytes))
+    pub fn parse(bytes: &[u8], limits: super::Limits) -> Result<Self, Error> {
+        let limits = limits.validate()?;
+        codec::parse(Arc::<[u8]>::from(bytes), limits).map_err(Error::from)
     }
 
     /// Parses a link stream without copying an existing allocation.
@@ -153,8 +154,9 @@ impl Link {
     ///
     /// Returns an error when the stream is malformed or exceeds the OLEDS
     /// metadata limit.
-    pub fn parse_shared(bytes: Arc<[u8]>) -> Result<Self, OleError> {
-        codec::parse(bytes)
+    pub fn parse_shared(bytes: Arc<[u8]>, limits: super::Limits) -> Result<Self, Error> {
+        let limits = limits.validate()?;
+        codec::parse(bytes, limits).map_err(Error::from)
     }
 
     /// The exact source bytes retained by this value.
@@ -206,11 +208,11 @@ impl Link {
     /// # Errors
     ///
     /// Returns an error when `flags` changes the embedded/linked layout.
-    pub fn set_flags(&mut self, flags: u32) -> Result<(), OleError> {
+    pub fn set_flags(&mut self, flags: u32) -> Result<(), Error> {
         if (flags & codec::LINKED_FLAG) != (self.flags & codec::LINKED_FLAG) {
-            return Err(OleError::InvalidFormat(
+            return Err(Error::Cfb(OleError::InvalidFormat(
                 "OLE link kind cannot change without rebuilding its wire layout".into(),
-            ));
+            )));
         }
         self.flags = flags;
         Ok(())
@@ -269,11 +271,11 @@ impl Link {
     ///
     /// Returns an error when this is an embedded link with no class identifier
     /// field in its wire layout.
-    pub fn set_class_id(&mut self, value: Guid) -> Result<(), OleError> {
+    pub fn set_class_id(&mut self, value: Guid) -> Result<(), Error> {
         if self.class_id_offset.is_none() {
-            return Err(OleError::InvalidFormat(
+            return Err(Error::Cfb(OleError::InvalidFormat(
                 "embedded OLE links do not carry a stream class identifier".into(),
-            ));
+            )));
         }
         self.class_id = Some(value);
         Ok(())
@@ -305,11 +307,11 @@ impl Link {
     ///
     /// Returns an error when this link has no timestamp group in its wire
     /// layout.
-    pub fn set_times(&mut self, value: Times) -> Result<(), OleError> {
+    pub fn set_times(&mut self, value: Times) -> Result<(), Error> {
         if self.times_offsets.is_none() {
-            return Err(OleError::InvalidFormat(
+            return Err(Error::Cfb(OleError::InvalidFormat(
                 "OLE link has no linked-object timestamp group".into(),
-            ));
+            )));
         }
         self.times = Some(value);
         Ok(())
@@ -325,8 +327,15 @@ impl Link {
     ///
     /// Unknown flags, reserved fields, monikers, display bytes, and trailing
     /// data are copied from the original stream unchanged.
-    #[must_use]
-    pub fn to_bytes(&self) -> Vec<u8> {
+    pub fn to_bytes(&self, limits: super::Limits) -> Result<Vec<u8>, Error> {
+        let limits = limits.validate()?;
+        if self.wire.len() > limits.max_bytes {
+            return Err(Error::Limit {
+                kind: crate::LimitKind::StreamBytes,
+                observed: self.wire.len() as u64,
+                maximum: limits.max_bytes as u64,
+            });
+        }
         let mut output = self.wire.as_ref().to_vec();
         output[4..8].copy_from_slice(&self.flags.to_le_bytes());
         output[8..12].copy_from_slice(&self.update_option.to_le_bytes());
@@ -342,6 +351,6 @@ impl Link {
                 output[offset..offset + 8].copy_from_slice(&value.to_le_bytes());
             }
         }
-        output
+        Ok(output)
     }
 }

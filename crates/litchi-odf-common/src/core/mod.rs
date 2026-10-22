@@ -124,7 +124,7 @@ pub use metadata::{MetaXmlPatch, patch_meta_xml};
 pub use package::{
     OwnedPackage, SourceBackedPackage, SourceMemberReaderError, is_signature_owner_path,
 };
-pub use resolved_reader::ResolvedReader;
+pub use resolved_reader::{ResolvedReader, map_resolved_reader_error};
 pub use source_publication::{
     SourceContentInsertionCallbackError, SourceContentInsertionError, SourceContentInsertionPlan,
     SourceContentPublicationError, SourceContentPublicationOptions,

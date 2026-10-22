@@ -190,9 +190,9 @@ impl Snapshot {
     ///
     /// Returns an error if reading or parsing the stream fails, or its section
     /// does not satisfy the typed invariants.
-    pub fn from_ole<R: Read + Seek>(ole: &mut OleFile<R>) -> Result<Self, OleError> {
+    pub fn from_ole<R: Read + Seek>(ole: &mut OleFile<R>) -> Result<Self, crate::Error> {
         let stream = ole.property_set(Binding::DocumentSummaryInformation)?;
-        Self::from_stream(&stream)
+        Ok(Self::from_stream(&stream)?)
     }
 
     /// Borrows the complete generic section, including opaque properties.

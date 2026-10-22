@@ -38,7 +38,7 @@ use litchi_cfb::{
     ArtifactFingerprint, ComposedOverlaySource, OverlayError, OverlayOperationShape, PublishReport,
     SameLengthStreamSplice, StreamSpliceLimits, ValidatedOverlayPlan,
 };
-use litchi_cfb::{OleFileLimits, SharedOleFileLimits, consts::STGTY_STORAGE};
+use litchi_cfb::{OleFileLimits, SharedOleFile, SharedOleFileLimits, consts::STGTY_STORAGE};
 use litchi_core::binary;
 use litchi_core::edit::RefusalKind;
 pub use litchi_core::patch::HistoryLimits;
@@ -50,7 +50,7 @@ use litchi_core::sheet::{Cell as _, CellValue};
 use litchi_core::{Position, ReadAt, SourceVersion};
 /// The object and record limits a cell-value snapshot is read under.
 pub use litchi_ole_common::object::Limits;
-use litchi_ole_common::object::{Edit as PackageEditor, Targets};
+use litchi_ole_common::object::{OpenOptions, Package as ObjectPackage, Targets};
 use litchi_ole_common::source_backed_overlay::SourceBackedOverlayPublisher;
 use std::collections::BTreeMap;
 use std::fmt;
@@ -671,8 +671,88 @@ impl NumericTargetVerification<'_> {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ArtifactMode {
+    /// Generic/eager snapshots use one packed allocation for their artifact.
+    Packed,
+    /// Source-backed snapshots retain the vector accepted by `OwnedSource`.
+    Shared,
+}
+
+#[derive(Clone, PartialEq, Eq)]
+enum ArtifactBytes {
+    Packed(Arc<[u8]>),
+    Shared(Arc<Vec<u8>>),
+}
+
+impl ArtifactBytes {
+    fn from_source(source: Arc<Vec<u8>>, mode: ArtifactMode) -> Self {
+        match mode {
+            ArtifactMode::Packed => Self::Packed(Arc::from(source.as_slice())),
+            ArtifactMode::Shared => Self::Shared(source),
+        }
+    }
+
+    fn as_slice(&self) -> &[u8] {
+        match self {
+            Self::Packed(bytes) => bytes,
+            Self::Shared(bytes) => bytes,
+        }
+    }
+
+    fn len(&self) -> usize {
+        self.as_slice().len()
+    }
+
+    fn mode(&self) -> ArtifactMode {
+        match self {
+            Self::Packed(_) => ArtifactMode::Packed,
+            Self::Shared(_) => ArtifactMode::Shared,
+        }
+    }
+
+    #[cfg(test)]
+    fn ptr_eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Packed(left), Self::Packed(right)) => Arc::ptr_eq(left, right),
+            (Self::Shared(left), Self::Shared(right)) => Arc::ptr_eq(left, right),
+            _ => false,
+        }
+    }
+
+    fn shared_vec(&self) -> Result<Arc<Vec<u8>>> {
+        match self {
+            Self::Shared(bytes) => Ok(Arc::clone(bytes)),
+            // The record-level source-backed publisher is also exercised on
+            // eager snapshots. Keep that existing capability by materializing
+            // the vector only at this explicit handoff; true source-backed
+            // owners use the Shared arm and remain zero-copy.
+            Self::Packed(bytes) => Ok(Arc::new(bytes.to_vec())),
+        }
+    }
+
+    fn open_shared_ole_file(
+        &self,
+        source_version: SourceVersion,
+        limits: SharedOleFileLimits,
+    ) -> std::result::Result<SharedOleFile, litchi_cfb::OleError> {
+        match self {
+            Self::Packed(bytes) => {
+                SharedOleFile::open_owned_with_limits(Arc::clone(bytes), source_version, limits)
+            },
+            Self::Shared(bytes) => {
+                SharedOleFile::open_owned_vec_with_limits(Arc::clone(bytes), source_version, limits)
+            },
+        }
+    }
+}
+
 struct Inner {
-    bytes: Arc<[u8]>,
+    // Generic/eager snapshots pack the immutable artifact into one allocation;
+    // source-backed snapshots retain the shared vector accepted by
+    // `OwnedSource::from_arc`. The mode is part of the private owner state so
+    // every derived snapshot and patch preserves the handoff policy.
+    bytes: ArtifactBytes,
     source_version: SourceVersion,
     limits: Limits,
     cfb_limits: OleFileLimits,
@@ -715,13 +795,14 @@ impl Snapshot {
     /// The bounded corpus and other security-sensitive callers use this entry
     /// point instead of inheriting the broad convenience defaults.
     pub(crate) fn from_bytes(bytes: Vec<u8>, limits: Limits) -> Result<Self> {
-        let package = PackageEditor::open_with_cfb_limits(
+        let package = ObjectPackage::open_with_options(
             bytes,
-            Targets::default(),
-            limits,
-            OleFileLimits::default(),
+            OpenOptions::new()
+                .targets(Targets::default())
+                .limits(limits)
+                .cfb_limits(OleFileLimits::default()),
         )?;
-        Self::from_package_editor(package)
+        Self::open_package(package, None)
     }
 
     /// Opens an unencrypted XLS package under explicit object and CFB
@@ -731,9 +812,23 @@ impl Snapshot {
         limits: Limits,
         cfb_limits: OleFileLimits,
     ) -> Result<Self> {
-        let package =
-            PackageEditor::open_with_cfb_limits(bytes, Targets::default(), limits, cfb_limits)?;
-        Self::from_package_editor(package)
+        Self::from_bytes_with_cfb_mode(bytes, limits, cfb_limits, ArtifactMode::Packed)
+    }
+
+    fn from_bytes_with_cfb_mode(
+        bytes: Vec<u8>,
+        limits: Limits,
+        cfb_limits: OleFileLimits,
+        artifact_mode: ArtifactMode,
+    ) -> Result<Self> {
+        let package = ObjectPackage::open_with_options(
+            bytes,
+            OpenOptions::new()
+                .targets(Targets::default())
+                .limits(limits)
+                .cfb_limits(cfb_limits),
+        )?;
+        Self::open_package_with_mode(package, None, artifact_mode)
     }
 
     /// Opens the editable snapshot over a positional CFB owner that is
@@ -753,7 +848,7 @@ impl Snapshot {
     /// `cfb_limits`, [`Error::Allocation`] when the copy cannot be reserved,
     /// and otherwise the errors of [`Self::from_bytes_with_cfb`].
     pub(crate) fn from_shared_ole_file(
-        cfb: &litchi_cfb::SharedOleFile,
+        cfb: &SharedOleFile,
         limits: Limits,
         cfb_limits: OleFileLimits,
     ) -> Result<Self> {
@@ -794,20 +889,12 @@ impl Snapshot {
                 observed,
             }));
         }
-        Self::from_bytes_with_cfb(bytes, limits, cfb_limits)
-    }
-
-    fn from_package_editor(package: PackageEditor) -> Result<Self> {
-        Self::open_package(package, None, None)
+        Self::from_bytes_with_cfb_mode(bytes, limits, cfb_limits, ArtifactMode::Shared)
     }
 
     /// Opens a captured package, optionally verifying a source-backed numeric
     /// commit's materialized target on the complete `raw::Reader` this open
     /// already parses.
-    ///
-    /// `rendered` is the artifact an edit's package publication already
-    /// rendered and validated for this exact editor state; without it the
-    /// editor is finished here.
     ///
     /// The optional verification is the exact sequence the source-backed
     /// numeric commit used to run on a *second* complete parse of the same
@@ -816,14 +903,24 @@ impl Snapshot {
     /// is a pure function of the sealed bytes and the retained limits, so the
     /// second one could only ever have reproduced this one.
     fn open_package(
-        package: PackageEditor,
-        rendered: Option<Vec<u8>>,
+        package: ObjectPackage,
         verification: Option<NumericTargetVerification<'_>>,
     ) -> Result<Self> {
-        let limits = package.limits();
-        let cfb_limits = package.cfb_limits();
-        let workbook_path = [vec!["Workbook".to_string()], vec!["Book".to_string()]]
+        Self::open_package_with_mode(package, verification, ArtifactMode::Packed)
+    }
+
+    fn open_package_with_mode(
+        package: ObjectPackage,
+        verification: Option<NumericTargetVerification<'_>>,
+        artifact_mode: ArtifactMode,
+    ) -> Result<Self> {
+        let limits = package.limits_value();
+        let cfb_limits = package.cfb_limits_value();
+        // Allocate only the selected path: BIFF8 packages name the stream
+        // `Workbook`, and only a BIFF5-style package falls back to `Book`.
+        let workbook_path = ["Workbook", "Book"]
             .into_iter()
+            .map(|name| vec![name.to_string()])
             .find(|path| package.stream(path).is_some())
             .ok_or_else(|| {
                 Error::InvalidData("XLS package has no Workbook or Book stream".into())
@@ -831,10 +928,7 @@ impl Snapshot {
         let workbook_stream = package
             .stream_shared(&workbook_path)
             .ok_or_else(|| Error::InvalidData("selected XLS Workbook stream disappeared".into()))?;
-        let source = match rendered {
-            Some(rendered) => rendered,
-            None => package.finish()?,
-        };
+        let source = package.source_shared();
         let source_version = fresh_snapshot_source_version();
 
         let (mut sheets, sst_total_offset, xf_records) = parse_workbook_stream(&workbook_stream)?;
@@ -873,7 +967,7 @@ impl Snapshot {
         drop(pending);
         Ok(Self {
             inner: Arc::new(Inner {
-                bytes: Arc::from(source),
+                bytes: ArtifactBytes::from_source(source, artifact_mode),
                 source_version,
                 limits,
                 cfb_limits,
@@ -890,10 +984,9 @@ impl Snapshot {
     }
 
     /// Builds a fixed-numeric commit's target snapshot from the artifact its
-    /// package publication `rendered` and validated for `package`'s state.
+    /// package publication rendered and validated for `package`'s state.
     fn from_fixed_numeric_package_editor(
-        package: PackageEditor,
-        rendered: Vec<u8>,
+        package: ObjectPackage,
         source_snapshot: &Self,
         changes: &[Change],
     ) -> Result<Self> {
@@ -901,7 +994,7 @@ impl Snapshot {
             .stream_shared(&source_snapshot.inner.workbook_path)
             .ok_or_else(|| Error::InvalidData("selected XLS Workbook stream disappeared".into()))?;
         let sheets = carry_fixed_numeric_inventory(source_snapshot, &workbook_stream, changes)?;
-        let source = rendered;
+        let source = package.source_shared();
 
         // Keep the complete public reader as an independent validation owner.
         // Only the private offset inventory is carried forward after proving
@@ -917,10 +1010,10 @@ impl Snapshot {
 
         Ok(Self {
             inner: Arc::new(Inner {
-                bytes: Arc::from(source),
+                bytes: ArtifactBytes::from_source(source, source_snapshot.artifact_mode()),
                 source_version: fresh_snapshot_source_version(),
-                limits: package.limits(),
-                cfb_limits: package.cfb_limits(),
+                limits: package.limits_value(),
+                cfb_limits: package.cfb_limits_value(),
                 workbook_path: source_snapshot.inner.workbook_path.clone(),
                 workbook_stream,
                 shared_strings: Arc::clone(&source_snapshot.inner.shared_strings),
@@ -942,14 +1035,18 @@ impl Snapshot {
             reason = "the unit tests drive the record-level publishers; Package and source_backed are the public routes"
         )
     )]
-    fn retag_source_version(self, source_version: SourceVersion) -> Self {
+    fn retag_source_version(mut self, source_version: SourceVersion) -> Self {
         if self.inner.source_version == source_version {
+            return self;
+        }
+        if let Some(inner) = Arc::get_mut(&mut self.inner) {
+            inner.source_version = source_version;
             return self;
         }
         let inner = &self.inner;
         Self {
             inner: Arc::new(Inner {
-                bytes: Arc::clone(&inner.bytes),
+                bytes: inner.bytes.clone(),
                 source_version,
                 limits: inner.limits,
                 cfb_limits: inner.cfb_limits,
@@ -968,7 +1065,7 @@ impl Snapshot {
     /// Returns exact source CFB bytes.
     #[must_use]
     pub fn bytes(&self) -> &[u8] {
-        &self.inner.bytes
+        self.inner.bytes.as_slice()
     }
 
     /// Effective complete-package capture profile retained by this snapshot.
@@ -993,7 +1090,12 @@ impl Snapshot {
         if limits == retained && cfb_limits == retained_cfb {
             return Ok(self.clone());
         }
-        Self::from_slice_with_limits_and_cfb(self.bytes(), limits, cfb_limits)
+        Self::from_slice_with_limits_and_cfb_mode(
+            self.bytes(),
+            limits,
+            cfb_limits,
+            self.artifact_mode(),
+        )
     }
 
     /// Copy an immutable image only after the selected physical input bound.
@@ -1001,6 +1103,15 @@ impl Snapshot {
         bytes: &[u8],
         limits: Limits,
         cfb_limits: OleFileLimits,
+    ) -> Result<Self> {
+        Self::from_slice_with_limits_and_cfb_mode(bytes, limits, cfb_limits, ArtifactMode::Packed)
+    }
+
+    fn from_slice_with_limits_and_cfb_mode(
+        bytes: &[u8],
+        limits: Limits,
+        cfb_limits: OleFileLimits,
+        artifact_mode: ArtifactMode,
     ) -> Result<Self> {
         let observed = u64::try_from(bytes.len()).unwrap_or(u64::MAX);
         if observed > cfb_limits.max_input_bytes() {
@@ -1015,7 +1126,27 @@ impl Snapshot {
             .try_reserve_exact(bytes.len())
             .map_err(|_| Error::Allocation("XLS primary edit source"))?;
         owned.extend_from_slice(bytes);
-        Self::from_bytes_with_cfb(owned, limits, cfb_limits)
+        Self::from_bytes_with_cfb_mode(owned, limits, cfb_limits, artifact_mode)
+    }
+
+    fn artifact_mode(&self) -> ArtifactMode {
+        self.inner.bytes.mode()
+    }
+
+    /// Opens this snapshot's exact artifact without copying it into another
+    /// CFB owner. Generic snapshots use the packed-byte owner while
+    /// source-backed snapshots retain the shared vector owner.
+    pub(crate) fn open_shared_ole_file(
+        &self,
+        limits: SharedOleFileLimits,
+    ) -> std::result::Result<SharedOleFile, litchi_cfb::OleError> {
+        self.inner
+            .bytes
+            .open_shared_ole_file(self.inner.source_version, limits)
+    }
+
+    fn shared_source_vec(&self) -> Result<Arc<Vec<u8>>> {
+        self.inner.bytes.shared_vec()
     }
 
     /// Intersect selected profiles without reparsing the immutable image.
@@ -1112,6 +1243,7 @@ impl Snapshot {
             structural_index: StructuralChangeIndex::default(),
             tab_change: None,
             layout_changes: Vec::new(),
+            source_strings: OnceLock::new(),
         }
     }
 
@@ -1697,6 +1829,75 @@ pub(crate) struct Edit {
     tab_change: Option<Box<tabs::TabChange>>,
     /// Row and column layout transitions, one per row or column.
     layout_changes: Vec<layout::LayoutChange>,
+    /// Lazily built membership index of the source SST, shared by clones.
+    source_strings: OnceLock<Arc<SourceStringIndex>>,
+}
+
+/// Hash index of one immutable source SST, for exact text membership.
+///
+/// Entries are `(hash, index)` pairs sorted by hash; a lookup compares the
+/// candidate text with every source string of an equal hash, so collisions
+/// cost a comparison and never a wrong answer.  Small tables are scanned
+/// directly and build no index.
+#[derive(Debug, Default)]
+struct SourceStringIndex {
+    entries: Vec<(u64, u32)>,
+}
+
+impl SourceStringIndex {
+    /// Tables at or below this size are scanned without an index.
+    const SCAN_LIMIT: usize = 32;
+
+    fn hash(text: &str) -> u64 {
+        use std::hash::{BuildHasher, BuildHasherDefault};
+        BuildHasherDefault::<std::collections::hash_map::DefaultHasher>::default().hash_one(text)
+    }
+
+    fn new(strings: &[String]) -> Arc<Self> {
+        if strings.len() <= Self::SCAN_LIMIT {
+            return Arc::default();
+        }
+        let mut entries = Vec::new();
+        // The source table was admitted under the snapshot's limits; an
+        // index that cannot be retained falls back to scanning.
+        if entries.try_reserve_exact(strings.len()).is_err() {
+            return Arc::default();
+        }
+        for (index, text) in strings.iter().enumerate() {
+            let Ok(index) = u32::try_from(index) else {
+                return Arc::default();
+            };
+            entries.push((Self::hash(text), index));
+        }
+        entries.sort_unstable();
+        Arc::new(Self { entries })
+    }
+
+    /// Counts the occurrences of `text` in `strings`, stopping at `limit`.
+    fn count_at_most(&self, strings: &[String], text: &str, limit: usize) -> usize {
+        if self.entries.is_empty() {
+            return strings
+                .iter()
+                .filter(|candidate| candidate.as_str() == text)
+                .take(limit)
+                .count();
+        }
+        let hash = Self::hash(text);
+        let start = self
+            .entries
+            .partition_point(|(candidate, _)| *candidate < hash);
+        self.entries[start..]
+            .iter()
+            .take_while(|(candidate, _)| *candidate == hash)
+            .filter(|(_, index)| {
+                usize::try_from(*index)
+                    .ok()
+                    .and_then(|index| strings.get(index))
+                    .is_some_and(|candidate| candidate.as_str() == text)
+            })
+            .take(limit)
+            .count()
+    }
 }
 
 /// One exact cell targeted differently by independently prepared transactions.
@@ -2471,19 +2672,16 @@ impl Edit {
         value: Value,
     ) -> Result<()> {
         // A missing text stages an SST resource before the cell operation;
-        // use a candidate only for that multi-stage path so a later overlap
+        // that multi-stage path rolls the resource back on a later refusal
+        // (every other staging step checks before it pushes), so an overlap
         // refusal cannot leave the resource behind. Fixed-width and
-        // structural-only edits are already failure-atomic and keep their
-        // fast path allocation-free.
+        // structural-only edits are already failure-atomic.
         let needs_candidate = match &value {
             Value::Text(text) => !self.has_shared_string(text),
             _ => false,
         };
         if needs_candidate {
-            let mut staged = self.clone();
-            staged.set_value_in_place(selector, reference, value)?;
-            *self = staged;
-            Ok(())
+            self.with_resource_rollback(|edit| edit.set_value_in_place(selector, reference, value))
         } else {
             self.set_value_in_place(selector, reference, value)
         }
@@ -2545,11 +2743,9 @@ impl Edit {
             Value::Text(text) if !self.has_shared_string(text) => Some(text.clone()),
             _ => None,
         };
-        let mut shared_strings = self.effective_shared_strings();
-        if let Some(text) = &missing_text {
-            shared_strings.push(text.clone());
-        }
-        match target_storage(source_cell.storage, &value, &shared_strings) {
+        // The value's text is present once the missing resource is staged.
+        let text_present = |text: &str| missing_text.is_some() || self.has_shared_string(text);
+        match target_storage(source_cell.storage, &value, text_present) {
             Ok(target) => {
                 if let Some(text) = missing_text {
                     self.stage_resource(ResourceChange::SharedString { text, insert: true })?;
@@ -2567,7 +2763,7 @@ impl Edit {
                 // the record and row-block closure atomically.  Formula
                 // records stay on the dependency-checked cache path and are
                 // never silently converted into ordinary scalar cells.
-                let target = storage_for_new_value(&value, &shared_strings).map_err(|_| error)?;
+                let target = storage_for_new_value(&value, text_present).map_err(|_| error)?;
                 if let Some(text) = missing_text {
                     self.stage_resource(ResourceChange::SharedString { text, insert: true })?;
                 }
@@ -2893,10 +3089,9 @@ impl Edit {
             _ => false,
         };
         if needs_candidate {
-            let mut staged = self.clone();
-            staged.insert_cell_with_style_in_place(selector, reference, value, style)?;
-            *self = staged;
-            Ok(())
+            self.with_resource_rollback(|edit| {
+                edit.insert_cell_with_style_in_place(selector, reference, value, style)
+            })
         } else {
             self.insert_cell_with_style_in_place(selector, reference, value, style)
         }
@@ -2930,8 +3125,7 @@ impl Edit {
                 insert: true,
             })?;
         }
-        let shared_strings = self.effective_shared_strings();
-        let storage = storage_for_new_value(&value, &shared_strings)?;
+        let storage = storage_for_new_value(&value, |text| self.has_shared_string(text))?;
         self.stage_structural(StructuralChange::Cell {
             sheet,
             reference,
@@ -3184,10 +3378,73 @@ impl Edit {
         Ok(index)
     }
 
+    /// Runs one multi-stage operation whose only staging before its final
+    /// fallible step is SST resources; on failure the resources it staged
+    /// are dropped, leaving the edit exactly as before.
+    ///
+    /// Every staging step checks its refusals before it pushes, so the
+    /// resource tail is the only state a failed operation can have changed.
+    /// This replaces cloning the whole edit per new text, which made each
+    /// text insertion O(staged changes).
+    fn with_resource_rollback(
+        &mut self,
+        stage: impl FnOnce(&mut Self) -> Result<()>,
+    ) -> Result<()> {
+        let resources = self.resource_changes.len();
+        let (changes, structural) = (self.changes.len(), self.structural_changes.len());
+        let result = stage(self);
+        if result.is_err() {
+            debug_assert_eq!(
+                (self.changes.len(), self.structural_changes.len()),
+                (changes, structural),
+                "a failed staging step pushed a cell change"
+            );
+            self.resource_changes.truncate(resources);
+        }
+        result
+    }
+
+    /// Whether `text` is present in the effective SST.
+    ///
+    /// This is the membership of [`Self::effective_shared_strings`] without
+    /// materializing it: a staged insertion of `text` makes it present, and
+    /// otherwise it is present while the source holds more occurrences than
+    /// the staged removals of the same text (each removal drops one source
+    /// occurrence).  The source occurrences come from a per-edit hash index,
+    /// so a text insertion costs O(staged resources) instead of cloning the
+    /// source table and fingerprinting every staged string.
     fn has_shared_string(&self, text: &str) -> bool {
-        self.effective_shared_strings()
-            .iter()
-            .any(|candidate| candidate == text)
+        let mut removed = 0_usize;
+        for change in &self.resource_changes {
+            match change {
+                ResourceChange::SharedString {
+                    text: candidate,
+                    insert,
+                }
+                | ResourceChange::RichSharedString {
+                    text: candidate,
+                    insert,
+                    ..
+                } if candidate == text => {
+                    if *insert {
+                        return true;
+                    }
+                    removed = removed.saturating_add(1);
+                },
+                ResourceChange::SharedString { .. }
+                | ResourceChange::RichSharedString { .. }
+                | ResourceChange::ExtendedFormat { .. }
+                | ResourceChange::FormulaCell { .. } => {},
+            }
+        }
+        self.source_strings
+            .get_or_init(|| SourceStringIndex::new(&self.source.inner.shared_strings))
+            .count_at_most(
+                &self.source.inner.shared_strings,
+                text,
+                removed.saturating_add(1),
+            )
+            > removed
     }
 
     fn has_rich_shared_string(
@@ -3358,11 +3615,7 @@ impl Edit {
                     ));
                 }
                 if *insert {
-                    structural::certify_sst_insertion(
-                        &self.source,
-                        &self.resource_changes,
-                        &change,
-                    )?;
+                    structural::certify_sst_insertion(&change)?;
                 }
             },
             ResourceChange::RichSharedString {
@@ -3387,11 +3640,7 @@ impl Edit {
                         ));
                     }
                     validate_rich_text(self, text, formatting_runs)?;
-                    structural::certify_sst_insertion(
-                        &self.source,
-                        &self.resource_changes,
-                        &change,
-                    )?;
+                    structural::certify_sst_insertion(&change)?;
                 }
             },
             ResourceChange::ExtendedFormat {
@@ -4417,8 +4666,8 @@ impl Edit {
             && layout.is_empty()
         {
             let patch = Patch::new(
-                Arc::clone(&self.source.inner.bytes),
-                Arc::clone(&self.source.inner.bytes),
+                self.source.inner.bytes.clone(),
+                self.source.inner.bytes.clone(),
                 semantic,
             );
             return Ok(Commit {
@@ -4507,39 +4756,25 @@ impl Edit {
         // immutable source owner.  The CFB profile is part of the source
         // contract even when the object profile alone would accept the
         // replacement stream.
-        let mut package = PackageEditor::open_with_cfb_limits(
-            self.source.inner.bytes.to_vec(),
-            Targets::default(),
-            self.source.inner.limits,
-            self.source.inner.cfb_limits,
+        let package = ObjectPackage::open_with_options(
+            self.source.bytes().to_vec(),
+            OpenOptions::new()
+                .targets(Targets::default())
+                .limits(self.source.inner.limits)
+                .cfb_limits(self.source.inner.cfb_limits),
         )?;
-        // The committed package editor has already rendered, reopened, and
-        // recaptured the candidate CFB, and it hands back the exact artifact
-        // it validated. Publish that artifact instead of rendering the same
-        // editor state a second time; snapshot construction then performs the
-        // owner parse and complete raw-reader validation once, over the bytes
-        // the CFB reopen already accepted.
-        let rendered =
-            package.put_stream_shared_with_rendered(&self.source.inner.workbook_path, workbook)?;
-        debug_assert_eq!(
-            package.clone().finish().ok().as_deref(),
-            Some(rendered.as_slice()),
-            "a fresh render of the committed editor reproduces its validated rendering"
-        );
+        let mut editor = package.edit()?;
+        editor.put_stream_shared(&self.source.inner.workbook_path, workbook)?;
+        let package = editor.commit()?.into_package();
         let snapshot = if fixed_cells != 0
             && self.structural_changes.is_empty()
             && self.resource_changes.is_empty()
             && layout.is_empty()
             && changes_are_fixed_numeric(&self.source, &self.changes)
         {
-            Snapshot::from_fixed_numeric_package_editor(
-                package,
-                rendered,
-                &self.source,
-                &self.changes,
-            )?
+            Snapshot::from_fixed_numeric_package_editor(package, &self.source, &self.changes)?
         } else {
-            Snapshot::open_package(package, Some(rendered), None)?
+            Snapshot::open_package_with_mode(package, None, self.source.artifact_mode())?
         };
         verify_readback(&snapshot, &self.changes)?;
         verify_structural_readback(
@@ -4551,8 +4786,8 @@ impl Edit {
         verify_resource_readback(&snapshot, &self.resource_changes)?;
         verify_layout_readback(&snapshot, &layout)?;
         let patch = Patch::new(
-            Arc::clone(&self.source.inner.bytes),
-            Arc::clone(&snapshot.inner.bytes),
+            self.source.inner.bytes.clone(),
+            snapshot.inner.bytes.clone(),
             semantic,
         );
         let changed = !patch.is_noop();
@@ -4615,15 +4850,20 @@ fn commit_tab_change(source: Snapshot, change: tabs::TabChange) -> Result<Commit
         ..
     } = change;
     let workbook: Arc<[u8]> = Arc::from(workbook);
-    let mut package = PackageEditor::open_with_cfb_limits(
-        source.inner.bytes.to_vec(),
-        Targets::default(),
-        source.inner.limits,
-        source.inner.cfb_limits,
+    let package = ObjectPackage::open_with_options(
+        source.bytes().to_vec(),
+        OpenOptions::new()
+            .targets(Targets::default())
+            .limits(source.inner.limits)
+            .cfb_limits(source.inner.cfb_limits),
     )?;
-    let rendered =
-        package.put_stream_shared_with_rendered(&source.inner.workbook_path, workbook)?;
-    let snapshot = Snapshot::open_package(package, Some(rendered), None)?;
+    let mut editor = package.edit()?;
+    editor.put_stream_shared(&source.inner.workbook_path, workbook)?;
+    let snapshot = Snapshot::open_package_with_mode(
+        editor.commit()?.into_package(),
+        None,
+        source.artifact_mode(),
+    )?;
     let observed = tabs::catalog(&snapshot.inner.workbook_stream)?;
     if observed.len() != target_names.len()
         || observed
@@ -4636,8 +4876,8 @@ fn commit_tab_change(source: Snapshot, change: tabs::TabChange) -> Result<Commit
         ));
     }
     let patch = Patch::new(
-        Arc::clone(&source.inner.bytes),
-        Arc::clone(&snapshot.inner.bytes),
+        source.inner.bytes.clone(),
+        snapshot.inner.bytes.clone(),
         semantic,
     );
     let changed = !patch.is_noop();
@@ -5421,13 +5661,13 @@ impl fmt::Debug for SourceBackedCommit {
 /// Successful source-bound fixed-width numeric publication plan.
 ///
 /// Unlike [`SourceBackedCommit`], this value never retains a rendered target
-/// [`Snapshot`], complete target `Vec<u8>`, or target artifact `Arc<[u8]>`.
+/// [`Snapshot`], complete target `Vec<u8>`, or target artifact `Arc<Vec<u8>>`.
 /// It keeps the immutable source and the checked CFB overlay plan. The plan
 /// owns the compact exact physical replacement spans derived from the numeric
 /// splices; logical path and expected-range descriptors are consumed during
 /// validation rather than duplicated here. The plan's source and target
 /// fingerprints are computed once, at planning, over the source's sealed
-/// immutable `Arc<[u8]>`; direct sequential publication, checked composed
+/// immutable `Arc<Vec<u8>>`; direct sequential publication, checked composed
 /// views and atomic saves rely on that ownership instead of re-hashing the
 /// artifact, and atomic saves keep every durability step.
 ///
@@ -7316,8 +7556,9 @@ fn apply_fixed_semantic(
             value,
         );
     }
-    let shared_strings = transaction.effective_shared_strings();
-    let represented = target_storage(cell.storage, &value, &shared_strings)?;
+    let represented = target_storage(cell.storage, &value, |text| {
+        transaction.has_shared_string(text)
+    })?;
     if represented != storage {
         return Err(Error::InvalidData(
             "cell patch target storage disagrees with its value".into(),
@@ -7427,8 +7668,8 @@ fn apply_structural_cell_semantic(
                     insert: true,
                 })?;
             }
-            let shared_strings = transaction.effective_shared_strings();
-            if storage_for_new_value(&value, &shared_strings)? != storage {
+            if storage_for_new_value(&value, |text| transaction.has_shared_string(text))? != storage
+            {
                 return Err(Error::InvalidData(
                     "structural cell storage disagrees with its value".into(),
                 ));
@@ -7481,11 +7722,10 @@ fn apply_structural_cell_semantic(
                     insert: true,
                 })?;
             }
-            let shared_strings = transaction.effective_shared_strings();
             let represented = if storage == Storage::MulRk {
                 matches!(&value, Value::Number(number) if encode_rk(*number).is_some())
             } else {
-                storage_for_new_value(&value, &shared_strings)
+                storage_for_new_value(&value, |text| transaction.has_shared_string(text))
                     .map(|candidate| candidate == storage)
                     .unwrap_or(false)
             };
@@ -7652,13 +7892,13 @@ impl fmt::Debug for SemanticPatch {
 /// Reversible, exact-source-checked replacement of one XLS artifact.
 #[derive(Clone)]
 pub(crate) struct Patch {
-    before: Arc<[u8]>,
-    after: Arc<[u8]>,
+    before: ArtifactBytes,
+    after: ArtifactBytes,
     semantic: SemanticPatch,
 }
 
 impl Patch {
-    fn new(before: Arc<[u8]>, after: Arc<[u8]>, semantic: SemanticPatch) -> Self {
+    fn new(before: ArtifactBytes, after: ArtifactBytes, semantic: SemanticPatch) -> Self {
         Self {
             before,
             after,
@@ -7675,13 +7915,13 @@ impl Patch {
     /// Returns the exact required source artifact.
     #[must_use]
     pub(crate) fn before(&self) -> &[u8] {
-        &self.before
+        self.before.as_slice()
     }
 
     /// Returns the exact produced artifact.
     #[must_use]
     pub(crate) fn after(&self) -> &[u8] {
-        &self.after
+        self.after.as_slice()
     }
 
     /// Durable semantic operation patch for this exact artifact transition.
@@ -7719,10 +7959,11 @@ impl Patch {
         if self.is_noop() {
             return Ok(source.clone());
         }
-        Snapshot::from_slice_with_limits_and_cfb(
-            &self.after,
+        Snapshot::from_slice_with_limits_and_cfb_mode(
+            self.after.as_slice(),
             source.inner.limits,
             source.inner.cfb_limits,
+            source.artifact_mode(),
         )
     }
 
@@ -7730,8 +7971,8 @@ impl Patch {
     #[must_use]
     pub(crate) fn inverse(&self) -> Self {
         Self {
-            before: Arc::clone(&self.after),
-            after: Arc::clone(&self.before),
+            before: self.after.clone(),
+            after: self.before.clone(),
             semantic: self.semantic.inverse(),
         }
     }
@@ -7835,8 +8076,8 @@ fn commit_source_backed_numeric_plan(transaction: Edit) -> Result<SourceBackedPl
     // still checked independently below over the composed positional reader.
     source.inner.source_policy.require()?;
 
-    let publisher = SourceBackedOverlayPublisher::open_owned(
-        Arc::clone(&source.inner.bytes),
+    let publisher = SourceBackedOverlayPublisher::open_owned_vec(
+        source.shared_source_vec()?,
         source.inner.source_version,
         shared_ole_limits(source.inner.cfb_limits)?,
     )
@@ -7972,8 +8213,8 @@ fn commit_source_backed_numeric(transaction: Edit) -> Result<SourceBackedCommit>
     // complete reopen.
     source.inner.source_policy.require()?;
 
-    let publisher = SourceBackedOverlayPublisher::open_owned(
-        Arc::clone(&source.inner.bytes),
+    let publisher = SourceBackedOverlayPublisher::open_owned_vec(
+        source.shared_source_vec()?,
         source.inner.source_version,
         shared_ole_limits(source.inner.cfb_limits)?,
     )
@@ -8022,24 +8263,25 @@ fn commit_source_backed_numeric(transaction: Edit) -> Result<SourceBackedCommit>
         source.clone()
     } else {
         let target_bytes = materialize_numeric_plan(&plan, source.bytes().len())?;
-        let package = PackageEditor::open_with_cfb_limits(
+        let package = ObjectPackage::open_with_options(
             target_bytes.clone(),
-            Targets::default(),
-            source.inner.limits,
-            source.inner.cfb_limits,
+            OpenOptions::new()
+                .targets(Targets::default())
+                .limits(source.inner.limits)
+                .cfb_limits(source.inner.cfb_limits),
         )?;
         // The publication boundary's complete reopen already parses this
         // target in full. The target checks below used to run on a second,
         // independent `Reader::new` over the identical bytes; they now read
         // that first parse, in the same order and at the same point.
-        let target = Snapshot::open_package(
+        let target = Snapshot::open_package_with_mode(
             package,
-            None,
             Some(NumericTargetVerification {
                 expected_bytes: &target_bytes,
                 source: &source,
                 changes: &changes,
             }),
+            source.artifact_mode(),
         )?;
         target.retag_source_version(target_version)
     };
@@ -8051,8 +8293,8 @@ fn commit_source_backed_numeric(transaction: Edit) -> Result<SourceBackedCommit>
     let target_workbook_bytes = u64::try_from(target.workbook_stream().len())
         .map_err(|_error| Error::InvalidData("target Workbook length exceeds u64".into()))?;
     let patch = Patch::new(
-        Arc::clone(&source.inner.bytes),
-        Arc::clone(&target.inner.bytes),
+        source.inner.bytes.clone(),
+        target.inner.bytes.clone(),
         semantic,
     );
     let diagnostics = SourceBackedDiagnostics {
@@ -8955,7 +9197,11 @@ fn valid_xnum(value: f64) -> bool {
     value.is_normal() || (value == 0.0 && value.is_sign_positive())
 }
 
-fn target_storage(source: Storage, value: &Value, shared_strings: &[String]) -> Result<Storage> {
+fn target_storage(
+    source: Storage,
+    value: &Value,
+    text_present: impl Fn(&str) -> bool,
+) -> Result<Storage> {
     let target = match (source, value) {
         (Storage::Number, Value::Number(number)) if valid_xnum(*number) => Storage::Number,
         (Storage::Rk | Storage::MulRk, Value::Number(number)) if encode_rk(*number).is_some() => {
@@ -8964,9 +9210,7 @@ fn target_storage(source: Storage, value: &Value, shared_strings: &[String]) -> 
         (Storage::LabelSst, Value::Number(number)) if encode_rk(*number).is_some() => Storage::Rk,
         (Storage::BoolErr, Value::Boolean(_) | Value::Error(_)) => Storage::BoolErr,
         (Storage::Blank, Value::Blank) => Storage::Blank,
-        (Storage::LabelSst | Storage::Rk, Value::Text(text))
-            if shared_strings.iter().any(|candidate| candidate == text) =>
-        {
+        (Storage::LabelSst | Storage::Rk, Value::Text(text)) if text_present(text) => {
             Storage::LabelSst
         },
         (Storage::Formula, Value::FormulaCache(cache)) if valid_formula_cache(cache) => {
@@ -8983,14 +9227,12 @@ fn target_storage(source: Storage, value: &Value, shared_strings: &[String]) -> 
     Ok(target)
 }
 
-fn storage_for_new_value(value: &Value, shared_strings: &[String]) -> Result<Storage> {
+fn storage_for_new_value(value: &Value, text_present: impl Fn(&str) -> bool) -> Result<Storage> {
     match value {
         Value::Number(number) if valid_xnum(*number) => Ok(Storage::Number),
         Value::Boolean(_) | Value::Error(_) => Ok(Storage::BoolErr),
         Value::Blank => Ok(Storage::Blank),
-        Value::Text(text) if shared_strings.iter().any(|candidate| candidate == text) => {
-            Ok(Storage::LabelSst)
-        },
+        Value::Text(text) if text_present(text) => Ok(Storage::LabelSst),
         Value::Text(_) => Err(Error::Internal(
             "new BIFF8 text is absent from the effective workbook SST",
         )),

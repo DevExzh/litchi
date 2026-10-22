@@ -543,6 +543,7 @@ impl std::error::Error for SelectionError {}
 
 /// Errors produced while staging or applying a semantic subdocument edit.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum Error {
     /// The candidate violates an MS-DOC invariant or wire limit.
     Invalid(PackageError),

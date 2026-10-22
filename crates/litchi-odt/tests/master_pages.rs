@@ -38,15 +38,16 @@ fn canonical_insert_replace_remove_preserves_unrelated_bytes() {
         r#"<draw:rect xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"/>"#,
     ));
     let fragment = page.to_xml_fragment().unwrap();
-    let inserted = insert(&original, &fragment).unwrap();
+    let limits = litchi_odf_common::XmlStreamLimits::default();
+    let inserted = insert(&original, &fragment, limits).unwrap();
     assert!(inserted.contains(r#"s:name="Keep""#));
     assert!(inserted.contains("Added &amp; Main"));
 
     page.children.clear();
-    let replaced = replace(&inserted, "Added", &page.to_xml_fragment().unwrap()).unwrap();
+    let replaced = replace(&inserted, "Added", &page.to_xml_fragment().unwrap(), limits).unwrap();
     assert!(replaced.contains(r#"s:name="Keep""#));
     assert!(!replaced.contains("<draw:rect"));
-    let removed = remove(&replaced, "Added").unwrap();
+    let removed = remove(&replaced, "Added", limits).unwrap();
     assert_eq!(removed, original);
 }
 

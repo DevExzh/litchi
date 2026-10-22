@@ -120,7 +120,12 @@ impl Index {
             };
             if object.class() == Some("chart") {
                 let chart = match content()? {
-                    Some(xml) => match litchi_odf_common::chart::read(&xml) {
+                    // The ODP owner retains no raw XML policy; read the chart
+                    // part under the owner default, as the leaf does.
+                    Some(xml) => match litchi_odf_common::chart::read(
+                        &xml,
+                        litchi_odf_common::XmlStreamLimits::owner_default_value(),
+                    ) {
                         Ok(element) => summarize(&element),
                         Err(_) => Chart::default(),
                     },

@@ -267,7 +267,15 @@ impl SourceBackedPresentation {
             // validation: a malformed optional meta.xml must not become
             // observable only after a source-backed facade is opened.
             let metadata = if package.has_file("meta.xml")? {
-                Some(Meta::from_bytes(&package.get_file("meta.xml")?)?.try_extract_metadata()?)
+                // ODP owners retain no raw XML policy yet; meta.xml is
+                // admitted under the documented owner default.
+                Some(
+                    Meta::from_bytes(
+                        &package.get_file("meta.xml")?,
+                        litchi_odf_common::XmlStreamLimits::owner_default_value(),
+                    )?
+                    .try_extract_metadata()?,
+                )
             } else {
                 None
             };

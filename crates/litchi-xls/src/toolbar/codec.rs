@@ -393,5 +393,6 @@ fn map_shared(error: SharedError) -> Error {
     match error {
         SharedError::Truncated(field) => Error::UnexpectedEndOfStream(format!("XCB {field}")),
         SharedError::Invalid(message) => Error::InvalidData(format!("XCB {message}")),
+        _ => Error::InvalidData("XCB shared toolbar error".to_string()),
     }
 }

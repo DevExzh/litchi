@@ -2954,6 +2954,10 @@
   {
    "record": "0362x",
    "reason": "ZIP prefill refusal-classification repair and bounded-read validation; no paired performance measurement or native acceptance."
+  },
+  {
+   "record": "0362hda",
+   "reason": "ODF flat output admission correctness follow-up with an untimed flat qualification probe, source and allocation receipts; native timing remains open and no performance acceptance is claimed."
   }
  ]
 }

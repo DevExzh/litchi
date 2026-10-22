@@ -20,7 +20,7 @@ use litchi_core::{
     ExecutionLimits, Limits as BudgetLimits, Metadata, Reservation, Resource, ResourceLimit,
     Result,
 };
-use litchi_odf_common::{OpenOptions, SemanticLimitKind};
+use litchi_odf_common::{OpenOptions, SemanticLimitKind, XmlStreamLimits};
 use std::cell::Cell;
 use std::io::Read;
 use std::mem::size_of;
@@ -266,6 +266,10 @@ pub(crate) fn allocate_xml(
 }
 
 impl FlatDocument {
+    pub(crate) fn xml_limits_value(&self) -> XmlStreamLimits {
+        self.xml_limits
+    }
+
     /// Parses the optional flat-document `office:settings` inventory.
     pub fn settings(&self) -> Result<crate::Settings> {
         crate::settings::parse_flat(self.xml())
@@ -301,7 +305,12 @@ impl FlatDocument {
 
     /// Read and validate a flat `OpenDocument` XML stream under `options`.
     pub fn from_reader_with_options(reader: impl Read, options: OpenOptions) -> Result<Self> {
-        Self::from_reader_with_limit(reader, options_maximum(options))
+        Self::from_reader_with_limit_and_context_and_xml_limits(
+            reader,
+            options_maximum(options),
+            default_flat_execution_context()?,
+            options.xml_limits_value(),
+        )
     }
 
     /// Read and validate a flat `OpenDocument` XML stream under `options` and
@@ -311,7 +320,12 @@ impl FlatDocument {
         options: OpenOptions,
         context: ExecutionContext,
     ) -> Result<Self> {
-        Self::from_reader_with_limit_and_context(reader, options_maximum(options), context)
+        Self::from_reader_with_limit_and_context_and_xml_limits(
+            reader,
+            options_maximum(options),
+            context,
+            options.xml_limits_value(),
+        )
     }
 
     /// Read and validate a flat `OpenDocument` XML stream under a finite
@@ -325,6 +339,33 @@ impl FlatDocument {
         maximum: u64,
         context: ExecutionContext,
     ) -> Result<Self> {
+        Self::from_reader_with_limit_and_context_and_xml_limits(
+            reader,
+            maximum,
+            context,
+            XmlStreamLimits::owner_default_value(),
+        )
+    }
+
+    pub(crate) fn from_reader_with_limit_and_xml_limits(
+        reader: impl Read,
+        maximum: u64,
+        xml_limits: XmlStreamLimits,
+    ) -> Result<Self> {
+        Self::from_reader_with_limit_and_context_and_xml_limits(
+            reader,
+            maximum,
+            default_flat_execution_context()?,
+            xml_limits,
+        )
+    }
+
+    fn from_reader_with_limit_and_context_and_xml_limits(
+        reader: impl Read,
+        maximum: u64,
+        context: ExecutionContext,
+        xml_limits: XmlStreamLimits,
+    ) -> Result<Self> {
         validate_flat_limit(maximum)?;
         context.check().map_err(map_execution_error)?;
         let (bytes, memory) = read_flat_input(reader, maximum, &context)?;
@@ -334,6 +375,7 @@ impl FlatDocument {
             context,
             Some(memory),
             true,
+            xml_limits,
         )
     }
 
@@ -344,7 +386,12 @@ impl FlatDocument {
 
     /// Validate flat `OpenDocument` XML from owned bytes under `options`.
     pub fn from_bytes_with_options(bytes: Vec<u8>, options: OpenOptions) -> Result<Self> {
-        Self::from_bytes_with_limit(bytes, options_maximum(options))
+        Self::from_bytes_with_limit_and_context_and_xml_limits(
+            bytes,
+            options_maximum(options),
+            default_flat_execution_context()?,
+            options.xml_limits_value(),
+        )
     }
 
     /// Validate owned flat `OpenDocument` XML under `options` and a
@@ -358,7 +405,12 @@ impl FlatDocument {
         options: OpenOptions,
         context: ExecutionContext,
     ) -> Result<Self> {
-        Self::from_bytes_with_limit_and_context(bytes, options_maximum(options), context)
+        Self::from_bytes_with_limit_and_context_and_xml_limits(
+            bytes,
+            options_maximum(options),
+            context,
+            options.xml_limits_value(),
+        )
     }
 
     /// Validate flat `OpenDocument` XML from owned bytes under an explicit
@@ -372,7 +424,36 @@ impl FlatDocument {
         maximum: u64,
         context: ExecutionContext,
     ) -> Result<Self> {
-        Self::from_bytes_with_execution_context_and_memory(bytes, maximum, context, None, false)
+        Self::from_bytes_with_limit_and_context_and_xml_limits(
+            bytes,
+            maximum,
+            context,
+            XmlStreamLimits::owner_default_value(),
+        )
+    }
+
+    pub(crate) fn from_bytes_with_limit_and_xml_limits(
+        bytes: Vec<u8>,
+        maximum: u64,
+        xml_limits: XmlStreamLimits,
+    ) -> Result<Self> {
+        Self::from_bytes_with_limit_and_context_and_xml_limits(
+            bytes,
+            maximum,
+            default_flat_execution_context()?,
+            xml_limits,
+        )
+    }
+
+    fn from_bytes_with_limit_and_context_and_xml_limits(
+        bytes: Vec<u8>,
+        maximum: u64,
+        context: ExecutionContext,
+        xml_limits: XmlStreamLimits,
+    ) -> Result<Self> {
+        Self::from_bytes_with_execution_context_and_memory(
+            bytes, maximum, context, None, false, xml_limits,
+        )
     }
 
     fn from_bytes_with_execution_context_and_memory(
@@ -381,6 +462,7 @@ impl FlatDocument {
         context: ExecutionContext,
         retained_memory: Option<MemoryLease>,
         input_already_admitted: bool,
+        xml_limits: XmlStreamLimits,
     ) -> Result<Self> {
         validate_flat_limit(maximum)?;
         context.check().map_err(map_execution_error)?;
@@ -474,7 +556,7 @@ impl FlatDocument {
                 })?;
         }
         context.check().map_err(map_execution_error)?;
-        validate_flat_document_with_context(&xml, family, &context)?;
+        validate_flat_document_with_context(&xml, family, &context, xml_limits)?;
         drop(input_memory);
         Ok(Self {
             xml,
@@ -484,6 +566,7 @@ impl FlatDocument {
             max_document_bytes: maximum_usize,
             execution_context: context,
             source_memory,
+            xml_limits,
         })
     }
 
@@ -524,6 +607,7 @@ impl FlatDocument {
             max_document_bytes: self.max_document_bytes,
             execution_context: context,
             source_memory,
+            xml_limits: self.xml_limits,
         })
     }
 
@@ -571,12 +655,12 @@ impl FlatDocument {
 
     /// Extract common document metadata from the combined XML document.
     pub fn metadata(&self) -> Result<Metadata> {
-        Meta::from_bytes(self.xml.as_bytes())?.try_extract_metadata()
+        Meta::from_bytes(self.xml.as_bytes(), self.xml_limits)?.try_extract_metadata()
     }
 
     /// Extract the complete format-specific metadata model.
     pub fn odf_metadata(&self) -> Result<crate::Metadata> {
-        Meta::from_bytes(self.xml.as_bytes())?.odf_metadata()
+        Meta::from_bytes(self.xml.as_bytes(), self.xml_limits)?.odf_metadata()
     }
 
     /// Discover inline and inert linked images in the flat document.
@@ -591,12 +675,15 @@ impl FlatDocument {
 
     /// Inspect in-content RDFa and inline `text:meta` values in the flat XML.
     pub fn in_content_metadata(&self) -> Result<crate::ContentMetadata> {
-        crate::content_metadata::parse_parts(&[(self.xml(), crate::MetadataPart::Content)])
+        crate::content_metadata::parse_parts_with_xml_limits(
+            &[(self.xml(), crate::MetadataPart::Content)],
+            self.xml_limits,
+        )
     }
 
     /// Inspect inert XForms model declarations in the flat XML.
     pub fn xforms_models(&self) -> Result<Vec<crate::xforms::Model>> {
-        crate::xforms::parse_models(self.xml())
+        crate::xforms::parse_models_with_xml_limits(self.xml(), self.xml_limits)
     }
 
     /// Set or clear RDFa on one paragraph in the flat XML.
@@ -607,17 +694,20 @@ impl FlatDocument {
     ) -> Result<()> {
         let scratch =
             FlatMutationBudget::new(&self.execution_context, "flat OpenDocument paragraph RDFa")?;
-        let updated = crate::content_metadata::set_paragraph_rdfa_with_limit_and_budget(
-            &self.xml,
-            position,
-            value,
-            self.max_document_bytes,
-            Some(&scratch),
-        )?;
+        let updated =
+            crate::content_metadata::set_paragraph_rdfa_with_limit_and_budget_and_xml_limits(
+                &self.xml,
+                position,
+                value,
+                self.max_document_bytes,
+                Some(&scratch),
+                self.xml_limits,
+            )?;
         self.validate_candidate(&updated.xml, &scratch)?;
-        crate::content_metadata::parse_parts_with_budget(
+        crate::content_metadata::parse_parts_with_budget_and_limits(
             &[(updated.xml.as_str(), crate::MetadataPart::Content)],
             &scratch,
+            self.xml_limits,
         )?;
         self.commit_candidate(updated)
     }
@@ -630,17 +720,20 @@ impl FlatDocument {
     ) -> Result<()> {
         let scratch =
             FlatMutationBudget::new(&self.execution_context, "flat OpenDocument bookmark RDFa")?;
-        let updated = crate::content_metadata::set_bookmark_rdfa_with_limit_and_budget(
-            &self.xml,
-            name,
-            value,
-            self.max_document_bytes,
-            Some(&scratch),
-        )?;
+        let updated =
+            crate::content_metadata::set_bookmark_rdfa_with_limit_and_budget_and_xml_limits(
+                &self.xml,
+                name,
+                value,
+                self.max_document_bytes,
+                Some(&scratch),
+                self.xml_limits,
+            )?;
         self.validate_candidate(&updated.xml, &scratch)?;
-        crate::content_metadata::parse_parts_with_budget(
+        crate::content_metadata::parse_parts_with_budget_and_limits(
             &[(updated.xml.as_str(), crate::MetadataPart::Content)],
             &scratch,
+            self.xml_limits,
         )?;
         self.commit_candidate(updated)
     }
@@ -653,17 +746,20 @@ impl FlatDocument {
     ) -> Result<()> {
         let scratch =
             FlatMutationBudget::new(&self.execution_context, "flat OpenDocument text:meta RDFa")?;
-        let updated = crate::content_metadata::set_text_meta_rdfa_with_limit_and_budget(
-            &self.xml,
-            position,
-            value,
-            self.max_document_bytes,
-            Some(&scratch),
-        )?;
+        let updated =
+            crate::content_metadata::set_text_meta_rdfa_with_limit_and_budget_and_xml_limits(
+                &self.xml,
+                position,
+                value,
+                self.max_document_bytes,
+                Some(&scratch),
+                self.xml_limits,
+            )?;
         self.validate_candidate(&updated.xml, &scratch)?;
-        crate::content_metadata::parse_parts_with_budget(
+        crate::content_metadata::parse_parts_with_budget_and_limits(
             &[(updated.xml.as_str(), crate::MetadataPart::Content)],
             &scratch,
+            self.xml_limits,
         )?;
         self.commit_candidate(updated)
     }
@@ -678,17 +774,20 @@ impl FlatDocument {
             &self.execution_context,
             "flat OpenDocument text:meta insertion",
         )?;
-        let updated = crate::content_metadata::insert_text_meta_with_limit_and_budget(
-            &self.xml,
-            paragraph,
-            value,
-            self.max_document_bytes,
-            Some(&scratch),
-        )?;
+        let updated =
+            crate::content_metadata::insert_text_meta_with_limit_and_budget_and_xml_limits(
+                &self.xml,
+                paragraph,
+                value,
+                self.max_document_bytes,
+                Some(&scratch),
+                self.xml_limits,
+            )?;
         self.validate_candidate(&updated.xml, &scratch)?;
-        crate::content_metadata::parse_parts_with_budget(
+        crate::content_metadata::parse_parts_with_budget_and_limits(
             &[(updated.xml.as_str(), crate::MetadataPart::Content)],
             &scratch,
+            self.xml_limits,
         )?;
         self.commit_candidate(updated)
     }
@@ -703,17 +802,20 @@ impl FlatDocument {
             &self.execution_context,
             "flat OpenDocument text:meta replacement",
         )?;
-        let updated = crate::content_metadata::replace_text_meta_with_limit_and_budget(
-            &self.xml,
-            position,
-            value,
-            self.max_document_bytes,
-            Some(&scratch),
-        )?;
+        let updated =
+            crate::content_metadata::replace_text_meta_with_limit_and_budget_and_xml_limits(
+                &self.xml,
+                position,
+                value,
+                self.max_document_bytes,
+                Some(&scratch),
+                self.xml_limits,
+            )?;
         self.validate_candidate(&updated.xml, &scratch)?;
-        crate::content_metadata::parse_parts_with_budget(
+        crate::content_metadata::parse_parts_with_budget_and_limits(
             &[(updated.xml.as_str(), crate::MetadataPart::Content)],
             &scratch,
+            self.xml_limits,
         )?;
         self.commit_candidate(updated)
     }
@@ -724,16 +826,19 @@ impl FlatDocument {
             &self.execution_context,
             "flat OpenDocument text:meta removal",
         )?;
-        let updated = crate::content_metadata::remove_text_meta_with_limit_and_budget(
-            &self.xml,
-            position,
-            self.max_document_bytes,
-            Some(&scratch),
-        )?;
+        let updated =
+            crate::content_metadata::remove_text_meta_with_limit_and_budget_and_xml_limits(
+                &self.xml,
+                position,
+                self.max_document_bytes,
+                Some(&scratch),
+                self.xml_limits,
+            )?;
         self.validate_candidate(&updated.xml, &scratch)?;
-        crate::content_metadata::parse_parts_with_budget(
+        crate::content_metadata::parse_parts_with_budget_and_limits(
             &[(updated.xml.as_str(), crate::MetadataPart::Content)],
             &scratch,
+            self.xml_limits,
         )?;
         self.commit_candidate(updated)
     }
@@ -748,15 +853,20 @@ impl FlatDocument {
             &self.execution_context,
             "flat OpenDocument XForms model replacement",
         )?;
-        let updated = crate::xforms::replace_model_with_limit_and_budget(
+        let updated = crate::xforms::replace_model_with_limit_and_budget_and_xml_limits(
             &self.xml,
             position.get(),
             model,
             self.max_document_bytes,
             Some(&scratch),
+            self.xml_limits,
         )?;
         self.validate_candidate(&updated.xml, &scratch)?;
-        crate::xforms::validate_models_with_budget(&updated.xml, &scratch)?;
+        crate::xforms::validate_models_with_budget_and_xml_limits(
+            &updated.xml,
+            &scratch,
+            self.xml_limits,
+        )?;
         self.commit_candidate(updated)
     }
 
@@ -766,14 +876,19 @@ impl FlatDocument {
             &self.execution_context,
             "flat OpenDocument XForms model insertion",
         )?;
-        let updated = crate::xforms::insert_model_with_limit_and_budget(
+        let updated = crate::xforms::insert_model_with_limit_and_budget_and_xml_limits(
             &self.xml,
             model,
             self.max_document_bytes,
             Some(&scratch),
+            self.xml_limits,
         )?;
         self.validate_candidate(&updated.xml, &scratch)?;
-        crate::xforms::validate_models_with_budget(&updated.xml, &scratch)?;
+        crate::xforms::validate_models_with_budget_and_xml_limits(
+            &updated.xml,
+            &scratch,
+            self.xml_limits,
+        )?;
         self.commit_candidate(updated)
     }
 
@@ -783,23 +898,28 @@ impl FlatDocument {
             &self.execution_context,
             "flat OpenDocument XForms model removal",
         )?;
-        let updated = crate::xforms::remove_model_with_limit_and_budget(
+        let updated = crate::xforms::remove_model_with_limit_and_budget_and_xml_limits(
             &self.xml,
             position.get(),
             self.max_document_bytes,
             Some(&scratch),
+            self.xml_limits,
         )?;
         self.validate_candidate(&updated.xml, &scratch)?;
-        crate::xforms::validate_models_with_budget(&updated.xml, &scratch)?;
+        crate::xforms::validate_models_with_budget_and_xml_limits(
+            &updated.xml,
+            &scratch,
+            self.xml_limits,
+        )?;
         self.commit_candidate(updated)
     }
 
     /// Inspect ordered ODF variable declarations without evaluating fields or formulas.
     pub fn variable_declarations(&self) -> Result<crate::variable_declaration::Declarations> {
-        crate::variable_declaration::parse_parts(&[(
-            self.xml(),
-            crate::variable_declaration::Part::Flat,
-        )])
+        crate::variable_declaration::parse_parts_with_xml_limits(
+            &[(self.xml(), crate::variable_declaration::Part::Flat)],
+            self.xml_limits,
+        )
     }
 
     /// Return the unnamed fallback page layout, when one is declared.
@@ -825,10 +945,12 @@ impl FlatDocument {
             "flat OpenDocument variable declaration replacement",
         )?;
         scratch.check()?;
-        let (current, source_memory) = crate::variable_declaration::parse_parts_with_budget(
-            &[(self.xml(), crate::variable_declaration::Part::Flat)],
-            &scratch,
-        )?;
+        let (current, source_memory) =
+            crate::variable_declaration::parse_parts_with_budget_and_xml_limits(
+                &[(self.xml(), crate::variable_declaration::Part::Flat)],
+                &scratch,
+                self.xml_limits,
+            )?;
         let old = current
             .groups
             .iter()
@@ -836,20 +958,23 @@ impl FlatDocument {
             .cloned();
         drop(current);
         drop(source_memory);
-        let updated = crate::variable_declaration::set_xml_with_limit_and_budget(
+        let updated = crate::variable_declaration::set_xml_with_limit_and_budget_and_xml_limits(
             &self.xml,
             group,
             self.max_document_bytes,
             Some(&scratch),
+            self.xml_limits,
         )?;
         self.validate_candidate(&updated.xml, &scratch)?;
-        let (parsed, readback_memory) = crate::variable_declaration::parse_parts_with_budget(
-            &[(
-                updated.xml.as_str(),
-                crate::variable_declaration::Part::Flat,
-            )],
-            &scratch,
-        )?;
+        let (parsed, readback_memory) =
+            crate::variable_declaration::parse_parts_with_budget_and_xml_limits(
+                &[(
+                    updated.xml.as_str(),
+                    crate::variable_declaration::Part::Flat,
+                )],
+                &scratch,
+                self.xml_limits,
+            )?;
         drop(parsed);
         drop(readback_memory);
         self.commit_candidate(updated)?;
@@ -870,10 +995,12 @@ impl FlatDocument {
             "flat OpenDocument variable declaration removal",
         )?;
         scratch.check()?;
-        let (current, source_memory) = crate::variable_declaration::parse_parts_with_budget(
-            &[(self.xml(), crate::variable_declaration::Part::Flat)],
-            &scratch,
-        )?;
+        let (current, source_memory) =
+            crate::variable_declaration::parse_parts_with_budget_and_xml_limits(
+                &[(self.xml(), crate::variable_declaration::Part::Flat)],
+                &scratch,
+                self.xml_limits,
+            )?;
         let Some(old) = current
             .groups
             .iter()
@@ -884,21 +1011,24 @@ impl FlatDocument {
         };
         drop(current);
         drop(source_memory);
-        let updated = crate::variable_declaration::remove_xml_with_limit_and_budget(
+        let updated = crate::variable_declaration::remove_xml_with_limit_and_budget_and_xml_limits(
             &self.xml,
             scope,
             kind,
             self.max_document_bytes,
             Some(&scratch),
+            self.xml_limits,
         )?;
         self.validate_candidate(&updated.xml, &scratch)?;
-        let (parsed, readback_memory) = crate::variable_declaration::parse_parts_with_budget(
-            &[(
-                updated.xml.as_str(),
-                crate::variable_declaration::Part::Flat,
-            )],
-            &scratch,
-        )?;
+        let (parsed, readback_memory) =
+            crate::variable_declaration::parse_parts_with_budget_and_xml_limits(
+                &[(
+                    updated.xml.as_str(),
+                    crate::variable_declaration::Part::Flat,
+                )],
+                &scratch,
+                self.xml_limits,
+            )?;
         drop(parsed);
         drop(readback_memory);
         self.commit_candidate(updated)?;
@@ -1024,7 +1154,7 @@ impl FlatDocument {
                 "flat OpenDocument mutation changed its canonical MIME".to_string(),
             ));
         }
-        validate_flat_document_with_budget(updated, self.family, budget)
+        validate_flat_document_with_budget(updated, self.family, budget, self.xml_limits)
     }
 
     fn commit_candidate(&mut self, candidate: ChargedXml) -> Result<()> {
@@ -1077,10 +1207,11 @@ impl super::staged::Staged for Document {
 
     fn reopen(&self, bytes: &[u8]) -> Result<Self> {
         let maximum = u64::try_from(self.max_document_bytes).unwrap_or(u64::MAX);
-        Self::from_bytes_with_limit_and_context(
+        Self::from_bytes_with_limit_and_context_and_xml_limits(
             bytes.to_vec(),
             maximum,
             self.execution_context.clone(),
+            self.xml_limits,
         )
     }
 

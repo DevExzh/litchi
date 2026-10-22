@@ -96,9 +96,15 @@ struct AllocationDelta {
     peak_live_bytes_after: u64,
 }
 
-#[cfg(feature = "legacy-xlsx-source-history")]
+#[cfg(all(
+    feature = "legacy-xlsx-source-history",
+    not(feature = "current-xlsx-source-history")
+))]
 const API_VARIANT: &str = "pre-w4-workbook-source-merge";
-#[cfg(not(feature = "legacy-xlsx-source-history"))]
+#[cfg(not(all(
+    feature = "legacy-xlsx-source-history",
+    not(feature = "current-xlsx-source-history")
+)))]
 const API_VARIANT: &str = "w4-deferred-source-workbook";
 
 fn main() -> AnyResult<()> {
@@ -191,12 +197,21 @@ struct StepChecks {
     patch: Patch,
 }
 
-#[cfg(not(feature = "legacy-xlsx-source-history"))]
+#[cfg(not(all(
+    feature = "legacy-xlsx-source-history",
+    not(feature = "current-xlsx-source-history")
+)))]
 type Patch = litchi_xlsx::merge::source::Patch;
-#[cfg(feature = "legacy-xlsx-source-history")]
+#[cfg(all(
+    feature = "legacy-xlsx-source-history",
+    not(feature = "current-xlsx-source-history")
+))]
 type Patch = litchi_xlsx::workbook::SourceBackedMergePatch;
 
-#[cfg(not(feature = "legacy-xlsx-source-history"))]
+#[cfg(not(all(
+    feature = "legacy-xlsx-source-history",
+    not(feature = "current-xlsx-source-history")
+)))]
 fn run_history(
     iterations: usize,
     warmups: usize,
@@ -228,7 +243,10 @@ fn run_history(
     Ok(patches)
 }
 
-#[cfg(not(feature = "legacy-xlsx-source-history"))]
+#[cfg(not(all(
+    feature = "legacy-xlsx-source-history",
+    not(feature = "current-xlsx-source-history")
+)))]
 fn run_merge_step(owner: &litchi_xlsx::SourceBackedWorkbook) -> AnyResult<StepChecks> {
     let mut edit = owner
         .edit_merges("Sheet1")?
@@ -239,7 +257,10 @@ fn run_merge_step(owner: &litchi_xlsx::SourceBackedWorkbook) -> AnyResult<StepCh
     Ok(StepChecks { patch })
 }
 
-#[cfg(not(feature = "legacy-xlsx-source-history"))]
+#[cfg(not(all(
+    feature = "legacy-xlsx-source-history",
+    not(feature = "current-xlsx-source-history")
+)))]
 fn run_unmerge_step(owner: &litchi_xlsx::SourceBackedWorkbook) -> AnyResult<StepChecks> {
     let mut edit = owner
         .edit_merges("Sheet1")?
@@ -250,7 +271,10 @@ fn run_unmerge_step(owner: &litchi_xlsx::SourceBackedWorkbook) -> AnyResult<Step
     Ok(StepChecks { patch })
 }
 
-#[cfg(feature = "legacy-xlsx-source-history")]
+#[cfg(all(
+    feature = "legacy-xlsx-source-history",
+    not(feature = "current-xlsx-source-history")
+))]
 fn run_history(
     iterations: usize,
     warmups: usize,
@@ -283,7 +307,10 @@ fn run_history(
     Ok(patches)
 }
 
-#[cfg(feature = "legacy-xlsx-source-history")]
+#[cfg(all(
+    feature = "legacy-xlsx-source-history",
+    not(feature = "current-xlsx-source-history")
+))]
 fn run_merge_step(owner: &litchi_xlsx::workbook::SourceBackedMergeEditor) -> AnyResult<StepChecks> {
     let mut edit = owner
         .edit("Sheet1")?
@@ -294,7 +321,10 @@ fn run_merge_step(owner: &litchi_xlsx::workbook::SourceBackedMergeEditor) -> Any
     Ok(StepChecks { patch })
 }
 
-#[cfg(feature = "legacy-xlsx-source-history")]
+#[cfg(all(
+    feature = "legacy-xlsx-source-history",
+    not(feature = "current-xlsx-source-history")
+))]
 fn run_unmerge_step(
     owner: &litchi_xlsx::workbook::SourceBackedMergeEditor,
 ) -> AnyResult<StepChecks> {
@@ -307,7 +337,10 @@ fn run_unmerge_step(
     Ok(StepChecks { patch })
 }
 
-#[cfg(not(feature = "legacy-xlsx-source-history"))]
+#[cfg(not(all(
+    feature = "legacy-xlsx-source-history",
+    not(feature = "current-xlsx-source-history")
+)))]
 fn verify_history(
     patches: &[Patch],
     merge_fixture: &[u8],
@@ -348,7 +381,10 @@ fn verify_history(
     Ok((replay_checks, inverse_checks))
 }
 
-#[cfg(feature = "legacy-xlsx-source-history")]
+#[cfg(all(
+    feature = "legacy-xlsx-source-history",
+    not(feature = "current-xlsx-source-history")
+))]
 fn verify_history(
     patches: &[Patch],
     merge_fixture: &[u8],
@@ -386,7 +422,10 @@ fn verify_history(
     Ok((replay_checks, inverse_checks))
 }
 
-#[cfg(not(feature = "legacy-xlsx-source-history"))]
+#[cfg(not(all(
+    feature = "legacy-xlsx-source-history",
+    not(feature = "current-xlsx-source-history")
+)))]
 fn run_common_replay(
     patches: &[Patch],
     merge_fixture: &[u8],
@@ -650,7 +689,10 @@ fn run_common_replay(
     ))
 }
 
-#[cfg(feature = "legacy-xlsx-source-history")]
+#[cfg(all(
+    feature = "legacy-xlsx-source-history",
+    not(feature = "current-xlsx-source-history")
+))]
 fn run_common_replay(
     patches: &[Patch],
     merge_fixture: &[u8],
@@ -909,7 +951,10 @@ fn run_common_replay(
     ))
 }
 
-#[cfg(not(feature = "legacy-xlsx-source-history"))]
+#[cfg(not(all(
+    feature = "legacy-xlsx-source-history",
+    not(feature = "current-xlsx-source-history")
+)))]
 fn run_source_owner_admission(
     iterations: usize,
     warmups: usize,
@@ -943,7 +988,10 @@ fn run_source_owner_admission(
     allocation_delta(before, after, "source_owner_admission_with_selected_edit")
 }
 
-#[cfg(feature = "legacy-xlsx-source-history")]
+#[cfg(all(
+    feature = "legacy-xlsx-source-history",
+    not(feature = "current-xlsx-source-history")
+))]
 fn run_source_owner_admission(
     iterations: usize,
     warmups: usize,

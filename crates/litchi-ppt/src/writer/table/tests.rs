@@ -14,7 +14,8 @@ fn positioned(table: Table, x: i32, y: i32) -> PositionedTable {
 }
 
 fn root(bytes: &[u8]) -> Container<'_> {
-    let (record, consumed) = Record::parse(bytes, 0).expect("root record");
+    let (record, consumed) =
+        Record::parse(bytes, 0, litchi_odraw::Limits::default()).expect("root record");
     assert_eq!(consumed, bytes.len());
     Container::try_new(record).expect("root container")
 }
@@ -120,7 +121,7 @@ fn emitted_group_is_detected_as_table_with_grid_and_text() {
 
     // Group anchor: (50pt, 60pt) -> (400, 480) master units. ClientAnchor is
     // host-defined, so validate it through the typed PPT projection.
-    let (record, consumed) = Record::parse(&bytes, 0).unwrap();
+    let (record, consumed) = Record::parse(&bytes, 0, litchi_odraw::Limits::default()).unwrap();
     assert_eq!(consumed, bytes.len());
     let typed = litchi_odraw::shape::Shape::from_record(record, Default::default()).unwrap();
     assert_eq!(typed.client_anchor().unwrap().len(), 8);

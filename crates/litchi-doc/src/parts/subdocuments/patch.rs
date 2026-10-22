@@ -242,6 +242,7 @@ impl TablePatch {
 
 /// A checked failure while applying a bounded table patch.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Error {
     /// The caller supplied a stream, range, fingerprint, or `ccpText` that is
     /// not the source captured by this patch.

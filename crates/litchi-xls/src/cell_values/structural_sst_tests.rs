@@ -466,3 +466,171 @@ fn exact_and_semantic_inverse_restore_a_pruned_sst_tail() {
         &Value::Text("old".into())
     );
 }
+
+/// A source whose SST of `count` distinct strings carries an ExtSST index,
+/// as Excel writes it (the builder writes none).
+fn package_with_ext_sst(count: usize) -> (Vec<u8>, Vec<String>) {
+    let texts: Vec<String> = (0..count).map(|index| format!("s{index:05}")).collect();
+    let borrowed: Vec<&str> = texts.iter().map(String::as_str).collect();
+    let plain = package(&borrowed);
+    let mut ole = OleFile::open(Cursor::new(plain.as_slice())).unwrap();
+    let workbook = ole.open_stream(&["Workbook"]).unwrap();
+    let sst_start = raw_records(&workbook)
+        .unwrap()
+        .iter()
+        .find(|record| record.kind == SST)
+        .unwrap()
+        .start;
+    let entries: Vec<_> = texts
+        .iter()
+        .map(|text| SstEntry {
+            text: text.clone(),
+            properties: None,
+            source_index: None,
+            raw: None,
+        })
+        .collect();
+    let unique = u32::try_from(count).unwrap();
+    let encoded = encode_sst_records(&entries, unique).unwrap();
+    let mut replacement = Vec::new();
+    for record in &encoded.records {
+        replacement.extend_from_slice(record);
+    }
+    replacement.extend_from_slice(
+        &encoded
+            .ext_sst_index(sst_start, unique)
+            .unwrap()
+            .to_record_bytes()
+            .unwrap(),
+    );
+    (replace_sst_family(&plain, &replacement), texts)
+}
+
+fn ext_sst(workbook: &[u8], unique: u32) -> crate::shared_string_index::SharedStringIndex {
+    let record = raw_records(workbook)
+        .unwrap()
+        .into_iter()
+        .find(|record| record.kind == EXT_SST)
+        .expect("ExtSST record");
+    crate::shared_string_index::SharedStringIndex::parse_payload(
+        unique,
+        &workbook[record.start + 4..record.end],
+    )
+    .unwrap()
+}
+
+#[test]
+fn new_text_across_an_ext_sst_bucket_size_boundary_commits_through_compaction() {
+    // 1,023 strings use 8-string buckets; the 1,024th needs 9.  Commit
+    // rebuilds the SST and its ExtSST, so staging no longer refuses the
+    // insertion with the tail-append geometry check (record 0359fa).
+    let (bytes, texts) = package_with_ext_sst(1_023);
+    let source = Snapshot::from_bytes(bytes, litchi_ole_common::object::Limits::default()).unwrap();
+    assert_eq!(
+        ext_sst(source.workbook_stream(), 1_023).strings_per_bucket(),
+        8
+    );
+    let mut edit = source.edit();
+    edit.insert_cell(
+        Selector::Name("Sheet1"),
+        Reference::new(1_023, 0).unwrap(),
+        Value::Text("new".into()),
+    )
+    .unwrap();
+    let commit = edit.commit().unwrap();
+    let target = commit.package();
+    assert_eq!(sst_counts(target.workbook_stream()), (1_024, 1_024));
+    let mut expected = texts;
+    expected.push("new".into());
+    assert_eq!(sst_table(target).strings, expected);
+    let index = ext_sst(target.workbook_stream(), 1_024);
+    assert_eq!(index.strings_per_bucket(), 9);
+    assert_eq!(index.buckets().len(), 114);
+    assert_eq!(
+        target
+            .worksheet(Selector::Name("Sheet1"))
+            .unwrap()
+            .unwrap()
+            .cell(Reference::new(1_023, 0).unwrap())
+            .unwrap()
+            .unwrap()
+            .value(),
+        &Value::Text("new".into())
+    );
+}
+
+#[test]
+fn shared_string_membership_matches_the_effective_table() {
+    // More strings than the scan limit build the hash index; duplicates and
+    // staged removals exercise the occurrence count.
+    let mut texts: Vec<String> = (0..80).map(|index| format!("t{index}")).collect();
+    texts.push("t3".into());
+    texts.push("t3".into());
+    let borrowed: Vec<&str> = texts.iter().map(String::as_str).collect();
+    let source = Snapshot::from_bytes(
+        package(&borrowed),
+        litchi_ole_common::object::Limits::default(),
+    )
+    .unwrap();
+    let mut edit = source.edit();
+    edit.resource_changes.push(ResourceChange::SharedString {
+        text: "t3".into(),
+        insert: false,
+    });
+    edit.resource_changes.push(ResourceChange::SharedString {
+        text: "t7".into(),
+        insert: false,
+    });
+    edit.resource_changes.push(ResourceChange::SharedString {
+        text: "added".into(),
+        insert: true,
+    });
+    let effective = edit.effective_shared_strings();
+    for probe in ["t0", "t3", "t7", "t79", "t80", "added", "absent", ""] {
+        assert_eq!(
+            edit.has_shared_string(probe),
+            effective.iter().any(|text| text == probe),
+            "{probe}"
+        );
+    }
+    edit.resource_changes.push(ResourceChange::SharedString {
+        text: "t3".into(),
+        insert: false,
+    });
+    edit.resource_changes.push(ResourceChange::SharedString {
+        text: "t3".into(),
+        insert: false,
+    });
+    assert!(
+        !edit
+            .effective_shared_strings()
+            .iter()
+            .any(|text| text == "t3")
+    );
+    assert!(!edit.has_shared_string("t3"));
+}
+
+#[test]
+fn a_refused_text_insertion_leaves_no_shared_string_resource() {
+    let source = Snapshot::from_bytes(
+        package(&["a", "b"]),
+        litchi_ole_common::object::Limits::default(),
+    )
+    .unwrap();
+    let mut edit = source.edit();
+    edit.insert_rows(Selector::Name("Sheet1"), 5, 1).unwrap();
+    let resources = edit.resource_changes.len();
+    let error = edit
+        .insert_cell(
+            Selector::Name("Sheet1"),
+            Reference::new(9, 0).unwrap(),
+            Value::Text("fresh".into()),
+        )
+        .unwrap_err();
+    assert!(
+        error.to_string().contains("overlapping structural"),
+        "{error}"
+    );
+    assert_eq!(edit.resource_changes.len(), resources);
+    assert!(!edit.has_shared_string("fresh"));
+}

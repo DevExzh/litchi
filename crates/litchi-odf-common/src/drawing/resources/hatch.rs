@@ -1,18 +1,17 @@
 //! Typed ODF drawing hatch resources.
 
 use super::gradient::RgbColor;
+use crate::core::{ResolvedReader, XmlStreamLimits};
 use litchi_core::{Error, Result};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
-use quick_xml::reader::NsReader;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::str::FromStr;
 
 const OFFICE_NS: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const DRAW_NS: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:drawing:1.0";
-const MAX_XML_BYTES: usize = 64 * 1_048_576;
 const MAX_DEPTH: usize = 256;
 const MAX_HATCHES: usize = 65_536;
 const MAX_VALUE_BYTES: usize = 65_536;
@@ -311,24 +310,22 @@ type Attributes = HashMap<(NamespaceKind, String), String>;
 ///
 /// Returns an error if the XML is malformed, uses an invalid namespace, or
 /// violates a bounded hatch resource rule.
-pub fn parse_drawing_hatches(xml: &str) -> Result<Collection> {
+pub fn parse_drawing_hatches(
+    xml: &str,
+    limits: XmlStreamLimits,
+) -> std::result::Result<Collection, crate::Error> {
+    let mut reader = ResolvedReader::from_xml(xml, limits)?;
     if !xml.contains("hatch") {
         return Ok(Collection::default());
     }
-    if xml.len() > MAX_XML_BYTES {
-        return invalid("drawing hatch XML exceeds 64 MiB");
-    }
 
-    let mut reader = NsReader::from_str(xml);
     reader.config_mut().check_end_names = true;
     let mut buffer = Vec::new();
     let mut stack = Vec::<Frame>::new();
     let mut result = Collection::default();
 
     loop {
-        let (resolved, event) = reader
-            .read_resolved_event_into(&mut buffer)
-            .map_err(|error| make_error(format!("invalid drawing hatch XML: {error}")))?;
+        let (resolved, event) = reader.read_resolved_event_into(&mut buffer)?;
         let namespace = namespace_kind(&resolved)?;
         match event {
             Event::Start(ref element) => {
@@ -336,11 +333,11 @@ pub fn parse_drawing_hatches(xml: &str) -> Result<Collection> {
                 reject_spoofed_name(namespace, &local)?;
                 if namespace == NamespaceKind::Draw && local == "hatch" {
                     ensure_location(&stack)?;
-                    return invalid("draw:hatch must be empty");
+                    return invalid_odf("draw:hatch must be empty");
                 }
                 stack.push(Frame { namespace, local });
                 if stack.len() > MAX_DEPTH {
-                    return invalid(format!("drawing hatch XML exceeds {MAX_DEPTH} levels"));
+                    return invalid_odf(format!("drawing hatch XML exceeds {MAX_DEPTH} levels"));
                 }
             },
             Event::Empty(ref element) => {
@@ -349,7 +346,7 @@ pub fn parse_drawing_hatches(xml: &str) -> Result<Collection> {
                 if namespace == NamespaceKind::Draw && local == "hatch" {
                     ensure_location(&stack)?;
                     if result.hatches.len() >= MAX_HATCHES {
-                        return invalid(format!("drawing styles exceed {MAX_HATCHES} hatches"));
+                        return invalid_odf(format!("drawing styles exceed {MAX_HATCHES} hatches"));
                     }
                     result.hatches.push(parse_hatch(&reader, element)?);
                 }
@@ -360,7 +357,7 @@ pub fn parse_drawing_hatches(xml: &str) -> Result<Collection> {
                     .ok_or_else(|| make_error("drawing hatch XML depth underflow"))?;
             },
             Event::DocType(_) | Event::PI(_) => {
-                return invalid("DTDs and processing instructions are prohibited in hatches");
+                return invalid_odf("DTDs and processing instructions are prohibited in hatches");
             },
             Event::Eof => break,
             Event::Text(_)
@@ -372,13 +369,13 @@ pub fn parse_drawing_hatches(xml: &str) -> Result<Collection> {
         buffer.clear();
     }
     if !stack.is_empty() {
-        return invalid("unterminated drawing hatch XML");
+        return invalid_odf("unterminated drawing hatch XML");
     }
     result.validate()?;
     Ok(result)
 }
 
-fn parse_hatch(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<Definition> {
+fn parse_hatch(reader: &ResolvedReader<'_>, element: &BytesStart<'_>) -> Result<Definition> {
     let mut values = attributes(reader, element)?;
     let name = required(&mut values, "name", "draw:name")?;
     let display_name = take(&mut values, "display-name");
@@ -405,7 +402,7 @@ fn parse_hatch(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<Def
     Ok(value)
 }
 
-fn attributes(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<Attributes> {
+fn attributes(reader: &ResolvedReader<'_>, element: &BytesStart<'_>) -> Result<Attributes> {
     let mut result = HashMap::new();
     for attribute_result in element.attributes() {
         let attribute = attribute_result
@@ -558,6 +555,10 @@ fn decode_name(value: &[u8], context: &str) -> Result<String> {
 
 fn invalid<T>(message: impl Into<String>) -> Result<T> {
     Err(make_error(message))
+}
+
+fn invalid_odf<T>(message: impl Into<String>) -> std::result::Result<T, crate::Error> {
+    Err(crate::Error::from(make_error(message)))
 }
 
 fn make_error(message: impl Into<String>) -> Error {

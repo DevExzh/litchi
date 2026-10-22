@@ -118,11 +118,11 @@ fn owned_input_limit_is_checked_before_arc_conversion() {
     );
     assert!(matches!(
         result,
-        Err(litchi_cfb::OleError::LimitExceeded {
+        Err(crate::Error::Cfb(litchi_cfb::OleError::LimitExceeded {
             resource: "non-simple Property Set input bytes",
             observed: 32,
             maximum: 1,
-        })
+        }))
     ));
 }
 
@@ -143,10 +143,10 @@ fn copied_path_budget_rejects_a_wide_directory_before_catalog_retention() {
     );
     assert!(matches!(
         result,
-        Err(litchi_cfb::OleError::LimitExceeded {
+        Err(crate::Error::Cfb(litchi_cfb::OleError::LimitExceeded {
             resource: "non-simple Property Set copied path bytes",
             ..
-        })
+        }))
     ));
 }
 
@@ -195,10 +195,10 @@ fn output_limit_accepts_exact_rendered_size_and_rejects_one_byte_less() {
         .expect("under-limit edit");
     assert!(matches!(
         under_editor.commit(),
-        Err(litchi_cfb::OleError::LimitExceeded {
+        Err(crate::Error::Cfb(litchi_cfb::OleError::LimitExceeded {
             resource: "non-simple Property Set output bytes",
             ..
-        })
+        }))
     ));
 }
 
@@ -293,10 +293,10 @@ fn output_layout_preflight_covers_empty_mini_and_regular_stream_boundaries() {
             .map(litchi_core::edit::Commit::into_package);
         assert!(matches!(
             result,
-            Err(litchi_cfb::OleError::LimitExceeded {
+            Err(crate::Error::Cfb(litchi_cfb::OleError::LimitExceeded {
                 resource: "non-simple Property Set output bytes",
                 ..
-            })
+            }))
         ));
         assert_eq!(
             under_editor

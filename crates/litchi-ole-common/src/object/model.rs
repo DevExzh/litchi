@@ -16,7 +16,7 @@ const MAX_PRESENTATION_STREAMS: usize = 999;
 
 /// Applies codec-owned limit validation even when the requested stream is absent.
 pub(crate) fn validate_ole_stream_limits(limits: ole_streams::Limits) -> Result<(), Error> {
-    limits.validate().map(|_| ()).map_err(Error::from)
+    limits.validate().map(|_| ())
 }
 
 /// Resource ceilings applied before CFB bytes are retained or rewritten.
@@ -111,6 +111,24 @@ impl Limits {
             self.max_streams
         } else {
             self.max_streams_per_object
+        }
+    }
+
+    /// Intersects this requested policy with a retained ingress policy.
+    ///
+    /// An edit may tighten a package's bounds, but it can never widen the
+    /// limits under which the package was admitted.
+    pub(crate) fn constrained_by(self, retained: Self) -> Self {
+        Self {
+            max_objects: self.max_objects.min(retained.max_objects),
+            max_storage_depth: self.max_storage_depth.min(retained.max_storage_depth),
+            max_streams_per_object: self
+                .max_streams_per_object
+                .min(retained.max_streams_per_object),
+            max_streams: self.max_streams.min(retained.max_streams),
+            max_stream_size: self.max_stream_size.min(retained.max_stream_size),
+            max_object_size: self.max_object_size.min(retained.max_object_size),
+            max_total_size: self.max_total_size.min(retained.max_total_size),
         }
     }
 }
@@ -217,13 +235,11 @@ impl Stream {
     ///
     /// Returns an error when a standard OLEDS stream is malformed or exceeds
     /// the OLEDS metadata limit.
-    pub fn link(&self) -> Result<Option<Link>, Error> {
+    pub fn link(&self, limits: link::Limits) -> Result<Option<Link>, Error> {
         if self.name() != Some(link::NAME) {
             return Ok(None);
         }
-        Link::parse_shared(Arc::clone(&self.data))
-            .map(Some)
-            .map_err(Error::from)
+        Link::parse_shared(Arc::clone(&self.data), limits).map(Some)
     }
 
     /// Parses this stream as an OLEDS presentation stream under explicit
@@ -241,9 +257,7 @@ impl Stream {
         if !name.starts_with(ole_streams::PRESENTATION_STREAM_PREFIX) {
             return Ok(None);
         }
-        ole_streams::parse_named_presentation(name, Arc::clone(&self.data), limits)
-            .map(Some)
-            .map_err(Error::from)
+        ole_streams::parse_named_presentation(name, Arc::clone(&self.data), limits).map(Some)
     }
 
     /// Parses this stream as OLEDS native data under explicit stream limits.
@@ -260,7 +274,6 @@ impl Stream {
             limits,
         )
         .map(Some)
-        .map_err(Error::from)
     }
 
     pub(crate) fn replace_data(&mut self, data: Arc<[u8]>) {
@@ -340,13 +353,13 @@ impl Object {
     ///
     /// Returns an error when the direct-child OLEDS stream is malformed or
     /// exceeds the OLEDS metadata limit.
-    pub fn link(&self) -> Result<Option<Link>, Error> {
+    pub fn link(&self, limits: link::Limits) -> Result<Option<Link>, Error> {
         match self
             .streams
             .iter()
             .find(|stream| stream.path().len() == 1 && stream.name() == Some(link::NAME))
         {
-            Some(stream) => stream.link(),
+            Some(stream) => stream.link(limits),
             None => Ok(None),
         }
     }
@@ -463,6 +476,20 @@ impl Object {
     }
 }
 
+static EMPTY_OBJECTS: Objects = Objects {
+    objects: Vec::new(),
+};
+
+impl super::snapshot::EmptyValue for Objects {
+    fn empty() -> &'static Self {
+        &EMPTY_OBJECTS
+    }
+
+    fn is_empty_value(&self) -> bool {
+        self.objects.is_empty()
+    }
+}
+
 /// Ordered, immutable object discovery results.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Objects {
@@ -470,6 +497,12 @@ pub struct Objects {
 }
 
 impl Objects {
+    /// Moves these results into shared owner state; a package without
+    /// discovered objects allocates nothing.
+    pub(crate) fn into_shared(self) -> super::snapshot::Shared<Self> {
+        super::snapshot::Shared::new(self)
+    }
+
     pub(crate) fn new(objects: Vec<Object>) -> Result<Self, Error> {
         let mut keys = HashSet::new();
         let mut paths = HashSet::new();

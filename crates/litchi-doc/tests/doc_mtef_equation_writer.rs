@@ -37,11 +37,26 @@ use litchi_doc::builder::Builder;
 use litchi_doc::embedded_object::Info;
 use litchi_doc::writer::Picture;
 use litchi_doc::{EQUATION_3_CLSID, MtefEquation, MtefEquationWriteOptions, Package, raw::Reader};
-use litchi_ole_common::object::{Edit as ObjectEditor, Limits as ObjectLimits, Target, Targets};
+use litchi_ole_common::object::{
+    Edit as ObjectEditor, Limits as ObjectLimits, OpenOptions as ObjectOpenOptions,
+    Package as ObjectPackage, Target, Targets,
+};
 use std::io::Cursor;
 
 const MINIMAL_MTEF_HEX: &str =
     include_str!("../../../test-data/ole/doc/mtef/equation3-minimal.hex");
+
+fn open_object(
+    bytes: Vec<u8>,
+    targets: Targets,
+    limits: ObjectLimits,
+) -> Result<ObjectEditor, litchi_ole_common::Error> {
+    ObjectPackage::open_with_options(
+        bytes,
+        ObjectOpenOptions::new().targets(targets).limits(limits),
+    )?
+    .edit()
+}
 
 fn decode_hex_fixture() -> Vec<u8> {
     MINIMAL_MTEF_HEX
@@ -112,7 +127,7 @@ fn authors_native_equation_object_and_preserves_storage_clsid() {
 
     let target = Target::new("_314159", ["ObjectPool", "_314159"]).unwrap();
     let objects =
-        ObjectEditor::open(bytes.clone(), Targets::one(target), ObjectLimits::default()).unwrap();
+        open_object(bytes.clone(), Targets::one(target), ObjectLimits::default()).unwrap();
     let object = objects.objects().get("_314159").unwrap();
     assert_eq!(object.path(), ["ObjectPool", "_314159"]);
     assert_eq!(object.storage().clsid(), Some(storage.clsid.as_str()));

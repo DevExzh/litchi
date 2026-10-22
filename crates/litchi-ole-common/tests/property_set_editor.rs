@@ -10,7 +10,7 @@
 use std::io::Cursor;
 use std::path::PathBuf;
 
-use litchi_cfb::{OleFile, OleWriter};
+use litchi_cfb::{OleFile, OleFileLimits, OleWriter};
 use litchi_ole_common::property_set::{
     CodePage, Edit, Guid, PropertySetReader, Standard, Value, Vector,
 };
@@ -44,7 +44,7 @@ fn ole_with_storage(path: &[&str]) -> Vec<u8> {
 fn generated_property_sets_round_trip_all_office_value_families() {
     let payload = b"untouched payload".to_vec();
     let original = ole_with_streams(&[("Payload", &payload)]);
-    let mut editor = Edit::new(original).unwrap();
+    let mut editor = Edit::new(original, OleFileLimits::default()).unwrap();
     editor
         .update(Standard::SummaryInformation, |section| {
             section.set_page(CodePage::WINDOWS_1252);
@@ -125,7 +125,7 @@ fn generated_property_sets_round_trip_all_office_value_families() {
         &Value::Lpwstr("山田".into())
     );
 
-    let mut editor = Edit::new(bytes).unwrap();
+    let mut editor = Edit::new(bytes, OleFileLimits::default()).unwrap();
     editor
         .update(Standard::SummaryInformation, |section| {
             section.update(2, Value::Lpstr("Changed".into()))?;
@@ -149,20 +149,23 @@ fn generated_property_sets_round_trip_all_office_value_families() {
 fn mutations_are_atomic_ordered_and_noops_are_byte_exact() {
     let original = ole_with_streams(&[("Payload", b"same")]);
     assert_eq!(
-        Edit::new(original.clone()).unwrap().finish().unwrap(),
+        Edit::new(original.clone(), OleFileLimits::default())
+            .unwrap()
+            .finish()
+            .unwrap(),
         original
     );
 
-    let mut editor = Edit::new(original.clone()).unwrap();
+    let mut editor = Edit::new(original.clone(), OleFileLimits::default()).unwrap();
     let error = editor.update(Standard::UserDefinedProperties, |section| {
         section.set_page(CodePage::Utf16Le);
         section.add_named(2, "Name".into(), Value::I4(1))?;
-        section.add_named(3, "name".into(), Value::I4(2))
+        Ok(section.add_named(3, "name".into(), Value::I4(2))?)
     });
     assert!(error.is_err());
     assert_eq!(editor.finish().unwrap(), original);
 
-    let mut editor = Edit::new(original).unwrap();
+    let mut editor = Edit::new(original, OleFileLimits::default()).unwrap();
     editor
         .update(Standard::SummaryInformation, |section| {
             section.set_page(CodePage::WINDOWS_1252);
@@ -193,9 +196,16 @@ fn protected_containers_are_rejected_at_root_and_nested_case_insensitively() {
         "ENCRYPTEDpACKAGE",
         "eNCRYPTIONiNFO",
     ] {
-        assert!(Edit::new(ole_with_path(&[marker])).is_err(), "{marker:?}");
         assert!(
-            Edit::new(ole_with_path(&["Nested", marker, "Payload"])).is_err(),
+            Edit::new(ole_with_path(&[marker]), OleFileLimits::default()).is_err(),
+            "{marker:?}"
+        );
+        assert!(
+            Edit::new(
+                ole_with_path(&["Nested", marker, "Payload"]),
+                OleFileLimits::default()
+            )
+            .is_err(),
             "nested {marker:?}"
         );
     }
@@ -207,7 +217,10 @@ fn drm_viewer_content_storages_are_rejected_at_root_and_nested_case_insensitivel
         &["\u{0009}DRMViewerContent"][..],
         &["Nested", "\u{0009}drmvIEWERcONTENT"][..],
     ] {
-        assert!(Edit::new(ole_with_storage(path)).is_err(), "{path:?}");
+        assert!(
+            Edit::new(ole_with_storage(path), OleFileLimits::default()).is_err(),
+            "{path:?}"
+        );
     }
 }
 
@@ -220,6 +233,12 @@ fn poi_and_libreoffice_fixtures_preserve_exact_noop_bytes() {
         "test-data/ole/doc/documentProperties.doc",
     ] {
         let bytes = std::fs::read(root.join(relative)).unwrap();
-        assert_eq!(Edit::new(bytes.clone()).unwrap().finish().unwrap(), bytes);
+        assert_eq!(
+            Edit::new(bytes.clone(), OleFileLimits::default())
+                .unwrap()
+                .finish()
+                .unwrap(),
+            bytes
+        );
     }
 }

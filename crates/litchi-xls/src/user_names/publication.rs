@@ -15,7 +15,9 @@ use std::io::Cursor;
 use std::sync::Arc;
 
 use litchi_cfb::OleFile;
-use litchi_ole_common::object::{Edit as PackageEditor, Limits as PackageLimits, Targets};
+use litchi_ole_common::object::{
+    Limits as PackageLimits, OpenOptions, Package as ObjectPackage, Targets,
+};
 
 use super::{Edit as UserNamesEdit, Limits as UserNamesLimits, Snapshot as UserNamesSnapshot};
 /// The User Names family error and result: the crate's.
@@ -58,7 +60,16 @@ impl Snapshot {
                 reason: "User Names stream path changed between CFB validation passes",
             });
         }
-        let bytes = Arc::<[u8]>::from(package.finish()?.into_boxed_slice());
+        Self::from_package(package, user_names_path, limits)
+    }
+
+    fn from_package(
+        package: ObjectPackage,
+        user_names_path: Vec<String>,
+        limits: UserNamesLimits,
+    ) -> Result<Self> {
+        let bytes = package.source_shared();
+        let bytes = Arc::<[u8]>::from(bytes.as_slice());
         let user_names = parse_user_names(&bytes, limits)?;
         Ok(Self {
             inner: Arc::new(Inner {
@@ -269,14 +280,20 @@ impl Edit {
 
         let replacement =
             Arc::<[u8]>::from(user_names_commit.package().finish().into_boxed_slice());
-        let mut package = PackageEditor::open(
+        let package = ObjectPackage::open_with_options(
             source.bytes().to_vec(),
-            Targets::default(),
-            PackageLimits::default(),
+            OpenOptions::new()
+                .targets(Targets::default())
+                .limits(PackageLimits::default()),
         )?;
-        let rendered =
-            package.put_stream_shared_with_rendered(&source.inner.user_names_path, replacement)?;
-        let snapshot = Snapshot::from_bytes(rendered, source.inner.user_names_limits)?;
+        let mut editor = package.edit()?;
+        editor.put_stream_shared(&source.inner.user_names_path, replacement)?;
+        let package = editor.commit()?.into_package();
+        let snapshot = Snapshot::from_package(
+            package,
+            source.inner.user_names_path.clone(),
+            source.inner.user_names_limits,
+        )?;
         let patch = Patch::new(source.bytes_shared(), snapshot.bytes_shared());
         Ok((snapshot, patch))
     }
@@ -493,9 +510,13 @@ fn preflight_user_names(bytes: &[u8], limits: UserNamesLimits) -> Result<Vec<Str
     Ok(path)
 }
 
-fn open_package(bytes: Vec<u8>) -> Result<(PackageEditor, Vec<String>)> {
-    let (package, ole) =
-        PackageEditor::open_with_ole_file(bytes, Targets::default(), PackageLimits::default())?;
+fn open_package(bytes: Vec<u8>) -> Result<(ObjectPackage, Vec<String>)> {
+    let (package, ole) = ObjectPackage::open_with_ole_file(
+        bytes,
+        OpenOptions::new()
+            .targets(Targets::default())
+            .limits(PackageLimits::default()),
+    )?;
     let path = find_user_names_path(&ole)?;
     Ok((package, path))
 }

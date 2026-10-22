@@ -30,12 +30,16 @@ const DESTINATION_LAYOUT: &str = r#"<office:document-styles xmlns:office="urn:oa
 
 #[test]
 fn master_transfer_carries_its_page_layout_dependency() -> Result<()> {
-    let source = super::Snapshot::parse(SOURCE_LAYOUT)?;
+    let source =
+        super::Snapshot::parse(SOURCE_LAYOUT, litchi_odf_common::XmlStreamLimits::default())?;
     let transfer = source.prepare_master_page_transfer("A")?;
     assert_eq!(transfer.page_layout_name(), "pmA");
     assert!(transfer.dependencies().is_empty());
 
-    let destination = super::Snapshot::parse(DESTINATION_LAYOUT)?;
+    let destination = super::Snapshot::parse(
+        DESTINATION_LAYOUT,
+        litchi_odf_common::XmlStreamLimits::default(),
+    )?;
     let mut edit = destination.edit();
     edit.insert_transfer(&transfer)?;
     let transferred = edit.commit()?;
@@ -85,7 +89,10 @@ fn authored_section(column_count: u8, margin: &str) -> Result<super::SectionLayo
 fn section_layout_is_typed_replaceable_and_transfer_safe() -> Result<()> {
     use crate::section_properties::SectionBackgroundColor;
 
-    let source = super::Snapshot::parse(SECTION_LAYOUT)?;
+    let source = super::Snapshot::parse(
+        SECTION_LAYOUT,
+        litchi_odf_common::XmlStreamLimits::default(),
+    )?;
     assert_eq!(source.section_layouts().len(), 1);
     let section = source
         .section_layouts()
@@ -131,7 +138,10 @@ fn section_layout_is_typed_replaceable_and_transfer_safe() -> Result<()> {
     let transfer = source.prepare_section_layout_transfer("Sect")?;
     assert_eq!(transfer.dependencies().len(), 1);
     assert_eq!(transfer.dependencies()[0].href(), "Pictures/section.png");
-    let destination = super::Snapshot::parse(EMPTY_SECTION_DESTINATION)?;
+    let destination = super::Snapshot::parse(
+        EMPTY_SECTION_DESTINATION,
+        litchi_odf_common::XmlStreamLimits::default(),
+    )?;
     let mut unauthorized = destination.edit();
     assert!(unauthorized.insert_section_transfer(&transfer).is_err());
     let mut authorized = destination.edit();

@@ -1,5 +1,51 @@
 use super::*;
 
+use crate::{LimitKind, RawXmlLimitKind, XmlStreamLimits};
+
+// The parsers take a required raw XML policy; these fixtures read under the
+// default one.
+fn parse_data_styles_xml(xml: &str, part: Part) -> Result<Styles> {
+    Ok(super::parse_data_styles_xml(
+        xml,
+        part,
+        XmlStreamLimits::default(),
+    )?)
+}
+
+fn set_data_style_xml(xml: &str, style: &Style) -> Result<String> {
+    Ok(super::set_data_style_xml(
+        xml,
+        style,
+        XmlStreamLimits::default(),
+    )?)
+}
+
+fn remove_data_style_xml(xml: &str, section: Section, name: &str) -> Result<String> {
+    Ok(super::remove_data_style_xml(
+        xml,
+        section,
+        name,
+        XmlStreamLimits::default(),
+    )?)
+}
+
+#[test]
+fn data_style_parser_reports_the_required_raw_xml_policy() {
+    let xml = doc13(r#"<number:number-style style:name="n"/>"#);
+    let limits =
+        XmlStreamLimits::new(64, 256, 4_000, 1_000, 64 * 1024).expect("test policy is finite");
+    let error = super::parse_data_styles_xml(&xml, Part::Flat, limits)
+        .expect_err("the input ceiling must be enforced before parsing");
+    assert!(matches!(
+        error,
+        crate::Error::Limit {
+            kind: LimitKind::RawXml(RawXmlLimitKind::InputBytes),
+            observed,
+            maximum,
+        } if observed == xml.len() as u64 && maximum == 64
+    ));
+}
+
 const HEAD_12: &str = r#"<office:document xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:number="urn:oasis:names:tc:opendocument:xmlns:datastyle:1.0" xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" xmlns:loext="urn:org:documentfoundation:names:experimental:office:xmlns:loext:1.0" office:version="1.2"><office:styles>"#;
 const HEAD_13: &str = r#"<office:document xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:number="urn:oasis:names:tc:opendocument:xmlns:datastyle:1.0" xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" office:version="1.3"><office:styles>"#;
 const TAIL: &str = "</office:styles><office:automatic-styles/></office:document>";

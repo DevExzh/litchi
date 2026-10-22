@@ -334,8 +334,9 @@ impl PictureShape {
     ) -> Result<Option<ImageFile<'data>>> {
         // Try to extract from embedded Escher data first
         if let Some(ref escher_data) = self.escher_data {
-            let images = litchi_odraw::image::scan(escher_data)
-                .map_err(|error| litchi_core::error::Error::ParseError(error.to_string()))?;
+            let images =
+                litchi_odraw::image::scan(escher_data, litchi_odraw::image::Limits::default())
+                    .map_err(|error| litchi_core::error::Error::ParseError(error.to_string()))?;
             if let Some(image) = images.into_iter().next() {
                 return Ok(Some(image));
             }
@@ -416,7 +417,7 @@ pub fn extract_blip_id(container: &Container<'_>) -> litchi_odraw::Result<Option
     for child in container.children() {
         let record = child?;
         if record.kind() == RecordKind::Opt
-            && let Some(raw) = Props::parse(&record)?.get_int(Id::BlipToDisplay)
+            && let Some(raw) = Props::parse(&record, record.limits())?.get_int(Id::BlipToDisplay)
         {
             let blip_index =
                 u32::try_from(raw).map_err(|_err| litchi_odraw::Error::MalformedProperties {

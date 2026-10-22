@@ -17,10 +17,25 @@ fn drawing(children: &[u8]) -> Vec<u8> {
     use crate::officeart_wire::{record_type, write_atom, write_container};
 
     let mut body = Vec::new();
-    write_atom(&mut body, 0, 0, record_type::DG, &[0; 8]).unwrap();
+    write_atom(
+        &mut body,
+        0,
+        0,
+        record_type::DG,
+        &[0; 8],
+        Default::default(),
+    )
+    .unwrap();
     body.extend_from_slice(children);
     let mut drawing = Vec::new();
-    write_container(&mut drawing, 0, record_type::DG_CONTAINER, &body).unwrap();
+    write_container(
+        &mut drawing,
+        0,
+        record_type::DG_CONTAINER,
+        &body,
+        Default::default(),
+    )
+    .unwrap();
     drawing
 }
 
@@ -36,11 +51,13 @@ fn create_frame_escher_drawing(
     let mut shape_children = Vec::new();
     ShapeBuilder::new(75, 42)
         .with_flags(ROOT_SHAPE_FLAGS)
-        .write(&mut shape_children)
+        .write(&mut shape_children, Default::default())
         .unwrap();
     let mut properties = PropertyBuilder::new();
     properties.add_simple(0x4104, blip_id.cast_signed());
-    properties.write(&mut shape_children).unwrap();
+    properties
+        .write(&mut shape_children, Default::default())
+        .unwrap();
     write_client_anchor(&mut shape_children, 10, 20, 210, 120).unwrap();
 
     let mut client_data_children = Vec::new();
@@ -51,6 +68,7 @@ fn create_frame_escher_drawing(
             0,
             3009,
             &external_object_id_value.to_le_bytes(),
+            Default::default(),
         )
         .unwrap();
     }
@@ -58,8 +76,23 @@ fn create_frame_escher_drawing(
         let mut interactive_atom = [0u8; 16];
         interactive_atom[8] = action;
         let mut interactive_children = Vec::new();
-        write_atom(&mut interactive_children, 0, 0, 4083, &interactive_atom).unwrap();
-        write_container(&mut client_data_children, 0, 4082, &interactive_children).unwrap();
+        write_atom(
+            &mut interactive_children,
+            0,
+            0,
+            4083,
+            &interactive_atom,
+            Default::default(),
+        )
+        .unwrap();
+        write_container(
+            &mut client_data_children,
+            0,
+            4082,
+            &interactive_children,
+            Default::default(),
+        )
+        .unwrap();
     }
     if !client_data_children.is_empty() {
         write_container(
@@ -67,6 +100,7 @@ fn create_frame_escher_drawing(
             0,
             record_type::CLIENT_DATA,
             &client_data_children,
+            Default::default(),
         )
         .unwrap();
     }
@@ -77,6 +111,7 @@ fn create_frame_escher_drawing(
         0,
         record_type::SP_CONTAINER,
         &shape_children,
+        Default::default(),
     )
     .unwrap();
 
@@ -95,12 +130,14 @@ fn create_autoshape_escher_drawing() -> Vec<u8> {
     let mut shape_children = Vec::new();
     ShapeBuilder::new(13, 44)
         .with_flags(ROOT_SHAPE_FLAGS)
-        .write(&mut shape_children)
+        .write(&mut shape_children, Default::default())
         .unwrap();
     let mut properties = PropertyBuilder::new();
     properties.add_simple(0x0147, 32_768);
     properties.add_simple(0x0149, -123);
-    properties.write(&mut shape_children).unwrap();
+    properties
+        .write(&mut shape_children, Default::default())
+        .unwrap();
     write_client_anchor(&mut shape_children, 11, 22, 211, 122).unwrap();
 
     let utf16: Vec<u8> = "Arrow label"
@@ -108,12 +145,13 @@ fn create_autoshape_escher_drawing() -> Vec<u8> {
         .flat_map(u16::to_le_bytes)
         .collect();
     let mut embedded_text = Vec::new();
-    write_atom(&mut embedded_text, 0, 0, 4000, &utf16).unwrap();
+    write_atom(&mut embedded_text, 0, 0, 4000, &utf16, Default::default()).unwrap();
     write_container(
         &mut shape_children,
         0,
         record_type::CLIENT_TEXTBOX,
         &embedded_text,
+        Default::default(),
     )
     .unwrap();
 
@@ -123,6 +161,7 @@ fn create_autoshape_escher_drawing() -> Vec<u8> {
         0,
         record_type::SP_CONTAINER,
         &shape_children,
+        Default::default(),
     )
     .unwrap();
 
@@ -135,7 +174,7 @@ fn create_freeform_escher_drawing() -> Vec<u8> {
     let mut shape_children = Vec::new();
     ShapeBuilder::new(0, 45)
         .with_flags(ROOT_SHAPE_FLAGS)
-        .write(&mut shape_children)
+        .write(&mut shape_children, Default::default())
         .unwrap();
 
     let mut vertices = Vec::new();
@@ -159,7 +198,9 @@ fn create_freeform_escher_drawing() -> Vec<u8> {
         0x00, 0x80, // end
     ];
     properties.add_complex(0x0146, &segments);
-    properties.write(&mut shape_children).unwrap();
+    properties
+        .write(&mut shape_children, Default::default())
+        .unwrap();
     write_client_anchor(&mut shape_children, 5, 6, 105, 206).unwrap();
 
     let mut shape_container = Vec::new();
@@ -168,6 +209,7 @@ fn create_freeform_escher_drawing() -> Vec<u8> {
         0,
         record_type::SP_CONTAINER,
         &shape_children,
+        Default::default(),
     )
     .unwrap();
     drawing(&shape_container)
@@ -193,10 +235,17 @@ fn create_animated_escher_drawing() -> Vec<u8> {
     let mut shape_children = Vec::new();
     ShapeBuilder::new(1, 88)
         .with_flags(ROOT_SHAPE_FLAGS)
-        .write(&mut shape_children)
+        .write(&mut shape_children, Default::default())
         .unwrap();
     write_client_anchor(&mut shape_children, 10, 20, 210, 120).unwrap();
-    write_container(&mut shape_children, 0, record_type::CLIENT_DATA, &animation).unwrap();
+    write_container(
+        &mut shape_children,
+        0,
+        record_type::CLIENT_DATA,
+        &animation,
+        Default::default(),
+    )
+    .unwrap();
 
     let mut shape_container = Vec::new();
     write_container(
@@ -204,6 +253,7 @@ fn create_animated_escher_drawing() -> Vec<u8> {
         0,
         record_type::SP_CONTAINER,
         &shape_children,
+        Default::default(),
     )
     .unwrap();
     drawing(&shape_container)
@@ -215,7 +265,7 @@ fn create_placeholder_escher_drawing(round_trip_records: &[u8]) -> Vec<u8> {
     let mut shape_children = Vec::new();
     ShapeBuilder::new(202, 43)
         .with_flags(ROOT_SHAPE_FLAGS)
-        .write(&mut shape_children)
+        .write(&mut shape_children, Default::default())
         .unwrap();
     write_client_anchor(&mut shape_children, 15, 25, 315, 125).unwrap();
 
@@ -224,12 +274,13 @@ fn create_placeholder_escher_drawing(round_trip_records: &[u8]) -> Vec<u8> {
         .flat_map(u16::to_le_bytes)
         .collect();
     let mut embedded_text = Vec::new();
-    write_atom(&mut embedded_text, 0, 0, 4000, &utf16).unwrap();
+    write_atom(&mut embedded_text, 0, 0, 4000, &utf16, Default::default()).unwrap();
     write_container(
         &mut shape_children,
         0,
         record_type::CLIENT_TEXTBOX,
         &embedded_text,
+        Default::default(),
     )
     .unwrap();
 
@@ -239,13 +290,22 @@ fn create_placeholder_escher_drawing(round_trip_records: &[u8]) -> Vec<u8> {
     placeholder_data.push(2); // quarter size
     placeholder_data.extend_from_slice(&0u16.to_le_bytes());
     let mut client_data_children = Vec::new();
-    write_atom(&mut client_data_children, 0, 0, 3011, &placeholder_data).unwrap();
+    write_atom(
+        &mut client_data_children,
+        0,
+        0,
+        3011,
+        &placeholder_data,
+        Default::default(),
+    )
+    .unwrap();
     client_data_children.extend_from_slice(round_trip_records);
     write_container(
         &mut shape_children,
         0,
         record_type::CLIENT_DATA,
         &client_data_children,
+        Default::default(),
     )
     .unwrap();
 
@@ -255,6 +315,7 @@ fn create_placeholder_escher_drawing(round_trip_records: &[u8]) -> Vec<u8> {
         0,
         record_type::SP_CONTAINER,
         &shape_children,
+        Default::default(),
     )
     .unwrap();
 
@@ -270,7 +331,7 @@ fn create_round_trip_placeholder_escher_drawing(
     let mut shape_children = Vec::new();
     ShapeBuilder::new(shape_type, 46)
         .with_flags(ROOT_SHAPE_FLAGS)
-        .write(&mut shape_children)
+        .write(&mut shape_children, Default::default())
         .unwrap();
     write_client_anchor(&mut shape_children, 20, 30, 220, 130).unwrap();
     write_container(
@@ -278,6 +339,7 @@ fn create_round_trip_placeholder_escher_drawing(
         0,
         record_type::CLIENT_DATA,
         round_trip_records,
+        Default::default(),
     )
     .unwrap();
 
@@ -287,6 +349,7 @@ fn create_round_trip_placeholder_escher_drawing(
         0,
         record_type::SP_CONTAINER,
         &shape_children,
+        Default::default(),
     )
     .unwrap();
     drawing(&shape_container)
@@ -299,7 +362,14 @@ fn create_table_escher_drawing() -> Vec<u8> {
 
     fn shape_container(children: &[u8]) -> Vec<u8> {
         let mut container = Vec::new();
-        write_container(&mut container, 0, record_type::SP_CONTAINER, children).unwrap();
+        write_container(
+            &mut container,
+            0,
+            record_type::SP_CONTAINER,
+            children,
+            Default::default(),
+        )
+        .unwrap();
         container
     }
 
@@ -307,41 +377,66 @@ fn create_table_escher_drawing() -> Vec<u8> {
         let mut children = Vec::new();
         ShapeBuilder::new(1, shape_id)
             .with_flags(CHILD_SHAPE_FLAGS)
-            .write(&mut children)
+            .write(&mut children, Default::default())
             .unwrap();
-        write_child_anchor(&mut children, left, top, left + 100, top + 50).unwrap();
+        write_child_anchor(
+            &mut children,
+            left,
+            top,
+            left + 100,
+            top + 50,
+            Default::default(),
+        )
+        .unwrap();
 
         let utf16: Vec<u8> = text.encode_utf16().flat_map(u16::to_le_bytes).collect();
         let mut embedded_text = Vec::new();
-        write_atom(&mut embedded_text, 0, 0, 4000, &utf16).unwrap();
+        write_atom(&mut embedded_text, 0, 0, 4000, &utf16, Default::default()).unwrap();
         write_container(
             &mut children,
             0,
             record_type::CLIENT_TEXTBOX,
             &embedded_text,
+            Default::default(),
         )
         .unwrap();
         shape_container(&children)
     }
 
     let mut patriarch_children = Vec::new();
-    write_spgr(&mut patriarch_children, 0, 0, 0, 0).unwrap();
+    write_spgr(&mut patriarch_children, 0, 0, 0, 0, Default::default()).unwrap();
     ShapeBuilder::new(0, 1)
         .with_flags(0x0005)
-        .write(&mut patriarch_children)
+        .write(&mut patriarch_children, Default::default())
         .unwrap();
     let patriarch = shape_container(&patriarch_children);
 
     let mut table_header_children = Vec::new();
-    write_spgr(&mut table_header_children, 0, 0, 200, 100).unwrap();
+    write_spgr(
+        &mut table_header_children,
+        0,
+        0,
+        200,
+        100,
+        Default::default(),
+    )
+    .unwrap();
     ShapeBuilder::new(0, 10)
         .with_flags(0x0201)
-        .write(&mut table_header_children)
+        .write(&mut table_header_children, Default::default())
         .unwrap();
     let mut table_properties = Vec::new();
     table_properties.extend_from_slice(&0x039Fu16.to_le_bytes());
     table_properties.extend_from_slice(&1i32.to_le_bytes());
-    write_atom(&mut table_header_children, 3, 1, 0xF122, &table_properties).unwrap();
+    write_atom(
+        &mut table_header_children,
+        3,
+        1,
+        0xF122,
+        &table_properties,
+        Default::default(),
+    )
+    .unwrap();
     write_client_anchor(&mut table_header_children, 20, 30, 220, 130).unwrap();
     let table_header = shape_container(&table_header_children);
 
@@ -360,6 +455,7 @@ fn create_table_escher_drawing() -> Vec<u8> {
         0,
         record_type::SPGR_CONTAINER,
         &table_children,
+        Default::default(),
     )
     .unwrap();
 
@@ -371,6 +467,7 @@ fn create_table_escher_drawing() -> Vec<u8> {
         0,
         record_type::SPGR_CONTAINER,
         &root_group_children,
+        Default::default(),
     )
     .unwrap();
 
@@ -1549,13 +1646,22 @@ fn exposes_powerpoint_2002_animation_extension_from_programmable_tags() {
         .flat_map(u16::to_le_bytes)
         .collect();
     let mut prog_binary_children = Vec::new();
-    write_atom(&mut prog_binary_children, 0, 0, 4026, &tag_name).unwrap();
+    write_atom(
+        &mut prog_binary_children,
+        0,
+        0,
+        4026,
+        &tag_name,
+        Default::default(),
+    )
+    .unwrap();
     write_atom(
         &mut prog_binary_children,
         0,
         0,
         RecordType::BinaryTagData.as_u16(),
         &extension_data,
+        Default::default(),
     )
     .unwrap();
     let mut prog_tags_children = Vec::new();
@@ -1564,6 +1670,7 @@ fn exposes_powerpoint_2002_animation_extension_from_programmable_tags() {
         0,
         RecordType::ProgBinaryTag.as_u16(),
         &prog_binary_children,
+        Default::default(),
     )
     .unwrap();
     let mut slide_children = Vec::new();
@@ -1572,10 +1679,18 @@ fn exposes_powerpoint_2002_animation_extension_from_programmable_tags() {
         0,
         RecordType::ProgTags.as_u16(),
         &prog_tags_children,
+        Default::default(),
     )
     .unwrap();
     let mut bytes = Vec::new();
-    write_container(&mut bytes, 0, RecordType::Slide.as_u16(), &slide_children).unwrap();
+    write_container(
+        &mut bytes,
+        0,
+        RecordType::Slide.as_u16(),
+        &slide_children,
+        Default::default(),
+    )
+    .unwrap();
 
     let (record, consumed) = Record::parse(&bytes, 0).unwrap();
     assert_eq!(consumed, bytes.len());
@@ -1707,7 +1822,7 @@ fn outline_shape(
     let mut children = Vec::new();
     ShapeBuilder::new(native_kind, id)
         .with_flags(ROOT_SHAPE_FLAGS)
-        .write(&mut children)
+        .write(&mut children, Default::default())
         .unwrap();
     write_client_anchor(&mut children, 10, 10, 110, 60).unwrap();
     if let Some((position, kind)) = placeholder {
@@ -1717,18 +1832,33 @@ fn outline_shape(
         data.push(0);
         data.extend_from_slice(&0u16.to_le_bytes());
         let mut client_data = Vec::new();
-        write_atom(&mut client_data, 0, 0, 3011, &data).unwrap();
-        write_container(&mut children, 0, record_type::CLIENT_DATA, &client_data).unwrap();
+        write_atom(&mut client_data, 0, 0, 3011, &data, Default::default()).unwrap();
+        write_container(
+            &mut children,
+            0,
+            record_type::CLIENT_DATA,
+            &client_data,
+            Default::default(),
+        )
+        .unwrap();
     }
     write_container(
         &mut children,
         0,
         record_type::CLIENT_TEXTBOX,
         textbox_records,
+        Default::default(),
     )
     .unwrap();
     let mut container = Vec::new();
-    write_container(&mut container, 0, record_type::SP_CONTAINER, &children).unwrap();
+    write_container(
+        &mut container,
+        0,
+        record_type::SP_CONTAINER,
+        &children,
+        Default::default(),
+    )
+    .unwrap();
     container
 }
 
@@ -1924,7 +2054,7 @@ fn identity_shape(
     let mut children = Vec::new();
     ShapeBuilder::new(native_kind, id)
         .with_flags(flags)
-        .write(&mut children)
+        .write(&mut children, Default::default())
         .unwrap();
     if name.is_some() || description.is_some() {
         let mut properties = PropertyBuilder::new();
@@ -1934,17 +2064,24 @@ fn identity_shape(
         if let Some(description) = description {
             properties.add_complex(0x0381, description);
         }
-        properties.write(&mut children).unwrap();
+        properties.write(&mut children, Default::default()).unwrap();
     }
     if anchored {
         if child {
-            write_child_anchor(&mut children, 0, 0, 100, 50).unwrap();
+            write_child_anchor(&mut children, 0, 0, 100, 50, Default::default()).unwrap();
         } else {
             write_client_anchor(&mut children, 10, 10, 110, 60).unwrap();
         }
     }
     let mut container = Vec::new();
-    write_container(&mut container, 0, record_type::SP_CONTAINER, &children).unwrap();
+    write_container(
+        &mut container,
+        0,
+        record_type::SP_CONTAINER,
+        &children,
+        Default::default(),
+    )
+    .unwrap();
     container
 }
 
@@ -1958,16 +2095,23 @@ fn identity_drawing() -> Vec<u8> {
 
     let header = |id: u32, flags: u32, anchored: bool| {
         let mut children = Vec::new();
-        write_spgr(&mut children, 0, 0, 100, 100).unwrap();
+        write_spgr(&mut children, 0, 0, 100, 100, Default::default()).unwrap();
         ShapeBuilder::new(0, id)
             .with_flags(flags)
-            .write(&mut children)
+            .write(&mut children, Default::default())
             .unwrap();
         if anchored {
             write_client_anchor(&mut children, 0, 0, 100, 100).unwrap();
         }
         let mut container = Vec::new();
-        write_container(&mut container, 0, record_type::SP_CONTAINER, &children).unwrap();
+        write_container(
+            &mut container,
+            0,
+            record_type::SP_CONTAINER,
+            &children,
+            Default::default(),
+        )
+        .unwrap();
         container
     };
 
@@ -1982,7 +2126,14 @@ fn identity_drawing() -> Vec<u8> {
         None,
     ));
     let mut group = Vec::new();
-    write_container(&mut group, 0, record_type::SPGR_CONTAINER, &group_children).unwrap();
+    write_container(
+        &mut group,
+        0,
+        record_type::SPGR_CONTAINER,
+        &group_children,
+        Default::default(),
+    )
+    .unwrap();
 
     let mut odd = utf16("Odd");
     odd.push(b'!');
@@ -2001,7 +2152,14 @@ fn identity_drawing() -> Vec<u8> {
     root_children.extend(identity_shape(1, 5, false, true, Some(&odd), None));
     root_children.extend(identity_shape(1, 6, false, true, Some(&[0, 0]), None));
     let mut root = Vec::new();
-    write_container(&mut root, 0, record_type::SPGR_CONTAINER, &root_children).unwrap();
+    write_container(
+        &mut root,
+        0,
+        record_type::SPGR_CONTAINER,
+        &root_children,
+        Default::default(),
+    )
+    .unwrap();
     drawing(&root)
 }
 

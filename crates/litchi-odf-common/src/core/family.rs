@@ -311,7 +311,9 @@ impl Package {
             Error::InvalidFormat(format!("{family_name} content.xml is not UTF-8: {error}"))
         })?;
         validate_content_part(content_xml, body_marker, family_name)?;
-        let content = Content::from_bytes(&content_bytes)?;
+        // The family checks above bound the part; admit it under the
+        // equivalent documented semantic defaults.
+        let content = Content::from_bytes(&content_bytes, crate::SemanticLimits::DEFAULT)?;
 
         let styles = if archive.has_file("styles.xml")? {
             let declared_size = archive
@@ -331,7 +333,7 @@ impl Package {
                     "ODF styles.xml exceeds the family limit".into(),
                 ));
             }
-            Some(Styles::from_bytes(&bytes)?)
+            Some(Styles::from_bytes(&bytes, crate::SemanticLimits::DEFAULT)?)
         } else {
             None
         };
@@ -339,7 +341,7 @@ impl Package {
             .has_file("meta.xml")?
             .then(|| archive.get_file("meta.xml"))
             .transpose()?
-            .map(|bytes| Meta::from_bytes(&bytes))
+            .map(|bytes| Meta::from_bytes(&bytes, crate::XmlStreamLimits::owner_default_value()))
             .transpose()?
             .map(|meta| meta.try_extract_metadata())
             .transpose()?;

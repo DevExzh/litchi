@@ -33,7 +33,9 @@ use crate::writer::ChpxFkpBuilder;
 use litchi_cfb::{OleFile, directory_names_equal};
 #[cfg(feature = "performance-diagnostics")]
 use litchi_ole_common::object::CfbParseEvent;
-use litchi_ole_common::object::{Edit as ObjectEditor, Targets};
+use litchi_ole_common::object::{
+    Edit as ObjectEditor, OpenOptions, Package as ObjectPackage, Targets,
+};
 use litchi_ole_common::property_set::{
     DOCUMENT_SUMMARY_INFORMATION_FMTID, Stream as PropertySetStream,
     document_summary::DIGITAL_SIGNATURE,
@@ -110,11 +112,13 @@ impl PictureGraph {
                     position: &position,
                     text: None,
                 };
-                let expected =
-                    crate::writer::images::build_dgg_info(std::slice::from_ref(&shape), &[], 1)
-                        .map_err(|error| {
-                            corrupted(format!("re-homed Dgg cannot be encoded: {error}"))
-                        })?;
+                let expected = crate::writer::images::build_dgg_info(
+                    std::slice::from_ref(&shape),
+                    &[],
+                    1,
+                    litchi_odraw::image::Limits::default(),
+                )
+                .map_err(|error| corrupted(format!("re-homed Dgg cannot be encoded: {error}")))?;
                 if expected == self.dgg_info {
                     return Ok(());
                 }
@@ -202,8 +206,13 @@ fn canonical_picture_from_block(block: &[u8]) -> Result<(crate::writer::Picture,
             .map_err(|error| corrupted(format!("re-homed picture is invalid: {error}")))?;
     let shape_id = picture_shape_id(block)?;
     let mut expected = Vec::new();
-    crate::writer::images::write_picture_block(&picture, shape_id, &mut expected)
-        .map_err(|error| corrupted(format!("re-homed picture cannot be encoded: {error}")))?;
+    crate::writer::images::write_picture_block(
+        &picture,
+        shape_id,
+        &mut expected,
+        litchi_odraw::image::Limits::default(),
+    )
+    .map_err(|error| corrupted(format!("re-homed picture cannot be encoded: {error}")))?;
     if expected != block {
         return Err(corrupted("re-homed picture block is not canonical"));
     }
@@ -224,8 +233,9 @@ fn canonical_picture_from_block(block: &[u8]) -> Result<(crate::writer::Picture,
 fn picture_shape_id(block: &[u8]) -> Result<u32> {
     const PICF_HEADER_LEN: usize = 0x44;
 
-    let (record, consumed) = litchi_odraw::Record::parse(block, PICF_HEADER_LEN)
-        .map_err(|error| corrupted(format!("picture shape container is invalid: {error}")))?;
+    let (record, consumed) =
+        litchi_odraw::Record::parse(block, PICF_HEADER_LEN, litchi_odraw::Limits::default())
+            .map_err(|error| corrupted(format!("picture shape container is invalid: {error}")))?;
     if record.kind() != litchi_odraw::RecordKind::SpContainer {
         return Err(corrupted(
             "picture PICF is not followed by an OfficeArt shape container",
@@ -282,8 +292,9 @@ struct MainDrawing<'data> {
 }
 
 fn main_drawing(dgg_info: &[u8]) -> Result<MainDrawing<'_>> {
-    let (first, first_size) = litchi_odraw::Record::parse(dgg_info, 0)
-        .map_err(|error| corrupted(format!("drawing-group root is invalid: {error}")))?;
+    let (first, first_size) =
+        litchi_odraw::Record::parse(dgg_info, 0, litchi_odraw::Limits::default())
+            .map_err(|error| corrupted(format!("drawing-group root is invalid: {error}")))?;
     if first.kind() != litchi_odraw::RecordKind::DggContainer {
         return Err(corrupted(
             "OfficeArtContent does not start with a DggContainer",
@@ -304,8 +315,9 @@ fn main_drawing(dgg_info: &[u8]) -> Result<MainDrawing<'_>> {
         let record_offset = offset
             .checked_add(1)
             .ok_or_else(|| corrupted("OfficeArtWordDrawing offset overflow"))?;
-        let (drawing, drawing_size) = litchi_odraw::Record::parse(dgg_info, record_offset)
-            .map_err(|error| corrupted(format!("main OfficeArt drawing is invalid: {error}")))?;
+        let (drawing, drawing_size) =
+            litchi_odraw::Record::parse(dgg_info, record_offset, litchi_odraw::Limits::default())
+                .map_err(|error| corrupted(format!("main OfficeArt drawing is invalid: {error}")))?;
         if drawing.kind() != litchi_odraw::RecordKind::DgContainer {
             return Err(corrupted(
                 "OfficeArtWordDrawing does not contain a DgContainer",
@@ -571,12 +583,13 @@ fn validate_picture_store(
     picture: &crate::writer::Picture,
 ) -> Result<()> {
     let pib = picture_pib(selected)?;
-    let (_drawing_group, drawing_group_size) = litchi_odraw::Record::parse(dgg_info, 0)
-        .map_err(|error| corrupted(format!("drawing-group root is invalid: {error}")))?;
+    let (_drawing_group, drawing_group_size) =
+        litchi_odraw::Record::parse(dgg_info, 0, litchi_odraw::Limits::default())
+            .map_err(|error| corrupted(format!("drawing-group root is invalid: {error}")))?;
     let drawing_group = dgg_info
         .get(..drawing_group_size)
         .ok_or_else(|| corrupted("drawing-group root extends past DggInfo"))?;
-    let store = litchi_odraw::image::store(drawing_group)
+    let store = litchi_odraw::image::store(drawing_group, litchi_odraw::image::Limits::default())
         .map_err(|error| corrupted(format!("drawing BStore is invalid: {error}")))?
         .ok_or_else(|| corrupted("floating picture drawing has no BStore"))?;
     let id = litchi_odraw::image::Id::new(pib)
@@ -602,7 +615,7 @@ struct NestedRewriteState {
 }
 
 fn rewrite_nested_picture_group(bytes: &mut [u8], source_pib: u32) -> Result<()> {
-    let (record, consumed) = litchi_odraw::Record::parse(bytes, 0)
+    let (record, consumed) = litchi_odraw::Record::parse(bytes, 0, litchi_odraw::Limits::default())
         .map_err(|error| corrupted(format!("nested image-group record is invalid: {error}")))?;
     if consumed != bytes.len() || record.kind() != litchi_odraw::RecordKind::SpgrContainer {
         return Err(corrupted(
@@ -767,11 +780,13 @@ fn build_nested_picture_dgg_info(
         std::slice::from_ref(&placeholder),
         &[],
         allocated,
+        litchi_odraw::image::Limits::default(),
     )
     .map_err(|error| corrupted(format!("nested image-group Dgg cannot be encoded: {error}")))?;
 
-    let (drawing_group_record, drawing_group_size) = litchi_odraw::Record::parse(&output, 0)
-        .map_err(|error| corrupted(format!("generated Dgg root is invalid: {error}")))?;
+    let (drawing_group_record, drawing_group_size) =
+        litchi_odraw::Record::parse(&output, 0, litchi_odraw::Limits::default())
+            .map_err(|error| corrupted(format!("generated Dgg root is invalid: {error}")))?;
     let dgg_meta = litchi_odraw::Container::try_new(drawing_group_record)
         .map_err(|error| corrupted(format!("generated Dgg root is invalid: {error}")))?
         .find(litchi_odraw::RecordKind::Dgg)
@@ -784,8 +799,9 @@ fn build_nested_picture_dgg_info(
     let dg_start = drawing_group_size
         .checked_add(1)
         .ok_or_else(|| corrupted("generated drawing offset overflows"))?;
-    let (drawing_record, drawing_size) = litchi_odraw::Record::parse(&output, dg_start)
-        .map_err(|error| corrupted(format!("generated drawing is invalid: {error}")))?;
+    let (drawing_record, drawing_size) =
+        litchi_odraw::Record::parse(&output, dg_start, litchi_odraw::Limits::default())
+            .map_err(|error| corrupted(format!("generated drawing is invalid: {error}")))?;
     if drawing_record.kind() != litchi_odraw::RecordKind::DgContainer {
         return Err(corrupted("generated drawing has no DgContainer"));
     }
@@ -1017,13 +1033,14 @@ impl RevisionEditor {
     where
         F: FnOnce(&OleFile<Cursor<Vec<u8>>>) -> Result<()>,
     {
-        let (package, mut ole) = ObjectEditor::open_with_ole_file_with_admission(
+        let (package, mut ole) = ObjectPackage::open_with_ole_file_with_admission(
             bytes,
-            Targets::default(),
-            limits,
+            OpenOptions::new()
+                .targets(Targets::default())
+                .limits(limits),
             admission,
         )?;
-        let editor = Self::open_from_package(package, &mut ole, policy)?;
+        let editor = Self::open_from_package(package.edit()?, &mut ole, policy)?;
         Ok((editor, ole))
     }
 
@@ -1037,14 +1054,16 @@ impl RevisionEditor {
     where
         F: FnOnce(&OleFile<Cursor<Vec<u8>>>) -> Result<()>,
     {
-        let (package, mut ole) = ObjectEditor::open_with_ole_file_profiled_with_admission(
+        let (package, mut ole) = ObjectPackage::open_with_ole_file_profiled_with_admission(
             bytes,
-            Targets::default(),
-            limits,
+            OpenOptions::new()
+                .targets(Targets::default())
+                .limits(limits),
             observer,
             admission,
         )?;
-        let editor = Self::open_from_package(package, &mut ole, ProtectionPolicy::default())?;
+        let editor =
+            Self::open_from_package(package.edit()?, &mut ole, ProtectionPolicy::default())?;
         Ok((editor, ole))
     }
 
@@ -2226,8 +2245,13 @@ impl RevisionEditor {
             crate::writer::images::FIRST_PICTURE_SHAPE_ID
         };
         let mut picture_block = Vec::new();
-        crate::writer::images::write_picture_block(&picture, rehomed_shape_id, &mut picture_block)
-            .map_err(|error| corrupted(format!("selected picture cannot be re-homed: {error}")))?;
+        crate::writer::images::write_picture_block(
+            &picture,
+            rehomed_shape_id,
+            &mut picture_block,
+            litchi_odraw::image::Limits::default(),
+        )
+        .map_err(|error| corrupted(format!("selected picture cannot be re-homed: {error}")))?;
         let (spa, dgg_info) = if let Some(mut spa) = selected_spa {
             spa.shape_id = rehomed_shape_id;
             let position = floating_position_from_spa(spa);
@@ -2243,12 +2267,17 @@ impl RevisionEditor {
             let dgg = if let Some(group) = nested_group.as_ref() {
                 build_nested_picture_dgg_info(&picture, spa, group)?
             } else {
-                crate::writer::images::build_dgg_info(std::slice::from_ref(&shape), &[], 1)
-                    .map_err(|error| {
-                        corrupted(format!(
-                            "selected drawing graph cannot be re-homed: {error}"
-                        ))
-                    })?
+                crate::writer::images::build_dgg_info(
+                    std::slice::from_ref(&shape),
+                    &[],
+                    1,
+                    litchi_odraw::image::Limits::default(),
+                )
+                .map_err(|error| {
+                    corrupted(format!(
+                        "selected drawing graph cannot be re-homed: {error}"
+                    ))
+                })?
             };
             (Some(spa), dgg)
         } else {
@@ -2351,8 +2380,13 @@ impl RevisionEditor {
                     ))
                 })?;
         let mut canonical_block = Vec::new();
-        crate::writer::images::write_picture_block(&picture, shape_id, &mut canonical_block)
-            .map_err(|error| corrupted(format!("picture graph cannot be encoded: {error}")))?;
+        crate::writer::images::write_picture_block(
+            &picture,
+            shape_id,
+            &mut canonical_block,
+            litchi_odraw::image::Limits::default(),
+        )
+        .map_err(|error| corrupted(format!("picture graph cannot be encoded: {error}")))?;
         if canonical_block != picture_block {
             return Err(corrupted(
                 "picture block is not the canonical OfficeArt graph for its shape ID",
@@ -3074,7 +3108,7 @@ impl RevisionEditor {
         if let Some(rendered) = self.retained_render.0.take() {
             return Ok(rendered);
         }
-        self.package.finish().map_err(PackageError::from)
+        crate::package::object_edit_bytes(&self.package)
     }
 
     /// Apply this editor's protection policy to a rendered candidate while
@@ -3464,13 +3498,16 @@ impl RevisionEditor {
                     .map_err(PackageError::from)?;
             }
         }
-        let rendered = self
-            .package
-            .put_streams_shared_with_rendered(replacements)
+        self.package
+            .put_streams_shared(replacements)
             .map_err(PackageError::from)?;
-        self.retained_render.0 = rendered.filter(|bytes| {
-            self.retained_render_limit != 0 && bytes.capacity() <= self.retained_render_limit
-        });
+        if self.retained_render_limit != 0 {
+            let rendered =
+                crate::package::object_edit_bytes(&self.package).map_err(PackageError::from)?;
+            if rendered.capacity() <= self.retained_render_limit {
+                self.retained_render.0 = Some(rendered);
+            }
+        }
         self.changed = true;
         Ok(())
     }
@@ -3866,8 +3903,15 @@ mod picture_group_tests {
         ShapeHorizontalOrigin, ShapeTextWrap, ShapeVerticalOrigin, ShapeWrapSide,
     };
 
+    fn open_object(bytes: Vec<u8>, targets: Targets, limits: Limits) -> ObjectEditor {
+        ObjectPackage::open_with_options(bytes, OpenOptions::new().targets(targets).limits(limits))
+            .unwrap()
+            .edit()
+            .unwrap()
+    }
+
     fn normalize_word2002_dop(bytes: Vec<u8>) -> Vec<u8> {
-        let mut package = ObjectEditor::open(bytes, Targets::default(), Limits::default()).unwrap();
+        let mut package = open_object(bytes, Targets::default(), Limits::default());
         let word_path = ["WordDocument".to_string()];
         let word = package.stream(&word_path).unwrap();
         let fib = FileInformationBlock::parse(word).unwrap();
@@ -3907,7 +3951,7 @@ mod picture_group_tests {
         word[pointer + 4..pointer + 8].copy_from_slice(&(dop.len() as u32).to_le_bytes());
         package.put_stream(&word_path, word).unwrap();
         package.put_stream(&table_path, table).unwrap();
-        package.finish().unwrap()
+        crate::package::object_edit_bytes(&package).unwrap()
     }
 
     fn record(version: u16, instance: u16, kind: u16, payload: &[u8]) -> Vec<u8> {
@@ -3990,7 +4034,13 @@ mod picture_group_tests {
         assert!(normalized.is_some());
 
         let mut picture_block = Vec::new();
-        crate::writer::images::write_picture_block(&picture, shape_id, &mut picture_block).unwrap();
+        crate::writer::images::write_picture_block(
+            &picture,
+            shape_id,
+            &mut picture_block,
+            litchi_odraw::image::Limits::default(),
+        )
+        .unwrap();
         PictureGraph {
             floating: true,
             picture_block,

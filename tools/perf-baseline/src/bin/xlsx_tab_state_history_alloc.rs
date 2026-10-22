@@ -92,9 +92,15 @@ struct AllocationDelta {
     peak_live_bytes_after: u64,
 }
 
-#[cfg(feature = "legacy-xlsx-source-history")]
+#[cfg(all(
+    feature = "legacy-xlsx-source-history",
+    not(feature = "current-xlsx-source-history")
+))]
 const API_VARIANT: &str = "pre-w4-tab-state-source-editor";
-#[cfg(not(feature = "legacy-xlsx-source-history"))]
+#[cfg(not(all(
+    feature = "legacy-xlsx-source-history",
+    not(feature = "current-xlsx-source-history")
+)))]
 const API_VARIANT: &str = "w4-tab-state-deferred-source-workbook";
 
 #[derive(Debug)]
@@ -102,9 +108,15 @@ struct StepChecks {
     patch: Patch,
 }
 
-#[cfg(feature = "legacy-xlsx-source-history")]
+#[cfg(all(
+    feature = "legacy-xlsx-source-history",
+    not(feature = "current-xlsx-source-history")
+))]
 type Patch = litchi_xlsx::tab_state::Patch;
-#[cfg(not(feature = "legacy-xlsx-source-history"))]
+#[cfg(not(all(
+    feature = "legacy-xlsx-source-history",
+    not(feature = "current-xlsx-source-history")
+)))]
 type Patch = litchi_xlsx::tab_state::source::Patch;
 
 #[derive(Debug)]
@@ -183,7 +195,10 @@ fn main() -> AnyResult<()> {
     Ok(())
 }
 
-#[cfg(not(feature = "legacy-xlsx-source-history"))]
+#[cfg(not(all(
+    feature = "legacy-xlsx-source-history",
+    not(feature = "current-xlsx-source-history")
+)))]
 fn run_history(
     iterations: usize,
     warmups: usize,
@@ -215,7 +230,10 @@ fn run_history(
     Ok(patches)
 }
 
-#[cfg(not(feature = "legacy-xlsx-source-history"))]
+#[cfg(not(all(
+    feature = "legacy-xlsx-source-history",
+    not(feature = "current-xlsx-source-history")
+)))]
 fn run_hide_step(owner: &litchi_xlsx::SourceBackedWorkbook) -> AnyResult<StepChecks> {
     let mut edit = owner.edit_tab_state()?;
     if !edit.hide("Sheet2")? {
@@ -227,7 +245,10 @@ fn run_hide_step(owner: &litchi_xlsx::SourceBackedWorkbook) -> AnyResult<StepChe
     })
 }
 
-#[cfg(not(feature = "legacy-xlsx-source-history"))]
+#[cfg(not(all(
+    feature = "legacy-xlsx-source-history",
+    not(feature = "current-xlsx-source-history")
+)))]
 fn run_show_step(owner: &litchi_xlsx::SourceBackedWorkbook) -> AnyResult<StepChecks> {
     let mut edit = owner.edit_tab_state()?;
     if !edit.show("Sheet2")? {
@@ -239,7 +260,10 @@ fn run_show_step(owner: &litchi_xlsx::SourceBackedWorkbook) -> AnyResult<StepChe
     })
 }
 
-#[cfg(feature = "legacy-xlsx-source-history")]
+#[cfg(all(
+    feature = "legacy-xlsx-source-history",
+    not(feature = "current-xlsx-source-history")
+))]
 fn run_history(
     iterations: usize,
     warmups: usize,
@@ -271,7 +295,10 @@ fn run_history(
     Ok(patches)
 }
 
-#[cfg(feature = "legacy-xlsx-source-history")]
+#[cfg(all(
+    feature = "legacy-xlsx-source-history",
+    not(feature = "current-xlsx-source-history")
+))]
 fn run_hide_step(owner: &litchi_xlsx::tab_state::SourceBackedEditor) -> AnyResult<StepChecks> {
     let mut edit = owner.edit()?;
     if !edit.hide("Sheet2")? {
@@ -283,7 +310,10 @@ fn run_hide_step(owner: &litchi_xlsx::tab_state::SourceBackedEditor) -> AnyResul
     })
 }
 
-#[cfg(feature = "legacy-xlsx-source-history")]
+#[cfg(all(
+    feature = "legacy-xlsx-source-history",
+    not(feature = "current-xlsx-source-history")
+))]
 fn run_show_step(owner: &litchi_xlsx::tab_state::SourceBackedEditor) -> AnyResult<StepChecks> {
     let mut edit = owner.edit()?;
     if !edit.show("Sheet2")? {
@@ -295,7 +325,10 @@ fn run_show_step(owner: &litchi_xlsx::tab_state::SourceBackedEditor) -> AnyResul
     })
 }
 
-#[cfg(not(feature = "legacy-xlsx-source-history"))]
+#[cfg(not(all(
+    feature = "legacy-xlsx-source-history",
+    not(feature = "current-xlsx-source-history")
+)))]
 fn verify_history(
     patches: &[Patch],
     visible_fixture: &[u8],
@@ -355,7 +388,10 @@ fn verify_history(
     Ok(verification)
 }
 
-#[cfg(feature = "legacy-xlsx-source-history")]
+#[cfg(all(
+    feature = "legacy-xlsx-source-history",
+    not(feature = "current-xlsx-source-history")
+))]
 fn verify_history(
     patches: &[Patch],
     visible_fixture: &[u8],
@@ -410,7 +446,10 @@ fn verify_history(
     Ok(verification)
 }
 
-#[cfg(not(feature = "legacy-xlsx-source-history"))]
+#[cfg(not(all(
+    feature = "legacy-xlsx-source-history",
+    not(feature = "current-xlsx-source-history")
+)))]
 fn run_source_owner_admission(
     iterations: usize,
     warmups: usize,
@@ -448,7 +487,10 @@ fn run_source_owner_admission(
     )
 }
 
-#[cfg(feature = "legacy-xlsx-source-history")]
+#[cfg(all(
+    feature = "legacy-xlsx-source-history",
+    not(feature = "current-xlsx-source-history")
+))]
 fn run_source_owner_admission(
     iterations: usize,
     warmups: usize,

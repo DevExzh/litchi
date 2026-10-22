@@ -5,15 +5,21 @@
 //! reparse an intermediate artifact without a public state verb.
 
 use super::model::{Document, State};
-use crate::core::{Content, Meta, OwnedPackage, PreparedPackage, Styles};
+#[cfg(test)]
+use crate::core::PreparedPackage;
+use crate::core::{Content, Meta, OwnedPackage, Styles};
 use crate::elements::style::{StyleElements, StyleRegistry};
 use litchi_core::{Error, Result};
 use litchi_odf_common::core::private::neutralize_prologue_doctype_bytes;
 use litchi_odf_common::leniency::ContentDefect;
-use litchi_odf_common::{SemanticLimitKind, SemanticLimits};
+use litchi_odf_common::{SemanticLimitKind, SemanticLimits, XmlStreamLimits};
 use std::sync::Arc;
 
 impl Document {
+    pub(crate) fn transaction_xml_limits(&self) -> XmlStreamLimits {
+        self.state.xml_limits
+    }
+
     pub(crate) fn transaction_package(&self) -> &OwnedPackage {
         &self.state.package
     }
@@ -27,12 +33,20 @@ impl Document {
     }
 
     pub(crate) fn replace_transaction_bytes(&mut self, bytes: Vec<u8>) -> Result<()> {
-        *self = Self::from_bytes(bytes)?;
+        let xml_limits = self.state.xml_limits;
+        *self = Self::from_bytes_with_xml_limits(bytes, xml_limits)?;
         Ok(())
     }
 
     /// Reparse a complete ODT artifact produced inside the crate.
     pub(crate) fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
+        Self::from_bytes_with_xml_limits(bytes, XmlStreamLimits::owner_default_value())
+    }
+
+    pub(crate) fn from_bytes_with_xml_limits(
+        bytes: Vec<u8>,
+        xml_limits: XmlStreamLimits,
+    ) -> Result<Self> {
         // Let the prepared detector perform the local MIME probe exactly
         // once.  A matching ODT result transfers its indexed archive; a
         // different ODF family still follows the historical package owner so
@@ -43,14 +57,30 @@ impl Document {
             litchi_odf_common::SourceLimits::default(),
         ) {
             Ok(prepared) if prepared.format() == litchi_core::detection::FileFormat::Odt => {
-                Self::from_prepared_package(prepared)
+                Self::from_owned_package_with_limits(
+                    prepared.into_package(),
+                    SemanticLimits::DEFAULT,
+                    xml_limits,
+                )
+                .map_err(Error::from)
             },
-            Ok(prepared) => Self::from_owned_package(prepared.into_package()),
-            Err(bytes) => Self::from_owned_package(OwnedPackage::from_bytes(bytes)?),
+            Ok(prepared) => Self::from_owned_package_with_limits(
+                prepared.into_package(),
+                SemanticLimits::DEFAULT,
+                xml_limits,
+            )
+            .map_err(Error::from),
+            Err(bytes) => Self::from_owned_package_with_limits(
+                OwnedPackage::from_bytes(bytes)?,
+                SemanticLimits::DEFAULT,
+                xml_limits,
+            )
+            .map_err(Error::from),
         }
     }
 
     /// Adopt a prepared packaged ODF result produced by smart detection.
+    #[cfg(test)]
     pub(crate) fn from_prepared_package(prepared: PreparedPackage) -> Result<Self> {
         if prepared.format() != litchi_core::detection::FileFormat::Odt {
             return Err(Error::UnexpectedFormat {
@@ -67,15 +97,21 @@ impl Document {
         self.state.package.prepared_index_identity()
     }
 
+    #[cfg(test)]
     pub(crate) fn from_owned_package(owned_package: OwnedPackage) -> Result<Self> {
-        Self::from_owned_package_with_limits(owned_package, SemanticLimits::DEFAULT)
-            .map_err(Error::from)
+        Self::from_owned_package_with_limits(
+            owned_package,
+            SemanticLimits::DEFAULT,
+            XmlStreamLimits::owner_default_value(),
+        )
+        .map_err(Error::from)
     }
 
     /// Parse the projection under caller-selected semantic limits.
     pub(crate) fn from_owned_package_with_limits(
         owned_package: OwnedPackage,
         limits: SemanticLimits,
+        xml_limits: XmlStreamLimits,
     ) -> std::result::Result<Self, litchi_odf_common::Error> {
         let mut tolerance = owned_package.tolerance_report().clone();
         let package = owned_package.package()?;
@@ -114,20 +150,21 @@ impl Document {
         // fetched; a content-styles error is only recorded and surfaces via
         // `finish` after the styles.xml parse, and a `try_extend` conflict
         // still loses to it — the historical call order.
-        let content_styles = super::open_parse::OpenParse::run(content_xml)?;
+        let content_styles =
+            super::open_parse::OpenParse::run_with_xml_limits(content_xml, xml_limits)?;
         limits.check(SemanticLimitKind::Units, content_styles.units())?;
-        let content = Content::from_vec(content_bytes)?;
+        let content = Content::from_vec(content_bytes, limits)?;
 
         let styles = if package.has_file("styles.xml") {
             let styles_bytes = package.get_file("styles.xml")?;
-            Some(Styles::from_vec(styles_bytes)?)
+            Some(Styles::from_vec(styles_bytes, limits)?)
         } else {
             None
         };
 
         let meta = if package.has_file("meta.xml") {
             let meta_bytes = package.get_file("meta.xml")?;
-            Some(Meta::from_vec(meta_bytes)?)
+            Some(Meta::from_vec(meta_bytes, xml_limits)?)
         } else {
             None
         };
@@ -154,6 +191,7 @@ impl Document {
                 meta,
                 style_registry,
                 tolerance,
+                xml_limits,
                 body: std::sync::OnceLock::new(),
             }),
         })
@@ -256,6 +294,7 @@ mod tests {
     use crate::core::OwnedPackage;
     use crate::elements::style::StyleElements;
     use litchi_core::Result;
+    use litchi_odf_common::XmlStreamLimits;
     use soapberry_zip::ZipArchiveWriter;
 
     const MIMETYPE: &str = "application/vnd.oasis.opendocument.text";
@@ -288,18 +327,27 @@ mod tests {
             "<office:text",
             "ODT",
         )?;
-        let content = crate::core::Content::from_vec(content_bytes)?;
+        let content = crate::core::Content::from_vec(
+            content_bytes,
+            litchi_odf_common::SemanticLimits::DEFAULT,
+        )?;
 
         let styles = if package.has_file("styles.xml") {
             let styles_bytes = package.get_file("styles.xml")?;
-            Some(crate::core::Styles::from_vec(styles_bytes)?)
+            Some(crate::core::Styles::from_vec(
+                styles_bytes,
+                litchi_odf_common::SemanticLimits::DEFAULT,
+            )?)
         } else {
             None
         };
 
         let meta = if package.has_file("meta.xml") {
             let meta_bytes = package.get_file("meta.xml")?;
-            Some(crate::core::Meta::from_vec(meta_bytes)?)
+            Some(crate::core::Meta::from_vec(
+                meta_bytes,
+                XmlStreamLimits::owner_default_value(),
+            )?)
         } else {
             None
         };
@@ -324,6 +372,7 @@ mod tests {
                 meta,
                 style_registry,
                 tolerance,
+                xml_limits: XmlStreamLimits::default(),
                 body: std::sync::OnceLock::new(),
             }),
         })

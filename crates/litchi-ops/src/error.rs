@@ -1743,6 +1743,11 @@ impl Classify for litchi_ole_common::Error {
             Self::Limit { .. } => Class::of(Code::LimitExceeded),
             Self::InvalidLimit { .. } => Class::of(Code::InvalidArgument),
             Self::PatchConflict => Class::of(Code::InvalidInput),
+            Self::Refused(refusal) => refusal.classify(),
+            // `litchi_ole_common::Error` is non-exhaustive by contract. Keep
+            // a future native error conservative until its facade mapping is
+            // assigned explicitly.
+            _ => Class::of(Code::InternalError),
         }
     }
 }
@@ -1903,6 +1908,7 @@ impl Classify for litchi_xls::SourceBackedError {
         match self {
             Self::Io(error) => error.classify(),
             Self::Cfb(error) => error.classify(),
+            Self::Object(error) => error.classify(),
             Self::Parse(error) => error.classify(),
             Self::Execution(error) => error.classify(),
             Self::SourceChanged { .. } => Class::of(Code::IoError),

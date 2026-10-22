@@ -143,7 +143,8 @@ impl Pictures {
     ///
     /// Returns an error if serialization fails or the underlying writer reports an error.
     pub fn write_store<W: Write>(&self, writer: &mut W) -> io::Result<()> {
-        self.builder()?.write_store(writer)
+        self.builder()?
+            .write_store(writer, litchi_odraw::image::Limits::default())
     }
 
     /// Streams the headerless `Pictures` `BStoreDelay` sequence.
@@ -152,7 +153,8 @@ impl Pictures {
     ///
     /// Returns an error if serialization fails or the underlying writer reports an error.
     pub fn write_delay<W: Write>(&self, writer: &mut W) -> io::Result<()> {
-        self.builder()?.write_delay(writer)
+        self.builder()?
+            .write_delay(writer, litchi_odraw::image::Limits::default())
     }
 
     /// Builds the Dgg `BStoreContainer` bytes.

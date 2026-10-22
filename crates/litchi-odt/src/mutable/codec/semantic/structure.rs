@@ -31,12 +31,15 @@ impl MutableDocument {
     pub(crate) fn variable_declarations(&self) -> Result<Declarations> {
         self.with_content_xml(|content| {
             if let Some(styles) = self.styles_xml.as_deref() {
-                crate::variable_declaration::parse_parts(&[
-                    (content, Part::Content),
-                    (styles, Part::Styles),
-                ])
+                crate::variable_declaration::parse_parts_with_xml_limits(
+                    &[(content, Part::Content), (styles, Part::Styles)],
+                    self.xml_limits,
+                )
             } else {
-                crate::variable_declaration::parse_parts(&[(content, Part::Content)])
+                crate::variable_declaration::parse_parts_with_xml_limits(
+                    &[(content, Part::Content)],
+                    self.xml_limits,
+                )
             }
         })
     }
@@ -61,15 +64,23 @@ impl MutableDocument {
             .cloned();
         match group.part {
             Part::Content => {
-                let updated =
-                    self.with_content_xml(|xml| crate::variable_declaration::set_xml(xml, group))?;
+                let updated = self.with_content_xml(|xml| {
+                    crate::variable_declaration::set_xml_with_xml_limits(
+                        xml,
+                        group,
+                        self.xml_limits,
+                    )
+                })?;
                 if let Some(styles) = self.styles_xml.as_deref() {
-                    crate::variable_declaration::parse_parts(&[
-                        (&updated, Part::Content),
-                        (styles, Part::Styles),
-                    ])?;
+                    crate::variable_declaration::parse_parts_with_xml_limits(
+                        &[(&updated, Part::Content), (styles, Part::Styles)],
+                        self.xml_limits,
+                    )?;
                 } else {
-                    crate::variable_declaration::parse_parts(&[(&updated, Part::Content)])?;
+                    crate::variable_declaration::parse_parts_with_xml_limits(
+                        &[(&updated, Part::Content)],
+                        self.xml_limits,
+                    )?;
                 }
                 self.content_xml = Some(updated);
             },
@@ -77,12 +88,16 @@ impl MutableDocument {
                 let styles = self.styles_xml.as_deref().ok_or_else(|| {
                     litchi_core::Error::InvalidFormat("styles.xml is absent".to_string())
                 })?;
-                let updated = crate::variable_declaration::set_xml(styles, group)?;
+                let updated = crate::variable_declaration::set_xml_with_xml_limits(
+                    styles,
+                    group,
+                    self.xml_limits,
+                )?;
                 self.with_content_xml(|content| {
-                    crate::variable_declaration::parse_parts(&[
-                        (content, Part::Content),
-                        (&updated, Part::Styles),
-                    ])
+                    crate::variable_declaration::parse_parts_with_xml_limits(
+                        &[(content, Part::Content), (&updated, Part::Styles)],
+                        self.xml_limits,
+                    )
                 })?;
                 self.styles_xml = Some(updated);
             },
@@ -119,15 +134,23 @@ impl MutableDocument {
         match part {
             Part::Content => {
                 let updated = self.with_content_xml(|xml| {
-                    crate::variable_declaration::remove_xml(xml, scope, kind)
+                    crate::variable_declaration::remove_xml_with_xml_limits(
+                        xml,
+                        scope,
+                        kind,
+                        self.xml_limits,
+                    )
                 })?;
                 if let Some(styles) = self.styles_xml.as_deref() {
-                    crate::variable_declaration::parse_parts(&[
-                        (&updated, Part::Content),
-                        (styles, Part::Styles),
-                    ])?;
+                    crate::variable_declaration::parse_parts_with_xml_limits(
+                        &[(&updated, Part::Content), (styles, Part::Styles)],
+                        self.xml_limits,
+                    )?;
                 } else {
-                    crate::variable_declaration::parse_parts(&[(&updated, Part::Content)])?;
+                    crate::variable_declaration::parse_parts_with_xml_limits(
+                        &[(&updated, Part::Content)],
+                        self.xml_limits,
+                    )?;
                 }
                 self.content_xml = Some(updated);
             },
@@ -135,12 +158,17 @@ impl MutableDocument {
                 let styles = self.styles_xml.as_deref().ok_or_else(|| {
                     litchi_core::Error::InvalidFormat("styles.xml is absent".to_string())
                 })?;
-                let updated = crate::variable_declaration::remove_xml(styles, scope, kind)?;
+                let updated = crate::variable_declaration::remove_xml_with_xml_limits(
+                    styles,
+                    scope,
+                    kind,
+                    self.xml_limits,
+                )?;
                 self.with_content_xml(|content| {
-                    crate::variable_declaration::parse_parts(&[
-                        (content, Part::Content),
-                        (&updated, Part::Styles),
-                    ])
+                    crate::variable_declaration::parse_parts_with_xml_limits(
+                        &[(content, Part::Content), (&updated, Part::Styles)],
+                        self.xml_limits,
+                    )
                 })?;
                 self.styles_xml = Some(updated);
             },

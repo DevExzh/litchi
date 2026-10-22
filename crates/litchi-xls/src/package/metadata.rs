@@ -63,6 +63,8 @@ pub enum Error {
     /// A property-set edit was refused (an invalid value or name, or a source
     /// stream that cannot be rewritten without loss).
     Property(OleError),
+    /// A shared property-set or object refusal with its typed classification.
+    Object(litchi_ole_common::Error),
     /// The workbook is encrypted or signed; its properties cannot be
     /// rewritten without storing them in plaintext or breaking the signature.
     Protected,
@@ -76,6 +78,7 @@ impl fmt::Display for Error {
             Self::Package(error) => write!(formatter, "XLS package error: {error}"),
             Self::Metadata(error) => fmt::Display::fmt(error, formatter),
             Self::Property(_) => formatter.write_str("XLS workbook property edit was refused"),
+            Self::Object(error) => write!(formatter, "XLS property-set error: {error}"),
             Self::Protected => formatter.write_str(
                 "the metadata of an encrypted or signed XLS workbook cannot be rewritten",
             ),
@@ -92,6 +95,7 @@ impl std::error::Error for Error {
             Self::Package(error) => Some(error),
             Self::Metadata(error) => Some(error),
             Self::Property(error) => Some(error),
+            Self::Object(error) => Some(error),
             Self::Protected | Self::PatchConflict => None,
         }
     }
@@ -121,6 +125,12 @@ impl From<MetadataError> for Error {
 impl From<OleError> for Error {
     fn from(error: OleError) -> Self {
         Self::Property(error)
+    }
+}
+
+impl From<litchi_ole_common::Error> for Error {
+    fn from(error: litchi_ole_common::Error) -> Self {
+        Self::Object(error)
     }
 }
 

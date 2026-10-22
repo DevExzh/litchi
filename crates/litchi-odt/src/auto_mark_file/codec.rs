@@ -5,7 +5,7 @@ use super::{
     MAX_AGGREGATE_BYTES, MAX_DEPTH, MAX_OCCURRENCES, MAX_VALUE_BYTES, OFFICE, TEXT, XLINK, invalid,
     make_error,
 };
-use crate::core::ResolvedReader;
+use crate::core::{ResolvedReader, XmlStreamLimits};
 use crate::generic::FlatMutationBudget;
 use crate::variable_declaration::{Body, Part, Scope};
 use litchi_core::{Error, Result};
@@ -57,8 +57,9 @@ pub(super) fn parse_part(
     scopes: &mut HashSet<(Part, Scope)>,
     aggregate: &mut usize,
     budget: Option<&FlatMutationBudget>,
+    xml_limits: XmlStreamLimits,
 ) -> Result<()> {
-    let mut reader = ResolvedReader::from_xml(xml);
+    let mut reader = ResolvedReader::from_xml(xml, xml_limits)?;
     reader.config_mut().check_end_names = true;
     let mut buffer = Vec::new();
     let mut depth = 0usize;
@@ -72,7 +73,9 @@ pub(super) fn parse_part(
         }
         let (namespace, event) = reader
             .read_resolved_event_into(&mut buffer)
-            .map_err(|error| make_error(format!("invalid auto-mark-file XML: {error}")))?;
+            .map_err(|error| {
+                crate::core::map_resolved_reader_error(error, "invalid auto-mark-file XML")
+            })?;
         match event {
             Event::Start(ref element) => {
                 if pending.is_some() {
@@ -397,6 +400,7 @@ mod namespace_tests {
             &mut scopes,
             &mut aggregate,
             None,
+            XmlStreamLimits::default(),
         )
         .expect("entity-escaped ODF namespace URIs should resolve semantically");
         assert_eq!(references.len(), 1);

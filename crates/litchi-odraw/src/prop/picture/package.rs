@@ -36,7 +36,7 @@ impl<'data> Parsed<'data> {
             usize::from(record.instance()),
             limits.properties_value(),
         )?;
-        let properties = Props::parse(record)?;
+        let properties = Props::parse(record, record.limits())?;
         decode(&properties, limits)?;
         Ok(Self {
             record: record.clone(),
@@ -547,7 +547,7 @@ impl<'data> Package<'data> {
         Self::open_with_options(bytes, OpenOptions::default())
     }
     pub fn open_with_options(bytes: &'data [u8], options: OpenOptions) -> Result<Self> {
-        let (record, consumed) = Record::parse(bytes, 0)?;
+        let (record, consumed) = Record::parse(bytes, 0, crate::Limits::default())?;
         if consumed != bytes.len() {
             return Err(crate::Error::TrailingData { offset: consumed }.into());
         }
@@ -588,7 +588,7 @@ impl<'data> Package<'data> {
             State::Edited(edited) => &edited.bytes,
         };
         let bytes = cache.get_or_init(|| Box::new(self.state.render()));
-        let (record, _) = Record::parse(bytes, 0)?;
+        let (record, _) = Record::parse(bytes, 0, crate::Limits::default())?;
         View::parse(&record, self.state.policy().limits())
     }
     pub fn metadata(&self) -> Result<Option<Metadata<'_>>> {

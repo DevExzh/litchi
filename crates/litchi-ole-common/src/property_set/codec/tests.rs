@@ -5,7 +5,7 @@ use super::super::model::{Guid, Section, Stream, Value};
 use super::binary::parse_typed_property;
 use super::{Edit, PropertySetReader};
 use litchi_cfb::consts::{VT_BLOB, VT_I4};
-use litchi_cfb::{OleFile, OleWriter};
+use litchi_cfb::{OleError, OleFile, OleFileLimits, OleWriter};
 use std::io::Cursor;
 
 #[test]
@@ -55,10 +55,11 @@ fn editor_preserves_nested_streams_with_matching_leaf_names() {
     let mut source = Cursor::new(Vec::new());
     writer.write_to(&mut source).expect("CFB source");
 
-    let mut editor = Edit::new(source.into_inner()).expect("editor source");
+    let mut editor =
+        Edit::new(source.into_inner(), OleFileLimits::default()).expect("editor source");
     editor
         .update(Binding::SummaryInformation, |section| {
-            section.add(2, Value::Lpstr("Title".into()))
+            Ok(section.add(2, Value::Lpstr("Title".into()))?)
         })
         .expect("summary edit");
     let mut ole =
@@ -68,6 +69,26 @@ fn editor_preserves_nested_streams_with_matching_leaf_names() {
             .expect("nested stream survives"),
         b"nested payload"
     );
+}
+
+#[test]
+fn editor_requires_and_enforces_the_callers_cfb_limits() {
+    let mut writer = OleWriter::new();
+    writer
+        .create_stream(&["Workbook"], b"source")
+        .expect("source stream");
+    let mut source = Cursor::new(Vec::new());
+    writer.write_to(&mut source).expect("CFB source");
+    let bytes = source.into_inner();
+    let limits = OleFileLimits::new(u64::try_from(bytes.len() - 1).expect("fixture length"))
+        .expect("finite ingress limit");
+    assert!(matches!(
+        Edit::new(bytes, limits),
+        Err(crate::Error::Cfb(OleError::LimitExceeded {
+            resource: "input bytes",
+            ..
+        }))
+    ));
 }
 
 #[test]
@@ -104,10 +125,11 @@ fn a_user_defined_edit_creates_a_typed_document_summary_section() {
     let mut source = Cursor::new(Vec::new());
     writer.write_to(&mut source).expect("CFB source");
 
-    let mut editor = Edit::new(source.into_inner()).expect("editor source");
+    let mut editor =
+        Edit::new(source.into_inner(), OleFileLimits::default()).expect("editor source");
     editor
         .update(Binding::UserDefinedProperties, |section| {
-            section.add_named(2, "Department".into(), Value::Lpstr("Research".into()))
+            Ok(section.add_named(2, "Department".into(), Value::Lpstr("Research".into()))?)
         })
         .expect("user-defined edit");
     let mut ole =

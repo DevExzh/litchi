@@ -44,15 +44,21 @@ fn compact_odt_exercises_shared_package_and_xml_parsers() -> Result<(), Error> {
         package.styles_xml(),
         &archive,
     )?);
-    drop(calculation::parse(package.content_xml())?);
+    drop(calculation::parse(
+        package.content_xml(),
+        litchi_odf_common::XmlStreamLimits::default(),
+    )?);
     drop(data::parse_package(
         package.styles_xml(),
         package.content_xml(),
+        litchi_odf_common::XmlStreamLimits::default(),
     )?);
     let Some(styles) = package.styles_xml() else {
         panic!("compact package has no styles.xml");
     };
-    assert!(!master::reader::read(styles)?.is_empty());
+    assert!(
+        !master::reader::read(styles, litchi_odf_common::XmlStreamLimits::default())?.is_empty()
+    );
     Ok(())
 }
 

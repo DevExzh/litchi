@@ -280,7 +280,9 @@ fn invalid(message: impl Into<String>) -> Error {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::chart::read;
+    fn read(xml: &str) -> std::result::Result<Element, crate::Error> {
+        crate::chart::read(xml, crate::XmlStreamLimits::default())
+    }
 
     const XML: &str = r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:c="urn:oasis:names:tc:opendocument:xmlns:chart:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:table:1.0"><o:body><o:chart><c:chart><c:legend c:legend-position="bottom-end"/><c:plot-area t:cell-range-address="Data.A1:C4" c:data-source-has-labels="both"><c:axis c:dimension="x" c:name="x"><c:categories t:cell-range-address="Data.A2:A4"/><c:grid c:class="major"/></c:axis><c:series c:values-cell-range-address="Data.B2:B4" c:label-cell-address="Data.B1"><c:domain t:cell-range-address="Data.A2:A4"/><c:data-point c:repeated="3"/></c:series></c:plot-area></c:chart></o:chart></o:body></o:document-content>"#;
 

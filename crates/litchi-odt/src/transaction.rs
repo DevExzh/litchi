@@ -46,6 +46,7 @@ use litchi_odf_common::Error as PackageError;
 /// The dimension named by [`Error::Limit`] and [`Error::InvalidLimit`].
 pub use litchi_odf_common::LimitKind;
 pub use litchi_odf_common::OpenOptions;
+use litchi_odf_common::XmlStreamLimits;
 
 const MAX_PACKAGE_BYTES: usize = 64 * 1024 * 1024;
 const MAX_DURABLE_TRANSFER_EXPANSION_BYTES: usize = MAX_PACKAGE_BYTES;
@@ -83,6 +84,9 @@ pub struct Package {
     /// bytes. The byte handle remains separate because lineage and exact
     /// source authorization intentionally compare the immutable artifact.
     package: crate::core::OwnedPackage,
+    /// The caller-selected raw XML policy retained across projections,
+    /// edits, commits and patch replay.
+    xml_limits: XmlStreamLimits,
     /// The parsed read-only projection of exactly these bytes. Opened and
     /// committed packages hold it from construction; freshly built packages
     /// parse it on first use.
@@ -326,17 +330,22 @@ impl Package {
         package: crate::core::OwnedPackage,
         options: OpenOptions,
     ) -> std::result::Result<Self, PackageError> {
-        let document =
-            Document::from_owned_package_with_limits(package, options.semantic_limits_value())?;
+        let document = Document::from_owned_package_with_limits(
+            package,
+            options.semantic_limits_value(),
+            options.xml_limits_value(),
+        )?;
         Ok(Self::from_parsed(document))
     }
 
     /// Adopt a parsed projection; the package shares its exact bytes.
     pub(crate) fn from_parsed(document: Document) -> Self {
+        let xml_limits = document.transaction_xml_limits();
         let package = document.transaction_package().clone_without_password();
         Self {
             bytes: package.shared_bytes(),
             package,
+            xml_limits,
             document: Arc::new(std::sync::OnceLock::from(document)),
         }
     }
@@ -349,6 +358,7 @@ impl Package {
         Ok(Self {
             bytes: package.shared_bytes(),
             package,
+            xml_limits: XmlStreamLimits::owner_default_value(),
             document: Arc::new(std::sync::OnceLock::new()),
         })
     }
@@ -356,6 +366,19 @@ impl Package {
     /// Reopen complete bytes produced inside the crate.
     pub(crate) fn from_vec(bytes: Vec<u8>) -> Result<Self> {
         Ok(Self::from_parsed(Document::from_bytes(bytes)?))
+    }
+
+    pub(crate) fn from_vec_with_xml_limits(
+        bytes: Vec<u8>,
+        xml_limits: XmlStreamLimits,
+    ) -> Result<Self> {
+        Ok(Self::from_parsed(Document::from_bytes_with_xml_limits(
+            bytes, xml_limits,
+        )?))
+    }
+
+    pub(crate) const fn xml_limits_value(&self) -> XmlStreamLimits {
+        self.xml_limits
     }
 
     /// Captures the exact bytes backing an already validated document.
@@ -374,7 +397,11 @@ impl Package {
         if let Some(document) = self.document.get() {
             return Ok(document.clone());
         }
-        let document = Document::from_owned_package(self.package.clone())?;
+        let document = Document::from_owned_package_with_limits(
+            self.package.clone(),
+            litchi_odf_common::SemanticLimits::DEFAULT,
+            self.xml_limits,
+        )?;
         Ok(self.document.get_or_init(|| document).clone())
     }
 
@@ -1845,7 +1872,8 @@ impl Edit {
         let mut document = self.source.document()?;
         if let Some(body) = self.body.take() {
             if let Some(bytes) = crate::body::apply_body_edits(&document, *body)? {
-                document = Document::from_bytes(bytes)?;
+                document =
+                    Document::from_bytes_with_xml_limits(bytes, document.transaction_xml_limits())?;
             }
         }
         let mut results = Vec::new();
@@ -1858,6 +1886,7 @@ impl Edit {
         let mut operation_index = 0;
         while operation_index < self.operations.len() {
             let operation = &self.operations[operation_index];
+            let xml_limits = document.transaction_xml_limits();
             let before_operation = document.transaction_package().clone();
             let run_end = model_content_run_end(&self.operations, operation_index);
             if is_model_content_operation(operation) && run_end - operation_index >= 2 {
@@ -1878,7 +1907,10 @@ impl Edit {
                     results.push(result);
                     operation_index += 1;
                 }
-                document = Document::from_bytes(mutable.to_bytes_content_only()?)?;
+                document = Document::from_bytes_with_xml_limits(
+                    mutable.to_bytes_content_only()?,
+                    xml_limits,
+                )?;
                 audit_changed_xml_is_compact(&before_operation, document.transaction_package())?;
                 continue;
             }
@@ -1890,7 +1922,7 @@ impl Edit {
                     results.push(apply(&mut mutable)?);
                     operation_index += 1;
                 }
-                document = Document::from_bytes(mutable.to_bytes()?)?;
+                document = Document::from_bytes_with_xml_limits(mutable.to_bytes()?, xml_limits)?;
                 audit_changed_xml_is_compact(&before_operation, document.transaction_package())?;
                 continue;
             }
@@ -1919,19 +1951,28 @@ impl Edit {
                 Operation::InsertParagraph { index, text } => {
                     let mut mutable = MutableDocument::from_document(document)?;
                     mutable.insert_semantic_paragraph(*index, text)?;
-                    document = Document::from_bytes(mutable.to_bytes_content_only()?)?;
+                    document = Document::from_bytes_with_xml_limits(
+                        mutable.to_bytes_content_only()?,
+                        xml_limits,
+                    )?;
                     OperationResult::Index(*index)
                 },
                 Operation::ReplaceParagraph { index, text } => {
                     let mut mutable = MutableDocument::from_document(document)?;
                     mutable.replace_semantic_paragraph(*index, text)?;
-                    document = Document::from_bytes(mutable.to_bytes_content_only()?)?;
+                    document = Document::from_bytes_with_xml_limits(
+                        mutable.to_bytes_content_only()?,
+                        xml_limits,
+                    )?;
                     OperationResult::Unit
                 },
                 Operation::RemoveParagraph { index } => {
                     let mut mutable = MutableDocument::from_document(document)?;
                     mutable.remove_semantic_paragraph(*index)?;
-                    document = Document::from_bytes(mutable.to_bytes_content_only()?)?;
+                    document = Document::from_bytes_with_xml_limits(
+                        mutable.to_bytes_content_only()?,
+                        xml_limits,
+                    )?;
                     OperationResult::Unit
                 },
                 Operation::MovePlainParagraph { from, to } => {
@@ -1973,7 +2014,10 @@ impl Edit {
                 } => {
                     let mut mutable = MutableDocument::from_document(document)?;
                     mutable.append_semantic_run(*paragraph, text, style_name.as_deref())?;
-                    document = Document::from_bytes(mutable.to_bytes_content_only()?)?;
+                    document = Document::from_bytes_with_xml_limits(
+                        mutable.to_bytes_content_only()?,
+                        xml_limits,
+                    )?;
                     OperationResult::Unit
                 },
                 Operation::AppendHyperlink {
@@ -1983,13 +2027,19 @@ impl Edit {
                 } => {
                     let mut mutable = MutableDocument::from_document(document)?;
                     mutable.append_semantic_hyperlink(*paragraph, href, text)?;
-                    document = Document::from_bytes(mutable.to_bytes_content_only()?)?;
+                    document = Document::from_bytes_with_xml_limits(
+                        mutable.to_bytes_content_only()?,
+                        xml_limits,
+                    )?;
                     OperationResult::Unit
                 },
                 Operation::AppendLineBreak { index } => {
                     let mut mutable = MutableDocument::from_document(document)?;
                     mutable.append_line_break_at(Position::new(*index))?;
-                    document = Document::from_bytes(mutable.to_bytes_content_only()?)?;
+                    document = Document::from_bytes_with_xml_limits(
+                        mutable.to_bytes_content_only()?,
+                        xml_limits,
+                    )?;
                     OperationResult::Unit
                 },
                 Operation::InsertNote {
@@ -2003,7 +2053,8 @@ impl Edit {
                     } else {
                         mutable.insert_note(*paragraph, note)?;
                     }
-                    document = Document::from_bytes(mutable.to_bytes()?)?;
+                    document =
+                        Document::from_bytes_with_xml_limits(mutable.to_bytes()?, xml_limits)?;
                     OperationResult::Unit
                 },
                 Operation::ReplaceNote {
@@ -2017,13 +2068,15 @@ impl Edit {
                     } else {
                         mutable.replace_note(*index, note)?;
                     }
-                    document = Document::from_bytes(mutable.to_bytes()?)?;
+                    document =
+                        Document::from_bytes_with_xml_limits(mutable.to_bytes()?, xml_limits)?;
                     OperationResult::Unit
                 },
                 Operation::RemoveNote { index } => {
                     let mut mutable = MutableDocument::from_document(document)?;
                     mutable.remove_note(*index)?;
-                    document = Document::from_bytes(mutable.to_bytes()?)?;
+                    document =
+                        Document::from_bytes_with_xml_limits(mutable.to_bytes()?, xml_limits)?;
                     OperationResult::Unit
                 },
                 Operation::InsertRubyAnnotation {
@@ -2032,49 +2085,57 @@ impl Edit {
                 } => {
                     let mut mutable = MutableDocument::from_document(document)?;
                     mutable.insert_ruby_annotation(*paragraph, annotation)?;
-                    document = Document::from_bytes(mutable.to_bytes()?)?;
+                    document =
+                        Document::from_bytes_with_xml_limits(mutable.to_bytes()?, xml_limits)?;
                     OperationResult::Unit
                 },
                 Operation::ReplaceRubyAnnotation { index, annotation } => {
                     let mut mutable = MutableDocument::from_document(document)?;
                     mutable.replace_ruby_annotation(*index, annotation)?;
-                    document = Document::from_bytes(mutable.to_bytes()?)?;
+                    document =
+                        Document::from_bytes_with_xml_limits(mutable.to_bytes()?, xml_limits)?;
                     OperationResult::Unit
                 },
                 Operation::RemoveRubyAnnotation { index } => {
                     let mut mutable = MutableDocument::from_document(document)?;
                     mutable.remove_ruby_annotation(*index)?;
-                    document = Document::from_bytes(mutable.to_bytes()?)?;
+                    document =
+                        Document::from_bytes_with_xml_limits(mutable.to_bytes()?, xml_limits)?;
                     OperationResult::Unit
                 },
                 Operation::InsertDynamicTextField { paragraph, field } => {
                     let mut mutable = MutableDocument::from_document(document)?;
                     mutable.insert_dynamic_text_field(*paragraph, field)?;
-                    document = Document::from_bytes(mutable.to_bytes()?)?;
+                    document =
+                        Document::from_bytes_with_xml_limits(mutable.to_bytes()?, xml_limits)?;
                     OperationResult::Unit
                 },
                 Operation::ReplaceDynamicTextField { index, field } => {
                     let mut mutable = MutableDocument::from_document(document)?;
                     mutable.replace_dynamic_text_field(*index, field)?;
-                    document = Document::from_bytes(mutable.to_bytes()?)?;
+                    document =
+                        Document::from_bytes_with_xml_limits(mutable.to_bytes()?, xml_limits)?;
                     OperationResult::Unit
                 },
                 Operation::RemoveDynamicTextField { index } => {
                     let mut mutable = MutableDocument::from_document(document)?;
                     mutable.remove_dynamic_text_field(*index)?;
-                    document = Document::from_bytes(mutable.to_bytes()?)?;
+                    document =
+                        Document::from_bytes_with_xml_limits(mutable.to_bytes()?, xml_limits)?;
                     OperationResult::Unit
                 },
                 Operation::SetRubyStyle { style } => {
                     let mut mutable = MutableDocument::from_document(document)?;
                     mutable.set_ruby_style(style)?;
-                    document = Document::from_bytes(mutable.to_bytes()?)?;
+                    document =
+                        Document::from_bytes_with_xml_limits(mutable.to_bytes()?, xml_limits)?;
                     OperationResult::Unit
                 },
                 Operation::RemoveRubyStyle { name } => {
                     let mut mutable = MutableDocument::from_document(document)?;
                     mutable.remove_ruby_style(name)?;
-                    document = Document::from_bytes(mutable.to_bytes()?)?;
+                    document =
+                        Document::from_bytes_with_xml_limits(mutable.to_bytes()?, xml_limits)?;
                     OperationResult::Unit
                 },
                 Operation::SetTrackedChangePolicy {
@@ -2088,13 +2149,15 @@ impl Edit {
                         protection_key.clone(),
                         digest_algorithm.clone(),
                     )?;
-                    document = Document::from_bytes(mutable.to_bytes()?)?;
+                    document =
+                        Document::from_bytes_with_xml_limits(mutable.to_bytes()?, xml_limits)?;
                     OperationResult::Unit
                 },
                 Operation::RemoveTrackedChange { id } => {
                     let mut mutable = MutableDocument::from_document(document)?;
                     mutable.remove_tracked_change(id)?;
-                    document = Document::from_bytes(mutable.to_bytes()?)?;
+                    document =
+                        Document::from_bytes_with_xml_limits(mutable.to_bytes()?, xml_limits)?;
                     OperationResult::Unit
                 },
                 Operation::AddRdfGraph {
@@ -4916,7 +4979,7 @@ fn apply_durable_patch<Mode>(patch: &CorePatch<Mode>, source: &Package) -> Resul
     }
     validate_patch_direction(patch)?;
     if let Some(bytes) = restore_target_bytes(patch)? {
-        return Package::from_vec(copy_bytes(bytes)?);
+        return Package::from_vec_with_xml_limits(copy_bytes(bytes)?, source.xml_limits_value());
     }
     let mut operations = Vec::new();
     operations

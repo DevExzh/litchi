@@ -19,6 +19,9 @@ use super::stream::{
 use super::{Area, FeatureSet};
 use crate::Package;
 use litchi_core::edit::RefusalKind;
+use litchi_ole_common::object::{
+    Limits as ObjectLimits, OpenOptions as ObjectOpenOptions, Package as ObjectPackage, Targets,
+};
 
 pub use super::PageBreak;
 pub use encode::{HyperlinkSpec as Hyperlink, StyleSpec as Style, ValidationSpec as Validation};
@@ -1037,15 +1040,23 @@ impl Edit {
         }
         let before: Arc<[u8]> = Arc::from(self.base.to_bytes()?);
         let name = workbook_stream_name(&before)?;
-        let mut editor = litchi_ole_common::object::Edit::open(
+        let package = ObjectPackage::open_with_options(
             before.to_vec(),
-            litchi_ole_common::object::Targets::default(),
-            litchi_ole_common::object::Limits::default(),
+            ObjectOpenOptions::new()
+                .targets(Targets::default())
+                .limits(ObjectLimits::default()),
         )
         .map_err(|error| Error::Records(error.into()))?;
-        let rendered = editor
-            .put_stream_shared_with_rendered(&[name.to_owned()], Arc::from(self.stream))
+        let mut editor = package
+            .edit()
             .map_err(|error| Error::Records(error.into()))?;
+        editor
+            .put_stream_shared(&[name.to_owned()], Arc::from(self.stream))
+            .map_err(|error| Error::Records(error.into()))?;
+        let committed = editor
+            .commit()
+            .map_err(|error| Error::Records(error.into()))?;
+        let rendered = committed.package().source_shared().as_ref().clone();
         let after: Arc<[u8]> = Arc::from(rendered.as_slice());
         let package = crate::package::republish(&self.base, rendered)?;
         Ok(Commit {
@@ -1109,7 +1120,7 @@ pub fn compile_formula(formula: &str) -> Result<Vec<u8>> {
 
 /// Apply a patch to the exact package it was made from.
 pub(super) fn apply(package: &Package, patch: &Patch) -> Result<Commit> {
-    let bytes = package.to_bytes()?;
+    let bytes = package.to_bytes().map_err(crate::scoped::package_error)?;
     if bytes.as_slice() != patch.before() {
         return Err(Error::PatchConflict);
     }

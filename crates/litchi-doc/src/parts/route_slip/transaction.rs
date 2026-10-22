@@ -48,6 +48,7 @@ impl std::error::Error for RecipientSelectionError {}
 
 /// Errors produced while staging semantic route-slip edits.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum Error {
     /// A recipient selector could not be resolved.
     Selection(RecipientSelectionError),

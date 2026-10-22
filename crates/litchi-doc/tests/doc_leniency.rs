@@ -34,16 +34,37 @@
 
 //! Opt-in tolerance for non-structural DOC stylesheet defects.
 
-use litchi_doc::tracked_revision::Limits;
 use litchi_doc::writer::{BookmarkEntry, CommentEntry};
 use litchi_doc::{
     AuxiliaryTableDefect, BookmarkDefect, Builder, CommentDefect, Defect, Leniency, OpenOptions,
     PapxDefect, PieceDefect, SectionDefect, SprmDefect, StshifDefect, StyleDefect,
     StylesheetDefect, TableDefinitionDefect, raw::Reader,
 };
-use litchi_ole_common::object::{Edit as PackageEditor, Targets};
+use litchi_ole_common::object::{
+    Edit as PackageEditor, Limits, OpenOptions as ObjectOpenOptions, Package as ObjectPackage,
+    Targets,
+};
 use std::io::Cursor;
 use std::path::PathBuf;
+
+fn open_object(
+    bytes: Vec<u8>,
+    targets: Targets,
+    limits: Limits,
+) -> Result<PackageEditor, litchi_ole_common::Error> {
+    ObjectPackage::open_with_options(
+        bytes,
+        ObjectOpenOptions::new().targets(targets).limits(limits),
+    )?
+    .edit()
+}
+
+fn object_bytes(editor: &PackageEditor) -> Vec<u8> {
+    let package = editor.clone().commit().unwrap().into_package();
+    let mut bytes = Vec::new();
+    package.write_to(&mut bytes).unwrap();
+    bytes
+}
 
 fn fixture(name: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -176,7 +197,7 @@ fn writer_document(build: impl FnOnce(&mut Builder)) -> Vec<u8> {
 
 /// Rewrite the `WordDocument` stream inside a DOC package.
 fn edit_word_stream(bytes: &[u8], edit: impl FnOnce(&mut Vec<u8>)) -> Vec<u8> {
-    let mut package = PackageEditor::open(bytes.to_vec(), Targets::default(), Limits::default())
+    let mut package = open_object(bytes.to_vec(), Targets::default(), Limits::default())
         .expect("fixture package");
     let word_path = ["WordDocument".to_string()];
     let mut word = package
@@ -187,7 +208,7 @@ fn edit_word_stream(bytes: &[u8], edit: impl FnOnce(&mut Vec<u8>)) -> Vec<u8> {
     package
         .put_stream(&word_path, word)
         .expect("edited WordDocument stream");
-    package.finish().expect("edited package")
+    object_bytes(&package)
 }
 
 /// Point one FIB table entry at a one-byte range, which every auxiliary
@@ -338,7 +359,7 @@ fn a_malformed_revision_author_table_does_not_cascade() {
 fn stshif_reserved_bytes_are_ignored_and_recorded() {
     let bytes = writer_document(|_| {});
     let mut package =
-        PackageEditor::open(bytes, Targets::default(), Limits::default()).expect("fixture package");
+        open_object(bytes, Targets::default(), Limits::default()).expect("fixture package");
     let word_path = ["WordDocument".to_string()];
     let word = package
         .stream(&word_path)
@@ -361,7 +382,7 @@ fn stshif_reserved_bytes_are_ignored_and_recorded() {
     package
         .put_stream(&table_path, table)
         .expect("edited table stream");
-    let bytes = package.finish().expect("edited package");
+    let bytes = object_bytes(&package);
 
     let document = open_degraded(bytes);
     let stylesheet = document.stylesheet().expect("stylesheet parses");
@@ -416,7 +437,7 @@ fn stylesheet_framing_stays_fatal() {
 /// the table stream and the stylesheet's offset within it.
 fn edit_stylesheet(bytes: Vec<u8>, edit: impl FnOnce(&mut [u8], usize)) -> Vec<u8> {
     let mut package =
-        PackageEditor::open(bytes, Targets::default(), Limits::default()).expect("fixture package");
+        open_object(bytes, Targets::default(), Limits::default()).expect("fixture package");
     let word = package
         .stream(&["WordDocument".to_string()])
         .expect("WordDocument stream")
@@ -434,7 +455,7 @@ fn edit_stylesheet(bytes: Vec<u8>, edit: impl FnOnce(&mut [u8], usize)) -> Vec<u
     package
         .put_stream(&table_path, table)
         .expect("edited table stream");
-    package.finish().expect("edited package")
+    object_bytes(&package)
 }
 
 /// Offset of the first style record (`STD`, istd 0) within the table stream.
@@ -486,7 +507,7 @@ fn reserved_grfstd_bits_are_ignored_and_recorded() {
 /// `WordDocument` stream (for FIB pointers) and the table stream.
 fn edit_table_stream(bytes: Vec<u8>, edit: impl FnOnce(&[u8], &mut [u8])) -> Vec<u8> {
     let mut package =
-        PackageEditor::open(bytes, Targets::default(), Limits::default()).expect("fixture package");
+        open_object(bytes, Targets::default(), Limits::default()).expect("fixture package");
     let word = package
         .stream(&["WordDocument".to_string()])
         .expect("WordDocument stream")
@@ -502,7 +523,7 @@ fn edit_table_stream(bytes: Vec<u8>, edit: impl FnOnce(&[u8], &mut [u8])) -> Vec
     package
         .put_stream(&table_path, table)
         .expect("edited table stream");
-    package.finish().expect("edited package")
+    object_bytes(&package)
 }
 
 /// The table-stream offset stored for one FIB `rgFcLcb` pointer.
@@ -702,7 +723,7 @@ fn unused_tc80_encodings_are_repaired_per_cell() {
 /// FIB pointer `index` (12 = `PlcfBteChpx`, 13 = `PlcfBtePapx`), plus that
 /// pointer's table-stream offset.
 fn first_bin_table_page(bytes: &[u8], index: usize) -> (usize, usize) {
-    let package = PackageEditor::open(bytes.to_vec(), Targets::default(), Limits::default())
+    let package = open_object(bytes.to_vec(), Targets::default(), Limits::default())
         .expect("fixture package");
     let word = package
         .stream(&["WordDocument".to_string()])
@@ -908,11 +929,11 @@ fn an_unresolvable_piece_modifier_is_ignored_and_recorded() {
 fn container_repairs_join_the_document_report() {
     let clean = writer_document(|_| {});
     let mut package =
-        PackageEditor::open(clean, Targets::default(), Limits::default()).expect("fixture package");
+        open_object(clean, Targets::default(), Limits::default()).expect("fixture package");
     package
         .add_stream(vec!["LeniencyProbe".to_string()], vec![0xAB; 5000])
         .expect("probe stream");
-    let with_probe = package.finish().expect("package with probe");
+    let with_probe = object_bytes(&package);
 
     let conformant = open_degraded(with_probe.clone());
     assert!(
@@ -1081,7 +1102,7 @@ fn property_set_repairs_join_the_document_report() {
     assert!(open_degraded(clean.clone()).tolerance_report().is_clean());
 
     let mut package =
-        PackageEditor::open(clean, Targets::default(), Limits::default()).expect("fixture package");
+        open_object(clean, Targets::default(), Limits::default()).expect("fixture package");
     let path = vec!["\u{5}SummaryInformation".to_string()];
     let stream = summary_information_with_unpaired_surrogate();
     if package.stream(&path).is_some() {
@@ -1089,7 +1110,7 @@ fn property_set_repairs_join_the_document_report() {
     } else {
         package.add_stream(path, stream).expect("summary stream");
     }
-    let bytes = package.finish().expect("package with lossy metadata");
+    let bytes = object_bytes(&package);
 
     let document = open_degraded(bytes.clone());
     assert!(document.text().unwrap().contains("Body text"));

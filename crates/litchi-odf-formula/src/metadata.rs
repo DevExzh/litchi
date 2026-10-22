@@ -83,7 +83,12 @@ impl crate::Package {
         if !owned.has_file("meta.xml")? {
             return Ok(None);
         }
-        let meta = litchi_odf_common::core::Meta::from_vec(owned.get_file("meta.xml")?)?;
+        // Formula owners retain no raw XML policy; meta.xml is admitted under
+        // the documented owner default.
+        let meta = litchi_odf_common::core::Meta::from_vec(
+            owned.get_file("meta.xml")?,
+            litchi_odf_common::XmlStreamLimits::owner_default_value(),
+        )?;
         Ok(Some(meta.try_extract_metadata()?))
     }
 }

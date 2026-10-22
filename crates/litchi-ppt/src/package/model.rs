@@ -605,6 +605,8 @@ pub enum Error {
     Io(io::Error),
     /// OLE file error
     Ole(OleError),
+    /// Shared OLE object or Property Set error with typed classification.
+    Object(litchi_ole_common::Error),
     /// Checked `OfficeArt` parsing or validation error.
     OfficeArt(litchi_odraw::Error),
     /// Host-neutral Office Graph parsing or validation error.
@@ -658,6 +660,7 @@ impl std::fmt::Debug for Error {
             Self::Authoring(_) => formatter.write_str("Error::Authoring(..)"),
             Self::Io(error) => formatter.debug_tuple("Error::Io").field(error).finish(),
             Self::Ole(error) => formatter.debug_tuple("Error::Ole").field(error).finish(),
+            Self::Object(error) => formatter.debug_tuple("Error::Object").field(error).finish(),
             Self::OfficeArt(error) => formatter
                 .debug_tuple("Error::OfficeArt")
                 .field(error)
@@ -736,6 +739,12 @@ impl From<OleError> for Error {
     }
 }
 
+impl From<litchi_ole_common::Error> for Error {
+    fn from(error: litchi_ole_common::Error) -> Self {
+        Self::Object(error)
+    }
+}
+
 impl From<litchi_odraw::Error> for Error {
     fn from(err: litchi_odraw::Error) -> Self {
         Error::OfficeArt(err)
@@ -754,6 +763,7 @@ impl std::fmt::Display for Error {
             Error::Authoring(_) => f.write_str("PPT authoring failed"),
             Error::Io(e) => write!(f, "IO error: {e}"),
             Error::Ole(e) => write!(f, "OLE error: {e}"),
+            Error::Object(e) => write!(f, "OLE object error: {e}"),
             Error::OfficeArt(e) => write!(f, "OfficeArt error: {e}"),
             Error::Graph(e) => write!(f, "Office Graph error: {e}"),
             Error::InvalidFormat(s) => write!(f, "Invalid format: {s}"),
@@ -801,6 +811,7 @@ impl std::error::Error for Error {
             Self::Authoring(error) => Some(error),
             Self::Io(error) => Some(error),
             Self::Ole(error) => Some(error),
+            Self::Object(error) => Some(error),
             Self::OfficeArt(error) => Some(error),
             Self::Graph(error) => Some(error),
             Self::InvalidFormat(_)
@@ -862,6 +873,7 @@ impl From<Error> for litchi_core::Error {
         match err {
             Error::Io(e) => litchi_core::Error::Io(e),
             Error::Ole(ole_err) => litchi_core::Error::from(ole_err),
+            Error::Object(error) => litchi_core::Error::from(error),
             Error::OfficeArt(error) => {
                 litchi_core::Error::CorruptedFile(format!("Invalid OfficeArt data: {error}"))
             },

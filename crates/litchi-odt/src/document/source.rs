@@ -23,7 +23,9 @@ use litchi_core::FileSource;
 use litchi_core::{Error, Metadata, ReadAt, Result, SourceVersion};
 use litchi_odf_common::core::{Content, Meta, SourceBackedPackage, Styles};
 use litchi_odf_common::package::{is_media_path, resolve_package_path};
-use litchi_odf_common::{Error as OdfError, OpenOptions, SemanticLimitKind, SemanticLimits};
+use litchi_odf_common::{
+    Error as OdfError, OpenOptions, SemanticLimitKind, SemanticLimits, XmlStreamLimits,
+};
 use zeroize::Zeroizing;
 
 use super::codec::parse_hyperlinks;
@@ -58,6 +60,8 @@ pub struct SourceBackedDocument {
     text_cache: OnceLock<Option<String>>,
     /// Package repairs followed by the content repairs of the open.
     tolerance: litchi_odf_common::leniency::ToleranceReport,
+    /// The caller-selected raw XML policy retained by this source owner.
+    xml_limits: XmlStreamLimits,
 }
 
 impl fmt::Debug for SourceBackedDocument {
@@ -152,7 +156,12 @@ impl SourceBackedDocument {
         options: OpenOptions,
     ) -> std::result::Result<Self, OdfError> {
         let package = SourceBackedPackage::from_read_at_with_options(Arc::clone(&source), options)?;
-        Self::from_package(source, package, options.semantic_limits_value())
+        Self::from_package(
+            source,
+            package,
+            options.semantic_limits_value(),
+            options.xml_limits_value(),
+        )
     }
 
     /// Open a password-protected ODT from a caller-provided positional source.
@@ -186,7 +195,12 @@ impl SourceBackedDocument {
             std::mem::take(&mut *password),
             options,
         )?;
-        Self::from_package(source, package, options.semantic_limits_value())
+        Self::from_package(
+            source,
+            package,
+            options.semantic_limits_value(),
+            options.xml_limits_value(),
+        )
     }
 
     /// Adopt an already validated positional ODF package without rebuilding
@@ -199,13 +213,19 @@ impl SourceBackedDocument {
         package: SourceBackedPackage,
     ) -> std::result::Result<Self, OdfError> {
         let source = package.source_arc();
-        Self::from_package(source, package, SemanticLimits::DEFAULT)
+        Self::from_package(
+            source,
+            package,
+            SemanticLimits::DEFAULT,
+            XmlStreamLimits::owner_default_value(),
+        )
     }
 
     fn from_package(
         source: Arc<dyn ReadAt>,
         package: SourceBackedPackage,
         limits: SemanticLimits,
+        xml_limits: XmlStreamLimits,
     ) -> std::result::Result<Self, OdfError> {
         let source_version = package.source_version()?;
         let parsed = (|| -> std::result::Result<_, OdfError> {
@@ -234,17 +254,21 @@ impl SourceBackedDocument {
                     0,
                 );
             }
-            let content = Content::from_vec(content_bytes)?;
+            let content = Content::from_vec(content_bytes, limits)?;
             // One fused tokenization validates the content structure and
             // collects the automatic styles; a validation error returns
             // here, before styles.xml is fetched, exactly as the historical
             // first pass early-returned.
-            let content_styles = super::open_parse::OpenParse::run(content.xml_content())?;
+            let content_styles = super::open_parse::OpenParse::run_with_xml_limits(
+                content.xml_content(),
+                xml_limits,
+            )?;
             limits.check(SemanticLimitKind::Units, content_styles.units())?;
 
             let styles = if package.has_file(crate::constants::ODF_STYLES)? {
                 Some(Styles::from_vec(
                     package.get_file(crate::constants::ODF_STYLES)?,
+                    limits,
                 )?)
             } else {
                 None
@@ -256,6 +280,7 @@ impl SourceBackedDocument {
             let meta = if package.has_file(crate::constants::ODF_META)? {
                 Some(Meta::from_vec(
                     package.get_file(crate::constants::ODF_META)?,
+                    xml_limits,
                 )?)
             } else {
                 None
@@ -284,6 +309,7 @@ impl SourceBackedDocument {
             text_queries: AtomicUsize::new(0),
             text_cache: OnceLock::new(),
             tolerance,
+            xml_limits,
         })
     }
 
@@ -352,7 +378,7 @@ impl SourceBackedDocument {
             if let Some(styles) = self.styles.as_ref().map(Styles::xml_content) {
                 parts.push((styles, crate::MetadataPart::Styles));
             }
-            crate::content_metadata::parse_parts(&parts)
+            crate::content_metadata::parse_parts_with_xml_limits(&parts, self.xml_limits)
         };
         prefer_current(self.source.as_ref(), self.source_version, result)
     }
@@ -361,7 +387,10 @@ impl SourceBackedDocument {
     /// source package.
     pub fn xforms_models(&self) -> Result<Vec<crate::xforms::Model>> {
         self.check_source()?;
-        let result = crate::xforms::parse_models(self.content.xml_content());
+        let result = crate::xforms::parse_models_with_xml_limits(
+            self.content.xml_content(),
+            self.xml_limits,
+        );
         prefer_current(self.source.as_ref(), self.source_version, result)
     }
 
@@ -725,7 +754,14 @@ impl SourceBackedDocument {
         let result = self
             .package
             .materialize()
-            .and_then(super::Document::from_owned_package)
+            .and_then(|package| {
+                super::Document::from_owned_package_with_limits(
+                    package,
+                    SemanticLimits::DEFAULT,
+                    self.xml_limits,
+                )
+                .map_err(Error::from)
+            })
             .map(crate::Package::from_parsed);
         prefer_current(self.source.as_ref(), self.source_version, result)
     }
@@ -742,7 +778,14 @@ impl SourceBackedDocument {
         let result = self
             .package
             .materialize()
-            .and_then(super::Document::from_owned_package)
+            .and_then(|package| {
+                super::Document::from_owned_package_with_limits(
+                    package,
+                    SemanticLimits::DEFAULT,
+                    self.xml_limits,
+                )
+                .map_err(Error::from)
+            })
             .map(crate::Package::from_parsed);
         prefer_current(source.as_ref(), source_version, result)
     }

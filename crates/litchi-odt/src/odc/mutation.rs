@@ -277,7 +277,7 @@ impl Document {
     }
 
     fn commit_chart_xml(&mut self, xml: String) -> Result<()> {
-        let parsed = read(&xml)?;
+        let parsed = read(&xml, self.package.xml_limits_value())?;
         scan_plot(&xml)?;
         self.package.replace_content_xml(xml)?;
         self.chart = parsed;

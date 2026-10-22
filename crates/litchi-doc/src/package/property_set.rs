@@ -17,7 +17,7 @@ use super::{Error as PackageError, Result as PackageResult};
 use crate::parts::fib::FileInformationBlock;
 use crate::parts::protection::{EditProtection, ProtectionPolicy, classify};
 use crate::user_defined_hyperlinks::{Limits, MutationError, UserDefinedHyperlinks};
-use litchi_cfb::{OleError, OleFile};
+use litchi_cfb::{OleError, OleFile, OleFileLimits};
 use litchi_ole_common::property_set::{
     self, Binding, CodePage, PropertySetReader, Section, Stream, USER_DEFINED_PROPERTIES_FMTID,
 };
@@ -142,7 +142,7 @@ impl Staging {
         source: Snapshot,
         protection_policy: ProtectionPolicy,
     ) -> PackageResult<Self> {
-        let editor = property_set::Edit::new(source.bytes.to_vec())?;
+        let editor = property_set::Edit::new(source.bytes.to_vec(), OleFileLimits::default())?;
         Ok(Self {
             source,
             editor,
@@ -327,7 +327,7 @@ impl Staging {
     /// Applies a generic user-defined property-section edit.
     pub(crate) fn edit_user_defined_properties<F>(&mut self, edit: F) -> PackageResult<bool>
     where
-        F: FnOnce(&mut Section) -> std::result::Result<(), OleError>,
+        F: FnOnce(&mut Section) -> std::result::Result<(), litchi_ole_common::Error>,
     {
         let source = self.editor.property_set(Binding::UserDefinedProperties)?;
         let mut candidate = source
@@ -554,7 +554,7 @@ impl Edit {
     /// Returns an error when the edit or the staged property set is invalid.
     pub fn edit_user_defined_properties<F>(&mut self, edit: F) -> Result<bool>
     where
-        F: FnOnce(&mut Section) -> std::result::Result<(), OleError>,
+        F: FnOnce(&mut Section) -> std::result::Result<(), litchi_ole_common::Error>,
     {
         Ok(self.inner.edit_user_defined_properties(edit)?)
     }
@@ -696,7 +696,7 @@ fn read_stream(bytes: &[u8], binding: Binding) -> PackageResult<Option<Stream>> 
     let mut ole = OleFile::open(Cursor::new(bytes))?;
     match ole.property_set(binding) {
         Ok(stream) => Ok(Some(stream)),
-        Err(OleError::StreamNotFound) => Ok(None),
+        Err(litchi_ole_common::Error::Cfb(OleError::StreamNotFound)) => Ok(None),
         Err(error) => Err(error.into()),
     }
 }

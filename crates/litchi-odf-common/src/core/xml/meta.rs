@@ -1,6 +1,7 @@
 //! `meta.xml` storage and metadata projection.
 
 use super::XmlPart;
+use crate::core::XmlStreamLimits;
 use litchi_core::Result;
 
 /// Parsed `meta.xml`.
@@ -10,25 +11,35 @@ pub struct Meta {
 }
 
 impl Meta {
-    /// Parse `meta.xml` from bytes.
+    /// Copy `meta.xml` admitted under the raw policy's input-byte bound.
     ///
     /// # Errors
     ///
-    /// Returns an error when the bytes are not valid UTF-8.
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
+    /// Returns [`LimitKind::RawXml`](crate::LimitKind::RawXml) when the part exceeds the bound, and an invalid-format
+    /// error when it is not UTF-8.
+    pub fn from_bytes(
+        bytes: &[u8],
+        limits: XmlStreamLimits,
+    ) -> std::result::Result<Self, crate::Error> {
+        super::part::admit_raw(bytes.len(), limits)?;
         Ok(Self {
-            xml: XmlPart::from_bytes(bytes)?,
+            xml: XmlPart::copy(bytes)?,
         })
     }
 
-    /// Parse `meta.xml` while consuming owned bytes.
+    /// Adopt owned `meta.xml` bytes admitted under the raw policy's input-byte bound, without copying
+    /// the buffer.
     ///
     /// # Errors
     ///
-    /// Returns an error when the bytes are not valid UTF-8.
-    pub fn from_vec(bytes: Vec<u8>) -> Result<Self> {
+    /// As [`Self::from_bytes`].
+    pub fn from_vec(
+        bytes: Vec<u8>,
+        limits: XmlStreamLimits,
+    ) -> std::result::Result<Self, crate::Error> {
+        super::part::admit_raw(bytes.len(), limits)?;
         Ok(Self {
-            xml: XmlPart::from_vec(bytes)?,
+            xml: XmlPart::adopt(bytes)?,
         })
     }
 

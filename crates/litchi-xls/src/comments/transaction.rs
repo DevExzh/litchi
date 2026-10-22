@@ -20,7 +20,7 @@ use litchi_cfb::{
 use litchi_core::binary;
 use litchi_core::edit::RefusalKind;
 use litchi_core::{ReadAt, SourceVersion};
-use litchi_ole_common::object::{Edit as PackageEditor, Limits, Targets};
+use litchi_ole_common::object::{Limits, OpenOptions, Package as ObjectPackage, Targets};
 use litchi_ole_common::source_backed_overlay::SourceBackedOverlayPublisher;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt;
@@ -152,18 +152,21 @@ impl Snapshot {
     /// Returns a package, workbook, comment-linkage, drawing-ambiguity, or
     /// finite-bound error before publishing the snapshot.
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        let package = PackageEditor::open(bytes, Targets::default(), Limits::default())?;
+        let package = ObjectPackage::open_with_options(
+            bytes,
+            OpenOptions::new()
+                .targets(Targets::default())
+                .limits(Limits::default()),
+        )?;
         Self::from_package(package)
     }
 
-    fn from_package(package: PackageEditor) -> Result<Self> {
-        Self::open_package(package, None)
+    fn from_package(package: ObjectPackage) -> Result<Self> {
+        Self::open_package(package)
     }
 
-    /// Opens a captured package. `rendered` is the artifact an edit's package
-    /// publication already rendered and validated for this exact editor
-    /// state; without it the editor is finished here.
-    fn open_package(package: PackageEditor, rendered: Option<Vec<u8>>) -> Result<Self> {
+    /// Opens a captured, already-published package.
+    fn open_package(package: ObjectPackage) -> Result<Self> {
         let workbook_path = [vec!["Workbook".to_string()], vec!["Book".to_string()]]
             .into_iter()
             .find(|path| package.stream(path).is_some())
@@ -173,10 +176,7 @@ impl Snapshot {
         let workbook_stream = package
             .stream_shared(&workbook_path)
             .ok_or_else(|| Error::InvalidData("selected XLS Workbook stream disappeared".into()))?;
-        let bytes = match rendered {
-            Some(rendered) => rendered,
-            None => package.finish()?,
-        };
+        let bytes = package.source_shared();
         // The complete reader's validation-only mode: every record is
         // validated as `Reader::new` validates it; no cell is decoded, and
         // no cell is read here.
@@ -184,7 +184,7 @@ impl Snapshot {
         let sheets = parse_inventory(&workbook_stream, &workbook)?;
         Ok(Self {
             inner: Arc::new(Inner {
-                bytes: Arc::from(bytes),
+                bytes: Arc::from(bytes.as_slice()),
                 workbook_path,
                 workbook_stream,
                 sheets,
@@ -576,23 +576,15 @@ impl Edit {
             &replacements,
         )?;
 
-        let mut package = PackageEditor::open(
+        let package = ObjectPackage::open_with_options(
             self.source.inner.bytes.to_vec(),
-            Targets::default(),
-            Limits::default(),
+            OpenOptions::new()
+                .targets(Targets::default())
+                .limits(Limits::default()),
         )?;
-        // Publish the rendering the package publication already validated
-        // instead of rendering the same editor state a second time.
-        let rendered = package.put_stream_shared_with_rendered(
-            &self.source.inner.workbook_path,
-            Arc::from(workbook),
-        )?;
-        debug_assert_eq!(
-            package.clone().finish().ok().as_deref(),
-            Some(rendered.as_slice()),
-            "a fresh render of the committed editor reproduces its validated rendering"
-        );
-        let snapshot = Snapshot::open_package(package, Some(rendered))?;
+        let mut editor = package.edit()?;
+        editor.put_stream_shared(&self.source.inner.workbook_path, Arc::from(workbook))?;
+        let snapshot = Snapshot::open_package(editor.commit()?.into_package())?;
         verify_readback(&snapshot, &self.source, &effective)?;
         let mut operations = Vec::new();
         operations

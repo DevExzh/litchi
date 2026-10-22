@@ -1,0 +1,156 @@
+{
+  "schema": "litchi.unified-ops.integration-validation.v1",
+  "base": "532cd8634b786827f1a3191f21ce6bc4889a2e69",
+  "incoming": "8d1199f45ed5e3e5e70d27fbbfc75807d169e132",
+  "status": "Compilation and consumer integration checks passed; semantic tests, final gate and native qualification remain required.",
+  "history_check": {
+    "head": "8d1199f45ed5e3e5e70d27fbbfc75807d169e132",
+    "incoming_commits": 88,
+    "pre_rewrite_matches": []
+  },
+  "runs": [
+    {
+      "run": "w5-odf-assembly-v1",
+      "checks": [
+        {
+          "command": [
+            "cargo",
+            "check",
+            "--offline",
+            "--locked",
+            "--workspace",
+            "--all-targets",
+            "--all-features"
+          ],
+          "exit": 0,
+          "seconds": 1033.7113673120039,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/w5-odf-assembly-v1/check-0.log",
+          "bytes": 11924,
+          "sha256": "bd670126efac25084383dee86ee8475085b3ed5c95cfda52de8bc224ca5145da"
+        },
+        {
+          "command": [
+            "cargo",
+            "check",
+            "--offline",
+            "--locked",
+            "--manifest-path",
+            "tools/perf-baseline/Cargo.toml",
+            "--all-targets",
+            "--all-features"
+          ],
+          "exit": 101,
+          "seconds": 152.57224710599985,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/w5-odf-assembly-v1/check-1.log",
+          "bytes": 6070,
+          "sha256": "f3e0b51178a88a8bf7bf77451b6e2ec88faba76d2a7663796cbaf6131ea7af4b"
+        }
+      ]
+    },
+    {
+      "run": "w5-odf-consumers-v2",
+      "checks": [
+        {
+          "command": [
+            "cargo",
+            "check",
+            "--offline",
+            "--locked",
+            "--manifest-path",
+            "tools/perf-baseline/Cargo.toml",
+            "--all-targets",
+            "--all-features"
+          ],
+          "exit": 101,
+          "seconds": 31.516462350962684,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/w5-odf-consumers-v2/check-0.log",
+          "bytes": 1158,
+          "sha256": "8a85a05c54d067daf56f6051afef7f6d26dc0f41f31296058b8586541c18ad6e"
+        }
+      ]
+    },
+    {
+      "run": "w5-odf-consumers-v3",
+      "checks": [
+        {
+          "command": [
+            "cargo",
+            "check",
+            "--offline",
+            "--locked",
+            "--manifest-path",
+            "tools/perf-baseline/Cargo.toml",
+            "--all-targets",
+            "--all-features"
+          ],
+          "exit": 101,
+          "seconds": 33.70824678998906,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/w5-odf-consumers-v3/check-0.log",
+          "bytes": 2022,
+          "sha256": "c923c7af359868f53a5ef51534f8506b39d7cad22aa85385fa4883a6fd7b81aa"
+        }
+      ]
+    },
+    {
+      "run": "w5-odf-consumers-v4",
+      "checks": [
+        {
+          "command": [
+            "cargo",
+            "check",
+            "--offline",
+            "--locked",
+            "--manifest-path",
+            "tools/perf-baseline/Cargo.toml",
+            "--all-targets",
+            "--all-features"
+          ],
+          "exit": 0,
+          "seconds": 50.59070880699437,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/w5-odf-consumers-v4/check-0.log",
+          "bytes": 195,
+          "sha256": "ee189f4604a004a140195e6e5dc1fa3a66cfb05565d5838028e0107482672061"
+        },
+        {
+          "command": [
+            "cargo",
+            "check",
+            "--offline",
+            "--locked",
+            "--manifest-path",
+            "tools/native-resave/Cargo.toml",
+            "--all-targets"
+          ],
+          "exit": 0,
+          "seconds": 8.368898442015052,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/w5-odf-consumers-v4/check-1.log",
+          "bytes": 1395,
+          "sha256": "8124df3fc075e01a4d728fa995d9bbb91107375ce4957370f9426260ac172277"
+        },
+        {
+          "command": [
+            "python3",
+            "tools/unified_bench_matrix.py",
+            "--check"
+          ],
+          "exit": 0,
+          "seconds": 4.846441624104045,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/w5-odf-consumers-v4/check-2.log",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "command": [
+            "python3",
+            "tools/check_crate_boundaries.py"
+          ],
+          "exit": 0,
+          "seconds": 405.35560751799494,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/w5-odf-consumers-v4/check-3.log",
+          "bytes": 565,
+          "sha256": "e302003e0f20687b6aac64aff19a826e6fd062e168a7ed12a3a2ecf1ddd75334"
+        }
+      ]
+    }
+  ]
+}

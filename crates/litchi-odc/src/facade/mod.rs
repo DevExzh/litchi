@@ -27,7 +27,10 @@ struct State {
 
 impl Chart {
     fn from_package(package: crate::package::Snapshot) -> Result<Self> {
-        let chart = read(package.content_xml())?;
+        let chart = read(
+            package.content_xml(),
+            package.limits().options().xml_limits_value(),
+        )?;
         Ok(Self(Arc::new(State { package, chart })))
     }
 

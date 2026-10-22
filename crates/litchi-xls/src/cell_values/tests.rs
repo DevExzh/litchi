@@ -7,9 +7,13 @@
 use super::*;
 use litchi_cfb::{
     OleFile, OleFileLimits, OleWriter, OutputProgress, OverlaySourceMode, SharedOleFile,
+    SharedOleFileLimits,
 };
 use std::io::Write;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{
+    Arc,
+    atomic::{AtomicU64, Ordering},
+};
 
 fn package() -> Vec<u8> {
     let mut writer = crate::Builder::new();
@@ -24,12 +28,19 @@ fn package() -> Vec<u8> {
     writer.write_formula(sheet, 8, 0, "1+1").unwrap();
     let mut output = Cursor::new(Vec::new());
     writer.build().unwrap().write_to(&mut output).unwrap();
-    let mut package =
-        PackageEditor::open(output.into_inner(), Targets::default(), Limits::default()).unwrap();
+    let mut package = ObjectPackage::open_with_options(
+        output.into_inner(),
+        OpenOptions::new()
+            .targets(Targets::default())
+            .limits(Limits::default()),
+    )
+    .unwrap()
+    .edit()
+    .unwrap();
     package
         .add_stream(vec!["Opaque".to_string()], b"untouched".to_vec())
         .unwrap();
-    package.finish().unwrap()
+    crate::scoped::object_editor_bytes(&package).unwrap()
 }
 
 fn protected_package(worksheet: bool) -> Vec<u8> {
@@ -371,11 +382,9 @@ fn directory_signature(
     bytes: &[u8],
 ) -> Vec<(u32, String, u8, String, u32, u32, u32, u32, u64, bool)> {
     let snapshot = Snapshot::from_bytes(bytes.to_vec(), Limits::default()).unwrap();
-    let shared = SharedOleFile::open_owned(
-        Arc::clone(&snapshot.inner.bytes),
-        snapshot.inner.source_version,
-    )
-    .unwrap();
+    let shared = snapshot
+        .open_shared_ole_file(SharedOleFileLimits::default())
+        .unwrap();
     shared
         .directory_entries()
         .map(|entry| {
@@ -488,10 +497,7 @@ fn retained_limits_survive_noop_changed_and_inverse_publication() {
     let source = Snapshot::from_bytes_with_cfb(bytes, limits, cfb_limits).unwrap();
 
     let noop = source.edit().commit().unwrap();
-    assert!(Arc::ptr_eq(
-        &source.inner.bytes,
-        &noop.package().inner.bytes
-    ));
+    assert!(source.inner.bytes.ptr_eq(&noop.package().inner.bytes));
     assert_eq!(noop.package().inner.limits, limits);
     assert_eq!(noop.package().inner.cfb_limits, cfb_limits);
 
@@ -1046,6 +1052,27 @@ fn source_backed_numeric_noop_reuses_identity_and_fingerprint() {
     );
     assert_eq!(commit.diagnostics().splice_count(), 0);
     assert_eq!(commit.diagnostics().replacement_bytes(), 0);
+}
+
+#[test]
+fn retag_source_version_reuses_unique_inner_and_copies_shared_inner() {
+    let source = Snapshot::from_bytes(package(), Limits::default()).unwrap();
+    let unique_inner = Arc::as_ptr(&source.inner);
+    let unique_version = SourceVersion::new(0x554e_4951, 1);
+    let retagged = source.retag_source_version(unique_version);
+    assert_eq!(Arc::as_ptr(&retagged.inner), unique_inner);
+    assert_eq!(retagged.source_version(), unique_version);
+
+    let shared = retagged.clone();
+    let shared_inner = Arc::as_ptr(&retagged.inner);
+    let copied_version = SourceVersion::new(0x5348_4152, 1);
+    let copied = retagged.retag_source_version(copied_version);
+    assert_ne!(Arc::as_ptr(&copied.inner), shared_inner);
+    assert_eq!(copied.source_version(), copied_version);
+    assert_eq!(shared.source_version(), unique_version);
+    assert_eq!(copied.bytes(), shared.bytes());
+    assert_eq!(copied.inner.limits, shared.inner.limits);
+    assert_eq!(copied.inner.cfb_limits, shared.inner.cfb_limits);
 }
 
 #[test]
@@ -1650,6 +1677,22 @@ fn rejected_and_noop_edits_are_failure_atomic() {
     assert!(patch.semantic().is_noop());
     assert_eq!(snapshot.bytes(), source.bytes());
     assert_eq!(diagnostics, Diagnostics::default());
+}
+
+#[test]
+fn snapshot_and_patch_share_artifact_vectors() {
+    let source = Snapshot::from_bytes(package(), Limits::default()).unwrap();
+    let mut edit = source.edit();
+    edit.set_number("Sheet1".into(), Reference::new(3, 2).unwrap(), 9.25)
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    let (target, patch) = commit.into_parts();
+
+    assert!(source.inner.bytes.ptr_eq(&patch.before));
+    assert!(target.inner.bytes.ptr_eq(&patch.after));
+    assert_eq!(patch.before(), source.bytes());
+    assert_eq!(patch.after(), target.bytes());
+    assert_eq!(patch.inverse().before(), target.bytes());
 }
 
 #[test]
@@ -3223,16 +3266,19 @@ fn source_backed_numeric_target_verification_agrees_with_an_independent_parse() 
 /// before it adopted the validated rendering: publish the stream through a
 /// fresh package editor, then finish (render) the editor a second time.
 fn rerendered_artifact(source: &Snapshot, workbook_stream: &[u8]) -> Vec<u8> {
-    let mut package = PackageEditor::open(
+    let mut package = ObjectPackage::open_with_options(
         source.bytes().to_vec(),
-        Targets::default(),
-        Limits::default(),
+        OpenOptions::new()
+            .targets(Targets::default())
+            .limits(Limits::default()),
     )
+    .unwrap()
+    .edit()
     .unwrap();
     package
         .put_stream_shared(&source.inner.workbook_path, Arc::from(workbook_stream))
         .unwrap();
-    package.finish().unwrap()
+    crate::scoped::object_editor_bytes(&package).unwrap()
 }
 
 /// The generic commit publishes the rendering its package publication
@@ -3366,6 +3412,21 @@ fn shared_ole_file_editor_matches_an_owned_byte_open() {
     assert_eq!(adopted.bytes(), owned.bytes());
     assert_eq!(adopted.worksheet_count(), owned.worksheet_count());
     assert_eq!(adopted.workbook_stream(), owned.workbook_stream());
+    assert!(matches!(&owned.inner.bytes, ArtifactBytes::Packed(_)));
+    assert!(matches!(&adopted.inner.bytes, ArtifactBytes::Shared(_)));
+
+    let mut edit = adopted.edit();
+    edit.set_number("Sheet1".into(), Reference::new(3, 2).unwrap(), 9.25)
+        .unwrap();
+    let commit = edit.commit_source_backed().unwrap();
+    assert!(matches!(
+        &commit.source().inner.bytes,
+        ArtifactBytes::Shared(_)
+    ));
+    assert!(matches!(
+        &commit.package().inner.bytes,
+        ArtifactBytes::Shared(_)
+    ));
 
     let length = u64::try_from(bytes.len()).unwrap();
     let tight = OleFileLimits::new(length - 1).unwrap();

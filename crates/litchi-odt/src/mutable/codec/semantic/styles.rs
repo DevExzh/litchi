@@ -101,7 +101,13 @@ impl MutableDocument {
     ) -> Result<crate::drawing::resources::gradient::Collection> {
         self.styles_xml.as_deref().map_or_else(
             || Ok(Default::default()),
-            crate::drawing::resources::gradient::parse_drawing_gradients,
+            |styles| {
+                crate::drawing::resources::gradient::parse_drawing_gradients(
+                    styles,
+                    self.xml_limits,
+                )
+                .map_err(litchi_core::Error::from)
+            },
         )
     }
 
@@ -112,7 +118,10 @@ impl MutableDocument {
     pub(crate) fn drawing_hatches(&self) -> Result<crate::drawing::resources::hatch::Collection> {
         self.styles_xml.as_deref().map_or_else(
             || Ok(Default::default()),
-            crate::drawing::resources::hatch::parse_drawing_hatches,
+            |styles| {
+                crate::drawing::resources::hatch::parse_drawing_hatches(styles, self.xml_limits)
+                    .map_err(litchi_core::Error::from)
+            },
         )
     }
 
@@ -125,7 +134,13 @@ impl MutableDocument {
     ) -> Result<crate::drawing::resources::stroke_dash::Collection> {
         self.styles_xml.as_deref().map_or_else(
             || Ok(Default::default()),
-            crate::drawing::resources::stroke_dash::parse_drawing_stroke_dashes,
+            |styles| {
+                crate::drawing::resources::stroke_dash::parse_drawing_stroke_dashes(
+                    styles,
+                    self.xml_limits,
+                )
+                .map_err(litchi_core::Error::from)
+            },
         )
     }
 
@@ -138,7 +153,13 @@ impl MutableDocument {
     ) -> Result<crate::drawing::resources::fill_image::Collection> {
         self.styles_xml.as_deref().map_or_else(
             || Ok(Default::default()),
-            crate::drawing::resources::fill_image::parse_drawing_fill_images,
+            |styles| {
+                crate::drawing::resources::fill_image::parse_drawing_fill_images(
+                    styles,
+                    self.xml_limits,
+                )
+                .map_err(litchi_core::Error::from)
+            },
         )
     }
 
@@ -149,7 +170,10 @@ impl MutableDocument {
     pub(crate) fn drawing_markers(&self) -> Result<crate::drawing::resources::marker::Collection> {
         self.styles_xml.as_deref().map_or_else(
             || Ok(Default::default()),
-            crate::drawing::resources::marker::parse_drawing_markers,
+            |styles| {
+                crate::drawing::resources::marker::parse_drawing_markers(styles, self.xml_limits)
+                    .map_err(litchi_core::Error::from)
+            },
         )
     }
 
@@ -162,7 +186,10 @@ impl MutableDocument {
     ) -> Result<crate::drawing::resources::opacity::Collection> {
         self.styles_xml.as_deref().map_or_else(
             || Ok(Default::default()),
-            crate::drawing::resources::opacity::parse_drawing_opacities,
+            |styles| {
+                crate::drawing::resources::opacity::parse_drawing_opacities(styles, self.xml_limits)
+                    .map_err(litchi_core::Error::from)
+            },
         )
     }
 
@@ -299,7 +326,12 @@ impl MutableDocument {
     ) -> Result<Option<crate::bibliography_configuration::Configuration>> {
         self.styles_xml.as_deref().map_or_else(
             || Ok(None),
-            crate::bibliography_configuration::parse_bibliography_configuration,
+            |styles| {
+                crate::bibliography_configuration::parse_bibliography_configuration_with_xml_limits(
+                    styles,
+                    self.xml_limits,
+                )
+            },
         )
     }
 
@@ -318,9 +350,10 @@ impl MutableDocument {
             .clone()
             .unwrap_or_else(Structure::default_styles_xml);
         self.styles_xml = Some(
-            crate::bibliography_configuration::set_bibliography_configuration_xml(
+            crate::bibliography_configuration::set_bibliography_configuration_xml_with_xml_limits(
                 &styles,
                 configuration,
+                self.xml_limits,
             )?,
         );
         Ok(old)
@@ -337,8 +370,12 @@ impl MutableDocument {
         let Some(styles) = self.styles_xml.as_deref() else {
             return Ok(None);
         };
-        self.styles_xml =
-            Some(crate::bibliography_configuration::remove_bibliography_configuration_xml(styles)?);
+        self.styles_xml = Some(
+            crate::bibliography_configuration::remove_bibliography_configuration_xml_with_xml_limits(
+                styles,
+                self.xml_limits,
+            )?,
+        );
         Ok(old)
     }
 
@@ -386,9 +423,10 @@ impl MutableDocument {
 
     /// Parse the document's master pages and current header/footer regions.
     pub(crate) fn master_pages(&self) -> Result<Vec<Master>> {
-        self.styles_xml
-            .as_deref()
-            .map_or_else(|| Ok(Vec::new()), read)
+        self.styles_xml.as_deref().map_or_else(
+            || Ok(Vec::new()),
+            |styles| read(styles, self.xml_limits).map_err(litchi_core::Error::from),
+        )
     }
 
     /// Parse automatic page layouts, their properties, and header/footer styles.
@@ -433,7 +471,7 @@ impl MutableDocument {
                 "document has no styles.xml layout owner to modify".to_string(),
             )
         })?;
-        let mut edit = crate::header_footer::Snapshot::parse(styles)?.edit();
+        let mut edit = crate::header_footer::Snapshot::parse(styles, self.xml_limits)?.edit();
         update(&mut edit)?;
         self.styles_xml = Some(edit.commit()?.into_snapshot().source_xml().to_owned());
         Ok(())
@@ -584,7 +622,7 @@ impl MutableDocument {
         let styles = self
             .styles_xml
             .get_or_insert_with(Structure::default_styles_xml);
-        *styles = add(styles, name, page_layout_name)?;
+        *styles = add(styles, name, page_layout_name, self.xml_limits)?;
         Ok(())
     }
 
@@ -594,7 +632,7 @@ impl MutableDocument {
         let styles = self
             .styles_xml
             .get_or_insert_with(Structure::default_styles_xml);
-        *styles = insert(styles, &fragment)?;
+        *styles = insert(styles, &fragment, self.xml_limits)?;
         Ok(())
     }
 
@@ -606,7 +644,7 @@ impl MutableDocument {
                 "document has no styles.xml master page to modify".to_string(),
             )
         })?;
-        self.styles_xml = Some(replace(styles, name, &fragment)?);
+        self.styles_xml = Some(replace(styles, name, &fragment, self.xml_limits)?);
         Ok(())
     }
 
@@ -617,7 +655,7 @@ impl MutableDocument {
                 "document has no styles.xml master page to modify".to_string(),
             )
         })?;
-        self.styles_xml = Some(remove(styles, name)?);
+        self.styles_xml = Some(remove(styles, name, self.xml_limits)?);
         Ok(())
     }
 
@@ -635,7 +673,13 @@ impl MutableDocument {
                 "document has no styles.xml master page to modify".to_string(),
             )
         })?;
-        self.styles_xml = Some(set_text(styles, master_page_name, kind, Some(text))?);
+        self.styles_xml = Some(set_text(
+            styles,
+            master_page_name,
+            kind,
+            Some(text),
+            self.xml_limits,
+        )?);
         Ok(())
     }
 
@@ -655,7 +699,13 @@ impl MutableDocument {
                 "document has no styles.xml master page to modify".to_string(),
             )
         })?;
-        self.styles_xml = Some(set_xml(styles, master_page_name, kind, xml)?);
+        self.styles_xml = Some(set_xml(
+            styles,
+            master_page_name,
+            kind,
+            xml,
+            self.xml_limits,
+        )?);
         Ok(())
     }
 
@@ -670,7 +720,13 @@ impl MutableDocument {
                 "document has no styles.xml master page to modify".to_string(),
             )
         })?;
-        self.styles_xml = Some(set_text(styles, master_page_name, kind, None)?);
+        self.styles_xml = Some(set_text(
+            styles,
+            master_page_name,
+            kind,
+            None,
+            self.xml_limits,
+        )?);
         Ok(())
     }
 }

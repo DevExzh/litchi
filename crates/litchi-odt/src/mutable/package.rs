@@ -57,6 +57,7 @@ impl MutableDocument {
             source_package,
             content_xml: Some(content_xml),
             pending_images: Vec::new(),
+            xml_limits: doc.transaction_xml_limits(),
             next_frame_number: 1,
         })
     }

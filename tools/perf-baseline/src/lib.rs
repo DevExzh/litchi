@@ -94,7 +94,8 @@ use litchi_core::{
 };
 use litchi_core::{OwnedSource, Position, Resource};
 use litchi_ole_common::object::{
-    Edit as OleObjectEditor, Limits as OleObjectLimits, Targets as OleObjectTargets,
+    Edit as OleObjectEditor, Limits as OleObjectLimits, OpenOptions as OleObjectOpenOptions,
+    Package as OleObjectPackage, Targets as OleObjectTargets,
 };
 use litchi_ooxml_common::xml::{
     OMML_NAMESPACE_URI, extract_omml_formulas, scan_omml_formula_ranges,
@@ -60153,9 +60154,9 @@ fn run_ole_common_one_edit_save(
         let replacement = OLE_COMMON_REPLACEMENT.to_vec();
         let targets = targets.clone();
         let started = Instant::now();
-        let mut editor = OleObjectEditor::open(source, targets, limits)?;
+        let mut editor = ole_common_open_editor(source, targets, limits)?;
         editor.put_stream(&path, replacement)?;
-        let output = editor.finish()?;
+        let output = ole_object_editor_bytes(editor)?;
         let duration = started.elapsed();
         if output != expected {
             return Err("OLE common edit/save output is not deterministic".into());
@@ -60189,7 +60190,7 @@ fn run_ole_common_open(
         let source = corpus.archive.clone();
         let targets = targets.clone();
         let started = Instant::now();
-        let editor = OleObjectEditor::open(source, targets, limits)?;
+        let editor = ole_common_open_editor(source, targets, limits)?;
         let duration = started.elapsed();
         std::hint::black_box(&editor);
         final_editor = Some(editor);
@@ -60213,17 +60214,17 @@ fn run_ole_common_put_stream_publish(
     let corpus = build_ole_common_corpus(corpus)?;
     let expected = ole_common_changed_output(&corpus)?;
     let path = vec![corpus.target_name.clone()];
-    let opened = OleObjectEditor::open(
+    let source = OleObjectPackage::open_with_options(
         corpus.archive.clone(),
-        OleObjectTargets::default(),
-        ole_common_limits(&corpus)?,
+        OleObjectOpenOptions::new()
+            .targets(OleObjectTargets::default())
+            .limits(ole_common_limits(&corpus)?),
     )?;
-    let source = opened.staged();
     let mut elapsed = Vec::with_capacity(samples);
     let mut final_editor = None;
 
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
-        let mut editor = source.edit();
+        let mut editor = source.edit()?;
         let replacement = OLE_COMMON_REPLACEMENT.to_vec();
         let started = Instant::now();
         editor.put_stream(&path, replacement)?;
@@ -60240,9 +60241,9 @@ fn run_ole_common_put_stream_publish(
         record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
     }
 
-    let output = final_editor
-        .ok_or("OLE common candidate publication produced no final editor")?
-        .finish()?;
+    let output = ole_object_editor_bytes(
+        final_editor.ok_or("OLE common candidate publication produced no final editor")?,
+    )?;
     if output != expected {
         return Err("OLE common candidate publication changed deterministic output".into());
     }
@@ -60263,20 +60264,20 @@ fn run_ole_common_finish_render(
     let corpus = build_ole_common_corpus(corpus)?;
     let expected = ole_common_changed_output(&corpus)?;
     let path = vec![corpus.target_name.clone()];
-    let mut editor = OleObjectEditor::open(
+    let mut editor = ole_common_open_editor(
         corpus.archive.clone(),
         OleObjectTargets::default(),
         ole_common_limits(&corpus)?,
     )?;
     editor.put_stream(&path, OLE_COMMON_REPLACEMENT.to_vec())?;
-    let changed = editor.staged();
+    let changed = editor.commit()?.into_package();
     let mut elapsed = Vec::with_capacity(samples);
     let mut final_output = None;
 
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
-        let editor = changed.edit();
+        let editor = changed.edit()?;
         let started = Instant::now();
-        let output = editor.finish()?;
+        let output = ole_object_editor_bytes(editor)?;
         let duration = started.elapsed();
         std::hint::black_box(&output);
         final_output = Some(output);
@@ -60325,17 +60326,36 @@ fn verify_ole_common_source_editor(
     Ok(())
 }
 
+fn ole_common_open_editor(
+    source: Vec<u8>,
+    targets: OleObjectTargets,
+    limits: OleObjectLimits,
+) -> Result<OleObjectEditor, Box<dyn Error>> {
+    Ok(OleObjectPackage::open_with_options(
+        source,
+        OleObjectOpenOptions::new().targets(targets).limits(limits),
+    )?
+    .edit()?)
+}
+
 fn ole_common_changed_output(corpus: &Corpus) -> Result<Vec<u8>, Box<dyn Error>> {
     let path = vec![corpus.target_name.clone()];
-    let mut editor = OleObjectEditor::open(
+    let mut editor = ole_common_open_editor(
         corpus.archive.clone(),
         OleObjectTargets::default(),
         ole_common_limits(corpus)?,
     )?;
     editor.put_stream(&path, OLE_COMMON_REPLACEMENT.to_vec())?;
-    let output = editor.finish()?;
+    let output = ole_object_editor_bytes(editor)?;
     verify_ole_common_changed_output(corpus, &output)?;
     Ok(output)
+}
+
+fn ole_object_editor_bytes(editor: OleObjectEditor) -> Result<Vec<u8>, Box<dyn Error>> {
+    let package = editor.commit()?.into_package();
+    let mut bytes = Vec::new();
+    package.write_to(&mut bytes)?;
+    Ok(bytes)
 }
 
 fn ole_common_limits(corpus: &Corpus) -> Result<OleObjectLimits, Box<dyn Error>> {

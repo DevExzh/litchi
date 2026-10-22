@@ -6,18 +6,20 @@ use super::{MAX_XML_BYTES, make_error};
 use crate::generic::FlatMutationBudget;
 use crate::variable_declaration::{Part, Scope};
 use litchi_core::Result;
+use litchi_odf_common::XmlStreamLimits;
 use std::collections::HashSet;
 
 #[cfg(test)]
 pub(crate) fn parse_auto_mark_file_parts(
     parts: &[(&str, Part)],
 ) -> Result<Vec<AlphabeticalIndexAutoMarkFile>> {
-    parse_auto_mark_file_parts_with_budget(parts, None)
+    parse_auto_mark_file_parts_with_budget_and_xml_limits(parts, None, XmlStreamLimits::default())
 }
 
-pub(crate) fn parse_auto_mark_file_parts_with_budget(
+pub(crate) fn parse_auto_mark_file_parts_with_budget_and_xml_limits(
     parts: &[(&str, Part)],
     budget: Option<&FlatMutationBudget>,
+    xml_limits: XmlStreamLimits,
 ) -> Result<Vec<AlphabeticalIndexAutoMarkFile>> {
     if let Some(budget) = budget {
         budget.check()?;
@@ -42,6 +44,7 @@ pub(crate) fn parse_auto_mark_file_parts_with_budget(
             &mut scopes,
             &mut aggregate,
             budget,
+            xml_limits,
         )?;
     }
     Ok(references)

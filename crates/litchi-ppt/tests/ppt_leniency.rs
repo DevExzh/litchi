@@ -15,6 +15,9 @@
 //! control must report nothing.
 
 use litchi_core::OwnedSource;
+use litchi_ole_common::object::{
+    Edit as ObjectEdit, Limits as ObjectLimits, OpenOptions, Package, Targets,
+};
 use litchi_ppt::shapes::ShapeEnum;
 use litchi_ppt::text_prop::parse_style_text_prop_atom_strict;
 use litchi_ppt::writer::Builder;
@@ -30,6 +33,20 @@ use std::sync::Arc;
 const STYLE_TEXT_PROP_HEADER: [u8; 4] = [0x00, 0x00, 0xA1, 0x0F];
 /// The text every fixture carries; the atom covers its length plus one.
 const TEXT: &str = "abcd";
+
+fn open_object(bytes: Vec<u8>, targets: Targets, limits: ObjectLimits) -> ObjectEdit {
+    Package::open_with_options(bytes, OpenOptions::new().targets(targets).limits(limits))
+        .unwrap()
+        .edit()
+        .unwrap()
+}
+
+fn object_bytes(editor: &ObjectEdit) -> Vec<u8> {
+    let package = editor.clone().commit().unwrap().into_package();
+    let mut bytes = Vec::new();
+    package.write_to(&mut bytes).unwrap();
+    bytes
+}
 
 /// A written presentation together with the location of its single
 /// `StyleTextPropAtom` payload.
@@ -1331,16 +1348,11 @@ fn cyclic_user_edit_chain_is_fatal_by_default_and_cut_when_opted_in() {
 
 /// `bytes` with a 5000-byte `LeniencyProbe` stream added at the root.
 fn with_probe(bytes: Vec<u8>) -> Vec<u8> {
-    let mut package = litchi_ole_common::object::Edit::open(
-        bytes,
-        litchi_ole_common::object::Targets::default(),
-        litchi_ole_common::object::Limits::default(),
-    )
-    .unwrap();
+    let mut package = open_object(bytes, Targets::default(), ObjectLimits::default());
     package
         .add_stream(vec!["LeniencyProbe".to_string()], vec![0xAB; 5000])
         .unwrap();
-    package.finish().unwrap()
+    object_bytes(&package)
 }
 
 /// Shrink the probe's declared size from 5000 to 4096 bytes, so its
@@ -1450,12 +1462,11 @@ fn summary_information_with_unpaired_surrogate() -> Vec<u8> {
 /// by the title's property identifier.
 #[test]
 fn property_set_repairs_join_the_open_time_report() {
-    let mut package = litchi_ole_common::object::Edit::open(
+    let mut package = open_object(
         Deck::new(2).bytes,
-        litchi_ole_common::object::Targets::default(),
-        litchi_ole_common::object::Limits::default(),
-    )
-    .unwrap();
+        Targets::default(),
+        ObjectLimits::default(),
+    );
     let path = vec!["\u{5}SummaryInformation".to_string()];
     let stream = summary_information_with_unpaired_surrogate();
     if package.stream(&path).is_some() {
@@ -1463,7 +1474,7 @@ fn property_set_repairs_join_the_open_time_report() {
     } else {
         package.add_stream(path, stream).unwrap();
     }
-    let bytes = package.finish().unwrap();
+    let bytes = object_bytes(&package);
 
     let expected = [open_time(
         Defect::PropertySet(litchi_ole_common::leniency::Defect::String(

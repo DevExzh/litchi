@@ -14,7 +14,9 @@ use super::validation;
 use crate::package::{Error as PackageError, Result};
 use crate::parts::fib::FileInformationBlock;
 use crate::parts::protection::{EditProtection, PackagePatch, ProtectionPolicy, classify};
-use litchi_ole_common::object::{Edit as ObjectEditor, Limits, Targets};
+use litchi_ole_common::object::{
+    Edit as ObjectEditor, Limits, OpenOptions, Package as ObjectPackage, Targets,
+};
 
 /// Immutable package bytes plus the decoded annotation-tag state.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -121,7 +123,13 @@ impl Editor {
         protection_policy: ProtectionPolicy,
     ) -> Result<Self> {
         let targets = Targets::new([]).map_err(PackageError::from)?;
-        let package = ObjectEditor::open(bytes, targets, limits).map_err(PackageError::from)?;
+        let package = ObjectPackage::open_with_options(
+            bytes,
+            OpenOptions::new().targets(targets).limits(limits),
+        )
+        .map_err(PackageError::from)?
+        .edit()
+        .map_err(PackageError::from)?;
         let word_path = vec!["WordDocument".to_owned()];
         let word = package
             .stream(&word_path)
@@ -232,7 +240,7 @@ impl Editor {
 
     /// Capture the current package as an immutable snapshot.
     pub(crate) fn snapshot(&self) -> Result<Snapshot> {
-        let bytes = self.package.clone().finish().map_err(PackageError::from)?;
+        let bytes = crate::package::object_edit_bytes(&self.package)?;
         Ok(Snapshot::new(bytes, self.tags.clone()))
     }
 
@@ -241,7 +249,7 @@ impl Editor {
         if self.changed {
             self.protection_policy.authorize(self.protection)?;
         }
-        self.package.finish().map_err(PackageError::from)
+        crate::package::object_edit_bytes(&self.package)
     }
 
     /// Commit semantic and byte-level reversible patches.

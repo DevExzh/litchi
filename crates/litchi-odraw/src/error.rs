@@ -5,6 +5,8 @@ use crate::record::RecordKind;
 /// The bounded traversal resource that was exhausted.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LimitKind {
+    /// Maximum body bytes accepted by one raw record.
+    RecordBytes,
     /// Maximum nested-container depth.
     Depth,
     /// Maximum number of visited records.
@@ -77,6 +79,8 @@ pub enum Error {
     ImageLimitExceeded {
         /// Resource whose ceiling was reached.
         limit: crate::image::LimitKind,
+        /// Observed resource size or count.
+        observed: u64,
         /// Configured maximum.
         maximum: u64,
     },
@@ -107,6 +111,8 @@ pub enum Error {
     InvalidLimit {
         /// Resource whose requested ceiling is unsafe.
         limit: LimitKind,
+        /// Requested ceiling.
+        value: u32,
         /// Largest accepted ceiling.
         maximum: u32,
     },
@@ -114,6 +120,8 @@ pub enum Error {
     LimitExceeded {
         /// Resource whose limit was reached.
         limit: LimitKind,
+        /// Observed resource size or count.
+        observed: u64,
         /// Configured maximum.
         maximum: u32,
     },
@@ -165,9 +173,13 @@ impl core::fmt::Display for Error {
                     "OfficeArt BLIP identifier {value} is outside 1..=4095"
                 )
             },
-            Self::ImageLimitExceeded { limit, maximum } => write!(
+            Self::ImageLimitExceeded {
+                limit,
+                observed,
+                maximum,
+            } => write!(
                 formatter,
-                "OfficeArt image {limit:?} limit of {maximum} exceeded"
+                "OfficeArt image {limit:?} observed {observed} exceeds {maximum}"
             ),
             Self::MissingDelayStore => {
                 write!(
@@ -193,12 +205,23 @@ impl core::fmt::Display for Error {
                     "unexpected OfficeArt top-level data at offset {offset}"
                 )
             },
-            Self::InvalidLimit { limit, maximum } => write!(
+            Self::InvalidLimit {
+                limit,
+                value,
+                maximum,
+            } => write!(
                 formatter,
-                "OfficeArt {limit:?} limit exceeds the safe maximum of {maximum}"
+                "OfficeArt {limit:?} limit {value} exceeds the safe maximum of {maximum}"
             ),
-            Self::LimitExceeded { limit, maximum } => {
-                write!(formatter, "OfficeArt {limit:?} limit of {maximum} exceeded")
+            Self::LimitExceeded {
+                limit,
+                observed,
+                maximum,
+            } => {
+                write!(
+                    formatter,
+                    "OfficeArt {limit:?} observed {observed} exceeds {maximum}"
+                )
             },
         }
     }

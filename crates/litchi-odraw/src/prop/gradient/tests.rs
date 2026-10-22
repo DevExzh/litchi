@@ -37,8 +37,8 @@ fn round_trips_typed_stops_and_retains_neighboring_opaque_properties() {
         ),
         Stop::new(ColorRef::from_raw(0x00FF_0000), Position::END),
     ];
-    let payload = encode(&authored).expect("encoded stops");
-    let parsed = parse_payload(&payload).expect("parsed stops");
+    let payload = encode(&authored, crate::Limits::default()).expect("encoded stops");
+    let parsed = parse_payload(&payload, crate::Limits::default()).expect("parsed stops");
 
     assert_eq!(parsed.payload(), payload.as_slice());
     assert_eq!(parsed.len(), authored.len());
@@ -46,8 +46,9 @@ fn round_trips_typed_stops_and_retains_neighboring_opaque_properties() {
 
     let opaque = [0xDE, 0xAD, 0xBE, 0xEF];
     let data = opt_record(&payload, &opaque);
-    let record = Record::from_parts(RecordKind::Opt, 3, 2, &data).expect("Opt record");
-    let properties = Props::parse(&record).expect("properties");
+    let record = Record::from_parts(RecordKind::Opt, 3, 2, &data, crate::Limits::default())
+        .expect("Opt record");
+    let properties = Props::parse(&record, crate::Limits::default()).expect("properties");
     let stops = properties
         .gradient_stops()
         .expect("gradient property")
@@ -61,15 +62,19 @@ fn round_trips_typed_stops_and_retains_neighboring_opaque_properties() {
 
 #[test]
 fn accepts_empty_and_boundary_positions() {
-    let empty = encode(&[]).expect("empty array");
-    assert!(parse_payload(&empty).expect("empty stops").is_empty());
+    let empty = encode(&[], crate::Limits::default()).expect("empty array");
+    assert!(
+        parse_payload(&empty, crate::Limits::default())
+            .expect("empty stops")
+            .is_empty()
+    );
 
     let stops = [
         Stop::new(ColorRef::from_raw(0), Position::START),
         Stop::new(ColorRef::from_raw(u32::MAX), Position::END),
     ];
-    let payload = encode(&stops).expect("boundary array");
-    let parsed = parse_payload(&payload).expect("stops");
+    let payload = encode(&stops, crate::Limits::default()).expect("boundary array");
+    let parsed = parse_payload(&payload, crate::Limits::default()).expect("stops");
     assert_eq!(parsed.get(0), Some(stops[0]));
     assert_eq!(parsed.get(1), Some(stops[1]));
 }
@@ -82,33 +87,39 @@ fn rejects_bad_width_range_order_and_amplification() {
     bad_width.extend_from_slice(&4_u16.to_le_bytes());
     bad_width.extend_from_slice(&[0; 4]);
     assert!(matches!(
-        parse_payload(&bad_width),
+        parse_payload(&bad_width, crate::Limits::default()),
         Err(Error::MalformedProperties {
             reason: "gradient stop array element size is not MSOSHADECOLOR"
         })
     ));
 
-    let mut out_of_range =
-        encode(&[Stop::new(ColorRef::from_raw(1), Position::START)]).expect("valid base");
+    let mut out_of_range = encode(
+        &[Stop::new(ColorRef::from_raw(1), Position::START)],
+        crate::Limits::default(),
+    )
+    .expect("valid base");
     out_of_range[10..14].copy_from_slice(&(-1_i32).to_le_bytes());
     assert!(matches!(
-        parse_payload(&out_of_range),
+        parse_payload(&out_of_range, crate::Limits::default()),
         Err(Error::MalformedProperties {
             reason: "gradient stop position is outside the inclusive 0..1 range"
         })
     ));
 
-    let mut duplicate = encode(&[
-        Stop::new(ColorRef::from_raw(1), Position::START),
-        Stop::new(
-            ColorRef::from_raw(2),
-            Position::new(1).expect("one fixed-point unit"),
-        ),
-    ])
+    let mut duplicate = encode(
+        &[
+            Stop::new(ColorRef::from_raw(1), Position::START),
+            Stop::new(
+                ColorRef::from_raw(2),
+                Position::new(1).expect("one fixed-point unit"),
+            ),
+        ],
+        crate::Limits::default(),
+    )
     .expect("valid base");
     duplicate[18..22].copy_from_slice(&0_i32.to_le_bytes());
     assert!(matches!(
-        parse_payload(&duplicate),
+        parse_payload(&duplicate, crate::Limits::default()),
         Err(Error::MalformedProperties {
             reason: "gradient stop positions are not strictly ascending"
         })
@@ -123,7 +134,7 @@ fn rejects_bad_width_range_order_and_amplification() {
     too_many.extend_from_slice(&8_u16.to_le_bytes());
     too_many.resize(6 + usize::from(count) * 8, 0);
     assert!(matches!(
-        parse_payload(&too_many),
+        parse_payload(&too_many, crate::Limits::default()),
         Err(Error::MalformedProperties {
             reason: "gradient stop count exceeds the safe bound"
         })
@@ -132,8 +143,9 @@ fn rejects_bad_width_range_order_and_amplification() {
     let mut simple = Vec::new();
     simple.extend_from_slice(&Id::FillShadeColors.raw().to_le_bytes());
     simple.extend_from_slice(&1_i32.to_le_bytes());
-    let record = Record::from_parts(RecordKind::Opt, 3, 1, &simple).expect("Opt record");
-    let properties = Props::parse(&record).expect("property table");
+    let record = Record::from_parts(RecordKind::Opt, 3, 1, &simple, crate::Limits::default())
+        .expect("Opt record");
+    let properties = Props::parse(&record, crate::Limits::default()).expect("property table");
     assert!(matches!(
         properties.gradient_stops(),
         Err(Error::MalformedProperties {

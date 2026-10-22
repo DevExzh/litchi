@@ -336,7 +336,11 @@ impl Document {
         self.state.styles.as_ref().map_or_else(
             || Ok(Default::default()),
             |styles| {
-                crate::drawing::resources::gradient::parse_drawing_gradients(styles.xml_content())
+                crate::drawing::resources::gradient::parse_drawing_gradients(
+                    styles.xml_content(),
+                    self.state.xml_limits,
+                )
+                .map_err(litchi_core::Error::from)
             },
         )
     }
@@ -348,7 +352,13 @@ impl Document {
     pub fn drawing_hatches(&self) -> Result<crate::drawing::resources::hatch::Collection> {
         self.state.styles.as_ref().map_or_else(
             || Ok(Default::default()),
-            |styles| crate::drawing::resources::hatch::parse_drawing_hatches(styles.xml_content()),
+            |styles| {
+                crate::drawing::resources::hatch::parse_drawing_hatches(
+                    styles.xml_content(),
+                    self.state.xml_limits,
+                )
+                .map_err(litchi_core::Error::from)
+            },
         )
     }
 
@@ -364,7 +374,9 @@ impl Document {
             |styles| {
                 crate::drawing::resources::stroke_dash::parse_drawing_stroke_dashes(
                     styles.xml_content(),
+                    self.state.xml_limits,
                 )
+                .map_err(litchi_core::Error::from)
             },
         )
     }
@@ -379,7 +391,9 @@ impl Document {
             |styles| {
                 crate::drawing::resources::fill_image::parse_drawing_fill_images(
                     styles.xml_content(),
+                    self.state.xml_limits,
                 )
+                .map_err(litchi_core::Error::from)
             },
         )
     }
@@ -391,7 +405,13 @@ impl Document {
     pub fn drawing_markers(&self) -> Result<crate::drawing::resources::marker::Collection> {
         self.state.styles.as_ref().map_or_else(
             || Ok(Default::default()),
-            |styles| crate::drawing::resources::marker::parse_drawing_markers(styles.xml_content()),
+            |styles| {
+                crate::drawing::resources::marker::parse_drawing_markers(
+                    styles.xml_content(),
+                    self.state.xml_limits,
+                )
+                .map_err(litchi_core::Error::from)
+            },
         )
     }
 
@@ -403,17 +423,23 @@ impl Document {
         self.state.styles.as_ref().map_or_else(
             || Ok(Default::default()),
             |styles| {
-                crate::drawing::resources::opacity::parse_drawing_opacities(styles.xml_content())
+                crate::drawing::resources::opacity::parse_drawing_opacities(
+                    styles.xml_content(),
+                    self.state.xml_limits,
+                )
+                .map_err(litchi_core::Error::from)
             },
         )
     }
 
     /// Parse master pages and their losslessly retained headers and footers.
     pub fn master_pages(&self) -> Result<Vec<Master>> {
-        self.state
-            .styles
-            .as_ref()
-            .map_or_else(|| Ok(Vec::new()), |styles| read(styles.xml_content()))
+        self.state.styles.as_ref().map_or_else(
+            || Ok(Vec::new()),
+            |styles| {
+                read(styles.xml_content(), self.state.xml_limits).map_err(litchi_core::Error::from)
+            },
+        )
     }
 
     /// The advanced-layout read view of `styles.xml` (master pages, page
@@ -432,7 +458,10 @@ impl Document {
                 "the document has no styles.xml",
             ))
         })?;
-        crate::header_footer::Snapshot::parse(styles.xml_content().to_owned())
+        crate::header_footer::Snapshot::parse(
+            styles.xml_content().to_owned(),
+            self.state.xml_limits,
+        )
     }
 
     /// Parse automatic page layouts, their properties, and header/footer styles.
@@ -485,8 +514,9 @@ impl Document {
         self.state.styles.as_ref().map_or_else(
             || Ok(None),
             |styles| {
-                crate::bibliography_configuration::parse_bibliography_configuration(
+                crate::bibliography_configuration::parse_bibliography_configuration_with_xml_limits(
                     styles.xml_content(),
+                    self.state.xml_limits,
                 )
             },
         )
@@ -1011,12 +1041,15 @@ impl Document {
         if let Some(styles) = self.state.styles.as_ref().map(Styles::xml_content) {
             parts.push((styles, crate::MetadataPart::Styles));
         }
-        crate::content_metadata::parse_parts(&parts)
+        crate::content_metadata::parse_parts_with_xml_limits(&parts, self.state.xml_limits)
     }
 
     /// Inspect inert XForms model declarations in `office:forms`.
     pub fn xforms_models(&self) -> Result<Vec<crate::xforms::Model>> {
-        crate::xforms::parse_models(self.state.content.xml_content())
+        crate::xforms::parse_models_with_xml_limits(
+            self.state.content.xml_content(),
+            self.state.xml_limits,
+        )
     }
 
     pub fn rdf_graphs(&self) -> Result<Vec<crate::rdf::Graph>> {
@@ -1032,7 +1065,7 @@ impl Document {
         if let Some(styles) = self.state.styles.as_ref().map(Styles::xml_content) {
             parts.push((styles, crate::variable_declaration::Part::Styles));
         }
-        crate::variable_declaration::parse_parts(&parts)
+        crate::variable_declaration::parse_parts_with_xml_limits(&parts, self.state.xml_limits)
     }
 
     /// Discover package, inline, missing, and inert linked embedded objects.

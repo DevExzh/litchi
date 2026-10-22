@@ -246,11 +246,12 @@ impl Odp {
     /// flat bytes, element by element (record 0292).
     pub(crate) fn with_package(&self, package: litchi_odp::Package) -> Result<Self> {
         if let OdpOwner::Flat(flat) = &self.0.owner {
-            let parts =
-                litchi_odf_common::flat::Parts::split(flat.as_bytes()).map_err(core_error)?;
+            let flat_limits = litchi_odf_common::flat::Limits::from_options(flat.options());
+            let parts = litchi_odf_common::flat::Parts::split(flat.as_bytes(), &flat_limits)
+                .map_err(odf_error)?;
             let bytes = parts
-                .merge_package(flat.as_bytes(), package.as_bytes())
-                .map_err(core_error)?;
+                .merge_package_projection(flat.as_bytes(), package.as_bytes(), &flat_limits)
+                .map_err(odf_error)?;
             let flat =
                 litchi_odp::flat::Presentation::from_bytes_with_options(&bytes, flat.options())
                     .map_err(odf_error)?;
@@ -482,15 +483,18 @@ impl Odp {
                 if let Some(package) = self.0.materialized.get() {
                     return Ok(package);
                 }
-                let parts =
-                    litchi_odf_common::flat::Parts::split(flat.as_bytes()).map_err(core_error)?;
-                let bytes = parts.to_bytes().map_err(core_error)?;
+                let flat_limits = litchi_odf_common::flat::Limits::from_options(flat.options());
+                let parts = litchi_odf_common::flat::Parts::split(flat.as_bytes(), &flat_limits)
+                    .map_err(odf_error)?;
+                let bytes = parts.to_bytes(&flat_limits).map_err(odf_error)?;
                 // The flat reader admitted the document; a projection the
                 // packaged reader refuses is a gap of the edit, not a
                 // corrupt file.
-                let package =
-                    litchi_odp::Package::from_bytes_with_options(&bytes, self.0.odf_options)
-                        .map_err(|error| self.flat_refusal(odf_error(error)))?;
+                let package = litchi_odp::Package::from_bytes_with_options(
+                    &bytes,
+                    flat_limits.projection_options(),
+                )
+                .map_err(|error| self.flat_refusal(odf_error(error)))?;
                 Ok(self.0.materialized.get_or_init(|| package))
             },
         }

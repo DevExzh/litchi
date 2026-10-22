@@ -901,8 +901,10 @@ impl ToleranceReport {
         &mut self,
         mut read: impl FnMut(
             &[&str],
-        )
-            -> Result<litchi_ole_common::property_set::Stream, litchi_cfb::OleError>,
+        ) -> Result<
+            litchi_ole_common::property_set::Stream,
+            litchi_ole_common::Error,
+        >,
     ) {
         for name in PROPERTY_SET_STREAMS {
             let Ok(stream) = read(&[name]) else {

@@ -8,6 +8,7 @@ use crate::model::page_layout::{
     set_xml as set_page_layout_xml,
 };
 use litchi_core::{Error, Result};
+use litchi_odf_common::XmlStreamLimits;
 use litchi_odf_common::style::master::Master as SharedMasterPage;
 use litchi_odf_common::style::master::reader::read as parse_master_pages;
 use quick_xml::events::{BytesStart, Event};
@@ -173,7 +174,8 @@ impl MasterPage {
         let validation_xml = format!(
             "<office:document-styles xmlns:office=\"{OFFICE}\"><office:master-styles>{xml}</office:master-styles></office:document-styles>"
         );
-        let parsed = parse_master_pages(&validation_xml)?;
+        let parsed = parse_master_pages(&validation_xml, XmlStreamLimits::owner_default_value())
+            .map_err(Error::from)?;
         if parsed.len() != 1 || parsed[0].name != self.master_page.name {
             return invalid("serialized master page did not roundtrip");
         }
@@ -185,7 +187,10 @@ impl Presentation {
     /// # Errors
     /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
     pub fn master_pages(&self) -> Result<Vec<MasterPage>> {
-        masters_from_xml(required_styles(self)?)
+        masters_from_xml(
+            required_styles(self)?,
+            XmlStreamLimits::owner_default_value(),
+        )
     }
 
     /// # Errors
@@ -881,12 +886,12 @@ fn rewrite_attr(
 ///
 /// Returns an error when the XML is malformed or exceeds the definition
 /// limits.
-pub fn parse_masters(styles_xml: &str) -> Result<Vec<MasterPage>> {
-    masters_from_xml(styles_xml)
+pub fn parse_masters(styles_xml: &str, limits: XmlStreamLimits) -> Result<Vec<MasterPage>> {
+    masters_from_xml(styles_xml, limits)
 }
 
-fn masters_from_xml(xml: &str) -> Result<Vec<MasterPage>> {
-    let parsed = parse_master_pages(xml)?;
+fn masters_from_xml(xml: &str, limits: XmlStreamLimits) -> Result<Vec<MasterPage>> {
+    let parsed = parse_master_pages(xml, limits).map_err(Error::from)?;
     if parsed.len() > MAX_DEFINITIONS {
         return invalid("ODP styles exceed 65536 master pages");
     }
@@ -927,7 +932,7 @@ fn validate_references(styles: &str, content: &str) -> Result<()> {
         definitions(styles, STYLE, "presentation-page-layout", STYLE, "name")?
             .into_keys()
             .collect();
-    let masters = masters_from_xml(styles)?;
+    let masters = masters_from_xml(styles, XmlStreamLimits::owner_default_value())?;
     let master_names: HashSet<String> = masters.iter().map(|m| m.name().to_string()).collect();
     let style_spans = scan(styles)?;
     let content_spans = scan(content)?;

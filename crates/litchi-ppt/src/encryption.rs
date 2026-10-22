@@ -900,7 +900,9 @@ mod tests {
             SourceLimits::default(),
         )
         .unwrap();
-        let images = litchi_odraw::image::delay(&encrypted_pictures).unwrap();
+        let images =
+            litchi_odraw::image::delay(&encrypted_pictures, litchi_odraw::image::Limits::default())
+                .unwrap();
         let hashes: Vec<String> = images
             .iter()
             .map(|image| {
