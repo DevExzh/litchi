@@ -25,8 +25,8 @@ use litchi_core::{
 };
 use litchi_opc::{OpcError, OpcPackage, PackageWriter, SourceLimits};
 use litchi_xlsx::form_control::{
-    Checked, ControlSelector, FormControlFormula, OwnerLimits, OwnerProfile, ScalarField,
-    ScalarValue, SourceBackedFormControlEditor,
+    Checked, ControlSelector, FormControlFormula, FormControlSnapshot, OwnerLimits, OwnerProfile,
+    ScalarField, ScalarValue,
 };
 use litchi_xlsx::{
     Change, Conflict, Error, JoinFailure, MergeChoice, MergeLimits, PackageChange,
@@ -321,11 +321,9 @@ fn source_commit(
     source: &[u8],
     field: ScalarField,
     value: Option<ScalarValue>,
-) -> (Vec<u8>, litchi_xlsx::form_control::FormControlCommit) {
-    let editor = SourceBackedFormControlEditor::from_read_at(Arc::new(VersionedSource::new(
-        source.to_vec(),
-    )))
-    .expect("open source scalar editor");
+) -> (Vec<u8>, litchi_xlsx::form_control::source::Commit) {
+    let editor = Editor::from_read_at(Arc::new(VersionedSource::new(source.to_vec())))
+        .expect("open source scalar editor");
     let mut edit = editor.edit("Sheet1").expect("select source worksheet");
     edit.set_scalar(ControlSelector::position(0), field, value)
         .expect("stage source scalar");
@@ -375,8 +373,7 @@ fn local_design_fixture_provenance_and_baseline_owner_views_are_stable() {
 fn source_snapshot_retains_profile_read_set_and_commit_guard() {
     let source = fixture_bytes("singlecontrol.xlsx");
     let versioned = Arc::new(VersionedSource::new(source));
-    let editor =
-        SourceBackedFormControlEditor::from_read_at(versioned).expect("open source scalar editor");
+    let editor = Editor::from_read_at(versioned).expect("open source scalar editor");
 
     let snapshot = editor.snapshot("Sheet1").expect("capture source snapshot");
     assert_eq!(snapshot.sheet_name(), "Sheet1");
@@ -415,19 +412,17 @@ fn source_snapshot_retains_profile_read_set_and_commit_guard() {
     let mut edit = editor.edit("Sheet1").expect("start source edit");
     assert_eq!(edit.before().profile(), snapshot.profile());
     assert_eq!(edit.before().read_set(), snapshot.read_set());
-    assert!(!edit.is_changed());
     edit.set_scalar(
         ControlSelector::position(0),
         ScalarField::Checked,
         checked_scalar(Checked::Checked),
     )
     .expect("stage exact source no-op");
-    assert!(edit.is_changed());
     let commit = edit.commit().expect("commit source no-op");
-    assert!(!commit.changed());
-    assert!(commit.patch().is_empty());
-    assert_eq!(commit.snapshot().profile(), OwnerProfile::canonical());
-    assert_eq!(commit.snapshot().read_set(), snapshot.read_set());
+    assert!(!commit.diagnostics().changed());
+    assert!(commit.patch().is_noop());
+    assert_eq!(commit.patch().after().profile(), OwnerProfile::canonical());
+    assert_eq!(commit.patch().after().read_set(), snapshot.read_set());
     assert_eq!(
         commit.patch().before().source_version(),
         snapshot.source_version()
@@ -436,11 +431,12 @@ fn source_snapshot_retains_profile_read_set_and_commit_guard() {
         commit.patch().after().source_version(),
         snapshot.source_version()
     );
-    assert!(commit.patch().inverse().is_empty());
+    assert!(commit.patch().inverse().is_noop());
 
-    let (committed_snapshot, patch) = commit.into_parts();
+    let committed_snapshot = commit.patch().after().clone();
+    let (_, patch) = commit.into_parts();
     assert_eq!(committed_snapshot.sheet_position(), 0);
-    assert!(patch.is_empty());
+    assert!(patch.is_noop());
 }
 
 #[test]
@@ -451,8 +447,8 @@ fn source_scalar_changes_properties_and_vml_as_one_write_set() {
         ScalarField::Checked,
         checked_scalar(Checked::Unchecked),
     );
-    assert!(commit.changed());
-    assert!(!commit.patch().is_empty());
+    assert!(commit.diagnostics().changed());
+    assert!(!commit.patch().is_noop());
     assert_only_members_changed(&source, &output, &[CONTROL_PROPERTIES_MEMBER, VML_MEMBER]);
 
     let properties = member(&output, CONTROL_PROPERTIES_MEMBER);
@@ -508,9 +504,8 @@ fn source_scalar_changes_properties_and_vml_as_one_write_set() {
 #[test]
 fn source_noop_is_exact_and_inverse_restores_lexical_pair() {
     let source = fixture_bytes("singlecontrol.xlsx");
-    let editor =
-        SourceBackedFormControlEditor::from_read_at(Arc::new(VersionedSource::new(source.clone())))
-            .expect("open source scalar editor");
+    let editor = Editor::from_read_at(Arc::new(VersionedSource::new(source.clone())))
+        .expect("open source scalar editor");
     let mut noop_edit = editor.edit("Sheet1").expect("select source worksheet");
     noop_edit
         .set_scalar(
@@ -520,8 +515,8 @@ fn source_noop_is_exact_and_inverse_restores_lexical_pair() {
         )
         .expect("stage exact scalar no-op");
     let noop = noop_edit.commit().expect("commit exact no-op");
-    assert!(!noop.changed());
-    assert!(noop.patch().is_empty());
+    assert!(!noop.diagnostics().changed());
+    assert!(noop.patch().is_noop());
     let mut no_op_bytes = Vec::new();
     editor
         .publish_commit_to_stream(&mut no_op_bytes, &noop)
@@ -533,11 +528,8 @@ fn source_noop_is_exact_and_inverse_restores_lexical_pair() {
         ScalarField::Checked,
         checked_scalar(Checked::Unchecked),
     );
-    let mut package = OpcPackage::from_bytes(&source).expect("source OPC package");
-    changed
-        .patch()
-        .apply(&mut package)
-        .expect("apply forward patch");
+    let forward = replay_bytes(&source, changed.patch()).expect("apply forward patch");
+    let package = OpcPackage::from_bytes(&forward).expect("forward OPC package");
     assert_eq!(
         package
             .get_part(&litchi_opc::PackURI::new(format!("/{CONTROL_PROPERTIES_MEMBER}")).unwrap())
@@ -546,7 +538,8 @@ fn source_noop_is_exact_and_inverse_restores_lexical_pair() {
         member(&changed_bytes, CONTROL_PROPERTIES_MEMBER).as_slice()
     );
     let inverse = changed.patch().inverse();
-    inverse.apply(&mut package).expect("apply inverse patch");
+    let restored = replay_bytes(&forward, &inverse).expect("apply inverse patch");
+    let package = OpcPackage::from_bytes(&restored).expect("restored OPC package");
     assert_eq!(
         package
             .get_part(&litchi_opc::PackURI::new(format!("/{CONTROL_PROPERTIES_MEMBER}")).unwrap())
@@ -571,7 +564,7 @@ fn source_scalar_preserves_unrelated_mce_sidecars_and_opaque_formula_bytes() {
         ScalarField::NoThreeD,
         Some(ScalarValue::Boolean(false)),
     );
-    assert!(commit.changed());
+    assert!(commit.diagnostics().changed());
     assert_only_members_changed(&source, &output, &[CONTROL_PROPERTIES_MEMBER, VML_MEMBER]);
     assert!(
         member(&output, CONTROL_PROPERTIES_MEMBER)
@@ -621,9 +614,8 @@ fn source_scalar_preserves_unrelated_mce_sidecars_and_opaque_formula_bytes() {
 fn source_only_formula_allows_exact_noop_and_unrelated_scalar_but_refuses_replacement() {
     let source = fixture_bytes("tdf134769.xlsx");
 
-    let editor =
-        SourceBackedFormControlEditor::from_read_at(Arc::new(VersionedSource::new(source.clone())))
-            .expect("open source-only formula fixture");
+    let editor = Editor::from_read_at(Arc::new(VersionedSource::new(source.clone())))
+        .expect("open source-only formula fixture");
     let snapshot = editor
         .snapshot("Sheet1")
         .expect("snapshot source-only formula fixture");
@@ -648,8 +640,8 @@ fn source_only_formula_allows_exact_noop_and_unrelated_scalar_but_refuses_replac
         )
         .expect("stage exact source-only formula no-op");
     let exact_commit = exact_edit.commit().expect("commit exact source-only no-op");
-    assert!(!exact_commit.changed());
-    assert!(exact_commit.patch().is_empty());
+    assert!(!exact_commit.diagnostics().changed());
+    assert!(exact_commit.patch().is_noop());
     let mut exact_output = Vec::new();
     editor
         .publish_commit_to_stream(&mut exact_output, &exact_commit)
@@ -661,7 +653,7 @@ fn source_only_formula_allows_exact_noop_and_unrelated_scalar_but_refuses_replac
         ScalarField::NoThreeD,
         Some(ScalarValue::Boolean(false)),
     );
-    assert!(unrelated_commit.changed());
+    assert!(unrelated_commit.diagnostics().changed());
     assert!(
         member(&unrelated_output, CONTROL_PROPERTIES_MEMBER)
             .windows(b"fmlaLink=\"#REF!\"".len())
@@ -675,9 +667,8 @@ fn source_only_formula_allows_exact_noop_and_unrelated_scalar_but_refuses_replac
         "unrelated scalar edit discarded source-only VML formula bytes"
     );
 
-    let replacement_editor =
-        SourceBackedFormControlEditor::from_read_at(Arc::new(VersionedSource::new(source.clone())))
-            .expect("reopen source-only formula fixture for replacement");
+    let replacement_editor = Editor::from_read_at(Arc::new(VersionedSource::new(source.clone())))
+        .expect("reopen source-only formula fixture for replacement");
     let mut replacement = replacement_editor
         .edit("Sheet1")
         .expect("select replacement sheet");
@@ -729,7 +720,7 @@ fn source_scalar_ignores_foreign_namespace_client_data_before_real_owner() {
         ScalarField::Checked,
         checked_scalar(Checked::Unchecked),
     );
-    assert!(commit.changed());
+    assert!(commit.diagnostics().changed());
     assert_only_members_changed(&source, &output, &[CONTROL_PROPERTIES_MEMBER, VML_MEMBER]);
     let output_vml = member(&output, VML_MEMBER);
     assert!(
@@ -777,9 +768,8 @@ fn source_scalar_does_not_select_foreign_shape_with_duplicate_id() {
             1,
         )
     });
-    let editor =
-        SourceBackedFormControlEditor::from_read_at(Arc::new(VersionedSource::new(source.clone())))
-            .expect("open duplicate-id namespace fixture");
+    let editor = Editor::from_read_at(Arc::new(VersionedSource::new(source.clone())))
+        .expect("open duplicate-id namespace fixture");
     let mut edit = editor
         .edit("Sheet1")
         .expect("select duplicate-id worksheet");
@@ -846,7 +836,7 @@ fn source_scalar_resolves_xml_escaped_vml_shape_id() {
         ScalarField::Checked,
         checked_scalar(Checked::Unchecked),
     );
-    assert!(commit.changed());
+    assert!(commit.diagnostics().changed());
     let output_vml = member(&output, VML_MEMBER);
     assert!(
         output_vml
@@ -885,10 +875,8 @@ fn source_scalar_refuses_disagreement_without_publishing_one_sided_changes() {
     let disagreement = rewrite_member(&source, VML_MEMBER, |xml| {
         xml.replace("<x:Checked>1</x:Checked>", "<x:Checked>0</x:Checked>")
     });
-    let editor = SourceBackedFormControlEditor::from_read_at(Arc::new(VersionedSource::new(
-        disagreement.clone(),
-    )))
-    .expect("open disagreement source");
+    let editor = Editor::from_read_at(Arc::new(VersionedSource::new(disagreement.clone())))
+        .expect("open disagreement source");
     let mut edit = editor.edit("Sheet1").expect("select source worksheet");
     edit.set_scalar(
         ControlSelector::position(0),
@@ -904,9 +892,8 @@ fn source_scalar_refuses_disagreement_without_publishing_one_sided_changes() {
     let unknown = rewrite_member(&source, VML_MEMBER, |xml| {
         xml.replace("<x:Checked>1</x:Checked>", "<x:Checked>9</x:Checked>")
     });
-    let editor =
-        SourceBackedFormControlEditor::from_read_at(Arc::new(VersionedSource::new(unknown)))
-            .expect("open unknown-mirror source");
+    let editor = Editor::from_read_at(Arc::new(VersionedSource::new(unknown)))
+        .expect("open unknown-mirror source");
     let mut edit = editor
         .edit("Sheet1")
         .expect("select unknown-mirror worksheet");
@@ -922,9 +909,8 @@ fn source_scalar_refuses_disagreement_without_publishing_one_sided_changes() {
 #[test]
 fn source_scalar_rejects_duplicate_name_selector() {
     let source = fixture_bytes("tdf161365.xlsx");
-    let editor =
-        SourceBackedFormControlEditor::from_read_at(Arc::new(VersionedSource::new(source)))
-            .expect("open duplicate-name source");
+    let editor = Editor::from_read_at(Arc::new(VersionedSource::new(source)))
+        .expect("open duplicate-name source");
     let selected = editor.edit("Arkusz1");
     assert!(
         selected.is_ok(),
@@ -946,8 +932,7 @@ fn source_scalar_rejects_duplicate_name_selector() {
 fn source_scalar_stale_version_and_cancellation_leave_output_empty() {
     let source = fixture_bytes("singlecontrol.xlsx");
     let versioned = Arc::new(VersionedSource::new(source.clone()));
-    let editor = SourceBackedFormControlEditor::from_read_at(versioned.clone())
-        .expect("open versioned source");
+    let editor = Editor::from_read_at(versioned.clone()).expect("open versioned source");
     let mut edit = editor.edit("Sheet1").expect("select source worksheet");
     edit.set_scalar(
         ControlSelector::position(0),
@@ -964,7 +949,7 @@ fn source_scalar_stale_version_and_cancellation_leave_output_empty() {
     ));
     assert!(output.is_empty(), "stale refusal wrote output bytes");
 
-    let canceled = SourceBackedFormControlEditor::from_read_at_with_execution_context(
+    let canceled = Editor::from_read_at_with_execution_context(
         Arc::new(VersionedSource::new(source)),
         SourceLimits::default(),
         canceled_context(),
@@ -992,7 +977,7 @@ fn source_patch_rejects_changed_incoming_readset_and_signed_mutation() {
     let serialized_before =
         PackageWriter::to_bytes(&package).expect("serialize incoming package snapshot");
     assert!(matches!(
-        commit.patch().apply(&mut package),
+        replay_patch(&mut package, commit.patch()),
         Err(Error::PatchConflict { .. })
     ));
     let serialized_after =
@@ -1004,8 +989,7 @@ fn source_patch_rejects_changed_incoming_readset_and_signed_mutation() {
 
     let signed = signed_fixture(&source);
     let editor =
-        SourceBackedFormControlEditor::from_read_at(Arc::new(VersionedSource::new(signed)))
-            .expect("open signed source");
+        Editor::from_read_at(Arc::new(VersionedSource::new(signed))).expect("open signed source");
     let mut edit = editor.edit("Sheet1").expect("select signed worksheet");
     edit.set_scalar(
         ControlSelector::position(0),
@@ -1013,27 +997,23 @@ fn source_patch_rejects_changed_incoming_readset_and_signed_mutation() {
         checked_scalar(Checked::Unchecked),
     )
     .expect("stage signed mutation");
-    let commit = edit.commit().expect("prepare signed mutation");
-    let mut output = Vec::new();
+    // A changed edit of a signed source is refused at commit (record 0360).
     assert!(matches!(
-        editor.publish_commit_to_stream(&mut output, &commit),
+        edit.commit(),
         Err(Error::Signed) | Err(Error::Package(OpcError::SignedSourceRequiresExplicitPolicy))
     ));
-    assert!(output.is_empty(), "signed refusal wrote output bytes");
 }
 
 #[test]
 fn source_scalar_limits_and_sink_refusals_do_not_publish_partial_pairs() {
     let source = fixture_bytes("singlecontrol.xlsx");
-    let limited =
-        SourceBackedFormControlEditor::from_read_at(Arc::new(VersionedSource::new(source.clone())))
-            .expect("open source scalar editor")
-            .with_limits(OwnerLimits::default().with_max_vml_bytes(1));
+    let limited = Editor::from_read_at(Arc::new(VersionedSource::new(source.clone())))
+        .expect("open source scalar editor")
+        .with_limits(OwnerLimits::default().with_max_vml_bytes(1));
     assert!(limited.snapshot("Sheet1").is_err(), "VML limit was ignored");
 
-    let editor =
-        SourceBackedFormControlEditor::from_read_at(Arc::new(VersionedSource::new(source.clone())))
-            .expect("open source scalar editor");
+    let editor = Editor::from_read_at(Arc::new(VersionedSource::new(source.clone())))
+        .expect("open source scalar editor");
     let mut edit = editor.edit("Sheet1").expect("select source worksheet");
     edit.set_scalar(
         ControlSelector::position(0),
@@ -1056,9 +1036,8 @@ fn source_scalar_limits_and_sink_refusals_do_not_publish_partial_pairs() {
 #[test]
 fn source_scalar_multi_control_batches_refuse_mixed_targets_atomically() {
     let source = fixture_bytes("tdf120301_xmlSpaceParsing.xlsx");
-    let editor =
-        SourceBackedFormControlEditor::from_read_at(Arc::new(VersionedSource::new(source.clone())))
-            .expect("open multi-control source");
+    let editor = Editor::from_read_at(Arc::new(VersionedSource::new(source.clone())))
+        .expect("open multi-control source");
     let mut edit = editor.edit("Sheet1").expect("select multi-control sheet");
     edit.set_scalar(
         ControlSelector::position(0),
@@ -1130,9 +1109,8 @@ fn ordinary_worksheet_edit_publishes_the_same_paired_scalar_closure() {
 #[test]
 fn source_scalar_composes_two_fields_on_one_control_without_losing_the_first_overlay() {
     let source = fixture_bytes("singlecontrol.xlsx");
-    let editor =
-        SourceBackedFormControlEditor::from_read_at(Arc::new(VersionedSource::new(source.clone())))
-            .expect("open source scalar editor");
+    let editor = Editor::from_read_at(Arc::new(VersionedSource::new(source.clone())))
+        .expect("open source scalar editor");
     let mut edit = editor.edit("Sheet1").expect("select source worksheet");
     edit.set_scalar(
         ControlSelector::position(0),
@@ -1206,7 +1184,7 @@ fn source_scalar_composes_two_fields_on_one_control_without_losing_the_first_ove
 fn source_commit_rechecks_cancellation_after_snapshot() {
     let source = fixture_bytes("singlecontrol.xlsx");
     let (context, cancellation) = live_context();
-    let editor = SourceBackedFormControlEditor::from_read_at_with_execution_context(
+    let editor = Editor::from_read_at_with_execution_context(
         Arc::new(VersionedSource::new(source)),
         SourceLimits::default(),
         context,
@@ -1245,7 +1223,7 @@ fn managed_scalar_result_handles_retain_and_refund_memory_and_objects() {
     let source = fixture_bytes("singlecontrol.xlsx");
     let (probe_budget, _probe_cancellation, probe_context) =
         managed_scalar_context(u64::MAX, u64::MAX);
-    let probe_editor = SourceBackedFormControlEditor::from_read_at_with_execution_context(
+    let probe_editor = Editor::from_read_at_with_execution_context(
         Arc::new(VersionedSource::new(source.clone())),
         SourceLimits::default(),
         probe_context,
@@ -1300,7 +1278,7 @@ fn managed_scalar_result_handles_retain_and_refund_memory_and_objects() {
     assert_eq!(scalar_resource_usage(&probe_budget), [0, 0]);
 
     let (budget, _cancellation, context) = managed_scalar_context(probe_limit[0], probe_limit[1]);
-    let editor = SourceBackedFormControlEditor::from_read_at_with_execution_context(
+    let editor = Editor::from_read_at_with_execution_context(
         Arc::new(VersionedSource::new(source)),
         SourceLimits::default(),
         context,
@@ -1327,7 +1305,7 @@ fn managed_scalar_result_handles_retain_and_refund_memory_and_objects() {
     .expect("stage finite scalar");
     let commit = edit.commit().expect("commit finite scalar");
     let retained_patch = commit.patch().clone();
-    let retained_snapshot = commit.snapshot().clone();
+    let retained_snapshot = commit.patch().after().clone();
     let retained_collection = retained_snapshot.form_controls().clone();
     // This fixture has no public OpaqueXml extension child; the clone below
     // covers the source-backed lexical payload lifetime exposed by Properties.
@@ -1421,10 +1399,9 @@ fn source_commit_rechecks_exact_custom_vml_limit_after_snapshot() {
     );
     let source = rewrite_member(&source, VML_MEMBER, |xml| xml.replace("#REF!", "A1"));
     let exact_vml_limit = member(&source, VML_MEMBER).len();
-    let editor =
-        SourceBackedFormControlEditor::from_read_at(Arc::new(VersionedSource::new(source)))
-            .expect("open source scalar editor")
-            .with_limits(OwnerLimits::default().with_max_vml_bytes(exact_vml_limit));
+    let editor = Editor::from_read_at(Arc::new(VersionedSource::new(source)))
+        .expect("open source scalar editor")
+        .with_limits(OwnerLimits::default().with_max_vml_bytes(exact_vml_limit));
     let snapshot = editor
         .snapshot("Sheet1")
         .expect("exact source VML bound admits snapshot");
@@ -1470,9 +1447,8 @@ fn source_publication_reopens_through_the_same_source_owner() {
         ScalarField::Checked,
         checked_scalar(Checked::Unchecked),
     );
-    let reopened =
-        SourceBackedFormControlEditor::from_read_at(Arc::new(VersionedSource::new(output.clone())))
-            .expect("reopen published source editor");
+    let reopened = Editor::from_read_at(Arc::new(VersionedSource::new(output.clone())))
+        .expect("reopen published source editor");
     let snapshot = reopened
         .snapshot("Sheet1")
         .expect("reopen published source snapshot");
@@ -1496,10 +1472,10 @@ fn source_publication_reopens_through_the_same_source_owner() {
         read_set.vml().expect("published VML read").bytes(),
         member(&output, VML_MEMBER)
     );
-    assert_eq!(snapshot.profile(), commit.snapshot().profile());
+    assert_eq!(snapshot.profile(), commit.patch().after().profile());
     assert_eq!(
         snapshot.source_version(),
-        commit.snapshot().source_version()
+        commit.patch().after().source_version()
     );
 }
 
@@ -1518,7 +1494,7 @@ fn paired_patch_rejects_each_stale_member_without_mutating_the_package() {
         let before = PackageWriter::to_bytes(&package).expect("serialize stale package");
         assert!(
             matches!(
-                commit.patch().apply(&mut package),
+                replay_patch(&mut package, commit.patch()),
                 Err(Error::PatchConflict { .. })
             ),
             "stale {stale_member} member was accepted"
@@ -1534,9 +1510,8 @@ fn paired_patch_rejects_each_stale_member_without_mutating_the_package() {
 #[test]
 fn empty_patch_still_checks_the_complete_source_read_set() {
     let source = fixture_bytes("singlecontrol.xlsx");
-    let editor =
-        SourceBackedFormControlEditor::from_read_at(Arc::new(VersionedSource::new(source.clone())))
-            .expect("open source scalar editor");
+    let editor = Editor::from_read_at(Arc::new(VersionedSource::new(source.clone())))
+        .expect("open source scalar editor");
     let mut edit = editor.edit("Sheet1").expect("select source worksheet");
     edit.set_scalar(
         ControlSelector::position(0),
@@ -1545,7 +1520,7 @@ fn empty_patch_still_checks_the_complete_source_read_set() {
     )
     .expect("stage exact no-op");
     let commit = edit.commit().expect("freeze exact no-op");
-    assert!(commit.patch().is_empty());
+    assert!(commit.patch().is_noop());
 
     let changed_read_set = rewrite_member(&source, WORKSHEET_RELS_MEMBER, |xml| {
         xml.replace(
@@ -1557,7 +1532,7 @@ fn empty_patch_still_checks_the_complete_source_read_set() {
     let before = PackageWriter::to_bytes(&package).expect("serialize changed read set");
     assert!(
         matches!(
-            commit.patch().apply(&mut package),
+            replay_patch(&mut package, commit.patch()),
             Err(Error::PatchConflict { .. })
         ),
         "empty patch ignored a changed source read set"
@@ -1653,16 +1628,9 @@ fn inverse_patch_reopens_to_the_original_scalar_state() {
         ))
     );
 
-    let mut package = OpcPackage::from_bytes(&source).expect("open source OPC package");
-    commit
-        .patch()
-        .apply(&mut package)
-        .expect("apply forward pair");
-    commit
-        .patch()
-        .inverse()
-        .apply(&mut package)
-        .expect("apply inverse pair");
+    let forward = replay_bytes(&source, commit.patch()).expect("apply forward pair");
+    let restored = replay_bytes(&forward, &commit.patch().inverse()).expect("apply inverse pair");
+    let package = OpcPackage::from_bytes(&restored).expect("open restored OPC package");
     let restored_properties = package
         .get_part(&litchi_opc::PackURI::new(format!("/{CONTROL_PROPERTIES_MEMBER}")).unwrap())
         .expect("restored properties part")
@@ -1676,8 +1644,11 @@ fn inverse_patch_reopens_to_the_original_scalar_state() {
         member(&source, CONTROL_PROPERTIES_MEMBER).as_slice()
     );
     assert_eq!(restored_vml, member(&source, VML_MEMBER).as_slice());
-    let restored_control =
-        litchi_xlsx::form_control::parse(restored_properties).expect("parse inverse properties");
+    let restored_control = litchi_xlsx::form_control::parse(
+        restored_properties,
+        &litchi_xlsx::form_control::Limits::default(),
+    )
+    .expect("parse inverse properties");
     assert_eq!(
         restored_control.checked(),
         Some(&litchi_xlsx::form_control::KnownOrUnknown::Known(
@@ -1690,9 +1661,8 @@ fn inverse_patch_reopens_to_the_original_scalar_state() {
 fn signed_exact_noop_is_byte_preserving_but_authored_clear_is_refused() {
     let source = fixture_bytes("singlecontrol.xlsx");
     let signed = signed_fixture(&source);
-    let editor =
-        SourceBackedFormControlEditor::from_read_at(Arc::new(VersionedSource::new(signed.clone())))
-            .expect("open signed source");
+    let editor = Editor::from_read_at(Arc::new(VersionedSource::new(signed.clone())))
+        .expect("open signed source");
     let mut noop_edit = editor.edit("Sheet1").expect("select signed worksheet");
     noop_edit
         .set_scalar(
@@ -1702,16 +1672,15 @@ fn signed_exact_noop_is_byte_preserving_but_authored_clear_is_refused() {
         )
         .expect("stage signed exact no-op");
     let noop = noop_edit.commit().expect("freeze signed exact no-op");
-    assert!(!noop.changed());
+    assert!(!noop.diagnostics().changed());
     let mut output = Vec::new();
     editor
         .publish_commit_to_stream(&mut output, &noop)
         .expect("publish signed exact no-op");
     assert_eq!(output, signed);
 
-    let editor =
-        SourceBackedFormControlEditor::from_read_at(Arc::new(VersionedSource::new(source)))
-            .expect("reopen unsigned source");
+    let editor = Editor::from_read_at(Arc::new(VersionedSource::new(source)))
+        .expect("reopen unsigned source");
     let mut clear_edit = editor.edit("Sheet1").expect("select unsigned worksheet");
     clear_edit
         .set_scalar(ControlSelector::position(0), ScalarField::Checked, None)
@@ -1734,11 +1703,9 @@ fn scalar_resource_limits_fail_before_any_pair_is_published() {
         OwnerLimits::default().with_max_output_bytes(1),
         OwnerLimits::default().with_max_staging_bytes(1),
     ] {
-        let editor = SourceBackedFormControlEditor::from_read_at(Arc::new(VersionedSource::new(
-            source.clone(),
-        )))
-        .expect("open limited source editor")
-        .with_limits(limits);
+        let editor = Editor::from_read_at(Arc::new(VersionedSource::new(source.clone())))
+            .expect("open limited source editor")
+            .with_limits(limits);
         let mut edit = editor.edit("Sheet1").expect("select limited worksheet");
         let staged = edit.set_scalar(
             ControlSelector::position(0),
@@ -2065,4 +2032,102 @@ fn ordinary_form_control_durable_patch_replays_forward_and_inverse() {
             .expect("serialize durable inverse"),
         base.to_plain_bytes().expect("serialize durable base")
     );
+}
+
+/// The source-backed form-control route of record 0360 under the shape these
+/// tests drive: a workbook, an owner policy, and publication by writing the
+/// committed workbook.
+struct Editor {
+    workbook: SourceBackedWorkbook,
+    limits: Option<OwnerLimits>,
+}
+
+impl Editor {
+    fn from_read_at(source: Arc<dyn ReadAt>) -> litchi_xlsx::Result<Self> {
+        Ok(Self {
+            workbook: SourceBackedWorkbook::from_read_at(source)?,
+            limits: None,
+        })
+    }
+
+    fn from_read_at_with_execution_context(
+        source: Arc<dyn ReadAt>,
+        limits: SourceLimits,
+        context: ExecutionContext,
+    ) -> litchi_xlsx::Result<Self> {
+        Ok(Self {
+            workbook: SourceBackedWorkbook::from_read_at_with_options(
+                source,
+                litchi_xlsx::OpenOptions::new()
+                    .source_limits(limits)
+                    .execution_context(context),
+            )?,
+            limits: None,
+        })
+    }
+
+    fn with_limits(mut self, limits: OwnerLimits) -> Self {
+        self.limits = Some(limits);
+        self
+    }
+
+    fn edit<'a>(
+        &self,
+        selector: impl Into<litchi_xlsx::Selector<'a>>,
+    ) -> litchi_xlsx::Result<litchi_xlsx::form_control::source::Edit> {
+        let mut options = litchi_xlsx::form_control::source::EditOptions::default();
+        if let Some(limits) = self.limits {
+            options = options.limits(limits);
+        }
+        self.workbook
+            .edit_form_controls_with_options(selector, options)
+    }
+
+    fn snapshot<'a>(
+        &self,
+        selector: impl Into<litchi_xlsx::Selector<'a>>,
+    ) -> litchi_xlsx::Result<FormControlSnapshot> {
+        Ok(self.edit(selector)?.before().clone())
+    }
+
+    /// Publish `commit` onto this editor's workbook: its own commit is
+    /// written; another workbook's patch is replayed first.
+    fn publish_commit_to_stream<W: Write>(
+        &self,
+        writer: W,
+        commit: &litchi_xlsx::form_control::source::Commit,
+    ) -> litchi_xlsx::Result<FormControlSnapshot> {
+        let replayed = self.workbook.apply_form_controls(commit.patch())?;
+        replayed.package().write_to(writer)?;
+        Ok(commit.patch().after().clone())
+    }
+}
+
+/// Replay a source-backed patch onto a source-backed workbook over `bytes`
+/// and return its output.
+fn replay_bytes(
+    bytes: &[u8],
+    patch: &litchi_xlsx::form_control::source::Patch,
+) -> litchi_xlsx::Result<Vec<u8>> {
+    SourceBackedWorkbook::from_read_at(Arc::new(litchi_core::OwnedSource::new(bytes.to_vec())))?
+        .apply_form_controls(patch)?
+        .into_package()
+        .to_bytes()
+}
+
+/// Replay a source-backed patch onto `package` through a source-backed
+/// workbook over its bytes.
+fn replay_patch(
+    package: &mut OpcPackage,
+    patch: &litchi_xlsx::form_control::source::Patch,
+) -> litchi_xlsx::Result<()> {
+    let bytes = PackageWriter::to_bytes(package)?;
+    let workbook =
+        SourceBackedWorkbook::from_read_at(Arc::new(litchi_core::OwnedSource::new(bytes)))?;
+    let next = workbook
+        .apply_form_controls(patch)?
+        .into_package()
+        .to_bytes()?;
+    *package = OpcPackage::from_bytes(&next)?;
+    Ok(())
 }

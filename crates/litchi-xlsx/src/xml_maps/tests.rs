@@ -190,7 +190,7 @@ fn serializer_rejects_oversized_output_before_final_append() {
     let error = value.to_xml(false).unwrap_err();
     assert_eq!(
         error.to_string(),
-        "serialized custom XML maps part exceeds 32 MiB"
+        "shared OOXML service error: serialized custom XML maps part exceeds 32 MiB"
     );
 }
 
@@ -428,7 +428,8 @@ fn transaction_crud_preserves_source_payload_and_round_trips_both_conformances()
     for conformance in [XmlMapConformance::Transitional, XmlMapConformance::Strict] {
         let mut package = workbook_package();
         let value = fixture_info();
-        let mut create = Transaction::new_with_conformance(&mut package, conformance).unwrap();
+        let mut create = Transaction::new(&mut package).unwrap();
+        create.set_conformance(conformance).unwrap();
         assert!(create.info().is_none());
         assert!(create.set(value.clone()).unwrap());
         let commit = create.commit().unwrap();
@@ -473,7 +474,7 @@ fn transaction_noop_inverse_and_stale_patch_are_atomic() {
     assert!(!no_op.edit_map(1, |_map| Ok(())).unwrap());
     let commit = no_op.commit().unwrap();
     assert!(!commit.changed());
-    assert!(commit.patch().is_empty());
+    assert!(commit.patch().is_noop());
     assert_eq!(PackageWriter::to_bytes(&package).unwrap(), original_bytes);
 
     let mut changed = Transaction::new(&mut package).unwrap();

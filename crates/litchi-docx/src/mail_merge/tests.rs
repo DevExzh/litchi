@@ -3,9 +3,10 @@
 use super::model::{MAX_STRING_BYTES, STRICT_W, W};
 use super::{
     Conformance, DataType, Destination, FieldMappingType, MainDocumentType, Recipient, Recipients,
-    parse_settings_mail_merge,
+    parse_settings_mail_merge, parse_settings_mail_merge_with_mce_limits,
 };
 use crate::Error;
+use litchi_ooxml_common::mce::{Error as MceError, LimitKind, Limits as MceLimits};
 
 const SETTINGS: &str = r#"<w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:mailMerge><w:mainDocumentType w:val="email"/><w:linkToQuery/><w:dataType w:val="native"/><w:connectString w:val="Provider=Inert&amp;X=1"/><w:query w:val="SELECT * FROM inert"/><w:dataSource r:id="source"/><w:destination w:val="email"/><w:mailSubject w:val="A &amp; B"/><w:mailAsAttachment/><w:viewMergedData/><w:activeRecord w:val="3"/><w:checkErrors w:val="3"/><w:odso><w:table w:val="Sheet1$"/><w:src r:id="source"/><w:colDelim w:val="9"/><w:type w:val="database"/><w:fHdr/><w:fieldMapData><w:type w:val="dbColumn"/><w:name w:val="Name"/><w:mappedName w:val="Last Name"/><w:column w:val="0"/><w:lid w:val="en-US"/><w:dynamicAddress/></w:fieldMapData><w:recipientData r:id="recipients"/></w:odso></w:mailMerge><w:trackRevisions/></w:settings>"#;
 
@@ -76,6 +77,25 @@ fn rejects_malformed_scoped_ordered_bounded_metadata() {
         r#"<w:recipients xmlns:w="{W}"><w:recipientData><w:uniqueTag w:val="AQ="/></w:recipientData></w:recipients>"#
     );
     assert!(Recipients::parse_xml(recipients.as_bytes()).is_err());
+}
+
+#[test]
+fn bounded_settings_parser_preserves_typed_mce_limits() {
+    let xml = format!(r#"<w:settings xmlns:w="{W}"/>"#);
+    let maximum = xml.len() - 1;
+    let limits = MceLimits {
+        max_input_bytes: xml.len(),
+        max_output_bytes: maximum,
+        ..MceLimits::default()
+    };
+    assert!(matches!(
+        parse_settings_mail_merge_with_mce_limits(xml.as_bytes(), &limits),
+        Err(Error::Mce(MceError::LimitExceeded {
+            kind: LimitKind::OutputBytes,
+            observed,
+            maximum: actual_maximum,
+        })) if observed == xml.len() && actual_maximum == maximum
+    ));
 }
 
 #[test]

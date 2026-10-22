@@ -52,7 +52,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
             italic: false,
         },
     ])?;
-    let _shared_strings_xml = strings.write_xml()?;
+    let _shared_strings_xml = strings.write_xml(&litchi_xlsx::SourceLimits::default())?;
 
     let workbook = Package::new()?;
     let mut edit = workbook.edit()?;

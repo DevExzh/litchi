@@ -9,7 +9,8 @@ use quick_xml::reader::NsReader;
 use std::collections::{BTreeMap, HashMap};
 
 use super::super::{
-    MAX_DEPTH, MAX_NODES, MAX_STRING_BYTES, MAX_XML_BYTES, invalid, limit, xml_error,
+    LimitKind, MAX_DEPTH, MAX_NODES, MAX_OPAQUE_BYTES, MAX_STRING_BYTES, MAX_XML_BYTES, invalid,
+    limit, xml_error,
 };
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
@@ -31,7 +32,7 @@ pub(crate) struct Node {
 
 pub(crate) fn parse_document(xml: &[u8]) -> Result<Node> {
     if xml.len() > MAX_XML_BYTES {
-        return Err(limit("XML bytes"));
+        return Err(limit(LimitKind::XmlBytes, xml.len(), MAX_XML_BYTES));
     }
     std::str::from_utf8(xml).map_err(xml_error)?;
     let mut reader = NsReader::from_reader(xml);
@@ -45,9 +46,18 @@ pub(crate) fn parse_document(xml: &[u8]) -> Result<Node> {
         let event = reader.read_event_into(&mut buffer).map_err(xml_error)?;
         match event {
             Event::Start(ref element) | Event::Empty(ref element) => {
-                nodes += 1;
-                if nodes > MAX_NODES || stack.len() >= MAX_DEPTH {
-                    return Err(limit("XML structure"));
+                nodes = nodes
+                    .checked_add(1)
+                    .ok_or_else(|| limit(LimitKind::Nodes, usize::MAX, MAX_NODES))?;
+                if nodes > MAX_NODES {
+                    return Err(limit(LimitKind::Nodes, nodes, MAX_NODES));
+                }
+                let depth = stack
+                    .len()
+                    .checked_add(1)
+                    .ok_or_else(|| limit(LimitKind::Depth, usize::MAX, MAX_DEPTH))?;
+                if depth > MAX_DEPTH {
+                    return Err(limit(LimitKind::Depth, depth, MAX_DEPTH));
                 }
                 let is_empty = matches!(&event, Event::Empty(_));
                 let node = make_node(&reader, element, reader.decoder(), &mut strings)?;
@@ -124,8 +134,8 @@ pub(crate) fn validate_fragment(xml: &[u8]) -> Result<()> {
 
 pub(crate) fn opaque(node: &Node) -> Result<super::super::model::Opaque> {
     let xml = serialize_node(node)?;
-    if xml.len() > super::super::MAX_OPAQUE_BYTES {
-        return Err(limit("opaque XML"));
+    if xml.len() > MAX_OPAQUE_BYTES {
+        return Err(limit(LimitKind::OpaqueBytes, xml.len(), MAX_OPAQUE_BYTES));
     }
     Ok(super::super::model::Opaque::from_serialized(xml))
 }
@@ -382,9 +392,11 @@ fn attribute<'a>(node: &'a Node, namespace: &str, name: &str) -> Option<&'a str>
 }
 
 fn add_string(total: &mut usize, size: usize) -> Result<()> {
-    *total = total.checked_add(size).ok_or_else(|| limit("XML string"))?;
+    *total = total
+        .checked_add(size)
+        .ok_or_else(|| limit(LimitKind::StringBytes, usize::MAX, MAX_STRING_BYTES))?;
     if *total > MAX_STRING_BYTES {
-        Err(limit("XML string"))
+        Err(limit(LimitKind::StringBytes, *total, MAX_STRING_BYTES))
     } else {
         Ok(())
     }
@@ -404,6 +416,26 @@ mod tests {
 
     fn parse(xml: &str) -> Result<Node> {
         parse_document(xml.as_bytes())
+    }
+
+    #[test]
+    fn depth_is_reported_as_a_typed_rich_values_limit() {
+        let mut xml = String::with_capacity((MAX_DEPTH + 1) * 7);
+        for _ in 0..=MAX_DEPTH {
+            xml.push_str("<n>");
+        }
+        for _ in 0..=MAX_DEPTH {
+            xml.push_str("</n>");
+        }
+
+        assert!(matches!(
+            parse_document(xml.as_bytes()),
+            Err(Error::Limit {
+                kind: crate::error::LimitKind::RichValues(LimitKind::Depth),
+                observed,
+                maximum,
+            }) if observed == (MAX_DEPTH + 1) as u64 && maximum == MAX_DEPTH as u64
+        ));
     }
 
     fn attributes(node: &Node) -> Vec<(&str, &str, &str)> {

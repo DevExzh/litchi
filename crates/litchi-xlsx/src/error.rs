@@ -74,16 +74,30 @@ pub enum Error {
     /// can distinguish resource exhaustion from malformed document input.
     #[error(transparent)]
     ResourceLimit(#[from] litchi_core::ResourceLimit),
-    /// A fixed bound of the primary workbook transaction was exceeded.
+    /// A bound of an edit family was exceeded.
     #[error("XLSX edit limit exceeded for {kind}: {observed} exceeds {maximum}")]
     Limit {
-        /// The bounded transaction dimension.
-        kind: crate::workbook::edit::LimitKind,
+        /// The bounded dimension and the family that owns it.
+        kind: LimitKind,
         /// The observed amount.
         observed: u64,
-        /// The fixed maximum.
+        /// The maximum in force.
         maximum: u64,
     },
+    /// A configured limit is outside the range its family accepts.
+    #[error("invalid XLSX limit for {kind}: {value} exceeds {maximum}")]
+    InvalidLimit {
+        /// The configured dimension.
+        kind: LimitKind,
+        /// The configured value.
+        value: u64,
+        /// The largest accepted value.
+        maximum: u64,
+    },
+    /// A staging or apply operation refused a well-formed request
+    /// (record 0351 §2.4).
+    #[error("XLSX {} refused ({}): {}", .0.operation(), .0.kind(), .0.reason())]
+    Refused(litchi_core::edit::Refusal),
     /// The bounded form-control properties codec refused a payload or edit.
     #[error(transparent)]
     FormControl(#[from] crate::form_control::FormControlError),
@@ -244,6 +258,185 @@ pub enum Error {
     CustomDataReferenced { id: String, connections: usize },
 }
 
+impl Error {
+    /// A typed refusal of `operation` for `reason` (content-free text).
+    pub(crate) const fn refused(
+        kind: litchi_core::edit::RefusalKind,
+        operation: &'static str,
+        reason: &'static str,
+    ) -> Self {
+        Self::Refused(litchi_core::edit::Refusal::new(kind, operation, reason))
+    }
+
+    /// An exceeded bound of `kind`.
+    pub(crate) fn limit(kind: impl Into<LimitKind>, observed: usize, maximum: usize) -> Self {
+        Self::Limit {
+            kind: kind.into(),
+            observed: u64::try_from(observed).unwrap_or(u64::MAX),
+            maximum: u64::try_from(maximum).unwrap_or(u64::MAX),
+        }
+    }
+}
+
+/// A bounded dimension of an XLSX edit family, as reported by
+/// [`Error::Limit`] and [`Error::InvalidLimit`].
+///
+/// Each variant wraps the typed `LimitKind` of the family that owns the
+/// bound.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum LimitKind {
+    /// The primary workbook transaction ([`crate::workbook::edit::LimitKind`]).
+    Workbook(crate::workbook::edit::LimitKind),
+    /// Conditional formatting ([`crate::conditional_formatting::edit::LimitKind`]).
+    ConditionalFormatting(crate::conditional_formatting::edit::LimitKind),
+    /// Data validation ([`crate::data_validation::edit::LimitKind`]).
+    DataValidation(crate::data_validation::edit::LimitKind),
+    /// Auto filters ([`crate::auto_filter::edit::LimitKind`]).
+    AutoFilter(crate::auto_filter::edit::LimitKind),
+    /// Legacy notes ([`crate::workbook::comments::edit::LimitKind`]).
+    Comments(crate::workbook::comments::edit::LimitKind),
+    /// Worksheet charts ([`crate::chart::edit::LimitKind`]).
+    Chart(crate::chart::edit::LimitKind),
+    /// Worksheet drawings ([`crate::drawing::edit::LimitKind`]).
+    Drawing(crate::drawing::edit::LimitKind),
+    /// Raw OPC edits ([`crate::opc::LimitKind`]).
+    Opc(crate::opc::LimitKind),
+    /// Custom Data ([`crate::custom_data::LimitKind`]).
+    CustomData(crate::custom_data::LimitKind),
+    /// Surveys ([`crate::survey::LimitKind`]).
+    Survey(crate::survey::LimitKind),
+    /// Workbook calculation metadata
+    /// ([`crate::calculation_properties::LimitKind`]).
+    CalculationProperties(crate::calculation_properties::LimitKind),
+    /// Worksheet page breaks ([`crate::page_breaks::LimitKind`]).
+    PageBreaks(crate::page_breaks::LimitKind),
+    /// `pivotTableData` reads and edits
+    /// ([`crate::pivot::table_data::LimitKind`]).
+    PivotTableData(crate::pivot::table_data::LimitKind),
+    /// PivotTable server formats ([`crate::pivot::server_formats::LimitKind`]).
+    PivotServerFormats(crate::pivot::server_formats::LimitKind),
+    /// Cached unique names ([`crate::pivot::cached_unique_names::LimitKind`]).
+    CachedUniqueNames(crate::pivot::cached_unique_names::LimitKind),
+    /// Custom XML Maps ([`crate::xml_maps::LimitKind`]).
+    XmlMaps(crate::xml_maps::LimitKind),
+    /// Source-backed cell values ([`crate::cell_values::LimitKind`]).
+    CellValues(crate::cell_values::LimitKind),
+    /// Source-backed row visibility
+    /// ([`crate::row_visibility::source::LimitKind`]).
+    RowVisibility(crate::row_visibility::source::LimitKind),
+    /// Workbook revision metadata ([`crate::revisions::LimitKind`]).
+    Revisions(crate::revisions::LimitKind),
+    /// Data-type-icon XML and relationship budgets.
+    DataTypeIcons(crate::data_type_icons::LimitKind),
+    /// Workbook Data Model XML and payload budgets.
+    DataModel(crate::workbook::data_model::LimitKind),
+    /// External-link XML and cache budgets.
+    ExternalLinks(crate::external_links::LimitKind),
+    /// Worksheet OLE-object XML and payload budgets.
+    OleObjects(crate::ole_objects::LimitKind),
+    /// Workbook connection XML and collection budgets.
+    Connections(crate::connections::LimitKind),
+    /// Rich-value refresh interval XML and collection budgets.
+    RichValueRefresh(crate::rich_values::refresh_intervals::LimitKind),
+    /// Rich-value XML, collection, and relationship budgets.
+    RichValues(crate::rich_values::LimitKind),
+    /// Form-control XML, model, and retained-memory budgets.
+    FormControl(crate::form_control::LimitKind),
+    /// Source-backed tab-state XML audit budgets.
+    TabState(crate::tab_state::source::LimitKind),
+}
+
+impl LimitKind {
+    /// A short structural description of the dimension.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        use crate::conditional_formatting::edit::LimitKind as ConditionalFormatting;
+        use crate::drawing::edit::LimitKind as Drawing;
+        match self {
+            Self::Workbook(kind) => kind.as_str(),
+            Self::ConditionalFormatting(ConditionalFormatting::Differentials) => {
+                "conditional-formatting differential formats"
+            },
+            Self::ConditionalFormatting(ConditionalFormatting::Formats) => {
+                "conditional-formatting collections of one worksheet"
+            },
+            Self::DataValidation(_) => "data validations of one worksheet",
+            Self::AutoFilter(_) => "auto-filter columns",
+            Self::Comments(crate::workbook::comments::edit::LimitKind::Comments) => {
+                "notes of one worksheet"
+            },
+            Self::Comments(crate::workbook::comments::edit::LimitKind::TextBytes) => {
+                "bytes of one note text or author"
+            },
+            Self::Chart(crate::chart::edit::LimitKind::Charts) => "charts of one worksheet",
+            Self::Chart(crate::chart::edit::LimitKind::ChartBytes) => "bytes of one chart part",
+            Self::Drawing(Drawing::Elements) => "objects of one worksheet drawing",
+            Self::Drawing(Drawing::DrawingBytes) => "bytes of one drawing part",
+            Self::Drawing(Drawing::ImageBytes) => "bytes of one image",
+            Self::Drawing(_) => "worksheet drawing",
+            Self::Opc(_) => "parts changed by one raw OPC commit",
+            Self::CustomData(_) => "Custom Data budget",
+            Self::Survey(_) => "Survey budget",
+            Self::CalculationProperties(_) => "calculation-metadata budget",
+            Self::PageBreaks(crate::page_breaks::LimitKind::HorizontalBreaks) => {
+                "row breaks of one worksheet"
+            },
+            Self::PageBreaks(crate::page_breaks::LimitKind::VerticalBreaks) => {
+                "column breaks of one worksheet"
+            },
+            Self::PivotTableData(kind) => kind.as_str(),
+            Self::PivotServerFormats(kind) => kind.as_str(),
+            Self::CachedUniqueNames(kind) => kind.as_str(),
+            Self::XmlMaps(kind) => kind.as_str(),
+            Self::CellValues(kind) => kind.as_str(),
+            Self::RowVisibility(kind) => kind.as_str(),
+            Self::Revisions(kind) => kind.as_str(),
+            Self::DataTypeIcons(kind) => kind.as_str(),
+            Self::DataModel(kind) => kind.as_str(),
+            Self::ExternalLinks(kind) => kind.as_str(),
+            Self::OleObjects(kind) => kind.as_str(),
+            Self::Connections(kind) => kind.as_str(),
+            Self::RichValueRefresh(kind) => kind.as_str(),
+            Self::RichValues(kind) => kind.as_str(),
+            Self::FormControl(kind) => kind.as_str(),
+            Self::TabState(kind) => kind.as_str(),
+        }
+    }
+}
+
+impl std::fmt::Display for LimitKind {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(self.as_str())
+    }
+}
+
+macro_rules! limit_kind_from {
+    ($($variant:ident($kind:ty)),* $(,)?) => {
+        $(impl From<$kind> for LimitKind {
+            fn from(kind: $kind) -> Self {
+                Self::$variant(kind)
+            }
+        })*
+    };
+}
+
+limit_kind_from!(
+    Workbook(crate::workbook::edit::LimitKind),
+    ConditionalFormatting(crate::conditional_formatting::edit::LimitKind),
+    DataValidation(crate::data_validation::edit::LimitKind),
+    AutoFilter(crate::auto_filter::edit::LimitKind),
+    Comments(crate::workbook::comments::edit::LimitKind),
+    Chart(crate::chart::edit::LimitKind),
+    Drawing(crate::drawing::edit::LimitKind),
+    Opc(crate::opc::LimitKind),
+    CustomData(crate::custom_data::LimitKind),
+    Survey(crate::survey::LimitKind),
+    CalculationProperties(crate::calculation_properties::LimitKind),
+    PageBreaks(crate::page_breaks::LimitKind),
+    PivotTableData(crate::pivot::table_data::LimitKind),
+);
+
 impl From<std::convert::Infallible> for Error {
     fn from(never: std::convert::Infallible) -> Self {
         match never {}
@@ -254,11 +447,10 @@ impl From<litchi_spreadsheet_drawing::Error> for Error {
     fn from(error: litchi_spreadsheet_drawing::Error) -> Self {
         match error {
             litchi_spreadsheet_drawing::Error::Drawing(error) => Self::Drawing(error),
+            litchi_spreadsheet_drawing::Error::Mce(error) => Self::MarkupCompatibility(error),
             litchi_spreadsheet_drawing::Error::Invalid(message)
             | litchi_spreadsheet_drawing::Error::Encoding(message) => Self::Invalid(message),
-            other @ (litchi_spreadsheet_drawing::Error::Mce(_)
-            | litchi_spreadsheet_drawing::Error::Xml(_)
-            | _) => Self::Invalid(other.to_string()),
+            other => Self::Invalid(other.to_string()),
         }
     }
 }
@@ -503,6 +695,17 @@ pub(crate) fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
 }
 
+/// A malformed-XML error from a parser or decoder failure.
+pub(crate) fn malformed(error: impl std::fmt::Display) -> Error {
+    Error::Xml(litchi_ooxml_common::XmlError::Malformed(error.to_string()))
+}
+
+/// Formatting into an owned `String` cannot fail; this maps the formatter's
+/// error type for the writers that use `write!`.
+pub(crate) fn fmt_error(_: std::fmt::Error) -> Error {
+    invalid("formatting XML into a string failed")
+}
+
 pub(crate) fn allocation(resource: &'static str, source: TryReserveError) -> Error {
     Error::Allocation { resource, source }
 }
@@ -533,14 +736,14 @@ mod tests {
     #[test]
     fn form_control_refusal_retains_leaf_limit_details() {
         let error = Error::from(crate::form_control::FormControlError::Limit {
-            resource: "items",
+            kind: crate::form_control::LimitKind::Items,
             observed: 3,
             maximum: 2,
         });
         assert!(matches!(
             error,
             Error::FormControl(crate::form_control::FormControlError::Limit {
-                resource: "items",
+                kind: crate::form_control::LimitKind::Items,
                 observed: 3,
                 maximum: 2,
             })

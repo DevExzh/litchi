@@ -2,6 +2,8 @@
 
 use crate::signature::{refuse_signed_change, settle_unsigned_change};
 use crate::{Error, Result};
+
+use super::limit::LimitKind;
 use litchi_opc::{OpcPackage, PackURI, Part, XmlPart};
 use std::cmp::Ordering;
 use std::collections::VecDeque;
@@ -16,21 +18,13 @@ const MAX_PART_NAMES: usize = 100_000;
 const MAX_PART_NAME_BYTES: usize = 64 * 1024 * 1024;
 const MAX_IMAGE_GC_EDGES: usize = 262_144;
 
-/// Read both Ribbon family slots with safe default limits.
+/// Read both Ribbon family slots under `limits` ([`Limits::standard`] for
+/// the safe defaults).
 /// # Errors
 ///
 /// Returns an error when input violates OOXML constraints, exceeds a configured
 /// bound, or an underlying XML or package operation fails.
-pub fn load(package: &OpcPackage) -> Result<Set<'_>> {
-    load_with(package, &Limits::standard())
-}
-
-/// Read both Ribbon family slots with explicit resource limits.
-/// # Errors
-///
-/// Returns an error when input violates OOXML constraints, exceeds a configured
-/// bound, or an underlying XML or package operation fails.
-pub fn load_with<'a>(package: &'a OpcPackage, limits: &Limits) -> Result<Set<'a>> {
+pub fn load<'a>(package: &'a OpcPackage, limits: &Limits) -> Result<Set<'a>> {
     let mut scanned = 0usize;
     reject_part_sourced_ribbons(package, &mut scanned)?;
 
@@ -65,7 +59,8 @@ pub fn load_with<'a>(package: &'a OpcPackage, limits: &Limits) -> Result<Set<'a>
     Ok(result)
 }
 
-/// Create or replace one Ribbon family using safe default limits.
+/// Create or replace one Ribbon family under `limits` ([`Limits::standard`]
+/// for the safe defaults).
 ///
 /// The XML allocation is moved into the OPC part. A byte-identical update is
 /// a true no-op and preserves package signatures; any other change to a
@@ -79,20 +74,7 @@ pub fn load_with<'a>(package: &'a OpcPackage, limits: &Limits) -> Result<Set<'a>
 /// for a change to a signed package, and an error when input violates OOXML
 /// constraints, exceeds a configured bound, or an underlying XML or package
 /// operation fails.
-pub fn put(package: &mut OpcPackage, version: Version, xml: Vec<u8>) -> Result<()> {
-    put_with(package, version, xml, &Limits::standard())
-}
-
-/// Create or replace one Ribbon family using explicit resource limits, under
-/// the signature policy of [`put`].
-/// # Errors
-///
-/// Returns [`Error::Opc`] with
-/// [`SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
-/// for a change to a signed package, and an error when input violates OOXML
-/// constraints, exceeds a configured bound, or an underlying XML or package
-/// operation fails.
-pub fn put_with(
+pub fn put(
     package: &mut OpcPackage,
     version: Version,
     xml: Vec<u8>,
@@ -106,7 +88,7 @@ pub fn put_with(
     }
 
     let existing = {
-        let ribbons = load_with(package, limits)?;
+        let ribbons = load(package, limits)?;
         match ribbons.get(version.family()) {
             Some(current) if current.version() == version && current.xml() == xml => return Ok(()),
             Some(current) => {
@@ -179,7 +161,7 @@ pub fn put_with(
 /// operation fails.
 pub fn remove(package: &mut OpcPackage, family: Family) -> Result<bool> {
     let (relationship_id, ribbon_part, images) = {
-        let ribbons = load(package)?;
+        let ribbons = load(package, &Limits::standard())?;
         let Some(selected) = ribbons.get(family) else {
             return Ok(false);
         };
@@ -254,29 +236,29 @@ fn sorted_part_names(package: &OpcPackage) -> Result<Vec<String>> {
     let mut bytes = 0usize;
     for part in package.iter_parts() {
         let count = names.len().checked_add(1).ok_or(Error::Limit {
-            resource: "Ribbon part-name allocation scan",
-            max: MAX_PART_NAMES,
-            actual: usize::MAX,
+            kind: crate::LimitKind::Ribbon(LimitKind::PartNameAllocationScan),
+            maximum: MAX_PART_NAMES,
+            observed: usize::MAX,
         })?;
         if count > MAX_PART_NAMES {
             return Err(Error::Limit {
-                resource: "Ribbon part-name allocation scan",
-                max: MAX_PART_NAMES,
-                actual: count,
+                kind: crate::LimitKind::Ribbon(LimitKind::PartNameAllocationScan),
+                maximum: MAX_PART_NAMES,
+                observed: count,
             });
         }
         bytes = bytes
             .checked_add(part.partname().as_str().len())
             .ok_or(Error::Limit {
-                resource: "Ribbon part-name allocation bytes",
-                max: MAX_PART_NAME_BYTES,
-                actual: usize::MAX,
+                kind: crate::LimitKind::Ribbon(LimitKind::PartNameAllocationBytes),
+                maximum: MAX_PART_NAME_BYTES,
+                observed: usize::MAX,
             })?;
         if bytes > MAX_PART_NAME_BYTES {
             return Err(Error::Limit {
-                resource: "Ribbon part-name allocation bytes",
-                max: MAX_PART_NAME_BYTES,
-                actual: bytes,
+                kind: crate::LimitKind::Ribbon(LimitKind::PartNameAllocationBytes),
+                maximum: MAX_PART_NAME_BYTES,
+                observed: bytes,
             });
         }
         names.push(part.partname().as_str().to_ascii_lowercase());
@@ -407,15 +389,15 @@ fn removable_images(
             match source_index {
                 Some(source_index) => {
                     edges = edges.checked_add(1).ok_or(Error::Limit {
-                        resource: "Ribbon image garbage-collection edges",
-                        max: MAX_IMAGE_GC_EDGES,
-                        actual: usize::MAX,
+                        kind: crate::LimitKind::Ribbon(LimitKind::ImageGarbageCollectionEdges),
+                        maximum: MAX_IMAGE_GC_EDGES,
+                        observed: usize::MAX,
                     })?;
                     if edges > MAX_IMAGE_GC_EDGES {
                         return Err(Error::Limit {
-                            resource: "Ribbon image garbage-collection edges",
-                            max: MAX_IMAGE_GC_EDGES,
-                            actual: edges,
+                            kind: crate::LimitKind::Ribbon(LimitKind::ImageGarbageCollectionEdges),
+                            maximum: MAX_IMAGE_GC_EDGES,
+                            observed: edges,
                         });
                     }
                     outgoing[source_index].push(target_index);
@@ -454,15 +436,15 @@ fn removable_images(
 
 fn bump_graph_links(scanned: &mut usize) -> Result<()> {
     *scanned = scanned.checked_add(1).ok_or(Error::Limit {
-        resource: "Ribbon package graph relationships",
-        max: MAX_GRAPH_LINKS,
-        actual: usize::MAX,
+        kind: crate::LimitKind::Ribbon(LimitKind::PackageGraphRelationships),
+        maximum: MAX_GRAPH_LINKS,
+        observed: usize::MAX,
     })?;
     if *scanned > MAX_GRAPH_LINKS {
         return Err(Error::Limit {
-            resource: "Ribbon package graph relationships",
-            max: MAX_GRAPH_LINKS,
-            actual: *scanned,
+            kind: crate::LimitKind::Ribbon(LimitKind::PackageGraphRelationships),
+            maximum: MAX_GRAPH_LINKS,
+            observed: *scanned,
         });
     }
     Ok(())

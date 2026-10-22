@@ -757,7 +757,7 @@ fn validate_slicer_cache_set(package: &OpcPackage, caches: &[SlicerCache]) -> Re
 
 fn validate_slicer_cache_pivot_links(package: &OpcPackage, caches: &[SlicerCache]) -> Result<()> {
     let workbook = package.main_document_part()?;
-    let details = crate::raw::parse_catalog(workbook.blob())?;
+    let details = crate::raw::parse_catalog(workbook.blob(), &package.read_limits())?;
     if details.pivot_caches.is_empty() {
         return Ok(());
     }
@@ -819,7 +819,7 @@ fn validate_timeline_cache_set(package: &OpcPackage, caches: &[Cache]) -> Result
         }
     }
     let workbook = package.main_document_part()?;
-    let details = crate::raw::parse_catalog(workbook.blob())?;
+    let details = crate::raw::parse_catalog(workbook.blob(), &package.read_limits())?;
     if !details.pivot_caches.is_empty() {
         let ids: HashSet<u32> = details
             .pivot_caches

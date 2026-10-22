@@ -85,7 +85,7 @@ pub(crate) fn load_from_source(
 /// [`crate::Error::Signed`] before anything is changed, even when the
 /// serialized comments equal the stored ones: remove the signature explicitly
 /// first ([`OpcPackage::unsign`]).
-pub fn store_on_worksheet(
+pub(crate) fn store_on_worksheet(
     package: &mut OpcPackage,
     worksheet_part: &PackURI,
     value: &Comments,
@@ -154,7 +154,7 @@ pub fn store_on_worksheet(
 /// Replace the worksheet's classic comments graph atomically at the semantic level.
 ///
 /// The signature policy is [`store_on_worksheet`]'s.
-pub fn replace_on_worksheet(
+pub(crate) fn replace_on_worksheet(
     package: &mut OpcPackage,
     worksheet_part: &PackURI,
     value: &Comments,
@@ -168,7 +168,10 @@ pub fn replace_on_worksheet(
 /// or not. Removing comments changes the package, so a signed package is
 /// refused with [`crate::Error::Signed`]: remove the signature explicitly
 /// first ([`OpcPackage::unsign`]).
-pub fn remove_from_worksheet(package: &mut OpcPackage, worksheet_part: &PackURI) -> Result<bool> {
+pub(crate) fn remove_from_worksheet(
+    package: &mut OpcPackage,
+    worksheet_part: &PackURI,
+) -> Result<bool> {
     let Some((relationship_id, part_name)) = find_relationship(package.get_part(worksheet_part)?)?
         .map(|relationship| {
             Ok::<_, crate::Error>((

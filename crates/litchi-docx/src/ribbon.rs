@@ -30,7 +30,12 @@ pub use litchi_ooxml_common::ribbon::{Family, Set, Ui, Version};
 
 use crate::package::family::{graph_edit, graph_family};
 
-graph_family!("Ribbon");
+graph_family!("Ribbon", own_limits);
+
+/// The typed budgets of the Ribbon family: its limit errors are
+/// [`litchi_ooxml_common::Error::Limit`] carried by
+/// [`crate::Error::Common`] (record 0360).
+pub use litchi_ooxml_common::ribbon::LimitKind;
 graph_edit!("Ribbon", edit_ribbon, apply_ribbon);
 
 impl Edit {

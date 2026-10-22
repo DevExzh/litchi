@@ -18,7 +18,11 @@ const SNAPSHOT_IMAGE: &[u8] = include_bytes!("../../../test-data/images/jpg/abst
 fn package_graph_discovers_local_task_panes_without_activation() {
     let mut package = OpcPackage::new();
     install_task_panes(&mut package);
-    assert_task_pane(web::load(&package).unwrap().unwrap());
+    assert_task_pane(
+        web::load(&package, &web::Limits::standard())
+            .unwrap()
+            .unwrap(),
+    );
 }
 
 #[test]
@@ -28,15 +32,28 @@ fn package_authoring_and_removal_round_trip_inert_task_panes() {
         &mut package,
         authored_task_panes(),
         Conformance::Transitional,
+        &web::Limits::standard(),
     )
     .unwrap();
-    assert_task_pane(web::load(&package).unwrap().unwrap());
+    assert_task_pane(
+        web::load(&package, &web::Limits::standard())
+            .unwrap()
+            .unwrap(),
+    );
 
     let bytes = PackageWriter::to_bytes(&package).unwrap();
     let mut reopened = OpcPackage::from_bytes(&bytes).unwrap();
-    assert_task_pane(web::load(&reopened).unwrap().unwrap());
-    assert!(web::remove(&mut reopened).unwrap());
-    assert!(web::load(&reopened).unwrap().is_none());
+    assert_task_pane(
+        web::load(&reopened, &web::Limits::standard())
+            .unwrap()
+            .unwrap(),
+    );
+    assert!(web::remove(&mut reopened, &web::Limits::standard()).unwrap());
+    assert!(
+        web::load(&reopened, &web::Limits::standard())
+            .unwrap()
+            .is_none()
+    );
 }
 
 #[test]
@@ -182,10 +199,18 @@ fn public_web_facade_updates_and_round_trips_crud() {
     assert!(panes.get(1usize).is_none());
 
     let mut package = OpcPackage::new();
-    web::put(&mut package, panes, Conformance::Transitional).unwrap();
+    web::put(
+        &mut package,
+        panes,
+        Conformance::Transitional,
+        &web::Limits::standard(),
+    )
+    .unwrap();
     let bytes = PackageWriter::to_bytes(&package).unwrap();
     let package = OpcPackage::from_bytes(&bytes).unwrap();
-    let panes = web::load(&package).unwrap().unwrap();
+    let panes = web::load(&package, &web::Limits::standard())
+        .unwrap()
+        .unwrap();
     assert_eq!(panes.get(0usize).unwrap().add_in().id(), ADD_IN_ID);
     let pane = panes.get(ADD_IN_ID).unwrap();
     assert!(!pane.visible());

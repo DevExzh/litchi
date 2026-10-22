@@ -888,7 +888,7 @@ impl Views {
     ///
     /// Removing the final view is rejected because an empty Named Sheet Views
     /// part is not valid OOXML. Remove the worksheet part instead with
-    /// [`crate::remove_worksheet_named_sheet_views`].
+    /// [`crate::named_sheet_view::Edit::remove`].
     pub fn remove_view(&mut self, name: &str) -> Result<Option<View>> {
         let Some(index) = self.views.iter().position(|view| view.name == name) else {
             return Ok(None);

@@ -159,11 +159,6 @@ impl<'a> WorksheetContentPart<'a> {
             outbound_relationships,
         })
     }
-
-    /// Alias emphasizing that payload access is deferred and bounded.
-    pub fn payload(&self) -> Result<WorksheetContentPartPayload<'a>> {
-        self.read_payload()
-    }
 }
 
 /// Bounded payload borrowed from a resolved core SpreadsheetDrawing content
@@ -439,11 +434,6 @@ impl<'a> WorksheetPicture<'a> {
         }
     }
 
-    /// Alias for [`Self::svg`] emphasizing descriptor-only access.
-    pub fn svg_descriptor(&self) -> Result<Option<WorksheetSvgDescriptor<'a>>> {
-        self.svg()
-    }
-
     /// Read the selected embedded SVG payload without copying it.
     pub fn read_svg_image(&self) -> Result<WorksheetSvgImage<'a>> {
         let descriptor = self
@@ -459,11 +449,6 @@ impl<'a> WorksheetPicture<'a> {
             descriptor,
             bytes: part.blob(),
         })
-    }
-
-    /// Alias for [`Self::read_svg_image`].
-    pub fn svg_image(&self) -> Result<WorksheetSvgImage<'a>> {
-        self.read_svg_image()
     }
 }
 
@@ -679,10 +664,8 @@ fn read_drawing<'a>(
         });
     }
     let worksheet_part = owner.package.get_part(sheet_uri)?;
-    let worksheet_scan = WorksheetSourceScan::scan_with_limits(
-        worksheet_part.blob(),
-        worksheet_source_limits(owner),
-    )?;
+    let worksheet_scan =
+        WorksheetSourceScan::scan(worksheet_part.blob(), worksheet_source_limits(owner))?;
     let reference = worksheet_scan.drawing(ordinal)?;
     let relationship = worksheet_part
         .rels()
@@ -702,7 +685,7 @@ fn read_drawing<'a>(
             ct::OFC_DRAWING
         )));
     }
-    let source = Arc::new(SourceDrawing::scan_with_limits(
+    let source = Arc::new(SourceDrawing::scan(
         drawing_part.blob(),
         ordinal,
         drawing_source_limits(owner),

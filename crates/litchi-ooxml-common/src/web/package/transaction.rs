@@ -5,6 +5,7 @@ use super::super::{
     TASK_PANES_RELATIONSHIP, VecDeque, WEB_EXTENSION_NAMESPACE,
 };
 use super::{PlannedPart, PlannedRelationship, fold_part_name, folded_name_conflicts};
+use crate::web::LimitKind;
 use litchi_core::xml::ReaderOrigin;
 use litchi_opc::{
     BlobPart, OpcError, OwnedContentTypes, OwnedRelationships, OwnedXmlPart, TargetMode,
@@ -73,9 +74,9 @@ impl Patch {
             .len()
             .checked_add(deletions.len())
             .ok_or(Error::Limit {
-                resource: "Web Extensions patch parts",
-                max: usize::MAX,
-                actual: usize::MAX,
+                kind: crate::LimitKind::Web(LimitKind::PatchParts),
+                maximum: usize::MAX,
+                observed: usize::MAX,
             })?;
         let mut parts = Vec::with_capacity(affected_parts);
         let mut planned_names = HashSet::with_capacity(planned.len());
@@ -504,7 +505,7 @@ fn reconstruct_proven_attribute_source(
         return Ok(Some(before.clone()));
     }
     if after.len() > limits.xml_bytes {
-        return limit("Web Extensions XML bytes", limits.xml_bytes, after.len());
+        return limit(LimitKind::PackageXmlBytes, limits.xml_bytes, after.len());
     }
 
     let before_bytes = before.bytes();
@@ -552,7 +553,7 @@ fn reconstruct_proven_attribute_source(
                 };
                 if edits.len() >= limits.nodes {
                     return limit(
-                        "Web Extensions source attribute edits",
+                        LimitKind::SourceAttributeEdits,
                         limits.nodes,
                         edits.len().saturating_add(1),
                     );
@@ -583,7 +584,7 @@ fn reconstruct_proven_attribute_source(
         }
         if result.bytes().len() > limits.xml_bytes {
             return limit(
-                "Web Extensions XML bytes",
+                LimitKind::PackageXmlBytes,
                 limits.xml_bytes,
                 result.bytes().len(),
             );
@@ -732,7 +733,7 @@ fn source_tag_edit(
     }
     if replacements.len() > limits.items {
         return limit(
-            "Web Extensions source attribute edits",
+            LimitKind::SourceAttributeEdits,
             limits.items,
             replacements.len(),
         );
@@ -800,7 +801,7 @@ fn parse_proven_source_tag(raw: &[u8], limits: Limits) -> Result<ProvenSourceTag
         }
         if attributes.len() >= limits.items {
             return limit(
-                "Web Extensions source tag attributes",
+                LimitKind::SourceTagAttributes,
                 limits.items,
                 attributes.len().saturating_add(1),
             );
@@ -881,7 +882,7 @@ impl LexicalChange {
         check_lexical_bytes(
             before_content_types.bytes().len(),
             &limits,
-            "content-types XML",
+            LimitKind::ContentTypesXml,
         )?;
 
         let mut candidate = package.clone();
@@ -910,7 +911,7 @@ impl LexicalChange {
         check_lexical_bytes(
             content_types_after.bytes().len(),
             &limits,
-            "content-types XML",
+            LimitKind::ContentTypesXml,
         )?;
 
         let scope_capacity = source_parts
@@ -918,9 +919,9 @@ impl LexicalChange {
             .checked_add(destination_parts.len())
             .and_then(|count| count.checked_add(parts.len()))
             .ok_or(Error::Limit {
-                resource: "Web Extensions patch lexical scope",
-                max: limits.package_parts,
-                actual: usize::MAX,
+                kind: crate::LimitKind::Web(LimitKind::PatchLexicalScope),
+                maximum: limits.package_parts,
+                observed: usize::MAX,
             })?;
         let mut scope_names = Vec::new();
         scope_names
@@ -953,9 +954,9 @@ impl LexicalChange {
                     .len()
                     .checked_add(if root.is_some() { 1 } else { 0 })
                     .ok_or(Error::Limit {
-                        resource: "Web Extensions patch relationship tokens",
-                        max: limits.package_relationships,
-                        actual: usize::MAX,
+                        kind: crate::LimitKind::Web(LimitKind::PatchRelationshipTokens),
+                        maximum: limits.package_relationships,
+                        observed: usize::MAX,
                     })?,
             )
             .map_err(|source| Error::Allocation {
@@ -973,9 +974,9 @@ impl LexicalChange {
         total_xml_bytes = total_xml_bytes
             .checked_add(content_types_after.bytes().len())
             .ok_or(Error::Limit {
-                resource: "Web Extensions patch lexical XML",
-                max: limits.total_xml_bytes,
-                actual: usize::MAX,
+                kind: crate::LimitKind::Web(LimitKind::PatchLexicalXml),
+                maximum: limits.total_xml_bytes,
+                observed: usize::MAX,
             })?;
 
         if root.is_some() {
@@ -1352,25 +1353,21 @@ fn is_xml_part(content_type: &str, name: &PackURI) -> bool {
         })
 }
 
-fn check_lexical_bytes(bytes: usize, limits: &Limits, resource: &'static str) -> Result<()> {
+fn check_lexical_bytes(bytes: usize, limits: &Limits, kind: LimitKind) -> Result<()> {
     if bytes > limits.xml_bytes {
-        return limit(resource, limits.xml_bytes, bytes);
+        return limit(kind, limits.xml_bytes, bytes);
     }
     Ok(())
 }
 
 fn charge_lexical_bytes(total: &mut usize, bytes: usize, limits: &Limits) -> Result<()> {
     *total = total.checked_add(bytes).ok_or(Error::Limit {
-        resource: "Web Extensions patch lexical XML",
-        max: limits.total_xml_bytes,
-        actual: usize::MAX,
+        kind: crate::LimitKind::Web(LimitKind::PatchLexicalXml),
+        maximum: limits.total_xml_bytes,
+        observed: usize::MAX,
     })?;
     if *total > limits.total_xml_bytes {
-        return limit(
-            "Web Extensions patch lexical XML",
-            limits.total_xml_bytes,
-            *total,
-        );
+        return limit(LimitKind::PatchLexicalXml, limits.total_xml_bytes, *total);
     }
     Ok(())
 }
@@ -1415,7 +1412,7 @@ pub(in crate::web) fn protected_parts(
 ) -> Result<HashSet<String>> {
     let part_count = package.part_count();
     if part_count > limits.package_parts {
-        return limit("package parts", limits.package_parts, part_count);
+        return limit(LimitKind::PackageParts, limits.package_parts, part_count);
     }
     if scope.owned_parts.is_empty() {
         return Ok(HashSet::new());
@@ -1497,13 +1494,13 @@ pub(in crate::web) fn charge_patch_relationship(
     limits: &Limits,
 ) -> Result<()> {
     *relationships = relationships.checked_add(1).ok_or(Error::Limit {
-        resource: "package relationships",
-        max: limits.package_relationships,
-        actual: usize::MAX,
+        kind: crate::LimitKind::Web(LimitKind::PackageRelationships),
+        maximum: limits.package_relationships,
+        observed: usize::MAX,
     })?;
     if *relationships > limits.package_relationships {
         return limit(
-            "package relationships",
+            LimitKind::PackageRelationships,
             limits.package_relationships,
             *relationships,
         );

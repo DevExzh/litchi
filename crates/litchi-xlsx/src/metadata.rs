@@ -41,12 +41,12 @@ type Result<T> = std::result::Result<T, Error>;
 ///
 /// Dropping the edit discards it.
 #[derive(Debug)]
-pub struct Edit<'a> {
-    package: &'a Package,
+pub struct Edit {
+    package: Package,
     inner: properties::Edit,
 }
 
-impl Edit<'_> {
+impl Edit {
     /// The staged metadata.
     ///
     /// # Errors
@@ -102,8 +102,14 @@ impl Edit<'_> {
     /// cannot carry, and [`Error::Signed`] for a changed edit of a signed
     /// workbook.
     pub fn commit(self) -> Result<Commit> {
-        let (_, patch, diagnostics) = self.inner.commit()?.into_parts();
-        let package = self.package.apply_metadata(&patch)?;
+        let commit = self.inner.commit()?;
+        let diagnostics = commit.diagnostics().clone();
+        let (opc, patch) = commit.into_parts();
+        let package = if patch.is_noop() {
+            self.package
+        } else {
+            self.package.adopt_metadata(opc)?
+        };
         Ok(Commit {
             package,
             patch,
@@ -180,10 +186,10 @@ impl Package {
     /// # Errors
     ///
     /// Returns the strict graph errors of the property families.
-    pub fn edit_metadata(&self) -> Result<Edit<'_>> {
+    pub fn edit_metadata(&self) -> Result<Edit> {
         Ok(Edit {
-            package: self,
-            inner: self.metadata_snapshot()?.edit(),
+            package: self.clone(),
+            inner: properties::Edit::new(self.opc(), Host::Excel)?,
         })
     }
 
@@ -197,12 +203,23 @@ impl Package {
     /// Returns [`Error::Conflict`] when this package is not the patch's
     /// before state and [`Error::Signed`] for a changed patch of a signed
     /// workbook.
-    pub fn apply_metadata(&self, patch: &Patch) -> Result<Self> {
-        if patch.is_noop() {
-            return Ok(self.clone());
-        }
-        let mut candidate = self.opc().clone();
-        patch.apply(&mut candidate)?;
+    pub fn apply_metadata(&self, patch: &Patch) -> Result<Commit> {
+        let package = if patch.is_noop() {
+            self.clone()
+        } else {
+            let mut candidate = self.opc().clone();
+            patch.apply(&mut candidate)?;
+            self.adopt_metadata(candidate)?
+        };
+        Ok(Commit {
+            package,
+            patch: patch.clone(),
+            diagnostics: patch.diagnostics(),
+        })
+    }
+
+    /// Wrap a package whose document properties changed as a new package.
+    fn adopt_metadata(&self, candidate: litchi_opc::OpcPackage) -> Result<Self> {
         self.workbook_ref()
             .adopt_published_package(candidate)
             .map(Self::from_workbook)
@@ -234,8 +251,13 @@ mod tests {
         assert!(!package.same_content(&after).unwrap());
 
         let replayed = package.apply_metadata(&patch).unwrap();
+        assert!(replayed.diagnostics().changed());
+        let replayed = replayed.into_package();
         assert!(replayed.same_content(&after).unwrap());
-        let restored = after.apply_metadata(&patch.inverse()).unwrap();
+        let restored = after
+            .apply_metadata(&patch.inverse())
+            .unwrap()
+            .into_package();
         assert!(restored.same_content(&package).unwrap());
     }
 

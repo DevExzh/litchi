@@ -194,10 +194,7 @@ impl XlsxOwner {
 
     fn names(&self) -> Box<[String]> {
         match self {
-            Self::Source(workbook) => workbook
-                .sheets()
-                .map(|sheet| sheet.name().to_owned())
-                .collect(),
+            Self::Source(workbook) => workbook.sheet_names().map(str::to_owned).collect(),
             Self::Eager(package) => package
                 .workbook_ref()
                 .sheets()
@@ -213,10 +210,20 @@ impl XlsxOwner {
         })
     }
 
-    fn active(&self) -> Option<Sheet> {
-        match self {
-            Self::Source(workbook) => workbook.active_sheet().map(Sheet::source),
+    fn active(&self) -> Result<Option<Sheet>> {
+        Ok(match self {
+            Self::Source(workbook) => workbook.active_sheet()?.map(Sheet::source),
             Self::Eager(package) => package.workbook_ref().active_sheet().map(Sheet::owned),
+        })
+    }
+
+    fn active_position(&self) -> Option<usize> {
+        match self {
+            Self::Source(workbook) => workbook.active_sheet_position(),
+            Self::Eager(package) => package
+                .workbook_ref()
+                .active_sheet()
+                .map(|sheet| sheet.position()),
         }
     }
 }
@@ -603,7 +610,7 @@ impl Xlsx {
         let workbook = self
             .0
             .owner
-            .finish(|| materialize(source.source_backed_package()))?;
+            .finish(|| materialize(source.source_backed_package()?))?;
         *cached = Some(workbook.clone());
         if let Err(error) = self.0.owner.ensure_current() {
             *cached = None;
@@ -632,8 +639,7 @@ impl Xlsx {
             XlsxOwner::Source(workbook) => self.promote_source(workbook)?,
             XlsxOwner::Eager(workbook) => workbook.clone(),
         };
-        let mut workbook = workbook;
-        workbook.unsign()?;
+        let workbook = workbook.unsign()?;
         *cached = Some(workbook.clone());
         if let Err(error) = self.0.owner.ensure_current() {
             *cached = None;
@@ -712,7 +718,7 @@ impl WorkbookTrait for Xlsx {
 
     fn active_worksheet(&self) -> Result<Self::Worksheet<'_>> {
         let sheet = self.0.owner.finish(|| {
-            self.0.owner.active().ok_or_else(|| {
+            self.0.owner.active()?.ok_or_else(|| {
                 Error::new(Code::NotFound, "XLSX workbook has no active worksheet")
                     .with_format(FileFormat::Xlsx)
             })
@@ -751,7 +757,7 @@ impl WorkbookTrait for Xlsx {
     }
 
     fn active_sheet_index(&self) -> usize {
-        self.0.owner.active().map_or(0, |sheet| sheet.position())
+        self.0.owner.active_position().unwrap_or(0)
     }
 
     fn is_1904_date_system(&self) -> bool {

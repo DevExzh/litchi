@@ -33,14 +33,11 @@ pub use transaction::Edit;
 pub use validation::{validate_binding_map_ids, validate_catalog};
 
 pub use host_api::{
-    parse_xml_map_info, parse_xml_map_info_with_conformance,
-    parse_xml_map_info_with_conformance_and_limits, parse_xml_map_info_with_limits,
-    patch_xml_map_info_source, patch_xml_map_info_source_with_limits, serialize_xml_map_info,
-    serialize_xml_map_info_with_limits, validate_xml_map_info, validate_xml_map_info_with_limits,
+    parse_xml_map_info, parse_xml_map_info_with_conformance, patch_xml_map_info_source,
+    serialize_xml_map_info, validate_xml_map_info,
 };
 pub use litchi_ooxml_common::spreadsheet_xml_maps::{
-    DataBinding, XmlMap, XmlMapConformance, XmlMapDataBinding, XmlMapInfo, XmlMapLimits,
-    XmlMapSchema, XmlSchema,
+    DataBinding, XmlMap, XmlMapConformance, XmlMapInfo, XmlMapLimits, XmlSchema,
 };
 
 pub use crate::package::error::{Error, Result};

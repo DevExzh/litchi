@@ -1,6 +1,6 @@
 //! Typed parsing of the compressed MS-OVBA `dir` stream.
 
-use super::{Error, Limits, check_limit, codec, invalid};
+use super::{Error, LimitKind, Limits, check_limit, codec, invalid};
 use litchi_codepage::Mbcs;
 
 const PROJECT_CODEPAGE_ID: u16 = 0x0003;
@@ -598,7 +598,7 @@ impl<'a> Reader<'a> {
         let Ok(length) = usize::try_from(self.read_u32()?) else {
             return Err(invalid("dir-stream string length does not fit usize"));
         };
-        check_limit("VBA string bytes", length, limits.max_string_bytes)?;
+        check_limit(LimitKind::StringBytes, length, limits.max_string_bytes)?;
         self.read_bytes(length)
     }
 
@@ -680,12 +680,12 @@ impl<'a> Reader<'a> {
 
 pub(crate) fn encode_dir(project: &WriteProject<'_>, limits: &Limits) -> Result<Vec<u8>, Error> {
     check_limit(
-        "VBA module count",
+        LimitKind::Modules,
         project.modules.len(),
         limits.max_modules,
     )?;
     check_limit(
-        "VBA reference count",
+        LimitKind::References,
         project.references.len(),
         limits.max_references,
     )?;
@@ -764,7 +764,7 @@ pub(crate) fn encode_dir(project: &WriteProject<'_>, limits: &Limits) -> Result<
     for reference in project.references {
         encode_reference(&mut output, reference, encoding, limits)?;
         check_limit(
-            "decompressed VBA stream bytes",
+            LimitKind::DecompressedStreamBytes,
             output.len(),
             limits.max_decompressed_stream_bytes,
         )?;
@@ -785,7 +785,7 @@ pub(crate) fn encode_dir(project: &WriteProject<'_>, limits: &Limits) -> Result<
     for module in project.modules {
         encode_module(&mut output, module, encoding, limits)?;
         check_limit(
-            "decompressed VBA stream bytes",
+            LimitKind::DecompressedStreamBytes,
             output.len(),
             limits.max_decompressed_stream_bytes,
         )?;
@@ -794,7 +794,7 @@ pub(crate) fn encode_dir(project: &WriteProject<'_>, limits: &Limits) -> Result<
     append_bounded(&mut output, &0u32.to_le_bytes(), limits)?;
 
     check_limit(
-        "decompressed VBA stream bytes",
+        LimitKind::DecompressedStreamBytes,
         output.len(),
         limits.max_decompressed_stream_bytes,
     )?;
@@ -811,12 +811,12 @@ pub(crate) fn encode_dir_with_references(
     limits: &Limits,
 ) -> Result<Vec<u8>, Error> {
     check_limit(
-        "decompressed VBA stream bytes",
+        LimitKind::DecompressedStreamBytes,
         source.len(),
         limits.max_decompressed_stream_bytes,
     )?;
     check_limit(
-        "VBA reference count",
+        LimitKind::References,
         references.len(),
         limits.max_references,
     )?;
@@ -835,7 +835,7 @@ pub(crate) fn encode_dir_with_references(
             .checked_add(1)
             .ok_or_else(|| invalid("VBA reference count overflow"))?;
         check_limit(
-            "VBA reference count",
+            LimitKind::References,
             source_reference_count,
             limits.max_references,
         )?;
@@ -850,7 +850,7 @@ pub(crate) fn encode_dir_with_references(
     let mut module_reader = Reader::new(source, references_end);
     module_reader.expect_sized_u32(PROJECT_MODULES_ID, FIXED_U16_SIZE)?;
     let source_module_count = usize::from(module_reader.read_u16()?);
-    check_limit("VBA module count", source_module_count, limits.max_modules)?;
+    check_limit(LimitKind::Modules, source_module_count, limits.max_modules)?;
 
     let base_len = source
         .len()
@@ -877,7 +877,7 @@ pub(crate) fn encode_dir_with_references(
         .and_then(|length| length.checked_add(encoded_references.len()))
         .ok_or_else(|| invalid("dir stream size overflow"))?;
     check_limit(
-        "decompressed VBA stream bytes",
+        LimitKind::DecompressedStreamBytes,
         new_len,
         limits.max_decompressed_stream_bytes,
     )?;
@@ -896,11 +896,11 @@ fn encode_module(
 ) -> Result<(), Error> {
     validate_module_identifier(module.name, "MODULENAME")?;
     let name = encode_mbcs(module.name, encoding, "MODULENAME")?;
-    check_limit("VBA string bytes", name.len(), limits.max_string_bytes)?;
+    check_limit(LimitKind::StringBytes, name.len(), limits.max_string_bytes)?;
     push_record_bounded(output, MODULE_NAME_ID, &name, limits)?;
     let unicode_name = encode_utf16(module.name, "MODULENAMEUNICODE")?;
     check_limit(
-        "VBA string bytes",
+        LimitKind::StringBytes,
         unicode_name.len(),
         limits.max_string_bytes,
     )?;
@@ -969,7 +969,7 @@ fn encode_reference(
             .checked_add(wire.len())
             .ok_or_else(|| invalid("VBA reference stream size overflow"))?;
         check_limit(
-            "decompressed VBA stream bytes",
+            LimitKind::DecompressedStreamBytes,
             new_len,
             limits.max_decompressed_stream_bytes,
         )?;
@@ -982,7 +982,7 @@ fn encode_reference(
         .checked_add(encoded_size)
         .ok_or_else(|| invalid("VBA reference stream size overflow"))?;
     check_limit(
-        "decompressed VBA stream bytes",
+        LimitKind::DecompressedStreamBytes,
         new_len,
         limits.max_decompressed_stream_bytes,
     )?;
@@ -1130,7 +1130,7 @@ fn encoded_string_pair_size(
     field: &'static str,
 ) -> Result<usize, Error> {
     check_limit(
-        "VBA input string bytes",
+        LimitKind::InputStringBytes,
         value.len(),
         limits.max_string_bytes.saturating_mul(4),
     )?;
@@ -1141,7 +1141,7 @@ fn encoded_string_pair_size(
         .count()
         .checked_mul(2)
         .ok_or_else(|| invalid(format!("{field} UTF-16 length overflow")))?;
-    check_limit("VBA string bytes", unicode_len, limits.max_string_bytes)?;
+    check_limit(LimitKind::StringBytes, unicode_len, limits.max_string_bytes)?;
     check_protocol_length(field, unicode_len, protocol_maximum.saturating_mul(2))?;
     12usize
         .checked_add(mbcs_len)
@@ -1276,7 +1276,11 @@ fn encode_reference_inner(
                     "opaque VBA reference id {id:#06x} is a known directory record"
                 )));
             }
-            check_limit("VBA string bytes", payload.len(), limits.max_string_bytes)?;
+            check_limit(
+                LimitKind::StringBytes,
+                payload.len(),
+                limits.max_string_bytes,
+            )?;
             push_record_bounded(output, *id, payload, limits)?;
         },
     }
@@ -1596,12 +1600,12 @@ fn encode_reference_bytes(
     field: &'static str,
 ) -> Result<Vec<u8>, Error> {
     check_limit(
-        "VBA input string bytes",
+        LimitKind::InputStringBytes,
         value.len(),
         limits.max_string_bytes.saturating_mul(4),
     )?;
     let bytes = encode_mbcs(value, encoding, field)?;
-    check_limit("VBA string bytes", bytes.len(), limits.max_string_bytes)?;
+    check_limit(LimitKind::StringBytes, bytes.len(), limits.max_string_bytes)?;
     Ok(bytes)
 }
 
@@ -1643,7 +1647,7 @@ fn encoded_mbcs_len(
     field: &'static str,
 ) -> Result<usize, Error> {
     check_limit(
-        "VBA input string bytes",
+        LimitKind::InputStringBytes,
         value.len(),
         limits.max_string_bytes.saturating_mul(4),
     )?;
@@ -1651,7 +1655,7 @@ fn encoded_mbcs_len(
         return Err(invalid(format!("{field} contains a null character")));
     }
     if value.is_ascii() {
-        check_limit("VBA string bytes", value.len(), limits.max_string_bytes)?;
+        check_limit(LimitKind::StringBytes, value.len(), limits.max_string_bytes)?;
         return Ok(value.len());
     }
 
@@ -1675,7 +1679,7 @@ fn encoded_mbcs_len(
             .ok_or_else(|| invalid(format!("{field} encoded size overflow")))?;
         start = end;
     }
-    check_limit("VBA string bytes", length, limits.max_string_bytes)?;
+    check_limit(LimitKind::StringBytes, length, limits.max_string_bytes)?;
     Ok(length)
 }
 
@@ -1906,7 +1910,7 @@ fn check_append_limit(output: &[u8], added: usize, limits: &Limits) -> Result<()
         .checked_add(added)
         .ok_or_else(|| invalid("dir-stream size overflow"))?;
     check_limit(
-        "decompressed VBA stream bytes",
+        LimitKind::DecompressedStreamBytes,
         new_len,
         limits.max_decompressed_stream_bytes,
     )
@@ -1923,7 +1927,7 @@ fn push_string_pair(
     field: &'static str,
 ) -> Result<(), Error> {
     check_limit(
-        "VBA input string bytes",
+        LimitKind::InputStringBytes,
         value.len(),
         limits.max_string_bytes.saturating_mul(4),
     )?;
@@ -1940,7 +1944,7 @@ fn push_string_pair(
         .count()
         .checked_mul(2)
         .ok_or_else(|| invalid(format!("{field} UTF-16 length overflow")))?;
-    check_limit("VBA string bytes", unicode_len, limits.max_string_bytes)?;
+    check_limit(LimitKind::StringBytes, unicode_len, limits.max_string_bytes)?;
     check_protocol_length(field, unicode_len, protocol_maximum.saturating_mul(2))?;
     let total = first_record
         .checked_add(2)
@@ -1966,7 +1970,7 @@ fn push_mbcs_pair(
     field: &'static str,
 ) -> Result<(), Error> {
     check_limit(
-        "VBA input string bytes",
+        LimitKind::InputStringBytes,
         value.len(),
         limits.max_string_bytes.saturating_mul(4),
     )?;
@@ -2130,7 +2134,7 @@ fn find_references_and_modules(
             break;
         }
         check_limit(
-            "VBA reference count",
+            LimitKind::References,
             references.len().saturating_add(1),
             limits.max_references,
         )?;
@@ -2139,7 +2143,7 @@ fn find_references_and_modules(
 
     reader.expect_sized_u32(PROJECT_MODULES_ID, FIXED_U16_SIZE)?;
     let count = usize::from(reader.read_u16()?);
-    check_limit("VBA module count", count, limits.max_modules)?;
+    check_limit(LimitKind::Modules, count, limits.max_modules)?;
     reader.expect_sized_u32(PROJECT_COOKIE_ID, FIXED_U16_SIZE)?;
     reader.read_u16()?;
     let modules = parse_modules(&mut reader, count, encoding, limits)?;
@@ -2616,7 +2620,7 @@ mod tests {
         };
         assert!(matches!(
             Dir::parse(&sample_dir(), &limits),
-            Err(Error::LimitExceeded { .. })
+            Err(Error::Limit { .. })
         ));
     }
 
@@ -2713,11 +2717,7 @@ mod tests {
         let mut rejected = Vec::new();
         assert!(matches!(
             encode_reference(&mut rejected, &reference, Mbcs::WINDOWS_1252, &limits),
-            Err(Error::LimitExceeded {
-                limit: "decompressed VBA stream bytes",
-                actual,
-                maximum
-            }) if actual == encoded.len() && maximum == encoded.len() - 1
+            Err(Error::Limit { kind: LimitKind::DecompressedStreamBytes, observed: actual, maximum }) if actual == encoded.len() && maximum == encoded.len() - 1
         ));
         assert!(rejected.is_empty());
     }
@@ -2779,10 +2779,10 @@ mod tests {
         let mut reader = Reader::new(&bytes, 0);
         assert!(matches!(
             parse_reference(&mut reader, Mbcs::WINDOWS_1252, &limits),
-            Err(Error::LimitExceeded {
-                limit: "VBA string bytes",
-                actual: 2,
-                maximum: 1,
+            Err(Error::Limit {
+                kind: LimitKind::StringBytes,
+                observed: 2,
+                maximum: 1
             })
         ));
     }

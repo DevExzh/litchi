@@ -20,6 +20,7 @@ use std::io::Read;
 use std::ops::ControlFlow;
 #[cfg(any(unix, windows))]
 use std::path::Path;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, OnceLock, PoisonError};
 
 #[cfg(any(unix, windows))]
@@ -30,15 +31,15 @@ use litchi_core::{
 use litchi_ooxml_common::mce::{Capabilities, Error as MceError, StreamError, StreamLimits};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{
-    PackURI, PartData, PartView, SourceBackedPackage, SourceCacheDiagnostics, SourceCacheLimits,
-    SourceLimits, VerifiedDecodedReaderError,
+    PackURI, PartData, PartView, SourceBackedPackage, SourceCacheDiagnostics, SourceLimits,
+    VerifiedDecodedReaderError,
 };
 use litchi_sheet::{Area, At, Cell as Address, Rect};
 
 use super::{DateSystem, Flavor, Selector, Visibility, WorksheetKind, codec};
 use crate::cell::{Cell, Store, Text, Value, View};
 use crate::error::{Error, Result, allocation, invalid};
-use crate::leniency::{Leniency, ToleranceReport};
+use crate::leniency::ToleranceReport;
 use crate::raw;
 use crate::raw::selected_worksheet::SelectedPayload;
 
@@ -47,6 +48,7 @@ mod tables;
 
 mod blocks;
 mod cursor;
+pub(crate) mod deferred;
 mod grid;
 #[cfg(test)]
 mod m1_tests;
@@ -84,13 +86,18 @@ fn check_execution(context: Option<&ExecutionContext>) -> Result<()> {
     })
 }
 
-struct SourceSheetData {
+pub(crate) struct SourceSheetData {
     position: usize,
-    name: String,
+    pub(crate) name: String,
     name_key: Box<str>,
-    kind: WorksheetKind,
-    visibility: Visibility,
-    part_uri: PackURI,
+    pub(crate) kind: WorksheetKind,
+    pub(crate) visibility: Visibility,
+    pub(crate) part_uri: PackURI,
+    /// The validated workbook catalog coordinates retained for the tab-state
+    /// source closure. Keeping these values avoids reparsing the same
+    /// workbook XML when an already admitted read-only owner starts an edit.
+    pub(crate) sheet_id: u32,
+    pub(crate) relationship_id: Box<str>,
     /// Repairs made by the first successful parse of this worksheet's grid.
     ///
     /// The parsed grid itself lives in the workbook's evictable semantic
@@ -111,8 +118,42 @@ impl SourceSheetData {
     }
 }
 
-struct SourceInner {
+#[derive(Debug)]
+pub(crate) struct SourceCatalogProof {
+    pub(crate) defined_names: Arc<[raw::DefinedName]>,
+    pub(crate) limits: Arc<SourceLimits>,
+}
+
+pub(crate) struct SourceInner {
     package: SourceBackedPackage,
+    /// One exact replay endpoint shared by every patch that observes this
+    /// opened source owner. Adjacent deferred patches otherwise retain the
+    /// same endpoint state twice: the earlier patch's `after` and the next
+    /// patch's `before` are the same pending owner.
+    pub(crate) restore_endpoint: OnceLock<Arc<deferred::RestoreEndpoint>>,
+    /// The immutable tab-state source closure captured for this owner. A
+    /// source-backed edit does not mutate that closure, so repeated edits can
+    /// share its parsed graph, relationships and source payload metadata.
+    pub(crate) tab_state_snapshot: OnceLock<Arc<crate::tab_state::Snapshot>>,
+    /// The first edit on an owner is commonly a one-shot admission probe. Do
+    /// not retain its snapshot solely because the edit was dropped; arm the
+    /// immutable cache after the first successful snapshot load so repeated
+    /// edits still share the closure without adding one to every new owner.
+    pub(crate) tab_state_snapshot_seen: AtomicBool,
+    /// The source-backed tab graph is already admitted by the workbook open.
+    /// Keep its exact validation lazy for the edit path, while sharing the
+    /// resulting graph across snapshots once a commit needs it.
+    pub(crate) tab_state_graph: OnceLock<Arc<crate::tab_state::GraphBinding>>,
+    /// One shared package handle for exact replay endpoints. Keeping this
+    /// lazy leaves ordinary read-only opens allocation-free while letting a
+    /// retained patch refer to one package owner per source lineage instead
+    /// of embedding a full `SourceBackedPackage` value in every endpoint.
+    package_handle: OnceLock<Arc<SourceBackedPackage>>,
+    /// Immutable merge-family source closures keyed by worksheet URI. Source
+    /// backed edits repeatedly reopen one worksheet from the same immutable
+    /// owner; sharing its workbook and relationship metadata keeps retained
+    /// patch history compact without sharing rewritten worksheet bytes.
+    merge_source_states: Mutex<HashMap<PackURI, Arc<crate::merge::source::SourceStateShared>>>,
     execution: Option<ExecutionContext>,
     // Keep the mandatory workbook payload pinned for managed facades. Besides
     // avoiding a second root extraction, this makes an exact managed budget
@@ -131,8 +172,8 @@ struct SourceInner {
     style_lineage: Arc<crate::style::StyleLineage>,
     flavor: Flavor,
     date_system: DateSystem,
-    active_sheet: Option<usize>,
-    sheets: Box<[Arc<SourceSheetData>]>,
+    pub(crate) active_sheet: Option<usize>,
+    pub(crate) sheets: Arc<[Arc<SourceSheetData>]>,
     /// Sheet positions sorted by their canonical, case-insensitive names.
     ///
     /// The mandatory workbook catalog rejects duplicate canonical names, so a
@@ -142,12 +183,24 @@ struct SourceInner {
     /// Repairs made while the workbook catalog was parsed at open time.
     tolerance: ToleranceReport,
     /// Defined names parsed with the mandatory workbook catalog at open.
-    defined_names: Box<[raw::DefinedName]>,
+    /// Source-backed snapshots share this immutable catalog.
+    defined_names: Arc<[raw::DefinedName]>,
+    /// Lazily shared ingress policy for source-backed snapshots. Keeping this
+    /// on the immutable lineage avoids copying all policy fields into every
+    /// retained before/after snapshot while leaving ordinary opens lazy.
+    source_limits: OnceLock<Arc<SourceLimits>>,
+    /// The immutable catalog proof shared by tab-state snapshots in this
+    /// source lineage. It groups the unchanged defined-name catalog and its
+    /// ingress policy behind one retained handle.
+    catalog_proof: OnceLock<Arc<SourceCatalogProof>>,
     /// Weighted clean-value cache of parsed worksheet values.
     values: values::ValueCache,
     /// Number of differential formats in the styles part, parsed once for
     /// conditional-format reads.
     differential_format_count: OnceLock<usize>,
+    /// The ingress policies this workbook was opened with; a committed
+    /// workbook reopens its output under them.
+    options: crate::OpenOptions,
 }
 
 /// Read-only XLSX catalog and worksheet access over a positional source.
@@ -162,6 +215,9 @@ struct SourceInner {
 #[derive(Clone)]
 pub struct SourceBackedWorkbook {
     inner: Arc<SourceInner>,
+    /// The pending output of a committed workbook (record 0360): `inner` is
+    /// then the base the commit was made on.
+    pending: Option<Arc<deferred::Deferred>>,
 }
 
 /// A lifetime-free read-only worksheet handle from [`SourceBackedWorkbook`].
@@ -177,6 +233,16 @@ pub struct SourceWorksheet {
     owner: Arc<SourceInner>,
     data: Arc<SourceSheetData>,
     grid: OnceLock<Grid>,
+}
+
+impl std::fmt::Debug for SourceBackedWorkbook {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("SourceBackedWorkbook")
+            .field("sheets", &self.current().sheets.len())
+            .field("committed", &self.pending.is_some())
+            .finish_non_exhaustive()
+    }
 }
 
 // Shared handles: the unified operations layer keeps these in `Arc`-backed,
@@ -240,150 +306,62 @@ impl SourceBackedWorkbook {
     /// open source, while a detected metadata change returns a typed source
     /// version error on the next operation.
     #[cfg(any(unix, windows))]
-    pub fn from_path(path: impl AsRef<Path>) -> Result<Self> {
-        Self::from_path_with_limits(path, SourceLimits::default())
-    }
-
-    /// Open a filesystem-backed XLSX package with explicit OPC limits.
-    #[cfg(any(unix, windows))]
-    pub fn from_path_with_limits(path: impl AsRef<Path>, limits: SourceLimits) -> Result<Self> {
-        Self::from_read_at_with_limits(file_source(path)?, limits)
-    }
-
-    /// Open a filesystem-backed XLSX package with an explicit deferred-Part
-    /// cache policy.
-    #[cfg(any(unix, windows))]
-    pub fn from_path_with_cache_limits(
-        path: impl AsRef<Path>,
-        cache_limits: SourceCacheLimits,
-    ) -> Result<Self> {
-        Self::from_read_at_with_cache_limits(file_source(path)?, cache_limits)
-    }
-
-    /// Open a filesystem-backed XLSX package with explicit read and cache
-    /// policies.
-    #[cfg(any(unix, windows))]
-    pub fn from_path_with_limits_and_cache_limits(
-        path: impl AsRef<Path>,
-        limits: SourceLimits,
-        cache_limits: SourceCacheLimits,
-    ) -> Result<Self> {
-        Self::from_read_at_with_limits_and_cache_limits(file_source(path)?, limits, cache_limits)
-    }
-
-    /// Open a filesystem-backed XLSX package with explicit read and execution
-    /// policies.
-    #[cfg(any(unix, windows))]
-    pub fn from_path_with_execution_context(
-        path: impl AsRef<Path>,
-        limits: SourceLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_read_at_with_execution_context(file_source(path)?, limits, context)
-    }
-
-    /// Open a filesystem-backed XLSX package with explicit read and execution
-    /// policies while retaining the default finite cache.
-    #[cfg(any(unix, windows))]
-    pub fn from_path_with_limits_and_execution_context(
-        path: impl AsRef<Path>,
-        limits: SourceLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_read_at_with_limits_and_execution_context(file_source(path)?, limits, context)
-    }
-
-    /// Open a filesystem-backed XLSX package with explicit read, cache, and
-    /// execution policies.
-    #[cfg(any(unix, windows))]
-    pub fn from_path_with_limits_and_cache_limits_and_execution_context(
-        path: impl AsRef<Path>,
-        limits: SourceLimits,
-        cache_limits: SourceCacheLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_read_at_with_limits_and_cache_limits_and_execution_context(
-            file_source(path)?,
-            limits,
-            cache_limits,
-            context,
-        )
-    }
-
-    /// Open a filesystem-backed XLSX package from a regular path.
-    #[cfg(any(unix, windows))]
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
-        Self::from_path(path)
+        Self::open_with_options(path, crate::OpenOptions::default())
     }
 
-    /// Open a filesystem-backed XLSX package with explicit OPC limits.
+    /// Open a filesystem-backed XLSX package under explicit ingress
+    /// policies: source limits, deferred-payload cache limits, execution
+    /// context, leniency and semantic limits ([`crate::OpenOptions`]).
     #[cfg(any(unix, windows))]
-    pub fn open_with_limits(path: impl AsRef<Path>, limits: SourceLimits) -> Result<Self> {
-        Self::from_path_with_limits(path, limits)
-    }
-
-    /// Open a filesystem-backed XLSX package with an explicit finite cache.
-    #[cfg(any(unix, windows))]
-    pub fn open_with_cache_limits(
-        path: impl AsRef<Path>,
-        cache_limits: SourceCacheLimits,
-    ) -> Result<Self> {
-        Self::from_path_with_cache_limits(path, cache_limits)
-    }
-
-    /// Open a filesystem-backed XLSX package with explicit read and cache
-    /// policies.
-    #[cfg(any(unix, windows))]
-    pub fn open_with_limits_and_cache_limits(
-        path: impl AsRef<Path>,
-        limits: SourceLimits,
-        cache_limits: SourceCacheLimits,
-    ) -> Result<Self> {
-        Self::from_path_with_limits_and_cache_limits(path, limits, cache_limits)
-    }
-
-    /// Open a filesystem-backed XLSX package with explicit read and execution
-    /// policies.
-    #[cfg(any(unix, windows))]
-    pub fn open_with_execution_context(
-        path: impl AsRef<Path>,
-        limits: SourceLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_path_with_execution_context(path, limits, context)
-    }
-
-    /// Open a filesystem-backed XLSX package with explicit read and execution
-    /// policies while retaining the default finite cache.
-    #[cfg(any(unix, windows))]
-    pub fn open_with_limits_and_execution_context(
-        path: impl AsRef<Path>,
-        limits: SourceLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_path_with_limits_and_execution_context(path, limits, context)
-    }
-
-    /// Open a filesystem-backed XLSX package with explicit read, cache, and
-    /// execution policies.
-    #[cfg(any(unix, windows))]
-    pub fn open_with_limits_and_cache_limits_and_execution_context(
-        path: impl AsRef<Path>,
-        limits: SourceLimits,
-        cache_limits: SourceCacheLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_path_with_limits_and_cache_limits_and_execution_context(
-            path,
-            limits,
-            cache_limits,
-            context,
-        )
+    pub fn open_with_options(path: impl AsRef<Path>, options: crate::OpenOptions) -> Result<Self> {
+        Self::from_read_at_with_options(file_source(path)?, options)
     }
 
     /// Open an ordinary XLSX package from a caller-provided positional source.
     pub fn from_read_at(source: Arc<dyn ReadAt>) -> Result<Self> {
-        Self::from_read_at_with_limits(source, SourceLimits::default())
+        Self::from_read_at_with_options(source, crate::OpenOptions::default())
+    }
+
+    /// Open from a positional source under explicit ingress policies.
+    ///
+    /// With an execution context, the context checks cancellation before
+    /// mandatory open reads and before every deferred semantic
+    /// materialization, and retained and in-flight payloads are charged to
+    /// its hierarchical memory budget; managed [`litchi_opc::PartData`]
+    /// handles never escape as unbudgeted `Arc` allocations through this
+    /// facade. Without one, the deferred-payload cache is bounded by the
+    /// selected [`litchi_opc::SourceCacheLimits`] (or the OPC default) but unmanaged.
+    pub fn from_read_at_with_options(
+        source: Arc<dyn ReadAt>,
+        options: crate::OpenOptions,
+    ) -> Result<Self> {
+        Self::from_read_at_with_options_and_shared_catalog(source, options, None)
+    }
+
+    fn from_read_at_with_options_and_shared_catalog(
+        source: Arc<dyn ReadAt>,
+        options: crate::OpenOptions,
+        shared_catalog: Option<Arc<SourceCatalogProof>>,
+    ) -> Result<Self> {
+        let limits = options.source_limits;
+        let cache_limits = options.cache_limits.unwrap_or_default();
+        let package = match options.execution_context.clone() {
+            Some(context) => {
+                SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
+                    source,
+                    limits,
+                    cache_limits,
+                    context,
+                )?
+            },
+            None => SourceBackedPackage::from_read_at_with_limits_and_cache_limits(
+                source,
+                limits,
+                cache_limits,
+            )?,
+        };
+        Self::open_source_backed_package_with_shared_catalog(package, options, shared_catalog)
     }
 
     /// Open an XLSX package from a sequential reader with the default
@@ -395,159 +373,58 @@ impl SourceBackedWorkbook {
     /// them. The resulting owned source has stable freshness identity for the
     /// lifetime of this immutable snapshot.
     pub fn from_reader<R: Read>(reader: R) -> Result<Self> {
-        Self::from_reader_with_limits(reader, SourceLimits::default())
+        Self::from_reader_with_options(reader, crate::OpenOptions::default())
     }
 
-    /// Open an XLSX package from a sequential reader with explicit OPC limits.
-    ///
-    /// Input ingestion and all later deferred payload reads use the same
-    /// bounded source-backed package policy; unselected worksheets remain
-    /// cold until explicitly selected.
-    pub fn from_reader_with_limits<R: Read>(reader: R, limits: SourceLimits) -> Result<Self> {
-        Self::from_source_backed_package(SourceBackedPackage::from_reader_with_limits(
-            reader, limits,
-        )?)
-    }
-
-    /// Open from a positional source with explicit OPC resource limits.
-    pub fn from_read_at_with_limits(source: Arc<dyn ReadAt>, limits: SourceLimits) -> Result<Self> {
-        Self::from_source_backed_package(SourceBackedPackage::from_read_at_with_limits(
-            source, limits,
-        )?)
-    }
-
-    /// Open an XLSX source with an explicit finite deferred-Part cache policy.
-    ///
-    /// This compatibility constructor remains unmanaged: the cache is
-    /// bounded by [`SourceCacheLimits`] but is not charged to a hierarchical
-    /// execution budget. Use
-    /// [`Self::from_read_at_with_limits_and_cache_limits_and_execution_context`]
-    /// when the caller owns a managed budget.
-    pub fn from_read_at_with_cache_limits(
-        source: Arc<dyn ReadAt>,
-        cache_limits: SourceCacheLimits,
+    /// Open an XLSX package from a sequential reader under explicit ingress
+    /// policies. Input ingestion and later deferred payload reads use the
+    /// same source limits.
+    pub fn from_reader_with_options<R: Read>(
+        reader: R,
+        options: crate::OpenOptions,
     ) -> Result<Self> {
-        Self::from_read_at_with_limits_and_cache_limits(
-            source,
-            SourceLimits::default(),
-            cache_limits,
-        )
-    }
-
-    /// Open an XLSX source with explicit read and finite cache policies.
-    pub fn from_read_at_with_limits_and_cache_limits(
-        source: Arc<dyn ReadAt>,
-        limits: SourceLimits,
-        cache_limits: SourceCacheLimits,
-    ) -> Result<Self> {
-        Self::from_source_backed_package(
-            SourceBackedPackage::from_read_at_with_limits_and_cache_limits(
-                source,
-                limits,
-                cache_limits,
-            )?,
-        )
-    }
-
-    /// Open an XLSX source with an explicit caller-owned execution context.
-    ///
-    /// The context checks cancellation before mandatory open reads and before
-    /// every deferred semantic materialization. Retained and in-flight
-    /// payloads are charged to its hierarchical memory budget. Managed
-    /// [`litchi_opc::PartData`] handles never escape as unbudgeted `Arc`
-    /// allocations through this read-only facade.
-    pub fn from_read_at_with_execution_context(
-        source: Arc<dyn ReadAt>,
-        limits: SourceLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        let package = SourceBackedPackage::from_read_at_with_execution_context(
-            source,
-            limits,
-            context.clone(),
-        )?;
-        Self::from_source_backed_package_with_execution_context(package, Some(context))
-    }
-
-    /// Open from a positional source with explicit read and execution
-    /// policies while retaining the default finite cache.
-    pub fn from_read_at_with_limits_and_execution_context(
-        source: Arc<dyn ReadAt>,
-        limits: SourceLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_read_at_with_execution_context(source, limits, context)
-    }
-
-    /// Open an XLSX source with explicit read, cache, and execution policies.
-    ///
-    /// This is the fully explicit managed constructor. The read-only
-    /// workbook/sheet facade retains only owned semantic values and bounded
-    /// OPC cache handles; it does not detach managed payloads.
-    pub fn from_read_at_with_limits_and_cache_limits_and_execution_context(
-        source: Arc<dyn ReadAt>,
-        limits: SourceLimits,
-        cache_limits: SourceCacheLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        let package =
-            SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
-                source,
-                limits,
-                cache_limits,
-                context.clone(),
-            )?;
-        Self::from_source_backed_package_with_execution_context(package, Some(context))
+        let package = SourceBackedPackage::from_reader_with_limits(reader, options.source_limits)?;
+        Self::open_source_backed_package(package, options)
     }
 
     /// Build the read-only XLSX facade from a validated deferred OPC package.
     pub fn from_source_backed_package(package: SourceBackedPackage) -> Result<Self> {
-        Self::from_source_backed_package_with_execution_context(package, None)
+        Self::from_source_backed_package_with_options(package, crate::OpenOptions::default())
     }
 
-    /// [`Self::from_source_backed_package`] with the opt-in repairs
-    /// `leniency` allows; see [`crate::leniency`]. The Excel-compatible
-    /// repairs apply under every policy.
-    pub fn from_source_backed_package_with_leniency(
+    /// [`Self::from_source_backed_package`] under explicit policies. The
+    /// package keeps its own source and cache limits; `options` contributes
+    /// the leniency, the semantic limits and an optional facade execution
+    /// context.
+    pub fn from_source_backed_package_with_options(
         package: SourceBackedPackage,
-        leniency: Leniency,
+        options: crate::OpenOptions,
     ) -> Result<Self> {
-        Self::open_source_backed_package(package, None, leniency)
-    }
-
-    /// [`Self::from_reader`] with the opt-in repairs `leniency` allows.
-    pub fn from_reader_with_leniency<R: Read>(reader: R, leniency: Leniency) -> Result<Self> {
-        Self::from_source_backed_package_with_leniency(
-            SourceBackedPackage::from_reader_with_limits(reader, SourceLimits::default())?,
-            leniency,
-        )
-    }
-
-    /// [`Self::from_path`] with the opt-in repairs `leniency` allows.
-    #[cfg(any(unix, windows))]
-    pub fn open_with_leniency(path: impl AsRef<Path>, leniency: Leniency) -> Result<Self> {
-        Self::from_source_backed_package_with_leniency(
-            SourceBackedPackage::from_read_at_with_limits(
-                file_source(path)?,
-                SourceLimits::default(),
-            )?,
-            leniency,
-        )
-    }
-
-    fn from_source_backed_package_with_execution_context(
-        package: SourceBackedPackage,
-        execution: Option<ExecutionContext>,
-    ) -> Result<Self> {
-        Self::open_source_backed_package(package, execution, Leniency::Strict)
+        Self::open_source_backed_package(package, options)
     }
 
     fn open_source_backed_package(
         package: SourceBackedPackage,
-        execution: Option<ExecutionContext>,
-        leniency: Leniency,
+        options: crate::OpenOptions,
     ) -> Result<Self> {
+        Self::open_source_backed_package_with_shared_catalog(package, options, None)
+    }
+
+    fn open_source_backed_package_with_shared_catalog(
+        package: SourceBackedPackage,
+        options: crate::OpenOptions,
+        shared_catalog: Option<Arc<SourceCatalogProof>>,
+    ) -> Result<Self> {
+        let execution = options.execution_context.clone();
+        let leniency = options.leniency;
         check_execution(execution.as_ref())?;
+        if let Some(shared) = shared_catalog.as_ref()
+            && package.read_limits() != *shared.limits
+        {
+            return Err(invalid(
+                "reopened workbook changed its source-backed policy",
+            ));
+        }
         let retain_catalog = execution.is_some() || package.cache_diagnostics().budget_managed;
         let workbook = package.main_document_part()?;
         let flavor = codec::flavor(workbook.content_type()).ok_or_else(|| {
@@ -573,7 +450,17 @@ impl SourceBackedWorkbook {
         check_execution(execution.as_ref())?;
 
         let active_sheet = (!catalog.sheets.is_empty()).then_some(catalog.active_sheet_index);
-        let defined_names = catalog.defined_names.into_boxed_slice();
+        let defined_names = match shared_catalog.as_ref() {
+            Some(shared) => {
+                if catalog.defined_names.as_slice() != shared.defined_names.as_ref() {
+                    return Err(invalid(
+                        "reopened workbook changed its defined-name catalog",
+                    ));
+                }
+                Arc::clone(&shared.defined_names)
+            },
+            None => Arc::from(catalog.defined_names.into_boxed_slice()),
+        };
         let mut sheets = Vec::new();
         sheets
             .try_reserve_exact(catalog.sheets.len())
@@ -586,11 +473,13 @@ impl SourceBackedWorkbook {
                 kind: part.kind,
                 visibility: codec::visibility(sheet.visibility),
                 part_uri: part.uri,
+                sheet_id: sheet.sheet_id,
+                relationship_id: sheet.relationship_id.into_boxed_str(),
                 tolerance: OnceLock::new(),
                 build: Mutex::new(()),
             }));
         }
-        let sheets = sheets.into_boxed_slice();
+        let sheets: Arc<[Arc<SourceSheetData>]> = sheets.into_boxed_slice().into();
         let mut sheet_name_order = Vec::new();
         sheet_name_order
             .try_reserve_exact(sheets.len())
@@ -613,9 +502,22 @@ impl SourceBackedWorkbook {
         package.source_version()?;
         check_execution(execution.as_ref())?;
 
+        let source_limits = OnceLock::new();
+        let catalog_proof = OnceLock::new();
+        if let Some(shared) = shared_catalog {
+            let _ = source_limits.set(Arc::clone(&shared.limits));
+            let _ = catalog_proof.set(shared);
+        }
+
         Ok(Self {
             inner: Arc::new(SourceInner {
                 package,
+                restore_endpoint: OnceLock::new(),
+                tab_state_snapshot: OnceLock::new(),
+                tab_state_snapshot_seen: AtomicBool::new(false),
+                tab_state_graph: OnceLock::new(),
+                package_handle: OnceLock::new(),
+                merge_source_states: Mutex::new(HashMap::new()),
                 execution,
                 _catalog_data: retain_catalog.then_some(catalog_bytes),
                 shared_strings_uri,
@@ -636,9 +538,13 @@ impl SourceBackedWorkbook {
                 sheet_name_order,
                 tolerance,
                 defined_names,
+                source_limits,
+                catalog_proof,
                 values: values::ValueCache::new(),
                 differential_format_count: OnceLock::new(),
+                options,
             }),
+            pending: None,
         })
     }
 
@@ -655,11 +561,12 @@ impl SourceBackedWorkbook {
     /// far conformed. See [`crate::leniency`] for the contract.
     #[must_use]
     pub fn tolerance_report(&self) -> ToleranceReport {
-        let mut report = self.inner.tolerance.clone();
-        if let Some(strings) = self.inner.shared_strings_tolerance.get() {
+        let inner = self.current();
+        let mut report = inner.tolerance.clone();
+        if let Some(strings) = inner.shared_strings_tolerance.get() {
             report.append(strings);
         }
-        for sheet in self.inner.sheets.iter() {
+        for sheet in inner.sheets.iter() {
             if let Some(tolerance) = sheet.tolerance.get() {
                 report.append_sheet(tolerance, sheet.position);
             }
@@ -674,7 +581,28 @@ impl SourceBackedWorkbook {
     /// the same workbook part; reading them performs no I/O.
     #[must_use]
     pub fn defined_names(&self) -> &[raw::DefinedName] {
-        &self.inner.defined_names
+        match self.pending_catalog() {
+            Some(catalog) => &catalog.defined_names,
+            None => &self.current().defined_names,
+        }
+    }
+
+    pub(crate) fn shared_catalog_proof(&self) -> Arc<SourceCatalogProof> {
+        self.current().catalog_proof()
+    }
+
+    pub(crate) fn tab_state_snapshot(&self) -> &OnceLock<Arc<crate::tab_state::Snapshot>> {
+        &self.current().tab_state_snapshot
+    }
+
+    pub(crate) fn tab_state_source_owner(&self) -> Arc<SourceInner> {
+        Arc::clone(self.current())
+    }
+
+    pub(crate) fn tab_state_snapshot_should_cache(&self) -> bool {
+        self.current()
+            .tab_state_snapshot_seen
+            .swap(true, Ordering::AcqRel)
     }
 
     /// Content-free diagnostics of the workbook's semantic cache.
@@ -686,7 +614,7 @@ impl SourceBackedWorkbook {
     /// [`Self::cache_diagnostics`].
     #[must_use]
     pub fn semantic_cache_diagnostics(&self) -> CacheDiagnostics {
-        self.inner.values.diagnostics()
+        self.current().values.diagnostics()
     }
 
     /// Release every parsed worksheet value the semantic cache retains that
@@ -695,30 +623,30 @@ impl SourceBackedWorkbook {
     /// Reads are unaffected apart from cost: a released value is parsed
     /// again from the same source snapshot when a read next needs it.
     pub fn trim_semantic_cache(&self) -> usize {
-        self.inner.values.trim_clean()
+        self.current().values.trim_clean()
     }
 
     /// Workbook flavor derived from the mandatory workbook catalog.
     #[must_use]
     pub fn flavor(&self) -> Flavor {
-        self.inner.flavor
+        self.current().flavor
     }
 
     /// Date serial system derived from the mandatory workbook catalog.
     #[must_use]
     pub fn date_system(&self) -> DateSystem {
-        self.inner.date_system
+        self.current().date_system
     }
 
     /// Content-free deferred-Part cache diagnostics.
     #[must_use]
     pub fn cache_diagnostics(&self) -> SourceCacheDiagnostics {
-        self.inner.package.cache_diagnostics()
+        self.current().package.cache_diagnostics()
     }
 
     /// Exact source identity and revision captured by this facade.
     pub fn source_version(&self) -> Result<SourceVersion> {
-        self.inner.package.source_version().map_err(Into::into)
+        self.current().package.source_version().map_err(Into::into)
     }
 
     /// Borrow the validated deferred OPC package this catalog reads from.
@@ -728,17 +656,22 @@ impl SourceBackedWorkbook {
     /// Borrowed package services, such as
     /// [`SourceBackedPackage::to_opc_package`], read through the same
     /// positional source and observe the same source-version fence.
-    #[must_use]
-    pub fn source_backed_package(&self) -> &SourceBackedPackage {
-        &self.inner.package
+    ///
+    /// A committed workbook (record 0360) has no indexed package of its own
+    /// until a read writes its output into memory; this does so once.
+    ///
+    /// # Errors
+    ///
+    /// Returns the publication error of a committed workbook's output.
+    pub fn source_backed_package(&self) -> Result<&SourceBackedPackage> {
+        Ok(&self.view()?.inner.package)
     }
 
     /// Recover the validated deferred OPC package without re-indexing it.
     ///
-    /// The returned package is the one this catalog was opened from, so a
-    /// per-feature `SourceBackedEditor` (for example
-    /// [`crate::cell_values::SourceBackedEditor::from_source_backed_package`])
-    /// can adopt it without a second container index. The lazily parsed
+    /// The returned package is the one this catalog was opened from, so
+    /// [`Self::from_source_backed_package`] can adopt it again without a
+    /// second container index. The lazily parsed
     /// catalog, shared strings and styles, and every parsed worksheet value
     /// the semantic cache retains, are released.
     ///
@@ -746,39 +679,92 @@ impl SourceBackedWorkbook {
     ///
     /// Returns `self` unchanged while another clone of this workbook, or a
     /// [`SourceWorksheet`] handle selected from it, still shares the catalog.
+    /// A committed workbook (record 0360), which has no indexed package of
+    /// its own, is returned unchanged too.
     pub fn try_into_source_backed_package(self) -> std::result::Result<SourceBackedPackage, Self> {
+        if self.pending.is_some() {
+            return Err(self);
+        }
         match Arc::try_unwrap(self.inner) {
             Ok(inner) => Ok(inner.package),
-            Err(inner) => Err(Self { inner }),
+            Err(inner) => Err(Self {
+                inner,
+                pending: None,
+            }),
         }
     }
 
     /// Number of logical workbook sheets.
     #[must_use]
     pub fn len(&self) -> usize {
-        self.inner.sheets.len()
+        self.current().sheets.len()
     }
 
     /// Whether the workbook catalog contains no sheets.
     #[must_use]
     pub fn is_empty(&self) -> bool {
-        self.inner.sheets.is_empty()
+        self.current().sheets.is_empty()
     }
 
     /// Iterate lightweight sheet handles without reading worksheet payloads.
-    #[must_use]
+    ///
+    /// # Errors
+    ///
+    /// Returns the publication error of a committed workbook's output, which
+    /// the first read writes into memory once (record 0360).
     pub fn sheets(
         &self,
-    ) -> impl ExactSizeIterator<Item = SourceWorksheet> + DoubleEndedIterator + '_ {
-        self.inner
+    ) -> Result<impl ExactSizeIterator<Item = SourceWorksheet> + DoubleEndedIterator + '_> {
+        let inner = &self.view()?.inner;
+        Ok(inner
             .sheets
             .iter()
             .cloned()
-            .map(|data| SourceWorksheet::new(Arc::clone(&self.inner), data))
+            .map(|data| SourceWorksheet::new(Arc::clone(inner), data)))
+    }
+
+    /// The developer-facing sheet names in catalog order, without reading
+    /// any worksheet payload.
+    ///
+    /// A worksheet-level commit leaves the catalog unchanged, so a committed
+    /// workbook answers from its base catalog without materializing its
+    /// output. Workbook-level families retain catalog-only state in their
+    /// deferred projection; a read that needs the reopened owner materializes
+    /// and validates that output before replacing the base projection.
+    #[must_use]
+    pub fn sheet_names(&self) -> impl ExactSizeIterator<Item = &str> + DoubleEndedIterator + '_ {
+        self.current()
+            .sheets
+            .iter()
+            .map(|sheet| sheet.name.as_str())
+    }
+
+    /// The catalog position of the active sheet, if the catalog contains one;
+    /// see [`Self::sheet_names`] for committed workbooks.
+    #[must_use]
+    pub fn active_sheet_position(&self) -> Option<usize> {
+        match self.pending_catalog() {
+            Some(catalog) => catalog.active_sheet,
+            None => self.current().active_sheet,
+        }
+    }
+
+    fn pending_catalog(&self) -> Option<&deferred::Catalog> {
+        self.pending
+            .as_ref()
+            .filter(|pending| pending.materialized().is_none())
+            .and_then(|pending| pending.catalog())
     }
 
     /// Look up a sheet by developer-facing name or checked zero-based position.
     pub fn sheet<'a>(&self, selector: impl Into<Selector<'a>>) -> Result<Option<SourceWorksheet>> {
+        self.view()?.sheet_in_view(selector)
+    }
+
+    fn sheet_in_view<'a>(
+        &self,
+        selector: impl Into<Selector<'a>>,
+    ) -> Result<Option<SourceWorksheet>> {
         self.inner.execution_check()?;
         let data = match selector.into() {
             CoreSelector::Position(position) => self.inner.sheets.get(position.get()).cloned(),
@@ -803,14 +789,35 @@ impl SourceBackedWorkbook {
     }
 
     /// Return the active sheet, if the workbook catalog contains one.
-    #[must_use]
-    pub fn active_sheet(&self) -> Option<SourceWorksheet> {
-        let data = self
-            .inner
+    ///
+    /// # Errors
+    ///
+    /// Returns the publication error of a committed workbook's output, which
+    /// the first read writes into memory once (record 0360).
+    pub fn active_sheet(&self) -> Result<Option<SourceWorksheet>> {
+        let inner = &self.view()?.inner;
+        let Some(data) = inner
             .active_sheet
-            .and_then(|position| self.inner.sheets.get(position))
-            .cloned()?;
-        Some(SourceWorksheet::new(Arc::clone(&self.inner), data))
+            .and_then(|position| inner.sheets.get(position))
+            .cloned()
+        else {
+            return Ok(None);
+        };
+        Ok(Some(SourceWorksheet::new(Arc::clone(inner), data)))
+    }
+
+    /// The catalog state infallible accessors read: the reopened output of a
+    /// committed workbook once a read has materialized it, otherwise the
+    /// opened (or base) catalog, which a worksheet-level commit leaves
+    /// unchanged. Catalog-only workbook-level projections remain deferred;
+    /// accessors that need their reopened owner go through [`Self::view`].
+    fn current(&self) -> &Arc<SourceInner> {
+        match &self.pending {
+            Some(pending) => pending
+                .materialized()
+                .map_or(&self.inner, |view| &view.inner),
+            None => &self.inner,
+        }
     }
 }
 
@@ -902,25 +909,17 @@ impl SourceWorksheet {
                 sheet: self.data.name.clone(),
             });
         }
-        crate::form_control::source_form_controls_for_sheet(
-            &self.owner.package,
-            &self.data.part_uri,
-        )
-    }
-
-    /// Read this worksheet's form controls under a caller-owned bounded
-    /// owner policy.
-    pub fn form_controls_with_limits(
-        &self,
-        limits: crate::form_control::OwnerLimits,
-    ) -> Result<crate::form_control::FormControlCollection> {
-        if self.data.kind != WorksheetKind::Worksheet {
-            return Err(Error::NotWorksheet {
-                sheet: self.data.name.clone(),
+        let package = &self.owner.package;
+        let limits = self
+            .owner
+            .options
+            .semantic_limits
+            .form_controls_value()
+            .unwrap_or_else(|| {
+                crate::form_control::OwnerLimits::from_read_limits(package.read_limits())
             });
-        }
         crate::form_control::source_form_controls_for_sheet_with_limits(
-            &self.owner.package,
+            package,
             &self.data.part_uri,
             limits,
         )
@@ -932,18 +931,6 @@ impl SourceWorksheet {
         selector: impl Into<crate::form_control::ControlSelector<'a>>,
     ) -> Result<Option<crate::form_control::FormControlView>> {
         Ok(self.form_controls()?.get(selector)?.cloned())
-    }
-
-    /// Resolve one form control under a caller-owned bounded owner policy.
-    pub fn form_control_with_limits<'a>(
-        &self,
-        selector: impl Into<crate::form_control::ControlSelector<'a>>,
-        limits: crate::form_control::OwnerLimits,
-    ) -> Result<Option<crate::form_control::FormControlView>> {
-        Ok(self
-            .form_controls_with_limits(limits)?
-            .get(selector)?
-            .cloned())
     }
 
     /// Retained visibility state.
@@ -1597,6 +1584,72 @@ fn map_selected_mce_error(error: MceError) -> Error {
 }
 
 impl SourceInner {
+    pub(crate) fn tab_state_graph(
+        &self,
+        owner: std::sync::Weak<SourceInner>,
+    ) -> Arc<crate::tab_state::GraphBinding> {
+        Arc::clone(self.tab_state_graph.get_or_init(|| {
+            Arc::new(crate::tab_state::GraphBinding::source(
+                owner,
+                Arc::clone(&self.sheets),
+            ))
+        }))
+    }
+
+    pub(crate) fn tab_state_package(&self) -> &SourceBackedPackage {
+        &self.package
+    }
+
+    pub(crate) fn tab_state_catalog_is_clean(&self) -> bool {
+        self.tolerance.is_clean()
+    }
+
+    pub(crate) fn source_limits(&self) -> Arc<SourceLimits> {
+        Arc::clone(
+            self.source_limits
+                .get_or_init(|| Arc::new(self.package.read_limits())),
+        )
+    }
+
+    pub(crate) fn catalog_proof(&self) -> Arc<SourceCatalogProof> {
+        Arc::clone(self.catalog_proof.get_or_init(|| {
+            Arc::new(SourceCatalogProof {
+                defined_names: Arc::clone(&self.defined_names),
+                limits: self.source_limits(),
+            })
+        }))
+    }
+
+    pub(crate) fn package_handle(&self) -> Arc<SourceBackedPackage> {
+        Arc::clone(
+            self.package_handle
+                .get_or_init(|| Arc::new(self.package.clone())),
+        )
+    }
+
+    pub(crate) fn merge_source_state(
+        &self,
+        worksheet_uri: &PackURI,
+    ) -> Option<Arc<crate::merge::source::SourceStateShared>> {
+        self.merge_source_states
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .get(worksheet_uri)
+            .cloned()
+    }
+
+    pub(crate) fn cache_merge_source_state(
+        &self,
+        worksheet_uri: PackURI,
+        state: Arc<crate::merge::source::SourceStateShared>,
+    ) -> Arc<crate::merge::source::SourceStateShared> {
+        let mut states = self
+            .merge_source_states
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        Arc::clone(states.entry(worksheet_uri).or_insert(state))
+    }
+
     fn execution_check(&self) -> Result<()> {
         // The package owns the execution context used by managed source
         // caches. Always check it first so compatibility facades built around
@@ -1921,8 +1974,9 @@ mod tests {
     use litchi_opc::{OpcError, OpcPackage, PackURI, SourceBackedPackage, SourceCacheLimits};
     use soapberry_zip::office::StreamingArchiveWriter;
 
-    use super::{SourceBackedWorkbook, SourceCellView, SourceLimits};
+    use super::{SourceBackedWorkbook, SourceCellView};
     use crate::{Cell, Error, Value};
+    use litchi_opc::SourceLimits;
 
     const FIRST_MARKER: &[u8] = b"source-backed-requested-first-sheet";
     const SECOND_MARKER: &[u8] = b"source-backed-unrequested-second-sheet";
@@ -2154,6 +2208,7 @@ mod tests {
         assert_eq!(
             workbook
                 .sheets()
+                .unwrap()
                 .map(|sheet| sheet.name().to_owned())
                 .collect::<Vec<_>>(),
             ["First", "Second"]
@@ -2188,10 +2243,11 @@ mod tests {
     fn cached_worksheet_queries_do_not_reload_an_evicted_payload() {
         let source = Arc::new(CountingSource::new(source_backed_xlsx()));
         let cache_limits = SourceCacheLimits::new(256 * 1024, 1).unwrap();
-        let workbook = SourceBackedWorkbook::from_read_at_with_limits_and_cache_limits(
+        let workbook = SourceBackedWorkbook::from_read_at_with_options(
             source.clone(),
-            SourceLimits::default(),
-            cache_limits,
+            crate::OpenOptions::new()
+                .source_limits(SourceLimits::default())
+                .cache_limits(cache_limits),
         )
         .unwrap();
 
@@ -2309,14 +2365,14 @@ mod tests {
         let source = Arc::new(CountingSource::new(archive));
         let (budget, _cancellation_source, context) = managed_context(exact);
         let cache_limits = SourceCacheLimits::new(usize::try_from(exact).unwrap(), 4).unwrap();
-        let workbook =
-            SourceBackedWorkbook::from_read_at_with_limits_and_cache_limits_and_execution_context(
-                source.clone(),
-                SourceLimits::default(),
-                cache_limits,
-                context,
-            )
-            .unwrap();
+        let workbook = SourceBackedWorkbook::from_read_at_with_options(
+            source.clone(),
+            crate::OpenOptions::new()
+                .source_limits(SourceLimits::default())
+                .cache_limits(cache_limits)
+                .execution_context(context),
+        )
+        .unwrap();
 
         assert_eq!(workbook.source_version().unwrap().revision(), 0);
         assert_eq!(workbook.cache_diagnostics().successful_loads, 1);
@@ -2353,14 +2409,14 @@ mod tests {
         let source = Arc::new(CountingSource::new(archive));
         let (budget, _cancellation_source, context) = managed_context(exact - 1);
         let cache_limits = SourceCacheLimits::new(usize::try_from(exact).unwrap(), 4).unwrap();
-        let workbook =
-            SourceBackedWorkbook::from_read_at_with_limits_and_cache_limits_and_execution_context(
-                source.clone(),
-                SourceLimits::default(),
-                cache_limits,
-                context,
-            )
-            .unwrap();
+        let workbook = SourceBackedWorkbook::from_read_at_with_options(
+            source.clone(),
+            crate::OpenOptions::new()
+                .source_limits(SourceLimits::default())
+                .cache_limits(cache_limits)
+                .execution_context(context),
+        )
+        .unwrap();
 
         assert_eq!(workbook.cache_diagnostics().successful_loads, 1);
         assert_eq!(budget.used(Resource::Memory), workbook_bytes);
@@ -2388,10 +2444,11 @@ mod tests {
         let (budget, cancellation_source, context) = managed_context(u64::MAX);
         cancellation_source.cancel();
         assert!(matches!(
-            SourceBackedWorkbook::from_read_at_with_execution_context(
+            SourceBackedWorkbook::from_read_at_with_options(
                 source.clone(),
-                SourceLimits::default(),
-                context,
+                crate::OpenOptions::new()
+                    .source_limits(SourceLimits::default())
+                    .execution_context(context)
             ),
             Err(Error::Package(OpcError::Cancelled))
         ));
@@ -2401,10 +2458,11 @@ mod tests {
 
         let source = Arc::new(CountingSource::new(archive));
         let (budget, cancellation_source, context) = managed_context(u64::MAX);
-        let workbook = SourceBackedWorkbook::from_read_at_with_execution_context(
+        let workbook = SourceBackedWorkbook::from_read_at_with_options(
             source.clone(),
-            SourceLimits::default(),
-            context,
+            crate::OpenOptions::new()
+                .source_limits(SourceLimits::default())
+                .execution_context(context),
         )
         .unwrap();
         let first = workbook.sheet("First").unwrap().unwrap();
@@ -2703,10 +2761,11 @@ mod tests {
         fn cancellation_0363_does_not_publish_store() {
             let source = Arc::new(CountingSource::new(source_backed_xlsx()));
             let (_budget, cancellation_source, context) = managed_context(u64::MAX);
-            let workbook = SourceBackedWorkbook::from_read_at_with_execution_context(
+            let workbook = SourceBackedWorkbook::from_read_at_with_options(
                 source,
-                SourceLimits::default(),
-                context,
+                crate::OpenOptions::new()
+                    .source_limits(SourceLimits::default())
+                    .execution_context(context),
             )
             .unwrap();
             let sheet = workbook.sheet("First").unwrap().unwrap();
@@ -3109,10 +3168,11 @@ mod tests {
 
             let source = Arc::new(CountingSource::new(bytes));
             let (_budget, cancellation_source, context) = managed_context(u64::MAX);
-            let workbook = SourceBackedWorkbook::from_read_at_with_execution_context(
+            let workbook = SourceBackedWorkbook::from_read_at_with_options(
                 source,
-                SourceLimits::default(),
-                context,
+                crate::OpenOptions::new()
+                    .source_limits(SourceLimits::default())
+                    .execution_context(context),
             )
             .unwrap();
             let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
@@ -3163,8 +3223,11 @@ mod tests {
             );
             let source = Arc::new(CountingSource::new(bytes));
             let cache_limits = SourceCacheLimits::new(4096, 1).unwrap();
-            let workbook =
-                SourceBackedWorkbook::from_read_at_with_cache_limits(source, cache_limits).unwrap();
+            let workbook = SourceBackedWorkbook::from_read_at_with_options(
+                source,
+                crate::OpenOptions::new().cache_limits(cache_limits),
+            )
+            .unwrap();
             let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
             assert_text(sheet.cell("A1").unwrap(), "rich text");
             assert!(sheet.store_resident());
@@ -3580,10 +3643,11 @@ mod tests {
                 None,
             )));
             let (_budget, cancellation_source, context) = managed_context(u64::MAX);
-            let workbook = SourceBackedWorkbook::from_read_at_with_execution_context(
+            let workbook = SourceBackedWorkbook::from_read_at_with_options(
                 source,
-                SourceLimits::default(),
-                context,
+                crate::OpenOptions::new()
+                    .source_limits(SourceLimits::default())
+                    .execution_context(context),
             )
             .unwrap();
             let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
@@ -4186,10 +4250,11 @@ mod tests {
 
             let source = Arc::new(CountingSource::new(dependency_xlsx(&valid, None, None)));
             let (_budget, cancellation_source, context) = managed_context(u64::MAX);
-            let workbook = SourceBackedWorkbook::from_read_at_with_execution_context(
+            let workbook = SourceBackedWorkbook::from_read_at_with_options(
                 source,
-                SourceLimits::default(),
-                context,
+                crate::OpenOptions::new()
+                    .source_limits(SourceLimits::default())
+                    .execution_context(context),
             )
             .unwrap();
             let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
@@ -4465,9 +4530,13 @@ mod package_handoff_tests {
     #[test]
     fn package_handoff_returns_the_package_indexed_at_open() {
         let workbook = SourceBackedWorkbook::from_reader(Cursor::new(fixture())).unwrap();
-        let lineage = workbook.source_backed_package().source_lineage();
+        let lineage = workbook.source_backed_package().unwrap().source_lineage();
         assert_eq!(
-            workbook.source_backed_package().source_version().unwrap(),
+            workbook
+                .source_backed_package()
+                .unwrap()
+                .source_version()
+                .unwrap(),
             workbook.source_version().unwrap()
         );
         let selected = workbook.sheet(0_usize).unwrap().expect("first sheet");
@@ -4489,14 +4558,12 @@ mod package_handoff_tests {
 
         let package = workbook
             .try_into_source_backed_package()
-            .ok()
             .expect("the sole owner recovers its package");
         // Same lineage token: the very package opened above, not a re-index.
         assert!(package.source_lineage() == lineage);
-        let editor =
-            crate::tab_state::SourceBackedEditor::from_source_backed_package(package).unwrap();
-        editor
-            .snapshot()
-            .expect("a per-feature editor adopts the recovered package");
+        let workbook = SourceBackedWorkbook::from_source_backed_package(package).unwrap();
+        workbook
+            .edit_tab_state()
+            .expect("a source-backed family edit adopts the recovered package");
     }
 }

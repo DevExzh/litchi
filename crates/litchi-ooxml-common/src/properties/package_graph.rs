@@ -182,7 +182,7 @@ pub(crate) fn ensure_only_inbound<P: PackageMetadata>(
 pub(crate) fn free_part_name<P: PackageMetadata>(
     package: &P,
     stem: &str,
-    resource: &'static str,
+    resource: crate::LimitKind,
 ) -> Result<PackURI> {
     const MAX_CANDIDATES: u32 = 10_000;
     for index in 1..=MAX_CANDIDATES {
@@ -200,8 +200,8 @@ pub(crate) fn free_part_name<P: PackageMetadata>(
         }
     }
     Err(Error::Limit {
-        resource,
-        max: MAX_CANDIDATES as usize,
-        actual: MAX_CANDIDATES as usize,
+        kind: resource,
+        maximum: MAX_CANDIDATES as usize,
+        observed: MAX_CANDIDATES as usize,
     })
 }

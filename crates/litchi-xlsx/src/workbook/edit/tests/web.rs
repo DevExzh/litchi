@@ -201,7 +201,8 @@ fn web_patch_cross_graph_validation_is_atomic_on_alternate_snapshots() {
             .expect("worksheet part")
             .blob()
             .to_vec();
-        let after = raw::web::replace(&source, &bindings).expect("write bindings");
+        let after = raw::web::replace(&source, &bindings, &litchi_opc::SourceLimits::default())
+            .expect("write bindings");
         package
             .get_part_mut(&uri)
             .expect("worksheet part")

@@ -90,9 +90,10 @@ fn serializer_rejects_oversized_output_before_appending_extension() {
     value.extension_list_xml = Some(vec![b'x'; MAX_PART_BYTES]);
 
     let error = value.to_xml(false).unwrap_err();
-    assert_eq!(
-        error.to_string(),
-        "serialized volatile-dependencies part exceeds 8 MiB"
+    assert!(
+        matches!(&error, Error::Invalid(message)
+            if message == "serialized volatile-dependencies part exceeds 8 MiB"),
+        "{error:?}"
     );
 }
 

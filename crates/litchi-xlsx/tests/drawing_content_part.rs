@@ -426,7 +426,8 @@ fn source_core_content_parts_pair_all_anchor_geometry_and_ranges() {
         (true, DrawingDialect::Strict, RelationshipDialect::Strict),
     ] {
         let xml = direct_core_drawing(strict);
-        let source = SourceDrawing::scan(&xml).expect("core content-part source must scan");
+        let source = SourceDrawing::scan(&xml, 0, litchi_xlsx::drawing::ScanLimits::default())
+            .expect("core content-part source must scan");
         assert_eq!(source.dialect(), dialect);
         assert_eq!(source.relationship_dialect(), relationship_dialect);
         assert_eq!(source.content_parts().len(), 3);
@@ -447,7 +448,7 @@ fn source_core_content_parts_pair_all_anchor_geometry_and_ranges() {
             assert!(owner_bytes.ends_with(b"/>"));
             assert_eq!(
                 owner_bytes,
-                &xml[owner.owner_range().start..owner.owner_range().end]
+                &xml[owner.owner_element().range().start..owner.owner_element().range().end]
             );
 
             let anchor_bytes = owner
@@ -505,7 +506,12 @@ fn alias_default_namespace_and_mixed_picture_content_part_order_stay_paired() {
             .replace("x:", "")
             .replace("xmlns:x=", "xmlns=");
 
-    let source = SourceDrawing::scan(xml.as_bytes()).expect("default namespace drawing scans");
+    let source = SourceDrawing::scan(
+        xml.as_bytes(),
+        0,
+        litchi_xlsx::drawing::ScanLimits::default(),
+    )
+    .expect("default namespace drawing scans");
     assert_eq!(source.pictures().len(), 2);
     assert_eq!(source.content_parts().len(), 2);
 
@@ -571,7 +577,12 @@ fn source_content_part_requires_childless_core_element_and_canonical_qname() {
     ];
     for candidate in malformed {
         assert!(
-            SourceDrawing::scan(candidate.as_bytes()).is_err(),
+            SourceDrawing::scan(
+                candidate.as_bytes(),
+                0,
+                litchi_xlsx::drawing::ScanLimits::default()
+            )
+            .is_err(),
             "malformed core contentPart was accepted: {candidate}"
         );
     }
@@ -595,7 +606,12 @@ fn strict_core_content_part_rejects_unknown_attributes_and_pairs_valid_typed_own
         );
     for candidate in [unknown_unqualified, foreign_namespace] {
         assert!(
-            SourceDrawing::scan(candidate.as_bytes()).is_err(),
+            SourceDrawing::scan(
+                candidate.as_bytes(),
+                0,
+                litchi_xlsx::drawing::ScanLimits::default()
+            )
+            .is_err(),
             "strict contentPart accepted an unknown attribute: {candidate}"
         );
         assert!(
@@ -604,7 +620,12 @@ fn strict_core_content_part_rejects_unknown_attributes_and_pairs_valid_typed_own
         );
     }
 
-    let source = SourceDrawing::scan(valid.as_bytes()).unwrap();
+    let source = SourceDrawing::scan(
+        valid.as_bytes(),
+        0,
+        litchi_xlsx::drawing::ScanLimits::default(),
+    )
+    .unwrap();
     assert_eq!(source.dialect(), DrawingDialect::Strict);
     assert_eq!(source.relationship_dialect(), RelationshipDialect::Strict);
     let typed = litchi_xlsx::drawing::parse(&valid).unwrap().unwrap();
@@ -627,14 +648,25 @@ fn source_content_part_refuses_mce_owners_and_keeps_foreign_opaque_markup_out() 
         r#"<xdr:wsDr xmlns:xdr="{XDR}" xmlns:r="{REL}" xmlns:mc="{MCE}" xmlns:x="urn:litchi:choice"><xdr:twoCellAnchor><xdr:from><xdr:col>1</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>1</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from><xdr:to><xdr:col>2</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>2</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to><mc:AlternateContent><mc:Choice Requires="x">{owner}</mc:Choice><mc:Fallback><xdr:sp/></mc:Fallback></mc:AlternateContent><xdr:clientData/></xdr:twoCellAnchor></xdr:wsDr>"#,
         owner = core_content_part("xdr", "r", "rIdMce"),
     );
-    assert!(SourceDrawing::scan(active_choice.as_bytes()).is_err());
+    assert!(
+        SourceDrawing::scan(
+            active_choice.as_bytes(),
+            0,
+            litchi_xlsx::drawing::ScanLimits::default()
+        )
+        .is_err()
+    );
 
     let foreign_wrapper = format!(
         r#"<xdr:wsDr xmlns:xdr="{XDR}" xmlns:r="{REL}" xmlns:pmc="{FOREIGN_MCE}" xmlns:opaque="urn:litchi:opaque">{}<pmc:AlternateContent pmc:Ignorable="opaque"><pmc:Choice Requires="opaque"><xdr:contentPart r:id="rIdOpaque"/></pmc:Choice><pmc:Fallback><opaque:payload/></pmc:Fallback></pmc:AlternateContent></xdr:wsDr>"#,
         core_anchor("xdr", "r", 0),
     );
-    let source =
-        SourceDrawing::scan(foreign_wrapper.as_bytes()).expect("foreign wrapper stays opaque");
+    let source = SourceDrawing::scan(
+        foreign_wrapper.as_bytes(),
+        0,
+        litchi_xlsx::drawing::ScanLimits::default(),
+    )
+    .expect("foreign wrapper stays opaque");
     assert_eq!(source.content_parts().len(), 1);
     assert_eq!(source.content_parts()[0].relationship_id(), "rIdContent0");
     assert!(
@@ -651,7 +683,12 @@ fn source_content_part_refuses_mce_owners_and_keeps_foreign_opaque_markup_out() 
             "<xdr:contentPart r:id=\"rIdDuplicate\"/><xdr:clientData/>",
         );
     assert!(
-        SourceDrawing::scan(duplicate.as_bytes()).is_err(),
+        SourceDrawing::scan(
+            duplicate.as_bytes(),
+            0,
+            litchi_xlsx::drawing::ScanLimits::default()
+        )
+        .is_err(),
         "two direct core owners in one anchor must be refused"
     );
 }
@@ -664,7 +701,7 @@ fn source_content_part_limit_accepts_exact_and_rejects_one_under() {
         ..litchi_xlsx::drawing::ScanLimits::default()
     };
     assert_eq!(
-        SourceDrawing::scan_with_limits(&xml, 0, exact)
+        SourceDrawing::scan(&xml, 0, exact)
             .unwrap()
             .content_parts()
             .len(),
@@ -674,7 +711,7 @@ fn source_content_part_limit_accepts_exact_and_rejects_one_under() {
         max_content_parts: 2,
         ..litchi_xlsx::drawing::ScanLimits::default()
     };
-    assert!(SourceDrawing::scan_with_limits(&xml, 0, one_under).is_err());
+    assert!(SourceDrawing::scan(&xml, 0, one_under).is_err());
 }
 
 #[test]
@@ -682,7 +719,12 @@ fn nested_xdr14_group_content_part_is_not_inferred_as_core_owner() {
     let xml = format!(
         r#"<xdr:wsDr xmlns:xdr="{XDR}" xmlns:r="{REL}" xmlns:xdr14="{XDR14}"><xdr:twoCellAnchor><xdr:from><xdr:col>1</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>1</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from><xdr:to><xdr:col>2</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>2</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to><xdr:grpSp><xdr:nvGrpSpPr/><xdr:grpSpPr/><xdr14:contentPart r:id="rIdGroup"/></xdr:grpSp><xdr:clientData/></xdr:twoCellAnchor></xdr:wsDr>"#
     );
-    let source = SourceDrawing::scan(xml.as_bytes()).expect("unresolved extension remains opaque");
+    let source = SourceDrawing::scan(
+        xml.as_bytes(),
+        0,
+        litchi_xlsx::drawing::ScanLimits::default(),
+    )
+    .expect("unresolved extension remains opaque");
     assert!(source.content_parts().is_empty());
 }
 
@@ -766,14 +808,14 @@ fn worksheet_content_part_facade_pairs_source_typed_geometry_and_borrowed_payloa
                 }
             );
 
-            let payload = part.payload().expect("target XML must be read lazily");
+            let payload = part.read_payload().expect("target XML must be read lazily");
             assert_eq!(
                 payload.bytes(),
                 target_payload(index, PackageFault::None).as_slice()
             );
             assert!(payload.outbound_relationships().is_empty());
             let first_payload_ptr = payload.bytes().as_ptr();
-            let second_payload = part.payload().unwrap();
+            let second_payload = part.read_payload().unwrap();
             assert_eq!(first_payload_ptr, second_payload.bytes().as_ptr());
         }
 
@@ -824,7 +866,7 @@ fn worksheet_content_part_relation_and_target_graph_failures_are_typed() {
     let workbook = Package::from_bytes(&malformed_target).unwrap();
     let worksheet = workbook.workbook_ref().sheet("Sheet1").unwrap().unwrap();
     let drawing = worksheet.drawing(0).unwrap();
-    assert!(drawing.content_part(0).unwrap().payload().is_err());
+    assert!(drawing.content_part(0).unwrap().read_payload().is_err());
 }
 
 #[test]
@@ -853,7 +895,7 @@ fn worksheet_content_part_payload_xml_contract_is_bounded_and_preserving() {
         let worksheet = workbook.workbook_ref().sheet("Sheet1").unwrap().unwrap();
         let drawing = worksheet.drawing(0).unwrap();
         assert!(
-            drawing.content_part(0).unwrap().payload().is_err(),
+            drawing.content_part(0).unwrap().read_payload().is_err(),
             "payload fault {fault:?} was accepted"
         );
     }
@@ -862,7 +904,7 @@ fn worksheet_content_part_payload_xml_contract_is_bounded_and_preserving() {
     let workbook = Package::from_bytes(&legal).unwrap();
     let worksheet = workbook.workbook_ref().sheet("Sheet1").unwrap().unwrap();
     let drawing = worksheet.drawing(0).unwrap();
-    let payload = drawing.content_part(0).unwrap().payload().unwrap();
+    let payload = drawing.content_part(0).unwrap().read_payload().unwrap();
     assert!(
         payload
             .bytes()
@@ -898,7 +940,12 @@ fn worksheet_content_part_payload_xml_contract_is_bounded_and_preserving() {
     let worksheet = workbook.workbook_ref().sheet("Sheet1").unwrap().unwrap();
     let drawing = worksheet.drawing(0).unwrap();
     assert_eq!(
-        drawing.content_part(0).unwrap().payload().unwrap().bytes(),
+        drawing
+            .content_part(0)
+            .unwrap()
+            .read_payload()
+            .unwrap()
+            .bytes(),
         b"<payload/>"
     );
 
@@ -916,7 +963,7 @@ fn worksheet_content_part_payload_xml_contract_is_bounded_and_preserving() {
     .unwrap();
     let worksheet = workbook.workbook_ref().sheet("Sheet1").unwrap().unwrap();
     let drawing = worksheet.drawing(0).unwrap();
-    assert!(drawing.content_part(0).unwrap().payload().is_err());
+    assert!(drawing.content_part(0).unwrap().read_payload().is_err());
 
     let nested = content_part_package(false, PackageFault::NestedDepthTarget, 1);
     let limits = SourceLimits::builder()
@@ -931,7 +978,7 @@ fn worksheet_content_part_payload_xml_contract_is_bounded_and_preserving() {
     .unwrap();
     let worksheet = workbook.workbook_ref().sheet("Sheet1").unwrap().unwrap();
     let drawing = worksheet.drawing(0).unwrap();
-    assert!(drawing.content_part(0).unwrap().payload().is_err());
+    assert!(drawing.content_part(0).unwrap().read_payload().is_err());
 }
 
 #[test]
@@ -953,15 +1000,15 @@ fn worksheet_content_part_shared_target_and_outbound_graph_are_retained_and_boun
         second.relationship().target_uri()
     );
     assert_eq!(
-        first.payload().unwrap().bytes(),
-        second.payload().unwrap().bytes()
+        first.read_payload().unwrap().bytes(),
+        second.read_payload().unwrap().bytes()
     );
 
     let outbound = content_part_package(false, PackageFault::OutboundGraph, 1);
     let workbook = Package::from_bytes(&outbound).unwrap();
     let worksheet = workbook.workbook_ref().sheet("Sheet1").unwrap().unwrap();
     let drawing = worksheet.drawing(0).unwrap();
-    let payload = drawing.content_part(0).unwrap().payload().unwrap();
+    let payload = drawing.content_part(0).unwrap().read_payload().unwrap();
     assert_eq!(payload.outbound_relationships().len(), 1);
     assert_eq!(
         payload.outbound_relationships()[0].relationship_id(),

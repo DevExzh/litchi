@@ -16,7 +16,9 @@ use std::borrow::Cow;
 use std::mem::size_of;
 use std::sync::Arc;
 
-use litchi_ooxml_common::mce::{Error as MceError, Limits as MceLimits, process_part};
+use litchi_ooxml_common::mce::{
+    Error as MceError, LimitKind as MceLimitKind, Limits as MceLimits, process_part,
+};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{OpcPackage, PackURI, Part, Relationship};
 use quick_xml::events::BytesStart;
@@ -364,14 +366,18 @@ fn raw_xml(part: &dyn Part) -> Result<&[u8]> {
 fn validate_cached_mce(source: &[u8], processed: &[u8]) -> Result<()> {
     let limits = MceLimits::default();
     if source.len() > limits.max_input_bytes {
-        return Err(Error::MarkupCompatibility(MceError::LimitExceeded(
-            "input bytes".to_owned(),
-        )));
+        return Err(Error::MarkupCompatibility(MceError::LimitExceeded {
+            kind: MceLimitKind::InputBytes,
+            observed: source.len(),
+            maximum: limits.max_input_bytes,
+        }));
     }
     if processed.len() > limits.max_output_bytes {
-        return Err(Error::MarkupCompatibility(MceError::LimitExceeded(
-            "output bytes".to_owned(),
-        )));
+        return Err(Error::MarkupCompatibility(MceError::LimitExceeded {
+            kind: MceLimitKind::OutputBytes,
+            observed: processed.len(),
+            maximum: limits.max_output_bytes,
+        }));
     }
     Ok(())
 }

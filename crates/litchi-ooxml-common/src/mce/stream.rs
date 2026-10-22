@@ -34,8 +34,8 @@ use std::{
 
 pub use super::model::XMLNS_NAMESPACE;
 use super::model::{
-    ATTRIBUTES_PER_ELEMENT_CEILING, Capabilities, Error, ExpandedName, Limits, Name, NamespaceUri,
-    Report, XML_NS,
+    ATTRIBUTES_PER_ELEMENT_CEILING, Capabilities, Error, ExpandedName, LimitKind, Limits, Name,
+    NamespaceUri, Report, XML_NS,
 };
 use super::patterns::{NamePattern, Patterns};
 use super::scope::{NO_NAMESPACE, Scope, Uri, UriId, XMLNS_URI, has_duplicate_prefix};
@@ -152,75 +152,73 @@ impl StreamLimits {
 
     /// Validate finite, non-zero bounds and the hard ceilings.
     pub fn validate(&self) -> Result<(), Error> {
-        check_bound(self.max_events, HARD_MAX_EVENTS, "stream event count")?;
+        check_bound(self.max_events, HARD_MAX_EVENTS, LimitKind::Events)?;
         check_bound(
             self.max_event_bytes,
             HARD_MAX_EVENT_BYTES,
-            "stream event bytes",
+            LimitKind::EventBytes,
         )?;
         check_bound(
             self.max_attributes_per_event,
             HARD_MAX_ATTRIBUTES_PER_EVENT,
-            "stream attributes per event",
+            LimitKind::Attributes,
         )?;
         check_bound(
             self.max_attribute_bytes_per_event,
             HARD_MAX_ATTRIBUTE_BYTES_PER_EVENT,
-            "stream attribute bytes per event",
+            LimitKind::AttributeBytes,
         )?;
         check_bound(
             self.max_context_bytes,
             HARD_MAX_CONTEXT_BYTES,
-            "stream context bytes",
+            LimitKind::ContextBytes,
         )?;
         check_bound(
             self.max_name_bytes,
             HARD_MAX_NAME_BYTES,
-            "stream name bytes",
+            LimitKind::NameBytes,
         )?;
-        if self.processing.max_input_bytes == 0 || self.processing.max_output_bytes == 0 {
-            return Err(limit("MCE processing bounds must be non-zero"));
-        }
-        if self.processing.max_input_bytes > HARD_MAX_INPUT_BYTES
-            || self.processing.max_output_bytes > HARD_MAX_OUTPUT_BYTES
-        {
-            return Err(limit("MCE processing byte bounds"));
-        }
+        check_bound(
+            self.processing.max_input_bytes,
+            HARD_MAX_INPUT_BYTES,
+            LimitKind::InputBytes,
+        )?;
+        check_bound(
+            self.processing.max_output_bytes,
+            HARD_MAX_OUTPUT_BYTES,
+            LimitKind::OutputBytes,
+        )?;
         check_bound(
             self.processing.max_namespace_bindings,
             HARD_MAX_NAMESPACE_BINDINGS,
-            "MCE namespace bindings",
+            LimitKind::NamespaceBindings,
         )?;
         check_bound(
             self.processing.max_directive_tokens,
             HARD_MAX_DIRECTIVE_TOKENS,
-            "MCE directive tokens",
+            LimitKind::DirectiveTokens,
         )?;
         check_bound(
             self.processing.max_choices_per_alternate,
             HARD_MAX_CHOICES,
-            "MCE AlternateContent choices",
+            LimitKind::Choices,
         )?;
-        check_bound(
-            self.processing.max_depth,
-            HARD_MAX_DEPTH,
-            "MCE processing depth",
-        )?;
+        check_bound(self.processing.max_depth, HARD_MAX_DEPTH, LimitKind::Depth)?;
         check_bound(
             self.processing.max_attributes_per_element,
             ATTRIBUTES_PER_ELEMENT_CEILING,
-            "MCE attributes per element",
+            LimitKind::Attributes,
         )?;
         Ok(())
     }
 }
 
-fn check_bound(value: usize, hard: usize, resource: &'static str) -> Result<(), Error> {
+fn check_bound(value: usize, hard: usize, kind: LimitKind) -> Result<(), Error> {
     if value == 0 {
-        return Err(limit(resource));
+        return Err(invalid_limit(kind, value, 1, hard));
     }
     if value > hard {
-        return Err(limit(resource));
+        return Err(invalid_limit(kind, value, 1, hard));
     }
     Ok(())
 }
@@ -468,6 +466,8 @@ pub enum SemanticEvent<'a> {
 pub struct EventLimitExceeded {
     /// Configured maximum for the event.
     pub limit: usize,
+    /// Bytes that were available when the event ceiling was reached.
+    pub observed: usize,
 }
 
 impl fmt::Display for EventLimitExceeded {
@@ -483,6 +483,8 @@ impl std::error::Error for EventLimitExceeded {}
 pub struct InputLimitExceeded {
     /// Configured maximum input bytes.
     pub limit: usize,
+    /// Bytes that were available when the source ceiling was reached.
+    pub observed: usize,
 }
 
 impl fmt::Display for InputLimitExceeded {
@@ -506,11 +508,17 @@ impl fmt::Display for InvalidMeterConsume {
 impl std::error::Error for InvalidMeterConsume {}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct InterruptedRetriesExceeded;
+struct InterruptedRetriesExceeded {
+    retries: usize,
+}
 
 impl fmt::Display for InterruptedRetriesExceeded {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("XML input exceeded the Interrupted retry bound")
+        write!(
+            f,
+            "XML input exceeded the Interrupted retry bound after {} retries",
+            self.retries
+        )
     }
 }
 
@@ -578,7 +586,13 @@ impl BufRead for InterruptedRetryReader<'_> {
                     Err(error) if error.kind() == io::ErrorKind::Interrupted => {
                         return Err(io::Error::new(
                             io::ErrorKind::InvalidData,
-                            InterruptedRetriesExceeded,
+                            InterruptedRetriesExceeded {
+                                // This is the first interruption observed
+                                // beyond the permitted retries. The policy
+                                // maximum is eight retries, but the ninth
+                                // interruption is the actual count reported.
+                                retries: interrupted.saturating_add(1),
+                            },
                         ));
                     },
                     Err(error) => return Err(error),
@@ -674,18 +688,6 @@ impl<RawE, ActiveE> StreamError<RawE, ActiveE> {
         }
     }
 
-    /// Alias for [`Self::raw_callback_error`].
-    #[must_use]
-    pub fn raw_error(&self) -> Option<&RawE> {
-        self.raw_callback_error()
-    }
-
-    /// Alias for [`Self::active_callback_error`].
-    #[must_use]
-    pub fn active_error(&self) -> Option<&ActiveE> {
-        self.active_callback_error()
-    }
-
     /// Return the primary MCE error, if this is an MCE failure.
     #[must_use]
     pub fn mce_error(&self) -> Option<&Error> {
@@ -776,7 +778,8 @@ fn prior_mce_kind(error: &Error) -> &'static str {
     match error {
         Error::NonConformant(_) => "non-conformant",
         Error::MustUnderstand(_) => "must-understand",
-        Error::LimitExceeded(_) => "limit-exceeded",
+        Error::InvalidLimit { .. } => "invalid-limit",
+        Error::LimitExceeded { .. } => "limit-exceeded",
         Error::Allocation { .. } => "allocation",
         Error::Xml(_) => "xml",
     }
@@ -933,13 +936,16 @@ where
     let mut retry_reader = InterruptedRetryReader::new(input);
     let mut prefix_reader = PrefixReader::new(&mut retry_reader);
     if let Err(error) = prefix_reader.initialize() {
-        if error
+        if let Some(source) = error
             .get_ref()
             .and_then(|source| source.downcast_ref::<InterruptedRetriesExceeded>())
-            .is_some()
         {
             return Err(StreamError::Mce {
-                error: limit("input Interrupted retries"),
+                error: limit(
+                    LimitKind::RetryCount,
+                    source.retries,
+                    MAX_INTERRUPTED_RETRIES,
+                ),
                 prior_mce_error: None,
                 raw_error: None,
                 active_error: None,
@@ -955,7 +961,11 @@ where
     let prefix_bytes = prefix_reader.consumed_bytes();
     if prefix_bytes > limits.processing.max_input_bytes {
         return Err(StreamError::Mce {
-            error: limit("input bytes"),
+            error: limit(
+                LimitKind::InputBytes,
+                prefix_bytes,
+                limits.processing.max_input_bytes,
+            ),
             prior_mce_error: None,
             raw_error: None,
             active_error: None,
@@ -1206,19 +1216,6 @@ where
     }
 }
 
-/// Alias retained for callers that prefer an explicit active-observer name.
-pub fn process_markup_compatibility_stream_with_active_observer<ActiveE, Active>(
-    input: &mut dyn BufRead,
-    capabilities: &Capabilities,
-    limits: &StreamLimits,
-    active: Active,
-) -> Result<StreamReport, StreamError<std::convert::Infallible, ActiveE>>
-where
-    Active: for<'a> FnMut(SemanticEvent<'a>) -> Result<(), ActiveE>,
-{
-    process_markup_compatibility_stream(input, capabilities, limits, active)
-}
-
 fn finish_callbacks<RawE, ActiveE>(
     raw_error: Option<RawE>,
     active_error: Option<ActiveE>,
@@ -1241,37 +1238,38 @@ fn stream_error_from_quick_xml<RawE, ActiveE>(
 ) -> StreamError<RawE, ActiveE> {
     match error {
         quick_xml::Error::Io(error) => {
-            if error
+            if let Some(source) = error
                 .get_ref()
                 .and_then(|source| source.downcast_ref::<InterruptedRetriesExceeded>())
-                .is_some()
             {
                 return StreamError::Mce {
-                    error: limit("input Interrupted retries"),
+                    error: limit(
+                        LimitKind::RetryCount,
+                        source.retries,
+                        MAX_INTERRUPTED_RETRIES,
+                    ),
                     prior_mce_error: None,
                     raw_error,
                     active_error,
                 };
             }
-            if error
+            if let Some(source) = error
                 .get_ref()
                 .and_then(|source| source.downcast_ref::<EventLimitExceeded>())
-                .is_some()
             {
                 return StreamError::Mce {
-                    error: limit("stream event bytes"),
+                    error: limit(LimitKind::EventBytes, source.observed, source.limit),
                     prior_mce_error: None,
                     raw_error,
                     active_error,
                 };
             }
-            if error
+            if let Some(source) = error
                 .get_ref()
                 .and_then(|source| source.downcast_ref::<InputLimitExceeded>())
-                .is_some()
             {
                 return StreamError::Mce {
-                    error: limit("input bytes"),
+                    error: limit(LimitKind::InputBytes, source.observed, source.limit),
                     prior_mce_error: None,
                     raw_error,
                     active_error,
@@ -1502,6 +1500,10 @@ impl BufRead for EventMeter<'_> {
                 io::ErrorKind::InvalidData,
                 InputLimitExceeded {
                     limit: self.total_limit,
+                    observed: self
+                        .total_bytes
+                        .checked_add(available.len())
+                        .unwrap_or(usize::MAX),
                 },
             ));
         }
@@ -1511,6 +1513,10 @@ impl BufRead for EventMeter<'_> {
                 io::ErrorKind::InvalidData,
                 EventLimitExceeded {
                     limit: self.event_limit,
+                    observed: self
+                        .event_bytes
+                        .checked_add(available.len())
+                        .unwrap_or(usize::MAX),
                 },
             ));
         }
@@ -1625,21 +1631,34 @@ impl Namespaces {
                 "the prefix index disagrees with the declaration chain for {prefix:?}"
             );
             if bound.is_none() {
-                bindings = bindings
-                    .checked_add(1)
-                    .ok_or_else(|| limit("namespace bindings"))?;
+                bindings = bindings.checked_add(1).ok_or_else(|| {
+                    limit_lower_bound(
+                        LimitKind::NamespaceBindings,
+                        limits.processing.max_namespace_bindings,
+                    )
+                })?;
             }
             bytes = bytes
                 .checked_add(prefix.len())
                 .and_then(|bytes| bytes.checked_add(namespace.len()))
                 .and_then(|bytes| bytes.checked_add(2))
-                .ok_or_else(|| limit("stream context bytes"))?;
+                .ok_or_else(|| {
+                    limit_lower_bound(LimitKind::ContextBytes, limits.max_context_bytes)
+                })?;
         }
         if bindings > limits.processing.max_namespace_bindings {
-            return Err(limit("namespace bindings"));
+            return Err(limit(
+                LimitKind::NamespaceBindings,
+                bindings,
+                limits.processing.max_namespace_bindings,
+            ));
         }
         if bytes > limits.max_context_bytes {
-            return Err(limit("stream context bytes"));
+            return Err(limit(
+                LimitKind::ContextBytes,
+                bytes,
+                limits.max_context_bytes,
+            ));
         }
         Ok(Self {
             head: Some(Arc::new(NamespaceLayer {
@@ -1861,9 +1880,13 @@ impl<'a> Processor<'a> {
             .report
             .events
             .checked_add(1)
-            .ok_or_else(|| limit("stream event count"))?;
+            .ok_or_else(|| limit_lower_bound(LimitKind::Events, self.limits.max_events))?;
         if self.report.events > self.limits.max_events {
-            return Err(limit("stream event count"));
+            return Err(limit(
+                LimitKind::Events,
+                self.report.events,
+                self.limits.max_events,
+            ));
         }
         Ok(())
     }
@@ -1890,7 +1913,7 @@ impl<'a> Processor<'a> {
         Raw: for<'b> FnMut(RawElement<'b>) -> Result<(), RawE>,
         Active: for<'b> FnMut(SemanticEvent<'b>) -> Result<ActiveFlow, ActiveE>,
     {
-        let depth = self.raw_stack.len().saturating_add(1);
+        let depth = self.raw_stack.len().checked_add(1).unwrap_or(usize::MAX);
         let result = self.start_element(
             element,
             decoder,
@@ -1933,7 +1956,11 @@ impl<'a> Processor<'a> {
         Active: for<'b> FnMut(SemanticEvent<'b>) -> Result<ActiveFlow, ActiveE>,
     {
         if self.raw_stack.len() >= self.limits.processing.max_depth {
-            return Err(limit("depth"));
+            return Err(limit(
+                LimitKind::Depth,
+                self.raw_stack.len().checked_add(1).unwrap_or(usize::MAX),
+                self.limits.processing.max_depth,
+            ));
         }
         self.prolog_started = true;
         let raw_parent = self
@@ -1982,12 +2009,20 @@ impl<'a> Processor<'a> {
             .ns
             .bytes
             .checked_sub(inherited_namespace_bytes)
-            .ok_or_else(|| limit("stream context bytes"))?;
+            .ok_or_else(|| {
+                limit_lower_bound(LimitKind::ContextBytes, self.limits.max_context_bytes)
+            })?;
         context.bytes = inherited_context_bytes
             .checked_add(namespace_bytes)
-            .ok_or_else(|| limit("stream context bytes"))?;
+            .ok_or_else(|| {
+                limit_lower_bound(LimitKind::ContextBytes, self.limits.max_context_bytes)
+            })?;
         if context.bytes > self.limits.max_context_bytes {
-            return Err(limit("stream context bytes"));
+            return Err(limit(
+                LimitKind::ContextBytes,
+                context.bytes,
+                self.limits.max_context_bytes,
+            ));
         }
 
         if context.opaque {
@@ -2036,11 +2071,10 @@ impl<'a> Processor<'a> {
         {
             if !self.scope.is_mce(namespace) {
                 if context.is_ignorable(namespace) && !self.scope.understood(namespace) {
-                    self.report.ignored_elements = self
-                        .report
-                        .ignored_elements
-                        .checked_add(1)
-                        .ok_or_else(|| limit("stream report counters"))?;
+                    self.report.ignored_elements =
+                        self.report.ignored_elements.checked_add(1).ok_or_else(|| {
+                            limit_lower_bound(LimitKind::ReportCounters, usize::MAX)
+                        })?;
                     return self.close_start(context, Mode::Skip, false, data, empty);
                 }
                 return Err(bad("non-ignorable AlternateContent child"));
@@ -2050,9 +2084,18 @@ impl<'a> Processor<'a> {
                     if *fallback {
                         return Err(bad("Choice after Fallback"));
                     }
-                    *choices = choices.checked_add(1).ok_or_else(|| limit("choices"))?;
+                    *choices = choices.checked_add(1).ok_or_else(|| {
+                        limit_lower_bound(
+                            LimitKind::Choices,
+                            self.limits.processing.max_choices_per_alternate,
+                        )
+                    })?;
                     if *choices > self.limits.processing.max_choices_per_alternate {
-                        return Err(limit("choices"));
+                        return Err(limit(
+                            LimitKind::Choices,
+                            *choices,
+                            self.limits.processing.max_choices_per_alternate,
+                        ));
                     }
                     let requires = attr_value(&data.attrs, "Requires")?
                         .ok_or_else(|| bad("Choice lacks Requires"))?;
@@ -2063,13 +2106,24 @@ impl<'a> Processor<'a> {
                             return Err(bad("invalid Requires prefix"));
                         }
                         check_name_bytes(prefix.as_bytes(), self.limits)?;
-                        count = count
-                            .checked_add(1)
-                            .ok_or_else(|| limit("directive tokens"))?;
-                        if directive_tokens.checked_add(count).is_none_or(|tokens| {
-                            tokens > self.limits.processing.max_directive_tokens
-                        }) {
-                            return Err(limit("directive tokens"));
+                        count = count.checked_add(1).ok_or_else(|| {
+                            limit_lower_bound(
+                                LimitKind::DirectiveTokens,
+                                self.limits.processing.max_directive_tokens,
+                            )
+                        })?;
+                        let tokens = directive_tokens.checked_add(count).ok_or_else(|| {
+                            limit_lower_bound(
+                                LimitKind::DirectiveTokens,
+                                self.limits.processing.max_directive_tokens,
+                            )
+                        })?;
+                        if tokens > self.limits.processing.max_directive_tokens {
+                            return Err(limit(
+                                LimitKind::DirectiveTokens,
+                                tokens,
+                                self.limits.processing.max_directive_tokens,
+                            ));
                         }
                         let required = resolver(&self.scope, &context.ns)
                             .resolve(prefix)
@@ -2082,11 +2136,10 @@ impl<'a> Processor<'a> {
                     let active = parent.active && !*selected && supported;
                     if active {
                         *selected = true;
-                        self.report.selected_choices = self
-                            .report
-                            .selected_choices
-                            .checked_add(1)
-                            .ok_or_else(|| limit("stream report counters"))?;
+                        self.report.selected_choices =
+                            self.report.selected_choices.checked_add(1).ok_or_else(|| {
+                                limit_lower_bound(LimitKind::ReportCounters, usize::MAX)
+                            })?;
                     }
                     (active, Mode::Branch)
                 },
@@ -2102,7 +2155,9 @@ impl<'a> Processor<'a> {
                             .report
                             .selected_fallbacks
                             .checked_add(1)
-                            .ok_or_else(|| limit("stream report counters"))?;
+                            .ok_or_else(|| {
+                                limit_lower_bound(LimitKind::ReportCounters, usize::MAX)
+                            })?;
                     }
                     (active, Mode::Branch)
                 },
@@ -2121,7 +2176,7 @@ impl<'a> Processor<'a> {
                         .report
                         .alternate_content_count
                         .checked_add(1)
-                        .ok_or_else(|| limit("stream report counters"))?;
+                        .ok_or_else(|| limit_lower_bound(LimitKind::ReportCounters, usize::MAX))?;
                     Mode::Alt {
                         choices: 0,
                         selected: false,
@@ -2137,7 +2192,7 @@ impl<'a> Processor<'a> {
                     .report
                     .preserved_elements
                     .checked_add(1)
-                    .ok_or_else(|| limit("stream report counters"))?;
+                    .ok_or_else(|| limit_lower_bound(LimitKind::ReportCounters, usize::MAX))?;
                 Mode::Emit
             } else if context.processes(namespace, local) {
                 for attr in &data.attrs {
@@ -2154,7 +2209,7 @@ impl<'a> Processor<'a> {
                     .report
                     .unwrapped_elements
                     .checked_add(1)
-                    .ok_or_else(|| limit("stream report counters"))?;
+                    .ok_or_else(|| limit_lower_bound(LimitKind::ReportCounters, usize::MAX))?;
                 Mode::Unwrap
             } else {
                 active = false;
@@ -2162,7 +2217,7 @@ impl<'a> Processor<'a> {
                     .report
                     .ignored_elements
                     .checked_add(1)
-                    .ok_or_else(|| limit("stream report counters"))?;
+                    .ok_or_else(|| limit_lower_bound(LimitKind::ReportCounters, usize::MAX))?;
                 Mode::Skip
             }
         } else {
@@ -2221,13 +2276,21 @@ impl<'a> Processor<'a> {
             .len()
             .checked_add(data.expanded_name.namespace.len())
             .and_then(|bytes| bytes.checked_add(data.expanded_name.local_name.len()))
-            .ok_or_else(|| limit("stream context bytes"))?;
+            .ok_or_else(|| {
+                limit_lower_bound(LimitKind::ContextBytes, self.limits.max_context_bytes)
+            })?;
         context.bytes = context
             .bytes
             .checked_add(retained_name_bytes)
-            .ok_or_else(|| limit("stream context bytes"))?;
+            .ok_or_else(|| {
+                limit_lower_bound(LimitKind::ContextBytes, self.limits.max_context_bytes)
+            })?;
         if context.bytes > self.limits.max_context_bytes {
-            return Err(limit("stream context bytes"));
+            return Err(limit(
+                LimitKind::ContextBytes,
+                context.bytes,
+                self.limits.max_context_bytes,
+            ));
         }
         reserve_vec(&mut self.stack, 1, "MCE stream element stack")?;
         let qualified_name = {
@@ -2469,7 +2532,11 @@ impl<'a> Processor<'a> {
         Raw: for<'b> FnMut(RawElement<'b>) -> Result<(), RawE>,
     {
         if self.raw_stack.len() >= self.limits.processing.max_depth {
-            return Err(limit("depth"));
+            return Err(limit(
+                LimitKind::Depth,
+                self.raw_stack.len().checked_add(1).unwrap_or(usize::MAX),
+                self.limits.processing.max_depth,
+            ));
         }
         let raw_parent = self
             .raw_stack
@@ -2497,7 +2564,7 @@ impl<'a> Processor<'a> {
             }
         }
         validate_duplicate_attributes(&data.attrs, self.limits)?;
-        let depth = self.raw_stack.len().saturating_add(1);
+        let depth = self.raw_stack.len().checked_add(1).unwrap_or(usize::MAX);
         self.raw_start_commit(&data, empty)?;
         if empty {
             self.scope.truncate(depth);
@@ -2519,7 +2586,7 @@ impl<'a> Processor<'a> {
             .namespace
             .bytes
             .checked_sub(parent_namespace_bytes)
-            .ok_or_else(|| limit("stream context bytes"))?;
+            .ok_or_else(|| bad("raw namespace context underflow"))?;
         let inherited_opaque = self.raw_stack.last().is_some_and(|frame| frame.opaque);
         let directive_bytes = if inherited_opaque {
             0
@@ -2531,9 +2598,15 @@ impl<'a> Processor<'a> {
             .checked_add(namespace_delta)
             .and_then(|bytes| bytes.checked_add(directive_bytes))
             .and_then(|bytes| bytes.checked_add(frame_name_bytes))
-            .ok_or_else(|| limit("stream context bytes"))?;
+            .ok_or_else(|| {
+                limit_lower_bound(LimitKind::ContextBytes, self.limits.max_context_bytes)
+            })?;
         if context_bytes > self.limits.max_context_bytes {
-            return Err(limit("stream context bytes"));
+            return Err(limit(
+                LimitKind::ContextBytes,
+                context_bytes,
+                self.limits.max_context_bytes,
+            ));
         }
         if empty {
             return Ok(());
@@ -2725,32 +2798,36 @@ impl<'a> Processor<'a> {
         // `validate` refused either limit above the ceiling before processing
         // began; the clamp keeps the bound if a caller changed a public field
         // since.
-        let (max_attributes, attribute_limit) = if self.limits.max_attributes_per_event
-            <= self.limits.processing.max_attributes_per_element
-        {
-            (
-                self.limits.max_attributes_per_event,
-                "stream attributes per event",
-            )
-        } else {
-            (
-                self.limits.processing.max_attributes_per_element,
-                "attributes per element",
-            )
-        };
-        let max_attributes = max_attributes.min(ATTRIBUTES_PER_ELEMENT_CEILING);
+        let max_attributes = self
+            .limits
+            .max_attributes_per_event
+            .min(self.limits.processing.max_attributes_per_element)
+            .min(ATTRIBUTES_PER_ELEMENT_CEILING);
         for attribute in element.unchecked_attributes() {
             let attribute = attribute.map_err(xml_error)?;
             check_name_bytes(attribute.key.as_ref(), self.limits)?;
             attr_bytes = attr_bytes
                 .checked_add(attribute.key.as_ref().len())
                 .and_then(|bytes| bytes.checked_add(attribute.value.as_ref().len()))
-                .ok_or_else(|| limit("stream attribute bytes"))?;
+                .ok_or_else(|| {
+                    limit_lower_bound(
+                        LimitKind::AttributeBytes,
+                        self.limits.max_attribute_bytes_per_event,
+                    )
+                })?;
             if attr_bytes > self.limits.max_attribute_bytes_per_event {
-                return Err(limit("stream attribute bytes"));
+                return Err(limit(
+                    LimitKind::AttributeBytes,
+                    attr_bytes,
+                    self.limits.max_attribute_bytes_per_event,
+                ));
             }
             if preliminary.len() >= max_attributes {
-                return Err(limit(attribute_limit));
+                return Err(limit(
+                    LimitKind::Attributes,
+                    preliminary.len().checked_add(1).unwrap_or(usize::MAX),
+                    max_attributes,
+                ));
             }
             let decoded = attribute
                 .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
@@ -2780,7 +2857,7 @@ impl<'a> Processor<'a> {
         }
         let local = local_namespaces(&preliminary, self.limits)?;
         let declares = !local.is_empty();
-        let depth = self.raw_stack.len().saturating_add(1);
+        let depth = self.raw_stack.len().checked_add(1).unwrap_or(usize::MAX);
         let namespace = parent_ns.with_local(local, self.limits, &self.scope, depth)?;
         if declares && let Some(layer) = namespace.head.as_ref() {
             // Removed when the element's raw frame closes, or at once for an
@@ -2833,13 +2910,20 @@ fn raw_directive_bytes(
         bytes = bytes
             .checked_add(value.len())
             .and_then(|value_bytes| value_bytes.checked_add(1))
-            .ok_or_else(|| limit("stream context bytes"))?;
+            .ok_or_else(|| limit_lower_bound(LimitKind::ContextBytes, limits.max_context_bytes))?;
         for token in value.split_whitespace() {
-            tokens = tokens
-                .checked_add(1)
-                .ok_or_else(|| limit("directive tokens"))?;
+            tokens = tokens.checked_add(1).ok_or_else(|| {
+                limit_lower_bound(
+                    LimitKind::DirectiveTokens,
+                    limits.processing.max_directive_tokens,
+                )
+            })?;
             if tokens > limits.processing.max_directive_tokens {
-                return Err(limit("directive tokens"));
+                return Err(limit(
+                    LimitKind::DirectiveTokens,
+                    tokens,
+                    limits.processing.max_directive_tokens,
+                ));
             }
             check_name_bytes(token.as_bytes(), limits)?;
         }
@@ -2949,7 +3033,11 @@ fn clone_raw_attributes<'a>(
     reserve_vec(&mut cloned, attrs.len(), "MCE stream raw attributes")?;
     for attr in attrs {
         if cloned.len() >= limits.max_attributes_per_event {
-            return Err(limit("stream attributes per event"));
+            return Err(limit(
+                LimitKind::Attributes,
+                cloned.len().checked_add(1).unwrap_or(usize::MAX),
+                limits.max_attributes_per_event,
+            ));
         }
         cloned.push(borrow_raw_attribute(attr, limits)?);
     }
@@ -2976,7 +3064,7 @@ fn semantic_attrs<'a>(
             report.ignored_attributes = report
                 .ignored_attributes
                 .checked_add(1)
-                .ok_or_else(|| limit("stream report counters"))?;
+                .ok_or_else(|| limit_lower_bound(LimitKind::ReportCounters, usize::MAX))?;
             continue;
         }
         if filter
@@ -2988,13 +3076,13 @@ fn semantic_attrs<'a>(
                 report.ignored_attributes = report
                     .ignored_attributes
                     .checked_add(1)
-                    .ok_or_else(|| limit("stream report counters"))?;
+                    .ok_or_else(|| limit_lower_bound(LimitKind::ReportCounters, usize::MAX))?;
                 continue;
             }
             report.preserved_attributes = report
                 .preserved_attributes
                 .checked_add(1)
-                .ok_or_else(|| limit("stream report counters"))?;
+                .ok_or_else(|| limit_lower_bound(LimitKind::ReportCounters, usize::MAX))?;
         }
         check_expanded_name(&attr.expanded_name, limits)?;
         let expanded_name = std::mem::take(&mut attr.expanded_name);
@@ -3005,7 +3093,11 @@ fn semantic_attrs<'a>(
             decoded_value: Cow::Borrowed(attr.decoded_value.as_ref()),
         });
         if output.len() > limits.max_attributes_per_event {
-            return Err(limit("stream attributes per event"));
+            return Err(limit(
+                LimitKind::Attributes,
+                output.len(),
+                limits.max_attributes_per_event,
+            ));
         }
     }
     Ok(output)
@@ -3090,9 +3182,18 @@ fn collect_directives(
         };
         tokens = tokens
             .checked_add(attr.decoded_value.split_whitespace().count())
-            .ok_or_else(|| limit("directive tokens"))?;
+            .ok_or_else(|| {
+                limit_lower_bound(
+                    LimitKind::DirectiveTokens,
+                    limits.processing.max_directive_tokens,
+                )
+            })?;
         if tokens > limits.processing.max_directive_tokens {
-            return Err(limit("directive tokens"));
+            return Err(limit(
+                LimitKind::DirectiveTokens,
+                tokens,
+                limits.processing.max_directive_tokens,
+            ));
         }
         reserve_amortized(&mut values, 1, "MCE stream directives")?;
         values.push(DirectiveValue {
@@ -3113,13 +3214,21 @@ fn apply_directives(
     limits: &StreamLimits,
     scope: &Scope<NamespaceUri>,
 ) -> Result<(), Error> {
-    let additional_context_bytes = directive_bytes(&values)?;
+    let additional_context_bytes = directive_bytes(&values, limits.max_context_bytes)?;
     if context
         .bytes
         .checked_add(additional_context_bytes)
         .is_none_or(|bytes| bytes > limits.max_context_bytes)
     {
-        return Err(limit("stream context bytes"));
+        let observed = context
+            .bytes
+            .checked_add(additional_context_bytes)
+            .unwrap_or(usize::MAX);
+        return Err(limit(
+            LimitKind::ContextBytes,
+            observed,
+            limits.max_context_bytes,
+        ));
     }
     let mut local_ignorable = HashSet::new();
     let mut seen = HashSet::new();
@@ -3246,9 +3355,13 @@ fn apply_directives(
     context.bytes = context
         .bytes
         .checked_add(additional_context_bytes)
-        .ok_or_else(|| limit("stream context bytes"))?;
+        .ok_or_else(|| limit_lower_bound(LimitKind::ContextBytes, limits.max_context_bytes))?;
     if context.bytes > limits.max_context_bytes {
-        return Err(limit("stream context bytes"));
+        return Err(limit(
+            LimitKind::ContextBytes,
+            context.bytes,
+            limits.max_context_bytes,
+        ));
     }
     Ok(())
 }
@@ -3421,7 +3534,11 @@ fn parse_target(
 
 fn check_name_bytes(name: &[u8], limits: &StreamLimits) -> Result<(), Error> {
     if name.len() > limits.max_name_bytes {
-        return Err(limit("stream name bytes"));
+        return Err(limit(
+            LimitKind::NameBytes,
+            name.len(),
+            limits.max_name_bytes,
+        ));
     }
     Ok(())
 }
@@ -3433,7 +3550,12 @@ fn check_expanded_name(name: &ExpandedName, limits: &StreamLimits) -> Result<(),
         .checked_add(name.local_name.len())
         .is_none_or(|bytes| bytes > limits.max_name_bytes)
     {
-        return Err(limit("stream name bytes"));
+        let observed = name
+            .namespace
+            .len()
+            .checked_add(name.local_name.len())
+            .unwrap_or(usize::MAX);
+        return Err(limit(LimitKind::NameBytes, observed, limits.max_name_bytes));
     }
     Ok(())
 }
@@ -3444,7 +3566,11 @@ fn clone_bounded_string(
     resource: &'static str,
 ) -> Result<String, Error> {
     if value.len() > limits.max_context_bytes {
-        return Err(limit("stream context bytes"));
+        return Err(limit(
+            LimitKind::ContextBytes,
+            value.len(),
+            limits.max_context_bytes,
+        ));
     }
     #[cfg(test)]
     super::scope::counter::copied(value.len());
@@ -3462,7 +3588,11 @@ fn clone_bounded_bytes<'a>(
     resource: &'static str,
 ) -> Result<Cow<'a, [u8]>, Error> {
     if value.len() > limits.max_event_bytes {
-        return Err(limit("stream event bytes"));
+        return Err(limit(
+            LimitKind::EventBytes,
+            value.len(),
+            limits.max_event_bytes,
+        ));
     }
     #[cfg(test)]
     super::scope::counter::copied(value.len());
@@ -3480,7 +3610,11 @@ fn clone_bounded_text<'a>(
     resource: &'static str,
 ) -> Result<Cow<'a, str>, Error> {
     if value.len() > limits.max_event_bytes {
-        return Err(limit("stream event bytes"));
+        return Err(limit(
+            LimitKind::EventBytes,
+            value.len(),
+            limits.max_event_bytes,
+        ));
     }
     #[cfg(test)]
     super::scope::counter::copied(value.len());
@@ -3498,7 +3632,11 @@ fn clone_bounded_name_part(
     resource: &'static str,
 ) -> Result<String, Error> {
     if value.len() > limits.max_name_bytes {
-        return Err(limit("stream name bytes"));
+        return Err(limit(
+            LimitKind::NameBytes,
+            value.len(),
+            limits.max_name_bytes,
+        ));
     }
     #[cfg(test)]
     super::scope::counter::copied(value.len());
@@ -3529,16 +3667,20 @@ fn clone_shared_name(
 /// stream copied a URI before it shared one: without reading its bytes.
 fn check_uri_bytes(uri: &str, limits: &StreamLimits) -> Result<(), Error> {
     if uri.len() > limits.max_name_bytes {
-        return Err(limit("stream name bytes"));
+        return Err(limit(
+            LimitKind::NameBytes,
+            uri.len(),
+            limits.max_name_bytes,
+        ));
     }
     Ok(())
 }
 
-fn directive_bytes(values: &DirectiveValues) -> Result<usize, Error> {
+fn directive_bytes(values: &DirectiveValues, maximum: usize) -> Result<usize, Error> {
     values.values.iter().try_fold(0usize, |sum, value| {
         sum.checked_add(value.value.len())
             .and_then(|sum| sum.checked_add(1))
-            .ok_or_else(|| limit("stream context bytes"))
+            .ok_or_else(|| limit_lower_bound(LimitKind::ContextBytes, maximum))
     })
 }
 
@@ -3581,10 +3723,46 @@ fn bad(message: impl Into<String>) -> Error {
     Error::NonConformant(message.into())
 }
 
-fn limit(message: &str) -> Error {
-    Error::LimitExceeded(message.to_owned())
+fn limit(kind: LimitKind, observed: usize, maximum: usize) -> Error {
+    Error::LimitExceeded {
+        kind,
+        observed,
+        maximum,
+    }
+}
+
+fn invalid_limit(kind: LimitKind, value: usize, minimum: usize, maximum: usize) -> Error {
+    Error::InvalidLimit {
+        kind,
+        value,
+        minimum,
+        maximum,
+    }
+}
+
+fn limit_lower_bound(kind: LimitKind, maximum: usize) -> Error {
+    // The checked arithmetic which reached this path overflowed, so the
+    // exact observation is unavailable. Report the saturated usize bound.
+    limit(kind, usize::MAX, maximum)
 }
 
 fn xml_error(error: impl fmt::Display) -> Error {
     Error::Xml(error.to_string())
+}
+
+#[cfg(test)]
+mod limit_lower_bound_tests {
+    use super::{Error, LimitKind};
+
+    #[test]
+    fn arithmetic_overflow_reports_saturated_observation() {
+        assert!(matches!(
+            super::limit_lower_bound(LimitKind::ContextBytes, 10),
+            Error::LimitExceeded {
+                kind: LimitKind::ContextBytes,
+                observed: usize::MAX,
+                maximum: 10,
+            }
+        ));
+    }
 }

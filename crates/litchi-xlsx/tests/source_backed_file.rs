@@ -1,6 +1,13 @@
 #![cfg(any(unix, windows))]
 #![allow(clippy::unwrap_used, reason = "focused filesystem-source assertions")]
 
+#[path = "support/source_editors.rs"]
+mod source_editors;
+#[allow(
+    unused_imports,
+    reason = "each test target uses a subset of the drivers"
+)]
+use source_editors::{Replay, RowVisibilityEditor, SourceBackedEditor, replay_bytes, replay_patch};
 use std::fs;
 use std::io;
 use std::num::{NonZeroU64, NonZeroUsize};
@@ -10,7 +17,6 @@ use litchi_core::{
 };
 use litchi_opc::constants::content_type as ct;
 use litchi_opc::{OpcError, OpcPackage, PackURI, SourceCacheLimits, SourceLimits};
-use litchi_xlsx::cell_values::SourceBackedEditor;
 use litchi_xlsx::workbook::{SourceBackedWorkbook, SourceCellView};
 use litchi_xlsx::{Address, Cell, Error, Value};
 use soapberry_zip::office::StreamingArchiveWriter;
@@ -151,10 +157,11 @@ fn managed_context(memory: u64) -> (Budget, ExecutionContext) {
 #[test]
 fn path_catalog_and_selected_reads_are_lazy_over_unrequested_payloads() {
     let (file, _bytes) = write_fixture();
-    let workbook = SourceBackedWorkbook::from_path(file.path()).unwrap();
+    let workbook = SourceBackedWorkbook::open(file.path()).unwrap();
     assert_eq!(
         workbook
             .sheets()
+            .unwrap()
             .map(|sheet| sheet.name().to_owned())
             .collect::<Vec<_>>(),
         ["First", "Second"]
@@ -203,7 +210,8 @@ fn path_managed_editor_releases_payload_budget_after_drop() {
         context,
     )
     .unwrap();
-    assert_eq!(budget.used(Resource::Memory), 0);
+    // Only the workbook catalog is pinned at open.
+    assert!(budget.used(Resource::Memory) <= workbook_bytes);
     let commit = editor.edit("First").unwrap().commit().unwrap();
     assert!(budget.used(Resource::Memory) >= workbook_bytes + sheet_bytes);
     drop(commit);
@@ -214,7 +222,7 @@ fn path_managed_editor_releases_payload_budget_after_drop() {
 #[test]
 fn path_replacement_and_limits_are_typed_errors() {
     let (file, _bytes) = write_fixture();
-    let workbook = SourceBackedWorkbook::from_path(file.path()).unwrap();
+    let workbook = SourceBackedWorkbook::open(file.path()).unwrap();
     let first = workbook.sheet("First").unwrap().unwrap();
     fs::write(file.path(), b"replaced source with a different length").unwrap();
     assert!(matches!(
@@ -240,7 +248,10 @@ fn path_replacement_and_limits_are_typed_errors() {
         .build()
         .unwrap();
     assert!(matches!(
-        SourceBackedWorkbook::from_path_with_limits(file.path(), limits),
+        SourceBackedWorkbook::open_with_options(
+            file.path(),
+            litchi_xlsx::OpenOptions::new().source_limits(limits)
+        ),
         Err(Error::Package(OpcError::Limit { .. }))
     ));
 
@@ -252,7 +263,7 @@ fn path_replacement_and_limits_are_typed_errors() {
 
     let directory = tempfile::tempdir().unwrap();
     assert!(matches!(
-        SourceBackedWorkbook::from_path(directory.path()),
+        SourceBackedWorkbook::open(directory.path()),
         Err(Error::Package(OpcError::IoError(error)))
             if matches!(
                 error.kind(),
@@ -267,48 +278,69 @@ fn path_replacement_and_limits_are_typed_errors() {
 fn path_policy_variants_accept_explicit_cache_and_execution_options() {
     let (file, _bytes) = write_fixture();
     let cache = SourceCacheLimits::new(1 << 20, 8).unwrap();
-    SourceBackedWorkbook::from_path(file.path()).unwrap();
-    SourceBackedWorkbook::from_path_with_limits(file.path(), SourceLimits::default()).unwrap();
-    SourceBackedWorkbook::from_path_with_cache_limits(file.path(), cache).unwrap();
-    SourceBackedWorkbook::from_path_with_limits_and_cache_limits(
+    SourceBackedWorkbook::open(file.path()).unwrap();
+    SourceBackedWorkbook::open_with_options(
         file.path(),
-        SourceLimits::default(),
-        cache,
+        litchi_xlsx::OpenOptions::new().source_limits(SourceLimits::default()),
+    )
+    .unwrap();
+    SourceBackedWorkbook::open_with_options(
+        file.path(),
+        litchi_xlsx::OpenOptions::new().cache_limits(cache),
+    )
+    .unwrap();
+    SourceBackedWorkbook::open_with_options(
+        file.path(),
+        litchi_xlsx::OpenOptions::new()
+            .source_limits(SourceLimits::default())
+            .cache_limits(cache),
     )
     .unwrap();
 
     SourceBackedWorkbook::open(file.path()).unwrap();
-    SourceBackedWorkbook::open_with_limits(file.path(), SourceLimits::default()).unwrap();
-    SourceBackedWorkbook::open_with_cache_limits(file.path(), cache).unwrap();
-    SourceBackedWorkbook::open_with_limits_and_cache_limits(
+    SourceBackedWorkbook::open_with_options(
         file.path(),
-        SourceLimits::default(),
-        cache,
+        litchi_xlsx::OpenOptions::new().source_limits(SourceLimits::default()),
+    )
+    .unwrap();
+    SourceBackedWorkbook::open_with_options(
+        file.path(),
+        litchi_xlsx::OpenOptions::new().cache_limits(cache),
+    )
+    .unwrap();
+    SourceBackedWorkbook::open_with_options(
+        file.path(),
+        litchi_xlsx::OpenOptions::new()
+            .source_limits(SourceLimits::default())
+            .cache_limits(cache),
     )
     .unwrap();
 
     let (_budget, context) = managed_context(1 << 20);
-    SourceBackedWorkbook::from_path_with_execution_context(
+    SourceBackedWorkbook::open_with_options(
         file.path(),
-        SourceLimits::default(),
-        context,
+        litchi_xlsx::OpenOptions::new()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
 
     let (_budget, context) = managed_context(1 << 20);
-    SourceBackedWorkbook::from_path_with_limits_and_execution_context(
+    SourceBackedWorkbook::open_with_options(
         file.path(),
-        SourceLimits::default(),
-        context,
+        litchi_xlsx::OpenOptions::new()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
 
     let (_budget, context) = managed_context(1 << 20);
-    SourceBackedWorkbook::open_with_limits_and_cache_limits_and_execution_context(
+    SourceBackedWorkbook::open_with_options(
         file.path(),
-        SourceLimits::default(),
-        cache,
-        context,
+        litchi_xlsx::OpenOptions::new()
+            .source_limits(SourceLimits::default())
+            .cache_limits(cache)
+            .execution_context(context),
     )
     .unwrap();
 

@@ -9,7 +9,9 @@
 use std::{convert::Infallible, io::Cursor};
 
 use super::codec::process_markup_compatibility;
-use super::model::{Capabilities, DEFAULT_MAX_ATTRIBUTES_PER_ELEMENT, Error, Limits, Report};
+use super::model::{
+    Capabilities, DEFAULT_MAX_ATTRIBUTES_PER_ELEMENT, Error, LimitKind, Limits, Report,
+};
 use super::scope::WALKED_DECLARATIONS;
 use super::scope::counter::{counted, counted_uri_bytes};
 use super::stream::{
@@ -58,7 +60,22 @@ fn stream(
 }
 
 fn is_limit(error: &Error, label: &str) -> bool {
-    matches!(error, Error::LimitExceeded(message) if message == label)
+    let expected = match label {
+        "attributes per element" | "MCE attributes per element" | "stream attributes per event" => {
+            LimitKind::Attributes
+        },
+        "namespace bindings" => LimitKind::NamespaceBindings,
+        _ => return false,
+    };
+    matches!(error, Error::LimitExceeded { kind, .. } if *kind == expected)
+}
+
+fn is_invalid_limit(error: &Error, label: &str) -> bool {
+    let expected = match label {
+        "MCE attributes per element" | "stream attributes per event" => LimitKind::Attributes,
+        _ => return false,
+    };
+    matches!(error, Error::InvalidLimit { kind, .. } if *kind == expected)
 }
 
 #[test]
@@ -332,7 +349,7 @@ fn no_configuration_admits_more_than_the_ceiling() {
     let stream_limits = StreamLimits::new(unbounded);
     let error = stream(&with_tag(&attributes(1)), &stream_limits).expect_err("refused");
     assert!(
-        matches!(&error, StreamError::Mce { error, .. } if is_limit(error, "MCE attributes per element")),
+        matches!(&error, StreamError::Mce { error, .. } if is_invalid_limit(error, "MCE attributes per element")),
         "{error:?}"
     );
     let per_event = StreamLimits {
@@ -341,7 +358,7 @@ fn no_configuration_admits_more_than_the_ceiling() {
     };
     let error = stream(&with_tag(&attributes(1)), &per_event).expect_err("refused");
     assert!(
-        matches!(&error, StreamError::Mce { error, .. } if is_limit(error, "stream attributes per event")),
+        matches!(&error, StreamError::Mce { error, .. } if is_invalid_limit(error, "stream attributes per event")),
         "{error:?}"
     );
     // At the ceiling both limits are valid.

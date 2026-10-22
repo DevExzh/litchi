@@ -72,9 +72,7 @@ pub use model::{
     State,
 };
 pub use planning::{MergeChoice, MergeLimits, ThreeWayPlan};
-pub use semantic::{
-    ColumnEdit, DefaultsEdit, Edit, FormControlEdit, NewSheet, RowEdit, TabEdit, WorksheetEdit,
-};
+pub use semantic::{Column, Defaults, Edit, FormControl, NewSheet, Row, Sheet, Tab};
 pub use svg::{PictureSelector, SvgInput};
 pub use wire::{DurablePatch, SealedPatch};
 

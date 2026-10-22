@@ -906,6 +906,42 @@ fn managed_restore_releases_workspace_on_memory_hash_and_sink_failures() {
 }
 
 #[test]
+fn managed_restore_authenticates_with_bounded_stack_when_memory_is_full() {
+    let current_bytes = archive_bytes_with_extra(b"current-source");
+    let original_bytes = archive_bytes();
+    let (budget, _cancellation, context) = managed_context(64 * 1024 * 1024, u64::MAX);
+    let current = SourceBackedPackage::from_read_at_with_execution_context(
+        Arc::new(OwnedSource::new(current_bytes)),
+        litchi_opc::SourceLimits::default(),
+        context.clone(),
+    )
+    .expect("managed current package must open");
+    let original = open_unmanaged(original_bytes.clone());
+    let current_artifact = current.source_artifact();
+    let original_artifact = original.source_artifact();
+    let proof = proof_for(&current_artifact, &original_artifact);
+    let available = budget
+        .limit(Resource::Memory)
+        .checked_sub(budget.used(Resource::Memory))
+        .expect("managed package must fit inside its memory budget");
+    let occupied = context
+        .reserve(Resource::Memory, available)
+        .expect("test must consume the remaining recipient memory");
+
+    let mut output = Vec::new();
+    current
+        .restore_source_artifact_to_stream(
+            &original_artifact,
+            proof,
+            original_artifact.len(),
+            &mut output,
+        )
+        .expect("exact restore must use the bounded stack window");
+    assert_eq!(output, original_bytes);
+    drop(occupied);
+}
+
+#[test]
 fn managed_restore_charges_shared_output_once_and_releases_memory_lease() {
     let bytes = archive_bytes();
     let (budget, _cancellation, context) = managed_context(64 * 1024 * 1024, u64::MAX);

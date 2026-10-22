@@ -13,7 +13,9 @@ use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{
     BlobPart, OpcError, OpcPackage, PackURI, PackageWriter, SourceCacheLimits, TargetMode,
 };
-use litchi_xlsx::defined_names::{Commit, Snapshot, SourceBackedEditor};
+use litchi_xlsx::SourceBackedWorkbook;
+use litchi_xlsx::defined_names::Snapshot;
+use litchi_xlsx::defined_names::source::Commit;
 use litchi_xlsx::raw::DefinedName;
 use litchi_xlsx::{Error, SourceLimits};
 use soapberry_zip::{PreservationIndex, ZipArchive};
@@ -192,13 +194,16 @@ fn target_names() -> Vec<DefinedName> {
     ]
 }
 
-fn changed_commit(editor: &SourceBackedEditor) -> Commit {
-    let mut edit = editor.edit();
+fn changed_edit(editor: &SourceBackedWorkbook) -> litchi_xlsx::defined_names::source::Edit {
+    let mut edit = editor.edit_defined_names().unwrap();
     assert!(edit.replace(target_names()).unwrap());
-    let commit = edit.commit().unwrap();
-    assert!(commit.changed());
-    assert_eq!(commit.diagnostics().touched_workbooks(), 1);
-    assert_eq!(commit.snapshot().defined_names(), target_names());
+    edit
+}
+
+fn changed_commit(editor: &SourceBackedWorkbook) -> Commit {
+    let commit = changed_edit(editor).commit().unwrap();
+    assert!(commit.diagnostics().changed());
+    assert_eq!(commit.patch().after().defined_names(), target_names());
     commit
 }
 
@@ -249,25 +254,27 @@ fn managed_context(memory: u64) -> (Budget, CancellationSource, ExecutionContext
 fn changed_edit_reopens_and_changes_only_workbook_xml() {
     let source_bytes = fixture("", r#"<extLst><ext uri="urn:keep"/></extLst>"#, false);
     let editor =
-        SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(source_bytes.clone())))
+        SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(source_bytes.clone())))
             .unwrap();
-    assert_eq!(editor.cache_diagnostics().successful_loads, 1);
+    let opened = editor.cache_diagnostics().successful_loads;
+    assert_eq!(editor.cache_diagnostics().successful_loads, opened);
     let commit = changed_commit(&editor);
-    assert_eq!(editor.cache_diagnostics().successful_loads, 1);
+    assert_eq!(editor.cache_diagnostics().successful_loads, opened);
 
     let mut replay = OpcPackage::from_bytes(&source_bytes).unwrap();
-    commit.patch().apply(&mut replay).unwrap();
+    replay_patch(&mut replay, commit.patch()).unwrap();
     assert_eq!(
         Snapshot::load(&replay).unwrap().defined_names(),
         target_names()
     );
-    commit.patch().inverse().apply(&mut replay).unwrap();
+    replay_patch(&mut replay, &commit.patch().inverse()).unwrap();
     assert!(Snapshot::load(&replay).unwrap().defined_names().is_empty());
 
     let mut output = Vec::new();
-    let published = editor
-        .publish_commit_to_stream(&mut output, &commit)
-        .unwrap();
+    commit.package().write_to(&mut output).unwrap();
+    assert_eq!(commit.package().defined_names(), target_names());
+    assert_eq!(commit.package().active_sheet_position(), Some(0));
+    let published = commit.patch().after().clone();
     assert_eq!(published.defined_names(), target_names());
 
     let source = OpcPackage::from_bytes(&source_bytes).unwrap();
@@ -321,65 +328,64 @@ fn changed_edit_reopens_and_changes_only_workbook_xml() {
 fn replacement_clear_and_noop_are_exact() {
     let bytes = fixture("", "", false);
     let editor =
-        SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(bytes.clone()))).unwrap();
-    let noop = editor.edit().commit().unwrap();
-    assert!(!noop.changed());
-    assert!(noop.patch().is_empty());
+        SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(bytes.clone()))).unwrap();
+    let noop = editor.edit_defined_names().unwrap().commit().unwrap();
+    assert!(!noop.diagnostics().changed());
+    assert!(noop.patch().is_noop());
     let mut output = Vec::new();
-    editor.publish_commit_to_stream(&mut output, &noop).unwrap();
+    noop.package().write_to(&mut output).unwrap();
     assert_eq!(output, bytes);
 
-    let editor = SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(bytes))).unwrap();
+    let editor = SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(bytes))).unwrap();
     let commit = changed_commit(&editor);
     let mut output = Vec::new();
-    editor
-        .publish_commit_to_stream(&mut output, &commit)
-        .unwrap();
-    let editor = SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(output))).unwrap();
-    let mut edit = editor.edit();
+    commit.package().write_to(&mut output).unwrap();
+    let editor =
+        SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(output))).unwrap();
+    let mut edit = editor.edit_defined_names().unwrap();
     assert!(edit.clear().unwrap());
     let cleared = edit.commit().unwrap();
-    assert!(cleared.snapshot().defined_names().is_empty());
+    assert!(cleared.patch().after().defined_names().is_empty());
 }
 
 #[test]
 fn signed_change_foreign_commit_and_changed_source_refuse_before_output() {
     let signed = fixture("", "", true);
     let editor =
-        SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(signed.clone()))).unwrap();
-    let noop = editor.edit().commit().unwrap();
+        SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(signed.clone()))).unwrap();
+    let noop = editor.edit_defined_names().unwrap().commit().unwrap();
     let mut output = Vec::new();
-    editor.publish_commit_to_stream(&mut output, &noop).unwrap();
+    noop.package().write_to(&mut output).unwrap();
     assert_eq!(output, signed);
 
-    let editor = SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(signed))).unwrap();
-    let commit = changed_commit(&editor);
-    output.clear();
+    let editor =
+        SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(signed))).unwrap();
     assert!(matches!(
-        editor.publish_commit_to_stream(&mut output, &commit),
+        changed_edit(&editor).commit(),
         Err(Error::Package(OpcError::SignedSourceRequiresExplicitPolicy))
     ));
-    assert!(output.is_empty());
 
     let bytes = fixture("", "", false);
     let editor =
-        SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(bytes.clone()))).unwrap();
+        SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(bytes.clone()))).unwrap();
     let commit = changed_commit(&editor);
     let foreign = fixture("", r#"<extLst><ext uri="urn:foreign"/></extLst>"#, false);
     let foreign_editor =
-        SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(foreign))).unwrap();
+        SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(foreign))).unwrap();
     assert!(matches!(
-        foreign_editor.publish_commit_to_stream(&mut output, &commit),
+        foreign_editor
+            .apply_defined_names(commit.patch())
+            .map(|_| ()),
         Err(Error::PatchConflict { .. })
     ));
-    assert!(output.is_empty());
 
     let source = Arc::new(VersionedSource::new(bytes));
-    let editor = SourceBackedEditor::from_read_at(source.clone()).unwrap();
+    let editor = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
     let commit = changed_commit(&editor);
     source.changed();
+    output.clear();
     assert!(matches!(
-        editor.publish_commit_to_stream(&mut output, &commit),
+        commit.package().write_to(&mut output),
         Err(Error::Package(OpcError::SourceChanged { .. }))
     ));
     assert!(output.is_empty());
@@ -389,23 +395,41 @@ fn signed_change_foreign_commit_and_changed_source_refuse_before_output() {
 fn protection_mce_limits_invalid_scopes_and_partial_sink_are_checked() {
     let protected = fixture(r#"<workbookProtection lockStructure="1"/>"#, "", false);
     let editor =
-        SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(protected))).unwrap();
-    assert!(editor.edit().replace(target_names()).is_err());
+        SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(protected))).unwrap();
+    assert!(
+        editor
+            .edit_defined_names()
+            .unwrap()
+            .replace(target_names())
+            .is_err()
+    );
 
     let mce = fixture(
         "",
         r#"<definedNames><definedName name="Direct">1</definedName><future/></definedNames>"#,
         false,
     );
-    let editor = SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(mce))).unwrap();
-    assert!(editor.edit().replace(target_names()).is_err());
+    let editor = SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(mce))).unwrap();
+    assert!(
+        editor
+            .edit_defined_names()
+            .unwrap()
+            .replace(target_names())
+            .is_err()
+    );
 
     let bytes = fixture("", "", false);
     let editor =
-        SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(bytes.clone()))).unwrap();
+        SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(bytes.clone()))).unwrap();
     let mut invalid = target_names();
     invalid[1].local_sheet_id = Some(1);
-    assert!(editor.edit().replace(invalid).is_err());
+    assert!(
+        editor
+            .edit_defined_names()
+            .unwrap()
+            .replace(invalid)
+            .is_err()
+    );
 
     let limits = SourceLimits::builder()
         .max_part_bytes(1)
@@ -413,24 +437,56 @@ fn protection_mce_limits_invalid_scopes_and_partial_sink_are_checked() {
         .build()
         .unwrap();
     assert!(matches!(
-        SourceBackedEditor::from_read_at_with_limits(
+        SourceBackedWorkbook::from_read_at_with_options(
             Arc::new(VersionedSource::new(bytes.clone())),
-            limits,
+            litchi_xlsx::OpenOptions::new().source_limits(limits)
         ),
         Err(Error::Package(OpcError::Limit { .. }))
     ));
 
-    let editor = SourceBackedEditor::from_read_at(Arc::new(VersionedSource::new(bytes))).unwrap();
+    let editor = SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(bytes))).unwrap();
     let commit = changed_commit(&editor);
     let mut sink = FailingSink {
         accepted: 0,
         limit: 128,
     };
     assert!(matches!(
-        editor.publish_commit_to_stream(&mut sink, &commit),
+        commit.package().write_to(&mut sink),
         Err(Error::Package(OpcError::IncompleteOutput { .. }))
     ));
     assert_eq!(sink.accepted, 128);
+}
+
+#[test]
+fn replay_rechecks_target_catalog_under_recipient_source_limits() {
+    // Source-backed extraction reads in bounded chunks. Keep the admitted
+    // source above that scratch size so an exact `max_part_bytes` policy can
+    // admit the before workbook while the larger authored target exceeds it.
+    let padding = format!("<!--{}-->", "x".repeat(192 * 1024));
+    let source_bytes = fixture("", &padding, false);
+    let producer =
+        SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(source_bytes.clone())))
+            .unwrap();
+    let commit = changed_commit(&producer);
+    let before_workbook_bytes = part_len(&source_bytes, MAIN);
+    let recipient_limits = SourceLimits::builder()
+        .max_part_bytes(before_workbook_bytes)
+        .unwrap()
+        .build()
+        .unwrap();
+    let recipient = SourceBackedWorkbook::from_read_at_with_options(
+        Arc::new(VersionedSource::new(source_bytes)),
+        litchi_xlsx::OpenOptions::new().source_limits(recipient_limits),
+    )
+    .unwrap();
+    let mut output = Vec::new();
+    commit.package().write_to(&mut output).unwrap();
+    assert!(part_len(&output, MAIN) > before_workbook_bytes);
+
+    assert!(matches!(
+        recipient.apply_defined_names(commit.patch()),
+        Err(Error::Package(OpcError::Limit { .. }))
+    ));
 }
 
 #[test]
@@ -438,29 +494,25 @@ fn managed_workbook_payload_is_budgeted_streamed_and_released() {
     let bytes = fixture("", "", false);
     let exact = part_len(&bytes, MAIN);
     let (budget, _cancellation_source, context) = managed_context(exact);
-    let editor =
-        SourceBackedEditor::from_read_at_with_limits_and_cache_limits_and_execution_context(
-            Arc::new(VersionedSource::new(bytes.clone())),
-            SourceLimits::default(),
-            SourceCacheLimits::new(usize::try_from(exact).unwrap(), 4).unwrap(),
-            context,
-        )
-        .unwrap();
+    let editor = SourceBackedWorkbook::from_read_at_with_options(
+        Arc::new(VersionedSource::new(bytes.clone())),
+        litchi_xlsx::OpenOptions::new()
+            .source_limits(SourceLimits::default())
+            .cache_limits(SourceCacheLimits::new(usize::try_from(exact).unwrap(), 4).unwrap())
+            .execution_context(context),
+    )
+    .unwrap();
     assert!(editor.cache_diagnostics().budget_managed);
     assert_eq!(budget.used(Resource::Memory), exact);
 
     let commit = changed_commit(&editor);
     let mut replay = OpcPackage::from_bytes(&bytes).unwrap();
-    commit.patch().apply(&mut replay).unwrap();
-    assert!(matches!(
-        commit.patch().inverse().apply(&mut replay),
-        Err(Error::Package(OpcError::ManagedPartDataArcEscape))
-    ));
+    replay_patch(&mut replay, commit.patch()).unwrap();
+    replay_patch(&mut replay, &commit.patch().inverse()).unwrap();
 
     let mut output = Vec::new();
-    let published = editor
-        .publish_commit_to_stream(&mut output, &commit)
-        .unwrap();
+    commit.package().write_to(&mut output).unwrap();
+    let published = commit.patch().after().clone();
     assert_eq!(published.defined_names(), target_names());
     assert_eq!(
         Snapshot::load(&OpcPackage::from_bytes(&output).unwrap())
@@ -469,6 +521,8 @@ fn managed_workbook_payload_is_budgeted_streamed_and_released() {
         target_names()
     );
     drop(commit);
+    assert!(budget.used(Resource::Memory) <= exact);
+    drop(editor);
     assert_eq!(budget.used(Resource::Memory), 0);
 }
 
@@ -478,10 +532,11 @@ fn managed_one_under_budget_fails_before_payload_retention_and_cancellation_stop
     let exact = part_len(&bytes, MAIN);
     let (budget, _cancellation_source, context) = managed_context(exact - 1);
     assert!(matches!(
-        SourceBackedEditor::from_read_at_with_execution_context(
+        SourceBackedWorkbook::from_read_at_with_options(
             Arc::new(VersionedSource::new(bytes.clone())),
-            SourceLimits::default(),
-            context,
+            litchi_xlsx::OpenOptions::new()
+                .source_limits(SourceLimits::default())
+                .execution_context(context)
         ),
         Err(Error::Package(OpcError::Execution(
             ExecutionError::ResourceLimit(_)
@@ -490,13 +545,14 @@ fn managed_one_under_budget_fails_before_payload_retention_and_cancellation_stop
     assert_eq!(budget.used(Resource::Memory), 0);
 
     let (budget, cancellation_source, context) = managed_context(exact);
-    let editor = SourceBackedEditor::from_read_at_with_execution_context(
+    let editor = SourceBackedWorkbook::from_read_at_with_options(
         Arc::new(VersionedSource::new(bytes.clone())),
-        SourceLimits::default(),
-        context,
+        litchi_xlsx::OpenOptions::new()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
-    let edit = editor.edit();
+    let edit = editor.edit_defined_names().unwrap();
     cancellation_source.cancel();
     assert!(matches!(
         edit.commit(),
@@ -506,20 +562,41 @@ fn managed_one_under_budget_fails_before_payload_retention_and_cancellation_stop
     assert_eq!(budget.used(Resource::Memory), 0);
 
     let (budget, cancellation_source, context) = managed_context(exact);
-    let editor = SourceBackedEditor::from_read_at_with_execution_context(
+    let editor = SourceBackedWorkbook::from_read_at_with_options(
         Arc::new(VersionedSource::new(bytes)),
-        SourceLimits::default(),
-        context,
+        litchi_xlsx::OpenOptions::new()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     let commit = changed_commit(&editor);
     cancellation_source.cancel();
     let mut output = Vec::new();
     assert!(matches!(
-        editor.publish_commit_to_stream(&mut output, &commit),
+        commit.package().write_to(&mut output),
         Err(Error::Package(OpcError::Cancelled))
     ));
     assert!(output.is_empty());
     drop(commit);
+    assert!(budget.used(Resource::Memory) <= exact);
+    drop(editor);
     assert_eq!(budget.used(Resource::Memory), 0);
+}
+
+/// Replay a source-backed patch onto `package` through a source-backed
+/// workbook over its bytes (record 0360: source-backed patches replay onto
+/// source-backed workbooks).
+fn replay_patch(
+    package: &mut OpcPackage,
+    patch: &litchi_xlsx::defined_names::source::Patch,
+) -> litchi_xlsx::Result<()> {
+    let bytes = PackageWriter::to_bytes(package)?;
+    let workbook =
+        SourceBackedWorkbook::from_read_at(Arc::new(litchi_core::OwnedSource::new(bytes)))?;
+    let next = workbook
+        .apply_defined_names(patch)?
+        .into_package()
+        .to_bytes()?;
+    *package = OpcPackage::from_bytes(&next)?;
+    Ok(())
 }

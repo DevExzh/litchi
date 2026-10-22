@@ -9,7 +9,6 @@ use std::collections::HashSet;
 use std::ops::Range;
 use std::sync::Arc;
 
-use litchi_core::Resource;
 use litchi_opc::{OpcPackage, OwnedRelationships, PackURI, Part, SourceLimits, TargetMode};
 use quick_xml::events::Event;
 use quick_xml::name::ResolveResult;
@@ -35,13 +34,8 @@ fn invalid(value: impl std::fmt::Display) -> Error {
     crate::error::invalid(value.to_string())
 }
 
-fn limit(resource: Resource, name: &'static str, observed: usize, maximum: usize) -> Error {
-    Error::ResourceLimit(litchi_core::ResourceLimit {
-        resource,
-        observed: observed as u64,
-        limit: maximum as u64,
-        scope: Arc::<str>::from(format!("XLSX Custom Data {name}")),
-    })
+fn limit(kind: super::LimitKind, observed: usize, maximum: usize) -> Error {
+    super::limit(kind, observed, maximum)
 }
 
 #[derive(Clone, PartialEq, Eq)]
@@ -158,8 +152,7 @@ impl Bindings {
         // deliberately refuses unmodeled MCE contexts.
         if part.blob().len() > limits.max_connections_bytes() {
             return Err(limit(
-                Resource::InputBytes,
-                "connections XML bytes",
+                super::LimitKind::XmlBytes,
                 part.blob().len(),
                 limits.max_connections_bytes(),
             ));
@@ -170,8 +163,7 @@ impl Bindings {
             package.source_relationships_with_limits(part.partname(), read_limits)?;
         if relationships.bytes().len() > limits.max_relationship_xml_bytes() {
             return Err(limit(
-                Resource::InputBytes,
-                "connections relationship XML bytes",
+                super::LimitKind::RelationshipBytes,
                 relationships.bytes().len(),
                 limits.max_relationship_xml_bytes(),
             ));
@@ -249,8 +241,7 @@ impl Bindings {
             .ok_or_else(|| invalid("embeddedDataId aggregate size overflow"))?;
         if size > limits.max_connections_bytes() {
             return Err(limit(
-                Resource::OutputBytes,
-                "connections XML bytes",
+                super::LimitKind::OutputBytes,
                 size,
                 limits.max_connections_bytes(),
             ));
@@ -278,12 +269,7 @@ impl Bindings {
             }
             let maximum = limits.max_connections_bytes();
             if output_bytes > maximum {
-                return Err(limit(
-                    Resource::OutputBytes,
-                    "connections output bytes",
-                    output_bytes,
-                    maximum,
-                ));
+                return Err(limit(super::LimitKind::OutputBytes, output_bytes, maximum));
             }
         }
         let mut values = Vec::new();
@@ -364,8 +350,7 @@ impl Bindings {
             .ok_or_else(|| invalid("connections XML output size overflow"))?;
         if output > limits.max_connections_bytes() {
             return Err(limit(
-                Resource::OutputBytes,
-                "connections output bytes",
+                super::LimitKind::OutputBytes,
                 output,
                 limits.max_connections_bytes(),
             ));
@@ -411,16 +396,14 @@ impl Bindings {
                     .ok_or_else(|| invalid("embeddedDataId replacement size overflow"))?;
                 if replacement_bytes > limits.max_connections_bytes() {
                     return Err(limit(
-                        Resource::OutputBytes,
-                        "connections XML bytes",
+                        super::LimitKind::OutputBytes,
                         replacement_bytes,
                         limits.max_connections_bytes(),
                     ));
                 }
                 if escaped_len > limits.max_temporary_bytes() {
                     return Err(limit(
-                        Resource::Memory,
-                        "temporary connection attribute bytes",
+                        super::LimitKind::TemporaryBytes,
                         escaped_len,
                         limits.max_temporary_bytes(),
                     ));
@@ -444,12 +427,7 @@ impl Bindings {
             .min(output_limit)
             .min(limits.max_temporary_bytes());
         if output_bytes > maximum {
-            return Err(limit(
-                Resource::OutputBytes,
-                "connections output bytes",
-                output_bytes,
-                maximum,
-            ));
+            return Err(limit(super::LimitKind::OutputBytes, output_bytes, maximum));
         }
         let token = source.proof.replace_attributes(&edits)?;
         package.try_replace_owned_xml_part(&source.bytes, token)?;
@@ -465,8 +443,7 @@ impl Bindings {
         if let Some(source) = &self.source {
             if source.bytes.len() > limits.max_connections_bytes() {
                 return Err(limit(
-                    Resource::InputBytes,
-                    "connections XML bytes",
+                    super::LimitKind::XmlBytes,
                     source.bytes.len(),
                     limits.max_connections_bytes(),
                 ));
@@ -506,9 +483,8 @@ fn capture_edges(
             {
                 if edges.len() >= MAX_CONNECTIONS.min(limits.max_relationships()) {
                     return Err(limit(
-                        Resource::Objects,
-                        "connections relationships",
-                        edges.len().saturating_add(1),
+                        super::LimitKind::RelationshipCount,
+                        edges.len().checked_add(1).unwrap_or(usize::MAX),
                         MAX_CONNECTIONS.min(limits.max_relationships()),
                     ));
                 }
@@ -565,8 +541,7 @@ fn parse_with_limits(
 ) -> Result<(Vec<Slot>, Vec<String>, bool)> {
     if xml.len() > limits.max_connections_bytes() {
         return Err(limit(
-            Resource::InputBytes,
-            "connections XML bytes",
+            super::LimitKind::XmlBytes,
             xml.len(),
             limits.max_connections_bytes(),
         ));
@@ -595,11 +570,16 @@ fn parse_with_limits(
     let mut events = 0usize;
     let mut namespace_bytes = 0usize;
     loop {
-        events = events.saturating_add(1);
+        events = events.checked_add(1).ok_or_else(|| {
+            limit(
+                super::LimitKind::Events,
+                usize::MAX,
+                limits.max_xml_events(),
+            )
+        })?;
         if events > limits.max_xml_events() {
             return Err(limit(
-                Resource::Objects,
-                "connections XML events",
+                super::LimitKind::Events,
                 events,
                 limits.max_xml_events(),
             ));
@@ -613,17 +593,15 @@ fn parse_with_limits(
                     .ok_or_else(|| invalid("connections XML node count overflow"))?;
                 if nodes > MAX_NODES.min(limits.max_xml_nodes()) {
                     return Err(limit(
-                        Resource::Objects,
-                        "connections XML nodes",
+                        super::LimitKind::Nodes,
                         nodes,
                         MAX_NODES.min(limits.max_xml_nodes()),
                     ));
                 }
                 if stack.len() >= MAX_DEPTH.min(limits.max_xml_depth()) {
                     return Err(limit(
-                        Resource::Depth,
-                        "connections XML depth",
-                        stack.len().saturating_add(1),
+                        super::LimitKind::Depth,
+                        stack.len().checked_add(1).unwrap_or(usize::MAX),
                         MAX_DEPTH.min(limits.max_xml_depth()),
                     ));
                 }
@@ -646,16 +624,14 @@ fn parse_with_limits(
                         .ok_or_else(|| invalid("connections XML attribute count overflow"))?;
                     if attribute_count > limits.max_xml_attributes() {
                         return Err(limit(
-                            Resource::Objects,
-                            "connections XML attributes",
+                            super::LimitKind::Attributes,
                             attribute_count,
                             limits.max_xml_attributes(),
                         ));
                     }
                     if attribute.value.as_ref().len() > limits.max_xml_string_bytes() {
                         return Err(limit(
-                            Resource::InputBytes,
-                            "connections XML string bytes",
+                            super::LimitKind::StringBytes,
                             attribute.value.as_ref().len(),
                             limits.max_xml_string_bytes(),
                         ));
@@ -681,8 +657,7 @@ fn parse_with_limits(
                             })?;
                         if namespace_bytes > limits.max_xml_namespace_bytes() {
                             return Err(limit(
-                                Resource::InputBytes,
-                                "connections XML namespace bytes",
+                                super::LimitKind::NamespaceBytes,
                                 namespace_bytes,
                                 limits.max_xml_namespace_bytes(),
                             ));
@@ -716,8 +691,7 @@ fn parse_with_limits(
                         .map_err(invalid)?;
                     if value.len() > limits.max_xml_string_bytes() {
                         return Err(limit(
-                            Resource::InputBytes,
-                            "connections XML string bytes",
+                            super::LimitKind::StringBytes,
                             value.len(),
                             limits.max_xml_string_bytes(),
                         ));
@@ -735,8 +709,7 @@ fn parse_with_limits(
                             let units = value.encode_utf16().count();
                             if units > limits.max_uid_units() {
                                 return Err(limit(
-                                    Resource::InputBytes,
-                                    "UID UTF-16 units",
+                                    super::LimitKind::StringBytes,
                                     units,
                                     limits.max_uid_units(),
                                 ));
@@ -773,16 +746,21 @@ fn parse_with_limits(
                         .ok_or_else(|| invalid("connection ID is absent"))?
                         .parse::<u32>()
                         .map_err(invalid)?;
+                    if ids.contains(&id) {
+                        return Err(invalid("duplicate connection ID"));
+                    }
                     if ids.len() >= MAX_CONNECTIONS {
-                        return Err(invalid("duplicate or excessive connection IDs"));
+                        return Err(limit(
+                            super::LimitKind::Connections,
+                            ids.len().checked_add(1).unwrap_or(usize::MAX),
+                            MAX_CONNECTIONS,
+                        ));
                     }
                     ids.try_reserve(1).map_err(|source| Error::Allocation {
                         resource: "Custom Data connection IDs",
                         source,
                     })?;
-                    if !ids.insert(id) {
-                        return Err(invalid("duplicate or excessive connection IDs"));
-                    }
+                    ids.insert(id);
                     Context::Connection(
                         id,
                         kind.map(|v| v.parse::<u32>().map_err(invalid))
@@ -832,7 +810,11 @@ fn parse_with_limits(
                     }
                     if let Some((range, value)) = embedded {
                         if slots.len() >= MAX_CONNECTIONS {
-                            return Err(invalid("embeddedDataId reference limit exceeded"));
+                            return Err(limit(
+                                super::LimitKind::Connections,
+                                slots.len().checked_add(1).unwrap_or(usize::MAX),
+                                MAX_CONNECTIONS,
+                            ));
                         }
                         slots.try_reserve(1).map_err(|source| Error::Allocation {
                             resource: "Custom Data connection slots",
@@ -881,8 +863,7 @@ fn parse_with_limits(
             Event::Text(text) => {
                 if text.as_ref().len() > limits.max_xml_string_bytes() {
                     return Err(limit(
-                        Resource::InputBytes,
-                        "connections XML string bytes",
+                        super::LimitKind::StringBytes,
                         text.as_ref().len(),
                         limits.max_xml_string_bytes(),
                     ));
@@ -894,8 +875,7 @@ fn parse_with_limits(
             Event::GeneralRef(reference) => {
                 if reference.as_ref().len() > limits.max_xml_string_bytes() {
                     return Err(limit(
-                        Resource::InputBytes,
-                        "connections XML string bytes",
+                        super::LimitKind::StringBytes,
                         reference.as_ref().len(),
                         limits.max_xml_string_bytes(),
                     ));

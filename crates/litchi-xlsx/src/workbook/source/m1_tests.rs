@@ -9,8 +9,8 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 
 use litchi_core::{ReadAt, SourceVersion};
-use litchi_opc::OpcError;
 use litchi_opc::constants::content_type as ct;
+use litchi_opc::{OpcError, SourceLimits};
 use soapberry_zip::office::StreamingArchiveWriter;
 
 use super::values::limit_retained_weight;
@@ -571,6 +571,48 @@ fn defined_names_match_the_eager_owner() {
 }
 
 #[test]
+fn deferred_views_reuse_the_lineage_catalog_policy_and_reject_mismatch() {
+    let bytes = rich_workbook();
+    let (_, workbook) = open(&bytes);
+    let proof = workbook.shared_catalog_proof();
+
+    let mut edit = workbook.edit_tab_state().unwrap();
+    assert!(edit.hide("Other").unwrap());
+    let first = edit.commit().unwrap();
+    let first_view = first.package().view().unwrap();
+    assert!(Arc::ptr_eq(&proof, &first_view.inner.catalog_proof()));
+    assert!(Arc::ptr_eq(
+        &proof.limits,
+        &first_view.inner.source_limits()
+    ));
+
+    // Materializing the next deferred owner must keep the same proof and
+    // policy handles rather than allocating one OnceLock value per owner.
+    let mut edit = first_view.edit_tab_state().unwrap();
+    assert!(edit.show("Other").unwrap());
+    let second = edit.commit().unwrap();
+    let second_view = second.package().view().unwrap();
+    assert!(Arc::ptr_eq(&proof, &second_view.inner.catalog_proof()));
+    assert!(Arc::ptr_eq(
+        &proof.limits,
+        &second_view.inner.source_limits()
+    ));
+
+    let mismatch = SourceBackedWorkbook::from_read_at_with_options_and_shared_catalog(
+        ProbeSource::new(bytes),
+        crate::OpenOptions::new().source_limits(
+            SourceLimits::builder()
+                .max_part_bytes(1_000_000)
+                .unwrap()
+                .build()
+                .unwrap(),
+        ),
+        Some(proof),
+    );
+    assert!(mismatch.is_err());
+}
+
+#[test]
 fn block_reads_match_the_eager_owner_and_scan_once() {
     let bytes = rich_workbook();
     let eager = crate::Package::from_bytes(&bytes).unwrap();
@@ -661,13 +703,16 @@ fn block_reads_do_not_count_cell_events() {
     assert!(error.to_string().contains("event limit"), "{error}");
 
     // The physical scan still counts every event under the caller's budget.
-    let limits = litchi_opc::SourceLimits::builder()
+    let limits = SourceLimits::builder()
         .max_events(2_000_000)
         .unwrap()
         .build()
         .unwrap();
-    let workbook =
-        SourceBackedWorkbook::from_read_at_with_limits(ProbeSource::new(bytes), limits).unwrap();
+    let workbook = SourceBackedWorkbook::from_read_at_with_options(
+        ProbeSource::new(bytes),
+        crate::OpenOptions::new().source_limits(limits),
+    )
+    .unwrap();
     let sheet = workbook.sheet("Large").unwrap().unwrap();
     let filter = sheet.auto_filter().unwrap().expect("auto-filter");
     assert!(debug(filter).contains("A1:J21000"));
@@ -798,13 +843,17 @@ fn cold_cell_reads_stream_until_structural_reads_pin_a_grid() {
 
 #[test]
 fn block_reads_honor_the_open_profile_and_never_cache_limit_failures() {
-    let limits = litchi_opc::SourceLimits::builder()
+    let limits = SourceLimits::builder()
         .max_events(32)
         .unwrap()
         .build()
         .unwrap();
     let source = ProbeSource::new(rich_workbook());
-    let workbook = SourceBackedWorkbook::from_read_at_with_limits(source.clone(), limits).unwrap();
+    let workbook = SourceBackedWorkbook::from_read_at_with_options(
+        source.clone(),
+        crate::OpenOptions::new().source_limits(limits),
+    )
+    .unwrap();
     let sheet = workbook.sheet("Other").unwrap().unwrap();
     for _ in 0..2 {
         assert!(matches!(

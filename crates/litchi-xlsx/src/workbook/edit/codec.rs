@@ -116,6 +116,7 @@ pub(super) fn validate_web_integrity(workbook: &Workbook) -> Result<()> {
         let sheet = Worksheet {
             owner: Arc::clone(&workbook.inner),
             data: Arc::clone(data),
+            policy: None,
         };
         check_web_bindings(&refs, &data.name, sheet.web_bindings()?)?;
     }
@@ -450,7 +451,7 @@ pub(super) fn create_sheets(
             )?;
         }
         if let Some(bindings) = &web {
-            content = raw::web::replace(&content, bindings)?;
+            content = raw::web::replace(&content, bindings, &workbook.inner.package.read_limits())?;
         }
         if let Some(page_breaks) = &page_breaks
             && page_breaks != &crate::page_breaks::PageBreaks::new()
@@ -607,7 +608,8 @@ pub(super) fn create_sheets(
                     after: expected,
                     ..
                 } => {
-                    if raw::web::read(&content)? != *expected {
+                    if raw::web::read(&content, &workbook.inner.package.read_limits())? != *expected
+                    {
                         return Err(invalid(format!(
                             "new worksheet web-binding verification failed at {sheet}"
                         )));

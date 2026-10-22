@@ -3,7 +3,8 @@
 //! Discovery validates OPC relationship and content-type metadata only. It
 //! does not inspect, parse, decompress, or execute VBA project bytes.
 
-use crate::error::{Error, Result};
+use crate::error::Result;
+use crate::part_edit::{Staged, family};
 use litchi_ooxml_common::vba::{
     Host, read_project_part, remove_project_graph, store_project_graph,
 };
@@ -119,14 +120,17 @@ pub fn discover(package: &OpcPackage, source: &dyn Part) -> Result<Option<Projec
 ///
 /// Storing always republishes the graph, so a signed package is refused with
 /// [`crate::Error::Signed`] before it is changed (ADR 0006): remove the
-/// signature explicitly first, with [`crate::Package::unsign`] or
-/// [`OpcPackage::unsign`].
+/// signature explicitly first, with [`crate::Package::unsign`].
 ///
 /// # Errors
 ///
 /// Returns [`crate::Error::Signed`] for a signed package, and an error when the
 /// graph is invalid or the package cannot be changed.
-pub fn store(package: &mut OpcPackage, source: &PackURI, payload: Payload) -> Result<Project> {
+pub(crate) fn store(
+    package: &mut OpcPackage,
+    source: &PackURI,
+    payload: Payload,
+) -> Result<Project> {
     let payload = Arc::new(payload.into_bytes());
     store_project_graph(package, source, Host::Excel, payload, None)
         .map_err(crate::signature_policy::from_shared)?;
@@ -140,14 +144,111 @@ pub fn store(package: &mut OpcPackage, source: &PackURI, payload: Payload) -> Re
 /// An absent graph returns `Ok(false)` and keeps a signed package's
 /// signature; removing a present graph from a signed package is refused with
 /// [`crate::Error::Signed`] (ADR 0006): remove the signature explicitly first,
-/// with [`crate::Package::unsign`] or [`OpcPackage::unsign`].
+/// with [`crate::Package::unsign`].
 ///
 /// # Errors
 ///
 /// Returns [`crate::Error::Signed`] for a change to a signed package, and an
 /// error when the graph is invalid or the package cannot be changed.
-pub fn remove(package: &mut OpcPackage, source: &PackURI) -> Result<bool> {
+pub(crate) fn remove(package: &mut OpcPackage, source: &PackURI) -> Result<bool> {
     remove_project_graph(package, source, Host::Excel).map_err(crate::signature_policy::from_shared)
+}
+
+family!("VBA-project");
+
+pub use crate::opc::LimitKind;
+
+/// A staged edit of the workbook's VBA-project graph of one
+/// [`crate::Package`]. Dropping it discards it.
+///
+/// The `vbaProject.bin` payload stays opaque: it is stored and removed, never
+/// parsed or executed.
+#[derive(Debug, Clone)]
+pub struct Edit {
+    staged: Staged,
+    workbook: PackURI,
+}
+
+impl crate::Package {
+    /// Start an edit of the workbook's VBA-project graph.
+    ///
+    /// # Errors
+    ///
+    /// Returns the encryption-policy error for a package whose mutations are
+    /// refused.
+    pub fn edit_vba(&self) -> Result<Edit> {
+        let staged = Staged::new(self, "edit_vba")?;
+        let workbook = staged.opc().main_document_part()?.partname().clone();
+        Ok(Edit { staged, workbook })
+    }
+
+    /// Apply a VBA-project patch to a new package; this one is unchanged.
+    /// An empty patch returns this package.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::PatchConflict`] when this package is not the patch's
+    /// before state and [`Error::Signed`] for a changed patch of a signed
+    /// workbook.
+    pub fn apply_vba(&self, patch: &Patch) -> Result<Commit> {
+        Ok(Commit::new((
+            patch.0.apply(self, "apply_vba")?,
+            patch.0.clone(),
+        )))
+    }
+}
+
+impl Edit {
+    /// The staged VBA project relationship metadata, when present.
+    ///
+    /// # Errors
+    ///
+    /// Returns the validation errors of the VBA-project graph.
+    pub fn project(&self) -> Result<Option<Project>> {
+        let source = self.staged.opc().get_part(&self.workbook)?;
+        discover(self.staged.opc(), source)
+    }
+
+    /// Store `payload` as the workbook's VBA project, replacing any present
+    /// graph.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Signed`] for a signed package and the graph's
+    /// validation errors.
+    pub fn store(&mut self, payload: Payload) -> Result<Project> {
+        let workbook = self.workbook.clone();
+        self.staged
+            .update(|candidate| store(candidate, &workbook, payload))
+    }
+
+    /// Remove the workbook's VBA-project graph. Returns whether one was
+    /// present.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Signed`] for a change to a signed package and the
+    /// graph's validation errors.
+    pub fn remove(&mut self) -> Result<bool> {
+        let workbook = self.workbook.clone();
+        self.staged.update(|candidate| remove(candidate, &workbook))
+    }
+
+    /// Discard every staged change.
+    pub fn reset(&mut self) {
+        self.staged.reset();
+    }
+
+    /// Publish the staged graph to a new package. An unchanged edit returns
+    /// the source package.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Signed`] for a changed signed package and the
+    /// workbook validation errors of the staged package.
+    pub fn commit(self) -> Result<Commit> {
+        Ok(Commit::new(self.staged.commit()?))
+    }
 }
 
 #[cfg(test)]
@@ -242,7 +343,7 @@ mod tests {
         assert!(matches!(
             metadata.project_with(&package, &too_small),
             Err(Error::Common(litchi_ooxml_common::Error::Vba(
-                litchi_vba::Error::LimitExceeded { .. },
+                litchi_vba::Error::Limit { .. },
             )))
         ));
 

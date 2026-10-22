@@ -40,17 +40,17 @@ use super::super::{
 };
 use super::super::{codec, package};
 
-use super::layout::{ColumnEdit, DefaultsEdit, RowEdit};
+use super::layout::{Column, Defaults, Row};
 use super::transaction::Edit;
 
 /// Transaction-scoped state editor for any workbook sheet tab.
 #[derive(Debug)]
-pub struct TabEdit<'a> {
+pub struct Tab<'a> {
     pub(super) edit: &'a mut Edit,
     pub(super) position: usize,
 }
 
-impl TabEdit<'_> {
+impl Tab<'_> {
     /// Rename this tab and every modeled local formula/reference dependency.
     ///
     /// Borrowed strings are validated and copied once. Passing a prevalidated
@@ -93,7 +93,7 @@ impl TabEdit<'_> {
 
 /// Borrowed worksheet editor tied to one transaction.
 #[derive(Debug)]
-pub struct WorksheetEdit<'a> {
+pub struct Sheet<'a> {
     pub(super) edit: &'a mut Edit,
     pub(super) position: usize,
 }
@@ -107,13 +107,13 @@ pub struct WorksheetEdit<'a> {
 /// require the exact immutable source workbook; durable patches check the
 /// complete serialized source.
 #[derive(Debug)]
-pub struct FormControlEdit<'a> {
+pub struct FormControl<'a> {
     pub(super) edit: &'a mut Edit,
     pub(super) position: usize,
     pub(super) selector: crate::form_control::OwnedSelector,
 }
 
-impl FormControlEdit<'_> {
+impl FormControl<'_> {
     /// Stage one typed scalar on the selected control.
     pub fn set_scalar(
         &mut self,
@@ -130,7 +130,7 @@ impl FormControlEdit<'_> {
     }
 }
 
-impl WorksheetEdit<'_> {
+impl Sheet<'_> {
     /// Stage one selector-first scalar on an existing form control.
     pub fn set_form_control_scalar<'a>(
         &mut self,
@@ -147,7 +147,7 @@ impl WorksheetEdit<'_> {
     pub fn edit_form_control<'e, 's>(
         &'e mut self,
         selector: impl Into<crate::form_control::ControlSelector<'s>>,
-    ) -> Result<FormControlEdit<'e>> {
+    ) -> Result<FormControl<'e>> {
         let selector = selector.into();
         let target = crate::form_control::owned_selector(selector);
         {
@@ -169,7 +169,7 @@ impl WorksheetEdit<'_> {
                 target.selector(),
             )?;
         }
-        Ok(FormControlEdit {
+        Ok(FormControl {
             edit: self.edit,
             position: self.position,
             selector: target,
@@ -243,14 +243,6 @@ impl WorksheetEdit<'_> {
         Ok(self)
     }
 
-    /// Alias for [`Self::put_hyperlink`] emphasizing replacement semantics.
-    pub fn replace_hyperlink(
-        &mut self,
-        hyperlink: crate::hyperlinks::Hyperlink,
-    ) -> Result<&mut Self> {
-        self.put_hyperlink(hyperlink)
-    }
-
     /// Remove one hyperlink selected by its checked cell or range reference.
     pub fn remove_hyperlink(
         &mut self,
@@ -260,18 +252,18 @@ impl WorksheetEdit<'_> {
     }
 
     /// Borrow the worksheet-wide grid-default editor.
-    pub fn defaults(&mut self) -> DefaultsEdit<'_> {
-        DefaultsEdit {
+    pub fn defaults(&mut self) -> Defaults<'_> {
+        Defaults {
             action: &mut self.edit.sheets.entry(self.position).or_default().defaults,
         }
     }
 
     /// Select one checked row for short property-editing verbs.
-    pub fn row(&mut self, at: impl Into<RowAt>) -> Result<RowEdit<'_>> {
+    pub fn row(&mut self, at: impl Into<RowAt>) -> Result<Row<'_>> {
         let row = at.into().resolve()?;
         let style_lineage = &self.edit.base.inner.style_lineage;
         let actions = &mut self.edit.sheets.entry(self.position).or_default().rows;
-        Ok(RowEdit {
+        Ok(Row {
             actions,
             style_lineage,
             row,
@@ -279,11 +271,11 @@ impl WorksheetEdit<'_> {
     }
 
     /// Select one column by its primary A1 label or a checked zero-based input.
-    pub fn column<'a>(&mut self, at: impl Into<ColumnAt<'a>>) -> Result<ColumnEdit<'_>> {
+    pub fn column<'a>(&mut self, at: impl Into<ColumnAt<'a>>) -> Result<Column<'_>> {
         let column = at.into().resolve()?;
         let style_lineage = &self.edit.base.inner.style_lineage;
         let actions = &mut self.edit.sheets.entry(self.position).or_default().columns;
-        Ok(ColumnEdit {
+        Ok(Column {
             actions,
             style_lineage,
             column,
@@ -330,6 +322,7 @@ impl WorksheetEdit<'_> {
             let sheet = Worksheet {
                 owner: Arc::clone(&self.edit.base.inner),
                 data,
+                policy: None,
             };
             let intents = self
                 .edit
@@ -1015,16 +1008,16 @@ impl NewSheet<'_> {
     }
 
     /// Borrow the pending worksheet's grid-default editor.
-    pub fn defaults(&mut self) -> DefaultsEdit<'_> {
-        DefaultsEdit {
+    pub fn defaults(&mut self) -> Defaults<'_> {
+        Defaults {
             action: &mut self.added.actions.defaults,
         }
     }
 
     /// Select one checked row for short property-editing verbs.
-    pub fn row(&mut self, at: impl Into<RowAt>) -> Result<RowEdit<'_>> {
+    pub fn row(&mut self, at: impl Into<RowAt>) -> Result<Row<'_>> {
         let row = at.into().resolve()?;
-        Ok(RowEdit {
+        Ok(Row {
             actions: &mut self.added.actions.rows,
             style_lineage: self.style_lineage,
             row,
@@ -1032,9 +1025,9 @@ impl NewSheet<'_> {
     }
 
     /// Select one column by its primary A1 label or a checked zero-based input.
-    pub fn column<'b>(&mut self, at: impl Into<ColumnAt<'b>>) -> Result<ColumnEdit<'_>> {
+    pub fn column<'b>(&mut self, at: impl Into<ColumnAt<'b>>) -> Result<Column<'_>> {
         let column = at.into().resolve()?;
-        Ok(ColumnEdit {
+        Ok(Column {
             actions: &mut self.added.actions.columns,
             style_lineage: self.style_lineage,
             column,

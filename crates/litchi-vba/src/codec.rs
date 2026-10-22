@@ -1,6 +1,6 @@
 //! MS-OVBA compressed-container encoding and decoding.
 
-use super::{Error, Limits, check_limit, invalid};
+use super::{Error, LimitKind, Limits, check_limit, invalid};
 use std::collections::HashMap;
 
 const CONTAINER_SIGNATURE: u8 = 0x01;
@@ -29,7 +29,7 @@ const MIN_COPY_BYTES: usize = 3;
 /// configured [`Limits`], or if an internal size conversion overflows.
 pub fn encode(decompressed: &[u8], limits: &Limits) -> Result<Vec<u8>, Error> {
     check_limit(
-        "decompressed VBA stream bytes",
+        LimitKind::DecompressedStreamBytes,
         decompressed.len(),
         limits.max_decompressed_stream_bytes,
     )?;
@@ -185,7 +185,7 @@ fn append_compressed_checked(
         .checked_add(bytes.len())
         .ok_or_else(|| invalid("compressed VBA size overflow"))?;
     check_limit(
-        "compressed VBA stream bytes",
+        LimitKind::CompressedStreamBytes,
         new_len,
         limits.max_compressed_stream_bytes,
     )?;
@@ -205,7 +205,7 @@ fn append_compressed_checked(
 /// input or decompressed output exceeds the configured [`Limits`].
 pub fn decode(compressed: &[u8], limits: &Limits) -> Result<Vec<u8>, Error> {
     check_limit(
-        "compressed VBA stream bytes",
+        LimitKind::CompressedStreamBytes,
         compressed.len(),
         limits.max_compressed_stream_bytes,
     )?;
@@ -313,7 +313,7 @@ fn decompress_chunk(
                 .checked_add(copy_length)
                 .ok_or_else(|| invalid("decompressed VBA size overflow"))?;
             check_limit(
-                "decompressed VBA stream bytes",
+                LimitKind::DecompressedStreamBytes,
                 new_total,
                 limits.max_decompressed_stream_bytes,
             )?;
@@ -342,7 +342,7 @@ fn append_checked(output: &mut Vec<u8>, bytes: &[u8], limits: &Limits) -> Result
         .checked_add(bytes.len())
         .ok_or_else(|| invalid("decompressed VBA size overflow"))?;
     check_limit(
-        "decompressed VBA stream bytes",
+        LimitKind::DecompressedStreamBytes,
         new_len,
         limits.max_decompressed_stream_bytes,
     )?;
@@ -364,7 +364,7 @@ fn append_byte_checked(
         .checked_add(1)
         .ok_or_else(|| invalid("decompressed VBA size overflow"))?;
     check_limit(
-        "decompressed VBA stream bytes",
+        LimitKind::DecompressedStreamBytes,
         new_len,
         limits.max_decompressed_stream_bytes,
     )?;
@@ -523,7 +523,7 @@ mod tests {
         };
         assert!(matches!(
             decode(MAX_COMPRESSION, &limits),
-            Err(Error::LimitExceeded { .. })
+            Err(Error::Limit { .. })
         ));
     }
 
@@ -535,7 +535,7 @@ mod tests {
         };
         assert!(matches!(
             encode(b"four", &input_limits),
-            Err(Error::LimitExceeded { .. })
+            Err(Error::Limit { .. })
         ));
 
         let output_limits = Limits {
@@ -545,7 +545,7 @@ mod tests {
         assert_eq!(encode(&[], &output_limits).unwrap(), [CONTAINER_SIGNATURE]);
         assert!(matches!(
             encode(b"x", &output_limits),
-            Err(Error::LimitExceeded { .. })
+            Err(Error::Limit { .. })
         ));
     }
 }

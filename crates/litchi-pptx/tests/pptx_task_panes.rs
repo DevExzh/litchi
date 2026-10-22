@@ -8,7 +8,7 @@ use litchi_ooxml_common::Error as CommonError;
 use litchi_ooxml_common::web::raw::{
     ADD_IN_CONTENT_TYPE, ADD_IN_RELATIONSHIP, TASK_PANES_CONTENT_TYPE, TASK_PANES_RELATIONSHIP,
 };
-use litchi_ooxml_common::web::{Conformance, Store, load, put, remove};
+use litchi_ooxml_common::web::{Conformance, Limits, Store, load, put, remove};
 use litchi_opc::part::{Part, XmlPart};
 use litchi_opc::{OpcPackage, PackURI};
 
@@ -21,7 +21,7 @@ const WEB_EXTENSION_XML: &[u8] =
 fn common_web_owner_loads_inert_task_panes() {
     let package = package_with_task_panes(false);
 
-    let panes = load(&package).unwrap().unwrap();
+    let panes = load(&package, &Limits::standard()).unwrap().unwrap();
     assert_eq!(panes.len(), 1);
     let pane = panes.iter().next().unwrap();
     assert!(pane.visible());
@@ -31,20 +31,26 @@ fn common_web_owner_loads_inert_task_panes() {
 #[test]
 fn common_web_owner_moves_and_removes_a_validated_task_pane_graph() {
     let source = package_with_task_panes(false);
-    let panes = load(&source).unwrap().unwrap();
+    let panes = load(&source, &Limits::standard()).unwrap().unwrap();
     let mut package = OpcPackage::new();
 
-    put(&mut package, panes, Conformance::Transitional).unwrap();
-    let stored = load(&package).unwrap().unwrap();
+    put(
+        &mut package,
+        panes,
+        Conformance::Transitional,
+        &Limits::standard(),
+    )
+    .unwrap();
+    let stored = load(&package, &Limits::standard()).unwrap().unwrap();
     assert_eq!(stored.len(), 1);
     assert_eq!(
         stored.iter().next().unwrap().add_in().reference().store(),
         Store::Omex
     );
 
-    assert!(remove(&mut package).unwrap());
-    assert!(load(&package).unwrap().is_none());
-    assert!(!remove(&mut package).unwrap());
+    assert!(remove(&mut package, &Limits::standard()).unwrap());
+    assert!(load(&package, &Limits::standard()).unwrap().is_none());
+    assert!(!remove(&mut package, &Limits::standard()).unwrap());
 }
 
 #[test]
@@ -52,7 +58,7 @@ fn common_web_owner_rejects_external_web_extension_relationships() {
     let package = package_with_task_panes(true);
 
     assert!(matches!(
-        load(&package),
+        load(&package, &Limits::standard()),
         Err(CommonError::Relationship(message)) if message.contains("internal")
     ));
 }

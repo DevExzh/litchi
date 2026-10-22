@@ -185,23 +185,14 @@ pub struct WorksheetSourceScan {
 }
 
 impl WorksheetSourceScan {
-    /// Scan one worksheet using the hard bounded default policy.
-    pub fn scan(source: &[u8]) -> Result<Self> {
-        Self::scan_with_limits(source, WorksheetSourceLimits::default())
-    }
-
-    /// Scan one worksheet using a caller-supplied finite policy.
-    pub fn scan_with_limits(source: &[u8], limits: WorksheetSourceLimits) -> Result<Self> {
+    /// Scan one worksheet under a finite policy
+    /// ([`WorksheetSourceLimits::default`] for the standard one).
+    pub fn scan(source: &[u8], limits: WorksheetSourceLimits) -> Result<Self> {
         Scanner::new(source, limits.bounded())?.run()
     }
 
     /// Direct worksheet drawing owners in source order.
     pub fn drawings(&self) -> &[WorksheetDrawingReference] {
-        &self.references
-    }
-
-    /// Alias emphasizing that the values are relationship references.
-    pub fn references(&self) -> &[WorksheetDrawingReference] {
         &self.references
     }
 
@@ -232,7 +223,7 @@ pub fn scan_worksheet_drawing_references(
     source: &[u8],
     limits: WorksheetSourceLimits,
 ) -> Result<Vec<String>> {
-    let scan = WorksheetSourceScan::scan_with_limits(source, limits)?;
+    let scan = WorksheetSourceScan::scan(source, limits)?;
     let mut references = Vec::new();
     references
         .try_reserve_exact(scan.references.len())
@@ -246,11 +237,6 @@ pub fn scan_worksheet_drawing_references(
         references.push(value);
     }
     Ok(references)
-}
-
-/// Short alias for callers that prefer a source-scanner verb.
-pub fn scan(source: &[u8], limits: WorksheetSourceLimits) -> Result<WorksheetSourceScan> {
-    WorksheetSourceScan::scan_with_limits(source, limits)
 }
 
 struct Scanner<'a> {
@@ -1027,7 +1013,7 @@ mod tests {
     }
 
     fn scan(xml: &str, max_attributes: usize) -> Result<WorksheetSourceScan> {
-        WorksheetSourceScan::scan_with_limits(
+        WorksheetSourceScan::scan(
             xml.as_bytes(),
             WorksheetSourceLimits {
                 max_attributes,

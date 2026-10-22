@@ -10,7 +10,7 @@ use quick_xml::{
     reader::NsReader,
 };
 
-use super::super::{Error, NAMESPACE};
+use super::super::{Error, LimitKind, NAMESPACE};
 use super::model::{Alternatives, Kind, Limits, Span, Stored};
 use crate::xml::attributes::BytesStartExt as _;
 use crate::{xml::decode_xml_reference, xml_name};
@@ -27,7 +27,7 @@ use crate::{xml::decode_xml_reference, xml_name};
 /// bound, or an underlying XML or package operation fails.
 pub fn read(xml: &[u8], limits: &Limits) -> Result<Alternatives, Error> {
     if xml.len() > limits.bytes {
-        return Err(limit("alternate-content XML bytes"));
+        return Err(limit(LimitKind::InputBytes, xml.len(), limits.bytes));
     }
 
     let mut reader = NsReader::from_reader(xml);
@@ -50,13 +50,17 @@ pub fn read(xml: &[u8], limits: &Limits) -> Result<Alternatives, Error> {
         if matches!(event, Event::Eof) {
             break;
         }
-        charge(&mut nodes, limits.nodes, "alternate-content XML events")?;
+        charge(&mut nodes, limits.nodes, LimitKind::Events)?;
 
         match event {
             Event::Start(element) => {
                 validate_element(&reader, &element, &namespace)?;
                 if frames.len() >= limits.depth {
-                    return Err(limit("alternate-content XML depth"));
+                    return Err(limit(
+                        LimitKind::Depth,
+                        frames.len().checked_add(1).unwrap_or(usize::MAX),
+                        limits.depth,
+                    ));
                 }
 
                 if frames.is_empty() {
@@ -87,7 +91,11 @@ pub fn read(xml: &[u8], limits: &Limits) -> Result<Alternatives, Error> {
             Event::Empty(element) => {
                 validate_element(&reader, &element, &namespace)?;
                 if frames.len() >= limits.depth {
-                    return Err(limit("alternate-content XML depth"));
+                    return Err(limit(
+                        LimitKind::Depth,
+                        frames.len().checked_add(1).unwrap_or(usize::MAX),
+                        limits.depth,
+                    ));
                 }
 
                 if frames.is_empty() {
@@ -307,7 +315,11 @@ fn add_branch_with_span(
     limits: &Limits,
 ) -> Result<(), Error> {
     if branches.len() >= limits.branches {
-        return Err(limit("alternate-content branch count"));
+        return Err(limit(
+            LimitKind::Branches,
+            branches.len().checked_add(1).unwrap_or(usize::MAX),
+            limits.branches,
+        ));
     }
     if kind == Kind::Choice && branches.iter().any(|branch| branch.kind == Kind::Fallback) {
         return Err(invalid("Choice cannot follow Fallback"));
@@ -420,10 +432,12 @@ fn position<R: BufRead>(reader: &NsReader<R>, origin: ReaderOrigin) -> Result<us
         .ok_or_else(|| invalid("AlternateContent byte offset exceeds platform size"))
 }
 
-fn charge(current: &mut usize, max: usize, resource: &'static str) -> Result<(), Error> {
-    *current = current.checked_add(1).ok_or_else(|| limit(resource))?;
+fn charge(current: &mut usize, max: usize, kind: LimitKind) -> Result<(), Error> {
+    *current = current
+        .checked_add(1)
+        .ok_or_else(|| limit_lower_bound(kind, max))?;
     if *current > max {
-        return Err(limit(resource));
+        return Err(limit(kind, *current, max));
     }
     Ok(())
 }
@@ -432,6 +446,33 @@ fn invalid(message: impl Into<String>) -> Error {
     Error::NonConformant(message.into())
 }
 
-fn limit(resource: &'static str) -> Error {
-    Error::LimitExceeded(resource.into())
+fn limit(kind: LimitKind, observed: usize, maximum: usize) -> Error {
+    Error::LimitExceeded {
+        kind,
+        observed,
+        maximum,
+    }
+}
+
+fn limit_lower_bound(kind: LimitKind, maximum: usize) -> Error {
+    // The checked counter increment already overflowed; retain that fact as
+    // a saturated observation rather than fabricating a policy successor.
+    limit(kind, usize::MAX, maximum)
+}
+
+#[cfg(test)]
+mod limit_lower_bound_tests {
+    use super::{Error, LimitKind};
+
+    #[test]
+    fn arithmetic_overflow_reports_saturated_observation() {
+        assert!(matches!(
+            super::limit_lower_bound(LimitKind::Choices, 10),
+            Error::LimitExceeded {
+                kind: LimitKind::Choices,
+                observed: usize::MAX,
+                maximum: 10,
+            }
+        ));
+    }
 }

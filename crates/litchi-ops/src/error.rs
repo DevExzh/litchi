@@ -1149,6 +1149,40 @@ impl Classify for litchi_core::Error {
     }
 }
 
+/// Whether a shared OOXML error is a typed budget of a shared family
+/// (record 0360).
+#[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
+fn mce_limit(error: &litchi_ooxml_common::mce::Error) -> bool {
+    matches!(error, litchi_ooxml_common::mce::Error::LimitExceeded { .. })
+}
+
+/// Whether a shared MCE policy rejected the caller's configured bound before
+/// processing started. This is an invalid argument, not an exhausted document
+/// resource (record 0360).
+#[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
+fn mce_invalid_limit(error: &litchi_ooxml_common::mce::Error) -> bool {
+    matches!(error, litchi_ooxml_common::mce::Error::InvalidLimit { .. })
+}
+
+/// Whether a shared OOXML error is a typed budget of a shared family,
+/// including a typed MCE budget nested in the common wrapper (record 0360).
+#[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
+fn common_limit(error: &litchi_ooxml_common::Error) -> bool {
+    match error {
+        litchi_ooxml_common::Error::Limit { .. } => true,
+        litchi_ooxml_common::Error::Mce(error) => mce_limit(error),
+        _ => false,
+    }
+}
+
+#[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
+fn common_invalid_limit(error: &litchi_ooxml_common::Error) -> bool {
+    matches!(
+        error,
+        litchi_ooxml_common::Error::Mce(error) if mce_invalid_limit(error)
+    )
+}
+
 #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
 impl Classify for litchi_opc::OpcError {
     fn classify(&self) -> Class {
@@ -1245,6 +1279,11 @@ impl Classify for litchi_docx::Error {
             | Self::ExternalHyperlinkDetachmentLimit { .. }
             | Self::ExternalHyperlinkRedactionLimit { .. }
             | Self::SectionInventoryLimit { .. } => Class::of(Code::LimitExceeded),
+            // The shared OOXML families' typed budgets (record 0360).
+            Self::Common(error) if common_invalid_limit(error) => Class::of(Code::InvalidArgument),
+            Self::Common(error) if common_limit(error) => Class::of(Code::LimitExceeded),
+            Self::Mce(error) if mce_invalid_limit(error) => Class::of(Code::InvalidArgument),
+            Self::Mce(error) if mce_limit(error) => Class::of(Code::LimitExceeded),
             Self::OutOfBounds { .. } => Class::of(Code::OutOfRange),
             Self::Refused(refusal) => refusal.classify(),
             Self::PatchConflict { .. } => Class::of(Code::InvalidInput),
@@ -1270,7 +1309,7 @@ impl Classify for litchi_docx::document::Error {
             Self::PatchConflict => Class::of(Code::InvalidInput),
             Self::SemanticPrecondition => Class::of(Code::InvalidArgument),
             Self::Durable(_) | Self::Composition(_) | Self::InvalidDurable(_) => {
-                Class::of(Code::InvalidInput)
+                Class::of(Code::InvalidArgument)
             },
             _ => Class::of(Code::CorruptFile),
         }
@@ -1323,6 +1362,18 @@ impl Classify for litchi_pptx::Error {
             // a source change or cancellation during the read, through the
             // shared OOXML error.
             Self::CustomProperties(litchi_ooxml_common::Error::Opc(error)) => error.classify(),
+            Self::CustomProperties(error) if common_invalid_limit(error) => {
+                Class::of(Code::InvalidArgument)
+            },
+            Self::CustomProperties(error) if common_limit(error) => {
+                Class::of(Code::LimitExceeded)
+            },
+            Self::MarkupCompatibility(error) if mce_invalid_limit(error) => {
+                Class::of(Code::InvalidArgument)
+            },
+            Self::MarkupCompatibility(error) if mce_limit(error) => {
+                Class::of(Code::LimitExceeded)
+            },
             Self::Limit { .. } => Class::of(Code::LimitExceeded),
             Self::IndexOutOfBounds { .. }
             | Self::SlideIndexOutOfBounds { .. }
@@ -1371,6 +1422,16 @@ impl Classify for litchi_xlsx::Error {
                 _ => Class::of(Code::CorruptFile),
             },
             Self::Package(error) => error.classify(),
+            Self::Common(error) if common_invalid_limit(error) => {
+                Class::of(Code::InvalidArgument)
+            },
+            Self::Common(error) if common_limit(error) => Class::of(Code::LimitExceeded),
+            Self::MarkupCompatibility(error) if mce_invalid_limit(error) => {
+                Class::of(Code::InvalidArgument)
+            },
+            Self::MarkupCompatibility(error) if mce_limit(error) => {
+                Class::of(Code::LimitExceeded)
+            },
             #[cfg(feature = "encryption")]
             Self::Encryption(error) => error.classify(),
             #[cfg(feature = "encryption")]
@@ -1379,6 +1440,14 @@ impl Classify for litchi_xlsx::Error {
                 litchi_ooxml_common::package_encryption::PolicyError::NoRetainedMode => Class::of(Code::UnsupportedCapability),
             },
             Self::ResourceLimit(_) | Self::Limit { .. } => Class::of(Code::LimitExceeded),
+            Self::FormControl(litchi_xlsx::form_control::FormControlError::Limit { .. }) => {
+                Class::of(Code::LimitExceeded)
+            },
+            // Typed refusals, patches for another base and invalid configured
+            // limits (record 0360).
+            Self::Refused(refusal) => refusal.classify(),
+            Self::PatchConflict { .. } => Class::of(Code::InvalidInput),
+            Self::InvalidLimit { .. } => Class::of(Code::InvalidArgument),
             Self::Signed => Class::suggest(Code::DocumentProtected, SIGNED_SUGGESTION),
             Self::Unsupported { .. } | Self::UnsupportedSelector => {
                 Class::of(Code::UnsupportedCapability)
@@ -1465,6 +1534,8 @@ impl Classify for litchi_xlsb::package::PackageError {
             },
             Self::Io(error) => error.classify(),
             Self::Opc(error) => error.classify(),
+            Self::Common(error) if common_invalid_limit(error) => Class::of(Code::InvalidArgument),
+            Self::Common(error) if common_limit(error) => Class::of(Code::LimitExceeded),
             Self::Wire(error) => error.classify(),
             Self::Execution(error) => error.classify(),
             Self::LimitExceeded { .. }

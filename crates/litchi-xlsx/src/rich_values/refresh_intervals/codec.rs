@@ -4,6 +4,7 @@ use std::collections::TryReserveError;
 use std::ops::Range;
 
 use litchi_core::xml::ReaderOrigin;
+use litchi_opc::SourceLimits;
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::ResolveResult;
@@ -25,7 +26,26 @@ use crate::rich_values::{
 };
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
+// This is the schema's intrinsic CT_RichValueType name bound. It is part of
+// valid input, so exceeding it remains Invalid rather than a configurable
+// resource LimitKind.
 const TYPE_NAME_MAX_CHARS: usize = 255;
+
+fn source_xml_limit(limits: &SourceLimits) -> usize {
+    limits.max_part_bytes().min(MAX_XML_BYTES as u64) as usize
+}
+
+fn source_output_limit(limits: &SourceLimits) -> usize {
+    limits.max_part_bytes().min(MAX_OUTPUT_BYTES as u64) as usize
+}
+
+fn check_source_xml_bytes(xml: &[u8], limits: &SourceLimits) -> Result<()> {
+    let maximum = source_xml_limit(limits);
+    if xml.len() > maximum {
+        return Err(Error::limit(super::LimitKind::XmlBytes, xml.len(), maximum));
+    }
+    Ok(())
+}
 
 #[derive(Clone, Debug)]
 pub(crate) struct Inspection {
@@ -48,17 +68,19 @@ pub(crate) struct ExtensionLocation {
 }
 
 /// Parse one standalone `refreshIntervals` element.
-pub fn parse_refresh_intervals(xml: &[u8]) -> Result<RefreshIntervals> {
+pub fn parse_refresh_intervals(xml: &[u8], limits: &SourceLimits) -> Result<RefreshIntervals> {
+    check_source_xml_bytes(xml, limits)?;
     let root = parse_document(xml)?;
     parse_refresh_node(&root)
 }
 
 /// Serialize one bounded `refreshIntervals` element.
-pub fn write_refresh_intervals(value: &RefreshIntervals) -> Result<Vec<u8>> {
+pub fn write_refresh_intervals(value: &RefreshIntervals, limits: &SourceLimits) -> Result<Vec<u8>> {
     validate_intervals(value.intervals())?;
     let size = refresh_xml_len(value)?;
-    if size > MAX_OUTPUT_BYTES {
-        return Err(super::super::limit("refresh interval XML output bytes"));
+    let maximum = source_output_limit(limits);
+    if size > maximum {
+        return Err(Error::limit(super::LimitKind::OutputBytes, size, maximum));
     }
     let mut output = Vec::new();
     output
@@ -84,14 +106,12 @@ pub fn write_refresh_intervals(value: &RefreshIntervals) -> Result<Vec<u8>> {
 }
 
 /// Inspect `rvTypesInfo` while retaining source spans for a later local edit.
-pub(crate) fn inspect(xml: &[u8]) -> Result<Inspection> {
+pub(crate) fn inspect(xml: &[u8], limits: &SourceLimits) -> Result<Inspection> {
     // The common DOM pass enforces the package XML byte, depth, node, string,
     // entity, and document-shape limits before the span scanner retains any
     // source-bound metadata.
+    check_source_xml_bytes(xml, limits)?;
     let _ = parse_document(xml)?;
-    if xml.len() > MAX_XML_BYTES {
-        return Err(super::super::limit("rich-value types XML bytes"));
-    }
 
     let mut reader = NsReader::from_reader(xml);
     reader.config_mut().trim_text(false);
@@ -157,7 +177,7 @@ pub(crate) fn inspect(xml: &[u8]) -> Result<Inspection> {
                             extensions: Vec::new(),
                             extension_list_seen: false,
                         },
-                        "rich-value types",
+                        super::LimitKind::Types,
                     )?;
                     FrameKind::Type(types.len() - 1)
                 } else if parent.is_some_and(|parent| {
@@ -234,7 +254,7 @@ pub(crate) fn inspect(xml: &[u8]) -> Result<Inspection> {
                         non_whitespace_text: false,
                         intervals: Vec::new(),
                     },
-                    "rich-value XML depth",
+                    super::LimitKind::Depth,
                 )?;
             },
             Event::Empty(element) => {
@@ -278,7 +298,7 @@ pub(crate) fn inspect(xml: &[u8]) -> Result<Inspection> {
                                 extensions: Vec::new(),
                                 extension_list_seen: false,
                             },
-                            "rich-value types",
+                            super::LimitKind::Types,
                         )?;
                     } else if matches!(parent.kind, FrameKind::Type(_))
                         && info.namespace == SPREADSHEETML
@@ -311,7 +331,7 @@ pub(crate) fn inspect(xml: &[u8]) -> Result<Inspection> {
                             &mut refresh.intervals,
                             MAX_INTERVALS,
                             interval,
-                            "rich-value refresh intervals",
+                            super::LimitKind::Intervals,
                         )?;
                         let _ = type_index;
                     } else if direct_refresh_parent(&stack).is_some_and(|(_, _)| {
@@ -399,7 +419,7 @@ pub(crate) fn inspect(xml: &[u8]) -> Result<Inspection> {
                             &mut refresh.intervals,
                             MAX_INTERVALS,
                             interval,
-                            "rich-value refresh intervals",
+                            super::LimitKind::Intervals,
                         )?;
                         let _ = type_index;
                     },
@@ -444,7 +464,9 @@ pub(crate) fn rewrite(
     source: &[u8],
     before: &Inspection,
     after: &[TypeRefreshIntervals],
+    limits: &SourceLimits,
 ) -> Result<Vec<u8>> {
+    check_source_xml_bytes(source, limits)?;
     if before.types.len() != after.len() {
         return Err(invalid("rich-value type count changed during refresh edit"));
     }
@@ -473,8 +495,13 @@ pub(crate) fn rewrite(
             });
         }
     }
-    if output_len > MAX_OUTPUT_BYTES {
-        return Err(super::super::limit("rich-value refresh XML output bytes"));
+    let maximum = source_output_limit(limits);
+    if output_len > maximum {
+        return Err(Error::limit(
+            super::LimitKind::OutputBytes,
+            output_len,
+            maximum,
+        ));
     }
 
     let mut edits = Vec::<Edit>::new();
@@ -488,7 +515,7 @@ pub(crate) fn rewrite(
                 .next()
                 .ok_or_else(|| invalid("rich-value refresh edit plan is incomplete"))?;
             let range = planned.range;
-            plan_type_edit(source, index, old, new, &mut edits)?;
+            plan_type_edit(source, index, old, new, limits, &mut edits)?;
             let edit = edits
                 .last()
                 .ok_or_else(|| invalid("rich-value refresh edit plan was not materialized"))?;
@@ -592,13 +619,14 @@ fn plan_type_edit(
     type_index: usize,
     old: &TypeInspection,
     new: &TypeRefreshIntervals,
+    limits: &SourceLimits,
     edits: &mut Vec<Edit>,
 ) -> Result<()> {
     let _ = type_index;
     match (&old.refresh, &new.intervals) {
         (Some(range), Some(intervals)) => edits.push(Edit {
             range: range.clone(),
-            replacement: write_refresh_intervals(intervals)?,
+            replacement: write_refresh_intervals(intervals, limits)?,
         }),
         (Some(range), None) => edits.push(Edit {
             range: range.clone(),
@@ -610,7 +638,7 @@ fn plan_type_edit(
                     "cannot author refreshIntervals without an existing rich-value type ext owner",
                 )
             })?;
-            let payload = write_refresh_intervals(intervals)?;
+            let payload = write_refresh_intervals(intervals, limits)?;
             if let Some(close) = &extension.close_tag {
                 edits.push(Edit {
                     range: close.start..close.start,
@@ -672,7 +700,7 @@ fn parse_refresh_node(node: &Node) -> Result<RefreshIntervals> {
             &mut intervals,
             MAX_INTERVALS,
             parse_interval_node(child)?,
-            "refresh intervals",
+            super::LimitKind::Intervals,
         )?;
     }
     RefreshIntervals::new(intervals)
@@ -981,7 +1009,11 @@ fn resolve_namespace(value: ResolveResult<'_>) -> Result<String> {
 fn bounded_qname(element: &BytesStart<'_>) -> Result<Vec<u8>> {
     let name = element.name();
     if name.as_ref().len() > MAX_STRING_BYTES {
-        return Err(super::super::limit("rich-value extension name"));
+        return Err(super::limit(
+            super::LimitKind::StringBytes,
+            name.as_ref().len(),
+            MAX_STRING_BYTES,
+        ));
     }
     Ok(name.as_ref().to_vec())
 }
@@ -1002,7 +1034,11 @@ fn checked_position(origin: ReaderOrigin, position: u64, source_len: usize) -> R
 
 fn push_extension(values: &mut Vec<ExtensionLocation>, value: ExtensionLocation) -> Result<usize> {
     if values.len() >= MAX_INTERVALS {
-        return Err(super::super::limit("rich-value extension locations"));
+        return Err(super::limit(
+            super::LimitKind::ExtensionLocations,
+            values.len().checked_add(1).unwrap_or(usize::MAX),
+            MAX_INTERVALS,
+        ));
     }
     values
         .try_reserve(1)
@@ -1015,14 +1051,18 @@ fn push_bounded<T>(
     values: &mut Vec<T>,
     maximum: usize,
     value: T,
-    resource: &'static str,
+    kind: super::LimitKind,
 ) -> Result<()> {
     if values.len() >= maximum {
-        return Err(super::super::limit(resource));
+        return Err(super::limit(
+            kind,
+            values.len().checked_add(1).unwrap_or(usize::MAX),
+            maximum,
+        ));
     }
     values
         .try_reserve(1)
-        .map_err(|source| allocation(resource, source))?;
+        .map_err(|source| allocation("rich-value bounded values", source))?;
     values.push(value);
     Ok(())
 }

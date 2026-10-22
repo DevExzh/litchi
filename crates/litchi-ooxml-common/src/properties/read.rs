@@ -259,9 +259,9 @@ pub(super) fn decode(xml: &str) -> Result<(Core, Dialect)> {
 fn decode_reporting(xml: &str, recorder: &mut Recorder<'_>) -> Result<(Core, Dialect)> {
     if xml.len() > MAX_XML_BYTES {
         return Err(Error::Limit {
-            resource: "core-properties XML bytes",
-            max: MAX_XML_BYTES,
-            actual: xml.len(),
+            kind: crate::LimitKind::CorePropertiesXmlBytes,
+            maximum: MAX_XML_BYTES,
+            observed: xml.len(),
         });
     }
     let mut reader = NsReader::from_reader(xml.as_bytes());
@@ -278,15 +278,15 @@ fn decode_reporting(xml: &str, recorder: &mut Recorder<'_>) -> Result<(Core, Dia
 
     loop {
         events = events.checked_add(1).ok_or(Error::Limit {
-            resource: "core-properties XML events",
-            max: MAX_XML_EVENTS,
-            actual: usize::MAX,
+            kind: crate::LimitKind::CorePropertiesXmlEvents,
+            maximum: MAX_XML_EVENTS,
+            observed: usize::MAX,
         })?;
         if events > MAX_XML_EVENTS {
             return Err(Error::Limit {
-                resource: "core-properties XML events",
-                max: MAX_XML_EVENTS,
-                actual: events,
+                kind: crate::LimitKind::CorePropertiesXmlEvents,
+                maximum: MAX_XML_EVENTS,
+                observed: events,
             });
         }
         let (namespace, event) = reader
@@ -776,15 +776,15 @@ fn push_property_text(active: &mut Option<Active>, value: &str) -> Result<()> {
             bytes,
         } => {
             *bytes = bytes.checked_add(value.len()).ok_or(Error::Limit {
-                resource: "core property text bytes",
-                max: MAX_PROPERTY_TEXT,
-                actual: usize::MAX,
+                kind: crate::LimitKind::CorePropertyTextBytes,
+                maximum: MAX_PROPERTY_TEXT,
+                observed: usize::MAX,
             })?;
             if *bytes > MAX_PROPERTY_TEXT {
                 return Err(Error::Limit {
-                    resource: "core property text bytes",
-                    max: MAX_PROPERTY_TEXT,
-                    actual: *bytes,
+                    kind: crate::LimitKind::CorePropertyTextBytes,
+                    maximum: MAX_PROPERTY_TEXT,
+                    observed: *bytes,
                 });
             }
             if let Some(child) = child.as_mut() {
@@ -799,15 +799,15 @@ fn push_property_text(active: &mut Option<Active>, value: &str) -> Result<()> {
 
 fn append_bounded(text: &mut String, value: &str) -> Result<()> {
     let length = text.len().checked_add(value.len()).ok_or(Error::Limit {
-        resource: "core property text bytes",
-        max: MAX_PROPERTY_TEXT,
-        actual: usize::MAX,
+        kind: crate::LimitKind::CorePropertyTextBytes,
+        maximum: MAX_PROPERTY_TEXT,
+        observed: usize::MAX,
     })?;
     if length > MAX_PROPERTY_TEXT {
         return Err(Error::Limit {
-            resource: "core property text bytes",
-            max: MAX_PROPERTY_TEXT,
-            actual: length,
+            kind: crate::LimitKind::CorePropertyTextBytes,
+            maximum: MAX_PROPERTY_TEXT,
+            observed: length,
         });
     }
     text.push_str(value);
@@ -1438,9 +1438,9 @@ mod tests {
         assert!(matches!(
             decode(&xml),
             Err(Error::Limit {
-                resource: "core property text bytes",
-                max: MAX_PROPERTY_TEXT,
-                actual,
+                kind: crate::LimitKind::CorePropertyTextBytes,
+                maximum: MAX_PROPERTY_TEXT,
+                observed: actual,
             }) if actual == MAX_PROPERTY_TEXT + 1
         ));
     }

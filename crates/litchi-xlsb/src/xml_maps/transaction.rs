@@ -13,9 +13,8 @@ use litchi_opc::{PackURI, TargetMode};
 use super::snapshot::{SourcePart, SourceRelationship, SourceState};
 use super::{
     CellReference, ColumnBinding, Commit, MappedTable, Patch, SingleCellBinding, Snapshot, XmlMap,
-    XmlMapConformance, XmlMapInfo, parse_single_cells, parse_xml_map_info_with_limits,
-    patch_single_cells, patch_table_bindings, serialize_single_cells, validate_binding_map_ids,
-    validate_catalog,
+    XmlMapConformance, XmlMapInfo, parse_single_cells, parse_xml_map_info, patch_single_cells,
+    patch_table_bindings, serialize_single_cells, validate_binding_map_ids, validate_catalog,
 };
 use crate::package::error::{Error, Result};
 
@@ -406,7 +405,7 @@ impl Edit {
                 part.content_type == litchi_ooxml_common::spreadsheet_xml_maps::CONTENT_TYPE
             })
             .map(|part| {
-                parse_xml_map_info_with_limits(part.bytes(), &self.before.limits().xml_maps)
+                parse_xml_map_info(part.bytes(), &self.before.limits().xml_maps)
                     .map_err(|error| invalid(error.to_string()))
             })
             .transpose()?;
@@ -435,7 +434,7 @@ impl Edit {
             .position(|part| part.content_type == content_type);
         match (existing, self.before.map_info(), self.catalog.as_ref()) {
             (Some(index), Some(before), Some(after)) => {
-                let xml = litchi_ooxml_common::spreadsheet_xml_maps::patch_xml_map_info_source_with_limits(
+                let xml = litchi_ooxml_common::spreadsheet_xml_maps::patch_xml_map_info_source(
                     source.dependencies[index].bytes(),
                     before,
                     after,
@@ -443,7 +442,7 @@ impl Edit {
                     self.conformance,
                     &self.before.limits().xml_maps,
                 )?;
-                parse_xml_map_info_with_limits(&xml, &self.before.limits().xml_maps)
+                parse_xml_map_info(&xml, &self.before.limits().xml_maps)
                     .map_err(|error| invalid(error.to_string()))?;
                 source.dependencies[index].bytes = Arc::new(xml);
                 let map_name = source.dependencies[index].part_name.clone();
@@ -947,7 +946,7 @@ fn serialize_catalog(
     conformance: XmlMapConformance,
     limits: super::SemanticLimits,
 ) -> Result<Vec<u8>> {
-    litchi_ooxml_common::spreadsheet_xml_maps::serialize_xml_map_info_with_limits(
+    litchi_ooxml_common::spreadsheet_xml_maps::serialize_xml_map_info(
         catalog,
         conformance,
         &limits.xml_maps,

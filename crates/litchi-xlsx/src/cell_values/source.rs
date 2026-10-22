@@ -1,24 +1,30 @@
-//! Guarded source-backed value-only worksheet transactions.
+//! Guarded source-backed value-only worksheet edits of a
+//! [`SourceBackedWorkbook`] (record 0360, the 0355a §1 shape).
+//!
+//! [`SourceBackedWorkbook::edit_cell_values`] stages value-only changes over a
+//! bounded worksheet set ([`super::Edit`]); [`super::sheet`] is the same
+//! family over one worksheet. A commit returns the new workbook whose output
+//! is the topology publication the former stream publishers wrote: the
+//! selected worksheet parts (and the invalidated calculation closure) are
+//! replaced, every other member is raw-copied.
 
 use std::collections::BTreeMap;
 use std::io::Write;
-#[cfg(any(unix, windows))]
-use std::path::Path;
 use std::sync::Arc;
 
-#[cfg(any(unix, windows))]
-use litchi_core::FileSource;
-use litchi_core::{ExecutionContext, ReadAt};
-use litchi_opc::{SourceBackedPackage, SourceCacheLimits, SourceLimits};
+use litchi_opc::SourceBackedPackage;
 use litchi_sheet::Cell as Address;
 
+use super::patch::Record;
 use super::snapshot::SourceProvenance;
-use super::{Commit, MAX_SHEET_OWNERS, MultiCommit, MultiPatch, MultiSnapshot, Patch, Snapshot};
-use crate::Selector;
+use super::{Commit, MAX_SHEET_OWNERS, MultiSnapshot, Patch, Snapshot};
 use crate::cell::{Cell, Content, Number, Value};
 use crate::error::{Error, Result, invalid};
 use crate::formula::Formula;
 use crate::raw::worksheet::edit::{Action, rewrite_value_only_with_provenance};
+use crate::{Selector, SourceBackedWorkbook};
+
+pub mod sheet;
 
 /// Maximum unique cells in one atomic value transaction.
 pub const MAX_BATCH_EDITS: usize = 256;
@@ -26,7 +32,7 @@ pub const MAX_BATCH_EDITS: usize = 256;
 /// One typed value-only edit for a scalar cell.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
-pub enum CellValueEdit {
+pub enum Change {
     /// Insert one numeric cell at an absent coordinate.
     Insert { address: Address, value: Number },
     /// Replace the stored scalar value without changing local style.
@@ -47,19 +53,19 @@ pub enum CellValueEdit {
 
 /// One selector-first scalar edit for a bounded multi-worksheet transaction.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct SheetCellValueEdit<'a> {
+pub struct SheetChange<'a> {
     /// Worksheet selected by its semantic name or zero-based position.
     pub selector: Selector<'a>,
     /// Scalar operation applied to one selected worksheet.
-    pub edit: CellValueEdit,
+    pub edit: Change,
 }
 
-impl<'a> SheetCellValueEdit<'a> {
+impl<'a> SheetChange<'a> {
     /// Construct a selector-first numeric insertion for an absent coordinate.
     pub fn insert(selector: impl Into<Selector<'a>>, address: Address, value: Number) -> Self {
         Self {
             selector: selector.into(),
-            edit: CellValueEdit::insert(address, value),
+            edit: Change::insert(address, value),
         }
     }
 
@@ -71,7 +77,7 @@ impl<'a> SheetCellValueEdit<'a> {
     ) -> Self {
         Self {
             selector: selector.into(),
-            edit: CellValueEdit::set(address, value),
+            edit: Change::set(address, value),
         }
     }
 
@@ -83,7 +89,7 @@ impl<'a> SheetCellValueEdit<'a> {
     ) -> Self {
         Self {
             selector: selector.into(),
-            edit: CellValueEdit::set_formula(address, formula),
+            edit: Change::set_formula(address, formula),
         }
     }
 
@@ -95,7 +101,7 @@ impl<'a> SheetCellValueEdit<'a> {
     ) -> Self {
         Self {
             selector: selector.into(),
-            edit: CellValueEdit::set_shared_formula(address, formula),
+            edit: Change::set_shared_formula(address, formula),
         }
     }
 
@@ -104,7 +110,7 @@ impl<'a> SheetCellValueEdit<'a> {
     pub fn clear(selector: impl Into<Selector<'a>>, address: Address) -> Self {
         Self {
             selector: selector.into(),
-            edit: CellValueEdit::clear(address),
+            edit: Change::clear(address),
         }
     }
 
@@ -113,12 +119,12 @@ impl<'a> SheetCellValueEdit<'a> {
     pub fn remove(selector: impl Into<Selector<'a>>, address: Address) -> Self {
         Self {
             selector: selector.into(),
-            edit: CellValueEdit::remove(address),
+            edit: Change::remove(address),
         }
     }
 }
 
-impl CellValueEdit {
+impl Change {
     /// Construct a numeric insertion for an absent coordinate.
     pub fn insert(address: Address, value: Number) -> Self {
         Self::Insert { address, value }
@@ -179,311 +185,43 @@ enum StagedValueEdit {
     Remove,
 }
 
-/// Owning source-backed editor for one exact XLSX artifact.
-///
-/// On managed opens, the caller-provided [`Budget`](litchi_core::Budget)
-/// accounts for retained and in-flight OPC [`PartData`](litchi_opc::PartData)
-/// payload reservations. Parsed cell stores, graph and relationship metadata,
-/// staging allocations, rewritten XML, candidate package clones, and output
-/// buffers remain governed by this facade's separate bounds and are not
-/// charged to that payload budget.
-pub struct SourceBackedEditor {
-    package: SourceBackedPackage,
-}
-
-/// Clone-staged atomic changes over one exact source worksheet.
-pub struct SourceEdit {
-    before: Snapshot,
-    staged: Vec<(Address, StagedValueEdit)>,
-}
-
-/// Clone-staged atomic changes over a bounded worksheet set.
-pub struct MultiSourceEdit {
+/// Clone-staged atomic value changes over a bounded worksheet set of a
+/// [`SourceBackedWorkbook`]. Dropping it discards it.
+pub struct Edit {
+    workbook: SourceBackedWorkbook,
     before: MultiSnapshot,
     staged: BTreeMap<usize, Vec<(Address, StagedValueEdit)>>,
     staged_cells: usize,
 }
 
-impl SourceBackedEditor {
-    /// Open an ordinary XLSX package from a regular filesystem path.
+impl SourceBackedWorkbook {
+    /// Begin a bounded value-only edit over selected worksheet owners
+    /// without loading unselected worksheet payloads.
     ///
-    /// The path is represented by an open positional [`FileSource`], so
-    /// opening does not read the complete artifact into memory. Deferred
-    /// worksheet payloads retain the same lazy behavior as the `ReadAt`
-    /// constructors below.
-    #[cfg(any(unix, windows))]
-    pub fn from_path(path: impl AsRef<Path>) -> Result<Self> {
-        Self::from_path_with_limits(path, SourceLimits::default())
-    }
-
-    /// Open a filesystem-backed XLSX package with explicit OPC ingress
-    /// limits.
-    #[cfg(any(unix, windows))]
-    pub fn from_path_with_limits(path: impl AsRef<Path>, limits: SourceLimits) -> Result<Self> {
-        Self::from_read_at_with_limits(file_source(path)?, limits)
-    }
-
-    /// Open a filesystem-backed XLSX package with an explicit finite
-    /// deferred-payload cache policy.
-    #[cfg(any(unix, windows))]
-    pub fn from_path_with_cache_limits(
-        path: impl AsRef<Path>,
-        cache_limits: SourceCacheLimits,
-    ) -> Result<Self> {
-        Self::from_read_at_with_cache_limits(file_source(path)?, cache_limits)
-    }
-
-    /// Open a filesystem-backed XLSX package with explicit read and cache
-    /// policies.
-    #[cfg(any(unix, windows))]
-    pub fn from_path_with_limits_and_cache_limits(
-        path: impl AsRef<Path>,
-        limits: SourceLimits,
-        cache_limits: SourceCacheLimits,
-    ) -> Result<Self> {
-        Self::from_read_at_with_limits_and_cache_limits(file_source(path)?, limits, cache_limits)
-    }
-
-    /// Open a filesystem-backed XLSX package with explicit read and
-    /// execution policies.
-    #[cfg(any(unix, windows))]
-    pub fn from_path_with_execution_context(
-        path: impl AsRef<Path>,
-        limits: SourceLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_read_at_with_execution_context(file_source(path)?, limits, context)
-    }
-
-    /// Open a filesystem-backed XLSX package with explicit read and
-    /// execution policies (the cache uses its default bounded policy).
-    #[cfg(any(unix, windows))]
-    pub fn from_path_with_limits_and_execution_context(
-        path: impl AsRef<Path>,
-        limits: SourceLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_read_at_with_limits_and_execution_context(file_source(path)?, limits, context)
-    }
-
-    /// Open a filesystem-backed XLSX package with explicit read, cache, and
-    /// caller-owned execution policies.
-    #[cfg(any(unix, windows))]
-    pub fn from_path_with_limits_and_cache_limits_and_execution_context(
-        path: impl AsRef<Path>,
-        limits: SourceLimits,
-        cache_limits: SourceCacheLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_read_at_with_limits_and_cache_limits_and_execution_context(
-            file_source(path)?,
-            limits,
-            cache_limits,
-            context,
-        )
-    }
-
-    /// Open a filesystem-backed XLSX editor from a regular path.
-    #[cfg(any(unix, windows))]
-    pub fn open(path: impl AsRef<Path>) -> Result<Self> {
-        Self::from_path(path)
-    }
-
-    /// Open a filesystem-backed XLSX editor with explicit OPC limits.
-    #[cfg(any(unix, windows))]
-    pub fn open_with_limits(path: impl AsRef<Path>, limits: SourceLimits) -> Result<Self> {
-        Self::from_path_with_limits(path, limits)
-    }
-
-    /// Open a filesystem-backed XLSX editor with an explicit finite cache.
-    #[cfg(any(unix, windows))]
-    pub fn open_with_cache_limits(
-        path: impl AsRef<Path>,
-        cache_limits: SourceCacheLimits,
-    ) -> Result<Self> {
-        Self::from_path_with_cache_limits(path, cache_limits)
-    }
-
-    /// Open a filesystem-backed XLSX editor with explicit read and cache
-    /// policies.
-    #[cfg(any(unix, windows))]
-    pub fn open_with_limits_and_cache_limits(
-        path: impl AsRef<Path>,
-        limits: SourceLimits,
-        cache_limits: SourceCacheLimits,
-    ) -> Result<Self> {
-        Self::from_path_with_limits_and_cache_limits(path, limits, cache_limits)
-    }
-
-    /// Open a filesystem-backed XLSX editor with explicit read and execution
-    /// policies while retaining the default finite cache.
-    #[cfg(any(unix, windows))]
-    pub fn open_with_execution_context(
-        path: impl AsRef<Path>,
-        limits: SourceLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_path_with_execution_context(path, limits, context)
-    }
-
-    /// Open a filesystem-backed XLSX editor with explicit read and execution
-    /// policies while retaining the default finite cache.
-    #[cfg(any(unix, windows))]
-    pub fn open_with_limits_and_execution_context(
-        path: impl AsRef<Path>,
-        limits: SourceLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_path_with_limits_and_execution_context(path, limits, context)
-    }
-
-    /// Open a filesystem-backed XLSX editor with explicit read, cache, and
-    /// execution policies.
-    #[cfg(any(unix, windows))]
-    pub fn open_with_limits_and_cache_limits_and_execution_context(
-        path: impl AsRef<Path>,
-        limits: SourceLimits,
-        cache_limits: SourceCacheLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_path_with_limits_and_cache_limits_and_execution_context(
-            path,
-            limits,
-            cache_limits,
-            context,
-        )
-    }
-
-    /// Open with the standard bounded OPC policy.
-    pub fn from_read_at(source: Arc<dyn ReadAt>) -> Result<Self> {
-        Self::from_read_at_with_limits(source, SourceLimits::default())
-    }
-
-    /// Open with explicit OPC ingress limits.
-    pub fn from_read_at_with_limits(source: Arc<dyn ReadAt>, limits: SourceLimits) -> Result<Self> {
-        Self::from_source_backed_package(SourceBackedPackage::from_read_at_with_limits(
-            source, limits,
-        )?)
-    }
-
-    /// Open with an explicit finite payload-cache policy. This compatibility
-    /// path is bounded but unmanaged; use an execution-context constructor to
-    /// charge retained [`PartData`](litchi_opc::PartData) handles to a caller
-    /// budget.
-    pub fn from_read_at_with_cache_limits(
-        source: Arc<dyn ReadAt>,
-        cache_limits: SourceCacheLimits,
-    ) -> Result<Self> {
-        Self::from_source_backed_package(SourceBackedPackage::from_read_at_with_cache_limits(
-            source,
-            cache_limits,
-        )?)
-    }
-
-    /// Open with explicit read and finite payload-cache policies.
-    pub fn from_read_at_with_limits_and_cache_limits(
-        source: Arc<dyn ReadAt>,
-        limits: SourceLimits,
-        cache_limits: SourceCacheLimits,
-    ) -> Result<Self> {
-        Self::from_source_backed_package(
-            SourceBackedPackage::from_read_at_with_limits_and_cache_limits(
-                source,
-                limits,
-                cache_limits,
-            )?,
-        )
-    }
-
-    /// Open with an explicit caller-owned execution context and the default
-    /// finite source cache. The context charges retained and in-flight OPC
-    /// `PartData` payloads; parsed semantic state and rewritten/output buffers
-    /// remain outside that payload accounting and use separate bounds.
-    pub fn from_read_at_with_execution_context(
-        source: Arc<dyn ReadAt>,
-        limits: SourceLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_source_backed_package(SourceBackedPackage::from_read_at_with_execution_context(
-            source, limits, context,
-        )?)
-    }
-
-    /// Open with explicit read and execution policies.
-    pub fn from_read_at_with_limits_and_execution_context(
-        source: Arc<dyn ReadAt>,
-        limits: SourceLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_read_at_with_execution_context(source, limits, context)
-    }
-
-    /// Open with explicit read, cache, and caller-owned execution policies.
-    /// The managed budget covers retained and in-flight OPC `PartData` payload
-    /// reservations only; parsed stores, metadata, rewritten candidates, and
-    /// output buffers are not charged to it.
-    pub fn from_read_at_with_limits_and_cache_limits_and_execution_context(
-        source: Arc<dyn ReadAt>,
-        limits: SourceLimits,
-        cache_limits: SourceCacheLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_source_backed_package(
-            SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
-                source,
-                limits,
-                cache_limits,
-                context,
-            )?,
-        )
-    }
-
-    /// Build an editor from a validated deferred OPC package.
-    pub fn from_source_backed_package(package: SourceBackedPackage) -> Result<Self> {
-        package.check_execution()?;
-        Ok(Self { package })
-    }
-
-    /// Capture the exact safe value-only closure for one selected worksheet.
-    pub fn snapshot<'a>(&self, selector: impl Into<Selector<'a>>) -> Result<Snapshot> {
-        self.package.check_execution()?;
-        Snapshot::load_source_backed(&self.package, selector)
-    }
-
-    /// Begin one atomic value-only edit.
-    pub fn edit<'a>(&self, selector: impl Into<Selector<'a>>) -> Result<SourceEdit> {
-        self.package.check_execution()?;
-        let mut staged = Vec::new();
-        staged
-            .try_reserve_exact(MAX_BATCH_EDITS)
-            .map_err(|source| Error::Allocation {
-                resource: "value-only batch staging",
-                source,
-            })?;
-        Ok(SourceEdit {
-            before: self.snapshot(selector)?,
-            staged,
-        })
-    }
-
-    /// Begin a bounded transaction over selected worksheet owners.
-    pub fn edit_sheets<'a, I>(&self, selectors: I) -> Result<MultiSourceEdit>
+    /// # Errors
+    ///
+    /// Returns an error when a selector does not name a worksheet, the set
+    /// exceeds its bounds, or the source cannot be read.
+    pub fn edit_cell_values<'a, I>(&self, selectors: I) -> Result<Edit>
     where
         I: IntoIterator<Item = Selector<'a>>,
     {
-        self.package.check_execution()?;
-        MultiSourceEdit::new(MultiSnapshot::load_source_backed(&self.package, selectors)?)
+        let package = self.edit_package()?;
+        Edit::new(
+            self.clone(),
+            MultiSnapshot::load_source_backed(package, selectors)?,
+        )
     }
 
     /// Begin a bounded selector-first transaction and stage its initial batch.
-    pub fn edit_many<'a, I>(&self, edits: I) -> Result<MultiSourceEdit>
+    pub fn edit_cell_values_batch<'a, I>(&self, edits: I) -> Result<Edit>
     where
-        I: IntoIterator<Item = SheetCellValueEdit<'a>>,
+        I: IntoIterator<Item = SheetChange<'a>>,
     {
-        self.package.check_execution()?;
+        self.edit_package()?.check_execution()?;
         let mut requests = edits.into_iter();
         let first = requests.next();
-        self.package.check_execution()?;
+        self.edit_package()?.check_execution()?;
         let first =
             first.ok_or_else(|| invalid("multi-sheet value edits require one cell edit"))?;
         let mut selectors = Vec::new();
@@ -503,389 +241,120 @@ impl SourceBackedEditor {
             })?;
         pending.push(first);
         for request in requests {
-            self.package.check_execution()?;
+            self.edit_package()?.check_execution()?;
             if pending.len() >= MAX_BATCH_EDITS {
-                return Err(invalid(format!(
-                    "multi-sheet value-only batch exceeds {MAX_BATCH_EDITS} unique cells"
-                )));
+                return Err(Error::limit(
+                    super::LimitKind::BatchEdits,
+                    MAX_BATCH_EDITS + 1,
+                    MAX_BATCH_EDITS,
+                ));
             }
             if !selectors
                 .iter()
                 .any(|selector| selector == &request.selector)
             {
                 if selectors.len() >= MAX_SHEET_OWNERS {
-                    return Err(invalid(format!(
-                        "multi-sheet value edits exceed {MAX_SHEET_OWNERS} worksheet owners"
-                    )));
+                    return Err(Error::limit(
+                        super::LimitKind::SheetOwners,
+                        MAX_SHEET_OWNERS + 1,
+                        MAX_SHEET_OWNERS,
+                    ));
                 }
                 selectors.push(request.selector.clone());
             }
             pending.push(request);
         }
-        let mut transaction = self.edit_sheets(selectors)?;
+        let mut transaction = self.edit_cell_values(selectors)?;
         transaction.apply_batch(pending)?;
         Ok(transaction)
     }
 
-    /// Content-free deferred-Part cache diagnostics.
-    #[must_use]
-    pub fn cache_diagnostics(&self) -> litchi_opc::SourceCacheDiagnostics {
-        self.package.cache_diagnostics()
-    }
-
-    /// Publish one exact-source-checked worksheet overlay to a sequential sink.
-    pub fn publish_commit_to_stream<W: Write>(
-        self,
-        writer: W,
-        commit: &Commit,
-    ) -> Result<Snapshot> {
-        self.publish_patch_to_stream(writer, commit.patch())
-    }
-
-    /// Publish one exact-source-checked worksheet patch for an owning sibling
-    /// facade that retains the same scalar worksheet closure.
-    pub(crate) fn publish_patch_to_stream<W: Write>(
-        self,
-        writer: W,
-        patch: &Patch,
-    ) -> Result<Snapshot> {
-        self.package.check_execution()?;
-        let before = patch.before();
-        let current = match before.matches_source_backed(&self.package)? {
-            SourceProvenance::Matched => None,
-            SourceProvenance::Mismatched => {
-                return Err(Error::PatchConflict {
-                    part: before.worksheet_part_name().to_string(),
-                });
-            },
-            SourceProvenance::Unavailable => Some(Snapshot::load_source_backed(
-                &self.package,
-                before.sheet_position(),
-            )?),
-        };
-        if let Some(current) = &current
-            && !current.same_source(before)
-        {
-            return Err(Error::PatchConflict {
-                part: current.worksheet_part_name().to_string(),
-            });
-        }
-        let target = if patch.is_empty() {
-            current.unwrap_or_else(|| before.clone())
-        } else {
-            patch.after().clone()
-        };
-        if patch.is_empty() {
-            self.package
-                .write_part_overlays_shared_to_stream(writer, Vec::new())?;
-        } else {
-            self.write_snapshot_overlay_to_stream(writer, before, &target)?;
-        }
-        Ok(target)
-    }
-
-    pub(crate) fn write_snapshot_overlay_to_stream<W: Write>(
-        self,
-        writer: W,
-        before: &Snapshot,
-        target: &Snapshot,
-    ) -> Result<()> {
-        self.package.check_execution()?;
-        let plan = target.topology_plan_from(before)?;
-        self.package.write_topology_to_stream(writer, plan)?;
-        Ok(())
-    }
-
-    /// Publish a bounded multi-worksheet commit through one atomic overlay.
-    pub fn publish_multi_commit_to_stream<W: Write>(
-        self,
-        writer: W,
-        commit: &MultiCommit,
-    ) -> Result<MultiSnapshot> {
-        self.package.check_execution()?;
-        let before = commit.patch().before();
-        let current = match before.matches_source_backed(&self.package)? {
-            SourceProvenance::Matched => None,
-            SourceProvenance::Mismatched => {
-                return Err(Error::PatchConflict {
-                    part: before
-                        .sheets()
-                        .first()
-                        .map_or_else(String::new, |snapshot| {
-                            snapshot.worksheet_part_name().to_string()
-                        }),
-                });
-            },
-            SourceProvenance::Unavailable => Some(MultiSnapshot::load_source_backed(
-                &self.package,
-                before
-                    .sheets()
-                    .iter()
-                    .map(|snapshot| snapshot.sheet_position().into()),
-            )?),
-        };
-        if let Some(current) = &current
-            && !current.same_source(before)
-        {
-            return Err(Error::PatchConflict {
-                part: before
-                    .sheets()
-                    .first()
-                    .map_or_else(String::new, |snapshot| {
-                        snapshot.worksheet_part_name().to_string()
-                    }),
-            });
-        }
-        let target = if commit.patch().is_empty() {
-            current.unwrap_or_else(|| before.clone())
-        } else {
-            commit.patch().after().clone()
-        };
-        let plan = if commit.patch().is_empty() {
-            litchi_opc::SourceTopologyPlan::new()
-        } else {
-            target.topology_plan_from(before)?
-        };
-        self.package.write_topology_to_stream(writer, plan)?;
-        Ok(target)
-    }
-}
-
-#[cfg(any(unix, windows))]
-fn file_source(path: impl AsRef<Path>) -> Result<Arc<dyn ReadAt>> {
-    Ok(Arc::new(FileSource::open(path).map_err(|error| {
-        Error::Package(litchi_opc::OpcError::from(error))
-    })?))
-}
-
-impl SourceEdit {
-    /// Exact source snapshot captured at transaction start.
-    #[must_use]
-    pub const fn before(&self) -> &Snapshot {
-        &self.before
-    }
-
-    /// Number of unique staged selectors.
-    #[must_use]
-    pub fn len(&self) -> usize {
-        self.staged.len()
-    }
-
-    /// Whether no selectors have been staged.
-    #[must_use]
-    pub fn is_empty(&self) -> bool {
-        self.staged.is_empty()
-    }
-
-    /// Stage one numeric insertion for an absent coordinate.
-    pub fn insert(&mut self, address: Address, value: Number) -> Result<()> {
-        self.apply_batch([CellValueEdit::insert(address, value)])
-    }
-
-    /// Stage one value replacement. Repeated selectors are rejected.
-    pub fn set(&mut self, address: Address, value: impl Into<Value>) -> Result<()> {
-        self.apply_batch([CellValueEdit::set(address, value)])
-    }
-
-    /// Stage one cacheless scalar formula replacement.
-    pub fn set_formula(&mut self, address: Address, formula: Formula) -> Result<()> {
-        self.apply_batch([CellValueEdit::set_formula(address, formula)])
-    }
-
-    /// Stage one shared-formula master replacement.
-    pub fn set_shared_formula(&mut self, address: Address, formula: Formula) -> Result<()> {
-        self.apply_batch([CellValueEdit::set_shared_formula(address, formula)])
-    }
-
-    /// Stage one scalar clear. Repeated selectors are rejected.
-    pub fn clear(&mut self, address: Address) -> Result<()> {
-        self.apply_batch([CellValueEdit::clear(address)])
-    }
-
-    /// Stage complete removal of one scalar `<c>` owner.
+    /// Replay a multi-worksheet value patch onto this workbook.
     ///
-    /// The containing `<row>` is retained even when this is its last cell.
-    /// Repeated selectors are rejected.
-    pub fn remove(&mut self, address: Address) -> Result<()> {
-        self.apply_batch([CellValueEdit::remove(address)])
-    }
-
-    /// Stage a bounded batch atomically.
-    pub fn apply_batch(&mut self, edits: impl IntoIterator<Item = CellValueEdit>) -> Result<()> {
-        self.before.check_execution()?;
-        let mut pending = Vec::new();
-        pending
-            .try_reserve_exact(MAX_BATCH_EDITS.saturating_sub(self.staged.len()))
-            .map_err(|source| Error::Allocation {
-                resource: "value-only pending batch",
-                source,
-            })?;
-        for edit in edits {
-            self.before.check_execution()?;
-            if self.staged.len() + pending.len() >= MAX_BATCH_EDITS {
-                return Err(invalid(format!(
-                    "value-only batch exceeds {MAX_BATCH_EDITS} unique cells"
-                )));
-            }
-            let address = edit.address();
-            if self
-                .staged
-                .iter()
-                .chain(&pending)
-                .any(|(stored, _)| *stored == address)
-            {
-                return Err(invalid(format!(
-                    "duplicate value-only selector '{address}'"
-                )));
-            }
-            let source = self.before.editable_cell(address);
-            let value = match edit {
-                CellValueEdit::Insert { value, .. } => {
-                    self.before.require_insertable_absence(address)?;
-                    let value = Value::Number(value);
-                    value.validate_for_write()?;
-                    StagedValueEdit::Insert(Content::Value(value))
-                },
-                CellValueEdit::Set { value, .. } => {
-                    let source = source.ok_or_else(|| {
-                        invalid(format!(
-                            "cell selector '{address}' has no existing cell owner"
-                        ))
-                    })?;
-                    self.before.require_shared_string_free_target(address)?;
-                    value.validate_for_write()?;
-                    if !matches!(source, Cell::Value(_)) {
-                        return Err(self.before.edit_blocked(address));
-                    }
-                    self.before.require_unmerged_target(address)?;
-                    StagedValueEdit::Set(Content::Value(value))
-                },
-                CellValueEdit::SetFormula { formula, .. } => {
-                    let _source = source.ok_or_else(|| {
-                        invalid(format!(
-                            "cell selector '{address}' has no existing cell owner"
-                        ))
-                    })?;
-                    self.before.require_shared_string_free_target(address)?;
-                    Content::Formula(formula.clone()).validate_for_write()?;
-                    self.before.require_formula_target(address)?;
-                    self.before.require_unmerged_target(address)?;
-                    StagedValueEdit::Set(Content::Formula(formula))
-                },
-                CellValueEdit::SetSharedFormula { formula, .. } => {
-                    let _source = source.ok_or_else(|| {
-                        invalid(format!(
-                            "cell selector '{address}' has no existing cell owner"
-                        ))
-                    })?;
-                    self.before.require_shared_string_free_target(address)?;
-                    Content::Formula(formula.clone()).validate_for_write()?;
-                    self.before.shared_formula_group(address, MAX_BATCH_EDITS)?;
-                    self.before.require_unmerged_target(address)?;
-                    StagedValueEdit::SetSharedFormula(formula)
-                },
-                CellValueEdit::Clear { .. } => {
-                    let source = source.ok_or_else(|| {
-                        invalid(format!(
-                            "cell selector '{address}' has no existing cell owner"
-                        ))
-                    })?;
-                    self.before.require_shared_string_free_target(address)?;
-                    if !matches!(source, Cell::Value(_)) {
-                        return Err(self.before.edit_blocked(address));
-                    }
-                    self.before.require_unmerged_target(address)?;
-                    StagedValueEdit::Clear
-                },
-                CellValueEdit::Remove { .. } => {
-                    let source = source.ok_or_else(|| {
-                        invalid(format!(
-                            "cell selector '{address}' has no existing cell owner"
-                        ))
-                    })?;
-                    self.before.require_shared_string_free_target(address)?;
-                    if !matches!(source, Cell::Value(_)) {
-                        return Err(self.before.edit_blocked(address));
-                    }
-                    self.before.require_unmerged_target(address)?;
-                    StagedValueEdit::Remove
-                },
-            };
-            self.before.check_execution()?;
-            pending.push((address, value));
-        }
-        self.before.check_execution()?;
-        let original_len = self.staged.len();
-        self.staged.extend(pending);
-        if let Err(error) = self.before.check_execution() {
-            self.staged.truncate(original_len);
-            return Err(error);
-        }
-        Ok(())
-    }
-
-    /// Validate, rewrite once, and freeze an exact reversible commit.
-    pub fn commit(self) -> Result<Commit> {
-        self.before.check_execution()?;
-        let expected_actions = effective_action_count(&self.before, &self.staged)?;
-        if expected_actions > MAX_BATCH_EDITS {
-            return Err(invalid(format!(
-                "value-only batch exceeds {MAX_BATCH_EDITS} expanded cell actions"
-            )));
-        }
-        let mut actions = BTreeMap::new();
-        for (address, value) in &self.staged {
-            append_actions(&self.before, *address, value, &mut actions)?;
-        }
-        if actions.is_empty() {
-            let patch = Patch::new(self.before.clone(), self.before.clone());
-            self.before.check_execution()?;
-            return Ok(Commit::new(self.before, patch, 0));
-        }
-        let changed = actions.len();
-        let output = rewrite_value_only_with_provenance(
-            self.before.source_xml(),
-            self.before.sheet_name(),
-            actions,
-            self.before.source_facts(),
-        )?;
-        let snapshot = Snapshot::from_rewritten_value_source(&self.before, output)?
-            .with_invalidated_calculation()?;
-        for (address, expected) in &self.staged {
-            let matches = match expected {
-                StagedValueEdit::Set(content) => {
-                    snapshot.cell(*address) == Some(&content.as_cell())
-                },
-                StagedValueEdit::Insert(content) => {
-                    snapshot.cell(*address) == Some(&content.as_cell())
-                },
-                StagedValueEdit::SetSharedFormula(formula) => shared_formula_readback(
-                    &self.before,
-                    &snapshot,
-                    *address,
-                    formula,
-                    shared_formula_changed(&self.before, *address, formula)?,
-                )?,
-                StagedValueEdit::Clear => {
-                    snapshot.contains_cell(*address) && snapshot.value(*address).is_none()
-                },
-                StagedValueEdit::Remove => !snapshot.contains_cell(*address),
-            };
-            if !matches {
-                return Err(invalid(
-                    "value-only publication readback differs from staged state",
-                ));
-            }
-        }
-        self.before.check_execution()?;
-        let patch = Patch::new(self.before, snapshot.clone());
-        Ok(Commit::new(snapshot, patch, changed))
+    /// # Errors
+    ///
+    /// Returns [`Error::PatchConflict`] when a selected worksheet does not hold
+    /// the patch's before state, and the signed-source refusal for a changed
+    /// patch on a signed source.
+    pub fn apply_cell_values(&self, patch: &Patch) -> Result<Commit> {
+        super::apply_change(self, patch)
     }
 }
 
-impl MultiSourceEdit {
-    fn new(before: MultiSnapshot) -> Result<Self> {
+impl crate::workbook::source::deferred::Change for Record {
+    fn is_noop(&self) -> bool {
+        self.is_empty()
+    }
+
+    fn inverse(&self) -> Self {
+        Record::inverse(self)
+    }
+
+    fn check(&self, package: &SourceBackedPackage) -> Result<()> {
+        let before = self.before();
+        let conflict = || Error::PatchConflict {
+            part: before
+                .sheets()
+                .first()
+                .map_or_else(String::new, |snapshot| {
+                    snapshot.worksheet_part_name().to_string()
+                }),
+        };
+        match before.matches_source_backed(package)? {
+            // The patch was made over this exact source: nothing to reload.
+            SourceProvenance::Matched => Ok(()),
+            SourceProvenance::Mismatched if before.same_lineage(package) => Err(conflict()),
+            // A replay compares content (record 0360).
+            SourceProvenance::Mismatched | SourceProvenance::Unavailable => {
+                let current = MultiSnapshot::load_source_backed(
+                    package,
+                    before
+                        .sheets()
+                        .iter()
+                        .map(|snapshot| snapshot.sheet_position().into()),
+                )?;
+                if current.same_content(before) {
+                    Ok(())
+                } else {
+                    Err(conflict())
+                }
+            },
+        }
+    }
+
+    fn write(&self, package: &SourceBackedPackage, writer: &mut dyn Write) -> Result<()> {
+        package.check_execution()?;
+        crate::workbook::source::deferred::Change::check(self, package)?;
+        let plan = self.after().topology_plan_from(self.before())?;
+        package.clone().write_topology_to_stream(writer, plan)?;
+        Ok(())
+    }
+
+    fn write_authenticated(
+        &self,
+        package: &SourceBackedPackage,
+        writer: &mut dyn Write,
+    ) -> Result<()> {
+        package.check_execution()?;
+        let plan = self.after().topology_plan_from(self.before())?;
+        package.clone().write_topology_to_stream(writer, plan)?;
+        Ok(())
+    }
+}
+
+impl crate::workbook::source::deferred::Report for Record {
+    type Diagnostics = super::Diagnostics;
+
+    fn diagnostics(&self) -> super::Diagnostics {
+        let (changed_cells, touched_worksheets) = self.counts();
+        super::Diagnostics::new(changed_cells, touched_worksheets)
+    }
+}
+
+impl Edit {
+    fn new(workbook: SourceBackedWorkbook, before: MultiSnapshot) -> Result<Self> {
         Ok(Self {
+            workbook,
             before,
             staged: BTreeMap::new(),
             staged_cells: 0,
@@ -923,7 +392,7 @@ impl MultiSourceEdit {
         address: Address,
         value: Number,
     ) -> Result<()> {
-        self.apply_batch([SheetCellValueEdit::insert(selector, address, value)])
+        self.apply_batch([SheetChange::insert(selector, address, value)])
     }
 
     /// Stage one selector-first scalar replacement.
@@ -933,7 +402,7 @@ impl MultiSourceEdit {
         address: Address,
         value: impl Into<Value>,
     ) -> Result<()> {
-        self.apply_batch([SheetCellValueEdit::set(selector, address, value)])
+        self.apply_batch([SheetChange::set(selector, address, value)])
     }
 
     /// Stage one selector-first cacheless scalar formula replacement.
@@ -943,7 +412,7 @@ impl MultiSourceEdit {
         address: Address,
         formula: Formula,
     ) -> Result<()> {
-        self.apply_batch([SheetCellValueEdit::set_formula(selector, address, formula)])
+        self.apply_batch([SheetChange::set_formula(selector, address, formula)])
     }
 
     /// Stage one selector-first shared-formula master replacement.
@@ -953,14 +422,12 @@ impl MultiSourceEdit {
         address: Address,
         formula: Formula,
     ) -> Result<()> {
-        self.apply_batch([SheetCellValueEdit::set_shared_formula(
-            selector, address, formula,
-        )])
+        self.apply_batch([SheetChange::set_shared_formula(selector, address, formula)])
     }
 
     /// Stage one selector-first scalar clear.
     pub fn clear<'a>(&mut self, selector: impl Into<Selector<'a>>, address: Address) -> Result<()> {
-        self.apply_batch([SheetCellValueEdit::clear(selector, address)])
+        self.apply_batch([SheetChange::clear(selector, address)])
     }
 
     /// Stage one selector-first complete cell-owner removal.
@@ -969,13 +436,13 @@ impl MultiSourceEdit {
         selector: impl Into<Selector<'a>>,
         address: Address,
     ) -> Result<()> {
-        self.apply_batch([SheetCellValueEdit::remove(selector, address)])
+        self.apply_batch([SheetChange::remove(selector, address)])
     }
 
     /// Stage a bounded cross-worksheet batch atomically.
     pub fn apply_batch<'a, I>(&mut self, edits: I) -> Result<()>
     where
-        I: IntoIterator<Item = SheetCellValueEdit<'a>>,
+        I: IntoIterator<Item = SheetChange<'a>>,
     {
         self.before.check_execution()?;
         let remaining = MAX_BATCH_EDITS.saturating_sub(self.staged_cells);
@@ -989,9 +456,11 @@ impl MultiSourceEdit {
         for request in edits {
             self.before.check_execution()?;
             if pending.len() >= remaining {
-                return Err(invalid(format!(
-                    "multi-sheet value-only batch exceeds {MAX_BATCH_EDITS} unique cells"
-                )));
+                return Err(Error::limit(
+                    super::LimitKind::BatchEdits,
+                    MAX_BATCH_EDITS + 1,
+                    MAX_BATCH_EDITS,
+                ));
             }
             let position = resolve_snapshot_selector(&self.before, &request.selector)?;
             let snapshot = self
@@ -1016,13 +485,13 @@ impl MultiSourceEdit {
             }
             let source = snapshot.editable_cell(address);
             let value = match request.edit {
-                CellValueEdit::Insert { value, .. } => {
+                Change::Insert { value, .. } => {
                     snapshot.require_insertable_absence(address)?;
                     let value = Value::Number(value);
                     value.validate_for_write()?;
                     StagedValueEdit::Insert(Content::Value(value))
                 },
-                CellValueEdit::Set { value, .. } => {
+                Change::Set { value, .. } => {
                     let source = source.ok_or_else(|| {
                         invalid(format!(
                             "cell selector '{}!{}' has no existing cell owner",
@@ -1038,7 +507,7 @@ impl MultiSourceEdit {
                     snapshot.require_unmerged_target(address)?;
                     StagedValueEdit::Set(Content::Value(value))
                 },
-                CellValueEdit::SetFormula { formula, .. } => {
+                Change::SetFormula { formula, .. } => {
                     let _source = source.ok_or_else(|| {
                         invalid(format!(
                             "cell selector '{}!{}' has no existing cell owner",
@@ -1052,7 +521,7 @@ impl MultiSourceEdit {
                     snapshot.require_unmerged_target(address)?;
                     StagedValueEdit::Set(Content::Formula(formula))
                 },
-                CellValueEdit::SetSharedFormula { formula, .. } => {
+                Change::SetSharedFormula { formula, .. } => {
                     let _source = source.ok_or_else(|| {
                         invalid(format!(
                             "cell selector '{}!{}' has no existing cell owner",
@@ -1066,7 +535,7 @@ impl MultiSourceEdit {
                     snapshot.require_unmerged_target(address)?;
                     StagedValueEdit::SetSharedFormula(formula)
                 },
-                CellValueEdit::Clear { .. } => {
+                Change::Clear { .. } => {
                     let source = source.ok_or_else(|| {
                         invalid(format!(
                             "cell selector '{}!{}' has no existing cell owner",
@@ -1081,7 +550,7 @@ impl MultiSourceEdit {
                     snapshot.require_unmerged_target(address)?;
                     StagedValueEdit::Clear
                 },
-                CellValueEdit::Remove { .. } => {
+                Change::Remove { .. } => {
                     let source = source.ok_or_else(|| {
                         invalid(format!(
                             "cell selector '{}!{}' has no existing cell owner",
@@ -1143,8 +612,15 @@ impl MultiSourceEdit {
         Ok(())
     }
 
-    /// Validate, rewrite, and freeze one atomic multi-worksheet commit.
-    pub fn commit(self) -> Result<MultiCommit> {
+    /// Discard every staged change in place.
+    pub fn reset(&mut self) {
+        self.staged.clear();
+        self.staged_cells = 0;
+    }
+
+    /// Validate and rewrite the staged changes and return the committed
+    /// workbook, the exact patch and the diagnostics.
+    pub fn commit(self) -> Result<Commit> {
         self.before.check_execution()?;
         let mut expected_actions = 0usize;
         for snapshot in self.before.sheets() {
@@ -1153,9 +629,11 @@ impl MultiSourceEdit {
                     .checked_add(effective_action_count(snapshot, staged)?)
                     .ok_or_else(|| invalid("expanded value-only action count overflows usize"))?;
                 if expected_actions > MAX_BATCH_EDITS {
-                    return Err(invalid(format!(
-                        "multi-sheet value-only batch exceeds {MAX_BATCH_EDITS} expanded cell actions"
-                    )));
+                    return Err(Error::limit(
+                        super::LimitKind::BatchEdits,
+                        expected_actions,
+                        MAX_BATCH_EDITS,
+                    ));
                 }
             }
         }
@@ -1245,13 +723,10 @@ impl MultiSourceEdit {
         }
         self.before.check_execution()?;
         let after = MultiSnapshot::from_sheets(after)?;
-        let patch = MultiPatch::new(self.before, after.clone());
-        Ok(MultiCommit::new(
-            after,
-            patch,
-            changed_cells,
-            touched_worksheets,
-        ))
+        super::commit_change(
+            &self.workbook,
+            Record::new(self.before, after, changed_cells, touched_worksheets),
+        )
     }
 }
 

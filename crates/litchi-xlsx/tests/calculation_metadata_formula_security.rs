@@ -1,8 +1,7 @@
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcPackage, PackURI, TargetMode};
-use litchi_xlsx::calculation_properties::{
-    Feature, Features, Mode, Patch as CalculationPatch, Properties,
-};
+use litchi_xlsx::calculation_properties::edit::Patch as CalculationPatch;
+use litchi_xlsx::calculation_properties::{Feature, Features, Mode, Properties};
 use litchi_xlsx::formula::Formula;
 use litchi_xlsx::{Error, Package};
 use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
@@ -38,7 +37,7 @@ fn calculation_source() -> Package {
                 .with_force_full_calculation(Some(false)),
         )
     );
-    metadata.commit().expect("metadata commit");
+    package = metadata.commit().expect("metadata commit").into_package();
 
     let mut raw = package.into_plain_opc();
     let workbook_uri = raw
@@ -101,7 +100,7 @@ fn assert_invalidated(workbook: &Package) {
 
 fn calculation_metadata_patches() -> (Package, CalculationPatch, CalculationPatch) {
     let baseline = Package::new().expect("baseline Package");
-    let mut no_op_author = baseline.clone();
+    let no_op_author = baseline.clone();
     let no_op = no_op_author
         .edit_calculation_metadata()
         .expect("no-op metadata edit")
@@ -109,9 +108,9 @@ fn calculation_metadata_patches() -> (Package, CalculationPatch, CalculationPatc
         .expect("no-op metadata commit")
         .patch()
         .clone();
-    assert!(no_op.is_empty());
+    assert!(no_op.is_noop());
 
-    let mut changed_author = baseline.clone();
+    let changed_author = baseline.clone();
     let mut edit = changed_author
         .edit_calculation_metadata()
         .expect("changed metadata edit");
@@ -121,7 +120,7 @@ fn calculation_metadata_patches() -> (Package, CalculationPatch, CalculationPatc
         .expect("changed metadata commit")
         .patch()
         .clone();
-    assert!(!changed.is_empty());
+    assert!(!changed.is_noop());
     (baseline, no_op, changed)
 }
 
@@ -203,7 +202,10 @@ fn formula_invalidation_preserves_ordered_duplicate_calc_features_exactly() {
             .expect("ordered features"),
         )
     );
-    metadata.commit().expect("feature metadata commit");
+    package = metadata
+        .commit()
+        .expect("feature metadata commit")
+        .into_package();
     let source = package;
 
     let mut edit = source.edit().expect("formula edit");
@@ -420,12 +422,13 @@ fn calculation_metadata_patch_no_op_is_exact_but_change_is_refused_on_signed_pac
     let mut signed = inert_signed_fixture(&baseline_bytes);
     let before = signed.to_plain_bytes().expect("signed source bytes");
 
-    signed
-        .apply_calculation_metadata_patch(&no_op)
-        .expect("signed exact no-op patch");
+    signed = signed
+        .apply_calculation_metadata(&no_op)
+        .expect("signed exact no-op patch")
+        .into_package();
     assert_eq!(signed.to_plain_bytes().unwrap(), before);
     assert!(matches!(
-        signed.apply_calculation_metadata_patch(&changed),
+        signed.apply_calculation_metadata(&changed),
         Err(Error::Signed)
     ));
     assert_eq!(signed.to_plain_bytes().unwrap(), before);
@@ -478,22 +481,22 @@ fn calculation_metadata_patches_are_refused_exactly_on_encrypted_provenance_pack
     let encrypted = baseline
         .to_encrypted(PASSWORD, EncryptionMode::Standard)
         .expect("encrypted bytes");
-    let mut package = Package::from_bytes_with_password(&encrypted, PASSWORD)
+    let package = Package::from_bytes_with_password(&encrypted, PASSWORD)
         .expect("encrypted provenance Package");
     let before = package.to_plain_bytes().expect("clear inner source bytes");
 
     assert!(matches!(
-        package.apply_calculation_metadata_patch(&changed),
+        package.apply_calculation_metadata(&changed),
         Err(Error::EncryptionPolicy {
-            operation: "apply_calculation_metadata_patch",
+            operation: "apply_calculation_metadata",
             ..
         })
     ));
     assert_eq!(package.to_plain_bytes().unwrap(), before);
     assert!(matches!(
-        package.apply_calculation_metadata_patch(&no_op),
+        package.apply_calculation_metadata(&no_op),
         Err(Error::EncryptionPolicy {
-            operation: "apply_calculation_metadata_patch",
+            operation: "apply_calculation_metadata",
             ..
         })
     ));
@@ -509,7 +512,7 @@ fn mce_projected_source() -> Package {
         .edit_calculation_metadata()
         .expect("metadata removal edit");
     assert!(metadata.remove_properties());
-    metadata.commit().expect("metadata removal");
+    package = metadata.commit().expect("metadata removal").into_package();
 
     let mut raw = package.into_plain_opc();
     let workbook_uri = raw

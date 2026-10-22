@@ -2529,6 +2529,7 @@ impl fmt::Display for ClientDataSource<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::form_control::Limits;
     use crate::form_control::{FormControlFormula, inspect};
 
     const EXCEL: &str = "http://schemas.microsoft.com/office/spreadsheetml/2009/9/main";
@@ -2552,7 +2553,7 @@ mod tests {
     #[test]
     fn checked_pair_splice_preserves_vml_lexical_context() {
         let x14_source = x14("Checked", "");
-        let view = inspect(&x14_source).expect("x14 fixture");
+        let view = inspect(&x14_source, &Limits::default()).expect("x14 fixture");
         let vml = client_data("<!-- keep --><x:Checked>1</x:Checked><x:Opaque a=\"b\"/>");
         let source = ClientDataSource::new(&vml, 0..vml.len(), b"x").expect("VML fixture");
         let edited = replace_scalar_pair(
@@ -2573,7 +2574,7 @@ mod tests {
     #[test]
     fn boolean_empty_element_uses_proven_lexical_set() {
         let x14 = x14("Checked", " colored=\"1\"");
-        let view = inspect(&x14).expect("x14 fixture");
+        let view = inspect(&x14, &Limits::default()).expect("x14 fixture");
         let vml = client_data("<x:Colored/><x:Checked>1</x:Checked>");
         let source = ClientDataSource::new(&vml, 0..vml.len(), b"x").expect("VML fixture");
         let edited = replace_scalar_pair(
@@ -2592,7 +2593,7 @@ mod tests {
     #[test]
     fn unknown_boolean_is_refused_without_touching_x14() {
         let x14 = x14("Checked", " colored=\"1\"");
-        let view = inspect(&x14).expect("x14 fixture");
+        let view = inspect(&x14, &Limits::default()).expect("x14 fixture");
         let vml = client_data("<x:Colored>yes</x:Colored><x:Checked>1</x:Checked>");
         let source = ClientDataSource::new(&vml, 0..vml.len(), b"x").expect("VML fixture");
         let error = replace_scalar_pair(
@@ -2614,7 +2615,7 @@ mod tests {
     #[test]
     fn disagreement_is_refused() {
         let x14 = x14("Checked", " horiz=\"1\"");
-        let view = inspect(&x14).expect("x14 fixture");
+        let view = inspect(&x14, &Limits::default()).expect("x14 fixture");
         let vml = client_data("<x:Horiz>False</x:Horiz><x:Checked>1</x:Checked>");
         let source = ClientDataSource::new(&vml, 0..vml.len(), b"x").expect("VML fixture");
         let error = replace_scalar_pair(
@@ -2635,7 +2636,7 @@ mod tests {
     #[test]
     fn object_type_transition_is_refused() {
         let x14 = x14("Checked", " objectType=\"CheckBox\"");
-        let view = inspect(&x14).expect("x14 fixture");
+        let view = inspect(&x14, &Limits::default()).expect("x14 fixture");
         let vml = client_data("<x:Checked>1</x:Checked>");
         let source = ClientDataSource::new(&vml, 0..vml.len(), b"x").expect("VML fixture");
         let error = replace_scalar_pair(
@@ -2657,7 +2658,7 @@ mod tests {
     #[test]
     fn opaque_target_content_is_refused() {
         let x14 = x14("Checked", " colored=\"1\"");
-        let view = inspect(&x14).expect("x14 fixture");
+        let view = inspect(&x14, &Limits::default()).expect("x14 fixture");
         let vml =
             client_data("<x:Colored><!-- keep --><x:Nested/></x:Colored><x:Checked>1</x:Checked>");
         let source = ClientDataSource::new(&vml, 0..vml.len(), b"x").expect("VML fixture");
@@ -2680,7 +2681,7 @@ mod tests {
     #[test]
     fn source_noop_copies_exact_bytes() {
         let x14 = x14("Checked", "");
-        let view = inspect(&x14).expect("x14 fixture");
+        let view = inspect(&x14, &Limits::default()).expect("x14 fixture");
         let vml = client_data("<x:Checked>1</x:Checked><!-- after -->");
         let source = ClientDataSource::new(&vml, 0..vml.len(), b"x").expect("VML fixture");
         let edited = replace_scalar_pair(
@@ -2698,7 +2699,7 @@ mod tests {
     #[test]
     fn nonzero_client_data_range_splices_the_complete_vml_member() {
         let x14 = x14("Checked", "");
-        let view = inspect(&x14).expect("x14 fixture");
+        let view = inspect(&x14, &Limits::default()).expect("x14 fixture");
         let vml = b"<!-- before --><x:ClientData ObjectType=\"Checkbox\"><x:Checked>1</x:Checked></x:ClientData><!-- after -->".to_vec();
         let start = vml
             .windows(b"<x:ClientData".len())
@@ -2731,7 +2732,7 @@ mod tests {
             EXCEL = EXCEL
         )
         .into_bytes();
-        let view = inspect(&x14).expect("x14 fixture");
+        let view = inspect(&x14, &Limits::default()).expect("x14 fixture");
         let vml = client_data("<x:FmlaLink>Sheet1!A1</x:FmlaLink>");
         let source = ClientDataSource::new(&vml, 0..vml.len(), b"x").expect("VML fixture");
         let edited = replace_scalar_pair(
@@ -2747,7 +2748,7 @@ mod tests {
     #[test]
     fn exact_output_limit_accepts_numeric_shrink_and_one_under_refuses() {
         let x14 = x14("Checked", " dropLines=\"10\"");
-        let view = inspect(&x14).expect("x14 fixture");
+        let view = inspect(&x14, &Limits::default()).expect("x14 fixture");
         let vml = client_data("<x:DropLines>10</x:DropLines><x:Checked>1</x:Checked>");
         let make_source = || ClientDataSource::new(&vml, 0..vml.len(), b"x").expect("VML fixture");
         let target = ScalarValue::Unsigned(2);
@@ -2795,7 +2796,7 @@ mod tests {
     #[test]
     fn exact_output_limit_accounts_for_effective_x14_attribute_insertion() {
         let x14_source = x14("Checked", "");
-        let view = inspect(&x14_source).expect("x14 fixture");
+        let view = inspect(&x14_source, &Limits::default()).expect("x14 fixture");
         let vml = client_data("<x:Horiz>False</x:Horiz><x:Checked>1</x:Checked>");
         let make_source = || ClientDataSource::new(&vml, 0..vml.len(), b"x").expect("VML fixture");
         let target = ScalarValue::Boolean(true);
@@ -2852,7 +2853,7 @@ mod tests {
             EXCEL = EXCEL
         )
         .into_bytes();
-        let view = inspect(&x14).expect("x14 fixture");
+        let view = inspect(&x14, &Limits::default()).expect("x14 fixture");
         let vml = client_data("<x:FmlaLink>Sheet1!A1</x:FmlaLink>");
         let make_source = || ClientDataSource::new(&vml, 0..vml.len(), b"x").expect("VML fixture");
         let target = ScalarValue::Formula(formula.clone());

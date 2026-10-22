@@ -1,15 +1,15 @@
-//! Exact reversible value-only worksheet patches.
-
-use litchi_opc::OpcPackage;
+//! Exact reversible value-only worksheet records: the replay payloads of the
+//! source-backed [`super::Patch`] and [`super::sheet::Patch`] families.
 
 use super::{MultiSnapshot, Snapshot};
-use crate::error::{Error, Result, invalid};
+use crate::error::Result;
 
 /// Exact source-bound replacement of one safe worksheet value closure.
 #[derive(Clone, Debug)]
-pub struct Patch {
+pub(crate) struct SheetRecord {
     before: Snapshot,
     after: Snapshot,
+    changed_cells: usize,
 }
 
 /// Exact source-bound replacement of a bounded worksheet set.
@@ -20,333 +20,146 @@ pub struct Patch {
 /// those payloads while still rejecting graph, relationship, content-type,
 /// signature, and source-lineage conflicts.
 #[derive(Clone, Debug)]
-pub struct MultiPatch {
+pub(crate) struct Record {
     before: MultiSnapshot,
     after: MultiSnapshot,
+    changed_cells: usize,
+    touched_worksheets: usize,
 }
 
-impl MultiPatch {
-    pub(crate) const fn new(before: MultiSnapshot, after: MultiSnapshot) -> Self {
-        Self { before, after }
+impl Record {
+    pub(crate) const fn new(
+        before: MultiSnapshot,
+        after: MultiSnapshot,
+        changed_cells: usize,
+        touched_worksheets: usize,
+    ) -> Self {
+        Self {
+            before,
+            after,
+            changed_cells,
+            touched_worksheets,
+        }
+    }
+
+    /// The scalar payloads and worksheet parts the record changes.
+    pub(crate) const fn counts(&self) -> (usize, usize) {
+        (self.changed_cells, self.touched_worksheets)
     }
 
     /// Required exact source state for every selected worksheet.
     #[must_use]
-    pub const fn before(&self) -> &MultiSnapshot {
+    pub(crate) const fn before(&self) -> &MultiSnapshot {
         &self.before
     }
 
     /// Exact target state for every selected worksheet.
     #[must_use]
-    pub const fn after(&self) -> &MultiSnapshot {
+    pub(crate) const fn after(&self) -> &MultiSnapshot {
         &self.after
     }
 
     /// Whether every selected worksheet remains byte-identical to its source.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub(crate) fn is_empty(&self) -> bool {
         self.before.same_source(&self.after)
     }
 
     /// Exact source-bound inverse.
     #[must_use]
-    pub fn inverse(&self) -> Self {
+    pub(crate) fn inverse(&self) -> Self {
         Self {
             before: self.after.clone(),
             after: self.before.clone(),
+            changed_cells: self.changed_cells,
+            touched_worksheets: self.touched_worksheets,
         }
-    }
-
-    /// Apply all worksheet replacements atomically after exact source checks.
-    ///
-    /// A patch whose target still carries a managed source payload returns a
-    /// typed `ManagedPartDataArcEscape` error. Use
-    /// [`Self::apply_materialized`] when an owning [`OpcPackage`] handoff is
-    /// explicitly desired.
-    pub fn apply(&self, package: &mut OpcPackage) -> Result<()> {
-        self.apply_inner(package, None)
-    }
-
-    /// Apply after explicitly copying managed target payloads into the owning
-    /// package, bounded by `maximum_bytes` across this patch's replacements.
-    pub fn apply_materialized(&self, package: &mut OpcPackage, maximum_bytes: usize) -> Result<()> {
-        self.apply_inner(package, Some(maximum_bytes))
-    }
-
-    fn apply_inner(&self, package: &mut OpcPackage, maximum_bytes: Option<usize>) -> Result<()> {
-        self.before.check_execution()?;
-        self.after.check_execution()?;
-        let current = MultiSnapshot::load_owned(
-            package,
-            self.before.sheets().iter().map(Snapshot::sheet_position),
-        )
-        .map_err(|_| Error::PatchConflict {
-            part: self
-                .before
-                .sheets()
-                .first()
-                .map_or_else(String::new, |snapshot| {
-                    snapshot.worksheet_part_name().to_string()
-                }),
-        })?;
-        if !current.same_source(&self.before) {
-            return Err(Error::PatchConflict {
-                part: self
-                    .before
-                    .sheets()
-                    .first()
-                    .map_or_else(String::new, |snapshot| {
-                        snapshot.worksheet_part_name().to_string()
-                    }),
-            });
-        }
-        if self.is_empty() {
-            self.before.check_execution()?;
-            self.after.check_execution()?;
-            return Ok(());
-        }
-        if package.is_signed() {
-            return Err(Error::Signed);
-        }
-        self.after.check_execution()?;
-        let mut candidate = package.clone();
-        MultiSnapshot::apply_owned_target(
-            &self.before,
-            &self.after,
-            &mut candidate,
-            maximum_bytes,
-        )?;
-        let readback = MultiSnapshot::load_owned(
-            &candidate,
-            self.after.sheets().iter().map(Snapshot::sheet_position),
-        )?;
-        if !readback.same_source(&self.after) {
-            return Err(invalid(
-                "multi-sheet value-only patch readback differs from its target",
-            ));
-        }
-        self.after.check_execution()?;
-        *package = candidate;
-        Ok(())
     }
 }
 
-impl Patch {
-    pub(crate) const fn new(before: Snapshot, after: Snapshot) -> Self {
-        Self { before, after }
+impl SheetRecord {
+    pub(crate) const fn new(before: Snapshot, after: Snapshot, changed_cells: usize) -> Self {
+        Self {
+            before,
+            after,
+            changed_cells,
+        }
+    }
+
+    /// The scalar payloads the record changes.
+    pub(crate) const fn changed_cells(&self) -> usize {
+        self.changed_cells
+    }
+
+    /// The record with its target worksheet payload copied out of a managed
+    /// reservation under `maximum_bytes`.
+    pub(crate) fn materialized(&self, maximum_bytes: usize) -> Result<Self> {
+        Ok(Self {
+            before: self.before.clone(),
+            after: self.after.materialized(maximum_bytes)?,
+            changed_cells: self.changed_cells,
+        })
     }
 
     /// Required exact source state.
     #[must_use]
-    pub const fn before(&self) -> &Snapshot {
+    pub(crate) const fn before(&self) -> &Snapshot {
         &self.before
     }
 
     /// Exact target state.
     #[must_use]
-    pub const fn after(&self) -> &Snapshot {
+    pub(crate) const fn after(&self) -> &Snapshot {
         &self.after
     }
 
     /// Whether application preserves the selected source bytes exactly.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub(crate) fn is_empty(&self) -> bool {
         self.before.same_source(&self.after)
     }
 
     /// Exact source-bound inverse.
     #[must_use]
-    pub fn inverse(&self) -> Self {
+    pub(crate) fn inverse(&self) -> Self {
         Self {
             before: self.after.clone(),
             after: self.before.clone(),
+            changed_cells: self.changed_cells,
         }
-    }
-
-    /// Apply atomically to an owning OPC package after exact source validation.
-    ///
-    /// A managed source target is refused unless the caller uses
-    /// [`Self::apply_materialized`] explicitly.
-    pub fn apply(&self, package: &mut OpcPackage) -> Result<()> {
-        self.apply_inner(package, None)
-    }
-
-    /// Apply after explicitly copying a managed target payload into the owning
-    /// package, bounded by `maximum_bytes`.
-    pub fn apply_materialized(&self, package: &mut OpcPackage, maximum_bytes: usize) -> Result<()> {
-        self.apply_inner(package, Some(maximum_bytes))
-    }
-
-    fn apply_inner(&self, package: &mut OpcPackage, maximum_bytes: Option<usize>) -> Result<()> {
-        self.before.check_execution()?;
-        self.after.check_execution()?;
-        if !self.before.matches_current_source(package) {
-            return Err(Error::PatchConflict {
-                part: self.before.worksheet_part_name().to_string(),
-            });
-        }
-        if self.is_empty() {
-            self.before.check_execution()?;
-            self.after.check_execution()?;
-            return Ok(());
-        }
-        if package.is_signed() {
-            return Err(Error::Signed);
-        }
-        self.after.check_execution()?;
-        let mut candidate = package.clone();
-        Snapshot::apply_owned_target(&self.before, &self.after, &mut candidate, maximum_bytes)?;
-        let result = Snapshot::load(&candidate, self.after.sheet_position())?;
-        if !result.same_source(&self.after) {
-            return Err(invalid("value-only patch readback differs from its target"));
-        }
-        self.after.check_execution()?;
-        *package = candidate;
-        Ok(())
     }
 }
 
-/// Successful value-only transaction publication.
-#[derive(Debug)]
-pub struct Commit {
-    snapshot: Snapshot,
-    patch: Patch,
-    diagnostics: Diagnostics,
-}
-
-/// Successful bounded multi-worksheet value-only publication.
-#[derive(Debug)]
-pub struct MultiCommit {
-    snapshot: MultiSnapshot,
-    patch: MultiPatch,
-    diagnostics: MultiDiagnostics,
-}
-
-impl MultiCommit {
-    pub(super) fn new(
-        snapshot: MultiSnapshot,
-        patch: MultiPatch,
-        changed_cells: usize,
-        touched_worksheets: usize,
-    ) -> Self {
-        Self {
-            snapshot,
-            patch,
-            diagnostics: MultiDiagnostics {
-                changed_cells,
-                touched_worksheets,
-            },
-        }
-    }
-
-    /// Whether at least one scalar payload changed.
-    #[must_use]
-    pub fn changed(&self) -> bool {
-        self.diagnostics.changed_cells != 0
-    }
-
-    /// Resulting immutable worksheet snapshots.
-    #[must_use]
-    pub const fn snapshot(&self) -> &MultiSnapshot {
-        &self.snapshot
-    }
-
-    /// Exact reversible multi-worksheet patch.
-    #[must_use]
-    pub const fn patch(&self) -> &MultiPatch {
-        &self.patch
-    }
-
-    /// Content-free publication diagnostics.
-    #[must_use]
-    pub const fn diagnostics(&self) -> MultiDiagnostics {
-        self.diagnostics
-    }
-
-    /// Consume into snapshot and patch.
-    #[must_use]
-    pub fn into_parts(self) -> (MultiSnapshot, MultiPatch) {
-        (self.snapshot, self.patch)
-    }
-}
-
-impl Commit {
-    pub(super) fn new(snapshot: Snapshot, patch: Patch, changed_cells: usize) -> Self {
-        Self {
-            snapshot,
-            patch,
-            diagnostics: Diagnostics { changed_cells },
-        }
-    }
-
-    /// Whether at least one scalar payload changed.
-    #[must_use]
-    pub fn changed(&self) -> bool {
-        self.diagnostics.changed_cells != 0
-    }
-
-    /// Resulting immutable snapshot.
-    #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
-    }
-
-    /// Exact reversible patch.
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Content-free transaction diagnostics.
-    #[must_use]
-    pub const fn diagnostics(&self) -> Diagnostics {
-        self.diagnostics
-    }
-
-    /// Consume into snapshot and patch.
-    #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch) {
-        (self.snapshot, self.patch)
-    }
-}
-
-/// Content-free value-only publication diagnostics.
+/// What a committed multi-worksheet value change changed.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Diagnostics {
-    changed_cells: usize,
-}
-
-/// Content-free bounded multi-worksheet publication diagnostics.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct MultiDiagnostics {
     changed_cells: usize,
     touched_worksheets: usize,
 }
 
-impl MultiDiagnostics {
-    /// Number of scalar payloads changed by the commit.
-    #[must_use]
-    pub const fn changed_cells(self) -> usize {
-        self.changed_cells
-    }
-
-    /// Number of worksheet Parts replaced by the commit.
-    #[must_use]
-    pub const fn touched_worksheets(self) -> usize {
-        self.touched_worksheets
-    }
-}
-
 impl Diagnostics {
+    pub(crate) const fn new(changed_cells: usize, touched_worksheets: usize) -> Self {
+        Self {
+            changed_cells,
+            touched_worksheets,
+        }
+    }
+
+    /// Whether at least one scalar payload changed.
+    #[must_use]
+    pub const fn changed(&self) -> bool {
+        self.changed_cells != 0
+    }
+
     /// Number of scalar payloads changed by the commit.
     #[must_use]
-    pub const fn changed_cells(self) -> usize {
+    pub const fn changed_cells(&self) -> usize {
         self.changed_cells
     }
 
-    /// Number of worksheet parts replaced (zero or one).
+    /// Number of worksheet parts replaced by the commit.
     #[must_use]
-    pub const fn touched_worksheets(self) -> usize {
-        if self.changed_cells == 0 { 0 } else { 1 }
+    pub const fn touched_worksheets(&self) -> usize {
+        self.touched_worksheets
     }
 }

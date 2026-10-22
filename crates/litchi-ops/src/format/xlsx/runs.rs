@@ -10,7 +10,7 @@
 //!
 //! Writes go through [`litchi_xlsx::RichRun::apply_font`], which keeps every
 //! run property a change does not name, and publish the cell's runs as its
-//! own inline rich string ([`litchi_xlsx::WorksheetEdit::set_rich_text`]),
+//! own inline rich string ([`litchi_xlsx::workbook::edit::Sheet::set_rich_text`]),
 //! as find/replace does (record 0295). `set` on a run changes it, `add`
 //! under a cell inserts one (a plain text cell becomes rich, its text the
 //! first run, as OfficeCLI's `AddRun` does), `remove` deletes one; as

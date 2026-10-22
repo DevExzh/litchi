@@ -8,6 +8,7 @@ use super::{
     Selector, Snapshot,
 };
 use crate::Error;
+use crate::web::LimitKind;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AddIn {
     pub(in crate::web) id: String,
@@ -68,7 +69,7 @@ impl AddIn {
         validate_binding(&binding)?;
         if self.bindings.len() >= MAX_WEB_EXTENSION_ITEMS {
             return limit(
-                "web extension bindings",
+                LimitKind::Bindings,
                 MAX_WEB_EXTENSION_ITEMS,
                 self.bindings.len().saturating_add(1),
             );
@@ -156,7 +157,7 @@ impl AddIn {
     pub fn push_property(&mut self, property: Property) -> Result<&mut Self> {
         if self.properties.len() >= MAX_WEB_EXTENSION_ITEMS {
             return limit(
-                "web extension properties",
+                LimitKind::Properties,
                 MAX_WEB_EXTENSION_ITEMS,
                 self.properties.len().saturating_add(1),
             );
@@ -220,7 +221,7 @@ impl AddIn {
         validate_store_reference(&reference)?;
         if self.alternate_references.len() >= MAX_WEB_EXTENSION_ITEMS {
             return limit(
-                "alternate references",
+                LimitKind::AlternateReferences,
                 MAX_WEB_EXTENSION_ITEMS,
                 self.alternate_references.len().saturating_add(1),
             );

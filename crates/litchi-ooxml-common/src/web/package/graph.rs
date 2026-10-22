@@ -2,6 +2,7 @@ use super::super::codec::{invalid, limit};
 use super::super::model::{Limits, OperationBudget, Panes};
 use super::super::{Arc, BTreeSet, Error, HashMap, HashSet, OpcPackage, PackURI, Result, VecDeque};
 use super::fold_part_name;
+use crate::web::LimitKind;
 #[derive(Debug)]
 pub(in crate::web) struct ExistingAddInGraph {
     pub(in crate::web) root_relationship_id: String,
@@ -61,7 +62,7 @@ impl PackageGraphIndex {
     ) -> Result<Self> {
         let part_count = package.part_count();
         if part_count > limits.package_parts {
-            return limit("package parts", limits.package_parts, part_count);
+            return limit(LimitKind::PackageParts, limits.package_parts, part_count);
         }
         let mut parts: Vec<IndexedPart> = Vec::with_capacity(part_count);
         let mut by_folded = HashMap::with_capacity(part_count);
@@ -73,9 +74,9 @@ impl PackageGraphIndex {
                 .len()
                 .checked_add(part.content_type().len())
                 .ok_or(Error::Limit {
-                    resource: "indexed web extension package metadata bytes",
-                    max: limits.total_string_bytes,
-                    actual: usize::MAX,
+                    kind: crate::LimitKind::Web(LimitKind::IndexedPackageMetadataBytes),
+                    maximum: limits.total_string_bytes,
+                    observed: usize::MAX,
                 })?;
             budget.charge_metadata(metadata_bytes, 4, limits)?;
             let folded = fold_part_name(part.partname());
@@ -127,19 +128,19 @@ impl PackageGraphIndex {
             .checked_add(relationship.reltype().len())
             .and_then(|bytes| bytes.checked_add(relationship.target_ref().len()))
             .ok_or(Error::Limit {
-                resource: "indexed web extension package metadata bytes",
-                max: limits.total_string_bytes,
-                actual: usize::MAX,
+                kind: crate::LimitKind::Web(LimitKind::IndexedPackageMetadataBytes),
+                maximum: limits.total_string_bytes,
+                observed: usize::MAX,
             })?;
         budget.charge_metadata(metadata_bytes, 3, limits)?;
         self.relationships = self.relationships.checked_add(1).ok_or(Error::Limit {
-            resource: "package relationships",
-            max: limits.package_relationships,
-            actual: usize::MAX,
+            kind: crate::LimitKind::Web(LimitKind::PackageRelationships),
+            maximum: limits.package_relationships,
+            observed: usize::MAX,
         })?;
         if self.relationships > limits.package_relationships {
             return limit(
-                "package relationships",
+                LimitKind::PackageRelationships,
                 limits.package_relationships,
                 self.relationships,
             );

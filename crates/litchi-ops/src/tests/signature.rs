@@ -567,24 +567,34 @@ fn assert_exact_noop(input: &Input) {
         },
         #[cfg(feature = "xlsx")]
         FileFormat::Xlsx => {
-            // Every source-backed XLSX editor publishes through the same OPC
-            // overlay; the workbook-level defined-names editor reaches it on
+            // Every source-backed XLSX family publishes through the same OPC
+            // overlay; the workbook-level defined-names family reaches it on
             // any workbook.
-            let editor =
-                litchi_xlsx::defined_names::SourceBackedEditor::from_read_at(source()).unwrap();
-            let commit = editor.edit().commit().unwrap();
+            let workbook = litchi_xlsx::SourceBackedWorkbook::from_read_at(source()).unwrap();
+            let commit = workbook.edit_defined_names().unwrap().commit().unwrap();
             let mut output = Vec::new();
-            editor
-                .publish_commit_to_stream(&mut output, &commit)
-                .unwrap();
+            commit.package().write_to(&mut output).unwrap();
             assert_eq!(&output, bytes, "{label}: source-backed no-op");
 
-            // The eager semantic transaction refuses a signed workbook, even
-            // for an exact no-op: it never strips the signature.
+            // The eager semantic transaction returns a signed workbook
+            // unchanged for an exact no-op (ADR 0006) and refuses a change:
+            // it never strips the signature.
             let workbook = litchi_xlsx::Package::from_bytes(bytes).unwrap();
-            let refused = workbook.edit().and_then(litchi_xlsx::Edit::commit);
+            let commit = workbook.edit().unwrap().commit().unwrap();
+            assert!(!commit.diagnostics().changed(), "{label}");
+            assert_eq!(
+                &commit.package().to_bytes().unwrap(),
+                bytes,
+                "{label}: eager no-op"
+            );
+            let mut edit = workbook.edit().unwrap();
+            edit.sheet(0_usize)
+                .unwrap()
+                .expect("a first worksheet")
+                .set("A1", "changed")
+                .unwrap();
             assert!(
-                matches!(refused, Err(litchi_xlsx::Error::Signed)),
+                matches!(edit.commit(), Err(litchi_xlsx::Error::Signed)),
                 "{label}: eager XLSX edit"
             );
         },

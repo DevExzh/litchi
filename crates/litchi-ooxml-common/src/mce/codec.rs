@@ -11,8 +11,8 @@ use super::admission::mentions_namespace;
 #[cfg(test)]
 use super::model::NAMESPACE;
 use super::model::{
-    ATTRIBUTES_PER_ELEMENT_CEILING, Capabilities, Error, Limits, Name, OffsetLimits, Output,
-    Report, XML_NS,
+    ATTRIBUTES_PER_ELEMENT_CEILING, Capabilities, Error, LimitKind, Limits, Name, OffsetLimits,
+    Output, Report, XML_NS,
 };
 use super::patterns::{NamePattern, Patterns};
 use super::scope::{Scope, Uri, UriId, has_duplicate_prefix, sorted_prefixes};
@@ -46,10 +46,18 @@ pub fn active_offsets(
     limits: &OffsetLimits,
 ) -> R<Vec<u32>> {
     if xml.len() > limits.max_source_bytes {
-        return Err(limit("active-offset source bytes"));
+        return Err(limit(
+            LimitKind::SourceBytes,
+            xml.len(),
+            limits.max_source_bytes,
+        ));
     }
     if offsets.len() > limits.max_offsets {
-        return Err(limit("active-offset count"));
+        return Err(limit(
+            LimitKind::OffsetCount,
+            offsets.len(),
+            limits.max_offsets,
+        ));
     }
     for &offset in offsets {
         if usize::try_from(offset).map_or(true, |offset| offset >= xml.len()) {
@@ -74,14 +82,18 @@ pub fn active_offsets(
         .len()
         .checked_add(ACTIVE_MARKER_WRAPPER_BYTES)
         .and_then(|bytes| bytes.checked_add(decimal_digits))
-        .ok_or_else(|| limit("active-offset marker bytes"))?;
+        .ok_or_else(|| limit_lower_bound(LimitKind::MarkerBytes, limits.max_marked_bytes))?;
     let marked_len = offsets
         .len()
         .checked_mul(marker_bytes)
         .and_then(|extra| xml.len().checked_add(extra))
-        .ok_or_else(|| limit("active-offset marked XML bytes"))?;
+        .ok_or_else(|| limit_lower_bound(LimitKind::MarkedBytes, limits.max_marked_bytes))?;
     if marked_len > limits.max_marked_bytes {
-        return Err(limit("active-offset marked XML bytes"));
+        return Err(limit(
+            LimitKind::MarkedBytes,
+            marked_len,
+            limits.max_marked_bytes,
+        ));
     }
 
     let mut positions = Vec::new();
@@ -377,13 +389,17 @@ impl Namespaces {
                 "the prefix index disagrees with the declaration chain for {prefix:?}"
             );
             if bound.is_none() {
-                bindings = bindings
-                    .checked_add(1)
-                    .ok_or_else(|| limit("namespace bindings"))?;
+                bindings = bindings.checked_add(1).ok_or_else(|| {
+                    limit_lower_bound(LimitKind::NamespaceBindings, lim.max_namespace_bindings)
+                })?;
             }
         }
         if bindings > lim.max_namespace_bindings {
-            return Err(limit("namespace bindings"));
+            return Err(limit(
+                LimitKind::NamespaceBindings,
+                bindings,
+                lim.max_namespace_bindings,
+            ));
         }
         Ok(Self {
             head: Some(Arc::new(NamespaceLayer {
@@ -646,9 +662,9 @@ impl BoundedOutput {
             .bytes
             .len()
             .checked_add(additional)
-            .ok_or_else(|| limit("output bytes"))?;
+            .ok_or_else(|| limit_lower_bound(LimitKind::OutputBytes, self.max))?;
         if len > self.max {
-            return Err(limit("output bytes"));
+            return Err(limit(LimitKind::OutputBytes, len, self.max));
         }
         if additional > self.bytes.capacity().saturating_sub(self.bytes.len()) {
             // Grow geometrically so a document that outgrows the input-sized
@@ -732,13 +748,17 @@ pub fn process_markup_compatibility<'a>(
     lim: &Limits,
 ) -> R<Output<'a>> {
     if xml.len() > lim.max_input_bytes {
-        return Err(limit("input bytes"));
+        return Err(limit(LimitKind::InputBytes, xml.len(), lim.max_input_bytes));
     }
     // A declaration that spells the namespace with references binds it as a
     // literal one does, so the fast path decides on decoded declarations too.
     if !mentions_namespace(xml) {
         if xml.len() > lim.max_output_bytes {
-            return Err(limit("output bytes"));
+            return Err(limit(
+                LimitKind::OutputBytes,
+                xml.len(),
+                lim.max_output_bytes,
+            ));
         }
         return Ok(Output {
             xml: Cow::Borrowed(xml),
@@ -853,7 +873,11 @@ fn start(
     scope: &mut Scope,
 ) -> R<()> {
     if st.len() >= lim.max_depth {
-        return Err(limit("depth"));
+        return Err(limit(
+            LimitKind::Depth,
+            st.len().checked_add(1).unwrap_or(usize::MAX),
+            lim.max_depth,
+        ));
     }
     let depth = st.len() + 1;
     let q = str::from_utf8(e.name().into_inner()).map_err(xerr)?;
@@ -869,9 +893,9 @@ fn start(
         // tag.
         attributes = attributes
             .checked_add(1)
-            .ok_or_else(|| limit("attributes per element"))?;
+            .ok_or_else(|| limit_lower_bound(LimitKind::Attributes, max_attributes))?;
         if attributes > max_attributes {
-            return Err(limit("attributes per element"));
+            return Err(limit(LimitKind::Attributes, attributes, max_attributes));
         }
         let a = a.map_err(xerr)?;
         reserve_amortized(&mut raw, 1, "MCE attributes")?;
@@ -966,9 +990,15 @@ fn start(
         }
         tokens = tokens
             .checked_add(a.value.split_whitespace().count())
-            .ok_or_else(|| limit("directive tokens"))?;
+            .ok_or_else(|| {
+                limit_lower_bound(LimitKind::DirectiveTokens, lim.max_directive_tokens)
+            })?;
         if tokens > lim.max_directive_tokens {
-            return Err(limit("directive tokens"));
+            return Err(limit(
+                LimitKind::DirectiveTokens,
+                tokens,
+                lim.max_directive_tokens,
+            ));
         }
         reserve_amortized(&mut directives, 1, "MCE directives")?;
         directives.push((local, a.value.as_ref()));
@@ -1020,9 +1050,15 @@ fn start(
                     if *fallback {
                         return Err(bad("Choice after Fallback"));
                     }
-                    *choices += 1;
+                    *choices = choices.checked_add(1).ok_or_else(|| {
+                        limit_lower_bound(LimitKind::Choices, lim.max_choices_per_alternate)
+                    })?;
                     if *choices > lim.max_choices_per_alternate {
-                        return Err(limit("choices"));
+                        return Err(limit(
+                            LimitKind::Choices,
+                            *choices,
+                            lim.max_choices_per_alternate,
+                        ));
                     }
                     let req =
                         attr(&raw, "Requires")?.ok_or_else(|| bad("Choice lacks Requires"))?;
@@ -1331,8 +1367,19 @@ fn visible(s: &[Frame]) -> bool {
 fn bad(s: impl Into<String>) -> Error {
     Error::NonConformant(s.into())
 }
-fn limit(s: &str) -> Error {
-    Error::LimitExceeded(s.into())
+fn limit(kind: LimitKind, observed: usize, maximum: usize) -> Error {
+    Error::LimitExceeded {
+        kind,
+        observed,
+        maximum,
+    }
+}
+
+fn limit_lower_bound(kind: LimitKind, maximum: usize) -> Error {
+    // The checked arithmetic which reaches this helper already overflowed;
+    // the exact value is therefore unavailable, so expose the saturated
+    // representable observation instead of inventing `maximum + 1`.
+    limit(kind, usize::MAX, maximum)
 }
 fn xerr(e: impl std::fmt::Display) -> Error {
     Error::Xml(e.to_string())
@@ -1850,6 +1897,23 @@ mod marker_exhaustion_test {
             super::active_marker_with_hash(&source, hash),
             Err(super::Error::NonConformant(message))
                 if message == "source XML collides with active-offset markers"
+        ));
+    }
+}
+
+#[cfg(test)]
+mod limit_lower_bound_tests {
+    use super::{Error, LimitKind};
+
+    #[test]
+    fn arithmetic_overflow_reports_saturated_observation() {
+        assert!(matches!(
+            super::limit_lower_bound(LimitKind::MarkedBytes, 10),
+            Error::LimitExceeded {
+                kind: LimitKind::MarkedBytes,
+                observed: usize::MAX,
+                maximum: 10,
+            }
         ));
     }
 }

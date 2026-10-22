@@ -114,19 +114,17 @@ impl Edit<'_> {
     /// cannot carry, and [`Error::Signed`] for a changed edit of a signed
     /// workbook.
     pub fn commit(self) -> Result<Commit> {
-        let (_, patch, diagnostics) = self.inner.commit()?.into_parts();
+        let commit = self.inner.commit()?;
+        let diagnostics = commit.diagnostics().clone();
+        let (candidate, patch) = commit.into_parts();
         let package = match self.owner {
-            Owner::Package(package) => package.apply_metadata(&patch)?,
-            Owner::Workbook(workbook) => {
-                if patch.is_noop() {
-                    workbook.to_package()
-                } else {
-                    let mut candidate = workbook.package.clone();
-                    patch.apply(&mut candidate)?;
-                    Package::reparse_workbook_candidate(workbook, candidate)
-                        .map_err(|error| Error::Invalid(error.to_string()))?
-                }
-            },
+            Owner::Package(package) if patch.is_noop() => package.clone(),
+            Owner::Package(package) => package
+                .reparse_candidate_retaining_projection(candidate)
+                .map_err(|error| Error::Invalid(error.to_string()))?,
+            Owner::Workbook(workbook) if patch.is_noop() => workbook.to_package(),
+            Owner::Workbook(workbook) => Package::reparse_workbook_candidate(workbook, candidate)
+                .map_err(|error| Error::Invalid(error.to_string()))?,
         };
         Ok(Commit {
             package,
@@ -207,7 +205,7 @@ impl Package {
     pub fn edit_metadata(&self) -> Result<Edit<'_>> {
         Ok(Edit {
             owner: Owner::Package(self),
-            inner: self.metadata_snapshot()?.edit(),
+            inner: properties::Edit::new(self.opc_package(), Host::Excel)?,
         })
     }
 
@@ -257,7 +255,7 @@ impl Workbook {
     pub fn edit_metadata(&self) -> Result<Edit<'_>> {
         Ok(Edit {
             owner: Owner::Workbook(self),
-            inner: Snapshot::read(&self.package, Host::Excel)?.edit(),
+            inner: properties::Edit::new(&self.package, Host::Excel)?,
         })
     }
 }

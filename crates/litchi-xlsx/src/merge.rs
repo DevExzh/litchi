@@ -8,6 +8,8 @@ use litchi_sheet::{Cell as Address, Rect};
 
 use crate::error::{Result, allocation, invalid};
 
+pub mod source;
+
 /// One valid merged-range membership transition.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Change {

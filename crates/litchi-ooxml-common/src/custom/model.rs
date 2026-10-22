@@ -257,7 +257,7 @@ impl Props {
                 base,
                 new_text,
                 MAX_TOTAL_TEXT_BYTES,
-                "custom-property text bytes",
+                crate::LimitKind::CustomPropertyTextBytes,
             )?;
             let wire = if property.wire.is_text() && matches!(value, Value::Text(_)) {
                 property.wire
@@ -275,21 +275,26 @@ impl Props {
                 "custom property name '{name}' duplicates an existing name case-insensitively"
             )));
         }
-        let actual_count = checked_increment(self.properties.len(), "custom properties")?;
+        let actual_count =
+            checked_increment(self.properties.len(), crate::LimitKind::CustomProperties)?;
         if actual_count > MAX_PROPERTIES {
-            return Err(limit("custom properties", MAX_PROPERTIES, actual_count));
+            return Err(limit(
+                crate::LimitKind::CustomProperties,
+                MAX_PROPERTIES,
+                actual_count,
+            ));
         }
         let names = checked_total(
             self.name_bytes,
             name.len(),
             MAX_TOTAL_NAME_BYTES,
-            "custom-property name bytes",
+            crate::LimitKind::CustomPropertyNameBytes,
         )?;
         let texts = checked_total(
             self.text_bytes,
             value_text_bytes(&value),
             MAX_TOTAL_TEXT_BYTES,
-            "custom-property text bytes",
+            crate::LimitKind::CustomPropertyTextBytes,
         )?;
         let pid = self
             .next_pid
@@ -405,21 +410,26 @@ impl Props {
                 "duplicate custom property name '{name}' (names are case-insensitive)"
             )));
         }
-        let actual_count = checked_increment(self.properties.len(), "custom properties")?;
+        let actual_count =
+            checked_increment(self.properties.len(), crate::LimitKind::CustomProperties)?;
         if actual_count > MAX_PROPERTIES {
-            return Err(limit("custom properties", MAX_PROPERTIES, actual_count));
+            return Err(limit(
+                crate::LimitKind::CustomProperties,
+                MAX_PROPERTIES,
+                actual_count,
+            ));
         }
         let names = checked_total(
             self.name_bytes,
             name.len(),
             MAX_TOTAL_NAME_BYTES,
-            "custom-property name bytes",
+            crate::LimitKind::CustomPropertyNameBytes,
         )?;
         let texts = checked_total(
             self.text_bytes,
             value_text_bytes(&value),
             MAX_TOTAL_TEXT_BYTES,
-            "custom-property text bytes",
+            crate::LimitKind::CustomPropertyTextBytes,
         )?;
         self.folded_names.insert(folded, name.clone());
         self.properties.insert(
@@ -446,7 +456,7 @@ pub(crate) fn validate_value(value: &Value) -> Result<()> {
         Value::Text(text) => {
             if text.len() > MAX_TEXT_BYTES {
                 return Err(limit(
-                    "custom-property text bytes",
+                    crate::LimitKind::CustomPropertyTextBytes,
                     MAX_TEXT_BYTES,
                     text.len(),
                 ));
@@ -475,7 +485,7 @@ pub(crate) fn validate_name(name: &str) -> Result<()> {
     }
     if name.len() > MAX_NAME_BYTES {
         return Err(limit(
-            "custom-property name bytes",
+            crate::LimitKind::CustomPropertyNameBytes,
             MAX_NAME_BYTES,
             name.len(),
         ));
@@ -483,7 +493,7 @@ pub(crate) fn validate_name(name: &str) -> Result<()> {
     let chars = name.chars().count();
     if chars > MAX_NAME_CHARS {
         return Err(limit(
-            "custom-property name characters",
+            crate::LimitKind::CustomPropertyNameCharacters,
             MAX_NAME_CHARS,
             chars,
         ));

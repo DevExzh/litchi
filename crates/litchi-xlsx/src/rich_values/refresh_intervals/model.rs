@@ -133,8 +133,10 @@ pub(crate) fn validate_intervals(value: &[RefreshInterval]) -> Result<()> {
         ));
     }
     if value.len() > MAX_INTERVALS {
-        return Err(invalid(
-            "rich-value refresh interval count exceeds the limit",
+        return Err(super::limit(
+            super::LimitKind::Intervals,
+            value.len(),
+            MAX_INTERVALS,
         ));
     }
     for interval in value {
@@ -152,7 +154,11 @@ pub(crate) fn validate_intervals(value: &[RefreshInterval]) -> Result<()> {
 
 fn validate_string(value: &str, field: &str) -> Result<()> {
     if value.len() > MAX_STRING_BYTES {
-        return Err(invalid(format!("{field} exceeds the string limit")));
+        return Err(super::limit(
+            super::LimitKind::StringBytes,
+            value.len(),
+            MAX_STRING_BYTES,
+        ));
     }
     if !value.chars().all(valid_xml10) {
         return Err(invalid(format!(

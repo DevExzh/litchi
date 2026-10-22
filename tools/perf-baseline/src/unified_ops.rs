@@ -1494,10 +1494,7 @@ pub(crate) fn leaf_xlsx_open(source: Arc<dyn ReadAt>) -> Result<LeafXlsx, Box<dy
 }
 
 pub(crate) fn leaf_xlsx_names(workbook: &litchi_xlsx::SourceBackedWorkbook) -> Vec<String> {
-    workbook
-        .sheets()
-        .map(|sheet| sheet.name().to_owned())
-        .collect()
+    workbook.sheet_names().map(str::to_owned).collect()
 }
 
 /// Cell text for one leaf XLSX cell, as the unified workbook text renders it.
@@ -3506,12 +3503,10 @@ fn run_detection(
             DetectionMode::Bytes | DetectionMode::Polyglot | DetectionMode::CatalogAlias => {
                 let started = Instant::now();
                 let observed = match entry.leg {
-                    Leg::Unified => {
-                        litchi_ops::detect::detect_file_format_from_bytes(
-                            &corpus.archive,
-                            &detection_limits,
-                        )
-                    },
+                    Leg::Unified => litchi_ops::detect::detect_file_format_from_bytes(
+                        &corpus.archive,
+                        &detection_limits,
+                    ),
                     Leg::Leaf => litchi_odf_common::detect::bytes(
                         &corpus.archive,
                         litchi_odf_common::detect::Limits::default(),

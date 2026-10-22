@@ -11,9 +11,8 @@
 //! Each family is checked three ways: a change to a signed package is refused
 //! with [`Error::Signed`] and leaves the package as it was (it still publishes
 //! its signed source byte for byte); an exact no-op keeps the signature byte
-//! for byte; and after the explicit removal (`OpcPackage::unsign` or
-//! `Package::unsign`) the same change publishes a package without signature
-//! parts. Changes to the producer-signed fixtures are stores; removals and
+//! for byte; and after the explicit removal (`Package::unsign`) the same
+//! change publishes a package without signature parts. Changes to the producer-signed fixtures are stores; removals and
 //! patches run against a package that already holds the family's content and
 //! is signed in the test.
 
@@ -21,7 +20,7 @@ use std::path::PathBuf;
 
 use litchi_opc::constants::relationship_type as rt;
 use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter, Part as _, TargetMode};
-use litchi_xlsx::Error;
+use litchi_xlsx::{Error, Package};
 
 /// The producer-signed fixtures: one signature by `xmlsec`, one by Office 2010.
 const SIGNED: [&str; 2] = ["hello-world-signed.xlsx", "ms-office-2010-signed.xlsx"];
@@ -126,22 +125,6 @@ fn sign(plain: &OpcPackage) -> Vec<u8> {
     bytes
 }
 
-/// `signed` with its signature graph deleted part by part instead of removed
-/// with `unsign`. Deleting signature parts does not authorize a change: the
-/// OPC edit-policy requirement survives, so the families still refuse. The
-/// package root keeps the relationships of the unsigned package `signed` was
-/// made from, so a patch planned on that package is not stale here.
-fn signature_deleted_by_hand(signed: &[u8]) -> OpcPackage {
-    let mut package = open(signed);
-    assert!(package.rels_mut().remove("rIdSignatureOrigin").is_some());
-    for name in ["/_xmlsignatures/sig1.xml", "/_xmlsignatures/origin.sigs"] {
-        assert!(package.remove_part(&PackURI::new(name).unwrap()));
-    }
-    assert!(!package.is_signed());
-    assert!(package.requires_signature_edit_policy());
-    package
-}
-
 /// An unsigned copy of a producer-signed fixture, removed explicitly.
 fn unsigned_fixture(name: &str) -> OpcPackage {
     let mut package = open(&signed_fixture(name));
@@ -175,20 +158,28 @@ fn assert_signed<T: std::fmt::Debug>(result: litchi_xlsx::Result<T>) {
     assert!(matches!(error, Error::Signed), "{error:?}");
 }
 
-#[track_caller]
-fn assert_boxed_signed<T: std::fmt::Debug>(
-    result: Result<T, Box<dyn std::error::Error + Send + Sync>>,
-) {
-    let error = result.expect_err("a change to a signed package must be refused");
-    assert!(
-        matches!(error.downcast_ref::<Error>(), Some(Error::Signed)),
-        "{error:?}"
-    );
+/// A package adopted from `bytes`; an untouched package republishes them.
+fn adopt(bytes: &[u8]) -> Package {
+    Package::from_bytes(bytes).unwrap()
+}
+
+fn bytes(package: &Package) -> Vec<u8> {
+    package.to_bytes().unwrap()
+}
+
+/// An unsigned copy of a producer-signed fixture, removed explicitly.
+fn unsigned_package(name: &str) -> Package {
+    adopt(&signed_fixture(name)).unsign().unwrap()
+}
+
+/// `plain` signed in the test.
+fn sign_package(plain: &Package) -> Vec<u8> {
+    sign(&open(&bytes(plain)))
 }
 
 mod connections_family {
     use super::*;
-    use litchi_xlsx::connections::{self, Connection, Connections, CredentialsMethod, Transaction};
+    use litchi_xlsx::connections::{self, Connection, Connections, CredentialsMethod};
 
     pub(super) fn connection(id: u32, name: &str) -> Connection {
         Connection {
@@ -227,61 +218,65 @@ mod connections_family {
         }
     }
 
+    pub(super) fn with_catalog(package: &Package) -> Package {
+        let mut edit = package.edit_connections().unwrap();
+        assert!(edit.replace(Some(catalog())).unwrap());
+        edit.commit().unwrap().into_package()
+    }
+
+    fn load(package: &OpcPackage) -> litchi_xlsx::Result<Option<Connections>> {
+        let limits = package.read_limits();
+        connections::load_from_package(package, &limits)
+    }
+
     #[test]
     fn a_signed_fixture_refuses_a_store_and_keeps_exact_noops() {
         for name in SIGNED {
             let original = signed_fixture(name);
-            let mut package = open(&original);
+            let package = adopt(&original);
 
-            assert!(!connections::remove_from_package(&mut package).unwrap());
-            let commit = Transaction::new(&mut package).unwrap().commit().unwrap();
-            assert!(!commit.changed());
-            assert!(commit.patch().is_empty());
-            assert_eq!(publish(&package), original, "{name}: exact no-ops");
+            let mut edit = package.edit_connections().unwrap();
+            assert!(!edit.replace(None).unwrap());
+            let commit = edit.commit().unwrap();
+            assert!(!commit.diagnostics().changed());
+            assert!(commit.patch().is_noop());
+            assert_eq!(bytes(commit.package()), original, "{name}: exact no-ops");
 
-            assert_boxed_signed(connections::store_in_package(
-                &mut package,
-                &catalog(),
-                false,
-            ));
-            let mut transaction = Transaction::new(&mut package).unwrap();
-            assert!(transaction.set(connection(3, "Staged")).unwrap());
-            assert_boxed_signed(transaction.commit());
-            assert_eq!(publish(&package), original, "{name}: refusals");
+            let mut edit = package.edit_connections().unwrap();
+            assert!(edit.replace(Some(catalog())).unwrap());
+            assert_signed(edit.commit());
+            let mut edit = package.edit_connections().unwrap();
+            assert!(edit.set(connection(3, "Staged")).unwrap());
+            assert_signed(edit.commit());
+            assert_eq!(bytes(&package), original, "{name}: refusals");
 
-            package.unsign();
-            connections::store_in_package(&mut package, &catalog(), false).unwrap();
-            let output = publish(&package);
+            let output = bytes(&with_catalog(&package.unsign().unwrap()));
             assert!(!carries_signature(&output), "{name}");
-            assert_eq!(
-                connections::load_from_package(&open(&output)).unwrap(),
-                Some(catalog())
-            );
+            assert_eq!(load(&open(&output)).unwrap(), Some(catalog()));
         }
     }
 
     #[test]
     fn a_signed_package_refuses_a_removal_and_a_patch() {
-        let mut plain = unsigned_fixture(SIGNED[0]);
-        connections::store_in_package(&mut plain, &catalog(), false).unwrap();
-        let signed = sign(&plain);
-        let mut package = open(&signed);
+        let plain = with_catalog(&unsigned_package(SIGNED[0]));
+        let signed = sign_package(&plain);
+        let package = adopt(&signed);
 
-        assert_boxed_signed(connections::remove_from_package(&mut package));
-        assert_eq!(publish(&package), signed);
+        let mut edit = package.edit_connections().unwrap();
+        assert!(edit.replace(None).unwrap());
+        assert_signed(edit.commit());
+        assert_eq!(bytes(&package), signed);
 
-        // The snapshot binds the package root, so the patch targets the same
-        // graph with its signature parts deleted by hand.
+        // A changed patch is refused as signed before its source state is
+        // checked; after the explicit removal it targets the plain graph.
         let patch = {
-            let mut transaction = Transaction::new(&mut plain).unwrap();
-            assert!(transaction.remove(1).unwrap().is_some());
-            transaction.commit().unwrap().patch().clone()
+            let mut edit = plain.edit_connections().unwrap();
+            assert!(edit.remove(1).unwrap().is_some());
+            edit.commit().unwrap().patch().clone()
         };
-        let mut package = signature_deleted_by_hand(&signed);
-        assert_boxed_signed(patch.apply(&mut package));
-        assert!(package.requires_signature_edit_policy());
+        assert_signed(package.apply_connections(&patch));
         assert_eq!(
-            connections::load_from_package(&package)
+            load(&open(&bytes(&package)))
                 .unwrap()
                 .unwrap()
                 .connections
@@ -289,121 +284,89 @@ mod connections_family {
             2
         );
 
-        package.unsign();
-        patch.apply(&mut package).unwrap();
-        let output = publish(&package);
-        assert!(!carries_signature(&output));
-        assert_eq!(
-            connections::load_from_package(&open(&output))
+        let output = bytes(
+            package
+                .unsign()
                 .unwrap()
+                .apply_connections(&patch)
                 .unwrap()
-                .connections
-                .len(),
-            1
+                .package(),
         );
+        assert!(!carries_signature(&output));
+        assert_eq!(load(&open(&output)).unwrap().unwrap().connections.len(), 1);
     }
 }
 
 mod query_table_family {
-    use super::connections_family::catalog;
+    use super::connections_family::with_catalog;
     use super::*;
-    use litchi_xlsx::connections;
     use litchi_xlsx::query_table::{Conformance, Table};
-    use litchi_xlsx::{
-        add_worksheet_query_table, load_worksheet_query_tables, remove_worksheet_query_table,
-        reorder_worksheet_query_tables, replace_worksheet_query_table,
-    };
-
-    fn plain_with_connections() -> OpcPackage {
-        let mut plain = unsigned_fixture(SIGNED[0]);
-        connections::store_in_package(&mut plain, &catalog(), false).unwrap();
-        plain
-    }
 
     #[test]
     fn a_signed_package_refuses_query_table_changes_and_keeps_exact_noops() {
-        let mut plain = plain_with_connections();
-        let worksheet = first_worksheet(&plain);
-        let signed = sign(&plain);
-        let mut package = open(&signed);
+        let plain = with_catalog(&unsigned_package(SIGNED[0]));
+        let signed = sign_package(&plain);
+        let package = adopt(&signed);
 
         // No query tables: removing and reordering publish nothing.
-        assert!(!remove_worksheet_query_table(&mut package, &worksheet, "rIdQueryTable1").unwrap());
-        assert!(
-            reorder_worksheet_query_tables(&mut package, &worksheet, &[])
-                .unwrap()
-                .is_empty()
+        let mut edit = package.edit_query_tables(0_usize).unwrap();
+        assert!(!edit.remove("rIdQueryTable1").unwrap());
+        assert!(edit.reorder(&[]).unwrap().is_empty());
+        assert_signed(edit.add(Table::new("Query", 1), Conformance::Transitional));
+        assert_eq!(
+            bytes(&edit.commit().unwrap().into_package()),
+            signed,
+            "exact no-ops and a refused add"
         );
-        assert_eq!(publish(&package), signed, "exact no-ops");
-
-        assert_signed(add_worksheet_query_table(
-            &mut package,
-            &worksheet,
-            Table::new("Query", 1),
-            Conformance::Transitional,
-        ));
-        assert_eq!(publish(&package), signed, "refused add");
 
         // The same content, signed with two query tables in canonical order.
-        add_worksheet_query_table(
-            &mut plain,
-            &worksheet,
-            Table::new("First", 1),
-            Conformance::Transitional,
-        )
-        .unwrap();
-        add_worksheet_query_table(
-            &mut plain,
-            &worksheet,
-            Table::new("Second", 2),
-            Conformance::Transitional,
-        )
-        .unwrap();
-        let ids = reorder_worksheet_query_tables(
-            &mut plain,
-            &worksheet,
-            &["rIdQueryTable1".into(), "rIdQueryTable2".into()],
-        )
-        .unwrap()
-        .iter()
-        .map(|part| part.relationship_id().to_owned())
-        .collect::<Vec<_>>();
+        let mut edit = plain.edit_query_tables(0_usize).unwrap();
+        edit.add(Table::new("First", 1), Conformance::Transitional)
+            .unwrap();
+        edit.add(Table::new("Second", 2), Conformance::Transitional)
+            .unwrap();
+        let ids = edit
+            .reorder(&["rIdQueryTable1".into(), "rIdQueryTable2".into()])
+            .unwrap()
+            .iter()
+            .map(|part| part.relationship_id().to_owned())
+            .collect::<Vec<_>>();
         assert_eq!(ids, ["rIdQueryTable1", "rIdQueryTable2"]);
-        let signed = sign(&plain);
-        let mut package = open(&signed);
+        let plain = edit.commit().unwrap().into_package();
+        let signed = sign_package(&plain);
+        let package = adopt(&signed);
 
-        let unchanged = reorder_worksheet_query_tables(&mut package, &worksheet, &ids).unwrap();
-        assert_eq!(unchanged.len(), 2);
-        assert_eq!(publish(&package), signed, "reorder into the current order");
-
+        let mut edit = package.edit_query_tables(0_usize).unwrap();
+        assert_eq!(edit.reorder(&ids).unwrap().len(), 2);
         let swapped = [ids[1].clone(), ids[0].clone()];
-        assert_signed(reorder_worksheet_query_tables(
-            &mut package,
-            &worksheet,
-            &swapped,
-        ));
-        assert_signed(replace_worksheet_query_table(
-            &mut package,
-            &worksheet,
+        assert_signed(edit.reorder(&swapped));
+        assert_signed(edit.replace(
             &ids[0],
             Table::new("Replaced", 1),
             Conformance::Transitional,
         ));
-        assert_signed(remove_worksheet_query_table(
-            &mut package,
-            &worksheet,
-            &ids[0],
-        ));
-        assert_eq!(publish(&package), signed, "refused changes");
+        assert_signed(edit.remove(&ids[0]));
+        assert_eq!(
+            bytes(&edit.commit().unwrap().into_package()),
+            signed,
+            "reorder into the current order and refused changes"
+        );
 
-        package.unsign();
-        let reordered = reorder_worksheet_query_tables(&mut package, &worksheet, &swapped).unwrap();
+        let mut edit = package
+            .unsign()
+            .unwrap()
+            .edit_query_tables(0_usize)
+            .unwrap();
+        let reordered = edit.reorder(&swapped).unwrap();
         assert_eq!(reordered[0].query_table().name(), "Second");
-        assert!(remove_worksheet_query_table(&mut package, &worksheet, &ids[1]).unwrap());
-        let output = publish(&package);
+        assert!(edit.remove(&ids[1]).unwrap());
+        let output = bytes(&edit.commit().unwrap().into_package());
         assert!(!carries_signature(&output));
         assert_eq!(
-            load_worksheet_query_tables(&open(&output), &worksheet)
+            adopt(&output)
+                .edit_query_tables(0_usize)
+                .unwrap()
+                .query_tables()
                 .unwrap()
                 .len(),
             1
@@ -413,9 +376,7 @@ mod query_table_family {
 
 mod xml_maps_family {
     use super::*;
-    use litchi_xlsx::xml_maps::{
-        self, Transaction, XmlMap, XmlMapConformance, XmlMapInfo, XmlMapSchema,
-    };
+    use litchi_xlsx::xml_maps::{self, XmlMap, XmlMapInfo, XmlMapSchema};
 
     fn info(name: &str) -> XmlMapInfo {
         XmlMapInfo {
@@ -441,28 +402,28 @@ mod xml_maps_family {
         }
     }
 
+    fn store(package: &Package, value: XmlMapInfo) -> litchi_xlsx::Result<Package> {
+        let mut edit = package.edit_xml_maps()?;
+        edit.set(value)?;
+        Ok(edit.commit()?.into_package())
+    }
+
     #[test]
     fn a_signed_fixture_refuses_a_store_and_keeps_exact_noops() {
         for name in SIGNED {
             let original = signed_fixture(name);
-            let mut package = open(&original);
+            let package = adopt(&original);
 
-            assert!(!xml_maps::remove_from_package(&mut package).unwrap());
-            let commit = Transaction::new(&mut package).unwrap().commit().unwrap();
-            assert!(!commit.changed());
-            assert_eq!(publish(&package), original, "{name}: exact no-ops");
+            let mut edit = package.edit_xml_maps().unwrap();
+            assert!(edit.remove().unwrap().is_none());
+            let commit = edit.commit().unwrap();
+            assert!(!commit.diagnostics().changed());
+            assert_eq!(bytes(commit.package()), original, "{name}: exact no-ops");
 
-            assert_boxed_signed(xml_maps::store_in_package(
-                &mut package,
-                &info("Map"),
-                XmlMapConformance::Transitional,
-            ));
-            assert_eq!(publish(&package), original, "{name}: refused store");
+            assert_signed(store(&package, info("Map")));
+            assert_eq!(bytes(&package), original, "{name}: refused store");
 
-            package.unsign();
-            xml_maps::store_in_package(&mut package, &info("Map"), XmlMapConformance::Transitional)
-                .unwrap();
-            let output = publish(&package);
+            let output = bytes(&store(&package.unsign().unwrap(), info("Map")).unwrap());
             assert!(!carries_signature(&output), "{name}");
             assert_eq!(
                 xml_maps::load_from_package(&open(&output)).unwrap(),
@@ -473,44 +434,42 @@ mod xml_maps_family {
 
     #[test]
     fn a_signed_package_keeps_an_equal_store_and_refuses_changes() {
-        let mut plain = unsigned_fixture(SIGNED[1]);
-        xml_maps::store_in_package(&mut plain, &info("Map"), XmlMapConformance::Transitional)
-            .unwrap();
-        let signed = sign(&plain);
-        let mut package = open(&signed);
+        let plain = store(&unsigned_package(SIGNED[1]), info("Map")).unwrap();
+        let signed = sign_package(&plain);
+        let package = adopt(&signed);
 
-        xml_maps::store_in_package(&mut package, &info("Map"), XmlMapConformance::Transitional)
-            .unwrap();
-        assert_eq!(publish(&package), signed, "an equal store");
-
-        assert_boxed_signed(xml_maps::store_in_package(
-            &mut package,
-            &info("Renamed"),
-            XmlMapConformance::Transitional,
-        ));
-        assert_boxed_signed(xml_maps::remove_from_package(&mut package));
-        let mut transaction = Transaction::new(&mut package).unwrap();
-        assert!(transaction.replace(None).unwrap());
-        assert_boxed_signed(transaction.commit());
-        assert_eq!(publish(&package), signed, "refused changes");
-
-        // The snapshot binds the package root, so the patch targets the same
-        // graph with its signature parts deleted by hand.
-        let patch = {
-            let mut transaction = Transaction::new(&mut plain).unwrap();
-            assert!(transaction.replace(Some(info("Patched"))).unwrap());
-            transaction.commit().unwrap().patch().clone()
-        };
-        let mut package = signature_deleted_by_hand(&signed);
-        assert_boxed_signed(patch.apply(&mut package));
         assert_eq!(
-            xml_maps::load_from_package(&package).unwrap(),
+            bytes(&store(&package, info("Map")).unwrap()),
+            signed,
+            "an equal store"
+        );
+        assert_signed(store(&package, info("Renamed")));
+        let mut edit = package.edit_xml_maps().unwrap();
+        assert!(edit.replace(None).unwrap());
+        assert_signed(edit.commit());
+        assert_eq!(bytes(&package), signed, "refused changes");
+
+        // A changed patch is refused as signed before its source state is
+        // checked; after the explicit removal it targets the plain graph.
+        let patch = {
+            let mut edit = plain.edit_xml_maps().unwrap();
+            assert!(edit.replace(Some(info("Patched"))).unwrap());
+            edit.commit().unwrap().patch().clone()
+        };
+        assert_signed(package.apply_xml_maps(&patch));
+        assert_eq!(
+            xml_maps::load_from_package(&open(&bytes(&package))).unwrap(),
             Some(info("Map"))
         );
 
-        package.unsign();
-        patch.apply(&mut package).unwrap();
-        let output = publish(&package);
+        let output = bytes(
+            package
+                .unsign()
+                .unwrap()
+                .apply_xml_maps(&patch)
+                .unwrap()
+                .package(),
+        );
         assert!(!carries_signature(&output));
         assert_eq!(
             xml_maps::load_from_package(&open(&output)).unwrap(),
@@ -532,27 +491,28 @@ mod volatile_dependencies_family {
         .unwrap()
     }
 
+    fn store(package: &Package) -> Package {
+        let mut edit = package.edit_volatile_dependencies().unwrap();
+        edit.set(&value(), VolatileDependenciesConformance::Transitional)
+            .unwrap();
+        edit.commit().unwrap().into_package()
+    }
+
     #[test]
     fn a_signed_package_refuses_changes_and_keeps_exact_noops() {
         for name in SIGNED {
             let original = signed_fixture(name);
-            let mut package = open(&original);
-            assert!(!volatile_dependencies::remove_from_package(&mut package).unwrap());
-            assert_boxed_signed(volatile_dependencies::store_in_package(
-                &mut package,
-                &value(),
-                VolatileDependenciesConformance::Transitional,
-            ));
-            assert_eq!(publish(&package), original, "{name}");
+            let package = adopt(&original);
+            let mut edit = package.edit_volatile_dependencies().unwrap();
+            assert!(!edit.remove().unwrap());
+            assert_signed(edit.set(&value(), VolatileDependenciesConformance::Transitional));
+            assert_eq!(
+                bytes(&edit.commit().unwrap().into_package()),
+                original,
+                "{name}"
+            );
 
-            package.unsign();
-            volatile_dependencies::store_in_package(
-                &mut package,
-                &value(),
-                VolatileDependenciesConformance::Transitional,
-            )
-            .unwrap();
-            let output = publish(&package);
+            let output = bytes(&store(&package.unsign().unwrap()));
             assert!(!carries_signature(&output), "{name}");
             assert_eq!(
                 volatile_dependencies::load_from_package(&open(&output)).unwrap(),
@@ -560,97 +520,116 @@ mod volatile_dependencies_family {
             );
         }
 
-        let mut plain = unsigned_fixture(SIGNED[0]);
-        volatile_dependencies::store_in_package(
-            &mut plain,
-            &value(),
-            VolatileDependenciesConformance::Transitional,
-        )
-        .unwrap();
-        let signed = sign(&plain);
-        let mut package = open(&signed);
-        assert_boxed_signed(volatile_dependencies::remove_from_package(&mut package));
-        assert_eq!(publish(&package), signed);
-        package.unsign();
-        assert!(volatile_dependencies::remove_from_package(&mut package).unwrap());
-        assert!(!carries_signature(&publish(&package)));
+        let plain = store(&unsigned_package(SIGNED[0]));
+        let signed = sign_package(&plain);
+        let package = adopt(&signed);
+        let mut edit = package.edit_volatile_dependencies().unwrap();
+        assert_signed(edit.remove());
+        assert_eq!(bytes(&edit.commit().unwrap().into_package()), signed);
+        let mut edit = package
+            .unsign()
+            .unwrap()
+            .edit_volatile_dependencies()
+            .unwrap();
+        assert!(edit.remove().unwrap());
+        assert!(!carries_signature(&bytes(
+            &edit.commit().unwrap().into_package()
+        )));
     }
 }
 
 mod comments_family {
     use super::*;
-    use litchi_xlsx::workbook::comments::{
-        self, Comments, Transaction, load_from_worksheet, remove_from_worksheet, store_on_worksheet,
-    };
+    use litchi_xlsx::workbook::comments::{self, Comment, Comments};
 
-    fn note(package: &OpcPackage, worksheet: &PackURI, text: &str) -> Comments {
-        let mut staged = package.clone();
-        let mut transaction = Transaction::new(&mut staged, worksheet).unwrap();
-        transaction.set("B2", "Reviewer", text).unwrap();
-        transaction.comments().unwrap().clone()
+    fn note(text: &str) -> Comments {
+        let mut value = Comments {
+            authors: vec!["Reviewer".into()],
+            ..Comments::default()
+        };
+        value.comments.insert(
+            "B2".into(),
+            Comment {
+                cell_ref: "B2".into(),
+                author: "Reviewer".into(),
+                author_id: 0,
+                text: text.into(),
+                guid: None,
+                shape_id: None,
+                runs: Vec::new(),
+            },
+        );
+        value
+    }
+
+    fn store(package: &Package, value: &Comments) -> Package {
+        let mut edit = package.edit_comments().unwrap();
+        assert!(edit.replace(0, Some(value.clone())).unwrap());
+        edit.commit().unwrap().into_package()
     }
 
     #[test]
     fn a_signed_package_refuses_changes_and_keeps_exact_noops() {
         for name in SIGNED {
             let original = signed_fixture(name);
-            let mut package = open(&original);
-            let worksheet = first_worksheet(&package);
-            let value = note(&package, &worksheet, "Checked");
+            let package = adopt(&original);
+            let value = note("Checked");
 
-            assert!(!remove_from_worksheet(&mut package, &worksheet).unwrap());
-            let commit = Transaction::new(&mut package, &worksheet)
-                .unwrap()
-                .commit()
-                .unwrap();
-            assert!(!commit.changed());
-            assert_eq!(publish(&package), original, "{name}: exact no-ops");
+            let mut edit = package.edit_comments().unwrap();
+            assert!(!edit.clear(0).unwrap());
+            let commit = edit.commit().unwrap();
+            assert!(!commit.diagnostics().changed());
+            assert_eq!(bytes(commit.package()), original, "{name}: exact no-ops");
 
-            assert_signed(store_on_worksheet(&mut package, &worksheet, &value));
-            let mut transaction = Transaction::new(&mut package, &worksheet).unwrap();
-            assert!(transaction.set("C3", "Reviewer", "Staged").unwrap());
-            assert_signed(transaction.commit());
-            assert_eq!(publish(&package), original, "{name}: refusals");
+            let mut edit = package.edit_comments().unwrap();
+            assert_signed(edit.replace(0, Some(value.clone())));
+            assert_signed(edit.set(0, "C3", "Reviewer", "Staged"));
+            assert_eq!(
+                bytes(&edit.commit().unwrap().into_package()),
+                original,
+                "{name}: refusals"
+            );
 
-            package.unsign();
-            store_on_worksheet(&mut package, &worksheet, &value).unwrap();
-            let output = publish(&package);
+            let output = bytes(&store(&package.unsign().unwrap(), &value));
             assert!(!carries_signature(&output), "{name}");
             assert_eq!(
-                load_from_worksheet(&open(&output), &worksheet)
-                    .unwrap()
-                    .unwrap()
-                    .comments,
-                value
+                adopt(&output).edit_comments().unwrap().comments(0).unwrap(),
+                Some(value)
             );
         }
     }
 
     #[test]
     fn a_signed_package_refuses_a_removal_and_a_patch() {
-        let mut plain = unsigned_fixture(SIGNED[1]);
-        let worksheet = first_worksheet(&plain);
-        let value = note(&plain, &worksheet, "Signed note");
-        store_on_worksheet(&mut plain, &worksheet, &value).unwrap();
-        let signed = sign(&plain);
-        let mut package = open(&signed);
+        let plain = store(&unsigned_package(SIGNED[1]), &note("Signed note"));
+        let signed = sign_package(&plain);
+        let package = adopt(&signed);
 
-        assert_signed(remove_from_worksheet(&mut package, &worksheet));
+        let mut edit = package.edit_comments().unwrap();
+        assert_signed(edit.clear(0));
         let patch = {
-            let mut transaction = Transaction::new(&mut plain, &worksheet).unwrap();
-            assert!(transaction.clear());
-            transaction.commit().unwrap().patch().clone()
+            let mut edit = plain.edit_comments().unwrap();
+            assert!(edit.clear(0).unwrap());
+            edit.commit().unwrap().patch().clone()
         };
-        assert_signed(patch.apply(&mut package));
-        assert_eq!(publish(&package), signed);
-        comments::validate_graph(&package).unwrap();
+        assert_signed(package.apply_comments(&patch));
+        assert_eq!(bytes(&package), signed);
+        comments::validate_graph(&open(&signed)).unwrap();
 
-        package.unsign();
-        patch.apply(&mut package).unwrap();
-        let output = publish(&package);
+        let output = bytes(
+            package
+                .unsign()
+                .unwrap()
+                .apply_comments(&patch)
+                .unwrap()
+                .package(),
+        );
         assert!(!carries_signature(&output));
         assert!(
-            load_from_worksheet(&open(&output), &worksheet)
+            adopt(&output)
+                .edit_comments()
+                .unwrap()
+                .comments(0)
                 .unwrap()
                 .is_none()
         );
@@ -660,8 +639,7 @@ mod comments_family {
 mod revisions_family {
     use super::*;
     use litchi_xlsx::revisions::{
-        RevisionConformance, RevisionUser, Transaction, load_workbook_revisions,
-        remove_workbook_revisions, store_workbook_revisions,
+        EditOptions, RevisionConformance, RevisionUser, load_workbook_revisions,
     };
 
     const TRACKED: &str =
@@ -679,32 +657,39 @@ mod revisions_family {
 
     #[test]
     fn a_signed_fixture_refuses_a_store_and_keeps_exact_noops() {
-        let mut value = load_workbook_revisions(&open(&read(TRACKED)))
-            .unwrap()
-            .expect("tracked revisions");
+        let mut value =
+            load_workbook_revisions(&open(&read(TRACKED)), &litchi_opc::SourceLimits::default())
+                .unwrap()
+                .expect("tracked revisions");
         value.users_relationship_id = "rIdRevisionUsers".into();
         value.headers_relationship_id = "rIdRevisionHeaders".into();
+        let options = EditOptions::default().conformance(RevisionConformance::Transitional);
         for name in SIGNED {
             let original = signed_fixture(name);
-            let mut package = open(&original);
-            assert!(!remove_workbook_revisions(&mut package).unwrap());
-            let commit = Transaction::new(&mut package).unwrap().commit().unwrap();
-            assert!(!commit.changed());
-            assert_eq!(publish(&package), original, "{name}: exact no-ops");
+            let package = adopt(&original);
+            let mut edit = package.edit_revisions().unwrap();
+            assert!(!edit.replace(None).unwrap());
+            let commit = edit.commit().unwrap();
+            assert!(!commit.diagnostics().changed());
+            assert_eq!(bytes(commit.package()), original, "{name}: exact no-ops");
 
-            assert_signed(store_workbook_revisions(
-                &mut package,
-                &value,
-                RevisionConformance::Transitional,
-            ));
-            assert_eq!(publish(&package), original, "{name}: refused store");
+            let mut edit = package.edit_revisions_with_options(options).unwrap();
+            assert!(edit.replace(Some(value.clone())).unwrap());
+            assert_signed(edit.commit());
+            assert_eq!(bytes(&package), original, "{name}: refused store");
 
-            package.unsign();
-            store_workbook_revisions(&mut package, &value, RevisionConformance::Transitional)
+            let mut edit = package
+                .unsign()
+                .unwrap()
+                .edit_revisions_with_options(options)
                 .unwrap();
-            let output = publish(&package);
+            assert!(edit.replace(Some(value.clone())).unwrap());
+            let output = bytes(&edit.commit().unwrap().into_package());
             assert!(!carries_signature(&output), "{name}");
-            let stored = load_workbook_revisions(&open(&output)).unwrap().unwrap();
+            let stored =
+                load_workbook_revisions(&open(&output), &litchi_opc::SourceLimits::default())
+                    .unwrap()
+                    .unwrap();
             assert_eq!(stored.headers, value.headers, "{name}");
             assert_eq!(stored.logs.len(), value.logs.len(), "{name}");
         }
@@ -712,31 +697,38 @@ mod revisions_family {
 
     #[test]
     fn a_signed_package_refuses_edits_removal_and_patches() {
-        let mut plain = open(&read(TRACKED));
-        let signed = sign(&plain);
-        let mut package = open(&signed);
+        let plain = adopt(&read(TRACKED));
+        let signed = sign(&open(&read(TRACKED)));
+        let package = adopt(&signed);
 
-        let commit = Transaction::new(&mut package).unwrap().commit().unwrap();
-        assert!(!commit.changed());
-        assert_eq!(publish(&package), signed, "an exact no-op");
+        let commit = package.edit_revisions().unwrap().commit().unwrap();
+        assert!(!commit.diagnostics().changed());
+        assert_eq!(bytes(commit.package()), signed, "an exact no-op");
 
-        let mut transaction = Transaction::new(&mut package).unwrap();
-        assert!(transaction.set_user(user("Alice")).unwrap());
-        assert_signed(transaction.commit());
-        assert_signed(remove_workbook_revisions(&mut package));
+        let mut edit = package.edit_revisions().unwrap();
+        assert!(edit.set_user(user("Alice")).unwrap());
+        assert_signed(edit.commit());
+        let mut edit = package.edit_revisions().unwrap();
+        assert!(edit.replace(None).unwrap());
+        assert_signed(edit.commit());
         let patch = {
-            let mut transaction = Transaction::new(&mut plain).unwrap();
-            assert!(transaction.set_user(user("Patched")).unwrap());
-            transaction.commit().unwrap().patch().clone()
+            let mut edit = plain.edit_revisions().unwrap();
+            assert!(edit.set_user(user("Patched")).unwrap());
+            edit.commit().unwrap().patch().clone()
         };
-        assert_signed(patch.apply(&mut package));
-        assert_eq!(publish(&package), signed, "refused changes");
+        assert_signed(package.apply_revisions(&patch));
+        assert_eq!(bytes(&package), signed, "refused changes");
 
-        package.unsign();
-        patch.apply(&mut package).unwrap();
-        let output = publish(&package);
+        let output = bytes(
+            package
+                .unsign()
+                .unwrap()
+                .apply_revisions(&patch)
+                .unwrap()
+                .package(),
+        );
         assert!(!carries_signature(&output));
-        let users = load_workbook_revisions(&open(&output))
+        let users = load_workbook_revisions(&open(&output), &litchi_opc::SourceLimits::default())
             .unwrap()
             .unwrap()
             .users
@@ -747,10 +739,7 @@ mod revisions_family {
 
 mod named_sheet_view_family {
     use super::*;
-    use litchi_xlsx::named_sheet_view::{
-        Guid, View, Views, load_worksheet_named_sheet_views, remove_worksheet_named_sheet_views,
-        store_worksheet_named_sheet_views,
-    };
+    use litchi_xlsx::named_sheet_view::{Guid, View, Views};
 
     fn views(name: &str) -> Views {
         Views::new(
@@ -762,55 +751,60 @@ mod named_sheet_view_family {
         )
     }
 
+    fn store(package: &Package, value: &Views) -> Package {
+        let mut edit = package.edit_named_sheet_views(0_usize).unwrap();
+        edit.set(value).unwrap();
+        edit.commit().unwrap().into_package()
+    }
+
     #[test]
     fn a_signed_package_refuses_changes_and_keeps_exact_noops() {
         for name in SIGNED {
             let original = signed_fixture(name);
-            let mut package = open(&original);
-            let worksheet = first_worksheet(&package);
-            assert!(!remove_worksheet_named_sheet_views(&mut package, &worksheet).unwrap());
-            assert_signed(store_worksheet_named_sheet_views(
-                &mut package,
-                &worksheet,
-                &views("Data"),
-            ));
-            assert_eq!(publish(&package), original, "{name}");
+            let package = adopt(&original);
+            let mut edit = package.edit_named_sheet_views(0_usize).unwrap();
+            assert!(!edit.remove().unwrap());
+            assert_signed(edit.set(&views("Data")));
+            assert_eq!(
+                bytes(&edit.commit().unwrap().into_package()),
+                original,
+                "{name}"
+            );
 
-            package.unsign();
-            store_worksheet_named_sheet_views(&mut package, &worksheet, &views("Data")).unwrap();
-            let output = publish(&package);
+            let output = bytes(&store(&package.unsign().unwrap(), &views("Data")));
             assert!(!carries_signature(&output), "{name}");
             assert!(
-                load_worksheet_named_sheet_views(&open(&output), &worksheet)
+                adopt(&output)
+                    .edit_named_sheet_views(0_usize)
+                    .unwrap()
+                    .views()
                     .unwrap()
                     .is_some()
             );
         }
 
-        let mut plain = unsigned_fixture(SIGNED[1]);
-        let worksheet = first_worksheet(&plain);
-        store_worksheet_named_sheet_views(&mut plain, &worksheet, &views("Data")).unwrap();
-        let signed = sign(&plain);
-        let mut package = open(&signed);
-        assert_signed(store_worksheet_named_sheet_views(
-            &mut package,
-            &worksheet,
-            &views("Renamed"),
-        ));
-        assert_signed(remove_worksheet_named_sheet_views(&mut package, &worksheet));
-        assert_eq!(publish(&package), signed);
-        package.unsign();
-        assert!(remove_worksheet_named_sheet_views(&mut package, &worksheet).unwrap());
-        assert!(!carries_signature(&publish(&package)));
+        let plain = store(&unsigned_package(SIGNED[1]), &views("Data"));
+        let signed = sign_package(&plain);
+        let package = adopt(&signed);
+        let mut edit = package.edit_named_sheet_views(0_usize).unwrap();
+        assert_signed(edit.set(&views("Renamed")));
+        assert_signed(edit.remove());
+        assert_eq!(bytes(&edit.commit().unwrap().into_package()), signed);
+        let mut edit = package
+            .unsign()
+            .unwrap()
+            .edit_named_sheet_views(0_usize)
+            .unwrap();
+        assert!(edit.remove().unwrap());
+        assert!(!carries_signature(&bytes(
+            &edit.commit().unwrap().into_package()
+        )));
     }
 }
 
 mod active_x_family {
     use super::*;
-    use litchi_xlsx::{
-        Binary, Control, ControlSet, Descriptor, LoadedControl, Persistence, load_from_worksheet,
-        remove_from_worksheet, replace_on_worksheet, store_on_worksheet,
-    };
+    use litchi_xlsx::{Binary, Control, ControlSet, Descriptor, LoadedControl, Persistence};
 
     fn controls(name: &str) -> ControlSet {
         ControlSet {
@@ -839,50 +833,51 @@ mod active_x_family {
         }
     }
 
+    fn store(package: &Package, value: &ControlSet) -> Package {
+        let mut edit = package.edit_active_x(0_usize).unwrap();
+        edit.set(value).unwrap();
+        edit.commit().unwrap().into_package()
+    }
+
     #[test]
     fn a_signed_package_refuses_changes_and_keeps_exact_noops() {
         for name in SIGNED {
             let original = signed_fixture(name);
-            let mut package = open(&original);
-            let worksheet = first_worksheet(&package);
-            assert!(!remove_from_worksheet(&mut package, &worksheet).unwrap());
-            assert_signed(store_on_worksheet(
-                &mut package,
-                &worksheet,
-                &controls("Button"),
-            ));
-            assert_signed(replace_on_worksheet(
-                &mut package,
-                &worksheet,
-                &controls("Button"),
-            ));
-            assert_eq!(publish(&package), original, "{name}");
+            let package = adopt(&original);
+            let mut edit = package.edit_active_x(0_usize).unwrap();
+            assert!(!edit.remove().unwrap());
+            assert_signed(edit.set(&controls("Button")));
+            assert_signed(edit.replace(&controls("Button")));
+            assert_eq!(
+                bytes(&edit.commit().unwrap().into_package()),
+                original,
+                "{name}"
+            );
 
-            package.unsign();
-            store_on_worksheet(&mut package, &worksheet, &controls("Button")).unwrap();
-            let output = publish(&package);
+            let output = bytes(&store(&package.unsign().unwrap(), &controls("Button")));
             assert!(!carries_signature(&output), "{name}");
             assert_eq!(
-                load_from_worksheet(&open(&output), &worksheet).unwrap(),
+                adopt(&output)
+                    .edit_active_x(0_usize)
+                    .unwrap()
+                    .controls()
+                    .unwrap(),
                 controls("Button")
             );
         }
 
-        let mut plain = unsigned_fixture(SIGNED[0]);
-        let worksheet = first_worksheet(&plain);
-        store_on_worksheet(&mut plain, &worksheet, &controls("Button")).unwrap();
-        let signed = sign(&plain);
-        let mut package = open(&signed);
-        assert_signed(remove_from_worksheet(&mut package, &worksheet));
-        assert_signed(replace_on_worksheet(
-            &mut package,
-            &worksheet,
-            &controls("Renamed"),
-        ));
-        assert_eq!(publish(&package), signed);
-        package.unsign();
-        assert!(remove_from_worksheet(&mut package, &worksheet).unwrap());
-        assert!(!carries_signature(&publish(&package)));
+        let plain = store(&unsigned_package(SIGNED[0]), &controls("Button"));
+        let signed = sign_package(&plain);
+        let package = adopt(&signed);
+        let mut edit = package.edit_active_x(0_usize).unwrap();
+        assert_signed(edit.remove());
+        assert_signed(edit.replace(&controls("Renamed")));
+        assert_eq!(bytes(&edit.commit().unwrap().into_package()), signed);
+        let mut edit = package.unsign().unwrap().edit_active_x(0_usize).unwrap();
+        assert!(edit.remove().unwrap());
+        assert!(!carries_signature(&bytes(
+            &edit.commit().unwrap().into_package()
+        )));
     }
 }
 
@@ -907,14 +902,14 @@ mod smart_tags_family {
             assert!(!transaction.clear().unwrap());
             transaction.replace(Collection::default()).unwrap();
             assert_signed(transaction.set(cell()));
-            transaction.commit().unwrap();
+            package = transaction.commit().unwrap().into_package();
             assert_eq!(package.to_bytes().unwrap(), original, "{name}");
 
-            package.unsign().unwrap();
+            package = package.unsign().unwrap();
             assert!(!package.is_signed());
             let mut transaction = package.edit_smart_tags(0_usize).unwrap();
             transaction.set(cell()).unwrap();
-            transaction.commit().unwrap();
+            package = transaction.commit().unwrap().into_package();
             let output = package.to_bytes().unwrap();
             assert!(!carries_signature(&output), "{name}");
             let reopened = Package::from_bytes(&output).unwrap();
@@ -922,16 +917,16 @@ mod smart_tags_family {
         }
 
         let mut plain = Package::from_bytes(&signed_fixture(SIGNED[1])).unwrap();
-        plain.unsign().unwrap();
+        plain = plain.unsign().unwrap();
         let mut transaction = plain.edit_smart_tags(0_usize).unwrap();
         transaction.set(cell()).unwrap();
-        transaction.commit().unwrap();
+        plain = transaction.commit().unwrap().into_package();
         let signed = sign(&open(&plain.to_bytes().unwrap()));
         let mut package = Package::from_bytes(&signed).unwrap();
         let mut transaction = package.edit_smart_tags(0_usize).unwrap();
         assert_signed(transaction.remove("A1"));
         assert_signed(transaction.clear());
-        transaction.commit().unwrap();
+        package = transaction.commit().unwrap().into_package();
         assert_eq!(package.to_bytes().unwrap(), signed);
     }
 }
@@ -1006,29 +1001,29 @@ mod slicer_and_timeline_family {
             // A worksheet without slicers has nothing to reorder.
             assert!(slicers.reorder_views(&worksheet, &[]).unwrap().is_empty());
             assert_signed(slicers.add_cache(slicer_cache("Cache_A")));
-            slicers.commit().unwrap();
+            package = slicers.commit().unwrap().into_package();
 
             let mut timelines = package.edit_timelines().unwrap();
             assert!(!timelines.remove_cache("Absent").unwrap());
             assert!(!timelines.remove_view(&worksheet, "Absent").unwrap());
             assert!(timelines.reorder_views(&worksheet, &[]).unwrap().is_empty());
             assert_signed(timelines.add_cache(timeline_cache("Timeline_A")));
-            timelines.commit().unwrap();
+            package = timelines.commit().unwrap().into_package();
             assert_eq!(package.to_bytes().unwrap(), original, "{name}");
 
-            package.unsign().unwrap();
+            package = package.unsign().unwrap();
             let mut slicers = package.edit_slicers().unwrap();
             slicers.add_cache(slicer_cache("Cache_A")).unwrap();
             slicers
                 .add_view(&worksheet, Slicer::new("View", "Cache_A", 228_600))
                 .unwrap();
-            slicers.commit().unwrap();
+            package = slicers.commit().unwrap().into_package();
             let mut timelines = package.edit_timelines().unwrap();
             timelines.add_cache(timeline_cache("Timeline_A")).unwrap();
             timelines
                 .add_view(&worksheet, timeline_view("Timeline", "Timeline_A"))
                 .unwrap();
-            timelines.commit().unwrap();
+            package = timelines.commit().unwrap().into_package();
             let output = package.to_bytes().unwrap();
             assert!(!carries_signature(&output), "{name}");
             let reopened = open(&output);
@@ -1044,7 +1039,7 @@ mod slicer_and_timeline_family {
     #[test]
     fn a_signed_workbook_with_slicers_and_timelines_refuses_their_changes() {
         let mut plain = Package::from_bytes(&signed_fixture(SIGNED[0])).unwrap();
-        plain.unsign().unwrap();
+        plain = plain.unsign().unwrap();
         let worksheet = first_worksheet(&open(&plain.to_bytes().unwrap()));
         let mut slicers = plain.edit_slicers().unwrap();
         slicers.add_cache(slicer_cache("Cache_A")).unwrap();
@@ -1055,13 +1050,13 @@ mod slicer_and_timeline_family {
         slicers
             .add_view(&worksheet, Slicer::new("View_B", "Cache_B", 228_600))
             .unwrap();
-        slicers.commit().unwrap();
+        plain = slicers.commit().unwrap().into_package();
         let mut timelines = plain.edit_timelines().unwrap();
         timelines.add_cache(timeline_cache("Timeline_A")).unwrap();
         timelines
             .add_view(&worksheet, timeline_view("Timeline", "Timeline_A"))
             .unwrap();
-        timelines.commit().unwrap();
+        plain = timelines.commit().unwrap().into_package();
         let signed = sign(&open(&plain.to_bytes().unwrap()));
         let mut package = Package::from_bytes(&signed).unwrap();
 
@@ -1082,7 +1077,7 @@ mod slicer_and_timeline_family {
             cache.source_name = "City".into();
         }));
         assert_signed(slicers.add_view(&worksheet, Slicer::new("View_C", "Cache_A", 228_600)));
-        slicers.commit().unwrap();
+        package = slicers.commit().unwrap().into_package();
 
         let mut timelines = package.edit_timelines().unwrap();
         let order = [String::from("Timeline")];
@@ -1101,16 +1096,16 @@ mod slicer_and_timeline_family {
         assert_signed(timelines.update_cache("Timeline_A", |cache| {
             cache.source_name = "Shipped".into();
         }));
-        timelines.commit().unwrap();
+        package = timelines.commit().unwrap().into_package();
         assert_eq!(package.to_bytes().unwrap(), signed);
 
-        package.unsign().unwrap();
+        package = package.unsign().unwrap();
         let mut slicers = package.edit_slicers().unwrap();
         assert!(slicers.remove_view(&worksheet, "View_B").unwrap());
-        slicers.commit().unwrap();
+        package = slicers.commit().unwrap().into_package();
         let mut timelines = package.edit_timelines().unwrap();
         assert!(timelines.remove_view(&worksheet, "Timeline").unwrap());
-        timelines.commit().unwrap();
+        package = timelines.commit().unwrap().into_package();
         assert!(!carries_signature(&package.to_bytes().unwrap()));
     }
 }
@@ -1119,16 +1114,18 @@ mod slicer_and_timeline_family {
 fn package_unsign_is_explicit_and_leaves_an_unsigned_package_untouched() {
     for name in SIGNED {
         let original = signed_fixture(name);
-        let mut package = litchi_xlsx::Package::from_bytes(&original).unwrap();
+        let package = Package::from_bytes(&original).unwrap();
         assert!(package.is_signed());
         assert_eq!(package.to_bytes().unwrap(), original);
-        package.unsign().unwrap();
-        assert!(!package.is_signed());
-        let output = package.to_bytes().unwrap();
+        let stripped = package.unsign().unwrap();
+        assert!(!stripped.is_signed());
+        // The source package keeps its signature.
+        assert!(package.is_signed());
+        assert_eq!(package.to_bytes().unwrap(), original);
+        let output = stripped.to_bytes().unwrap();
         assert!(!carries_signature(&output), "{name}");
 
-        let mut unsigned = litchi_xlsx::Package::from_bytes(&output).unwrap();
-        unsigned.unsign().unwrap();
+        let unsigned = Package::from_bytes(&output).unwrap().unsign().unwrap();
         assert_eq!(unsigned.to_bytes().unwrap(), output, "{name}");
     }
 }
@@ -1147,24 +1144,42 @@ mod shared_owners {
         props
     }
 
+    /// Stage `props` as the package's custom properties (empty removes them)
+    /// through the metadata family and commit.
+    fn set_custom_props(
+        package: &Package,
+        props: Props,
+    ) -> Result<Package, litchi_xlsx::metadata::Error> {
+        let mut edit = package.edit_metadata()?;
+        edit.set_custom_props(props);
+        Ok(edit.commit()?.into_package())
+    }
+
+    #[track_caller]
+    fn assert_metadata_signed<T: std::fmt::Debug>(result: Result<T, litchi_xlsx::metadata::Error>) {
+        let error = result.expect_err("a change to a signed package must be refused");
+        assert!(
+            matches!(error, litchi_xlsx::metadata::Error::Signed),
+            "{error:?}"
+        );
+    }
+
     #[test]
     fn custom_properties_refuse_a_signed_fixture_and_keep_exact_noops() {
         for name in SIGNED {
             let original = signed_fixture(name);
-            let mut package = litchi_xlsx::Package::from_bytes(&original).unwrap();
-            package.remove_custom_props().unwrap();
-            package.put_custom_props(Props::new()).unwrap();
+            let package = Package::from_bytes(&original).unwrap();
+            let package = set_custom_props(&package, Props::new()).unwrap();
             assert_eq!(package.to_bytes().unwrap(), original, "{name}: no-ops");
 
-            assert_signed(package.put_custom_props(props()));
+            assert_metadata_signed(set_custom_props(&package, props()));
             assert!(package.is_signed());
             assert_eq!(package.to_bytes().unwrap(), original, "{name}: refusal");
 
-            package.unsign().unwrap();
-            package.put_custom_props(props()).unwrap();
+            let package = set_custom_props(&package.unsign().unwrap(), props()).unwrap();
             let output = package.to_bytes().unwrap();
             assert!(!carries_signature(&output), "{name}");
-            let reopened = litchi_xlsx::Package::from_bytes(&output).unwrap();
+            let reopened = Package::from_bytes(&output).unwrap();
             assert!(reopened.custom_props().unwrap().get("Project").is_some());
         }
     }
@@ -1174,15 +1189,14 @@ mod shared_owners {
         let mut plain = unsigned_fixture(SIGNED[0]);
         props().write_for(&mut plain, Host::Excel).unwrap();
         let signed = sign(&plain);
-        let mut package = litchi_xlsx::Package::from_bytes(&signed).unwrap();
+        let package = Package::from_bytes(&signed).unwrap();
 
-        package.put_custom_props(props()).unwrap();
+        let package = set_custom_props(&package, props()).unwrap();
         assert_eq!(package.to_bytes().unwrap(), signed, "an equal store");
-        assert_signed(package.remove_custom_props());
+        assert_metadata_signed(set_custom_props(&package, Props::new()));
         assert_eq!(package.to_bytes().unwrap(), signed, "the refusal");
 
-        package.unsign().unwrap();
-        package.remove_custom_props().unwrap();
+        let package = set_custom_props(&package.unsign().unwrap(), Props::new()).unwrap();
         assert!(package.custom_props().unwrap().is_empty());
     }
 
@@ -1190,7 +1204,6 @@ mod shared_owners {
     #[test]
     fn vba_projects_refuse_a_signed_package() {
         use litchi_vba::{Limits, build};
-        use litchi_xlsx::active_x::vba;
 
         let payload = || {
             build::Project::new("ExcelProject")
@@ -1201,29 +1214,38 @@ mod shared_owners {
                 .finish(&Limits::default())
                 .unwrap()
         };
+        let store = |package: &Package| {
+            let mut edit = package.edit_vba().unwrap();
+            edit.store(payload()).unwrap();
+            edit.commit().unwrap().into_package()
+        };
         for name in SIGNED {
             let original = signed_fixture(name);
-            let mut package = open(&original);
-            let workbook = package.main_document_part().unwrap().partname().clone();
-            assert!(!vba::remove(&mut package, &workbook).unwrap());
-            assert_eq!(publish(&package), original, "{name}: no-op");
+            let package = adopt(&original);
+            let mut edit = package.edit_vba().unwrap();
+            assert!(!edit.remove().unwrap());
+            assert_signed(edit.store(payload()));
+            assert_eq!(
+                bytes(&edit.commit().unwrap().into_package()),
+                original,
+                "{name}: no-op and refusal"
+            );
 
-            assert_signed(vba::store(&mut package, &workbook, payload()));
-            assert_eq!(publish(&package), original, "{name}: refusal");
-
-            package.unsign();
-            vba::store(&mut package, &workbook, payload()).unwrap();
-            assert!(!carries_signature(&publish(&package)), "{name}");
+            let output = bytes(&store(&package.unsign().unwrap()));
+            assert!(!carries_signature(&output), "{name}");
         }
 
-        let mut plain = unsigned_fixture(SIGNED[0]);
-        let workbook = plain.main_document_part().unwrap().partname().clone();
-        vba::store(&mut plain, &workbook, payload()).unwrap();
-        let signed = sign(&plain);
-        let mut package = open(&signed);
-        assert_signed(vba::remove(&mut package, &workbook));
-        assert_eq!(publish(&package), signed, "the refusal");
-        package.unsign();
-        assert!(vba::remove(&mut package, &workbook).unwrap());
+        let plain = store(&unsigned_package(SIGNED[0]));
+        let signed = sign_package(&plain);
+        let package = adopt(&signed);
+        let mut edit = package.edit_vba().unwrap();
+        assert_signed(edit.remove());
+        assert_eq!(
+            bytes(&edit.commit().unwrap().into_package()),
+            signed,
+            "the refusal"
+        );
+        let mut edit = package.unsign().unwrap().edit_vba().unwrap();
+        assert!(edit.remove().unwrap());
     }
 }

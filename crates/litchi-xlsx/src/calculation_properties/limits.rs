@@ -4,6 +4,34 @@ use crate::error::{Result, invalid};
 
 const DEFAULT_BYTES: usize = 32 * 1024 * 1024;
 
+/// A bounded dimension of the calculation-metadata family, configured by its
+/// [`Limits`] budget.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum LimitKind {
+    /// Bytes of the raw workbook part ([`Limits::max_raw_bytes`]).
+    RawBytes,
+    /// Bytes after markup-compatibility preprocessing
+    /// ([`Limits::max_mce_bytes`]).
+    MceBytes,
+    /// Bytes of the rewritten workbook part ([`Limits::max_output_bytes`]).
+    OutputBytes,
+    /// Element depth ([`Limits::max_depth`]).
+    Depth,
+    /// XML events ([`Limits::max_events`]).
+    Events,
+    /// Attributes of one element ([`Limits::max_attributes`]).
+    Attributes,
+    /// Calculation features ([`Limits::max_features`]).
+    Features,
+    /// Bytes of one feature name ([`Limits::max_feature_name_bytes`]).
+    FeatureNameBytes,
+    /// Bytes of every feature name ([`Limits::max_feature_names_bytes`]).
+    FeatureNamesBytes,
+    /// Bytes of opaque extension content ([`Limits::max_opaque_bytes`]).
+    OpaqueBytes,
+}
+
 /// Resource limits for reading, processing, retaining, and writing calculation metadata.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Limits {

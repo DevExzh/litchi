@@ -9,27 +9,9 @@ pub fn load_caches(package: &OpcPackage, workbook: &PackURI) -> Result<Vec<Cache
     crate::timelines::load_timeline_caches(package, workbook)
 }
 
-/// Store a complete workbook timeline-cache set atomically at the part layer.
-///
-/// A signed package is refused with [`crate::Error::Signed`] before anything
-/// is changed: remove the signature explicitly first
-/// ([`OpcPackage::unsign`]).
-pub fn store_caches(package: &mut OpcPackage, workbook: &PackURI, caches: &[Cache]) -> Result<()> {
-    crate::timelines::store_timeline_caches(package, workbook, caches)
-}
-
 /// Load and validate every worksheet timelines part.
 pub fn load_parts(package: &OpcPackage, workbook: &PackURI) -> Result<Vec<Part>> {
     crate::timelines::load_timelines(package, workbook)
-}
-
-/// Store one worksheet-owned timelines part and its relationship.
-///
-/// A signed package is refused with [`crate::Error::Signed`] before anything
-/// is changed: remove the signature explicitly first
-/// ([`OpcPackage::unsign`]).
-pub fn store_part(package: &mut OpcPackage, workbook: &PackURI, value: &Part) -> Result<()> {
-    crate::timelines::store_worksheet_timelines(package, workbook, value)
 }
 
 /// Validate every timeline cache/view edge and orphan rule.

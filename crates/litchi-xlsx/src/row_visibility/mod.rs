@@ -29,8 +29,7 @@
 mod patch;
 pub(crate) mod rewrite;
 mod snapshot;
-mod source;
+pub mod source;
 
-pub use patch::{Commit, Diagnostics, Patch};
 pub use snapshot::Snapshot;
-pub use source::{MAX_BATCH_EDITS, RowVisibilityEdit, SourceBackedEditor, SourceEdit};
+pub use source::{Change, MAX_BATCH_EDITS};

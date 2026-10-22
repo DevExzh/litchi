@@ -9,8 +9,8 @@ use super::super::validation::{
     validate_arrays, validate_bags, validate_data, validate_rich_value_rels, validate_structures,
 };
 use super::super::{
-    FEATURE_BAG, MAX_OUTPUT_BYTES, RELATIONSHIPS, RICH_DATA, RICH_DATA_2, RICH_VALUE_REL,
-    SPREADSHEETML, invalid, limit,
+    FEATURE_BAG, LimitKind, MAX_OUTPUT_BYTES, RELATIONSHIPS, RICH_DATA, RICH_DATA_2,
+    RICH_VALUE_REL, SPREADSHEETML, invalid, limit,
 };
 use super::xml::{attr, escape_attr, escape_text};
 use crate::error::Result;
@@ -349,7 +349,11 @@ fn write_opaque_children(output: &mut Vec<u8>, values: &[super::super::model::Op
 
 fn finish(output: Vec<u8>) -> Result<Vec<u8>> {
     if output.len() > MAX_OUTPUT_BYTES {
-        return Err(limit("serialized XML"));
+        return Err(limit(
+            LimitKind::OutputBytes,
+            output.len(),
+            MAX_OUTPUT_BYTES,
+        ));
     }
     Ok(output)
 }

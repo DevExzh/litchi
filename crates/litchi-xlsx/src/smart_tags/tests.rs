@@ -110,7 +110,7 @@ fn package_transaction_is_semantic_atomic_and_ergonomic() {
     {
         let mut edit = package.edit_smart_tags(0usize).unwrap();
         edit.replace(sample()).unwrap();
-        edit.commit().unwrap();
+        package = edit.commit().unwrap().into_package();
     }
     let value = package.smart_tags("sheet1").unwrap().unwrap();
     assert_eq!(value, sample());
@@ -127,7 +127,7 @@ fn package_transaction_is_semantic_atomic_and_ergonomic() {
 
     let mut edit = package.edit_smart_tags("Sheet1").unwrap();
     assert!(edit.remove("A1").unwrap().is_some());
-    edit.commit().unwrap();
+    package = edit.commit().unwrap().into_package();
     assert!(
         package
             .smart_tags("Sheet1")

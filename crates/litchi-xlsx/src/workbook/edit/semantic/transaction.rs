@@ -54,7 +54,7 @@ use super::super::{codec, package};
 
 use self::snapshot::Snapshot;
 use super::super::svg::{PictureSelector, SvgInput};
-use super::worksheet::{NewSheet, TabEdit, WorksheetEdit};
+use super::worksheet::{NewSheet, Sheet, Tab};
 
 const MAX_SVG_INPUT_BYTES: usize = 32 * 1024 * 1024;
 
@@ -344,7 +344,6 @@ pub struct Edit {
 
 impl Edit {
     pub(crate) fn new(base: Workbook) -> Result<Self> {
-        codec::ensure_unsigned(&base)?;
         Ok(Self {
             base,
             panes: None,
@@ -561,7 +560,7 @@ impl Edit {
         let input_limit = svg_plan::payload_limit(&self.base).min(MAX_SVG_INPUT_BYTES);
         if bytes.len() > input_limit {
             return Err(Error::Limit {
-                kind: super::super::LimitKind::SvgInputBytes,
+                kind: super::super::LimitKind::SvgInputBytes.into(),
                 observed: u64::try_from(bytes.len()).unwrap_or(u64::MAX),
                 maximum: u64::try_from(input_limit).unwrap_or(u64::MAX),
             });
@@ -677,7 +676,7 @@ impl Edit {
             .package
             .get_part(&self.base.inner.workbook_uri)?;
         let candidate = raw::catalog_edit::replace_defined_names(workbook.blob(), &names)?;
-        let parsed = raw::parse_catalog(&candidate)?;
+        let parsed = raw::parse_catalog(&candidate, &self.base.inner.package.read_limits())?;
         if parsed.defined_names != names {
             return Err(invalid("defined-name authoring verification failed"));
         }
@@ -750,14 +749,14 @@ impl Edit {
     pub fn sheet<'e, 's>(
         &'e mut self,
         selector: impl Into<Selector<'s>>,
-    ) -> Result<Option<WorksheetEdit<'e>>> {
+    ) -> Result<Option<Sheet<'e>>> {
         guard::no_removal(self, "transaction")?;
         let sheet = Snapshot::new(&self.base).worksheet(selector)?;
         let Some(sheet) = sheet else {
             return Ok(None);
         };
         let position = sheet.position();
-        Ok(Some(WorksheetEdit {
+        Ok(Some(Sheet {
             edit: self,
             position,
         }))
@@ -767,13 +766,10 @@ impl Edit {
     /// zero-based position. Unlike [`Self::sheet`], this entry point also
     /// accepts chart, dialog, and macro sheets because visibility belongs to
     /// the workbook catalog rather than worksheet cell storage.
-    pub fn tab<'e, 's>(
-        &'e mut self,
-        selector: impl Into<Selector<'s>>,
-    ) -> Result<Option<TabEdit<'e>>> {
+    pub fn tab<'e, 's>(&'e mut self, selector: impl Into<Selector<'s>>) -> Result<Option<Tab<'e>>> {
         guard::no_removal(self, "transaction")?;
         let tab = Snapshot::new(&self.base).tab(selector)?;
-        Ok(tab.map(|tab| TabEdit {
+        Ok(tab.map(|tab| Tab {
             edit: self,
             position: tab.position(),
         }))
@@ -1208,18 +1204,6 @@ impl Edit {
         super::super::transfer::copy_scalar_cells_from(self, donor, source, range, target, anchor)
     }
 
-    /// Descriptive alias for [`Self::copy_cells_from`].
-    pub fn copy_scalar_cells_from<'source, 'range, 'target, 'anchor>(
-        &mut self,
-        donor: &Workbook,
-        source: impl Into<Selector<'source>>,
-        range: impl Into<Area<'range>>,
-        target: impl Into<Selector<'target>>,
-        anchor: impl Into<At<'anchor>>,
-    ) -> Result<Option<&mut Self>> {
-        self.copy_cells_from(donor, source, range, target, anchor)
-    }
-
     /// Move a bounded cell region with the same dependency closure and
     /// refusals as [`Self::copy_cells`].
     ///
@@ -1272,7 +1256,7 @@ impl Edit {
             .ok_or_else(|| invalid("cell-transfer area overflow"))?;
         if cells > MAX_CELL_TRANSFER {
             return Err(Error::Limit {
-                kind: super::super::LimitKind::TransferCells,
+                kind: super::super::LimitKind::TransferCells.into(),
                 observed: cells,
                 maximum: MAX_CELL_TRANSFER,
             });
@@ -1818,8 +1802,11 @@ impl Edit {
     }
 
     /// Validate and atomically publish a new immutable snapshot.
+    ///
+    /// An edit that staged nothing returns its source snapshot, a signed one
+    /// included (ADR 0006); a changed edit of a signed workbook is refused
+    /// with [`Error::Signed`].
     pub fn commit(self) -> Result<Commit> {
-        codec::ensure_unsigned(&self.base)?;
         if self.is_empty() {
             let source = self.base.clone();
             return Ok(Commit {
@@ -1831,6 +1818,7 @@ impl Edit {
                 },
             });
         }
+        codec::ensure_unsigned(&self.base)?;
         if !self.removed.is_empty() {
             return package::commit_removals(self);
         }
@@ -2174,8 +2162,14 @@ impl Edit {
                 package_changes.push(PackageChange::FormControl {
                     sheet: data.name.as_str().into(),
                     control: overlay.position,
-                    before: Box::new(crate::form_control::parse(&overlay.before_properties)?),
-                    after: Box::new(crate::form_control::parse(&overlay.after_properties)?),
+                    before: Box::new(crate::form_control::parse(
+                        &overlay.before_properties,
+                        &crate::form_control::Limits::default(),
+                    )?),
+                    after: Box::new(crate::form_control::parse(
+                        &overlay.after_properties,
+                        &crate::form_control::Limits::default(),
+                    )?),
                 });
             }
             form_control_validations.extend(
@@ -2215,6 +2209,7 @@ impl Edit {
             let sheet = Worksheet {
                 owner: Arc::clone(&base.inner),
                 data: Arc::clone(&data),
+                policy: None,
             };
             let store = sheet.store()?;
             let change_start = changes.len();
@@ -2541,7 +2536,11 @@ impl Edit {
             }
             if let Some(bindings) = &effective_web {
                 let input = after.as_deref().unwrap_or(&before);
-                after = Some(raw::web::replace(input, bindings)?);
+                after = Some(raw::web::replace(
+                    input,
+                    bindings,
+                    &base.inner.package.read_limits(),
+                )?);
             }
             if let Some(page_breaks) = &effective_page_breaks {
                 let input = after.as_deref().unwrap_or(&before);
@@ -3038,12 +3037,15 @@ impl Edit {
                             || base.inner.package.get_part(&data.part_uri).map(Part::blob),
                             |part| Ok(part.after.as_slice()),
                         )?;
-                    *after = raw::web::read(content)?;
+                    *after = raw::web::read(content, &base.inner.package.read_limits())?;
                 } else if let Some(created) = created
                     .iter()
                     .find(|created| created.name.as_str() == sheet.as_ref())
                 {
-                    *after = raw::web::read(created.graph.part.blob())?;
+                    *after = raw::web::read(
+                        created.graph.part.blob(),
+                        &base.inner.package.read_limits(),
+                    )?;
                 }
             }
         }
@@ -3141,7 +3143,7 @@ impl Edit {
             };
             let workbook_input = referenced_workbook.as_deref().unwrap_or(&before);
             let scope_source = (effective_order.is_some() || !created.is_empty())
-                .then(|| raw::parse_catalog(workbook_input))
+                .then(|| raw::parse_catalog(workbook_input, &base.inner.package.read_limits()))
                 .transpose()?;
             let raw_order = effective_order
                 .as_ref()
@@ -3335,7 +3337,7 @@ impl Edit {
                 || active_change.is_some()
                 || requested_defined_names.is_some()
             {
-                let catalog = raw::parse_catalog(&after)?;
+                let catalog = raw::parse_catalog(&after, &base.inner.package.read_limits())?;
                 if let Some(expected) = &requested_defined_names
                     && catalog.defined_names.as_slice() != expected.as_ref()
                 {
@@ -3486,7 +3488,12 @@ impl Edit {
         let web_patch = match requested_panes {
             Some(PanesAction::Put { panes, conformance }) => {
                 let after = panes.clone();
-                let patch = common_web::plan_put(&base.inner.package, panes, conformance)?;
+                let patch = common_web::plan_put(
+                    &base.inner.package,
+                    panes,
+                    conformance,
+                    &common_web::Limits::standard(),
+                )?;
                 if patch.is_empty() {
                     None
                 } else {
@@ -3498,7 +3505,8 @@ impl Edit {
                 }
             },
             Some(PanesAction::Remove) => {
-                let patch = common_web::plan_remove(&base.inner.package)?;
+                let patch =
+                    common_web::plan_remove(&base.inner.package, &common_web::Limits::standard())?;
                 if patch.is_empty() {
                     None
                 } else {
@@ -3821,6 +3829,7 @@ impl Edit {
             let sheet = Worksheet {
                 owner: Arc::clone(&self.base.inner),
                 data,
+                policy: None,
             };
             let source = sheet.web_bindings()?.clone();
             self.sheets.entry(position).or_default().web = Some(source);
@@ -3915,6 +3924,7 @@ impl Edit {
         let sheet = Worksheet {
             owner: Arc::clone(&self.base.inner),
             data,
+            policy: None,
         };
         Ok(sheet.hyperlinks()?.into_iter().find(|value| {
             crate::hyperlinks::model::reference_key(value.reference().range()) == key
@@ -4008,7 +4018,7 @@ impl Edit {
         for (position, entry) in sheet.store()?.entries().iter().enumerate() {
             if position >= MAX_CELL_DEPENDENCY_SCAN {
                 return Err(Error::Limit {
-                    kind: super::super::LimitKind::TransferDependencyScan,
+                    kind: super::super::LimitKind::TransferDependencyScan.into(),
                     observed: u64::try_from(position)
                         .unwrap_or(u64::MAX)
                         .saturating_add(1),
@@ -4654,6 +4664,7 @@ fn lower_style_requests(
         let sheet = Worksheet {
             owner: Arc::clone(&base.inner),
             data: Arc::clone(data),
+            policy: None,
         };
         let store = sheet.store()?;
         let request_count = actions
@@ -5198,6 +5209,7 @@ fn validate_web_edit(
             let sheet = Worksheet {
                 owner: Arc::clone(&base.inner),
                 data: Arc::clone(data),
+                policy: None,
             };
             codec::check_web_bindings(&refs, &data.name, sheet.web_bindings()?)?;
         }

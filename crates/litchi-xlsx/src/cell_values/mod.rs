@@ -53,18 +53,51 @@ mod admission_tests;
 #[cfg(test)]
 #[path = "facts_oracle_tests.rs"]
 mod facts_oracle_tests;
-mod patch;
+pub(crate) mod patch;
 #[cfg(test)]
 #[path = "publication_audit_tests.rs"]
 mod publication_audit_tests;
 mod snapshot;
 mod source;
+#[cfg(test)]
+#[path = "../../tests/support/source_editors.rs"]
+pub(crate) mod test_editors;
 mod validation;
 
-pub use patch::Patch;
-pub use patch::{Commit, Diagnostics, MultiCommit, MultiDiagnostics, MultiPatch};
+pub use patch::Diagnostics;
 pub use snapshot::{MAX_MULTI_WORKSHEET_BYTES, MAX_SHEET_OWNERS, MultiSnapshot, Snapshot};
-pub use source::{
-    CellValueEdit, MAX_BATCH_EDITS, MultiSourceEdit, SheetCellValueEdit, SourceBackedEditor,
-    SourceEdit,
-};
+pub use source::{Change, Edit, MAX_BATCH_EDITS, SheetChange, sheet};
+
+crate::workbook::source::deferred::source_family!(
+    "cell-value",
+    patch::Record,
+    own_limits,
+    own_diagnostics
+);
+
+crate::record::limit_kinds!("source-backed cell-value", CellValues {
+    /// Unique cells or expanded cell actions of one batch
+    /// ([`MAX_BATCH_EDITS`]).
+    BatchEdits => "cells of one value-only batch",
+    /// Worksheets one multi-sheet edit selects ([`MAX_SHEET_OWNERS`]).
+    SheetOwners => "worksheets of one multi-sheet value edit",
+    /// Worksheet XML bytes one multi-sheet edit retains
+    /// ([`MAX_MULTI_WORKSHEET_BYTES`]).
+    WorksheetBytes => "worksheet XML bytes of one multi-sheet value edit",
+    /// Members of one shared-formula group an edit expands.
+    SharedFormulaMembers => "members of one shared-formula group",
+});
+
+impl Patch {
+    /// The exact source state of every selected worksheet.
+    #[must_use]
+    pub fn before(&self) -> &MultiSnapshot {
+        self.0.before()
+    }
+
+    /// The exact target state of every selected worksheet.
+    #[must_use]
+    pub fn after(&self) -> &MultiSnapshot {
+        self.0.after()
+    }
+}

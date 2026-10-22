@@ -10,13 +10,13 @@
 //! extension bytes and all other package members remain source material.
 //!
 //! The ordinary workbook surface is `Workbook::pivot_table_server_formats`
-//! (also available as `Workbook::pivot_server_formats`) for typed reads and
+//! for typed reads and
 //! `Package::edit_pivot_table` for a source-checked edit.  Selectors are a
 //! semantic PivotTable name or workbook position; callers do not provide OPC
 //! relationship IDs or Part names.  An edit stages `ServerFormat` values or
-//! explicit `AttributeEdit::{Keep,Set,Clear}` operations for `culture` and
-//! `format`, then publishes through `PackageCommit::workbook` and its exact
-//! reversible `PackagePatch`.
+//! explicit `Attribute::{Keep,Set,Clear}` operations for `culture` and
+//! `format`, then publishes through `Commit::package` and its exact
+//! reversible `Patch`.
 //!
 //! This owner covers the C510 `pivotTableServerFormats` payload under a
 //! non-worksheet PivotTable and its required `pivotTableReferences`/external
@@ -43,7 +43,7 @@ use quick_xml::reader::Reader;
 use litchi_ooxml_common::xml_name::is_qualified_name;
 
 use crate::Workbook;
-use crate::error::{Error, Result, invalid};
+use crate::error::{Result, invalid};
 use crate::raw;
 use crate::source_attributes::{
     append_escaped_xstring, escaped_xstring_len, try_escaped_xstring, validate_xml_characters,
@@ -188,12 +188,6 @@ impl PivotTableView {
         &self.value
     }
 
-    /// Alias for callers using the extension element's collection name.
-    #[must_use]
-    pub fn formats(&self) -> &[ServerFormat] {
-        self.value.formats()
-    }
-
     /// Semantic PivotTable name.
     #[must_use]
     pub fn table_name(&self) -> &str {
@@ -227,7 +221,7 @@ impl ServerFormat {
 /// One explicit scalar edit.  `Keep`, `Set`, and `Clear` are intentionally
 /// distinct so an omitted field cannot accidentally clear or retain a value.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum AttributeEdit {
+pub enum Attribute {
     /// Leave this attribute at its source value.
     Keep,
     /// Set or replace this attribute with decoded SpreadsheetML text.
@@ -236,7 +230,7 @@ pub enum AttributeEdit {
     Clear,
 }
 
-impl AttributeEdit {
+impl Attribute {
     /// Construct a `Set` operation.
     #[must_use]
     pub fn set(value: impl Into<String>) -> Self {
@@ -258,20 +252,20 @@ impl AttributeEdit {
 
 /// Explicit per-attribute update for one server format.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ServerFormatEdit {
+pub struct Format {
     /// `culture` update.
-    pub culture: AttributeEdit,
+    pub culture: Attribute,
     /// `format` update.
-    pub format: AttributeEdit,
+    pub format: Attribute,
 }
 
-impl ServerFormatEdit {
+impl Format {
     /// Keep both source attributes.
     #[must_use]
     pub const fn keep() -> Self {
         Self {
-            culture: AttributeEdit::Keep,
-            format: AttributeEdit::Keep,
+            culture: Attribute::Keep,
+            format: Attribute::Keep,
         }
     }
 
@@ -279,12 +273,8 @@ impl ServerFormatEdit {
     #[must_use]
     pub fn from_value(value: ServerFormat) -> Self {
         Self {
-            culture: value
-                .culture
-                .map_or(AttributeEdit::Clear, AttributeEdit::Set),
-            format: value
-                .format
-                .map_or(AttributeEdit::Clear, AttributeEdit::Set),
+            culture: value.culture.map_or(Attribute::Clear, Attribute::Set),
+            format: value.format.map_or(Attribute::Clear, Attribute::Set),
         }
     }
 }
@@ -317,12 +307,6 @@ impl PivotTableServerFormats {
     #[must_use]
     pub fn formats(&self) -> &[ServerFormat] {
         &self.formats
-    }
-
-    /// Alias for callers using the XML collection name.
-    #[must_use]
-    pub fn server_formats(&self) -> &[ServerFormat] {
-        self.formats()
     }
 
     /// Whether one `pivotValueCellExtra@in` used the unresolved inclusive
@@ -372,24 +356,10 @@ impl Snapshot {
         graph.snapshot(selector)
     }
 
-    /// Alias emphasizing that this state is tied to exact source bytes.
-    pub fn read<'a>(
-        package: &OpcPackage,
-        selector: impl Into<PivotTableSelector<'a>>,
-    ) -> Result<Self> {
-        Self::load(package, selector)
-    }
-
     /// The typed server-format collection.
     #[must_use]
     pub fn server_formats(&self) -> &PivotTableServerFormats {
         &self.value
-    }
-
-    /// Alias for callers that use the extension element's name.
-    #[must_use]
-    pub fn formats(&self) -> &[ServerFormat] {
-        self.value.formats()
     }
 
     /// Semantic PivotTable name.
@@ -608,7 +578,7 @@ struct RelationshipState {
 
 /// Failure-atomic edits over one PivotTable's ordered server-format list and
 /// scalar metadata.
-pub struct Transaction<'a> {
+pub(crate) struct Transaction<'a> {
     target: &'a mut OpcPackage,
     before: Snapshot,
     staged: Vec<ServerFormat>,
@@ -618,7 +588,7 @@ pub struct Transaction<'a> {
 
 impl<'a> Transaction<'a> {
     /// Resolve a semantic PivotTable selector and begin an isolated edit.
-    pub fn new<'selector>(
+    pub(crate) fn new<'selector>(
         target: &'a mut OpcPackage,
         selector: impl Into<PivotTableSelector<'selector>>,
     ) -> Result<Self> {
@@ -626,20 +596,20 @@ impl<'a> Transaction<'a> {
         ensure_editable(&before)?;
         let mut staged = Vec::new();
         staged
-            .try_reserve_exact(before.formats().len())
+            .try_reserve_exact(before.server_formats().formats().len())
             .map_err(|source| Error::Allocation {
                 resource: "PivotTable staged server-format values",
                 source,
             })?;
-        staged.extend_from_slice(before.formats());
+        staged.extend_from_slice(before.server_formats().formats());
         let mut staged_sources = Vec::new();
         staged_sources
-            .try_reserve_exact(before.formats().len())
+            .try_reserve_exact(before.server_formats().formats().len())
             .map_err(|source| Error::Allocation {
                 resource: "PivotTable staged server-format source order",
                 source,
             })?;
-        staged_sources.extend((0..before.formats().len()).map(Some));
+        staged_sources.extend((0..before.server_formats().formats().len()).map(Some));
         Ok(Self {
             selection: before.selection,
             target,
@@ -649,22 +619,11 @@ impl<'a> Transaction<'a> {
         })
     }
 
-    /// Exact source state captured at transaction start.
-    #[must_use]
-    pub fn before(&self) -> &Snapshot {
-        &self.before
-    }
-
-    /// Currently staged ordered server-format values.
-    #[must_use]
-    pub fn server_formats(&self) -> &[ServerFormat] {
-        &self.staged
-    }
-
+    #[cfg(test)]
     /// Set, replace, or clear both optional attributes explicitly.  `None`
     /// means clear for this method; use [`Self::update_server_format`] when a
     /// field must be retained.
-    pub fn set_server_format(&mut self, index: usize, value: ServerFormat) -> Result<bool> {
+    pub(crate) fn set_server_format(&mut self, index: usize, value: ServerFormat) -> Result<bool> {
         let slot = self
             .staged
             .get_mut(index)
@@ -679,11 +638,12 @@ impl<'a> Transaction<'a> {
         Ok(true)
     }
 
+    #[cfg(test)]
     /// Insert one ordered `serverFormat` leaf before `index`.
     ///
     /// The collection is schema-required and non-empty, so insertion accepts
     /// `0..=len` and publication updates the required `count` attribute.
-    pub fn insert_server_format(&mut self, index: usize, value: ServerFormat) -> Result<()> {
+    pub(crate) fn insert_server_format(&mut self, index: usize, value: ServerFormat) -> Result<()> {
         if index > self.staged.len() {
             return Err(invalid("server-format insertion index is out of range"));
         }
@@ -710,17 +670,19 @@ impl<'a> Transaction<'a> {
         Ok(())
     }
 
+    #[cfg(test)]
     /// Append one ordered `serverFormat` leaf.
-    pub fn push_server_format(&mut self, value: ServerFormat) -> Result<()> {
+    pub(crate) fn push_server_format(&mut self, value: ServerFormat) -> Result<()> {
         self.insert_server_format(self.staged.len(), value)
     }
 
+    #[cfg(test)]
     /// Remove one ordered `serverFormat` leaf.
     ///
     /// Removing the last leaf is refused because the schema requires at least
     /// one `serverFormat` child.  Removing the whole payload/container is a
     /// separate lifecycle operation and is not inferred here.
-    pub fn remove_server_format(&mut self, index: usize) -> Result<ServerFormat> {
+    pub(crate) fn remove_server_format(&mut self, index: usize) -> Result<ServerFormat> {
         if self.staged.len() == 1 {
             return Err(invalid(
                 "pivotTableServerFormats must retain one server-format child",
@@ -733,8 +695,9 @@ impl<'a> Transaction<'a> {
         Ok(self.staged.remove(index))
     }
 
+    #[cfg(test)]
     /// Move one leaf, interpreting `to` in the final ordered sequence.
-    pub fn move_server_format(&mut self, from: usize, to: usize) -> Result<()> {
+    pub(crate) fn move_server_format(&mut self, from: usize, to: usize) -> Result<()> {
         if from >= self.staged.len() || to >= self.staged.len() {
             return Err(invalid("server-format move index is out of range"));
         }
@@ -747,8 +710,9 @@ impl<'a> Transaction<'a> {
         Ok(())
     }
 
+    #[cfg(test)]
     /// Reorder the leaves using a final-position-to-old-position permutation.
-    pub fn reorder_server_formats(&mut self, order: &[usize]) -> Result<()> {
+    pub(crate) fn reorder_server_formats(&mut self, order: &[usize]) -> Result<()> {
         let len = self.staged.len();
         validate_permutation(order, len)?;
         let mut values = Vec::new();
@@ -776,8 +740,9 @@ impl<'a> Transaction<'a> {
         Ok(())
     }
 
+    #[cfg(test)]
     /// Apply explicit `Keep`/`Set`/`Clear` operations to one server format.
-    pub fn update_server_format(&mut self, index: usize, edit: ServerFormatEdit) -> Result<bool> {
+    pub(crate) fn update_server_format(&mut self, index: usize, edit: Format) -> Result<bool> {
         let current = self
             .staged
             .get(index)
@@ -790,54 +755,46 @@ impl<'a> Transaction<'a> {
         self.set_server_format(index, next)
     }
 
+    #[cfg(test)]
     /// Set or clear only the `culture` attribute.
-    pub fn set_culture(&mut self, index: usize, value: Option<String>) -> Result<bool> {
+    pub(crate) fn set_culture(&mut self, index: usize, value: Option<String>) -> Result<bool> {
         self.update_server_format(
             index,
-            ServerFormatEdit {
-                culture: value.map_or(AttributeEdit::Clear, AttributeEdit::Set),
-                format: AttributeEdit::Keep,
+            Format {
+                culture: value.map_or(Attribute::Clear, Attribute::Set),
+                format: Attribute::Keep,
             },
         )
     }
 
+    #[cfg(test)]
     /// Set or clear only the `format` attribute.
-    pub fn set_format(&mut self, index: usize, value: Option<String>) -> Result<bool> {
+    pub(crate) fn set_format(&mut self, index: usize, value: Option<String>) -> Result<bool> {
         self.update_server_format(
             index,
-            ServerFormatEdit {
-                culture: AttributeEdit::Keep,
-                format: value.map_or(AttributeEdit::Clear, AttributeEdit::Set),
+            Format {
+                culture: Attribute::Keep,
+                format: value.map_or(Attribute::Clear, Attribute::Set),
             },
         )
     }
 
-    /// Clear the `culture` attribute.
-    pub fn clear_culture(&mut self, index: usize) -> Result<bool> {
-        self.update_server_format(
-            index,
-            ServerFormatEdit {
-                culture: AttributeEdit::Clear,
-                format: AttributeEdit::Keep,
-            },
-        )
-    }
-
+    #[cfg(test)]
     /// Clear the `format` attribute.
-    pub fn clear_format(&mut self, index: usize) -> Result<bool> {
+    pub(crate) fn clear_format(&mut self, index: usize) -> Result<bool> {
         self.update_server_format(
             index,
-            ServerFormatEdit {
-                culture: AttributeEdit::Keep,
-                format: AttributeEdit::Clear,
+            Format {
+                culture: Attribute::Keep,
+                format: Attribute::Clear,
             },
         )
     }
 
     /// Whether the staged semantic list differs from the source list.
     #[must_use]
-    pub fn is_changed(&self) -> bool {
-        self.before.formats() != self.staged.as_slice()
+    pub(crate) fn is_changed(&self) -> bool {
+        self.before.server_formats().formats() != self.staged.as_slice()
             || self
                 .staged_sources
                 .iter()
@@ -846,10 +803,10 @@ impl<'a> Transaction<'a> {
     }
 
     /// Validate, rewrite, reopen, and atomically publish the staged edit.
-    pub fn commit(self) -> Result<Commit> {
+    pub(crate) fn commit(self) -> Result<SourceCommit> {
         if !self.is_changed() {
-            let patch = Patch::new(self.before.clone(), self.before.clone());
-            return Ok(Commit::new(self.before, patch, false));
+            let patch = SourcePatch::new(self.before.clone(), self.before.clone());
+            return Ok(SourceCommit::new(self.before, patch, false));
         }
         if self.target.is_signed() || self.target.requires_signature_edit_policy() {
             return Err(Error::Signed);
@@ -875,7 +832,7 @@ impl<'a> Transaction<'a> {
             .set_blob_shared(Arc::new(output));
         validate_candidate_limits(&candidate)?;
         let after = Snapshot::load(&candidate, PivotTableSelector::Position(self.selection))?;
-        if after.formats() != self.staged.as_slice()
+        if after.server_formats().formats() != self.staged.as_slice()
             || !after.same_closure(&self.before)
             || after.table_owner.start != self.before.table_owner.start
         {
@@ -883,9 +840,9 @@ impl<'a> Transaction<'a> {
                 "PivotTable server-format publication changed semantic state or source closure",
             ));
         }
-        let patch = Patch::new(self.before, after.clone());
+        let patch = SourcePatch::new(self.before, after.clone());
         *self.target = candidate;
-        Ok(Commit::new(after, patch, true))
+        Ok(SourceCommit::new(after, patch, true))
     }
 }
 
@@ -912,7 +869,8 @@ pub fn load<'a>(
 }
 
 /// Start a source-bound PivotTable server-format transaction.
-pub fn edit<'package, 'selector>(
+#[cfg(test)]
+pub(crate) fn edit<'package, 'selector>(
     package: &'package mut OpcPackage,
     selector: impl Into<PivotTableSelector<'selector>>,
 ) -> Result<Transaction<'package>> {
@@ -920,43 +878,44 @@ pub fn edit<'package, 'selector>(
 }
 
 /// Apply an exact source-checked patch atomically.
-pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<()> {
+#[cfg(test)]
+pub(crate) fn apply_patch(package: &mut OpcPackage, patch: &SourcePatch) -> Result<()> {
     patch.apply(package)
 }
 
 /// An exact source-checked reversible edit.
 #[derive(Clone, Debug)]
-pub struct Patch {
+pub(crate) struct SourcePatch {
     before: Snapshot,
     after: Snapshot,
 }
 
-impl Patch {
+impl SourcePatch {
     fn new(before: Snapshot, after: Snapshot) -> Self {
         Self { before, after }
     }
 
     /// Required source state.
     #[must_use]
-    pub fn before(&self) -> &Snapshot {
+    pub(crate) fn before(&self) -> &Snapshot {
         &self.before
     }
 
     /// Exact state produced by application.
     #[must_use]
-    pub fn after(&self) -> &Snapshot {
+    pub(crate) fn after(&self) -> &Snapshot {
         &self.after
     }
 
     /// Whether this patch is an exact no-op.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub(crate) fn is_empty(&self) -> bool {
         self.before.same_source(&self.after)
     }
 
     /// Return the exact source-bound inverse.
     #[must_use]
-    pub fn inverse(&self) -> Self {
+    pub(crate) fn inverse(&self) -> Self {
         Self {
             before: self.after.clone(),
             after: self.before.clone(),
@@ -964,7 +923,8 @@ impl Patch {
     }
 
     /// Apply the patch after validating source closure and semantic readback.
-    pub fn apply(&self, package: &mut OpcPackage) -> Result<()> {
+    #[cfg(test)]
+    pub(crate) fn apply(&self, package: &mut OpcPackage) -> Result<()> {
         self.apply_checked(package, false)
     }
 
@@ -1008,7 +968,9 @@ impl Patch {
         } else {
             resulting.same_source(&self.after)
         };
-        if resulting.formats() != self.after.formats() || !target_matches {
+        if resulting.server_formats().formats() != self.after.server_formats().formats()
+            || !target_matches
+        {
             return Err(invalid(
                 "PivotTable server-format patch verification failed",
             ));
@@ -1020,15 +982,20 @@ impl Patch {
 
 /// A committed transaction and reversible patch.
 #[derive(Clone, Debug)]
-pub struct Commit {
+pub(crate) struct SourceCommit {
+    /// The resulting state, read only by the engine tests.
+    #[cfg(test)]
     snapshot: Snapshot,
-    patch: Patch,
+    patch: SourcePatch,
     changed: bool,
 }
 
-impl Commit {
-    fn new(snapshot: Snapshot, patch: Patch, changed: bool) -> Self {
+impl SourceCommit {
+    fn new(snapshot: Snapshot, patch: SourcePatch, changed: bool) -> Self {
+        #[cfg(not(test))]
+        drop(snapshot);
         Self {
+            #[cfg(test)]
             snapshot,
             patch,
             changed,
@@ -1036,35 +1003,32 @@ impl Commit {
     }
 
     /// Resulting immutable source-bound state.
+    #[cfg(test)]
     #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
+    pub(crate) fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
     /// Exact reversible patch.
     #[must_use]
-    pub fn patch(&self) -> &Patch {
+    pub(crate) fn patch(&self) -> &SourcePatch {
         &self.patch
     }
 
     /// Whether authored values changed.
     #[must_use]
-    pub const fn changed(&self) -> bool {
+    pub(crate) const fn changed(&self) -> bool {
         self.changed
-    }
-
-    /// Consume the commit into its snapshot and patch.
-    pub fn into_parts(self) -> (Snapshot, Patch) {
-        (self.snapshot, self.patch)
     }
 }
 
-/// Start an ordinary semantic edit against an immutable [`Workbook`] snapshot.
+/// A staged server-format edit of one PivotTable of a [`crate::Package`],
+/// started by [`crate::Package::edit_pivot_table`]. Dropping it discards it.
 ///
 /// The package owner and its source-bound ranges stay private.  Callers stage
-/// only typed server-format values and receive a new Package through
-/// [`PackageCommit::package`] after commit.
-pub struct PackageEdit {
+/// only typed server-format values and receive a new package through
+/// [`Commit::package`] after commit.
+pub struct Edit {
     source: Workbook,
     before: Snapshot,
     staged: Vec<ServerFormat>,
@@ -1072,7 +1036,7 @@ pub struct PackageEdit {
     selection: usize,
 }
 
-impl PackageEdit {
+impl Edit {
     pub(crate) fn new<'selector>(
         source: &Workbook,
         selector: impl Into<PivotTableSelector<'selector>>,
@@ -1081,20 +1045,20 @@ impl PackageEdit {
         ensure_editable(&before)?;
         let mut staged = Vec::new();
         staged
-            .try_reserve_exact(before.formats().len())
+            .try_reserve_exact(before.server_formats().formats().len())
             .map_err(|source| Error::Allocation {
                 resource: "Workbook staged pivot server-format values",
                 source,
             })?;
-        staged.extend_from_slice(before.formats());
+        staged.extend_from_slice(before.server_formats().formats());
         let mut staged_sources = Vec::new();
         staged_sources
-            .try_reserve_exact(before.formats().len())
+            .try_reserve_exact(before.server_formats().formats().len())
             .map_err(|source| Error::Allocation {
                 resource: "Workbook staged pivot server-format source order",
                 source,
             })?;
-        staged_sources.extend((0..before.formats().len()).map(Some));
+        staged_sources.extend((0..before.server_formats().formats().len()).map(Some));
         Ok(Self {
             source: source.clone(),
             selection: before.selection,
@@ -1114,12 +1078,6 @@ impl PackageEdit {
     #[must_use]
     pub fn server_formats(&self) -> &[ServerFormat] {
         &self.staged
-    }
-
-    /// Alias for callers using the extension element's name.
-    #[must_use]
-    pub fn formats(&self) -> &[ServerFormat] {
-        self.server_formats()
     }
 
     /// Set, replace, or clear both optional attributes explicitly.
@@ -1230,7 +1188,7 @@ impl PackageEdit {
     }
 
     /// Apply explicit `Keep`/`Set`/`Clear` operations to one server format.
-    pub fn update_server_format(&mut self, index: usize, edit: ServerFormatEdit) -> Result<bool> {
+    pub fn update_server_format(&mut self, index: usize, edit: Format) -> Result<bool> {
         let current = self
             .staged
             .get(index)
@@ -1247,9 +1205,9 @@ impl PackageEdit {
     pub fn set_culture(&mut self, index: usize, value: Option<String>) -> Result<bool> {
         self.update_server_format(
             index,
-            ServerFormatEdit {
-                culture: value.map_or(AttributeEdit::Clear, AttributeEdit::Set),
-                format: AttributeEdit::Keep,
+            Format {
+                culture: value.map_or(Attribute::Clear, Attribute::Set),
+                format: Attribute::Keep,
             },
         )
     }
@@ -1258,9 +1216,9 @@ impl PackageEdit {
     pub fn set_format(&mut self, index: usize, value: Option<String>) -> Result<bool> {
         self.update_server_format(
             index,
-            ServerFormatEdit {
-                culture: AttributeEdit::Keep,
-                format: value.map_or(AttributeEdit::Clear, AttributeEdit::Set),
+            Format {
+                culture: Attribute::Keep,
+                format: value.map_or(Attribute::Clear, Attribute::Set),
             },
         )
     }
@@ -1269,9 +1227,9 @@ impl PackageEdit {
     pub fn clear_culture(&mut self, index: usize) -> Result<bool> {
         self.update_server_format(
             index,
-            ServerFormatEdit {
-                culture: AttributeEdit::Clear,
-                format: AttributeEdit::Keep,
+            Format {
+                culture: Attribute::Clear,
+                format: Attribute::Keep,
             },
         )
     }
@@ -1280,26 +1238,31 @@ impl PackageEdit {
     pub fn clear_format(&mut self, index: usize) -> Result<bool> {
         self.update_server_format(
             index,
-            ServerFormatEdit {
-                culture: AttributeEdit::Keep,
-                format: AttributeEdit::Clear,
+            Format {
+                culture: Attribute::Keep,
+                format: Attribute::Clear,
             },
         )
     }
 
-    /// Whether the staged semantic list differs from the source list.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        self.before.formats() != self.staged.as_slice()
-            || self
-                .staged_sources
-                .iter()
-                .enumerate()
-                .any(|(index, source)| *source != Some(index))
+    /// Discard every staged change.
+    pub fn reset(&mut self) {
+        self.staged.clear();
+        self.staged
+            .extend_from_slice(self.before.server_formats().formats());
+        self.staged_sources.clear();
+        self.staged_sources
+            .extend((0..self.before.server_formats().formats().len()).map(Some));
     }
 
-    /// Validate, reopen, and publish a new immutable Workbook snapshot.
-    pub fn commit(self) -> Result<PackageCommit> {
+    /// Validate, reopen, and publish a new immutable package. An unchanged
+    /// edit returns the source package.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Signed`] for a changed edit of a signed workbook and
+    /// the rewrite and validation errors of the publication.
+    pub fn commit(self) -> Result<Commit> {
         let source = self.source;
         let staged = self.staged;
         let staged_sources = self.staged_sources;
@@ -1310,24 +1273,27 @@ impl PackageEdit {
         transaction.staged = staged;
         transaction.staged_sources = staged_sources;
         let committed = transaction.commit()?;
-        let changed = committed.changed();
         let low_patch = committed.patch().clone();
+        if !committed.changed() {
+            let patch = Patch::new(source.clone(), source.clone(), low_patch);
+            return Ok(package_commit(source, patch, false));
+        }
         let workbook = source.adopt_published_package(candidate)?;
-        let patch = PackagePatch::new(source, workbook.clone(), low_patch);
-        Ok(PackageCommit::new(workbook, patch, changed))
+        let patch = Patch::new(source, workbook.clone(), low_patch);
+        Ok(package_commit(workbook, patch, true))
     }
 }
 
 /// An exact reversible patch over ordinary Workbook snapshots.
 #[derive(Clone, Debug)]
-pub struct PackagePatch {
+pub struct Patch {
     before: Workbook,
     after: Workbook,
-    source_patch: Patch,
+    source_patch: SourcePatch,
 }
 
-impl PackagePatch {
-    fn new(before: Workbook, after: Workbook, source_patch: Patch) -> Self {
+impl Patch {
+    fn new(before: Workbook, after: Workbook, source_patch: SourcePatch) -> Self {
         Self {
             before,
             after,
@@ -1364,70 +1330,24 @@ impl PackagePatch {
     }
 
     /// Apply after checking the complete source-bound owner closure.
-    pub fn apply(&self, source: &crate::Package) -> Result<PackageCommit> {
+    pub(crate) fn apply(&self, source: &crate::Package) -> Result<Commit> {
         let source = source.workbook_ref();
-        source.ensure_mutation_allowed("apply_pivot_table_server_formats_patch")?;
+        source.ensure_mutation_allowed("apply_pivot_table")?;
         let mut candidate = source.pivot_package().clone();
         self.source_patch.apply_readset(&mut candidate)?;
+        if self.is_noop() {
+            return Ok(package_commit(
+                source.clone(),
+                Self::new(source.clone(), source.clone(), self.source_patch.clone()),
+                false,
+            ));
+        }
         let workbook = source.adopt_published_package(candidate)?;
-        Ok(PackageCommit::new(
+        Ok(package_commit(
             workbook.clone(),
             Self::new(source.clone(), workbook, self.source_patch.clone()),
             !self.is_noop(),
         ))
-    }
-}
-
-/// A committed ordinary Workbook server-format edit.
-#[derive(Clone, Debug)]
-pub struct PackageCommit {
-    package: crate::Package,
-    patch: PackagePatch,
-    changed: bool,
-}
-
-impl PackageCommit {
-    fn new(workbook: Workbook, patch: PackagePatch, changed: bool) -> Self {
-        Self {
-            package: crate::Package::from_workbook(workbook),
-            patch,
-            changed,
-        }
-    }
-
-    /// The published immutable package.
-    #[must_use]
-    pub const fn package(&self) -> &crate::Package {
-        &self.package
-    }
-
-    /// Consume the commit into its published package.
-    #[must_use]
-    pub fn into_package(self) -> crate::Package {
-        self.package
-    }
-
-    /// Alias for callers using snapshot terminology.
-    #[must_use]
-    pub fn snapshot(&self) -> &PivotTableServerFormats {
-        self.patch.after()
-    }
-
-    /// Exact reversible Workbook patch.
-    #[must_use]
-    pub fn patch(&self) -> &PackagePatch {
-        &self.patch
-    }
-
-    /// Whether authored values changed.
-    #[must_use]
-    pub const fn changed(&self) -> bool {
-        self.changed
-    }
-
-    /// Consume the commit into its Workbook and patch.
-    pub fn into_parts(self) -> (crate::Package, PackagePatch) {
-        (self.package, self.patch)
     }
 }
 
@@ -1442,12 +1362,41 @@ pub(crate) fn view_workbook<'selector>(
     })
 }
 
+crate::record::record_family!("PivotTable server-format");
+
+crate::record::limit_kinds!("PivotTable server-format", PivotServerFormats {
+    /// Bytes of one attribute value.
+    AttributeBytes => "bytes of one PivotTable attribute",
+    /// Bytes of one element name.
+    NameBytes => "bytes of one PivotTable element name",
+    /// Bytes of one namespace URI.
+    NamespaceBytes => "bytes of one PivotTable namespace URI",
+    /// Bytes of one PivotTable part read.
+    PartBytes => "bytes of one PivotTable part",
+    /// Bytes of one PivotTable part written.
+    OutputBytes => "bytes of one written PivotTable part",
+    /// XML events of one PivotTable part.
+    Events => "XML events of one PivotTable part",
+    /// XML nodes of one PivotTable part.
+    Nodes => "XML nodes of one PivotTable part",
+    /// Bytes of the retained workbook root context.
+    FragmentBytes => "bytes of the retained PivotTable owner context",
+});
+
+fn package_commit(workbook: Workbook, patch: Patch, changed: bool) -> Commit {
+    Commit::new(
+        crate::Package::from_workbook(workbook),
+        patch,
+        Diagnostics::new(changed),
+    )
+}
+
 /// Start a semantic Workbook edit without exposing its OPC owner.
 pub(crate) fn edit_workbook<'selector>(
     workbook: &Workbook,
     selector: impl Into<PivotTableSelector<'selector>>,
-) -> Result<PackageEdit> {
-    PackageEdit::new(workbook, selector)
+) -> Result<Edit> {
+    Edit::new(workbook, selector)
 }
 
 struct Graph {
@@ -1875,16 +1824,16 @@ impl Graph {
 
 fn apply_attribute(
     slot: &mut Option<String>,
-    edit: AttributeEdit,
+    edit: Attribute,
     maximum_text_bytes: usize,
 ) -> Result<()> {
     match edit {
-        AttributeEdit::Keep => {},
-        AttributeEdit::Set(value) => {
+        Attribute::Keep => {},
+        Attribute::Set(value) => {
             validate_text_value(&value, maximum_text_bytes)?;
             *slot = Some(value);
         },
-        AttributeEdit::Clear => *slot = None,
+        Attribute::Clear => *slot = None,
     }
     Ok(())
 }
@@ -1939,8 +1888,13 @@ fn validate_text(value: &Option<String>, maximum_text_bytes: usize) -> Result<()
 }
 
 fn validate_text_value(value: &str, maximum_text_bytes: usize) -> Result<()> {
-    if value.len() > MAX_ATTRIBUTE_TEXT_BYTES || value.len() > maximum_text_bytes {
-        return Err(invalid("server-format attribute exceeds its text limit"));
+    let maximum = MAX_ATTRIBUTE_TEXT_BYTES.min(maximum_text_bytes);
+    if value.len() > maximum {
+        return Err(Error::limit(
+            LimitKind::AttributeBytes,
+            value.len(),
+            maximum,
+        ));
     }
     Ok(())
 }
@@ -2049,7 +2003,12 @@ fn rewrite_scalar_table(
     let mut output_len = source.len();
     let mut owner_len = owner.len();
     let mut has_edits = false;
-    for ((entry, previous), next) in before.entries.iter().zip(before.formats()).zip(staged) {
+    for ((entry, previous), next) in before
+        .entries
+        .iter()
+        .zip(before.server_formats().formats())
+        .zip(staged)
+    {
         has_edits |= apply_planned_attribute_delta(
             source,
             &entry.start_tag,
@@ -2081,8 +2040,9 @@ fn rewrite_scalar_table(
             "rewritten pivotTableServerFormats owner fragment exceeds limit",
         ));
     }
-    if output_len > MAX_PART_BYTES || output_len > maximum_output_bytes {
-        return Err(invalid("PivotTable output exceeds the caller's Part limit"));
+    let maximum = MAX_PART_BYTES.min(maximum_output_bytes);
+    if output_len > maximum {
+        return Err(Error::limit(LimitKind::OutputBytes, output_len, maximum));
     }
     let output_len_u64 = u64::try_from(output_len).unwrap_or(u64::MAX);
     let source_len = u64::try_from(source.len()).unwrap_or(u64::MAX);
@@ -2096,7 +2056,12 @@ fn rewrite_scalar_table(
         ));
     }
     let mut edits = Vec::<(Range<usize>, Vec<u8>)>::new();
-    for ((entry, previous), next) in before.entries.iter().zip(before.formats()).zip(staged) {
+    for ((entry, previous), next) in before
+        .entries
+        .iter()
+        .zip(before.server_formats().formats())
+        .zip(staged)
+    {
         push_named_attribute_edit(
             source,
             &entry.start_tag,
@@ -2379,7 +2344,7 @@ fn staged_child_len(
     existing_leaf_len(
         before.table.bytes.as_slice(),
         &before.entries[source_index],
-        &before.formats()[source_index],
+        &before.server_formats().formats()[source_index],
         &staged[new_index],
         maximum_attribute_bytes,
         include_open,
@@ -2796,7 +2761,7 @@ fn append_staged_child(
         output,
         source,
         &before.entries[source_index],
-        &before.formats()[source_index],
+        &before.server_formats().formats()[source_index],
         &staged[new_index],
         maximum_attribute_bytes,
         include_open,
@@ -2983,7 +2948,11 @@ fn apply_planned_attribute_delta(
             .checked_add(encoded_len)
             .ok_or_else(|| invalid("server-format attribute length overflows"))?;
         if attribute_bytes > maximum_attribute_bytes {
-            return Err(invalid("server-format attribute exceeds its text limit"));
+            return Err(Error::limit(
+                LimitKind::AttributeBytes,
+                attribute_bytes,
+                maximum_attribute_bytes,
+            ));
         }
     }
     *output_len = output_len
@@ -3676,7 +3645,11 @@ fn parse_workbook_references(
         .get(root.start.clone())
         .ok_or_else(|| invalid("workbook root context range is invalid"))?;
     if root_context.len() > MAX_FRAGMENT_BYTES {
-        return Err(invalid("workbook root context exceeds limit"));
+        return Err(Error::limit(
+            LimitKind::FragmentBytes,
+            root_context.len(),
+            MAX_FRAGMENT_BYTES,
+        ));
     }
     let mut context_copy = Vec::new();
     context_copy
@@ -5001,8 +4974,12 @@ fn source_element_qname(
         .iter()
         .position(|byte| byte.is_ascii_whitespace() || matches!(byte, b'/' | b'>'))
         .ok_or_else(|| invalid("serverFormat start tag has no QName"))?;
-    if name_len == 0 || name_len > MAX_NAME_BYTES || name_len > maximum_name_bytes {
-        return Err(invalid("serverFormat QName exceeds its source limit"));
+    if name_len == 0 {
+        return Err(invalid("serverFormat start tag has an empty QName"));
+    }
+    let maximum = MAX_NAME_BYTES.min(maximum_name_bytes);
+    if name_len > maximum {
+        return Err(Error::limit(LimitKind::NameBytes, name_len, maximum));
     }
     let mut qname = Vec::new();
     qname
@@ -5177,7 +5154,11 @@ struct NamespaceInterner {
 impl NamespaceInterner {
     fn intern(&mut self, value: &[u8], limits: XmlScanLimits) -> Result<NamespaceRef> {
         if value.len() > limits.namespace_bytes {
-            return Err(invalid("PivotTable XML namespace URI exceeds caller limit"));
+            return Err(Error::limit(
+                LimitKind::NamespaceBytes,
+                value.len(),
+                limits.namespace_bytes,
+            ));
         }
         validate_xml_characters(value)?;
         if let Some(existing) = self.values.get(value) {
@@ -5274,8 +5255,15 @@ fn scan_xml_config(
     parse_mce_branches: bool,
 ) -> Result<XmlScan> {
     let limits = XmlScanLimits::from_read_limits(read_limits);
-    if bytes.is_empty() || bytes.len() > limits.part_bytes {
-        return Err(invalid("PivotTable XML exceeds its Part limit"));
+    if bytes.is_empty() {
+        return Err(invalid("PivotTable XML part is empty"));
+    }
+    if bytes.len() > limits.part_bytes {
+        return Err(Error::limit(
+            LimitKind::PartBytes,
+            bytes.len(),
+            limits.part_bytes,
+        ));
     }
     validate_xml_characters(bytes)?;
     // Use the plain reader here instead of `NsReader`.  `NsReader` resolves
@@ -5312,7 +5300,7 @@ fn scan_xml_config(
             .checked_add(1)
             .ok_or_else(|| invalid("PivotTable XML event count overflows"))?;
         if events > limits.events {
-            return Err(invalid("PivotTable XML event count exceeds caller limit"));
+            return Err(Error::limit(LimitKind::Events, events, limits.events));
         }
         let before = origin
             .offset(reader.buffer_position())
@@ -5328,7 +5316,7 @@ fn scan_xml_config(
                 .checked_add(1)
                 .ok_or_else(|| invalid("PivotTable XML node count overflow"))?;
             if nodes > MAX_NODES {
-                return Err(invalid("PivotTable XML node count exceeds limit"));
+                return Err(Error::limit(LimitKind::Nodes, nodes, MAX_NODES));
             }
         }
         let is_start = matches!(&event, Event::Start(_));
@@ -6073,13 +6061,21 @@ fn parse_ignorable_namespaces(
             continue;
         }
         if attribute.value.len() > limits.attribute_bytes {
-            return Err(invalid("mc:Ignorable exceeds its text limit"));
+            return Err(Error::limit(
+                LimitKind::AttributeBytes,
+                attribute.value.len(),
+                limits.attribute_bytes,
+            ));
         }
         let value = attribute
             .decoded_and_normalized_value(quick_xml::XmlVersion::Explicit1_0, decoder)
             .map_err(|error| invalid(error.to_string()))?;
         if value.len() > limits.attribute_bytes {
-            return Err(invalid("mc:Ignorable exceeds its text limit"));
+            return Err(Error::limit(
+                LimitKind::AttributeBytes,
+                value.len(),
+                limits.attribute_bytes,
+            ));
         }
         for prefix in value.split([' ', '\t', '\r', '\n']) {
             if prefix.is_empty() {
@@ -6185,7 +6181,11 @@ fn resolved_name(
     }
     let (resolved, local_name) = resolver.resolve_element(name)?;
     if local_name.as_ref().len() > limits.name_bytes {
-        return Err(invalid("PivotTable XML local name exceeds caller limit"));
+        return Err(Error::limit(
+            LimitKind::NameBytes,
+            local_name.as_ref().len(),
+            limits.name_bytes,
+        ));
     }
     let ns = match resolved {
         NamespaceResolution::Bound(value) => value,
@@ -6259,7 +6259,11 @@ fn parse_attrs(
                 ));
             }
             if attribute.value.len() > limits.namespace_bytes {
-                return Err(invalid("PivotTable XML namespace URI exceeds caller limit"));
+                return Err(Error::limit(
+                    LimitKind::NamespaceBytes,
+                    attribute.value.len(),
+                    limits.namespace_bytes,
+                ));
             }
             continue;
         }
@@ -6317,8 +6321,13 @@ fn parse_attrs(
             .map_err(|error| invalid(error.to_string()))?
             .into_owned();
         validate_xml_characters(value.as_bytes())?;
-        if value.len() > MAX_ATTRIBUTE_TEXT_BYTES || value.len() > limits.attribute_bytes {
-            return Err(invalid("PivotTable attribute exceeds its text limit"));
+        let maximum = MAX_ATTRIBUTE_TEXT_BYTES.min(limits.attribute_bytes);
+        if value.len() > maximum {
+            return Err(Error::limit(
+                LimitKind::AttributeBytes,
+                value.len(),
+                maximum,
+            ));
         }
         let value_range = value_span(bytes, attribute.value.as_ref())?;
         let key_start = ptr_offset(bytes, attribute.key.0.as_ptr())?;
@@ -6351,7 +6360,11 @@ fn parse_attrs(
 
 fn decode_namespace_uri(value: &[u8], limits: XmlScanLimits) -> Result<Vec<u8>> {
     if value.len() > limits.namespace_bytes {
-        return Err(invalid("PivotTable XML namespace URI exceeds caller limit"));
+        return Err(Error::limit(
+            LimitKind::NamespaceBytes,
+            value.len(),
+            limits.namespace_bytes,
+        ));
     }
     let value = std::str::from_utf8(value).map_err(|error| {
         invalid(format!(
@@ -6362,7 +6375,11 @@ fn decode_namespace_uri(value: &[u8], limits: XmlScanLimits) -> Result<Vec<u8>> 
         .map_err(|error| invalid(format!("PivotTable XML namespace URI is invalid: {error}")))?;
     validate_xml_characters(decoded.as_bytes())?;
     if decoded.len() > limits.namespace_bytes {
-        return Err(invalid("PivotTable XML namespace URI exceeds caller limit"));
+        return Err(Error::limit(
+            LimitKind::NamespaceBytes,
+            decoded.len(),
+            limits.namespace_bytes,
+        ));
     }
     let mut result = Vec::new();
     result

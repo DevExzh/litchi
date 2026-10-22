@@ -7,6 +7,7 @@ use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
 
 use super::model::ShowDataTypeIcons;
+use super::{Error, LimitKind};
 use super::{
     MAX_DEPTH, MAX_EXTENSION_BYTES, MAX_NODES, MAX_PART_BYTES, SHOW_DATA_TYPE_ICONS_NAMESPACE,
     Target, invalid,
@@ -22,8 +23,15 @@ pub(crate) fn inspect_extension(
     markup: &[u8],
     target: Target,
 ) -> crate::Result<Option<ShowDataTypeIcons>> {
-    if markup.is_empty() || markup.len() > MAX_EXTENSION_BYTES {
-        return Err(invalid("data-type-icon extension exceeds its byte limit"));
+    if markup.is_empty() {
+        return Err(invalid("data-type-icon extension is empty"));
+    }
+    if markup.len() > MAX_EXTENSION_BYTES {
+        return Err(Error::limit(
+            LimitKind::ExtensionBytes,
+            markup.len(),
+            MAX_EXTENSION_BYTES,
+        ));
     }
     let mut reader = NsReader::from_reader(markup);
     reader.config_mut().trim_text(false);
@@ -42,10 +50,17 @@ pub(crate) fn inspect_extension(
         if !matches!(event, Event::Eof) {
             nodes = nodes
                 .checked_add(1)
-                .ok_or_else(|| invalid("data-type-icon extension node count overflow"))?;
+                .ok_or_else(|| Error::limit(LimitKind::XmlNodes, usize::MAX, MAX_NODES))?;
             if nodes > MAX_NODES {
-                return Err(invalid("data-type-icon extension node count exceeds limit"));
+                return Err(Error::limit(LimitKind::XmlNodes, nodes, MAX_NODES));
             }
+        }
+        if matches!(event, Event::Start(_) | Event::Empty(_)) && stack.len() >= MAX_DEPTH {
+            return Err(Error::limit(
+                LimitKind::XmlDepth,
+                stack.len().saturating_add(1),
+                MAX_DEPTH,
+            ));
         }
         let resolver = reader.resolver().clone();
         match event {
@@ -63,9 +78,6 @@ pub(crate) fn inspect_extension(
                 }
                 if root_closed && stack.is_empty() {
                     return Err(invalid("data-type-icon extension has multiple roots"));
-                }
-                if stack.len() >= MAX_DEPTH {
-                    return Err(invalid("data-type-icon extension depth exceeds limit"));
                 }
                 let parent = stack.last().copied();
                 if matches!(parent, Some(Frame::Ext)) && namespace.is_target() {
@@ -353,8 +365,15 @@ pub(crate) fn rewrite_extension(
     target: Target,
     value: Option<ShowDataTypeIcons>,
 ) -> crate::Result<Vec<u8>> {
-    if markup.is_empty() || markup.len() > MAX_EXTENSION_BYTES {
-        return Err(invalid("data-type-icon extension exceeds its byte limit"));
+    if markup.is_empty() {
+        return Err(invalid("data-type-icon extension is empty"));
+    }
+    if markup.len() > MAX_EXTENSION_BYTES {
+        return Err(Error::limit(
+            LimitKind::ExtensionBytes,
+            markup.len(),
+            MAX_EXTENSION_BYTES,
+        ));
     }
     let owner = Span {
         start: 0,
@@ -378,7 +397,9 @@ pub(crate) fn rewrite_extension(
                     .len()
                     .checked_add(replacement.len())
                     .and_then(|size| size.checked_add(name.len() + 3))
-                    .ok_or_else(|| invalid("data-type-icon output size overflow"))?;
+                    .ok_or_else(|| {
+                        Error::limit(LimitKind::PartBytes, usize::MAX, MAX_PART_BYTES)
+                    })?;
                 reserve_output(&mut output, size)?;
                 output.extend_from_slice(&markup[..slash]);
                 output.push(b'>');
@@ -393,10 +414,9 @@ pub(crate) fn rewrite_extension(
                     .iter()
                     .rposition(|byte| *byte == b'<')
                     .ok_or_else(|| invalid("data-type-icon extension closing tag is malformed"))?;
-                let size = markup
-                    .len()
-                    .checked_add(replacement.len())
-                    .ok_or_else(|| invalid("data-type-icon output size overflow"))?;
+                let size = markup.len().checked_add(replacement.len()).ok_or_else(|| {
+                    Error::limit(LimitKind::PartBytes, usize::MAX, MAX_PART_BYTES)
+                })?;
                 reserve_output(&mut output, size)?;
                 output.extend_from_slice(&markup[..close_start]);
                 output.extend_from_slice(&replacement);
@@ -460,7 +480,11 @@ pub(crate) fn rewrite(
     value: Option<ShowDataTypeIcons>,
 ) -> crate::Result<Vec<u8>> {
     if xml.len() > MAX_PART_BYTES {
-        return Err(invalid("data-type-icon source part exceeds its byte limit"));
+        return Err(Error::limit(
+            LimitKind::PartBytes,
+            xml.len(),
+            MAX_PART_BYTES,
+        ));
     }
     let owners = scan_owners(xml, owner_kind)?;
     let matching = owners
@@ -515,7 +539,7 @@ pub(crate) fn rewrite(
         let size = xml
             .len()
             .checked_add(replacement.len())
-            .ok_or_else(|| invalid("data-type-icon output size overflow"))?;
+            .ok_or_else(|| Error::limit(LimitKind::PartBytes, usize::MAX, MAX_PART_BYTES))?;
         reserve_output(&mut output, size)?;
         output.extend_from_slice(&xml[..close_start]);
         output.extend_from_slice(&replacement);
@@ -529,7 +553,7 @@ pub(crate) fn rewrite(
             .len()
             .checked_add(replacement.len())
             .and_then(|size| size.checked_add(name.len() + 3))
-            .ok_or_else(|| invalid("data-type-icon output size overflow"))?;
+            .ok_or_else(|| Error::limit(LimitKind::PartBytes, usize::MAX, MAX_PART_BYTES))?;
         reserve_output(&mut output, size)?;
         output.extend_from_slice(&xml[..owner.span.start]);
         output.extend_from_slice(&opening[..opening.len() - 2]);
@@ -545,11 +569,14 @@ pub(crate) fn rewrite(
 
 fn reserve_output(output: &mut Vec<u8>, size: usize) -> crate::Result<()> {
     if size > MAX_PART_BYTES {
-        return Err(invalid("data-type-icon output exceeds its byte limit"));
+        return Err(Error::limit(LimitKind::PartBytes, size, MAX_PART_BYTES));
     }
     output
         .try_reserve_exact(size)
-        .map_err(|_| invalid("data-type-icon output allocation failed"))
+        .map_err(|source| Error::Allocation {
+            resource: "data-type-icon output",
+            source,
+        })
 }
 
 fn replace_span(xml: &[u8], span: Span, replacement: &[u8]) -> crate::Result<Vec<u8>> {
@@ -557,7 +584,7 @@ fn replace_span(xml: &[u8], span: Span, replacement: &[u8]) -> crate::Result<Vec
         .len()
         .checked_sub(span.end.saturating_sub(span.start))
         .and_then(|size| size.checked_add(replacement.len()))
-        .ok_or_else(|| invalid("data-type-icon output size overflow"))?;
+        .ok_or_else(|| Error::limit(LimitKind::PartBytes, usize::MAX, MAX_PART_BYTES))?;
     let mut output = Vec::new();
     reserve_output(&mut output, size)?;
     output.extend_from_slice(&xml[..span.start]);
@@ -605,10 +632,17 @@ fn find_target(xml: &[u8], owner: Span, target: Target) -> crate::Result<Option<
         if !matches!(event, Event::Eof) {
             nodes = nodes
                 .checked_add(1)
-                .ok_or_else(|| invalid("data-type-icon target node count overflow"))?;
+                .ok_or_else(|| Error::limit(LimitKind::XmlNodes, usize::MAX, MAX_NODES))?;
             if nodes > MAX_NODES {
-                return Err(invalid("data-type-icon target node count exceeds limit"));
+                return Err(Error::limit(LimitKind::XmlNodes, nodes, MAX_NODES));
             }
+        }
+        if matches!(event, Event::Start(_) | Event::Empty(_)) && depth >= MAX_DEPTH {
+            return Err(Error::limit(
+                LimitKind::XmlDepth,
+                depth.saturating_add(1),
+                MAX_DEPTH,
+            ));
         }
         let resolver = reader.resolver().clone();
         match event {
@@ -634,7 +668,7 @@ fn find_target(xml: &[u8], owner: Span, target: Target) -> crate::Result<Option<
                 }
                 depth = depth
                     .checked_add(1)
-                    .ok_or_else(|| invalid("data-type-icon target depth overflow"))?;
+                    .ok_or_else(|| Error::limit(LimitKind::XmlDepth, usize::MAX, MAX_DEPTH))?;
             },
             Event::Empty(element) => {
                 let (namespace, local) = resolve(&resolver, element.name());
@@ -715,10 +749,17 @@ fn scan_owners(xml: &[u8], owner_kind: OwnerKind) -> crate::Result<Vec<OwnerSpan
         if !matches!(event, Event::Eof) {
             nodes = nodes
                 .checked_add(1)
-                .ok_or_else(|| invalid("data-type-icon source node count overflow"))?;
+                .ok_or_else(|| Error::limit(LimitKind::XmlNodes, usize::MAX, MAX_NODES))?;
             if nodes > MAX_NODES {
-                return Err(invalid("data-type-icon source node count exceeds limit"));
+                return Err(Error::limit(LimitKind::XmlNodes, nodes, MAX_NODES));
             }
+        }
+        if matches!(event, Event::Start(_) | Event::Empty(_)) && stack.len() >= MAX_DEPTH {
+            return Err(Error::limit(
+                LimitKind::XmlDepth,
+                stack.len().saturating_add(1),
+                MAX_DEPTH,
+            ));
         }
         let resolver = reader.resolver().clone();
         match event {
@@ -755,7 +796,7 @@ fn scan_owners(xml: &[u8], owner_kind: OwnerKind) -> crate::Result<Vec<OwnerSpan
                     let index = next_owner_index;
                     next_owner_index = next_owner_index
                         .checked_add(1)
-                        .ok_or_else(|| invalid("data-type-icon owner count overflow"))?;
+                        .ok_or_else(|| Error::limit(LimitKind::XmlNodes, usize::MAX, MAX_NODES))?;
                     index
                 } else if matches!(node_kind, NodeKind::ExtList | NodeKind::Ext) {
                     parent.map_or(0, |parent| parent.owner_index)

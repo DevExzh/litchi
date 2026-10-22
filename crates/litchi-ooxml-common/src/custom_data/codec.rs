@@ -34,9 +34,9 @@ const MAX_UID_UNITS: usize = 65_535;
 
 /// Resource ceilings for the bounded Custom Data XML codec.
 ///
-/// The public convenience functions use [`Self::standard`].  Package owners
-/// should pass a lower profile through the `_with_limits` functions before
-/// parsing or constructing any temporary XML state.  Every field is capped by
+/// Every codec function takes its profile as a required argument;
+/// [`Self::standard`] is the default one.  Package owners pass a lower
+/// profile before parsing or constructing any temporary XML state.  Every field is capped by
 /// an immutable format-wide maximum; callers may tighten, but never widen,
 /// those ceilings.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -104,51 +104,59 @@ impl Limits {
     pub const fn validate(self) -> Result<Self> {
         if self.properties_xml_bytes > MAX_PROPERTIES_XML_BYTES {
             return Err(limit_for(
-                "properties XML bytes",
+                crate::LimitKind::PropertiesXmlBytes,
                 self.properties_xml_bytes,
                 MAX_PROPERTIES_XML_BYTES,
             ));
         }
         if self.extension_xml_bytes > MAX_EXTENSION_XML_BYTES {
             return Err(limit_for(
-                "extension XML bytes",
+                crate::LimitKind::ExtensionXmlBytes,
                 self.extension_xml_bytes,
                 MAX_EXTENSION_XML_BYTES,
             ));
         }
         if self.string_bytes > MAX_STRING_BYTES {
             return Err(limit_for(
-                "XML string bytes",
+                crate::LimitKind::XmlStringBytes,
                 self.string_bytes,
                 MAX_STRING_BYTES,
             ));
         }
         if self.nodes > MAX_NODES {
-            return Err(limit_for("XML node count", self.nodes, MAX_NODES));
+            return Err(limit_for(
+                crate::LimitKind::XmlNodeCount,
+                self.nodes,
+                MAX_NODES,
+            ));
         }
         if self.events > MAX_EVENTS {
-            return Err(limit_for("XML event count", self.events, MAX_EVENTS));
+            return Err(limit_for(
+                crate::LimitKind::XmlEventCount,
+                self.events,
+                MAX_EVENTS,
+            ));
         }
         if self.depth > MAX_DEPTH {
-            return Err(limit_for("XML depth", self.depth, MAX_DEPTH));
+            return Err(limit_for(crate::LimitKind::XmlDepth, self.depth, MAX_DEPTH));
         }
         if self.namespace_bytes > MAX_NAMESPACE_BYTES {
             return Err(limit_for(
-                "Custom Data XML namespace bytes",
+                crate::LimitKind::CustomDataXmlNamespaceBytes,
                 self.namespace_bytes,
                 MAX_NAMESPACE_BYTES,
             ));
         }
         if self.attributes > MAX_ATTRIBUTES {
             return Err(limit_for(
-                "XML attribute count",
+                crate::LimitKind::XmlAttributeCount,
                 self.attributes,
                 MAX_ATTRIBUTES,
             ));
         }
         if self.uid_units > MAX_UID_UNITS {
             return Err(limit_for(
-                "Custom Data UID UTF-16 units",
+                crate::LimitKind::CustomDataUidUtf16Units,
                 self.uid_units,
                 MAX_UID_UNITS,
             ));
@@ -218,12 +226,6 @@ impl Limits {
         self.uid_units = value;
         self
     }
-
-    /// Alias for [`Self::with_uid_units`].
-    #[must_use]
-    pub const fn with_max_uid_units(self, value: usize) -> Self {
-        self.with_uid_units(value)
-    }
 }
 
 impl Default for Limits {
@@ -292,7 +294,7 @@ impl NamespaceState {
     fn seed(&mut self, bindings: &[(String, String)], limits: &Limits) -> Result<()> {
         check_limit(
             limits,
-            "XML namespace binding count",
+            crate::LimitKind::XmlNamespaceBindingCount,
             bindings.len(),
             limits.attributes,
         )?;
@@ -303,27 +305,31 @@ impl NamespaceState {
         for (prefix, uri) in bindings {
             let binding_bytes = prefix.len().checked_add(uri.len()).ok_or_else(|| {
                 limit_for(
-                    "Custom Data XML namespace bytes",
+                    crate::LimitKind::CustomDataXmlNamespaceBytes,
                     usize::MAX,
                     limits.namespace_bytes,
                 )
             })?;
             bytes = bytes.checked_add(binding_bytes).ok_or_else(|| {
                 limit_for(
-                    "Custom Data XML namespace bytes",
+                    crate::LimitKind::CustomDataXmlNamespaceBytes,
                     usize::MAX,
                     limits.namespace_bytes,
                 )
             })?;
             check_limit(
                 limits,
-                "Custom Data XML namespace bytes",
+                crate::LimitKind::CustomDataXmlNamespaceBytes,
                 bytes,
                 limits.namespace_bytes,
             )?;
             self.bindings.push(NamespaceBinding {
-                prefix: copy_string(prefix, "Custom Data XML namespace prefix", limits)?,
-                uri: copy_string(uri, "Custom Data XML namespace URI", limits)?,
+                prefix: copy_string(
+                    prefix,
+                    crate::LimitKind::CustomDataXmlNamespacePrefix,
+                    limits,
+                )?,
+                uri: copy_string(uri, crate::LimitKind::CustomDataXmlNamespaceUri, limits)?,
             });
         }
         self.bytes = bytes;
@@ -333,7 +339,7 @@ impl NamespaceState {
     fn snapshot(&self, limits: &Limits) -> Result<Vec<(String, String)>> {
         check_limit(
             limits,
-            "XML namespace binding count",
+            crate::LimitKind::XmlNamespaceBindingCount,
             self.bindings.len(),
             limits.attributes,
         )?;
@@ -342,8 +348,16 @@ impl NamespaceState {
             .try_reserve(self.bindings.len())
             .map_err(|source| allocation("Custom Data XML namespace snapshot", source))?;
         for binding in &self.bindings {
-            let prefix = copy_string(&binding.prefix, "Custom Data XML namespace prefix", limits)?;
-            let uri = copy_string(&binding.uri, "Custom Data XML namespace URI", limits)?;
+            let prefix = copy_string(
+                &binding.prefix,
+                crate::LimitKind::CustomDataXmlNamespacePrefix,
+                limits,
+            )?;
+            let uri = copy_string(
+                &binding.uri,
+                crate::LimitKind::CustomDataXmlNamespaceUri,
+                limits,
+            )?;
             snapshot.push((prefix, uri));
         }
         Ok(snapshot)
@@ -358,7 +372,7 @@ impl NamespaceState {
         let attribute_count = count_up_to(element, limits.attributes);
         check_limit(
             limits,
-            "XML attribute count",
+            crate::LimitKind::XmlAttributeCount,
             attribute_count,
             limits.attributes,
         )?;
@@ -374,7 +388,7 @@ impl NamespaceState {
             };
             check_limit(
                 limits,
-                "XML string bytes",
+                crate::LimitKind::XmlStringBytes,
                 item.value.as_ref().len(),
                 limits.string_bytes,
             )?;
@@ -392,21 +406,21 @@ impl NamespaceState {
             }
             let binding_bytes = prefix.len().checked_add(value.len()).ok_or_else(|| {
                 limit_for(
-                    "Custom Data XML namespace bytes",
+                    crate::LimitKind::CustomDataXmlNamespaceBytes,
                     usize::MAX,
                     limits.namespace_bytes,
                 )
             })?;
             let total_bytes = self.bytes.checked_add(binding_bytes).ok_or_else(|| {
                 limit_for(
-                    "Custom Data XML namespace bytes",
+                    crate::LimitKind::CustomDataXmlNamespaceBytes,
                     usize::MAX,
                     limits.namespace_bytes,
                 )
             })?;
             check_limit(
                 limits,
-                "Custom Data XML namespace bytes",
+                crate::LimitKind::CustomDataXmlNamespaceBytes,
                 total_bytes,
                 limits.namespace_bytes,
             )?;
@@ -475,7 +489,7 @@ fn decorate_extension_fragment(
         return copy_bounded(
             xml,
             limits.extension_xml_bytes,
-            "extension XML bytes",
+            crate::LimitKind::ExtensionXmlBytes,
             limits,
         );
     }
@@ -490,7 +504,7 @@ fn decorate_extension_fragment(
                 .and_then(|length| length.checked_add(b"=\"".len()))
                 .ok_or_else(|| {
                     limit_for(
-                        "extension XML bytes",
+                        crate::LimitKind::ExtensionXmlBytes,
                         usize::MAX,
                         limits.extension_xml_bytes,
                     )
@@ -503,7 +517,7 @@ fn decorate_extension_fragment(
             .and_then(|length| length.checked_add(1))
             .ok_or_else(|| {
                 limit_for(
-                    "extension XML bytes",
+                    crate::LimitKind::ExtensionXmlBytes,
                     usize::MAX,
                     limits.extension_xml_bytes,
                 )
@@ -511,14 +525,14 @@ fn decorate_extension_fragment(
     }
     let total = xml.len().checked_add(added).ok_or_else(|| {
         limit_for(
-            "extension XML bytes",
+            crate::LimitKind::ExtensionXmlBytes,
             usize::MAX,
             limits.extension_xml_bytes,
         )
     })?;
     check_limit(
         limits,
-        "extension XML bytes",
+        crate::LimitKind::ExtensionXmlBytes,
         total,
         limits.extension_xml_bytes,
     )?;
@@ -592,7 +606,7 @@ fn extension_root_opening(xml: &[u8], limits: &Limits) -> Result<(Range<usize>, 
         let attribute_count = count_up_to(element, limits.attributes);
         check_limit(
             limits,
-            "XML attribute count",
+            crate::LimitKind::XmlAttributeCount,
             attribute_count,
             limits.attributes,
         )?;
@@ -619,8 +633,13 @@ fn is_xml_space_only(value: &str) -> bool {
 fn count_event(events: &mut usize, limits: &Limits) -> Result<()> {
     *events = events
         .checked_add(1)
-        .ok_or_else(|| limit_for("XML event count", usize::MAX, limits.events))?;
-    check_limit(limits, "XML event count", *events, limits.events)
+        .ok_or_else(|| limit_for(crate::LimitKind::XmlEventCount, usize::MAX, limits.events))?;
+    check_limit(
+        limits,
+        crate::LimitKind::XmlEventCount,
+        *events,
+        limits.events,
+    )
 }
 
 fn escaped_attribute_len(value: &str) -> Result<usize> {
@@ -633,9 +652,13 @@ fn escaped_attribute_len(value: &str) -> Result<usize> {
             '"' | '\'' => 6,
             _ => character.len_utf8(),
         };
-        length = length
-            .checked_add(added)
-            .ok_or_else(|| limit_for("escaped XML attribute length", usize::MAX, usize::MAX))?;
+        length = length.checked_add(added).ok_or_else(|| {
+            limit_for(
+                crate::LimitKind::EscapedXmlAttributeLength,
+                usize::MAX,
+                usize::MAX,
+            )
+        })?;
     }
     Ok(length)
 }
@@ -665,12 +688,10 @@ fn append_escaped_attribute(output: &mut Vec<u8>, value: &str) {
 /// returned standalone fragment receives equivalent declarations on its own
 /// root.  The package host retains the original document separately for
 /// source-bound no-op preservation.
-pub fn parse_properties(xml: &[u8]) -> Result<Properties> {
-    parse_properties_with_limits(xml, &Limits::standard())
-}
-
-/// Parse one Custom Data Properties part under an explicit resource profile.
-pub fn parse_properties_with_limits(xml: &[u8], limits: &Limits) -> Result<Properties> {
+///
+/// `limits` is the resource profile ([`Limits::standard`] for the default
+/// ceilings).
+pub fn parse_properties(xml: &[u8], limits: &Limits) -> Result<Properties> {
     let limits = limits.validate()?;
     let info = parse_document(xml, ExpectedRoot::Properties, false, &limits)?;
     let id = info
@@ -680,7 +701,7 @@ pub fn parse_properties_with_limits(xml: &[u8], limits: &Limits) -> Result<Prope
         let extension = copy_bounded(
             &xml[range],
             limits.extension_xml_bytes,
-            "extension XML bytes",
+            crate::LimitKind::ExtensionXmlBytes,
             &limits,
         )?;
         let extension = if let Some(context) = info.extension_context.as_deref() {
@@ -705,13 +726,9 @@ pub fn parse_properties_with_limits(xml: &[u8], limits: &Limits) -> Result<Prope
 ///
 /// The root wrapper is compact and stable.  A supplied extension list is
 /// validated and then copied byte-for-byte into the wrapper.
-pub fn write_properties(value: &Properties) -> Result<Vec<u8>> {
-    write_properties_with_limits(value, &Limits::standard())
-}
-
-/// Deterministically serialize Custom Data Properties under an explicit
-/// resource profile.
-pub fn write_properties_with_limits(value: &Properties, limits: &Limits) -> Result<Vec<u8>> {
+/// `limits` is the resource profile ([`Limits::standard`] for the default
+/// ceilings).
+pub fn write_properties(value: &Properties, limits: &Limits) -> Result<Vec<u8>> {
     let limits = limits.validate()?;
     validate_properties(value, false, &limits)?;
     let id_len = escaped_xstring_len(&value.id, &limits)?;
@@ -749,14 +766,14 @@ pub fn write_properties_with_limits(value: &Properties, limits: &Limits) -> Resu
         })
         .ok_or_else(|| {
             limit_for(
-                "serialized properties XML bytes",
+                crate::LimitKind::SerializedPropertiesXmlBytes,
                 usize::MAX,
                 limits.properties_xml_bytes,
             )
         })?;
     check_limit(
         &limits,
-        "serialized properties XML bytes",
+        crate::LimitKind::SerializedPropertiesXmlBytes,
         total,
         limits.properties_xml_bytes,
     )?;
@@ -780,26 +797,13 @@ pub fn write_properties_with_limits(value: &Properties, limits: &Limits) -> Resu
     Ok(output)
 }
 
-/// Replace only the required root `id` value in a validated source part.
+/// Replace only the required root `id` value in a validated source part,
+/// under the source resource profile `limits` and a replacement-output
+/// ceiling `max_output_bytes` (at most `limits.properties_xml_bytes`
+/// applies). An exact no-op shares the source token without constructing
+/// output.
 #[doc(hidden)]
-pub fn rewrite_id(source: &litchi_opc::OwnedXmlPart, id: &str) -> Result<litchi_opc::OwnedXmlPart> {
-    rewrite_id_with_limits(source, id, &Limits::standard())
-}
-
-/// Rewrite one source-bound UID under an explicit resource profile.
-#[doc(hidden)]
-pub fn rewrite_id_with_limits(
-    source: &litchi_opc::OwnedXmlPart,
-    id: &str,
-    limits: &Limits,
-) -> Result<litchi_opc::OwnedXmlPart> {
-    rewrite_id_with_limits_and_output(source, id, limits, limits.properties_xml_bytes)
-}
-
-/// Rewrite a retained UID with independent source and replacement-output limits.
-/// An exact no-op shares the source token without constructing output.
-#[doc(hidden)]
-pub fn rewrite_id_with_limits_and_output(
+pub fn rewrite_id(
     source: &litchi_opc::OwnedXmlPart,
     id: &str,
     limits: &Limits,
@@ -823,48 +827,31 @@ pub fn rewrite_id_with_limits_and_output(
         .len()
         .checked_sub(range.len())
         .and_then(|length| length.checked_add(replacement_len))
-        .ok_or_else(|| limit_for("properties XML output", usize::MAX, maximum))?;
-    check_limit(&limits, "properties XML output", output_len, maximum)?;
+        .ok_or_else(|| limit_for(crate::LimitKind::PropertiesXmlOutput, usize::MAX, maximum))?;
+    check_limit(
+        &limits,
+        crate::LimitKind::PropertiesXmlOutput,
+        output_len,
+        maximum,
+    )?;
     let replacement = try_escaped_xstring(id, &limits)?;
     let result = source.replace_attributes(&[(range, replacement)])?;
     check_limit(
         &limits,
-        "properties XML output",
+        crate::LimitKind::PropertiesXmlOutput,
         result.bytes().len(),
         maximum,
     )?;
     Ok(result)
 }
 
-/// Replace or remove only the direct `extLst` child of a retained source root.
+/// Replace or remove only the direct `extLst` child of a retained source
+/// root, under the source resource profile `limits` and a
+/// replacement-output ceiling `max_output_bytes` (at most
+/// `limits.properties_xml_bytes` applies). Exact no-ops retain their
+/// original source token.
 #[doc(hidden)]
 pub fn rewrite_extension_list(
-    source: &litchi_opc::OwnedXmlPart,
-    extension: Option<&ExtensionList>,
-) -> Result<litchi_opc::OwnedXmlPart> {
-    rewrite_extension_list_with_limits(source, extension, &Limits::standard())
-}
-
-/// Replace or remove one source-bound extension list under an explicit
-/// resource profile.
-#[doc(hidden)]
-pub fn rewrite_extension_list_with_limits(
-    source: &litchi_opc::OwnedXmlPart,
-    extension: Option<&ExtensionList>,
-    limits: &Limits,
-) -> Result<litchi_opc::OwnedXmlPart> {
-    rewrite_extension_list_with_limits_and_output(
-        source,
-        extension,
-        limits,
-        limits.properties_xml_bytes,
-    )
-}
-
-/// Rewrite a retained extension with independent source and replacement-output
-/// limits. Exact no-ops retain their original source token.
-#[doc(hidden)]
-pub fn rewrite_extension_list_with_limits_and_output(
     source: &litchi_opc::OwnedXmlPart,
     extension: Option<&ExtensionList>,
     limits: &Limits,
@@ -881,11 +868,16 @@ pub fn rewrite_extension_list_with_limits_and_output(
                 .len()
                 .checked_sub(removed)
                 .ok_or_else(|| invalid("Custom Data extension range exceeds source"))?;
-            check_limit(&limits, "properties XML output", output_len, maximum)?;
+            check_limit(
+                &limits,
+                crate::LimitKind::PropertiesXmlOutput,
+                output_len,
+                maximum,
+            )?;
             let result = source.remove_element(range)?;
             check_limit(
                 &limits,
-                "properties XML output",
+                crate::LimitKind::PropertiesXmlOutput,
                 result.bytes().len(),
                 maximum,
             )?;
@@ -926,14 +918,19 @@ pub fn rewrite_extension_list_with_limits_and_output(
         .checked_sub(info.extension.as_ref().map_or(0, Range::len))
         .and_then(|n| n.checked_add(extension.xml.len()))
         .and_then(|n| n.checked_add(expansion))
-        .ok_or_else(|| limit_for("properties XML output", usize::MAX, maximum))?;
-    check_limit(&limits, "properties XML output", output_len, maximum)?;
+        .ok_or_else(|| limit_for(crate::LimitKind::PropertiesXmlOutput, usize::MAX, maximum))?;
+    check_limit(
+        &limits,
+        crate::LimitKind::PropertiesXmlOutput,
+        output_len,
+        maximum,
+    )?;
     match info.extension_open {
         Some(range) => {
             let result = source.replace_element(range, &extension.xml)?;
             check_limit(
                 &limits,
-                "properties XML output",
+                crate::LimitKind::PropertiesXmlOutput,
                 result.bytes().len(),
                 maximum,
             )?;
@@ -943,7 +940,7 @@ pub fn rewrite_extension_list_with_limits_and_output(
             let result = source.append_element(info.root_open, &extension.xml)?;
             check_limit(
                 &limits,
-                "properties XML output",
+                crate::LimitKind::PropertiesXmlOutput,
                 result.bytes().len(),
                 maximum,
             )?;
@@ -957,13 +954,7 @@ pub fn rewrite_extension_list_with_limits_and_output(
 /// No canonicalization is performed: lexical source bytes are part of the
 /// preservation contract.
 #[doc(hidden)]
-pub fn canonical_extension(extension: Option<&ExtensionList>) -> Result<Option<Vec<u8>>> {
-    canonical_extension_with_limits(extension, &Limits::standard())
-}
-
-/// Validate and retain an extension projection under an explicit profile.
-#[doc(hidden)]
-pub fn canonical_extension_with_limits(
+pub fn canonical_extension(
     extension: Option<&ExtensionList>,
     limits: &Limits,
 ) -> Result<Option<Vec<u8>>> {
@@ -974,7 +965,7 @@ pub fn canonical_extension_with_limits(
             copy_bounded(
                 &extension.xml,
                 limits.extension_xml_bytes,
-                "extension XML bytes",
+                crate::LimitKind::ExtensionXmlBytes,
                 &limits,
             )
         })
@@ -988,24 +979,15 @@ pub fn canonical_extension_with_limits(
 /// staged fragment that relies on a host root must be validated through the
 /// source-context rewrite path instead.
 #[doc(hidden)]
-pub fn validate_source_properties(value: &Properties) -> Result<()> {
-    validate_source_properties_with_limits(value, &Limits::standard())
-}
-
-/// Validate source-bound properties under an explicit resource profile.
-#[doc(hidden)]
-pub fn validate_source_properties_with_limits(value: &Properties, limits: &Limits) -> Result<()> {
+pub fn validate_source_properties(value: &Properties, limits: &Limits) -> Result<()> {
     let limits = limits.validate()?;
     validate_properties(value, false, &limits)
 }
 
-/// Validate that a source belongs to a SpreadsheetML workbook part.
-pub fn validate_workbook_root(xml: &[u8]) -> Result<()> {
-    validate_workbook_root_with_limits(xml, &Limits::standard())
-}
-
-/// Validate a workbook root under an explicit resource profile.
-pub fn validate_workbook_root_with_limits(xml: &[u8], limits: &Limits) -> Result<()> {
+/// Validate that a source belongs to a SpreadsheetML workbook part, under
+/// the resource profile `limits` ([`Limits::standard`] for the default
+/// ceilings).
+pub fn validate_workbook_root(xml: &[u8], limits: &Limits) -> Result<()> {
     let limits = limits.validate()?;
     let (namespace, name) = scan_generic_document(xml, &limits)?;
     if name == "workbook" && matches!(namespace.as_str(), SML | STRICT_SML) {
@@ -1035,7 +1017,7 @@ fn parse_document_with_context(
 ) -> Result<SourceInfo> {
     check_limit(
         limits,
-        "properties XML bytes",
+        crate::LimitKind::PropertiesXmlBytes,
         xml.len(),
         limits.properties_xml_bytes,
     )?;
@@ -1067,9 +1049,9 @@ fn parse_document_with_context(
         let end = position(&reader, origin)?;
         match event {
             Event::Start(element) => {
-                nodes = nodes
-                    .checked_add(1)
-                    .ok_or_else(|| limit_for("XML node count", usize::MAX, limits.nodes))?;
+                nodes = nodes.checked_add(1).ok_or_else(|| {
+                    limit_for(crate::LimitKind::XmlNodeCount, usize::MAX, limits.nodes)
+                })?;
                 check_structure(nodes, stack.len(), limits)?;
                 let depth = stack.len();
                 let insertion_context = if expected == ExpectedRoot::Properties && depth == 1 {
@@ -1196,9 +1178,9 @@ fn parse_document_with_context(
                 });
             },
             Event::Empty(element) => {
-                nodes = nodes
-                    .checked_add(1)
-                    .ok_or_else(|| limit_for("XML node count", usize::MAX, limits.nodes))?;
+                nodes = nodes.checked_add(1).ok_or_else(|| {
+                    limit_for(crate::LimitKind::XmlNodeCount, usize::MAX, limits.nodes)
+                })?;
                 check_structure(nodes, stack.len(), limits)?;
                 let depth = stack.len();
                 let insertion_context = if expected == ExpectedRoot::Properties && depth == 1 {
@@ -1259,7 +1241,7 @@ fn parse_document_with_context(
                             extension = Some(start..end);
                             check_limit(
                                 limits,
-                                "extension XML bytes",
+                                crate::LimitKind::ExtensionXmlBytes,
                                 end.checked_sub(start)
                                     .ok_or_else(|| invalid("invalid extension XML source range"))?,
                                 limits.extension_xml_bytes,
@@ -1338,7 +1320,7 @@ fn parse_document_with_context(
                 if frame.kind == FrameKind::ExtensionList && expected == ExpectedRoot::Properties {
                     check_limit(
                         limits,
-                        "extension XML bytes",
+                        crate::LimitKind::ExtensionXmlBytes,
                         end.checked_sub(frame.start)
                             .ok_or_else(|| invalid("invalid extension XML source range"))?,
                         limits.extension_xml_bytes,
@@ -1356,7 +1338,7 @@ fn parse_document_with_context(
             Event::Text(text) => {
                 check_limit(
                     limits,
-                    "XML string bytes",
+                    crate::LimitKind::XmlStringBytes,
                     text.as_ref().len(),
                     limits.string_bytes,
                 )?;
@@ -1460,7 +1442,7 @@ fn parse_document_with_context(
 fn scan_generic_document(xml: &[u8], limits: &Limits) -> Result<(String, String)> {
     check_limit(
         limits,
-        "properties XML bytes",
+        crate::LimitKind::PropertiesXmlBytes,
         xml.len(),
         limits.properties_xml_bytes,
     )?;
@@ -1478,9 +1460,9 @@ fn scan_generic_document(xml: &[u8], limits: &Limits) -> Result<(String, String)
         count_event(&mut events, limits)?;
         match event {
             Event::Start(element) => {
-                nodes = nodes
-                    .checked_add(1)
-                    .ok_or_else(|| limit_for("XML node count", usize::MAX, limits.nodes))?;
+                nodes = nodes.checked_add(1).ok_or_else(|| {
+                    limit_for(crate::LimitKind::XmlNodeCount, usize::MAX, limits.nodes)
+                })?;
                 check_structure(nodes, stack.len(), limits)?;
                 namespaces.enter(&reader, &element, limits)?;
                 let _ = element_attributes(&reader, &element, xml, &namespaces, false, limits)?;
@@ -1497,9 +1479,9 @@ fn scan_generic_document(xml: &[u8], limits: &Limits) -> Result<(String, String)
                 stack.push(name);
             },
             Event::Empty(element) => {
-                nodes = nodes
-                    .checked_add(1)
-                    .ok_or_else(|| limit_for("XML node count", usize::MAX, limits.nodes))?;
+                nodes = nodes.checked_add(1).ok_or_else(|| {
+                    limit_for(crate::LimitKind::XmlNodeCount, usize::MAX, limits.nodes)
+                })?;
                 check_structure(nodes, stack.len(), limits)?;
                 namespaces.enter(&reader, &element, limits)?;
                 let _ = element_attributes(&reader, &element, xml, &namespaces, false, limits)?;
@@ -1525,7 +1507,7 @@ fn scan_generic_document(xml: &[u8], limits: &Limits) -> Result<(String, String)
             Event::Text(text) => {
                 check_limit(
                     limits,
-                    "XML string bytes",
+                    crate::LimitKind::XmlStringBytes,
                     text.as_ref().len(),
                     limits.string_bytes,
                 )?;
@@ -1634,7 +1616,7 @@ fn validate_extension_attributes(attributes: &[Attribute], limits: &Limits) -> R
             if uri {
                 return Err(invalid("duplicate core SpreadsheetML ext uri attribute"));
             }
-            bounded_string(&attribute.value, "extension URI", limits)?;
+            bounded_string(&attribute.value, crate::LimitKind::ExtensionUri, limits)?;
             uri = true;
         } else {
             return Err(invalid(
@@ -1663,7 +1645,7 @@ fn element_attributes(
     let attribute_count = count_up_to(element, limits.attributes);
     check_limit(
         limits,
-        "XML attribute count",
+        crate::LimitKind::XmlAttributeCount,
         attribute_count,
         limits.attributes,
     )?;
@@ -1679,7 +1661,7 @@ fn element_attributes(
         let key = item.key.as_ref();
         check_limit(
             limits,
-            "XML string bytes",
+            crate::LimitKind::XmlStringBytes,
             item.value.as_ref().len(),
             limits.string_bytes,
         )?;
@@ -1697,7 +1679,12 @@ fn element_attributes(
             validate_namespace_declaration(key, &value)?;
             continue;
         }
-        check_limit(limits, "XML string bytes", key.len(), limits.string_bytes)?;
+        check_limit(
+            limits,
+            crate::LimitKind::XmlStringBytes,
+            key.len(),
+            limits.string_bytes,
+        )?;
         let namespace = namespaces.resolve(item.key, allow_inherited_namespaces, true)?;
         let name = std::str::from_utf8(item.key.local_name().as_ref())
             .map_err(xml_error)?
@@ -1769,7 +1756,7 @@ fn element_name(
     let local_name = name.local_name();
     check_limit(
         limits,
-        "XML string bytes",
+        crate::LimitKind::XmlStringBytes,
         local_name.as_ref().len(),
         limits.string_bytes,
     )?;
@@ -1787,11 +1774,15 @@ fn position(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
 
 fn check_structure(nodes: usize, depth: usize, limits: &Limits) -> Result<()> {
     if nodes > limits.nodes {
-        return Err(limit_for("XML node count", nodes, limits.nodes));
+        return Err(limit_for(
+            crate::LimitKind::XmlNodeCount,
+            nodes,
+            limits.nodes,
+        ));
     }
     if depth >= limits.depth {
         return Err(limit_for(
-            "XML depth",
+            crate::LimitKind::XmlDepth,
             depth.saturating_add(1),
             limits.depth,
         ));
@@ -1808,7 +1799,7 @@ fn validate_properties(
     if let Some(extension) = &value.extension_list {
         check_limit(
             limits,
-            "extension XML bytes",
+            crate::LimitKind::ExtensionXmlBytes,
             extension.xml.len(),
             limits.extension_xml_bytes,
         )?;
@@ -1821,11 +1812,11 @@ fn validate_id(value: &str, limits: &Limits) -> Result<()> {
     let units = value.encode_utf16().count();
     check_limit(
         limits,
-        "Custom Data storage id UTF-16 units",
+        crate::LimitKind::CustomDataStorageIdUtf16Units,
         units,
         limits.uid_units,
     )?;
-    bounded_string(value, "storage id bytes", limits)
+    bounded_string(value, crate::LimitKind::StorageIdBytes, limits)
 }
 
 #[cfg(test)]
@@ -1857,7 +1848,7 @@ fn validate_extension_fragment_with_context_and_mode(
 ) -> Result<()> {
     check_limit(
         limits,
-        "extension XML bytes",
+        crate::LimitKind::ExtensionXmlBytes,
         xml.len(),
         limits.extension_xml_bytes,
     )?;
@@ -1876,31 +1867,41 @@ fn validate_extension_fragment_with_context_and_mode(
     Ok(())
 }
 
-fn bounded_string(value: &str, name: &'static str, limits: &Limits) -> Result<()> {
+fn bounded_string(value: &str, name: crate::LimitKind, limits: &Limits) -> Result<()> {
     check_limit(limits, name, value.len(), limits.string_bytes)
 }
 
-fn copy_bounded(value: &[u8], max: usize, name: &'static str, limits: &Limits) -> Result<Vec<u8>> {
+fn copy_bounded(
+    value: &[u8],
+    max: usize,
+    name: crate::LimitKind,
+    limits: &Limits,
+) -> Result<Vec<u8>> {
     check_limit(limits, name, value.len(), max)?;
     let mut output = Vec::new();
     output
         .try_reserve_exact(value.len())
-        .map_err(|source| allocation(name, source))?;
+        .map_err(|source| allocation(name.as_str(), source))?;
     output.extend_from_slice(value);
     Ok(output)
 }
 
-fn copy_string(value: &str, name: &'static str, limits: &Limits) -> Result<String> {
+fn copy_string(value: &str, name: crate::LimitKind, limits: &Limits) -> Result<String> {
     check_limit(limits, name, value.len(), limits.string_bytes)?;
     let mut output = String::new();
     output
         .try_reserve_exact(value.len())
-        .map_err(|source| allocation(name, source))?;
+        .map_err(|source| allocation(name.as_str(), source))?;
     output.push_str(value);
     Ok(output)
 }
 
-fn check_limit(_limits: &Limits, resource: &'static str, actual: usize, max: usize) -> Result<()> {
+fn check_limit(
+    _limits: &Limits,
+    resource: crate::LimitKind,
+    actual: usize,
+    max: usize,
+) -> Result<()> {
     if actual > max {
         Err(limit_for(resource, actual, max))
     } else {
@@ -1912,11 +1913,11 @@ fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
 }
 
-const fn limit_for(resource: &'static str, actual: usize, max: usize) -> Error {
+const fn limit_for(resource: crate::LimitKind, actual: usize, max: usize) -> Error {
     Error::Limit {
-        resource,
-        max,
-        actual,
+        kind: resource,
+        maximum: max,
+        observed: actual,
     }
 }
 
@@ -1984,13 +1985,18 @@ fn escaped_xstring_len(value: &str, limits: &Limits) -> Result<usize> {
         };
         length = length.checked_add(added).ok_or_else(|| {
             limit_for(
-                "escaped XML attribute length",
+                crate::LimitKind::EscapedXmlAttributeLength,
                 usize::MAX,
                 limits.string_bytes,
             )
         })?;
     }
-    check_limit(limits, "storage id bytes", length, limits.string_bytes)?;
+    check_limit(
+        limits,
+        crate::LimitKind::StorageIdBytes,
+        length,
+        limits.string_bytes,
+    )?;
     Ok(length)
 }
 
@@ -2077,11 +2083,16 @@ fn hex(byte: u8) -> Option<u8> {
 }
 
 fn decode_spreadsheet_text(value: &str, limits: &Limits) -> Result<String> {
-    check_limit(limits, "storage id bytes", value.len(), limits.string_bytes)?;
+    check_limit(
+        limits,
+        crate::LimitKind::StorageIdBytes,
+        value.len(),
+        limits.string_bytes,
+    )?;
     let units = spreadsheet_text_utf16_units(value)?;
     check_limit(
         limits,
-        "Custom Data storage id UTF-16 units",
+        crate::LimitKind::CustomDataStorageIdUtf16Units,
         units,
         limits.uid_units,
     )?;
@@ -2130,7 +2141,7 @@ fn decode_spreadsheet_text(value: &str, limits: &Limits) -> Result<String> {
     decoded.push_str(&value[copied_until..]);
     check_limit(
         limits,
-        "storage id bytes",
+        crate::LimitKind::StorageIdBytes,
         decoded.len(),
         limits.string_bytes,
     )?;
@@ -2162,7 +2173,7 @@ fn spreadsheet_text_utf16_units(value: &str) -> Result<usize> {
                 }
                 units = units.checked_add(2).ok_or_else(|| {
                     limit_for(
-                        "Custom Data storage id UTF-16 units",
+                        crate::LimitKind::CustomDataStorageIdUtf16Units,
                         usize::MAX,
                         usize::MAX,
                     )
@@ -2180,7 +2191,7 @@ fn spreadsheet_text_utf16_units(value: &str) -> Result<usize> {
             }
             units = units.checked_add(1).ok_or_else(|| {
                 limit_for(
-                    "Custom Data storage id UTF-16 units",
+                    crate::LimitKind::CustomDataStorageIdUtf16Units,
                     usize::MAX,
                     usize::MAX,
                 )
@@ -2199,7 +2210,7 @@ fn spreadsheet_text_utf16_units(value: &str) -> Result<usize> {
             .checked_add(character.encode_utf16(&mut encoded).len())
             .ok_or_else(|| {
                 limit_for(
-                    "Custom Data storage id UTF-16 units",
+                    crate::LimitKind::CustomDataStorageIdUtf16Units,
                     usize::MAX,
                     usize::MAX,
                 )
@@ -2222,7 +2233,7 @@ mod tests {
         let source = format!(
             "<?xml version=\"1.0\"?>\n<!--before--><p:datastoreItem xmlns:p=\"{XML}\" xmlns:s=\"{SML}\" id=\"Storage&#45;1\"> <?inside?><p:extLst>\n<s:ext uri=\"urn:test\"><v:opaque xmlns:v=\"urn:v\"><![CDATA[<? and ]]><?pi?></v:opaque><!--tail--></s:ext>\n</p:extLst><!--after--></p:datastoreItem>"
         );
-        let properties = parse_properties(source.as_bytes()).unwrap();
+        let properties = parse_properties(source.as_bytes(), &Limits::standard()).unwrap();
         assert_eq!(properties.id, "Storage-1");
         let extension = properties.extension_list.unwrap().xml;
         assert!(String::from_utf8_lossy(&extension).contains("<![CDATA[<? and ]]>"));
@@ -2244,7 +2255,11 @@ mod tests {
                 extension_list: None,
             };
             assert_eq!(
-                parse_properties(&write_properties(&value).unwrap()).unwrap(),
+                parse_properties(
+                    &write_properties(&value, &Limits::standard()).unwrap(),
+                    &Limits::standard()
+                )
+                .unwrap(),
                 value
             );
         }
@@ -2259,7 +2274,8 @@ mod tests {
         assert!(
             parse_properties(
                 format!("<x14:datastoreItem xmlns:x14=\"{XML}\" id=\"x\">text</x14:datastoreItem>")
-                    .as_bytes()
+                    .as_bytes(),
+                &Limits::standard()
             )
             .is_err()
         );
@@ -2272,7 +2288,7 @@ mod tests {
         );
         let mut source = vec![0xEF, 0xBB, 0xBF];
         source.extend_from_slice(body.as_bytes());
-        let parsed = parse_properties(&source).unwrap();
+        let parsed = parse_properties(&source, &Limits::standard()).unwrap();
         assert_eq!(parsed.id, "x");
         assert!(validate_extension_fragment(
             b"\xEF\xBB\xBF<x14:extLst xmlns:x14=\"http://schemas.microsoft.com/office/spreadsheetml/2009/9/main\"/>"
@@ -2285,7 +2301,7 @@ mod tests {
         let xml = format!(
             "<d:datastoreItem xmlns:d=\"http://schemas.microsoft.com/office/spreadsheetml/2009/9&#x2F;main\" xmlns:s=\"{SML}\" id=\"x\"><d:extLst><s:ext uri=\"urn:test\"><q:opaque xmlns:q=\"urn:q\"/></s:ext></d:extLst></d:datastoreItem>"
         );
-        assert!(parse_properties(xml.as_bytes()).is_ok());
+        assert!(parse_properties(xml.as_bytes(), &Limits::standard()).is_ok());
     }
 
     #[test]
@@ -2293,7 +2309,7 @@ mod tests {
         let xml = format!(
             "<x14:datastoreItem xmlns:x14=\"{XML}\" xmlns:s=\"{SML}\" id=\"x\"><x14:extLst><s:ext uri=\"urn&#x3A;vendor\"><v:opaque xmlns:v=\"urn:v\"/></s:ext></x14:extLst></x14:datastoreItem>"
         );
-        let properties = parse_properties(xml.as_bytes()).unwrap();
+        let properties = parse_properties(xml.as_bytes(), &Limits::standard()).unwrap();
         assert_eq!(
             properties.extension_list.unwrap().xml,
             format!(
@@ -2306,10 +2322,11 @@ mod tests {
     #[test]
     fn rejects_cdata_outside_the_document_root() {
         let xml = format!("<![CDATA[before]]><x14:datastoreItem xmlns:x14=\"{XML}\" id=\"x\"/>");
-        assert!(parse_properties(xml.as_bytes()).is_err());
+        assert!(parse_properties(xml.as_bytes(), &Limits::standard()).is_err());
         assert!(
             validate_workbook_root(
-                format!("<![CDATA[before]]><workbook xmlns=\"{SML}\"/>").as_bytes()
+                format!("<![CDATA[before]]><workbook xmlns=\"{SML}\"/>").as_bytes(),
+                &Limits::standard()
             )
             .is_err()
         );
@@ -2320,7 +2337,7 @@ mod tests {
         let xml = format!(
             "<x14:datastoreItem xmlns:x14=\"{XML}\" xmlns:s=\"{SML}\" id=\"x\"><x14:extLst><s:ext uri=\"u\"><opaque>literal]]></opaque></s:ext></x14:extLst></x14:datastoreItem>"
         );
-        assert!(parse_properties(xml.as_bytes()).is_err());
+        assert!(parse_properties(xml.as_bytes(), &Limits::standard()).is_err());
     }
 
     #[test]
@@ -2328,7 +2345,7 @@ mod tests {
         let source = format!(
             "<p:datastoreItem xmlns:p=\"{XML}\" xmlns:s=\"{SML}\" xmlns:q=\"urn:opaque\" id=\"x\"><p:extLst><s:ext uri=\"u\"><q:opaque><q:child/></q:opaque></s:ext></p:extLst></p:datastoreItem>"
         );
-        let properties = parse_properties(source.as_bytes()).unwrap();
+        let properties = parse_properties(source.as_bytes(), &Limits::standard()).unwrap();
         let extension = properties.extension_list.as_ref().unwrap();
         assert_eq!(
             extension.xml,
@@ -2347,7 +2364,7 @@ mod tests {
         let source = format!(
             "<x14:datastoreItem xmlns:x14=\"{XML}\" xmlns:s=\"{STRICT_SML}\" id=\"x\"><x14:extLst><s:ext><opaque/></s:ext></x14:extLst></x14:datastoreItem>"
         );
-        assert!(parse_properties(source.as_bytes()).is_err());
+        assert!(parse_properties(source.as_bytes(), &Limits::standard()).is_err());
     }
 
     /// ` n000000="" ...`: `distinct` names of 11 bytes each, then as many
@@ -2377,15 +2394,15 @@ mod tests {
         let xml = format!("<x14:datastoreItem xmlns:x14=\"{XML}\" id=\"x\"/>");
         let exact = Limits::standard().with_attributes(2);
         let under = Limits::standard().with_attributes(1);
-        assert!(parse_properties_with_limits(xml.as_bytes(), &exact).is_ok());
-        let error = parse_properties_with_limits(xml.as_bytes(), &under).unwrap_err();
+        assert!(parse_properties(xml.as_bytes(), &exact).is_ok());
+        let error = parse_properties(xml.as_bytes(), &under).unwrap_err();
         assert!(
             matches!(
                 error,
                 Error::Limit {
-                    resource: "XML attribute count",
-                    max: 1,
-                    actual: 2,
+                    kind: crate::LimitKind::XmlAttributeCount,
+                    maximum: 1,
+                    observed: 2,
                 }
             ),
             "{error}"
@@ -2400,9 +2417,9 @@ mod tests {
             matches!(
                 error,
                 Error::Limit {
-                    resource: "XML attribute count",
-                    max: 1,
-                    actual: 2,
+                    kind: crate::LimitKind::XmlAttributeCount,
+                    maximum: 1,
+                    observed: 2,
                 }
             ),
             "{error}"
@@ -2413,7 +2430,7 @@ mod tests {
     fn repeated_attribute_names_are_refused_where_quick_xml_reports_them() {
         let xml = format!("<x14:datastoreItem xmlns:x14=\"{XML}\" id=\"x\" id=\"y\"/>");
         let expected = duplicated_at(xml.rfind(" id=").unwrap(), xml.find(" id=").unwrap());
-        let error = parse_properties(xml.as_bytes()).unwrap_err();
+        let error = parse_properties(xml.as_bytes(), &Limits::standard()).unwrap_err();
         assert!(
             matches!(&error, Error::Decode(XmlError::Malformed(message)) if *message == expected),
             "{error}"
@@ -2439,7 +2456,7 @@ mod tests {
         let head = format!("<x14:datastoreItem xmlns:x14=\"{XML}\" id=\"x\"");
         let xml = format!("{head}{names}/>");
         let expected = duplicated_at(head.len() + 20_000 * 11, head.len() + 19_999 * 11);
-        let error = parse_properties(xml.as_bytes()).unwrap_err();
+        let error = parse_properties(xml.as_bytes(), &Limits::standard()).unwrap_err();
         assert!(
             matches!(&error, Error::Decode(XmlError::Malformed(message)) if *message == expected),
             "{error}"
@@ -2459,16 +2476,16 @@ mod tests {
         let xml = format!("<x14:datastoreItem xmlns:x14=\"{XML}\" id=\"x\"{names}/>");
         let extension = format!("<x14:extLst xmlns:x14=\"{XML}\"{names}/>");
         for error in [
-            parse_properties(xml.as_bytes()).unwrap_err(),
+            parse_properties(xml.as_bytes(), &Limits::standard()).unwrap_err(),
             extension_root_opening(extension.as_bytes(), &Limits::standard()).unwrap_err(),
         ] {
             assert!(
                 matches!(
                     error,
                     Error::Limit {
-                        resource: "XML attribute count",
-                        max: MAX_ATTRIBUTES,
-                        actual,
+                        kind: crate::LimitKind::XmlAttributeCount,
+                        maximum: MAX_ATTRIBUTES,
+                        observed: actual,
                     } if actual == MAX_ATTRIBUTES + 1
                 ),
                 "{error}"

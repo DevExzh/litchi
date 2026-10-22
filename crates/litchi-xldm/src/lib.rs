@@ -34,7 +34,7 @@ mod xml_attributes;
 mod tests;
 
 pub use codec::{inspect, write};
-pub use error::{Error, Result};
+pub use error::{Error, LimitKind, Result};
 pub use identity::{
     Xldm140Closure, Xldm140ClosureMember, Xldm140ColumnBinding, Xldm140ColumnIdentity,
     Xldm140FileReplacement, Xldm140IdentityProjection, Xldm140InversePatch, Xldm140MemberSection,

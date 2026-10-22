@@ -25,23 +25,31 @@ pub(super) const MAX_TEXT_BYTES: usize = 1024 * 1024;
 pub(super) const MAX_TOTAL_TEXT_BYTES: usize = 1024 * 1024;
 
 pub(super) fn checked_depth(depth: usize) -> Result<usize> {
-    let actual = checked_increment(depth, "custom-properties XML depth")?;
+    let actual = checked_increment(depth, crate::LimitKind::CustomPropertiesXmlDepth)?;
     if actual > MAX_XML_DEPTH {
-        return Err(limit("custom-properties XML depth", MAX_XML_DEPTH, actual));
+        return Err(limit(
+            crate::LimitKind::CustomPropertiesXmlDepth,
+            MAX_XML_DEPTH,
+            actual,
+        ));
     }
     Ok(actual)
 }
 
 pub(super) fn count_node(nodes: &mut usize) -> Result<()> {
-    let actual = checked_increment(*nodes, "custom-properties XML nodes")?;
+    let actual = checked_increment(*nodes, crate::LimitKind::CustomPropertiesXmlNodes)?;
     if actual > MAX_XML_NODES {
-        return Err(limit("custom-properties XML nodes", MAX_XML_NODES, actual));
+        return Err(limit(
+            crate::LimitKind::CustomPropertiesXmlNodes,
+            MAX_XML_NODES,
+            actual,
+        ));
     }
     *nodes = actual;
     Ok(())
 }
 
-pub(super) fn checked_increment(value: usize, resource: &'static str) -> Result<usize> {
+pub(super) fn checked_increment(value: usize, resource: crate::LimitKind) -> Result<usize> {
     value
         .checked_add(1)
         .ok_or_else(|| limit(resource, usize::MAX, usize::MAX))
@@ -51,7 +59,7 @@ pub(super) fn checked_total(
     current: usize,
     added: usize,
     max: usize,
-    resource: &'static str,
+    resource: crate::LimitKind,
 ) -> Result<usize> {
     let actual = current
         .checked_add(added)
@@ -66,10 +74,10 @@ pub(super) fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
 }
 
-pub(super) fn limit(resource: &'static str, max: usize, actual: usize) -> Error {
+pub(super) fn limit(resource: crate::LimitKind, max: usize, actual: usize) -> Error {
     Error::Limit {
-        resource,
-        max,
-        actual,
+        kind: resource,
+        maximum: max,
+        observed: actual,
     }
 }

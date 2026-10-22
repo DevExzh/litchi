@@ -665,9 +665,6 @@ impl<W: Write> PoisonTarget<'_, W> {
     }
 }
 
-/// Convenience alias for the scalar value enum.
-pub type StreamingValue<'a> = StreamingCellValue<'a>;
-
 #[derive(Default)]
 struct ExecutionFailureState {
     error: Mutex<Option<litchi_core::ExecutionError>>,

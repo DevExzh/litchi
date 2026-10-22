@@ -18,7 +18,7 @@ fn public_multi_edit_matches_baseline_whole_worksheet_output() {
     edit.set("Sheet1", address("A1"), 10u32).unwrap();
     edit.set("Sheet1", address("C2"), 30u32).unwrap();
     let commit = edit.commit().unwrap();
-    assert!(commit.changed());
+    assert!(commit.diagnostics().changed());
     assert_eq!(commit.diagnostics().changed_cells(), 2);
     assert_eq!(commit.diagnostics().touched_worksheets(), 1);
 
@@ -41,11 +41,11 @@ fn public_multi_edit_matches_baseline_whole_worksheet_output() {
 
     // The public commit snapshot must agree with the exact worksheet oracle.
     assert_eq!(
-        commit.snapshot().value(0, address("A1")),
+        commit.patch().after().value(0, address("A1")),
         Some(&Value::Number(Number::new("10").unwrap()))
     );
     assert_eq!(
-        commit.snapshot().value(0, address("C2")),
+        commit.patch().after().value(0, address("C2")),
         Some(&Value::Number(Number::new("30").unwrap()))
     );
 }
@@ -87,7 +87,7 @@ fn public_multi_edit_publishes_a_producer_formatted_worksheet_verbatim() {
         let mut edit = editor.edit_sheets(["Sheet1".into()]).unwrap();
         edit.set("Sheet1", address("A1"), 10u32).unwrap();
         let commit = edit.commit().unwrap();
-        assert!(commit.changed());
+        assert!(commit.diagnostics().changed());
         let mut published = Vec::new();
         editor
             .publish_multi_commit_to_stream(&mut published, &commit)

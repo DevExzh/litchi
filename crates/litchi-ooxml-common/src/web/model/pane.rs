@@ -7,6 +7,7 @@ use super::{
     AddIn, Compression, Dock, Effect, ExtKind, ExtList, Image, Link,
     MAX_WEB_EXTENSION_SNAPSHOT_BYTES, Snapshot, SnapshotResource, SnapshotTarget,
 };
+use crate::web::LimitKind;
 #[derive(Debug, Clone, PartialEq)]
 pub struct Pane {
     pub(in crate::web) dock_state: Dock,
@@ -132,7 +133,7 @@ impl Pane {
         let data = data.into();
         if data.len() > MAX_WEB_EXTENSION_SNAPSHOT_BYTES {
             return limit(
-                "web extension snapshot bytes",
+                LimitKind::SnapshotBytes,
                 MAX_WEB_EXTENSION_SNAPSHOT_BYTES,
                 data.len(),
             );
@@ -252,7 +253,7 @@ impl Pane {
         let data = data.into();
         if data.len() > MAX_WEB_EXTENSION_SNAPSHOT_BYTES {
             return limit(
-                "web extension snapshot bytes",
+                LimitKind::SnapshotBytes,
                 MAX_WEB_EXTENSION_SNAPSHOT_BYTES,
                 data.len(),
             );
@@ -522,9 +523,9 @@ impl Pane {
             .len()
             .checked_add(2)
             .ok_or(Error::Limit {
-                resource: "snapshot relationship IDs",
-                max: usize::MAX,
-                actual: usize::MAX,
+                kind: crate::LimitKind::Web(LimitKind::SnapshotRelationshipIds),
+                maximum: usize::MAX,
+                observed: usize::MAX,
             })?;
         for index in 0..attempts {
             let candidate = if index == 0 {

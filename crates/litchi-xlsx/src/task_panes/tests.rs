@@ -46,6 +46,12 @@ fn root_task_pane_relationship(package: &Package) -> (String, String) {
     )
 }
 
+fn same_reopened_content(left: &Package, right: &Package) -> bool {
+    let left = Package::from_bytes(&left.to_bytes().unwrap()).unwrap();
+    let right = Package::from_bytes(&right.to_bytes().unwrap()).unwrap();
+    left.same_content(&right).unwrap()
+}
+
 #[test]
 fn crud_is_atomic_and_preserves_relationships_and_opaque_extensions() {
     let mut package = Package::new().unwrap();
@@ -58,7 +64,7 @@ fn crud_is_atomic_and_preserves_relationships_and_opaque_extensions() {
 
     let mut transaction = package.edit_task_panes().unwrap();
     transaction.add(value).unwrap();
-    transaction.commit().unwrap();
+    package = transaction.commit().unwrap().into_package();
     let relationship_before = root_task_pane_relationship(&package);
 
     let mut transaction = package.edit_task_panes().unwrap();
@@ -76,7 +82,7 @@ fn crud_is_atomic_and_preserves_relationships_and_opaque_extensions() {
         ))
     });
     assert!(failed.is_err());
-    transaction.commit().unwrap();
+    package = transaction.commit().unwrap().into_package();
 
     assert_eq!(root_task_pane_relationship(&package), relationship_before);
     let workbook = package.workbook();
@@ -95,16 +101,18 @@ fn crud_is_atomic_and_preserves_relationships_and_opaque_extensions() {
 
     let mut transaction = package.edit_task_panes().unwrap();
     assert!(transaction.remove("addin-one").unwrap().is_some());
-    transaction.commit().unwrap();
+    package = transaction.commit().unwrap().into_package();
     assert!(package.task_panes().unwrap().is_none());
 }
 
 #[test]
 fn strict_task_panes_round_trip_through_facade() {
     let mut package = Package::new().unwrap();
-    let mut transaction = package.edit_task_panes_with(Conformance::Strict).unwrap();
+    let mut transaction = package
+        .edit_task_panes_with_options(EditOptions::default().conformance(Conformance::Strict))
+        .unwrap();
     transaction.add(pane("strict-addin")).unwrap();
-    transaction.commit().unwrap();
+    package = transaction.commit().unwrap().into_package();
 
     let bytes = package.to_bytes().unwrap();
     let xml_package = OpcPackage::from_vec(bytes).unwrap();
@@ -127,7 +135,7 @@ fn strict_task_panes_round_trip_through_facade() {
     let mut transaction = package.edit_task_panes().unwrap();
     assert_eq!(transaction.panes().unwrap().len(), 1);
     transaction.clear().unwrap();
-    transaction.commit().unwrap();
+    package = transaction.commit().unwrap().into_package();
     assert!(package.task_panes().unwrap().is_none());
 }
 
@@ -147,7 +155,7 @@ fn malformed_task_pane_graph_is_rejected_without_mutation() {
         "rIdPanesMalformed".into(),
         false,
     );
-    let mut package = Package::from_opc(raw).unwrap();
+    let package = Package::from_opc(raw).unwrap();
     let before = package.to_bytes().unwrap();
     assert!(package.edit_task_panes().is_err());
     assert_eq!(package.to_bytes().unwrap(), before);
@@ -174,7 +182,7 @@ fn unknown_root_parts_survive_task_pane_edits() {
     };
     let mut transaction = package.edit_task_panes().unwrap();
     transaction.add(pane("opaque-survivor")).unwrap();
-    transaction.commit().unwrap();
+    package = transaction.commit().unwrap().into_package();
 
     let parsed = OpcPackage::from_vec(package.to_bytes().unwrap()).unwrap();
     let opaque_name = PackURI::new("/xl/opaque.bin").unwrap();
@@ -183,4 +191,56 @@ fn unknown_root_parts_survive_task_pane_edits() {
         b"opaque payload"
     );
     assert!(parsed.rels().get("rIdOpaque").is_some());
+}
+
+#[test]
+fn commits_publish_new_packages_and_patches_replay_root_relationships_exactly() {
+    let source = Package::new().unwrap();
+    let source_bytes = source.to_bytes().unwrap();
+    let mut edit = source.edit_task_panes().unwrap();
+    edit.add(pane("addin-one")).unwrap();
+    let commit = edit.commit().unwrap();
+    assert!(commit.diagnostics().changed());
+    let (after, patch) = commit.into_parts();
+    // The source is unchanged; the new package relates the task panes from
+    // the package root.
+    assert_eq!(source.to_bytes().unwrap(), source_bytes);
+    assert!(source.task_panes().unwrap().is_none());
+    assert!(!root_task_pane_relationship(&after).0.is_empty());
+
+    let replayed = source.apply_task_panes(&patch).unwrap().into_package();
+    assert!(replayed.same_content(&after).unwrap());
+    assert_eq!(replayed.to_bytes().unwrap(), after.to_bytes().unwrap());
+    assert_eq!(replayed.task_panes().unwrap(), after.task_panes().unwrap());
+    let reopened_source = Package::from_bytes(&source.to_bytes().unwrap()).unwrap();
+    let reopened_after = Package::from_bytes(&after.to_bytes().unwrap()).unwrap();
+    let reopened_forward = reopened_source
+        .apply_task_panes(&patch)
+        .unwrap()
+        .into_package();
+    assert!(same_reopened_content(&reopened_forward, &after));
+    let reopened_restored = reopened_after
+        .apply_task_panes(&patch.inverse())
+        .unwrap()
+        .into_package();
+    assert!(same_reopened_content(&reopened_restored, &source));
+    let restored = after
+        .apply_task_panes(&patch.inverse())
+        .unwrap()
+        .into_package();
+    assert!(restored.same_content(&source).unwrap());
+    assert_eq!(restored.to_bytes().unwrap(), source_bytes);
+    assert!(restored.task_panes().unwrap().is_none());
+    assert!(matches!(
+        after.apply_task_panes(&patch),
+        Err(Error::PatchConflict { .. })
+    ));
+
+    // A dropped or reset edit stages nothing.
+    let mut edit = source.edit_task_panes().unwrap();
+    edit.add(pane("addin-two")).unwrap();
+    edit.reset();
+    let noop = edit.commit().unwrap();
+    assert!(noop.patch().is_noop());
+    assert_eq!(noop.package().to_bytes().unwrap(), source_bytes);
 }

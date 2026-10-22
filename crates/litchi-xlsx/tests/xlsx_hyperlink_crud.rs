@@ -118,7 +118,7 @@ fn hyperlinks_add_replace_remove_and_reopen() {
             Some("https://example.test/inert")
         );
         sheet
-            .replace_hyperlink(external("A1", "https://example.test/replaced"))
+            .put_hyperlink(external("A1", "https://example.test/replaced"))
             .unwrap();
     }
     let after_replace = edit.commit().unwrap().into_package();

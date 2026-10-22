@@ -8,9 +8,15 @@ const CUSTOM_UI2_XML: &[u8] = include_bytes!("../../../test-data/ooxml/ribbonx/c
 #[test]
 fn stores_borrows_and_roundtrips_local_ribbon_xml() {
     let mut package = OpcPackage::new();
-    ribbon::put(&mut package, Version::V2007, OFFICE_2007_XML.to_vec()).unwrap();
+    ribbon::put(
+        &mut package,
+        Version::V2007,
+        OFFICE_2007_XML.to_vec(),
+        &ribbon::Limits::standard(),
+    )
+    .unwrap();
 
-    let ribbons = ribbon::load(&package).unwrap();
+    let ribbons = ribbon::load(&package, &ribbon::Limits::standard()).unwrap();
     let stored = ribbons.effective().unwrap();
     assert_eq!(stored.part().as_str(), "/customUI/customUI.xml");
     assert_eq!(stored.version(), Version::V2007);
@@ -22,7 +28,7 @@ fn stores_borrows_and_roundtrips_local_ribbon_xml() {
 
     let bytes = PackageWriter::to_bytes(&package).unwrap();
     let reopened = OpcPackage::from_bytes(&bytes).unwrap();
-    let reopened = ribbon::load(&reopened).unwrap();
+    let reopened = ribbon::load(&reopened, &ribbon::Limits::standard()).unwrap();
     let reopened = reopened.effective().unwrap();
     assert_eq!(reopened.part().as_str(), "/customUI/customUI.xml");
     assert_eq!(reopened.version(), Version::V2007);
@@ -32,17 +38,29 @@ fn stores_borrows_and_roundtrips_local_ribbon_xml() {
 #[test]
 fn updates_the_modern_family_in_place() {
     let mut package = OpcPackage::new();
-    ribbon::put(&mut package, Version::Ui2, CUSTOM_UI2_XML.to_vec()).unwrap();
-    let first_part = ribbon::load(&package)
+    ribbon::put(
+        &mut package,
+        Version::Ui2,
+        CUSTOM_UI2_XML.to_vec(),
+        &ribbon::Limits::standard(),
+    )
+    .unwrap();
+    let first_part = ribbon::load(&package, &ribbon::Limits::standard())
         .unwrap()
         .modern()
         .unwrap()
         .part()
         .clone();
 
-    ribbon::put(&mut package, Version::V2010, OFFICE_2010_XML.to_vec()).unwrap();
+    ribbon::put(
+        &mut package,
+        Version::V2010,
+        OFFICE_2010_XML.to_vec(),
+        &ribbon::Limits::standard(),
+    )
+    .unwrap();
 
-    let updated = ribbon::load(&package).unwrap();
+    let updated = ribbon::load(&package, &ribbon::Limits::standard()).unwrap();
     let updated = updated.modern().unwrap();
     assert_eq!(updated.part(), &first_part);
     assert_eq!(updated.version(), Version::V2010);
@@ -56,10 +74,22 @@ fn updates_the_modern_family_in_place() {
 #[test]
 fn keeps_fixed_family_slots_with_modern_precedence() {
     let mut package = OpcPackage::new();
-    ribbon::put(&mut package, Version::V2007, OFFICE_2007_XML.to_vec()).unwrap();
-    ribbon::put(&mut package, Version::V2010, OFFICE_2010_XML.to_vec()).unwrap();
+    ribbon::put(
+        &mut package,
+        Version::V2007,
+        OFFICE_2007_XML.to_vec(),
+        &ribbon::Limits::standard(),
+    )
+    .unwrap();
+    ribbon::put(
+        &mut package,
+        Version::V2010,
+        OFFICE_2010_XML.to_vec(),
+        &ribbon::Limits::standard(),
+    )
+    .unwrap();
 
-    let ribbons = ribbon::load(&package).unwrap();
+    let ribbons = ribbon::load(&package, &ribbon::Limits::standard()).unwrap();
     assert_eq!(ribbons.legacy().unwrap().version(), Version::V2007);
     assert_eq!(ribbons.modern().unwrap().version(), Version::V2010);
     assert_eq!(ribbons.effective(), ribbons.modern());
@@ -77,5 +107,5 @@ fn rejects_a_root_that_does_not_match_its_relationship_family() {
     )));
     package.relate_to("customUI/customUI.xml", Version::V2007.relationship());
 
-    assert!(ribbon::load(&package).is_err());
+    assert!(ribbon::load(&package, &ribbon::Limits::standard()).is_err());
 }

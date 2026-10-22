@@ -1,4 +1,5 @@
 use super::super::super::model::Limits;
+use crate::web::LimitKind;
 use crate::{Error, Result};
 pub(in crate::web) fn format_f64(value: f64) -> String {
     let mut buffer = ryu::Buffer::new();
@@ -33,7 +34,7 @@ pub(in crate::web) fn require_nonempty(label: &str, value: &str) -> Result<()> {
 }
 
 pub(in crate::web) fn enforce_count_with(
-    label: &'static str,
+    label: LimitKind,
     count: usize,
     limits: &Limits,
 ) -> Result<()> {
@@ -56,10 +57,10 @@ pub(in crate::web) fn invalid<T>(message: String) -> Result<T> {
     Err(Error::Invalid(message))
 }
 
-pub(in crate::web) fn limit<T>(resource: &'static str, max: usize, actual: usize) -> Result<T> {
+pub(in crate::web) fn limit<T>(kind: LimitKind, max: usize, actual: usize) -> Result<T> {
     Err(Error::Limit {
-        resource,
-        max,
-        actual,
+        kind: crate::LimitKind::Web(kind),
+        maximum: max,
+        observed: actual,
     })
 }

@@ -730,7 +730,7 @@ impl Package {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn ribbon(&self) -> Result<ribbon::Set<'_>> {
-        Ok(ribbon::load(&self.opc)?)
+        Ok(ribbon::load(&self.opc, &ribbon::Limits::standard())?)
     }
 
     /// Store opaque Ribbon XML by moving its `Vec` into package ownership.
@@ -753,12 +753,15 @@ impl Package {
         // The shared Ribbon owner removes signatures itself, so a change to a
         // signed package is refused here, before it is reached.
         if crate::signature_policy::is_signed(&self.opc) {
-            let stored = ribbon_slot(ribbon::load(&self.opc)?, version.family());
+            let stored = ribbon_slot(
+                ribbon::load(&self.opc, &ribbon::Limits::standard())?,
+                version.family(),
+            );
             if !stored.is_some_and(|ui| ui.version() == version && ui.xml() == xml.as_slice()) {
                 crate::signature_policy::ensure_unsigned(&self.opc)?;
             }
         }
-        ribbon::put(&mut self.opc, version, xml)?;
+        ribbon::put(&mut self.opc, version, xml, &ribbon::Limits::standard())?;
         Ok(self)
     }
 
@@ -774,7 +777,11 @@ impl Package {
     /// Returns an error if the operation cannot be completed.
     pub(crate) fn remove_ribbon(&mut self, family: ribbon::Family) -> Result<bool> {
         if crate::signature_policy::is_signed(&self.opc)
-            && ribbon_slot(ribbon::load(&self.opc)?, family).is_some()
+            && ribbon_slot(
+                ribbon::load(&self.opc, &ribbon::Limits::standard())?,
+                family,
+            )
+            .is_some()
         {
             crate::signature_policy::ensure_unsigned(&self.opc)?;
         }

@@ -9,9 +9,11 @@
 pub mod build;
 pub mod codec;
 pub mod dir;
+mod limit;
 pub mod project;
 
 pub use build::Payload;
+pub use limit::LimitKind;
 
 use litchi_cfb::OleError;
 use std::fmt;
@@ -68,12 +70,12 @@ pub enum Error {
     Cfb(OleError),
     /// A required MS-OVBA structure is malformed.
     InvalidData(String),
-    /// An explicit resource ceiling was exceeded.
-    LimitExceeded {
-        /// Name of the exceeded ceiling.
-        limit: &'static str,
+    /// An explicit resource ceiling was exceeded (record 0360).
+    Limit {
+        /// The exceeded ceiling.
+        kind: LimitKind,
         /// Observed or requested byte/item count.
-        actual: usize,
+        observed: usize,
         /// Configured maximum.
         maximum: usize,
     },
@@ -93,11 +95,11 @@ impl fmt::Display for Error {
         match self {
             Self::Cfb(error) => write!(formatter, "{error}"),
             Self::InvalidData(message) => write!(formatter, "invalid MS-OVBA data: {message}"),
-            Self::LimitExceeded {
-                limit,
-                actual,
+            Self::Limit {
+                kind,
+                observed,
                 maximum,
-            } => write!(formatter, "{limit} limit exceeded: {actual} > {maximum}"),
+            } => write!(formatter, "{kind} limit exceeded: {observed} > {maximum}"),
             Self::UnsupportedCodePage(code_page) => {
                 write!(formatter, "unsupported VBA project code page {code_page}")
             },
@@ -109,9 +111,7 @@ impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             Self::Cfb(error) => Some(error),
-            Self::InvalidData(_) | Self::LimitExceeded { .. } | Self::UnsupportedCodePage(_) => {
-                None
-            },
+            Self::InvalidData(_) | Self::Limit { .. } | Self::UnsupportedCodePage(_) => None,
         }
     }
 }
@@ -126,11 +126,11 @@ pub(crate) fn invalid(message: impl Into<String>) -> Error {
     Error::invalid(message)
 }
 
-pub(crate) fn check_limit(limit: &'static str, actual: usize, maximum: usize) -> Result<(), Error> {
+pub(crate) fn check_limit(kind: LimitKind, actual: usize, maximum: usize) -> Result<(), Error> {
     if actual > maximum {
-        return Err(Error::LimitExceeded {
-            limit,
-            actual,
+        return Err(Error::Limit {
+            kind,
+            observed: actual,
             maximum,
         });
     }

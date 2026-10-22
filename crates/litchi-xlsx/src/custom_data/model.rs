@@ -5,5 +5,5 @@
 //! common leaf without depending on this crate.
 
 pub use litchi_ooxml_common::custom_data::{
-    CustomData, CustomDataView, ExtensionList, Properties, RemovalDisposition, Store,
+    CustomData, CustomDataView, ExtensionList, Properties, RemovalDisposition,
 };

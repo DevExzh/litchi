@@ -1069,8 +1069,8 @@ fn finish_xlsx_producer_corpus(
     // code serves generated and real files.
     let selected_sheet = SELECTED_SHEET.min(sheet_count.saturating_sub(1));
     let sheet_names = workbook
-        .sheets()
-        .map(|sheet| sheet.name().to_owned())
+        .sheet_names()
+        .map(str::to_owned)
         .collect::<Vec<_>>();
     let selected_name = sheet_names
         .get(selected_sheet)
@@ -1180,7 +1180,7 @@ fn finish_xlsx_producer_corpus(
 /// The `Edit` variant exists because the value-only editor admits it; assert
 /// that, so the split stays honest if a gate moves.
 fn prove_edit_variant_is_admitted(archive: &[u8]) -> Result<(), Box<dyn Error>> {
-    let editor = litchi_xlsx::cell_values::SourceBackedEditor::from_read_at(Arc::new(
+    let editor = crate::xlsx_source_editors::SourceBackedEditor::from_read_at(Arc::new(
         OwnedSource::new(archive.to_vec()),
     ))?;
     let transaction = editor.edit_sheets([litchi_xlsx::Selector::from(PLANNING_SHEET)])?;
@@ -1280,7 +1280,7 @@ fn refuse(
     sheet: usize,
     archive: &[u8],
 ) -> Result<ProvenRefusal, Box<dyn Error>> {
-    let editor = litchi_xlsx::cell_values::SourceBackedEditor::from_read_at(Arc::new(
+    let editor = crate::xlsx_source_editors::SourceBackedEditor::from_read_at(Arc::new(
         OwnedSource::new(archive.to_vec()),
     ))?;
     let message = match editor.edit_sheets([litchi_xlsx::Selector::from(sheet)]) {
@@ -1387,7 +1387,7 @@ fn producer_xlsx_semantics(
         return Err("producer XLSX semantic oracle observed an unexpected sheet count".into());
     }
     workbook
-        .sheets()
+        .sheets()?
         .map(|sheet| {
             Ok(ProducerWorksheetSemantics {
                 name: sheet.name().to_owned(),
@@ -2519,7 +2519,7 @@ fn run_xlsx_full_cell_scan(
         let started = std::time::Instant::now();
         let timed = (|| {
             let workbook = litchi_xlsx::SourceBackedWorkbook::from_read_at(source)?;
-            let sheets = workbook.sheets().collect::<Vec<_>>();
+            let sheets = workbook.sheets()?.collect::<Vec<_>>();
             if sheets.len() != spec.sheet_count {
                 return Err(format!(
                     "producer full-cell scan observed {} worksheets instead of {}",
@@ -2760,7 +2760,8 @@ fn run_xlsx_planning(
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         // Opening is deliberately outside the planning interval, exactly as
         // the XLSX planning guard measures it.
-        let editor = litchi_xlsx::cell_values::SourceBackedEditor::from_read_at(source_of(corpus))?;
+        let editor =
+            crate::xlsx_source_editors::SourceBackedEditor::from_read_at(source_of(corpus))?;
         let started = Instant::now();
         let planned = editor.edit_sheets(selectors.iter().cloned());
         let duration = started.elapsed();
@@ -2769,7 +2770,7 @@ fn run_xlsx_planning(
             return Err("producer XLSX planning selected an unexpected worksheet count".into());
         }
         let commit = transaction.commit()?;
-        if commit.changed() || !commit.patch().is_empty() {
+        if commit.diagnostics().changed() || !commit.patch().is_noop() {
             return Err("producer XLSX empty planning commit was not an exact no-op".into());
         }
         if sha256_hex(&corpus.corpus.archive) != before {
@@ -2804,7 +2805,8 @@ fn run_xlsx_one_edit_save(
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let mut sink = CountingSink::bounded(maximum, 64 * 1024);
         sink.reserve_budget()?;
-        let editor = litchi_xlsx::cell_values::SourceBackedEditor::from_read_at(source_of(corpus))?;
+        let editor =
+            crate::xlsx_source_editors::SourceBackedEditor::from_read_at(source_of(corpus))?;
         let mut duration = Duration::ZERO;
         // The editor is opened before the clock. The timed interval includes
         // planning, set, commit and publication. Publication consumes the
@@ -2816,7 +2818,7 @@ fn run_xlsx_one_edit_save(
         let mut edit = editor.edit_sheets([litchi_xlsx::Selector::from(PLANNING_SHEET)])?;
         edit.set(PLANNING_SHEET, address, i32::try_from(replacement)?)?;
         let commit = edit.commit()?;
-        if !commit.changed() {
+        if !commit.diagnostics().changed() {
             return Err("producer XLSX one-cell edit produced no change".into());
         }
         editor.publish_multi_commit_to_stream(&mut sink, &commit)?;
@@ -2963,8 +2965,9 @@ mod tests {
             .expect("producer XLSX corpus has a specification");
         let (address, replacement) =
             producer_numeric_edit_target(spec).expect("producer edit target");
-        let editor = litchi_xlsx::cell_values::SourceBackedEditor::from_read_at(source_of(corpus))
-            .expect("producer editor opens");
+        let editor =
+            crate::xlsx_source_editors::SourceBackedEditor::from_read_at(source_of(corpus))
+                .expect("producer editor opens");
         let mut edit = editor
             .edit_sheets([litchi_xlsx::Selector::from(PLANNING_SHEET)])
             .expect("producer edit plans");

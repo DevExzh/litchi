@@ -10,7 +10,7 @@ mod model;
 #[cfg(test)]
 mod tests;
 
-pub use codec::{scan, scan_source, scan_source_with, scan_with};
+pub use codec::{scan, scan_source};
 pub use model::{
     Entry, Kind, Limits, Payload, SourceEntry, SourcePayload, SourcePayloadData, SourceTarget,
     Target,

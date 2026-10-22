@@ -7,21 +7,7 @@ use crate::error::{Result, invalid};
 
 /// Load the package-level task-pane graph, if present.
 pub fn load(package: &OpcPackage) -> Result<Option<Panes>> {
-    common_web::load(package).map_err(Into::into)
-}
-
-/// Store or replace the package-level task-pane graph.
-///
-/// The common owner preserves supported opaque extension fragments and leaves
-/// unrelated package parts and relationships untouched. Callers that need
-/// rollback across several operations should use [`super::Transaction`].
-pub fn store(package: &mut OpcPackage, panes: Panes, conformance: Conformance) -> Result<()> {
-    common_web::put(package, panes, conformance).map_err(Into::into)
-}
-
-/// Remove the task-pane graph and any now-unreferenced owned parts.
-pub fn remove(package: &mut OpcPackage) -> Result<bool> {
-    common_web::remove(package).map_err(Into::into)
+    common_web::load(package, &common_web::Limits::standard()).map_err(Into::into)
 }
 
 /// Detect the relationship namespace used by an existing task-pane graph.

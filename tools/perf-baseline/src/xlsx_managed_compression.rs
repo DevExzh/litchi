@@ -13,12 +13,13 @@ use super::{
     xlsx_cell_values_payload_budget, xlsx_output_ceiling, xlsx_spec, xlsx_update_sheet_selectors,
     xlsx_value,
 };
+use crate::xlsx_source_editors::SourceBackedEditor;
 use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionError, ExecutionLimits, Limits,
     OwnedSource, ReadAt, Resource,
 };
 use litchi_opc::{OpcPackage, PackageWriter, SourceCacheLimits, SourceLimits};
-use litchi_xlsx::cell_values::{MultiCommit, SourceBackedEditor};
+use litchi_xlsx::cell_values::Commit as MultiCommit;
 use serde::Serialize;
 use std::{
     error::Error,
@@ -328,7 +329,7 @@ fn stage_commit(editor: &SourceBackedEditor, updates: &[XlsxCoordinate]) -> AnyR
         )?;
     }
     let commit = edit.commit()?;
-    if !commit.changed() || commit.diagnostics().changed_cells() != updates.len() {
+    if !commit.diagnostics().changed() || commit.diagnostics().changed_cells() != updates.len() {
         return Err("managed compression commit changed an unexpected cell count".into());
     }
     Ok(commit)
@@ -363,11 +364,7 @@ fn inverse_round_trip(
     published_output: &[u8],
 ) -> AnyResult<bool> {
     let mut package = OpcPackage::from_bytes(published_output)?;
-    let maximum_bytes = corpus.archive.len();
-    commit
-        .patch()
-        .inverse()
-        .apply_materialized(&mut package, maximum_bytes)?;
+    crate::xlsx_source_editors::replay_patch(&mut package, &commit.patch().inverse())?;
     let restored = PackageWriter::to_bytes(&package)?;
     if restored != corpus.archive {
         return Err("managed-origin inverse patch did not restore exact source ZIP".into());
@@ -502,7 +499,7 @@ fn managed_noop(corpus: &Corpus, spec: &super::XlsxCorpus) -> AnyResult<bool> {
     let (budget, _cancellation, context) = managed_context(payload_budget, output_budget, 4, 1)?;
     let editor = open_editor(corpus, &updates, context)?;
     let commit = editor.edit_sheets(selectors)?.commit()?;
-    if commit.changed() || !commit.patch().is_empty() {
+    if commit.diagnostics().changed() || !commit.patch().is_noop() {
         return Err("managed exact no-op produced a non-empty patch".into());
     }
     let mut sink = PermitObservingSink::new(budget.clone());

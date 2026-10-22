@@ -728,8 +728,11 @@ fn inverse_refuses_oversized_source_template_under_temporary_cap_atomically() {
         .expect("oversized-template storage")
         .properties()
         .clone();
-    let canonical_properties =
-        write_properties(&properties).expect("canonical restoration properties serialize");
+    let canonical_properties = write_properties(
+        &properties,
+        &litchi_ooxml_common::custom_data::Limits::standard(),
+    )
+    .expect("canonical restoration properties serialize");
     assert!(
         source_properties.len() > canonical_properties.len(),
         "formatted source must exceed canonical restoration: source={}, canonical={}",

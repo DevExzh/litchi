@@ -44,3 +44,39 @@ pub(crate) fn panic_missing_invariant(message: &str) -> ! {
 pub(crate) fn panic_error_invariant(message: &str, error: impl std::fmt::Display) -> ! {
     panic!("MS-XLDM internal invariant failed: {message}: {error}")
 }
+
+/// A bounded dimension of an MS-XLDM proof or rewrite, as reported by
+/// [`crate::OlapProofError::Limit`] and
+/// [`crate::Xldm140RenameError::limit_kind`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum LimitKind {
+    /// Visited records and XML nodes ([`crate::OlapProofLimits::max_items`]).
+    Items,
+    /// UTF-8 bytes examined and retained
+    /// ([`crate::OlapProofLimits::max_string_bytes`]).
+    StringBytes,
+    /// The inspected source size ([`crate::OlapProofLimits::max_source_bytes`]).
+    SourceBytes,
+    /// Graph work units ([`crate::OlapProofLimits::max_work`]).
+    Work,
+}
+
+impl LimitKind {
+    /// A short structural description of the dimension.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Items => "OLAP proof items",
+            Self::StringBytes => "OLAP proof string bytes",
+            Self::SourceBytes => "OLAP proof source bytes",
+            Self::Work => "OLAP proof graph work",
+        }
+    }
+}
+
+impl std::fmt::Display for LimitKind {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(self.as_str())
+    }
+}

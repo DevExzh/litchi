@@ -13,8 +13,8 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Instant;
 
+use crate::xlsx_source_editors::SourceBackedEditor;
 use litchi_core::OwnedSource;
-use litchi_xlsx::cell_values::SourceBackedEditor;
 use litchi_xlsx::{Address, Error as XlsxError, Number, Selector, Value};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
@@ -493,9 +493,7 @@ fn run_iteration(
     })
 }
 
-fn validate_valid_transaction(
-    transaction: litchi_xlsx::cell_values::MultiSourceEdit,
-) -> AnyResult<()> {
+fn validate_valid_transaction(transaction: litchi_xlsx::cell_values::Edit) -> AnyResult<()> {
     if transaction.worksheet_count() != 1 {
         return Err("valid guard selected an unexpected worksheet count".into());
     }
@@ -507,10 +505,10 @@ fn validate_valid_transaction(
     // This is intentionally outside the phase clock: the empty commit is the
     // exact no-op oracle for both `valid` and `semantic-noop`.
     let commit = transaction.commit()?;
-    if commit.changed() || !commit.patch().is_empty() {
+    if commit.diagnostics().changed() || !commit.patch().is_noop() {
         return Err("empty planning guard commit was not an exact no-op".into());
     }
-    if commit.snapshot().value(0, address) != Some(&expected) {
+    if commit.patch().after().value(0, address) != Some(&expected) {
         return Err("empty planning guard commit lost A1".into());
     }
     Ok(())

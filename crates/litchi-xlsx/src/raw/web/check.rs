@@ -81,7 +81,7 @@ impl Probe {
         if self.proven(output.len()) {
             Ok(Bindings::default())
         } else {
-            read(output)
+            read(output, &litchi_opc::SourceLimits::default())
         }
     }
 
@@ -281,7 +281,7 @@ mod tests {
         let (output, probe) = compact_probe(input);
         assert_eq!(probe.is_proven(), expected_proven);
         let actual = probe.finish(&output);
-        let expected = read(&output);
+        let expected = read(&output, &litchi_opc::SourceLimits::default());
         assert_result_parity(actual, expected);
     }
 
@@ -379,7 +379,7 @@ mod tests {
             probe.observe(&reader, &event);
         }
         assert!(!probe.is_proven());
-        assert!(read(orphan.as_bytes()).is_err());
+        assert!(read(orphan.as_bytes(), &litchi_opc::SourceLimits::default()).is_err());
     }
 
     #[test]
@@ -443,6 +443,9 @@ mod tests {
         assert!(probe.is_proven());
         assert!(output.len() <= MAX_XML_BYTES);
         let oversized = vec![b' '; MAX_XML_BYTES + 1];
-        assert_result_parity(probe.finish(&oversized), read(&oversized));
+        assert_result_parity(
+            probe.finish(&oversized),
+            read(&oversized, &litchi_opc::SourceLimits::default()),
+        );
     }
 }

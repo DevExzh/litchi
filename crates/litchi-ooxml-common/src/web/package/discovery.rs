@@ -8,6 +8,7 @@ use super::super::{
     TASK_PANES_CONTENT_TYPE, TASK_PANES_RELATIONSHIP,
 };
 use super::{PackageGraphIndex, fold_part_name};
+use crate::web::LimitKind;
 pub(in crate::web) fn has_task_panes_relationship(
     package: &OpcPackage,
     limits: &Limits,
@@ -15,7 +16,7 @@ pub(in crate::web) fn has_task_panes_relationship(
     let relationships = package.rels().len();
     if relationships > limits.package_relationships {
         return limit(
-            "package relationships",
+            LimitKind::PackageRelationships,
             limits.package_relationships,
             relationships,
         );
@@ -26,21 +27,13 @@ pub(in crate::web) fn has_task_panes_relationship(
         .any(|relationship| relationship.reltype() == TASK_PANES_RELATIONSHIP))
 }
 
-/// Resolve and validate the complete package graph with safe default limits.
+/// Resolve and validate the complete package graph under `limits`
+/// ([`Limits::standard`] for the safe defaults).
 /// # Errors
 ///
 /// Returns an error when input violates OOXML constraints, exceeds a configured
 /// bound, or an underlying XML or package operation fails.
-pub fn load(package: &OpcPackage) -> Result<Option<Panes>> {
-    load_with(package, &Limits::standard())
-}
-
-/// Resolve and validate the complete package graph with explicit limits.
-/// # Errors
-///
-/// Returns an error when input violates OOXML constraints, exceeds a configured
-/// bound, or an underlying XML or package operation fails.
-pub fn load_with(package: &OpcPackage, limits: &Limits) -> Result<Option<Panes>> {
+pub fn load(package: &OpcPackage, limits: &Limits) -> Result<Option<Panes>> {
     if !has_task_panes_relationship(package, limits)? {
         return Ok(None);
     }

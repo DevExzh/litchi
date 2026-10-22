@@ -1319,7 +1319,7 @@ impl SourceBackedWorkbook {
         limits: &litchi_ooxml_common::embedded::Limits,
     ) -> Result<Vec<litchi_ooxml_common::embedded::SourceEntry<'_>>> {
         let _ = preflight_package(&self.inner.package)?;
-        let entries = litchi_ooxml_common::embedded::scan_source_with(&self.inner.package, limits);
+        let entries = litchi_ooxml_common::embedded::scan_source(&self.inner.package, limits);
         postflight_package(&self.inner.package)?;
         Ok(entries?)
     }

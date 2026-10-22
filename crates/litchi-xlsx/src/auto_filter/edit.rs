@@ -40,8 +40,8 @@ pub enum LimitKind {
 
 /// A staged auto-filter edit of one [`Package`]. Dropping it discards it.
 #[derive(Debug)]
-pub struct Edit<'a> {
-    staged: Staged<'a>,
+pub struct Edit {
+    staged: Staged,
 }
 
 impl Package {
@@ -51,7 +51,7 @@ impl Package {
     ///
     /// Returns the encryption-policy error for a package whose mutations are
     /// refused.
-    pub fn edit_auto_filter(&self) -> Result<Edit<'_>> {
+    pub fn edit_auto_filter(&self) -> Result<Edit> {
         Ok(Edit {
             staged: Staged::new(self, "edit_auto_filter")?,
         })
@@ -65,12 +65,15 @@ impl Package {
     /// Returns [`Error::PatchConflict`] when this package is not the patch's
     /// before state and [`Error::Signed`] for a changed patch of a signed
     /// workbook.
-    pub fn apply_auto_filter(&self, patch: &Patch) -> Result<Self> {
-        patch.0.apply(self, "apply_auto_filter")
+    pub fn apply_auto_filter(&self, patch: &Patch) -> Result<Commit> {
+        Ok(Commit::new((
+            patch.0.apply(self, "apply_auto_filter")?,
+            patch.0.clone(),
+        )))
     }
 }
 
-impl Edit<'_> {
+impl Edit {
     /// The staged direct auto-filter of the worksheet at `sheet`.
     ///
     /// # Errors
@@ -130,6 +133,7 @@ mod tests {
             package
                 .apply_auto_filter(&patch)
                 .unwrap()
+                .package()
                 .same_content(&after)
                 .unwrap()
         );

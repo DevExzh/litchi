@@ -7,7 +7,7 @@ mod layout;
 mod transaction;
 mod worksheet;
 
-pub use layout::{ColumnEdit, DefaultsEdit, RowEdit};
+pub use layout::{Column, Defaults, Row};
 pub use transaction::Edit;
 pub(super) use transaction::SvgLifecycleIntent;
-pub use worksheet::{FormControlEdit, NewSheet, TabEdit, WorksheetEdit};
+pub use worksheet::{FormControl, NewSheet, Sheet, Tab};

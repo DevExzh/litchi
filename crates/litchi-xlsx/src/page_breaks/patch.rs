@@ -7,7 +7,7 @@ use crate::error::{Error, Result, invalid};
 
 /// Exact source-checked page-break worksheet replacement.
 #[derive(Clone, Debug)]
-pub struct Patch {
+pub(crate) struct Patch {
     before: Snapshot,
     after: Snapshot,
 }
@@ -19,25 +19,25 @@ impl Patch {
 
     /// Required source state.
     #[must_use]
-    pub const fn before(&self) -> &Snapshot {
+    pub(crate) const fn before(&self) -> &Snapshot {
         &self.before
     }
 
     /// Exact state produced by application.
     #[must_use]
-    pub const fn after(&self) -> &Snapshot {
+    pub(crate) const fn after(&self) -> &Snapshot {
         &self.after
     }
 
     /// Whether this patch preserves its source byte-for-byte.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub(crate) fn is_empty(&self) -> bool {
         self.before.same_source(&self.after)
     }
 
     /// Return the exact source-bound inverse.
     #[must_use]
-    pub fn inverse(&self) -> Self {
+    pub(crate) fn inverse(&self) -> Self {
         Self {
             before: self.after.clone(),
             after: self.before.clone(),
@@ -50,7 +50,7 @@ impl Patch {
     ///
     /// Returns an error for stale source bytes, signed packages, invalid OPC
     /// state, or a target that fails semantic readback.
-    pub fn apply(&self, package: &mut OpcPackage) -> Result<()> {
+    pub(crate) fn apply(&self, package: &mut OpcPackage) -> Result<()> {
         self.before.check_execution()?;
         self.after.check_execution()?;
         if !self.before.matches_current_source(package) {
@@ -81,69 +81,5 @@ impl Patch {
         }
         *package = candidate;
         Ok(())
-    }
-}
-
-/// Successful page-break transaction publication.
-#[derive(Debug)]
-pub struct Commit {
-    snapshot: Snapshot,
-    patch: Patch,
-    diagnostics: Diagnostics,
-}
-
-impl Commit {
-    pub(super) const fn new(snapshot: Snapshot, patch: Patch, changed: bool) -> Self {
-        Self {
-            snapshot,
-            patch,
-            diagnostics: Diagnostics {
-                touched_worksheets: if changed { 1 } else { 0 },
-            },
-        }
-    }
-
-    /// Whether authored page-break state changed.
-    #[must_use]
-    pub const fn changed(&self) -> bool {
-        self.diagnostics.touched_worksheets != 0
-    }
-
-    /// Resulting immutable source-bound state.
-    #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
-    }
-
-    /// Exact reversible patch.
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Content-free publication diagnostics.
-    #[must_use]
-    pub const fn diagnostics(&self) -> Diagnostics {
-        self.diagnostics
-    }
-
-    /// Consume this result into its snapshot and patch.
-    #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch) {
-        (self.snapshot, self.patch)
-    }
-}
-
-/// Content-free page-break publication diagnostics.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub struct Diagnostics {
-    touched_worksheets: u8,
-}
-
-impl Diagnostics {
-    /// Number of worksheet parts replaced by the commit.
-    #[must_use]
-    pub fn touched_worksheets(self) -> usize {
-        usize::from(self.touched_worksheets)
     }
 }

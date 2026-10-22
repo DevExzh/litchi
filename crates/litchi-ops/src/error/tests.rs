@@ -427,6 +427,116 @@ fn row_malformed_input_is_corrupt_file() {
 
 // Row: `ResourceLimit`, OPC `Limit`, leaf limit errors -> `limit_exceeded`
 // (record 0007, Q1), with the limit detail kept in the typed source.
+/// The typed budgets of the shared OOXML families (Custom XML, Web
+/// Extensions, Ribbon), carried by each OOXML crate's shared-error variant,
+/// are limit errors (record 0360).
+#[test]
+#[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
+fn shared_ooxml_family_limits_are_limit_exceeded() {
+    let shared = || {
+        [
+            litchi_ooxml_common::Error::Limit {
+                kind: litchi_ooxml_common::LimitKind::CustomXml(
+                    litchi_ooxml_common::custom_xml::LimitKind::Items,
+                ),
+                observed: 11,
+                maximum: 10,
+            },
+            litchi_ooxml_common::Error::Limit {
+                kind: litchi_ooxml_common::LimitKind::Web(
+                    litchi_ooxml_common::web::LimitKind::Panes,
+                ),
+                observed: 11,
+                maximum: 10,
+            },
+            litchi_ooxml_common::Error::Limit {
+                kind: litchi_ooxml_common::LimitKind::Ribbon(
+                    litchi_ooxml_common::ribbon::LimitKind::XmlBytes,
+                ),
+                observed: 11,
+                maximum: 10,
+            },
+        ]
+    };
+    let check = |error: Error| assert_eq!(error.code(), Code::LimitExceeded, "{error:?}");
+    let mce = || litchi_ooxml_common::mce::Error::LimitExceeded {
+        kind: litchi_ooxml_common::mce::LimitKind::EventBytes,
+        observed: 17,
+        maximum: 16,
+    };
+    #[cfg(feature = "docx")]
+    {
+        for error in shared() {
+            check(litchi_docx::Error::Common(error).into());
+        }
+        check(litchi_docx::Error::Mce(mce()).into());
+        check(litchi_docx::Error::Common(litchi_ooxml_common::Error::Mce(mce())).into());
+    }
+    #[cfg(feature = "pptx")]
+    {
+        for error in shared() {
+            check(litchi_pptx::Error::CustomProperties(error).into());
+        }
+        check(litchi_pptx::Error::MarkupCompatibility(mce()).into());
+        check(litchi_pptx::Error::CustomProperties(litchi_ooxml_common::Error::Mce(mce())).into());
+    }
+    #[cfg(feature = "xlsx")]
+    {
+        for error in shared() {
+            check(litchi_xlsx::Error::Common(error).into());
+        }
+        check(litchi_xlsx::Error::MarkupCompatibility(mce()).into());
+        check(litchi_xlsx::Error::Common(litchi_ooxml_common::Error::Mce(mce())).into());
+    }
+    #[cfg(feature = "xlsb")]
+    {
+        for error in shared() {
+            check(litchi_xlsb::package::PackageError::Common(error).into());
+        }
+        check(
+            litchi_xlsb::package::PackageError::Common(litchi_ooxml_common::Error::Mce(mce()))
+                .into(),
+        );
+    }
+}
+
+/// A shared MCE policy rejects malformed caller bounds before reading input;
+/// hosts must preserve that as an invalid argument rather than an exhausted file
+/// resource (record 0360).
+#[test]
+#[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
+fn shared_ooxml_invalid_mce_limits_are_invalid_arguments() {
+    let check = |error: Error| assert_eq!(error.code(), Code::InvalidArgument, "{error:?}");
+    let mce = || litchi_ooxml_common::mce::Error::InvalidLimit {
+        kind: litchi_ooxml_common::mce::LimitKind::InputBytes,
+        value: 0,
+        minimum: 1,
+        maximum: 2 * 1024 * 1024 * 1024,
+    };
+    #[cfg(feature = "docx")]
+    {
+        check(litchi_docx::Error::Mce(mce()).into());
+        check(litchi_docx::Error::Common(litchi_ooxml_common::Error::Mce(mce())).into());
+    }
+    #[cfg(feature = "pptx")]
+    {
+        check(litchi_pptx::Error::MarkupCompatibility(mce()).into());
+        check(litchi_pptx::Error::CustomProperties(litchi_ooxml_common::Error::Mce(mce())).into());
+    }
+    #[cfg(feature = "xlsx")]
+    {
+        check(litchi_xlsx::Error::MarkupCompatibility(mce()).into());
+        check(litchi_xlsx::Error::Common(litchi_ooxml_common::Error::Mce(mce())).into());
+    }
+    #[cfg(feature = "xlsb")]
+    {
+        check(
+            litchi_xlsb::package::PackageError::Common(litchi_ooxml_common::Error::Mce(mce()))
+                .into(),
+        );
+    }
+}
+
 #[test]
 fn row_resource_limits_are_limit_exceeded() {
     let check = |error: Error| {
@@ -874,6 +984,70 @@ fn wildcard_docx_errors_are_corrupt_file() {
 fn wildcard_pptx_errors_are_corrupt_file() {
     let error = assert_code(litchi_pptx::Error::Xml("bad".into()), Code::CorruptFile);
     assert_eq!(error.format(), Some(FileFormat::Pptx));
+}
+
+#[cfg(feature = "xlsx")]
+#[test]
+fn xlsx_refusals_conflicts_and_limits_have_their_codes() {
+    use litchi_core::edit::{Refusal, RefusalKind};
+    assert_code(
+        litchi_xlsx::Error::Refused(Refusal::new(
+            RefusalKind::NotFound,
+            "edit_auto_filter",
+            "the worksheet does not exist",
+        )),
+        Code::NotFound,
+    );
+    assert_code(
+        litchi_xlsx::Error::Refused(Refusal::new(
+            RefusalKind::UnsupportedContent,
+            "edit_comments",
+            "markup compatibility",
+        )),
+        Code::UnsupportedCapability,
+    );
+    assert_code(
+        litchi_xlsx::Error::PatchConflict {
+            part: "/xl/workbook.xml".into(),
+        },
+        Code::InvalidInput,
+    );
+    assert_code(
+        litchi_xlsx::Error::InvalidLimit {
+            kind: litchi_xlsx::LimitKind::Opc(litchi_xlsx::opc::LimitKind::Parts),
+            value: 0,
+            maximum: 1,
+        },
+        Code::InvalidArgument,
+    );
+    assert_code(
+        litchi_xlsx::Error::Limit {
+            kind: litchi_xlsx::LimitKind::ConditionalFormatting(
+                litchi_xlsx::conditional_formatting::edit::LimitKind::Formats,
+            ),
+            observed: 2,
+            maximum: 1,
+        },
+        Code::LimitExceeded,
+    );
+    assert_code(
+        litchi_xlsx::Error::Limit {
+            kind: litchi_xlsx::LimitKind::Connections(
+                litchi_xlsx::connections::LimitKind::NamespaceBindings,
+            ),
+            observed: 5,
+            maximum: 4,
+        },
+        Code::LimitExceeded,
+    );
+    assert_code(
+        litchi_xlsx::Error::FormControl(litchi_xlsx::form_control::FormControlError::Limit {
+            kind: litchi_xlsx::form_control::LimitKind::Items,
+            observed: 5,
+            maximum: 4,
+        }),
+        Code::LimitExceeded,
+    );
 }
 
 #[cfg(feature = "xlsx")]

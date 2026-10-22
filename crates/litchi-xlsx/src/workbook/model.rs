@@ -441,9 +441,36 @@ pub(crate) struct Inner {
     pub(super) chart_inventories: Arc<crate::chart::edit::InventoryCache>,
     /// Repairs made while the workbook catalog was parsed at open time.
     pub(super) tolerance: ToleranceReport,
-    /// The opt-in repairs this workbook was opened with; snapshots derived
-    /// from it by edits re-open under the same policy.
+    /// The ingress policies this workbook retains after open (its leniency,
+    /// semantic limits and encryption limits); snapshots derived from it by
+    /// edits re-open under the same policies.
+    pub(super) options: WorkbookOptions,
+}
+
+/// The policies an owned workbook snapshot actually needs after ingress.
+///
+/// Physical source limits live on the validated OPC package, while cache
+/// limits and an execution context belong only to a source-backed owner.
+/// Keeping those source-owner fields out of every eager snapshot preserves
+/// the compact immutable workbook layout without dropping any policy used by
+/// owned edits or encrypted output.
+#[derive(Debug, Clone, Copy, Default)]
+pub(crate) struct WorkbookOptions {
     pub(super) leniency: Leniency,
+    pub(super) semantic_limits: crate::SemanticLimits,
+    #[cfg(feature = "encryption")]
+    pub(super) encryption_limits: crate::encryption::Limits,
+}
+
+impl WorkbookOptions {
+    fn from_open_options(options: &crate::OpenOptions) -> Self {
+        Self {
+            leniency: options.leniency,
+            semantic_limits: options.semantic_limits,
+            #[cfg(feature = "encryption")]
+            encryption_limits: options.encryption_limits,
+        }
+    }
 }
 
 /// The owned, read-only semantic projection of an XLSX [`crate::Package`].
@@ -455,6 +482,20 @@ pub(crate) struct Inner {
 #[derive(Debug, Clone)]
 pub struct Workbook {
     pub(super) inner: Arc<Inner>,
+    /// The policies of this snapshot that do not belong to its state;
+    /// snapshots derived from it by edits share them.
+    ///
+    /// The ordinary strict package path keeps this absent and reads its
+    /// semantic defaults from `Inner::options`.  An override (or encrypted
+    /// provenance) installs the shared policy lazily; this keeps the common
+    /// eager open path allocation-free for policy state.
+    policy: Option<Arc<Policy>>,
+}
+
+/// The semantic budgets and encryption provenance of a workbook snapshot.
+#[derive(Debug, Clone, Copy)]
+pub(super) struct Policy {
+    semantic_limits: crate::SemanticLimits,
     #[cfg(feature = "encryption")]
     encryption: PackageEncryption,
 }
@@ -466,12 +507,42 @@ impl Workbook {
         Self::from_package_with_styles(package, None)
     }
 
-    /// [`Self::from_package`] with the opt-in repairs `leniency` allows.
-    pub(crate) fn from_package_with_leniency(
+    /// [`Self::from_package`] under the ingress policies `options`, which
+    /// the projection keeps.
+    pub(crate) fn from_package_with_options(
         package: OpcPackage,
-        leniency: Leniency,
+        options: crate::OpenOptions,
     ) -> Result<Self> {
-        Self::open_package(package, None, leniency)
+        Self::open_package(package, None, WorkbookOptions::from_open_options(&options))
+    }
+
+    /// The semantic budgets of this snapshot.
+    pub(crate) fn semantic_limits(&self) -> &crate::SemanticLimits {
+        self.policy
+            .as_deref()
+            .map_or(&self.inner.options.semantic_limits, |policy| {
+                &policy.semantic_limits
+            })
+    }
+
+    /// This snapshot under the semantic budgets `limits`; the state is
+    /// shared.
+    pub(crate) fn with_semantic_limits(&self, limits: crate::SemanticLimits) -> Self {
+        let mut policy = self.policy.as_deref().copied().unwrap_or_else(|| Policy {
+            semantic_limits: self.inner.options.semantic_limits,
+            #[cfg(feature = "encryption")]
+            encryption: PackageEncryption::plain(),
+        });
+        policy.semantic_limits = limits;
+        Self {
+            inner: Arc::clone(&self.inner),
+            policy: Some(Arc::new(policy)),
+        }
+    }
+
+    #[cfg(feature = "encryption")]
+    pub(crate) fn encryption_limits(&self) -> crate::encryption::Limits {
+        self.inner.options.encryption_limits
     }
 
     /// The lineage's memo of worksheet drawing chart inventories.
@@ -482,44 +553,46 @@ impl Workbook {
     /// The opt-in repair policy the owning package was opened with.
     #[must_use]
     pub fn leniency(&self) -> Leniency {
-        self.inner.leniency
+        self.inner.options.leniency
     }
 
     #[cfg(feature = "encryption")]
     pub(crate) fn from_package_with_encryption(
         package: OpcPackage,
         encryption: PackageEncryption,
-        leniency: Leniency,
+        options: crate::OpenOptions,
     ) -> Result<Self> {
-        let mut workbook = Self::open_package(package, None, leniency)?;
-        workbook.encryption = encryption;
+        let mut workbook =
+            Self::open_package(package, None, WorkbookOptions::from_open_options(&options))?;
+        workbook.policy = Some(Arc::new(Policy {
+            encryption,
+            semantic_limits: workbook.semantic_limits().to_owned(),
+        }));
         Ok(workbook)
     }
 
     /// Encryption provenance retained from the owning package.
     #[cfg(feature = "encryption")]
-    pub(crate) const fn encryption_state(&self) -> PackageEncryption {
-        self.encryption
-    }
-
-    #[cfg(feature = "encryption")]
-    pub(crate) fn mark_encrypted(&mut self, mode: crate::encryption::Mode) {
-        self.encryption.mark_encrypted(mode);
+    pub(crate) fn encryption_state(&self) -> PackageEncryption {
+        self.policy
+            .as_deref()
+            .map_or_else(PackageEncryption::plain, |policy| policy.encryption)
     }
 
     pub(crate) fn from_package_with_styles(
         package: OpcPackage,
         source: Option<&Workbook>,
     ) -> Result<Self> {
-        let leniency = source.map_or(Leniency::Strict, |source| source.inner.leniency);
-        Self::open_package(package, source, leniency)
+        let options = source.map_or_else(WorkbookOptions::default, |source| source.inner.options);
+        Self::open_package(package, source, options)
     }
 
     fn open_package(
         package: OpcPackage,
         source: Option<&Workbook>,
-        leniency: Leniency,
+        options: WorkbookOptions,
     ) -> Result<Self> {
+        let leniency = options.leniency;
         // The packaging repairs come first (they were made before the
         // workbook part could be read), then the open-time catalog sites
         // (findings 4.7/4.8); see `crate::leniency`.
@@ -625,6 +698,18 @@ impl Workbook {
         });
         let sheet_name_order = sheet_name_order.into_boxed_slice();
 
+        let policy = source
+            .and_then(|source| source.policy.as_ref().map(Arc::clone))
+            .or_else(|| {
+                let semantic_limits = options.semantic_limits;
+                (semantic_limits != crate::SemanticLimits::default()).then(|| {
+                    Arc::new(Policy {
+                        semantic_limits,
+                        #[cfg(feature = "encryption")]
+                        encryption: PackageEncryption::plain(),
+                    })
+                })
+            });
         Ok(Self {
             inner: Arc::new(Inner {
                 package,
@@ -655,10 +740,9 @@ impl Workbook {
                 format_cache,
                 chart_inventories,
                 tolerance,
-                leniency,
+                options,
             }),
-            #[cfg(feature = "encryption")]
-            encryption: source.map_or_else(PackageEncryption::plain, |source| source.encryption),
+            policy,
         })
     }
 
@@ -856,6 +940,7 @@ impl Workbook {
         self.inner.sheets.iter().cloned().map(|data| Worksheet {
             owner: Arc::clone(&self.inner),
             data,
+            policy: self.policy.as_ref().map(Arc::clone),
         })
     }
 
@@ -883,6 +968,7 @@ impl Workbook {
         Ok(data.map(|data| Worksheet {
             owner: Arc::clone(&self.inner),
             data,
+            policy: self.policy.as_ref().map(Arc::clone),
         }))
     }
 
@@ -897,6 +983,7 @@ impl Workbook {
         Some(Worksheet {
             owner: Arc::clone(&self.inner),
             data,
+            policy: self.policy.as_ref().map(Arc::clone),
         })
     }
 
@@ -964,8 +1051,8 @@ impl Workbook {
     pub fn pivot_table_server_formats_source<'a>(
         &self,
         selector: impl Into<crate::pivot::PivotTableSelector<'a>>,
-    ) -> Result<crate::pivot::PivotServerFormatsSnapshot> {
-        crate::pivot::load_pivot_server_formats(&self.inner.package, selector)
+    ) -> Result<crate::pivot::server_formats::Snapshot> {
+        crate::pivot::server_formats::load(&self.inner.package, selector)
     }
 
     /// Resolve one semantic PivotTable through the ordinary workbook facade.
@@ -979,22 +1066,6 @@ impl Workbook {
         crate::pivot::server_formats::view_workbook(self, selector)
     }
 
-    /// Alias for the typed extension collection view.
-    pub fn pivot_server_formats<'a>(
-        &self,
-        selector: impl Into<crate::pivot::PivotTableSelector<'a>>,
-    ) -> Result<crate::pivot::PivotTableView> {
-        self.pivot_table_server_formats(selector)
-    }
-
-    /// Low-level source-bound alias for the extension collection view.
-    pub fn pivot_server_formats_source<'a>(
-        &self,
-        selector: impl Into<crate::pivot::PivotTableSelector<'a>>,
-    ) -> Result<crate::pivot::PivotServerFormatsSnapshot> {
-        self.pivot_table_server_formats_source(selector)
-    }
-
     /// Resolve the typed `pivotTableData` payload for one semantic
     /// non-worksheet PivotTable.  A missing C444 owner is reported as `None`;
     /// malformed or ambiguous owners remain fallible diagnostics.
@@ -1002,16 +1073,11 @@ impl Workbook {
         &self,
         selector: impl Into<crate::pivot::PivotTableSelector<'a>>,
     ) -> Result<Option<crate::pivot::PivotTableDataView>> {
-        crate::pivot::server_formats::table_data::view_workbook(self, selector)
-    }
-
-    /// Resolve C444 with a caller-lowered semantic resource policy.
-    pub fn pivot_table_data_with_limits<'a>(
-        &self,
-        selector: impl Into<crate::pivot::PivotTableSelector<'a>>,
-        limits: &crate::pivot::PivotTableDataLimits,
-    ) -> Result<Option<crate::pivot::PivotTableDataView>> {
-        crate::pivot::server_formats::table_data::view_workbook_with_limits(self, selector, limits)
+        crate::pivot::table_data::view_workbook_with_limits(
+            self,
+            selector,
+            &self.semantic_limits().pivot_table_data_value(),
+        )
     }
 
     pub(crate) fn pivot_package(&self) -> &OpcPackage {
@@ -1047,17 +1113,14 @@ impl Workbook {
         &self.inner.external_reference_ids
     }
 
-    /// Read the workbook's source-bound calculation metadata.
+    /// Read the workbook's source-bound calculation metadata under the
+    /// owning package's semantic limits
+    /// ([`crate::SemanticLimits::calculation_properties`]).
     pub fn calculation_metadata(&self) -> Result<crate::calculation_properties::Snapshot> {
-        crate::calculation_properties::Snapshot::load(&self.inner.package)
-    }
-
-    /// Read calculation metadata with a caller-supplied resource policy.
-    pub fn calculation_metadata_with_limits(
-        &self,
-        limits: &crate::calculation_properties::Limits,
-    ) -> Result<crate::calculation_properties::Snapshot> {
-        crate::calculation_properties::Snapshot::load_with_limits(&self.inner.package, limits)
+        crate::calculation_properties::Snapshot::load_with_limits(
+            &self.inner.package,
+            &self.semantic_limits().calculation_properties_value(),
+        )
     }
 
     /// Persisted Office Add-in task panes, when this package contains them.
@@ -1065,10 +1128,12 @@ impl Workbook {
     /// The complete package graph is validated on first access. Later calls
     /// borrow the model retained by this immutable workbook snapshot.
     pub fn task_panes(&self) -> Result<Option<&litchi_ooxml_common::web::Panes>> {
-        let panes = self
-            .inner
-            .task_panes
-            .get_or_try_init(|| litchi_ooxml_common::web::load(&self.inner.package))?;
+        let panes = self.inner.task_panes.get_or_try_init(|| {
+            litchi_ooxml_common::web::load(
+                &self.inner.package,
+                &litchi_ooxml_common::web::Limits::standard(),
+            )
+        })?;
         Ok(panes.as_ref())
     }
 
@@ -1084,7 +1149,11 @@ impl Workbook {
     /// duplicate survey ID, or malformed Survey XML.
     pub fn surveys(&self) -> Result<&[crate::survey::Part]> {
         let values = self.inner.surveys.get_or_try_init(|| {
-            crate::survey::load(&self.inner.package).map(Vec::into_boxed_slice)
+            crate::survey::load_with_limits(
+                &self.inner.package,
+                &self.semantic_limits().survey_value(),
+            )
+            .map(Vec::into_boxed_slice)
         })?;
         Ok(values)
     }
@@ -1156,9 +1225,15 @@ impl Workbook {
 
     pub(crate) fn ensure_ordinary_output(&self, operation: &'static str) -> Result<()> {
         #[cfg(feature = "encryption")]
-        self.encryption
-            .ordinary_output()
-            .map_err(|source| Error::EncryptionPolicy { operation, source })?;
+        self.policy.as_deref().map_or_else(
+            || Ok(()),
+            |policy| {
+                policy
+                    .encryption
+                    .ordinary_output()
+                    .map_err(|source| Error::EncryptionPolicy { operation, source })
+            },
+        )?;
         #[cfg(not(feature = "encryption"))]
         let _ = operation;
         Ok(())
@@ -1170,7 +1245,9 @@ impl Workbook {
 
     #[cfg(feature = "encryption")]
     pub(crate) fn retained_mode(&self, operation: &'static str) -> Result<crate::encryption::Mode> {
-        self.encryption
+        self.policy
+            .as_deref()
+            .map_or_else(PackageEncryption::plain, |policy| policy.encryption)
             .require_retained_mode()
             .map_err(|source| Error::EncryptionPolicy { operation, source })
     }
@@ -1181,6 +1258,10 @@ impl Workbook {
 pub struct Worksheet {
     pub(super) owner: Arc<Inner>,
     pub(super) data: Arc<SheetData>,
+    /// The owning package's policy, for the form-control read budget
+    /// ([`crate::SemanticLimits::form_controls`]); `None` for internal
+    /// handles that never read form controls.
+    pub(super) policy: Option<Arc<Policy>>,
 }
 
 impl Worksheet {
@@ -1236,7 +1317,18 @@ impl Worksheet {
                 sheet: self.data.name.clone(),
             });
         }
-        crate::form_control::eager_form_controls_for_sheet(&self.owner.package, &self.data.part_uri)
+        crate::form_control::eager_form_controls_for_sheet_with_limits(
+            &self.owner.package,
+            &self.data.part_uri,
+            self.policy
+                .as_ref()
+                .map_or_else(
+                    || self.owner.options.semantic_limits.form_controls_value(),
+                    |policy| policy.semantic_limits.form_controls_value(),
+                )
+                .unwrap_or_default(),
+        )
+        .map_err(crate::form_control::owner_to_xlsx)
     }
 
     /// Parse this worksheet's legacy notes; `None` without a comments part.
@@ -1271,43 +1363,12 @@ impl Worksheet {
         crate::threaded_comments::package::comments(&self.owner.package, &self.data.part_uri)
     }
 
-    /// Read this worksheet's form controls under a caller-owned bounded
-    /// owner policy.
-    pub fn form_controls_with_limits(
-        &self,
-        limits: crate::form_control::OwnerLimits,
-    ) -> Result<crate::form_control::FormControlCollection> {
-        if self.data.kind != WorksheetKind::Worksheet {
-            return Err(Error::NotWorksheet {
-                sheet: self.data.name.clone(),
-            });
-        }
-        crate::form_control::eager_form_controls_for_sheet_with_limits(
-            &self.owner.package,
-            &self.data.part_uri,
-            limits,
-        )
-        .map_err(crate::form_control::owner_to_xlsx)
-    }
-
     /// Resolve one form control by checked position or exact authored name.
     pub fn form_control<'a>(
         &self,
         selector: impl Into<crate::form_control::ControlSelector<'a>>,
     ) -> Result<Option<crate::form_control::FormControlView>> {
         Ok(self.form_controls()?.get(selector)?.cloned())
-    }
-
-    /// Resolve one form control under a caller-owned bounded owner policy.
-    pub fn form_control_with_limits<'a>(
-        &self,
-        selector: impl Into<crate::form_control::ControlSelector<'a>>,
-        limits: crate::form_control::OwnerLimits,
-    ) -> Result<Option<crate::form_control::FormControlView>> {
-        Ok(self
-            .form_controls_with_limits(limits)?
-            .get(selector)?
-            .cloned())
     }
 
     /// Borrow this worksheet's Office Add-in range bindings.
@@ -1323,7 +1384,7 @@ impl Worksheet {
         }
         self.data.web_bindings.get_or_try_init(|| {
             let part = self.owner.package.get_part(&self.data.part_uri)?;
-            raw::web::read(part.blob())
+            raw::web::read(part.blob(), &self.owner.package.read_limits())
         })
     }
 
@@ -1888,6 +1949,7 @@ impl Inner {
             let sheet = Worksheet {
                 owner: Arc::clone(self),
                 data: Arc::clone(data),
+                policy: None,
             };
             count = count
                 .checked_add(

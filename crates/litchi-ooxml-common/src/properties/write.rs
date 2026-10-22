@@ -266,9 +266,9 @@ fn add_typed_time_bytes(
 fn keyword_xml_bytes(keywords: &Keywords) -> Result<usize> {
     if keywords.items.len() > MAX_KEYWORD_ITEMS {
         return Err(Error::Limit {
-            resource: "core keyword items",
-            max: MAX_KEYWORD_ITEMS,
-            actual: keywords.items.len(),
+            kind: crate::LimitKind::CoreKeywordItems,
+            maximum: MAX_KEYWORD_ITEMS,
+            observed: keywords.items.len(),
         });
     }
 
@@ -315,9 +315,9 @@ fn keyword_xml_bytes(keywords: &Keywords) -> Result<usize> {
 fn escaped_xml_bytes(value: &str, property: &str) -> Result<usize> {
     if value.len() > MAX_PROPERTY_TEXT {
         return Err(Error::Limit {
-            resource: "core property text bytes",
-            max: MAX_PROPERTY_TEXT,
-            actual: value.len(),
+            kind: crate::LimitKind::CorePropertyTextBytes,
+            maximum: MAX_PROPERTY_TEXT,
+            observed: value.len(),
         });
     }
     let mut bytes = 0usize;
@@ -335,9 +335,9 @@ fn escaped_xml_bytes(value: &str, property: &str) -> Result<usize> {
             _ => character.len_utf8(),
         };
         bytes = bytes.checked_add(additional).ok_or(Error::Limit {
-            resource: "core-properties XML bytes",
-            max: MAX_XML_BYTES,
-            actual: usize::MAX,
+            kind: crate::LimitKind::CorePropertiesXmlBytes,
+            maximum: MAX_XML_BYTES,
+            observed: usize::MAX,
         })?;
     }
     Ok(bytes)
@@ -345,15 +345,15 @@ fn escaped_xml_bytes(value: &str, property: &str) -> Result<usize> {
 
 fn add_xml_bytes(total: &mut usize, additional: usize) -> Result<()> {
     let actual = total.checked_add(additional).ok_or(Error::Limit {
-        resource: "core-properties XML bytes",
-        max: MAX_XML_BYTES,
-        actual: usize::MAX,
+        kind: crate::LimitKind::CorePropertiesXmlBytes,
+        maximum: MAX_XML_BYTES,
+        observed: usize::MAX,
     })?;
     if actual > MAX_XML_BYTES {
         return Err(Error::Limit {
-            resource: "core-properties XML bytes",
-            max: MAX_XML_BYTES,
-            actual,
+            kind: crate::LimitKind::CorePropertiesXmlBytes,
+            maximum: MAX_XML_BYTES,
+            observed: actual,
         });
     }
     *total = actual;
@@ -373,9 +373,9 @@ impl BoundedXml {
     fn with_capacity(capacity: usize) -> Result<Self> {
         if capacity > MAX_XML_BYTES {
             return Err(Error::Limit {
-                resource: "core-properties XML bytes",
-                max: MAX_XML_BYTES,
-                actual: capacity,
+                kind: crate::LimitKind::CorePropertiesXmlBytes,
+                maximum: MAX_XML_BYTES,
+                observed: capacity,
             });
         }
         let mut bytes = Vec::new();
@@ -397,15 +397,15 @@ impl BoundedXml {
             .len()
             .checked_add(value.len())
             .ok_or(Error::Limit {
-                resource: "core-properties XML bytes",
-                max: MAX_XML_BYTES,
-                actual: usize::MAX,
+                kind: crate::LimitKind::CorePropertiesXmlBytes,
+                maximum: MAX_XML_BYTES,
+                observed: usize::MAX,
             })?;
         if length > MAX_XML_BYTES {
             return Err(Error::Limit {
-                resource: "core-properties XML bytes",
-                max: MAX_XML_BYTES,
-                actual: length,
+                kind: crate::LimitKind::CorePropertiesXmlBytes,
+                maximum: MAX_XML_BYTES,
+                observed: length,
             });
         }
         self.bytes.try_reserve_exact(value.len()).map_err(|error| {
@@ -498,15 +498,15 @@ fn push_keywords(xml: &mut BoundedXml, keywords: Option<&Keywords>) -> Result<()
 
 fn add_keyword_bytes(total: &mut usize, additional: usize) -> Result<()> {
     *total = total.checked_add(additional).ok_or(Error::Limit {
-        resource: "core property text bytes",
-        max: MAX_PROPERTY_TEXT,
-        actual: usize::MAX,
+        kind: crate::LimitKind::CorePropertyTextBytes,
+        maximum: MAX_PROPERTY_TEXT,
+        observed: usize::MAX,
     })?;
     if *total > MAX_PROPERTY_TEXT {
         return Err(Error::Limit {
-            resource: "core property text bytes",
-            max: MAX_PROPERTY_TEXT,
-            actual: *total,
+            kind: crate::LimitKind::CorePropertyTextBytes,
+            maximum: MAX_PROPERTY_TEXT,
+            observed: *total,
         });
     }
     Ok(())
@@ -530,9 +530,9 @@ fn push_text(xml: &mut BoundedXml, element: &str, value: Option<&str>) -> Result
 fn validate_text(value: &str, property: &str) -> Result<()> {
     if value.len() > MAX_PROPERTY_TEXT {
         return Err(Error::Limit {
-            resource: "core property text bytes",
-            max: MAX_PROPERTY_TEXT,
-            actual: value.len(),
+            kind: crate::LimitKind::CorePropertyTextBytes,
+            maximum: MAX_PROPERTY_TEXT,
+            observed: value.len(),
         });
     }
     validate_xml_text(value, property)
@@ -566,9 +566,9 @@ fn available_part_name(package: &OpcPackage) -> Result<PackURI> {
         }
     }
     Err(Error::Limit {
-        resource: "core-properties part-name candidates",
-        max: MAX_PART_CANDIDATES as usize,
-        actual: MAX_PART_CANDIDATES as usize,
+        kind: crate::LimitKind::CorePropertiesPartNameCandidates,
+        maximum: MAX_PART_CANDIDATES as usize,
+        observed: MAX_PART_CANDIDATES as usize,
     })
 }
 
@@ -580,9 +580,9 @@ fn next_relationship_id(relationships: &litchi_opc::Relationships) -> Result<Str
             return Ok(candidate);
         }
         index = index.checked_add(1).ok_or(Error::Limit {
-            resource: "package relationship identifiers",
-            max: u32::MAX as usize,
-            actual: usize::MAX,
+            kind: crate::LimitKind::PackageRelationshipIdentifiers,
+            maximum: u32::MAX as usize,
+            observed: usize::MAX,
         })?;
     }
 }
@@ -754,9 +754,9 @@ mod tests {
         assert!(matches!(
             Core::new().revision(oversized).xml(),
             Err(Error::Limit {
-                resource: "core property text bytes",
-                max: MAX_PROPERTY_TEXT,
-                actual,
+                kind: crate::LimitKind::CorePropertyTextBytes,
+                maximum: MAX_PROPERTY_TEXT,
+                observed: actual,
             }) if actual == MAX_PROPERTY_TEXT + 1
         ));
     }
@@ -792,9 +792,9 @@ mod tests {
         assert!(matches!(
             Core::new().keywords(keywords).xml(),
             Err(Error::Limit {
-                resource: "core keyword items",
-                max: MAX_KEYWORD_ITEMS,
-                actual,
+                kind: crate::LimitKind::CoreKeywordItems,
+                maximum: MAX_KEYWORD_ITEMS,
+                observed: actual,
             }) if actual == MAX_KEYWORD_ITEMS + 1
         ));
 
@@ -813,8 +813,8 @@ mod tests {
         assert!(matches!(
             write_core(&mut package, oversized),
             Err(Error::Limit {
-                resource: "core-properties XML bytes",
-                max: MAX_XML_BYTES,
+                kind: crate::LimitKind::CorePropertiesXmlBytes,
+                maximum: MAX_XML_BYTES,
                 ..
             })
         ));
@@ -838,9 +838,9 @@ mod tests {
         assert!(matches!(
             result,
             Err(Error::Limit {
-                resource: "core-properties XML bytes",
-                max: MAX_XML_BYTES,
-                actual,
+                kind: crate::LimitKind::CorePropertiesXmlBytes,
+                maximum: MAX_XML_BYTES,
+                observed: actual,
             }) if actual == MAX_XML_BYTES + 1
         ));
         assert_eq!(xml.len(), MAX_XML_BYTES - 1);

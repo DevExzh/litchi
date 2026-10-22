@@ -5,8 +5,8 @@ use super::model::{
     RichValueData, RichValueRels, Structures, ValueType, XfComplement,
 };
 use super::{
-    MAX_ARRAY_COLUMNS, MAX_ARRAY_ROWS, MAX_BAGS, MAX_ITEMS, MAX_RELATIONSHIPS, OFFICE_MAX_COUNT,
-    bounded, bounded_nonempty, invalid, limit,
+    LimitKind, MAX_ARRAY_COLUMNS, MAX_ARRAY_ROWS, MAX_BAGS, MAX_ITEMS, MAX_RELATIONSHIPS,
+    OFFICE_MAX_COUNT, bounded, bounded_nonempty, invalid, limit,
 };
 use crate::error::Result;
 use caseless::Caseless;
@@ -20,10 +20,14 @@ pub fn validate_data(
     arrays: Option<&ArrayData>,
 ) -> Result<()> {
     if value.values.len() > MAX_ITEMS {
-        return Err(limit("rich values"));
+        return Err(limit(LimitKind::ValueItems, value.values.len(), MAX_ITEMS));
     }
     if value.values.len() > OFFICE_MAX_COUNT as usize {
-        return Err(limit("rich-value count"));
+        return Err(limit(
+            LimitKind::ValueItems,
+            value.values.len(),
+            OFFICE_MAX_COUNT as usize,
+        ));
     }
     for (index, item) in value.values.iter().enumerate() {
         if let Some(structures) = structures {
@@ -37,7 +41,7 @@ pub fn validate_data(
                 ));
             }
             for (key, raw) in structure.keys.iter().zip(&item.values) {
-                bounded(raw, "rich-value value")?;
+                bounded(raw, LimitKind::StringBytes)?;
                 match &key.value_type {
                     ValueType::RichValue => {
                         let reference = index_value(raw, "rich-value reference")?;
@@ -66,11 +70,11 @@ pub fn validate_data(
             }
         } else {
             for raw in &item.values {
-                bounded(raw, "rich-value value")?;
+                bounded(raw, LimitKind::StringBytes)?;
             }
         }
         if let Some(fallback) = &item.fallback {
-            bounded(&fallback.value, "rich-value fallback")?;
+            bounded(&fallback.value, LimitKind::StringBytes)?;
         }
         validate_opaque(&item.opaque)?;
     }
@@ -84,19 +88,38 @@ pub fn validate_data(
 /// Validate rich-value structure definitions and case-insensitive key identity.
 pub fn validate_structures(value: &Structures) -> Result<()> {
     if value.values.len() > MAX_ITEMS {
-        return Err(limit("rich-value structures"));
+        return Err(limit(
+            LimitKind::StructureItems,
+            value.values.len(),
+            MAX_ITEMS,
+        ));
     }
     if value.values.len() > OFFICE_MAX_COUNT as usize {
-        return Err(limit("rich-value structure count"));
+        return Err(limit(
+            LimitKind::StructureItems,
+            value.values.len(),
+            OFFICE_MAX_COUNT as usize,
+        ));
     }
     for structure in &value.values {
-        bounded_nonempty(&structure.type_name, "rich-value structure type")?;
-        if structure.keys.is_empty() || structure.keys.len() > MAX_ITEMS {
+        bounded_nonempty(
+            &structure.type_name,
+            "rich-value structure type",
+            LimitKind::StringBytes,
+        )?;
+        if structure.keys.len() > MAX_ITEMS {
+            return Err(limit(
+                LimitKind::StructureKeys,
+                structure.keys.len(),
+                MAX_ITEMS,
+            ));
+        }
+        if structure.keys.is_empty() {
             return Err(invalid("rich-value structure requires at least one key"));
         }
         let mut names = HashSet::new();
         for key in &structure.keys {
-            bounded_nonempty(&key.name, "rich-value key")?;
+            bounded_nonempty(&key.name, "rich-value key", LimitKind::StringBytes)?;
             if key.name.chars().count() > 255 {
                 return Err(invalid("rich-value key exceeds 255 characters"));
             }
@@ -118,7 +141,11 @@ pub fn validate_structures(value: &Structures) -> Result<()> {
 /// Validate rich arrays and their row-major dimensions.
 pub fn validate_arrays(value: &ArrayData) -> Result<()> {
     if value.values.len() > MAX_ITEMS || value.values.len() > OFFICE_MAX_COUNT as usize {
-        return Err(limit("rich arrays"));
+        return Err(limit(
+            LimitKind::ArrayItems,
+            value.values.len(),
+            MAX_ITEMS.min(OFFICE_MAX_COUNT as usize),
+        ));
     }
     for array in &value.values {
         if !(1..=MAX_ARRAY_ROWS).contains(&array.rows) {
@@ -131,14 +158,14 @@ pub fn validate_arrays(value: &ArrayData) -> Result<()> {
         }
         let expected = (array.rows as usize)
             .checked_mul(array.columns as usize)
-            .ok_or_else(|| limit("rich-array values"))?;
+            .ok_or_else(|| limit(LimitKind::ArrayValues, usize::MAX, MAX_ITEMS))?;
         if array.values.len() != expected {
             return Err(invalid(
                 "rich-array value count does not match its dimensions",
             ));
         }
         for item in &array.values {
-            bounded(&item.value, "rich-array value")?;
+            bounded(&item.value, LimitKind::StringBytes)?;
             if matches!(
                 &item.value_type,
                 ArrayValueType::RichValue | ArrayValueType::Array
@@ -159,7 +186,11 @@ pub fn validate_arrays(value: &ArrayData) -> Result<()> {
 /// and XF-control chains defined by MS-XLSX section 2.3.9.
 pub fn validate_bags(value: &Bags) -> Result<()> {
     if value.values.len() > MAX_BAGS || value.values.len() > OFFICE_MAX_COUNT as usize {
-        return Err(limit("feature property bags"));
+        return Err(limit(
+            LimitKind::BagItems,
+            value.values.len(),
+            MAX_BAGS.min(OFFICE_MAX_COUNT as usize),
+        ));
     }
     if value
         .count
@@ -185,7 +216,11 @@ pub fn validate_bags(value: &Bags) -> Result<()> {
 /// Validate a rich-value relationship part independently from its package.
 pub fn validate_rich_value_rels(value: &RichValueRels) -> Result<()> {
     if value.ids.len() > MAX_RELATIONSHIPS {
-        return Err(limit("rich-value relationships"));
+        return Err(limit(
+            LimitKind::RelationshipItems,
+            value.ids.len(),
+            MAX_RELATIONSHIPS,
+        ));
     }
     let mut ids = HashSet::new();
     for id in &value.ids {
@@ -204,7 +239,11 @@ pub fn validate_rich_value_rels(value: &RichValueRels) -> Result<()> {
 /// Validate an xfComplement reference against the feature-bag graph.
 pub fn validate_xf_complement(value: &XfComplement, bags: &Bags) -> Result<()> {
     if value.opaque.len() > MAX_ITEMS {
-        return Err(limit("xfComplement extensions"));
+        return Err(limit(
+            LimitKind::ExtensionItems,
+            value.opaque.len(),
+            MAX_ITEMS,
+        ));
     }
     validate_bags(bags)?;
     let mapping = mapping_index(bags, &BagType::XfComplements)?;
@@ -225,7 +264,11 @@ pub fn validate_xf_complement(value: &XfComplement, bags: &Bags) -> Result<()> {
 /// Validate a `DXFComplement` reference against the feature-bag graph.
 pub fn validate_dxf_complement(value: &DxfComplement, bags: &Bags) -> Result<()> {
     if value.opaque.len() > MAX_ITEMS {
-        return Err(limit("DXFComplement extensions"));
+        return Err(limit(
+            LimitKind::ExtensionItems,
+            value.opaque.len(),
+            MAX_ITEMS,
+        ));
     }
     validate_bags(bags)?;
     let mapping = mapping_index(bags, &BagType::DxfComplements)?;
@@ -244,12 +287,16 @@ pub fn validate_dxf_complement(value: &DxfComplement, bags: &Bags) -> Result<()>
 }
 
 fn validate_bag(owner: &Bags, index: usize, bag: &Bag) -> Result<()> {
-    bounded_nonempty(bag.bag_type.token(), "feature property bag type")?;
+    bounded_nonempty(
+        bag.bag_type.token(),
+        "feature property bag type",
+        LimitKind::StringBytes,
+    )?;
     if let Some(value) = &bag.ext_ref {
-        bounded(value, "feature property bag extRef")?;
+        bounded(value, LimitKind::StringBytes)?;
     }
     if let Some(value) = &bag.attribute {
-        bounded(value, "feature property bag att")?;
+        bounded(value, LimitKind::StringBytes)?;
     }
     if let Some(extension) = bag.bag_extension
         && extension as usize >= owner.bag_extensions.len()
@@ -259,12 +306,16 @@ fn validate_bag(owner: &Bags, index: usize, bag: &Bag) -> Result<()> {
         ));
     }
     if bag.properties.len() > MAX_ITEMS {
-        return Err(limit("feature property bag properties"));
+        return Err(limit(
+            LimitKind::PropertyItems,
+            bag.properties.len(),
+            MAX_ITEMS,
+        ));
     }
     let mut keys = HashSet::new();
     for property in &bag.properties {
         if let Some(key) = property.key() {
-            bounded_nonempty(key, "feature property key")?;
+            bounded_nonempty(key, "feature property key", LimitKind::StringBytes)?;
             if key.chars().count() > 255 {
                 return Err(invalid("feature property key exceeds 255 characters"));
             }
@@ -283,7 +334,11 @@ fn validate_property(owner: &Bags, index: usize, property: &Property) -> Result<
     match property {
         Property::Array { values, .. } => {
             if values.len() > MAX_ITEMS {
-                return Err(limit("feature property array"));
+                return Err(limit(
+                    LimitKind::PropertyArrayItems,
+                    values.len(),
+                    MAX_ITEMS,
+                ));
             }
             for value in values {
                 validate_property_value(owner, value)?;
@@ -299,7 +354,7 @@ fn validate_property(owner: &Bags, index: usize, property: &Property) -> Result<
         Property::Integer { value, .. } => {
             integer(value)?;
         },
-        Property::Text { value, .. } => bounded(value, "feature property text")?,
+        Property::Text { value, .. } => bounded(value, LimitKind::StringBytes)?,
         Property::Boolean { .. } => {},
         Property::Decimal { value, .. } => double(value)?,
         Property::Relationship { id, .. } => relationship_id(id)?,
@@ -318,7 +373,7 @@ fn validate_property_value(owner: &Bags, value: &PropertyValue) -> Result<()> {
         PropertyValue::Integer(value) => {
             integer(value)?;
         },
-        PropertyValue::Text(value) => bounded(value, "feature property array text")?,
+        PropertyValue::Text(value) => bounded(value, LimitKind::StringBytes)?,
         PropertyValue::Boolean(_) => {},
         PropertyValue::Decimal(value) => double(value)?,
         PropertyValue::Relationship(id) => relationship_id(id)?,
@@ -466,7 +521,7 @@ fn double(value: &str) -> Result<()> {
 }
 
 fn relationship_id(value: &str) -> Result<()> {
-    bounded_nonempty(value, "relationship ID")?;
+    bounded_nonempty(value, "relationship ID", LimitKind::StringBytes)?;
     if value.chars().any(char::is_whitespace) {
         return Err(invalid("relationship ID cannot contain whitespace"));
     }
@@ -482,7 +537,11 @@ fn validate_opaque(values: &[super::model::Opaque]) -> Result<()> {
 
 fn validate_opaque_one(value: &super::model::Opaque) -> Result<()> {
     if value.xml.len() > super::MAX_OPAQUE_BYTES {
-        return Err(limit("opaque XML"));
+        return Err(limit(
+            LimitKind::OpaqueBytes,
+            value.xml.len(),
+            super::MAX_OPAQUE_BYTES,
+        ));
     }
     Ok(())
 }

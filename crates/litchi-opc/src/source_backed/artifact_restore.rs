@@ -10,7 +10,7 @@ use super::{
     read_source_at_with_context,
 };
 use crate::SpliceResource;
-use litchi_core::{ExecutionContext, Resource};
+use litchi_core::{ExecutionContext, ExecutionError, Resource};
 use sha2::{Digest as _, Sha256};
 use std::io::{self, Write};
 use std::sync::{Arc, Mutex};
@@ -33,12 +33,14 @@ impl SourceBackedPackage {
     /// Restore an explicit original artifact after authenticating both complete
     /// artifacts, without materializing either artifact.
     ///
-    /// The current package's execution context controls the operation. If it
-    /// has none, the original artifact's context is used. Both providers must
-    /// remain fresh and uncancelled. A single 64 KiB workspace is reserved;
-    /// output is charged once, by the context selected above. The original
-    /// bytes are authenticated again as they are emitted. Any failure after
-    /// accepted output is reported with its exact accepted byte count.
+    /// The current package's execution context controls the operation. The
+    /// retained provider is still checked for freshness and cancellation, but
+    /// its resource policy is never inherited by the recipient. Both
+    /// providers must remain fresh and uncancelled. A single 64 KiB workspace
+    /// is reserved when the current context has one; output is charged once by
+    /// that context. The original bytes are authenticated again as they are
+    /// emitted. Any failure after accepted output is reported with its exact
+    /// accepted byte count.
     pub fn restore_source_artifact_to_stream<W: Write>(
         &self,
         original: &SourceArtifact,
@@ -48,11 +50,7 @@ impl SourceBackedPackage {
     ) -> Result<()> {
         self.disable_read_ahead_for_publication()?;
         let retained = &original.snapshot;
-        let context = self
-            .cache
-            .context()
-            .cloned()
-            .or_else(|| retained.context.clone());
+        let context = self.cache.context().cloned();
         check_inverse_state(self, retained, context.as_ref())?;
         if max_output_bytes == 0 || max_output_bytes == u64::MAX {
             return Err(OpcError::InvalidSourcePartSpliceLimit {
@@ -91,34 +89,37 @@ impl SourceBackedPackage {
         }
         let _monitored_current = self.source.monitor_publication();
         let _monitored_retained = retained.monitor_publication();
-        let _workspace = context
-            .as_ref()
-            .map(|context| {
-                context
-                    .reserve(Resource::Memory, SOURCE_PUBLICATION_CHUNK_BYTES as u64)
-                    .map_err(map_execution_error)
-            })
-            .transpose()?;
-        let mut buffer = Vec::new();
-        buffer
-            .try_reserve_exact(SOURCE_PUBLICATION_CHUNK_BYTES)
-            .map_err(|source| OpcError::Allocation {
-                resource: "exact artifact restore buffer",
-                source,
-            })?;
-        if buffer.capacity() > SOURCE_PUBLICATION_CHUNK_BYTES {
-            return Err(overlay_unavailable(
-                "exact artifact restore allocation exceeds its reserved window",
-            ));
-        }
-        buffer.resize(SOURCE_PUBLICATION_CHUNK_BYTES, 0);
-        let current_hash = fingerprint_inverse_snapshot(
-            self,
-            &self.source,
-            retained,
-            context.as_ref(),
-            &mut buffer,
-        )?;
+        let _workspace = if let Some(context) = context.as_ref() {
+            let requested = SOURCE_PUBLICATION_CHUNK_BYTES;
+            match context.reserve(Resource::Memory, requested as u64) {
+                Ok(reservation) => Some(reservation),
+                Err(ExecutionError::ResourceLimit(limit)) if limit.resource == Resource::Memory => {
+                    let used = limit.observed.saturating_sub(requested as u64);
+                    let available = limit.limit.saturating_sub(used);
+                    if available == 0 {
+                        // The package may already retain its complete
+                        // catalog under an exact memory allowance. A
+                        // bounded stack window keeps authentication and
+                        // streaming available without an uncharged heap
+                        // allocation or a false policy refusal.
+                        None
+                    } else {
+                        return Err(OpcError::Execution(ExecutionError::ResourceLimit(limit)));
+                    }
+                },
+                Err(error) => return Err(map_execution_error(error)),
+            }
+        } else {
+            None
+        };
+        const RESTORE_STACK_BYTES: usize = 4 * 1024;
+        let mut stack_buffer = [0_u8; RESTORE_STACK_BYTES];
+        // Keep the managed 64 KiB reservation and its refusal boundary above,
+        // but use the bounded stack window for the actual reads. This avoids
+        // one heap buffer per exact inverse while retaining recipient policy.
+        let buffer: &mut [u8] = &mut stack_buffer;
+        let current_hash =
+            fingerprint_inverse_snapshot(self, &self.source, retained, context.as_ref(), buffer)?;
         if current_hash != proof.current_sha256 {
             return Err(OpcError::SourceArtifactMismatch {
                 artifact: "current",
@@ -126,7 +127,7 @@ impl SourceBackedPackage {
             });
         }
         let original_hash =
-            fingerprint_inverse_snapshot(self, retained, retained, context.as_ref(), &mut buffer)?;
+            fingerprint_inverse_snapshot(self, retained, retained, context.as_ref(), buffer)?;
         if original_hash != proof.original_sha256 {
             return Err(OpcError::SourceArtifactMismatch {
                 artifact: "original",
@@ -168,7 +169,7 @@ impl SourceBackedPackage {
                 retained,
                 context.as_ref(),
                 proof.original_sha256,
-                &mut buffer,
+                buffer,
                 &mut output,
             )
             .and_then(|()| output.flush().map_err(map_io_error))
@@ -179,7 +180,7 @@ impl SourceBackedPackage {
                 retained,
                 context.as_ref(),
                 proof.original_sha256,
-                &mut buffer,
+                buffer,
                 &mut output,
             )
             .and_then(|()| output.flush().map_err(map_io_error))

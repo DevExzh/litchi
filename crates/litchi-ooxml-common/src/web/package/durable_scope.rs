@@ -327,6 +327,7 @@ mod tests {
             &litchi_opc::OpcPackage::new(),
             panes,
             Conformance::Transitional,
+            &crate::web::Limits::standard(),
         )
         .unwrap()
     }

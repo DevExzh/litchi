@@ -226,7 +226,11 @@ pub struct OleObjects {
 
 pub(super) fn validate_value(value: &OleObjects, require_targets: bool) -> Result<()> {
     if value.objects.len() > MAX_OBJECTS {
-        return Err(limit("object count"));
+        return Err(limit(
+            super::LimitKind::Objects,
+            value.objects.len(),
+            MAX_OBJECTS,
+        ));
     }
     let mut shapes = HashSet::new();
     let mut ids = HashSet::new();
@@ -265,7 +269,11 @@ pub(super) fn validate_value(value: &OleObjects, require_targets: bool) -> Resul
         if let Some(value) = &object.link {
             bounded(value)?;
             if value.len() > 8192 {
-                return Err(invalid("OLE link moniker exceeds Office's limit"));
+                return Err(Error::limit(
+                    super::LimitKind::StringBytes,
+                    value.len(),
+                    8192,
+                ));
             }
         }
         if require_targets && object.target.is_none() {
@@ -332,20 +340,36 @@ pub(super) fn validate_resource(resource: &OleObjectResource, prefix: &str) -> R
         return Err(invalid("invalid embedded resource content type"));
     }
     if resource.data.len() > MAX_PAYLOAD_BYTES {
-        return Err(limit("individual payload bytes"));
+        return Err(limit(
+            super::LimitKind::PayloadBytes,
+            resource.data.len(),
+            MAX_PAYLOAD_BYTES,
+        ));
     }
     Ok(())
 }
 
 pub(super) fn add_payload(total: &mut usize, size: usize) -> Result<()> {
     if size > MAX_PAYLOAD_BYTES {
-        return Err(limit("individual payload bytes"));
+        return Err(limit(
+            super::LimitKind::PayloadBytes,
+            size,
+            MAX_PAYLOAD_BYTES,
+        ));
     }
-    *total = total
-        .checked_add(size)
-        .ok_or_else(|| limit("total payload bytes"))?;
+    *total = total.checked_add(size).ok_or_else(|| {
+        limit(
+            super::LimitKind::TotalPayloadBytes,
+            usize::MAX,
+            MAX_TOTAL_PAYLOAD_BYTES,
+        )
+    })?;
     if *total > MAX_TOTAL_PAYLOAD_BYTES {
-        Err(limit("total payload bytes"))
+        Err(limit(
+            super::LimitKind::TotalPayloadBytes,
+            *total,
+            MAX_TOTAL_PAYLOAD_BYTES,
+        ))
     } else {
         Ok(())
     }
@@ -355,7 +379,11 @@ pub(super) fn bounded(value: &str) -> Result<()> {
     if value.len() <= MAX_STRING_BYTES {
         Ok(())
     } else {
-        Err(limit("string bytes"))
+        Err(limit(
+            super::LimitKind::StringBytes,
+            value.len(),
+            MAX_STRING_BYTES,
+        ))
     }
 }
 

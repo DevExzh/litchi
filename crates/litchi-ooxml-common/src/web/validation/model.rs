@@ -5,6 +5,7 @@ use super::super::model::{
 };
 use super::super::package::fold_part_name;
 use super::super::{ADD_IN_RELATIONSHIP, IMAGE_RELATIONSHIP_TYPE};
+use crate::web::LimitKind;
 use crate::{Error, Result};
 use std::collections::{HashMap, HashSet};
 pub(in crate::web) fn validate_model(extension: &AddIn) -> Result<()> {
@@ -15,12 +16,12 @@ pub(in crate::web) fn validate_model_with(extension: &AddIn, limits: &Limits) ->
     require_nonempty("web extension id", &extension.id)?;
     validate_store_reference_with(&extension.reference, limits)?;
     enforce_count_with(
-        "alternate reference",
+        LimitKind::AlternateReferenceItems,
         extension.alternate_references.len(),
         limits,
     )?;
-    enforce_count_with("property", extension.properties.len(), limits)?;
-    enforce_count_with("binding", extension.bindings.len(), limits)?;
+    enforce_count_with(LimitKind::PropertyItems, extension.properties.len(), limits)?;
+    enforce_count_with(LimitKind::BindingItems, extension.bindings.len(), limits)?;
     let mut reference_ids = HashSet::new();
     reference_ids.insert(extension.reference.id.as_str());
     for reference in &extension.alternate_references {
@@ -48,7 +49,11 @@ pub(in crate::web) fn validate_model_with(extension: &AddIn, limits: &Limits) ->
         }
     }
     if let Some(snapshot) = &extension.snapshot {
-        enforce_count_with("snapshot effect", snapshot.effects.len(), limits)?;
+        enforce_count_with(
+            LimitKind::SnapshotEffectItems,
+            snapshot.effects.len(),
+            limits,
+        )?;
         for effect in &snapshot.effects {
             let reparsed = Effect::from_xml(effect.xml.as_bytes())?;
             if reparsed.kind != effect.kind {
@@ -110,7 +115,7 @@ pub(in crate::web) fn validate_task_pane_with(pane: &Pane, limits: &Limits) -> R
 }
 
 pub(in crate::web) fn validate_panes(task_panes: &Panes, limits: &Limits) -> Result<()> {
-    enforce_count_with("task pane", task_panes.panes.len(), limits)?;
+    enforce_count_with(LimitKind::TaskPaneItems, task_panes.panes.len(), limits)?;
     let mut relationship_ids = HashSet::new();
     let mut extension_ids = HashSet::new();
     let mut total_snapshot_bytes = 0usize;
@@ -135,24 +140,20 @@ pub(in crate::web) fn validate_panes(task_panes: &Panes, limits: &Limits) -> Res
             } = &resource.target
             {
                 if data.len() > limits.image_bytes {
-                    return limit(
-                        "web extension snapshot bytes",
-                        limits.image_bytes,
-                        data.len(),
-                    );
+                    return limit(LimitKind::SnapshotBytes, limits.image_bytes, data.len());
                 }
                 if snapshot_names.insert(fold_part_name(part_name)) {
                     total_snapshot_bytes =
                         total_snapshot_bytes
                             .checked_add(data.len())
                             .ok_or(Error::Limit {
-                                resource: "aggregate web extension snapshot bytes",
-                                max: limits.total_image_bytes,
-                                actual: usize::MAX,
+                                kind: crate::LimitKind::Web(LimitKind::AggregateSnapshotBytes),
+                                maximum: limits.total_image_bytes,
+                                observed: usize::MAX,
                             })?;
                     if total_snapshot_bytes > limits.total_image_bytes {
                         return limit(
-                            "aggregate web extension snapshot bytes",
+                            LimitKind::AggregateSnapshotBytes,
                             limits.total_image_bytes,
                             total_snapshot_bytes,
                         );
@@ -175,9 +176,9 @@ pub(in crate::web) fn charge_authored_metadata(
         .checked_add(1)
         .and_then(|count| count.checked_mul(128))
         .ok_or(Error::Limit {
-            resource: "authored web extension package metadata bytes",
-            max: limits.total_string_bytes,
-            actual: usize::MAX,
+            kind: crate::LimitKind::Web(LimitKind::AuthoredPackageMetadataBytes),
+            maximum: limits.total_string_bytes,
+            observed: usize::MAX,
         })?;
     budget.charge_metadata(generated_names, 2, limits)?;
     for pane in &task_panes.panes {
@@ -186,9 +187,9 @@ pub(in crate::web) fn charge_authored_metadata(
             .len()
             .checked_add(ADD_IN_RELATIONSHIP.len())
             .ok_or(Error::Limit {
-                resource: "authored web extension package metadata bytes",
-                max: limits.total_string_bytes,
-                actual: usize::MAX,
+                kind: crate::LimitKind::Web(LimitKind::AuthoredPackageMetadataBytes),
+                maximum: limits.total_string_bytes,
+                observed: usize::MAX,
             })?;
         budget.charge_metadata(pane_bytes, 2, limits)?;
         for resource in &pane.snapshot_resources {
@@ -203,9 +204,9 @@ pub(in crate::web) fn charge_authored_metadata(
             .and_then(|bytes| bytes.checked_add(resource.relationship_id.len()))
             .and_then(|bytes| bytes.checked_add(IMAGE_RELATIONSHIP_TYPE.len()))
             .ok_or(Error::Limit {
-                resource: "authored web extension package metadata bytes",
-                max: limits.total_string_bytes,
-                actual: usize::MAX,
+                kind: crate::LimitKind::Web(LimitKind::AuthoredPackageMetadataBytes),
+                maximum: limits.total_string_bytes,
+                observed: usize::MAX,
             })?;
             budget.charge_metadata(target_bytes, 3, limits)?;
         }
@@ -219,12 +220,12 @@ pub(in crate::web) fn add_xml_budget(
     limits: &Limits,
 ) -> Result<()> {
     *total = total.checked_add(bytes).ok_or(Error::Limit {
-        resource: "authored web extension XML bytes",
-        max: limits.xml_bytes,
-        actual: usize::MAX,
+        kind: crate::LimitKind::Web(LimitKind::AuthoredXmlBytes),
+        maximum: limits.xml_bytes,
+        observed: usize::MAX,
     })?;
     if *total > limits.xml_bytes {
-        return limit("authored web extension XML bytes", limits.xml_bytes, *total);
+        return limit(LimitKind::AuthoredXmlBytes, limits.xml_bytes, *total);
     }
     Ok(())
 }
@@ -235,9 +236,9 @@ pub(in crate::web) fn add_escaped_xml_budget(
     limits: &Limits,
 ) -> Result<()> {
     let bytes = value.len().checked_mul(6).ok_or(Error::Limit {
-        resource: "authored web extension XML bytes",
-        max: limits.xml_bytes,
-        actual: usize::MAX,
+        kind: crate::LimitKind::Web(LimitKind::AuthoredXmlBytes),
+        maximum: limits.xml_bytes,
+        observed: usize::MAX,
     })?;
     add_xml_budget(total, bytes, limits)
 }
@@ -385,11 +386,7 @@ pub(in crate::web) fn validate_snapshot_resources_with(pane: &Pane, limits: &Lim
                 }
                 validate_image_content_type(content_type)?;
                 if data.len() > limits.image_bytes {
-                    return limit(
-                        "web extension snapshot bytes",
-                        limits.image_bytes,
-                        data.len(),
-                    );
+                    return limit(LimitKind::SnapshotBytes, limits.image_bytes, data.len());
                 }
             },
             SnapshotTarget::External { target } => {

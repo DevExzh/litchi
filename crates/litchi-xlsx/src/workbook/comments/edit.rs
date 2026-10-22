@@ -2,7 +2,10 @@
 //!
 //! [`Package::edit_comments`] starts an [`Edit`] over an immutable snapshot.
 //! [`Edit::set`] adds or replaces the note of one cell, [`Edit::remove`]
-//! deletes it, and [`Edit::commit`] returns a [`Commit`] with the new
+//! deletes it, [`Edit::replace`] writes a worksheet's whole typed note graph
+//! (with [`Edit::set_comment`], [`Edit::set_author`],
+//! [`Edit::rename_author`] and [`Edit::clear`] over it), and
+//! [`Edit::commit`] returns a [`Commit`] with the new
 //! package, the reversible [`Patch`] of the parts it changed and the
 //! [`Diagnostics`]; [`Package::apply_comments`] replays a patch onto an
 //! equal package.
@@ -40,8 +43,12 @@ use litchi_spreadsheet_drawing::vml::{
 };
 use quick_xml::events::Event;
 
-use super::model::{Comments, RunColor, TextRun};
-use super::package::{COMMENTS_CONTENT_TYPE, COMMENTS_RELATIONSHIP_TYPE, load_from_worksheet};
+use super::model::{Comment, Comments, RunColor, TextRun};
+use super::package::{
+    COMMENTS_CONTENT_TYPE, COMMENTS_RELATIONSHIP_TYPE, load_from_worksheet, remove_from_worksheet,
+    replace_on_worksheet,
+};
+use super::validation;
 use crate::Package;
 use crate::error::{Result, invalid};
 use crate::part_edit::{Staged, WorksheetLayout, family};
@@ -65,8 +72,8 @@ pub enum LimitKind {
 
 /// A staged legacy-note edit of one [`Package`]. Dropping it discards it.
 #[derive(Debug)]
-pub struct Edit<'a> {
-    staged: Staged<'a>,
+pub struct Edit {
+    staged: Staged,
 }
 
 impl Package {
@@ -76,7 +83,7 @@ impl Package {
     ///
     /// Returns the encryption-policy error for a package whose mutations are
     /// refused.
-    pub fn edit_comments(&self) -> Result<Edit<'_>> {
+    pub fn edit_comments(&self) -> Result<Edit> {
         Ok(Edit {
             staged: Staged::new(self, "edit_comments")?,
         })
@@ -90,8 +97,11 @@ impl Package {
     /// Returns [`Error::PatchConflict`] when this package is not the patch's
     /// before state and [`Error::Signed`] for a changed patch of a signed
     /// workbook.
-    pub fn apply_comments(&self, patch: &Patch) -> Result<Self> {
-        patch.0.apply(self, "apply_comments")
+    pub fn apply_comments(&self, patch: &Patch) -> Result<Commit> {
+        Ok(Commit::new((
+            patch.0.apply(self, "apply_comments")?,
+            patch.0.clone(),
+        )))
     }
 }
 
@@ -101,7 +111,7 @@ fn cell(value: &str) -> Result<(String, u32, u32)> {
     Ok((cell.a1(), cell.row().get(), cell.column().get()))
 }
 
-impl Edit<'_> {
+impl Edit {
     /// The staged notes of the worksheet at `sheet`; `None` without a
     /// comments part.
     ///
@@ -235,10 +245,15 @@ impl Edit<'_> {
             },
         };
         for (value, what) in [(author, "author"), (text, "text")] {
-            if value.len() > MAX_TEXT_BYTES || value.contains('\0') {
-                return Err(invalid(format!(
-                    "a note {what} must hold at most {MAX_TEXT_BYTES} bytes and no NUL"
-                )));
+            if value.len() > MAX_TEXT_BYTES {
+                return Err(Error::limit(
+                    LimitKind::TextBytes,
+                    value.len(),
+                    MAX_TEXT_BYTES,
+                ));
+            }
+            if value.contains('\0') {
+                return Err(invalid(format!("a note {what} must hold no NUL")));
             }
         }
         let worksheet = self.staged.worksheet(sheet)?;
@@ -252,9 +267,11 @@ impl Edit<'_> {
                     return Ok(false);
                 }
             } else if part.comments.len() >= MAX_COMMENTS {
-                return Err(invalid(format!(
-                    "a worksheet holds at most {MAX_COMMENTS} notes"
-                )));
+                return Err(Error::limit(
+                    LimitKind::Comments,
+                    part.comments.len() + 1,
+                    MAX_COMMENTS,
+                ));
             }
         }
         let added = existing
@@ -326,6 +343,152 @@ impl Edit<'_> {
         }
         self.remove_note_shape(&worksheet, row, column)?;
         Ok(true)
+    }
+
+    /// Replace the complete legacy-note graph of the worksheet at `sheet`;
+    /// `None` removes the comments part and its worksheet relationship.
+    /// Returns whether anything changed.
+    ///
+    /// The graph is written whole through the comments codec: inert VML
+    /// shape IDs are kept as note metadata, and VML drawing parts are left as
+    /// they are (no note shape is added or removed).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing sheet or a chartsheet, an invalid
+    /// graph, or a changed edit of a signed workbook.
+    pub fn replace(&mut self, sheet: usize, value: Option<Comments>) -> Result<bool> {
+        let worksheet = self.staged.worksheet(sheet)?;
+        if let Some(value) = &value {
+            validation::comments(value)?;
+        }
+        let current = load_from_worksheet(self.staged.opc(), &worksheet)?.map(|part| part.comments);
+        if current == value {
+            return Ok(false);
+        }
+        self.staged.update(|candidate| {
+            match &value {
+                Some(value) => {
+                    replace_on_worksheet(candidate, &worksheet, value)?;
+                },
+                None => {
+                    remove_from_worksheet(candidate, &worksheet)?;
+                },
+            }
+            super::package::validate_graph(candidate)?;
+            let published = load_from_worksheet(candidate, &worksheet)?.map(|part| part.comments);
+            if published != value {
+                return Err(invalid(
+                    "classic comments package publication changed the staged graph",
+                ));
+            }
+            Ok(())
+        })?;
+        Ok(true)
+    }
+
+    /// Add or replace a fully typed note entry of the worksheet at `sheet`,
+    /// written through [`Self::replace`]. The cell reference and author
+    /// relationship are checked by the comments validator; shape IDs remain
+    /// opaque and inert.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::replace`], and for an invalid cell, author or text.
+    pub fn set_comment(&mut self, sheet: usize, value: Comment) -> Result<bool> {
+        litchi_sheet::Cell::from_a1(&value.cell_ref)?;
+        validation::text(&value.author, "author")?;
+        validation::text(&value.text, "text")?;
+        let mut comments = self.comments(sheet)?.unwrap_or_default();
+        if comments.comments.get(&value.cell_ref) == Some(&value) {
+            return Ok(false);
+        }
+        comments.comments.insert(value.cell_ref.clone(), value);
+        self.replace(sheet, Some(comments))
+    }
+
+    /// Rename one checked author-table entry of the worksheet at `sheet` and
+    /// update every note referencing it, written through [`Self::replace`].
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::replace`], and for an absent comments part or author ID.
+    pub fn set_author(
+        &mut self,
+        sheet: usize,
+        author_id: u32,
+        author: impl Into<String>,
+    ) -> Result<bool> {
+        let author = author.into();
+        validation::text(&author, "author")?;
+        let mut comments = self
+            .comments(sheet)?
+            .ok_or_else(|| invalid("cannot edit an author on an absent comments part"))?;
+        let index = usize::try_from(author_id)
+            .ok()
+            .filter(|index| *index < comments.authors.len())
+            .ok_or_else(|| invalid(format!("classic comments author ID {author_id} is absent")))?;
+        if comments.authors[index] == author {
+            return Ok(false);
+        }
+        comments.authors[index].clone_from(&author);
+        for comment in comments.comments.values_mut() {
+            if comment.author_id == author_id {
+                comment.author.clone_from(&author);
+            }
+        }
+        self.replace(sheet, Some(comments))
+    }
+
+    /// Rename a unique author of the worksheet at `sheet` without exposing
+    /// its native author-table index. Ambiguous names are refused rather
+    /// than guessed.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::set_author`], and for an absent or ambiguous author.
+    pub fn rename_author(
+        &mut self,
+        sheet: usize,
+        current: &str,
+        replacement: impl Into<String>,
+    ) -> Result<bool> {
+        validation::text(current, "author")?;
+        let comments = self
+            .comments(sheet)?
+            .ok_or_else(|| invalid("cannot edit an author on an absent comments part"))?;
+        let mut found = None;
+        for (index, author) in comments.authors.iter().enumerate() {
+            if author == current {
+                if found.is_some() {
+                    return Err(invalid(format!(
+                        "classic comments author '{current}' is ambiguous"
+                    )));
+                }
+                found = Some(index);
+            }
+        }
+        let index = found
+            .ok_or_else(|| invalid(format!("classic comments author '{current}' is absent")))?;
+        let index = u32::try_from(index)
+            .map_err(|_source| invalid("classic-comments author index exceeds u32"))?;
+        self.set_author(sheet, index, replacement)
+    }
+
+    /// Remove every legacy note of the worksheet at `sheet`, written through
+    /// [`Self::replace`]: the comments part and its relationship go, VML
+    /// drawing parts stay.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::replace`].
+    pub fn clear(&mut self, sheet: usize) -> Result<bool> {
+        self.replace(sheet, None)
+    }
+
+    /// Discard every staged change.
+    pub fn reset(&mut self) {
+        self.staged.reset();
     }
 
     /// The worksheet's VML drawing: its relationship id and part name.
@@ -893,6 +1056,7 @@ mod tests {
             package
                 .apply_comments(&patch)
                 .unwrap()
+                .package()
                 .same_content(&after)
                 .unwrap()
         );

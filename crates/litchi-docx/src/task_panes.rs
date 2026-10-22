@@ -30,7 +30,12 @@
 use crate::package::family::{Staged, graph_family};
 use crate::web_extensions::{self as web, Conformance, Limits, Panes};
 
-graph_family!("task-pane");
+graph_family!("task-pane", own_limits);
+
+/// The typed budgets of the task-pane family: its limit errors are
+/// [`litchi_ooxml_common::Error::Limit`] carried by
+/// [`crate::Error::Common`] (record 0360).
+pub use litchi_ooxml_common::web::LimitKind;
 
 /// The configuration of a task-pane edit.
 #[derive(Debug, Clone, Default)]
@@ -90,7 +95,7 @@ impl Edit {
     ///
     /// Returns an error for panes the configured limits refuse.
     pub fn put(&mut self, panes: Panes, conformance: Conformance) -> Result<bool> {
-        let plan = web::plan_put_with(
+        let plan = web::plan_put(
             self.staged.working().opc_package(),
             panes,
             conformance,
@@ -106,7 +111,7 @@ impl Edit {
     ///
     /// Returns an error for a graph the configured limits refuse.
     pub fn remove(&mut self) -> Result<bool> {
-        let plan = web::plan_remove_with(self.staged.working().opc_package(), &self.limits)?;
+        let plan = web::plan_remove(self.staged.working().opc_package(), &self.limits)?;
         self.stage(&plan)
     }
 
@@ -130,11 +135,7 @@ impl Edit {
     /// Returns an error for a durable vocabulary or graph the configured
     /// limits refuse.
     pub fn apply_durable<Mode>(&mut self, patch: &litchi_core::patch::Patch<Mode>) -> Result<bool> {
-        let plan = web::plan_durable_with_limits(
-            self.staged.working().opc_package(),
-            patch,
-            &self.limits,
-        )?;
+        let plan = web::plan_durable(self.staged.working().opc_package(), patch, &self.limits)?;
         self.stage(&plan)
     }
 

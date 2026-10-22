@@ -78,14 +78,7 @@ impl LimitKind {
 
     fn check(self, observed: usize) -> Result<()> {
         if observed > self.maximum() {
-            return Err(invalid(format!(
-                "conditional-formatting {} limit exceeded: {observed} exceeds {}",
-                match self {
-                    Self::Differentials => "differential-format",
-                    Self::Formats => "collection",
-                },
-                self.maximum()
-            )));
+            return Err(Error::limit(self, observed, self.maximum()));
         }
         Ok(())
     }
@@ -292,8 +285,8 @@ fn read_components(xml: &[u8], mut visit: impl FnMut(&[u8], &Attributes<'_>)) ->
 /// A staged conditional-formatting edit of one [`Package`]. Dropping it
 /// discards it.
 #[derive(Debug)]
-pub struct Edit<'a> {
-    staged: Staged<'a>,
+pub struct Edit {
+    staged: Staged,
 }
 
 impl Package {
@@ -303,7 +296,7 @@ impl Package {
     ///
     /// Returns the encryption-policy error for a package whose mutations are
     /// refused.
-    pub fn edit_conditional_formats(&self) -> Result<Edit<'_>> {
+    pub fn edit_conditional_formats(&self) -> Result<Edit> {
         Ok(Edit {
             staged: Staged::new(self, "edit_conditional_formats")?,
         })
@@ -317,12 +310,15 @@ impl Package {
     /// Returns [`Error::PatchConflict`] when this package is not the patch's
     /// before state and [`Error::Signed`] for a changed patch of a signed
     /// workbook.
-    pub fn apply_conditional_formats(&self, patch: &Patch) -> Result<Self> {
-        patch.0.apply(self, "apply_conditional_formats")
+    pub fn apply_conditional_formats(&self, patch: &Patch) -> Result<Commit> {
+        Ok(Commit::new((
+            patch.0.apply(self, "apply_conditional_formats")?,
+            patch.0.clone(),
+        )))
     }
 }
 
-impl Edit<'_> {
+impl Edit {
     fn differentials(&self) -> Result<(Option<PackURI>, usize)> {
         let Some(styles) = self.staged.styles() else {
             return Ok((None, 0));
@@ -615,9 +611,15 @@ mod tests {
                 .unwrap(),
             formats
         );
-        let replayed = package.apply_conditional_formats(&patch).unwrap();
+        let replayed = package
+            .apply_conditional_formats(&patch)
+            .unwrap()
+            .into_package();
         assert!(replayed.same_content(&after).unwrap());
-        let reverted = after.apply_conditional_formats(&patch.inverse()).unwrap();
+        let reverted = after
+            .apply_conditional_formats(&patch.inverse())
+            .unwrap()
+            .into_package();
         assert!(reverted.same_content(&package).unwrap());
         assert!(after.apply_conditional_formats(&patch).is_err());
 

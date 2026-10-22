@@ -23,7 +23,7 @@
 //! absent part from a present but empty one. [`write()`] stores the core
 //! fields of a [`Metadata`] and refuses any field core properties cannot
 //! carry. Hosts edit all three families at once through the shared
-//! transaction ([`Snapshot`], [`Edit`], [`Commit`], [`Patch`]), which each
+//! transaction ([`Edit`], [`Commit`], [`Patch`], read through [`Snapshot`]), which each
 //! format re-exports as its `metadata` module.
 
 pub mod app;
@@ -38,7 +38,7 @@ mod write;
 mod transaction_tests;
 
 pub use transaction::{
-    Change, Commit, Diagnostics, Edit, Error, Family, LimitKind, Patch, Snapshot,
+    Change, Commit, Diagnostics, Edit, Error, Family, LimitKind, Patch, Plan, Snapshot,
 };
 pub use write::clear;
 

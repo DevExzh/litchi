@@ -1,174 +1,123 @@
 //! Guarded conditional-formatting publication over an immutable positional source.
+//!
+//! [`SourceBackedWorkbook::edit_conditional_formats`] stages one worksheet without
+//! materializing any unselected part body; [`Edit::commit`] validates the
+//! edit and returns a [`Commit`] holding the new workbook, whose output is the
+//! byte-preserving splice the former stream publisher wrote (the selected
+//! worksheet XML is the only replaced member; every other ZIP member is
+//! raw-copied). An exact no-op returns the source workbook unchanged; a
+//! changed edit of a signed source is refused at commit.
+//! [`SourceBackedWorkbook::apply_conditional_formats`] replays a [`Patch`] onto a workbook
+//! holding its before state (record 0360).
 
 use std::io::Write;
-use std::sync::Arc;
 
-use litchi_core::{ExecutionContext, ReadAt};
-use litchi_opc::{SourceBackedPackage, SourceCacheLimits, SourceLimits};
+use litchi_opc::SourceBackedPackage;
 
-use super::{Commit, Formatting, Patch, Snapshot};
-use crate::Selector;
-use crate::error::{Error, Result, invalid};
+use super::{Formatting, Snapshot};
+use crate::error::{Result, invalid};
+use crate::{Selector, SourceBackedWorkbook};
 
-/// Owning source-backed worksheet conditional-formatting editor.
-pub struct SourceBackedEditor {
-    package: SourceBackedPackage,
+crate::workbook::source::deferred::source_family!("conditional-formatting", super::Patch);
+
+impl Patch {
+    /// The exact worksheet state the patch requires.
+    #[must_use]
+    pub fn before(&self) -> &Snapshot {
+        self.0.before()
+    }
+
+    /// The exact worksheet state the patch produces.
+    #[must_use]
+    pub fn after(&self) -> &Snapshot {
+        self.0.after()
+    }
 }
 
-/// Isolated complete-collection edit over one exact worksheet source.
-pub struct SourceEdit {
+impl crate::workbook::source::deferred::Change for super::Patch {
+    fn is_noop(&self) -> bool {
+        self.is_empty()
+    }
+
+    fn inverse(&self) -> Self {
+        super::Patch::inverse(self)
+    }
+
+    fn check(&self, package: &SourceBackedPackage) -> Result<()> {
+        // A replay compares content: the selected worksheet, its owner and
+        // relationships must hold the before state (record 0360).
+        let current = Snapshot::load_source_backed(package, self.before().sheet_position())?;
+        if !current.same_source(self.before()) {
+            return Err(Error::PatchConflict {
+                part: current.worksheet_part_name().to_string(),
+            });
+        }
+        Ok(())
+    }
+
+    fn write(&self, package: &SourceBackedPackage, writer: &mut dyn Write) -> Result<()> {
+        package.check_execution()?;
+        crate::workbook::source::deferred::Change::check(self, package)?;
+        package.clone().write_part_overlay_shared_to_stream(
+            writer,
+            self.after().worksheet_part_name(),
+            self.after().source_arc()?,
+        )?;
+        Ok(())
+    }
+
+    fn write_authenticated(
+        &self,
+        package: &SourceBackedPackage,
+        writer: &mut dyn Write,
+    ) -> Result<()> {
+        package.check_execution()?;
+        package.clone().write_part_overlay_shared_to_stream(
+            writer,
+            self.after().worksheet_part_name(),
+            self.after().source_arc()?,
+        )?;
+        Ok(())
+    }
+}
+
+impl SourceBackedWorkbook {
+    /// Begin an isolated conditional-formatting edit of one worksheet without materializing
+    /// any unselected part body.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the selector does not name a worksheet, its XML
+    /// is invalid, or the source cannot be read.
+    pub fn edit_conditional_formats<'a>(&self, selector: impl Into<Selector<'a>>) -> Result<Edit> {
+        let before = Snapshot::load_source_backed(self.edit_package()?, selector)?;
+        Ok(Edit::new(self.clone(), before))
+    }
+
+    /// Replay a conditional-formatting patch onto this workbook.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::PatchConflict`] when the selected worksheet does not
+    /// hold the patch's before state, and the signed-source refusal for a
+    /// changed patch on a signed source.
+    pub fn apply_conditional_formats(&self, patch: &Patch) -> Result<Commit> {
+        apply_change(self, patch)
+    }
+}
+
+/// An isolated conditional-formatting edit over one exact source worksheet of a
+/// [`SourceBackedWorkbook`]. Dropping it discards it.
+pub struct Edit {
+    workbook: SourceBackedWorkbook,
     before: Snapshot,
     staged: Vec<Formatting>,
 }
 
-impl SourceBackedEditor {
-    /// Open a deferred OPC source with the standard bounded read policy.
-    pub fn from_read_at(source: Arc<dyn ReadAt>) -> Result<Self> {
-        Self::from_read_at_with_limits(source, SourceLimits::default())
-    }
-
-    /// Open a deferred OPC source with an explicit bounded read policy.
-    pub fn from_read_at_with_limits(
-        source: Arc<dyn ReadAt>,
-        read_limits: SourceLimits,
-    ) -> Result<Self> {
-        Self::from_source_backed_package(SourceBackedPackage::from_read_at_with_limits(
-            source,
-            read_limits,
-        )?)
-    }
-
-    /// Open with an explicit finite deferred-payload cache policy.
-    pub fn from_read_at_with_cache_limits(
-        source: Arc<dyn ReadAt>,
-        cache_limits: SourceCacheLimits,
-    ) -> Result<Self> {
-        Self::from_source_backed_package(SourceBackedPackage::from_read_at_with_cache_limits(
-            source,
-            cache_limits,
-        )?)
-    }
-
-    /// Open with explicit read and cache policies.
-    pub fn from_read_at_with_limits_and_cache_limits(
-        source: Arc<dyn ReadAt>,
-        read_limits: SourceLimits,
-        cache_limits: SourceCacheLimits,
-    ) -> Result<Self> {
-        Self::from_source_backed_package(
-            SourceBackedPackage::from_read_at_with_limits_and_cache_limits(
-                source,
-                read_limits,
-                cache_limits,
-            )?,
-        )
-    }
-
-    /// Open with an explicit managed execution context.
-    pub fn from_read_at_with_execution_context(
-        source: Arc<dyn ReadAt>,
-        read_limits: SourceLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_source_backed_package(SourceBackedPackage::from_read_at_with_execution_context(
-            source,
-            read_limits,
-            context,
-        )?)
-    }
-
-    /// Open with explicit read and managed execution policies.
-    pub fn from_read_at_with_limits_and_execution_context(
-        source: Arc<dyn ReadAt>,
-        read_limits: SourceLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_read_at_with_execution_context(source, read_limits, context)
-    }
-
-    /// Open with explicit read, cache, and managed execution policies.
-    pub fn from_read_at_with_limits_and_cache_limits_and_execution_context(
-        source: Arc<dyn ReadAt>,
-        read_limits: SourceLimits,
-        cache_limits: SourceCacheLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_source_backed_package(
-            SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
-                source,
-                read_limits,
-                cache_limits,
-                context,
-            )?,
-        )
-    }
-
-    /// Build an editor from an already opened deferred OPC package.
-    pub fn from_source_backed_package(package: SourceBackedPackage) -> Result<Self> {
-        package.check_execution()?;
-        Ok(Self { package })
-    }
-
-    /// Capture the exact conditional-formatting state for one worksheet.
-    pub fn snapshot<'a>(&self, selector: impl Into<Selector<'a>>) -> Result<Snapshot> {
-        self.package.check_execution()?;
-        Snapshot::load_source_backed(&self.package, selector)
-    }
-
-    /// Begin an isolated complete-collection edit for one worksheet.
-    pub fn edit<'a>(&self, selector: impl Into<Selector<'a>>) -> Result<SourceEdit> {
-        self.package.check_execution()?;
-        Ok(SourceEdit::new(self.snapshot(selector)?))
-    }
-
-    #[must_use]
-    /// Return content-free payload-cache diagnostics for the deferred package.
-    pub fn cache_diagnostics(&self) -> litchi_opc::SourceCacheDiagnostics {
-        self.package.cache_diagnostics()
-    }
-
-    /// Publish by overlaying only the selected worksheet Part.
-    ///
-    /// Every unselected physical member is raw-copied. Publication checks the
-    /// complete retained workbook, worksheet-relationship, and styles closure
-    /// before writing; an exact no-op reproduces the source archive bytes.
-    pub fn publish_commit_to_stream<W: Write>(
-        self,
-        writer: W,
-        commit: &Commit,
-    ) -> Result<Snapshot> {
-        self.package.check_execution()?;
-        if !commit
-            .patch()
-            .before()
-            .matches_source_backed(&self.package)?
-        {
-            return Err(Error::PatchConflict {
-                part: commit.patch().before().worksheet_part_name().to_string(),
-            });
-        }
-        let target = if commit.patch().is_empty() {
-            commit.patch().before().clone()
-        } else {
-            commit.patch().after().clone()
-        };
-        if commit.patch().is_empty() {
-            self.package
-                .write_part_overlays_shared_to_stream(writer, Vec::new())?;
-        } else {
-            self.package.write_part_overlay_shared_to_stream(
-                writer,
-                target.worksheet_part_name(),
-                target.source_arc()?,
-            )?;
-        }
-        Ok(target)
-    }
-}
-
-impl SourceEdit {
-    fn new(before: Snapshot) -> Self {
+impl Edit {
+    fn new(workbook: SourceBackedWorkbook, before: Snapshot) -> Self {
         Self {
+            workbook,
             staged: before.collections().to_vec(),
             before,
         }
@@ -215,18 +164,21 @@ impl SourceEdit {
         true
     }
 
-    #[must_use]
-    /// Whether the staged collection differs semantically from its source.
-    pub fn is_changed(&self) -> bool {
+    /// Discard every staged change in place.
+    pub fn reset(&mut self) {
+        self.staged = self.before.collections().to_vec();
+    }
+
+    fn changed(&self) -> bool {
         self.before.collections() != self.staged
     }
 
     /// Validate, rewrite, reopen, and freeze the isolated edit.
     pub fn commit(self) -> Result<Commit> {
         self.before.check_execution()?;
-        if !self.is_changed() {
-            let patch = Patch::new(self.before.clone(), self.before.clone());
-            return Ok(Commit::new(self.before, patch, false));
+        if !self.changed() {
+            let patch = super::Patch::new(self.before.clone(), self.before);
+            return commit_change(&self.workbook, patch);
         }
         if self.before.mutation_locked() {
             return Err(invalid(
@@ -248,7 +200,6 @@ impl SourceEdit {
         }
         let snapshot = Snapshot::from_rewritten_source(&self.before, output, readback)?;
         self.before.check_execution()?;
-        let patch = Patch::new(self.before, snapshot.clone());
-        Ok(Commit::new(snapshot, patch, true))
+        commit_change(&self.workbook, super::Patch::new(self.before, snapshot))
     }
 }

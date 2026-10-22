@@ -5,6 +5,7 @@
 //! layers.
 
 mod codec;
+pub mod edit;
 mod features;
 mod limits;
 mod model;
@@ -16,21 +17,20 @@ mod patch;
 )]
 mod rewriter;
 mod snapshot;
-mod source;
-mod transaction;
+pub mod source;
 
 #[cfg(test)]
 mod tests;
 
-pub use codec::{parse, parse_features, parse_features_with_limits, parse_with_limits};
+pub use codec::{parse, parse_features};
 pub use features::{Feature, Features};
-pub use limits::Limits;
+pub use limits::{LimitKind, Limits};
 pub use model::{Builder, Mode, Properties, ReferenceMode, Specified};
-pub use package::{apply_patch, edit, edit_with_limits, load, load_with_limits};
-pub use patch::{Commit, Patch};
+pub use package::load;
+#[cfg(test)]
+pub(crate) use patch::Commit;
+pub(crate) use patch::Patch;
 pub use snapshot::Snapshot;
-pub use source::{SourceBackedEditor, SourceEdit};
-pub use transaction::Transaction;
 
 #[allow(
     unused_imports,

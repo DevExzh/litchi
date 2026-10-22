@@ -29,7 +29,7 @@ fn package_and_workbook_round_trip_managed_encryption() {
 fn encrypted_provenance_blocks_implicit_plaintext_and_mutation() {
     let source = Package::new().unwrap();
     let encrypted = source.to_encrypted(PASSWORD, Mode::Standard).unwrap();
-    let mut package = Package::from_bytes_with_password(&encrypted, PASSWORD).unwrap();
+    let package = Package::from_bytes_with_password(&encrypted, PASSWORD).unwrap();
 
     assert!(matches!(
         package.to_bytes(),
@@ -64,7 +64,7 @@ fn reencrypted_output_retains_mode_and_atomic_failure_retains_state() {
     let target = directory.path().join("reencrypted.xlsx");
     let package = Package::new().unwrap();
     let encrypted = package.to_encrypted(PASSWORD, Mode::Standard).unwrap();
-    let mut package = Package::from_bytes_with_password(&encrypted, PASSWORD).unwrap();
+    let package = Package::from_bytes_with_password(&encrypted, PASSWORD).unwrap();
 
     package.save_reencrypted(&target, NEW_PASSWORD).unwrap();
     assert!(matches!(
@@ -100,7 +100,56 @@ fn reencrypted_output_retains_mode_and_atomic_failure_retains_state() {
     package
         .save_encrypted(&selected, NEW_PASSWORD, Mode::Agile)
         .unwrap();
-    assert_eq!(package.encryption(), Some(Mode::Agile));
+    // Saving is an output: the package keeps the profile it was opened with.
+    assert_eq!(package.encryption(), before);
+    assert_eq!(
+        Package::open_with_password(&selected, NEW_PASSWORD)
+            .unwrap()
+            .encryption(),
+        Some(Mode::Agile)
+    );
+}
+
+#[test]
+fn encrypted_outputs_use_the_encryption_limits_the_package_was_opened_with() {
+    let encrypted = Package::new()
+        .unwrap()
+        .to_encrypted(PASSWORD, Mode::Standard)
+        .unwrap();
+    let limits = Limits {
+        max_output_bytes: 512,
+        ..Limits::default()
+    };
+    let package = Package::from_bytes_with_password_and_options(
+        &encrypted,
+        PASSWORD,
+        litchi_xlsx::OpenOptions::new().encryption_limits(limits),
+    )
+    .unwrap();
+    let error = package.to_reencrypted(NEW_PASSWORD).unwrap_err();
+    assert!(
+        matches!(error, Error::Encryption(CryptoError::Limit { .. })),
+        "{error:?}"
+    );
+    // A commit carries the limits to the package it publishes.
+    let mut edit = Package::from_bytes_with_password_and_options(
+        &Package::new().unwrap().to_bytes().unwrap(),
+        PASSWORD,
+        litchi_xlsx::OpenOptions::new().encryption_limits(limits),
+    )
+    .unwrap()
+    .edit()
+    .unwrap();
+    edit.sheet(0_usize)
+        .unwrap()
+        .expect("a first worksheet")
+        .set("A1", 1)
+        .unwrap();
+    let after = edit.commit().unwrap().into_package();
+    assert!(matches!(
+        after.to_encrypted(PASSWORD, Mode::Standard),
+        Err(Error::Encryption(CryptoError::Limit { .. }))
+    ));
 }
 
 #[test]

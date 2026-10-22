@@ -40,7 +40,7 @@ impl Snapshot {
             });
         }
         let workbook_part = package.main_document_part()?;
-        let catalog = raw::parse_catalog(workbook_part.blob())?;
+        let catalog = raw::parse_catalog(workbook_part.blob(), &package.read_limits())?;
         let catalog_sheet = catalog.sheets.get(sheet.position()).ok_or_else(|| {
             invalid("auto-filter worksheet position is absent from the workbook catalog")
         })?;
@@ -87,7 +87,7 @@ impl Snapshot {
         let workbook = package.main_document_part()?;
         require_workbook_content_type(workbook.content_type())?;
         let workbook_xml = SourcePayload::from_part_data(package, workbook.data()?)?;
-        let catalog = raw::parse_catalog(workbook_xml.as_bytes())?;
+        let catalog = raw::parse_catalog(workbook_xml.as_bytes(), &package.read_limits())?;
         let sheet_parts = validate_sheet_graph(package, &workbook, &catalog.sheets)?;
         let sheet_position = resolve_selector(&catalog.sheets, selector.into())?
             .ok_or_else(|| invalid("auto-filter worksheet selector did not resolve"))?;
@@ -272,83 +272,6 @@ impl Snapshot {
             && self.source == other.source
     }
 
-    pub(crate) fn matches_source_backed(&self, package: &SourceBackedPackage) -> Result<bool> {
-        let workbook = package.main_document_part()?;
-        require_workbook_content_type(workbook.content_type())?;
-        let workbook_xml = workbook.data()?;
-        if !self
-            .source
-            .workbook
-            .matches_view(&workbook, workbook_xml.as_bytes())
-            || !current_owner_relationship(package.rels())
-                .is_some_and(|value| self.source.owner_relationship.matches(value))
-            || !styles_match_source_backed(self.source.styles.as_ref(), package, &workbook)?
-        {
-            return Ok(false);
-        }
-        let catalog = raw::parse_catalog(workbook_xml.as_bytes())?;
-        let sheet_parts = validate_sheet_graph(package, &workbook, &catalog.sheets)?;
-        let Some(catalog_sheet) = catalog.sheets.get(self.sheet_position) else {
-            return Ok(false);
-        };
-        let Some(sheet_part) = sheet_parts.get(self.sheet_position) else {
-            return Ok(false);
-        };
-        if catalog_sheet.name != self.sheet_name.as_ref()
-            || sheet_part.kind != WorksheetKind::Worksheet
-            || sheet_part.uri != self.source.worksheet.uri
-        {
-            return Ok(false);
-        }
-        let worksheet = package.part(&sheet_part.uri)?;
-        let relationship = require_selected_worksheet(
-            workbook.rels(),
-            catalog_sheet,
-            worksheet.partname(),
-            worksheet.content_type(),
-        )?;
-        let worksheet_xml = worksheet.data()?;
-        Ok(self.source.sheet_relationship.matches(relationship)
-            && self
-                .source
-                .worksheet
-                .matches_view(&worksheet, worksheet_xml.as_bytes())
-            && relationships_match(&self.source.worksheet_relationships, worksheet.rels()))
-    }
-
-    pub(crate) fn matches_current_source(&self, package: &OpcPackage) -> bool {
-        let Ok(workbook) = package.main_document_part() else {
-            return false;
-        };
-        if !self.source.workbook.matches_part(workbook)
-            || !current_owner_relationship(package.rels())
-                .is_some_and(|value| self.source.owner_relationship.matches(value))
-            || !styles_match_owned(self.source.styles.as_ref(), package, workbook)
-        {
-            return false;
-        }
-        let Some(relationship) = workbook
-            .rels()
-            .get(self.source.sheet_relationship.id.as_ref())
-        else {
-            return false;
-        };
-        let Ok(target) = relationship.target_partname() else {
-            return false;
-        };
-        if !self.source.sheet_relationship.matches(relationship)
-            || target != self.source.worksheet.uri
-        {
-            return false;
-        }
-        package
-            .get_part(&self.source.worksheet.uri)
-            .is_ok_and(|part| {
-                self.source.worksheet.matches_part(part)
-                    && relationships_match(&self.source.worksheet_relationships, part.rels())
-            })
-    }
-
     /// Rebind the retained worksheet closure after another embedded worksheet
     /// owner has been rewritten. The direct auto-filter is reparsed so this
     /// helper cannot accidentally bless a change to its semantic state.
@@ -414,18 +337,6 @@ impl PartState {
             bytes,
         })
     }
-
-    fn matches_part(&self, part: &dyn Part) -> bool {
-        part.partname() == &self.uri
-            && part.content_type() == self.content_type.as_ref()
-            && part.blob() == self.bytes.as_bytes()
-    }
-
-    fn matches_view(&self, part: &PartView<'_>, bytes: &[u8]) -> bool {
-        part.partname() == &self.uri
-            && part.content_type() == self.content_type.as_ref()
-            && bytes == self.bytes.as_bytes()
-    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -444,13 +355,6 @@ impl SourceRelationship {
             target: copy_boxed(value.target_ref(), "auto-filter relationship target")?,
             mode: value.target_mode(),
         })
-    }
-
-    fn matches(&self, value: &Relationship) -> bool {
-        value.r_id() == self.id.as_ref()
-            && value.reltype() == self.relationship_type.as_ref()
-            && value.target_ref() == self.target.as_ref()
-            && value.target_mode() == self.mode
     }
 }
 
@@ -534,44 +438,6 @@ fn load_styles_source_backed(
     }))
 }
 
-fn styles_match_source_backed(
-    expected: Option<&StylesState>,
-    package: &SourceBackedPackage,
-    workbook: &PartView<'_>,
-) -> Result<bool> {
-    let actual = unique_styles_relationship(workbook.rels())?;
-    match (expected, actual) {
-        (None, None) => Ok(true),
-        (Some(expected), Some(relationship)) if expected.relationship.matches(relationship) => {
-            let part = package.part(&relationship.target_partname()?)?;
-            let bytes = part.data()?;
-            Ok(expected.part.matches_view(&part, bytes.as_bytes()))
-        },
-        _ => Ok(false),
-    }
-}
-
-fn styles_match_owned(
-    expected: Option<&StylesState>,
-    package: &OpcPackage,
-    workbook: &dyn Part,
-) -> bool {
-    let Ok(actual) = unique_styles_relationship(workbook.rels()) else {
-        return false;
-    };
-    match (expected, actual) {
-        (None, None) => true,
-        (Some(expected), Some(relationship)) if expected.relationship.matches(relationship) => {
-            relationship
-                .target_partname()
-                .ok()
-                .and_then(|uri| package.get_part(&uri).ok())
-                .is_some_and(|part| expected.part.matches_part(part))
-        },
-        _ => false,
-    }
-}
-
 fn unique_styles_relationship(relationships: &Relationships) -> Result<Option<&Relationship>> {
     let mut matching = relationships
         .iter()
@@ -610,15 +476,6 @@ fn capture_relationships(relationships: &Relationships) -> Result<Vec<SourceRela
     }
     captured.sort_by(|left, right| left.id.cmp(&right.id));
     Ok(captured)
-}
-
-fn relationships_match(expected: &[SourceRelationship], actual: &Relationships) -> bool {
-    expected.len() == actual.len()
-        && expected.iter().all(|value| {
-            actual
-                .get(value.id.as_ref())
-                .is_some_and(|actual| value.matches(actual))
-        })
 }
 
 fn resolve_selector(sheets: &[raw::Sheet], selector: Selector<'_>) -> Result<Option<usize>> {

@@ -824,7 +824,7 @@ pub(super) fn load_chart_embedded_package_resource(
 }
 
 /// Adds a preflighted chartsheet package graph and workbook sheet entry.
-pub fn store_chartsheet(
+pub(crate) fn store_chartsheet(
     package: &mut OpcPackage,
     workbook_name: &PackURI,
     value: &Package,
@@ -839,7 +839,7 @@ pub fn store_chartsheet(
 
 /// Validates a typed chartsheet package graph without mutating an OPC package.
 ///
-/// This is the in-memory counterpart to [`store_chartsheet`]. It checks the
+/// This is the in-memory counterpart to [`crate::chart_sheet::Edit::add`]. It checks the
 /// `CT_Chartsheet` shape and the relationship/part closure required by the
 /// `SpreadsheetML` chartsheet profile (ISO/IEC 29500-1, §18.3.1 and §12.3),
 /// including the drawing, chart, media, VML, Printer Settings, and extension

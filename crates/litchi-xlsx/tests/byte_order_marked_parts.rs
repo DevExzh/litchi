@@ -18,11 +18,18 @@
 //! output's member, or that member behind one mark, and a mark appears only on
 //! a member whose input had one.
 
+#[path = "support/source_editors.rs"]
+mod source_editors;
+#[allow(
+    unused_imports,
+    reason = "each test target uses a subset of the drivers"
+)]
+use source_editors::{Replay, RowVisibilityEditor, SourceBackedEditor, replay_bytes, replay_patch};
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
 use litchi_core::OwnedSource;
-use litchi_xlsx::cell_values::{CellValueEdit, SourceBackedEditor};
+use litchi_xlsx::cell_values::Change;
 use litchi_xlsx::{Address, Hyperlink, HyperlinkReference, Number};
 use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
 
@@ -281,9 +288,9 @@ fn source_backed_cell_edits_of_marked_parts_match_unmarked_edits() {
                 SourceBackedEditor::from_read_at(Arc::new(OwnedSource::new(source))).unwrap();
             let mut edit = editor.edit("Sheet1").unwrap();
             edit.apply_batch([
-                CellValueEdit::set(Address::at(0, 1).unwrap(), Number::new("10.50").unwrap()),
-                CellValueEdit::set(Address::at(2, 2).unwrap(), false),
-                CellValueEdit::insert(Address::at(30, 3).unwrap(), Number::new("7").unwrap()),
+                Change::set(Address::at(0, 1).unwrap(), Number::new("10.50").unwrap()),
+                Change::set(Address::at(2, 2).unwrap(), false),
+                Change::insert(Address::at(30, 3).unwrap(), Number::new("7").unwrap()),
             ])
             .unwrap();
             let commit = edit.commit().unwrap();

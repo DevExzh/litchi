@@ -1315,11 +1315,126 @@
           "name": "into_snapshot",
           "scope": "litchi_ooxml_common",
           "replacement": "Commit::into_package publishes a Package; no part-level snapshot publication (record 0351)"
+        },
+        {
+          "scope": "litchi_ooxml_common",
+          "name": "Transaction",
+          "match": "exact",
+          "replacement": "record 0351 family contract (0360)"
+        },
+        {
+          "scope": "litchi_ooxml_common",
+          "name": "is_changed",
+          "match": "exact",
+          "replacement": "record 0351 family contract (0360)"
+        },
+        {
+          "scope": "litchi_ooxml_common",
+          "name": "_with_limits",
+          "match": "suffix",
+          "replacement": "record 0351 family contract (0360)"
+        },
+        {
+          "scope": "litchi_ooxml_common",
+          "name": "into_workbook",
+          "match": "exact",
+          "replacement": "record 0351 family contract (0360)"
+        },
+        {
+          "scope": "litchi_ooxml_common::web::custom_function",
+          "name": "Edit",
+          "replacement": "Change (semantic patch input, record 0360)"
+        },
+        {
+          "name": "raw_error",
+          "scope": "litchi_ooxml_common::mce::StreamError",
+          "replacement": "use raw_callback_error",
+          "recursive": false
+        },
+        {
+          "name": "raw_error",
+          "scope": "litchi_ooxml_common::mce::stream::StreamError",
+          "replacement": "use raw_callback_error",
+          "recursive": false
+        },
+        {
+          "name": "active_error",
+          "scope": "litchi_ooxml_common::mce::StreamError",
+          "replacement": "use active_callback_error",
+          "recursive": false
+        },
+        {
+          "name": "active_error",
+          "scope": "litchi_ooxml_common::mce::stream::StreamError",
+          "replacement": "use active_callback_error",
+          "recursive": false
+        },
+        {
+          "name": "process_markup_compatibility_stream_with_active_observer",
+          "scope": "litchi_ooxml_common::mce",
+          "replacement": "use process_markup_compatibility_stream (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "process_markup_compatibility_stream_with_active_observer",
+          "scope": "litchi_ooxml_common::mce::stream",
+          "replacement": "use process_markup_compatibility_stream (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "with_max_uid_units",
+          "scope": "litchi_ooxml_common::custom_data::Limits",
+          "replacement": "use with_uid_units",
+          "recursive": false
+        },
+        {
+          "name": "with_max_uid_units",
+          "scope": "litchi_ooxml_common::custom_data::codec::Limits",
+          "replacement": "use with_uid_units",
+          "recursive": false
+        },
+        {
+          "name": "set_item_xml",
+          "scope": "litchi_ooxml_common::custom_xml::Edit",
+          "replacement": "use set_xml",
+          "recursive": false
+        },
+        {
+          "name": "set_item_xml",
+          "scope": "litchi_ooxml_common::custom_xml::edit::Edit",
+          "replacement": "use set_xml",
+          "recursive": false
+        },
+        {
+          "name": "set_props",
+          "scope": "litchi_ooxml_common::custom_xml::Edit",
+          "replacement": "use set_properties",
+          "recursive": false
+        },
+        {
+          "name": "set_props",
+          "scope": "litchi_ooxml_common::custom_xml::edit::Edit",
+          "replacement": "use set_properties",
+          "recursive": false
+        },
+        {
+          "name": "read",
+          "scope": "litchi_ooxml_common::custom_xml::Snapshot",
+          "replacement": "use load",
+          "recursive": false
+        },
+        {
+          "name": "read",
+          "scope": "litchi_ooxml_common::custom_xml::snapshot::Snapshot",
+          "replacement": "use load",
+          "recursive": false
         }
       ],
       "families": [
+        "litchi_ooxml_common::custom_xml",
         "litchi_ooxml_common::properties"
-      ]
+      ],
+      "family_methods": true
     },
     {
       "id": "ooxml-common-full",
@@ -1468,11 +1583,126 @@
           "name": "into_snapshot",
           "scope": "litchi_ooxml_common",
           "replacement": "Commit::into_package publishes a Package; no part-level snapshot publication (record 0351)"
+        },
+        {
+          "scope": "litchi_ooxml_common",
+          "name": "Transaction",
+          "match": "exact",
+          "replacement": "record 0351 family contract (0360)"
+        },
+        {
+          "scope": "litchi_ooxml_common",
+          "name": "is_changed",
+          "match": "exact",
+          "replacement": "record 0351 family contract (0360)"
+        },
+        {
+          "scope": "litchi_ooxml_common",
+          "name": "_with_limits",
+          "match": "suffix",
+          "replacement": "record 0351 family contract (0360)"
+        },
+        {
+          "scope": "litchi_ooxml_common",
+          "name": "into_workbook",
+          "match": "exact",
+          "replacement": "record 0351 family contract (0360)"
+        },
+        {
+          "scope": "litchi_ooxml_common::web::custom_function",
+          "name": "Edit",
+          "replacement": "Change (semantic patch input, record 0360)"
+        },
+        {
+          "name": "raw_error",
+          "scope": "litchi_ooxml_common::mce::StreamError",
+          "replacement": "use raw_callback_error",
+          "recursive": false
+        },
+        {
+          "name": "raw_error",
+          "scope": "litchi_ooxml_common::mce::stream::StreamError",
+          "replacement": "use raw_callback_error",
+          "recursive": false
+        },
+        {
+          "name": "active_error",
+          "scope": "litchi_ooxml_common::mce::StreamError",
+          "replacement": "use active_callback_error",
+          "recursive": false
+        },
+        {
+          "name": "active_error",
+          "scope": "litchi_ooxml_common::mce::stream::StreamError",
+          "replacement": "use active_callback_error",
+          "recursive": false
+        },
+        {
+          "name": "process_markup_compatibility_stream_with_active_observer",
+          "scope": "litchi_ooxml_common::mce",
+          "replacement": "use process_markup_compatibility_stream (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "process_markup_compatibility_stream_with_active_observer",
+          "scope": "litchi_ooxml_common::mce::stream",
+          "replacement": "use process_markup_compatibility_stream (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "with_max_uid_units",
+          "scope": "litchi_ooxml_common::custom_data::Limits",
+          "replacement": "use with_uid_units",
+          "recursive": false
+        },
+        {
+          "name": "with_max_uid_units",
+          "scope": "litchi_ooxml_common::custom_data::codec::Limits",
+          "replacement": "use with_uid_units",
+          "recursive": false
+        },
+        {
+          "name": "set_item_xml",
+          "scope": "litchi_ooxml_common::custom_xml::Edit",
+          "replacement": "use set_xml",
+          "recursive": false
+        },
+        {
+          "name": "set_item_xml",
+          "scope": "litchi_ooxml_common::custom_xml::edit::Edit",
+          "replacement": "use set_xml",
+          "recursive": false
+        },
+        {
+          "name": "set_props",
+          "scope": "litchi_ooxml_common::custom_xml::Edit",
+          "replacement": "use set_properties",
+          "recursive": false
+        },
+        {
+          "name": "set_props",
+          "scope": "litchi_ooxml_common::custom_xml::edit::Edit",
+          "replacement": "use set_properties",
+          "recursive": false
+        },
+        {
+          "name": "read",
+          "scope": "litchi_ooxml_common::custom_xml::Snapshot",
+          "replacement": "use load",
+          "recursive": false
+        },
+        {
+          "name": "read",
+          "scope": "litchi_ooxml_common::custom_xml::snapshot::Snapshot",
+          "replacement": "use load",
+          "recursive": false
         }
       ],
       "families": [
+        "litchi_ooxml_common::custom_xml",
         "litchi_ooxml_common::properties"
-      ]
+      ],
+      "family_methods": true
     },
     {
       "id": "pptx-minimal",
@@ -3466,20 +3696,767 @@
           "name": "into_snapshot",
           "scope": "litchi_xlsx",
           "replacement": "Commit::into_package publishes a Package; no part-level snapshot publication (record 0351)"
+        },
+        {
+          "scope": "litchi_xlsx",
+          "name": "WorksheetEdit",
+          "replacement": "focused edit handles or Change values (record 0360)"
+        },
+        {
+          "scope": "litchi_xlsx",
+          "name": "TabEdit",
+          "replacement": "focused edit handles or Change values (record 0360)"
+        },
+        {
+          "scope": "litchi_xlsx",
+          "name": "RowEdit",
+          "replacement": "focused edit handles or Change values (record 0360)"
+        },
+        {
+          "scope": "litchi_xlsx",
+          "name": "ColumnEdit",
+          "replacement": "focused edit handles or Change values (record 0360)"
+        },
+        {
+          "scope": "litchi_xlsx",
+          "name": "DefaultsEdit",
+          "replacement": "focused edit handles or Change values (record 0360)"
+        },
+        {
+          "scope": "litchi_xlsx",
+          "name": "FormControlEdit",
+          "replacement": "focused edit handles or Change values (record 0360)"
+        },
+        {
+          "scope": "litchi_xlsx",
+          "name": "CellValueEdit",
+          "replacement": "focused edit handles or Change values (record 0360)"
+        },
+        {
+          "scope": "litchi_xlsx",
+          "name": "SheetCellValueEdit",
+          "replacement": "focused edit handles or Change values (record 0360)"
+        },
+        {
+          "scope": "litchi_xlsx",
+          "name": "RowVisibilityEdit",
+          "replacement": "focused edit handles or Change values (record 0360)"
+        },
+        {
+          "scope": "litchi_xlsx",
+          "name": "Transaction",
+          "match": "exact",
+          "replacement": "record 0351 family contract (0360)"
+        },
+        {
+          "scope": "litchi_xlsx",
+          "name": "Transaction",
+          "match": "suffix",
+          "replacement": "record 0351 family contract (0360)"
+        },
+        {
+          "scope": "litchi_xlsx",
+          "name": "is_changed",
+          "match": "exact",
+          "replacement": "record 0351 family contract (0360)"
+        },
+        {
+          "scope": "litchi_xlsx",
+          "name": "_with_limits",
+          "match": "suffix",
+          "replacement": "record 0351 family contract (0360)"
+        },
+        {
+          "name": "StreamingValue",
+          "scope": "litchi_xlsx",
+          "replacement": "use StreamingCellValue (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "StreamingValue",
+          "scope": "litchi_xlsx::streaming",
+          "replacement": "use StreamingCellValue (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "custom_data_properties",
+          "scope": "litchi_xlsx::Package",
+          "replacement": "use custom_data (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "custom_data_properties",
+          "scope": "litchi_xlsx::package::Package",
+          "replacement": "use custom_data (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "new_for_column",
+          "scope": "litchi_xlsx::SurveyQuestion",
+          "replacement": "use for_column",
+          "recursive": false
+        },
+        {
+          "name": "new_for_column",
+          "scope": "litchi_xlsx::survey::Question",
+          "replacement": "use for_column",
+          "recursive": false
+        },
+        {
+          "name": "read",
+          "scope": "litchi_xlsx::survey::Snapshot",
+          "replacement": "use load",
+          "recursive": false
+        },
+        {
+          "name": "surveys",
+          "scope": "litchi_xlsx::survey::Snapshot",
+          "replacement": "use entries",
+          "recursive": false
+        },
+        {
+          "name": "read",
+          "scope": "litchi_xlsx::calculation_properties::Snapshot",
+          "replacement": "use load",
+          "recursive": false
+        },
+        {
+          "name": "read",
+          "scope": "litchi_xlsx::calculation_properties::snapshot::Snapshot",
+          "replacement": "use load",
+          "recursive": false
+        },
+        {
+          "name": "read",
+          "scope": "litchi_xlsx::revisions::Snapshot",
+          "replacement": "use load",
+          "recursive": false
+        },
+        {
+          "name": "read",
+          "scope": "litchi_xlsx::revisions::snapshot::Snapshot",
+          "replacement": "use load",
+          "recursive": false
+        },
+        {
+          "name": "read",
+          "scope": "litchi_xlsx::ole_objects::Snapshot",
+          "replacement": "use load",
+          "recursive": false
+        },
+        {
+          "name": "read",
+          "scope": "litchi_xlsx::ole_objects::snapshot::Snapshot",
+          "replacement": "use load",
+          "recursive": false
+        },
+        {
+          "name": "ole_objects",
+          "scope": "litchi_xlsx::ole_objects::Snapshot",
+          "replacement": "use objects",
+          "recursive": false
+        },
+        {
+          "name": "ole_objects",
+          "scope": "litchi_xlsx::ole_objects::snapshot::Snapshot",
+          "replacement": "use objects",
+          "recursive": false
+        },
+        {
+          "name": "pivot_server_formats",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "use pivot_table_server_formats (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "pivot_server_formats",
+          "scope": "litchi_xlsx::workbook::Workbook",
+          "replacement": "use pivot_table_server_formats (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "pivot_server_formats",
+          "scope": "litchi_xlsx::workbook::model::Workbook",
+          "replacement": "use pivot_table_server_formats (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "pivot_server_formats_source",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "use pivot_table_server_formats_source (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "pivot_server_formats_source",
+          "scope": "litchi_xlsx::workbook::Workbook",
+          "replacement": "use pivot_table_server_formats_source (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "pivot_server_formats_source",
+          "scope": "litchi_xlsx::workbook::model::Workbook",
+          "replacement": "use pivot_table_server_formats_source (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "payload",
+          "scope": "litchi_xlsx::WorksheetContentPart",
+          "replacement": "use read_payload (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "payload",
+          "scope": "litchi_xlsx::workbook::WorksheetContentPart",
+          "replacement": "use read_payload (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "payload",
+          "scope": "litchi_xlsx::workbook::drawing::WorksheetContentPart",
+          "replacement": "use read_payload (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "svg_descriptor",
+          "scope": "litchi_xlsx::workbook::WorksheetPicture",
+          "replacement": "use svg",
+          "recursive": false
+        },
+        {
+          "name": "svg_descriptor",
+          "scope": "litchi_xlsx::workbook::drawing::WorksheetPicture",
+          "replacement": "use svg",
+          "recursive": false
+        },
+        {
+          "name": "svg_image",
+          "scope": "litchi_xlsx::workbook::WorksheetPicture",
+          "replacement": "use read_svg_image",
+          "recursive": false
+        },
+        {
+          "name": "svg_image",
+          "scope": "litchi_xlsx::workbook::drawing::WorksheetPicture",
+          "replacement": "use read_svg_image",
+          "recursive": false
+        },
+        {
+          "name": "read",
+          "scope": "litchi_xlsx::data_type_icons::Snapshot",
+          "replacement": "use load",
+          "recursive": false
+        },
+        {
+          "name": "read",
+          "scope": "litchi_xlsx::data_type_icons::package::Snapshot",
+          "replacement": "use load",
+          "recursive": false
+        },
+        {
+          "name": "values",
+          "scope": "litchi_xlsx::hyperlinks::Snapshot",
+          "replacement": "use hyperlinks",
+          "recursive": false
+        },
+        {
+          "name": "values",
+          "scope": "litchi_xlsx::hyperlinks::snapshot::Snapshot",
+          "replacement": "use hyperlinks",
+          "recursive": false
+        },
+        {
+          "name": "put_hyperlink",
+          "scope": "litchi_xlsx::hyperlinks::source::Edit",
+          "replacement": "use put",
+          "recursive": false
+        },
+        {
+          "name": "replace_hyperlink",
+          "scope": "litchi_xlsx::hyperlinks::source::Edit",
+          "replacement": "use put",
+          "recursive": false
+        },
+        {
+          "name": "remove_hyperlink",
+          "scope": "litchi_xlsx::hyperlinks::source::Edit",
+          "replacement": "use remove",
+          "recursive": false
+        },
+        {
+          "name": "replace",
+          "scope": "litchi_xlsx::hyperlinks::source::Edit",
+          "replacement": "use set",
+          "recursive": false
+        },
+        {
+          "name": "replace_all",
+          "scope": "litchi_xlsx::hyperlinks::source::Edit",
+          "replacement": "use set",
+          "recursive": false
+        },
+        {
+          "name": "set_scalar",
+          "scope": "litchi_xlsx::form_control",
+          "replacement": "use replace_scalar (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "collection",
+          "scope": "litchi_xlsx::form_control::FormControlSnapshot",
+          "replacement": "use form_controls",
+          "recursive": false
+        },
+        {
+          "name": "collection",
+          "scope": "litchi_xlsx::form_control::source::FormControlSnapshot",
+          "replacement": "use form_controls",
+          "recursive": false
+        },
+        {
+          "name": "val",
+          "scope": "litchi_xlsx::form_control::Item",
+          "replacement": "use value (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "val",
+          "scope": "litchi_xlsx::form_control::model::Item",
+          "replacement": "use value (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "set_val",
+          "scope": "litchi_xlsx::form_control::Item",
+          "replacement": "use set_value (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "set_val",
+          "scope": "litchi_xlsx::form_control::model::Item",
+          "replacement": "use set_value (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "effective_sel_type",
+          "scope": "litchi_xlsx::form_control::Properties",
+          "replacement": "use effective_seltype (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "effective_sel_type",
+          "scope": "litchi_xlsx::form_control::model::Properties",
+          "replacement": "use effective_seltype (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "storages",
+          "scope": "litchi_xlsx::CustomDataSnapshot",
+          "replacement": "use entries (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "storages",
+          "scope": "litchi_xlsx::custom_data::Snapshot",
+          "replacement": "use entries (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "storages",
+          "scope": "litchi_xlsx::custom_data::package::Snapshot",
+          "replacement": "use entries (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "links",
+          "scope": "litchi_xlsx::external_links::Edit",
+          "replacement": "use entries",
+          "recursive": false
+        },
+        {
+          "name": "links",
+          "scope": "litchi_xlsx::external_links::edit::Edit",
+          "replacement": "use entries",
+          "recursive": false
+        },
+        {
+          "name": "read",
+          "scope": "litchi_xlsx::external_links::Snapshot",
+          "replacement": "use load",
+          "recursive": false
+        },
+        {
+          "name": "read",
+          "scope": "litchi_xlsx::external_links::snapshot::Snapshot",
+          "replacement": "use load",
+          "recursive": false
+        },
+        {
+          "name": "links",
+          "scope": "litchi_xlsx::external_links::Snapshot",
+          "replacement": "use entries",
+          "recursive": false
+        },
+        {
+          "name": "links",
+          "scope": "litchi_xlsx::external_links::snapshot::Snapshot",
+          "replacement": "use entries",
+          "recursive": false
+        },
+        {
+          "name": "xml_maps",
+          "scope": "litchi_xlsx::xml_maps::Edit",
+          "replacement": "use info",
+          "recursive": false
+        },
+        {
+          "name": "xml_maps",
+          "scope": "litchi_xlsx::xml_maps::edit::Edit",
+          "replacement": "use info",
+          "recursive": false
+        },
+        {
+          "name": "catalog",
+          "scope": "litchi_xlsx::xml_maps::Edit",
+          "replacement": "use info",
+          "recursive": false
+        },
+        {
+          "name": "catalog",
+          "scope": "litchi_xlsx::xml_maps::edit::Edit",
+          "replacement": "use info",
+          "recursive": false
+        },
+        {
+          "name": "map_info",
+          "scope": "litchi_xlsx::xml_maps::Edit",
+          "replacement": "use info (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "map_info",
+          "scope": "litchi_xlsx::xml_maps::edit::Edit",
+          "replacement": "use info (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "read",
+          "scope": "litchi_xlsx::xml_maps::Snapshot",
+          "replacement": "use load",
+          "recursive": false
+        },
+        {
+          "name": "read",
+          "scope": "litchi_xlsx::xml_maps::snapshot::Snapshot",
+          "replacement": "use load",
+          "recursive": false
+        },
+        {
+          "name": "xml_maps",
+          "scope": "litchi_xlsx::xml_maps::Snapshot",
+          "replacement": "use info",
+          "recursive": false
+        },
+        {
+          "name": "xml_maps",
+          "scope": "litchi_xlsx::xml_maps::snapshot::Snapshot",
+          "replacement": "use info",
+          "recursive": false
+        },
+        {
+          "name": "catalog",
+          "scope": "litchi_xlsx::xml_maps::Snapshot",
+          "replacement": "use info",
+          "recursive": false
+        },
+        {
+          "name": "catalog",
+          "scope": "litchi_xlsx::xml_maps::snapshot::Snapshot",
+          "replacement": "use info",
+          "recursive": false
+        },
+        {
+          "name": "map_info",
+          "scope": "litchi_xlsx::xml_maps::Snapshot",
+          "replacement": "use info (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "map_info",
+          "scope": "litchi_xlsx::xml_maps::snapshot::Snapshot",
+          "replacement": "use info (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "value",
+          "scope": "litchi_xlsx::xml_maps::Snapshot",
+          "replacement": "use info",
+          "recursive": false
+        },
+        {
+          "name": "value",
+          "scope": "litchi_xlsx::xml_maps::snapshot::Snapshot",
+          "replacement": "use info",
+          "recursive": false
+        },
+        {
+          "name": "references",
+          "scope": "litchi_xlsx::drawing::WorksheetSourceScan",
+          "replacement": "use drawings (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "references",
+          "scope": "litchi_xlsx::drawing::worksheet_source::WorksheetSourceScan",
+          "replacement": "use drawings (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "scan",
+          "scope": "litchi_xlsx::drawing::worksheet_source",
+          "replacement": "use WorksheetSourceScan::scan (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "owner_range",
+          "scope": "litchi_xlsx::drawing::ContentPartSource",
+          "replacement": "use owner_element",
+          "recursive": false
+        },
+        {
+          "name": "owner_range",
+          "scope": "litchi_xlsx::drawing::source::ContentPartSource",
+          "replacement": "use owner_element",
+          "recursive": false
+        },
+        {
+          "name": "formats",
+          "scope": "litchi_xlsx::PivotTableView",
+          "replacement": "use server_formats().formats() (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "formats",
+          "scope": "litchi_xlsx::pivot::PivotTableView",
+          "replacement": "use server_formats().formats() (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "formats",
+          "scope": "litchi_xlsx::pivot::formats::PivotTableView",
+          "replacement": "use server_formats().formats() (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "formats",
+          "scope": "litchi_xlsx::pivot::server_formats::PivotTableView",
+          "replacement": "use server_formats().formats() (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "server_formats",
+          "scope": "litchi_xlsx::PivotTableServerFormats",
+          "replacement": "use formats (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "server_formats",
+          "scope": "litchi_xlsx::pivot::PivotTableServerFormats",
+          "replacement": "use formats (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "server_formats",
+          "scope": "litchi_xlsx::pivot::formats::PivotTableServerFormats",
+          "replacement": "use formats (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "server_formats",
+          "scope": "litchi_xlsx::pivot::server_formats::PivotTableServerFormats",
+          "replacement": "use formats (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "read",
+          "scope": "litchi_xlsx::pivot::formats::Snapshot",
+          "replacement": "use load",
+          "recursive": false
+        },
+        {
+          "name": "read",
+          "scope": "litchi_xlsx::pivot::server_formats::Snapshot",
+          "replacement": "use load",
+          "recursive": false
+        },
+        {
+          "name": "formats",
+          "scope": "litchi_xlsx::pivot::formats::Snapshot",
+          "replacement": "use server_formats().formats() (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "formats",
+          "scope": "litchi_xlsx::pivot::server_formats::Snapshot",
+          "replacement": "use server_formats().formats() (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "formats",
+          "scope": "litchi_xlsx::pivot::formats::Edit",
+          "replacement": "use server_formats (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "formats",
+          "scope": "litchi_xlsx::pivot::server_formats::Edit",
+          "replacement": "use server_formats (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "read",
+          "scope": "litchi_xlsx::pivot::cached_unique_names::Snapshot",
+          "replacement": "use load",
+          "recursive": false
+        },
+        {
+          "name": "read",
+          "scope": "litchi_xlsx::pivot::formats::cached_unique_names::Snapshot",
+          "replacement": "use load",
+          "recursive": false
+        },
+        {
+          "name": "names",
+          "scope": "litchi_xlsx::pivot::cached_unique_names::Snapshot",
+          "replacement": "use cached_unique_names().names() (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "names",
+          "scope": "litchi_xlsx::pivot::formats::cached_unique_names::Snapshot",
+          "replacement": "use cached_unique_names().names() (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "read",
+          "scope": "litchi_xlsx::rich_values::refresh_intervals::Snapshot",
+          "replacement": "use load",
+          "recursive": false
+        },
+        {
+          "name": "read",
+          "scope": "litchi_xlsx::rich_values::refresh_intervals::package::Snapshot",
+          "replacement": "use load",
+          "recursive": false
+        },
+        {
+          "name": "replace_hyperlink",
+          "scope": "litchi_xlsx::edit::Sheet",
+          "replacement": "use put_hyperlink",
+          "recursive": false
+        },
+        {
+          "name": "replace_hyperlink",
+          "scope": "litchi_xlsx::workbook::edit::Sheet",
+          "replacement": "use put_hyperlink",
+          "recursive": false
+        },
+        {
+          "name": "replace_hyperlink",
+          "scope": "litchi_xlsx::workbook::edit::semantic::worksheet::Sheet",
+          "replacement": "use put_hyperlink",
+          "recursive": false
+        },
+        {
+          "name": "copy_scalar_cells_from",
+          "scope": "litchi_xlsx::Edit",
+          "replacement": "use copy_cells_from",
+          "recursive": false
+        },
+        {
+          "name": "copy_scalar_cells_from",
+          "scope": "litchi_xlsx::edit::Edit",
+          "replacement": "use copy_cells_from",
+          "recursive": false
+        },
+        {
+          "name": "copy_scalar_cells_from",
+          "scope": "litchi_xlsx::workbook::Edit",
+          "replacement": "use copy_cells_from",
+          "recursive": false
+        },
+        {
+          "name": "copy_scalar_cells_from",
+          "scope": "litchi_xlsx::workbook::edit::Edit",
+          "replacement": "use copy_cells_from",
+          "recursive": false
+        },
+        {
+          "name": "copy_scalar_cells_from",
+          "scope": "litchi_xlsx::workbook::edit::semantic::transaction::Edit",
+          "replacement": "use copy_cells_from",
+          "recursive": false
         }
       ],
       "families": [
-        "litchi_xlsx::workbook::edit",
-        "litchi_xlsx::metadata",
-        "litchi_xlsx::chart::edit",
-        "litchi_xlsx::conditional_formatting::edit",
-        "litchi_xlsx::data_validation::edit",
+        "litchi_xlsx::active_x",
         "litchi_xlsx::auto_filter::edit",
+        "litchi_xlsx::auto_filter::source",
+        "litchi_xlsx::calculation_properties::edit",
+        "litchi_xlsx::calculation_properties::source",
+        "litchi_xlsx::cell_values",
+        "litchi_xlsx::cell_values::sheet",
+        "litchi_xlsx::chain",
+        "litchi_xlsx::chart::edit",
+        "litchi_xlsx::chart_sheet",
+        "litchi_xlsx::conditional_formatting::edit",
+        "litchi_xlsx::conditional_formatting::source",
+        "litchi_xlsx::connections",
+        "litchi_xlsx::custom_data",
+        "litchi_xlsx::data_type_icons",
+        "litchi_xlsx::data_validation::edit",
+        "litchi_xlsx::data_validation::source",
+        "litchi_xlsx::defined_names::source",
+        "litchi_xlsx::drawing::edit",
+        "litchi_xlsx::external_links",
+        "litchi_xlsx::form_control::source",
+        "litchi_xlsx::hyperlinks::source",
+        "litchi_xlsx::merge::source",
+        "litchi_xlsx::metadata",
+        "litchi_xlsx::named_sheet_view",
+        "litchi_xlsx::ole_objects",
+        "litchi_xlsx::opc",
+        "litchi_xlsx::package::printer_settings",
+        "litchi_xlsx::page_breaks::edit",
+        "litchi_xlsx::page_breaks::source",
+        "litchi_xlsx::page_margins::source",
+        "litchi_xlsx::page_setup::source",
+        "litchi_xlsx::pivot::cached_unique_names",
+        "litchi_xlsx::pivot::server_formats",
+        "litchi_xlsx::pivot::table_data",
+        "litchi_xlsx::print_options::source",
+        "litchi_xlsx::query_table",
+        "litchi_xlsx::revisions",
+        "litchi_xlsx::rich_values::refresh_intervals",
+        "litchi_xlsx::row_visibility::source",
+        "litchi_xlsx::sheet_protection::source",
+        "litchi_xlsx::slicer",
+        "litchi_xlsx::smart_tags",
+        "litchi_xlsx::survey",
+        "litchi_xlsx::tab_state::source",
+        "litchi_xlsx::task_panes",
+        "litchi_xlsx::timeline",
+        "litchi_xlsx::volatile_dependencies",
         "litchi_xlsx::workbook::comments::edit",
-        "litchi_xlsx::drawing::edit"
+        "litchi_xlsx::workbook::data_model",
+        "litchi_xlsx::workbook::edit",
+        "litchi_xlsx::xml_maps"
       ],
       "immutable_owners": [
-        "litchi_xlsx::Workbook"
+        "litchi_xlsx::Package",
+        "litchi_xlsx::SourceBackedWorkbook",
+        "litchi_xlsx::SourceWorksheet",
+        "litchi_xlsx::Workbook",
+        "litchi_xlsx::Worksheet"
       ],
       "family_methods": true
     },
@@ -4028,20 +5005,768 @@
           "name": "into_snapshot",
           "scope": "litchi_xlsx",
           "replacement": "Commit::into_package publishes a Package; no part-level snapshot publication (record 0351)"
+        },
+        {
+          "scope": "litchi_xlsx",
+          "name": "WorksheetEdit",
+          "replacement": "focused edit handles or Change values (record 0360)"
+        },
+        {
+          "scope": "litchi_xlsx",
+          "name": "TabEdit",
+          "replacement": "focused edit handles or Change values (record 0360)"
+        },
+        {
+          "scope": "litchi_xlsx",
+          "name": "RowEdit",
+          "replacement": "focused edit handles or Change values (record 0360)"
+        },
+        {
+          "scope": "litchi_xlsx",
+          "name": "ColumnEdit",
+          "replacement": "focused edit handles or Change values (record 0360)"
+        },
+        {
+          "scope": "litchi_xlsx",
+          "name": "DefaultsEdit",
+          "replacement": "focused edit handles or Change values (record 0360)"
+        },
+        {
+          "scope": "litchi_xlsx",
+          "name": "FormControlEdit",
+          "replacement": "focused edit handles or Change values (record 0360)"
+        },
+        {
+          "scope": "litchi_xlsx",
+          "name": "CellValueEdit",
+          "replacement": "focused edit handles or Change values (record 0360)"
+        },
+        {
+          "scope": "litchi_xlsx",
+          "name": "SheetCellValueEdit",
+          "replacement": "focused edit handles or Change values (record 0360)"
+        },
+        {
+          "scope": "litchi_xlsx",
+          "name": "RowVisibilityEdit",
+          "replacement": "focused edit handles or Change values (record 0360)"
+        },
+        {
+          "scope": "litchi_xlsx",
+          "name": "Transaction",
+          "match": "exact",
+          "replacement": "record 0351 family contract (0360)"
+        },
+        {
+          "scope": "litchi_xlsx",
+          "name": "Transaction",
+          "match": "suffix",
+          "replacement": "record 0351 family contract (0360)"
+        },
+        {
+          "scope": "litchi_xlsx",
+          "name": "is_changed",
+          "match": "exact",
+          "replacement": "record 0351 family contract (0360)"
+        },
+        {
+          "scope": "litchi_xlsx",
+          "name": "_with_limits",
+          "match": "suffix",
+          "replacement": "record 0351 family contract (0360)"
+        },
+        {
+          "name": "StreamingValue",
+          "scope": "litchi_xlsx",
+          "replacement": "use StreamingCellValue (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "StreamingValue",
+          "scope": "litchi_xlsx::streaming",
+          "replacement": "use StreamingCellValue (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "custom_data_properties",
+          "scope": "litchi_xlsx::Package",
+          "replacement": "use custom_data (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "custom_data_properties",
+          "scope": "litchi_xlsx::package::Package",
+          "replacement": "use custom_data (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "new_for_column",
+          "scope": "litchi_xlsx::SurveyQuestion",
+          "replacement": "use for_column",
+          "recursive": false
+        },
+        {
+          "name": "new_for_column",
+          "scope": "litchi_xlsx::survey::Question",
+          "replacement": "use for_column",
+          "recursive": false
+        },
+        {
+          "name": "read",
+          "scope": "litchi_xlsx::survey::Snapshot",
+          "replacement": "use load",
+          "recursive": false
+        },
+        {
+          "name": "surveys",
+          "scope": "litchi_xlsx::survey::Snapshot",
+          "replacement": "use entries",
+          "recursive": false
+        },
+        {
+          "name": "read",
+          "scope": "litchi_xlsx::calculation_properties::Snapshot",
+          "replacement": "use load",
+          "recursive": false
+        },
+        {
+          "name": "read",
+          "scope": "litchi_xlsx::calculation_properties::snapshot::Snapshot",
+          "replacement": "use load",
+          "recursive": false
+        },
+        {
+          "name": "read",
+          "scope": "litchi_xlsx::revisions::Snapshot",
+          "replacement": "use load",
+          "recursive": false
+        },
+        {
+          "name": "read",
+          "scope": "litchi_xlsx::revisions::snapshot::Snapshot",
+          "replacement": "use load",
+          "recursive": false
+        },
+        {
+          "name": "read",
+          "scope": "litchi_xlsx::ole_objects::Snapshot",
+          "replacement": "use load",
+          "recursive": false
+        },
+        {
+          "name": "read",
+          "scope": "litchi_xlsx::ole_objects::snapshot::Snapshot",
+          "replacement": "use load",
+          "recursive": false
+        },
+        {
+          "name": "ole_objects",
+          "scope": "litchi_xlsx::ole_objects::Snapshot",
+          "replacement": "use objects",
+          "recursive": false
+        },
+        {
+          "name": "ole_objects",
+          "scope": "litchi_xlsx::ole_objects::snapshot::Snapshot",
+          "replacement": "use objects",
+          "recursive": false
+        },
+        {
+          "name": "pivot_server_formats",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "use pivot_table_server_formats (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "pivot_server_formats",
+          "scope": "litchi_xlsx::workbook::Workbook",
+          "replacement": "use pivot_table_server_formats (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "pivot_server_formats",
+          "scope": "litchi_xlsx::workbook::model::Workbook",
+          "replacement": "use pivot_table_server_formats (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "pivot_server_formats_source",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "use pivot_table_server_formats_source (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "pivot_server_formats_source",
+          "scope": "litchi_xlsx::workbook::Workbook",
+          "replacement": "use pivot_table_server_formats_source (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "pivot_server_formats_source",
+          "scope": "litchi_xlsx::workbook::model::Workbook",
+          "replacement": "use pivot_table_server_formats_source (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "payload",
+          "scope": "litchi_xlsx::WorksheetContentPart",
+          "replacement": "use read_payload (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "payload",
+          "scope": "litchi_xlsx::workbook::WorksheetContentPart",
+          "replacement": "use read_payload (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "payload",
+          "scope": "litchi_xlsx::workbook::drawing::WorksheetContentPart",
+          "replacement": "use read_payload (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "svg_descriptor",
+          "scope": "litchi_xlsx::workbook::WorksheetPicture",
+          "replacement": "use svg",
+          "recursive": false
+        },
+        {
+          "name": "svg_descriptor",
+          "scope": "litchi_xlsx::workbook::drawing::WorksheetPicture",
+          "replacement": "use svg",
+          "recursive": false
+        },
+        {
+          "name": "svg_image",
+          "scope": "litchi_xlsx::workbook::WorksheetPicture",
+          "replacement": "use read_svg_image",
+          "recursive": false
+        },
+        {
+          "name": "svg_image",
+          "scope": "litchi_xlsx::workbook::drawing::WorksheetPicture",
+          "replacement": "use read_svg_image",
+          "recursive": false
+        },
+        {
+          "name": "read",
+          "scope": "litchi_xlsx::data_type_icons::Snapshot",
+          "replacement": "use load",
+          "recursive": false
+        },
+        {
+          "name": "read",
+          "scope": "litchi_xlsx::data_type_icons::package::Snapshot",
+          "replacement": "use load",
+          "recursive": false
+        },
+        {
+          "name": "values",
+          "scope": "litchi_xlsx::hyperlinks::Snapshot",
+          "replacement": "use hyperlinks",
+          "recursive": false
+        },
+        {
+          "name": "values",
+          "scope": "litchi_xlsx::hyperlinks::snapshot::Snapshot",
+          "replacement": "use hyperlinks",
+          "recursive": false
+        },
+        {
+          "name": "put_hyperlink",
+          "scope": "litchi_xlsx::hyperlinks::source::Edit",
+          "replacement": "use put",
+          "recursive": false
+        },
+        {
+          "name": "replace_hyperlink",
+          "scope": "litchi_xlsx::hyperlinks::source::Edit",
+          "replacement": "use put",
+          "recursive": false
+        },
+        {
+          "name": "remove_hyperlink",
+          "scope": "litchi_xlsx::hyperlinks::source::Edit",
+          "replacement": "use remove",
+          "recursive": false
+        },
+        {
+          "name": "replace",
+          "scope": "litchi_xlsx::hyperlinks::source::Edit",
+          "replacement": "use set",
+          "recursive": false
+        },
+        {
+          "name": "replace_all",
+          "scope": "litchi_xlsx::hyperlinks::source::Edit",
+          "replacement": "use set",
+          "recursive": false
+        },
+        {
+          "name": "set_scalar",
+          "scope": "litchi_xlsx::form_control",
+          "replacement": "use replace_scalar (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "collection",
+          "scope": "litchi_xlsx::form_control::FormControlSnapshot",
+          "replacement": "use form_controls",
+          "recursive": false
+        },
+        {
+          "name": "collection",
+          "scope": "litchi_xlsx::form_control::source::FormControlSnapshot",
+          "replacement": "use form_controls",
+          "recursive": false
+        },
+        {
+          "name": "val",
+          "scope": "litchi_xlsx::form_control::Item",
+          "replacement": "use value (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "val",
+          "scope": "litchi_xlsx::form_control::model::Item",
+          "replacement": "use value (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "set_val",
+          "scope": "litchi_xlsx::form_control::Item",
+          "replacement": "use set_value (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "set_val",
+          "scope": "litchi_xlsx::form_control::model::Item",
+          "replacement": "use set_value (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "effective_sel_type",
+          "scope": "litchi_xlsx::form_control::Properties",
+          "replacement": "use effective_seltype (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "effective_sel_type",
+          "scope": "litchi_xlsx::form_control::model::Properties",
+          "replacement": "use effective_seltype (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "storages",
+          "scope": "litchi_xlsx::CustomDataSnapshot",
+          "replacement": "use entries (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "storages",
+          "scope": "litchi_xlsx::custom_data::Snapshot",
+          "replacement": "use entries (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "storages",
+          "scope": "litchi_xlsx::custom_data::package::Snapshot",
+          "replacement": "use entries (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "links",
+          "scope": "litchi_xlsx::external_links::Edit",
+          "replacement": "use entries",
+          "recursive": false
+        },
+        {
+          "name": "links",
+          "scope": "litchi_xlsx::external_links::edit::Edit",
+          "replacement": "use entries",
+          "recursive": false
+        },
+        {
+          "name": "read",
+          "scope": "litchi_xlsx::external_links::Snapshot",
+          "replacement": "use load",
+          "recursive": false
+        },
+        {
+          "name": "read",
+          "scope": "litchi_xlsx::external_links::snapshot::Snapshot",
+          "replacement": "use load",
+          "recursive": false
+        },
+        {
+          "name": "links",
+          "scope": "litchi_xlsx::external_links::Snapshot",
+          "replacement": "use entries",
+          "recursive": false
+        },
+        {
+          "name": "links",
+          "scope": "litchi_xlsx::external_links::snapshot::Snapshot",
+          "replacement": "use entries",
+          "recursive": false
+        },
+        {
+          "name": "xml_maps",
+          "scope": "litchi_xlsx::xml_maps::Edit",
+          "replacement": "use info",
+          "recursive": false
+        },
+        {
+          "name": "xml_maps",
+          "scope": "litchi_xlsx::xml_maps::edit::Edit",
+          "replacement": "use info",
+          "recursive": false
+        },
+        {
+          "name": "catalog",
+          "scope": "litchi_xlsx::xml_maps::Edit",
+          "replacement": "use info",
+          "recursive": false
+        },
+        {
+          "name": "catalog",
+          "scope": "litchi_xlsx::xml_maps::edit::Edit",
+          "replacement": "use info",
+          "recursive": false
+        },
+        {
+          "name": "map_info",
+          "scope": "litchi_xlsx::xml_maps::Edit",
+          "replacement": "use info (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "map_info",
+          "scope": "litchi_xlsx::xml_maps::edit::Edit",
+          "replacement": "use info (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "read",
+          "scope": "litchi_xlsx::xml_maps::Snapshot",
+          "replacement": "use load",
+          "recursive": false
+        },
+        {
+          "name": "read",
+          "scope": "litchi_xlsx::xml_maps::snapshot::Snapshot",
+          "replacement": "use load",
+          "recursive": false
+        },
+        {
+          "name": "xml_maps",
+          "scope": "litchi_xlsx::xml_maps::Snapshot",
+          "replacement": "use info",
+          "recursive": false
+        },
+        {
+          "name": "xml_maps",
+          "scope": "litchi_xlsx::xml_maps::snapshot::Snapshot",
+          "replacement": "use info",
+          "recursive": false
+        },
+        {
+          "name": "catalog",
+          "scope": "litchi_xlsx::xml_maps::Snapshot",
+          "replacement": "use info",
+          "recursive": false
+        },
+        {
+          "name": "catalog",
+          "scope": "litchi_xlsx::xml_maps::snapshot::Snapshot",
+          "replacement": "use info",
+          "recursive": false
+        },
+        {
+          "name": "map_info",
+          "scope": "litchi_xlsx::xml_maps::Snapshot",
+          "replacement": "use info (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "map_info",
+          "scope": "litchi_xlsx::xml_maps::snapshot::Snapshot",
+          "replacement": "use info (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "value",
+          "scope": "litchi_xlsx::xml_maps::Snapshot",
+          "replacement": "use info",
+          "recursive": false
+        },
+        {
+          "name": "value",
+          "scope": "litchi_xlsx::xml_maps::snapshot::Snapshot",
+          "replacement": "use info",
+          "recursive": false
+        },
+        {
+          "name": "references",
+          "scope": "litchi_xlsx::drawing::WorksheetSourceScan",
+          "replacement": "use drawings (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "references",
+          "scope": "litchi_xlsx::drawing::worksheet_source::WorksheetSourceScan",
+          "replacement": "use drawings (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "scan",
+          "scope": "litchi_xlsx::drawing::worksheet_source",
+          "replacement": "use WorksheetSourceScan::scan (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "owner_range",
+          "scope": "litchi_xlsx::drawing::ContentPartSource",
+          "replacement": "use owner_element",
+          "recursive": false
+        },
+        {
+          "name": "owner_range",
+          "scope": "litchi_xlsx::drawing::source::ContentPartSource",
+          "replacement": "use owner_element",
+          "recursive": false
+        },
+        {
+          "name": "formats",
+          "scope": "litchi_xlsx::PivotTableView",
+          "replacement": "use server_formats().formats() (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "formats",
+          "scope": "litchi_xlsx::pivot::PivotTableView",
+          "replacement": "use server_formats().formats() (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "formats",
+          "scope": "litchi_xlsx::pivot::formats::PivotTableView",
+          "replacement": "use server_formats().formats() (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "formats",
+          "scope": "litchi_xlsx::pivot::server_formats::PivotTableView",
+          "replacement": "use server_formats().formats() (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "server_formats",
+          "scope": "litchi_xlsx::PivotTableServerFormats",
+          "replacement": "use formats (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "server_formats",
+          "scope": "litchi_xlsx::pivot::PivotTableServerFormats",
+          "replacement": "use formats (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "server_formats",
+          "scope": "litchi_xlsx::pivot::formats::PivotTableServerFormats",
+          "replacement": "use formats (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "server_formats",
+          "scope": "litchi_xlsx::pivot::server_formats::PivotTableServerFormats",
+          "replacement": "use formats (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "read",
+          "scope": "litchi_xlsx::pivot::formats::Snapshot",
+          "replacement": "use load",
+          "recursive": false
+        },
+        {
+          "name": "read",
+          "scope": "litchi_xlsx::pivot::server_formats::Snapshot",
+          "replacement": "use load",
+          "recursive": false
+        },
+        {
+          "name": "formats",
+          "scope": "litchi_xlsx::pivot::formats::Snapshot",
+          "replacement": "use server_formats().formats() (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "formats",
+          "scope": "litchi_xlsx::pivot::server_formats::Snapshot",
+          "replacement": "use server_formats().formats() (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "formats",
+          "scope": "litchi_xlsx::pivot::formats::Edit",
+          "replacement": "use server_formats (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "formats",
+          "scope": "litchi_xlsx::pivot::server_formats::Edit",
+          "replacement": "use server_formats (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "read",
+          "scope": "litchi_xlsx::pivot::cached_unique_names::Snapshot",
+          "replacement": "use load",
+          "recursive": false
+        },
+        {
+          "name": "read",
+          "scope": "litchi_xlsx::pivot::formats::cached_unique_names::Snapshot",
+          "replacement": "use load",
+          "recursive": false
+        },
+        {
+          "name": "names",
+          "scope": "litchi_xlsx::pivot::cached_unique_names::Snapshot",
+          "replacement": "use cached_unique_names().names() (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "names",
+          "scope": "litchi_xlsx::pivot::formats::cached_unique_names::Snapshot",
+          "replacement": "use cached_unique_names().names() (record 0360)",
+          "recursive": false
+        },
+        {
+          "name": "read",
+          "scope": "litchi_xlsx::rich_values::refresh_intervals::Snapshot",
+          "replacement": "use load",
+          "recursive": false
+        },
+        {
+          "name": "read",
+          "scope": "litchi_xlsx::rich_values::refresh_intervals::package::Snapshot",
+          "replacement": "use load",
+          "recursive": false
+        },
+        {
+          "name": "replace_hyperlink",
+          "scope": "litchi_xlsx::edit::Sheet",
+          "replacement": "use put_hyperlink",
+          "recursive": false
+        },
+        {
+          "name": "replace_hyperlink",
+          "scope": "litchi_xlsx::workbook::edit::Sheet",
+          "replacement": "use put_hyperlink",
+          "recursive": false
+        },
+        {
+          "name": "replace_hyperlink",
+          "scope": "litchi_xlsx::workbook::edit::semantic::worksheet::Sheet",
+          "replacement": "use put_hyperlink",
+          "recursive": false
+        },
+        {
+          "name": "copy_scalar_cells_from",
+          "scope": "litchi_xlsx::Edit",
+          "replacement": "use copy_cells_from",
+          "recursive": false
+        },
+        {
+          "name": "copy_scalar_cells_from",
+          "scope": "litchi_xlsx::edit::Edit",
+          "replacement": "use copy_cells_from",
+          "recursive": false
+        },
+        {
+          "name": "copy_scalar_cells_from",
+          "scope": "litchi_xlsx::workbook::Edit",
+          "replacement": "use copy_cells_from",
+          "recursive": false
+        },
+        {
+          "name": "copy_scalar_cells_from",
+          "scope": "litchi_xlsx::workbook::edit::Edit",
+          "replacement": "use copy_cells_from",
+          "recursive": false
+        },
+        {
+          "name": "copy_scalar_cells_from",
+          "scope": "litchi_xlsx::workbook::edit::semantic::transaction::Edit",
+          "replacement": "use copy_cells_from",
+          "recursive": false
         }
       ],
       "families": [
-        "litchi_xlsx::workbook::edit",
-        "litchi_xlsx::metadata",
-        "litchi_xlsx::chart::edit",
-        "litchi_xlsx::conditional_formatting::edit",
-        "litchi_xlsx::data_validation::edit",
+        "litchi_xlsx::active_x",
+        "litchi_xlsx::active_x::vba",
         "litchi_xlsx::auto_filter::edit",
+        "litchi_xlsx::auto_filter::source",
+        "litchi_xlsx::calculation_properties::edit",
+        "litchi_xlsx::calculation_properties::source",
+        "litchi_xlsx::cell_values",
+        "litchi_xlsx::cell_values::sheet",
+        "litchi_xlsx::chain",
+        "litchi_xlsx::chart::edit",
+        "litchi_xlsx::chart_sheet",
+        "litchi_xlsx::conditional_formatting::edit",
+        "litchi_xlsx::conditional_formatting::source",
+        "litchi_xlsx::connections",
+        "litchi_xlsx::custom_data",
+        "litchi_xlsx::data_type_icons",
+        "litchi_xlsx::data_validation::edit",
+        "litchi_xlsx::data_validation::source",
+        "litchi_xlsx::defined_names::source",
+        "litchi_xlsx::drawing::edit",
+        "litchi_xlsx::external_links",
+        "litchi_xlsx::form_control::source",
+        "litchi_xlsx::hyperlinks::source",
+        "litchi_xlsx::merge::source",
+        "litchi_xlsx::metadata",
+        "litchi_xlsx::named_sheet_view",
+        "litchi_xlsx::ole_objects",
+        "litchi_xlsx::opc",
+        "litchi_xlsx::package::printer_settings",
+        "litchi_xlsx::page_breaks::edit",
+        "litchi_xlsx::page_breaks::source",
+        "litchi_xlsx::page_margins::source",
+        "litchi_xlsx::page_setup::source",
+        "litchi_xlsx::pivot::cached_unique_names",
+        "litchi_xlsx::pivot::server_formats",
+        "litchi_xlsx::pivot::table_data",
+        "litchi_xlsx::print_options::source",
+        "litchi_xlsx::query_table",
+        "litchi_xlsx::revisions",
+        "litchi_xlsx::rich_values::refresh_intervals",
+        "litchi_xlsx::row_visibility::source",
+        "litchi_xlsx::sheet_protection::source",
+        "litchi_xlsx::slicer",
+        "litchi_xlsx::smart_tags",
+        "litchi_xlsx::survey",
+        "litchi_xlsx::tab_state::source",
+        "litchi_xlsx::task_panes",
+        "litchi_xlsx::timeline",
+        "litchi_xlsx::volatile_dependencies",
         "litchi_xlsx::workbook::comments::edit",
-        "litchi_xlsx::drawing::edit"
+        "litchi_xlsx::workbook::data_model",
+        "litchi_xlsx::workbook::edit",
+        "litchi_xlsx::xml_maps"
       ],
       "immutable_owners": [
-        "litchi_xlsx::Workbook"
+        "litchi_xlsx::Package",
+        "litchi_xlsx::SourceBackedWorkbook",
+        "litchi_xlsx::SourceWorksheet",
+        "litchi_xlsx::Workbook",
+        "litchi_xlsx::Worksheet"
       ],
       "family_methods": true
     },

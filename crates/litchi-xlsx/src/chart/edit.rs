@@ -92,14 +92,7 @@ impl LimitKind {
 
     fn check(self, observed: usize) -> Result<()> {
         if observed > self.maximum() {
-            return Err(invalid(format!(
-                "worksheet chart {} limit exceeded: {observed} exceeds {}",
-                match self {
-                    Self::Charts => "count",
-                    Self::ChartBytes => "byte",
-                },
-                self.maximum()
-            )));
+            return Err(Error::limit(self, observed, self.maximum()));
         }
         Ok(())
     }
@@ -299,8 +292,8 @@ impl Commit {
 
 /// A staged chart edit of one [`Package`]. Dropping it discards it.
 #[derive(Debug)]
-pub struct Edit<'a> {
-    package: &'a Package,
+pub struct Edit {
+    package: Package,
     staged: OpcPackage,
     touched: BTreeSet<String>,
 }
@@ -887,10 +880,10 @@ impl Package {
     ///
     /// Returns the encryption-policy error for a package whose mutations are
     /// refused.
-    pub fn edit_charts(&self) -> Result<Edit<'_>> {
+    pub fn edit_charts(&self) -> Result<Edit> {
         self.workbook_ref().ensure_mutation_allowed("edit_charts")?;
         Ok(Edit {
-            package: self,
+            package: self.clone(),
             staged: self.opc().clone(),
             touched: BTreeSet::new(),
         })
@@ -904,28 +897,35 @@ impl Package {
     /// Returns [`Error::PatchConflict`] when this package is not the
     /// patch's before state and [`Error::Signed`] for a changed patch of a
     /// signed workbook.
-    pub fn apply_charts(&self, patch: &Patch) -> Result<Self> {
-        if patch.is_noop() {
-            return Ok(self.clone());
-        }
-        self.workbook_ref()
-            .ensure_mutation_allowed("apply_charts")?;
-        crate::signature_policy::ensure_unsigned(self.opc())?;
-        let mut candidate = self.opc().clone();
-        patch.apply(&mut candidate)?;
-        self.workbook_ref()
-            .adopt_published_package(candidate)
-            .map(Self::from_workbook)
+    pub fn apply_charts(&self, patch: &Patch) -> Result<Commit> {
+        let diagnostics = Diagnostics {
+            parts: patch.deltas.len(),
+        };
+        let package = if patch.is_noop() {
+            self.clone()
+        } else {
+            self.workbook_ref()
+                .ensure_mutation_allowed("apply_charts")?;
+            crate::signature_policy::ensure_unsigned(self.opc())?;
+            let mut candidate = self.opc().clone();
+            patch.apply(&mut candidate)?;
+            self.derive(candidate)?
+        };
+        Ok(Commit {
+            package,
+            patch: patch.clone(),
+            diagnostics,
+        })
     }
 }
 
-impl Edit<'_> {
+impl Edit {
     fn touch(&mut self, name: &PackURI) {
         self.touched.insert(name.as_str().to_owned());
     }
 
     fn frames(&self, sheet: usize) -> Result<(PackURI, PackURI, Arc<Inventory>)> {
-        let worksheet = worksheet_uri(self.package, sheet)?;
+        let worksheet = worksheet_uri(&self.package, sheet)?;
         let drawing = drawing_uri(&self.staged, &worksheet)?
             .ok_or_else(|| invalid("the worksheet has no charts"))?;
         let inventory = self
@@ -952,7 +952,7 @@ impl Edit<'_> {
             return Err(invalid("chart frame name contains a NUL character"));
         }
         crate::signature_policy::ensure_unsigned(&self.staged)?;
-        let worksheet = worksheet_uri(self.package, sheet)?;
+        let worksheet = worksheet_uri(&self.package, sheet)?;
         let mut staged = self.staged.clone();
         let drawing = match drawing_uri(&staged, &worksheet)? {
             Some(drawing) => drawing,
@@ -1196,7 +1196,7 @@ impl Edit<'_> {
         };
         if patch.is_noop() {
             return Ok(Commit {
-                package: self.package.clone(),
+                package: self.package,
                 patch,
                 diagnostics,
             });
@@ -1335,9 +1335,9 @@ mod tests {
             bytes
         );
         // Replay and inverse.
-        let replayed = package.apply_charts(&patch).unwrap();
+        let replayed = package.apply_charts(&patch).unwrap().into_package();
         assert!(replayed.same_content(&after).unwrap());
-        let restored = after.apply_charts(&patch.inverse()).unwrap();
+        let restored = after.apply_charts(&patch.inverse()).unwrap().into_package();
         assert!(restored.same_content(&package).unwrap());
         assert!(matches!(
             after.apply_charts(&patch),

@@ -284,6 +284,7 @@ impl Builder {
         crate::xml_maps::serialize_xml_map_info(
             &value,
             crate::xml_maps::XmlMapConformance::Transitional,
+            &crate::xml_maps::XmlMapLimits::DEFAULT,
         )?;
         self.xml_maps = Some(value);
         Ok(self)

@@ -1,4 +1,4 @@
-use super::{Kind, Limits, SourceTarget, Target, scan, scan_source, scan_source_with, scan_with};
+use super::{Kind, Limits, SourceTarget, Target, scan, scan_source};
 use crate::Error;
 use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits as CoreLimits, ReadAt,
@@ -44,14 +44,14 @@ fn inventories_all_seven_real_world_fixtures_without_opening_payloads() {
 #[test]
 fn preserves_malformed_and_recursive_payload_bytes_opaquely() {
     let malformed = OpcPackage::from_bytes(LO_DOCX_BAD_COMPOUND).expect("fixture opens");
-    let entries = scan(&malformed).expect("malformed payload remains opaque");
+    let entries = scan(&malformed, &Limits::default()).expect("malformed payload remains opaque");
     let Target::Internal(payload) = entries[0].target() else {
         panic!("expected internal malformed payload")
     };
     assert_eq!(payload.bytes().len(), 2_560);
 
     let recursive = OpcPackage::from_bytes(POI_DOCX_RECURSIVE).expect("fixture opens");
-    let entries = scan(&recursive).expect("recursive payload remains opaque");
+    let entries = scan(&recursive, &Limits::default()).expect("recursive payload remains opaque");
     let Target::Internal(payload) = entries[0].target() else {
         panic!("expected internal recursive payload")
     };
@@ -61,7 +61,7 @@ fn preserves_malformed_and_recursive_payload_bytes_opaquely() {
 #[test]
 fn preserves_server_specific_object_content_types_without_sniffing() {
     let package = OpcPackage::from_bytes(POI_XLSX_TWO).expect("fixture opens");
-    let entries = scan(&package).expect("fixture graph is valid");
+    let entries = scan(&package, &Limits::default()).expect("fixture graph is valid");
     assert!(entries.iter().any(|entry| {
         entry.kind() == Kind::Object
             && matches!(
@@ -79,7 +79,7 @@ fn accepts_strict_relationships_and_returns_external_targets_inertly() {
         (relationship_type::STRICT_PACKAGE, Kind::Package),
     ] {
         let package = synthetic_package(relationship, true, true, content_type::WML_DOCUMENT_MAIN);
-        let entries = scan(&package).expect("strict relationship is valid");
+        let entries = scan(&package, &Limits::default()).expect("strict relationship is valid");
         assert_eq!(entries[0].kind(), expected);
         assert!(matches!(
             entries[0].target(),
@@ -97,7 +97,12 @@ fn accepts_word_template_and_macro_main_sources() {
     ] {
         for relationship in [relationship_type::OLE_OBJECT, relationship_type::PACKAGE] {
             let package = synthetic_package(relationship, true, false, source);
-            assert_eq!(scan(&package).expect("Word source is valid").len(), 1);
+            assert_eq!(
+                scan(&package, &Limits::default())
+                    .expect("Word source is valid")
+                    .len(),
+                1
+            );
         }
     }
 }
@@ -111,7 +116,12 @@ fn applies_kind_specific_xlsb_source_policy() {
     ] {
         for relationship in [relationship_type::OLE_OBJECT, relationship_type::PACKAGE] {
             let package = synthetic_package(relationship, true, false, source);
-            assert_eq!(scan(&package).expect("XLSB source is valid").len(), 1);
+            assert_eq!(
+                scan(&package, &Limits::default())
+                    .expect("XLSB source is valid")
+                    .len(),
+                1
+            );
         }
     }
 
@@ -122,7 +132,7 @@ fn applies_kind_specific_xlsb_source_policy() {
         super::codec::XLSB_EXTERNAL_LINK,
     );
     assert_eq!(
-        scan(&object)
+        scan(&object, &Limits::default())
             .expect("XLSB external-link object is valid")
             .len(),
         1
@@ -133,7 +143,7 @@ fn applies_kind_specific_xlsb_source_policy() {
         false,
         super::codec::XLSB_EXTERNAL_LINK,
     );
-    assert!(scan(&package).is_err());
+    assert!(scan(&package, &Limits::default()).is_err());
 }
 
 #[test]
@@ -144,14 +154,19 @@ fn accepts_chart_packages_but_not_chart_objects() {
         false,
         content_type::DML_CHART,
     );
-    assert_eq!(scan(&package).expect("chart package is valid").len(), 1);
+    assert_eq!(
+        scan(&package, &Limits::default())
+            .expect("chart package is valid")
+            .len(),
+        1
+    );
     let object = synthetic_package(
         relationship_type::OLE_OBJECT,
         true,
         false,
         content_type::DML_CHART,
     );
-    assert!(scan(&object).is_err());
+    assert!(scan(&object, &Limits::default()).is_err());
 }
 
 #[test]
@@ -162,7 +177,7 @@ fn rejects_missing_targets_invalid_sources_and_package_root_relationships() {
         false,
         content_type::WML_DOCUMENT_MAIN,
     );
-    assert!(scan(&missing).is_err());
+    assert!(scan(&missing, &Limits::default()).is_err());
 
     let invalid_source = synthetic_package(
         relationship_type::OLE_OBJECT,
@@ -170,7 +185,7 @@ fn rejects_missing_targets_invalid_sources_and_package_root_relationships() {
         false,
         content_type::WML_STYLES,
     );
-    assert!(scan(&invalid_source).is_err());
+    assert!(scan(&invalid_source, &Limits::default()).is_err());
 
     let mut root = OpcPackage::new();
     root.rels_mut().add_relationship(
@@ -179,7 +194,7 @@ fn rejects_missing_targets_invalid_sources_and_package_root_relationships() {
         "rId1".into(),
         true,
     );
-    assert!(scan(&root).is_err());
+    assert!(scan(&root, &Limits::default()).is_err());
 }
 
 #[test]
@@ -195,7 +210,10 @@ fn rejects_query_and_fragment_components_on_internal_targets() {
             false,
         );
         package.add_part(Box::new(source));
-        assert!(matches!(scan(&package), Err(Error::Relationship(_))));
+        assert!(matches!(
+            scan(&package, &Limits::default()),
+            Err(Error::Relationship(_))
+        ));
     }
 }
 
@@ -203,7 +221,11 @@ fn rejects_query_and_fragment_components_on_internal_targets() {
 fn ignores_orphans_preserves_duplicate_occurrences_and_sorts_deterministically() {
     let mut orphan = OpcPackage::new();
     orphan.add_part(Box::new(payload_part("/word/embeddings/orphan.bin")));
-    assert!(scan(&orphan).expect("orphan is inert").is_empty());
+    assert!(
+        scan(&orphan, &Limits::default())
+            .expect("orphan is inert")
+            .is_empty()
+    );
 
     let mut package = OpcPackage::new();
     package.add_part(Box::new(payload_part("/word/embeddings/payload.bin")));
@@ -221,7 +243,7 @@ fn ignores_orphans_preserves_duplicate_occurrences_and_sorts_deterministically()
         false,
     );
     package.add_part(Box::new(source));
-    let entries = scan(&package).expect("duplicate occurrences are valid");
+    let entries = scan(&package, &Limits::default()).expect("duplicate occurrences are valid");
     assert_eq!(entries.len(), 2);
     assert_eq!(entries[0].id(), "rId2");
     assert_eq!(entries[1].id(), "rId9");
@@ -254,7 +276,7 @@ fn rejects_forbidden_payload_relationships_and_default_relationship_limit() {
         false,
     );
     forbidden.add_part(Box::new(source));
-    assert!(scan(&forbidden).is_err());
+    assert!(scan(&forbidden, &Limits::default()).is_err());
 
     let mut limited = OpcPackage::new();
     let mut source = source_part("/word/document.xml", content_type::WML_DOCUMENT_MAIN);
@@ -267,7 +289,10 @@ fn rejects_forbidden_payload_relationships_and_default_relationship_limit() {
         );
     }
     limited.add_part(Box::new(source));
-    assert!(matches!(scan(&limited), Err(Error::Limit { .. })));
+    assert!(matches!(
+        scan(&limited, &Limits::default()),
+        Err(Error::Limit { .. })
+    ));
 }
 
 #[test]
@@ -288,7 +313,7 @@ fn custom_limits_are_checked_and_payload_budget_is_aggregate() {
         ..Limits::default()
     };
     assert!(matches!(
-        scan_with(&entries, &one_entry),
+        scan(&entries, &one_entry),
         Err(Error::Limit { .. })
     ));
 
@@ -319,7 +344,7 @@ fn custom_limits_are_checked_and_payload_budget_is_aggregate() {
         ..Limits::default()
     };
     assert!(matches!(
-        scan_with(&payloads, &one_payload_relationship),
+        scan(&payloads, &one_payload_relationship),
         Err(Error::Limit { .. })
     ));
 }
@@ -356,7 +381,7 @@ fn duplicate_internal_targets_are_validated_and_charged_once() {
         ..Limits::default()
     };
     assert_eq!(
-        scan_with(&package, &limits)
+        scan(&package, &limits)
             .expect("duplicate target consumes one payload budget")
             .len(),
         2
@@ -381,8 +406,9 @@ fn source_scan_matches_eager_metadata_on_real_fixtures() {
         let eager_package = OpcPackage::from_bytes(bytes).expect("fixture opens eagerly");
         let source_package =
             SourceBackedPackage::from_vec(bytes.to_vec()).expect("fixture opens source-backed");
-        let eager = scan(&eager_package).expect("eager fixture scan succeeds");
-        let source = scan_source(&source_package).expect("source fixture scan succeeds");
+        let eager = scan(&eager_package, &Limits::default()).expect("eager fixture scan succeeds");
+        let source =
+            scan_source(&source_package, &Limits::default()).expect("source fixture scan succeeds");
         assert_eq!(source.len(), eager.len());
         for (eager, source) in eager.iter().zip(source.iter()) {
             assert_eq!(source.source(), eager.source());
@@ -416,7 +442,7 @@ fn source_scan_reads_no_payload_until_selected_data_or_stream() {
         SourceBackedPackage::from_read_at(source.clone()).expect("source package opens");
     let opened_reads = source.reads();
 
-    let entries = scan_source(&source_package).expect("external scan succeeds");
+    let entries = scan_source(&source_package, &Limits::default()).expect("external scan succeeds");
     assert_eq!(source.reads(), opened_reads);
     assert!(matches!(
         entries[0].target(),
@@ -429,13 +455,13 @@ fn source_scan_reads_no_payload_until_selected_data_or_stream() {
         true,
         content_type::WML_DOCUMENT_MAIN,
     );
-    let eager_entries = scan(&eager_package).expect("eager scan succeeds");
+    let eager_entries = scan(&eager_package, &Limits::default()).expect("eager scan succeeds");
     let source_bytes = package_bytes(&eager_package);
     let source = Arc::new(CountingSource::new(source_bytes));
     let source_package =
         SourceBackedPackage::from_read_at(source.clone()).expect("source package opens");
     let opened_reads = source.reads();
-    let entries = scan_source(&source_package).expect("internal scan succeeds");
+    let entries = scan_source(&source_package, &Limits::default()).expect("internal scan succeeds");
     assert_eq!(source.reads(), opened_reads);
     let SourceTarget::Internal(payload) = entries[0].target() else {
         panic!("expected internal source payload")
@@ -464,7 +490,7 @@ fn source_duplicate_canonical_targets_are_ordered_and_charged_once() {
         payload_relationships: 1,
         ..Limits::default()
     };
-    let entries = scan_source_with(&source_package, &limits)
+    let entries = scan_source(&source_package, &limits)
         .expect("canonical duplicate target consumes one payload budget");
     assert_eq!(entries.len(), 2);
     assert_eq!(entries[0].id(), "rId2");
@@ -484,7 +510,7 @@ fn source_limits_stale_sources_and_cancellation_fail_closed() {
     let bytes = package_bytes(&package);
     let relationships = SourceBackedPackage::from_vec(bytes.clone()).expect("source opens");
     assert!(matches!(
-        scan_source_with(
+        scan_source(
             &relationships,
             &Limits {
                 relationships: 1,
@@ -494,7 +520,7 @@ fn source_limits_stale_sources_and_cancellation_fail_closed() {
         Err(Error::Limit { .. })
     ));
     assert!(matches!(
-        scan_source_with(
+        scan_source(
             &relationships,
             &Limits {
                 payload_relationships: 0,
@@ -507,7 +533,7 @@ fn source_limits_stale_sources_and_cancellation_fail_closed() {
     let mutable_source = Arc::new(CountingSource::new(bytes.clone()));
     let stale = SourceBackedPackage::from_read_at(mutable_source.clone()).expect("source opens");
     mutable_source.bump_revision();
-    assert!(scan_source(&stale).is_err());
+    assert!(scan_source(&stale, &Limits::default()).is_err());
 
     let (cancellation_source, cancellation) = CancellationSource::pair();
     let budget = Budget::root(
@@ -529,12 +555,12 @@ fn source_limits_stale_sources_and_cancellation_fail_closed() {
     )
     .expect("source opens before cancellation");
     cancellation_source.cancel();
-    assert!(scan_source(&cancelled).is_err());
+    assert!(scan_source(&cancelled, &Limits::default()).is_err());
 }
 
 fn assert_fixture(bytes: &[u8], total: usize, objects: usize, packages: usize) {
     let package = OpcPackage::from_bytes(bytes).expect("fixture opens");
-    let entries = scan(&package).expect("fixture graph is valid");
+    let entries = scan(&package, &Limits::default()).expect("fixture graph is valid");
     assert_eq!(entries.len(), total);
     assert_eq!(
         entries

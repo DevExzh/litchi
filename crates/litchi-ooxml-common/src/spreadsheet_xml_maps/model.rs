@@ -76,7 +76,7 @@ pub struct XmlMap {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct XmlMapInfo {
     pub selection_namespaces: String,
-    pub schemas: Vec<XmlMapSchema>,
+    pub schemas: Vec<XmlSchema>,
     pub maps: Vec<XmlMap>,
 }
 
@@ -86,11 +86,6 @@ pub struct ParsedXmlMapInfo {
     pub info: XmlMapInfo,
     pub conformance: XmlMapConformance,
 }
-
-/// Backward-compatible `SpreadsheetML` name for [`XmlSchema`].
-pub type XmlMapSchema = XmlSchema;
-/// Backward-compatible `SpreadsheetML` name for [`DataBinding`].
-pub type XmlMapDataBinding = DataBinding;
 
 /// Fixed resource ceilings enforced by the bounded XML Maps codec.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -213,10 +208,7 @@ impl<'a> XmlMapInfoRef<'a> {
     ///
     /// Returns an error when input violates OOXML constraints, exceeds a configured
     /// bound, or an underlying XML or package operation fails.
-    pub fn from_owned_with_limits(
-        value: &'a XmlMapInfo,
-        limits: &XmlMapLimits,
-    ) -> crate::Result<Self> {
+    pub fn from_owned(value: &'a XmlMapInfo, limits: &XmlMapLimits) -> crate::Result<Self> {
         if value.schemas.len() > limits.max_schemas || value.maps.len() > limits.max_maps {
             return Err(crate::Error::SpreadsheetXmlMaps(
                 "custom XML maps descriptor count exceeds configured limit".into(),
@@ -241,13 +233,5 @@ impl<'a> XmlMapInfoRef<'a> {
             schemas,
             maps,
         })
-    }
-}
-
-impl<'a> TryFrom<&'a XmlMapInfo> for XmlMapInfoRef<'a> {
-    type Error = crate::Error;
-
-    fn try_from(value: &'a XmlMapInfo) -> Result<Self, Self::Error> {
-        Self::from_owned_with_limits(value, &XmlMapLimits::DEFAULT)
     }
 }

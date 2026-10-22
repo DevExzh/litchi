@@ -93,7 +93,7 @@ impl<'a> Sink<'a> {
 fn decode_with(xml: &[u8], sink: &mut Sink<'_>) -> Result<Props> {
     if xml.len() > MAX_XML_BYTES {
         return Err(limit(
-            "custom-properties XML bytes",
+            crate::LimitKind::CustomPropertiesXmlBytes,
             MAX_XML_BYTES,
             xml.len(),
         ));
@@ -217,7 +217,7 @@ fn decode_with(xml: &[u8], sink: &mut Sink<'_>) -> Result<Props> {
                     },
                     _ => {
                         return Err(limit(
-                            "custom-properties XML depth",
+                            crate::LimitKind::CustomPropertiesXmlDepth,
                             MAX_XML_DEPTH,
                             child_depth,
                         ));
@@ -281,7 +281,7 @@ fn decode_with(xml: &[u8], sink: &mut Sink<'_>) -> Result<Props> {
                     },
                     _ => {
                         return Err(limit(
-                            "custom-properties XML depth",
+                            crate::LimitKind::CustomPropertiesXmlDepth,
                             MAX_XML_DEPTH,
                             child_depth,
                         ));
@@ -625,7 +625,7 @@ pub(crate) fn encode(props: &Props) -> Result<Vec<u8>> {
     let xml = writer.into_inner();
     if xml.len() > MAX_XML_BYTES {
         return Err(limit(
-            "custom-properties XML bytes",
+            crate::LimitKind::CustomPropertiesXmlBytes,
             MAX_XML_BYTES,
             xml.len(),
         ));
@@ -637,7 +637,7 @@ fn validate_collection(props: &Props) -> Result<()> {
     reserved::validate(props, None)?;
     if props.properties.len() > MAX_PROPERTIES {
         return Err(limit(
-            "custom properties",
+            crate::LimitKind::CustomProperties,
             MAX_PROPERTIES,
             props.properties.len(),
         ));
@@ -666,13 +666,13 @@ fn validate_collection(props: &Props) -> Result<()> {
             name_bytes,
             name.len(),
             MAX_TOTAL_NAME_BYTES,
-            "custom-property name bytes",
+            crate::LimitKind::CustomPropertyNameBytes,
         )?;
         text_bytes = checked_total(
             text_bytes,
             value_text_bytes(&property.value),
             MAX_TOTAL_TEXT_BYTES,
-            "custom-property text bytes",
+            crate::LimitKind::CustomPropertyTextBytes,
         )?;
     }
     Ok(())
@@ -693,9 +693,19 @@ fn estimated_xml_size(props: &Props) -> Result<usize> {
                     .checked_mul(6)
                     .and_then(|text| size.checked_add(text))
             })
-            .ok_or_else(|| limit("custom-properties XML bytes", MAX_XML_BYTES, usize::MAX))?;
+            .ok_or_else(|| {
+                limit(
+                    crate::LimitKind::CustomPropertiesXmlBytes,
+                    MAX_XML_BYTES,
+                    usize::MAX,
+                )
+            })?;
         if size > MAX_XML_BYTES {
-            return Err(limit("custom-properties XML bytes", MAX_XML_BYTES, size));
+            return Err(limit(
+                crate::LimitKind::CustomPropertiesXmlBytes,
+                MAX_XML_BYTES,
+                size,
+            ));
         }
     }
     Ok(size)
@@ -714,10 +724,10 @@ fn validate_root(
     }
     let mut count = 0usize;
     for attribute in element.checked_attributes() {
-        count = checked_increment(count, "custom-properties XML attributes")?;
+        count = checked_increment(count, crate::LimitKind::CustomPropertiesXmlAttributes)?;
         if count > MAX_ATTRIBUTES {
             return Err(limit(
-                "custom-properties XML attributes",
+                crate::LimitKind::CustomPropertiesXmlAttributes,
                 MAX_ATTRIBUTES,
                 count,
             ));
@@ -725,7 +735,7 @@ fn validate_root(
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         if attribute.value.len() > MAX_ATTRIBUTE_BYTES {
             return Err(limit(
-                "custom-properties XML attribute bytes",
+                crate::LimitKind::CustomPropertiesXmlAttributeBytes,
                 MAX_ATTRIBUTE_BYTES,
                 attribute.value.len(),
             ));
@@ -753,10 +763,10 @@ fn parse_property_attributes(
     let mut format_id = None;
     let mut count = 0usize;
     for attribute in element.checked_attributes() {
-        count = checked_increment(count, "custom-properties XML attributes")?;
+        count = checked_increment(count, crate::LimitKind::CustomPropertiesXmlAttributes)?;
         if count > MAX_ATTRIBUTES {
             return Err(limit(
-                "custom-properties XML attributes",
+                crate::LimitKind::CustomPropertiesXmlAttributes,
                 MAX_ATTRIBUTES,
                 count,
             ));
@@ -764,7 +774,7 @@ fn parse_property_attributes(
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         if attribute.value.len() > MAX_ATTRIBUTE_BYTES {
             return Err(limit(
-                "custom-properties XML attribute bytes",
+                crate::LimitKind::CustomPropertiesXmlAttributeBytes,
                 MAX_ATTRIBUTE_BYTES,
                 attribute.value.len(),
             ));
@@ -820,10 +830,10 @@ fn parse_property_attributes(
 fn validate_value_attributes(element: &BytesStart<'_>) -> Result<()> {
     let mut count = 0usize;
     for attribute in element.checked_attributes() {
-        count = checked_increment(count, "custom-properties XML attributes")?;
+        count = checked_increment(count, crate::LimitKind::CustomPropertiesXmlAttributes)?;
         if count > MAX_ATTRIBUTES {
             return Err(limit(
-                "custom-properties XML attributes",
+                crate::LimitKind::CustomPropertiesXmlAttributes,
                 MAX_ATTRIBUTES,
                 count,
             ));
@@ -831,7 +841,7 @@ fn validate_value_attributes(element: &BytesStart<'_>) -> Result<()> {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         if attribute.value.len() > MAX_ATTRIBUTE_BYTES {
             return Err(limit(
-                "custom-properties XML attribute bytes",
+                crate::LimitKind::CustomPropertiesXmlAttributeBytes,
                 MAX_ATTRIBUTE_BYTES,
                 attribute.value.len(),
             ));
@@ -995,12 +1005,19 @@ fn normalize_format_id(format_id: &str) -> Result<String> {
 }
 
 fn append_value_text(buffer: &mut String, text: &str) -> Result<()> {
-    let actual = buffer
-        .len()
-        .checked_add(text.len())
-        .ok_or_else(|| limit("custom-property text bytes", MAX_TEXT_BYTES, usize::MAX))?;
+    let actual = buffer.len().checked_add(text.len()).ok_or_else(|| {
+        limit(
+            crate::LimitKind::CustomPropertyTextBytes,
+            MAX_TEXT_BYTES,
+            usize::MAX,
+        )
+    })?;
     if actual > MAX_TEXT_BYTES {
-        return Err(limit("custom-property text bytes", MAX_TEXT_BYTES, actual));
+        return Err(limit(
+            crate::LimitKind::CustomPropertyTextBytes,
+            MAX_TEXT_BYTES,
+            actual,
+        ));
     }
     buffer.push_str(text);
     Ok(())

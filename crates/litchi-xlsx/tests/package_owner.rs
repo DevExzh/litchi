@@ -89,7 +89,7 @@ fn transaction_limits_report_their_kind() {
     assert!(matches!(
         error,
         Error::Limit {
-            kind: LimitKind::TransferCells,
+            kind: litchi_xlsx::LimitKind::Workbook(LimitKind::TransferCells),
             observed: 1_703_936,
             maximum: 65_536,
         }
@@ -97,10 +97,9 @@ fn transaction_limits_report_their_kind() {
 }
 
 #[test]
-fn scoped_package_transactions_republish_a_validated_snapshot() {
+fn scoped_package_edits_publish_a_validated_snapshot() {
     let source = Package::new().unwrap();
-    let mut package = source.clone();
-    let mut transaction = package.edit_task_panes().unwrap();
+    let mut transaction = source.edit_task_panes().unwrap();
     let reference = litchi_ooxml_common::web::Reference::new(
         "wa1",
         "1.0.0.0",
@@ -113,10 +112,10 @@ fn scoped_package_transactions_republish_a_validated_snapshot() {
         .push(litchi_ooxml_common::web::Pane::new(add_in))
         .unwrap();
     transaction.replace(panes).unwrap();
-    transaction.commit().unwrap();
+    let package = transaction.commit().unwrap().into_package();
 
-    // The owner and its projection observe the published graph; the clone
-    // taken before the transaction does not.
+    // The published package and its projection observe the new graph; the
+    // source package does not.
     assert!(package.task_panes().unwrap().is_some());
     assert!(package.workbook().task_panes().unwrap().is_some());
     assert!(source.task_panes().unwrap().is_none());

@@ -465,6 +465,51 @@ fn package_and_workbook_ingress_honor_exact_read_limits() {
 }
 
 #[test]
+fn derived_owned_edit_keeps_the_physical_part_limit() {
+    let baseline = Package::new().expect("minimal workbook");
+    let baseline_bytes = baseline.to_bytes().expect("serialize minimal workbook");
+    let maximum_part = baseline
+        .opc()
+        .try_iter_parts()
+        .map(|part| part.expect("baseline part").blob().len())
+        .max()
+        .expect("baseline parts");
+    let limits = SourceLimits::builder()
+        .max_part_bytes(maximum_part as u64)
+        .expect("part limit")
+        .build()
+        .expect("source limits");
+    let package = Package::from_bytes_with_options(
+        &baseline_bytes,
+        crate::OpenOptions::new().source_limits(limits),
+    )
+    .expect("limited workbook");
+    assert_eq!(package.opc().read_limits(), limits);
+    let before = package.to_bytes().expect("serialize source");
+
+    let mut edit = package.edit().expect("start edit");
+    edit.sheet(0usize)
+        .expect("lookup")
+        .expect("worksheet")
+        .set("A1", "x".repeat(maximum_part))
+        .expect("stage oversized cell");
+    let committed = edit.commit().expect("derived edit remains valid");
+    assert_eq!(committed.package().opc().read_limits(), limits);
+    assert!(
+        Package::from_bytes_with_options(
+            &committed
+                .package()
+                .to_bytes()
+                .expect("serialize derived edit"),
+            crate::OpenOptions::new().source_limits(limits),
+        )
+        .is_err()
+    );
+    assert_eq!(package.to_bytes().expect("source remains readable"), before);
+    assert_eq!(package.opc().read_limits(), limits);
+}
+
+#[test]
 fn clones_share_the_snapshot_and_handles_pin_it() {
     fn assert_send_sync<T: Send + Sync>() {}
     assert_send_sync::<Workbook>();
@@ -526,8 +571,13 @@ fn web_facades_are_lazy_borrowed_and_snapshot_scoped() {
             AddIn::new("add-in-1", reference).expect("valid add-in"),
         ))
         .expect("valid pane");
-    litchi_ooxml_common::web::put(&mut package, panes, Conformance::Transitional)
-        .expect("install task panes");
+    litchi_ooxml_common::web::put(
+        &mut package,
+        panes,
+        Conformance::Transitional,
+        &litchi_ooxml_common::web::Limits::standard(),
+    )
+    .expect("install task panes");
 
     let with_panes = Package::from_opc(package).expect("reopen task-pane workbook");
     std::thread::scope(|scope| {

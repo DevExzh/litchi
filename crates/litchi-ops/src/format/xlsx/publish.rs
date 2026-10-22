@@ -51,11 +51,7 @@ impl Xlsx {
                     .map_err(Error::from);
             }
             match &self.0.owner {
-                XlsxOwner::Source(workbook) => workbook
-                    .source_backed_package()
-                    .source_artifact()
-                    .write_to(&mut sink)
-                    .map_err(Error::from),
+                XlsxOwner::Source(workbook) => workbook.write_to(&mut sink).map_err(Error::from),
                 XlsxOwner::Eager(workbook) => {
                     workbook.clone().write_to(&mut sink).map_err(Error::from)
                 },
@@ -80,7 +76,7 @@ fn publish_source(
         return Err(reencrypt_source_refused());
     }
 
-    let package = workbook.source_backed_package();
+    let package = workbook.source_backed_package()?;
     let context = package.execution_context();
     let mut bytes = 0_u64;
     let write = |sink: &mut litchi_opc::atomic::AtomicSink<'_>| {
@@ -169,7 +165,10 @@ fn publish_reencrypted(
 
 fn source_context(owner: &XlsxOwner) -> Option<ExecutionContext> {
     match owner {
-        XlsxOwner::Source(workbook) => workbook.source_backed_package().execution_context(),
+        XlsxOwner::Source(workbook) => workbook
+            .source_backed_package()
+            .ok()
+            .and_then(litchi_opc::SourceBackedPackage::execution_context),
         XlsxOwner::Eager(_) => None,
     }
 }
