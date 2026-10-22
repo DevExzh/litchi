@@ -76,20 +76,61 @@ and `CARGO_BUILD_JOBS=2 CARGO_TEST_JOBS=2` unless stated otherwise.
   `9ae36bb22d8f0f810a77044760863f70b81405396a32cce477ec08eecd4e6d59`).
 - Formatting:
   `cargo fmt --all -- --check` passed.
-- Strict DOCX library Clippy was also run with
+- Before the layout repair, strict DOCX library Clippy was also run with
   `cargo clippy --offline --locked -p litchi-docx --lib --all-features -- -D warnings`.
   It reports one pre-existing `clippy::large_enum_variant` diagnostic for
   `source_backed::tail_append::TailChange` (the 297-byte `Forward` variant),
-  outside this slice. The changed library passes with that one existing lint
-  explicitly allowed; log:
+  outside this slice. This pre-repair receipt is retained only to show the
+  original diagnostic; log:
   `/home/zhuhe/code/litchi-worktrees/.coord/w8-docx-paragraph-clippy-lib-allow-existing.log`
   (1,839 bytes, SHA-256
   `e1e8ba2349ad62512ee1f362b2fad85f209e2cf262ef6591ffb1b789e528eb92`).
-  The corresponding all-target run with only that existing lint allowed also
-  passed; log:
+  The corresponding pre-repair all-target run with only that existing lint
+  allowed also passed; log:
   `/home/zhuhe/code/litchi-worktrees/.coord/w8-docx-paragraph-clippy-all-allow-existing.log`
   (7,818 bytes, SHA-256
   `18db4aa40e46ca5bddd70c19e53da29e19ff5d6f0202c5b2d57c14b204a47437`).
 
 No performance measurement or compiled artifact is part of this commit. All
 large logs, targets, and binaries remain outside the repository.
+
+## Follow-up layout repair
+
+The original deferred change representation used a large `Forward` enum
+variant and boxed every non-noop inverse. The follow-up stores the forward
+fields in one private `TailChange` struct and toggles a private inverse bit.
+This keeps the public API and forward field layout unchanged, removes the
+inverse box allocation, and leaves inverse publication and exact no-op
+behavior unchanged. It also removes the `large_enum_variant` diagnostic
+without a lint suppression or an added hot-path allocation.
+
+The final unfiltered all-target/all-feature Clippy command was:
+
+```text
+cargo clippy --offline --locked -p litchi-docx --all-targets --all-features -- -D warnings
+```
+
+It passed. The log is
+`/home/zhuhe/code/litchi-worktrees/.coord/w8-docx-paragraph-clippy-final.log`
+(7,818 bytes, SHA-256
+`265e0b39a6ce4d23c34acaa99d21551a3684aab67fb5b93ff22d8bb3aa8ea762`). The
+focused post-repair suites were:
+
+```text
+cargo test --offline --locked -p litchi-docx \
+  --test source_backed_tail_append \
+  --test source_backed_tail_append_stream \
+  --test paragraph_index_reuse
+```
+
+All 87 tests passed; the log is
+`/home/zhuhe/code/litchi-worktrees/.coord/w8-docx-paragraph-focused-final.log`
+(7,724 bytes, SHA-256
+`6574babf41545784bfe6baa91b3121bcba64c15861083e27d148ec21b52b914e`). The
+full all-target run immediately before the focused receipt passed 2,270 tests
+across 85 suites; its log is
+`/home/zhuhe/code/litchi-worktrees/.coord/w8-docx-paragraph-tests-final.log`
+(217,628 bytes, SHA-256
+`bb1f0f455bf2ea89fddc8a0a95a66d5682679ca65cf9e47be6fb3365611f34f8`). The
+earlier allow-only Clippy logs remain historical evidence for the original
+diagnostic and are superseded by the strict run above.

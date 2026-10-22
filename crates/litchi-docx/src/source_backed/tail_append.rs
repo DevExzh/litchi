@@ -472,7 +472,7 @@ impl<'package> Plan<'package> {
     /// Returns a signature or encryption refusal of a changed source.
     pub fn commit(self) -> Result<Commit> {
         let package = self.package.clone();
-        let change = TailChange::Forward {
+        let change = TailChange {
             text: self.text.clone(),
             limits: self.limits,
             options: self.options.clone(),
@@ -482,6 +482,7 @@ impl<'package> Plan<'package> {
                 splice: self.splice.into_owned(),
                 options: self.options,
             })),
+            inverse: false,
         };
         commit_change(&package, change)
     }
@@ -501,79 +502,66 @@ impl PreparedTail {
 }
 
 /// The append (its text and policy, with the plan prepared for the commit's
-/// own package), or its restore-only inverse.
+/// own package). An inverse is represented by the same fields with the
+/// `inverse` bit set, so inverting a change does not allocate a second boxed
+/// change or enlarge the common forward representation.
 #[derive(Clone)]
-pub(crate) enum TailChange {
-    Forward {
-        text: Option<String>,
-        limits: Limits,
-        options: EditOptions,
-        noop: bool,
-        prepared: Option<Arc<PreparedTail>>,
-    },
-    Inverse {
-        noop: bool,
-        forward: Box<TailChange>,
-    },
+pub(crate) struct TailChange {
+    text: Option<String>,
+    limits: Limits,
+    options: EditOptions,
+    noop: bool,
+    prepared: Option<Arc<PreparedTail>>,
+    inverse: bool,
 }
 
 impl crate::source_backed::deferred::Change for TailChange {
     type Error = Error;
 
     fn is_noop(&self) -> bool {
-        match self {
-            Self::Forward { noop, .. } | Self::Inverse { noop, .. } => *noop,
-        }
+        self.noop
     }
 
     fn inverse(&self) -> Self {
-        match self {
-            Self::Forward { noop, .. } => Self::Inverse {
-                noop: *noop,
-                forward: Box::new(self.clone()),
-            },
-            Self::Inverse { forward, .. } => (**forward).clone(),
-        }
+        let mut inverse = self.clone();
+        inverse.inverse = !inverse.inverse;
+        inverse
     }
 
     fn publish(&self, package: &Package) -> Result<Package> {
-        match self {
-            Self::Forward {
-                text,
-                limits,
-                options,
-                prepared,
-                ..
-            } => {
-                let prepared = match prepared {
-                    Some(prepared) if prepared.base.same_owner(package) => Arc::clone(prepared),
-                    _ => {
-                        let edit = Edit {
-                            package,
-                            text: text.clone().map(Cow::Owned),
-                            limits: *limits,
-                            options: options.clone(),
-                        };
-                        let plan = edit.prepare()?;
-                        Arc::new(PreparedTail {
-                            base: package.clone(),
-                            splice: plan.splice.into_owned(),
-                            options: plan.options,
-                        })
-                    },
-                };
-                if prepared.splice.is_noop() {
-                    return Ok(package.clone());
-                }
-                package
-                    .deferred(move |writer| prepared.write(writer).map_err(tail_to_document))
-                    .map_err(Error::Document)
-            },
-            Self::Inverse { noop: true, .. } => Ok(package.clone()),
+        if self.inverse {
             // The appended paragraph's removal is restored only on the
             // commit's own package (the exact source artifact).
-            Self::Inverse { .. } => Err(Error::PatchConflict),
+            return if self.noop {
+                Ok(package.clone())
+            } else {
+                Err(Error::PatchConflict)
+            };
         }
+
+        let prepared = match &self.prepared {
+            Some(prepared) if prepared.base.same_owner(package) => Arc::clone(prepared),
+            _ => {
+                let edit = Edit {
+                    package,
+                    text: self.text.clone().map(Cow::Owned),
+                    limits: self.limits,
+                    options: self.options.clone(),
+                };
+                let plan = edit.prepare()?;
+                Arc::new(PreparedTail {
+                    base: package.clone(),
+                    splice: plan.splice.into_owned(),
+                    options: plan.options,
+                })
+            },
+        };
+        if prepared.splice.is_noop() {
+            return Ok(package.clone());
+        }
+        package
+            .deferred(move |writer| prepared.write(writer).map_err(tail_to_document))
+            .map_err(Error::Document)
     }
 }
 
