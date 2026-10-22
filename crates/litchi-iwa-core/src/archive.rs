@@ -60,6 +60,8 @@ use identity_clone::{
 
 const MAX_VARINT_BYTES: usize = 10;
 const DEFAULT_MESSAGE_VERSIONS: [u32; 3] = [1, 0, 5];
+const MINIMAL_MESSAGE_INFO_MEMORY: usize =
+    size_of::<MessageInfo>() + DEFAULT_MESSAGE_VERSIONS.len() * size_of::<u32>();
 
 #[cfg(test)]
 thread_local! {
@@ -189,15 +191,42 @@ struct MessageInfoCollectionAdmission {
 }
 
 impl MessageInfoCollectionAdmission {
+    const MINIMAL_ONLY_MARKER: usize = usize::MAX;
+
     fn empty() -> Self {
         Self {
             encoded_messages_length: 0,
             header_fields: 0,
-            max_message_nesting: 0,
+            max_message_nesting: Self::MINIMAL_ONLY_MARKER,
             header_memory: 0,
             metadata_items: 0,
             message_count: 0,
         }
+    }
+
+    #[inline]
+    fn is_minimal_only(self) -> bool {
+        self.max_message_nesting == Self::MINIMAL_ONLY_MARKER
+    }
+
+    fn materialize_minimal_totals(&mut self) -> Result<()> {
+        if !self.is_minimal_only() {
+            return Ok(());
+        }
+        self.header_fields = self
+            .message_count
+            .checked_mul(4)
+            .ok_or_else(|| Error::invalid_archive(0, "ArchiveInfo field count overflow"))?;
+        self.header_memory = self
+            .message_count
+            .checked_mul(MINIMAL_MESSAGE_INFO_MEMORY)
+            .ok_or_else(|| Error::invalid_archive(0, "neutral metadata memory overflow"))?;
+        self.metadata_items = self
+            .message_count
+            .checked_mul(1 + DEFAULT_MESSAGE_VERSIONS.len())
+            .ok_or_else(|| Error::invalid_archive(0, "ArchiveInfo metadata count overflow"))?;
+        self.max_message_nesting = 0;
+        Ok(())
     }
 
     fn archive_info_with_options(
@@ -216,7 +245,31 @@ impl MessageInfoCollectionAdmission {
                 varint_field_length(3, u64::from(should_merge))?,
             )?;
         }
-        let mut header_fields = self.header_fields;
+        let (header_fields, header_memory, metadata_items, max_message_nesting) = if self
+            .is_minimal_only()
+        {
+            let per_message_fields = self
+                .message_count
+                .checked_mul(4)
+                .ok_or_else(|| Error::invalid_archive(0, "ArchiveInfo field count overflow"))?;
+            let header_memory = self
+                .message_count
+                .checked_mul(MINIMAL_MESSAGE_INFO_MEMORY)
+                .ok_or_else(|| Error::invalid_archive(0, "neutral metadata memory overflow"))?;
+            let metadata_items = self
+                .message_count
+                .checked_mul(1 + DEFAULT_MESSAGE_VERSIONS.len())
+                .ok_or_else(|| Error::invalid_archive(0, "ArchiveInfo metadata count overflow"))?;
+            (per_message_fields, header_memory, metadata_items, 0)
+        } else {
+            (
+                self.header_fields,
+                self.header_memory,
+                self.metadata_items,
+                self.max_message_nesting,
+            )
+        };
+        let mut header_fields = header_fields;
         header_fields = header_fields
             .checked_add(usize::from(identifier.is_some()))
             .and_then(|value| value.checked_add(usize::from(should_merge.is_some())))
@@ -225,24 +278,68 @@ impl MessageInfoCollectionAdmission {
             0
         } else {
             1usize
-                .checked_add(self.max_message_nesting)
+                .checked_add(max_message_nesting)
                 .ok_or_else(|| Error::invalid_archive(0, "ArchiveInfo nesting overflow"))?
         };
         let header_memory = size_of::<ArchiveInfo>()
-            .checked_add(self.header_memory)
+            .checked_add(header_memory)
             .ok_or_else(|| Error::invalid_archive(0, "neutral metadata memory overflow"))?;
         Ok(ArchiveInfoAdmission {
             header_length,
             header_fields,
             header_nesting,
             header_memory,
-            metadata_items: self.metadata_items,
+            metadata_items,
             message_count: self.message_count,
         })
     }
 
     fn archive_info(self, identifier: u64) -> Result<ArchiveInfoAdmission> {
         self.archive_info_with_options(Some(identifier), None)
+    }
+
+    fn push_minimal(&mut self, type_: u32, length: u32, limits: Limits) -> Result<()> {
+        let message_count = self
+            .message_count
+            .checked_add(1)
+            .ok_or_else(|| Error::invalid_archive(0, "ArchiveInfo message count overflow"))?;
+        if message_count > limits.max_messages_per_object() {
+            return Err(limit(
+                LimitKind::MessagesPerObject,
+                message_count,
+                limits.max_messages_per_object(),
+            ));
+        }
+
+        let encoded_length = minimal_message_info_encoded_length(type_, length)?;
+        let header_memory = MINIMAL_MESSAGE_INFO_MEMORY;
+        if !limits.is_default_profile() {
+            check_constructor_header(
+                encoded_length,
+                3,
+                0,
+                header_memory,
+                DEFAULT_MESSAGE_VERSIONS.len(),
+                limits,
+            )?;
+        }
+        self.encoded_messages_length = checked_encoded_add(
+            self.encoded_messages_length,
+            length_delimited_field_length(2, encoded_length)?,
+        )?;
+        if !self.is_minimal_only() {
+            self.header_fields = self
+                .header_fields
+                .checked_add(4)
+                .ok_or_else(|| Error::invalid_archive(0, "ArchiveInfo field count overflow"))?;
+            self.header_memory = checked_memory_add(self.header_memory, header_memory)?;
+            self.metadata_items = self
+                .metadata_items
+                .checked_add(1 + DEFAULT_MESSAGE_VERSIONS.len())
+                .ok_or_else(|| Error::invalid_archive(0, "ArchiveInfo metadata count overflow"))?;
+        }
+        self.message_count = message_count;
+        Ok(())
     }
 
     fn push(&mut self, admission: MessageInfoAdmission, limits: Limits) -> Result<()> {
@@ -257,6 +354,7 @@ impl MessageInfoCollectionAdmission {
                 limits.max_messages_per_object(),
             ));
         }
+        self.materialize_minimal_totals()?;
         self.encoded_messages_length = checked_encoded_add(
             self.encoded_messages_length,
             length_delimited_field_length(2, admission.encoded_length)?,
@@ -849,7 +947,7 @@ impl ArchiveInfo {
         message_infos: impl Into<MessageInfoCollection>,
         limits: Limits,
     ) -> Result<Self> {
-        let default_limits = limits == Limits::default();
+        let default_limits = limits.is_default_profile();
         let limits = if default_limits {
             limits
         } else {
@@ -930,11 +1028,18 @@ impl MessageInfo {
     /// narrowed to the wire `u32` representation. The fixed version vector
     /// is allocated only after the header and metadata budgets are admitted.
     pub fn new(type_: u32, length: usize, limits: Limits) -> Result<Self> {
-        let limits = limits.validate()?;
+        let default_limits = limits.is_default_profile();
+        let limits = if default_limits {
+            limits
+        } else {
+            limits.validate()?
+        };
         check_message_length(length, limits)?;
         let length = u32::try_from(length)
             .map_err(|_| Error::invalid_archive(0, "message payload exceeds u32"))?;
-        check_minimal_message_info_constructor(type_, length, limits)?;
+        if !default_limits {
+            check_minimal_message_info_constructor(type_, length, limits)?;
+        }
         let mut versions = Vec::new();
         versions
             .try_reserve_exact(DEFAULT_MESSAGE_VERSIONS.len())
@@ -1135,7 +1240,7 @@ impl MessageInfoCollection {
                 limits.max_messages_per_object(),
             ));
         }
-        let admission = if is_minimal_message_info(&message_info) {
+        if is_minimal_message_info(&message_info) {
             // `MessageInfo::new` admits this conventional shape before it
             // publishes the record. Recompute the current public length and
             // use the same fixed-shape totals only after checking the exact
@@ -1144,24 +1249,18 @@ impl MessageInfoCollection {
             let length = usize::try_from(message_info.length)
                 .map_err(|_| Error::invalid_archive(0, "message length exceeds usize"))?;
             check_message_length(length, limits)?;
-            let admission =
-                minimal_message_info_admission(message_info.type_, message_info.length)?;
-            if limits != Limits::default() {
-                check_constructor_header(
-                    admission.encoded_length,
-                    admission.header_fields,
-                    admission.header_nesting,
-                    admission.header_memory,
-                    admission.metadata_items,
+            if let Some(collection_admission) = self.admission.as_mut() {
+                collection_admission.push_minimal(
+                    message_info.type_,
+                    message_info.length,
                     limits,
                 )?;
             }
-            admission
         } else {
-            message_info_admission(&message_info, limits)?
-        };
-        if let Some(collection_admission) = self.admission.as_mut() {
-            collection_admission.push(admission, limits)?;
+            let admission = message_info_admission(&message_info, limits)?;
+            if let Some(collection_admission) = self.admission.as_mut() {
+                collection_admission.push(admission, limits)?;
+            }
         }
         self.message_infos.push(message_info);
         Ok(())
@@ -1191,25 +1290,9 @@ impl MessageInfoCollection {
         check_message_length(length, limits)?;
         let length = u32::try_from(length)
             .map_err(|_| Error::invalid_archive(0, "message payload exceeds u32"))?;
-        let admission = minimal_message_info_admission(type_, length)?;
-        // The default profile's fixed minimal shape is far below every
-        // structural ceiling. Its aggregate certificate is checked when the
-        // collection is consumed, so the hot authoring path needs only the
-        // message-byte and count checks above. Tight profiles still receive
-        // the exact per-message first-failure check before publication.
-        if limits != Limits::default() {
-            check_constructor_header(
-                admission.encoded_length,
-                admission.header_fields,
-                admission.header_nesting,
-                admission.header_memory,
-                admission.metadata_items,
-                limits,
-            )?;
-        }
         let message_info = MessageInfo::try_new(type_, length)?;
         if let Some(collection_admission) = self.admission.as_mut() {
-            collection_admission.push(admission, limits)?;
+            collection_admission.push_minimal(type_, length, limits)?;
         }
         self.message_infos.push(message_info);
         Ok(())
@@ -1491,14 +1574,7 @@ fn preflight_archive_object_constructor(
 }
 
 fn minimal_message_info_memory() -> Result<usize> {
-    size_of::<MessageInfo>()
-        .checked_add(
-            DEFAULT_MESSAGE_VERSIONS
-                .len()
-                .checked_mul(size_of::<u32>())
-                .ok_or_else(|| Error::invalid_archive(0, "message metadata memory overflow"))?,
-        )
-        .ok_or_else(|| Error::invalid_archive(0, "message metadata memory overflow"))
+    Ok(MINIMAL_MESSAGE_INFO_MEMORY)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1615,17 +1691,6 @@ fn field_info_admission(info: &FieldInfo) -> Result<FieldInfoAdmission> {
         header_fields,
         header_memory,
         metadata_items,
-    })
-}
-
-fn minimal_message_info_admission(type_: u32, length: u32) -> Result<MessageInfoAdmission> {
-    let encoded_length = minimal_message_info_encoded_length(type_, length)?;
-    Ok(MessageInfoAdmission {
-        encoded_length,
-        header_fields: 3,
-        header_nesting: 0,
-        header_memory: minimal_message_info_memory()?,
-        metadata_items: DEFAULT_MESSAGE_VERSIONS.len(),
     })
 }
 
@@ -1803,7 +1868,7 @@ fn check_archive_info_constructor(
         ));
     }
     if info.should_merge.is_none() && info.message_infos.iter().all(is_minimal_message_info) {
-        if limits == Limits::default() {
+        if limits.is_default_profile() {
             return check_minimal_archive_info_default(info, limits);
         }
         return check_minimal_archive_info_constructor(info, limits);
@@ -1999,12 +2064,7 @@ fn check_minimal_archive_info_constructor(
 }
 
 fn minimal_message_info_encoded_length(type_: u32, length: u32) -> Result<usize> {
-    let mut total = varint_field_length(1, u64::from(type_))?;
-    total = checked_encoded_add(
-        total,
-        packed_u32_field_length(2, &DEFAULT_MESSAGE_VERSIONS)?,
-    )?;
-    checked_encoded_add(total, varint_field_length(3, u64::from(length))?)
+    Ok(7 + u64_varint_length(u64::from(type_)) + u64_varint_length(u64::from(length)))
 }
 
 fn field_path_memory(path: &FieldPath) -> Result<usize> {
@@ -10266,6 +10326,43 @@ mod tests {
         collection.as_mut_slice()[0].versions.clear();
         let archive = ArchiveInfo::new(42, collection, limits)?;
         assert!(archive.message_infos[0].versions.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn message_info_collection_admission_materializes_minimal_prefix() -> Result<()> {
+        let defaults = Limits::default();
+        let mut nonminimal = MessageInfo::new(8, 2, defaults)?;
+        nonminimal.versions.clear();
+        let raw = ArchiveInfo {
+            identifier: Some(42),
+            message_infos: vec![MessageInfo::new(7, 1, defaults)?, nonminimal.clone()],
+            should_merge: None,
+        };
+        let expected = check_archive_info_constructor(&raw, defaults)?;
+        let limits = defaults.with_header_fields(expected.header_fields - 1)?;
+        let mut collection = MessageInfoCollection::with_capacity(2, limits)?;
+        collection.push_new(7, 1)?;
+        collection.push(nonminimal)?;
+        let error = ArchiveInfo::new(42, collection, limits)
+            .expect_err("the minimal prefix must remain in aggregate field admission");
+        assert!(matches!(
+            error,
+            Error::Limit {
+                kind: LimitKind::HeaderFields,
+                observed,
+                maximum,
+            } if observed == expected.header_fields && maximum == expected.header_fields - 1
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn limits_default_profile_marker_tracks_real_changes() -> Result<()> {
+        let defaults = Limits::default();
+        assert!(defaults.is_default_profile());
+        assert!(defaults.with_header_nesting(16)?.is_default_profile());
+        assert!(!defaults.with_header_fields(1)?.is_default_profile());
         Ok(())
     }
 
