@@ -1179,6 +1179,7 @@ impl Patch {
             return Err(Error::TopologyConflict);
         }
         if !same_content(
+            source.part_fingerprint,
             source.raw_bytes(),
             self.before.raw_bytes(),
             self.before.part_fingerprint,
@@ -4631,8 +4632,18 @@ fn same_part_name(left: &PackURI, right: &PackURI) -> bool {
     left.as_str().eq_ignore_ascii_case(right.as_str())
 }
 
-fn same_content(actual: &[u8], expected: &[u8], expected_fingerprint: [u8; 32]) -> bool {
-    actual.len() == expected.len() && digest(actual) == expected_fingerprint && actual == expected
+fn same_content(
+    actual_fingerprint: [u8; 32],
+    actual: &[u8],
+    expected: &[u8],
+    expected_fingerprint: [u8; 32],
+) -> bool {
+    // Snapshots are immutable and their fingerprint was computed when the
+    // source was admitted. Reusing that authenticated value avoids hashing
+    // the same payload again on every owner publication.
+    actual.len() == expected.len()
+        && actual_fingerprint == expected_fingerprint
+        && actual == expected
 }
 
 #[derive(Debug)]
@@ -5124,6 +5135,7 @@ impl GlossaryBatchPatch {
             return Err(Error::TopologyConflict);
         }
         if !same_content(
+            source.part_fingerprint,
             source.raw_bytes(),
             self.before.raw_bytes(),
             self.before.part_fingerprint,
