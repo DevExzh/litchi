@@ -1986,8 +1986,7 @@ pub(super) fn rewrite_selected_chart_payload_with_previews(
         .map_err(|_| Error::InvalidSource)?;
     budget.output(bytes.len())?;
     budget.retained(bytes.len())?;
-    let compressed =
-        SnappyStream::compress(&bytes, snappy_limits).map_err(map_core_error)?;
+    let compressed = SnappyStream::compress(&bytes, snappy_limits).map_err(map_core_error)?;
     budget.retained(compressed.len())?;
     let edits = [EntryEdit::new(
         selection.component_name.as_ref(),

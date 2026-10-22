@@ -48,8 +48,8 @@ cargo test --offline -p litchi-numbers --all-targets --all-features
 cargo clippy --offline -p litchi-numbers --all-targets --all-features -- -D warnings
 ```
 
-The capped Numbers checks and workspace formatting must pass before this record
-is accepted. The focused boundary tests are complete; the full check, test and
-Clippy commands remain to be rerun after the final typed-mapping change. No
-native or profiler result is claimed here; the W5 owner timing work remains
-separately recorded.
+The capped Numbers checks and workspace formatting passed after the final
+typed-mapping change: all 479 unit tests passed, four oracle tests remained
+ignored as documented, and every integration target and example completed
+successfully. No native or profiler result is claimed here; the W5 owner timing
+work remains separately recorded.

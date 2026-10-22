@@ -1395,7 +1395,7 @@ pub(super) fn pack_metadata(
         .snappy_limits()
         .map_err(|_| Error::InvalidSource { path })?;
     let stream = SnappyStream::decompress(entry.data(), snappy_limits)
-    .map_err(|error| super::map_core_error(error, path))?;
+        .map_err(|error| super::map_core_error(error, path))?;
     let mut archive =
         Archive::parse(stream.as_bytes(), limits).map_err(|_| Error::InvalidSource { path })?;
     archive

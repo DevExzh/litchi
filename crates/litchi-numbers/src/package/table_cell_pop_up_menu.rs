@@ -2298,7 +2298,7 @@ fn pack_metadata_payload(
         .snappy_limits()
         .map_err(|_| Error::InvalidSource { path })?;
     let stream = SnappyStream::decompress(entry.data(), snappy_limits)
-    .map_err(|error| map_core_error(error, path))?;
+        .map_err(|error| map_core_error(error, path))?;
     let source_payload_bytes = stream.as_bytes().len();
     let mut archive = Archive::parse(stream.as_bytes(), archive_limits)
         .map_err(|_| Error::InvalidSource { path })?;

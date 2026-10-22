@@ -3232,7 +3232,7 @@ fn prepare_metadata_token_entry(
         .snappy_limits()
         .map_err(|_| Error::InvalidSource { path })?;
     let stream = SnappyStream::decompress(entry.data(), snappy_limits)
-    .map_err(|error| map_core_error(error, path))?;
+        .map_err(|error| map_core_error(error, path))?;
     let mut archive = Archive::parse(stream.as_bytes(), archive_limits)
         .map_err(|_| Error::InvalidSource { path })?;
     archive
@@ -3297,7 +3297,7 @@ fn rewrite_archives(
             .snappy_limits()
             .map_err(|_| Error::InvalidSource { path })?;
         let stream = SnappyStream::decompress(entry.data(), snappy_limits)
-        .map_err(|error| map_core_error(error, path))?;
+            .map_err(|error| map_core_error(error, path))?;
         let mut archive = Archive::parse(stream.as_bytes(), archive_limits)
             .map_err(|_| Error::InvalidSource { path })?;
         archive
@@ -3476,11 +3476,9 @@ pub(super) fn map_core_error(error: litchi_iwa_core::Error, path: Path) -> Error
             maximum,
             path,
         },
-        litchi_iwa_core::Error::Allocation { requested, .. } => {
-            Error::Allocation {
-                amount: requested,
-                path,
-            }
+        litchi_iwa_core::Error::Allocation { requested, .. } => Error::Allocation {
+            amount: requested,
+            path,
         },
         _ => Error::InvalidSource { path },
     }
