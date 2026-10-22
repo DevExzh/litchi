@@ -12,6 +12,8 @@ use std::sync::Arc;
 
 use crate::Package;
 
+type FamilyResult<T> = std::result::Result<T, Error>;
+
 /// Whether a commit changed the package bytes.
 pub use litchi_core::edit::Diagnostics;
 /// The family error: typed limits, refusals and patch conflicts plus the
@@ -55,7 +57,7 @@ impl<'source> Edit<'source> {
     ///
     /// Returns an error when the value is too large or cannot be represented
     /// as XML 1.0 text.
-    pub fn set(&mut self, value: impl Into<String>) -> Result<()> {
+    pub fn set(&mut self, value: impl Into<String>) -> FamilyResult<()> {
         let title = value.into();
         validate_title(&title)?;
         self.after = Some(title);
@@ -89,11 +91,12 @@ impl<'source> Edit<'source> {
         let source_meta_xml = self
             .source_meta_xml
             .ok_or_else(|| invalid("ODM title editing requires an existing UTF-8 meta.xml part"))?;
-        let source_metadata = OdfMetadata::from_xml(&source_meta_xml)?;
+        let source_metadata =
+            OdfMetadata::from_xml(&source_meta_xml, self.source.xml_limits_value())?;
         let mut current = Metadata::from(source_metadata.clone());
         current.title.clone_from(&self.after);
         let patch = MetaXmlPatch::preserve_all().diff_simple_fields(&source_metadata, &current);
-        let meta_xml = patch_meta_xml(&source_meta_xml, &patch)?
+        let meta_xml = patch_meta_xml(&source_meta_xml, &patch, self.source.xml_limits_value())?
             .ok_or_else(|| invalid("ODM title editing requires an office:meta container"))?;
         if meta_xml.len() > source_meta_xml.len().saturating_add(MAX_TITLE_BYTES * 5) {
             return Err(invalid("ODM patched meta.xml exceeds the title edit limit"));

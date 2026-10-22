@@ -152,7 +152,7 @@ impl Odt {
     ) -> Result<Self> {
         let document = package
             .document()
-            .map_err(|error| core_error(error).with_format(format))?;
+            .map_err(|error| odf_error(error).with_format(format))?;
         Ok(Self(Arc::new(OdtState {
             owner: OdtOwner::Eager(document),
             format,
@@ -182,7 +182,7 @@ impl Odt {
         origin: Option<Arc<Path>>,
     ) -> Result<Self> {
         let package = flat.to_package().map_err(odf_error)?;
-        let document = package.document().map_err(core_error)?;
+        let document = package.document().map_err(odf_error)?;
         Ok(Self(Arc::new(OdtState {
             owner: OdtOwner::Eager(document),
             format: FileFormat::Odt,
@@ -204,7 +204,7 @@ impl Odt {
                 let republished = flat.republish(&package).map_err(odf_error)?;
                 // The edited package holds exactly the parts the republished
                 // flat document splits into, so it stays the projection.
-                let document = package.document().map_err(core_error)?;
+                let document = package.document().map_err(odf_error)?;
                 Ok(Self(Arc::new(OdtState {
                     owner: OdtOwner::Eager(document),
                     format: FileFormat::Odt,

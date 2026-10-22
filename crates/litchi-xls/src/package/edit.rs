@@ -1119,9 +1119,12 @@ fn package_from_snapshot(source: &Package, snapshot: cell_values::Snapshot) -> R
             })
             .map_err(PackageError::Cfb)?;
         let cfb = Arc::new(
-            snapshot
-                .open_shared_ole_file(cfb_limits)
-                .map_err(PackageError::Cfb)?,
+            SharedOleFile::open_owned_vec_with_limits(
+                snapshot.bytes_shared(),
+                snapshot.source_version(),
+                cfb_limits,
+            )
+            .map_err(PackageError::Cfb)?,
         );
         let workbook = crate::SourceBackedWorkbook::from_shared_ole_file_with_options(
             cfb,

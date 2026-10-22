@@ -33,7 +33,7 @@ impl Package {
                     return Ok(None);
                 };
                 if self.has_file(path)? {
-                    self.get_file(path).map(Cow::Owned).map(Some)
+                    Ok(Some(Cow::Owned(self.get_file(path)?)))
                 } else {
                     Ok(None)
                 }

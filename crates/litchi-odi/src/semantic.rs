@@ -4,10 +4,8 @@ use crate::{
     Commit, Edit, FrameChange, Image, MetadataFields, Package, ResourceChange, frame::Frame,
     map::ImageMap, source::Source,
 };
-use litchi_core::{
-    Error, Result,
-    edit::{Refusal, RefusalKind},
-};
+use litchi_core::{Error as CoreError, Result};
+use litchi_odf_common::Error as PackageError;
 use quick_xml::{
     XmlVersion,
     events::Event,
@@ -23,6 +21,8 @@ const MIB: usize = 1024 * 1024;
 const OFFICE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const STYLE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:style:1.0";
 const MAX_STYLE_CLOSURE: usize = 1_024;
+
+type PackageResult<T> = std::result::Result<T, PackageError>;
 
 /// Whether a security-sensitive semantic capability is available.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -489,7 +489,7 @@ impl SemanticPlan {
         &self,
         source: &crate::flat::Image,
         policy: &SecurityPolicy,
-    ) -> Result<crate::flat::Commit> {
+    ) -> PackageResult<crate::flat::Commit> {
         self.ensure_publishable(policy)?;
         ensure_current_values(&self.operations, |key| flat_value(source, key))?;
         let mut edit = source.edit();
@@ -502,13 +502,19 @@ impl SemanticPlan {
             source.bounds(),
         )?;
         if reopened.as_bytes() != commit.package().as_bytes() {
-            return Err(invalid("ODI flat plan failed full byte reopen"));
+            return Err(PackageError::from(invalid(
+                "ODI flat plan failed full byte reopen",
+            )));
         }
         Ok(commit)
     }
 
     /// Applies this plan to a package and fully reopens the result.
-    pub fn commit_package(&self, source: &Package, policy: &SecurityPolicy) -> Result<Commit> {
+    pub fn commit_package(
+        &self,
+        source: &Package,
+        policy: &SecurityPolicy,
+    ) -> PackageResult<Commit> {
         self.ensure_publishable(policy)?;
         ensure_current_values(&self.operations, |key| {
             package_value(source.image_ref(), key)
@@ -520,7 +526,9 @@ impl SemanticPlan {
         let commit = edit.commit()?;
         let reopened = Package::from_vec(commit.package().as_bytes().to_vec())?;
         if reopened.as_bytes() != commit.package().as_bytes() {
-            return Err(invalid("ODI package plan failed full byte reopen"));
+            return Err(PackageError::from(invalid(
+                "ODI package plan failed full byte reopen",
+            )));
         }
         Ok(commit)
     }
@@ -579,7 +587,7 @@ impl SemanticPatch {
     ///
     /// Returns an error when an operation or the retained byte count
     /// violates `policy`.
-    pub fn from_package_commit(commit: &Commit, policy: &SecurityPolicy) -> Result<Self> {
+    pub fn from_package_commit(commit: &Commit, policy: &SecurityPolicy) -> PackageResult<Self> {
         let mut operations = frame_operations(commit.patch().changes());
         if let Some(change) = commit.patch().metadata_change() {
             operations.extend(metadata_operations(change.before(), change.after()));
@@ -592,11 +600,14 @@ impl SemanticPatch {
             });
         }
         for change in commit.patch().resource_changes() {
-            operations.push(resource_operation(
-                commit.source().image_ref(),
-                commit.package().image_ref(),
-                change,
-            )?);
+            operations.push(
+                resource_operation(
+                    commit.source().image_ref(),
+                    commit.package().image_ref(),
+                    change,
+                )
+                .map_err(PackageError::from)?,
+            );
         }
         Self::new(
             ArtifactKind::Package,
@@ -605,6 +616,7 @@ impl SemanticPatch {
             operations,
             policy,
         )
+        .map_err(PackageError::from)
     }
 
     fn new(
@@ -667,25 +679,32 @@ impl SemanticPatch {
     }
 
     /// Applies only to the exact flat source and reparses the target bytes.
-    pub fn apply_flat(&self, source: &crate::flat::Image) -> Result<crate::flat::Image> {
+    pub fn apply_flat(&self, source: &crate::flat::Image) -> PackageResult<crate::flat::Image> {
         if self.kind != ArtifactKind::Flat {
             return Err(wrong_artifact_kind("odi.semantic.apply_flat"));
         }
         if self.source.as_slice() != source.as_bytes() {
-            return Err(Error::PatchConflict);
+            return Err(PackageError::patch_conflict(
+                "odi.semantic.apply_flat",
+                "the patch source does not match the image",
+            ));
         }
         crate::flat::Image::from_flat_bytes(self.target.as_ref().clone(), source.bounds())
+            .map_err(PackageError::from)
     }
 
     /// Applies only to the exact package source and reparses the target bytes.
-    pub fn apply_package(&self, source: &Package) -> Result<Package> {
+    pub fn apply_package(&self, source: &Package) -> PackageResult<Package> {
         if self.kind != ArtifactKind::Package {
             return Err(wrong_artifact_kind("odi.semantic.apply_package"));
         }
         if self.source.as_slice() != source.as_bytes() {
-            return Err(Error::PatchConflict);
+            return Err(PackageError::patch_conflict(
+                "odi.semantic.apply_package",
+                "the patch source does not match the package",
+            ));
         }
-        Package::from_vec(self.target.as_ref().clone())
+        Package::from_vec(self.target.as_ref().clone()).map_err(PackageError::from)
     }
 
     /// Joins two patches derived from the same exact source without mutation.
@@ -1935,11 +1954,17 @@ fn apply_flat_operation(edit: &mut crate::flat::Edit, operation: &SemanticOperat
                 return Err(invalid("ODI metadata operation has the wrong value type"));
             };
             match property {
-                MetadataProperty::Title => edit.set_title(value.clone()),
-                MetadataProperty::Author => edit.set_author(value.clone()),
-                MetadataProperty::Subject => edit.set_subject(value.clone()),
-                MetadataProperty::Description => edit.set_description(value.clone()),
-                MetadataProperty::Keywords => edit.set_keywords(keyword_list(value.as_ref())),
+                MetadataProperty::Title => edit.set_title(value.clone()).map_err(CoreError::from),
+                MetadataProperty::Author => edit.set_author(value.clone()).map_err(CoreError::from),
+                MetadataProperty::Subject => {
+                    edit.set_subject(value.clone()).map_err(CoreError::from)
+                },
+                MetadataProperty::Description => {
+                    edit.set_description(value.clone()).map_err(CoreError::from)
+                },
+                MetadataProperty::Keywords => edit
+                    .set_keywords(keyword_list(value.as_ref()))
+                    .map_err(CoreError::from),
             }
         },
         OperationKey::Styles => Err(invalid("ODI flat plan contains a package style operation")),
@@ -1959,18 +1984,24 @@ fn apply_package_operation(edit: &mut Edit<'_>, operation: &SemanticOperation) -
                 return Err(invalid("ODI metadata operation has the wrong value type"));
             };
             match property {
-                MetadataProperty::Title => edit.set_title(value.clone()),
-                MetadataProperty::Author => edit.set_author(value.clone()),
-                MetadataProperty::Subject => edit.set_subject(value.clone()),
-                MetadataProperty::Description => edit.set_description(value.clone()),
-                MetadataProperty::Keywords => edit.set_keywords(keyword_list(value.as_ref())),
+                MetadataProperty::Title => edit.set_title(value.clone()).map_err(CoreError::from),
+                MetadataProperty::Author => edit.set_author(value.clone()).map_err(CoreError::from),
+                MetadataProperty::Subject => {
+                    edit.set_subject(value.clone()).map_err(CoreError::from)
+                },
+                MetadataProperty::Description => {
+                    edit.set_description(value.clone()).map_err(CoreError::from)
+                },
+                MetadataProperty::Keywords => edit
+                    .set_keywords(keyword_list(value.as_ref()))
+                    .map_err(CoreError::from),
             }
         },
         OperationKey::Styles => {
             let SemanticValue::Xml(value) = operation.after() else {
                 return Err(invalid("ODI style operation has the wrong value type"));
             };
-            edit.set_styles_xml(value.clone())
+            edit.set_styles_xml(value.clone()).map_err(CoreError::from)
         },
         OperationKey::Resource(path) => {
             let SemanticValue::Resource(value) = operation.after() else {
@@ -1982,8 +2013,9 @@ fn apply_package_operation(edit: &mut Edit<'_>, operation: &SemanticOperation) -
                     resource.media_type.clone(),
                     resource.bytes.clone(),
                 )
+                .map_err(CoreError::from)
             } else {
-                edit.remove_member(path.clone())
+                edit.remove_member(path.clone()).map_err(CoreError::from)
             }
         },
     }
@@ -2239,22 +2271,22 @@ fn artifact_conflict(kind: ConflictKind) -> Conflict {
     }
 }
 
-fn invalid(message: impl Into<String>) -> Error {
-    Error::InvalidFormat(message.into())
+fn invalid(message: impl Into<String>) -> CoreError {
+    CoreError::InvalidFormat(message.into())
 }
 
-fn wrong_artifact_kind(operation: &'static str) -> Error {
-    Error::Refused(Refusal::new(
-        RefusalKind::UnsupportedContent,
+fn wrong_artifact_kind(operation: &'static str) -> PackageError {
+    PackageError::refused(
+        litchi_core::edit::RefusalKind::UnsupportedContent,
         operation,
         "the semantic patch targets another ODI artifact kind",
-    ))
+    )
 }
 
 fn copy_patch_bytes(bytes: &[u8], resource: &'static str) -> Result<Vec<u8>> {
     let mut copy = Vec::new();
     copy.try_reserve_exact(bytes.len())
-        .map_err(|source| Error::Allocation { resource, source })?;
+        .map_err(|source| CoreError::Allocation { resource, source })?;
     copy.extend_from_slice(bytes);
     Ok(copy)
 }

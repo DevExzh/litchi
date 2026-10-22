@@ -16,12 +16,14 @@ use std::sync::Arc;
 
 use crate::core::{ResolvedReader, XmlStreamLimits};
 use litchi_core::{Error as CoreError, Metadata, Resource, ResourceLimit, Result};
-use litchi_odf_common::SemanticLimitKind;
+use litchi_odf_common::{Error as OdfError, SemanticLimitKind};
 use quick_xml::events::Event;
 
 use crate::elements::parser::{OrderElement, Parser};
 use crate::elements::table::Table;
 use crate::generic::{Family, FlatDocument};
+
+type FamilyResult<T> = std::result::Result<T, OdfError>;
 
 pub(crate) mod atomic;
 
@@ -329,28 +331,28 @@ impl Document {
     }
 
     /// Returns common flat-document metadata.
-    pub fn metadata(&self) -> Result<Metadata> {
-        self.inner.metadata()
+    pub fn metadata(&self) -> FamilyResult<Metadata> {
+        Ok(self.inner.metadata()?)
     }
 
     /// Returns the unnamed fallback page layout, when one is declared.
-    pub fn default_page_layout(&self) -> Result<Option<crate::page_layout::PageLayout>> {
-        self.inner.default_page_layout()
+    pub fn default_page_layout(&self) -> FamilyResult<Option<crate::page_layout::PageLayout>> {
+        Ok(self.inner.default_page_layout()?)
     }
 
     /// Discovers inert inline and linked embedded objects without fetching them.
-    pub fn embedded_objects(&self) -> Result<Vec<crate::Object>> {
-        self.inner.embedded_objects()
+    pub fn embedded_objects(&self) -> FamilyResult<Vec<crate::Object>> {
+        Ok(self.inner.embedded_objects()?)
     }
 
     /// Inspects ordered variable declarations without evaluating fields.
-    pub fn variable_declarations(&self) -> Result<crate::variable_declaration::Declarations> {
-        self.inner.variable_declarations()
+    pub fn variable_declarations(&self) -> FamilyResult<crate::variable_declaration::Declarations> {
+        Ok(self.inner.variable_declarations()?)
     }
 
     /// Inspects inert document script and macro metadata without executing it.
-    pub fn document_scripts(&self) -> Result<Option<crate::document_scripts::Scripts>> {
-        crate::package::scripts::document_scripts(self.xml())
+    pub fn document_scripts(&self) -> FamilyResult<Option<crate::document_scripts::Scripts>> {
+        Ok(crate::package::scripts::document_scripts(self.xml())?)
     }
 
     /// The options this document was opened with, retained for its edits,
@@ -380,17 +382,17 @@ impl Document {
     }
 
     /// Parses modeled top-level text elements in document order.
-    pub fn elements(&self) -> Result<Vec<OrderElement>> {
-        Parser::parse_elements_in_order(self.xml())
+    pub fn elements(&self) -> FamilyResult<Vec<OrderElement>> {
+        Ok(Parser::parse_elements_in_order(self.xml())?)
     }
 
     /// Parses modeled tables in document order.
-    pub fn tables(&self) -> Result<Vec<Table>> {
-        Parser::parse_tables_in_order(self.xml())
+    pub fn tables(&self) -> FamilyResult<Vec<Table>> {
+        Ok(Parser::parse_tables_in_order(self.xml())?)
     }
 
     /// Extracts modeled paragraph and heading text.
-    pub fn text(&self) -> Result<String> {
+    pub fn text(&self) -> FamilyResult<String> {
         let mut result = String::new();
         for element in self.elements()? {
             let text = match element {
@@ -423,12 +425,12 @@ impl Document {
     ///
     /// Unix and Windows use a same-directory temporary and atomic replacement;
     /// other targets return [`CoreError::Unsupported`].
-    pub fn save(&self, path: impl AsRef<Path>) -> Result<()> {
-        self.inner.save_with_attached_context_and_scopes(
+    pub fn save(&self, path: impl AsRef<Path>) -> FamilyResult<()> {
+        Ok(self.inner.save_with_attached_context_and_scopes(
             path,
             "flat ODT output",
             "flat ODT symbolic-link or non-file destination",
-        )
+        )?)
     }
 
     /// Atomically replaces a filesystem destination using a caller-supplied
@@ -437,13 +439,13 @@ impl Document {
         &self,
         path: impl AsRef<Path>,
         context: litchi_core::ExecutionContext,
-    ) -> Result<()> {
-        self.inner.save_with_execution_context_and_scopes(
+    ) -> FamilyResult<()> {
+        Ok(self.inner.save_with_execution_context_and_scopes(
             path,
             context,
             "flat ODT output",
             "flat ODT symbolic-link or non-file destination",
-        )
+        )?)
     }
 }
 
@@ -467,14 +469,19 @@ impl Edit {
     }
 
     /// Stages replacement of a zero-based top-level paragraph's text payload.
-    pub fn update_paragraph(&mut self, index: usize, text: &str) -> Result<Option<&mut Self>> {
+    pub fn update_paragraph(
+        &mut self,
+        index: usize,
+        text: &str,
+    ) -> FamilyResult<Option<&mut Self>> {
         if self.operations.len() >= self.source.limits.max_edits {
             return Err(resource_limit_error(
                 Resource::Objects,
                 self.operations.len().saturating_add(1),
                 self.source.limits.max_edits,
                 "flat ODT paragraph edits",
-            ));
+            )
+            .into());
         }
         if text.len() > self.source.limits.max_paragraph_text_bytes {
             return Err(resource_limit_error(
@@ -482,7 +489,8 @@ impl Edit {
                 text.len(),
                 self.source.limits.max_paragraph_text_bytes,
                 "flat ODT paragraph text",
-            ));
+            )
+            .into());
         }
         validate_xml_text(&text)?;
         if self
@@ -490,7 +498,7 @@ impl Edit {
             .iter()
             .any(|operation| operation.index == index)
         {
-            return invalid("flat ODT edit contains a duplicate paragraph selector");
+            return invalid_family("flat ODT edit contains a duplicate paragraph selector");
         }
         if self.paragraph_sites.is_none() {
             self.paragraph_sites = Some(index_direct_paragraphs(
@@ -507,7 +515,9 @@ impl Edit {
             return Ok(None);
         };
         let ParagraphSite::Plain(range) = site else {
-            return invalid("flat ODT paragraph contains structured or opaque inline markup");
+            return invalid_family(
+                "flat ODT paragraph contains structured or opaque inline markup",
+            );
         };
         let mut owned_text = String::new();
         owned_text
@@ -934,4 +944,10 @@ fn checked_depth(depth: usize, limits: Limits) -> Result<usize> {
 
 fn invalid<T>(message: &str) -> Result<T> {
     Err(CoreError::InvalidFormat(message.to_string()))
+}
+
+fn invalid_family<T>(message: &str) -> FamilyResult<T> {
+    Err(OdfError::from(CoreError::InvalidFormat(
+        message.to_string(),
+    )))
 }

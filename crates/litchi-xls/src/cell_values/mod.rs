@@ -38,7 +38,7 @@ use litchi_cfb::{
     ArtifactFingerprint, ComposedOverlaySource, OverlayError, OverlayOperationShape, PublishReport,
     SameLengthStreamSplice, StreamSpliceLimits, ValidatedOverlayPlan,
 };
-use litchi_cfb::{OleFileLimits, SharedOleFile, SharedOleFileLimits, consts::STGTY_STORAGE};
+use litchi_cfb::{OleFileLimits, SharedOleFileLimits, consts::STGTY_STORAGE};
 use litchi_core::binary;
 use litchi_core::edit::RefusalKind;
 pub use litchi_core::patch::HistoryLimits;
@@ -671,88 +671,11 @@ impl NumericTargetVerification<'_> {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum ArtifactMode {
-    /// Generic/eager snapshots use one packed allocation for their artifact.
-    Packed,
-    /// Source-backed snapshots retain the vector accepted by `OwnedSource`.
-    Shared,
-}
-
-#[derive(Clone, PartialEq, Eq)]
-enum ArtifactBytes {
-    Packed(Arc<[u8]>),
-    Shared(Arc<Vec<u8>>),
-}
-
-impl ArtifactBytes {
-    fn from_source(source: Arc<Vec<u8>>, mode: ArtifactMode) -> Self {
-        match mode {
-            ArtifactMode::Packed => Self::Packed(Arc::from(source.as_slice())),
-            ArtifactMode::Shared => Self::Shared(source),
-        }
-    }
-
-    fn as_slice(&self) -> &[u8] {
-        match self {
-            Self::Packed(bytes) => bytes,
-            Self::Shared(bytes) => bytes,
-        }
-    }
-
-    fn len(&self) -> usize {
-        self.as_slice().len()
-    }
-
-    fn mode(&self) -> ArtifactMode {
-        match self {
-            Self::Packed(_) => ArtifactMode::Packed,
-            Self::Shared(_) => ArtifactMode::Shared,
-        }
-    }
-
-    #[cfg(test)]
-    fn ptr_eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Self::Packed(left), Self::Packed(right)) => Arc::ptr_eq(left, right),
-            (Self::Shared(left), Self::Shared(right)) => Arc::ptr_eq(left, right),
-            _ => false,
-        }
-    }
-
-    fn shared_vec(&self) -> Result<Arc<Vec<u8>>> {
-        match self {
-            Self::Shared(bytes) => Ok(Arc::clone(bytes)),
-            // The record-level source-backed publisher is also exercised on
-            // eager snapshots. Keep that existing capability by materializing
-            // the vector only at this explicit handoff; true source-backed
-            // owners use the Shared arm and remain zero-copy.
-            Self::Packed(bytes) => Ok(Arc::new(bytes.to_vec())),
-        }
-    }
-
-    fn open_shared_ole_file(
-        &self,
-        source_version: SourceVersion,
-        limits: SharedOleFileLimits,
-    ) -> std::result::Result<SharedOleFile, litchi_cfb::OleError> {
-        match self {
-            Self::Packed(bytes) => {
-                SharedOleFile::open_owned_with_limits(Arc::clone(bytes), source_version, limits)
-            },
-            Self::Shared(bytes) => {
-                SharedOleFile::open_owned_vec_with_limits(Arc::clone(bytes), source_version, limits)
-            },
-        }
-    }
-}
-
 struct Inner {
-    // Generic/eager snapshots pack the immutable artifact into one allocation;
-    // source-backed snapshots retain the shared vector accepted by
-    // `OwnedSource::from_arc`. The mode is part of the private owner state so
-    // every derived snapshot and patch preserves the handoff policy.
-    bytes: ArtifactBytes,
+    // Keep the complete artifact in the same shared-vector shape accepted by
+    // `OwnedSource::from_arc`. Source-backed publication can therefore move
+    // this handle into its reopened CFB owner without copying the artifact.
+    bytes: Arc<Vec<u8>>,
     source_version: SourceVersion,
     limits: Limits,
     cfb_limits: OleFileLimits,
@@ -812,15 +735,6 @@ impl Snapshot {
         limits: Limits,
         cfb_limits: OleFileLimits,
     ) -> Result<Self> {
-        Self::from_bytes_with_cfb_mode(bytes, limits, cfb_limits, ArtifactMode::Packed)
-    }
-
-    fn from_bytes_with_cfb_mode(
-        bytes: Vec<u8>,
-        limits: Limits,
-        cfb_limits: OleFileLimits,
-        artifact_mode: ArtifactMode,
-    ) -> Result<Self> {
         let package = ObjectPackage::open_with_options(
             bytes,
             OpenOptions::new()
@@ -828,7 +742,7 @@ impl Snapshot {
                 .limits(limits)
                 .cfb_limits(cfb_limits),
         )?;
-        Self::open_package_with_mode(package, None, artifact_mode)
+        Self::open_package(package, None)
     }
 
     /// Opens the editable snapshot over a positional CFB owner that is
@@ -848,7 +762,7 @@ impl Snapshot {
     /// `cfb_limits`, [`Error::Allocation`] when the copy cannot be reserved,
     /// and otherwise the errors of [`Self::from_bytes_with_cfb`].
     pub(crate) fn from_shared_ole_file(
-        cfb: &SharedOleFile,
+        cfb: &litchi_cfb::SharedOleFile,
         limits: Limits,
         cfb_limits: OleFileLimits,
     ) -> Result<Self> {
@@ -889,7 +803,7 @@ impl Snapshot {
                 observed,
             }));
         }
-        Self::from_bytes_with_cfb_mode(bytes, limits, cfb_limits, ArtifactMode::Shared)
+        Self::from_bytes_with_cfb(bytes, limits, cfb_limits)
     }
 
     /// Opens a captured package, optionally verifying a source-backed numeric
@@ -905,14 +819,6 @@ impl Snapshot {
     fn open_package(
         package: ObjectPackage,
         verification: Option<NumericTargetVerification<'_>>,
-    ) -> Result<Self> {
-        Self::open_package_with_mode(package, verification, ArtifactMode::Packed)
-    }
-
-    fn open_package_with_mode(
-        package: ObjectPackage,
-        verification: Option<NumericTargetVerification<'_>>,
-        artifact_mode: ArtifactMode,
     ) -> Result<Self> {
         let limits = package.limits_value();
         let cfb_limits = package.cfb_limits_value();
@@ -967,7 +873,7 @@ impl Snapshot {
         drop(pending);
         Ok(Self {
             inner: Arc::new(Inner {
-                bytes: ArtifactBytes::from_source(source, artifact_mode),
+                bytes: source,
                 source_version,
                 limits,
                 cfb_limits,
@@ -1010,7 +916,7 @@ impl Snapshot {
 
         Ok(Self {
             inner: Arc::new(Inner {
-                bytes: ArtifactBytes::from_source(source, source_snapshot.artifact_mode()),
+                bytes: source,
                 source_version: fresh_snapshot_source_version(),
                 limits: package.limits_value(),
                 cfb_limits: package.cfb_limits_value(),
@@ -1046,7 +952,7 @@ impl Snapshot {
         let inner = &self.inner;
         Self {
             inner: Arc::new(Inner {
-                bytes: inner.bytes.clone(),
+                bytes: Arc::clone(&inner.bytes),
                 source_version,
                 limits: inner.limits,
                 cfb_limits: inner.cfb_limits,
@@ -1065,7 +971,16 @@ impl Snapshot {
     /// Returns exact source CFB bytes.
     #[must_use]
     pub fn bytes(&self) -> &[u8] {
-        self.inner.bytes.as_slice()
+        &self.inner.bytes
+    }
+
+    /// Returns shared ownership of the exact immutable artifact bytes.
+    ///
+    /// This is crate-private so source-backed publication can hand the same
+    /// allocation to `OwnedSource::from_arc`; public callers continue to use
+    /// the borrowed [`Self::bytes`] projection.
+    pub(crate) fn bytes_shared(&self) -> Arc<Vec<u8>> {
+        Arc::clone(&self.inner.bytes)
     }
 
     /// Effective complete-package capture profile retained by this snapshot.
@@ -1090,12 +1005,7 @@ impl Snapshot {
         if limits == retained && cfb_limits == retained_cfb {
             return Ok(self.clone());
         }
-        Self::from_slice_with_limits_and_cfb_mode(
-            self.bytes(),
-            limits,
-            cfb_limits,
-            self.artifact_mode(),
-        )
+        Self::from_slice_with_limits_and_cfb(self.bytes(), limits, cfb_limits)
     }
 
     /// Copy an immutable image only after the selected physical input bound.
@@ -1103,15 +1013,6 @@ impl Snapshot {
         bytes: &[u8],
         limits: Limits,
         cfb_limits: OleFileLimits,
-    ) -> Result<Self> {
-        Self::from_slice_with_limits_and_cfb_mode(bytes, limits, cfb_limits, ArtifactMode::Packed)
-    }
-
-    fn from_slice_with_limits_and_cfb_mode(
-        bytes: &[u8],
-        limits: Limits,
-        cfb_limits: OleFileLimits,
-        artifact_mode: ArtifactMode,
     ) -> Result<Self> {
         let observed = u64::try_from(bytes.len()).unwrap_or(u64::MAX);
         if observed > cfb_limits.max_input_bytes() {
@@ -1126,27 +1027,7 @@ impl Snapshot {
             .try_reserve_exact(bytes.len())
             .map_err(|_| Error::Allocation("XLS primary edit source"))?;
         owned.extend_from_slice(bytes);
-        Self::from_bytes_with_cfb_mode(owned, limits, cfb_limits, artifact_mode)
-    }
-
-    fn artifact_mode(&self) -> ArtifactMode {
-        self.inner.bytes.mode()
-    }
-
-    /// Opens this snapshot's exact artifact without copying it into another
-    /// CFB owner. Generic snapshots use the packed-byte owner while
-    /// source-backed snapshots retain the shared vector owner.
-    pub(crate) fn open_shared_ole_file(
-        &self,
-        limits: SharedOleFileLimits,
-    ) -> std::result::Result<SharedOleFile, litchi_cfb::OleError> {
-        self.inner
-            .bytes
-            .open_shared_ole_file(self.inner.source_version, limits)
-    }
-
-    fn shared_source_vec(&self) -> Result<Arc<Vec<u8>>> {
-        self.inner.bytes.shared_vec()
+        Self::from_bytes_with_cfb(owned, limits, cfb_limits)
     }
 
     /// Intersect selected profiles without reparsing the immutable image.
@@ -4666,8 +4547,8 @@ impl Edit {
             && layout.is_empty()
         {
             let patch = Patch::new(
-                self.source.inner.bytes.clone(),
-                self.source.inner.bytes.clone(),
+                Arc::clone(&self.source.inner.bytes),
+                Arc::clone(&self.source.inner.bytes),
                 semantic,
             );
             return Ok(Commit {
@@ -4757,7 +4638,7 @@ impl Edit {
         // contract even when the object profile alone would accept the
         // replacement stream.
         let package = ObjectPackage::open_with_options(
-            self.source.bytes().to_vec(),
+            self.source.inner.bytes.to_vec(),
             OpenOptions::new()
                 .targets(Targets::default())
                 .limits(self.source.inner.limits)
@@ -4774,7 +4655,7 @@ impl Edit {
         {
             Snapshot::from_fixed_numeric_package_editor(package, &self.source, &self.changes)?
         } else {
-            Snapshot::open_package_with_mode(package, None, self.source.artifact_mode())?
+            Snapshot::open_package(package, None)?
         };
         verify_readback(&snapshot, &self.changes)?;
         verify_structural_readback(
@@ -4786,8 +4667,8 @@ impl Edit {
         verify_resource_readback(&snapshot, &self.resource_changes)?;
         verify_layout_readback(&snapshot, &layout)?;
         let patch = Patch::new(
-            self.source.inner.bytes.clone(),
-            snapshot.inner.bytes.clone(),
+            Arc::clone(&self.source.inner.bytes),
+            Arc::clone(&snapshot.inner.bytes),
             semantic,
         );
         let changed = !patch.is_noop();
@@ -4851,7 +4732,7 @@ fn commit_tab_change(source: Snapshot, change: tabs::TabChange) -> Result<Commit
     } = change;
     let workbook: Arc<[u8]> = Arc::from(workbook);
     let package = ObjectPackage::open_with_options(
-        source.bytes().to_vec(),
+        source.inner.bytes.to_vec(),
         OpenOptions::new()
             .targets(Targets::default())
             .limits(source.inner.limits)
@@ -4859,11 +4740,7 @@ fn commit_tab_change(source: Snapshot, change: tabs::TabChange) -> Result<Commit
     )?;
     let mut editor = package.edit()?;
     editor.put_stream_shared(&source.inner.workbook_path, workbook)?;
-    let snapshot = Snapshot::open_package_with_mode(
-        editor.commit()?.into_package(),
-        None,
-        source.artifact_mode(),
-    )?;
+    let snapshot = Snapshot::open_package(editor.commit()?.into_package(), None)?;
     let observed = tabs::catalog(&snapshot.inner.workbook_stream)?;
     if observed.len() != target_names.len()
         || observed
@@ -4876,8 +4753,8 @@ fn commit_tab_change(source: Snapshot, change: tabs::TabChange) -> Result<Commit
         ));
     }
     let patch = Patch::new(
-        source.inner.bytes.clone(),
-        snapshot.inner.bytes.clone(),
+        Arc::clone(&source.inner.bytes),
+        Arc::clone(&snapshot.inner.bytes),
         semantic,
     );
     let changed = !patch.is_noop();
@@ -7892,13 +7769,13 @@ impl fmt::Debug for SemanticPatch {
 /// Reversible, exact-source-checked replacement of one XLS artifact.
 #[derive(Clone)]
 pub(crate) struct Patch {
-    before: ArtifactBytes,
-    after: ArtifactBytes,
+    before: Arc<Vec<u8>>,
+    after: Arc<Vec<u8>>,
     semantic: SemanticPatch,
 }
 
 impl Patch {
-    fn new(before: ArtifactBytes, after: ArtifactBytes, semantic: SemanticPatch) -> Self {
+    fn new(before: Arc<Vec<u8>>, after: Arc<Vec<u8>>, semantic: SemanticPatch) -> Self {
         Self {
             before,
             after,
@@ -7915,13 +7792,13 @@ impl Patch {
     /// Returns the exact required source artifact.
     #[must_use]
     pub(crate) fn before(&self) -> &[u8] {
-        self.before.as_slice()
+        &self.before
     }
 
     /// Returns the exact produced artifact.
     #[must_use]
     pub(crate) fn after(&self) -> &[u8] {
-        self.after.as_slice()
+        &self.after
     }
 
     /// Durable semantic operation patch for this exact artifact transition.
@@ -7959,11 +7836,10 @@ impl Patch {
         if self.is_noop() {
             return Ok(source.clone());
         }
-        Snapshot::from_slice_with_limits_and_cfb_mode(
-            self.after.as_slice(),
+        Snapshot::from_slice_with_limits_and_cfb(
+            &self.after,
             source.inner.limits,
             source.inner.cfb_limits,
-            source.artifact_mode(),
         )
     }
 
@@ -7971,8 +7847,8 @@ impl Patch {
     #[must_use]
     pub(crate) fn inverse(&self) -> Self {
         Self {
-            before: self.after.clone(),
-            after: self.before.clone(),
+            before: Arc::clone(&self.after),
+            after: Arc::clone(&self.before),
             semantic: self.semantic.inverse(),
         }
     }
@@ -8077,7 +7953,7 @@ fn commit_source_backed_numeric_plan(transaction: Edit) -> Result<SourceBackedPl
     source.inner.source_policy.require()?;
 
     let publisher = SourceBackedOverlayPublisher::open_owned_vec(
-        source.shared_source_vec()?,
+        Arc::clone(&source.inner.bytes),
         source.inner.source_version,
         shared_ole_limits(source.inner.cfb_limits)?,
     )
@@ -8214,7 +8090,7 @@ fn commit_source_backed_numeric(transaction: Edit) -> Result<SourceBackedCommit>
     source.inner.source_policy.require()?;
 
     let publisher = SourceBackedOverlayPublisher::open_owned_vec(
-        source.shared_source_vec()?,
+        Arc::clone(&source.inner.bytes),
         source.inner.source_version,
         shared_ole_limits(source.inner.cfb_limits)?,
     )
@@ -8274,14 +8150,13 @@ fn commit_source_backed_numeric(transaction: Edit) -> Result<SourceBackedCommit>
         // target in full. The target checks below used to run on a second,
         // independent `Reader::new` over the identical bytes; they now read
         // that first parse, in the same order and at the same point.
-        let target = Snapshot::open_package_with_mode(
+        let target = Snapshot::open_package(
             package,
             Some(NumericTargetVerification {
                 expected_bytes: &target_bytes,
                 source: &source,
                 changes: &changes,
             }),
-            source.artifact_mode(),
         )?;
         target.retag_source_version(target_version)
     };
@@ -8293,8 +8168,8 @@ fn commit_source_backed_numeric(transaction: Edit) -> Result<SourceBackedCommit>
     let target_workbook_bytes = u64::try_from(target.workbook_stream().len())
         .map_err(|_error| Error::InvalidData("target Workbook length exceeds u64".into()))?;
     let patch = Patch::new(
-        source.inner.bytes.clone(),
-        target.inner.bytes.clone(),
+        Arc::clone(&source.inner.bytes),
+        Arc::clone(&target.inner.bytes),
         semantic,
     );
     let diagnostics = SourceBackedDiagnostics {

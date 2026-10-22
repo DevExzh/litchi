@@ -5,6 +5,7 @@
 //!
 //! Uses soapberry-zip for high-performance zero-copy ZIP parsing.
 
+use crate::XmlStreamLimits;
 use crate::leniency::ToleranceReport;
 use crate::limits::SourceLimits;
 pub use crate::package::ArchiveLimits;
@@ -656,7 +657,7 @@ impl SourceBackedPackage {
         let mut manifest = prefer_current(
             source.as_ref(),
             source_version,
-            super::manifest::Manifest::parse(&manifest_xml),
+            super::manifest::Manifest::parse(&manifest_xml, XmlStreamLimits::owner_default_value()),
         )?;
         adopt_manifest_root_fallback(&mut manifest, &mimetype, &mut tolerance);
         let mime_result = if manifest.mimetype == mimetype {
@@ -2239,6 +2240,7 @@ impl<'data> Package<'data> {
         let mut manifest = super::manifest::Manifest::parse(
             &archive
                 .read_manifest_xml_with_limit(limits.max_manifest_bytes(), "ODF manifest bytes")?,
+            XmlStreamLimits::owner_default_value(),
         )?;
         // An absent or empty manifest root media type falls back to the
         // `mimetype` member (LENIENCY_AUDIT F9.2). The owning

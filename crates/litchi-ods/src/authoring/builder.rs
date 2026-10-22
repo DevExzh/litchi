@@ -59,7 +59,8 @@ impl Builder {
     /// # Errors
     /// Returns an error when the operation cannot be completed.
     pub fn set_metadata(&mut self, metadata: litchi_core::Metadata) -> Result<&mut Self> {
-        let snapshot = crate::metadata::Snapshot::from_source(None)?;
+        let snapshot =
+            crate::metadata::Snapshot::from_source(None, XmlStreamLimits::owner_default_value())?;
         let mut transaction = snapshot.transaction();
         transaction.replace(metadata.clone())?;
         self.metadata = metadata;
@@ -396,7 +397,10 @@ impl Builder {
         writer.set_mimetype(MIMETYPE)?;
         writer.add_file("content.xml", content_xml.as_bytes())?;
         if self.metadata.has_data() {
-            let snapshot = crate::metadata::Snapshot::from_source(None)?;
+            let snapshot = crate::metadata::Snapshot::from_source(
+                None,
+                XmlStreamLimits::owner_default_value(),
+            )?;
             let mut transaction = snapshot.transaction();
             transaction.replace(self.metadata)?;
             if let Some(metadata_xml) = transaction.commit()?.into_owned_xml() {

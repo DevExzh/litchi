@@ -7,7 +7,6 @@
 use super::*;
 use litchi_cfb::{
     OleFile, OleFileLimits, OleWriter, OutputProgress, OverlaySourceMode, SharedOleFile,
-    SharedOleFileLimits,
 };
 use std::io::Write;
 use std::sync::{
@@ -382,9 +381,11 @@ fn directory_signature(
     bytes: &[u8],
 ) -> Vec<(u32, String, u8, String, u32, u32, u32, u32, u64, bool)> {
     let snapshot = Snapshot::from_bytes(bytes.to_vec(), Limits::default()).unwrap();
-    let shared = snapshot
-        .open_shared_ole_file(SharedOleFileLimits::default())
-        .unwrap();
+    let shared = SharedOleFile::open_owned_vec(
+        Arc::clone(&snapshot.inner.bytes),
+        snapshot.inner.source_version,
+    )
+    .unwrap();
     shared
         .directory_entries()
         .map(|entry| {
@@ -497,7 +498,10 @@ fn retained_limits_survive_noop_changed_and_inverse_publication() {
     let source = Snapshot::from_bytes_with_cfb(bytes, limits, cfb_limits).unwrap();
 
     let noop = source.edit().commit().unwrap();
-    assert!(source.inner.bytes.ptr_eq(&noop.package().inner.bytes));
+    assert!(Arc::ptr_eq(
+        &source.inner.bytes,
+        &noop.package().inner.bytes
+    ));
     assert_eq!(noop.package().inner.limits, limits);
     assert_eq!(noop.package().inner.cfb_limits, cfb_limits);
 
@@ -1688,8 +1692,8 @@ fn snapshot_and_patch_share_artifact_vectors() {
     let commit = edit.commit().unwrap();
     let (target, patch) = commit.into_parts();
 
-    assert!(source.inner.bytes.ptr_eq(&patch.before));
-    assert!(target.inner.bytes.ptr_eq(&patch.after));
+    assert!(Arc::ptr_eq(&source.inner.bytes, &patch.before));
+    assert!(Arc::ptr_eq(&target.inner.bytes, &patch.after));
     assert_eq!(patch.before(), source.bytes());
     assert_eq!(patch.after(), target.bytes());
     assert_eq!(patch.inverse().before(), target.bytes());
@@ -3412,21 +3416,6 @@ fn shared_ole_file_editor_matches_an_owned_byte_open() {
     assert_eq!(adopted.bytes(), owned.bytes());
     assert_eq!(adopted.worksheet_count(), owned.worksheet_count());
     assert_eq!(adopted.workbook_stream(), owned.workbook_stream());
-    assert!(matches!(&owned.inner.bytes, ArtifactBytes::Packed(_)));
-    assert!(matches!(&adopted.inner.bytes, ArtifactBytes::Shared(_)));
-
-    let mut edit = adopted.edit();
-    edit.set_number("Sheet1".into(), Reference::new(3, 2).unwrap(), 9.25)
-        .unwrap();
-    let commit = edit.commit_source_backed().unwrap();
-    assert!(matches!(
-        &commit.source().inner.bytes,
-        ArtifactBytes::Shared(_)
-    ));
-    assert!(matches!(
-        &commit.package().inner.bytes,
-        ArtifactBytes::Shared(_)
-    ));
 
     let length = u64::try_from(bytes.len()).unwrap();
     let tight = OleFileLimits::new(length - 1).unwrap();

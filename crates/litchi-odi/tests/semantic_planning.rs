@@ -1,5 +1,7 @@
 #![allow(clippy::unwrap_used, reason = "test assertions use unwrap for clarity")]
 
+use litchi_core::edit::RefusalKind;
+use litchi_odf_common::Error as PackageError;
 use litchi_odi::flat::Image as FlatImage;
 use litchi_odi::{
     Builder, ConflictKind, FrameProperty, History, OperationKey, Package, ProtectionDisposition,
@@ -9,7 +11,6 @@ use litchi_odi::{
     map::{Area, ImageMap},
     source::Source,
 };
-use litchi_core::{Error as CoreError, edit::RefusalKind};
 
 const FLAT: &str = concat!(
     r#"<?xml version="1.0" encoding="UTF-8"?><office:document xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0" office:mimetype="application/vnd.oasis.opendocument.image"><office:meta><dc:title>Before</dc:title><meta:user-defined meta:name="opaque">keep</meta:user-defined></office:meta><office:body><office:image>"#,
@@ -303,7 +304,7 @@ fn semantic_patch_is_deterministic_exact_reopenable_and_transferable() {
     let stale = FlatImage::from_bytes(FLAT.replace("gr1", "other").as_bytes()).unwrap();
     assert!(matches!(
         patch.apply_flat(&stale),
-        Err(CoreError::PatchConflict)
+        Err(PackageError::PatchConflict { .. })
     ));
 
     let package_source = {
@@ -314,7 +315,7 @@ fn semantic_patch_is_deterministic_exact_reopenable_and_transferable() {
     };
     assert!(matches!(
         patch.apply_package(&package_source),
-        Err(CoreError::Refused(refusal))
+        Err(PackageError::Refused(refusal))
             if refusal.kind() == RefusalKind::UnsupportedContent
     ));
     let transfer = patch.plan_package(&package_source);
@@ -550,7 +551,7 @@ fn package_metadata_and_resource_crud_have_transferable_inverse_patches() {
     );
     assert!(matches!(
         patch.apply_package(commit.package()),
-        Err(CoreError::PatchConflict)
+        Err(PackageError::PatchConflict { .. })
     ));
     assert_eq!(
         patch

@@ -1,6 +1,5 @@
 use std::collections::BTreeSet;
 
-use litchi_core::Error;
 use super::support;
 use crate::form::TextControl;
 use crate::{
@@ -25,6 +24,7 @@ use crate::{
         Position, SubEditJoinFailure, TransferDependencyKind,
     },
 };
+use litchi_odf_common::Error;
 use litchi_odf_common::package::raw_identical_members;
 
 fn source() -> Package {
@@ -1143,7 +1143,10 @@ fn durable_patch_round_trips_deterministically_and_remains_exactly_reversible() 
     assert_all_package_xml_is_compact(applied.as_bytes());
     let restored = decoded.inverse().apply(&applied).unwrap();
     assert_eq!(restored.as_bytes(), snapshot.as_bytes());
-    assert!(matches!(decoded.apply(&applied), Err(Error::PatchConflict)));
+    assert!(matches!(
+        decoded.apply(&applied),
+        Err(Error::PatchConflict { .. })
+    ));
 }
 
 #[test]
@@ -1599,7 +1602,7 @@ fn sealed_durable_patch_discards_reverse_artifact_and_checks_source_digest() {
     );
     assert!(matches!(
         sealed.apply(commit.package()),
-        Err(Error::PatchConflict)
+        Err(Error::PatchConflict { .. })
     ));
 }
 
@@ -1767,7 +1770,7 @@ fn bounded_history_rejects_stale_edits_and_fully_reopens_undo_redo() {
     assert_eq!(history.document().unwrap().text().unwrap(), "committed");
     assert!(matches!(
         history.commit(stale),
-        Err(Error::PatchConflict)
+        Err(Error::PatchConflict { .. })
     ));
     assert_eq!(history.document().unwrap().text().unwrap(), "committed");
     assert!(history.undo());

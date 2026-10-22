@@ -235,10 +235,10 @@ impl MutableDocument {
         let Ok(source) = String::from_utf8(bytes) else {
             return Ok(None);
         };
-        let source_metadata = crate::Metadata::from_xml(&source)?;
+        let source_metadata = crate::Metadata::from_xml(&source, self.xml_limits)?;
         let patch =
             MetaXmlPatch::preserve_all().diff_simple_fields(&source_metadata, &self.metadata);
-        patch_meta_xml(&source, &patch)
+        patch_meta_xml(&source, &patch, self.xml_limits)
     }
 
     /// Generate meta.xml from the mutable metadata model alone.

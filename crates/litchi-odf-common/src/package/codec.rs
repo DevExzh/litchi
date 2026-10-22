@@ -5,11 +5,12 @@ use super::model::{
     PreparedArchive,
 };
 use super::path::validate_manifest_path;
+use crate::core::{ResolvedReader, XmlStreamLimits};
+use crate::map_resolved_reader_error;
 use litchi_core::{Error, Resource, ResourceLimit, Result};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
-use quick_xml::reader::NsReader;
 use soapberry_zip::office::ArchiveReader;
 use std::borrow::Cow;
 use std::collections::HashMap;
@@ -282,8 +283,8 @@ impl<'data> Archive<'data> {
 /// # Errors
 ///
 /// Returns an error when the manifest member cannot be read or parsed.
-pub fn read_manifest(archive: &Archive<'_>) -> Result<Manifest> {
-    parse_manifest(&archive.read_manifest_xml()?)
+pub fn read_manifest(archive: &Archive<'_>, limits: XmlStreamLimits) -> Result<Manifest> {
+    parse_manifest(&archive.read_manifest_xml()?, limits)
 }
 
 /// Observe a manifest while the neutral parser validates and indexes it.
@@ -310,8 +311,10 @@ pub(crate) trait ManifestScanObserver {
 pub(crate) fn parse_manifest_with_observer<O: ManifestScanObserver>(
     xml: &str,
     observer: &mut O,
+    limits: XmlStreamLimits,
 ) -> Result<(Manifest, Option<Error>)> {
-    let mut reader = NsReader::from_str(xml);
+    let mut reader = ResolvedReader::from_xml(xml, limits)
+        .map_err(|error| map_resolved_reader_error(error, "Invalid manifest XML"))?;
     let mut buffer = Vec::new();
     let mut entries = HashMap::new();
     let mut current_path: Option<String> = None;
@@ -320,7 +323,7 @@ pub(crate) fn parse_manifest_with_observer<O: ManifestScanObserver>(
     loop {
         let (namespace, event) = reader
             .read_resolved_event_into(&mut buffer)
-            .map_err(|error| Error::InvalidFormat(format!("Invalid manifest XML: {error}")))?;
+            .map_err(|error| map_resolved_reader_error(error, "Invalid manifest XML"))?;
         let scan_event = classify_manifest_event(&namespace, &event);
         let mut attributes = if observer_error.is_none() && observer.wants_attributes() {
             scan_attributes(&reader, &event, scan_event)
@@ -463,7 +466,7 @@ fn classify_manifest_event(namespace: &ResolveResult<'_>, event: &Event<'_>) -> 
 }
 
 fn scan_attributes(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     event: &Event<'_>,
     scan_event: ManifestScanEvent,
 ) -> Option<ManifestScanAttributes> {
@@ -505,7 +508,7 @@ fn scan_attributes(
 }
 
 fn scan_manifest_attributes(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     element: &BytesStart<'_>,
 ) -> Result<HashMap<Vec<u8>, String>> {
     let mut values = HashMap::new();
@@ -542,7 +545,7 @@ fn scan_manifest_attributes(
 }
 
 fn scan_manifest_and_loext_attributes(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     element: &BytesStart<'_>,
 ) -> Result<(HashMap<Vec<u8>, String>, HashMap<Vec<u8>, String>)> {
     let mut manifest = HashMap::new();
@@ -587,7 +590,7 @@ fn scan_manifest_and_loext_attributes(
 ///
 /// Returns an error when the XML is malformed or contains invalid manifest
 /// entries.
-pub fn parse_manifest(xml: &str) -> Result<Manifest> {
+pub fn parse_manifest(xml: &str, limits: XmlStreamLimits) -> Result<Manifest> {
     struct NoopObserver;
     impl ManifestScanObserver for NoopObserver {
         fn event(
@@ -601,7 +604,7 @@ pub fn parse_manifest(xml: &str) -> Result<Manifest> {
         }
     }
 
-    let (manifest, _) = parse_manifest_with_observer(xml, &mut NoopObserver)?;
+    let (manifest, _) = parse_manifest_with_observer(xml, &mut NoopObserver, limits)?;
     Ok(manifest)
 }
 
@@ -623,7 +626,7 @@ fn namespace_is_manifest(namespace: &ResolveResult<'_>) -> bool {
 }
 
 fn manifest_attributes(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     element: &BytesStart<'_>,
 ) -> Result<HashMap<Vec<u8>, String>> {
     let mut values = HashMap::new();
@@ -660,7 +663,7 @@ fn manifest_attributes(
 }
 
 fn parse_entry(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     element: &BytesStart<'_>,
 ) -> Result<Option<(String, Entry)>> {
     let mut attributes = manifest_attributes(reader, element)?;

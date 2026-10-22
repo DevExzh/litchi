@@ -19,4 +19,5 @@ pub mod title;
 pub mod transaction;
 
 pub use facade::{Builder, Document, Package};
+pub use litchi_odf_common::{Error, LimitKind, OpenOptions};
 pub use model::{resource, section, security, structure, style, subdocument};

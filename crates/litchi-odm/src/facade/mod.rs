@@ -1,10 +1,12 @@
 //! The immutable master-document owner and its read-only projection.
 
-use litchi_core::{Metadata, Result};
+use litchi_core::{Metadata, Result as CoreResult};
 use litchi_odf_common::{Error as PackageError, OpenOptions};
 use std::path::Path;
 
 pub use crate::authoring::Builder;
+
+type FamilyResult<T> = Result<T, PackageError>;
 
 /// The immutable, cheap-to-clone master-document owner (ADR 0034 §2).
 ///
@@ -25,7 +27,7 @@ pub struct Document {
     package: crate::package::Snapshot,
 }
 
-fn copy_input(bytes: &[u8]) -> std::result::Result<Vec<u8>, PackageError> {
+fn copy_input(bytes: &[u8]) -> Result<Vec<u8>, PackageError> {
     let mut copy = Vec::new();
     copy.try_reserve_exact(bytes.len())
         .map_err(|source| litchi_core::Error::Allocation {
@@ -42,15 +44,19 @@ impl Package {
         self.package.owned_package()
     }
 
+    pub(crate) fn xml_limits_value(&self) -> litchi_odf_common::XmlStreamLimits {
+        self.package.xml_limits_value()
+    }
+
     pub(crate) fn from_snapshot(package: crate::package::Snapshot) -> Self {
         Self { package }
     }
 
-    pub(crate) fn from_shared_bytes(bytes: std::sync::Arc<Vec<u8>>) -> Result<Self> {
+    pub(crate) fn from_shared_bytes(bytes: std::sync::Arc<Vec<u8>>) -> CoreResult<Self> {
         crate::package::Snapshot::from_shared_bytes(bytes).map(Self::from_snapshot)
     }
 
-    pub(crate) fn from_vec(bytes: Vec<u8>) -> Result<Self> {
+    pub(crate) fn from_vec(bytes: Vec<u8>) -> CoreResult<Self> {
         crate::package::Snapshot::from_bytes(bytes).map(Self::from_snapshot)
     }
 
@@ -58,17 +64,17 @@ impl Package {
         self.package.shared_bytes()
     }
 
-    pub(crate) fn meta_xml(&self) -> Result<Option<String>> {
+    pub(crate) fn meta_xml(&self) -> CoreResult<Option<String>> {
         self.package.meta_xml()
     }
 
-    pub(crate) fn with_meta_xml(&self, meta_xml: &str) -> Result<Self> {
+    pub(crate) fn with_meta_xml(&self, meta_xml: &str) -> CoreResult<Self> {
         self.package
             .with_meta_xml(meta_xml)
             .map(Self::from_snapshot)
     }
 
-    pub(crate) fn with_content_xml(&self, content_xml: &str) -> Result<Self> {
+    pub(crate) fn with_content_xml(&self, content_xml: &str) -> CoreResult<Self> {
         self.package
             .with_content_xml(content_xml)
             .map(Self::from_snapshot)
@@ -81,7 +87,7 @@ impl Package {
         meta_xml: Option<&str>,
         removed_resources: &[String],
         resource_writes: &[crate::package::ResourceWrite],
-    ) -> Result<Self> {
+    ) -> CoreResult<Self> {
         self.package
             .with_transaction_parts(
                 content_xml,
@@ -93,7 +99,7 @@ impl Package {
             .map(Self::from_snapshot)
     }
 
-    pub(crate) fn resource_bytes(&self, path: &str) -> Result<Vec<u8>> {
+    pub(crate) fn resource_bytes(&self, path: &str) -> CoreResult<Vec<u8>> {
         self.package.resource_bytes(path)
     }
 
@@ -154,7 +160,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if package writing fails.
-    pub fn new() -> std::result::Result<Self, PackageError> {
+    pub fn new() -> Result<Self, PackageError> {
         Builder::new().build()
     }
 
@@ -165,7 +171,7 @@ impl Package {
     ///
     /// Returns [`PackageError::Limit`] when a selected limit is exceeded and
     /// [`PackageError::Core`] for I/O, archive or family-validation failures.
-    pub fn open(path: impl AsRef<Path>) -> std::result::Result<Self, PackageError> {
+    pub fn open(path: impl AsRef<Path>) -> Result<Self, PackageError> {
         Self::open_with_options(path, OpenOptions::new())
     }
 
@@ -177,7 +183,7 @@ impl Package {
     pub fn open_with_options(
         path: impl AsRef<Path>,
         options: OpenOptions,
-    ) -> std::result::Result<Self, PackageError> {
+    ) -> Result<Self, PackageError> {
         crate::package::Snapshot::open_with_options(path, options).map(Self::from_snapshot)
     }
 
@@ -193,7 +199,7 @@ impl Package {
     pub fn open_with_password(
         path: impl AsRef<Path>,
         password: impl Into<String>,
-    ) -> std::result::Result<Self, PackageError> {
+    ) -> Result<Self, PackageError> {
         Self::open_with_password_and_options(path, password, OpenOptions::new())
     }
 
@@ -207,7 +213,7 @@ impl Package {
         path: impl AsRef<Path>,
         password: impl Into<String>,
         options: OpenOptions,
-    ) -> std::result::Result<Self, PackageError> {
+    ) -> Result<Self, PackageError> {
         crate::package::Snapshot::open_with_password_and_options(path, password, options)
             .map(Self::from_snapshot)
     }
@@ -217,7 +223,7 @@ impl Package {
     /// # Errors
     ///
     /// As [`Self::open`].
-    pub fn from_bytes(bytes: &[u8]) -> std::result::Result<Self, PackageError> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, PackageError> {
         Self::from_bytes_with_options(bytes, OpenOptions::new())
     }
 
@@ -229,7 +235,7 @@ impl Package {
     pub fn from_bytes_with_options(
         bytes: &[u8],
         options: OpenOptions,
-    ) -> std::result::Result<Self, PackageError> {
+    ) -> Result<Self, PackageError> {
         crate::package::Snapshot::from_bytes_with_options(copy_input(bytes)?, options)
             .map(Self::from_snapshot)
     }
@@ -246,7 +252,7 @@ impl Package {
     pub fn from_bytes_with_password(
         bytes: &[u8],
         password: impl Into<String>,
-    ) -> std::result::Result<Self, PackageError> {
+    ) -> Result<Self, PackageError> {
         Self::from_bytes_with_password_and_options(bytes, password, OpenOptions::new())
     }
 
@@ -260,7 +266,7 @@ impl Package {
         bytes: &[u8],
         password: impl Into<String>,
         options: OpenOptions,
-    ) -> std::result::Result<Self, PackageError> {
+    ) -> Result<Self, PackageError> {
         crate::package::Snapshot::from_bytes_with_password_and_options(
             copy_input(bytes)?,
             password,
@@ -274,7 +280,7 @@ impl Package {
     /// # Errors
     ///
     /// As [`Self::open`].
-    pub fn from_reader(reader: impl std::io::Read) -> std::result::Result<Self, PackageError> {
+    pub fn from_reader(reader: impl std::io::Read) -> Result<Self, PackageError> {
         Self::from_reader_with_options(reader, OpenOptions::new())
     }
 
@@ -286,7 +292,7 @@ impl Package {
     pub fn from_reader_with_options(
         reader: impl std::io::Read,
         options: OpenOptions,
-    ) -> std::result::Result<Self, PackageError> {
+    ) -> Result<Self, PackageError> {
         crate::package::Snapshot::from_reader_with_options(reader, options).map(Self::from_snapshot)
     }
 
@@ -300,7 +306,7 @@ impl Package {
     /// and otherwise as [`Self::open`].
     pub fn from_prepared_package(
         prepared: litchi_odf_common::PreparedPackage,
-    ) -> std::result::Result<Self, PackageError> {
+    ) -> Result<Self, PackageError> {
         Self::from_prepared_package_with_options(prepared, OpenOptions::new())
     }
 
@@ -313,7 +319,7 @@ impl Package {
     pub fn from_prepared_package_with_options(
         prepared: litchi_odf_common::PreparedPackage,
         options: OpenOptions,
-    ) -> std::result::Result<Self, PackageError> {
+    ) -> Result<Self, PackageError> {
         let detected = prepared.format();
         if detected != litchi_core::detection::FileFormat::Odm {
             return Err(litchi_core::Error::UnexpectedFormat { detected }.into());
@@ -335,8 +341,8 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error when the source metadata part cannot be read as UTF-8.
-    pub fn edit_title(&self) -> Result<crate::title::Edit<'_>> {
-        crate::title::Edit::new(self)
+    pub fn edit_title(&self) -> FamilyResult<crate::title::Edit<'_>> {
+        crate::title::Edit::new(self).map_err(PackageError::from)
     }
 
     /// Applies a title patch only when this is its exact source package.
@@ -347,7 +353,7 @@ impl Package {
     pub fn apply_title(
         &self,
         patch: &crate::title::Patch,
-    ) -> std::result::Result<crate::title::Commit, PackageError> {
+    ) -> Result<crate::title::Commit, PackageError> {
         patch.apply(self)
     }
 
@@ -364,8 +370,8 @@ impl Package {
     pub fn edit_link<'source, 'selector>(
         &'source self,
         selector: impl Into<crate::link::Selector<'selector>>,
-    ) -> Result<crate::link::Edit<'source>> {
-        crate::link::Edit::new(self, selector.into())
+    ) -> FamilyResult<crate::link::Edit<'source>> {
+        crate::link::Edit::new(self, selector.into()).map_err(PackageError::from)
     }
 
     /// Applies a linked-section patch only when this is its exact source.
@@ -376,7 +382,7 @@ impl Package {
     pub fn apply_link(
         &self,
         patch: &crate::link::Patch,
-    ) -> std::result::Result<crate::link::Commit, PackageError> {
+    ) -> Result<crate::link::Commit, PackageError> {
         patch.apply(self)
     }
 
@@ -403,7 +409,7 @@ impl Package {
     pub fn apply(
         &self,
         patch: &crate::transaction::Patch,
-    ) -> std::result::Result<crate::transaction::Commit, PackageError> {
+    ) -> Result<crate::transaction::Commit, PackageError> {
         if !patch.is_applicable_to(self) {
             return Err(PackageError::patch_conflict(
                 "odm.apply",
@@ -429,7 +435,7 @@ impl Package {
     ///
     /// Returns an I/O or publication failure; the destination keeps its
     /// previous bytes on failure.
-    pub fn save(&self, path: impl AsRef<Path>) -> std::result::Result<(), PackageError> {
+    pub fn save(&self, path: impl AsRef<Path>) -> Result<(), PackageError> {
         self.save_with_durability(path, litchi_core::Durability::Full)
     }
 
@@ -443,7 +449,7 @@ impl Package {
         &self,
         path: impl AsRef<Path>,
         durability: litchi_core::Durability,
-    ) -> std::result::Result<(), PackageError> {
+    ) -> Result<(), PackageError> {
         litchi_odf_common::publish::save_bytes(path.as_ref(), self.as_bytes(), durability)
     }
 
@@ -452,7 +458,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns an allocation failure.
-    pub fn to_bytes(&self) -> std::result::Result<Vec<u8>, PackageError> {
+    pub fn to_bytes(&self) -> Result<Vec<u8>, PackageError> {
         copy_input(self.as_bytes())
     }
 
@@ -461,10 +467,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns the stream's I/O failure.
-    pub fn write_to(
-        &self,
-        mut writer: impl std::io::Write,
-    ) -> std::result::Result<(), PackageError> {
+    pub fn write_to(&self, mut writer: impl std::io::Write) -> Result<(), PackageError> {
         writer.write_all(self.as_bytes())?;
         Ok(())
     }
@@ -556,8 +559,8 @@ impl Document {
     /// # Errors
     ///
     /// Returns an error if the package entries cannot be enumerated.
-    pub fn files(&self) -> Result<Vec<String>> {
-        self.package.files()
+    pub fn files(&self) -> FamilyResult<Vec<String>> {
+        self.package.files().map_err(PackageError::from)
     }
 }
 

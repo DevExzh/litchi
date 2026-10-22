@@ -4,14 +4,16 @@ use crate::codec::Parser;
 use crate::core::{OwnedPackage, family::Package};
 use crate::model::{Reference, Settings, Slide, declaration, page_layout, page_metadata, settings};
 use litchi_core::{
-    Error, Metadata, Result, SequentialTextWriter, TextOutputError, TextOutputOptions,
-    TextOutputReport,
+    Error, Metadata, Result as CoreResult, SequentialTextWriter, TextOutputError,
+    TextOutputOptions, TextOutputReport,
 };
 use litchi_odf_common::{XmlStreamLimits, constants::ODF_PRESENTATION, core::PreparedPackage};
 use std::io::Write;
 use std::sync::{Arc, OnceLock};
 
 const BODY_MARKER: &str = "<office:presentation";
+
+type FamilyResult<T> = Result<T, litchi_odf_common::Error>;
 
 /// The read-only semantic projection of an `OpenDocument` presentation.
 ///
@@ -24,7 +26,7 @@ const BODY_MARKER: &str = "<office:presentation";
 /// ```no_run
 /// use litchi_odp::Package;
 ///
-/// # fn main() -> Result<(), litchi_odp::Error> {
+/// # fn main() -> CoreResult<(), litchi_odp::Error> {
 /// let presentation = Package::open("slides.odp")?.presentation()?;
 ///
 /// // Get slide count
@@ -80,7 +82,7 @@ impl Presentation {
     }
 
     /// Reparse complete ODP bytes produced inside the crate.
-    pub(crate) fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
+    pub(crate) fn from_bytes(bytes: Vec<u8>) -> CoreResult<Self> {
         // Let the prepared detector perform the local MIME probe exactly
         // once.  A matching ODP result transfers its indexed archive; a
         // different ODF family still follows the historical package owner so
@@ -103,7 +105,7 @@ impl Presentation {
     ///
     /// The concrete ODP MIME and body contracts remain checked at this
     /// boundary while the detector-owned ZIP index is transferred unchanged.
-    pub(crate) fn from_prepared_package(prepared: PreparedPackage) -> Result<Self> {
+    pub(crate) fn from_prepared_package(prepared: PreparedPackage) -> CoreResult<Self> {
         if prepared.format() != litchi_core::detection::FileFormat::Odp {
             return Err(Error::UnexpectedFormat {
                 detected: prepared.format(),
@@ -113,13 +115,13 @@ impl Presentation {
     }
 
     /// Adopt an already validated archive without copying its package bytes.
-    pub(crate) fn from_owned_package(package: OwnedPackage) -> Result<Self> {
+    pub(crate) fn from_owned_package(package: OwnedPackage) -> CoreResult<Self> {
         Package::from_owned_package(package, ODF_PRESENTATION, BODY_MARKER, "ODP")
             .map(Self::with_package)
     }
 
     /// Copy the exact package bytes (edit pipeline only).
-    pub(crate) fn to_bytes(&self) -> Result<Vec<u8>> {
+    pub(crate) fn to_bytes(&self) -> CoreResult<Vec<u8>> {
         Ok(self.inner.package.as_bytes().to_vec())
     }
 
@@ -165,7 +167,7 @@ impl Presentation {
     ///
     /// # Errors
     /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
-    pub fn charts(&self) -> Result<crate::charts::Inventory<'_>> {
+    pub fn charts(&self) -> FamilyResult<crate::charts::Inventory<'_>> {
         self.charts_with(crate::charts::Limits::default())
     }
 
@@ -176,28 +178,29 @@ impl Presentation {
     pub fn charts_with(
         &self,
         limits: crate::charts::Limits,
-    ) -> Result<crate::charts::Inventory<'_>> {
-        crate::charts::inventory(&self.inner.package, limits)
+    ) -> FamilyResult<crate::charts::Inventory<'_>> {
+        Ok(crate::charts::inventory(&self.inner.package, limits)?)
     }
 
     /// Select one embedded chart by exact frame name or checked position.
     ///
     /// # Errors
     /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
-    pub fn chart<'a, S>(&self, selector: S) -> Result<Option<crate::charts::Chart>>
+    pub fn chart<'a, S>(&self, selector: S) -> FamilyResult<Option<crate::charts::Chart>>
     where
         S: Into<crate::charts::Selector<'a>>,
     {
-        self.charts()?
+        Ok(self
+            .charts()?
             .get(selector)
-            .map(Option::<&crate::charts::Chart>::cloned)
+            .map(Option::<&crate::charts::Chart>::cloned)?)
     }
 
     /// Create an immutable, exact-source embedded-chart snapshot.
     ///
     /// # Errors
     /// Returns an error when the package or chart inventory is malformed or exceeds its limits.
-    pub fn chart_snapshot(&self) -> Result<crate::charts::Snapshot> {
+    pub fn chart_snapshot(&self) -> FamilyResult<crate::charts::Snapshot> {
         self.chart_snapshot_with(crate::charts::Limits::default())
     }
 
@@ -208,8 +211,11 @@ impl Presentation {
     pub fn chart_snapshot_with(
         &self,
         limits: crate::charts::Limits,
-    ) -> Result<crate::charts::Snapshot> {
-        crate::charts::Snapshot::from_owned_package(self.inner.package.package().clone(), limits)
+    ) -> FamilyResult<crate::charts::Snapshot> {
+        Ok(crate::charts::Snapshot::from_owned_package(
+            self.inner.package.package().clone(),
+            limits,
+        )?)
     }
 
     /// Borrow the optional validated `styles.xml` snapshot without reparsing it.
@@ -228,7 +234,7 @@ impl Presentation {
     ///
     /// # Errors
     /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
-    pub fn slide_count(&self) -> Result<usize> {
+    pub fn slide_count(&self) -> FamilyResult<usize> {
         let slides = self.slides()?;
         Ok(slides.len())
     }
@@ -239,7 +245,7 @@ impl Presentation {
     ///
     /// # Errors
     /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
-    pub fn slides(&self) -> Result<Vec<Slide>> {
+    pub fn slides(&self) -> FamilyResult<Vec<Slide>> {
         let (slides, content) = Parser::parse_slides_with_report(
             self.inner.package.content_xml(),
             self.inner.package.styles_xml(),
@@ -252,13 +258,13 @@ impl Presentation {
     ///
     /// # Errors
     /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
-    pub fn settings(&self) -> Result<Option<Settings>> {
-        settings::parse(self.inner.package.content_xml())
+    pub fn settings(&self) -> FamilyResult<Option<Settings>> {
+        Ok(settings::parse(self.inner.package.content_xml())?)
     }
 
     /// Read the auxiliary projections and retained source skeleton required to
     /// stage an edit in one traversal.
-    pub(crate) fn staging(&self) -> Result<crate::model::staging::Staged> {
+    pub(crate) fn staging(&self) -> CoreResult<crate::model::staging::Staged> {
         crate::model::staging::parse_with_content_source(self.inner.package.content_xml())
     }
 
@@ -266,27 +272,27 @@ impl Presentation {
     ///
     /// # Errors
     /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
-    pub fn declarations(&self) -> Result<declaration::Collection> {
-        declaration::parse(self.inner.package.content_xml())
+    pub fn declarations(&self) -> FamilyResult<declaration::Collection> {
+        Ok(declaration::parse(self.inner.package.content_xml())?)
     }
 
     /// Inspect all typed `draw:layer-set` declarations lazily.
     ///
     /// The inventory is inert: layer visibility and protection are metadata
     /// values and no rendering or access-control behavior is executed.
-    pub fn layers(&self) -> Result<crate::model::LayerInventory> {
-        crate::model::layer::inventory(
+    pub fn layers(&self) -> FamilyResult<crate::model::LayerInventory> {
+        Ok(crate::model::layer::inventory(
             self.inner.package.content_xml(),
             self.inner.package.styles_xml(),
-        )
+        )?)
     }
 
     /// Inspect static page names, IDs, and layout/master references.
     ///
     /// # Errors
     /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
-    pub fn pages(&self) -> Result<page_metadata::Collection> {
-        page_metadata::parse(self.inner.package.content_xml())
+    pub fn pages(&self) -> FamilyResult<page_metadata::Collection> {
+        Ok(page_metadata::parse(self.inner.package.content_xml())?)
     }
 
     /// Inspect slide- and shape-anchored ODF annotations in document order.
@@ -296,16 +302,21 @@ impl Presentation {
     ///
     /// # Errors
     /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
-    pub fn annotations(&self) -> Result<Vec<crate::annotation::Info>> {
-        crate::annotation::annotations(self.inner.package.content_xml())
+    pub fn annotations(&self) -> FamilyResult<Vec<crate::annotation::Info>> {
+        Ok(crate::annotation::annotations(
+            self.inner.package.content_xml(),
+        )?)
     }
 
     /// Find a uniquely named slide or shape annotation.
     ///
     /// # Errors
     /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
-    pub fn find_annotation(&self, name: &str) -> Result<Option<crate::annotation::Info>> {
-        crate::annotation::find(self.inner.package.content_xml(), name)
+    pub fn find_annotation(&self, name: &str) -> FamilyResult<Option<crate::annotation::Info>> {
+        Ok(crate::annotation::find(
+            self.inner.package.content_xml(),
+            name,
+        )?)
     }
 
     /// Add an annotation to a page or uniquely named shape atomically.
@@ -316,7 +327,7 @@ impl Presentation {
         &mut self,
         anchor: &crate::annotation::Anchor,
         annotation: &crate::annotation::Annotation,
-    ) -> Result<usize> {
+    ) -> CoreResult<usize> {
         let (bytes, index) = crate::annotation::add(
             self.inner.package.package(),
             self.inner.package.content_xml(),
@@ -336,7 +347,7 @@ impl Presentation {
         &mut self,
         index: usize,
         annotation: &crate::annotation::Annotation,
-    ) -> Result<()> {
+    ) -> CoreResult<()> {
         let bytes = crate::annotation::replace(
             self.inner.package.package(),
             self.inner.package.content_xml(),
@@ -352,7 +363,7 @@ impl Presentation {
     ///
     /// # Errors
     /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
-    pub(crate) fn remove_annotation(&mut self, index: usize) -> Result<()> {
+    pub(crate) fn remove_annotation(&mut self, index: usize) -> CoreResult<()> {
         let bytes = crate::annotation::remove(
             self.inner.package.package(),
             self.inner.package.content_xml(),
@@ -367,9 +378,9 @@ impl Presentation {
     ///
     /// # Errors
     /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
-    pub fn layouts(&self) -> Result<page_layout::Collection> {
+    pub fn layouts(&self) -> FamilyResult<page_layout::Collection> {
         match self.inner.package.styles_xml() {
-            Some(styles) => page_layout::parse(styles),
+            Some(styles) => Ok(page_layout::parse(styles)?),
             None => Ok(page_layout::Collection::default()),
         }
     }
@@ -380,7 +391,7 @@ impl Presentation {
     /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
     pub fn drawing_fill_images(
         &self,
-    ) -> Result<litchi_odf_common::drawing::resources::fill_image::Collection> {
+    ) -> FamilyResult<litchi_odf_common::drawing::resources::fill_image::Collection> {
         self.inner.package.styles_xml().map_or_else(
             || Ok(litchi_odf_common::drawing::resources::fill_image::Collection::default()),
             |styles| {
@@ -388,7 +399,7 @@ impl Presentation {
                     styles,
                     XmlStreamLimits::owner_default_value(),
                 )
-                .map_err(Error::from)
+                .map_err(litchi_odf_common::Error::from)
             },
         )
     }
@@ -399,7 +410,7 @@ impl Presentation {
     /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
     pub fn drawing_gradients(
         &self,
-    ) -> Result<litchi_odf_common::drawing::resources::gradient::Collection> {
+    ) -> FamilyResult<litchi_odf_common::drawing::resources::gradient::Collection> {
         self.inner.package.styles_xml().map_or_else(
             || Ok(litchi_odf_common::drawing::resources::gradient::Collection::default()),
             |styles| {
@@ -407,7 +418,7 @@ impl Presentation {
                     styles,
                     XmlStreamLimits::owner_default_value(),
                 )
-                .map_err(Error::from)
+                .map_err(litchi_odf_common::Error::from)
             },
         )
     }
@@ -418,7 +429,7 @@ impl Presentation {
     /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
     pub fn drawing_hatches(
         &self,
-    ) -> Result<litchi_odf_common::drawing::resources::hatch::Collection> {
+    ) -> FamilyResult<litchi_odf_common::drawing::resources::hatch::Collection> {
         self.inner.package.styles_xml().map_or_else(
             || Ok(litchi_odf_common::drawing::resources::hatch::Collection::default()),
             |styles| {
@@ -426,7 +437,7 @@ impl Presentation {
                     styles,
                     XmlStreamLimits::owner_default_value(),
                 )
-                .map_err(Error::from)
+                .map_err(litchi_odf_common::Error::from)
             },
         )
     }
@@ -437,7 +448,7 @@ impl Presentation {
     /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
     pub fn drawing_markers(
         &self,
-    ) -> Result<litchi_odf_common::drawing::resources::marker::Collection> {
+    ) -> FamilyResult<litchi_odf_common::drawing::resources::marker::Collection> {
         self.inner.package.styles_xml().map_or_else(
             || Ok(litchi_odf_common::drawing::resources::marker::Collection::default()),
             |styles| {
@@ -445,7 +456,7 @@ impl Presentation {
                     styles,
                     XmlStreamLimits::owner_default_value(),
                 )
-                .map_err(Error::from)
+                .map_err(litchi_odf_common::Error::from)
             },
         )
     }
@@ -456,7 +467,7 @@ impl Presentation {
     /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
     pub fn drawing_opacities(
         &self,
-    ) -> Result<litchi_odf_common::drawing::resources::opacity::Collection> {
+    ) -> FamilyResult<litchi_odf_common::drawing::resources::opacity::Collection> {
         self.inner.package.styles_xml().map_or_else(
             || Ok(litchi_odf_common::drawing::resources::opacity::Collection::default()),
             |styles| {
@@ -464,7 +475,7 @@ impl Presentation {
                     styles,
                     XmlStreamLimits::owner_default_value(),
                 )
-                .map_err(Error::from)
+                .map_err(litchi_odf_common::Error::from)
             },
         )
     }
@@ -475,7 +486,7 @@ impl Presentation {
     /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
     pub fn drawing_stroke_dashes(
         &self,
-    ) -> Result<litchi_odf_common::drawing::resources::stroke_dash::Collection> {
+    ) -> FamilyResult<litchi_odf_common::drawing::resources::stroke_dash::Collection> {
         self.inner.package.styles_xml().map_or_else(
             || Ok(litchi_odf_common::drawing::resources::stroke_dash::Collection::default()),
             |styles| {
@@ -483,7 +494,7 @@ impl Presentation {
                     styles,
                     XmlStreamLimits::owner_default_value(),
                 )
-                .map_err(Error::from)
+                .map_err(litchi_odf_common::Error::from)
             },
         )
     }
@@ -498,12 +509,12 @@ impl Presentation {
     ///
     /// # Errors
     /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
-    pub fn slide(&self, index: usize) -> Result<Option<Slide>> {
-        Parser::parse_slide_with_styles_at(
+    pub fn slide(&self, index: usize) -> FamilyResult<Option<Slide>> {
+        Ok(Parser::parse_slide_with_styles_at(
             self.inner.package.content_xml(),
             self.inner.package.styles_xml(),
             index,
-        )
+        )?)
     }
 
     /// Read a package-contained media payload without fetching external URLs.
@@ -513,7 +524,7 @@ impl Presentation {
     ///
     /// # Errors
     /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
-    pub fn media_data(&self, media: &Reference) -> Result<Option<Vec<u8>>> {
+    pub fn media_data(&self, media: &Reference) -> FamilyResult<Option<Vec<u8>>> {
         let Some(path) = media.package_path() else {
             return Ok(None);
         };
@@ -521,7 +532,7 @@ impl Presentation {
         if !package.has_file(path) {
             return Ok(None);
         }
-        package.get_file(path).map(Some)
+        Ok(package.get_file(path).map(Some)?)
     }
 
     /// Read one package member (an embedded object's part), or `None` when
@@ -529,12 +540,12 @@ impl Presentation {
     ///
     /// # Errors
     /// Returns an error when the package or the member cannot be read.
-    pub fn member_data(&self, path: &str) -> Result<Option<Vec<u8>>> {
+    pub fn member_data(&self, path: &str) -> FamilyResult<Option<Vec<u8>>> {
         let package = self.inner.package.package().package()?;
         if !package.has_file(path) {
             return Ok(None);
         }
-        package.get_file(path).map(Some)
+        Ok(package.get_file(path).map(Some)?)
     }
 
     /// Discover inert embedded objects in content and styles document order.
@@ -546,13 +557,13 @@ impl Presentation {
     /// # Errors
     /// Returns an error when XML, package paths, inline payloads, or the bounded inventory is
     /// malformed or exceeds its configured safety ceilings.
-    pub fn embedded_objects(&self) -> Result<Vec<crate::embedded::Object>> {
+    pub fn embedded_objects(&self) -> FamilyResult<Vec<crate::embedded::Object>> {
         let package = self.inner.package.package().package()?;
-        litchi_odf_common::embedded::scan_package(
+        Ok(litchi_odf_common::embedded::scan_package(
             self.inner.package.content_xml(),
             self.inner.package.styles_xml(),
             &package,
-        )
+        )?)
     }
 
     /// Extract all text content from the presentation.
@@ -561,7 +572,7 @@ impl Presentation {
     ///
     /// # Errors
     /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
-    pub fn text(&self) -> Result<String> {
+    pub fn text(&self) -> FamilyResult<String> {
         let slides = self.slides()?;
         let mut all_text = Vec::new();
 
@@ -595,7 +606,7 @@ impl Presentation {
         &self,
         output: &mut W,
         options: TextOutputOptions<'_>,
-    ) -> std::result::Result<TextOutputReport, TextOutputError<Error>> {
+    ) -> Result<TextOutputReport, TextOutputError<Error>> {
         let paragraph_separator = options.paragraph_separator();
         let mut writer = SequentialTextWriter::new(output, options);
         Parser::write_slides_text_to(
@@ -612,7 +623,7 @@ impl Presentation {
     ///
     /// # Errors
     /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
-    pub fn metadata(&self) -> Result<Metadata> {
+    pub fn metadata(&self) -> FamilyResult<Metadata> {
         Ok(self.inner.package.metadata().cloned().unwrap_or_default())
     }
 
@@ -620,8 +631,8 @@ impl Presentation {
     ///
     /// # Errors
     /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
-    pub fn rdf_graphs(&self) -> Result<Vec<crate::rdf::Graph>> {
-        crate::rdf::graphs(self.inner.package.package())
+    pub fn rdf_graphs(&self) -> FamilyResult<Vec<crate::rdf::Graph>> {
+        Ok(crate::rdf::graphs(self.inner.package.package())?)
     }
 }
 

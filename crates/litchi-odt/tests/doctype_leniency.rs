@@ -121,7 +121,6 @@ fn a_dtd_never_declares_entities() {
     });
     assert!(
         Package::from_bytes(&bytes)
-            .map_err(litchi_core::Error::from)
             .and_then(|package| package.document())
             .is_err()
     );
@@ -141,7 +140,6 @@ fn an_external_entity_doctype_stays_rejected() {
     .unwrap();
     for error in [
         Package::from_bytes(&nasty)
-            .map_err(litchi_core::Error::from)
             .and_then(|package| package.document())
             .err()
             .unwrap()

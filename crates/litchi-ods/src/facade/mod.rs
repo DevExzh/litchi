@@ -6,7 +6,8 @@ pub(crate) mod source;
 mod source_edit;
 
 use litchi_core::{
-    Result, SequentialTextWriter, TextOutputError, TextOutputOptions, TextOutputReport,
+    Result as CoreResult, SequentialTextWriter, TextOutputError, TextOutputOptions,
+    TextOutputReport,
 };
 use std::{
     io::Write,
@@ -23,6 +24,8 @@ pub use selective::{SheetCatalogEntry, SourceBackedSpreadsheetCatalog, SourceRea
 pub use source::SourceBackedSpreadsheet;
 pub(crate) use source_edit::SourceCellEdit;
 pub use source_edit::{FormulaChange, HyperlinkChange, HyperlinkOperation};
+
+type FamilyResult<T> = Result<T, litchi_odf_common::Error>;
 
 /// Maximum number of positional cell selectors accepted by one lookup batch.
 ///
@@ -80,7 +83,7 @@ impl<'a> From<(&'a str, usize, usize)> for CellSelector<'a> {
     }
 }
 
-fn validate_cell_batch_len(length: usize) -> Result<()> {
+fn validate_cell_batch_len(length: usize) -> CoreResult<()> {
     if length > MAX_CELL_SELECTORS {
         return Err(litchi_core::Error::InvalidFormat(format!(
             "ODS cell lookup batch exceeds the {MAX_CELL_SELECTORS} selector safety limit"
@@ -137,7 +140,7 @@ impl std::fmt::Debug for Workbook {
 
 impl Workbook {
     /// Reparse complete ODS bytes produced inside the crate.
-    pub(crate) fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
+    pub(crate) fn from_bytes(bytes: Vec<u8>) -> CoreResult<Self> {
         // Let the prepared detector perform the local MIME probe exactly
         // once.  A matching ODS result transfers its indexed archive; a
         // different ODF family still follows the historical package owner so
@@ -168,7 +171,7 @@ impl Workbook {
         self.inner.package.prepared_index_identity()
     }
 
-    pub(crate) fn from_package(package: crate::package::Archive) -> Result<Self> {
+    pub(crate) fn from_package(package: crate::package::Archive) -> CoreResult<Self> {
         let xml_limits = package.xml_limits_value();
         Self::from_shared_package(Arc::new(package), xml_limits)
     }
@@ -176,7 +179,7 @@ impl Workbook {
     pub(crate) fn from_shared_package(
         package: Arc<crate::package::Archive>,
         xml_limits: litchi_odf_common::XmlStreamLimits,
-    ) -> Result<Self> {
+    ) -> CoreResult<Self> {
         // Keep ordinary and source-backed opening on the same namespace-aware
         // content reader.  Besides avoiding five independent tokenizations,
         // this admits semantically normalized namespace declarations (for
@@ -249,8 +252,8 @@ impl Workbook {
     ///
     /// # Errors
     /// Returns an error when the bounded projection cannot reserve its output.
-    pub fn text(&self) -> Result<String> {
-        source::project_text(&self.inner.sheets)
+    pub fn text(&self) -> FamilyResult<String> {
+        Ok(source::project_text(&self.inner.sheets)?)
     }
 
     /// Write displayed worksheet text to a caller-owned sequential sink.
@@ -272,7 +275,7 @@ impl Workbook {
         &self,
         output: &mut W,
         options: TextOutputOptions<'_>,
-    ) -> std::result::Result<TextOutputReport, TextOutputError<litchi_core::Error>> {
+    ) -> Result<TextOutputReport, TextOutputError<litchi_core::Error>> {
         let mut writer = SequentialTextWriter::new(output, options);
         source::write_text_to_sheets(&self.inner.sheets, &mut writer, options)?;
         Ok(writer.finish())
@@ -287,14 +290,16 @@ impl Workbook {
     ///
     /// The snapshot retains the exact styles source for no-op, stale-source,
     /// and inverse transaction checks.
-    pub fn table_templates(&self) -> Result<crate::styles::table_template::Snapshot> {
-        crate::styles::table_template::Snapshot::from_source(self.inner.package.styles_xml())
+    pub fn table_templates(&self) -> FamilyResult<crate::styles::table_template::Snapshot> {
+        Ok(crate::styles::table_template::Snapshot::from_source(
+            self.inner.package.styles_xml(),
+        )?)
     }
 
     /// Stage a source-checked table-template edit and publish it atomically.
-    pub(crate) fn edit_table_templates<F>(&mut self, update: F) -> Result<()>
+    pub(crate) fn edit_table_templates<F>(&mut self, update: F) -> CoreResult<()>
     where
-        F: FnOnce(&mut crate::styles::table_template::Edit) -> Result<()>,
+        F: FnOnce(&mut crate::styles::table_template::Edit) -> CoreResult<()>,
     {
         let snapshot = self.table_templates()?;
         let mut edit = snapshot.edit();
@@ -315,11 +320,11 @@ impl Workbook {
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn protection(&self) -> Result<crate::protection::Snapshot> {
-        crate::protection::Snapshot::parse(
+    pub fn protection(&self) -> FamilyResult<crate::protection::Snapshot> {
+        Ok(crate::protection::Snapshot::parse(
             self.inner.package.content_xml(),
             self.inner.package.styles_xml(),
-        )
+        )?)
     }
 
     /// Apply a failure-atomic protection edit and rebuild only `content.xml`.
@@ -328,9 +333,9 @@ impl Workbook {
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub(crate) fn update_protection<F>(&mut self, edit: F) -> Result<()>
+    pub(crate) fn update_protection<F>(&mut self, edit: F) -> CoreResult<()>
     where
-        F: FnOnce(&mut crate::protection::Edit) -> Result<()>,
+        F: FnOnce(&mut crate::protection::Edit) -> CoreResult<()>,
     {
         let snapshot = self.protection()?;
         let commit = crate::protection::update(&snapshot, edit)?;
@@ -353,16 +358,20 @@ impl Workbook {
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn annotations(&self) -> Result<crate::annotations::Snapshot> {
-        crate::annotations::Snapshot::parse(self.inner.package.content_xml())
+    pub fn annotations(&self) -> FamilyResult<crate::annotations::Snapshot> {
+        Ok(crate::annotations::Snapshot::parse(
+            self.inner.package.content_xml(),
+        )?)
     }
 
     /// Capture the presence-aware, exact-source tracked-change owner.
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn tracked_changes(&self) -> Result<crate::tracked_changes::Snapshot> {
-        crate::tracked_changes::Snapshot::parse(self.inner.package.content_xml())
+    pub fn tracked_changes(&self) -> FamilyResult<crate::tracked_changes::Snapshot> {
+        Ok(crate::tracked_changes::Snapshot::parse(
+            self.inner.package.content_xml(),
+        )?)
     }
 
     /// Capture tracked changes under an explicit resource budget.
@@ -372,11 +381,11 @@ impl Workbook {
     pub fn tracked_changes_with(
         &self,
         limits: crate::tracked_changes::Limits,
-    ) -> Result<crate::tracked_changes::Snapshot> {
-        crate::tracked_changes::Snapshot::parse_with_limits(
+    ) -> FamilyResult<crate::tracked_changes::Snapshot> {
+        Ok(crate::tracked_changes::Snapshot::parse_with_limits(
             self.inner.package.content_xml(),
             limits,
-        )
+        )?)
     }
 
     /// Inspect all DDE declarations and cached tables as inert, source-bound data.
@@ -388,8 +397,11 @@ impl Workbook {
     ///
     /// Returns an error when the content XML has invalid or over-budget DDE
     /// metadata.
-    pub fn dde(&self) -> Result<crate::dde::Snapshot> {
-        crate::dde::Snapshot::parse(self.inner.package.content_xml()).map_err(Into::into)
+    pub fn dde(&self) -> FamilyResult<crate::dde::Snapshot> {
+        Ok(
+            crate::dde::Snapshot::parse(self.inner.package.content_xml())
+                .map_err(litchi_core::Error::from)?,
+        )
     }
 
     /// Capture inert DDE declarations and cached tables under explicit limits.
@@ -397,17 +409,21 @@ impl Workbook {
         &self,
         limits: crate::dde::Limits,
         context: &litchi_core::ExecutionContext,
-    ) -> Result<crate::dde::Snapshot> {
-        crate::dde::Snapshot::parse_with_context(self.inner.package.content_xml(), limits, context)
-            .map_err(Into::into)
+    ) -> FamilyResult<crate::dde::Snapshot> {
+        Ok(crate::dde::Snapshot::parse_with_context(
+            self.inner.package.content_xml(),
+            limits,
+            context,
+        )
+        .map_err(litchi_core::Error::from)?)
     }
 
     /// Stage and publish a failure-atomic DDE metadata transaction.
     ///
     /// Sources remain inert; publication never refreshes cached data.
-    pub(crate) fn edit_dde<F>(&mut self, update: F) -> Result<()>
+    pub(crate) fn edit_dde<F>(&mut self, update: F) -> CoreResult<()>
     where
-        F: FnOnce(&mut crate::dde::Edit) -> Result<()>,
+        F: FnOnce(&mut crate::dde::Edit) -> CoreResult<()>,
     {
         self.edit_dde_with_context(
             crate::dde::Limits::default(),
@@ -425,9 +441,9 @@ impl Workbook {
         limits: crate::dde::Limits,
         context: &litchi_core::ExecutionContext,
         update: F,
-    ) -> Result<()>
+    ) -> CoreResult<()>
     where
-        F: FnOnce(&mut crate::dde::Edit) -> Result<()>,
+        F: FnOnce(&mut crate::dde::Edit) -> CoreResult<()>,
     {
         let snapshot = self.dde_with(limits, context)?;
         let mut edit = snapshot.edit();
@@ -446,7 +462,7 @@ impl Workbook {
         Ok(())
     }
 
-    fn ensure_dde_publication_allowed(&self) -> Result<()> {
+    fn ensure_dde_publication_allowed(&self) -> CoreResult<()> {
         if self
             .inner
             .package
@@ -472,12 +488,16 @@ impl Workbook {
     ///
     /// Returns an error when the content XML has invalid or over-budget
     /// scenario metadata.
-    pub fn scenarios(&self) -> Result<crate::scenario::Snapshot> {
-        crate::scenario::Snapshot::parse(self.inner.package.content_xml()).map_err(|error| {
-            litchi_core::Error::InvalidFormat(format!(
-                "ODS scenario metadata inspection failed: {error}"
-            ))
-        })
+    pub fn scenarios(&self) -> FamilyResult<crate::scenario::Snapshot> {
+        Ok(
+            crate::scenario::Snapshot::parse(self.inner.package.content_xml()).map_err(
+                |error| {
+                    litchi_core::Error::InvalidFormat(format!(
+                        "ODS scenario metadata inspection failed: {error}"
+                    ))
+                },
+            )?,
+        )
     }
 
     /// Stage and publish one failure-atomic scenario metadata edit.
@@ -485,9 +505,9 @@ impl Workbook {
     /// The closure edits typed declarations selected by exact worksheet name
     /// or source order.  A failed closure, stale source, invalid XML, or typed
     /// readback leaves this spreadsheet unchanged.
-    pub(crate) fn edit_scenarios<F>(&mut self, update: F) -> Result<()>
+    pub(crate) fn edit_scenarios<F>(&mut self, update: F) -> CoreResult<()>
     where
-        F: FnOnce(&mut crate::scenario::Edit) -> Result<()>,
+        F: FnOnce(&mut crate::scenario::Edit) -> CoreResult<()>,
     {
         let snapshot = self.scenarios()?;
         let mut edit = snapshot.edit();
@@ -505,8 +525,10 @@ impl Workbook {
 
     /// Capture the source-backed consolidation, label-range, cell-source, and
     /// detective metadata catalog for this owned spreadsheet.
-    pub fn sheet_metadata(&self) -> Result<crate::sheet_metadata::Snapshot> {
-        crate::sheet_metadata::Snapshot::parse(self.inner.package.content_xml())
+    pub fn sheet_metadata(&self) -> FamilyResult<crate::sheet_metadata::Snapshot> {
+        Ok(crate::sheet_metadata::Snapshot::parse(
+            self.inner.package.content_xml(),
+        )?)
     }
 
     /// Capture sheet metadata under explicit finite limits and execution context.
@@ -514,18 +536,18 @@ impl Workbook {
         &self,
         limits: crate::sheet_metadata::Limits,
         context: &litchi_core::ExecutionContext,
-    ) -> Result<crate::sheet_metadata::Snapshot> {
-        crate::sheet_metadata::Snapshot::parse_with_context(
+    ) -> FamilyResult<crate::sheet_metadata::Snapshot> {
+        Ok(crate::sheet_metadata::Snapshot::parse_with_context(
             self.inner.package.content_xml(),
             limits,
             context,
-        )
+        )?)
     }
 
     /// Stage and publish one failure-atomic sheet metadata edit.
-    pub(crate) fn edit_sheet_metadata<F>(&mut self, update: F) -> Result<()>
+    pub(crate) fn edit_sheet_metadata<F>(&mut self, update: F) -> CoreResult<()>
     where
-        F: FnOnce(&mut crate::sheet_metadata::Edit) -> Result<()>,
+        F: FnOnce(&mut crate::sheet_metadata::Edit) -> CoreResult<()>,
     {
         self.edit_sheet_metadata_with_context(
             crate::sheet_metadata::Limits::default(),
@@ -545,9 +567,9 @@ impl Workbook {
         limits: crate::sheet_metadata::Limits,
         context: &litchi_core::ExecutionContext,
         update: F,
-    ) -> Result<()>
+    ) -> CoreResult<()>
     where
-        F: FnOnce(&mut crate::sheet_metadata::Edit) -> Result<()>,
+        F: FnOnce(&mut crate::sheet_metadata::Edit) -> CoreResult<()>,
     {
         let snapshot = self.sheet_metadata_with(limits, context)?;
         let mut edit = snapshot.edit();
@@ -566,7 +588,7 @@ impl Workbook {
         Ok(())
     }
 
-    fn ensure_sheet_metadata_publication_allowed(&self) -> Result<()> {
+    fn ensure_sheet_metadata_publication_allowed(&self) -> CoreResult<()> {
         let signed = self
             .inner
             .package
@@ -590,9 +612,9 @@ impl Workbook {
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub(crate) fn update_tracked_changes<F>(&mut self, edit: F) -> Result<()>
+    pub(crate) fn update_tracked_changes<F>(&mut self, edit: F) -> CoreResult<()>
     where
-        F: FnOnce(&mut crate::tracked_changes::Edit) -> Result<()>,
+        F: FnOnce(&mut crate::tracked_changes::Edit) -> CoreResult<()>,
     {
         let snapshot = self.tracked_changes()?;
         let commit = crate::tracked_changes::update(&snapshot, edit)?;
@@ -607,7 +629,7 @@ impl Workbook {
 
     /// Publish a validated annotation transaction without rebuilding an
     /// unchanged package.
-    pub(crate) fn publish_annotations(&mut self, content_xml: &str) -> Result<()> {
+    pub(crate) fn publish_annotations(&mut self, content_xml: &str) -> CoreResult<()> {
         let package = crate::annotations::replace_content(&self.inner.package, content_xml)?;
         *self = Self::from_package(package)?;
         Ok(())
@@ -647,19 +669,19 @@ impl Workbook {
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn data_pilots(&self) -> Result<crate::data_pilot::Catalog<'_>> {
-        crate::data_pilot::Catalog::load(&self.inner.package)
+    pub fn data_pilots(&self) -> FamilyResult<crate::data_pilot::Catalog<'_>> {
+        Ok(crate::data_pilot::Catalog::load(&self.inner.package)?)
     }
 
     /// Capture the `DataPilot` owner as an immutable, exact-package snapshot.
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn data_pilot_snapshot(&self) -> Result<crate::data_pilot::Snapshot> {
-        crate::data_pilot::Snapshot::from_bytes_with_xml_limits(
+    pub fn data_pilot_snapshot(&self) -> FamilyResult<crate::data_pilot::Snapshot> {
+        Ok(crate::data_pilot::Snapshot::from_bytes_with_xml_limits(
             self.inner.package.package().as_bytes().to_vec(),
             self.inner.xml_limits,
-        )
+        )?)
     }
 
     /// Discover inert database-range declarations owned by this spreadsheet.
@@ -670,8 +692,8 @@ impl Workbook {
     ///
     /// # Errors
     /// Returns an error when the content owner is malformed or over budget.
-    pub fn database_ranges(&self) -> Result<crate::database_range::Catalog<'_>> {
-        crate::database_range::Catalog::load(&self.inner.package)
+    pub fn database_ranges(&self) -> FamilyResult<crate::database_range::Catalog<'_>> {
+        Ok(crate::database_range::Catalog::load(&self.inner.package)?)
     }
 
     /// Capture database-range metadata as an immutable, exact-package
@@ -680,12 +702,14 @@ impl Workbook {
     /// # Errors
     /// Returns an error when the package or typed owner exceeds its finite
     /// admission limits.
-    pub fn database_range_snapshot(&self) -> Result<crate::database_range::Snapshot> {
-        crate::database_range::Snapshot::from_package(&self.inner.package)
+    pub fn database_range_snapshot(&self) -> FamilyResult<crate::database_range::Snapshot> {
+        Ok(crate::database_range::Snapshot::from_package(
+            &self.inner.package,
+        )?)
     }
 
     /// Alias with a plural noun for callers that use the owner name.
-    pub fn database_ranges_snapshot(&self) -> Result<crate::database_range::Snapshot> {
+    pub fn database_ranges_snapshot(&self) -> FamilyResult<crate::database_range::Snapshot> {
         self.database_range_snapshot()
     }
 
@@ -698,9 +722,9 @@ impl Workbook {
     /// # Errors
     /// Returns an error when the closure, source checks, package rebuild, or
     /// typed readback fails.
-    pub(crate) fn edit_database_ranges<F>(&mut self, edit: F) -> Result<()>
+    pub(crate) fn edit_database_ranges<F>(&mut self, edit: F) -> CoreResult<()>
     where
-        F: for<'source> FnOnce(&mut crate::database_range::Editor<'_, 'source>) -> Result<()>,
+        F: for<'source> FnOnce(&mut crate::database_range::Editor<'_, 'source>) -> CoreResult<()>,
     {
         let commit = {
             let catalog = self.database_ranges()?;
@@ -729,11 +753,13 @@ impl Workbook {
     /// # Errors
     ///
     /// Returns an error when the retained package or worksheet graph is invalid.
-    pub fn worksheet_snapshot(&self) -> Result<crate::worksheet::Snapshot> {
+    pub fn worksheet_snapshot(&self) -> FamilyResult<crate::worksheet::Snapshot> {
         let package = self.inner.package.clone_without_password()?;
-        crate::worksheet::Snapshot::from_shared_package_with_xml_limits(
-            Arc::new(package),
-            self.inner.xml_limits,
+        Ok(
+            crate::worksheet::Snapshot::from_shared_package_with_xml_limits(
+                Arc::new(package),
+                self.inner.xml_limits,
+            )?,
         )
     }
 
@@ -741,7 +767,7 @@ impl Workbook {
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn charts(&self) -> Result<crate::charts::Inventory<'_>> {
+    pub fn charts(&self) -> FamilyResult<crate::charts::Inventory<'_>> {
         self.charts_with(crate::charts::Limits::default())
     }
 
@@ -752,15 +778,15 @@ impl Workbook {
     pub fn charts_with(
         &self,
         limits: crate::charts::Limits,
-    ) -> Result<crate::charts::Inventory<'_>> {
-        crate::charts::inventory(&self.inner.package, limits)
+    ) -> FamilyResult<crate::charts::Inventory<'_>> {
+        Ok(crate::charts::inventory(&self.inner.package, limits)?)
     }
 
     /// Capture embedded charts as an immutable, exact-package snapshot.
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn chart_snapshot(&self) -> Result<crate::charts::Snapshot> {
+    pub fn chart_snapshot(&self) -> FamilyResult<crate::charts::Snapshot> {
         self.chart_snapshot_with(crate::charts::Limits::default())
     }
 
@@ -771,23 +797,23 @@ impl Workbook {
     pub fn chart_snapshot_with(
         &self,
         limits: crate::charts::Limits,
-    ) -> Result<crate::charts::Snapshot> {
-        crate::charts::Snapshot::from_bytes_with_xml_limits(
+    ) -> FamilyResult<crate::charts::Snapshot> {
+        Ok(crate::charts::Snapshot::from_bytes_with_xml_limits(
             self.inner.package.package().as_bytes().to_vec(),
             limits,
             self.inner.xml_limits,
-        )
+        )?)
     }
 
     /// Select one embedded chart by exact drawing name or checked position.
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn chart<'a, S>(&self, selector: S) -> Result<Option<crate::charts::Chart>>
+    pub fn chart<'a, S>(&self, selector: S) -> FamilyResult<Option<crate::charts::Chart>>
     where
         S: Into<crate::charts::Selector<'a>>,
     {
-        self.charts()?.get(selector).map(|chart| chart.cloned())
+        Ok(self.charts()?.get(selector).map(|chart| chart.cloned())?)
     }
 
     /// Find a worksheet by its exact ODF name.
@@ -868,7 +894,7 @@ impl Workbook {
     pub fn cell_batch(
         &self,
         selectors: &[CellSelector<'_>],
-    ) -> Result<Vec<Option<crate::worksheet::CellView<'_>>>> {
+    ) -> FamilyResult<Vec<Option<crate::worksheet::CellView<'_>>>> {
         validate_cell_batch_len(selectors.len())?;
         let mut values = Vec::new();
         values
@@ -887,7 +913,7 @@ impl Workbook {
     pub fn cells(
         &self,
         selectors: &[CellSelector<'_>],
-    ) -> Result<Vec<Option<crate::worksheet::CellView<'_>>>> {
+    ) -> FamilyResult<Vec<Option<crate::worksheet::CellView<'_>>>> {
         self.cell_batch(selectors)
     }
 
@@ -895,13 +921,13 @@ impl Workbook {
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn images(&self) -> Result<Vec<crate::media::Image>> {
+    pub fn images(&self) -> FamilyResult<Vec<crate::media::Image>> {
         let package = self.inner.package.package().package()?;
-        crate::media::scan_package(
+        Ok(crate::media::scan_package(
             self.inner.package.content_xml(),
             self.inner.package.styles_xml(),
             &package,
-        )
+        )?)
     }
 
     /// Inspect inert conditional-format, sparkline, hyperlink, and in-table
@@ -909,8 +935,10 @@ impl Workbook {
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn source_features(&self) -> Result<crate::source_features::Snapshot> {
-        crate::source_features::Snapshot::parse(self.inner.package.content_xml())
+    pub fn source_features(&self) -> FamilyResult<crate::source_features::Snapshot> {
+        Ok(crate::source_features::Snapshot::parse(
+            self.inner.package.content_xml(),
+        )?)
     }
 
     /// Inspect the source-backed content-validation catalog and compact cell bindings.
@@ -931,13 +959,13 @@ impl Workbook {
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn embedded_objects(&self) -> Result<Vec<crate::embedded::Object>> {
+    pub fn embedded_objects(&self) -> FamilyResult<Vec<crate::embedded::Object>> {
         let package = self.inner.package.package().package()?;
-        crate::embedded::scan_package(
+        Ok(crate::embedded::scan_package(
             self.inner.package.content_xml(),
             self.inner.package.styles_xml(),
             &package,
-        )
+        )?)
     }
 
     /// Return bytes only for inline or verified package-contained images.
@@ -945,11 +973,11 @@ impl Workbook {
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn image_bytes(&self, image: &crate::media::Image) -> Result<Option<Vec<u8>>> {
+    pub fn image_bytes(&self, image: &crate::media::Image) -> FamilyResult<Option<Vec<u8>>> {
         match &image.source {
             crate::media::Source::Inline { bytes, .. } => Ok(Some(bytes.clone())),
             crate::media::Source::PackagePart { path, .. } => {
-                self.inner.package.package().get_file(path).map(Some)
+                Ok(self.inner.package.package().get_file(path).map(Some)?)
             },
             crate::media::Source::MissingPackagePart { .. }
             | crate::media::Source::Linked { .. }
@@ -974,11 +1002,11 @@ impl Workbook {
     /// # Errors
     ///
     /// Returns an error when the retained package cannot be reparsed.
-    pub fn definitions_snapshot(&self) -> Result<crate::definitions::Snapshot> {
-        crate::definitions::Snapshot::from_bytes_with_xml_limits(
+    pub fn definitions_snapshot(&self) -> FamilyResult<crate::definitions::Snapshot> {
+        Ok(crate::definitions::Snapshot::from_bytes_with_xml_limits(
             self.inner.package.package().as_bytes().to_vec(),
             self.inner.xml_limits,
-        )
+        )?)
     }
 
     /// Return named ranges in their document order.
@@ -1021,7 +1049,7 @@ impl Workbook {
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub(crate) fn add_range(&mut self, range: Range) -> Result<()> {
+    pub(crate) fn add_range(&mut self, range: Range) -> CoreResult<()> {
         self.add_definition(range.into())
     }
 
@@ -1029,7 +1057,7 @@ impl Workbook {
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub(crate) fn add_expression(&mut self, expression: Expression) -> Result<()> {
+    pub(crate) fn add_expression(&mut self, expression: Expression) -> CoreResult<()> {
         self.add_definition(expression.into())
     }
 
@@ -1037,7 +1065,7 @@ impl Workbook {
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub(crate) fn add_definition(&mut self, definition: Definition) -> Result<()> {
+    pub(crate) fn add_definition(&mut self, definition: Definition) -> CoreResult<()> {
         let mut candidate = self.inner.definitions.clone();
         candidate.push(definition);
         self.set_definitions(candidate)
@@ -1047,7 +1075,7 @@ impl Workbook {
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub(crate) fn set_definitions(&mut self, definitions: Vec<Definition>) -> Result<()> {
+    pub(crate) fn set_definitions(&mut self, definitions: Vec<Definition>) -> CoreResult<()> {
         let updated = crate::codec::names::replace(self.inner.package.content_xml(), &definitions)?;
         let package = self.inner.package.replace_content_xml(&updated)?;
         *self = Self::from_package(package)?;
@@ -1055,14 +1083,17 @@ impl Workbook {
     }
 
     /// Publish a validated worksheet snapshot as one package transaction.
-    pub(crate) fn publish_sheets(&mut self, sheets: Vec<crate::worksheet::Sheet>) -> Result<()> {
+    pub(crate) fn publish_sheets(
+        &mut self,
+        sheets: Vec<crate::worksheet::Sheet>,
+    ) -> CoreResult<()> {
         crate::worksheet::package::validate_owned_link_delta(&self.inner.sheets, &sheets)?;
         let package = self.inner.package.replace_sheets(&sheets)?;
         *self = Self::from_package(package)?;
         Ok(())
     }
 
-    pub(crate) fn publish_metadata(&mut self, metadata: litchi_core::Metadata) -> Result<()> {
+    pub(crate) fn publish_metadata(&mut self, metadata: litchi_core::Metadata) -> CoreResult<()> {
         let package = self.inner.package.metadata_snapshot()?;
         let mut transaction = package.transaction();
         transaction.replace(metadata)?;
@@ -1083,7 +1114,7 @@ impl Workbook {
         Ok(())
     }
 
-    pub(crate) fn remove_metadata(&mut self) -> Result<()> {
+    pub(crate) fn remove_metadata(&mut self) -> CoreResult<()> {
         let snapshot = self.inner.package.metadata_snapshot()?;
         let mut transaction = snapshot.transaction();
         transaction.remove();
@@ -1099,7 +1130,7 @@ impl Workbook {
     pub(crate) fn publish_settings(
         &mut self,
         settings: Option<crate::settings::Settings>,
-    ) -> Result<()> {
+    ) -> CoreResult<()> {
         if self.inner.settings == settings {
             return Ok(());
         }
@@ -1116,8 +1147,10 @@ impl Workbook {
     /// # Errors
     ///
     /// Returns an error when the manifest or a declared graph is invalid.
-    pub fn rdf_graphs(&self) -> Result<Vec<Graph>> {
-        litchi_odf_common::rdf::graphs(self.inner.package.package())
+    pub fn rdf_graphs(&self) -> FamilyResult<Vec<Graph>> {
+        Ok(litchi_odf_common::rdf::graphs(
+            self.inner.package.package(),
+        )?)
     }
 
     /// Capture RDF graphs as an immutable, exact-package snapshot.
@@ -1125,10 +1158,12 @@ impl Workbook {
     /// # Errors
     ///
     /// Returns an error when the package, manifest, or a declared graph is invalid.
-    pub fn rdf_snapshot(&self) -> Result<crate::metadata_graphs::Snapshot> {
-        crate::metadata_graphs::Snapshot::from_bytes_with_xml_limits(
-            self.inner.package.package().as_bytes().to_vec(),
-            self.inner.xml_limits,
+    pub fn rdf_snapshot(&self) -> FamilyResult<crate::metadata_graphs::Snapshot> {
+        Ok(
+            crate::metadata_graphs::Snapshot::from_bytes_with_xml_limits(
+                self.inner.package.package().as_bytes().to_vec(),
+                self.inner.xml_limits,
+            )?,
         )
     }
 
@@ -1137,7 +1172,10 @@ impl Workbook {
     /// # Errors
     ///
     /// Returns an error for a stale patch or invalid candidate package.
-    pub(crate) fn apply_rdf_patch(&mut self, patch: &crate::metadata_graphs::Patch) -> Result<()> {
+    pub(crate) fn apply_rdf_patch(
+        &mut self,
+        patch: &crate::metadata_graphs::Patch,
+    ) -> CoreResult<()> {
         let commit = patch.apply(&self.rdf_snapshot()?)?;
         self.publish_rdf_commit(commit)
     }
@@ -1151,7 +1189,7 @@ impl Workbook {
         &mut self,
         preferred_path: Option<&str>,
         triples: &[Triple],
-    ) -> Result<String> {
+    ) -> CoreResult<String> {
         let snapshot = self.rdf_snapshot()?;
         let mut edit = snapshot.edit();
         let path = edit.add_graph(preferred_path, triples)?;
@@ -1164,7 +1202,7 @@ impl Workbook {
     /// # Errors
     ///
     /// Returns an error when the graph, triples, compact XML, or rebuilt package is invalid.
-    pub(crate) fn replace_rdf_graph(&mut self, path: &str, triples: &[Triple]) -> Result<()> {
+    pub(crate) fn replace_rdf_graph(&mut self, path: &str, triples: &[Triple]) -> CoreResult<()> {
         let snapshot = self.rdf_snapshot()?;
         let mut edit = snapshot.edit();
         edit.replace_graph(path, triples)?;
@@ -1176,7 +1214,7 @@ impl Workbook {
     /// # Errors
     ///
     /// Returns an error when the graph is missing, referenced, or package rebuilding fails.
-    pub(crate) fn remove_rdf_graph(&mut self, path: &str) -> Result<()> {
+    pub(crate) fn remove_rdf_graph(&mut self, path: &str) -> CoreResult<()> {
         let snapshot = self.rdf_snapshot()?;
         let mut edit = snapshot.edit();
         edit.remove_graph(path)?;
@@ -1188,7 +1226,7 @@ impl Workbook {
     /// # Errors
     ///
     /// Returns an error when the graph, triple, compact XML, or rebuilt package is invalid.
-    pub(crate) fn add_rdf_triple(&mut self, path: &str, triple: &Triple) -> Result<usize> {
+    pub(crate) fn add_rdf_triple(&mut self, path: &str, triple: &Triple) -> CoreResult<usize> {
         let snapshot = self.rdf_snapshot()?;
         let mut edit = snapshot.edit();
         let position = edit.add_triple(path, triple)?;
@@ -1206,7 +1244,7 @@ impl Workbook {
         path: &str,
         index: usize,
         triple: &Triple,
-    ) -> Result<()> {
+    ) -> CoreResult<()> {
         let snapshot = self.rdf_snapshot()?;
         let mut edit = snapshot.edit();
         edit.replace_triple(path, litchi_core::Position::new(index), triple)?;
@@ -1218,7 +1256,7 @@ impl Workbook {
     /// # Errors
     ///
     /// Returns an error when the graph, position, compact XML, or rebuilt package is invalid.
-    pub(crate) fn remove_rdf_triple(&mut self, path: &str, index: usize) -> Result<()> {
+    pub(crate) fn remove_rdf_triple(&mut self, path: &str, index: usize) -> CoreResult<()> {
         let snapshot = self.rdf_snapshot()?;
         let mut edit = snapshot.edit();
         edit.remove_triple(path, litchi_core::Position::new(index))?;
@@ -1230,7 +1268,7 @@ impl Workbook {
     /// # Errors
     ///
     /// Returns an error when either position, the graph, or rebuilt package is invalid.
-    pub(crate) fn move_rdf_triple(&mut self, path: &str, from: usize, to: usize) -> Result<()> {
+    pub(crate) fn move_rdf_triple(&mut self, path: &str, from: usize, to: usize) -> CoreResult<()> {
         let snapshot = self.rdf_snapshot()?;
         let mut edit = snapshot.edit();
         edit.move_triple(
@@ -1241,7 +1279,7 @@ impl Workbook {
         self.publish_rdf_commit(edit.commit())
     }
 
-    fn publish_rdf_commit(&mut self, commit: crate::metadata_graphs::Commit) -> Result<()> {
+    fn publish_rdf_commit(&mut self, commit: crate::metadata_graphs::Commit) -> CoreResult<()> {
         if commit.changed() {
             let snapshot = commit.into_snapshot();
             let package = crate::package::Archive::from_bytes_with_xml_limits(

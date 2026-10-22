@@ -1,6 +1,7 @@
 #![allow(clippy::unwrap_used, reason = "test assertions use unwrap for clarity")]
 
-use litchi_core::{Error, HistoryLimits, Position};
+use litchi_core::{HistoryLimits, Position};
+use litchi_odf_common::Error;
 use litchi_odf_common::core::PackageWriter;
 use litchi_odm::{
     Package,
@@ -273,7 +274,7 @@ fn transfer_durable_stale_and_three_way_plan_share_the_strong_boundary() {
     );
     assert!(matches!(
         decoded.apply(transfer_commit.package()),
-        Err(Error::PatchConflict)
+        Err(Error::PatchConflict { .. })
     ));
 
     let mut metadata = source.document().metadata().unwrap().clone();

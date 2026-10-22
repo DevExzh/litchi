@@ -882,9 +882,9 @@ pub(crate) fn stage_metadata(source: &Package, metadata: &Metadata) -> Result<St
     let source_xml = source
         .meta_xml()?
         .ok_or_else(|| invalid("ODM metadata editing requires meta.xml"))?;
-    let parsed = OdfMetadata::from_xml(&source_xml)?;
+    let parsed = OdfMetadata::from_xml(&source_xml, source.xml_limits_value())?;
     let patch = MetaXmlPatch::preserve_all().diff_simple_fields(&parsed, metadata);
-    patch_meta_xml(&source_xml, &patch)?
+    patch_meta_xml(&source_xml, &patch, source.xml_limits_value())?
         .ok_or_else(|| invalid("ODM metadata editing requires office:meta"))
 }
 

@@ -1,6 +1,7 @@
 #![allow(clippy::unwrap_used, reason = "test assertions use unwrap for clarity")]
 
-use litchi_core::{Error, HistoryLimits, Position};
+use litchi_core::{HistoryLimits, Position};
+use litchi_odf_common::Error;
 use litchi_odf_common::{
     compact_xml,
     core::{PackageWriter, Profile},
@@ -187,7 +188,10 @@ fn durable_patch_merge_and_bounded_history_preserve_lineage() {
         decoded.inverse().apply(&applied).unwrap().as_bytes(),
         source.as_bytes()
     );
-    assert!(matches!(decoded.apply(&applied), Err(Error::PatchConflict)));
+    assert!(matches!(
+        decoded.apply(&applied),
+        Err(Error::PatchConflict { .. })
+    ));
 
     let mut history = source.history(HistoryLimits::new(4, u64::MAX));
     history.record(&title_commit).unwrap();
@@ -198,7 +202,7 @@ fn durable_patch_merge_and_bounded_history_preserve_lineage() {
     assert_eq!(history.current().document().title(), Some("Merged title"));
     assert!(matches!(
         history.record(&title_commit),
-        Err(Error::PatchConflict)
+        Err(Error::PatchConflict { .. })
     ));
 }
 

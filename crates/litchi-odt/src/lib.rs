@@ -7,8 +7,8 @@
 //! # Implementation Progress
 //!
 //! ## ✅ Reading (`document.rs`, `parser.rs`) - COMPLETE
-//! - ✅ `Package::open().map_err(litchi_core::Error::from).and_then(|package| package.document())` - Load from file path
-//! - ✅ `Package::from_bytes(&).map_err(litchi_core::Error::from).and_then(|package| package.document())` - Load from memory
+//! - ✅ `Package::open().and_then(|package| package.document())` - Load from file path
+//! - ✅ `Package::from_bytes(&).and_then(|package| package.document())` - Load from memory
 //! - ✅ `text()` - Extract all text content
 //! - ✅ `paragraphs()` - Parse all paragraphs with formatting
 //! - ✅ `tables()` - Parse tables with nested structure support
