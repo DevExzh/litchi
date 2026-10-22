@@ -2020,3 +2020,52 @@ See [0063](0063-source-pptx-modern-comments.md).
   exception is granted. Three workers continue these bounded repairs; native
   qualification, remaining integrations, the complete inventory/glossary sweep
   and final 53-check gate remain required. Nothing has been pushed.
+
+- Coordinator checkpoint (2026-10-22, resumed handoff and combined repairs):
+  Read the updated external `.coord/ctx-resume.txt` and
+  `.coord/triage-2026-10-22.md` before continuing. The replay integration
+  branch now includes trunk `a18593385c`, RTF through `5909588b99`, DOCX
+  paragraph-copy through `9f1b3eb45f`, and durable Ink through `f97f0eef7a`.
+  Its current head is `3c1d25de24`. Conflict resolutions preserve inverse
+  RTF diagnostics, generic return checking and Ink source-owner sharing.
+  Record 0362u retains 63 passing focused RTF tests and 144 combined DOCX
+  tests, strict DOCX/ops/XLSB Clippy, all five RTF result rules and fresh
+  DOCX minimal/full profiles with 42/43 result contracts. These are
+  integration receipts, not final performance or trunk acceptance.
+
+  The resumed full gate on older assembly `ad1c6cede8` completed: its actual
+  script ran 52 checks, with 48 passing and four failing. Workspace docs
+  passed, including the earlier memory-sensitive IWA documentation. Ops
+  failed on seven stale RTF consumers and two XLSB refusal assertions;
+  committed repairs `0641d926aa` and `759b09f0d9` now pass focused checks.
+  Facade/workspace tests also found a missing doctest import and ZIP refusal
+  mismatch; native-resave found an out-of-date lockfile. ZIP repair
+  `a4d69035be` passes 104 affected tests and strict Clippy on its branch.
+  The doctest and locked-tool repairs are being validated in the assembly.
+  All failed logs are preserved; the earlier 225-group run remains partial.
+
+  W4 owner compaction and sequential-reader policy propagation are committed
+  as `da0068d02b`: 1,816 library tests, five reader-policy tests, 18 tab-state
+  tests and Clippy pass. Its allocation residual and proof-backed history
+  costs remain unaccepted. Capability review found that old slicer/timeline
+  stores exposed physical relationship IDs and part names; the typed raw
+  replacement `47c89d20da` is under review for bounded policy, fidelity and
+  full validation. XLSB raw-policy slices reach `1309cfc15e`, but retained
+  default-policy leaks are still being repaired; its closure claim is not
+  accepted. No capability golden was changed to hide these gaps.
+
+  The updated signed-replay decision permits exact no-op replay on matching
+  signed content through both leaf and File, preserving signed bytes.
+  Candidate `7e7cfe421c` is under review for removal-authorized, changed-base
+  and freshness cases. Changed signed content remains refused. DOCX's fresh
+  inventory has 27 rows in implemented categories; variables and SVG
+  migrations are active, with remaining document/section/story work required.
+
+  Record 0361fda formally returns iWork constructor and retained-header
+  instruction regressions from the resumed 0361fd evidence. New constructor
+  repairs require matched measurement; no host-noise waiver applies. ODF
+  raw styles, W5 legacy costs, ODP retained-content heap and DOC body-toggle
+  work continue in isolated branches. Native qualification for all remaining
+  candidates, final inventory/glossary, corpus dispositions and the final
+  combined gate remain required. The user authorized additional parallel
+  workers; builds remain capped. Nothing has been pushed.
