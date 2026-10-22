@@ -1198,6 +1198,11 @@ impl Classify for litchi_opc::OpcError {
             Self::SourceChanged { .. }
             | Self::CentralDirectorySpool { .. }
             | Self::IncompleteOutput { .. } => Class::of(Code::IoError),
+            // A durable replay or restore supplied an authenticated artifact
+            // proof that does not describe the current/original artifact.
+            // The proof is caller-owned input, while a source that changes
+            // during the operation remains an I/O freshness failure above.
+            Self::SourceArtifactMismatch { .. } => Class::of(Code::InvalidInput),
             Self::Limit { .. }
             | Self::SourcePartSpliceLimit { .. }
             | Self::CentralDirectorySpoolLimitExceeded { .. } => Class::of(Code::LimitExceeded),
@@ -1286,6 +1291,15 @@ impl Classify for litchi_docx::Error {
             Self::Mce(error) if mce_limit(error) => Class::of(Code::LimitExceeded),
             Self::OutOfBounds { .. } => Class::of(Code::OutOfRange),
             Self::Refused(refusal) => refusal.classify(),
+            Self::ExternalHyperlinkDetachmentConflict
+            | Self::ExternalHyperlinkRedactionConflict
+            | Self::DocumentVariablesConflict
+            | Self::SectionLayoutStaleSource
+            | Self::SectionLayoutRevisionConflict
+            | Self::SectionLayoutForeignSource
+            | Self::SectionLayoutFingerprintConflict
+            | Self::SectionLayoutPolicyConflict
+            | Self::SectionLayoutAuthorizationConflict => Class::of(Code::InvalidInput),
             Self::PatchConflict { .. } => Class::of(Code::InvalidInput),
             Self::Allocation { .. }
             | Self::RevisionAllocation { .. }
