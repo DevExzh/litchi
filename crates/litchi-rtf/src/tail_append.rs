@@ -2040,6 +2040,7 @@ impl TailAppendSourceEdit {
             publication_limits,
             root_close,
             inserted,
+            direction: Direction::Append,
             source_digest,
             target_digest,
             source_bytes: source_length_usize,
@@ -2068,6 +2069,7 @@ pub(crate) struct TailAppendSourcePublicationPlan {
     publication_limits: TailAppendPublicationLimits,
     root_close: usize,
     inserted: Box<[u8]>,
+    direction: Direction,
     source_digest: String,
     target_digest: String,
     source_bytes: usize,
@@ -2086,6 +2088,7 @@ impl fmt::Debug for TailAppendSourcePublicationPlan {
             .field("publication_limits", &self.publication_limits)
             .field("root_close", &self.root_close)
             .field("inserted_bytes", &self.inserted.len())
+            .field("direction", &self.direction)
             .field("source_digest", &self.source_digest)
             .field("target_digest", &self.target_digest)
             .field("source_bytes", &self.source_bytes)
@@ -2100,7 +2103,10 @@ impl TailAppendSourcePublicationPlan {
     /// Whether this plan is an exact source identity publication.
     #[must_use]
     pub(crate) const fn is_noop(&self) -> bool {
-        self.inserted.is_empty() && self.root_close == self.source_bytes
+        match self.direction {
+            Direction::Append => self.inserted.is_empty() && self.root_close == self.source_bytes,
+            Direction::Remove => false,
+        }
     }
 
     /// Exact source byte length captured during planning.
@@ -2118,7 +2124,10 @@ impl TailAppendSourcePublicationPlan {
     /// Exact output byte length.
     #[must_use]
     pub(crate) const fn output_bytes(&self) -> usize {
-        self.source_bytes.saturating_add(self.inserted.len())
+        match self.direction {
+            Direction::Append => self.source_bytes.saturating_add(self.inserted.len()),
+            Direction::Remove => self.source_bytes.saturating_sub(self.inserted.len()),
+        }
     }
 
     /// UTF-8 bytes copied while staging.
@@ -2162,6 +2171,76 @@ impl TailAppendSourcePublicationPlan {
     #[must_use]
     pub(crate) const fn publication_limits(&self) -> TailAppendPublicationLimits {
         self.publication_limits
+    }
+
+    /// Rebind this validated append plan to an independently opened equal
+    /// source. Inverse replay removes the exact inserted span and swaps the
+    /// authenticated source/target digests; no complete artifact is retained.
+    pub(crate) fn rebase(
+        &self,
+        source: Arc<dyn ReadAt>,
+        proof: TailAppendSourceProof,
+        publication_limits: TailAppendPublicationLimits,
+        inverse: bool,
+    ) -> Result<Self, TailAppendPublicationError> {
+        publication_limits.validate()?;
+        let source_bytes = if inverse {
+            self.output_bytes()
+        } else {
+            self.source_bytes
+        };
+        if proof.source_bytes != source_bytes {
+            return Err(TailAppendPublicationError::SourceLengthChanged {
+                expected: u64::try_from(source_bytes).unwrap_or(u64::MAX),
+                observed: u64::try_from(proof.source_bytes).unwrap_or(u64::MAX),
+            });
+        }
+        let source_digest = if inverse {
+            &self.target_digest
+        } else {
+            &self.source_digest
+        };
+        let target_digest = if inverse {
+            &self.source_digest
+        } else {
+            &self.target_digest
+        };
+        if proof.source_digest.as_str() != source_digest {
+            return Err(TailAppendPublicationError::SourceDigestChanged {
+                expected: source_digest.clone(),
+                observed: proof.source_digest.clone(),
+            });
+        }
+        let removed_end = self.root_close.checked_add(self.inserted.len()).ok_or(
+            TailAppendPublicationError::Plan(Error::unsupported_source(
+                "source-backed replay span overflows",
+            )),
+        )?;
+        if self.root_close > source_bytes || (inverse && removed_end > source_bytes) {
+            return Err(TailAppendPublicationError::Plan(Error::unsupported_source(
+                "source-backed replay span is outside the recipient source",
+            )));
+        }
+        Ok(Self {
+            source,
+            proof,
+            selector: self.selector,
+            append_limits: self.append_limits,
+            publication_limits,
+            root_close: self.root_close,
+            inserted: self.inserted.clone(),
+            direction: if inverse {
+                Direction::Remove
+            } else {
+                self.direction
+            },
+            source_digest: source_digest.clone(),
+            target_digest: target_digest.clone(),
+            source_bytes,
+            input_bytes: self.input_bytes,
+            paragraphs: self.paragraphs,
+            runs: self.runs,
+        })
     }
 
     /// Emits against the plan's retained positional source.
@@ -2236,19 +2315,29 @@ impl TailAppendSourcePublicationPlan {
                 written: 0,
             }
         })?;
-        if source_length != self.source_bytes || self.root_close > source_length {
+        let removed_end = self.root_close.checked_add(self.inserted.len()).ok_or(
+            TailAppendPublicationError::Plan(Error::unsupported_source(
+                "source-backed publication span overflows",
+            )),
+        )?;
+        if source_length != self.source_bytes
+            || self.root_close > source_length
+            || (self.direction == Direction::Remove && removed_end > source_length)
+        {
             return Err(TailAppendPublicationError::Plan(Error::unsupported_source(
                 "source-backed publication bounds no longer match the proof",
             )));
         }
-        let output_length = source_length.checked_add(self.inserted.len()).ok_or(
-            TailAppendPublicationError::LimitExceeded {
-                resource: "output bytes",
-                observed: u64::MAX,
-                limit: u64::try_from(self.append_limits.max_output_bytes).unwrap_or(u64::MAX),
-                written: 0,
-            },
-        )?;
+        let output_length = match self.direction {
+            Direction::Append => source_length.checked_add(self.inserted.len()),
+            Direction::Remove => source_length.checked_sub(self.inserted.len()),
+        }
+        .ok_or(TailAppendPublicationError::LimitExceeded {
+            resource: "output bytes",
+            observed: u64::MAX,
+            limit: u64::try_from(self.append_limits.max_output_bytes).unwrap_or(u64::MAX),
+            written: 0,
+        })?;
         let expected_output = u64::try_from(output_length).map_err(|_error| {
             TailAppendPublicationError::LimitExceeded {
                 resource: "output bytes",
@@ -2330,11 +2419,12 @@ impl TailAppendSourcePublicationPlan {
             .map_err(|error| publication_execution(error, 0))?;
         let mut source_scanned = 0usize;
         let mut inserted_scanned = 0usize;
-        let preflight = source_and_target_digest(
+        let preflight = source_and_target_digest_with_direction(
             source,
             source_length,
             self.root_close,
             &self.inserted,
+            self.direction,
             self.publication_limits.max_window_bytes,
             Some(context),
             &mut source_scanned,
@@ -2483,8 +2573,8 @@ impl TailAppendSourcePublicationPlan {
             &mut writes,
             &mut largest_write,
         )
-        .and_then(|()| {
-            write_publication_segment(
+        .and_then(|()| match self.direction {
+            Direction::Append => write_publication_segment(
                 sink,
                 &self.inserted,
                 chunk_limit,
@@ -2493,12 +2583,17 @@ impl TailAppendSourcePublicationPlan {
                 &mut accepted,
                 &mut writes,
                 &mut largest_write,
-            )
+            ),
+            Direction::Remove => Ok(()),
         })
         .and_then(|()| {
             write_source_segment(
                 source,
-                root_close,
+                if self.direction == Direction::Remove {
+                    removed_end
+                } else {
+                    root_close
+                },
                 source_length,
                 &mut source_window,
                 sink,
@@ -2628,11 +2723,12 @@ impl TailAppendSourcePublicationPlan {
             });
         }
         drop(source_window);
-        let final_digest = match source_and_target_digest(
+        let final_digest = match source_and_target_digest_with_direction(
             source,
             source_length,
             self.root_close,
             &self.inserted,
+            self.direction,
             self.publication_limits.max_window_bytes,
             Some(context),
             &mut source_scanned,
@@ -2740,7 +2836,11 @@ impl TailAppendSourcePublicationPlan {
         Ok(crate::source_backed::Report {
             bytes: output_length,
             source_bytes: self.source_bytes,
-            inserted_bytes: self.inserted.len(),
+            inserted_bytes: if self.direction == Direction::Append {
+                self.inserted.len()
+            } else {
+                0
+            },
             source_version: self.proof.source_version,
             source_digest: final_digest,
             target_digest: self.target_digest.clone(),
@@ -2762,7 +2862,7 @@ impl TailAppendSourcePublicationPlan {
     pub(crate) fn to_durable(&self) -> Result<DurableTailAppendPatch, Error> {
         let wire = DurableTailAppendPatch {
             selector: self.selector,
-            direction: Direction::Append,
+            direction: self.direction,
             before_digest: self.source_digest.clone(),
             after_digest: self.target_digest.clone(),
             before_bytes: self.source_bytes,
@@ -3016,17 +3116,55 @@ fn source_and_target_digest(
     source_scanned: &mut usize,
     inserted_scanned: &mut usize,
 ) -> Result<(String, String), SourceScanFailure> {
+    source_and_target_digest_with_direction(
+        source,
+        source_length,
+        root_close,
+        inserted,
+        Direction::Append,
+        window_limit,
+        context,
+        source_scanned,
+        inserted_scanned,
+    )
+}
+
+fn source_and_target_digest_with_direction(
+    source: &dyn ReadAt,
+    source_length: usize,
+    root_close: usize,
+    inserted: &[u8],
+    direction: Direction,
+    window_limit: usize,
+    context: Option<&ExecutionContext>,
+    source_scanned: &mut usize,
+    inserted_scanned: &mut usize,
+) -> Result<(String, String), SourceScanFailure> {
     if window_limit == 0 || root_close > source_length {
         return Err(SourceScanFailure::Io(io::Error::new(
             io::ErrorKind::InvalidInput,
             "source digest window or root offset is invalid",
         )));
     }
+    let removed_end = root_close.checked_add(inserted.len()).ok_or_else(|| {
+        SourceScanFailure::Io(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "source digest span overflows",
+        ))
+    })?;
+    if direction == Direction::Remove && removed_end > source_length {
+        return Err(SourceScanFailure::Io(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "source digest removal is outside the source",
+        )));
+    }
     let mut source_hasher = Sha256::new();
     let mut target_hasher = Sha256::new();
     if source_length == 0 {
-        target_hasher.update(inserted);
-        *inserted_scanned = (*inserted_scanned).saturating_add(inserted.len());
+        if direction == Direction::Append {
+            target_hasher.update(inserted);
+            *inserted_scanned = (*inserted_scanned).saturating_add(inserted.len());
+        }
         return Ok((sha256_hex(source_hasher), sha256_hex(target_hasher)));
     }
     let window_limit = window_limit.min(source_length);
@@ -3038,28 +3176,47 @@ fn source_and_target_digest(
             requested: window_limit,
         })?;
     window.resize(window_limit, 0);
-    hash_source_range(
-        source,
-        0,
-        root_close,
-        &mut window,
-        &mut source_hasher,
-        &mut target_hasher,
-        context,
-        source_scanned,
-    )?;
-    target_hasher.update(inserted);
-    *inserted_scanned = (*inserted_scanned).saturating_add(inserted.len());
-    hash_source_range(
-        source,
-        root_close,
-        source_length,
-        &mut window,
-        &mut source_hasher,
-        &mut target_hasher,
-        context,
-        source_scanned,
-    )?;
+    match direction {
+        Direction::Append => {
+            hash_source_range(
+                source,
+                0,
+                root_close,
+                &mut window,
+                &mut source_hasher,
+                &mut target_hasher,
+                None,
+                context,
+                source_scanned,
+            )?;
+            target_hasher.update(inserted);
+            *inserted_scanned = (*inserted_scanned).saturating_add(inserted.len());
+            hash_source_range(
+                source,
+                root_close,
+                source_length,
+                &mut window,
+                &mut source_hasher,
+                &mut target_hasher,
+                None,
+                context,
+                source_scanned,
+            )?;
+        },
+        Direction::Remove => {
+            hash_source_range(
+                source,
+                0,
+                source_length,
+                &mut window,
+                &mut source_hasher,
+                &mut target_hasher,
+                Some((root_close, removed_end)),
+                context,
+                source_scanned,
+            )?;
+        },
+    }
     Ok((sha256_hex(source_hasher), sha256_hex(target_hasher)))
 }
 
@@ -3070,6 +3227,7 @@ fn hash_source_range(
     window: &mut [u8],
     source_hasher: &mut Sha256,
     target_hasher: &mut Sha256,
+    target_skip: Option<(usize, usize)>,
     context: Option<&ExecutionContext>,
     source_scanned: &mut usize,
 ) -> Result<(), SourceScanFailure> {
@@ -3084,7 +3242,23 @@ fn hash_source_range(
         })?;
         read_source_window(source, offset, chunk, context, source_scanned)?;
         source_hasher.update(&*chunk);
-        target_hasher.update(&*chunk);
+        if let Some((skip_start, skip_end)) = target_skip {
+            let chunk_end = offset.saturating_add(count);
+            if skip_end <= offset || skip_start >= chunk_end {
+                target_hasher.update(&*chunk);
+            } else {
+                let left_end = skip_start.min(chunk_end);
+                if left_end > offset {
+                    target_hasher.update(&chunk[..left_end - offset]);
+                }
+                let right_start = skip_end.max(offset);
+                if right_start < chunk_end {
+                    target_hasher.update(&chunk[right_start - offset..]);
+                }
+            }
+        } else {
+            target_hasher.update(&*chunk);
+        }
         offset = offset.saturating_add(count);
     }
     Ok(())
