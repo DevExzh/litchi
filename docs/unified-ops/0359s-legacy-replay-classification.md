@@ -47,8 +47,10 @@ All final validation commands passed:
 
 Two setup attempts failed before the final run and were corrected without
 changing the result: the first OLE command lacked the sparse tree's materialized
-`Cargo.lock` (`98cadf5d76374f8350a710f62ef8be21ce0e1e5a38a6e66723f3c8651319ac4b`,
-262 bytes), and the first DOC command addressed an internal test as a nonexistent
-integration target (`24a657b09d0cc776073c5d578aa2916f5fd832e6c18e739e9c62218cadec398e`,
-1,215 bytes).  Materializing `Cargo.lock` and using the crate's
-`internal_tests::*` target fixed both setup errors.
+`Cargo.lock` (`failure-01-missing-lock.log`, 262 bytes,
+`98cadf5d76374f8350a710f62ef8be21ce0e1e5a38a6e66723f3c8651319ac4b`), and the
+first DOC command addressed an internal test as a nonexistent integration target
+(`failure-02-wrong-test-target.log`, 1,215 bytes,
+`24a657b09d0cc776073c5d578aa2916f5fd832e6c18e739e9c62218cadec398e`).
+Materializing `Cargo.lock` and using the crate's `internal_tests::*` target fixed
+both setup errors.
