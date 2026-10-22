@@ -173,6 +173,7 @@ pub mod shapes;
 pub use document::Document;
 pub use drawable_order::DrawableLayerMove;
 pub use media::{EmbeddedMediaAsset, MediaAsset, MediaAssetId, MediaManager, MediaStats};
+pub use litchi_iwa_archive::LimitKind;
 pub use litchi_core::edit::Diagnostics;
 pub use package::{Commit, Edit, Package, Patch};
 /// The host package under its crate-internal name, distinct from the leaf

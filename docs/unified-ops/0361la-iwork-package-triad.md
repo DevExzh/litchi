@@ -30,9 +30,11 @@ commit accessor for a snapshot rather than the package required by the
 contract. Raw package capability is preserved by the public
 `Package::edit() -> Edit` family: `Edit` exposes the bounded entry and archive
 operations, and `Edit::commit()` publishes the same shared triad. Dropping an
-edit discards its copy-on-write candidate, while `Package::apply(&Patch)` is
-the replay family. There is no generic callback publication wrapper or
-compatibility patch spelling.
+edit discards its copy-on-write candidate; output is available from the
+committed `Package`, while `Package::apply(&Patch)` is the replay family.
+There is no generic callback publication wrapper or compatibility patch
+spelling. The edit inherits the source package's checked `PackageLimits`; a
+failed staged operation leaves both the edit candidate and source unchanged.
 
 The stale-base path is crate-owned `Error::PatchConflict` with its fixed
 content-free reason. `SourceChanged` remains a separate source freshness error.
@@ -44,11 +46,13 @@ future adapter at that boundary must classify these errors as required by
 ## Consumers and fidelity
 
 Package tests now exercise clone-based copy-on-write reads, package-level
-triad replay and inverse replay, no-op byte preservation, stale conflict
-classification, dropped/final-validation edit discard, indexed reads, and
-streaming output. Existing format editors continue to use the crate-private
-raw mutation seam and retain their prior entry ordering, archive validation,
-source retention, and bounded output behavior.
+triad replay on an independently reopened matching-content package, inverse
+replay, no-op byte preservation, stale conflict classification,
+dropped/final-validation edit discard, atomic limit rejection, indexed reads,
+and streaming output from the committed package. Existing format editors
+continue to use the crate-private raw mutation seam and retain their prior
+entry ordering, archive validation, source retention, and bounded output
+behavior.
 
 The 0361l detector migration and its consumers remain in the same branch and
 record. No compatibility alias or deprecation is introduced.

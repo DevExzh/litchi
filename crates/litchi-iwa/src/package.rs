@@ -1224,21 +1224,6 @@ impl Edit {
         self.candidate.validate()
     }
 
-    /// Encode the staged package as a ZIP.
-    pub fn to_bytes(&self) -> Result<Vec<u8>> {
-        self.candidate.to_bytes()
-    }
-
-    /// Stream the staged package as a ZIP to a caller-owned sink.
-    pub fn write_to<W: Write>(&self, sink: W) -> Result<()> {
-        self.candidate.write_to(sink)
-    }
-
-    /// Atomically save the staged package to a regular file.
-    pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<()> {
-        self.candidate.save(path)
-    }
-
     /// Discard all staged operations and restore the source package.
     pub fn reset(&mut self) {
         self.candidate = self.source.clone();
@@ -2166,7 +2151,8 @@ mod tests {
             Some(b"changed".as_slice())
         );
 
-        let replayed = source.apply(commit.patch())?;
+        let reopened = Package::from_bytes(&source.to_bytes()?)?;
+        let replayed = reopened.apply(commit.patch())?;
         assert_eq!(
             replayed.package().entry("Data/changed"),
             Some(b"changed".as_slice())
@@ -2256,6 +2242,29 @@ mod tests {
         drop(edit);
         assert_eq!(source.len(), 1);
         assert_eq!(source.entry("Data/changed"), None);
+        Ok(())
+    }
+
+    #[test]
+    fn package_edit_rejects_limit_exceeding_stage_atomically() -> crate::Result<()> {
+        let limits = PackageLimits::new(1, 4, 4)?;
+        let mut package = empty_package_with_limits(limits);
+        package.insert_entry("Data/asset", vec![1, 2, 3, 4])?;
+        let source = package.clone();
+
+        let mut edit = source.edit();
+        assert_eq!(edit.limits(), limits);
+        let error = edit
+            .insert_entry("Data/asset", vec![1, 2, 3, 4, 5])
+            .unwrap_err();
+        assert!(error.to_string().contains("total size"));
+        assert_eq!(edit.entry("Data/asset"), Some([1, 2, 3, 4].as_slice()));
+
+        let commit = edit.commit()?;
+        assert!(!commit.diagnostics().changed());
+        assert!(commit.patch().is_empty());
+        assert_eq!(commit.package().entry("Data/asset"), source.entry("Data/asset"));
+        assert_eq!(source.entry("Data/asset"), Some([1, 2, 3, 4].as_slice()));
         Ok(())
     }
 
