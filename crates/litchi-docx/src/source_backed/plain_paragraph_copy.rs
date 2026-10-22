@@ -9,7 +9,8 @@ use litchi_core::Position;
 
 use crate::source_backed::Package;
 use crate::source_backed::deferred::{Change, source_family};
-use crate::source_backed::paragraph_copy::{self as record, EffectReport};
+use crate::source_backed::paragraph_copy::raw;
+use crate::source_backed::paragraph_copy_record as record;
 
 /// The record patch the family publishes.
 #[derive(Clone)]
@@ -36,9 +37,22 @@ impl Change for CopyChange {
     }
 }
 
-source_family!("plain-paragraph copy", CopyChange, record::Error);
+source_family!("plain-paragraph copy", CopyChange, raw::Error);
+
+pub use raw::{EffectReport, LimitKind};
 
 impl Patch {
+    /// Return the deterministic exact-copy effect.
+    #[must_use]
+    pub fn effect_report(&self) -> EffectReport {
+        self.change.0.effect_report()
+    }
+
+    /// Encode the durable record patch under the caller policy.
+    pub fn to_bytes(&self, limits: raw::Limits) -> Result<Vec<u8>, Error> {
+        self.durable()?.to_bytes(limits)
+    }
+
     /// The durable record patch of this change, bound to the complete
     /// artifact it applies to: for a commit's patch, the artifact of the
     /// package it was committed on; for its inverse, the committed
@@ -48,29 +62,27 @@ impl Patch {
     /// # Errors
     ///
     /// Returns a source or resource error while fingerprinting the artifact.
-    pub fn durable(&self) -> Result<record::Patch, Error> {
-        Ok(match &self.restore {
+    pub fn durable(&self) -> Result<raw::Patch, Error> {
+        Ok(raw::Patch::from_record(match &self.restore {
             Some((before, _)) => self.change.0.clone().rebound(before.output_fingerprint()?),
             None => self.change.0.clone(),
-        })
+        }))
     }
 }
 
-impl From<record::Patch> for Patch {
+impl From<raw::Patch> for Patch {
     /// Replay a record patch onto a package whose main document holds its
     /// before bytes.
-    fn from(patch: record::Patch) -> Self {
+    fn from(patch: raw::Patch) -> Self {
         Self {
-            change: CopyChange(patch),
+            change: CopyChange(patch.into_record()),
             restore: None,
         }
     }
 }
 
-/// The budgets of this family, reported by [`record::Error::Limit`].
-pub use crate::source_backed::paragraph_copy::LimitKind;
-
-/// A staged copy of one plain paragraph. The source is never changed:
+/// A staged copy of one plain paragraph. Its resource errors carry a
+/// [`LimitKind`] dimension. The source is never changed:
 /// [`Self::commit`] returns a new package.
 #[derive(Clone)]
 pub struct Edit {
@@ -93,8 +105,8 @@ impl Edit {
 
     /// The projected main story.
     #[must_use]
-    pub const fn projected(&self) -> &record::Snapshot {
-        self.inner.projected()
+    pub fn projected(&self) -> raw::Tree {
+        raw::Tree::from_record(self.inner.projected().clone())
     }
 
     /// Copy source paragraph `source` before insertion slot `before`, both
@@ -134,7 +146,7 @@ impl Package {
     ///
     /// # Errors
     ///
-    /// Returns the errors of [`Self::plain_paragraph_copy_snapshot`].
+    /// Returns the errors of the package's bounded plain-paragraph admission.
     pub fn edit_plain_paragraph_copy(&self) -> Result<Edit, Error> {
         Ok(Edit {
             package: self.clone(),
@@ -146,7 +158,7 @@ impl Package {
     ///
     /// # Errors
     ///
-    /// Returns [`record::Error::PatchConflict`] for another main story.
+    /// Returns a patch-conflict error for another main story.
     pub fn apply_plain_paragraph_copy(&self, patch: &Patch) -> Result<Commit, Error> {
         apply_change(self, patch)
     }

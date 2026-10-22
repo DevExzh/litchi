@@ -13,6 +13,9 @@ pub(crate) mod document_policy;
 mod ingress;
 mod ink;
 mod owner;
+#[path = "source_backed/paragraph_copy_record.rs"]
+#[allow(unreachable_pub)]
+mod paragraph_copy_record;
 mod svg_lifecycle;
 
 #[cfg(test)]
@@ -26,7 +29,6 @@ pub mod glossary_text;
 pub mod hyperlink_detachment;
 pub mod hyperlink_redaction;
 pub mod paragraph_copy;
-pub mod paragraph_remove;
 pub mod paragraph_stream;
 pub mod plain_paragraph_copy;
 pub mod plain_paragraph_removal;
