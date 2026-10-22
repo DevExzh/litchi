@@ -1842,3 +1842,20 @@ See [0063](0063-source-pptx-modern-comments.md).
   correction and the later unrelated host test. Required flat ODF raw
   limits, remaining wave integration, native qualification, the complete
   inventory and final gate stay open. Nothing has been pushed.
+
+- Coordinator checkpoint (2026-10-22, retained-header and integrated harness):
+  the Part A candidate through `fd5f513df6` now records all 109 untimed File
+  routes passing on integrated source `d39d179353`. Exact output and semantic
+  receipts match the worker run; native acceptance still awaits the final
+  integrated wave source. Constructor repair `536d7fdcca` closes the reproduced
+  stricter-policy bypass for retained unknown IWA headers; all 115 core tests
+  and Clippy pass. Its fresh matched-v5 build preserves all eight output files,
+  and all 15 allocation routes remain at or below the original reference.
+  V5 native qualification is pending; interrupted v4 attempts retain their
+  original source attribution. W4 continues repairing source-owner admission.
+  The W5 hybrid representation improves source-backed cells allocation but
+  leaves eager byte/peak residuals, so it remains under repair. Flat ODF raw
+  limits and the DOCX durable-ink Commit repair are active. These candidates
+  are unmerged; remaining content-matching replay, raw audits, complete
+  inventory/glossary closure, native qualification and the final gate remain
+  required. Nothing has been pushed.
