@@ -333,6 +333,54 @@ fn row_other_io_and_source_changes_are_io_error() {
     }
 }
 
+#[cfg(feature = "docx")]
+#[test]
+fn docx_recorded_replay_conflicts_are_invalid_input() {
+    use litchi_docx::Error as DocxError;
+
+    let conflicts: [fn() -> DocxError; 9] = [
+        || DocxError::ExternalHyperlinkDetachmentConflict,
+        || DocxError::ExternalHyperlinkRedactionConflict,
+        || DocxError::DocumentVariablesConflict,
+        || DocxError::SectionLayoutStaleSource,
+        || DocxError::SectionLayoutRevisionConflict,
+        || DocxError::SectionLayoutForeignSource,
+        || DocxError::SectionLayoutFingerprintConflict,
+        || DocxError::SectionLayoutPolicyConflict,
+        || DocxError::SectionLayoutAuthorizationConflict,
+    ];
+    for make_conflict in conflicts {
+        assert_code(make_conflict(), Code::InvalidInput);
+    }
+
+    assert_code(
+        DocxError::Opc(litchi_opc::OpcError::SourceArtifactMismatch {
+            artifact: "current",
+            field: "sha256",
+        }),
+        Code::InvalidInput,
+    );
+    assert_code(
+        DocxError::Opc(litchi_opc::OpcError::SourceArtifactMismatch {
+            artifact: "original",
+            field: "length",
+        }),
+        Code::InvalidInput,
+    );
+    let (expected, actual) = changed();
+    assert_code(
+        DocxError::Opc(litchi_opc::OpcError::SourceChanged { expected, actual }),
+        Code::IoError,
+    );
+
+    // This safety error is not a recorded-base mismatch and stays malformed
+    // until its own preservation semantics are reviewed.
+    assert_code(
+        DocxError::DocumentVariablesPreservation("unsafe preservation"),
+        Code::CorruptFile,
+    );
+}
+
 // Row: no format recognized -> `unsupported_format`, `detected: None`.
 #[test]
 fn row_unrecognized_input_is_unsupported_format_without_detection() {
