@@ -98,7 +98,12 @@ struct State {
     origin: Option<Arc<Path>>,
     /// The flat single-XML bytes (`.fodg`) a flat handle publishes; its
     /// owner is the leaf's packaged read projection (record 0292).
-    flat: Option<Box<[u8]>>,
+    flat: Option<FlatSource>,
+}
+
+struct FlatSource {
+    bytes: Box<[u8]>,
+    limits: litchi_odf_common::flat::Limits,
 }
 
 const fn assert_handle<T: Send + Sync + Clone>() {}
@@ -263,11 +268,12 @@ impl OdfTree {
     #[cfg(feature = "odg")]
     pub(crate) fn from_flat(bytes: Vec<u8>, options: &OpenOptions) -> Result<Self> {
         let format = FileFormat::Odg;
-        let parts = litchi_odf_common::flat::Parts::split(&bytes)
-            .map_err(|error| core_error(error, format))?;
+        let flat_limits = litchi_odf_common::flat::Limits::from_options(options.odf_open_options());
+        let parts = litchi_odf_common::flat::Parts::split(&bytes, &flat_limits)
+            .map_err(|error| odf_error(error, format))?;
         let package = parts
-            .to_bytes()
-            .map_err(|error| core_error(error, format))
+            .to_bytes(&flat_limits)
+            .map_err(|error| odf_error(error, format))
             .and_then(|zip| {
                 // The input limit applies to the original flat source. The
                 // generated ZIP is an internal projection; semantic policy
@@ -285,7 +291,10 @@ impl OdfTree {
             owner,
             tree: std::sync::OnceLock::from(tree),
             origin: None,
-            flat: Some(bytes.into_boxed_slice()),
+            flat: Some(FlatSource {
+                bytes: bytes.into_boxed_slice(),
+                limits: flat_limits,
+            }),
         })))
     }
 
@@ -293,15 +302,15 @@ impl OdfTree {
     /// a flat drawing republishes the edit of its packaged projection into
     /// its flat bytes, element by element (record 0292).
     pub(crate) fn republish(&self, owner: Owner) -> Result<Self> {
-        let Some(flat) = self.0.flat.as_deref() else {
+        let Some(flat) = self.0.flat.as_ref() else {
             return Self::from_commit(owner, self.origin().cloned());
         };
         let format = self.format();
-        let parts = litchi_odf_common::flat::Parts::split(flat)
-            .map_err(|error| core_error(error, format))?;
+        let parts = litchi_odf_common::flat::Parts::split(&flat.bytes, &flat.limits)
+            .map_err(|error| odf_error(error, format))?;
         let bytes = parts
-            .merge_package(flat, owner.as_bytes())
-            .map_err(|error| core_error(error, format))?;
+            .merge_package_projection(&flat.bytes, owner.as_bytes(), &flat.limits)
+            .map_err(|error| odf_error(error, format))?;
         // The edited package holds exactly the parts the republished flat
         // document splits into, so it stays the projection; its tree is
         // built on the first read.
@@ -309,7 +318,10 @@ impl OdfTree {
             owner,
             tree: std::sync::OnceLock::new(),
             origin: self.origin().cloned(),
-            flat: Some(bytes.into_boxed_slice()),
+            flat: Some(FlatSource {
+                bytes: bytes.into_boxed_slice(),
+                limits: flat.limits,
+            }),
         })))
     }
 
@@ -317,8 +329,8 @@ impl OdfTree {
     fn published(&self) -> &[u8] {
         self.0
             .flat
-            .as_deref()
-            .unwrap_or_else(|| self.0.owner.as_bytes())
+            .as_ref()
+            .map_or_else(|| self.0.owner.as_bytes(), |flat| flat.bytes.as_ref())
     }
 
     /// Adopt a package a leaf commit published and verified. The object

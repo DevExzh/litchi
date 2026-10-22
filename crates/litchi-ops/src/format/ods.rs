@@ -205,6 +205,14 @@ impl Ods {
         }
     }
 
+    /// The policy retained by a flat single-XML spreadsheet.
+    pub(crate) fn flat_options(&self) -> Option<litchi_odf_common::OpenOptions> {
+        match self.owner() {
+            OdsOwner::Flat(flat) => Some(flat.options()),
+            _ => None,
+        }
+    }
+
     /// Whether the owner defers package-member reads to the file, for the
     /// tests that pin each route's owner.
     #[cfg(test)]
@@ -398,9 +406,10 @@ impl Ods {
             // A flat spreadsheet's edits start from its packaged projection
             // and republish into the flat bytes (record 0292).
             OdsOwner::Flat(flat) => {
-                let parts =
-                    litchi_odf_common::flat::Parts::split(flat.as_bytes()).map_err(core_error)?;
-                let bytes = parts.to_bytes().map_err(core_error)?;
+                let flat_limits = litchi_odf_common::flat::Limits::from_options(flat.options());
+                let parts = litchi_odf_common::flat::Parts::split(flat.as_bytes(), &flat_limits)
+                    .map_err(odf_error)?;
+                let bytes = parts.to_bytes(&flat_limits).map_err(odf_error)?;
                 // The flat reader admitted the document; a projection the
                 // packaged reader refuses is a gap of the edit.
                 Package::from_bytes(&bytes).map_err(|error| {
