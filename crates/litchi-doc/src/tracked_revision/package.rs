@@ -3119,7 +3119,7 @@ impl RevisionEditor {
             // those buffers into the retained object owner before rendering;
             // otherwise the render would still observe the pre-toggle
             // package even though the semantic CHPX model is current.
-            self.commit()?;
+            self = self.commit_consuming()?;
         }
         if let Some(rendered) = self.retained_render.0.take() {
             return Ok(rendered);
@@ -3537,6 +3537,46 @@ impl RevisionEditor {
         }
         self.changed = true;
         Ok(())
+    }
+
+    /// Publishes a final pending CHPX edit from the owned stream buffers.
+    /// `finish_unchecked` consumes the revision editor, so retaining the
+    /// clone-first `commit` above for every reusable edit would allocate and
+    /// copy an intermediate `Vec` once more before `Arc<[u8]>` performs its
+    /// required allocation and copy. This path is private to the consuming
+    /// finish route; all reusable mutation paths keep the failure-atomic
+    /// clone-and-publish behavior of `commit`.
+    fn commit_consuming(mut self) -> Result<Self> {
+        self.flush_pending_chpx()?;
+        self.protection_policy.authorize(self.protection)?;
+        self.release_retained_render();
+
+        let mut replacements: SmallVec<[(&[String], Arc<[u8]>); 3]> = SmallVec::new();
+        let word = Arc::<[u8]>::from(std::mem::take(&mut self.word));
+        let table = Arc::<[u8]>::from(std::mem::take(&mut self.table));
+        replacements.push((self.word_path.as_slice(), word));
+        replacements.push((self.table_path.as_slice(), table));
+        if self.data_changed {
+            if self.package.stream(&self.data_path).is_some() {
+                let data = Arc::<[u8]>::from(std::mem::take(&mut self.data));
+                replacements.push((self.data_path.as_slice(), data));
+            } else {
+                self.package
+                    .add_stream(self.data_path.clone(), std::mem::take(&mut self.data))
+                    .map_err(PackageError::from)?;
+            }
+        }
+        self.package
+            .put_streams_shared(replacements)
+            .map_err(PackageError::from)?;
+        if self.retained_render_limit != 0 {
+            let rendered = crate::package::object_edit_bytes(&self.package)?;
+            if rendered.capacity() <= self.retained_render_limit {
+                self.retained_render.0 = Some(rendered);
+            }
+        }
+        self.changed = true;
+        Ok(self)
     }
 }
 
