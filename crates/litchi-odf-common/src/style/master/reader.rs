@@ -1,13 +1,15 @@
 //! Bounded ODF master-page and header/footer reader.
 
+use crate::core::{ResolvedReader, XmlStreamLimits};
 use std::collections::HashSet;
+
+type OdfResult<T> = std::result::Result<T, crate::Error>;
 
 use litchi_core::{Error, Result};
 use quick_xml::{
     XmlVersion,
     events::{BytesRef, BytesStart, Event},
     name::{Namespace, ResolveResult},
-    reader::NsReader,
 };
 
 use super::content::{MAX_EXPANDED_SPACES, parse};
@@ -24,11 +26,8 @@ const DRAW: &[u8] = DRAW_NAMESPACE;
 const DR3D: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:dr3d:1.0";
 const ANIM: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:animation:1.0";
 const PRESENTATION: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:presentation:1.0";
-const MAX_XML_BYTES: usize = 64 * 1_048_576;
 const MAX_FRAGMENT_BYTES: usize = 16 * 1_048_576;
 const MAX_TOTAL_CHILD_BYTES: usize = 32 * 1_048_576;
-const MAX_DEPTH: usize = 256;
-const MAX_EVENTS: usize = 1_000_000;
 const MAX_MASTER_PAGES: usize = 65_536;
 const MAX_CHILDREN: usize = 65_536;
 
@@ -76,7 +75,7 @@ fn byte_offset(offset: u64, context: &str) -> Result<usize> {
         .map_err(|error| invalid(format!("{context} byte offset is out of range: {error}")))
 }
 
-fn expanded(reader: &NsReader<&[u8]>, name: quick_xml::name::QName<'_>) -> ExpandedName {
+fn expanded(reader: &ResolvedReader<'_>, name: quick_xml::name::QName<'_>) -> ExpandedName {
     let (namespace, local) = reader.resolver().resolve_element(name);
     ExpandedName {
         namespace: match namespace {
@@ -208,7 +207,7 @@ fn push_child(
 }
 
 fn required_style_attr(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     element: &BytesStart<'_>,
     local: &[u8],
 ) -> Result<String> {
@@ -239,7 +238,7 @@ fn required_style_attr(
 }
 
 fn validate_header(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     element: &BytesStart<'_>,
     page: &Master,
 ) -> Result<()> {
@@ -253,55 +252,50 @@ fn validate_header(
     Ok(())
 }
 
-pub(crate) fn validate_schema(xml: &str, pages: &mut [Master]) -> Result<()> {
-    if xml.len() > MAX_XML_BYTES {
-        return Err(invalid("master-page XML exceeds 64 MiB"));
-    }
+pub(crate) fn validate_schema(
+    xml: &str,
+    pages: &mut [Master],
+    limits: XmlStreamLimits,
+) -> OdfResult<()> {
     if pages.len() > MAX_MASTER_PAGES {
-        return Err(invalid("styles XML has too many master pages"));
+        return Err(crate::Error::from(invalid(
+            "styles XML has too many master pages",
+        )));
     }
     let mut names = HashSet::new();
     for page in pages.iter_mut() {
         if page.name.is_empty() {
-            return Err(invalid("style:name must not be empty"));
+            return Err(crate::Error::from(invalid("style:name must not be empty")));
         }
         if !names.insert(page.name.clone()) {
-            return Err(invalid("duplicate style:master-page name"));
+            return Err(crate::Error::from(invalid(
+                "duplicate style:master-page name",
+            )));
         }
         page.children.clear();
     }
 
-    let mut reader = NsReader::from_str(xml);
+    let mut reader = ResolvedReader::from_xml(xml, limits)?;
     reader.config_mut().trim_text(false);
     let mut buffer = Vec::new();
     let mut stack: Vec<ExpandedName> = Vec::new();
     let mut active: Option<ActiveMaster> = None;
     let mut page_index = 0usize;
-    let mut events = 0usize;
     loop {
-        events += 1;
-        if events > MAX_EVENTS {
-            return Err(invalid("styles XML has too many events"));
-        }
         let start = byte_offset(reader.buffer_position(), "styles XML")?;
-        let (_, event) = reader
-            .read_resolved_event_into(&mut buffer)
-            .map_err(|error| invalid(format!("styles XML parsing error: {error}")))?;
+        let (_, event) = reader.read_resolved_event_into(&mut buffer)?;
         let end = byte_offset(reader.buffer_position(), "styles XML")?;
         match event.into_owned() {
             Event::Start(element) => {
-                if stack.len() >= MAX_DEPTH {
-                    return Err(invalid("styles XML exceeds 256 levels"));
-                }
                 let current = expanded(&reader, element.name());
                 let parent_is_master_styles = stack
                     .last()
                     .is_some_and(|parent| is_name(parent, OFFICE, b"master-styles"));
                 if is_name(&current, STYLE, b"master-page") {
                     if !parent_is_master_styles || active.is_some() {
-                        return Err(invalid(
+                        return Err(crate::Error::from(invalid(
                             "style:master-page must be a direct office:master-styles child",
-                        ));
+                        )));
                     }
                     let page = pages
                         .get(page_index)
@@ -334,9 +328,9 @@ pub(crate) fn validate_schema(xml: &str, pages: &mut [Master]) -> Result<()> {
                     .is_some_and(|parent| is_name(parent, OFFICE, b"master-styles"));
                 if is_name(&current, STYLE, b"master-page") {
                     if !parent_is_master_styles || active.is_some() {
-                        return Err(invalid(
+                        return Err(crate::Error::from(invalid(
                             "style:master-page must be a direct office:master-styles child",
-                        ));
+                        )));
                     }
                     let page = pages
                         .get(page_index)
@@ -370,7 +364,9 @@ pub(crate) fn validate_schema(xml: &str, pages: &mut [Master]) -> Result<()> {
                     && master.depth == depth
                 {
                     if master.child.is_some() {
-                        return Err(invalid("unterminated master-page child"));
+                        return Err(crate::Error::from(invalid(
+                            "unterminated master-page child",
+                        )));
                     }
                     active = None;
                 }
@@ -384,9 +380,9 @@ pub(crate) fn validate_schema(xml: &str, pages: &mut [Master]) -> Result<()> {
                     && stack.len() == master.depth
                     && !bytes.iter().all(u8::is_ascii_whitespace)
                 {
-                    return Err(invalid(
+                    return Err(crate::Error::from(invalid(
                         "non-whitespace text is not allowed directly in style:master-page",
-                    ));
+                    )));
                 }
             },
             Event::CData(value) => {
@@ -395,13 +391,15 @@ pub(crate) fn validate_schema(xml: &str, pages: &mut [Master]) -> Result<()> {
                     && stack.len() == master.depth
                     && !bytes.iter().all(u8::is_ascii_whitespace)
                 {
-                    return Err(invalid(
+                    return Err(crate::Error::from(invalid(
                         "non-whitespace CDATA is not allowed directly in style:master-page",
-                    ));
+                    )));
                 }
             },
             Event::DocType(_) | Event::PI(_) => {
-                return Err(invalid("DTDs and processing instructions are not allowed"));
+                return Err(crate::Error::from(invalid(
+                    "DTDs and processing instructions are not allowed",
+                )));
             },
             Event::Eof => break,
             Event::Comment(_) | Event::Decl(_) | Event::GeneralRef(_) => {},
@@ -409,7 +407,7 @@ pub(crate) fn validate_schema(xml: &str, pages: &mut [Master]) -> Result<()> {
         buffer.clear();
     }
     if active.is_some() || !stack.is_empty() || page_index != pages.len() {
-        return Err(invalid("truncated master-page XML"));
+        return Err(crate::Error::from(invalid("truncated master-page XML")));
     }
     Ok(())
 }
@@ -420,11 +418,11 @@ pub(crate) fn validate_schema(xml: &str, pages: &mut [Master]) -> Result<()> {
 ///
 /// Returns an error when the XML is malformed, exceeds resource limits, or
 /// cannot be reconciled with the ODF master-page schema.
-pub fn read(source: &str) -> Result<Vec<Master>> {
+pub fn read(source: &str, limits: XmlStreamLimits) -> OdfResult<Vec<Master>> {
     // quick-xml strips a UTF-8 BOM and reports positions relative to the
     // stripped text, so slice against the same view.
     let xml = source.strip_prefix('\u{FEFF}').unwrap_or(source);
-    let mut reader = NsReader::from_str(xml);
+    let mut reader = ResolvedReader::from_xml(xml, limits)?;
     let mut buffer = Vec::new();
     let mut pages = Vec::new();
     let mut active_master: Option<MasterBuilder> = None;
@@ -432,9 +430,7 @@ pub fn read(source: &str) -> Result<Vec<Master>> {
 
     loop {
         let event_start = byte_offset(reader.buffer_position(), "styles XML")?;
-        let (namespace, parsed_event) = reader
-            .read_resolved_event_into(&mut buffer)
-            .map_err(|error| Error::InvalidFormat(format!("styles.xml parsing error: {error}")))?;
+        let (namespace, parsed_event) = reader.read_resolved_event_into(&mut buffer)?;
         let style_element = bound_to(&namespace, STYLE_NAMESPACE);
         let text_element = bound_to(&namespace, TEXT_NAMESPACE);
         let event = parsed_event.into_owned();
@@ -445,9 +441,9 @@ pub fn read(source: &str) -> Result<Vec<Master>> {
                 if style_element && element.local_name().as_ref() == b"master-page" =>
             {
                 if active_master.is_some() {
-                    return Err(Error::InvalidFormat(
+                    return Err(crate::Error::from(Error::InvalidFormat(
                         "nested style:master-page element".to_string(),
-                    ));
+                    )));
                 }
                 active_master = Some(MasterBuilder {
                     page: parse_master_page(&reader, &element)?,
@@ -472,10 +468,10 @@ pub fn read(source: &str) -> Result<Vec<Master>> {
                     && let Some(kind) = Kind::parse(element.local_name().as_ref())
                 {
                     if master.page.region(kind).is_some() {
-                        return Err(Error::InvalidFormat(format!(
+                        return Err(crate::Error::from(Error::InvalidFormat(format!(
                             "duplicate {kind:?} in master page '{}'",
                             master.page.name
-                        )));
+                        ))));
                     }
                     active_region = Some(RegionBuilder {
                         kind,
@@ -501,10 +497,10 @@ pub fn read(source: &str) -> Result<Vec<Master>> {
                     Error::InvalidFormat("missing active style:master-page".to_string())
                 })?;
                 if master.page.region(kind).is_some() {
-                    return Err(Error::InvalidFormat(format!(
+                    return Err(crate::Error::from(Error::InvalidFormat(format!(
                         "duplicate {kind:?} in master page '{}'",
                         master.page.name
-                    )));
+                    ))));
                 }
                 master.page.regions.push(Region {
                     kind,
@@ -586,9 +582,9 @@ pub fn read(source: &str) -> Result<Vec<Master>> {
                 };
                 if master_finished {
                     if !style_element || element.local_name().as_ref() != b"master-page" {
-                        return Err(Error::InvalidFormat(
+                        return Err(crate::Error::from(Error::InvalidFormat(
                             "malformed style:master-page element".to_string(),
-                        ));
+                        )));
                     }
                     let mut finished = active_master.take().ok_or_else(|| {
                         Error::InvalidFormat("missing active style:master-page".to_string())
@@ -598,9 +594,9 @@ pub fn read(source: &str) -> Result<Vec<Master>> {
                 }
             },
             Event::DocType(_) => {
-                return Err(Error::InvalidFormat(
+                return Err(crate::Error::from(Error::InvalidFormat(
                     "DTD is not allowed in ODF styles.xml".to_string(),
-                ));
+                )));
             },
             Event::Eof => break,
             Event::Start(_)
@@ -616,12 +612,12 @@ pub fn read(source: &str) -> Result<Vec<Master>> {
         buffer.clear();
     }
     if active_master.is_some() || active_region.is_some() {
-        return Err(Error::InvalidFormat(
+        return Err(crate::Error::from(Error::InvalidFormat(
             "unterminated master-page header/footer".to_string(),
-        ));
+        )));
     }
-    validate_schema(xml, &mut pages)?;
-    let mut structured = parse(xml)?;
+    validate_schema(xml, &mut pages, limits)?;
+    let mut structured = parse(xml, limits)?;
     for page in &mut pages {
         for page_region in &mut page.regions {
             page_region.blocks = structured
@@ -632,7 +628,7 @@ pub fn read(source: &str) -> Result<Vec<Master>> {
     Ok(pages)
 }
 
-fn parse_master_page(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<Master> {
+fn parse_master_page(reader: &ResolvedReader<'_>, element: &BytesStart<'_>) -> Result<Master> {
     let name = style_attr(reader, element, b"name")?.ok_or_else(|| {
         Error::InvalidFormat("style:master-page is missing style:name".to_string())
     })?;
@@ -649,7 +645,7 @@ fn parse_master_page(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Resu
 }
 
 fn style_attr(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     element: &BytesStart<'_>,
     local_name: &[u8],
 ) -> Result<Option<String>> {
@@ -657,7 +653,7 @@ fn style_attr(
 }
 
 fn namespaced_attr(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     element: &BytesStart<'_>,
     expected_namespace: &[u8],
     local_name: &[u8],
@@ -682,7 +678,7 @@ fn namespaced_attr(
 }
 
 fn append_empty_text_element(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     element: &BytesStart<'_>,
     output: &mut String,
     expanded_spaces: &mut usize,
@@ -708,7 +704,7 @@ fn append_empty_text_element(
 }
 
 fn style_independent_text_count(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     element: &BytesStart<'_>,
 ) -> Result<Option<usize>> {
     for raw_attribute in element.attributes() {
@@ -757,6 +753,11 @@ fn decode_reference(reference: &BytesRef<'_>) -> Result<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{LimitKind, RawXmlLimitKind};
+
+    fn read(source: &str) -> Result<Vec<Master>> {
+        Ok(super::read(source, XmlStreamLimits::default())?)
+    }
 
     const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
     const STYLE: &str = "urn:oasis:names:tc:opendocument:xmlns:style:1.0";
@@ -807,5 +808,23 @@ mod tests {
             r#"<o:document-styles xmlns:o="{OFFICE}" xmlns:s="{STYLE}"><o:master-styles><s:master-page s:name="A" s:page-layout-name="pm1"><x:foreign xmlns:x="urn:example"/></s:master-page></o:master-styles></o:document-styles>"#
         );
         assert!(read(&unknown).is_err());
+    }
+
+    #[test]
+    fn reader_reports_the_required_raw_xml_policy() {
+        let xml = format!(
+            r#"<o:document-styles xmlns:o="{OFFICE}" xmlns:s="{STYLE}"><o:master-styles><s:master-page s:name="A"/></o:master-styles></o:document-styles>"#
+        );
+        let limits = XmlStreamLimits::new(1 << 20, 1, 4_000, 1_000, 64 * 1024)
+            .expect("test policy is finite");
+        let error = super::read(&xml, limits).expect_err("the depth ceiling must be enforced");
+        assert!(matches!(
+            error,
+            crate::Error::Limit {
+                kind: LimitKind::RawXml(RawXmlLimitKind::Depth),
+                observed,
+                maximum,
+            } if observed == 2 && maximum == 1
+        ));
     }
 }

@@ -396,9 +396,10 @@ impl MutableDocument {
 
     /// Parse the document's master pages and current header/footer regions.
     pub(crate) fn master_pages(&self) -> Result<Vec<Master>> {
-        self.styles_xml
-            .as_deref()
-            .map_or_else(|| Ok(Vec::new()), read)
+        self.styles_xml.as_deref().map_or_else(
+            || Ok(Vec::new()),
+            |styles| read(styles, self.xml_limits).map_err(litchi_core::Error::from),
+        )
     }
 
     /// Parse automatic page layouts, their properties, and header/footer styles.
@@ -443,7 +444,7 @@ impl MutableDocument {
                 "document has no styles.xml layout owner to modify".to_string(),
             )
         })?;
-        let mut edit = crate::header_footer::Snapshot::parse(styles)?.edit();
+        let mut edit = crate::header_footer::Snapshot::parse(styles, self.xml_limits)?.edit();
         update(&mut edit)?;
         self.styles_xml = Some(edit.commit()?.into_snapshot().source_xml().to_owned());
         Ok(())
@@ -594,7 +595,7 @@ impl MutableDocument {
         let styles = self
             .styles_xml
             .get_or_insert_with(Structure::default_styles_xml);
-        *styles = add(styles, name, page_layout_name)?;
+        *styles = add(styles, name, page_layout_name, self.xml_limits)?;
         Ok(())
     }
 
@@ -604,7 +605,7 @@ impl MutableDocument {
         let styles = self
             .styles_xml
             .get_or_insert_with(Structure::default_styles_xml);
-        *styles = insert(styles, &fragment)?;
+        *styles = insert(styles, &fragment, self.xml_limits)?;
         Ok(())
     }
 
@@ -616,7 +617,7 @@ impl MutableDocument {
                 "document has no styles.xml master page to modify".to_string(),
             )
         })?;
-        self.styles_xml = Some(replace(styles, name, &fragment)?);
+        self.styles_xml = Some(replace(styles, name, &fragment, self.xml_limits)?);
         Ok(())
     }
 
@@ -627,7 +628,7 @@ impl MutableDocument {
                 "document has no styles.xml master page to modify".to_string(),
             )
         })?;
-        self.styles_xml = Some(remove(styles, name)?);
+        self.styles_xml = Some(remove(styles, name, self.xml_limits)?);
         Ok(())
     }
 
@@ -645,7 +646,13 @@ impl MutableDocument {
                 "document has no styles.xml master page to modify".to_string(),
             )
         })?;
-        self.styles_xml = Some(set_text(styles, master_page_name, kind, Some(text))?);
+        self.styles_xml = Some(set_text(
+            styles,
+            master_page_name,
+            kind,
+            Some(text),
+            self.xml_limits,
+        )?);
         Ok(())
     }
 
@@ -665,7 +672,13 @@ impl MutableDocument {
                 "document has no styles.xml master page to modify".to_string(),
             )
         })?;
-        self.styles_xml = Some(set_xml(styles, master_page_name, kind, xml)?);
+        self.styles_xml = Some(set_xml(
+            styles,
+            master_page_name,
+            kind,
+            xml,
+            self.xml_limits,
+        )?);
         Ok(())
     }
 
@@ -680,7 +693,13 @@ impl MutableDocument {
                 "document has no styles.xml master page to modify".to_string(),
             )
         })?;
-        self.styles_xml = Some(set_text(styles, master_page_name, kind, None)?);
+        self.styles_xml = Some(set_text(
+            styles,
+            master_page_name,
+            kind,
+            None,
+            self.xml_limits,
+        )?);
         Ok(())
     }
 }

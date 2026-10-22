@@ -3,6 +3,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use litchi_core::Result;
+use litchi_odf_common::XmlStreamLimits;
 use quick_xml::XmlVersion;
 use quick_xml::events::Event;
 use quick_xml::name::ResolveResult;
@@ -34,16 +35,17 @@ pub struct Snapshot {
     masters: Vec<Master>,
     layouts: Vec<PageLayout>,
     sections: Vec<SectionLayout>,
+    limits: XmlStreamLimits,
 }
 
 impl Snapshot {
     /// Parse advanced page-layout, section-style, and master-page owners.
-    pub fn parse(source: impl Into<String>) -> Result<Self> {
+    pub fn parse(source: impl Into<String>, limits: XmlStreamLimits) -> Result<Self> {
         let source = source.into();
         if source.len() > MAX_XML_BYTES {
             return Err(bad("layout styles XML exceeds its byte limit"));
         }
-        let masters = read(&source)?;
+        let masters = read(&source, limits).map_err(litchi_core::Error::from)?;
         let layouts = parse_page_layouts(&source)?;
         let sections = section_layouts(&source)?;
         Ok(Self {
@@ -51,6 +53,7 @@ impl Snapshot {
             masters,
             layouts,
             sections,
+            limits,
         })
     }
 
@@ -260,36 +263,42 @@ impl Transaction {
     /// Insert one compact typed section-layout style.
     pub(crate) fn insert_section_layout(&mut self, section: &SectionLayout) -> Result<()> {
         let target = Target::SectionStyle(section.name().to_string());
-        let before = owner_xml(&self.draft, &target)?;
+        let before = owner_xml(&self.draft, &target, self.before.limits)?;
         if before.is_some() {
             return Err(bad(format!(
                 "section style '{}' already exists",
                 section.name()
             )));
         }
-        let next = insert_section_style(&self.draft, section.xml())?;
+        let next = insert_section_style(&self.draft, section.xml(), self.before.limits)?;
         self.publish(target, before, Some(section.xml().to_string()), next)
     }
 
     /// Replace one named section-layout style with a typed compact owner.
     pub(crate) fn replace_section_layout(&mut self, section: &SectionLayout) -> Result<()> {
         let target = Target::SectionStyle(section.name().to_string());
-        let before = owner_xml(&self.draft, &target)?;
+        let before = owner_xml(&self.draft, &target, self.before.limits)?;
         let current = before
             .as_deref()
             .ok_or_else(|| bad(format!("section style '{}' does not exist", section.name())))?;
-        let next = replace_owner_exact(&self.draft, current, section.xml(), &target)?;
+        let next = replace_owner_exact(
+            &self.draft,
+            current,
+            section.xml(),
+            &target,
+            self.before.limits,
+        )?;
         self.publish(target, before, Some(section.xml().to_string()), next)
     }
 
     /// Remove one named section-layout style.
     pub(crate) fn remove_section_layout(&mut self, name: &str) -> Result<()> {
         let target = Target::SectionStyle(name.to_string());
-        let before = owner_xml(&self.draft, &target)?;
+        let before = owner_xml(&self.draft, &target, self.before.limits)?;
         let current = before
             .as_deref()
             .ok_or_else(|| bad(format!("section style '{name}' does not exist")))?;
-        let next = remove_owner_exact(&self.draft, current, &target)?;
+        let next = remove_owner_exact(&self.draft, current, &target, self.before.limits)?;
         self.publish(target, before, None, next)
     }
 
@@ -316,14 +325,14 @@ impl Transaction {
             return Err(bad("layout transfer has an unresolved linked dependency"));
         }
         let master_target = Target::MasterPage(transfer.master_name.clone());
-        if owner_xml(&self.draft, &master_target)?.is_some() {
+        if owner_xml(&self.draft, &master_target, self.before.limits)?.is_some() {
             return Err(bad(format!(
                 "master page '{}' already exists",
                 transfer.master_name
             )));
         }
         let layout_target = Target::PageLayout(transfer.page_layout_name.clone());
-        match owner_xml(&self.draft, &layout_target)? {
+        match owner_xml(&self.draft, &layout_target, self.before.limits)? {
             Some(existing) if existing != transfer.page_layout_xml => {
                 return Err(bad(format!(
                     "page layout '{}' already exists with different XML",
@@ -334,6 +343,7 @@ impl Transaction {
                 let next = litchi_odf_common::style::master::writer::insert(
                     &self.draft,
                     &transfer.master_xml,
+                    self.before.limits,
                 )?;
                 self.publish(master_target, None, Some(transfer.master_xml.clone()), next)?;
             },
@@ -342,6 +352,7 @@ impl Transaction {
                     &self.draft,
                     &transfer.page_layout_name,
                     &transfer.page_layout_xml,
+                    self.before.limits,
                 )?;
                 self.publish(
                     layout_target,
@@ -352,6 +363,7 @@ impl Transaction {
                 let next = litchi_odf_common::style::master::writer::insert(
                     &self.draft,
                     &transfer.master_xml,
+                    self.before.limits,
                 )?;
                 self.publish(master_target, None, Some(transfer.master_xml.clone()), next)?;
             },
@@ -381,25 +393,25 @@ impl Transaction {
             ));
         }
         let target = Target::SectionStyle(transfer.name.clone());
-        if owner_xml(&self.draft, &target)?.is_some() {
+        if owner_xml(&self.draft, &target, self.before.limits)?.is_some() {
             return Err(bad(format!(
                 "section style '{}' already exists",
                 transfer.name
             )));
         }
-        let next = insert_section_style(&self.draft, &transfer.xml)?;
+        let next = insert_section_style(&self.draft, &transfer.xml, self.before.limits)?;
         self.publish(target, None, Some(transfer.xml.clone()), next)
     }
 
     /// Parse, validate, and publish the candidate atomically.
     pub(crate) fn commit(self) -> Result<Commit> {
-        let snapshot = Snapshot::parse(self.draft)?;
+        let snapshot = Snapshot::parse(self.draft, self.before.limits)?;
         let patch = Patch {
             source: self.before.source,
             target: snapshot.source.clone(),
             changes: self.changes.into_values().collect(),
         };
-        validate_patch(&patch)?;
+        validate_patch(&patch, self.before.limits)?;
         Ok(Commit { snapshot })
     }
 
@@ -470,22 +482,22 @@ pub(crate) struct Patch {
     changes: Vec<Change>,
 }
 
-fn validate_patch(patch: &Patch) -> Result<()> {
+fn validate_patch(patch: &Patch, limits: XmlStreamLimits) -> Result<()> {
     if patch.source.len() > MAX_XML_BYTES
         || patch.target.len() > MAX_XML_BYTES
         || patch.changes.len() > MAX_CHANGES
     {
         return Err(bad("layout patch exceeds its finite bounds"));
     }
-    Snapshot::parse(patch.source.clone())?;
-    Snapshot::parse(patch.target.clone())?;
+    Snapshot::parse(patch.source.clone(), limits)?;
+    Snapshot::parse(patch.target.clone(), limits)?;
     let mut replay = patch.source.clone();
     let mut targets = BTreeSet::new();
     for change in &patch.changes {
         if !targets.insert(change.target.clone()) {
             return Err(bad("layout patch repeats one semantic target"));
         }
-        replay = apply_change(&replay, change)?;
+        replay = apply_change(&replay, change, limits)?;
     }
     if replay != patch.target {
         return Err(bad("layout patch target is not its semantic replay result"));
@@ -493,61 +505,78 @@ fn validate_patch(patch: &Patch) -> Result<()> {
     Ok(())
 }
 
-fn apply_change(source: &str, change: &Change) -> Result<String> {
-    if owner_xml(source, &change.target)? != change.before {
+fn apply_change(source: &str, change: &Change, limits: XmlStreamLimits) -> Result<String> {
+    if owner_xml(source, &change.target, limits)? != change.before {
         return Err(bad("layout change semantic precondition does not match"));
     }
     match (&change.target, &change.before, &change.after) {
         (Target::MasterPage(_), None, Some(after)) => {
-            litchi_odf_common::style::master::writer::insert(source, after)
+            litchi_odf_common::style::master::writer::insert(source, after, limits)
+                .map_err(litchi_core::Error::from)
         },
         (Target::MasterPage(_), Some(before), Some(after)) => {
-            replace_owner_exact(source, before, after, &change.target)
+            replace_owner_exact(source, before, after, &change.target, limits)
         },
         (Target::MasterPage(name), Some(_), None) => {
-            litchi_odf_common::style::master::writer::remove(source, name)
+            litchi_odf_common::style::master::writer::remove(source, name, limits)
+                .map_err(litchi_core::Error::from)
         },
-        (Target::PageLayout(name), None, Some(after)) => insert_page_layout(source, name, after),
+        (Target::PageLayout(name), None, Some(after)) => {
+            insert_page_layout(source, name, after, limits)
+        },
         (Target::PageLayout(_), Some(before), Some(after)) => {
-            replace_owner_exact(source, before, after, &change.target)
+            replace_owner_exact(source, before, after, &change.target, limits)
         },
-        (Target::PageLayout(name), Some(before), None) => remove_page_layout(source, name, before),
-        (Target::SectionStyle(_), None, Some(after)) => insert_section_style(source, after),
+        (Target::PageLayout(name), Some(before), None) => {
+            remove_page_layout(source, name, before, limits)
+        },
+        (Target::SectionStyle(_), None, Some(after)) => insert_section_style(source, after, limits),
         (Target::SectionStyle(_), Some(before), Some(after)) => {
-            replace_owner_exact(source, before, after, &change.target)
+            replace_owner_exact(source, before, after, &change.target, limits)
         },
         (Target::SectionStyle(_), Some(before), None) => {
-            remove_owner_exact(source, before, &change.target)
+            remove_owner_exact(source, before, &change.target, limits)
         },
         _ => Err(bad("invalid layout semantic change")),
     }
 }
 
-fn replace_owner_exact(source: &str, before: &str, after: &str, target: &Target) -> Result<String> {
+fn replace_owner_exact(
+    source: &str,
+    before: &str,
+    after: &str,
+    target: &Target,
+    limits: XmlStreamLimits,
+) -> Result<String> {
     let start = source
         .find(before)
         .ok_or_else(|| bad("layout owner XML span is missing"))?;
     let candidate = super::replace_range(source, start, start + before.len(), after)?;
-    if owner_xml(&candidate, target)?.as_deref() != Some(after) {
+    if owner_xml(&candidate, target, limits)?.as_deref() != Some(after) {
         return Err(bad("replaced layout owner did not validate exactly"));
     }
     Ok(candidate)
 }
 
-fn remove_owner_exact(source: &str, before: &str, target: &Target) -> Result<String> {
+fn remove_owner_exact(
+    source: &str,
+    before: &str,
+    target: &Target,
+    limits: XmlStreamLimits,
+) -> Result<String> {
     let start = source
         .find(before)
         .ok_or_else(|| bad("layout owner XML span is missing"))?;
     let candidate = super::replace_range(source, start, start + before.len(), "")?;
-    if owner_xml(&candidate, target)?.is_some() {
+    if owner_xml(&candidate, target, limits)?.is_some() {
         return Err(bad("removed layout owner remains present"));
     }
     Ok(candidate)
 }
 
-fn owner_xml(source: &str, target: &Target) -> Result<Option<String>> {
+fn owner_xml(source: &str, target: &Target, limits: XmlStreamLimits) -> Result<Option<String>> {
     match target {
-        Target::MasterPage(name) => Ok(read(source)?
+        Target::MasterPage(name) => Ok(read(source, limits)?
             .into_iter()
             .find(|master| master.name == *name)
             .map(|master| master.xml)),
@@ -562,11 +591,16 @@ fn owner_xml(source: &str, target: &Target) -> Result<Option<String>> {
     }
 }
 
-fn insert_page_layout(source: &str, name: &str, fragment: &str) -> Result<String> {
-    if owner_xml(source, &Target::PageLayout(name.to_string()))?.is_some() {
+fn insert_page_layout(
+    source: &str,
+    name: &str,
+    fragment: &str,
+    limits: XmlStreamLimits,
+) -> Result<String> {
+    if owner_xml(source, &Target::PageLayout(name.to_string()), limits)?.is_some() {
         return Err(bad(format!("page layout '{name}' already exists")));
     }
-    let masters = read(source)?;
+    let masters = read(source, limits)?;
     let mut suffix = 0usize;
     let temporary = loop {
         let candidate = format!("__litchi_layout_transfer_{suffix}");
@@ -577,13 +611,19 @@ fn insert_page_layout(source: &str, name: &str, fragment: &str) -> Result<String
             .checked_add(1)
             .ok_or_else(|| bad("temporary layout owner name overflow"))?;
     };
-    let source = litchi_odf_common::style::master::writer::add(source, &temporary, name)?;
+    let source = litchi_odf_common::style::master::writer::add(source, &temporary, name, limits)?;
     let source = set_page_layout_xml(&source, name, fragment)?;
-    litchi_odf_common::style::master::writer::remove(&source, &temporary)
+    litchi_odf_common::style::master::writer::remove(&source, &temporary, limits)
+        .map_err(litchi_core::Error::from)
 }
 
-fn remove_page_layout(source: &str, name: &str, expected: &str) -> Result<String> {
-    let actual = owner_xml(source, &Target::PageLayout(name.to_string()))?
+fn remove_page_layout(
+    source: &str,
+    name: &str,
+    expected: &str,
+    limits: XmlStreamLimits,
+) -> Result<String> {
+    let actual = owner_xml(source, &Target::PageLayout(name.to_string()), limits)?
         .ok_or_else(|| bad(format!("page layout '{name}' does not exist")))?;
     if actual != expected {
         return Err(bad("page-layout removal precondition does not match"));
@@ -775,7 +815,7 @@ fn section_style_fragment(
     Ok(xml)
 }
 
-fn insert_section_style(source: &str, fragment: &str) -> Result<String> {
+fn insert_section_style(source: &str, fragment: &str, limits: XmlStreamLimits) -> Result<String> {
     let closed = fragment.to_string();
     let wrapper = format!(
         "<office:document-styles xmlns:office=\"urn:oasis:names:tc:opendocument:xmlns:office:1.0\"><office:styles>{closed}</office:styles></office:document-styles>"
@@ -786,7 +826,13 @@ fn insert_section_style(source: &str, fragment: &str) -> Result<String> {
             "section layout fragment is not exactly one section style",
         ));
     }
-    if owner_xml(source, &Target::SectionStyle(parsed[0].name().to_string()))?.is_some() {
+    if owner_xml(
+        source,
+        &Target::SectionStyle(parsed[0].name().to_string()),
+        limits,
+    )?
+    .is_some()
+    {
         return Err(bad(format!(
             "section style '{}' already exists",
             parsed[0].name()

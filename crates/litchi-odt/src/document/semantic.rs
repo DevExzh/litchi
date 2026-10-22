@@ -410,10 +410,12 @@ impl Document {
 
     /// Parse master pages and their losslessly retained headers and footers.
     pub fn master_pages(&self) -> Result<Vec<Master>> {
-        self.state
-            .styles
-            .as_ref()
-            .map_or_else(|| Ok(Vec::new()), |styles| read(styles.xml_content()))
+        self.state.styles.as_ref().map_or_else(
+            || Ok(Vec::new()),
+            |styles| {
+                read(styles.xml_content(), self.state.xml_limits).map_err(litchi_core::Error::from)
+            },
+        )
     }
 
     /// The advanced-layout read view of `styles.xml` (master pages, page
@@ -432,7 +434,10 @@ impl Document {
                 "the document has no styles.xml",
             ))
         })?;
-        crate::header_footer::Snapshot::parse(styles.xml_content().to_owned())
+        crate::header_footer::Snapshot::parse(
+            styles.xml_content().to_owned(),
+            self.state.xml_limits,
+        )
     }
 
     /// Parse automatic page layouts, their properties, and header/footer styles.

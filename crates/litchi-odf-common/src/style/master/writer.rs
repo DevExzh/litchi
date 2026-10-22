@@ -5,12 +5,14 @@ use quick_xml::{
     XmlVersion,
     events::{BytesStart, Event},
     name::{Namespace, ResolveResult},
-    reader::NsReader,
 };
 
 use super::reader::read;
 use super::region::Kind;
 use super::{Child, ChildKind, Master};
+use crate::core::{ResolvedReader, XmlStreamLimits};
+
+type OdfResult<T> = std::result::Result<T, crate::Error>;
 
 const STYLE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:style:1.0";
 const TEXT_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:text:1.0";
@@ -142,24 +144,28 @@ fn canonical_fragment(page: &Master) -> Result<String> {
         "<office:document xmlns:office=\"{}\"><office:master-styles>{output}</office:master-styles></office:document>",
         String::from_utf8_lossy(OFFICE),
     );
-    let parsed = read(&wrapper)?;
+    let parsed = read(&wrapper, XmlStreamLimits::owner_default_value()).map_err(Error::from)?;
     if parsed.len() != 1 {
         return Err(invalid("canonical master-page did not validate"));
     }
     Ok(output)
 }
 
-fn validate_fragment(fragment: &str) -> Result<Master> {
+fn validate_fragment(fragment: &str, limits: XmlStreamLimits) -> OdfResult<Master> {
     if fragment.len() > MAX_FRAGMENT_BYTES {
-        return Err(invalid("master-page fragment exceeds 16 MiB"));
+        return Err(crate::Error::from(invalid(
+            "master-page fragment exceeds 16 MiB",
+        )));
     }
     let wrapper = format!(
         "<office:document xmlns:office=\"{}\"><office:master-styles>{fragment}</office:master-styles></office:document>",
         String::from_utf8_lossy(OFFICE)
     );
-    let mut pages = read(&wrapper)?;
+    let mut pages = read(&wrapper, limits)?;
     if pages.len() != 1 || pages[0].xml != fragment {
-        return Err(invalid("fragment must be exactly one style:master-page"));
+        return Err(crate::Error::from(invalid(
+            "fragment must be exactly one style:master-page",
+        )));
     }
     Ok(pages.remove(0))
 }
@@ -170,15 +176,18 @@ fn validate_fragment(fragment: &str) -> Result<Master> {
 ///
 /// Returns an error when either XML input is invalid, the fragment is not an
 /// exact master page, or its name already exists.
-pub fn insert(xml: &str, fragment: &str) -> Result<String> {
-    let requested = validate_fragment(fragment)?;
-    if read(xml)?.iter().any(|page| page.name == requested.name) {
-        return Err(invalid(format!(
+pub fn insert(xml: &str, fragment: &str, limits: XmlStreamLimits) -> OdfResult<String> {
+    let requested = validate_fragment(fragment, limits)?;
+    if read(xml, limits)?
+        .iter()
+        .any(|page| page.name == requested.name)
+    {
+        return Err(crate::Error::from(invalid(format!(
             "master page '{}' already exists",
             requested.name
-        )));
+        ))));
     }
-    insert_container_child(xml, OFFICE, b"master-styles", fragment)
+    insert_container_child(xml, OFFICE, b"master-styles", fragment, limits)
 }
 
 /// Replace one named master page with an exact validated fragment.
@@ -187,17 +196,22 @@ pub fn insert(xml: &str, fragment: &str) -> Result<String> {
 ///
 /// Returns an error when the XML or fragment is invalid, or the target master
 /// page does not exist.
-pub fn replace(xml: &str, name: &str, fragment: &str) -> Result<String> {
-    let requested = validate_fragment(fragment)?;
+pub fn replace(
+    xml: &str,
+    name: &str,
+    fragment: &str,
+    limits: XmlStreamLimits,
+) -> OdfResult<String> {
+    let requested = validate_fragment(fragment, limits)?;
     if requested.name != name {
-        return Err(invalid(
+        return Err(crate::Error::from(invalid(
             "replacement master-page name does not match target",
-        ));
+        )));
     }
-    read(xml)?;
-    let location = find_master_page(xml, name)?
+    read(xml, limits)?;
+    let location = find_master_page(xml, name, limits)?
         .ok_or_else(|| invalid(format!("master page '{name}' does not exist")))?;
-    replace_range(xml, location.start, location.end, fragment)
+    Ok(replace_range(xml, location.start, location.end, fragment)?)
 }
 
 /// Remove one named master page without rewriting surrounding XML.
@@ -206,11 +220,11 @@ pub fn replace(xml: &str, name: &str, fragment: &str) -> Result<String> {
 ///
 /// Returns an error when the XML is invalid or the target master page does not
 /// exist.
-pub fn remove(xml: &str, name: &str) -> Result<String> {
-    read(xml)?;
-    let location = find_master_page(xml, name)?
+pub fn remove(xml: &str, name: &str, limits: XmlStreamLimits) -> OdfResult<String> {
+    read(xml, limits)?;
+    let location = find_master_page(xml, name, limits)?
         .ok_or_else(|| invalid(format!("master page '{name}' does not exist")))?;
-    replace_range(xml, location.start, location.end, "")
+    Ok(replace_range(xml, location.start, location.end, "")?)
 }
 
 /// Sets or removes the text of one master-page header or footer region.
@@ -224,7 +238,8 @@ pub fn set_text(
     master_page_name: &str,
     kind: Kind,
     text: Option<&str>,
-) -> Result<String> {
+    limits: XmlStreamLimits,
+) -> OdfResult<String> {
     let replacement = text.map(|plain_text| {
         format!(
             "<style:{name} xmlns:style=\"{style}\" xmlns:text=\"{text_ns}\"><text:p>{value}</text:p></style:{name}>",
@@ -234,7 +249,7 @@ pub fn set_text(
             value = litchi_core::xml::escape_xml(plain_text),
         )
     });
-    replace_region(xml, master_page_name, kind, replacement.as_deref())
+    replace_region(xml, master_page_name, kind, replacement.as_deref(), limits)
 }
 
 /// Replaces one master-page header or footer with validated XML.
@@ -243,27 +258,33 @@ pub fn set_text(
 ///
 /// Returns an error when the region XML or document XML is invalid, or the
 /// target master page cannot be found.
-pub fn set_xml(xml: &str, master_page_name: &str, kind: Kind, region_xml: &str) -> Result<String> {
-    validate_region_xml(region_xml, kind)?;
-    replace_region(xml, master_page_name, kind, Some(region_xml))
+pub fn set_xml(
+    xml: &str,
+    master_page_name: &str,
+    kind: Kind,
+    region_xml: &str,
+    limits: XmlStreamLimits,
+) -> OdfResult<String> {
+    validate_region_xml(region_xml, kind, limits)?;
+    replace_region(xml, master_page_name, kind, Some(region_xml), limits)
 }
 
-fn validate_region_xml(region_xml: &str, kind: Kind) -> Result<()> {
+fn validate_region_xml(region_xml: &str, kind: Kind, limits: XmlStreamLimits) -> OdfResult<()> {
     let wrapper = format!(
         "<office:document-styles xmlns:office=\"{}\" xmlns:style=\"{}\"><office:master-styles><style:master-page style:name=\"validation\" style:page-layout-name=\"validation\">{region_xml}</style:master-page></office:master-styles></office:document-styles>",
         String::from_utf8_lossy(OFFICE_NAMESPACE),
         String::from_utf8_lossy(STYLE_NAMESPACE),
     );
-    let pages = read(&wrapper)?;
+    let pages = read(&wrapper, limits)?;
     let valid = pages.len() == 1
         && pages[0].regions.len() == 1
         && pages[0].regions[0].kind == kind
         && pages[0].regions[0].xml == region_xml;
     if !valid {
-        return Err(Error::InvalidFormat(format!(
+        return Err(crate::Error::from(Error::InvalidFormat(format!(
             "header/footer XML must be exactly one style:{} element",
             kind.element_name()
-        )));
+        ))));
     }
     Ok(())
 }
@@ -273,15 +294,16 @@ fn replace_region(
     master_page_name: &str,
     kind: Kind,
     replacement: Option<&str>,
-) -> Result<String> {
-    let pages = read(xml)?;
+    limits: XmlStreamLimits,
+) -> OdfResult<String> {
+    let pages = read(xml, limits)?;
     let page = pages
         .iter()
         .find(|page| page.name == master_page_name)
         .ok_or_else(|| {
             Error::InvalidFormat(format!("master page '{master_page_name}' does not exist"))
         })?;
-    let location = find_master_page(xml, master_page_name)?.ok_or_else(|| {
+    let location = find_master_page(xml, master_page_name, limits)?.ok_or_else(|| {
         Error::InvalidFormat(format!("master page '{master_page_name}' does not exist"))
     })?;
 
@@ -300,7 +322,7 @@ fn replace_region(
         expanded.push_str("</");
         expanded.push_str(&location.qualified_name);
         expanded.push('>');
-        return replace_range(xml, location.start, location.end, &expanded);
+        return Ok(replace_range(xml, location.start, location.end, &expanded)?);
     }
 
     if let Some(region) = page.region(kind) {
@@ -310,7 +332,7 @@ fn replace_region(
         })?;
         let start = location.content_start + relative;
         let end = start + region.xml.len();
-        return replace_range(xml, start, end, replacement.unwrap_or(""));
+        return Ok(replace_range(xml, start, end, replacement.unwrap_or(""))?);
     }
     let Some(replacement_xml) = replacement else {
         return Ok(xml.to_string());
@@ -328,7 +350,7 @@ fn replace_region(
         }
         insertion = start + existing.xml.len();
     }
-    replace_range(xml, insertion, insertion, replacement_xml)
+    Ok(replace_range(xml, insertion, insertion, replacement_xml)?)
 }
 
 /// Adds a master page and its page layout when needed.
@@ -337,31 +359,42 @@ fn replace_region(
 ///
 /// Returns an error when the document XML is invalid, a required name is empty,
 /// or a master page with the requested name already exists.
-pub fn add(xml: &str, name: &str, page_layout_name: &str) -> Result<String> {
+pub fn add(
+    xml: &str,
+    name: &str,
+    page_layout_name: &str,
+    limits: XmlStreamLimits,
+) -> OdfResult<String> {
     if name.is_empty() {
-        return Err(Error::InvalidFormat(
+        return Err(crate::Error::from(Error::InvalidFormat(
             "master-page name must not be empty".to_string(),
-        ));
+        )));
     }
     if page_layout_name.is_empty() {
-        return Err(Error::InvalidFormat(
+        return Err(crate::Error::from(Error::InvalidFormat(
             "page-layout name must not be empty".to_string(),
-        ));
-    }
-    if read(xml)?.iter().any(|page| page.name == name) {
-        return Err(Error::InvalidFormat(format!(
-            "master page '{name}' already exists"
         )));
+    }
+    if read(xml, limits)?.iter().any(|page| page.name == name) {
+        return Err(crate::Error::from(Error::InvalidFormat(format!(
+            "master page '{name}' already exists"
+        ))));
     }
 
     let mut output = xml.to_string();
-    if !has_named_style_element(&output, b"page-layout", page_layout_name)? {
+    if !has_named_style_element(&output, b"page-layout", page_layout_name, limits)? {
         let layout = format!(
             "<style:page-layout xmlns:style=\"{}\" style:name=\"{}\"/>",
             String::from_utf8_lossy(STYLE_NAMESPACE),
             litchi_core::xml::escape_xml(page_layout_name),
         );
-        output = insert_container_child(&output, OFFICE_NAMESPACE, b"automatic-styles", &layout)?;
+        output = insert_container_child(
+            &output,
+            OFFICE_NAMESPACE,
+            b"automatic-styles",
+            &layout,
+            limits,
+        )?;
     }
     let master = format!(
         "<style:master-page xmlns:style=\"{}\" style:name=\"{}\" style:page-layout-name=\"{}\"/>",
@@ -369,16 +402,19 @@ pub fn add(xml: &str, name: &str, page_layout_name: &str) -> Result<String> {
         litchi_core::xml::escape_xml(name),
         litchi_core::xml::escape_xml(page_layout_name),
     );
-    insert_container_child(&output, OFFICE_NAMESPACE, b"master-styles", &master)
+    insert_container_child(&output, OFFICE_NAMESPACE, b"master-styles", &master, limits)
 }
 
-fn has_named_style_element(xml: &str, local_name: &[u8], expected_name: &str) -> Result<bool> {
-    let mut reader = NsReader::from_str(xml);
+fn has_named_style_element(
+    xml: &str,
+    local_name: &[u8],
+    expected_name: &str,
+    limits: XmlStreamLimits,
+) -> OdfResult<bool> {
+    let mut reader = ResolvedReader::from_xml(xml, limits)?;
     let mut buffer = Vec::new();
     loop {
-        let (namespace, event) = reader
-            .read_resolved_event_into(&mut buffer)
-            .map_err(|error| Error::InvalidFormat(format!("styles.xml parsing error: {error}")))?;
+        let (namespace, event) = reader.read_resolved_event_into(&mut buffer)?;
         let style_element = bound_to(&namespace, STYLE_NAMESPACE);
         match event {
             Event::Start(element) | Event::Empty(element)
@@ -410,15 +446,21 @@ pub(crate) fn insert_container_child(
     namespace: &[u8],
     local_name: &[u8],
     child: &str,
-) -> Result<String> {
-    let location = find_element(xml, namespace, local_name)?.ok_or_else(|| {
+    limits: XmlStreamLimits,
+) -> OdfResult<String> {
+    let location = find_element(xml, namespace, local_name, limits)?.ok_or_else(|| {
         Error::InvalidFormat(format!(
             "styles.xml is missing {}",
             String::from_utf8_lossy(local_name)
         ))
     })?;
     if !location.empty {
-        return replace_range(xml, location.content_end, location.content_end, child);
+        return Ok(replace_range(
+            xml,
+            location.content_end,
+            location.content_end,
+            child,
+        )?);
     }
     let empty = &xml[location.start..location.end];
     let marker = empty.rfind("/>").ok_or_else(|| {
@@ -434,18 +476,21 @@ pub(crate) fn insert_container_child(
     expanded.push_str("</");
     expanded.push_str(&location.qualified_name);
     expanded.push('>');
-    replace_range(xml, location.start, location.end, &expanded)
+    Ok(replace_range(xml, location.start, location.end, &expanded)?)
 }
 
-fn find_element(xml: &str, namespace: &[u8], local_name: &[u8]) -> Result<Option<ElementLocation>> {
-    let mut reader = NsReader::from_str(xml);
+fn find_element(
+    xml: &str,
+    namespace: &[u8],
+    local_name: &[u8],
+    limits: XmlStreamLimits,
+) -> OdfResult<Option<ElementLocation>> {
+    let mut reader = ResolvedReader::from_xml(xml, limits)?;
     let mut buffer = Vec::new();
     let mut active: Option<(usize, usize, usize, String)> = None;
     loop {
         let event_start = byte_offset(reader.buffer_position(), "styles XML")?;
-        let (resolved_namespace, parsed_event) = reader
-            .read_resolved_event_into(&mut buffer)
-            .map_err(|error| Error::InvalidFormat(format!("styles.xml parsing error: {error}")))?;
+        let (resolved_namespace, parsed_event) = reader.read_resolved_event_into(&mut buffer)?;
         let matches = bound_to(&resolved_namespace, namespace);
         let event = parsed_event.into_owned();
         let event_end = byte_offset(reader.buffer_position(), "styles XML")?;
@@ -521,15 +566,17 @@ fn find_element(xml: &str, namespace: &[u8], local_name: &[u8]) -> Result<Option
     }
 }
 
-pub(crate) fn find_master_page(xml: &str, expected_name: &str) -> Result<Option<MasterLocation>> {
-    let mut reader = NsReader::from_str(xml);
+pub(crate) fn find_master_page(
+    xml: &str,
+    expected_name: &str,
+    limits: XmlStreamLimits,
+) -> OdfResult<Option<MasterLocation>> {
+    let mut reader = ResolvedReader::from_xml(xml, limits)?;
     let mut buffer = Vec::new();
     let mut active: Option<(usize, usize, usize, String)> = None;
     loop {
         let event_start = byte_offset(reader.buffer_position(), "styles XML")?;
-        let (namespace, parsed_event) = reader
-            .read_resolved_event_into(&mut buffer)
-            .map_err(|error| Error::InvalidFormat(format!("styles.xml parsing error: {error}")))?;
+        let (namespace, parsed_event) = reader.read_resolved_event_into(&mut buffer)?;
         let style_element = bound_to(&namespace, STYLE_NAMESPACE);
         let event = parsed_event.into_owned();
         let event_end = byte_offset(reader.buffer_position(), "styles XML")?;
@@ -635,7 +682,7 @@ pub fn replace_range(xml: &str, start: usize, end: usize, replacement: &str) -> 
 }
 
 fn style_attr(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     element: &BytesStart<'_>,
     local_name: &[u8],
 ) -> Result<Option<String>> {
@@ -643,7 +690,7 @@ fn style_attr(
 }
 
 fn namespaced_attr(
-    reader: &NsReader<&[u8]>,
+    reader: &ResolvedReader<'_>,
     element: &BytesStart<'_>,
     expected_namespace: &[u8],
     local_name: &[u8],
@@ -673,6 +720,25 @@ fn bound_to(namespace: &ResolveResult<'_>, expected: &[u8]) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn read(source: &str) -> Result<Vec<Master>> {
+        Ok(super::read(source, XmlStreamLimits::default())?)
+    }
+
+    fn set_text(
+        xml: &str,
+        master_page_name: &str,
+        kind: Kind,
+        text: Option<&str>,
+    ) -> Result<String> {
+        Ok(super::set_text(
+            xml,
+            master_page_name,
+            kind,
+            text,
+            XmlStreamLimits::default(),
+        )?)
+    }
 
     const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
     const STYLE: &str = "urn:oasis:names:tc:opendocument:xmlns:style:1.0";
