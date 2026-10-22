@@ -30,6 +30,43 @@ container substrate consumed by DOC/PPT/XLS and encrypted OOXML
 high-performance ZIP reader for OOXML, ODF and iWork
 (`crates/soapberry-zip/Cargo.toml:2-6`).
 
+### Scope qualification against 0350, 0351 and 0343 D5
+
+0350 §1 (`docs/unified-ops/0350-owner-api-debt-decision.md:8-17`) makes the
+required experience explicit: every **format crate** and the unified `File`
+facade, with every affected consumer migrated in the same change. It does not
+assign every workspace implementation crate to a current wave. 0351 §1
+describes the inventory method as rustdoc JSON for 25 format/shared crates and
+`litchi-ops` (`docs/unified-ops/0351-api-contract.md:45-60`), and its wave table
+lists the owned paths (`:28-38`). That inventory scope is evidence about what
+the current format contract measures; it is not permission to hide a public
+format re-export, and it is not evidence that every standalone transport method
+was accepted as current-format debt.
+
+The original 0343 D5 is equally specific. Its closure record describes PPT
+`raw::Reader` and 173 record/family `*_with_limits` entry points
+(`docs/unified-ops/0343-glossary-closure.md:35-40,115-118`), and 0350 overrides
+that D5 default with the canonical limits outcome. D5 therefore supplies a
+textual basis for the PPT raw migration; it does not, by itself, authorize a
+rewrite of every CFB or ZIP primitive used by PPT.
+
+The resulting classification is:
+
+| Surface | Textual basis | Status |
+|---|---|---|
+| Public format-facing re-export, alias or leak | 0350’s every-format requirement; 0351 W5/W6 owned paths; ADR 0034 §1’s one-name/no-alias rule. Examples are the W5 `Revision`/`Snapshot` aliases and W6 `PackageWriterLimits`. | Required in the owning format wave. The three W5 removals in this branch are this category. A public ODF path cannot be excused as “generic ZIP”. |
+| Office-specific OPC surface | ADR 0034 §5 explicitly names OPC `ReadLimits` → `SourceLimits` and says OOXML re-exports follow (`docs/adr/0034-unified-api-glossary-and-default-policies.md:169-181`); 0343’s closure also records OPC stream-verb renames. The W4 brief fixes the raw `Package::edit_opc` boundary. | Required canonicalization for the Office package substrate, but it should be one atomic OPC lane with DOCX/PPTX/XLSX/XLSB consumers. Its absence from the 0351 wave table is a scheduling qualification, not a permanent exception. |
+| Standalone CFB or soapberry-ZIP methods with no public format leak | 0350 names format crates and `File`; 0351’s inventory and ownership table do not include these implementation crates. ADR 0034’s vocabulary policy does not assign their independent transport surface to W5/W6. | Separate scope requiring an explicit owner/coordinator lane. Do not claim the entire generic API is mandatory in the current format wave solely because formats depend on it. Any method re-exported through an owned format surface moves back into the first row and is required there. |
+
+This distinction is narrower than a blanket exemption. For example,
+`litchi-ole-common::source_backed_overlay` publicly accepts and returns
+`SharedOleFile`, and ODF publicly aliases a ZIP limits type; those are
+format-facing paths to review under W5/W6. Conversely, a `soapberry-zip`
+reader or a CFB writer method that is only consumed through private codec
+code has no direct 0350/0351 current-wave assignment. The latter remains an
+explicit follow-up candidate with its consumer and performance inventory,
+not an “accepted” API exception.
+
 ## Confirmed debt in the owned ODF family (W6)
 
 ### `SourceMemberReaderError` has six pure public aliases
