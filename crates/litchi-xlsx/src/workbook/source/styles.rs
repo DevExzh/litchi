@@ -85,7 +85,7 @@ impl SourceBackedWorkbook {
     /// The table is a clean cached value: releasing it changes no result, and
     /// the next formatting read parses the styles part again.
     pub fn release_cached_formats(&self) -> bool {
-        self.current().formats.trim_clean()
+        self.current().reader().formats.trim_clean()
     }
 }
 
@@ -113,7 +113,7 @@ impl SourceWorksheet {
             store.entry(address).and_then(|entry| {
                 entry
                     .style
-                    .map(|raw| StyleKey::new(raw, Arc::clone(&self.owner.style_lineage)))
+                    .map(|raw| StyleKey::new(raw, Arc::clone(&self.owner.reader().style_lineage)))
             })
         });
         self.finish_result(key)
@@ -164,7 +164,7 @@ impl SourceWorksheet {
         let record = self.store().map(|store| {
             store
                 .entry(address)
-                .map(|entry| Record::from_stored(entry, &self.owner.style_lineage))
+                .map(|entry| Record::from_stored(entry, &self.owner.reader().style_lineage))
         });
         self.finish_result(record)
     }
@@ -193,7 +193,7 @@ impl SourceWorksheet {
             records.extend(
                 store
                     .entries_in(range)
-                    .map(|entry| Record::from_stored(entry, &self.owner.style_lineage)),
+                    .map(|entry| Record::from_stored(entry, &self.owner.reader().style_lineage)),
             );
             Ok(records)
         });
@@ -205,7 +205,7 @@ impl SourceInner {
     fn format(&self, style: Option<&StyleKey>) -> Result<Option<Format>> {
         self.execution_check()?;
         self.package.source_version()?;
-        if style.is_some_and(|key| !key.belongs_to(&self.style_lineage)) {
+        if style.is_some_and(|key| !key.belongs_to(&self.reader().style_lineage)) {
             return Err(crate::Error::ForeignStyle);
         }
         let Some(table) = self.format_table()? else {
@@ -226,17 +226,20 @@ impl SourceInner {
         let part = self.package.part(uri)?;
         let version = self.package.source_version()?;
         let limits = self.package.read_limits();
-        let table = self.formats.get_or_build(FormatKey::source(version), || {
-            let data = part.data()?;
-            let table = FormatTable::parse_with_limits(data.as_bytes(), limits)?;
-            // `get_or_build` publishes the successful callback result before
-            // returning. Fence the value while the cache still owns only the
-            // local result, so cancellation or source replacement cannot
-            // publish a stale format table.
-            self.execution_check()?;
-            self.package.source_version()?;
-            Ok(table)
-        })?;
+        let table = self
+            .reader()
+            .formats
+            .get_or_build(FormatKey::source(version), || {
+                let data = part.data()?;
+                let table = FormatTable::parse_with_limits(data.as_bytes(), limits)?;
+                // `get_or_build` publishes the successful callback result before
+                // returning. Fence the value while the cache still owns only the
+                // local result, so cancellation or source replacement cannot
+                // publish a stale format table.
+                self.execution_check()?;
+                self.package.source_version()?;
+                Ok(table)
+            })?;
         self.execution_check()?;
         self.package.source_version()?;
         Ok(Some(table))
@@ -418,7 +421,10 @@ mod tests {
                 Record {
                     address: litchi_sheet::Cell::at(0, 1).unwrap(),
                     cell: Cell::Value(Value::Number(crate::Number::new("2").unwrap())),
-                    style: Some(StyleKey::new(1, Arc::clone(&workbook.inner.style_lineage))),
+                    style: Some(StyleKey::new(
+                        1,
+                        Arc::clone(&workbook.inner.reader().style_lineage)
+                    )),
                 },
             ]
         );
@@ -429,13 +435,13 @@ mod tests {
         assert_eq!(bold.font().unwrap().bold(), Some(true));
         assert_eq!(bold.font().unwrap().size(), Some(9.0));
 
-        let diagnostics = workbook.inner.formats.diagnostics();
+        let diagnostics = workbook.inner.reader().formats.diagnostics();
         assert_eq!((diagnostics.builds, diagnostics.hits), (1, 1));
         assert!(diagnostics.pinned);
 
         let outside = sheet.format(Some(&StyleKey::new(
             2,
-            Arc::clone(&workbook.inner.style_lineage),
+            Arc::clone(&workbook.inner.reader().style_lineage),
         )));
         assert!(matches!(outside, Err(Error::Invalid(_))), "{outside:?}");
     }
@@ -532,7 +538,7 @@ mod tests {
         assert_depth_limit(eager_style.format().unwrap_err());
 
         let (_source, source) = open_with_limits(bytes, limits);
-        let source_style = StyleKey::new(1, Arc::clone(&source.inner.style_lineage));
+        let source_style = StyleKey::new(1, Arc::clone(&source.inner.reader().style_lineage));
         assert_depth_limit(source.format(Some(&source_style)).unwrap_err());
     }
 }
