@@ -25,7 +25,8 @@ use litchi_odf_common::core::source_publication::{
 };
 use litchi_odf_common::core::{
     Meta, SourceBackedPackage, SourceContentPublicationError, SourceContentPublicationOptions,
-    SourceContentPublicationReport, SourceMemberReaderError, private::ContentDocumentValidator,
+    SourceContentPublicationReport, SourceMemberReaderError, XmlStreamLimits,
+    private::ContentDocumentValidator,
 };
 use litchi_odf_common::{Error as OdfError, OpenOptions};
 use zeroize::Zeroizing;
@@ -895,6 +896,14 @@ impl SourceBackedPresentation {
     ) -> Result<Option<ScanFacts>> {
         self.check_source()?;
         if options.execution_context().is_some() || options.cancellation().is_some() {
+            return Ok(None);
+        }
+        // Keep the cache path's error timing aligned with `scan_source`: an
+        // out-of-envelope source limit must fail before authored-fragment
+        // construction, even when the owner already has structural facts.
+        if XmlStreamLimits::new(max_content_xml_bytes, 256, 4_000_000, 1_000_000, 64 * 1024)
+            .is_err()
+        {
             return Ok(None);
         }
         let Some(facts) = self.append_facts.as_ref() else {
