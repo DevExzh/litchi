@@ -434,11 +434,6 @@ impl WorksheetBinaryIndex {
         parsed.bind(worksheet, limits)
     }
 
-    /// Parse and bind using safe defaults.
-    pub fn from_parts_default(index: &[u8], worksheet: &[u8]) -> Result<Self> {
-        Self::from_parts(index, worksheet, Limits::DEFAULT)
-    }
-
     /// Return the validated standalone index.
     #[must_use]
     pub fn index(&self) -> &BinaryIndex {
@@ -1674,7 +1669,8 @@ mod tests {
     fn generated_index_binds_and_looks_up_exact_cells() {
         let worksheet = worksheet_with_cells(&[(0, 0), (0, 1024), (33, 2)]);
         let index = encode_for_worksheet(&worksheet, Limits::DEFAULT).expect("index");
-        let bound = WorksheetBinaryIndex::from_parts_default(&index, &worksheet).expect("bind");
+        let bound =
+            WorksheetBinaryIndex::from_parts(&index, &worksheet, Limits::DEFAULT).expect("bind");
         assert_eq!(
             bound
                 .lookup_record(&worksheet, 0, 0)
@@ -1718,7 +1714,7 @@ mod tests {
         // its base offset is at payload+4 and must point to the cell header.
         let base = 2 + 4;
         index[base..base + 8].copy_from_slice(&1_u64.to_le_bytes());
-        assert!(WorksheetBinaryIndex::from_parts_default(&index, &worksheet).is_err());
+        assert!(WorksheetBinaryIndex::from_parts(&index, &worksheet, Limits::DEFAULT).is_err());
     }
 
     #[test]
@@ -1734,7 +1730,7 @@ mod tests {
             .expect("maintain")
             .expect("existing index");
         assert_ne!(maintained, index);
-        let bound = WorksheetBinaryIndex::from_parts_default(&maintained, &shifted)
+        let bound = WorksheetBinaryIndex::from_parts(&maintained, &shifted, Limits::DEFAULT)
             .expect("patched index binds");
         assert_eq!(
             bound
@@ -1807,7 +1803,7 @@ mod tests {
         assert_eq!(first.kind(), kind::INDEX_BLOCK);
         assert_eq!(read_u32(first.payload(), 0).expect("row start"), 2);
         assert_eq!(read_u32(first.payload(), 4).expect("row end"), 4);
-        WorksheetBinaryIndex::from_parts_default(&maintained, &shifted)
+        WorksheetBinaryIndex::from_parts(&maintained, &shifted, Limits::DEFAULT)
             .expect("patched native partition binds");
     }
 
@@ -1853,7 +1849,8 @@ mod tests {
                 0, 0x95, 0x02, 0,
             ]
         );
-        let bound = WorksheetBinaryIndex::from_parts_default(&index, &worksheet).expect("bind");
+        let bound =
+            WorksheetBinaryIndex::from_parts(&index, &worksheet, Limits::DEFAULT).expect("bind");
         assert!(
             bound
                 .lookup_record(&worksheet, 0, 0)

@@ -589,7 +589,7 @@ where
                 },
                 kind::H_LINK => {
                     // BrtHLink - hyperlink
-                    if let Ok(hyperlink) = Hyperlink::parse(&self.buf) {
+                    if let Ok(hyperlink) = Hyperlink::parse(&self.buf, self.raw_limits) {
                         self.hyperlinks.push(hyperlink);
                     }
                 },

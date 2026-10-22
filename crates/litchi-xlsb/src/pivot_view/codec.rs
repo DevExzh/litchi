@@ -12,8 +12,6 @@ use crate::raw::{Cursor, Header, Kind, Limits};
 const MAX_PIVOT_TABLE_PART_BYTES: usize = 32 * 1024 * 1024;
 const MAX_PIVOT_TABLE_RECORDS: usize = 1_000_000;
 const MAX_PIVOT_VIEW_NAME_UNITS: usize = 255;
-const PIVOT_VIEW_LIMITS: Limits =
-    Limits::new(MAX_PIVOT_TABLE_PART_BYTES, MAX_PIVOT_VIEW_NAME_UNITS);
 
 impl Part {
     /// Parse a complete PivotTable part while retaining every original byte.
@@ -22,7 +20,8 @@ impl Part {
     /// `BrtBeginSXView` are interpreted. Inner records remain opaque so
     /// extension records and features outside this crate's typed model are
     /// preserved losslessly.
-    pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
+    pub fn from_bytes(bytes: Vec<u8>, limits: Limits) -> Result<Self> {
+        limits.validate()?;
         if bytes.len() > MAX_PIVOT_TABLE_PART_BYTES {
             return Err(Error::InvalidLength {
                 expected: MAX_PIVOT_TABLE_PART_BYTES,
@@ -48,7 +47,7 @@ impl Part {
             let tail = bytes
                 .get(offset..)
                 .ok_or(Error::Invalid("PivotTable record offset is invalid"))?;
-            let (header, header_len) = Header::parse(tail, PIVOT_VIEW_LIMITS)?;
+            let (header, header_len) = Header::parse(tail, limits)?;
             let payload_start = offset
                 .checked_add(header_len)
                 .ok_or(Error::Invalid("PivotTable record header offset overflow"))?;
@@ -68,7 +67,7 @@ impl Part {
                             "PivotTable has duplicate or misplaced BrtBeginSXView",
                         ));
                     }
-                    begin = Some(parse_begin_view(payload)?);
+                    begin = Some(parse_begin_view(payload, limits)?);
                 },
                 crate::raw::kind::END_SX_VIEW => {
                     if begin.is_none() || ended || !payload.is_empty() {
@@ -100,7 +99,7 @@ impl Part {
     }
 }
 
-fn parse_begin_view(data: &[u8]) -> Result<(String, u32, u8)> {
+fn parse_begin_view(data: &[u8], limits: Limits) -> Result<(String, u32, u8)> {
     if data.len() < 36 {
         return Err(Error::InvalidLength {
             expected: 36,
@@ -121,7 +120,7 @@ fn parse_begin_view(data: &[u8]) -> Result<(String, u32, u8)> {
                     found: cache_id_bytes.len(),
                 })?,
         );
-    let mut cursor = Cursor::new(&data[32..], "BrtBeginSXView.irstName", PIVOT_VIEW_LIMITS);
+    let mut cursor = Cursor::new(&data[32..], "BrtBeginSXView.irstName", limits);
     let name = cursor.read_wide_string()?;
     let units = name.encode_utf16().count();
     if units == 0 || units > MAX_PIVOT_VIEW_NAME_UNITS || name.contains('\0') {

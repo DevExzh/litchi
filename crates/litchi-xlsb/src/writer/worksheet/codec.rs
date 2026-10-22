@@ -754,7 +754,7 @@ impl Worksheet {
     /// Write hyperlinks
     pub(super) fn write_hyperlinks<W: Write>(&self, writer: &mut Encoder<W>) -> Result<()> {
         for hyperlink in &self.hyperlinks {
-            let data = hyperlink.try_serialize()?;
+            let data = hyperlink.serialize(writer.limits())?;
             writer.write_record(kind::H_LINK, &data)?;
         }
         Ok(())

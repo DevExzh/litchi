@@ -82,7 +82,7 @@ pub(crate) fn read(
     };
     Ok(Features {
         hyperlinks: if select.contains(FeatureSet::HYPERLINKS) {
-            crate::hyperlinks::edit::read_layout(bytes, &layout, relationships)?
+            crate::hyperlinks::edit::read_layout(bytes, &layout, relationships, raw_limits)?
         } else {
             Vec::new()
         },

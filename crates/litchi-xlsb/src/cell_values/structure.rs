@@ -3760,6 +3760,7 @@ fn apply_sheet_removal(workbook: &mut Workbook, positions: &[usize]) -> Result<b
         &modeled_parts,
         &bundle_records,
         &removed,
+        workbook.raw_limits_value(),
     )?;
     reject_sheet_xml_dependencies(&workbook.package, &modeled_parts, &bundle_records, &removed)?;
 
@@ -4129,6 +4130,7 @@ fn reject_surviving_binary_sheet_dependencies(
     removed_parts: &HashSet<PackURI>,
     records: &[crate::package::records::BundleSheetRecord],
     removed: &[bool],
+    raw_limits: crate::raw::Limits,
 ) -> Result<()> {
     for part in package.iter_parts() {
         if !part
@@ -4141,7 +4143,7 @@ fn reject_surviving_binary_sheet_dependencies(
             continue;
         }
         let source = package.get_part(part.partname())?.blob();
-        for item in Records::new(source, crate::raw::Limits::DEFAULT) {
+        for item in Records::new(source, raw_limits) {
             let record = item?;
             match record.kind() {
                 kind::FRT_BEGIN | kind::AC_BEGIN | kind::ARR_FMLA | kind::SHR_FMLA => {
@@ -4152,7 +4154,8 @@ fn reject_surviving_binary_sheet_dependencies(
                     ));
                 },
                 kind::H_LINK => {
-                    let hyperlink = crate::hyperlinks::Hyperlink::parse(record.payload())?;
+                    let hyperlink =
+                        crate::hyperlinks::Hyperlink::parse(record.payload(), raw_limits)?;
                     if !hyperlink.r_id.is_empty() {
                         let Some(relationship) = part.rels().get(&hyperlink.r_id) else {
                             return Err(Error::refused(
