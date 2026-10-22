@@ -1412,7 +1412,10 @@ pub struct ArchiveObject {
     original_header_admission: Option<HeaderAdmission>,
     /// Neutral metadata totals and the profile under which they were parsed.
     /// This permits retained objects to reapply header-only tighter profiles
-    /// without rewalking every decoded metadata collection.
+    /// without rewalking every decoded metadata collection. The public
+    /// `archive_info` remains mutable, so validation probes its canonical
+    /// encoding before using this cache; only the private raw provenance is
+    /// immutable.
     archive_info_admission: Option<(ArchiveInfoAdmission, Limits)>,
 }
 
@@ -8970,12 +8973,12 @@ mod tests {
         DataReferencePruning, DataReferenceTransition, Error, FieldDataReferenceTransition,
         FieldInfo, FieldObjectReferenceTransition, FieldPath, FieldType, KnownFieldRule,
         MESSAGE_INFO_CONSTRUCTIONS, MessageInfo, ObjectReferenceTransition, RawMessage,
-        UnknownFieldRule, archive_info_encoded_len, archive_info_to_codec, encode_archive_info,
-        encode_varint, encode_varint_with_width, encoded_field_info_length,
-        encoded_field_path_length, encoded_message_info_length, field_info_header_field_count,
-        field_info_memory, field_path_memory, message_info_header_field_count,
-        message_info_header_nesting, message_info_memory, minimal_message_info_encoded_length,
-        varint_len,
+        UnknownFieldRule, archive_info_encoded_len, archive_info_to_codec,
+        check_archive_info_constructor, encode_archive_info, encode_varint,
+        encode_varint_with_width, encoded_field_info_length, encoded_field_path_length,
+        encoded_message_info_length, field_info_header_field_count, field_info_memory,
+        field_path_memory, message_info_header_field_count, message_info_header_nesting,
+        message_info_memory, minimal_message_info_encoded_length, varint_len,
     };
     use crate::{LimitKind, Limits, Result};
     use litchi_iwa_protos::archive_codec;
@@ -9766,6 +9769,103 @@ mod tests {
             } if observed == fixture.source.len() && maximum == fixture.source.len() - 1
         ));
         assert!(archive.to_bytes(below_limits).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn retained_admission_rechecks_public_mutations_and_strict_dimensions() -> Result<()> {
+        let fixture = reference_pruning_fixture()?;
+        let mut archive = Archive::parse(&fixture.source, Limits::default())?;
+        let admission =
+            check_archive_info_constructor(&archive.objects[0].archive_info, Limits::default())?;
+        let mut strict_profiles = Vec::new();
+        if admission.header_length > 1 {
+            strict_profiles.push((
+                LimitKind::HeaderBytes,
+                admission.header_length,
+                Limits::default().with_header_bytes(admission.header_length - 1)?,
+            ));
+        }
+        if admission.header_fields > 1 {
+            strict_profiles.push((
+                LimitKind::HeaderFields,
+                admission.header_fields,
+                Limits::default().with_header_fields(admission.header_fields - 1)?,
+            ));
+        }
+        if admission.header_nesting > 1 {
+            strict_profiles.push((
+                LimitKind::HeaderNesting,
+                admission.header_nesting,
+                Limits::default().with_header_nesting(admission.header_nesting - 1)?,
+            ));
+        }
+        if admission.header_memory > 1 {
+            strict_profiles.push((
+                LimitKind::HeaderMemoryBytes,
+                admission.header_memory,
+                Limits::default().with_header_memory_bytes(admission.header_memory - 1)?,
+            ));
+        }
+        if admission.metadata_items > 1 {
+            strict_profiles.push((
+                LimitKind::MetadataItems,
+                admission.metadata_items,
+                Limits::default().with_metadata_items(admission.metadata_items - 1)?,
+            ));
+        }
+        if admission.message_count > 1 {
+            strict_profiles.push((
+                LimitKind::MessagesPerObject,
+                admission.message_count,
+                Limits::default().with_messages_per_object(admission.message_count - 1)?,
+            ));
+        }
+        for (kind, observed, limits) in strict_profiles {
+            let error = archive.objects[0]
+                .validate(limits)
+                .expect_err("a retained header must reapply each stricter dimension");
+            assert!(matches!(
+                error,
+                Error::Limit {
+                    kind: actual,
+                    observed: actual_observed,
+                    maximum,
+                } if actual == kind && actual_observed == observed && maximum == observed - 1
+            ));
+        }
+
+        let object = &mut archive.objects[0];
+        object.archive_info.message_infos[0].type_ += 1;
+        object.validate(Limits::default())?;
+        let mutated_admission =
+            check_archive_info_constructor(&object.archive_info, Limits::default())?;
+        let error = object
+            .validate(Limits::default().with_header_fields(mutated_admission.header_fields - 1)?)
+            .expect_err("metadata mutation must invalidate the cached canonical admission");
+        assert!(matches!(
+            error,
+            Error::Limit {
+                kind: LimitKind::HeaderFields,
+                observed,
+                maximum,
+            } if observed == mutated_admission.header_fields
+                && maximum == mutated_admission.header_fields - 1
+        ));
+
+        let message_limit = object.messages[0].data.len();
+        object.messages[0].data.push(0);
+        let error = object
+            .validate(Limits::default().with_message_bytes(message_limit)?)
+            .expect_err("payload mutation must still report MessageBytes");
+        assert!(matches!(
+            error,
+            Error::Limit {
+                kind: LimitKind::MessageBytes,
+                observed,
+                maximum,
+            } if observed == message_limit + 1 && maximum == message_limit
+        ));
         Ok(())
     }
 
