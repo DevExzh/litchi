@@ -45,3 +45,26 @@ The exact commands, durations, log sizes, hashes and test summaries are in
 size recorded before a command was 18,845,543,576 bytes. The runner hashed
 and removed only completed debug test executables; its external receipt
 retains those hashes. Earlier failure evidence remains valid and retained.
+
+## Completed combined run
+
+All seven groups passed on the fixed source
+`c2122e26786f02058b36a95a0162c42489a3ad65`, with the pinned Rust 1.95.0
+toolchain. The run covers 1,578 tests: the 1,487 DOC/OLE/DataSpaces tests
+above, 78 facade error-classification tests, and 13 DOC facade tests. Three
+existing tests remain ignored. Strict all-target/all-feature Clippy passed
+for DOC, OLE common, crypto and ops; the locked all-target/all-feature
+performance-harness check also passed.
+
+[validation-v3.json](results/0362ue/validation-v3.json) records every command,
+test summary, duration, external log path, size and SHA-256. The largest
+pre-command target size was 18,982,780,844 bytes. The memory-capped runner
+used one Cargo job, no incremental compilation, debug information disabled,
+and a temporary directory outside the host `/tmp`. Completed debug test
+executables were hashed before removal; their hashes remain in the external
+runner receipt. The earlier failed runs are retained.
+
+This result includes the consuming DOC handoff through `76391f1a71`, but
+does not qualify its performance or newer worker source. It is an affected
+assembly result, not the final workspace gate, corpus disposition check,
+or native-performance acceptance.

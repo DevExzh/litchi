@@ -1,0 +1,177 @@
+{
+  "source": "c2122e26786f02058b36a95a0162c42489a3ad65",
+  "status": "All seven groups passed; final workspace gate and performance qualification remain required.",
+  "toolchain": "rustc 1.95.0",
+  "tests_passed": 1578,
+  "existing_tests_ignored": 3,
+  "checks": [
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--all-features",
+        "--message-format",
+        "json-render-diagnostics",
+        "-p",
+        "litchi-doc",
+        "--lib"
+      ],
+      "exit": 0,
+      "seconds": 33.27063052402809,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/legacy-replay-combined-v3/check-0.log",
+      "bytes": 228744,
+      "sha256": "44e604cb7834f6132ccfcc11cf2167183aac7d7a45bc29d2e3ffd446c763a7d3",
+      "target_bytes_before": 18845547470,
+      "test_summaries": [
+        "test result: ok. 1229 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 4.66s"
+      ]
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--all-features",
+        "--message-format",
+        "json-render-diagnostics",
+        "-p",
+        "litchi-ole-common",
+        "--lib",
+        "--test",
+        "ole1"
+      ],
+      "exit": 0,
+      "seconds": 14.904786864994094,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/legacy-replay-combined-v3/check-1.log",
+      "bytes": 84609,
+      "sha256": "3cebb2434177718e97c1a280fe21badb171405a3b20a934709d8be912dfa3980",
+      "target_bytes_before": 18845544276,
+      "test_summaries": [
+        "test result: ok. 227 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.15s",
+        "test result: ok. 15 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+      ]
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--all-features",
+        "--message-format",
+        "json-render-diagnostics",
+        "-p",
+        "litchi-crypto",
+        "--lib",
+        "spaces::"
+      ],
+      "exit": 0,
+      "seconds": 13.197919368045405,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/legacy-replay-combined-v3/check-2.log",
+      "bytes": 85330,
+      "sha256": "faaca34c9b2ee3dcdc25567920bb571ab0039c6c6a2b99ede37d004b8356ca85",
+      "target_bytes_before": 18845542687,
+      "test_summaries": [
+        "test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 58 filtered out; finished in 0.01s"
+      ]
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--all-features",
+        "--message-format",
+        "json-render-diagnostics",
+        "-p",
+        "litchi-ops",
+        "--lib",
+        "error::"
+      ],
+      "exit": 0,
+      "seconds": 279.04081488295924,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/legacy-replay-combined-v3/check-3.log",
+      "bytes": 336942,
+      "sha256": "1053570a5ba8f35f9055d46a3ec3ca86c4d1b2c61c2588825bf8fe30afa33090",
+      "target_bytes_before": 18845540673,
+      "test_summaries": [
+        "test result: ok. 78 passed; 0 failed; 0 ignored; 0 measured; 896 filtered out; finished in 0.01s"
+      ]
+    },
+    {
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--all-features",
+        "--message-format",
+        "json-render-diagnostics",
+        "-p",
+        "litchi-ops",
+        "--test",
+        "doc_unified_ops"
+      ],
+      "exit": 0,
+      "seconds": 89.99745242402423,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/legacy-replay-combined-v3/check-4.log",
+      "bytes": 331521,
+      "sha256": "6f83529ac8f4484a7833fd5db0ba05705d0e580e4824541d4c53ece1af9b9445",
+      "target_bytes_before": 18845544901,
+      "test_summaries": [
+        "test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.32s"
+      ]
+    },
+    {
+      "command": [
+        "cargo",
+        "clippy",
+        "--offline",
+        "--locked",
+        "-p",
+        "litchi-doc",
+        "-p",
+        "litchi-ole-common",
+        "-p",
+        "litchi-crypto",
+        "-p",
+        "litchi-ops",
+        "--all-targets",
+        "--all-features",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0,
+      "seconds": 309.5542524609482,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/legacy-replay-combined-v3/check-5.log",
+      "bytes": 4515,
+      "sha256": "c9e7010d55ca6bea5d0415cd0937a7263fa20e94b79271b161e582b2baf9321f",
+      "target_bytes_before": 18845650308,
+      "test_summaries": []
+    },
+    {
+      "command": [
+        "cargo",
+        "check",
+        "--offline",
+        "--locked",
+        "--manifest-path",
+        "tools/perf-baseline/Cargo.toml",
+        "--all-targets",
+        "--all-features"
+      ],
+      "exit": 0,
+      "seconds": 85.27620598801877,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/legacy-replay-combined-v3/check-6.log",
+      "bytes": 1113,
+      "sha256": "d3ea13534529deaef8bf1512fbfa1856fe06edfce7960e708049d76c5b9dc8ac",
+      "target_bytes_before": 18982780844,
+      "test_summaries": []
+    }
+  ]
+}
