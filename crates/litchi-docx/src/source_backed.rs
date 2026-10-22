@@ -46,15 +46,6 @@ pub use story_text::{
     GlossarySelector, GlossarySelectorKind, Limits as StoryTextLimits, Patch as StoryTextPatch,
     Selector as StorySelector, Snapshot as StoryTextSnapshot,
 };
-pub use svg_lifecycle::{
-    PictureSelector, PictureSelector as SvgPictureSelector, RasterResourceSourceView,
-    RasterResourceView, SourceBackedSvgAttachmentBatchCommit, SourceBackedSvgAttachmentBatchEdit,
-    SourceBackedSvgAttachmentBatchPatch, SourceBackedSvgAttachmentBatchSnapshot,
-    SourceBackedSvgAttachmentReplacement, SourceBackedSvgAttachmentSnapshot, SourceSvgAttachment,
-    SourceSvgPictureSourceView, SourceSvgPictureView, SvgAttachmentCommitDiagnostics, SvgInput,
-    SvgPictureOwnerState, SvgPictureView, SvgResourceSourceView, SvgResourceView,
-};
-
 pub use tail_append::{
     CandidateProof as TailAppendCandidateProof, Commit as TailAppendCommit,
     Error as TailAppendError, Limits as TailAppendLimits, Plan as TailAppendPlan,

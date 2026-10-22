@@ -9,7 +9,7 @@
 
 use std::{mem::size_of, sync::Arc};
 
-use litchi_core::{Reservation, Resource, SourceVersion};
+use litchi_core::{Reservation, Resource as CoreResource, SourceVersion};
 use litchi_drawingml::svg_blip;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{
@@ -19,8 +19,8 @@ use litchi_opc::{
 use sha2::{Digest as _, Sha256};
 
 use crate::drawing::source::{
-    ByteRange, DrawingPlacement, PictureSource, RelationshipDialect, ScanLimits, SourceDrawing,
-    SvgOwnerState,
+    ByteRange, DrawingPlacement, PictureSource as DrawingPictureSource, RelationshipDialect,
+    ScanLimits, SourceDrawing, SvgOwnerState,
 };
 use crate::error::{Error, Result};
 use crate::source_backed::StorySelector;
@@ -61,9 +61,9 @@ impl From<usize> for PictureSelector {
 
 /// Borrowed opaque SVG media input.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SvgInput<'a>(&'a [u8]);
+pub struct Input<'a>(&'a [u8]);
 
-impl<'a> SvgInput<'a> {
+impl<'a> Input<'a> {
     /// Borrow an opaque SVG payload for preflight and attachment.
     #[must_use]
     pub const fn borrowed(bytes: &'a [u8]) -> Self {
@@ -77,34 +77,34 @@ impl<'a> SvgInput<'a> {
     }
 }
 
-impl<'a> From<&'a [u8]> for SvgInput<'a> {
+impl<'a> From<&'a [u8]> for Input<'a> {
     fn from(bytes: &'a [u8]) -> Self {
         Self::borrowed(bytes)
     }
 }
 
-impl<'a> From<&'a Vec<u8>> for SvgInput<'a> {
+impl<'a> From<&'a Vec<u8>> for Input<'a> {
     fn from(bytes: &'a Vec<u8>) -> Self {
         Self::borrowed(bytes.as_slice())
     }
 }
 
-impl AsRef<[u8]> for SvgInput<'_> {
+impl AsRef<[u8]> for Input<'_> {
     fn as_ref(&self) -> &[u8] {
         self.0
     }
 }
 
 /// A caller-owned advanced attach request.  Ordinary callers should use
-/// [`SvgInput`] so relationship IDs and Part names remain package-owned.
+/// [`Input`] so relationship IDs and Part names remain package-owned.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SourceBackedSvgAttachmentReplacement {
+pub struct AttachmentReplacement {
     svg: Arc<Vec<u8>>,
     part_uri: Option<PackURI>,
     relationship_id: Option<String>,
 }
 
-impl SourceBackedSvgAttachmentReplacement {
+impl AttachmentReplacement {
     /// Construct an ordinary request with package-allocated identities.
     #[must_use]
     pub fn new(bytes: impl Into<Vec<u8>>) -> Self {
@@ -179,14 +179,14 @@ impl SourceBackedSvgAttachmentReplacement {
 
 /// An embedded SVG resource in a source-backed view or snapshot.
 #[derive(Clone)]
-pub struct SourceSvgAttachment {
+pub struct Attachment {
     relationship_id: String,
     relationship_type: String,
     part_uri: PackURI,
     payload: SvgPayload,
 }
 
-impl SourceSvgAttachment {
+impl Attachment {
     /// The owning-story relationship ID.
     #[must_use]
     pub fn relationship_id(&self) -> &str {
@@ -214,8 +214,8 @@ impl SourceSvgAttachment {
 
 /// A read-only SVG resource projection.
 #[derive(Clone)]
-pub struct SvgResourceView {
-    attachment: SourceSvgAttachment,
+pub struct Resource {
+    attachment: Attachment,
 }
 
 /// The raster fallback paired with one source-backed picture view.
@@ -223,7 +223,7 @@ pub struct SvgResourceView {
 /// The payload remains a managed [`PartData`] handle, so callers can borrow
 /// the exact PNG bytes without copying the media member into the view.
 #[derive(Clone)]
-pub struct RasterResourceView {
+pub struct Raster {
     relationship_id: String,
     relationship_type: String,
     part_uri: PackURI,
@@ -231,7 +231,7 @@ pub struct RasterResourceView {
     payload: PartData,
 }
 
-impl RasterResourceView {
+impl Raster {
     /// The owning-story raster relationship ID.
     #[must_use]
     pub fn relationship_id(&self) -> &str {
@@ -263,7 +263,7 @@ impl RasterResourceView {
     }
 }
 
-impl SvgResourceView {
+impl Resource {
     /// Relationship ID carried by the `svgBlip`.
     #[must_use]
     pub fn relationship_id(&self) -> &str {
@@ -293,14 +293,14 @@ impl SvgResourceView {
 /// [`Self::data`] is requested, so enumerating picture owners does not load
 /// unrelated or unselected media members.
 #[derive(Clone, Copy)]
-pub struct SvgResourceSourceView<'a> {
+pub struct ResourceSource<'a> {
     relationship_id: &'a str,
     relationship_type: &'a str,
     part_uri: &'a PackURI,
     part: PartView<'a>,
 }
 
-impl SvgResourceSourceView<'_> {
+impl ResourceSource<'_> {
     /// The owning-story relationship ID.
     #[must_use]
     pub fn relationship_id(&self) -> &str {
@@ -327,7 +327,7 @@ impl SvgResourceSourceView<'_> {
 
 /// A metadata-only raster fallback projection paired with one source picture.
 #[derive(Clone, Copy)]
-pub struct RasterResourceSourceView<'a> {
+pub struct RasterSource<'a> {
     relationship_id: &'a str,
     relationship_type: &'a str,
     part_uri: &'a PackURI,
@@ -335,7 +335,7 @@ pub struct RasterResourceSourceView<'a> {
     part: PartView<'a>,
 }
 
-impl RasterResourceSourceView<'_> {
+impl RasterSource<'_> {
     /// The owning-story raster relationship ID.
     #[must_use]
     pub fn relationship_id(&self) -> &str {
@@ -372,15 +372,15 @@ impl RasterResourceSourceView<'_> {
 /// media bytes. Use [`Self::raster`] and [`Self::svg`] for graph metadata, and
 /// their `data` methods only when the corresponding payload is needed.
 #[derive(Clone, Copy)]
-pub struct SourceSvgPictureSourceView<'a> {
+pub struct PictureSource<'a> {
     selector: PictureSelector,
     placement: DrawingPlacement,
-    owner_state: SvgPictureOwnerState,
-    raster: RasterResourceSourceView<'a>,
-    svg: Option<SvgResourceSourceView<'a>>,
+    owner_state: OwnerState,
+    raster: RasterSource<'a>,
+    svg: Option<ResourceSource<'a>>,
 }
 
-impl SourceSvgPictureSourceView<'_> {
+impl PictureSource<'_> {
     /// Semantic source selector.
     #[must_use]
     pub const fn selector(&self) -> PictureSelector {
@@ -394,19 +394,19 @@ impl SourceSvgPictureSourceView<'_> {
 
     /// Typed recognized-owner status.
     #[must_use]
-    pub const fn owner_state(&self) -> SvgPictureOwnerState {
+    pub const fn owner_state(&self) -> OwnerState {
         self.owner_state
     }
 
     /// Metadata-only raster fallback resource.
     #[must_use]
-    pub const fn raster(&self) -> &RasterResourceSourceView<'_> {
+    pub const fn raster(&self) -> &RasterSource<'_> {
         &self.raster
     }
 
     /// Metadata-only SVG resource, if one is present and graph-valid.
     #[must_use]
-    pub const fn svg(&self) -> Option<&SvgResourceSourceView<'_>> {
+    pub const fn svg(&self) -> Option<&ResourceSource<'_>> {
         self.svg.as_ref()
     }
 }
@@ -414,7 +414,7 @@ impl SourceSvgPictureSourceView<'_> {
 /// Typed owner status for a source picture.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
-pub enum SvgPictureOwnerState {
+pub enum OwnerState {
     /// No recognized SVG extension exists.
     None,
     /// One embedded owner exists and is graph-valid.
@@ -431,20 +431,17 @@ pub enum SvgPictureOwnerState {
 
 /// One direct main-story picture projection.
 #[derive(Clone)]
-pub struct SourceSvgPictureView {
+pub struct PictureView {
     selector: PictureSelector,
     placement: DrawingPlacement,
     raster_relationship_id: String,
     raster_part_uri: PackURI,
-    owner_state: SvgPictureOwnerState,
-    raster: RasterResourceView,
-    svg: Option<SvgResourceView>,
+    owner_state: OwnerState,
+    raster: Raster,
+    svg: Option<Resource>,
 }
 
-/// Short alias matching the design vocabulary for a picture view.
-pub type SvgPictureView = SourceSvgPictureView;
-
-impl SourceSvgPictureView {
+impl PictureView {
     /// Semantic source selector.
     #[must_use]
     pub const fn selector(&self) -> PictureSelector {
@@ -476,19 +473,19 @@ impl SourceSvgPictureView {
 
     /// The borrowed raster fallback resource and its exact payload.
     #[must_use]
-    pub const fn raster(&self) -> &RasterResourceView {
+    pub const fn raster(&self) -> &Raster {
         &self.raster
     }
 
     /// Typed recognized-owner status.
     #[must_use]
-    pub const fn owner_state(&self) -> SvgPictureOwnerState {
+    pub const fn owner_state(&self) -> OwnerState {
         self.owner_state
     }
 
     /// Embedded SVG resource, if one is present and graph-valid.
     #[must_use]
-    pub const fn svg(&self) -> Option<&SvgResourceView> {
+    pub const fn svg(&self) -> Option<&Resource> {
         self.svg.as_ref()
     }
 }
@@ -548,8 +545,8 @@ struct AttachmentState {
 }
 
 impl AttachmentState {
-    fn public(&self) -> SourceSvgAttachment {
-        SourceSvgAttachment {
+    fn public(&self) -> Attachment {
+        Attachment {
             relationship_id: self.relationship_id.clone(),
             relationship_type: self.relationship_type.clone(),
             part_uri: self.part_uri.clone(),
@@ -570,7 +567,7 @@ struct SnapshotState {
     raster_content_type: String,
     raster_payload: PartData,
     svg: Option<AttachmentState>,
-    owner_state: SvgPictureOwnerState,
+    owner_state: OwnerState,
     relationship_dialect: RelationshipDialect,
     existing_relationship_ids: Arc<[String]>,
     physical_member_names: Arc<[String]>,
@@ -630,8 +627,8 @@ struct PictureLayout {
     ext_list_prefix: Option<Box<[u8]>>,
     ext_list_close_start: Option<usize>,
     svg_extension_range: Option<ByteRange>,
-    owner_state: SvgPictureOwnerState,
-    post_detach_owner_state: SvgPictureOwnerState,
+    owner_state: OwnerState,
+    post_detach_owner_state: OwnerState,
 }
 
 /// Shared source facts for the lifetime of a batch edit.
@@ -655,11 +652,11 @@ struct ProjectionEdit {
 
 /// Immutable source-bound state for one selected picture.
 #[derive(Clone)]
-pub struct SourceBackedSvgAttachmentSnapshot {
+pub struct Picture {
     state: SnapshotState,
 }
 
-impl SourceBackedSvgAttachmentSnapshot {
+impl Picture {
     /// Selected semantic picture.
     #[must_use]
     pub const fn selector(&self) -> PictureSelector {
@@ -691,8 +688,8 @@ impl SourceBackedSvgAttachmentSnapshot {
 
     /// Return the exact raster fallback payload retained by this snapshot.
     #[must_use]
-    pub fn raster(&self) -> RasterResourceView {
-        RasterResourceView {
+    pub fn raster(&self) -> Raster {
+        Raster {
             relationship_id: self.state.raster_relationship_id.clone(),
             relationship_type: self.state.raster_relationship_type.clone(),
             part_uri: self.state.raster_part_uri.clone(),
@@ -703,13 +700,13 @@ impl SourceBackedSvgAttachmentSnapshot {
 
     /// Current optional SVG attachment.
     #[must_use]
-    pub fn svg(&self) -> Option<SourceSvgAttachment> {
+    pub fn svg(&self) -> Option<Attachment> {
         self.state.svg.as_ref().map(AttachmentState::public)
     }
 
     /// Current typed owner status.
     #[must_use]
-    pub const fn owner_state(&self) -> SvgPictureOwnerState {
+    pub const fn owner_state(&self) -> OwnerState {
         self.state.owner_state
     }
 
@@ -735,10 +732,10 @@ impl SourceBackedSvgAttachmentSnapshot {
 /// every intermediate state. All selected pictures are published through one
 /// XML replacement and one graph closure. A failed operation leaves the edit
 /// unchanged.
-pub struct SourceBackedSvgAttachmentBatchEdit<'a> {
+pub(crate) struct BatchEdit<'a> {
     package: &'a super::Package,
-    source: SourceBackedSvgAttachmentBatchSnapshot,
-    current: SourceBackedSvgAttachmentBatchSnapshot,
+    source: Snapshot,
+    current: Snapshot,
     context: Arc<BatchSourceContext>,
     operations: Vec<BatchOperation>,
     projection_edits: Vec<ProjectionEdit>,
@@ -750,13 +747,13 @@ pub struct SourceBackedSvgAttachmentBatchEdit<'a> {
 
 /// An exact source-bound snapshot of a selected picture batch.
 #[derive(Clone)]
-pub struct SourceBackedSvgAttachmentBatchSnapshot {
+pub struct Snapshot {
     states: Vec<SnapshotState>,
     story: StoryPayload,
     context: Option<Arc<BatchSourceContext>>,
 }
 
-impl SourceBackedSvgAttachmentBatchSnapshot {
+impl Snapshot {
     /// Number of selected pictures in source order.
     #[must_use]
     pub fn len(&self) -> usize {
@@ -771,10 +768,7 @@ impl SourceBackedSvgAttachmentBatchSnapshot {
 
     /// Borrow one selected picture snapshot by its semantic selector.
     #[must_use]
-    pub fn picture(
-        &self,
-        selector: impl Into<PictureSelector>,
-    ) -> Option<SourceBackedSvgAttachmentSnapshot> {
+    pub fn picture(&self, selector: impl Into<PictureSelector>) -> Option<Picture> {
         let selector = selector.into();
         self.states
             .iter()
@@ -782,7 +776,7 @@ impl SourceBackedSvgAttachmentBatchSnapshot {
             .cloned()
             .map(|mut state| {
                 state.xml = self.story.clone();
-                SourceBackedSvgAttachmentSnapshot { state }
+                Picture { state }
             })
     }
 
@@ -832,9 +826,9 @@ impl BatchOperation {
 
 /// Exact-source reversible attach/detach patch for a selected batch.
 #[derive(Clone)]
-pub struct SourceBackedSvgAttachmentBatchPatch {
-    before: SourceBackedSvgAttachmentBatchSnapshot,
-    after: SourceBackedSvgAttachmentBatchSnapshot,
+pub(crate) struct BatchPatch {
+    before: Snapshot,
+    after: Snapshot,
 }
 
 /// Content-free facts about a successful SVG lifecycle commit.
@@ -843,13 +837,13 @@ pub struct SourceBackedSvgAttachmentBatchPatch {
 /// media bytes.  They remain useful for a no-op commit: the selected-picture
 /// count still describes the edit scope even when no operation was staged.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SvgAttachmentCommitDiagnostics {
+pub struct BatchDiagnostics {
     operations: usize,
     selected_pictures: usize,
     changed: bool,
 }
 
-impl SvgAttachmentCommitDiagnostics {
+impl BatchDiagnostics {
     pub(crate) const fn new(operations: usize, selected_pictures: usize, changed: bool) -> Self {
         Self {
             operations,
@@ -890,40 +884,39 @@ impl SvgAttachmentCommitDiagnostics {
 }
 
 /// A checked SVG lifecycle batch commit ready for package publication.
-pub struct SourceBackedSvgAttachmentBatchCommit {
-    snapshot: SourceBackedSvgAttachmentBatchSnapshot,
-    patch: SourceBackedSvgAttachmentBatchPatch,
-    diagnostics: SvgAttachmentCommitDiagnostics,
+pub(crate) struct BatchCommit {
+    patch: BatchPatch,
+    diagnostics: BatchDiagnostics,
 }
 
-impl SourceBackedSvgAttachmentBatchEdit<'_> {
+impl BatchEdit<'_> {
     /// Borrow the immutable batch source snapshot.
     #[must_use]
-    pub const fn source(&self) -> &SourceBackedSvgAttachmentBatchSnapshot {
+    pub(crate) const fn source(&self) -> &Snapshot {
         &self.source
     }
 
     /// Return the current projected batch after staged operations.
     #[must_use]
-    pub const fn projected(&self) -> &SourceBackedSvgAttachmentBatchSnapshot {
+    pub(crate) const fn projected(&self) -> &Snapshot {
         &self.current
     }
 
     /// Attach one borrowed SVG payload to a selected picture.
-    pub fn attach_svg<'a>(
+    pub(crate) fn attach_svg<'a>(
         &mut self,
         selector: impl Into<PictureSelector>,
-        input: impl Into<SvgInput<'a>>,
+        input: impl Into<Input<'a>>,
     ) -> Result<bool> {
         let input = input.into();
         self.attach_bytes(selector.into(), input.as_bytes(), None, None, None)
     }
 
     /// Attach an advanced caller-owned request to a selected picture.
-    pub fn attach(
+    pub(crate) fn attach(
         &mut self,
         selector: impl Into<PictureSelector>,
-        request: &SourceBackedSvgAttachmentReplacement,
+        request: &AttachmentReplacement,
     ) -> Result<bool> {
         self.attach_bytes(
             selector.into(),
@@ -952,9 +945,7 @@ impl SourceBackedSvgAttachmentBatchEdit<'_> {
         }
         if matches!(
             current.owner_state,
-            SvgPictureOwnerState::Linked
-                | SvgPictureOwnerState::Ambiguous
-                | SvgPictureOwnerState::Refused
+            OwnerState::Linked | OwnerState::Ambiguous | OwnerState::Refused
         ) {
             return Err(unsafe_edit(
                 RefusalKind::UnsupportedContent,
@@ -1032,7 +1023,7 @@ impl SourceBackedSvgAttachmentBatchEdit<'_> {
     }
 
     /// Detach one selected embedded SVG owner while retaining its raster.
-    pub fn detach_svg(&mut self, selector: impl Into<PictureSelector>) -> Result<bool> {
+    pub(crate) fn detach_svg(&mut self, selector: impl Into<PictureSelector>) -> Result<bool> {
         let selector = selector.into();
         self.ensure_source_current()?;
         self.check_selector_operation(selector, "detach_svg")?;
@@ -1040,9 +1031,7 @@ impl SourceBackedSvgAttachmentBatchEdit<'_> {
         if current.svg.is_none() {
             if matches!(
                 current.owner_state,
-                SvgPictureOwnerState::Linked
-                    | SvgPictureOwnerState::Ambiguous
-                    | SvgPictureOwnerState::Refused
+                OwnerState::Linked | OwnerState::Ambiguous | OwnerState::Refused
             ) {
                 return Err(unsafe_edit(
                     RefusalKind::UnsupportedContent,
@@ -1059,7 +1048,7 @@ impl SourceBackedSvgAttachmentBatchEdit<'_> {
     }
 
     /// Validate the complete changed story/dependency closure and freeze it.
-    pub fn commit(mut self) -> Result<SourceBackedSvgAttachmentBatchCommit> {
+    pub(crate) fn commit(mut self) -> Result<BatchCommit> {
         self.ensure_source_current()?;
         if !self.operations.is_empty() {
             // Intermediate projections are raw source bytes because an OPC
@@ -1073,15 +1062,12 @@ impl SourceBackedSvgAttachmentBatchEdit<'_> {
             )?;
             self.current.story = StoryPayload::Edited(final_xml);
         }
-        let patch = SourceBackedSvgAttachmentBatchPatch {
+        let patch = BatchPatch {
             before: self.source,
             after: self.current,
         };
-        let diagnostics = SvgAttachmentCommitDiagnostics::new(
-            self.operations.len(),
-            patch.before.len(),
-            !patch.is_noop(),
-        );
+        let diagnostics =
+            BatchDiagnostics::new(self.operations.len(), patch.before.len(), !patch.is_noop());
         if !patch.is_noop() {
             let plan = build_batch_topology_plan(
                 self.package.physical_package()?,
@@ -1104,16 +1090,7 @@ impl SourceBackedSvgAttachmentBatchEdit<'_> {
                 })??;
         }
         self.package.physical_package()?.check_execution()?;
-        Ok(SourceBackedSvgAttachmentBatchCommit {
-            snapshot: patch.after.clone(),
-            patch,
-            diagnostics,
-        })
-    }
-
-    /// Explicit alias for callers that want the fallible commit spelling.
-    pub fn commit_checked(self) -> Result<SourceBackedSvgAttachmentBatchCommit> {
-        self.commit()
+        Ok(BatchCommit { patch, diagnostics })
     }
 
     fn check_selector_operation(
@@ -1303,10 +1280,10 @@ impl SourceBackedSvgAttachmentBatchEdit<'_> {
             } => {
                 if matches!(
                     layout.owner_state,
-                    SvgPictureOwnerState::Linked
-                        | SvgPictureOwnerState::Ambiguous
-                        | SvgPictureOwnerState::Refused
-                        | SvgPictureOwnerState::Embedded
+                    OwnerState::Linked
+                        | OwnerState::Ambiguous
+                        | OwnerState::Refused
+                        | OwnerState::Embedded
                 ) {
                     return Err(unsafe_edit(
                         RefusalKind::UnsupportedContent,
@@ -1403,7 +1380,7 @@ impl SourceBackedSvgAttachmentBatchEdit<'_> {
                     .map(|layout| layout.post_detach_owner_state)
             })
             .transpose()?
-            .unwrap_or(SvgPictureOwnerState::None);
+            .unwrap_or(OwnerState::None);
         let projected_xml = Arc::new(xml);
         let state = self.current.state_mut(selector)?;
         match &operation {
@@ -1422,7 +1399,7 @@ impl SourceBackedSvgAttachmentBatchEdit<'_> {
                     payload: SvgPayload::Edited(Arc::clone(payload)),
                     _reservation: reservation.clone(),
                 });
-                state.owner_state = SvgPictureOwnerState::Embedded;
+                state.owner_state = OwnerState::Embedded;
             },
             BatchOperation::Detach { .. } => {
                 state.svg = None;
@@ -1528,27 +1505,21 @@ fn reserve_payload_memory(
         .checked_add(size_of::<Vec<u8>>() as u64)
         .ok_or_else(|| Error::Invalid("DOCX SVG payload reservation overflows".into()))?;
     context
-        .reserve(Resource::Memory, bytes)
+        .reserve(CoreResource::Memory, bytes)
         .map(|reservation| Some(Arc::new(reservation)))
         .map_err(|error| Error::from(litchi_opc::OpcError::Execution(error)))
 }
 
-impl SourceBackedSvgAttachmentBatchPatch {
+impl BatchPatch {
     /// Exact source snapshot required by this patch.
     #[must_use]
-    pub const fn source(&self) -> &SourceBackedSvgAttachmentBatchSnapshot {
+    pub(crate) const fn source(&self) -> &Snapshot {
         &self.before
-    }
-
-    /// Target snapshot produced by this patch.
-    #[must_use]
-    pub const fn target(&self) -> &SourceBackedSvgAttachmentBatchSnapshot {
-        &self.after
     }
 
     /// Whether this patch leaves story and graph state unchanged.
     #[must_use]
-    pub fn is_noop(&self) -> bool {
+    pub(crate) fn is_noop(&self) -> bool {
         same_batch_state(&self.before, &self.after)
     }
 
@@ -1564,7 +1535,7 @@ impl SourceBackedSvgAttachmentBatchPatch {
 
     /// Return the exact in-memory inverse.
     #[must_use]
-    pub fn inverse(&self) -> Self {
+    pub(crate) fn inverse(&self) -> Self {
         Self {
             before: self.after.clone(),
             after: self.before.clone(),
@@ -1572,10 +1543,7 @@ impl SourceBackedSvgAttachmentBatchPatch {
     }
 
     /// Apply this patch only to the exact captured source batch.
-    pub fn apply(
-        &self,
-        source: &SourceBackedSvgAttachmentBatchSnapshot,
-    ) -> Result<SourceBackedSvgAttachmentBatchSnapshot> {
+    pub(crate) fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
         if !same_batch_source(source, &self.before) {
             return Err(Error::Invalid(
                 "SVG lifecycle batch patch source is stale or foreign".into(),
@@ -1589,22 +1557,16 @@ impl SourceBackedSvgAttachmentBatchPatch {
     }
 }
 
-impl SourceBackedSvgAttachmentBatchCommit {
-    /// Candidate target snapshot.
-    #[must_use]
-    pub const fn snapshot(&self) -> &SourceBackedSvgAttachmentBatchSnapshot {
-        &self.snapshot
-    }
-
+impl BatchCommit {
     /// Exact-source reversible batch patch.
     #[must_use]
-    pub const fn patch(&self) -> &SourceBackedSvgAttachmentBatchPatch {
+    pub(crate) const fn patch(&self) -> &BatchPatch {
         &self.patch
     }
 
     /// Return content-free facts about this commit.
     #[must_use]
-    pub const fn diagnostics(&self) -> SvgAttachmentCommitDiagnostics {
+    pub(crate) const fn diagnostics(&self) -> BatchDiagnostics {
         self.diagnostics
     }
 }
@@ -1613,10 +1575,7 @@ impl super::Package {
     /// Inspect direct main-story pictures without reading raster or SVG media
     /// payloads. The returned source views retain lazy Part handles; callers
     /// opt into a payload read through `raster().data()` or `svg().data()`.
-    pub fn svg_picture_sources(
-        &self,
-        story: StorySelector,
-    ) -> Result<Vec<SourceSvgPictureSourceView<'_>>> {
+    pub fn svg_picture_sources(&self, story: StorySelector) -> Result<Vec<PictureSource<'_>>> {
         if !matches!(story, StorySelector::Main) {
             return Err(unsafe_edit(
                 RefusalKind::UnsupportedTarget,
@@ -1658,7 +1617,7 @@ impl super::Package {
     /// This compatibility method returns payload-bearing views and therefore
     /// intentionally reads the selected media. Use [`Self::svg_picture_sources`]
     /// when only metadata or a lazily loaded resource handle is needed.
-    pub fn svg_pictures(&self, story: StorySelector) -> Result<Vec<SourceSvgPictureView>> {
+    pub fn svg_pictures(&self, story: StorySelector) -> Result<Vec<PictureView>> {
         if !matches!(story, StorySelector::Main) {
             return Err(unsafe_edit(
                 RefusalKind::UnsupportedTarget,
@@ -1685,10 +1644,7 @@ impl super::Package {
     /// captured once, even when many selectors are supplied. Its commit is a
     /// detached batch snapshot and patch; [`Self::edit_svg`] commits to a
     /// new package, and [`Self::apply_svg`] replays a batch patch.
-    pub fn edit_svg_attachments<I, S>(
-        &self,
-        selectors: I,
-    ) -> Result<SourceBackedSvgAttachmentBatchEdit<'_>>
+    pub(crate) fn edit_svg_record<I, S>(&self, selectors: I) -> Result<BatchEdit<'_>>
     where
         I: IntoIterator<Item = S>,
         S: Into<PictureSelector>,
@@ -1718,9 +1674,7 @@ impl super::Package {
         if snapshot.states.iter().any(|state| {
             matches!(
                 state.owner_state,
-                SvgPictureOwnerState::Linked
-                    | SvgPictureOwnerState::Ambiguous
-                    | SvgPictureOwnerState::Refused
+                OwnerState::Linked | OwnerState::Ambiguous | OwnerState::Refused
             )
         }) {
             return Err(unsafe_edit(
@@ -1733,7 +1687,7 @@ impl super::Package {
             .context
             .clone()
             .ok_or_else(|| Error::Invalid("SVG batch has no source layout context".into()))?;
-        Ok(SourceBackedSvgAttachmentBatchEdit {
+        Ok(BatchEdit {
             package: self,
             source: snapshot.clone(),
             current: snapshot,
@@ -1749,13 +1703,7 @@ impl super::Package {
 
     /// Check an SVG batch patch against this package and return the
     /// current and target batches (record 0355a).
-    pub(crate) fn svg_batch_target(
-        &self,
-        patch: &SourceBackedSvgAttachmentBatchPatch,
-    ) -> Result<(
-        SourceBackedSvgAttachmentBatchSnapshot,
-        SourceBackedSvgAttachmentBatchSnapshot,
-    )> {
+    pub(crate) fn svg_batch_target(&self, patch: &BatchPatch) -> Result<(Snapshot, Snapshot)> {
         self.physical_package()?.check_execution()?;
         let selectors = patch
             .before
@@ -1781,8 +1729,8 @@ impl super::Package {
     pub(crate) fn write_svg_batch(
         &self,
         writer: &mut dyn std::io::Write,
-        current: &SourceBackedSvgAttachmentBatchSnapshot,
-        target: &SourceBackedSvgAttachmentBatchSnapshot,
+        current: &Snapshot,
+        target: &Snapshot,
     ) -> Result<()> {
         let plan = build_batch_topology_plan(self.physical_package()?, current, target)?;
         publish_checked_topology(
@@ -1804,8 +1752,8 @@ fn publish_checked_topology<W: std::io::Write>(
     package: litchi_opc::SourceBackedPackage,
     writer: W,
     plan: SourceTopologyPlan,
-    before: &SourceBackedSvgAttachmentBatchSnapshot,
-    expected: &SourceBackedSvgAttachmentBatchSnapshot,
+    before: &Snapshot,
+    expected: &Snapshot,
 ) -> Result<SourceArtifactFingerprint> {
     let prepared = package.prepare_topology(plan)?;
     prepared.with_candidate(|candidate| {
@@ -1827,8 +1775,8 @@ fn publish_checked_topology<W: std::io::Write>(
 /// unrelated dangling edge or retained media mapping.
 fn validate_effective_candidate(
     candidate: &EffectiveTopology<'_>,
-    before: &SourceBackedSvgAttachmentBatchSnapshot,
-    expected: &SourceBackedSvgAttachmentBatchSnapshot,
+    before: &Snapshot,
+    expected: &Snapshot,
 ) -> Result<()> {
     if before.states.len() != expected.states.len() || expected.states.is_empty() {
         return Err(Error::Invalid(
@@ -1984,10 +1932,7 @@ fn validate_effective_candidate(
     Ok(())
 }
 
-fn validate_effective_graph(
-    candidate: &EffectiveTopology<'_>,
-    before: &SourceBackedSvgAttachmentBatchSnapshot,
-) -> Result<()> {
+fn validate_effective_graph(candidate: &EffectiveTopology<'_>, before: &Snapshot) -> Result<()> {
     let source_relationships = before
         .states
         .first()
@@ -2118,8 +2063,8 @@ fn effective_content_type_fingerprints(
 
 fn expected_transition_fingerprints(
     candidate: &EffectiveTopology<'_>,
-    before: &SourceBackedSvgAttachmentBatchSnapshot,
-    after: &SourceBackedSvgAttachmentBatchSnapshot,
+    before: &Snapshot,
+    after: &Snapshot,
 ) -> Result<(Vec<RelationshipFingerprint>, Vec<ContentTypeFingerprint>)> {
     let source = before
         .states
@@ -2256,7 +2201,7 @@ fn capture_inventory(package: &super::Package) -> Result<Vec<SnapshotState>> {
 fn capture_batch(
     package: &super::Package,
     mut selectors: Vec<PictureSelector>,
-) -> Result<SourceBackedSvgAttachmentBatchSnapshot> {
+) -> Result<Snapshot> {
     if selectors.is_empty() {
         return Err(Error::Invalid(
             "SVG lifecycle batch must select at least one picture".into(),
@@ -2334,7 +2279,7 @@ fn capture_batch(
         lineage: package.physical_package()?.source_lineage(),
         layouts: Arc::from(layouts.into_boxed_slice()),
     });
-    Ok(SourceBackedSvgAttachmentBatchSnapshot {
+    Ok(Snapshot {
         states,
         story: StoryPayload::Original(source),
         context: Some(context),
@@ -2345,7 +2290,7 @@ fn capture_from_picture(
     package: &super::Package,
     part_uri: PackURI,
     source: litchi_opc::SourceXmlPart,
-    picture: &PictureSource<'_>,
+    picture: &DrawingPictureSource<'_>,
     selector: PictureSelector,
     relationship_ids: Arc<[String]>,
     physical_names: Arc<[String]>,
@@ -2458,25 +2403,25 @@ fn capture_from_picture(
     })
 }
 
-fn view_from_snapshot(state: SnapshotState) -> SourceSvgPictureView {
+fn view_from_snapshot(state: SnapshotState) -> PictureView {
     let raster_relationship_id = state.raster_relationship_id.clone();
     let raster_relationship_type = state.raster_relationship_type.clone();
     let raster_part_uri = state.raster_part_uri.clone();
     let raster_content_type = state.raster_content_type.clone();
-    SourceSvgPictureView {
+    PictureView {
         selector: state.selector,
         placement: state.placement,
         raster_relationship_id: state.raster_relationship_id,
         raster_part_uri: state.raster_part_uri,
         owner_state: state.owner_state,
-        raster: RasterResourceView {
+        raster: Raster {
             relationship_id: raster_relationship_id,
             relationship_type: raster_relationship_type,
             part_uri: raster_part_uri,
             content_type: raster_content_type,
             payload: state.raster_payload.clone(),
         },
-        svg: state.svg.map(|attachment| SvgResourceView {
+        svg: state.svg.map(|attachment| Resource {
             attachment: attachment.public(),
         }),
     }
@@ -2485,9 +2430,9 @@ fn view_from_snapshot(state: SnapshotState) -> SourceSvgPictureView {
 fn source_view_from_picture<'a>(
     package: &'a super::Package,
     main: &PartView<'a>,
-    picture: &PictureSource<'_>,
+    picture: &DrawingPictureSource<'_>,
     selector: PictureSelector,
-) -> Result<SourceSvgPictureSourceView<'a>> {
+) -> Result<PictureSource<'a>> {
     let raster_id = picture
         .raster_relationship_id()
         .ok_or_else(|| Error::Invalid("direct DOCX picture has no raster relationship".into()))?;
@@ -2538,7 +2483,7 @@ fn source_view_from_picture<'a>(
                     "SVG media Part is not a relationship-free image/svg+xml leaf".into(),
                 ));
             }
-            Some(SvgResourceSourceView {
+            Some(ResourceSource {
                 relationship_id: relation.r_id(),
                 relationship_type: relation.reltype(),
                 part_uri: svg_part.partname(),
@@ -2551,11 +2496,11 @@ fn source_view_from_picture<'a>(
         | SvgOwnerState::Refused
         | SvgOwnerState::Opaque => None,
     };
-    Ok(SourceSvgPictureSourceView {
+    Ok(PictureSource {
         selector,
         placement: picture.placement(),
         owner_state: map_owner_state(picture.svg_owner()),
-        raster: RasterResourceSourceView {
+        raster: RasterSource {
             relationship_id: raster.r_id(),
             relationship_type: raster.reltype(),
             part_uri: raster_part.partname(),
@@ -2566,14 +2511,14 @@ fn source_view_from_picture<'a>(
     })
 }
 
-fn map_owner_state(state: &SvgOwnerState<'_>) -> SvgPictureOwnerState {
+fn map_owner_state(state: &SvgOwnerState<'_>) -> OwnerState {
     match state {
-        SvgOwnerState::None => SvgPictureOwnerState::None,
-        SvgOwnerState::Embedded(_) => SvgPictureOwnerState::Embedded,
-        SvgOwnerState::Linked(_) => SvgPictureOwnerState::Linked,
-        SvgOwnerState::Ambiguous => SvgPictureOwnerState::Ambiguous,
-        SvgOwnerState::Refused => SvgPictureOwnerState::Refused,
-        SvgOwnerState::Opaque => SvgPictureOwnerState::Opaque,
+        SvgOwnerState::None => OwnerState::None,
+        SvgOwnerState::Embedded(_) => OwnerState::Embedded,
+        SvgOwnerState::Linked(_) => OwnerState::Linked,
+        SvgOwnerState::Ambiguous => OwnerState::Ambiguous,
+        SvgOwnerState::Refused => OwnerState::Refused,
+        SvgOwnerState::Opaque => OwnerState::Opaque,
     }
 }
 
@@ -2589,7 +2534,7 @@ fn copy_layout_prefix(prefix: &[u8]) -> Result<Box<[u8]>> {
     Ok(owned.into_boxed_slice())
 }
 
-fn layout_from_picture(picture: &PictureSource<'_>) -> Result<PictureLayout> {
+fn layout_from_picture(picture: &DrawingPictureSource<'_>) -> Result<PictureLayout> {
     let blip = picture
         .blip_range()
         .ok_or_else(|| Error::Invalid("direct picture has no raster blip range".into()))?;
@@ -2604,9 +2549,9 @@ fn layout_from_picture(picture: &PictureSource<'_>) -> Result<PictureLayout> {
         | SvgOwnerState::Opaque => None,
     };
     let post_detach_owner_state = if picture.has_opaque_svg_extension() {
-        SvgPictureOwnerState::Opaque
+        OwnerState::Opaque
     } else {
-        SvgPictureOwnerState::None
+        OwnerState::None
     };
     Ok(PictureLayout {
         blip_range: blip.range(),
@@ -2861,7 +2806,7 @@ fn rewrite_story_xml_batch(
 }
 
 fn generated_attachment_replacement(
-    picture: &PictureSource<'_>,
+    picture: &DrawingPictureSource<'_>,
     relationship_id: &str,
     source: &[u8],
     limits: litchi_opc::SourceLimits,
@@ -2980,7 +2925,7 @@ fn generated_attachment_replacement_bounds_from_layout(
 }
 
 fn generated_attachment_replacement_bounds(
-    picture: &PictureSource<'_>,
+    picture: &DrawingPictureSource<'_>,
     relationship_id: &str,
 ) -> Result<(ByteRange, usize)> {
     let blip = picture
@@ -3203,10 +3148,7 @@ fn same_state_core(left: &SnapshotState, right: &SnapshotState) -> bool {
         && same_attachment(&left.svg, &right.svg)
 }
 
-fn same_batch_source(
-    left_batch: &SourceBackedSvgAttachmentBatchSnapshot,
-    right_batch: &SourceBackedSvgAttachmentBatchSnapshot,
-) -> bool {
+fn same_batch_source(left_batch: &Snapshot, right_batch: &Snapshot) -> bool {
     if left_batch.states.len() != right_batch.states.len() {
         return false;
     }
@@ -3230,10 +3172,7 @@ fn same_batch_source(
         })
 }
 
-fn same_batch_state(
-    left_batch: &SourceBackedSvgAttachmentBatchSnapshot,
-    right_batch: &SourceBackedSvgAttachmentBatchSnapshot,
-) -> bool {
+fn same_batch_state(left_batch: &Snapshot, right_batch: &Snapshot) -> bool {
     if left_batch.states.len() != right_batch.states.len() {
         return false;
     }
@@ -3276,8 +3215,8 @@ fn same_bytes(left: &[u8], right: &[u8]) -> bool {
 
 fn build_batch_topology_plan(
     package: &litchi_opc::SourceBackedPackage,
-    before: &SourceBackedSvgAttachmentBatchSnapshot,
-    after: &SourceBackedSvgAttachmentBatchSnapshot,
+    before: &Snapshot,
+    after: &Snapshot,
 ) -> Result<SourceTopologyPlan> {
     if before.states.len() != after.states.len() || before.states.is_empty() {
         return Err(Error::Invalid(
@@ -3335,7 +3274,7 @@ fn build_batch_topology_plan(
         }
         match (&before.svg, &after.svg) {
             (None, Some(svg)) => {
-                if !matches!(projected_owner, SvgPictureOwnerState::Embedded) {
+                if !matches!(projected_owner, OwnerState::Embedded) {
                     return Err(internal(
                         "SVG lifecycle publication",
                         "staged story does not resolve the newly attached SVG owner",

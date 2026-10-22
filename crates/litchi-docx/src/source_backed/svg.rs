@@ -9,11 +9,12 @@
 
 use crate::Result;
 use crate::source_backed::deferred::{Change, source_family};
-use crate::source_backed::{
-    Package, PictureSelector, SourceBackedSvgAttachmentBatchEdit as RecordEdit,
-    SourceBackedSvgAttachmentBatchPatch as RecordPatch,
-    SourceBackedSvgAttachmentBatchSnapshot as RecordSnapshot, SourceBackedSvgAttachmentReplacement,
-    SvgInput,
+use crate::source_backed::svg_lifecycle::{BatchEdit as RecordEdit, BatchPatch as RecordPatch};
+use crate::source_backed::{Package, svg_lifecycle};
+
+pub use svg_lifecycle::{
+    Attachment, AttachmentReplacement, Input, OwnerState, Picture, PictureSelector, PictureSource,
+    PictureView, Raster, RasterSource, Resource, ResourceSource, Snapshot,
 };
 
 /// The batch record patch the family publishes, with its staged operation
@@ -51,7 +52,7 @@ impl Change for SvgChange {
 
 /// Content-free facts about an SVG commit: staged operations, selected
 /// pictures and whether it changed anything.
-pub use crate::source_backed::SvgAttachmentCommitDiagnostics as Diagnostics;
+pub use svg_lifecycle::BatchDiagnostics as Diagnostics;
 
 source_family!("SVG attachment", SvgChange, crate::Error, diagnostics Diagnostics);
 
@@ -100,13 +101,13 @@ impl<'a> Edit<'a> {
 
     /// The selected pictures before the edit.
     #[must_use]
-    pub const fn source(&self) -> &RecordSnapshot {
+    pub const fn source(&self) -> &Snapshot {
         self.inner.source()
     }
 
     /// The selected pictures with the staged changes.
     #[must_use]
-    pub const fn projected(&self) -> &RecordSnapshot {
+    pub const fn projected(&self) -> &Snapshot {
         self.inner.projected()
     }
 
@@ -119,7 +120,7 @@ impl<'a> Edit<'a> {
     pub fn attach_svg<'b>(
         &mut self,
         selector: impl Into<PictureSelector>,
-        input: impl Into<SvgInput<'b>>,
+        input: impl Into<Input<'b>>,
     ) -> Result<bool> {
         self.inner.attach_svg(selector, input)
     }
@@ -132,7 +133,7 @@ impl<'a> Edit<'a> {
     pub fn attach(
         &mut self,
         selector: impl Into<PictureSelector>,
-        request: &SourceBackedSvgAttachmentReplacement,
+        request: &AttachmentReplacement,
     ) -> Result<bool> {
         self.inner.attach(selector, request)
     }
@@ -173,7 +174,7 @@ impl Package {
     {
         Ok(Edit {
             package: self,
-            inner: self.edit_svg_attachments(selectors)?,
+            inner: self.edit_svg_record(selectors)?,
         })
     }
 

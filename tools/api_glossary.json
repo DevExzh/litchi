@@ -444,6 +444,101 @@
           "scope": "litchi_docx::source_backed",
           "replacement": "a family Commit holds the new Package, its Patch and Diagnostics (record 0355a)",
           "match": "suffix"
+        },
+        {
+          "name": "edit_svg_attachments",
+          "scope": "litchi_docx::source_backed::Package",
+          "replacement": "use Package::edit_svg (record 0362z)"
+        },
+        {
+          "name": "SourceBackedSvgAttachmentBatchEdit",
+          "scope": "litchi_docx::source_backed",
+          "replacement": "use source_backed::svg::Edit (record 0362z)"
+        },
+        {
+          "name": "SourceBackedSvgAttachmentBatchCommit",
+          "scope": "litchi_docx::source_backed",
+          "replacement": "use source_backed::svg::Commit (record 0362z)"
+        },
+        {
+          "name": "SourceBackedSvgAttachmentBatchPatch",
+          "scope": "litchi_docx::source_backed",
+          "replacement": "use source_backed::svg::Patch (record 0362z)"
+        },
+        {
+          "name": "SourceBackedSvgAttachmentBatchSnapshot",
+          "scope": "litchi_docx::source_backed",
+          "replacement": "use source_backed::svg::Snapshot (record 0362z)"
+        },
+        {
+          "name": "SvgPictureSelector",
+          "scope": "litchi_docx::source_backed",
+          "replacement": "use source_backed::svg::PictureSelector (record 0362z)"
+        },
+        {
+          "name": "RasterResourceSourceView",
+          "scope": "litchi_docx::source_backed",
+          "replacement": "use source_backed::svg::RasterSource (record 0362z)"
+        },
+        {
+          "name": "RasterResourceView",
+          "scope": "litchi_docx::source_backed",
+          "replacement": "use source_backed::svg::Raster (record 0362z)"
+        },
+        {
+          "name": "SourceBackedSvgAttachmentReplacement",
+          "scope": "litchi_docx::source_backed",
+          "replacement": "use source_backed::svg::AttachmentReplacement (record 0362z)"
+        },
+        {
+          "name": "SourceBackedSvgAttachmentSnapshot",
+          "scope": "litchi_docx::source_backed",
+          "replacement": "use source_backed::svg::Picture (record 0362z)"
+        },
+        {
+          "name": "SourceSvgAttachment",
+          "scope": "litchi_docx::source_backed",
+          "replacement": "use source_backed::svg::Attachment (record 0362z)"
+        },
+        {
+          "name": "SourceSvgPictureSourceView",
+          "scope": "litchi_docx::source_backed",
+          "replacement": "use source_backed::svg::PictureSource (record 0362z)"
+        },
+        {
+          "name": "SourceSvgPictureView",
+          "scope": "litchi_docx::source_backed",
+          "replacement": "use source_backed::svg::PictureView (record 0362z)"
+        },
+        {
+          "name": "SvgAttachmentCommitDiagnostics",
+          "scope": "litchi_docx::source_backed",
+          "replacement": "use source_backed::svg::Diagnostics (record 0362z)"
+        },
+        {
+          "name": "SvgInput",
+          "scope": "litchi_docx::source_backed",
+          "replacement": "use source_backed::svg::Input (record 0362z)"
+        },
+        {
+          "name": "SvgPictureOwnerState",
+          "scope": "litchi_docx::source_backed",
+          "replacement": "use source_backed::svg::OwnerState (record 0362z)"
+        },
+        {
+          "name": "SvgPictureView",
+          "scope": "litchi_docx::source_backed",
+          "replacement": "use source_backed::svg::PictureView (record 0362z)"
+        },
+        {
+          "name": "SvgResourceSourceView",
+          "scope": "litchi_docx::source_backed",
+          "replacement": "use source_backed::svg::ResourceSource (record 0362z)"
+        },
+        {
+          "name": "SvgResourceView",
+          "scope": "litchi_docx::source_backed",
+          "replacement": "use source_backed::svg::Resource (record 0362z)"
         }
       ],
       "families": [
@@ -1005,6 +1100,101 @@
           "scope": "litchi_docx::source_backed",
           "replacement": "a family Commit holds the new Package, its Patch and Diagnostics (record 0355a)",
           "match": "suffix"
+        },
+        {
+          "name": "edit_svg_attachments",
+          "scope": "litchi_docx::source_backed::Package",
+          "replacement": "use Package::edit_svg (record 0362z)"
+        },
+        {
+          "name": "SourceBackedSvgAttachmentBatchEdit",
+          "scope": "litchi_docx::source_backed",
+          "replacement": "use source_backed::svg::Edit (record 0362z)"
+        },
+        {
+          "name": "SourceBackedSvgAttachmentBatchCommit",
+          "scope": "litchi_docx::source_backed",
+          "replacement": "use source_backed::svg::Commit (record 0362z)"
+        },
+        {
+          "name": "SourceBackedSvgAttachmentBatchPatch",
+          "scope": "litchi_docx::source_backed",
+          "replacement": "use source_backed::svg::Patch (record 0362z)"
+        },
+        {
+          "name": "SourceBackedSvgAttachmentBatchSnapshot",
+          "scope": "litchi_docx::source_backed",
+          "replacement": "use source_backed::svg::Snapshot (record 0362z)"
+        },
+        {
+          "name": "SvgPictureSelector",
+          "scope": "litchi_docx::source_backed",
+          "replacement": "use source_backed::svg::PictureSelector (record 0362z)"
+        },
+        {
+          "name": "RasterResourceSourceView",
+          "scope": "litchi_docx::source_backed",
+          "replacement": "use source_backed::svg::RasterSource (record 0362z)"
+        },
+        {
+          "name": "RasterResourceView",
+          "scope": "litchi_docx::source_backed",
+          "replacement": "use source_backed::svg::Raster (record 0362z)"
+        },
+        {
+          "name": "SourceBackedSvgAttachmentReplacement",
+          "scope": "litchi_docx::source_backed",
+          "replacement": "use source_backed::svg::AttachmentReplacement (record 0362z)"
+        },
+        {
+          "name": "SourceBackedSvgAttachmentSnapshot",
+          "scope": "litchi_docx::source_backed",
+          "replacement": "use source_backed::svg::Picture (record 0362z)"
+        },
+        {
+          "name": "SourceSvgAttachment",
+          "scope": "litchi_docx::source_backed",
+          "replacement": "use source_backed::svg::Attachment (record 0362z)"
+        },
+        {
+          "name": "SourceSvgPictureSourceView",
+          "scope": "litchi_docx::source_backed",
+          "replacement": "use source_backed::svg::PictureSource (record 0362z)"
+        },
+        {
+          "name": "SourceSvgPictureView",
+          "scope": "litchi_docx::source_backed",
+          "replacement": "use source_backed::svg::PictureView (record 0362z)"
+        },
+        {
+          "name": "SvgAttachmentCommitDiagnostics",
+          "scope": "litchi_docx::source_backed",
+          "replacement": "use source_backed::svg::Diagnostics (record 0362z)"
+        },
+        {
+          "name": "SvgInput",
+          "scope": "litchi_docx::source_backed",
+          "replacement": "use source_backed::svg::Input (record 0362z)"
+        },
+        {
+          "name": "SvgPictureOwnerState",
+          "scope": "litchi_docx::source_backed",
+          "replacement": "use source_backed::svg::OwnerState (record 0362z)"
+        },
+        {
+          "name": "SvgPictureView",
+          "scope": "litchi_docx::source_backed",
+          "replacement": "use source_backed::svg::PictureView (record 0362z)"
+        },
+        {
+          "name": "SvgResourceSourceView",
+          "scope": "litchi_docx::source_backed",
+          "replacement": "use source_backed::svg::ResourceSource (record 0362z)"
+        },
+        {
+          "name": "SvgResourceView",
+          "scope": "litchi_docx::source_backed",
+          "replacement": "use source_backed::svg::Resource (record 0362z)"
         }
       ],
       "families": [
