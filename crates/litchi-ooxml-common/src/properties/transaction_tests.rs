@@ -7,7 +7,7 @@
 use litchi_core::metadata::{Field, Metadata, Timestamp};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::part::BlobPart;
-use litchi_opc::{OpcPackage, PackURI};
+use litchi_opc::{OpcPackage, PackURI, TargetMode};
 
 use super::{Core, Edit, Error, Family, Keywords, Snapshot, app, write_core};
 use crate::custom::{self, Host, Value};
@@ -276,6 +276,31 @@ fn composed_no_op_scopes_are_checked_instead_of_dropped() {
         round_trip.apply(&mut after),
         Err(Error::Conflict(_))
     ));
+
+    // A partial cancellation scope remains useful when followed by a
+    // disjoint changed family. Both the retained core guard and the app
+    // before image must survive composition.
+    let mut app_plan = snapshot.plan();
+    app_plan.set_app_props(Some(app::Props {
+        company: Some("Other".into()),
+        ..app::Props::default()
+    }));
+    let (_, app_patch, _) = app_plan.finish().unwrap();
+    let disjoint = round_trip.compose(&app_patch).unwrap();
+    let mut composed = source.clone();
+    disjoint.apply(&mut composed).unwrap();
+    let mut expected = source.clone();
+    app_patch.apply(&mut expected).unwrap();
+    assert_eq!(
+        bytes(&composed, "/docProps/app.xml"),
+        bytes(&expected, "/docProps/app.xml")
+    );
+    let mut wrong = source.clone();
+    changed.apply(&mut wrong).unwrap();
+    assert!(matches!(
+        disjoint.apply(&mut wrong),
+        Err(Error::Conflict(_))
+    ));
 }
 
 #[test]
@@ -298,8 +323,66 @@ fn composed_no_op_scope_authenticates_absent_property_families() {
         bytes(&composed_package, "/docProps/core.xml"),
         bytes(&expected, "/docProps/core.xml")
     );
+    // The untouched absent families keep distinct synthetic IDs. The
+    // inverse therefore accepts the created core relationship while still
+    // proving that the app and custom IDs are free.
+    assert!(composed.inverse().apply(&mut composed_package).unwrap());
+    assert_eq!(composed_package.iter_parts().count(), 0);
     assert!(matches!(
         no_op.compose(&changed_no_op),
+        Err(Error::Conflict(_))
+    ));
+}
+
+#[test]
+fn removal_composes_only_with_a_no_op_from_its_exact_after_graph() {
+    let source = full();
+    let snapshot = Snapshot::read(&source, Host::Word).unwrap();
+    let mut remove_plan = snapshot.plan();
+    remove_plan.set_custom_props(custom::Props::new());
+    let (_, removal, _) = remove_plan.finish().unwrap();
+
+    let mut removed = source.clone();
+    assert!(removal.apply(&mut removed).unwrap());
+    let removed_snapshot = Snapshot::read(&removed, Host::Word).unwrap();
+    let (_, exact_no_op, _) = removed_snapshot.plan().finish().unwrap();
+    let composed = removal.compose(&exact_no_op).unwrap();
+    let mut round_trip = source.clone();
+    assert!(composed.apply(&mut round_trip).unwrap());
+    assert!(composed.inverse().apply(&mut round_trip).unwrap());
+    assert_eq!(
+        bytes(&round_trip, "/docProps/custom.xml"),
+        bytes(&source, "/docProps/custom.xml")
+    );
+
+    // A separately captured no-op whose free-ID graph differs is not the
+    // removal's after state, even though both owners have no custom part.
+    let removed_custom_id = source
+        .rels()
+        .iter()
+        .find(|relationship| relationship.reltype() == rt::CUSTOM_PROPERTIES)
+        .unwrap()
+        .r_id()
+        .to_owned();
+    let mut unrelated = removed.clone();
+    unrelated.add_part(Box::new(BlobPart::new(
+        PackURI::new("/dummy.xml").unwrap(),
+        "application/octet-stream".to_owned(),
+        Vec::new(),
+    )));
+    unrelated
+        .rels_mut()
+        .try_add_relationship(
+            "urn:litchi:test".to_owned(),
+            "dummy.xml".to_owned(),
+            removed_custom_id,
+            TargetMode::Internal,
+        )
+        .unwrap();
+    let unrelated_snapshot = Snapshot::read(&unrelated, Host::Word).unwrap();
+    let (_, different_no_op, _) = unrelated_snapshot.plan().finish().unwrap();
+    assert!(matches!(
+        removal.compose(&different_no_op),
         Err(Error::Conflict(_))
     ));
 }

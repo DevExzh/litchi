@@ -540,6 +540,7 @@ fn family_state<P: PackageMetadata>(
 /// family is chosen from the source's free IDs; `check_change` then verifies
 /// that it remains free on the recipient.
 fn snapshot_scope(snapshot: &Snapshot) -> Result<Box<[Change]>> {
+    let mut relationship_ids = snapshot.relationship_ids.clone();
     [Family::Core, Family::App, Family::Custom]
         .into_iter()
         .map(|family| {
@@ -555,7 +556,11 @@ fn snapshot_scope(snapshot: &Snapshot) -> Result<Box<[Change]>> {
                         Some(Arc::clone(&present.bytes)),
                     ),
                     None => (
-                        next_relationship_id(&snapshot.relationship_ids)?,
+                        // Each absent family needs its own synthetic free ID.
+                        // Reusing the first free ID for every absent family
+                        // makes a later creation occupy the ID still used by
+                        // another absent-family guard in the inverse scope.
+                        next_relationship_id(&relationship_ids)?,
                         state.new_part.clone(),
                         match family {
                             Family::Core => rt::CORE_PROPERTIES.to_owned(),
@@ -567,6 +572,9 @@ fn snapshot_scope(snapshot: &Snapshot) -> Result<Box<[Change]>> {
                         None,
                     ),
                 };
+            if state.present.is_none() {
+                relationship_ids.insert(relationship_id.clone());
+            }
             Ok(Change {
                 family,
                 part,
@@ -1316,17 +1324,14 @@ impl Patch {
         // touches, while the scope continues to authenticate every family it
         // leaves untouched. This keeps same-base history composition useful
         // without weakening the no-op patch's cross-family guard.
-        let self_after = self.complete_after_scope();
+        let self_after = self.after_scope();
         if let (Some(first), Some(second)) = (self_after, next.scope.as_deref()) {
-            if first != second {
-                return Err(Error::Conflict(
-                    "the composed patches do not share the same intermediate property state"
-                        .to_owned(),
-                ));
-            }
-        } else if let Some(first) = self_after {
+            check_scope_overlap(first, second)?;
+        }
+        if let Some(first) = self_after {
             check_scope_transition(first, &next.changes, false, "second")?;
-        } else if let Some(second) = next.scope.as_deref() {
+        }
+        if let Some(second) = next.scope.as_deref() {
             check_scope_transition(second, &self.changes, true, "first")?;
         }
 
@@ -1366,23 +1371,14 @@ impl Patch {
             }
         }
         let is_noop = changes.is_empty();
-        let mut scope = self.scope.clone().or_else(|| {
-            next.scope
-                .as_ref()
-                .map(|scope| scope_with_changes(scope, &self.changes, false))
-        });
-        let mut after_scope = next
-            .complete_after_scope()
-            .map(Box::<[Change]>::from)
-            .or_else(|| {
-                self.complete_after_scope()
-                    .map(|scope| scope_with_changes(scope, &next.changes, true))
-            });
+        let mut scope = compose_before_scope(self, next);
         if is_noop && scope.is_none() && !self.changes.is_empty() {
             let affected = scope_from_changes(&self.changes, false);
             scope = Some(affected.clone());
-            after_scope = Some(affected);
         }
+        let after_scope = scope
+            .as_deref()
+            .map(|scope| scope_with_changes(scope, &changes, true));
         Ok(Self {
             changes: changes.into_boxed_slice(),
             scope,
@@ -1470,11 +1466,44 @@ impl Patch {
         Ok(package.clone().prepare_topology(plan)?)
     }
 
-    fn complete_after_scope(&self) -> Option<&[Change]> {
+    fn after_scope(&self) -> Option<&[Change]> {
         self.after_scope
             .as_deref()
             .or_else(|| self.is_noop().then_some(self.scope.as_deref()).flatten())
     }
+}
+
+/// Build the before-state guard for a composed patch. A complete no-op scope
+/// contributes every untouched family; a partial cancellation scope
+/// contributes only its retained families, and disjoint changed families are
+/// appended from their own before images.
+fn compose_before_scope(first: &Patch, second: &Patch) -> Option<Box<[Change]>> {
+    let mut entries = Vec::new();
+    for family in [Family::Core, Family::App, Family::Custom] {
+        let first_change = first.changes.iter().find(|change| change.family == family);
+        let second_change = second.changes.iter().find(|change| change.family == family);
+        let entry = first_change
+            .map(|change| state_change(change, false))
+            .or_else(|| {
+                first
+                    .scope
+                    .as_deref()
+                    .and_then(|scope| scope.iter().find(|change| change.family == family))
+                    .cloned()
+            })
+            .or_else(|| {
+                second
+                    .scope
+                    .as_deref()
+                    .and_then(|scope| scope.iter().find(|change| change.family == family))
+                    .cloned()
+            })
+            .or_else(|| second_change.map(|change| state_change(change, false)));
+        if let Some(entry) = entry {
+            entries.push(entry);
+        }
+    }
+    (!entries.is_empty()).then(|| entries.into_boxed_slice())
 }
 
 /// Check the changed families at one end of a complete property scope.
@@ -1488,15 +1517,19 @@ fn check_scope_transition(
     after: bool,
     side: &str,
 ) -> Result<()> {
+    let complete = scope_is_complete(scope);
     for change in changes {
-        let expected = scope
-            .iter()
-            .find(|scoped| scoped.family == change.family)
-            .ok_or_else(|| {
-                Error::Conflict(format!(
+        let Some(expected) = scope.iter().find(|scoped| scoped.family == change.family) else {
+            if complete {
+                return Err(Error::Conflict(format!(
                     "the {side} patch has a family absent from the complete property scope"
-                ))
-            })?;
+                )));
+            }
+            // A partial cancellation scope authenticates only the families it
+            // retained. A disjoint changed family still carries its own
+            // before image and may be composed independently.
+            continue;
+        };
         if !same_change_identity(expected, change)
             || expected.before.as_deref()
                 != (if after {
@@ -1512,6 +1545,30 @@ fn check_scope_transition(
         }
     }
     Ok(())
+}
+
+fn check_scope_overlap(first: &[Change], second: &[Change]) -> Result<()> {
+    for first in first {
+        let Some(second) = second.iter().find(|change| change.family == first.family) else {
+            continue;
+        };
+        if !same_change_identity(first, second)
+            || first.before != second.before
+            || first.after != second.after
+        {
+            return Err(Error::Conflict(
+                "the composed patches do not share the same intermediate property state".to_owned(),
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn scope_is_complete(scope: &[Change]) -> bool {
+    scope.len() == 3
+        && [Family::Core, Family::App, Family::Custom]
+            .into_iter()
+            .all(|family| scope.iter().any(|change| change.family == family))
 }
 
 fn same_change_identity(first: &Change, second: &Change) -> bool {
