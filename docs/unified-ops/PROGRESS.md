@@ -2179,3 +2179,41 @@ See [0063](0063-source-pptx-modern-comments.md).
   All previous remaining engineering, corpus, inventory/glossary, native
   performance and final assembled-gate requirements still apply. Nothing
   has been pushed.
+
+- Coordinator checkpoint (2026-10-22, replay validation and resource recovery):
+  Record 0362ue preserves the combined replay runs and their corrections.
+  On `5fbcfc45e7`, 1,487 DOC, OLE and DataSpaces tests passed, with three
+  existing ignored tests. The next facade group stopped on denied
+  `unused_qualifications` lints introduced by a module-level test import;
+  `eb931ca487` corrects that import. The earlier protected-DOC assertion was
+  also corrected: matching protected content still requires authorization,
+  while changed content returns `PatchConflict`.
+
+  The integration branch reaches `c2122e2678`, including DataSpaces error
+  exhaustiveness, legacy alias removal, the qualified substrate scope audit,
+  and DOC's consuming final handoff through `76391f1a71`. The DOC change
+  removes the redundant Vec clone; conversion into Arc storage still copies
+  once. Its matched performance qualification remains open. Forty glossary
+  checker tests pass after the new alias bans. A fresh seven-group combined
+  run is active on this fixed source; no result is inferred for unfinished
+  groups or newer worker branches.
+
+  Source branches now include the ODF public error-boundary migration
+  `6ad7dfd8e8`, canonical ODF streaming-limit and reader names `84469fd9e4`,
+  DOCX section migration `96c9c4ac5c`, and IWA package-triad migration
+  `5a5715688a`. Their remaining consumer checks and combined validation are
+  required before acceptance. DOCX document memoization was returned again:
+  the first cache missed in-place mutation, and its generation repair added
+  allocations and invalidated unchanged branches. Story raw replay is under
+  independent review and still needs original-lifecycle qualification.
+
+  Performance returns remain active for XLSX raw admission and reader state,
+  XLSB reader reuse, DOC, RTF replay, ODP append and iWork constructors. The
+  ODP error repair has passing public facade/save regressions and unchanged
+  error layout, with final affected Clippy pending. Disk pressure temporarily
+  stopped all new builds; owners reclaimed inactive generated caches without
+  deleting protected measurement artifacts. Resumed commands use bounded
+  existing targets and a free-space guard. Final native qualification,
+  corpus dispositions, inventory/glossary closure and the complete assembled
+  gate remain required. Only the comprehensive redaction audit is deferred.
+  Nothing has been pushed.
