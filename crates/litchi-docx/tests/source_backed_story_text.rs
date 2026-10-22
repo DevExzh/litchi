@@ -638,8 +638,7 @@ fn patches_accept_matching_copy_and_reject_stale_snapshots_and_cancel_before_out
         Some("changed")
     );
 
-    let tight_limits = story_text::Limits::new(16 * 1024, 128, 10_000, 64, 1, 16, 4096)
-        .unwrap();
+    let tight_limits = story_text::Limits::new(16 * 1024, 128, 10_000, 64, 1, 16, 4096).unwrap();
     assert!(matches!(
         snapshot.raw_tree(tight_limits),
         Err(story_text::Error::Limit {
@@ -726,9 +725,7 @@ fn raw_story_replay_reopens_matches_and_chains_under_recipient_limits() {
     let restrictive_limits =
         story_text::Limits::new(16 * 1024, 128, 10_000, 64, 1, 16, 4096).unwrap();
     let restrictive = open(&source)
-        .with_semantic_limits(
-            litchi_docx::SemanticLimits::default().story_text(restrictive_limits),
-        )
+        .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(restrictive_limits))
         .story_text_snapshot(story_text::Selector::Header(0))
         .unwrap();
     assert!(matches!(
@@ -766,8 +763,8 @@ fn raw_story_replay_reopens_matches_and_chains_under_recipient_limits() {
 #[test]
 fn story_replay_uses_recipient_limits_for_broad_raw_patches() {
     let source = fixture();
-    let producer_limits = story_text::Limits::new(128 * 1024, 128, 10_000, 64, 128 * 1024, 16, 4096)
-        .unwrap();
+    let producer_limits =
+        story_text::Limits::new(128 * 1024, 128, 10_000, 64, 128 * 1024, 16, 4096).unwrap();
     let producer = open(&source)
         .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(producer_limits));
     let snapshot = producer
@@ -778,22 +775,18 @@ fn story_replay_uses_recipient_limits_for_broad_raw_patches() {
         .unwrap();
     let patch = tree.patch().unwrap();
 
-    let accepted_limits = story_text::Limits::new(16 * 1024, 128, 10_000, 64, 1024, 16, 4096)
-        .unwrap();
+    let accepted_limits =
+        story_text::Limits::new(16 * 1024, 128, 10_000, 64, 1024, 16, 4096).unwrap();
     let accepted = open(&source)
-        .with_semantic_limits(
-            litchi_docx::SemanticLimits::default().story_text(accepted_limits),
-        )
+        .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(accepted_limits))
         .story_text_snapshot(story_text::Selector::Main)
         .unwrap();
     let accepted_target = patch.apply(&accepted).unwrap();
     assert_eq!(accepted_target.limits_value(), accepted_limits);
 
-    let narrow_limits = story_text::Limits::new(16 * 1024, 128, 10_000, 64, 1, 16, 4096)
-        .unwrap();
-    let narrow = open(&source).with_semantic_limits(
-        litchi_docx::SemanticLimits::default().story_text(narrow_limits),
-    );
+    let narrow_limits = story_text::Limits::new(16 * 1024, 128, 10_000, 64, 1, 16, 4096).unwrap();
+    let narrow = open(&source)
+        .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(narrow_limits));
     let narrow_snapshot = narrow
         .story_text_snapshot(story_text::Selector::Main)
         .unwrap();
@@ -807,6 +800,25 @@ fn story_replay_uses_recipient_limits_for_broad_raw_patches() {
     let package_patch = patch.clone().into();
     assert!(matches!(
         narrow.apply_story_text(&package_patch),
+        Err(story_text::Error::Limit {
+            kind: story_text::LimitKind::OutputBytes,
+            ..
+        })
+    ));
+
+    // A package-family commit carries the full-artifact restore fast path.
+    // A recipient with a narrower semantic policy must use the family
+    // publisher instead, so the recipient's output ceiling is enforced rather
+    // than inheriting the producer's admitted policy.
+    let mut owner_edit = producer
+        .edit_story_text(story_text::Selector::Main)
+        .unwrap();
+    owner_edit
+        .replace_paragraph_text(Position::new(0), "broad owner patch")
+        .unwrap();
+    let owner_commit = owner_edit.commit().unwrap();
+    assert!(matches!(
+        narrow.apply_story_text(owner_commit.patch()),
         Err(story_text::Error::Limit {
             kind: story_text::LimitKind::OutputBytes,
             ..

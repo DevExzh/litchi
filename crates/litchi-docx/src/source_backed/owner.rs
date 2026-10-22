@@ -127,6 +127,7 @@ impl Package {
         // it, or a reopened copy of its bytes) gets the commit's exact after
         // package, so the inverse of a commit restores the source archive.
         if let Some((before, after)) = patch.restore()
+            && self.semantic_limits() == before.semantic_limits()
             && self
                 .same_artifact(before)
                 .map_err(crate::document::Error::from)?

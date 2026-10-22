@@ -430,6 +430,37 @@ fn protected_malformed_active_and_over_limit_sources_fail_closed() {
 }
 
 #[test]
+fn hyperlink_replay_uses_recipient_limits_for_restored_owner() {
+    let document = format!(
+        r#"<w:document xmlns:w="{W}" xmlns:r="{R}"><w:body><w:p><w:hyperlink r:id="rLink"/><w:hyperlink r:id="rLink"/><w:hyperlink r:id="rLink"/></w:p></w:body></w:document>"#
+    )
+    .into_bytes();
+    let source = fixture(document, external_options("https://one.invalid/"));
+    let producer = open_source(source.clone()).with_semantic_limits(
+        litchi_docx::SemanticLimits::default()
+            .hyperlinks(Limits::default().with_max_external_hyperlinks(3).unwrap()),
+    );
+    let owner_commit = producer
+        .edit_external_hyperlink_detachment()
+        .unwrap()
+        .commit()
+        .unwrap();
+
+    let recipient = open_source(source).with_semantic_limits(
+        litchi_docx::SemanticLimits::default()
+            .hyperlinks(Limits::default().with_max_external_hyperlinks(2).unwrap()),
+    );
+    assert!(matches!(
+        recipient.apply_external_hyperlink_detachment(owner_commit.patch()),
+        Err(Error::ExternalHyperlinkDetachmentLimit {
+            kind: litchi_docx::sanitize::LimitKind::ExternalHyperlinks,
+            maximum: 2,
+            actual: 3,
+        })
+    ));
+}
+
+#[test]
 fn wrapper_scoped_namespaces_xml_attributes_and_unknown_attributes_refuse_detachment() {
     let wrapper_scoped_prefix = format!(
         r#"<w:document xmlns:w="{W}" xmlns:r="{R}"><w:body><w:p><w:hyperlink r:id="rLink" xmlns:x="urn:wrapper-only"><w:r><w:t>visible</w:t></w:r><x:opaque/></w:hyperlink></w:p></w:body></w:document>"#

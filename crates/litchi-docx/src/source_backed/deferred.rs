@@ -11,7 +11,7 @@
 use std::io::Write;
 use std::sync::{Arc, OnceLock};
 
-use litchi_opc::{SourceBackedPackage, SourceLimits};
+use litchi_opc::{SourceBackedPackage, SourceLimitKind, SourceLimits};
 
 use super::Package;
 use crate::{Error, Result};
@@ -168,17 +168,27 @@ impl Package {
             return Ok(after.clone());
         }
         let current = self.physical_source()?.clone();
+        let recipient_read_limits = current.read_limits();
         let original = after.physical_source()?.source_artifact();
+        let original_len = original.len();
+        if original_len > recipient_read_limits.max_input_bytes() {
+            return Err(litchi_opc::OpcError::Limit {
+                kind: SourceLimitKind::InputBytes,
+                observed: original_len,
+                maximum: recipient_read_limits.max_input_bytes(),
+            }
+            .into());
+        }
         let current_artifact = current.source_artifact();
         let proof = litchi_opc::SourceArtifactRestoreProof {
             current_len: current_artifact.len(),
             current_sha256: current_artifact.fingerprint()?,
-            original_len: original.len(),
+            original_len,
             original_sha256: original.fingerprint()?,
         };
         let max_output_bytes = proof.original_len.max(1);
         let mut next = Self::with_execution(current.clone(), self.execution.clone())?
-            .with_semantic_limits(after.semantic_limits().clone());
+            .with_semantic_limits(self.semantic_limits().clone());
         next.deferred = Some(Arc::new(Deferred {
             base: self.clone(),
             publish: Box::new(move |writer| {
@@ -189,7 +199,7 @@ impl Package {
                     writer,
                 )?)
             }),
-            limits: after.physical_source()?.read_limits(),
+            limits: recipient_read_limits,
             materialized: OnceLock::new(),
             fingerprint: OnceLock::from((proof.original_len, proof.original_sha256.into_sha256())),
         }));
@@ -333,6 +343,7 @@ macro_rules! source_family {
             // share of it, or a reopened copy of its bytes) gets the exact
             // after package: an inverse restores the original artifact.
             if let Some((before, after)) = &patch.restore
+                && package.semantic_limits() == before.semantic_limits()
                 && package.same_artifact(before)?
             {
                 return Ok(Commit::new(
