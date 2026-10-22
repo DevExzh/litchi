@@ -2566,7 +2566,7 @@ fn publication_error(error: crate::metadata::Error) -> Error {
         },
         crate::metadata::Error::Package(error) => Error::Common(error),
         crate::metadata::Error::Signed => Error::Signed,
-        crate::metadata::Error::Conflict(_) => Error::PatchConflict {
+        crate::metadata::Error::PatchConflict => Error::PatchConflict {
             part: "the document-property parts",
         },
         crate::metadata::Error::Unsupported { .. }

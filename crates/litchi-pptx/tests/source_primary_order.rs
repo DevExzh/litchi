@@ -366,10 +366,9 @@ fn order_refuses_unsafe_presentation_properties_atomically() {
         assert!(
             matches!(
                 edit.move_slide(Position::new(0), Position::new(2)),
-                Err(Error::SlideOrderPlan {
-                    kind: litchi_pptx::SlideOrderRefusal::PresentationProperties,
-                    ..
-                })
+                Err(
+                    Error::Refused(refusal) if refusal.kind() == litchi_pptx::SlideOrderRefusal::PresentationProperties.kind(),
+                )
             ),
             "unsafe presentation properties unexpectedly admitted: {label}"
         );

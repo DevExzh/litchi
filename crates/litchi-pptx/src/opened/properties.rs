@@ -119,7 +119,11 @@ pub(super) fn stage_shape_properties_admitted(
         let position = replacement.position();
         let index = position.get();
         if !selected.insert(index) {
-            return Err(Error::DuplicateShapeTextSelection { index });
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::InvalidValue,
+                "set_shape_properties",
+                "a shape is selected more than once",
+            ));
         }
         let shape = scene.at(index)?;
         selected_spans.push(shape.common().span()?.range(xml.len())?);

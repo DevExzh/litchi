@@ -220,7 +220,9 @@ pub(super) fn plan(
 /// operation-level error while preserving ordinary XML/OPC/limit failures.
 pub(super) fn map_error(error: Error) -> Error {
     match error {
-        Error::SlideRemovalPlan { .. } | Error::SlideCopyPlan { .. } => unsafe_edit(
+        // Invalid XML/OPC validation failures are malformed input, rather
+        // than a supported-operation refusal.  Keep those errors intact.
+        Error::Refused(_) => unsafe_edit(
             "the source is outside the supported dependency-free slide insertion topology",
         ),
         other => other,

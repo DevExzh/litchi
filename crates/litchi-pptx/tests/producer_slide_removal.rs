@@ -209,10 +209,7 @@ fn a_slide_whose_edge_names_a_missing_part_is_a_typed_refusal() {
     assert!(
         matches!(
             &error,
-            Error::SlideRemovalPlan {
-                kind: SlideRemovalRefusal::AmbiguousTopology,
-                detail,
-            } if detail.contains("missing Part")
+            Error::Refused(refusal) if refusal.kind() == SlideRemovalRefusal::AmbiguousTopology.kind()
         ),
         "{error:?}"
     );
@@ -299,10 +296,7 @@ fn a_slide_jump_into_the_removed_slide_is_still_refused() {
     assert!(
         matches!(
             error,
-            Error::SlideRemovalPlan {
-                kind: SlideRemovalRefusal::SharedOwner,
-                ..
-            }
+            Error::Refused(refusal) if refusal.kind() == SlideRemovalRefusal::SharedOwner.kind()
         ),
         "{error:?}"
     );

@@ -1619,11 +1619,17 @@ fn pptx_slide_removal_refusals_preserve_semantic_classification() {
         (Refusal::AmbiguousTopology, Code::UnsupportedCapability),
         (Refusal::UnknownPhysicalMember, Code::UnsupportedCapability),
     ] {
+        let reason = match kind {
+            Refusal::SignedPackage => "the package is signed",
+            Refusal::FinalSlide => "a presentation must retain at least one slide",
+            _ => "the presentation cannot satisfy the requested slide removal",
+        };
         assert_code(
-            litchi_pptx::Error::SlideRemovalPlan {
-                kind,
-                detail: "removal guard".into(),
-            },
+            litchi_pptx::Error::Refused(litchi_core::edit::Refusal::new(
+                kind.kind(),
+                "slide_removal",
+                reason,
+            )),
             code,
         );
     }
@@ -1642,13 +1648,16 @@ fn pptx_slide_order_refusals_distinguish_protection_capability_and_corruption() 
         (Refusal::PresentationProperties, Code::UnsupportedCapability),
         (Refusal::PositionalOwner, Code::UnsupportedCapability),
     ] {
-        assert_code(
-            litchi_pptx::Error::SlideOrderPlan {
-                kind,
-                detail: "order guard".into(),
-            },
-            code,
-        );
+        let native = if matches!(kind, Refusal::AmbiguousBindings) {
+            litchi_pptx::Error::Invalid("slide-order bindings are ambiguous".into())
+        } else {
+            litchi_pptx::Error::Refused(litchi_core::edit::Refusal::new(
+                kind.kind(),
+                "slide_order",
+                "the presentation contains unsupported positional metadata",
+            ))
+        };
+        assert_code(native, code);
     }
 }
 

@@ -500,7 +500,14 @@ pub(crate) fn native_error(error: properties::Error, format: FileFormat) -> Erro
             format!("metadata {kind:?} limit exceeded: {observed} > {maximum}"),
         ),
         properties::Error::Signed => crate::format::signature::refusal(format),
-        properties::Error::Conflict(message) => Error::new(Code::ValidationError, message),
+        properties::Error::PatchConflict => Error::new(
+            Code::InvalidInput,
+            "the metadata patch base does not match the package",
+        ),
+        properties::Error::Internal(_) => Error::new(
+            Code::InternalError,
+            "the metadata transaction invariant failed",
+        ),
         other => Error::new(Code::CorruptFile, other.to_string()),
     };
     error.with_format(format)
@@ -586,5 +593,18 @@ mod tests {
         let error =
             admit(&Props::new().with("created", "yesterday"), FileFormat::Xlsb).unwrap_err();
         assert_eq!(error.code(), Code::InvalidValue);
+    }
+
+    #[test]
+    fn stale_ooxml_metadata_replay_is_invalid_input() {
+        for format in [
+            FileFormat::Docx,
+            FileFormat::Pptx,
+            FileFormat::Xlsx,
+            FileFormat::Xlsb,
+        ] {
+            let error = native_error(properties::Error::PatchConflict, format);
+            assert_eq!(error.code(), Code::InvalidInput, "{format:?}");
+        }
     }
 }

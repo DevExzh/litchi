@@ -200,7 +200,7 @@ impl Package {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Conflict`] when this package is not the patch's
+    /// Returns [`Error::PatchConflict`] when this package is not the patch's
     /// before state and [`Error::Signed`] for a changed patch of a signed
     /// workbook.
     pub fn apply_metadata(&self, patch: &Patch) -> Result<Commit> {
@@ -261,6 +261,10 @@ mod tests {
         assert!(replayed.diagnostics().changed());
         let replayed = replayed.into_package();
         assert!(replayed.same_content(&after).unwrap());
+        assert!(matches!(
+            package.apply_metadata(&patch.inverse()),
+            Err(Error::PatchConflict)
+        ));
         let restored = after
             .apply_metadata(&patch.inverse())
             .unwrap()
@@ -296,7 +300,7 @@ mod tests {
         let error = other
             .apply_metadata(no_op.patch())
             .expect_err("a no-op patch must authenticate its recorded base");
-        assert!(matches!(error, Error::Conflict(_)), "{error:?}");
+        assert!(matches!(error, Error::PatchConflict), "{error:?}");
 
         let replayed = source.apply_metadata(no_op.patch()).unwrap();
         assert!(replayed.patch().is_noop());

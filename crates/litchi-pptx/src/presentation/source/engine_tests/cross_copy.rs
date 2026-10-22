@@ -2943,8 +2943,12 @@ fn expect_plan_refusal(
         Err(error) => error,
     };
     match error {
-        Error::SlideCopyPlan { kind, .. } => {
-            assert_eq!(kind, expected, "unexpected refusal for {label}");
+        Error::Refused(refusal) => {
+            assert_eq!(
+                refusal.kind(),
+                expected.kind(),
+                "unexpected refusal for {label}"
+            );
         },
         other => panic!("unexpected error for {label}: {other:?}"),
     }
@@ -5563,10 +5567,11 @@ fn source_backed_cross_copy_unnamed_admission_still_requires_common_slide_data()
         let source = open_source(&source_bytes)?;
         let editor = open_editor(&destination_bytes)?;
         match editor.plan_cross_slide_copy(&source, 0, 1, 1) {
-            Err(Error::SlideCopyPlan {
-                kind: crate::SlideCopyRefusal::AmbiguousTopology,
-                detail,
-            }) => assert!(detail.contains("common data is missing")),
+            Err(
+                Error::Refused(refusal) if refusal.kind() == crate::SlideCopyRefusal::AmbiguousTopology.kind(),
+            ) => {
+                assert!(refusal.reason().contains("selected slide cannot be copied"))
+            },
             Err(error) => panic!("unexpected structural refusal: {error:?}"),
             Ok(_) => panic!("missing common slide data must be refused"),
         }
@@ -5723,7 +5728,7 @@ fn cross_slide_copy_family_publishes_a_source_backed_package() -> TestResult {
     edit.copy(&source, 0_usize, 0_usize, 1_usize)?;
     assert!(matches!(
         edit.copy(&source, 0_usize, 0_usize, 1_usize),
-        Err(Error::SlideCopyPlan { .. })
+        Err(Error::Refused(_))
     ));
     assert_eq!(edit.commit()?.package().to_bytes()?, streamed);
     let unchanged = destination.edit_cross_slide_copy()?.commit()?;

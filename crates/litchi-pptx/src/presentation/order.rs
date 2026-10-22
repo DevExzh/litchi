@@ -1080,11 +1080,8 @@ fn validate_presentation_extension_marker(
     ))
 }
 
-fn metadata_error(owner: MetadataOwner, error: Error) -> Error {
-    match error {
-        Error::SlideOrderPlan { detail, .. } => metadata_refusal(owner, detail),
-        other => other,
-    }
+fn metadata_error(_owner: MetadataOwner, error: Error) -> Error {
+    error
 }
 
 fn metadata_refusal(owner: MetadataOwner, detail: impl Into<String>) -> Error {
@@ -1632,11 +1629,8 @@ fn bump_xml(nodes: &mut usize) -> Result<()> {
     Ok(())
 }
 
-fn refusal(kind: SlideOrderRefusal, detail: impl Into<String>) -> Error {
-    Error::SlideOrderPlan {
-        kind,
-        detail: detail.into(),
-    }
+fn refusal(kind: SlideOrderRefusal, _detail: impl Into<String>) -> Error {
+    Error::slide_order_refused(kind)
 }
 
 #[cfg(test)]
@@ -1656,10 +1650,9 @@ mod tests {
         );
         assert!(matches!(
             inspect_metadata_xml(xml.as_bytes(), MetadataOwner::ViewProperties, None),
-            Err(Error::SlideOrderPlan {
-                kind: SlideOrderRefusal::ViewProperties,
-                ..
-            })
+            Err(
+                Error::Refused(refusal) if refusal.kind() == SlideOrderRefusal::ViewProperties.kind(),
+            )
         ));
     }
 
@@ -1672,10 +1665,9 @@ mod tests {
         );
         assert!(matches!(
             reject_root_features(canonical_root.as_bytes(), None),
-            Err(Error::SlideOrderPlan {
-                kind: SlideOrderRefusal::MarkupCompatibility,
-                ..
-            })
+            Err(
+                Error::Refused(refusal) if refusal.kind() == SlideOrderRefusal::MarkupCompatibility.kind(),
+            )
         ));
 
         let foreign_root = format!(
@@ -1685,10 +1677,9 @@ mod tests {
         );
         assert!(matches!(
             reject_root_features(foreign_root.as_bytes(), None),
-            Err(Error::SlideOrderPlan {
-                kind: SlideOrderRefusal::PositionalOwner,
-                ..
-            })
+            Err(
+                Error::Refused(refusal) if refusal.kind() == SlideOrderRefusal::PositionalOwner.kind(),
+            )
         ));
 
         let canonical_metadata = format!(
@@ -1702,10 +1693,9 @@ mod tests {
                 MetadataOwner::ViewProperties,
                 None,
             ),
-            Err(Error::SlideOrderPlan {
-                kind: SlideOrderRefusal::ViewProperties,
-                ..
-            })
+            Err(
+                Error::Refused(refusal) if refusal.kind() == SlideOrderRefusal::ViewProperties.kind(),
+            )
         ));
 
         let foreign_metadata = format!(
@@ -1748,20 +1738,18 @@ mod tests {
         );
         assert!(matches!(
             inspect_presentation_properties_xml(foreign.as_bytes(), None),
-            Err(Error::SlideOrderPlan {
-                kind: SlideOrderRefusal::PresentationProperties,
-                ..
-            })
+            Err(
+                Error::Refused(refusal) if refusal.kind() == SlideOrderRefusal::PresentationProperties.kind(),
+            )
         ));
         let foreign_namespace = format!(
             r#"<p:presentationPr xmlns:p="{presentation}"><p:showPr><p:penClr><a:srgbClr xmlns:a="{drawing}" xmlns:v="urn:foreign" v:href="https://example.invalid" val="112233"/></p:penClr></p:showPr></p:presentationPr>"#
         );
         assert!(matches!(
             inspect_presentation_properties_xml(foreign_namespace.as_bytes(), None),
-            Err(Error::SlideOrderPlan {
-                kind: SlideOrderRefusal::PresentationProperties,
-                ..
-            })
+            Err(
+                Error::Refused(refusal) if refusal.kind() == SlideOrderRefusal::PresentationProperties.kind(),
+            )
         ));
         let foreign_child = format!(
             r#"<p:presentationPr xmlns:p="{presentation}" xmlns:p14="{p14}" xmlns:a="{drawing}" xmlns:v="urn:foreign"><p:showPr><p:extLst><p:ext uri="{show_uri}"><p14:laserClr><a:srgbClr val="112233"><v:payload/></a:srgbClr></p14:laserClr></p:ext></p:extLst></p:showPr></p:presentationPr>"#,
@@ -1771,10 +1759,9 @@ mod tests {
         );
         assert!(matches!(
             inspect_presentation_properties_xml(foreign_child.as_bytes(), None),
-            Err(Error::SlideOrderPlan {
-                kind: SlideOrderRefusal::PresentationProperties,
-                ..
-            })
+            Err(
+                Error::Refused(refusal) if refusal.kind() == SlideOrderRefusal::PresentationProperties.kind(),
+            )
         ));
         let relationship_wrapper = format!(
             r#"<p:presentationPr xmlns:p="{presentation}" xmlns:p14="{p14}" xmlns:a="{drawing}" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><p:showPr><p:extLst><p:ext uri="{show_uri}"><p14:laserClr r:id="rId2"><a:srgbClr val="112233"/></p14:laserClr></p:ext></p:extLst></p:showPr></p:presentationPr>"#,
@@ -1784,10 +1771,9 @@ mod tests {
         );
         assert!(matches!(
             inspect_presentation_properties_xml(relationship_wrapper.as_bytes(), None),
-            Err(Error::SlideOrderPlan {
-                kind: SlideOrderRefusal::PresentationProperties,
-                ..
-            })
+            Err(
+                Error::Refused(refusal) if refusal.kind() == SlideOrderRefusal::PresentationProperties.kind(),
+            )
         ));
         let foreign_wrapper = format!(
             r#"<p:presentationPr xmlns:p="{presentation}" xmlns:p14="{p14}" xmlns:a="{drawing}" xmlns:v="urn:foreign"><p:showPr><p:extLst><p:ext uri="{show_uri}"><p14:laserClr v:href="https://example.invalid"><a:srgbClr val="112233"/></p14:laserClr></p:ext></p:extLst></p:showPr></p:presentationPr>"#,
@@ -1797,10 +1783,9 @@ mod tests {
         );
         assert!(matches!(
             inspect_presentation_properties_xml(foreign_wrapper.as_bytes(), None),
-            Err(Error::SlideOrderPlan {
-                kind: SlideOrderRefusal::PresentationProperties,
-                ..
-            })
+            Err(
+                Error::Refused(refusal) if refusal.kind() == SlideOrderRefusal::PresentationProperties.kind(),
+            )
         ));
     }
 
@@ -1815,10 +1800,9 @@ mod tests {
             crate::presentation_properties::Properties::parse_strict(unknown.as_bytes()).unwrap();
         assert!(matches!(
             validate_modeled_presentation_properties(&properties),
-            Err(Error::SlideOrderPlan {
-                kind: SlideOrderRefusal::PresentationProperties,
-                ..
-            })
+            Err(
+                Error::Refused(refusal) if refusal.kind() == SlideOrderRefusal::PresentationProperties.kind(),
+            )
         ));
     }
 }

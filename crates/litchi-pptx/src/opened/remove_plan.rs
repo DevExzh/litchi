@@ -14,7 +14,7 @@ use super::copy_plan::{
 use super::model::{Slide, Snapshot, invalid};
 use super::patch::Patch as OpenedPatch;
 use super::patch::SinglePartChange;
-use crate::{Error, Result, SlideCopyRefusal, SlideRemovalRefusal};
+use crate::{Error, Result, SlideRemovalRefusal};
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 const PML: &[u8] = b"http://schemas.openxmlformats.org/presentationml/2006/main";
@@ -139,8 +139,8 @@ impl Patch {
     /// # Errors
     ///
     /// Returns an error for malformed, trailing, or unbounded input, and
-    /// [`Error::DurablePatchRevisionFormat`] for a patch serialized under the
-    /// superseded `LPRM0001` format.
+    /// [`Error::PatchConflict`] for a patch serialized under the superseded
+    /// `LPRM0001` format.
     pub fn from_bytes(bytes: &[u8], limits: super::Limits) -> Result<Self> {
         let limit = limits
             .max_patch_bytes()
@@ -158,10 +158,7 @@ impl Patch {
         // ever holds a patch whose public `source_revision` cannot be compared
         // against a snapshot of this build.
         if bytes.get(..SUPERSEDED_PATCH_MAGIC.len()) == Some(SUPERSEDED_PATCH_MAGIC.as_slice()) {
-            return Err(Error::DurablePatchRevisionFormat {
-                found: crate::DurablePatchFormat::SlideRemovalV1,
-                expected: crate::DurablePatchFormat::SlideRemovalV2,
-            });
+            return Err(Error::PatchConflict);
         }
         if bytes.len() < PATCH_HEADER_BYTES || &bytes[..PATCH_MAGIC.len()] != PATCH_MAGIC {
             return Err(invalid(
@@ -1154,42 +1151,15 @@ fn has_macro_infrastructure(package: &OpcPackage) -> bool {
 
 fn map_copy_refusal(value: Result<()>) -> Result<()> {
     match value {
-        Ok(()) => Ok(()),
-        Err(Error::SlideCopyPlan { kind, detail }) => {
-            let kind = match kind {
-                SlideCopyRefusal::SignedPackage => SlideRemovalRefusal::SignedPackage,
-                SlideCopyRefusal::ProtectedPresentation => {
-                    SlideRemovalRefusal::ProtectedPresentation
-                },
-                SlideCopyRefusal::MarkupCompatibility => SlideRemovalRefusal::MarkupCompatibility,
-                SlideCopyRefusal::UnknownSemanticSurface => {
-                    SlideRemovalRefusal::UnknownSemanticSurface
-                },
-                SlideCopyRefusal::SharedOwner | SlideCopyRefusal::GlobalTableStyle => {
-                    SlideRemovalRefusal::SharedOwner
-                },
-                SlideCopyRefusal::UnknownPhysicalMember => {
-                    SlideRemovalRefusal::UnknownPhysicalMember
-                },
-                SlideCopyRefusal::UnsupportedRelationship => {
-                    SlideRemovalRefusal::UnsupportedRelationship
-                },
-                SlideCopyRefusal::DependencyCycle | SlideCopyRefusal::AmbiguousTopology => {
-                    SlideRemovalRefusal::AmbiguousTopology
-                },
-                // Raised only when a cross-presentation copy is applied; the
-                // shared validators slide removal reuses never raise it.
-                SlideCopyRefusal::CallerDefinedPart => SlideRemovalRefusal::UnknownSemanticSurface,
-            };
-            refusal(kind, detail)
-        },
-        Err(error) => Err(error),
+        Err(Error::Refused(refusal)) if refusal.operation() == "slide_copy" => Err(Error::refused(
+            refusal.kind(),
+            "slide_removal",
+            refusal.reason(),
+        )),
+        other => other,
     }
 }
 
-fn refusal<T>(kind: SlideRemovalRefusal, detail: impl Into<String>) -> Result<T> {
-    Err(Error::SlideRemovalPlan {
-        kind,
-        detail: detail.into(),
-    })
+fn refusal<T>(kind: SlideRemovalRefusal, _detail: impl Into<String>) -> Result<T> {
+    Err(Error::slide_removal_refused(kind))
 }

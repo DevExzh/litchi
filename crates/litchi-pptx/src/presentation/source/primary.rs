@@ -1543,10 +1543,9 @@ impl Edit {
             });
         }
         if self.working.order.len() < 2 {
-            return Err(Error::SlideRemovalPlan {
-                kind: crate::SlideRemovalRefusal::FinalSlide,
-                detail: "a presentation must retain at least one slide".into(),
-            });
+            return Err(Error::slide_removal_refused(
+                crate::SlideRemovalRefusal::FinalSlide,
+            ));
         }
         let key = self.working.order[logical].clone();
         let candidate = topology::remove(&self.working, &key)?;

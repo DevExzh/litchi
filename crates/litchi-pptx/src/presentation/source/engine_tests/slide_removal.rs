@@ -329,7 +329,7 @@ fn assert_refusal(source: &[u8], expected: SlideRemovalRefusal) {
         .err()
         .unwrap();
     assert!(
-        matches!(error, Error::SlideRemovalPlan { kind, .. } if kind == expected),
+        matches!(error, Error::Refused(refusal) if refusal.kind() == expected.kind()),
         "unexpected slide-removal refusal: {error:?}"
     );
 }
@@ -519,10 +519,7 @@ fn final_slide_shared_owner_dependency_unknown_macro_and_signed_sources_refuse_a
         .unwrap();
     assert!(matches!(
         final_error,
-        Error::SlideRemovalPlan {
-            kind: SlideRemovalRefusal::FinalSlide,
-            ..
-        }
+        Error::Refused(refusal) if refusal.kind() == SlideRemovalRefusal::FinalSlide.kind()
     ));
 
     assert_refusal(

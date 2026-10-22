@@ -19,9 +19,10 @@ fn refuse(reason: &'static str) -> Error {
 }
 fn source_refusal(error: Error) -> Error {
     match error {
-        Error::SlideCopyPlan { .. } | Error::SlideRemovalPlan { .. } => {
-            refuse("the source is outside the supported slide topology")
-        },
+        // A typed refusal is an unsupported source route.  Preserve invalid
+        // XML/OPC validation failures as malformed input so they retain the
+        // corrupt-file classification at the facade.
+        Error::Refused(_) => refuse("the source is outside the supported slide topology"),
         other => other,
     }
 }

@@ -211,7 +211,7 @@ impl Package {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Conflict`] when this package is not the patch's
+    /// Returns [`Error::PatchConflict`] when this package is not the patch's
     /// before state and [`Error::Signed`] for a changed patch of a signed
     /// workbook.
     pub fn apply_metadata(&self, patch: &Patch) -> Result<Commit> {
@@ -254,6 +254,10 @@ mod tests {
         );
         let replayed = package.apply_metadata(&patch).unwrap().into_package();
         assert_eq!(replayed.metadata().unwrap(), after.metadata().unwrap());
+        assert!(matches!(
+            package.apply_metadata(&patch.inverse()),
+            Err(Error::PatchConflict)
+        ));
         let restored = after
             .apply_metadata(&patch.inverse())
             .unwrap()

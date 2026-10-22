@@ -334,10 +334,7 @@ fn borrowed_real_producer_fixture_refuses_cross_copy_authorization() -> TestResu
         .expect_err("borrowed real-producer input cannot authorize physical copying");
     assert!(matches!(
         error,
-        Error::SlideCopyPlan {
-            kind: SlideCopyRefusal::UnknownPhysicalMember,
-            ..
-        }
+        Error::Refused(refusal) if refusal.kind() == SlideCopyRefusal::UnknownPhysicalMember.kind()
     ));
     assert_eq!(serialized(&mut destination)?, before);
     Ok(())

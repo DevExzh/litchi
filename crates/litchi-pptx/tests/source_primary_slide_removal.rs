@@ -253,10 +253,7 @@ fn repeated_removals_stop_at_the_final_slide_guard() {
     let error = edit.remove_slide(Position::new(0)).err().unwrap();
     assert!(matches!(
         error,
-        Error::SlideRemovalPlan {
-            kind: SlideRemovalRefusal::FinalSlide,
-            ..
-        }
+        Error::Refused(refusal) if refusal.kind() == SlideRemovalRefusal::FinalSlide.kind()
     ));
     let changed = edit.commit().unwrap().into_package();
     assert_eq!(texts(&changed), ["A"]);
@@ -451,10 +448,7 @@ fn final_slide_and_hidden_slide_are_refused_without_changing_the_edit() {
     let error = edit.remove_slide(Position::new(0)).err().unwrap();
     assert!(matches!(
         error,
-        Error::SlideRemovalPlan {
-            kind: SlideRemovalRefusal::FinalSlide,
-            ..
-        }
+        Error::Refused(refusal) if refusal.kind() == SlideRemovalRefusal::FinalSlide.kind()
     ));
     let commit = edit.commit().unwrap();
     assert!(commit.patch().is_noop());
@@ -466,10 +460,7 @@ fn final_slide_and_hidden_slide_are_refused_without_changing_the_edit() {
     let error = edit.remove_slide(Position::new(1)).err().unwrap();
     assert!(matches!(
         error,
-        Error::SlideRemovalPlan {
-            kind: SlideRemovalRefusal::UnknownSemanticSurface,
-            ..
-        }
+        Error::Refused(refusal) if refusal.kind() == SlideRemovalRefusal::UnknownSemanticSurface.kind()
     ));
     let commit = edit.commit().unwrap();
     assert!(commit.patch().is_noop());
@@ -647,10 +638,9 @@ fn alternate_layout_target_spelling_is_refused_before_noninvertible_removal() {
     let mut edit = source.edit().unwrap();
     assert!(matches!(
         edit.remove_slide(Position::new(1)),
-        Err(Error::SlideRemovalPlan {
-            kind: SlideRemovalRefusal::AmbiguousTopology,
-            ..
-        })
+        Err(
+            Error::Refused(refusal) if refusal.kind() == SlideRemovalRefusal::AmbiguousTopology.kind(),
+        )
     ));
     let commit = edit.commit().unwrap();
     assert!(commit.patch().is_noop());

@@ -470,7 +470,7 @@ fn retention_changes_no_apply_verdict() -> Result<()> {
         ))
     };
     assert_eq!(borrowed(&retained)?, borrowed(&unretained)?);
-    assert!(borrowed(&retained)?.contains("SlideCopyPlan"));
+    assert!(borrowed(&retained)?.contains("Refused"));
     Ok(())
 }
 
