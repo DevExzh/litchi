@@ -362,18 +362,16 @@ impl ArchiveCloneInventory {
             )?;
         }
 
-        if let Some(header) = object.original_header.as_deref() {
+        if let Some((header, canonical)) = object.source_headers() {
             self.admit_optional_bytes(
                 visitor,
                 ArchiveCloneInventoryKind::OriginalHeader,
                 header.len(),
             )?;
-        }
-        if let Some(header) = object.original_canonical_header.as_deref() {
             self.admit_optional_bytes(
                 visitor,
                 ArchiveCloneInventoryKind::OriginalCanonicalHeader,
-                header.len(),
+                canonical.len(),
             )?;
         }
         Ok(())
@@ -658,8 +656,10 @@ mod tests {
         raw.extend_from_slice(&[0xb2, 0x06, 0x01, b'x']);
         let raw_len = raw.len();
         let canonical_len = canonical.len();
-        object.original_header = Some(raw.into_boxed_slice());
-        object.original_canonical_header = Some(canonical.into_boxed_slice());
+        object.set_test_source_headers(
+            Some(raw.into_boxed_slice()),
+            Some(canonical.into_boxed_slice()),
+        );
 
         let archive = Archive {
             objects: vec![object],

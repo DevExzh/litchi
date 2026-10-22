@@ -30,6 +30,7 @@ use std::cell::Cell;
 use std::collections::{HashMap, HashSet};
 use std::io::Read;
 use std::mem::size_of;
+use std::sync::Arc;
 
 use litchi_iwa_common::wire::{
     WireDescent, WireField, WirePreflight, WireVisit, parse_wire_fields, preflight_wire_tree,
@@ -83,6 +84,79 @@ struct HeaderAdmission {
     message_infos: usize,
     decoded_memory: usize,
     metadata_items: usize,
+}
+
+/// Immutable source and admission provenance retained for a non-canonical
+/// archive header. The object keeps only an `Arc` to this record so clones
+/// share the source bytes and their exact admission totals.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct SourceProvenance {
+    /// Original bytes followed by the canonical bytes in one allocation.
+    headers: Box<[u8]>,
+    original_len: usize,
+    canonical_len: usize,
+    header_admission: Option<HeaderAdmission>,
+    archive_info_admission: Option<ArchiveInfoAdmission>,
+    admitted_message_bytes: Option<usize>,
+    admitted_metadata_items: Option<usize>,
+}
+
+impl SourceProvenance {
+    fn from_headers(
+        original: &[u8],
+        canonical: &[u8],
+        header_admission: Option<HeaderAdmission>,
+        archive_info_admission: Option<ArchiveInfoAdmission>,
+        limits: Option<Limits>,
+    ) -> Result<Arc<Self>> {
+        let total_len = original
+            .len()
+            .checked_add(canonical.len())
+            .ok_or_else(|| Error::allocation("IWA retained header provenance", usize::MAX))?;
+        let mut headers = Vec::new();
+        headers
+            .try_reserve_exact(total_len)
+            .map_err(|_| Error::allocation("IWA retained header provenance", total_len))?;
+        headers.extend_from_slice(original);
+        headers.extend_from_slice(canonical);
+        Ok(Arc::new(Self {
+            headers: headers.into_boxed_slice(),
+            original_len: original.len(),
+            canonical_len: canonical.len(),
+            header_admission,
+            archive_info_admission,
+            admitted_message_bytes: limits.map(|limits| limits.max_message_bytes()),
+            admitted_metadata_items: limits.map(|limits| limits.max_metadata_items()),
+        }))
+    }
+
+    fn original_header(&self) -> &[u8] {
+        &self.headers[..self.original_len]
+    }
+
+    fn original_canonical_header(&self) -> &[u8] {
+        &self.headers[self.original_len..self.original_len + self.canonical_len]
+    }
+
+    #[cfg(test)]
+    fn original_header_mut(&mut self) -> &mut [u8] {
+        &mut self.headers[..self.original_len]
+    }
+
+    #[cfg(test)]
+    fn original_canonical_header_mut(&mut self) -> &mut [u8] {
+        &mut self.headers[self.original_len..self.original_len + self.canonical_len]
+    }
+}
+
+fn retained_source_provenance(
+    original: &[u8],
+    canonical: &[u8],
+    retain: bool,
+) -> Result<Option<Arc<SourceProvenance>>> {
+    retain
+        .then(|| SourceProvenance::from_headers(original, canonical, None, None, None))
+        .transpose()
 }
 
 /// Exact resource totals for the decoded neutral ArchiveInfo projection.
@@ -650,28 +724,48 @@ impl ArchiveInfo {
     /// archive validation concern. The supplied limits admit the complete
     /// neutral header before this record is published.
     pub fn new(identifier: u64, message_infos: Vec<MessageInfo>, limits: Limits) -> Result<Self> {
-        Self::new_with_header_length(identifier, message_infos, limits)
-            .map(|(value, _header_length)| value)
-    }
-
-    fn new_with_header_length(
-        identifier: u64,
-        message_infos: Vec<MessageInfo>,
-        limits: Limits,
-    ) -> Result<(Self, usize)> {
         let limits = limits.validate()?;
         let value = Self {
             identifier: Some(identifier),
             message_infos,
             should_merge: None,
         };
-        let admission = check_archive_info_constructor(&value, limits)?;
-        Ok((value, admission.header_length))
+        // A default-profile minimal record has fixed metadata cardinalities:
+        // its message count, four fields per message, three version values,
+        // and fixed neutral allocations are all below the hard ceilings. The
+        // only caller-controlled resource dimension left is each payload
+        // length, which is checked before this certificate is used. Strict or
+        // non-minimal profiles retain the exact admission path below.
+        if limits == Limits::default() && default_archive_info_bounds_are_safe(&value) {
+            return Ok(value);
+        }
+        check_archive_info_constructor(&value, limits)?;
+        Ok(value)
     }
 
     fn validate(&self, limits: Limits) -> Result<()> {
         check_archive_info_constructor(self, limits).map(|_| ())
     }
+}
+
+#[inline]
+fn default_archive_info_bounds_are_safe(info: &ArchiveInfo) -> bool {
+    info.identifier.is_some()
+        && info.should_merge.is_none()
+        && info.message_infos.len() <= Limits::MAX_MESSAGES_PER_OBJECT
+        && info.message_infos.iter().all(|message_info| {
+            message_info.versions.len() == DEFAULT_MESSAGE_VERSIONS.len()
+                && message_info.field_infos.is_empty()
+                && message_info.object_references.is_empty()
+                && message_info.data_references.is_empty()
+                && message_info.base_message_index.is_none()
+                && message_info.diff_merge_version.is_empty()
+                && message_info.diff_field_path.is_none()
+                && message_info.fields_to_remove.is_empty()
+                && message_info.diff_read_version.is_empty()
+                && usize::try_from(message_info.length)
+                    .is_ok_and(|length| length <= Limits::MAX_MESSAGE_BYTES)
+        })
 }
 
 /// Metadata for one payload in an archive object.
@@ -1073,6 +1167,9 @@ fn check_archive_info_constructor(
         ));
     }
     if info.should_merge.is_none() && info.message_infos.iter().all(is_minimal_message_info) {
+        if limits == Limits::default() {
+            return check_minimal_archive_info_default(info);
+        }
         return check_minimal_archive_info_constructor(info, limits);
     }
     let mut metadata_items = message_count;
@@ -1112,6 +1209,51 @@ fn check_archive_info_constructor(
         metadata_items,
         limits,
     )?;
+    Ok(ArchiveInfoAdmission {
+        header_length,
+        header_fields,
+        header_nesting,
+        header_memory,
+        metadata_items,
+        message_count,
+    })
+}
+
+/// Admit the common default-profile constructor without repeating the
+/// general limit checks whose maxima are fixed hard ceilings. The arithmetic
+/// still computes the exact neutral header totals returned to retained
+/// provenance and uses checked operations so an oversized caller-owned vector
+/// cannot bypass the contract.
+#[inline]
+fn check_minimal_archive_info_default(info: &ArchiveInfo) -> Result<ArchiveInfoAdmission> {
+    let identifier = info
+        .identifier
+        .ok_or_else(|| Error::invalid_archive(0, "object is missing its archive identifier"))?;
+    let message_count = info.message_infos.len();
+    let header_fields = 1usize
+        .checked_add(message_count)
+        .and_then(|value| value.checked_add(message_count.checked_mul(3)?))
+        .ok_or_else(|| Error::invalid_archive(0, "ArchiveInfo field count overflow"))?;
+    let header_nesting = usize::from(message_count != 0);
+    let message_memory = minimal_message_info_memory()?;
+    let header_memory = size_of::<ArchiveInfo>()
+        .checked_add(
+            message_count
+                .checked_mul(message_memory)
+                .ok_or_else(|| Error::invalid_archive(0, "message metadata memory overflow"))?,
+        )
+        .ok_or_else(|| Error::invalid_archive(0, "neutral metadata memory overflow"))?;
+    let mut header_length = varint_field_length(1, identifier)?;
+    let mut metadata_items = message_count;
+    for message_info in &info.message_infos {
+        metadata_items = metadata_items
+            .checked_add(DEFAULT_MESSAGE_VERSIONS.len())
+            .ok_or_else(|| Error::invalid_archive(0, "ArchiveInfo metadata count overflow"))?;
+        let message_length =
+            minimal_message_info_encoded_length(message_info.type_, message_info.length)?;
+        let encoded = length_delimited_field_length(2, message_length)?;
+        header_length = checked_encoded_add(header_length, encoded)?;
+    }
     Ok(ArchiveInfoAdmission {
         header_length,
         header_fields,
@@ -1399,24 +1541,10 @@ pub struct ArchiveObject {
     /// and is not recomputed by in-memory message mutations. Current payload
     /// size is available by summing [`Self::messages`].
     pub data_length: u64,
-    /// Original encoded header, retained only when it differs from the
-    /// canonical encoding so untouched unknown protobuf fields survive a
-    /// parse/serialize round trip.
-    original_header: Option<Box<[u8]>>,
-    /// Canonical encoding paired with `original_header` for a non-canonical
-    /// source header. Both fields are absent for a canonical source header.
-    original_canonical_header: Option<Box<[u8]>>,
-    /// Exact wire admission totals paired with a parsed retained header.
-    /// Rewritten or test-constructed raw headers leave this absent and take
-    /// the validating fallback path.
-    original_header_admission: Option<HeaderAdmission>,
-    /// Neutral metadata totals and the profile under which they were parsed.
-    /// This permits retained objects to reapply header-only tighter profiles
-    /// without rewalking every decoded metadata collection. The public
-    /// `archive_info` remains mutable, so validation probes its canonical
-    /// encoding before using this cache; only the private raw provenance is
-    /// immutable.
-    archive_info_admission: Option<(ArchiveInfoAdmission, Limits)>,
+    /// Immutable source bytes and admission totals for a non-canonical
+    /// source header. Canonical objects have no retained provenance. The
+    /// allocation is shared by clones and is cleared by public mutations.
+    source_provenance: Option<Arc<SourceProvenance>>,
 }
 
 impl PartialEq for ArchiveObject {
@@ -1427,8 +1555,7 @@ impl PartialEq for ArchiveObject {
             && self.header_length == other.header_length
             && self.data_offset == other.data_offset
             && self.data_length == other.data_length
-            && self.original_header == other.original_header
-            && self.original_canonical_header == other.original_canonical_header
+            && self.source_headers() == other.source_headers()
     }
 }
 
@@ -1458,10 +1585,7 @@ impl ArchiveObject {
             header_length: 0,
             data_offset: 0,
             data_length: 0,
-            original_header: None,
-            original_canonical_header: None,
-            original_header_admission: None,
-            archive_info_admission: None,
+            source_provenance: None,
         };
         // `preflight_archive_object_constructor` has already admitted the
         // complete neutral header before metadata allocation. Validate only
@@ -1603,10 +1727,13 @@ impl ArchiveObject {
             header_length: 0,
             data_offset: 0,
             data_length: 0,
-            original_header: retained_header,
-            original_canonical_header: retained_canonical,
-            original_header_admission: None,
-            archive_info_admission: None,
+            source_provenance: match (retained_header, retained_canonical) {
+                (Some(original), Some(canonical)) => Some(SourceProvenance::from_headers(
+                    &original, &canonical, None, None, None,
+                )?),
+                (None, None) => None,
+                _ => unreachable!("retained header pair is constructed together"),
+            },
         };
         cloned.validate(limits)?;
         Ok(cloned)
@@ -1634,25 +1761,88 @@ impl ArchiveObject {
         self.validate_payloads(limits, cached_header_length)
     }
 
+    fn source_headers(&self) -> Option<(&[u8], &[u8])> {
+        self.source_provenance.as_deref().map(|provenance| {
+            (
+                provenance.original_header(),
+                provenance.original_canonical_header(),
+            )
+        })
+    }
+
+    fn source_header(&self) -> Option<&[u8]> {
+        self.source_provenance
+            .as_deref()
+            .map(SourceProvenance::original_header)
+    }
+
+    #[cfg(test)]
+    fn source_canonical_header(&self) -> Option<&[u8]> {
+        self.source_provenance
+            .as_deref()
+            .map(SourceProvenance::original_canonical_header)
+    }
+
+    #[cfg(test)]
+    fn set_test_source_headers(
+        &mut self,
+        original: Option<Box<[u8]>>,
+        canonical: Option<Box<[u8]>>,
+    ) {
+        self.source_provenance = match (original, canonical) {
+            (Some(original), Some(canonical)) => Some(
+                SourceProvenance::from_headers(&original, &canonical, None, None, None)
+                    .expect("test source header allocation"),
+            ),
+            (None, None) => None,
+            _ => panic!("test source headers must be supplied as a pair"),
+        };
+    }
+
+    #[cfg(test)]
+    fn clear_test_source_headers(&mut self) {
+        self.source_provenance = None;
+    }
+
+    #[cfg(test)]
+    fn test_original_header_mut(&mut self) -> Option<&mut [u8]> {
+        self.source_provenance
+            .as_mut()
+            .map(Arc::make_mut)
+            .map(SourceProvenance::original_header_mut)
+    }
+
+    #[cfg(test)]
+    fn test_original_canonical_header_mut(&mut self) -> Option<&mut [u8]> {
+        self.source_provenance
+            .as_mut()
+            .map(Arc::make_mut)
+            .map(SourceProvenance::original_canonical_header_mut)
+    }
+
     /// Reuse parsed neutral admission only after proving that the current
     /// metadata still emits the paired canonical header. Profiles that tighten
     /// sequence-sensitive message or metadata budgets use the full validator,
     /// preserving its first-failure precedence.
     fn validate_cached_archive_info(&self, limits: Limits) -> Result<Option<usize>> {
-        let Some((admission, admitted_limits)) = self.archive_info_admission else {
+        let Some(provenance) = self.source_provenance.as_deref() else {
             return Ok(None);
         };
-        if self.original_header.is_none() || self.original_canonical_header.is_none() {
+        let Some(admission) = provenance.archive_info_admission else {
             return Ok(None);
-        }
-        if limits.max_message_bytes() < admitted_limits.max_message_bytes()
-            || limits.max_metadata_items() < admitted_limits.max_metadata_items()
+        };
+        if limits.max_message_bytes()
+            < provenance
+                .admitted_message_bytes
+                .expect("parsed source provenance has message limit")
+            || limits.max_metadata_items()
+                < provenance
+                    .admitted_metadata_items
+                    .expect("parsed source provenance has metadata limit")
         {
             return Ok(None);
         }
-        let Some(original_canonical) = self.original_canonical_header.as_deref() else {
-            return Ok(None);
-        };
+        let original_canonical = provenance.original_canonical_header();
         let mut probe = CanonicalHeaderProbe::new(Some(original_canonical));
         if emit_canonical_archive_info(&mut probe, self).is_err() {
             return Ok(None);
@@ -1662,7 +1852,7 @@ impl ArchiveObject {
             return Ok(None);
         }
         admission.check(limits)?;
-        Ok(self.original_header.as_deref().map(<[u8]>::len))
+        Ok(Some(provenance.original_header().len()))
     }
 
     fn validate_payloads(&self, limits: Limits, cached_header_length: Option<usize>) -> Result<()> {
@@ -1673,14 +1863,15 @@ impl ArchiveObject {
                 check_message_length(message.data.len(), limits)?;
             }
             admit_retained_header(
-                self.original_header
-                    .as_deref()
+                self.source_header()
                     .expect("cached retained header is present"),
                 limits,
-                self.original_header_admission,
+                self.source_provenance
+                    .as_deref()
+                    .and_then(|provenance| provenance.header_admission),
             )?;
             header_length
-        } else if self.original_header.is_some() {
+        } else if self.source_header().is_some() {
             retained_header_length_for_object(self, limits)?.1
         } else {
             archive_info_encoded_len(&self.archive_info)?
@@ -1740,8 +1931,7 @@ impl ArchiveObject {
             && self.messages == other.messages
             && self.header_length == other.header_length
             && self.data_length == other.data_length
-            && self.original_header == other.original_header
-            && self.original_canonical_header == other.original_canonical_header
+            && self.source_headers() == other.source_headers()
     }
 
     /// Stream every aggregate and field-level object/data reference.
@@ -1772,13 +1962,8 @@ impl ArchiveObject {
         let limits = limits.validate()?;
         self.validate(limits)?;
         let canonical = encode_archive_info(&self.archive_info, limits)?;
-        let source_header = match (
-            self.original_header.as_deref(),
-            self.original_canonical_header.as_deref(),
-        ) {
-            (Some(original), Some(original_canonical))
-                if original_canonical == canonical.as_slice() =>
-            {
+        let source_header = match self.source_headers() {
+            Some((original, original_canonical)) if original_canonical == canonical.as_slice() => {
                 original
             },
             _ => canonical.as_slice(),
@@ -1931,11 +2116,8 @@ impl ArchiveObject {
         check_message_length(message.data.len(), limits)?;
 
         let canonical_before = encode_archive_info(&self.archive_info, limits)?;
-        let (source_header, retained_source_header) = match (
-            self.original_header.as_deref(),
-            self.original_canonical_header.as_deref(),
-        ) {
-            (Some(original), Some(canonical)) if canonical == canonical_before.as_slice() => {
+        let (source_header, retained_source_header) = match self.source_headers() {
+            Some((original, canonical)) if canonical == canonical_before.as_slice() => {
                 (original, true)
             },
             _ => (canonical_before.as_slice(), false),
@@ -1982,17 +2164,18 @@ impl ArchiveObject {
             },
         };
 
-        if retained_source_header && rewritten_header != canonical_after {
-            self.original_header = Some(rewritten_header.into_boxed_slice());
-            self.original_canonical_header = Some(canonical_after.into_boxed_slice());
-            self.original_header_admission = None;
-            self.archive_info_admission = None;
+        let source_provenance = if retained_source_header && rewritten_header != canonical_after {
+            Some(SourceProvenance::from_headers(
+                &rewritten_header,
+                &canonical_after,
+                None,
+                None,
+                None,
+            )?)
         } else {
-            self.original_header = None;
-            self.original_canonical_header = None;
-            self.original_header_admission = None;
-            self.archive_info_admission = None;
-        }
+            None
+        };
+        self.source_provenance = source_provenance;
         Ok(old)
     }
 
@@ -2112,11 +2295,8 @@ impl ArchiveObject {
         };
 
         let canonical_before = encode_archive_info(&self.archive_info, limits)?;
-        let (source_header, retained_source_header) = match (
-            self.original_header.as_deref(),
-            self.original_canonical_header.as_deref(),
-        ) {
-            (Some(original), Some(canonical)) if canonical == canonical_before.as_slice() => {
+        let (source_header, retained_source_header) = match self.source_headers() {
+            Some((original, canonical)) if canonical == canonical_before.as_slice() => {
                 (original, true)
             },
             _ => (canonical_before.as_slice(), false),
@@ -2161,13 +2341,16 @@ impl ArchiveObject {
             published_header_length,
             limits,
         )?;
-        let (original_header, original_canonical_header) = if retain_rewritten_header {
-            (
-                Some(rewritten_header.into_boxed_slice()),
-                Some(canonical_after.into_boxed_slice()),
-            )
+        let source_provenance = if retain_rewritten_header {
+            Some(SourceProvenance::from_headers(
+                &rewritten_header,
+                &canonical_after,
+                None,
+                None,
+                None,
+            )?)
         } else {
-            (None, None)
+            None
         };
 
         let message_slot = self
@@ -2176,10 +2359,7 @@ impl ArchiveObject {
             .ok_or_else(|| Error::invalid_archive(index, "message index is out of bounds"))?;
         let old = std::mem::replace(message_slot, message);
         self.archive_info = rewritten_info;
-        self.original_header = original_header;
-        self.original_canonical_header = original_canonical_header;
-        self.original_header_admission = None;
-        self.archive_info_admission = None;
+        self.source_provenance = source_provenance;
         Ok(old)
     }
 
@@ -2299,11 +2479,8 @@ impl ArchiveObject {
         drop(selected);
 
         let canonical_before = encode_archive_info(&self.archive_info, limits)?;
-        let (source_header, retained_source_header) = match (
-            self.original_header.as_deref(),
-            self.original_canonical_header.as_deref(),
-        ) {
-            (Some(original), Some(canonical)) if canonical == canonical_before.as_slice() => {
+        let (source_header, retained_source_header) = match self.source_headers() {
+            Some((original, canonical)) if canonical == canonical_before.as_slice() => {
                 (original, true)
             },
             _ => (canonical_before.as_slice(), false),
@@ -2348,14 +2525,11 @@ impl ArchiveObject {
             published_header_length,
             limits,
         )?;
-        let (original_header, original_canonical_header) = if retain_rewritten_header {
-            (
-                Some(rewritten_header.into_boxed_slice()),
-                Some(canonical_after.into_boxed_slice()),
-            )
-        } else {
-            (None, None)
-        };
+        let source_provenance = retained_source_provenance(
+            &rewritten_header,
+            &canonical_after,
+            retain_rewritten_header,
+        )?;
 
         let message_slot = self
             .messages
@@ -2363,10 +2537,7 @@ impl ArchiveObject {
             .ok_or_else(|| Error::invalid_archive(index, "message index is out of bounds"))?;
         let old = std::mem::replace(message_slot, message);
         self.archive_info = rewritten_info;
-        self.original_header = original_header;
-        self.original_canonical_header = original_canonical_header;
-        self.original_header_admission = None;
-        self.archive_info_admission = None;
+        self.source_provenance = source_provenance;
         Ok(old)
     }
 
@@ -2443,11 +2614,8 @@ impl ArchiveObject {
         }
 
         let canonical_before = encode_archive_info(&self.archive_info, limits)?;
-        let (source_header, retained_source_header) = match (
-            self.original_header.as_deref(),
-            self.original_canonical_header.as_deref(),
-        ) {
-            (Some(original), Some(canonical)) if canonical == canonical_before.as_slice() => {
+        let (source_header, retained_source_header) = match self.source_headers() {
+            Some((original, canonical)) if canonical == canonical_before.as_slice() => {
                 (original, true)
             },
             _ => (canonical_before.as_slice(), false),
@@ -2491,14 +2659,11 @@ impl ArchiveObject {
             published_header_length,
             limits,
         )?;
-        let (original_header, original_canonical_header) = if retain_rewritten_header {
-            (
-                Some(rewritten_header.into_boxed_slice()),
-                Some(canonical_after.into_boxed_slice()),
-            )
-        } else {
-            (None, None)
-        };
+        let source_provenance = retained_source_provenance(
+            &rewritten_header,
+            &canonical_after,
+            retain_rewritten_header,
+        )?;
 
         let message_slot = self
             .messages
@@ -2506,10 +2671,7 @@ impl ArchiveObject {
             .ok_or_else(|| Error::invalid_archive(index, "message index is out of bounds"))?;
         let old = std::mem::replace(message_slot, message);
         self.archive_info = rewritten_info;
-        self.original_header = original_header;
-        self.original_canonical_header = original_canonical_header;
-        self.original_header_admission = None;
-        self.archive_info_admission = None;
+        self.source_provenance = source_provenance;
         Ok(old)
     }
 
@@ -2589,11 +2751,8 @@ impl ArchiveObject {
         preflight_transitioned_metadata_items(&self.archive_info, index, &prepared, limits)?;
 
         let canonical_before = encode_archive_info(&self.archive_info, limits)?;
-        let (source_header, retained_source_header) = match (
-            self.original_header.as_deref(),
-            self.original_canonical_header.as_deref(),
-        ) {
-            (Some(original), Some(canonical)) if canonical == canonical_before.as_slice() => {
+        let (source_header, retained_source_header) = match self.source_headers() {
+            Some((original, canonical)) if canonical == canonical_before.as_slice() => {
                 (original, true)
             },
             _ => (canonical_before.as_slice(), false),
@@ -2635,14 +2794,11 @@ impl ArchiveObject {
             published_header_length,
             limits,
         )?;
-        let (original_header, original_canonical_header) = if retain_rewritten_header {
-            (
-                Some(rewritten_header.into_boxed_slice()),
-                Some(canonical_after.into_boxed_slice()),
-            )
-        } else {
-            (None, None)
-        };
+        let source_provenance = retained_source_provenance(
+            &rewritten_header,
+            &canonical_after,
+            retain_rewritten_header,
+        )?;
 
         let message_slot = self
             .messages
@@ -2650,10 +2806,7 @@ impl ArchiveObject {
             .ok_or_else(|| Error::invalid_archive(index, "message index is out of bounds"))?;
         let old = std::mem::replace(message_slot, message);
         self.archive_info = rewritten_info;
-        self.original_header = original_header;
-        self.original_canonical_header = original_canonical_header;
-        self.original_header_admission = None;
-        self.archive_info_admission = None;
+        self.source_provenance = source_provenance;
         Ok(old)
     }
 
@@ -2819,11 +2972,8 @@ impl ArchiveObject {
         }
 
         let canonical_before = encode_archive_info(&self.archive_info, limits)?;
-        let (source_header, retained_source_header) = match (
-            self.original_header.as_deref(),
-            self.original_canonical_header.as_deref(),
-        ) {
-            (Some(original), Some(canonical)) if canonical == canonical_before.as_slice() => {
+        let (source_header, retained_source_header) = match self.source_headers() {
+            Some((original, canonical)) if canonical == canonical_before.as_slice() => {
                 (original, true)
             },
             _ => (canonical_before.as_slice(), false),
@@ -2866,24 +3016,18 @@ impl ArchiveObject {
             published_header_length,
             limits,
         )?;
-        let (original_header, original_canonical_header) = if retain_rewritten_header {
-            (
-                Some(rewritten_header.into_boxed_slice()),
-                Some(canonical_after.into_boxed_slice()),
-            )
-        } else {
-            (None, None)
-        };
+        let source_provenance = retained_source_provenance(
+            &rewritten_header,
+            &canonical_after,
+            retain_rewritten_header,
+        )?;
         let message_slot = self
             .messages
             .get_mut(index)
             .ok_or_else(|| Error::invalid_archive(index, "message index is out of bounds"))?;
         let old = std::mem::replace(message_slot, message);
         self.archive_info = rewritten_info;
-        self.original_header = original_header;
-        self.original_canonical_header = original_canonical_header;
-        self.original_header_admission = None;
-        self.archive_info_admission = None;
+        self.source_provenance = source_provenance;
         Ok(old)
     }
 
@@ -3048,21 +3192,22 @@ impl Archive {
             }
             let selected = selected_identifier
                 .is_none_or(|identifier| archive_info.identifier == Some(identifier));
-            let (original_header, original_canonical_header, original_header_admission) =
-                if selected {
-                    let canonical_header = encode_archive_info(&archive_info, limits)?;
-                    if header == canonical_header.as_slice() {
-                        (None, None, None)
-                    } else {
-                        (
-                            Some(header.into()),
-                            Some(canonical_header.into()),
-                            Some(header_admission),
-                        )
-                    }
+            let source_provenance = if selected {
+                let canonical_header = encode_archive_info(&archive_info, limits)?;
+                if header == canonical_header.as_slice() {
+                    None
                 } else {
-                    (None, None, None)
-                };
+                    Some(SourceProvenance::from_headers(
+                        header,
+                        &canonical_header,
+                        Some(header_admission),
+                        Some(archive_info_admission),
+                        Some(limits),
+                    )?)
+                }
+            } else {
+                None
+            };
             cursor = header_end;
             add_limited(
                 &mut total_messages,
@@ -3140,10 +3285,7 @@ impl Archive {
                     data_length: u64::try_from(payload_length).map_err(|_| {
                         Error::invalid_archive(payload_start, "payload exceeds u64")
                     })?,
-                    original_header,
-                    original_canonical_header,
-                    original_header_admission,
-                    archive_info_admission: Some((archive_info_admission, limits)),
+                    source_provenance,
                 });
             } else {
                 cursor = payload_end;
@@ -3349,13 +3491,8 @@ impl Archive {
                     .map_err(|_| Error::invalid_archive(0, "message payload exceeds u32"))?;
             }
             let canonical_header = encode_archive_info(&info, limits)?;
-            let header = match (
-                object.original_header.as_deref(),
-                object.original_canonical_header.as_deref(),
-            ) {
-                (Some(original), Some(canonical)) if canonical == canonical_header.as_slice() => {
-                    original
-                },
+            let header = match object.source_headers() {
+                Some((original, canonical)) if canonical == canonical_header.as_slice() => original,
                 _ => canonical_header.as_slice(),
             };
             let header_length = header.len();
@@ -8069,11 +8206,7 @@ fn retained_header_length_for_object(
     object: &ArchiveObject,
     limits: Limits,
 ) -> Result<(usize, usize)> {
-    let Some((original, original_canonical)) = object
-        .original_header
-        .as_deref()
-        .zip(object.original_canonical_header.as_deref())
-    else {
+    let Some((original, original_canonical)) = object.source_headers() else {
         let canonical_length = canonical_archive_info_length_for_object(object)?;
         return Ok((canonical_length, canonical_length));
     };
@@ -8082,7 +8215,14 @@ fn retained_header_length_for_object(
     emit_canonical_archive_info(&mut probe, object)?;
     let (emitted_length, canonical_matches) = probe.finish();
     if canonical_matches {
-        admit_retained_header(original, limits, object.original_header_admission)?;
+        admit_retained_header(
+            original,
+            limits,
+            object
+                .source_provenance
+                .as_deref()
+                .and_then(|provenance| provenance.header_admission),
+        )?;
         Ok((emitted_length, original.len()))
     } else {
         Ok((emitted_length, emitted_length))
@@ -8845,12 +8985,16 @@ where
     let mut archive_length = 0usize;
     for object in objects {
         let canonical_header = encode_archive_info(&object.archive_info, limits)?;
-        let header = match (
-            object.original_header.as_deref(),
-            object.original_canonical_header.as_deref(),
-        ) {
-            (Some(original), Some(canonical)) if canonical == canonical_header.as_slice() => {
-                admit_retained_header(original, limits, object.original_header_admission)?;
+        let header = match object.source_headers() {
+            Some((original, canonical)) if canonical == canonical_header.as_slice() => {
+                admit_retained_header(
+                    original,
+                    limits,
+                    object
+                        .source_provenance
+                        .as_deref()
+                        .and_then(|provenance| provenance.header_admission),
+                )?;
                 original
             },
             _ => canonical_header.as_slice(),
@@ -9133,8 +9277,10 @@ mod tests {
         let canonical = encode_archive_info(&object.archive_info, Limits::default())?;
         let mut raw = canonical.clone();
         raw.extend_from_slice(&[0xb8, 0x3e, 0x01]);
-        object.original_header = Some(raw.into_boxed_slice());
-        object.original_canonical_header = Some(canonical.into_boxed_slice());
+        object.set_test_source_headers(
+            Some(raw.into_boxed_slice()),
+            Some(canonical.into_boxed_slice()),
+        );
 
         let mut permissive = ReferenceFacts::default();
         assert_eq!(
@@ -9175,8 +9321,8 @@ mod tests {
             ));
         };
 
-        assert!(object.original_header.is_none());
-        assert!(object.original_canonical_header.is_none());
+        assert!(object.source_header().is_none());
+        assert!(object.source_canonical_header().is_none());
         assert_eq!(parsed.to_bytes(Default::default())?, encoded);
         Ok(())
     }
@@ -9907,8 +10053,10 @@ mod tests {
         let canonical = encode_archive_info(&object.archive_info, Limits::default())?;
         let mut retained = canonical.clone();
         retained.extend_from_slice(&[0xb5, 0x0c, 1, 2, 3, 4]);
-        object.original_header = Some(retained.into_boxed_slice());
-        object.original_canonical_header = Some(canonical.into_boxed_slice());
+        object.set_test_source_headers(
+            Some(retained.into_boxed_slice()),
+            Some(canonical.into_boxed_slice()),
+        );
 
         let mut payload = object.clone();
         payload.messages[0].data[0] ^= 1;
@@ -9919,18 +10067,17 @@ mod tests {
         assert!(!object.same_content_ignoring_offsets(&metadata));
 
         let mut raw_header = object.clone();
-        raw_header.original_header.as_mut().expect("raw header")[0] ^= 1;
+        raw_header.test_original_header_mut().expect("raw header")[0] ^= 1;
         assert!(!object.same_content_ignoring_offsets(&raw_header));
 
         let mut canonical_header = object.clone();
         canonical_header
-            .original_canonical_header
-            .as_mut()
+            .test_original_canonical_header_mut()
             .expect("canonical header")[0] ^= 1;
         assert!(!object.same_content_ignoring_offsets(&canonical_header));
 
         let mut raw_header_state = object.clone();
-        raw_header_state.original_header = None;
+        raw_header_state.clear_test_source_headers();
         assert!(!object.same_content_ignoring_offsets(&raw_header_state));
 
         let mut framing = object.clone();
@@ -10054,7 +10201,7 @@ mod tests {
         archive.validate_canonical_object_framing(&fixture.source, Default::default())?;
         assert_eq!(archive.to_bytes(Default::default())?, fixture.source);
         assert_eq!(
-            archive.objects[0].original_header.as_deref(),
+            archive.objects[0].source_header(),
             Some(fixture.header.as_slice())
         );
         Ok(())
@@ -10253,15 +10400,15 @@ mod tests {
         }
         .to_bytes(Default::default())?;
         assert_eq!(edited.to_bytes(Default::default())?, expected);
-        assert!(edited.objects[0].original_header.is_none());
-        assert!(edited.objects[0].original_canonical_header.is_none());
+        assert!(edited.objects[0].source_header().is_none());
+        assert!(edited.objects[0].source_canonical_header().is_none());
 
         let replaced =
             edited.objects[0].replace_message_preserving_header(0, old, Default::default())?;
         assert_eq!(replaced, replacement);
         assert_eq!(edited.to_bytes(Default::default())?, source);
-        assert!(edited.objects[0].original_header.is_none());
-        assert!(edited.objects[0].original_canonical_header.is_none());
+        assert!(edited.objects[0].source_header().is_none());
+        assert!(edited.objects[0].source_canonical_header().is_none());
         Ok(())
     }
 
@@ -10297,8 +10444,8 @@ mod tests {
             Default::default(),
         )?;
         assert_eq!(old, original_message);
-        assert!(edited.objects[0].original_header.is_none());
-        assert!(edited.objects[0].original_canonical_header.is_none());
+        assert!(edited.objects[0].source_header().is_none());
+        assert!(edited.objects[0].source_canonical_header().is_none());
 
         let expected = Archive {
             objects: vec![ArchiveObject::new(
@@ -10354,7 +10501,7 @@ mod tests {
         assert_eq!(info.field_infos[0].object_references, [99, 100]);
         assert_eq!(info.field_infos[1].object_references, [77, 78]);
         assert_eq!(
-            archive.objects[0].original_header.as_deref(),
+            archive.objects[0].source_header(),
             Some(fixture.expected_header.as_slice())
         );
 
@@ -10438,8 +10585,10 @@ mod tests {
             let canonical = encode_archive_info(&object.archive_info, Limits::default())?;
             let mut raw_header = vec![0x08, 0x01];
             push_length_delimited(&mut raw_header, &[0x12], 1, &malformed_message)?;
-            object.original_header = Some(raw_header.into_boxed_slice());
-            object.original_canonical_header = Some(canonical.into_boxed_slice());
+            object.set_test_source_headers(
+                Some(raw_header.into_boxed_slice()),
+                Some(canonical.into_boxed_slice()),
+            );
             let before = object.clone();
 
             let malformed_error = object
@@ -10489,7 +10638,7 @@ mod tests {
         assert_eq!(info.field_infos[1].object_references, [77]);
         assert_eq!(info.field_infos[1].data_references, [31, 32, 33]);
         assert_eq!(
-            archive.objects[0].original_header.as_deref(),
+            archive.objects[0].source_header(),
             Some(fixture.selected_header.as_slice())
         );
 
@@ -10728,8 +10877,10 @@ mod tests {
             let canonical = encode_archive_info(&object.archive_info, Limits::default())?;
             let mut raw_header = vec![0x08, 0x01];
             push_length_delimited(&mut raw_header, &[0x12], 1, &malformed_message)?;
-            object.original_header = Some(raw_header.into_boxed_slice());
-            object.original_canonical_header = Some(canonical.into_boxed_slice());
+            object.set_test_source_headers(
+                Some(raw_header.into_boxed_slice()),
+                Some(canonical.into_boxed_slice()),
+            );
             let before = object.clone();
 
             let error = object
@@ -10872,8 +11023,10 @@ mod tests {
         let unknown_archive_info = [0xb5, 0x0c, 1, 2, 3, 4];
         let mut raw_header = canonical.clone();
         raw_header.extend_from_slice(&unknown_archive_info);
-        object.original_header = Some(raw_header.clone().into_boxed_slice());
-        object.original_canonical_header = Some(canonical.into_boxed_slice());
+        object.set_test_source_headers(
+            Some(raw_header.clone().into_boxed_slice()),
+            Some(canonical.into_boxed_slice()),
+        );
         let source = Archive {
             objects: vec![object.clone()],
         }
@@ -10895,10 +11048,7 @@ mod tests {
             .to_bytes(Default::default())?,
             source
         );
-        assert_eq!(
-            object.original_header.as_deref(),
-            Some(raw_header.as_slice())
-        );
+        assert_eq!(object.source_header(), Some(raw_header.as_slice()));
         Ok(())
     }
 
@@ -10910,8 +11060,10 @@ mod tests {
         let unknown_archive_info = [0xb5, 0x0c, 1, 2, 3, 4];
         let mut raw_header = canonical.clone();
         raw_header.extend_from_slice(&unknown_archive_info);
-        object.original_header = Some(raw_header.clone().into_boxed_slice());
-        object.original_canonical_header = Some(canonical.into_boxed_slice());
+        object.set_test_source_headers(
+            Some(raw_header.clone().into_boxed_slice()),
+            Some(canonical.into_boxed_slice()),
+        );
 
         object.replace_message_reordering_data_references_preserving_header(
             0,
@@ -10929,7 +11081,7 @@ mod tests {
         let (header, payload) = split_test_archive(&encoded)?;
         assert_eq!(payload, [0xdd]);
         assert!(header.ends_with(&unknown_archive_info));
-        assert_eq!(object.original_header.as_deref(), Some(header));
+        assert_eq!(object.source_header(), Some(header));
         assert_eq!(
             object.archive_info.message_infos[0].field_infos[0].data_references,
             [33, 11, 22]
@@ -10970,7 +11122,7 @@ mod tests {
         assert_eq!(info.field_infos[0].object_references, [10, 200]);
         assert_eq!(info.field_infos[0].data_references, [88]);
         assert_eq!(
-            archive.objects[0].original_header.as_deref(),
+            archive.objects[0].source_header(),
             Some(fixture.reordered_header.as_slice())
         );
 
@@ -10984,7 +11136,7 @@ mod tests {
         assert_eq!(replaced, replacement);
         assert_eq!(archive.to_bytes(Default::default())?, fixture.source);
         assert_eq!(
-            archive.objects[0].original_header.as_deref(),
+            archive.objects[0].source_header(),
             Some(fixture.header.as_slice())
         );
         Ok(())
@@ -11097,8 +11249,10 @@ mod tests {
             let canonical = encode_archive_info(&object.archive_info, Limits::default())?;
             let mut raw_header = vec![0x08, 0x01];
             push_length_delimited(&mut raw_header, &[0x12], 1, &malformed_message)?;
-            object.original_header = Some(raw_header.into_boxed_slice());
-            object.original_canonical_header = Some(canonical.into_boxed_slice());
+            object.set_test_source_headers(
+                Some(raw_header.into_boxed_slice()),
+                Some(canonical.into_boxed_slice()),
+            );
             let before = object.clone();
 
             let error = object
@@ -11452,8 +11606,7 @@ mod tests {
         let mut archive = Archive::parse(&fixture.source, Default::default())?;
         let object = &mut archive.objects[0];
         let mut malformed = object
-            .original_header
-            .as_deref()
+            .source_header()
             .ok_or_else(|| Error::invalid_archive(0, "test raw header was not retained"))?
             .to_vec();
         let key = malformed
@@ -11461,7 +11614,10 @@ mod tests {
             .position(|window| window == [0x28, 0x8a, 0x00])
             .ok_or_else(|| Error::invalid_archive(0, "test reference key is missing"))?;
         malformed[key] = 0x29;
-        object.original_header = Some(malformed.into_boxed_slice());
+        let canonical = object
+            .source_canonical_header()
+            .map(|header| header.to_vec().into_boxed_slice());
+        object.set_test_source_headers(Some(malformed.into_boxed_slice()), canonical);
         let before = object.clone();
         let error = object
             .replace_message_transitioning_object_references_preserving_header(
@@ -11751,8 +11907,7 @@ mod tests {
         let mut expected = archive.objects[0].clone();
         expected.replace_message_transitioning_object_references_with_canonical_fields_preserving_header(0, RawMessage { type_: 7, data: vec![1, 2, 3] }, transition, CanonicalObjectReferenceFields::Insert(&definition), Default::default())?;
         let header_bytes = expected
-            .original_header
-            .as_ref()
+            .source_header()
             .ok_or_else(|| Error::invalid_archive(0, "test missing raw header"))?
             .len();
         for maximum in [header_bytes, header_bytes - 1] {
@@ -12244,10 +12399,11 @@ mod tests {
         // touched. This exercises raw-wire admission independently from the
         // stale authorization check above.
         let mut malformed = original.clone();
-        malformed.objects[0].original_header = Some(Box::from([0x30, 0x80]));
-        malformed.objects[0].original_canonical_header = Some(
-            encode_archive_info(&malformed.objects[0].archive_info, Limits::default())?
-                .into_boxed_slice(),
+        let malformed_canonical =
+            encode_archive_info(&malformed.objects[0].archive_info, Limits::default())?;
+        malformed.objects[0].set_test_source_headers(
+            Some(Box::from([0x30, 0x80])),
+            Some(malformed_canonical.into_boxed_slice()),
         );
         let malformed_before = malformed.clone();
         assert!(
@@ -12406,8 +12562,7 @@ mod tests {
                 Default::default(),
             )?;
         let raw = noncanonical.objects[0]
-            .original_header
-            .as_deref()
+            .source_header()
             .ok_or_else(|| Error::invalid_archive(0, "canonical FieldInfo source is missing"))?;
         let expected =
             super::encode_canonical_data_reference_field_info(&[3], &after, Limits::default(), 0)?;
@@ -12424,7 +12579,11 @@ mod tests {
             .ok_or_else(|| Error::invalid_archive(0, "canonical FieldInfo is missing"))?;
         let mut altered = raw.to_vec();
         altered[key..key + expected.len()].copy_from_slice(&noncanonical_record);
-        noncanonical.objects[0].original_header = Some(altered.into_boxed_slice());
+        let canonical = noncanonical.objects[0]
+            .source_canonical_header()
+            .map(|header| header.to_vec().into_boxed_slice());
+        noncanonical.objects[0]
+            .set_test_source_headers(Some(altered.into_boxed_slice()), canonical);
         let original = noncanonical.clone();
         assert!(noncanonical.objects[0]
             .replace_message_transitioning_data_references_with_canonical_field_preserving_header(
