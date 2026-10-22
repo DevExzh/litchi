@@ -187,3 +187,20 @@ ratios against base were 0.607 calls, 0.409 requested bytes, 0.652 retained
 bytes and 0.665 peak bytes. The other successful routes had identical
 allocation counters. This is fresh-process allocation evidence only; no
 latency claim is made.
+
+## Coordinator receipt verification
+
+The [coordinator receipt](results/0362hda/coordinator-verification.json)
+verifies all 36 raw allocation legs against the committed summary, including
+paired endpoint equality. It records each raw file's size and SHA-256. Both
+protected binary hashes, portable probe copies and equal lockfiles match the
+worker receipt. The 606 tracked source files in each endpoint's workspace,
+core, ODF-common and ODS source set match their recorded Git blob IDs at
+`8d6abdab69` and `384205d218`. This is verification of the retained artifacts
+and current build inputs, not a reconstructed claim about an unrecorded
+compiler command. The existing record preserves the exact intended build
+commands and earlier projection-policy failure.
+
+Successful-route outputs and allocation counters support the stated memory
+results. Native latency qualification and integration remain open; this
+verification does not accept a latency regression or waive the final gate.
