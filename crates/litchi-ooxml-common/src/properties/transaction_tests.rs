@@ -375,6 +375,44 @@ fn composed_no_op_scope_authenticates_absent_property_families() {
 }
 
 #[test]
+fn composed_creation_authenticates_its_actual_relationship_id() {
+    let empty = OpcPackage::new();
+    let snapshot = Snapshot::read(&empty, Host::Excel).unwrap();
+    let (_, no_op, _) = snapshot.plan().finish().unwrap();
+    let (_, creation) = edited(&snapshot, "Created");
+    let composed = no_op.compose(&creation).unwrap();
+
+    // The no-op's absent-family scope uses wildcard relationship IDs. The
+    // creation itself still has to reject a recipient that occupied the
+    // concrete ID selected by its after package.
+    let mut occupied = empty.clone();
+    occupied.add_part(Box::new(BlobPart::new(
+        PackURI::new("/dummy.xml").unwrap(),
+        "application/xml".to_owned(),
+        b"<dummy/>".to_vec(),
+    )));
+    occupied
+        .rels_mut()
+        .try_add_relationship(
+            "urn:litchi:test".to_owned(),
+            "dummy.xml".to_owned(),
+            "rId1".to_owned(),
+            TargetMode::Internal,
+        )
+        .unwrap();
+    assert!(matches!(
+        composed.apply(&mut occupied),
+        Err(Error::Conflict(_))
+    ));
+
+    let occupied_source = source_backed(&occupied);
+    assert!(matches!(
+        composed.prepare_source_backed(&occupied_source),
+        Err(Error::Conflict(_))
+    ));
+}
+
+#[test]
 fn removal_composes_only_with_a_no_op_from_its_exact_after_graph() {
     let source = full();
     let snapshot = Snapshot::read(&source, Host::Word).unwrap();
@@ -436,6 +474,45 @@ fn removal_composes_only_with_a_no_op_from_its_exact_after_graph() {
         bytes(&different_gap_result, "/docProps/custom.xml"),
         bytes(&source, "/docProps/custom.xml")
     );
+}
+
+#[test]
+fn composed_removal_authenticates_all_inbound_relationships() {
+    let source = full();
+    let snapshot = Snapshot::read(&source, Host::Word).unwrap();
+    let mut remove_plan = snapshot.plan();
+    remove_plan.set_custom_props(custom::Props::new());
+    let (_, removal, _) = remove_plan.finish().unwrap();
+
+    let mut removed = source.clone();
+    removal.apply(&mut removed).unwrap();
+    let removed_snapshot = Snapshot::read(&removed, Host::Word).unwrap();
+    let (_, exact_no_op, _) = removed_snapshot.plan().finish().unwrap();
+    let composed = removal.compose(&exact_no_op).unwrap();
+
+    // The supplemental state scope authenticates the custom part itself, but
+    // the actual removal must still prove that no relationship besides the
+    // recorded owner targets it.
+    let mut extra_inbound = source.clone();
+    extra_inbound
+        .rels_mut()
+        .try_add_relationship(
+            "urn:litchi:test".to_owned(),
+            "docProps/custom.xml".to_owned(),
+            "rIdExtra".to_owned(),
+            TargetMode::Internal,
+        )
+        .unwrap();
+    assert!(matches!(
+        composed.apply(&mut extra_inbound),
+        Err(Error::Package(crate::Error::Relationship(_)))
+    ));
+
+    let extra_source = source_backed(&extra_inbound);
+    assert!(matches!(
+        composed.prepare_source_backed(&extra_source),
+        Err(Error::Package(crate::Error::Relationship(_)))
+    ));
 }
 
 #[test]

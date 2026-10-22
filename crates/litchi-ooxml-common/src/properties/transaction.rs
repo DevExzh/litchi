@@ -1244,6 +1244,28 @@ impl Patch {
             };
             check_change(package, change, graph, bytes.as_deref().map(Vec::as_slice))?;
         }
+        // A composed patch keeps a supplemental scope for families it does
+        // not change.  The scope authenticates the untouched state, but it
+        // may intentionally wildcard a future relationship ID for an absent
+        // family.  Check the actual changes as well so a creation still
+        // authenticates its selected ID and a removal still checks that its
+        // part has no additional inbound relationships.  Ordinary patches
+        // have no scope and therefore take only the single loop above.
+        if self.scope.is_some() {
+            for change in &self.changes {
+                let graph = owning_graph(package, change.family)?;
+                let bytes = match &graph.0 {
+                    Some(part) => Some(
+                        package
+                            .get_part(part)
+                            .map_err(crate::Error::from)?
+                            .blob_arc(),
+                    ),
+                    None => None,
+                };
+                check_change(package, change, graph, bytes.as_deref().map(Vec::as_slice))?;
+            }
+        }
         Ok(())
     }
 
@@ -1416,6 +1438,21 @@ impl Patch {
                 graph,
                 bytes.as_ref().map(|data| data.as_bytes()),
             )?;
+        }
+        if self.scope.is_some() {
+            for change in &self.changes {
+                let graph = source_graph(package, change.family)?;
+                let bytes = match &graph.0 {
+                    Some(part) => Some(package.part(part)?.data()?),
+                    None => None,
+                };
+                check_change(
+                    package,
+                    change,
+                    graph,
+                    bytes.as_ref().map(|data| data.as_bytes()),
+                )?;
+            }
         }
         package.check_execution()?;
         Ok(())
