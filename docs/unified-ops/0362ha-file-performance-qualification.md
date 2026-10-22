@@ -1,7 +1,7 @@
 # 0362ha — corrected unified File qualification harness
 
-- Status: protocol and source candidate; the coordinator review below still
-  requires harness repair before native qualification.
+- Status: protocol and source candidate; corrected harness build and all 109
+  untimed routes pass on the integrated source. Native qualification remains.
 
 The historical `file_w8_probe` and its receipts remain frozen. This harness uses
 `file_w8_qualified_probe`, which pairs the facade with the corresponding leaf
@@ -153,8 +153,16 @@ retaining the inline-owner allocation behavior and its explicit Clippy
 justification. Formatting, the all-feature probe build and Clippy pass on
 this integrated source; the [build receipt](results/0362ha/harness-build-validation.json)
 records the commands and source hashes. The worker's 109-route untimed receipt
-remains attached to its original source; the coordinator-source route matrix
-still needs to run before any native qualification. Historical and superseded
+remains attached to its original source. A fresh complete matrix on integrated
+source `d39d179353` also passes all 109 routes using the canonical semantic
+analyzer. It checks matching native/facade reads, real changed outputs,
+repeated output identity and exact source-owner bytes before/after staging.
+The [integrated receipt](results/0362ha/integrated-route-validation.json)
+records every route outcome and the protected binary, full source archive,
+lock, probe and raw route artifact identities. Reproduce its source archive
+with `git archive d39d179353`; the receipt supplies the build and validation
+commands. The full archive and binary remain outside the checkout. This
+untimed validation makes no native latency claim. Historical and superseded
 receipts remain attached to their source versions.
 
 ## ODF detector policy isolation repair
