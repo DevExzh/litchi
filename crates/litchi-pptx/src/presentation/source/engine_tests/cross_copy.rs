@@ -5660,10 +5660,18 @@ fn cross_slide_copy_family_publishes_a_source_backed_package() -> TestResult {
     // own package.
     let replayed = destination.apply_cross_slide_copy(&patch)?.into_package();
     assert_eq!(replayed.to_bytes()?, streamed);
+    assert!(
+        replayed.same_source_owner(&copied_package),
+        "same-owner replay should retain the published package identity"
+    );
     let restored = copied_package
         .apply_cross_slide_copy(&patch.inverse())?
         .into_package();
     assert_eq!(restored.to_bytes()?, destination_bytes);
+    assert!(
+        restored.same_source_owner(&destination),
+        "same-owner inverse should retain the original package identity"
+    );
     assert!(matches!(
         destination.apply_cross_slide_copy(&patch.inverse()),
         Err(Error::PatchConflict)

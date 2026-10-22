@@ -241,22 +241,37 @@ impl Package {
     /// its published bytes match the recorded state; the replayed output is
     /// then rebased onto that recipient's source policy.
     pub fn apply_cross_slide_copy(&self, patch: &Patch) -> Result<Commit> {
-        if let Some((before, after)) = &patch.restore
-            && self.same_replay_content(before)?
-        {
-            if patch.is_noop() {
+        if let Some((before, after)) = &patch.restore {
+            // Keep the original same-owner path. It compares the retained
+            // semantic revision without scanning an output and returns the
+            // already-published package, so ordinary replay keeps its O(1)
+            // identity and allocation behavior.
+            if self.same_source_owner(before) {
+                if self.same_content(before)? {
+                    return Ok(Commit::new(
+                        after.clone(),
+                        patch.clone(),
+                        Diagnostics::new(!patch.is_noop()),
+                    ));
+                }
+            // A different source owner may still carry the exact recorded
+            // bytes. Only this independently-owned path pays the bounded
+            // content proof and receives a recipient-context deferred result.
+            } else if self.same_replay_content(before)? {
+                if patch.is_noop() {
+                    return Ok(Commit::new(
+                        self.clone(),
+                        patch.clone(),
+                        Diagnostics::new(false),
+                    ));
+                }
+                let package = self.deferred_replay_from(after)?;
                 return Ok(Commit::new(
-                    self.clone(),
+                    package,
                     patch.clone(),
-                    Diagnostics::new(false),
+                    Diagnostics::new(!patch.is_noop()),
                 ));
             }
-            let package = self.deferred_replay_from(after)?;
-            return Ok(Commit::new(
-                package,
-                patch.clone(),
-                Diagnostics::new(!patch.is_noop()),
-            ));
         }
         if patch.inverse && !patch.is_noop() {
             return Err(Error::PatchConflict);
