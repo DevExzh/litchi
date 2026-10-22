@@ -65,3 +65,84 @@ covered by the focused tests; any native timing or allocator qualification is
 intentionally deferred until the coordinator grants a quiet measurement
 window. Target size was 4.6 GiB at handoff; no benchmark binaries or large
 evidence files were added.
+
+## Full ODS gate and matched allocation receipt
+
+The complete bounded ODS gate was rerun after this follow-up, rather than only
+the library target:
+
+```text
+source /home/zhuhe/code/litchi-worktrees/.coord/w8-odf-flat-limits/env.sh
+export CARGO_NET_OFFLINE=true
+python3 /home/zhuhe/code/litchi-worktrees/.coord/scripts/chunked-cargo-tests.py -p litchi-ods --all-features
+```
+
+The gate ran 18 bounded commands and 120 result blocks. It reported 1,768
+passed, 0 failed and 13 filtered compile/doctest cases. The full output is
+kept outside the checkout at
+`/home/zhuhe/code/litchi-worktrees/.coord/w8-odf-flat-limits/ods-gate-full.log`
+(183,230 bytes, SHA-256
+`32921e8cfdab15c4eeaccb52f3dcdef47b7ea4e49661a0aa73a65ad1ba718062`). The
+largest reported target was 5,892,730,880 bytes; the final target directory
+was 5.5 GiB.
+
+The matched non-timing probe uses the same source file and fixture for both
+endpoints. The base endpoint is `8d6abdab69`; the final endpoint is
+`384205d218`. Both probe lockfiles are 38,627 bytes with SHA-256
+`5b181fd886d5315fd56250db98226fa44aa2fc5d5bd0d5f3eb895732e65dfeab`, the
+probe source is 17,532 bytes with SHA-256
+`a6516e98df099c12fc7150b3ef5709b68a5f06e8ba50e07e87fc5859f194a256`, and
+the tracked fixture is 31,441 bytes with SHA-256
+`9b65ff2a65ceb92409a78c831ae74bbff82c51abe0203684467903091956ef53`.
+The exact build commands were:
+
+```text
+source /home/zhuhe/code/litchi-worktrees/.coord/w8-odf-flat-limits/env.sh
+export CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/w8-odf-flat-limits/probe-target-base
+cargo build --release --offline                 # probe dependency paths at 8d6abdab69
+export CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/w8-odf-flat-limits/probe-target-final
+cargo build --release --offline --features final # probe dependency paths at 384205d218
+```
+
+The protected base binary is 3,591,112 bytes, SHA-256
+`65c7e435017f72620229f2a26e17ed70d5cc40d4c86536ee0c6ab23b374947a5`; the
+final binary is 2,822,328 bytes, SHA-256
+`2f2dd856c687ab4d38b9a28d7e49d85251f1e065fb4b21abc324e0bfebc794d2`.
+The source and binary artifacts remain outside the repository.
+
+Each route ran in a fresh process with a counting allocator. `requested` is
+the sum of allocation and reallocation requests, `retained` is the live-byte
+delta while the result owner remained alive, and `peak` is the interval peak
+live-byte delta. Output hashes and sizes matched for every successful route.
+
+| route | base result | final result | base calls/requested/retained/peak | final calls/requested/retained/peak |
+| --- | --- | --- | --- | --- |
+| split | success | success | 56 / 120,147 / 65,388 / 67,895 | 34 / 49,113 / 42,640 / 45,147 |
+| to_package | success | success | 143 / 498,582 / 13,664 / 443,184 | 143 / 498,582 / 13,664 / 443,184 |
+| merge_noop, independent equal source | exact source | exact source | 1 / 31,441 / 31,441 / 31,441 | 1 / 31,441 / 31,441 / 31,441 |
+| merge_edit | exact changed bytes | exact changed bytes | 17 / 34,388 / 31,441 / 33,250 | 17 / 34,388 / 31,441 / 33,250 |
+| merge_package | exact source | exact source | 791 / 1,282,589 / 31,441 / 136,403 | 791 / 1,282,589 / 31,441 / 136,403 |
+| owner_roundtrip | exact source, 2 sheets | exact source, 2 sheets | 1,599 / 1,358,254 / 1,080,056 / 1,091,322 | 1,599 / 1,358,254 / 1,080,056 / 1,091,322 |
+
+The final `split` reduced the observed allocation calls to 0.607× base,
+requested bytes to 0.409×, retained bytes to 0.652× and peak bytes to 0.665×.
+All other successful routes had identical allocation counters and exact
+output hashes. This is allocation evidence only; no native latency claim is
+made.
+
+The proof and limit routes also ran in both endpoints. A same-length foreign
+source was accepted by the base range-only check and returned the foreign
+bytes; the final endpoint returned the typed `PatchConflict` after its digest
+check. A loose split followed by no-change merge of an independently owned
+source with an empty child at depth 3 succeeded on base, while the final
+endpoint returned `Limit(Semantic(Depth), observed=3, maximum=2)`. Direct
+split under that same tight profile returned the same typed depth refusal on
+the final endpoint. These routes confirm the empty-element attempted-depth
+check, retained-depth recheck, and independent-source content proof without
+retaining a second flat source.
+
+The JSON receipts are outside the checkout at
+`/home/zhuhe/code/litchi-worktrees/.coord/w8-odf-flat-limits/matched-results-20261022/`;
+the base and final JSONL files are 4,359 and 3,604 bytes. Native latency and
+allocator qualification beyond this fresh-process count/retention probe
+remain coordinator work.
