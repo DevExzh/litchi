@@ -104,10 +104,13 @@ the peak is heap plus allocator overhead, excluding stacks.
 | `doc/batch1k_leaf_write` | 21,183,223,373 | 6,436,404,593 | 0.304 | 113,171,296 B | 14,275,296 B | 0.126 |
 | `doc/leaf_write` | 5,426,409,220 | 1,737,517,721 | 0.320 | 104,778,760 B | 14,012,920 B | 0.134 |
 
-The ordinary route's shared-host wall-clock medians were 3,106.697 µs before
-and 3,684.751 µs after, but its matched instruction count and peak allocation
-both fell; the wall-clock difference is not a qualification result. Both
-routes produced the same output SHA on both legs.
+The `doc/leaf_write` shared-host wall-clock medians were 3,106.697 µs before
+and 3,684.751 µs after. The historical instruction and peak rows above are
+whole-process observations that include the unselected batch seed, so they do
+not establish ordinary-route CPU or heap changes; the wall-clock difference is
+not a qualification result. Both routes produced the same output SHA on both
+legs. The route-local ordinary attribution is corrected in
+[0359qa](0359qa-doc-body-toggle-profile.md).
 
 The compact profile summary is outside the repository at
 `/home/zhuhe/code/litchi-worktrees/.coord/doc-toggle/profile-summary.txt`
@@ -148,3 +151,13 @@ cargo clippy --offline --locked -p litchi-doc -p litchi-ops \
 
 All commands passed. The final release probe also passed its byte-for-byte
 before/after output assertion.
+
+## Attribution correction
+
+The historical profile rows in §Deterministic profile are retained, but they
+are not ordinary-route counts. The `doc/leaf_write` Callgrind and Massif legs
+still executed the unselected expected `doc/batch1k_leaf_write` call before
+the selector was checked. That 1,000-toggle seed dominates the old whole-
+process observation and its 0.320 ratio; the old Massif peak is likewise a
+batch-seed peak. The route-local attribution and the selector repair are
+recorded in [0359qa](0359qa-doc-body-toggle-profile.md).

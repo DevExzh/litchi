@@ -174,120 +174,142 @@ mod probe {
         };
 
         let bytes = doc(1_000);
-        let expected = super::routes::doc_source_set(&bytes);
-        probe.time("doc/source_set", 5, || {
-            assert_eq!(super::routes::doc_source_set(&bytes), expected);
-        });
-        probe.output(&expected);
+        if selected("doc/source_set") {
+            let expected = super::routes::doc_source_set(&bytes);
+            probe.time("doc/source_set", 5, || {
+                assert_eq!(super::routes::doc_source_set(&bytes), expected);
+            });
+            probe.output(&expected);
+        }
 
-        let file = litchi_ops::open_bytes(bytes.clone()).expect("open");
-        let paragraphs: Vec<String> = (1..=1_000)
-            .map(|index| format!("/body/p[{index}]"))
-            .collect();
-        // The base build retains one complete snapshot per isolated `bold`
-        // step, past the default 256 MiB retention bound: it raises that
-        // bound (`routes::DOC_BATCH_SNAPSHOT_BYTES`) and runs fewer rounds
-        // (`LITCHI_PROBE_BATCH_ROUNDS`, default 7).
-        let limits = SemanticLimits::builder()
-            .max_operations(1_000)
-            .expect("bound")
-            .max_snapshot_bytes(super::routes::DOC_BATCH_SNAPSHOT_BYTES)
-            .expect("bound")
-            .build()
-            .expect("limits");
         let batch_rounds = std::env::var("LITCHI_PROBE_BATCH_ROUNDS")
             .ok()
             .and_then(|value| value.parse().ok())
             .unwrap_or(7);
-        probe.time_rounds("doc/batch1k_ops", 1, batch_rounds, || {
-            let commit = file
-                .edit_with_options(
-                    litchi_ops::EditOptions::new().semantic_limits(limits),
-                    |tx| {
-                        for path in &paragraphs {
-                            tx.set(path.as_str(), props! { "bold" => true })?;
-                        }
-                        Ok(())
-                    },
-                )
-                .expect("edit");
-            black_box(commit.file());
-        });
-        let package = litchi_doc::Package::from_bytes(&bytes).expect("package");
-        probe.time_rounds("doc/batch1k_leaf", 1, batch_rounds, || {
-            let options = litchi_doc::EditOptions::default().transaction_limits(
-                litchi_doc::body_text::TransactionLimits::new(1_000, usize::MAX, usize::MAX),
-            );
-            let mut edit = package.edit_with_options(options).expect("edit");
-            for index in 0..1_000 {
-                edit.set_paragraph_bold(litchi_core::Position::new(index), true)
-                    .expect("bold");
-            }
-            black_box(edit.commit().expect("commit").into_package());
-        });
-        let expected_leaf_write = super::routes::doc_batch_leaf_write(&bytes, 1_000);
-        probe.time_rounds("doc/batch1k_leaf_write", 1, batch_rounds, || {
-            assert_eq!(
-                super::routes::doc_batch_leaf_write(&bytes, 1_000),
-                expected_leaf_write
-            );
-        });
-        probe.output(&expected_leaf_write);
 
-        let expected_leaf = super::routes::doc_leaf_write(&bytes);
-        probe.time_rounds("doc/leaf_write", 1, batch_rounds, || {
-            assert_eq!(super::routes::doc_leaf_write(&bytes), expected_leaf);
-        });
-        probe.output(&expected_leaf);
+        if selected("doc/batch1k_ops") {
+            let file = litchi_ops::open_bytes(bytes.clone()).expect("open");
+            let paragraphs: Vec<String> = (1..=1_000)
+                .map(|index| format!("/body/p[{index}]"))
+                .collect();
+            // The base build retains one complete snapshot per isolated `bold`
+            // step, past the default 256 MiB retention bound: it raises that
+            // bound (`routes::DOC_BATCH_SNAPSHOT_BYTES`) and runs fewer rounds
+            // (`LITCHI_PROBE_BATCH_ROUNDS`, default 7).
+            let limits = SemanticLimits::builder()
+                .max_operations(1_000)
+                .expect("bound")
+                .max_snapshot_bytes(super::routes::DOC_BATCH_SNAPSHOT_BYTES)
+                .expect("bound")
+                .build()
+                .expect("limits");
+            probe.time_rounds("doc/batch1k_ops", 1, batch_rounds, || {
+                let commit = file
+                    .edit_with_options(
+                        litchi_ops::EditOptions::new().semantic_limits(limits),
+                        |tx| {
+                            for path in &paragraphs {
+                                tx.set(path.as_str(), props! { "bold" => true })?;
+                            }
+                            Ok(())
+                        },
+                    )
+                    .expect("edit");
+                black_box(commit.file());
+            });
+        }
+
+        if selected("doc/batch1k_leaf") {
+            let package = litchi_doc::Package::from_bytes(&bytes).expect("package");
+            probe.time_rounds("doc/batch1k_leaf", 1, batch_rounds, || {
+                let options = litchi_doc::EditOptions::default().transaction_limits(
+                    litchi_doc::body_text::TransactionLimits::new(1_000, usize::MAX, usize::MAX),
+                );
+                let mut edit = package.edit_with_options(options).expect("edit");
+                for index in 0..1_000 {
+                    edit.set_paragraph_bold(litchi_core::Position::new(index), true)
+                        .expect("bold");
+                }
+                black_box(edit.commit().expect("commit").into_package());
+            });
+        }
+        if selected("doc/batch1k_leaf_write") {
+            let expected_leaf_write = super::routes::doc_batch_leaf_write(&bytes, 1_000);
+            probe.time_rounds("doc/batch1k_leaf_write", 1, batch_rounds, || {
+                assert_eq!(
+                    super::routes::doc_batch_leaf_write(&bytes, 1_000),
+                    expected_leaf_write
+                );
+            });
+            probe.output(&expected_leaf_write);
+        }
+
+        if selected("doc/leaf_write") {
+            let expected_leaf = super::routes::doc_leaf_write(&bytes);
+            probe.time_rounds("doc/leaf_write", 1, batch_rounds, || {
+                assert_eq!(super::routes::doc_leaf_write(&bytes), expected_leaf);
+            });
+            probe.output(&expected_leaf);
+        }
 
         let bytes = xls(100, 10);
         for (scenario, cells) in [("xls/source_cells1", 1), ("xls/source_cells100", 100)] {
-            let expected = super::routes::xls_source_cells(&bytes, cells, false);
-            probe.time(scenario, 5, || {
-                assert_eq!(
-                    super::routes::xls_source_cells(&bytes, cells, false),
-                    expected
-                );
-            });
-            probe.output(&expected);
-            if super::routes::PLAN_ONLY_ROUTE {
-                let scenario = format!("{scenario}_plan");
-                probe.time(&scenario, 5, || {
-                    assert_eq!(
-                        super::routes::xls_source_cells(&bytes, cells, true),
-                        expected
-                    );
-                });
-                probe.output(&expected);
+            let plan_scenario = format!("{scenario}_plan");
+            if selected(scenario) || (super::routes::PLAN_ONLY_ROUTE && selected(&plan_scenario)) {
+                let expected = super::routes::xls_source_cells(&bytes, cells, false);
+                if selected(scenario) {
+                    probe.time(scenario, 5, || {
+                        assert_eq!(
+                            super::routes::xls_source_cells(&bytes, cells, false),
+                            expected
+                        );
+                    });
+                    probe.output(&expected);
+                }
+                if super::routes::PLAN_ONLY_ROUTE && selected(&plan_scenario) {
+                    probe.time(&plan_scenario, 5, || {
+                        assert_eq!(
+                            super::routes::xls_source_cells(&bytes, cells, true),
+                            expected
+                        );
+                    });
+                    probe.output(&expected);
+                }
             }
         }
 
         let bytes = xls_comments(256);
         for (scenario, count) in [("xls/source_comments1", 1), ("xls/source_comments256", 256)] {
-            let expected = super::routes::xls_source_comments(&bytes, count);
-            probe.time(scenario, 5, || {
-                assert_eq!(super::routes::xls_source_comments(&bytes, count), expected);
+            if selected(scenario) {
+                let expected = super::routes::xls_source_comments(&bytes, count);
+                probe.time(scenario, 5, || {
+                    assert_eq!(super::routes::xls_source_comments(&bytes, count), expected);
+                });
+                probe.output(&expected);
+            }
+        }
+
+        let bytes = xls_sheets(8);
+        if selected("xls/source_hide7") {
+            let expected = super::routes::xls_source_hide(&bytes, 7);
+            probe.time("xls/source_hide7", 5, || {
+                assert_eq!(super::routes::xls_source_hide(&bytes, 7), expected);
             });
             probe.output(&expected);
         }
 
-        let bytes = xls_sheets(8);
-        let expected = super::routes::xls_source_hide(&bytes, 7);
-        probe.time("xls/source_hide7", 5, || {
-            assert_eq!(super::routes::xls_source_hide(&bytes, 7), expected);
-        });
-        probe.output(&expected);
-
         let bytes = rtf(1_000);
-        let document = litchi_rtf::Package::from_bytes(&bytes).expect("document");
-        let expected = super::routes::rtf_source_append(&document, &bytes);
-        probe.time("rtf/source_append", 5, || {
-            assert_eq!(
-                super::routes::rtf_source_append(&document, &bytes),
-                expected
-            );
-        });
-        probe.output(&expected);
+        if selected("rtf/source_append") {
+            let document = litchi_rtf::Package::from_bytes(&bytes).expect("document");
+            let expected = super::routes::rtf_source_append(&document, &bytes);
+            probe.time("rtf/source_append", 5, || {
+                assert_eq!(
+                    super::routes::rtf_source_append(&document, &bytes),
+                    expected
+                );
+            });
+            probe.output(&expected);
+        }
 
         println!(
             "{}",
