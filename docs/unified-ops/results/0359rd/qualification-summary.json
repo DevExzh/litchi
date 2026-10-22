@@ -1,0 +1,63 @@
+{
+  "record": "0359rd",
+  "status": "candidate-unaccepted-native-open",
+  "source_commit": "68f976eb00",
+  "probe_sha256": "9d9e91c639e47ccc94f154464f6f97a0dc0002a3b2fb37251f61b17bf71cdb22",
+  "binaries": {
+    "original": {
+      "sha256": "4693bd12232d92a61ef2f437de2d623e345a106288d5d0a5c5638cf27677420",
+      "role": "pre-api-0359b-baseline"
+    },
+    "current": {
+      "sha256": "b9fccd840476aac1beaa35cb5e14d5410f6272493dab33e361d83fb4d9aed8aa",
+      "role": "pre-68-diagnostic"
+    },
+    "candidate": {
+      "sha256": "126db1632fe150eae900782a98906933dec9aa3945542a0e1a99d22ae4758157",
+      "role": "68-fast-path-candidate"
+    }
+  },
+  "heaptrack": {
+    "wrapper_sha256": "72423f5068dcfd8f02d395668fc8d08c1e3b7e98861c5785eb741e3e5c5a27ec",
+    "original_candidate_order": ["original", "candidate", "candidate", "original"],
+    "current_candidate_order": ["current", "candidate", "candidate", "current"],
+    "original": {
+      "allocations": [177971, 177971],
+      "temporary": [1258, 1258],
+      "peak_heap": [3570000, 3570000],
+      "leaked": [544, 544]
+    },
+    "current": {
+      "allocations": [188171, 188171],
+      "temporary": [1254, 1254],
+      "peak_heap": [3570000, 3570000],
+      "leaked": [544, 544]
+    },
+    "candidate": {
+      "allocations": [188171, 188171],
+      "temporary": [1254, 1254],
+      "peak_heap": [3570000, 3570000],
+      "leaked": [544, 544]
+    },
+    "candidate_minus_original_allocations": 10200,
+    "candidate_only_edge": "litchi_rtf::api::facade::Package::apply",
+    "host_contaminated": true,
+    "rejection_reason": "active cargo/rustc/clippy processes"
+  },
+  "native": {
+    "blocks": 5,
+    "order": "baseline,candidate,candidate,baseline",
+    "cpu": 7,
+    "memory_max": "20G",
+    "clean_window_timeout_seconds": 180,
+    "accepted": false,
+    "rejection_reason": "clean_window_timeout",
+    "first_receipt": "native-qual-20261022/block-01-01-baseline.json"
+  },
+  "external_heap_files": [
+    {"name": "heap-01-baseline.zst", "size": 18775, "sha256": "92cf0aab23b343984847bf74aa781daf2038ac3485ddaa1b5c7368ee3cce4ab0"},
+    {"name": "heap-02-candidate.zst", "size": 18753, "sha256": "d8b6f0517ec6a1d58e5d4469905cce1e04c6681d40689ffed80fa15147345cea"},
+    {"name": "heap-03-candidate.zst", "size": 18726, "sha256": "3aae1a640bcd2f1df1d303e700d5e3fd78dd258fb271b7c181b41cff6abcedbe"},
+    {"name": "heap-04-baseline.zst", "size": 18730, "sha256": "397b9901e88cadfae92fd4c441a766b6ceba8eb1d1461bcffac778f22a966001"}
+  ]
+}
