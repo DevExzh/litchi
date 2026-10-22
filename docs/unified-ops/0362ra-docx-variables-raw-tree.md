@@ -47,6 +47,15 @@ and value characters are distinct observations. Invalid policy construction
 is still a request error, while allocation failures retain their allocator
 source.
 
+`Tree` retains a private summary of the admitted collection limits. A repeated
+`set` under the same or a looser count/name/value policy validates only the new
+entry; a genuinely tighter policy performs one full collection check before
+the mutation. The `repeated_sets_reuse_an_admitted_collection_policy` test
+stages 1,000 replacements in a 1,000-variable tree and observes zero full
+collection validations, then observes one validation for a tighter value
+policy. `to_bytes` still rechecks the complete collection, source depth, and
+source XML bytes for every caller policy, including an unchanged tree.
+
 ## Validation
 
 Commands were run from `/home/zhuhe/code/litchi-worktrees/uo2-w8-docx-variables`
@@ -61,7 +70,7 @@ cargo test --offline --locked -p litchi-docx \
 cargo clippy --offline --locked -p litchi-docx --all-targets --all-features -- -D warnings
 ```
 
-The final variables run passed 16 tests. The retained source-backed run passed
+The final variables run passed 17 tests. The retained source-backed run passed
 18 + 9 + 6 tests. The final all-target/all-feature Clippy run finished with
 `Finished dev profile` and no diagnostics. The first all-target attempt is
 retained because it caught the now-migrated integration consumer that called

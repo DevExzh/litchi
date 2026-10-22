@@ -6,6 +6,24 @@ use crate::{Error, Result};
 
 use super::raw::Limits;
 
+#[cfg(test)]
+use std::cell::Cell;
+
+#[cfg(test)]
+thread_local! {
+    static VALIDATION_COUNT: Cell<usize> = const { Cell::new(0) };
+}
+
+#[cfg(test)]
+pub(crate) fn reset_validation_count() {
+    VALIDATION_COUNT.with(|count| count.set(0));
+}
+
+#[cfg(test)]
+pub(crate) fn validation_count() -> usize {
+    VALIDATION_COUNT.with(Cell::get)
+}
+
 /// Maximum number of document variables accepted by the bounded codec.
 pub const MAX_DOCUMENT_VARIABLES: usize = 4096;
 /// Maximum XML input accepted by the bounded document-variable codec.
@@ -145,6 +163,8 @@ impl Variables {
     }
 
     pub(crate) fn validate_with_limits(&self, limits: &Limits) -> Result<()> {
+        #[cfg(test)]
+        VALIDATION_COUNT.with(|count| count.set(count.get().saturating_add(1)));
         if self.variables.len() > limits.max_variables() {
             return Err(limit_error(
                 crate::settings::LimitKind::DocumentVariableCount,

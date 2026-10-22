@@ -117,6 +117,35 @@ pub struct Tree {
     source_depth: usize,
     base: Variables,
     variables: Variables,
+    admitted_variables: VariableLimits,
+    base_variables: VariableLimits,
+}
+
+/// The part of a raw policy which can invalidate an already admitted typed
+/// collection. XML size and source depth are checked at output; collection
+/// limits can be retained independently so repeated staging does not rescan
+/// the whole collection for every set.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct VariableLimits {
+    max_variables: usize,
+    max_name_chars: usize,
+    max_value_chars: usize,
+}
+
+impl VariableLimits {
+    const fn from_limits(limits: Limits) -> Self {
+        Self {
+            max_variables: limits.max_variables,
+            max_name_chars: limits.max_name_chars,
+            max_value_chars: limits.max_value_chars,
+        }
+    }
+
+    const fn allows(self, limits: Limits) -> bool {
+        limits.max_variables >= self.max_variables
+            && limits.max_name_chars >= self.max_name_chars
+            && limits.max_value_chars >= self.max_value_chars
+    }
 }
 
 impl Tree {
@@ -133,6 +162,8 @@ impl Tree {
             source_depth,
             base,
             variables,
+            admitted_variables: VariableLimits::from_limits(limits),
+            base_variables: VariableLimits::from_limits(limits),
         })
     }
 
@@ -155,8 +186,10 @@ impl Tree {
         value: impl Into<String>,
         limits: Limits,
     ) -> Result<Option<String>> {
-        self.variables.validate_with_limits(&limits)?;
-        self.variables.insert_with_limits(name, value, &limits)
+        self.validate_variables_if_tighter(limits)?;
+        let previous = self.variables.insert_with_limits(name, value, &limits)?;
+        self.admitted_variables = VariableLimits::from_limits(limits);
+        Ok(previous)
     }
 
     /// Remove one variable without serializing the whole settings XML.
@@ -173,6 +206,7 @@ impl Tree {
     pub fn replace(&mut self, variables: Variables, limits: Limits) -> Result<()> {
         variables.validate_with_limits(&limits)?;
         self.variables = variables;
+        self.admitted_variables = VariableLimits::from_limits(limits);
         Ok(())
     }
 
@@ -182,11 +216,12 @@ impl Tree {
         limits: Limits,
         edit: impl FnOnce(&mut Variables) -> Result<()>,
     ) -> Result<()> {
-        self.variables.validate_with_limits(&limits)?;
+        self.validate_variables_if_tighter(limits)?;
         let mut candidate = self.variables.try_clone()?;
         edit(&mut candidate)?;
         candidate.validate_with_limits(&limits)?;
         self.variables = candidate;
+        self.admitted_variables = VariableLimits::from_limits(limits);
         Ok(())
     }
 
@@ -224,6 +259,14 @@ impl Tree {
     /// Discard staged values and restore the admitted source model.
     pub fn reset(&mut self) {
         self.variables = self.base.clone();
+        self.admitted_variables = self.base_variables;
+    }
+
+    fn validate_variables_if_tighter(&self, limits: Limits) -> Result<()> {
+        if !self.admitted_variables.allows(limits) {
+            self.variables.validate_with_limits(&limits)?;
+        }
+        Ok(())
     }
 }
 
@@ -315,5 +358,33 @@ mod tests {
                 ..
             })
         ));
+    }
+
+    #[test]
+    fn repeated_sets_reuse_an_admitted_collection_policy() {
+        let policy = Limits::new(8 * 1024 * 1024, 64, 1_200, 32, 128).unwrap();
+        let mut variables = Variables::new();
+        for index in 0..1_000 {
+            variables.insert(format!("name-{index}"), "value").unwrap();
+        }
+        let source = format!(
+            r#"<w:settings xmlns:w="{W}">{}</w:settings>"#,
+            variables.to_xml(&policy).unwrap()
+        );
+        let mut tree = Tree::from_xml(source.into_bytes(), policy).unwrap();
+
+        crate::variables::model::reset_validation_count();
+        for _ in 0..1_000 {
+            tree.set("name-0", "updated", policy).unwrap();
+        }
+        assert_eq!(crate::variables::model::validation_count(), 0);
+
+        let looser = Limits::new(8 * 1024 * 1024, 64, 2_000, 64, 256).unwrap();
+        tree.set("name-0", "looser", looser).unwrap();
+        assert_eq!(crate::variables::model::validation_count(), 0);
+
+        let tighter = Limits::new(8 * 1024 * 1024, 64, 1_200, 32, 3).unwrap();
+        assert!(tree.set("name-0", "tight", tighter).is_err());
+        assert_eq!(crate::variables::model::validation_count(), 1);
     }
 }
