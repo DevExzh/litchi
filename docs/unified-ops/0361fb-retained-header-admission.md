@@ -40,3 +40,16 @@ The protected v4 constructor binaries and interrupted timing attempts in
 fresh matched build and retained-header fidelity/allocation routes before
 native qualification. No performance exception, merge acceptance or push is
 recorded here.
+
+## Matched qualification harness
+
+The versioned scripts in `results/0361fb/` retain the nine constructor/archive
+routes and add six retained-header routes: parsing, ordinary validation,
+encoded length, publication, and validation/publication at the exact field
+ceiling. Their common fixture appends 64 unknown fields with a noncanonical
+varint spelling to an eight-message archive. Four binary preflights must
+agree on eight output files, including exact retained source/output bytes.
+The baseline and candidate compile the same probe; only constructor-signature
+adapters differ. The earlier 0361f scripts remain unchanged so their historical
+artifact hashes can still be verified. New build and measurement receipts
+will be attached after execution; adding the harness does not qualify latency.
