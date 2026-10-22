@@ -56,6 +56,18 @@ type name, without changing runtime behavior.
 receipt. The harness group was not reached; consumer and semantic validation
 remain pending.
 
+## ODT durable replay error conversion
+
+The fifth check ran on `7e2dacd743`, passed the DOCX library, and reached
+ODT. Two return expressions in durable replay still returned the common-core
+error after the function moved to the ODF family error. The correction uses
+the existing `PackageError::from` conversion for restored ingress and wraps
+the unchanged invalid-target cause. It preserves the recipient XML limits,
+typed limit conversion, and separate stale-base `PatchConflict` path.
+
+[consumer-v5.json](results/0362uf/consumer-v5.json) preserves the failure
+receipt. The harness and affected semantic checks remain pending.
+
 ## Graph memo cleanup
 
 The fourth check ran on `d797add634` after integrating the reviewed external

@@ -5098,7 +5098,8 @@ fn apply_durable_patch<Mode>(patch: &CorePatch<Mode>, source: &Package) -> Famil
     }
     validate_patch_direction(patch)?;
     if let Some(bytes) = restore_target_bytes(patch)? {
-        return Package::from_vec_with_xml_limits(copy_bytes(bytes)?, source.xml_limits_value());
+        return Package::from_vec_with_xml_limits(copy_bytes(bytes)?, source.xml_limits_value())
+            .map_err(PackageError::from);
     }
     let mut operations = Vec::new();
     operations
@@ -5122,7 +5123,8 @@ fn apply_durable_patch<Mode>(patch: &CorePatch<Mode>, source: &Package) -> Famil
     if BlobId::of(committed.package().as_bytes()).as_hex() != lineage.target_id {
         return Err(CoreError::InvalidFormat(
             "ODT semantic patch replay produced an unexpected target".to_string(),
-        ));
+        )
+        .into());
     }
     Ok(committed.into_package())
 }
