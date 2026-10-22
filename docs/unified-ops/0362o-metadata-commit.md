@@ -1,4 +1,4 @@
-# 0362n — DOCX/PPTX metadata commit triad
+# 0362o — DOCX/PPTX metadata commit triad
 
 This slice migrates the eager DOCX and PPTX metadata families to the shared
 commit shape. It is source work only; no performance qualification is claimed.
@@ -47,10 +47,36 @@ an external log before this record was written. No binary, raw capture or
 large evidence file is part of the commit. The worktree target was 1.8 GiB
 and is untracked build output.
 
-## Integration dependency
+## Coordinator integration
 
-The W4 shared-properties scope/no-op repair is intentionally not included in
-`2eca82b0f8`. Coordinator integration must apply the reviewed dependency
-`eade92f7188d463089958699faf37c728b8a13e0` (and its validated ancestry) and
-rerun the no-op scope, multi-family composition and metadata tests. Until that
-integration rerun, this record does not claim final no-op scope qualification.
+The coordinator assembled the six shared-properties repairs listed in the
+[receipt](results/0362o/validation.json) over `51c7fbb1b5`. The repaired scope
+code matches `9f9fa3930a` exactly after preserving the 91 lines of W4b deferred
+snapshot helpers already present in the assembly. The XLSX adapter and
+transaction tests match that worker revision exactly.
+
+This closes the correctness return in 0360ab: no-op scopes authenticate the
+recorded property state, compatible complete/partial scopes compose, and
+creation/removal inverses work with independently captured no-ops. Supplemental
+absence guards cannot hide the actual creation relationship ID or the
+removal's inbound-relationship preconditions. All 17 shared transaction tests
+pass, including those regression cases and eager/source-backed refusal checks.
+
+Fresh retained integration validation passes:
+
+- common OOXML library: 472 tests;
+- XLSX metadata filter: 51 tests;
+- DOCX metadata/core-properties/signature policy: 42 + 2 + 9 tests;
+- PPTX metadata/families/signature policy: 120 + 6 + 10 tests;
+- all-target/all-feature Clippy for common OOXML, XLSX, DOCX, PPTX and ops;
+- workspace formatting.
+
+The receipt records every command, exit status, elapsed time and external log
+size/SHA-256, plus source hashes and the retained W4b helper proof. Commands use
+the coordinator's 20 GiB capped environment, one Cargo job and four test threads.
+The earlier worker-terminal results above remain separate from this fresh run.
+
+The record is renamed from 0362n to 0362o to avoid the ODF raw audit's reserved
+number. This is a committed integration candidate, not performance acceptance
+or a completed final workspace gate. Native performance qualification and
+remaining integrations are still required before trunk acceptance.

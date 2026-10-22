@@ -2898,6 +2898,10 @@
   {
    "record": "0360d",
    "reason": "Integration correctness, typed error preservation and command-log verification only; no new performance measurement or acceptance."
+  },
+  {
+   "record": "0362o",
+   "reason": "DOCX/PPTX metadata Commit and common scope integration validation; retained commands and source parity contain no paired performance measurement."
   }
  ]
 }

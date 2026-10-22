@@ -204,13 +204,20 @@ impl Package {
     /// before state and [`Error::Signed`] for a changed patch of a signed
     /// workbook.
     pub fn apply_metadata(&self, patch: &Patch) -> Result<Commit> {
-        let package = if patch.is_noop() {
-            self.clone()
-        } else {
-            let mut candidate = self.opc().clone();
-            patch.apply(&mut candidate)?;
-            self.adopt_metadata(candidate)?
-        };
+        if patch.is_noop() {
+            // An exact no-op still authenticates every recorded property
+            // family, but it must not clone the complete OPC graph merely to
+            // discover that no bytes will change.
+            patch.check(self.opc())?;
+            return Ok(Commit {
+                package: self.clone(),
+                patch: patch.clone(),
+                diagnostics: patch.diagnostics(),
+            });
+        }
+        let mut candidate = self.opc().clone();
+        patch.apply(&mut candidate)?;
+        let package = self.adopt_metadata(candidate)?;
         Ok(Commit {
             package,
             patch: patch.clone(),
@@ -270,5 +277,29 @@ mod tests {
         assert!(!commit.diagnostics().changed());
         assert!(commit.patch().is_noop());
         assert!(commit.package().same_content(&package).unwrap());
+    }
+
+    #[test]
+    fn no_op_patch_replay_still_requires_its_recorded_property_scope() {
+        let source = Package::new().unwrap();
+        let mut edit = source.edit_metadata().unwrap();
+        edit.set(source.metadata().unwrap());
+        let no_op = edit.commit().unwrap();
+        assert!(no_op.patch().is_noop());
+
+        let mut other_edit = source.edit_metadata().unwrap();
+        other_edit
+            .update(|metadata| metadata.title = Some("Different owner".to_owned()))
+            .unwrap();
+        let other = other_edit.commit().unwrap().into_package();
+
+        let error = other
+            .apply_metadata(no_op.patch())
+            .expect_err("a no-op patch must authenticate its recorded base");
+        assert!(matches!(error, Error::Conflict(_)), "{error:?}");
+
+        let replayed = source.apply_metadata(no_op.patch()).unwrap();
+        assert!(replayed.patch().is_noop());
+        assert!(replayed.package().same_content(&source).unwrap());
     }
 }

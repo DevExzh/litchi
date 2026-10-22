@@ -7,7 +7,7 @@
 use litchi_core::metadata::{Field, Metadata, Timestamp};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::part::BlobPart;
-use litchi_opc::{OpcPackage, PackURI};
+use litchi_opc::{OpcPackage, PackURI, TargetMode};
 
 use super::{Core, Edit, Error, Family, Keywords, Snapshot, app, write_core};
 use crate::custom::{self, Host, Value};
@@ -185,6 +185,334 @@ fn equal_values_commit_nothing_even_on_a_signed_package() {
         .unwrap();
     let (_, patch, _) = plan.finish().unwrap();
     assert!(matches!(patch.apply(&mut package), Err(Error::Signed)));
+}
+
+#[test]
+fn an_exact_no_op_patch_rejects_a_different_property_owner() {
+    let source = full();
+    let snapshot = Snapshot::read(&source, Host::Word).unwrap();
+    let (_, no_op, diagnostics) = snapshot.plan().finish().unwrap();
+    assert!(!diagnostics.changed());
+    assert!(no_op.is_noop());
+
+    let mut changed_plan = snapshot.plan();
+    changed_plan
+        .update_metadata(|metadata| metadata.title = Some("Different".into()))
+        .unwrap();
+    let (_, changed, diagnostics) = changed_plan.finish().unwrap();
+    assert!(diagnostics.changed());
+    let mut different = source.clone();
+    changed.apply(&mut different).unwrap();
+    assert!(matches!(
+        no_op.apply(&mut different),
+        Err(Error::Conflict(_))
+    ));
+
+    let mut exact = source.clone();
+    assert!(!no_op.apply(&mut exact).unwrap());
+}
+
+#[test]
+fn composed_no_op_scopes_are_checked_instead_of_dropped() {
+    let source = full();
+    let snapshot = Snapshot::read(&source, Host::Word).unwrap();
+    let (_, no_op, _) = snapshot.plan().finish().unwrap();
+    let (changed_state, changed) = edited(&snapshot, "Changed");
+    let (_, changed_no_op, _) = changed_state.plan().finish().unwrap();
+
+    // A generated no-op authenticates all three property families. The
+    // composed changed patch retains that complete before scope instead of
+    // reducing authentication to the changed family.
+    let no_op_then_changed = no_op.compose(&changed).unwrap();
+    let mut direct = source.clone();
+    no_op_then_changed.apply(&mut direct).unwrap();
+    let mut sequential = source.clone();
+    changed.apply(&mut sequential).unwrap();
+    assert_eq!(
+        bytes(&direct, "/docProps/core.xml"),
+        bytes(&sequential, "/docProps/core.xml")
+    );
+
+    let changed_then_no_op = changed.compose(&changed_no_op).unwrap();
+    let mut direct = source.clone();
+    changed_then_no_op.apply(&mut direct).unwrap();
+    assert_eq!(
+        bytes(&direct, "/docProps/core.xml"),
+        bytes(&sequential, "/docProps/core.xml")
+    );
+
+    // The untouched application family remains authenticated by the
+    // composed scope.
+    let mut app_plan = snapshot.plan();
+    app_plan.set_app_props(Some(app::Props {
+        company: Some("Other".into()),
+        ..app::Props::default()
+    }));
+    let (_app_state, app_patch, _) = app_plan.finish().unwrap();
+    let mut different = source.clone();
+    app_patch.apply(&mut different).unwrap();
+    assert!(matches!(
+        no_op_then_changed.apply(&mut different),
+        Err(Error::Conflict(_))
+    ));
+
+    // The same exact owner remains composable, while a different property
+    // state is rejected even though both patches are semantic no-ops.
+    assert!(no_op.compose(&no_op).unwrap().is_noop());
+    assert!(matches!(
+        no_op.compose(&changed_no_op),
+        Err(Error::Conflict(_))
+    ));
+
+    // The inverse composition of a changed patch has no complete scope, so
+    // it retains the affected before image and remains an authenticated
+    // no-op on the original owner only.
+    let round_trip = changed.compose(&changed.inverse()).unwrap();
+    let mut exact = source.clone();
+    assert!(!round_trip.apply(&mut exact).unwrap());
+    let mut after = source.clone();
+    changed.apply(&mut after).unwrap();
+    assert!(matches!(
+        round_trip.apply(&mut after),
+        Err(Error::Conflict(_))
+    ));
+
+    // A partial cancellation scope remains useful when followed by a
+    // disjoint changed family. Both the retained core guard and the app
+    // before image must survive composition.
+    let mut app_plan = snapshot.plan();
+    app_plan.set_app_props(Some(app::Props {
+        company: Some("Other".into()),
+        ..app::Props::default()
+    }));
+    let (_, app_patch, _) = app_plan.finish().unwrap();
+    let disjoint = round_trip.compose(&app_patch).unwrap();
+    let mut composed = source.clone();
+    disjoint.apply(&mut composed).unwrap();
+    let mut expected = source.clone();
+    app_patch.apply(&mut expected).unwrap();
+    assert_eq!(
+        bytes(&composed, "/docProps/app.xml"),
+        bytes(&expected, "/docProps/app.xml")
+    );
+    let mut wrong = source.clone();
+    changed.apply(&mut wrong).unwrap();
+    assert!(matches!(
+        disjoint.apply(&mut wrong),
+        Err(Error::Conflict(_))
+    ));
+}
+
+#[test]
+fn composed_no_op_scope_authenticates_absent_property_families() {
+    let empty = OpcPackage::new();
+    let snapshot = Snapshot::read(&empty, Host::Excel).unwrap();
+    let (_, no_op, _) = snapshot.plan().finish().unwrap();
+    assert!(no_op.compose(&no_op).unwrap().is_noop());
+    let mut exact = empty.clone();
+    assert!(!no_op.apply(&mut exact).unwrap());
+
+    let (changed_state, changed) = edited(&snapshot, "Created");
+    let (_, changed_no_op, _) = changed_state.plan().finish().unwrap();
+    let composed = no_op.compose(&changed).unwrap();
+    let mut composed_package = empty.clone();
+    composed.apply(&mut composed_package).unwrap();
+    let mut expected = empty.clone();
+    changed.apply(&mut expected).unwrap();
+    assert_eq!(
+        bytes(&composed_package, "/docProps/core.xml"),
+        bytes(&expected, "/docProps/core.xml")
+    );
+    // The untouched absent families keep distinct synthetic IDs. The
+    // inverse therefore accepts the created core relationship while still
+    // proving that the app and custom IDs are free.
+    assert!(composed.inverse().apply(&mut composed_package).unwrap());
+    assert_eq!(composed_package.iter_parts().count(), 0);
+
+    // The same wildcard absence guard composes with an application-only or
+    // custom-only creation, whichever free relationship ID the plan chooses.
+    let mut app_plan = snapshot.plan();
+    app_plan.set_app_props(Some(app::Props {
+        company: Some("Litchi".into()),
+        ..app::Props::default()
+    }));
+    let (_, app_creation, _) = app_plan.finish().unwrap();
+    let app_composed = no_op.compose(&app_creation).unwrap();
+    let mut app_package = empty.clone();
+    app_composed.apply(&mut app_package).unwrap();
+    app_composed.inverse().apply(&mut app_package).unwrap();
+    assert_eq!(app_package.iter_parts().count(), 0);
+
+    let mut custom_plan = snapshot.plan();
+    let mut custom_props = custom::Props::new();
+    custom_props.insert("Created", "yes").unwrap();
+    custom_plan.set_custom_props(custom_props);
+    let (_, custom_creation, _) = custom_plan.finish().unwrap();
+    let custom_composed = no_op.compose(&custom_creation).unwrap();
+    let mut custom_package = empty.clone();
+    custom_composed.apply(&mut custom_package).unwrap();
+    custom_composed
+        .inverse()
+        .apply(&mut custom_package)
+        .unwrap();
+    assert_eq!(custom_package.iter_parts().count(), 0);
+
+    // A creation followed by an independently captured exact-after no-op
+    // keeps its creation relationship and still composes to one patch.
+    let mut created = empty.clone();
+    changed.apply(&mut created).unwrap();
+    let after_snapshot = Snapshot::read(&created, Host::Excel).unwrap();
+    let (_, after_no_op, _) = after_snapshot.plan().finish().unwrap();
+    let creation_then_no_op = changed.compose(&after_no_op).unwrap();
+    let mut recreated = empty.clone();
+    creation_then_no_op.apply(&mut recreated).unwrap();
+    creation_then_no_op.inverse().apply(&mut recreated).unwrap();
+    assert_eq!(recreated.iter_parts().count(), 0);
+    assert!(matches!(
+        no_op.compose(&changed_no_op),
+        Err(Error::Conflict(_))
+    ));
+}
+
+#[test]
+fn composed_creation_authenticates_its_actual_relationship_id() {
+    let empty = OpcPackage::new();
+    let snapshot = Snapshot::read(&empty, Host::Excel).unwrap();
+    let (_, no_op, _) = snapshot.plan().finish().unwrap();
+    let (_, creation) = edited(&snapshot, "Created");
+    let composed = no_op.compose(&creation).unwrap();
+
+    // The no-op's absent-family scope uses wildcard relationship IDs. The
+    // creation itself still has to reject a recipient that occupied the
+    // concrete ID selected by its after package.
+    let mut occupied = empty.clone();
+    occupied.add_part(Box::new(BlobPart::new(
+        PackURI::new("/dummy.xml").unwrap(),
+        "application/xml".to_owned(),
+        b"<dummy/>".to_vec(),
+    )));
+    occupied
+        .rels_mut()
+        .try_add_relationship(
+            "urn:litchi:test".to_owned(),
+            "dummy.xml".to_owned(),
+            "rId1".to_owned(),
+            TargetMode::Internal,
+        )
+        .unwrap();
+    assert!(matches!(
+        composed.apply(&mut occupied),
+        Err(Error::Conflict(_))
+    ));
+
+    let occupied_source = source_backed(&occupied);
+    assert!(matches!(
+        composed.prepare_source_backed(&occupied_source),
+        Err(Error::Conflict(_))
+    ));
+}
+
+#[test]
+fn removal_composes_only_with_a_no_op_from_its_exact_after_graph() {
+    let source = full();
+    let snapshot = Snapshot::read(&source, Host::Word).unwrap();
+    let mut remove_plan = snapshot.plan();
+    remove_plan.set_custom_props(custom::Props::new());
+    let (_, removal, _) = remove_plan.finish().unwrap();
+
+    let mut removed = source.clone();
+    assert!(removal.apply(&mut removed).unwrap());
+    let removed_snapshot = Snapshot::read(&removed, Host::Word).unwrap();
+    let (_, exact_no_op, _) = removed_snapshot.plan().finish().unwrap();
+    let composed = removal.compose(&exact_no_op).unwrap();
+    let mut round_trip = source.clone();
+    assert!(composed.apply(&mut round_trip).unwrap());
+    assert!(composed.inverse().apply(&mut round_trip).unwrap());
+    assert_eq!(
+        bytes(&round_trip, "/docProps/custom.xml"),
+        bytes(&source, "/docProps/custom.xml")
+    );
+
+    // A separately captured no-op may choose a different free ID because an
+    // unrelated relationship occupies the old gap. That phantom ID is not
+    // part of the property state, so the valid composition must remain
+    // supported.
+    let removed_custom_id = source
+        .rels()
+        .iter()
+        .find(|relationship| relationship.reltype() == rt::CUSTOM_PROPERTIES)
+        .unwrap()
+        .r_id()
+        .to_owned();
+    let mut unrelated = removed.clone();
+    unrelated.add_part(Box::new(BlobPart::new(
+        PackURI::new("/dummy.xml").unwrap(),
+        "application/octet-stream".to_owned(),
+        Vec::new(),
+    )));
+    unrelated
+        .rels_mut()
+        .try_add_relationship(
+            "urn:litchi:test".to_owned(),
+            "dummy.xml".to_owned(),
+            removed_custom_id,
+            TargetMode::Internal,
+        )
+        .unwrap();
+    let unrelated_snapshot = Snapshot::read(&unrelated, Host::Word).unwrap();
+    let (_, different_no_op, _) = unrelated_snapshot.plan().finish().unwrap();
+    let composed_with_different_gap = removal.compose(&different_no_op).unwrap();
+    let mut different_gap_result = source.clone();
+    composed_with_different_gap
+        .apply(&mut different_gap_result)
+        .unwrap();
+    composed_with_different_gap
+        .inverse()
+        .apply(&mut different_gap_result)
+        .unwrap();
+    assert_eq!(
+        bytes(&different_gap_result, "/docProps/custom.xml"),
+        bytes(&source, "/docProps/custom.xml")
+    );
+}
+
+#[test]
+fn composed_removal_authenticates_all_inbound_relationships() {
+    let source = full();
+    let snapshot = Snapshot::read(&source, Host::Word).unwrap();
+    let mut remove_plan = snapshot.plan();
+    remove_plan.set_custom_props(custom::Props::new());
+    let (_, removal, _) = remove_plan.finish().unwrap();
+
+    let mut removed = source.clone();
+    removal.apply(&mut removed).unwrap();
+    let removed_snapshot = Snapshot::read(&removed, Host::Word).unwrap();
+    let (_, exact_no_op, _) = removed_snapshot.plan().finish().unwrap();
+    let composed = removal.compose(&exact_no_op).unwrap();
+
+    // The supplemental state scope authenticates the custom part itself, but
+    // the actual removal must still prove that no relationship besides the
+    // recorded owner targets it.
+    let mut extra_inbound = source.clone();
+    extra_inbound
+        .rels_mut()
+        .try_add_relationship(
+            "urn:litchi:test".to_owned(),
+            "docProps/custom.xml".to_owned(),
+            "rIdExtra".to_owned(),
+            TargetMode::Internal,
+        )
+        .unwrap();
+    assert!(matches!(
+        composed.apply(&mut extra_inbound),
+        Err(Error::Package(crate::Error::Relationship(_)))
+    ));
+
+    let extra_source = source_backed(&extra_inbound);
+    assert!(matches!(
+        composed.prepare_source_backed(&extra_source),
+        Err(Error::Package(crate::Error::Relationship(_)))
+    ));
 }
 
 #[test]

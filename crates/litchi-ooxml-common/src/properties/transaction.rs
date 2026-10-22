@@ -623,6 +623,63 @@ fn family_state<P: PackageMetadata>(
     })
 }
 
+/// Capture the complete document-properties graph for an exact no-op patch.
+///
+/// Changed patches carry before bytes only for the families they replace.
+/// An empty patch has no changed family to authenticate, so it records every
+/// property family instead. The synthetic relationship ID for an absent
+/// family is chosen from the source's free IDs; `check_change` then verifies
+/// that it remains free on the recipient.
+fn snapshot_scope(snapshot: &Snapshot) -> Result<Box<[Change]>> {
+    let mut relationship_ids = snapshot.relationship_ids.clone();
+    [Family::Core, Family::App, Family::Custom]
+        .into_iter()
+        .map(|family| {
+            let state = snapshot.family(family);
+            let (relationship_id, part, relationship_type, relationship_target, before, after) =
+                match &state.present {
+                    Some(present) => (
+                        present.relationship_id.clone(),
+                        present.part.clone(),
+                        present.relationship_type.clone(),
+                        present.relationship_target.clone(),
+                        Some(Arc::clone(&present.bytes)),
+                        Some(Arc::clone(&present.bytes)),
+                    ),
+                    None => (
+                        // Each absent family needs its own synthetic free ID.
+                        // Reusing the first free ID for every absent family
+                        // makes a later creation occupy the ID still used by
+                        // another absent-family guard in the inverse scope.
+                        next_relationship_id(&relationship_ids)?,
+                        state.new_part.clone(),
+                        match family {
+                            Family::Core => rt::CORE_PROPERTIES.to_owned(),
+                            Family::App => rt::EXTENDED_PROPERTIES.to_owned(),
+                            Family::Custom => rt::CUSTOM_PROPERTIES.to_owned(),
+                        },
+                        state.new_part.as_str().trim_start_matches('/').to_owned(),
+                        None,
+                        None,
+                    ),
+                };
+            if state.present.is_none() {
+                relationship_ids.insert(relationship_id.clone());
+            }
+            Ok(Change {
+                family,
+                part,
+                relationship_id,
+                relationship_type,
+                relationship_target,
+                before,
+                after,
+                free_relationship_id: state.present.is_none(),
+            })
+        })
+        .collect()
+}
+
 /// A detached plan of a change of a [`Snapshot`]'s document properties.
 ///
 /// A plan stages like an [`Edit`] but holds no package: [`Plan::finish`]
@@ -865,10 +922,21 @@ impl Plan {
         if changes.is_empty() {
             changed_fields.clear();
         }
+        // An empty patch still has to authenticate the package it came from.
+        // Keep the complete document-properties scope separate from the
+        // changed-family list so `is_noop()` and diagnostics remain truthful
+        // while replay can reject an equal-looking patch on another owner.
+        let scope = if changes.is_empty() {
+            Some(snapshot_scope(&base)?)
+        } else {
+            None
+        };
         Ok((
             after,
             Patch {
                 changes: changes.into_boxed_slice(),
+                after_scope: scope.clone(),
+                scope,
             },
             Diagnostics {
                 families,
@@ -1032,6 +1100,7 @@ fn stage_change(
                 relationship_target: present.relationship_target,
                 before: Some(present.bytes),
                 after: None,
+                free_relationship_id: false,
             }
         },
         (Some(present), false, Some(bytes)) => {
@@ -1051,6 +1120,7 @@ fn stage_change(
                 relationship_target: present.relationship_target,
                 before: Some(present.bytes),
                 after: Some(bytes),
+                free_relationship_id: false,
             }
         },
         (None, false, Some(bytes)) => {
@@ -1073,6 +1143,7 @@ fn stage_change(
                 relationship_target: present.relationship_target.clone(),
                 before: None,
                 after: Some(bytes),
+                free_relationship_id: false,
             };
             let slot = after.family_mut(family);
             slot.present = Some(present);
@@ -1146,6 +1217,10 @@ pub struct Change {
     relationship_target: String,
     before: Option<Arc<Vec<u8>>>,
     after: Option<Arc<Vec<u8>>>,
+    /// An absent family has no meaningful relationship ID. Snapshot scopes
+    /// retain a free placeholder for diagnostics, but replay accepts any
+    /// free ID because a later creation may choose a different gap.
+    free_relationship_id: bool,
 }
 
 impl Change {
@@ -1187,6 +1262,15 @@ impl Change {
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Patch {
     changes: Box<[Change]>,
+    /// The recorded before state for an exact no-op. Changed patches already
+    /// carry their before state in `changes`; an empty patch needs the full
+    /// property-family scope or it could be replayed onto any package.
+    scope: Option<Box<[Change]>>,
+    /// The recorded after state for a patch whose before state carries a
+    /// complete property-family scope. This is present for exact no-ops and
+    /// for compositions that retain a complete scope while changing one or
+    /// more families, so their inverse authenticates the published state too.
+    after_scope: Option<Box<[Change]>>,
 }
 
 impl Patch {
@@ -1207,7 +1291,13 @@ impl Patch {
     pub fn inverse(&self) -> Self {
         Self {
             changes: self.changes.iter().map(Change::inverse).collect(),
+            scope: self.after_scope.clone().or_else(|| self.scope.clone()),
+            after_scope: self.scope.clone().or_else(|| self.after_scope.clone()),
         }
+    }
+
+    fn check_changes(&self) -> &[Change] {
+        self.scope.as_deref().unwrap_or(&self.changes)
     }
 
     /// What replaying this patch changes: its families, in [`Family`]
@@ -1222,7 +1312,7 @@ impl Patch {
     }
 
     /// Check that an owning package is in this patch's before state: each
-    /// family's graph selects exactly the recorded part through the
+    /// recorded family's graph selects exactly the recorded part through the
     /// recorded relationship with the recorded bytes, or (for a creation)
     /// holds no such family and the recorded relationship ID and part name
     /// are free; and a removed part has no other inbound relationship.
@@ -1232,7 +1322,7 @@ impl Patch {
     /// Returns [`Error::Conflict`] naming the first family whose state
     /// differs, and the graph errors of the family inspections.
     pub fn check(&self, package: &OpcPackage) -> Result<()> {
-        for change in &self.changes {
+        for change in self.check_changes() {
             let graph = owning_graph(package, change.family)?;
             let bytes = match &graph.0 {
                 Some(part) => Some(
@@ -1245,11 +1335,33 @@ impl Patch {
             };
             check_change(package, change, graph, bytes.as_deref().map(Vec::as_slice))?;
         }
+        // A composed patch keeps a supplemental scope for families it does
+        // not change.  The scope authenticates the untouched state, but it
+        // may intentionally wildcard a future relationship ID for an absent
+        // family.  Check the actual changes as well so a creation still
+        // authenticates its selected ID and a removal still checks that its
+        // part has no additional inbound relationships.  Ordinary patches
+        // have no scope and therefore take only the single loop above.
+        if self.scope.is_some() {
+            for change in &self.changes {
+                let graph = owning_graph(package, change.family)?;
+                let bytes = match &graph.0 {
+                    Some(part) => Some(
+                        package
+                            .get_part(part)
+                            .map_err(crate::Error::from)?
+                            .blob_arc(),
+                    ),
+                    None => None,
+                };
+                check_change(package, change, graph, bytes.as_deref().map(Vec::as_slice))?;
+            }
+        }
         Ok(())
     }
 
-    /// Apply the patch to an owning package after [`Self::check`]. Returns
-    /// whether the package changed.
+    /// Check and apply the patch to an owning package. Returns whether the
+    /// package changed.
     ///
     /// An empty patch changes nothing, so a signed package keeps its
     /// signature. A changed patch refuses a signed package before anything is
@@ -1261,10 +1373,10 @@ impl Patch {
     /// Returns [`Error::Signed`] for a signed package, and the errors of
     /// [`Self::check`].
     pub fn apply(&self, package: &mut OpcPackage) -> Result<bool> {
+        self.check(package)?;
         if self.is_noop() {
             return Ok(false);
         }
-        self.check(package)?;
         refuse_signed_change(package)?;
         let mut candidate = package.clone();
         for change in &self.changes {
@@ -1327,6 +1439,23 @@ impl Patch {
     /// or when one family is removed and then created again under another
     /// part or relationship (one [`Change`] keeps one relationship).
     pub fn compose(&self, next: &Self) -> Result<Self> {
+        // A complete scope belongs to the package state at one end of the
+        // patch. Preserve it when composing a changed patch: the changed
+        // patch supplies the exact before/after image for the families it
+        // touches, while the scope continues to authenticate every family it
+        // leaves untouched. This keeps same-base history composition useful
+        // without weakening the no-op patch's cross-family guard.
+        let self_after = self.after_scope();
+        if let (Some(first), Some(second)) = (self_after, next.scope.as_deref()) {
+            check_scope_overlap(first, second)?;
+        }
+        if let Some(first) = self_after {
+            check_scope_transition(first, &next.changes, false, "second")?;
+        }
+        if let Some(second) = next.scope.as_deref() {
+            check_scope_transition(second, &self.changes, true, "first")?;
+        }
+
         let mut changes = Vec::new();
         for family in [Family::Core, Family::App, Family::Custom] {
             let first = self.changes.iter().find(|change| change.family == family);
@@ -1362,13 +1491,24 @@ impl Patch {
                 changes.push(composed);
             }
         }
+        let is_noop = changes.is_empty();
+        let mut scope = compose_before_scope(self, next);
+        if is_noop && scope.is_none() && !self.changes.is_empty() {
+            let affected = scope_from_changes(&self.changes, false);
+            scope = Some(affected.clone());
+        }
+        let after_scope = scope
+            .as_deref()
+            .map(|scope| scope_with_changes(scope, &changes, true));
         Ok(Self {
             changes: changes.into_boxed_slice(),
+            scope,
+            after_scope,
         })
     }
 
     /// Check that a source-backed package is in this patch's before state,
-    /// with the rules of [`Self::check`]. Only the changed families' parts
+    /// with the rules of [`Self::check`]. Only the recorded families' parts
     /// are read, inside the package's source-freshness checks.
     ///
     /// # Errors
@@ -1377,7 +1517,7 @@ impl Patch {
     /// error.
     pub fn check_source_backed(&self, package: &SourceBackedPackage) -> Result<()> {
         package.check_execution()?;
-        for change in &self.changes {
+        for change in self.check_changes() {
             let graph = source_graph(package, change.family)?;
             let bytes = match &graph.0 {
                 Some(part) => Some(package.part(part)?.data()?),
@@ -1389,6 +1529,21 @@ impl Patch {
                 graph,
                 bytes.as_ref().map(|data| data.as_bytes()),
             )?;
+        }
+        if self.scope.is_some() {
+            for change in &self.changes {
+                let graph = source_graph(package, change.family)?;
+                let bytes = match &graph.0 {
+                    Some(part) => Some(package.part(part)?.data()?),
+                    None => None,
+                };
+                check_change(
+                    package,
+                    change,
+                    graph,
+                    bytes.as_ref().map(|data| data.as_bytes()),
+                )?;
+            }
         }
         package.check_execution()?;
         Ok(())
@@ -1412,8 +1567,8 @@ impl Patch {
     /// source, limit and allocation errors.
     pub fn prepare_source_backed(&self, package: &SourceBackedPackage) -> Result<PreparedTopology> {
         let mut plan = SourceTopologyPlan::new();
+        self.check_source_backed(package)?;
         if !self.is_noop() {
-            self.check_source_backed(package)?;
             if package.has_signature_infrastructure() {
                 return Err(Error::Signed);
             }
@@ -1446,6 +1601,158 @@ impl Patch {
         }
         Ok(package.clone().prepare_topology(plan)?)
     }
+
+    fn after_scope(&self) -> Option<&[Change]> {
+        self.after_scope
+            .as_deref()
+            .or_else(|| self.is_noop().then_some(self.scope.as_deref()).flatten())
+    }
+}
+
+/// Build the before-state guard for a composed patch. A complete no-op scope
+/// contributes every untouched family; a partial cancellation scope
+/// contributes only its retained families, and disjoint changed families are
+/// appended from their own before images.
+fn compose_before_scope(first: &Patch, second: &Patch) -> Option<Box<[Change]>> {
+    let mut entries = Vec::new();
+    for family in [Family::Core, Family::App, Family::Custom] {
+        let first_change = first.changes.iter().find(|change| change.family == family);
+        let second_change = second.changes.iter().find(|change| change.family == family);
+        let entry = first_change
+            .map(|change| state_change(change, false))
+            .or_else(|| {
+                first
+                    .scope
+                    .as_deref()
+                    .and_then(|scope| scope.iter().find(|change| change.family == family))
+                    .cloned()
+            })
+            .or_else(|| {
+                second
+                    .scope
+                    .as_deref()
+                    .and_then(|scope| scope.iter().find(|change| change.family == family))
+                    .cloned()
+            })
+            .or_else(|| second_change.map(|change| state_change(change, false)));
+        if let Some(entry) = entry {
+            entries.push(entry);
+        }
+    }
+    (!entries.is_empty()).then(|| entries.into_boxed_slice())
+}
+
+/// Check the changed families at one end of a complete property scope.
+///
+/// `after` selects the first patch's after image; otherwise the next patch's
+/// before image is selected. The scope itself still contains a state image in
+/// both `before` and `after`, so it can be used as an exact owner guard.
+fn check_scope_transition(
+    scope: &[Change],
+    changes: &[Change],
+    after: bool,
+    side: &str,
+) -> Result<()> {
+    let complete = scope_is_complete(scope);
+    for change in changes {
+        let Some(expected) = scope.iter().find(|scoped| scoped.family == change.family) else {
+            if complete {
+                return Err(Error::Conflict(format!(
+                    "the {side} patch has a family absent from the complete property scope"
+                )));
+            }
+            // A partial cancellation scope authenticates only the families it
+            // retained. A disjoint changed family still carries its own
+            // before image and may be composed independently.
+            continue;
+        };
+        if !same_change_identity(expected, change)
+            || expected.before.as_deref()
+                != (if after {
+                    change.after.as_deref()
+                } else {
+                    change.before.as_deref()
+                })
+        {
+            return Err(Error::Conflict(format!(
+                "the {side} patch does not continue the complete {} state",
+                change.family.label()
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn check_scope_overlap(first: &[Change], second: &[Change]) -> Result<()> {
+    for first in first {
+        let Some(second) = second.iter().find(|change| change.family == first.family) else {
+            continue;
+        };
+        if !same_change_identity(first, second)
+            || first.before != second.before
+            || first.after != second.after
+        {
+            return Err(Error::Conflict(
+                "the composed patches do not share the same intermediate property state".to_owned(),
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn scope_is_complete(scope: &[Change]) -> bool {
+    scope.len() == 3
+        && [Family::Core, Family::App, Family::Custom]
+            .into_iter()
+            .all(|family| scope.iter().any(|change| change.family == family))
+}
+
+fn same_change_identity(first: &Change, second: &Change) -> bool {
+    first.family == second.family
+        && first.part == second.part
+        && (first.free_relationship_id
+            || second.free_relationship_id
+            || first.relationship_id == second.relationship_id)
+        && first.relationship_type == second.relationship_type
+        && first.relationship_target == second.relationship_target
+}
+
+/// Turn one changed family into a state entry whose before and after images
+/// are the selected endpoint. The graph identity is retained, including the
+/// free relationship ID and part name for a creation/removal.
+fn state_change(change: &Change, after: bool) -> Change {
+    let bytes = if after {
+        change.after.clone()
+    } else {
+        change.before.clone()
+    };
+    Change {
+        before: bytes.clone(),
+        after: bytes,
+        ..change.clone()
+    }
+}
+
+/// Replace changed-family entries in a complete scope with an endpoint of a
+/// patch. Unchanged families retain their exact bytes and graph identity.
+fn scope_with_changes(scope: &[Change], changes: &[Change], after: bool) -> Box<[Change]> {
+    scope
+        .iter()
+        .map(|entry| {
+            changes
+                .iter()
+                .find(|change| change.family == entry.family)
+                .map(|change| state_change(change, after))
+                .unwrap_or_else(|| entry.clone())
+        })
+        .collect()
+}
+
+fn scope_from_changes(changes: &[Change], after: bool) -> Box<[Change]> {
+    changes
+        .iter()
+        .map(|change| state_change(change, after))
+        .collect()
 }
 
 /// The selected part and relationship ID of one family of a source-backed
@@ -1532,7 +1839,8 @@ fn check_change<P: PackageMetadata>(
         None => {
             if part.is_some()
                 || relationship_id.is_some()
-                || relationships.get(&change.relationship_id).is_some()
+                || (!change.free_relationship_id
+                    && relationships.get(&change.relationship_id).is_some())
                 || package
                     .metadata_parts()
                     .any(|candidate| names_conflict(candidate.part_name(), &change.part))
