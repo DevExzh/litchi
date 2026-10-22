@@ -1015,7 +1015,17 @@ impl Edit {
         parsed.reuse_stream_allocations(&self.state.package)?;
         let objects = discovery::from_package(&parsed, &self.state.targets, self.state.limits)?;
         let state = self.state_mut();
-        state.package = Arc::new(parsed);
+        // `package_mut` is called before every candidate publication.  Once
+        // it has detached the candidate package, its allocation is private
+        // to this edit; the base package still owns the prior capture.  Move
+        // the validated capture into that allocation instead of allocating a
+        // second `Arc<CapturedPackage>`.  Keep the fallback for callers that
+        // construct a candidate without first mutating its package.
+        if let Some(package) = Arc::get_mut(&mut state.package) {
+            *package = parsed;
+        } else {
+            state.package = Arc::new(parsed);
+        }
         state.objects = Arc::new(objects);
         state.changed = true;
         state.validated_layout = state.layout;
