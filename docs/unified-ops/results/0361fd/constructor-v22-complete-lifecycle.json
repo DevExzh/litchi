@@ -75,7 +75,7 @@
     "format": "cargo fmt --all -- --check passed; git diff --check passed.",
     "core_tests": "cargo test --offline --locked --manifest-path crates/litchi-iwa-core/Cargo.toml --lib: 78 passed, 3 pre-existing failures in reference-pruning tests.",
     "core_type_routes": "cargo test --offline --locked --manifest-path crates/litchi-iwa-archive/Cargo.toml --test core_type_routes: 2 passed.",
-    "failure_attribution": "The exact data_pruning_zero_and_noop_policies_preserve_existing_behavior test fails with the same ArchiveInfo nested encoded length mismatch on baseline 57c2ff520b; the other two failures have the same pre-existing error family.",
+    "failure_attribution": "Each of data_pruning_zero_and_noop_policies_preserve_existing_behavior, empty_reference_removal_delegates_to_preserving_replacement and exact_reference_transition_retains_duplicate_unselected_field_members was rerun exactly on baseline 57c2ff520b and failed with the same ArchiveInfo nested encoded length mismatch.",
     "staged_size_and_binary_checks": "passed with no output; no evidence file or binary was staged."
   }
 }
