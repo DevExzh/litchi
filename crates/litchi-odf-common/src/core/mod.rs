@@ -134,7 +134,7 @@ pub use source_publication::{
 pub use stream_xml::XmlStreamLimits;
 pub use writer::{
     PackageCompression, PackageWriter, PackageWriterError, PackageWriterLimitExceeded,
-    PackageWriterLimitResource, PackageWriterLimits, PackageWriterResult, Structure,
+    PackageWriterLimitResource, PackageWriterResult, StreamingArchiveLimits, Structure,
 };
 pub use xml::{Content, Meta, Styles};
 pub use xml_splice::{

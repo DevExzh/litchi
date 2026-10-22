@@ -224,7 +224,7 @@ fn ensure_supported_manifest_metadata(bytes: &[u8]) -> Result<()> {
 /// These limits bound ZIP transport bytes and the writer's retained manifest
 /// bookkeeping. They do not make arbitrary caller-owned readers seekable or
 /// reserve the complete payload in memory.
-pub use soapberry_zip::office::StreamingArchiveLimits as PackageWriterLimits;
+pub use soapberry_zip::office::StreamingArchiveLimits;
 
 /// Compression methods supported by opaque streamed ODF package members.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -620,7 +620,7 @@ pub struct PackageWriter<W: Write = io::Cursor<Vec<u8>>> {
     // The locally retained limits also bound generated ODF manifest XML and
     // manifest-only entries; ZIP transport metadata alone is insufficient.
     zip_writer: StreamingArchiveWriter<W>,
-    limits: PackageWriterLimits,
+    limits: StreamingArchiveLimits,
     mimetype: Option<String>,
     manifest_entries: Vec<ManifestEntry>,
     manifest_paths: HashSet<String>,
@@ -726,7 +726,7 @@ impl PackageWriter<io::Cursor<Vec<u8>>> {
     pub fn new() -> Self {
         Self {
             zip_writer: StreamingArchiveWriter::new(),
-            limits: PackageWriterLimits::default(),
+            limits: StreamingArchiveLimits::default(),
             mimetype: None,
             manifest_entries: Vec::new(),
             manifest_paths: HashSet::new(),
@@ -752,7 +752,7 @@ impl PackageWriter<io::Cursor<Vec<u8>>> {
     /// Create an in-memory writer with explicit finite ZIP transport limits.
     #[cfg(test)]
     #[must_use]
-    pub(crate) fn new_with_limits(limits: PackageWriterLimits) -> Self {
+    pub(crate) fn new_with_limits(limits: StreamingArchiveLimits) -> Self {
         Self::with_writer_and_limits(io::Cursor::new(Vec::new()), limits)
     }
 }
@@ -766,12 +766,12 @@ impl Default for PackageWriter<io::Cursor<Vec<u8>>> {
 impl<W: Write> PackageWriter<W> {
     /// Create a package writer over an arbitrary output sink.
     pub fn with_writer(writer: W) -> Self {
-        Self::with_writer_and_limits(writer, PackageWriterLimits::default())
+        Self::with_writer_and_limits(writer, StreamingArchiveLimits::default())
     }
 
     /// Create a package writer over an arbitrary sink with explicit finite
     /// ZIP transport limits.
-    pub fn with_writer_and_limits(writer: W, limits: PackageWriterLimits) -> Self {
+    pub fn with_writer_and_limits(writer: W, limits: StreamingArchiveLimits) -> Self {
         Self {
             zip_writer: StreamingArchiveWriter::with_writer_and_limits(writer, limits),
             limits,

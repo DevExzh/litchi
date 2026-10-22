@@ -1,4 +1,4 @@
-use super::{GeneratedXmlEnvelope, GeneratedXmlLimits, PackageWriter, PackageWriterLimits};
+use super::{GeneratedXmlEnvelope, GeneratedXmlLimits, PackageWriter, StreamingArchiveLimits};
 use litchi_core::Error;
 use soapberry_zip::office::ArchiveReader;
 use std::cell::Cell;
@@ -123,9 +123,9 @@ fn later_producer_failure_preserves_source_and_finish_is_refused() {
 
 #[test]
 fn rejected_archive_budget_does_not_pull_the_first_fragment() {
-    let limits = PackageWriterLimits {
+    let limits = StreamingArchiveLimits {
         max_entries: 1,
-        ..PackageWriterLimits::default()
+        ..StreamingArchiveLimits::default()
     };
     let mut writer = PackageWriter::new_with_limits(limits);
     writer

@@ -6,7 +6,7 @@
 //! Typed authored-XML publication, preflight, and transport failure contracts.
 
 use litchi_core::Error;
-use litchi_odf_common::core::{PackageWriter, PackageWriterError, PackageWriterLimits, Profile};
+use litchi_odf_common::core::{PackageWriter, PackageWriterError, Profile, StreamingArchiveLimits};
 use litchi_odf_common::signature::{DocumentSigner, SignatureAlgorithm};
 use soapberry_zip::office::ArchiveReader;
 use std::cell::RefCell;
@@ -258,11 +258,8 @@ fn authored_xml_io_failure_retains_marker_and_poisoned_finalize() {
 }
 
 fn output_limited_writer(sink: &mut Vec<u8>, maximum_output: u64) -> PackageWriter<&mut Vec<u8>> {
-    let limits = PackageWriterLimits::new(3, 32, maximum_output.min(64 * 1024)).with_byte_limits(
-        64 * 1024,
-        64 * 1024,
-        maximum_output,
-    );
+    let limits = StreamingArchiveLimits::new(3, 32, maximum_output.min(64 * 1024))
+        .with_byte_limits(64 * 1024, 64 * 1024, maximum_output);
     PackageWriter::with_writer_and_limits(sink, limits)
 }
 
@@ -302,9 +299,9 @@ fn authored_xml_output_limit_is_inclusive_and_one_byte_under_is_typed() {
     assert!(under_sink.len() < expected.len());
 }
 
-fn metadata_limits(max_metadata_bytes: u64) -> PackageWriterLimits {
-    let defaults = PackageWriterLimits::default();
-    PackageWriterLimits::new(
+fn metadata_limits(max_metadata_bytes: u64) -> StreamingArchiveLimits {
+    let defaults = StreamingArchiveLimits::default();
+    StreamingArchiveLimits::new(
         defaults.max_entries,
         defaults.max_member_name_bytes,
         max_metadata_bytes,
@@ -327,7 +324,7 @@ fn metadata_limited_package(max_metadata_bytes: u64) -> Result<Vec<u8>, PackageW
 }
 
 fn minimum_successful_metadata_limit() -> u64 {
-    let maximum = PackageWriterLimits::default().max_metadata_bytes;
+    let maximum = StreamingArchiveLimits::default().max_metadata_bytes;
     assert!(metadata_limited_package(maximum).is_ok());
     let mut low = 0_u64;
     let mut high = maximum;

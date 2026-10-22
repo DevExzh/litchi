@@ -28,7 +28,7 @@ use quick_xml::Reader;
 use quick_xml::events::Event;
 use sha2::{Digest, Sha256};
 
-use crate::core::{PackageWriter, PackageWriterLimits};
+use crate::core::{PackageWriter, StreamingArchiveLimits};
 use crate::{Error, LimitKind, OpenOptions, SemanticLimitKind, SemanticLimits, SourceLimits};
 use litchi_core::{Error as CoreError, Resource, ResourceLimit};
 
@@ -164,13 +164,13 @@ impl Limits {
         Ok(())
     }
 
-    fn writer_limits() -> PackageWriterLimits {
+    fn writer_limits() -> StreamingArchiveLimits {
         // This writer emits a synthetic ZIP projection. Its bounded archive
         // defaults are deliberately independent of SemanticLimitKind::OutputBytes,
         // which measures the published flat document. The logical XML parts
         // are checked against their semantic dimensions before this writer is
         // entered; ZIP overhead must not consume the flat output budget.
-        let defaults = PackageWriterLimits::default();
+        let defaults = StreamingArchiveLimits::default();
         defaults.with_byte_limits(
             defaults.max_entry_size,
             defaults.max_total_size,

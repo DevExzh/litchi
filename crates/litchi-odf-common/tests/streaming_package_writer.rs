@@ -5,7 +5,7 @@
 
 use litchi_core::Error;
 use litchi_odf_common::core::{
-    OwnedPackage, PackageCompression, PackageWriter, PackageWriterError, PackageWriterLimits,
+    OwnedPackage, PackageCompression, PackageWriter, PackageWriterError, StreamingArchiveLimits,
     Structure,
 };
 use litchi_odf_common::signature::{DocumentSigner, SignatureAlgorithm};
@@ -220,7 +220,7 @@ fn short_non_seek_sink_round_trips_exact_stream_and_is_deterministic() {
 fn exact_output_limit_succeeds_and_one_byte_under_reports_limit_progress() {
     let bytes = payload();
     let expected = memory_artifact(&bytes);
-    let mut exact_limits = PackageWriterLimits::default().with_byte_limits(
+    let mut exact_limits = StreamingArchiveLimits::default().with_byte_limits(
         64 * 1024,
         64 * 1024,
         expected.len() as u64,
@@ -241,7 +241,7 @@ fn exact_output_limit_succeeds_and_one_byte_under_reports_limit_progress() {
     exact.finish_to_writer().unwrap();
     assert_eq!(exact_sink, expected);
 
-    let mut under_limits = PackageWriterLimits::default().with_byte_limits(
+    let mut under_limits = StreamingArchiveLimits::default().with_byte_limits(
         64 * 1024,
         64 * 1024,
         (expected.len() - 1) as u64,
@@ -274,7 +274,7 @@ fn exact_output_limit_succeeds_and_one_byte_under_reports_limit_progress() {
 #[test]
 fn streamed_entry_limit_is_typed_after_the_member_header_starts() {
     let bytes = payload();
-    let mut limits = PackageWriterLimits::default().with_byte_limits(
+    let mut limits = StreamingArchiveLimits::default().with_byte_limits(
         (bytes.len() - 1) as u64,
         64 * 1024,
         1024 * 1024,
@@ -818,9 +818,9 @@ fn metadata_is_validated_and_bounded_before_member_output() {
         Some(parameterized_media_type)
     );
 
-    let metadata_limits = PackageWriterLimits {
+    let metadata_limits = StreamingArchiveLimits {
         max_metadata_bytes: 1_024,
-        ..PackageWriterLimits::default()
+        ..StreamingArchiveLimits::default()
     };
     let mut bounded_sink = Vec::new();
     let mut bounded = PackageWriter::with_writer_and_limits(&mut bounded_sink, metadata_limits);
@@ -868,9 +868,9 @@ fn manifest_collisions_and_finish_entry_limit_are_atomic_with_progress() {
     assert_eq!(collision_bytes.borrow().len(), before_collision);
     collision_writer.finish_to_writer().unwrap();
 
-    let limits = PackageWriterLimits {
+    let limits = StreamingArchiveLimits {
         max_entries: 2,
-        ..PackageWriterLimits::default()
+        ..StreamingArchiveLimits::default()
     };
     let mut sink = Vec::new();
     let mut limited = PackageWriter::with_writer_and_limits(&mut sink, limits);

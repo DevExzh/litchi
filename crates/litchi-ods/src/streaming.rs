@@ -15,7 +15,7 @@ use std::{borrow::Cow, error::Error as StdError, fmt, io::Write};
 use litchi_core::{Error, ExecutionContext, ExecutionError, Resource};
 use litchi_odf_common::core::{
     GeneratedXmlEnvelope, GeneratedXmlLimits, PackageWriter, PackageWriterError,
-    PackageWriterLimits,
+    StreamingArchiveLimits,
 };
 
 const ODS_MIME: &str = "application/vnd.oasis.opendocument.spreadsheet";
@@ -565,7 +565,7 @@ where
         .checked_add(256 * 1024)
         .ok_or_else(|| invalid("package total byte limit overflow"))?;
     let common_xml_limits = limits.xml_audit.into_common()?;
-    let archive_limits = PackageWriterLimits::new(
+    let archive_limits = StreamingArchiveLimits::new(
         3,
         member_name_bytes,
         // This is a provider-side upper bound for the generated manifest

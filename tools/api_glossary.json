@@ -11921,6 +11921,48 @@
           "scope": "litchi_odf_common",
           "replacement": "limits travel in OpenOptions/EditOptions or as a required argument (record 0351 \u00a72.5)",
           "match": "suffix"
+        },
+        {
+          "name": "PackageWriterLimits",
+          "scope": "litchi_odf_common::core",
+          "recursive": false,
+          "replacement": "use the canonical StreamingArchiveLimits re-export (record 0362rda)"
+        },
+        {
+          "name": "core_error",
+          "scope": "litchi_odf_common::core::SourceMemberReaderError",
+          "recursive": false,
+          "replacement": "use SourceMemberReaderError::core (record 0362rda)"
+        },
+        {
+          "name": "error",
+          "scope": "litchi_odf_common::core::SourceMemberReaderError",
+          "recursive": false,
+          "replacement": "use SourceMemberReaderError::core (record 0362rda)"
+        },
+        {
+          "name": "callback_error",
+          "scope": "litchi_odf_common::core::SourceMemberReaderError",
+          "recursive": false,
+          "replacement": "use SourceMemberReaderError::callback (record 0362rda)"
+        },
+        {
+          "name": "into_core_error",
+          "scope": "litchi_odf_common::core::SourceMemberReaderError",
+          "recursive": false,
+          "replacement": "use SourceMemberReaderError::into_core (record 0362rda)"
+        },
+        {
+          "name": "into_error",
+          "scope": "litchi_odf_common::core::SourceMemberReaderError",
+          "recursive": false,
+          "replacement": "use SourceMemberReaderError::into_core (record 0362rda)"
+        },
+        {
+          "name": "into_callback_error",
+          "scope": "litchi_odf_common::core::SourceMemberReaderError",
+          "recursive": false,
+          "replacement": "use SourceMemberReaderError::into_callback (record 0362rda)"
         }
       ],
       "families": []
