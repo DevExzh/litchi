@@ -121,8 +121,9 @@ keeps the plan it prepared (no second scan) and every save streams it.
   bound (a package with the same main story but another member is
   refused), the main document and story hyperlinks stay lineage bound. A
   detached section-layout patch therefore now replays on a second open of
-  the same bytes (it was refused as a foreign source); its inverse on an
-  unchanged source is `SectionLayoutStaleSource`.
+  the same bytes (it was refused as a foreign source); an incompatible
+  section base reports the shared `PatchConflict`, classified as
+  `invalid_input`.
 - **Exact inverse by artifact identity.** The inverse of a commit applied
   to a reopened copy of its output restores the source archive byte for
   byte, streamed through the reopened package's execution context, with
