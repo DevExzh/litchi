@@ -409,7 +409,7 @@ fn body_saved_selection_edit_is_source_bound_reversible_and_atomic() {
     let mut foreign_edit = foreign.edit().expect("foreign edit");
     assert!(matches!(
         foreign_edit.apply_saved_selection_patch(&patch),
-        Err(Error::Conflict)
+        Err(Error::PatchConflict)
     ));
     let foreign_commit = foreign_edit.commit().expect("foreign rollback commit");
     assert_eq!(foreign_commit.package().bytes(), foreign.bytes());

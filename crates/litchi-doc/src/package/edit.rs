@@ -1032,7 +1032,10 @@ mod tests {
         let changed = second.commit().expect("commit").into_package();
         let before = changed.to_bytes().expect("bytes");
         let error = changed.apply(&patch).expect_err("stale patch");
-        assert!(matches!(error, Error::Body(body_text::Error::Conflict)));
+        assert!(matches!(
+            error,
+            Error::Body(body_text::Error::PatchConflict)
+        ));
         assert_eq!(changed.to_bytes().unwrap(), before);
     }
 

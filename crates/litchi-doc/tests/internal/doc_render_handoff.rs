@@ -337,7 +337,7 @@ fn rejected_join_and_transfer_preserve_policy_and_retained_state() {
     let source_policy_before = edit.source().transaction_limits();
     assert!(matches!(
         edit.apply_transfer(&wrong_plan),
-        Err(Error::Conflict)
+        Err(Error::PatchConflict)
     ));
     assert_eq!(edit.retained_render_bytes(), held_before_rejection);
     assert_transaction_policy(
@@ -685,7 +685,7 @@ fn patches_inverse_conflict_and_composition_preserve_handoff_results() {
     let wrong_bytes = wrong.bytes().to_vec();
     assert!(matches!(
         composed.patch().apply(&wrong),
-        Err(Error::Conflict)
+        Err(Error::PatchConflict)
     ));
     assert_eq!(wrong.bytes(), wrong_bytes.as_slice());
 }
@@ -741,7 +741,7 @@ fn transfer_after_a_handoff_reopens_and_checks_source_lineage() {
     let mut wrong_edit = wrong_receiver.edit().expect("wrong edit should open");
     assert!(matches!(
         wrong_edit.apply_transfer(&plan),
-        Err(Error::Conflict)
+        Err(Error::PatchConflict)
     ));
     assert_eq!(wrong_edit.source().bytes(), wrong_bytes.as_slice());
 }

@@ -326,7 +326,7 @@ fn changed_dofr_patch_requires_the_complete_source_owner() {
 
     assert!(matches!(
         edit.apply_dofr_patch(&foreign_patch),
-        Err(Error::Conflict)
+        Err(Error::PatchConflict)
     ));
 
     // The rejected foreign patch was refused before the operation budget was

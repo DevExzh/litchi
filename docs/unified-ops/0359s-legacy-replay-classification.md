@@ -17,7 +17,9 @@ patch error remains `PatchConflict` and classifies as `invalid_input`; a
 positional `SourceChanged` remains `io_error`. The public DOC record APIs use
 `PatchConflict` for their semantic patch errors, and the subdocument table
 patch uses the same name in place of `SourceConflict`. Private package and
-body-edit conflict names remain unchanged.
+lower-level transaction conflicts remain private; the public body-text owner
+uses `PatchConflict` for stale replay and reserves `Conflict` for three-way
+semantic overlap.
 
 The original 0359s audit had incorrectly retained malformed variants for the
 seven raw replay boundaries. The 0359sb correction changes those boundaries to
