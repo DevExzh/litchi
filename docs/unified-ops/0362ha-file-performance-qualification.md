@@ -139,16 +139,23 @@ attempts. The full current-source ops library test was still running when this
 candidate was committed; this receipt does not claim its result or the final
 workspace gate.
 
-## Remaining harness review
+## Harness review and repair
 
 The coordinator returned three implementation defects in the assembled probe.
 Some native read legs inspect a whole document (or only count sheet names)
 while the facade reads one logical target. The DOCX refresh fixture contains
 no fields and therefore exercises only an empty refresh. Source preservation
 compares one semantic marker rather than the owner's exact published bytes
-before and after staging. These must be corrected and validated on the actual
-Part A API before this protocol can establish performance acceptance. The
-historical and superseded receipts remain attached to their source versions.
+before and after staging. These are corrected by the probe migration in
+[0362hb](0362hb-file-harness-repair.md). The coordinator integrated the
+reviewed source from `dd1052e06d` onto the Part A candidate after `8d6abdab69`,
+retaining the inline-owner allocation behavior and its explicit Clippy
+justification. Formatting, the all-feature probe build and Clippy pass on
+this integrated source; the [build receipt](results/0362ha/harness-build-validation.json)
+records the commands and source hashes. The worker's 109-route untimed receipt
+remains attached to its original source; the coordinator-source route matrix
+still needs to run before any native qualification. Historical and superseded
+receipts remain attached to their source versions.
 
 ## ODF detector policy isolation repair
 

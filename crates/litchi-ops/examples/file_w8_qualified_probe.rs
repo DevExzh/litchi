@@ -22,9 +22,9 @@
 ))]
 mod probe {
     use std::hint::black_box;
+    use std::io::{Cursor, Write};
     use std::time::Instant;
 
-    use litchi_core::sheet::WorkbookTrait;
     use litchi_core::{BlobId, FileFormat, Position};
     use litchi_ops::merge::{Options as MergeOptions, Record};
     use litchi_ops::{BatchItem, BatchMode, File, NewNode, Props, open_bytes, props};
@@ -66,6 +66,63 @@ mod probe {
             builder.add_paragraph(&line(index)).expect("paragraph");
         }
         builder.build().expect("build").to_bytes().expect("bytes")
+    }
+
+    /// A DOCX with a mergeable body and a real cached `NUMCHARS` field after
+    /// the 1,000 ordinary paragraphs.  Keeping the field outside the normal
+    /// edit paths lets batch/set and merge exercise the same simple paragraph
+    /// targets while refresh still performs an observable cache update.
+    fn docx_refresh(count: usize) -> Vec<u8> {
+        const W: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+        let mut body = String::from(r#"<w:p><w:r><w:t>Dear {{name}},</w:t></w:r></w:p>"#);
+        for index in 1..count {
+            body.push_str(&format!(
+                r#"<w:p><w:r><w:t>{}</w:t></w:r></w:p>"#,
+                line(index)
+            ));
+        }
+        body.push_str(
+            r#"<w:p><w:r><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:instrText xml:space="preserve"> NUMCHARS </w:instrText></w:r><w:r><w:fldChar w:fldCharType="separate"/></w:r><w:r><w:t>0</w:t></w:r><w:r><w:fldChar w:fldCharType="end"/></w:r></w:p>"#,
+        );
+        let document = format!(
+            r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="{W}"><w:body>{body}<w:sectPr><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:left="1440" w:right="1440" w:top="1440" w:bottom="1440"/></w:sectPr></w:body></w:document>"#
+        );
+        let content_types = r#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>"#;
+        let root = r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>"#;
+        let mut zip = zip::ZipWriter::new(Cursor::new(Vec::new()));
+        let options = zip::write::SimpleFileOptions::default();
+        for (name, contents) in [
+            ("[Content_Types].xml", content_types),
+            ("_rels/.rels", root),
+            ("word/document.xml", document.as_str()),
+        ] {
+            zip.start_file(name, options).expect("docx field member");
+            zip.write_all(contents.as_bytes())
+                .expect("docx field member bytes");
+        }
+        zip.finish().expect("docx field archive").into_inner()
+    }
+
+    fn docx_refresh_value(bytes: &[u8]) -> String {
+        let package = litchi_docx::Package::from_bytes(bytes).expect("docx refresh fixture");
+        let edit = package.edit().expect("docx refresh fixture edit");
+        let fields = edit.fields().expect("docx refresh fixture fields");
+        let (_, characters) =
+            fields
+                .paragraphs()
+                .iter()
+                .fold((0usize, 0usize), |(words, characters), paragraph| {
+                    (
+                        words + paragraph.text().split_whitespace().count(),
+                        characters
+                            + paragraph
+                                .text()
+                                .chars()
+                                .filter(|character| !character.is_whitespace())
+                                .count(),
+                    )
+                });
+        characters.to_string()
     }
 
     fn rtf(count: usize) -> Vec<u8> {
@@ -129,7 +186,14 @@ mod probe {
 
     fn odp(shapes: usize) -> Vec<u8> {
         let mut file = litchi_ops::create(FileFormat::Odp).expect("create");
+        // Keep every edited shape in its own scene. ODP's scene splice
+        // planner rejects two changes that touch the same serialized scene
+        // fragment, so putting all shapes on slide 1 would make a nominal
+        // 100-item batch invalid rather than measuring distinct targets.
         for index in 0..shapes {
+            if index > 0 {
+                file = file.add("/", NewNode::new("slide")).expect("slide").file;
+            }
             let text = if index == 0 {
                 "Dear {{name}}".to_owned()
             } else {
@@ -137,7 +201,7 @@ mod probe {
             };
             file = file
                 .add(
-                    "/slide[1]",
+                    format!("/slide[{}]", index + 1).as_str(),
                     NewNode::new("shape")
                         .prop("text", text.as_str())
                         .prop("width", "2cm")
@@ -155,6 +219,7 @@ mod probe {
         paths: Vec<String>,
         set_props: Props<'static>,
         marker: &'static str,
+        refresh_value: Option<String>,
         batch: usize,
         /// CSV rows of the import route; zero for no import.
         import: usize,
@@ -192,6 +257,7 @@ mod probe {
             paths: paragraphs.clone(),
             set_props: text.clone(),
             marker: "/body/p[1]",
+            refresh_value: None,
             batch,
             import: 0,
         };
@@ -201,6 +267,7 @@ mod probe {
             paths: cells.clone(),
             set_props: value.clone(),
             marker: "/sheet[1]/L1",
+            refresh_value: None,
             batch: 1_000,
             import,
         };
@@ -210,23 +277,59 @@ mod probe {
             paths: shapes.clone(),
             set_props: text.clone(),
             marker: "/slide[1]/shape[1]",
+            refresh_value: None,
             batch: 1_000,
             import: 0,
         };
         match name {
-            "docx" => word("docx", unified_words(FileFormat::Docx, PARAGRAPHS), 1_000),
+            "docx" => {
+                let bytes = docx_refresh(PARAGRAPHS);
+                let refresh_value = docx_refresh_value(&bytes);
+                Family {
+                    name: "docx",
+                    bytes,
+                    paths: paragraphs,
+                    set_props: text,
+                    marker: "/body/p[1]",
+                    refresh_value: Some(refresh_value),
+                    batch: 1_000,
+                    import: 0,
+                }
+            },
             "odt" => word("odt", unified_words(FileFormat::Odt, PARAGRAPHS), 1_000),
             "doc" => word("doc", doc(PARAGRAPHS), 256),
-            "rtf" => word("rtf", rtf(PARAGRAPHS), 1_000),
+            // RTF's native edit profile admits at most 256 staged paragraph
+            // operations; keep the facade batch within that same bound.
+            "rtf" => word("rtf", rtf(PARAGRAPHS), 256),
             "xlsx" => sheet("xlsx", FileFormat::Xlsx, 1_000),
-            "xlsb" => sheet("xlsb", FileFormat::Xlsb, 1_000),
+            // XLSB edits only admit already-indexed cell records, so keep its
+            // native import within the 100-row fixture while retaining the
+            // same CSV shape and destination cells as the facade route.
+            "xlsb" => sheet("xlsb", FileFormat::Xlsb, 100),
             // The XLS import route takes ~13 s for 1,000 rows at base and
             // head alike (record 0362 §5), so it is timed on 100 rows.
             "xls" => sheet("xls", FileFormat::Xls, 100),
             "ods" => sheet("ods", FileFormat::Ods, 1_000),
             "pptx" => slides("pptx", pptx(SHAPES)),
             "ppt" => slides("ppt", ppt(SHAPES)),
-            "odp" => slides("odp", odp(SHAPES)),
+            "odp" => {
+                // Each shape is on its own slide, so the 100-item batch
+                // exercises 100 distinct serialized scene fragments. The
+                // earlier one-slide/100-shape attempt is retained as a
+                // rejected workload receipt in the qualification record.
+                Family {
+                    name: "odp",
+                    bytes: odp(SHAPES),
+                    paths: (1..=SHAPES)
+                        .map(|slide| format!("/slide[{slide}]/shape[1]"))
+                        .collect(),
+                    set_props: text.clone(),
+                    marker: "/slide[1]/shape[1]",
+                    refresh_value: None,
+                    batch: SHAPES,
+                    import: 0,
+                }
+            },
             other => panic!("unknown family {other}"),
         }
     }
@@ -529,20 +632,20 @@ mod probe {
             .count()
     }
 
-    fn unified_set(family: &Family, source: &File, count: usize) -> File {
-        if count == 1 {
-            source
-                .set(
-                    family.paths[family.paths.len() / 2].as_str(),
-                    family.set_props.clone(),
-                )
-                .expect("unified set")
-        } else {
-            source
-                .batch(batch_items(family, count), BatchMode::Atomic)
-                .expect("unified batch")
-                .into_file()
-        }
+    fn unified_set(family: &Family, source: &File) -> File {
+        source
+            .set(
+                family.paths[family.paths.len() / 2].as_str(),
+                family.set_props.clone(),
+            )
+            .expect("unified set")
+    }
+
+    fn unified_batch(family: &Family, source: &File, count: usize) -> File {
+        source
+            .batch(batch_items(family, count), BatchMode::Atomic)
+            .expect("unified batch")
+            .into_file()
     }
 
     fn unified_import(source: &File, input: &[u8]) -> File {
@@ -596,11 +699,22 @@ mod probe {
                         .body()
                         .expect("odt body")
                         .nodes()
+                        .filter(|node| {
+                            matches!(
+                                node.kind(),
+                                litchi_odt::body::Kind::Paragraph | litchi_odt::body::Kind::Heading
+                            )
+                        })
                         .map(|node| node.id())
                         .collect();
                     let mut edit = package.edit();
                     for index in 0..count {
-                        edit.set_text(nodes[target(index) % nodes.len()], "Replaced text")
+                        // `paths` and this filtered node vector use the same
+                        // document-order index.  The path itself is rendered
+                        // one-based by the facade, so keep the selected index
+                        // rather than deriving an unrelated node id.
+                        let node = target(index) % nodes.len();
+                        edit.set_text(nodes[node], "Replaced text")
                             .expect("odt set");
                     }
                     Self::Odt(edit.commit().expect("odt commit").into_package())
@@ -729,6 +843,25 @@ mod probe {
             }
         }
 
+        fn native_batch(&self, name: &str, paths: &[String], count: usize) -> Self {
+            match self {
+                Self::Odp(package) => {
+                    use litchi_odp::scene::{Change, ObjectRef, StoryRef};
+                    let mut edit = package.edit().expect("odp batch edit");
+                    let changes: Vec<_> = (0..count)
+                        .map(|index| Change::SetParagraphText {
+                            story: StoryRef::object(ObjectRef::new(index % paths.len(), 0)),
+                            paragraph: 0,
+                            text: "Replaced text".to_owned(),
+                        })
+                        .collect();
+                    edit.splice_scene(&changes).expect("odp batch");
+                    Self::Odp(edit.commit().expect("odp batch commit").into_package())
+                },
+                _ => self.native_set(name, paths, count),
+            }
+        }
+
         fn native_import(&self, input: &[u8]) -> Self {
             let rows = imported_rows(input);
             let cells = rows.checked_mul(4).expect("CSV cell count");
@@ -823,7 +956,12 @@ mod probe {
                         .body()
                         .expect("odt body")
                         .nodes()
-                        .next()
+                        .find(|node| {
+                            matches!(
+                                node.kind(),
+                                litchi_odt::body::Kind::Paragraph | litchi_odt::body::Kind::Heading
+                            )
+                        })
                         .expect("odt node");
                     let mut edit = package.edit();
                     edit.set_text(node.id(), "Dear Acme,").expect("odt merge");
@@ -930,7 +1068,28 @@ mod probe {
                 Self::Docx(package) if name == "docx" => {
                     let mut edit = package.edit().expect("docx edit");
                     let fields = edit.fields().expect("docx fields");
-                    edit.refresh_fields(&fields, &[]).expect("docx refresh");
+                    let (_, characters) = fields.paragraphs().iter().fold(
+                        (0usize, 0usize),
+                        |(words, characters), paragraph| {
+                            (
+                                words + paragraph.text().split_whitespace().count(),
+                                characters
+                                    + paragraph
+                                        .text()
+                                        .chars()
+                                        .filter(|character| !character.is_whitespace())
+                                        .count(),
+                            )
+                        },
+                    );
+                    edit.refresh_fields(
+                        &fields,
+                        &[litchi_docx::document::fields::Update::Text {
+                            field: 0,
+                            text: characters.to_string(),
+                        }],
+                    )
+                    .expect("docx refresh");
                     Self::Docx(edit.commit().expect("docx refresh commit").into_package())
                 },
                 _ => panic!("refresh route is only supported for DOCX"),
@@ -953,10 +1112,24 @@ mod probe {
                     .body()
                     .expect("odt body")
                     .nodes()
-                    .next()
+                    .find(|node| {
+                        matches!(
+                            node.kind(),
+                            litchi_odt::body::Kind::Paragraph | litchi_odt::body::Kind::Heading
+                        )
+                    })
                     .map_or(0, |node| node.text().expect("odt text").len()),
-                Self::Doc(package) => package.document().text().expect("doc text").len(),
-                Self::Rtf(package) => package.text().len(),
+                Self::Doc(package) => package
+                    .document()
+                    .body_paragraph_text(Position::new(0))
+                    .expect("doc paragraph")
+                    .map_or(0, str::len),
+                Self::Rtf(package) => package
+                    .document()
+                    .body()
+                    .paragraphs()
+                    .next()
+                    .map_or(0, |paragraph| paragraph.len()),
                 Self::Xlsx(package) => package
                     .workbook()
                     .sheet(0)
@@ -965,36 +1138,90 @@ mod probe {
                     .cell("L1")
                     .expect("xlsx cell")
                     .stored()
-                    .map_or(0, |_| 1),
+                    .map_or(0, |cell| match cell {
+                        litchi_xlsx::cell::Cell::Value(litchi_xlsx::cell::Value::Text(text)) => {
+                            text.as_str().len()
+                        },
+                        litchi_xlsx::cell::Cell::Value(litchi_xlsx::cell::Value::Date(date)) => {
+                            date.as_str().len()
+                        },
+                        _ => 0,
+                    }),
                 Self::Xlsb(package) => package
                     .workbook()
                     .expect("xlsb workbook")
-                    .worksheet_names()
-                    .len(),
-                Self::Xls(package) => package.workbook().text().expect("xls text").len(),
+                    .cell_values(0)
+                    .expect("xlsb cell values")
+                    .cell(
+                        litchi_xlsb::cell_values::Reference::new(0, 11)
+                            .expect("xlsb marker reference"),
+                    )
+                    .expect("xlsb marker cell")
+                    .map_or(0, |cell| match cell.value() {
+                        litchi_xlsb::cell_values::Value::InlineString(text)
+                        | litchi_xlsb::cell_values::Value::FormulaStringCache(text) => text.len(),
+                        litchi_xlsb::cell_values::Value::RichString(text) => text.text.len(),
+                        _ => 0,
+                    }),
+                Self::Xls(package) => package
+                    .cell_values()
+                    .expect("xls cell values")
+                    .worksheet(litchi_xls::cell_values::Selector::Position(Position::new(
+                        0,
+                    )))
+                    .expect("xls worksheet")
+                    .expect("xls worksheet present")
+                    .cell(
+                        litchi_xls::cell_values::Reference::new(0, 11)
+                            .expect("xls marker reference"),
+                    )
+                    .expect("xls marker cell")
+                    .map_or(0, |cell| match cell.value() {
+                        litchi_xls::cell_values::Value::Text(text) => text.len(),
+                        _ => 0,
+                    }),
                 Self::Pptx(package) => package
                     .presentation()
                     .expect("pptx presentation")
-                    .text()
-                    .expect("pptx text")
-                    .len(),
+                    .slide(0)
+                    .expect("pptx slide")
+                    .expect("pptx slide present")
+                    .shapes()
+                    .expect("pptx shapes")
+                    .iter()
+                    .next()
+                    .and_then(|shape| shape.text())
+                    .map_or(0, str::len),
                 Self::Ppt(package) => package
                     .presentation()
                     .expect("ppt presentation")
-                    .text()
-                    .expect("ppt text")
-                    .len(),
+                    .slide_at(0)
+                    .expect("ppt slide")
+                    .expect("ppt slide present")
+                    .shapes()
+                    .expect("ppt shapes")
+                    .first()
+                    .map_or(0, |shape| shape.text().expect("ppt shape text").len()),
                 Self::Ods(package) => package
                     .workbook()
                     .expect("ods workbook")
-                    .text()
-                    .expect("ods text")
-                    .len(),
+                    .cell("Sheet1", 0, 11)
+                    .and_then(|view| match view {
+                        litchi_ods::worksheet::CellView::Stored(cell) => Some(cell),
+                        litchi_ods::worksheet::CellView::Missing => None,
+                    })
+                    .map_or(0, |cell| cell.text.len()),
                 Self::Odp(package) => package
                     .presentation()
                     .expect("odp presentation")
-                    .text()
-                    .expect("odp text")
+                    .slide(0)
+                    .expect("odp slide")
+                    .expect("odp slide present")
+                    // The fixture intentionally puts exactly one text shape
+                    // on each slide. The model exposes that shape's text as
+                    // the slide body, so `all_text` is the native equivalent
+                    // of `/slide[1]/shape[1]` here.
+                    .all_text()
                     .len(),
             }
         }
@@ -1019,7 +1246,7 @@ mod probe {
                 source.native_set(family.name, &family.paths, 1)
             },
             Route::BatchCommit | Route::BatchPublication => {
-                source.native_set(family.name, &family.paths, family.batch)
+                source.native_batch(family.name, &family.paths, family.batch)
             },
             Route::ImportCommit | Route::ImportPublication => source.native_import(import_input),
             Route::MergeCommit | Route::MergePublication => source.native_merge(),
@@ -1036,9 +1263,9 @@ mod probe {
         record: &Record,
     ) -> File {
         match route {
-            Route::SetCommit | Route::SetPublication => unified_set(family, source, 1),
+            Route::SetCommit | Route::SetPublication => unified_set(family, source),
             Route::BatchCommit | Route::BatchPublication => {
-                unified_set(family, source, family.batch)
+                unified_batch(family, source, family.batch)
             },
             Route::ImportCommit | Route::ImportPublication => unified_import(source, import_input),
             Route::MergeCommit | Route::MergePublication => unified_merge(source, record),
@@ -1119,37 +1346,51 @@ mod probe {
             .map_or_else(String::new, |value| value.into_owned())
     }
 
+    fn facade_marker_len(file: &File, marker: &str) -> usize {
+        file.get(marker)
+            .unwrap_or_else(|error| panic!("facade marker {marker}: {error}"))
+            .view()
+            .text()
+            .unwrap_or_else(|error| panic!("facade marker text {marker}: {error}"))
+            .map_or(0, |value| value.len())
+    }
+
     fn semantic_marker(family: &Family, route: Route) -> &str {
         match route {
-            Route::SetCommit
-            | Route::SetPublication
-            | Route::BatchCommit
-            | Route::BatchPublication => family.paths[family.paths.len() / 2].as_str(),
+            Route::SetCommit | Route::SetPublication => {
+                family.paths[family.paths.len() / 2].as_str()
+            },
+            Route::BatchCommit | Route::BatchPublication => family.paths[0].as_str(),
             Route::ImportCommit | Route::ImportPublication => "/sheet[1]/A1",
+            // `docx_refresh` puts the NUMCHARS field after the 1,000 normal
+            // paragraphs so the regular set/batch paths never target a field.
+            Route::RefreshCommit | Route::RefreshPublication => "/body/p[1001]",
             _ => family.marker,
         }
     }
 
-    fn expected_semantic(name: &str, route: Route) -> Option<&'static str> {
+    fn expected_semantic(family: &Family, route: Route) -> Option<String> {
+        let name = family.name;
         match route {
             Route::SetCommit
             | Route::SetPublication
             | Route::BatchCommit
             | Route::BatchPublication => Some(if matches!(name, "xlsx" | "xlsb" | "xls" | "ods") {
-                "42"
+                "42".to_owned()
             } else {
-                "Replaced text"
+                "Replaced text".to_owned()
             }),
-            Route::ImportCommit | Route::ImportPublication => Some("42"),
+            Route::ImportCommit | Route::ImportPublication => Some("42".to_owned()),
             Route::MergeCommit | Route::MergePublication => {
                 Some(if matches!(name, "xlsx" | "xlsb" | "xls" | "ods") {
-                    "Invoice for Acme"
+                    "Invoice for Acme".to_owned()
                 } else if matches!(name, "pptx" | "ppt" | "odp") {
-                    "Dear Acme"
+                    "Dear Acme".to_owned()
                 } else {
-                    "Dear Acme,"
+                    "Dear Acme,".to_owned()
                 })
             },
+            Route::RefreshCommit | Route::RefreshPublication => family.refresh_value.clone(),
             _ => None,
         }
     }
@@ -1174,15 +1415,39 @@ mod probe {
         route: Route,
         source_leaf: &LeafPackage,
         source_facade: &File,
+        source_leaf_before: &[u8],
+        source_facade_before: &[u8],
         leaf_after: &LeafPackage,
         facade_after: &File,
     ) -> serde_json::Value {
         let source_bytes = family.bytes.as_slice();
-        // Publish the untouched owners after the edit candidate was built.
-        // This proves that staging a candidate did not mutate the source owner,
-        // including on changed routes where the old check was vacuously true.
+        // Publish the untouched owners after the edit candidate was built and
+        // compare them with bytes captured before staging.  This proves that
+        // staging a candidate did not mutate either source owner, including on
+        // changed routes where a semantic-marker-only check is vacuous.
         let source_leaf_bytes = source_leaf.publish();
         let source_facade_bytes = source_facade.to_bytes().expect("facade source bytes");
+        let source_leaf_exact = source_leaf_bytes == source_leaf_before;
+        let source_facade_exact = source_facade_bytes == source_facade_before;
+        if !source_leaf_exact {
+            panic!("leaf source owner changed while staging the candidate");
+        }
+        if !source_facade_exact {
+            panic!("facade source owner changed while staging the candidate");
+        }
+        // Keep the untimed open/get comparison on the native read path. The
+        // semantic checks below reopen both byte streams through File and
+        // therefore cannot prove that LeafPackage::read_marker itself read
+        // the same logical target as the facade projection.
+        let leaf_read_marker_len = source_leaf.read_marker(family.name);
+        let facade_read_marker_len = facade_marker_len(source_facade, family.marker);
+        let read_marker_equal = leaf_read_marker_len == facade_read_marker_len;
+        if route == Route::OpenGet && !read_marker_equal {
+            panic!(
+                "native/facade open_get marker lengths differ: {} != {}",
+                leaf_read_marker_len, facade_read_marker_len
+            );
+        }
         let leaf_bytes = if route.is_commit() || route.is_publication() {
             leaf_after.publish()
         } else {
@@ -1205,7 +1470,7 @@ mod probe {
         let changed_expected = route.changed();
         let leaf_changed = leaf_bytes != source_bytes;
         let facade_changed = facade_bytes != source_bytes;
-        let expected = expected_semantic(family.name, route);
+        let expected = expected_semantic(family, route);
         let semantic_state_valid = expected
             .is_none_or(|expected| leaf_semantic == expected && facade_semantic == expected);
         let source_state_preserved =
@@ -1241,6 +1506,14 @@ mod probe {
             "facade_output_changed": facade_bytes != source_bytes,
             "semantic_state_valid": semantic_state_valid,
             "source_state_preserved": source_state_preserved,
+            "source_state_exact": source_leaf_exact && source_facade_exact,
+            "leaf_read_marker_len": leaf_read_marker_len,
+            "facade_read_marker_len": facade_read_marker_len,
+            "read_marker_equal": read_marker_equal,
+            "source_leaf_before_sha256": BlobId::of(source_leaf_before).as_hex(),
+            "source_leaf_after_sha256": BlobId::of(&source_leaf_bytes).as_hex(),
+            "source_facade_before_sha256": BlobId::of(source_facade_before).as_hex(),
+            "source_facade_after_sha256": BlobId::of(&source_facade_bytes).as_hex(),
             "semantic_equal": semantic_equal,
             "exact_noop": exact_noop,
             "leaf_repeated_equal": leaf_repeat == leaf_bytes,
@@ -1259,6 +1532,8 @@ mod probe {
     fn measure(family: &Family, route: Route, blocks: usize, calls: usize) -> serde_json::Value {
         let leaf_source = source_leaf(family);
         let facade_source = source_facade(family);
+        let source_leaf_before = leaf_source.publish();
+        let source_facade_before = facade_source.to_bytes().expect("facade source bytes");
         let import_input = csv(family.import);
         let record = merge_record();
         let leaf_after = leaf_commit(family, &leaf_source, route, &import_input);
@@ -1268,6 +1543,8 @@ mod probe {
             route,
             &leaf_source,
             &facade_source,
+            &source_leaf_before,
+            &source_facade_before,
             &leaf_after,
             &facade_after,
         );
@@ -1331,6 +1608,8 @@ mod probe {
     fn validate_route(family: &Family, route: Route) -> serde_json::Value {
         let leaf_source = source_leaf(family);
         let facade_source = source_facade(family);
+        let source_leaf_before = leaf_source.publish();
+        let source_facade_before = facade_source.to_bytes().expect("facade source bytes");
         let import_input = csv(family.import);
         let record = merge_record();
         let leaf_after = leaf_commit(family, &leaf_source, route, &import_input);
@@ -1343,6 +1622,8 @@ mod probe {
                 route,
                 &leaf_source,
                 &facade_source,
+                &source_leaf_before,
+                &source_facade_before,
                 &leaf_after,
                 &facade_after,
             ),

@@ -133,6 +133,12 @@ def integer(row: dict, key: str, label: str) -> int:
     return value
 
 
+def hash_text(value: object, label: str) -> str:
+    if not isinstance(value, str) or len(value) != 64 or set(value) - SHA256:
+        fail(f"{label} is not a well-formed SHA-256 hash")
+    return value
+
+
 def phase(row: dict, label: str, calls: int) -> dict:
     samples = row.get("samples")
     if not isinstance(samples, list) or not samples or not all(isinstance(value, int) and value > 0 for value in samples):
@@ -165,10 +171,24 @@ def semantic(value: dict, label: str, suffix: str) -> None:
         fail(f"{label}.validation is missing")
     for key in (
         "semantic_state_valid", "source_state_preserved", "semantic_equal",
-        "leaf_repeated_equal", "facade_repeated_equal", "exact_noop",
+        "source_state_exact", "leaf_repeated_equal", "facade_repeated_equal",
+        "exact_noop",
     ):
         if validation.get(key) is not True:
             fail(f"{label}.validation.{key} is not true")
+    if suffix == "open_get":
+        if validation.get("read_marker_equal") is not True:
+            fail(f"{label}.validation.read_marker_equal is not true")
+        leaf_marker = validation.get("leaf_read_marker_len")
+        facade_marker = validation.get("facade_read_marker_len")
+        if (
+            not isinstance(leaf_marker, int)
+            or leaf_marker < 0
+            or not isinstance(facade_marker, int)
+            or facade_marker < 0
+            or leaf_marker != facade_marker
+        ):
+            fail(f"{label}.validation native/facade marker lengths differ")
     for side in ("leaf", "facade"):
         if not isinstance(validation.get(f"{side}_changed"), bool):
             fail(f"{label}.validation.{side}_changed is malformed")
@@ -187,13 +207,22 @@ def semantic(value: dict, label: str, suffix: str) -> None:
         output = validation.get(key)
         if not isinstance(output, dict) or not isinstance(output.get("bytes"), int) or output["bytes"] <= 0:
             fail(f"{label}.validation.{key} is malformed")
-        if not isinstance(output.get("sha256"), str) or len(output["sha256"]) != 64:
-            fail(f"{label}.validation.{key}.sha256 is malformed")
-        if not isinstance(output.get("source_sha256"), str) or len(output["source_sha256"]) != 64:
-            fail(f"{label}.validation.{key}.source_sha256 is malformed")
+        hash_text(output.get("sha256"), f"{label}.validation.{key}.sha256")
+        hash_text(output.get("source_sha256"), f"{label}.validation.{key}.source_sha256")
     source_hashes = {validation[key]["source_sha256"] for key in output_keys}
     if len(source_hashes) != 1:
         fail(f"{label}.validation source identity differs between outputs")
+    for owner in ("leaf", "facade"):
+        before = hash_text(
+            validation.get(f"source_{owner}_before_sha256"),
+            f"{label}.validation.source_{owner}_before_sha256",
+        )
+        after = hash_text(
+            validation.get(f"source_{owner}_after_sha256"),
+            f"{label}.validation.source_{owner}_after_sha256",
+        )
+        if before != after:
+            fail(f"{label}.validation source {owner} owner hash changed")
     for side in ("leaf", "facade"):
         first = validation[f"{side}_output"]
         repeated = validation[f"{side}_repeat"]
