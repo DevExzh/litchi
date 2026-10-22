@@ -272,6 +272,11 @@ mod tests {
             &left.content_types_publication,
             &right.content_types_publication,
         );
+        assert_eq!(
+            left.content_types_source.is_some(),
+            right.content_types_source.is_some(),
+            "content-types source presence",
+        );
         if let (Some(left), Some(right)) = (
             left.content_types_source.as_ref(),
             right.content_types_source.as_ref(),
@@ -279,6 +284,11 @@ mod tests {
             assert_bytes_equal("content-types source", left, right);
         }
         assert_eq!(left.root_relationships, right.root_relationships);
+        assert_eq!(
+            left.retained_root_relationships.is_some(),
+            right.retained_root_relationships.is_some(),
+            "root relationships source presence",
+        );
         if let (Some((left, left_present)), Some((right, right_present))) = (
             left.retained_root_relationships.as_ref(),
             right.retained_root_relationships.as_ref(),
@@ -298,6 +308,12 @@ mod tests {
                 &part_right.blob,
             );
             assert_eq!(part_left.relationships, part_right.relationships);
+            assert_eq!(
+                part_left.retained_relationships.is_some(),
+                part_right.retained_relationships.is_some(),
+                "{} relationships source presence",
+                part_left.name,
+            );
             if let (Some((left, left_present)), Some((right, right_present))) = (
                 part_left.retained_relationships.as_ref(),
                 part_right.retained_relationships.as_ref(),
