@@ -298,6 +298,35 @@ impl MessageInfoCollectionAdmission {
         self.archive_info_with_options(Some(identifier), None)
     }
 
+    /// Add a conventional message under the default profile.
+    ///
+    /// The fixed shape totals are materialized once, when the collection is
+    /// published or when a nonminimal record follows.  While the collection
+    /// remains minimal, the only aggregate that still depends on each public
+    /// record is its exact encoded header length.  Keep that ledger update
+    /// separate from the strict-profile path so the common route does not
+    /// repeat fixed memory, field and metadata arithmetic for every push.
+    #[inline]
+    fn push_minimal_default(&mut self, type_: u32, length: u32, limits: Limits) -> Result<()> {
+        let message_count = self
+            .message_count
+            .checked_add(1)
+            .ok_or_else(|| Error::invalid_archive(0, "ArchiveInfo message count overflow"))?;
+        if message_count > limits.max_messages_per_object() {
+            return Err(limit(
+                LimitKind::MessagesPerObject,
+                message_count,
+                limits.max_messages_per_object(),
+            ));
+        }
+        let encoded_length = minimal_message_info_field_length(type_, length)?;
+        self.encoded_messages_length =
+            checked_encoded_add(self.encoded_messages_length, encoded_length)?;
+        self.message_count = message_count;
+        Ok(())
+    }
+
+    #[inline]
     fn push_minimal(&mut self, type_: u32, length: u32, limits: Limits) -> Result<()> {
         let message_count = self
             .message_count
@@ -1254,11 +1283,19 @@ impl MessageInfoCollection {
                 .map_err(|_| Error::invalid_archive(0, "message length exceeds usize"))?;
             check_message_length(length, limits)?;
             if let Some(collection_admission) = self.admission.as_mut() {
-                collection_admission.push_minimal(
-                    message_info.type_,
-                    message_info.length,
-                    limits,
-                )?;
+                if limits.is_default_profile() {
+                    collection_admission.push_minimal_default(
+                        message_info.type_,
+                        message_info.length,
+                        limits,
+                    )?;
+                } else {
+                    collection_admission.push_minimal(
+                        message_info.type_,
+                        message_info.length,
+                        limits,
+                    )?;
+                }
             }
         } else {
             let admission = message_info_admission(&message_info, limits)?;
@@ -1296,7 +1333,11 @@ impl MessageInfoCollection {
             .map_err(|_| Error::invalid_archive(0, "message payload exceeds u32"))?;
         let message_info = MessageInfo::try_new(type_, length)?;
         if let Some(collection_admission) = self.admission.as_mut() {
-            collection_admission.push_minimal(type_, length, limits)?;
+            if limits.is_default_profile() {
+                collection_admission.push_minimal_default(type_, length, limits)?;
+            } else {
+                collection_admission.push_minimal(type_, length, limits)?;
+            }
         }
         self.message_infos.push(message_info);
         Ok(())
@@ -2067,8 +2108,14 @@ fn check_minimal_archive_info_constructor(
     })
 }
 
+#[inline]
 fn minimal_message_info_encoded_length(type_: u32, length: u32) -> Result<usize> {
     Ok(7 + u64_varint_length(u64::from(type_)) + u64_varint_length(u64::from(length)))
+}
+
+#[inline]
+fn minimal_message_info_field_length(type_: u32, length: u32) -> Result<usize> {
+    length_delimited_field_length(2, minimal_message_info_encoded_length(type_, length)?)
 }
 
 fn field_path_memory(path: &FieldPath) -> Result<usize> {
