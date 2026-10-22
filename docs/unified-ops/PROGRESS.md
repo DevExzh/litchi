@@ -1859,3 +1859,46 @@ See [0063](0063-source-pptx-modern-comments.md).
   are unmerged; remaining content-matching replay, raw audits, complete
   inventory/glossary closure, native qualification and the final gate remain
   required. Nothing has been pushed.
+
+- Coordinator checkpoint (2026-10-22, W4/File assembly and replay review):
+  `uo2/coordinator-w4-integration` is committed and clean at `eafeed22a4`,
+  combining W4 `b6a5d10935` with Part A `fd5f513df6`. The merge fixes the
+  facade sparkline example, six harness detector consumers, the iWork-only
+  detector feature build and the combined harness lockfile. Nine affected
+  crates pass all-target/all-feature compilation; 119 PPTX metadata tests,
+  boundary/matrix checks, formatting and locked all-target harness compilation
+  pass. The feature matrix has 27 initial passes and all four repaired iWork
+  cases pass on rerun. Record 0360c retains every failed and successful log.
+  This is an integration candidate, not trunk or performance acceptance.
+  A dry XLSB merge identifies three source conflicts plus generated matrices
+  and lockfiles; the actual XLSB merge remains coordinator work.
+
+  DOCX durable Ink source-owner repair `76148455d5` and receipt `f97f0eef7a`
+  pass 58 integration tests, 1,489 library tests and 170 doctests, with every
+  matched allocation metric at or below baseline. This closes the earlier
+  allocation returns; native qualification remains open. Flat ODF receipt
+  `965beae5c9` independently verifies both 606-file source sets, protected
+  binaries, equal locks and all 36 raw allocation legs. Constructor protocol
+  `c72ebf4816` resumes only missing verified blocks without changing the five
+  required blocks per route or host/timing guards. Its first matched-v5
+  attempt was interrupted by an unrelated build during calibration; receipt
+  `631fc7be4a` retains it with zero qualified blocks. All heavy-command holds
+  are released.
+
+  W4's `72940100a1` policy compaction improves memory but leaves owner
+  admission above the original specialized-family baseline; it remains
+  returned. `528e04e6d5` fixes no-op metadata base admission and passes its
+  focused common/XLSX tests. W5's captured-package reuse and state compaction
+  through `cf3c9a4eb6` pass focused/full affected tests but retain eager XLS
+  allocation/peak residuals. File replay `bb745b0d8c` uses a bounded streaming
+  content proof. Its signed-state review preserves existing facade admission:
+  signed files cannot create an Edit, while leaf exact signed no-op replay
+  remains legal. PPTX cross-copy replay and the remaining leaf content scope
+  repairs are still under review and validation.
+
+  Review found additional replay-shape debt: DOCX/PPTX metadata and several
+  primary/source-backed replay methods still return Package/Self. These need
+  Commit migration with all consumers, shared triad review and gate/inventory
+  coverage. Raw ODF XML policy work from 0362n, remaining wave integration,
+  native qualification, the complete inventory/glossary and final 53-check
+  gate remain required. Nothing has been pushed.
