@@ -1030,7 +1030,10 @@ impl Edit {
             after: candidate.clone(),
             selector: self.selector,
             root_close: proof.root_close,
-            inserted: inserted.into_boxed_slice(),
+            inserted: InsertedSpan {
+                offset: proof.root_close,
+                len: inserted_len,
+            },
             direction: Direction::Append,
         };
         Ok(Commit {
@@ -3600,7 +3603,7 @@ impl Commit {
                 runs: 0,
                 input_bytes: 0,
                 source_bytes,
-                inserted_bytes: patch.inserted.len(),
+                inserted_bytes: patch.inserted.len,
                 output_bytes,
             },
             patch,
@@ -3665,7 +3668,7 @@ pub struct Patch {
     after: Package,
     selector: TailSelector,
     root_close: usize,
-    inserted: Box<[u8]>,
+    inserted: InsertedSpan,
     direction: Direction,
 }
 
@@ -3681,7 +3684,7 @@ impl Patch {
             after: source,
             selector,
             root_close: 0,
-            inserted: Box::new([]),
+            inserted: InsertedSpan::EMPTY,
             direction: Direction::Append,
         }
     }
@@ -3717,7 +3720,7 @@ impl Patch {
             after: self.before.clone(),
             selector: self.selector,
             root_close: self.root_close,
-            inserted: self.inserted.clone(),
+            inserted: self.inserted,
             direction: if self.inserted.is_empty() {
                 Direction::Append
             } else {
@@ -3734,8 +3737,8 @@ impl Patch {
 
     /// Number of exact inserted bytes represented by this patch.
     #[must_use]
-    pub fn inserted_bytes(&self) -> usize {
-        self.inserted.len()
+    pub const fn inserted_bytes(&self) -> usize {
+        self.inserted.len
     }
 
     /// Converts this patch to a deterministic bounded JSON envelope.
@@ -3754,7 +3757,7 @@ impl Patch {
             before_bytes: before.len(),
             after_bytes: after.len(),
             root_close: self.root_close,
-            inserted: self.inserted.clone(),
+            inserted: self.inserted_source_bytes()?.to_vec().into_boxed_slice(),
             limits,
         };
         validate_wire_fields(&wire)?;
@@ -3770,6 +3773,41 @@ impl Patch {
         )?;
         let _ = wire.to_deterministic_json()?;
         Ok(wire)
+    }
+
+    fn inserted_source_bytes(&self) -> Result<&[u8], Error> {
+        if self.inserted.offset != self.root_close {
+            return Err(Error::PatchConflict);
+        }
+        let source = match self.direction {
+            Direction::Append => self.after.source_bytes(),
+            Direction::Remove => self.before.source_bytes(),
+        }
+        .ok_or(Error::unsupported_source(
+            "tail patch source has no exact RTF source",
+        ))?;
+        let end = self
+            .inserted
+            .offset
+            .checked_add(self.inserted.len)
+            .ok_or(Error::PatchConflict)?;
+        source
+            .get(self.inserted.offset..end)
+            .ok_or(Error::PatchConflict)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct InsertedSpan {
+    offset: usize,
+    len: usize,
+}
+
+impl InsertedSpan {
+    const EMPTY: Self = Self { offset: 0, len: 0 };
+
+    const fn is_empty(self) -> bool {
+        self.len == 0
     }
 }
 
