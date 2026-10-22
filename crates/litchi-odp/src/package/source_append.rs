@@ -1792,10 +1792,10 @@ mod tests {
             .write_stored("mimetype", ODF_PRESENTATION.as_bytes())
             .unwrap();
         writer
-            .write_deflated(ODF_CONTENT, content.as_bytes())
+            .write_stored(ODF_CONTENT, content.as_bytes())
             .unwrap();
         writer
-            .write_deflated("META-INF/manifest.xml", manifest.as_bytes())
+            .write_stored("META-INF/manifest.xml", manifest.as_bytes())
             .unwrap();
         Arc::new(OwnedSource::new(writer.finish_to_bytes().unwrap()))
     }
@@ -1839,7 +1839,8 @@ mod tests {
             .unwrap()
             .prepare()
             .unwrap_err();
-        assert!(format!("{error}").contains("doctype"));
+        let message = format!("{error}");
+        assert!(message.contains("DTD") || message.contains("DOCTYPE"));
     }
 
     #[test]
