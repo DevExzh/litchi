@@ -35,8 +35,16 @@ The authored output was 1,048,625 bytes with SHA-256
 `85ab6f00ad070dc60eddc632118bb067b9dfe2969212946212ba072ef8c9ab3d` in both
 runs.  The durable JSON was 2,097,519 bytes with SHA-256
 `1cd14e2103724a4f217c46ece09dbe847f2edf7b87a39edc03a4c60438e6763a` in both
-runs.  Raw pre-change and candidate logs, source trees, binaries and the
-matching authored/durable files remain outside the repository:
+runs.  The exact-byte check was `cmp -s` between the baseline and candidate
+authored files and between the baseline and candidate durable files; both
+returned exit 0.  The files are
+`/home/zhuhe/code/litchi-worktrees/.coord/w8-rtf-tail-baseline-large.authored.bin`,
+`/home/zhuhe/code/litchi-worktrees/.coord/w8-rtf-tail-candidate-large.authored.bin`,
+`/home/zhuhe/code/litchi-worktrees/.coord/w8-rtf-tail-baseline-large.durable.json`
+and
+`/home/zhuhe/code/litchi-worktrees/.coord/w8-rtf-tail-candidate-large.durable.json`.
+Raw pre-change and candidate logs, source trees, binaries and these exact
+matching files remain outside the repository:
 
 * baseline log: `/home/zhuhe/code/litchi-worktrees/.coord/w8-rtf-tail-alloc-baseline-large-v2.txt`, 3,624 bytes, SHA-256
   `b0928d517c55f0a33fe84fcc05b2a8dfaa666aafee8addddf9e9f9e93fac2311`;
