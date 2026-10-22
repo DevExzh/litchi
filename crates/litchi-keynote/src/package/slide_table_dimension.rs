@@ -2878,7 +2878,7 @@ fn validate_global_references(
             )?;
             budget.work(object.data_length as usize)?;
             object
-                .inspect_references_with_policy_and_limits(
+                .inspect_references_with_policy(
                     &mut visitor,
                     ArchiveReferencePolicy::RejectUnknownMetadata,
                     limits,
@@ -3208,7 +3208,7 @@ fn rewrite_component(
     budget.allocations(1)?;
     budget.retained(entry.data().len())?;
     budget.physical(entry.data().len())?;
-    let stream = SnappyStream::decompress_with_limits(
+    let stream = SnappyStream::decompress(
         entry.data(),
         source
             .state
@@ -3221,8 +3221,7 @@ fn rewrite_component(
     budget.allocations(1)?;
     budget.retained(stream.as_bytes().len())?;
     budget.physical(stream.as_bytes().len())?;
-    let mut archive =
-        Archive::parse_with_limits(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
+    let mut archive = Archive::parse(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
     charge_archive_inventory(&archive, budget)?;
     for replacement in replacements {
         let object = archive
@@ -3239,7 +3238,7 @@ fn rewrite_component(
         budget.allocations(replacement.payload.len())?;
         budget.retained(replacement.payload.len())?;
         object
-            .replace_message_preserving_header_with_limits(
+            .replace_message_preserving_header(
                 replacement.message,
                 RawMessage {
                     type_: replacement.message_type,
@@ -3250,22 +3249,21 @@ fn rewrite_component(
             .map_err(map_core_error)?;
     }
     let encoded_length = archive
-        .encoded_len_with_limits(archive_limits)
+        .encoded_len(archive_limits)
         .map_err(map_core_error)?;
-    let compressed_bound =
-        SnappyStream::maximum_compressed_len(encoded_length).map_err(map_core_error)?;
+    let compressed_bound = SnappyStream::maximum_compressed_len(encoded_length, Default::default())
+        .map_err(map_core_error)?;
     budget.output(encoded_length.saturating_add(compressed_bound))?;
     budget.allocations(encoded_length)?;
     budget.retained(encoded_length)?;
     budget.allocations(compressed_bound)?;
     budget.retained(compressed_bound)?;
-    let encoded = archive
-        .to_bytes_with_limits(archive_limits)
-        .map_err(map_core_error)?;
+    let encoded = archive.to_bytes(archive_limits).map_err(map_core_error)?;
     if encoded.len() != encoded_length {
         return Err(Error::Verification);
     }
-    let compressed = SnappyStream::compress(&encoded).map_err(map_core_error)?;
+    let compressed =
+        SnappyStream::compress(&encoded, Default::default()).map_err(map_core_error)?;
     if compressed.len() > compressed_bound {
         return Err(Error::Verification);
     }
@@ -3531,7 +3529,7 @@ fn component_archive(
     budget.allocations(1)?;
     budget.retained(entry.data().len())?;
     budget.physical(entry.data().len())?;
-    let stream = SnappyStream::decompress_with_limits(
+    let stream = SnappyStream::decompress(
         entry.data(),
         package
             .state
@@ -3544,7 +3542,7 @@ fn component_archive(
     budget.allocations(1)?;
     budget.retained(stream.as_bytes().len())?;
     budget.physical(stream.as_bytes().len())?;
-    let archive = Archive::parse_with_limits(
+    let archive = Archive::parse(
         stream.as_bytes(),
         package
             .state

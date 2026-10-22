@@ -232,7 +232,7 @@ fn object(
     data: Vec<u8>,
     references: &[u64],
 ) -> TestResult<ArchiveObject> {
-    let mut object = ArchiveObject::new(identifier, vec![RawMessage { type_, data }])?;
+    let mut object = ArchiveObject::new(identifier, vec![RawMessage { type_, data }], Default::default())?;
     object.archive_info.message_infos[0]
         .object_references
         .extend_from_slice(references);
@@ -706,7 +706,7 @@ fn synthetic_package_with_metadata(
     }
 
     let archive = Archive { objects };
-    let component = SnappyStream::compress(&archive.to_bytes()?)?;
+    let component = SnappyStream::compress(&archive.to_bytes()?, Default::default())?;
     let mut members: Vec<(&str, &[u8])> = vec![
         ("Data/sentinel.bin", b"untouched-sentinel"),
         (DOCUMENT_MEMBER, component.as_slice()),
@@ -771,7 +771,7 @@ fn metadata_archive(document: &Archive) -> TestResult<Vec<u8>> {
             &[],
         )?],
     };
-    Ok(SnappyStream::compress(&archive.to_bytes()?)?)
+    Ok(SnappyStream::compress(&archive.to_bytes()?, Default::default())?)
 }
 
 fn document_archive(package: &[u8]) -> TestResult<Archive> {
@@ -781,8 +781,8 @@ fn document_archive(package: &[u8]) -> TestResult<Archive> {
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or("missing document member")?;
     Ok(Archive::parse(
-        SnappyStream::decompress(entry.data())?.as_bytes(),
-    )?)
+        SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+     Default::default(),)?)
 }
 
 fn preview_count(package: &[u8]) -> usize {
@@ -802,9 +802,9 @@ fn rewrite_document_archive(
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or("missing document member")?;
-    let mut archive = Archive::parse(SnappyStream::decompress(entry.data())?.as_bytes())?;
+    let mut archive = Archive::parse(SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(), Default::default())?;
     mutate(&mut archive)?;
-    let component = SnappyStream::compress(&archive.to_bytes()?)?;
+    let component = SnappyStream::compress(&archive.to_bytes()?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(DOCUMENT_MEMBER, &component)],
         Limits::default(),
@@ -817,7 +817,7 @@ fn metadata_payload_from_package(package: &[u8]) -> TestResult<Vec<u8>> {
         .iter()
         .find(|entry| entry.name() == METADATA_MEMBER)
         .ok_or("missing metadata member")?;
-    let archive = Archive::parse(SnappyStream::decompress(entry.data())?.as_bytes())?;
+    let archive = Archive::parse(SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(), Default::default())?;
     Ok(archive
         .object(METADATA_OBJECT_IDENTIFIER)
         .ok_or("missing metadata object")?
@@ -838,7 +838,7 @@ fn rewrite_metadata(
         .iter()
         .find(|entry| entry.name() == METADATA_MEMBER)
         .ok_or("missing metadata member")?;
-    let mut archive = Archive::parse(SnappyStream::decompress(entry.data())?.as_bytes())?;
+    let mut archive = Archive::parse(SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(), Default::default())?;
     let metadata_object = archive
         .object_mut(METADATA_OBJECT_IDENTIFIER)
         .ok_or("missing metadata object")?;
@@ -850,7 +850,7 @@ fn rewrite_metadata(
     let mut metadata = tsp::PackageMetadata::decode(message.data.as_slice())?;
     mutate(&mut metadata)?;
     message.data = metadata.encode_to_vec();
-    let component = SnappyStream::compress(&archive.to_bytes()?)?;
+    let component = SnappyStream::compress(&archive.to_bytes()?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(METADATA_MEMBER, component.as_slice())],
         Limits::default(),
@@ -1697,12 +1697,12 @@ fn aggregate_ownerless_fixture(cross_component: bool) -> TestResult<Vec<u8>> {
                 objects: vec![engine, owner],
             }
             .to_bytes()?,
-        )?)
+         Default::default(),)?)
     } else {
         archive.objects.push(engine);
         None
     };
-    let document = SnappyStream::compress(&archive.to_bytes()?)?;
+    let document = SnappyStream::compress(&archive.to_bytes()?, Default::default())?;
     let catalog = Catalog::from_bytes(&source)?;
     let mut members = catalog
         .iter()

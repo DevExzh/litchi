@@ -5,8 +5,9 @@
 //! `OfficeArt` framing only; DOC and PPT remain responsible for locating their
 //! host streams, and image codecs remain in `litchi-imgconv`.
 
+use super::LimitKind as ImageLimitKind;
 use super::{Blip, Block, Context, Delay, Entry, Id, Kind, Store};
-use crate::{Children, Container, Error, ImageLimit, Limit, Parser, Record, RecordKind, Result};
+use crate::{Children, Container, Error, LimitKind, Parser, Record, RecordKind, Result};
 
 const MAX_FILES: usize = 0x0fff;
 const MAX_DEPTH: usize = 64;
@@ -49,7 +50,7 @@ impl<'data> File<'data> {
     pub fn blip(&self) -> Result<Blip<'_>> {
         match &self.source {
             Source::View(blip) => Ok(blip.clone()),
-            Source::Owned { record, .. } => Blip::parse(record),
+            Source::Owned { record, .. } => Blip::parse(record, Default::default()),
         }
     }
 
@@ -162,12 +163,16 @@ pub fn store(data: &[u8]) -> Result<Option<Store<'_>>> {
         }
         if record.is_container() {
             let container = Container::try_new(record)?;
-            for store in container.find_recursive(RecordKind::BStoreContainer)? {
+            for store in
+                container.find_recursive(RecordKind::BStoreContainer, Default::default())?
+            {
                 set_store(&mut found, store)?;
             }
         }
     }
-    found.map(Store::from_record).transpose()
+    found
+        .map(|record| Store::from_record(record, Default::default()))
+        .transpose()
 }
 
 /// Resolves one checked semantic `BStore` ID against an optional delay store.
@@ -233,11 +238,11 @@ pub fn record_with_delay<'data>(
     delay_store: Option<&'data [u8]>,
 ) -> Result<File<'data>> {
     if record.kind().is_blip() {
-        let blip = Blip::from_record(record.clone())?;
+        let blip = Blip::from_record(record.clone(), Default::default())?;
         return Ok(File::new(blip, None, 0));
     }
     if record.kind() == RecordKind::Bse {
-        let entry = Entry::parse(record.clone())?;
+        let entry = Entry::parse(record.clone(), Default::default())?;
         return file_from_entry(&entry, delay_store, 0)?.ok_or(Error::MalformedImage {
             reason: "FBSE is an empty image slot",
         });
@@ -287,7 +292,7 @@ pub fn container<'data>(
 /// Returns an error when a delay record is malformed, a delayed BLIP cannot
 /// be resolved, or the file count limit is exceeded.
 pub fn delay(data: &[u8]) -> Result<Vec<File<'_>>> {
-    let delay = Delay::new(data);
+    let delay = Delay::new(data, Default::default());
     let mut files = Vec::new();
     for block in delay.iter() {
         let index = files.len();
@@ -369,7 +374,7 @@ fn file_from_entry<'data>(
 ) -> Result<Option<File<'data>>> {
     let name = entry_name(entry)?;
     let context = delay_store.map_or_else(Context::new, |data| {
-        Context::new().with_delay(Delay::new(data))
+        Context::new().with_delay(Delay::new(data, entry.limits))
     });
     entry
         .resolve(context)
@@ -382,7 +387,7 @@ fn check_count(current: usize, additional: usize) -> Result<()> {
         .is_none_or(|count| count > MAX_FILES)
     {
         return Err(Error::ImageLimitExceeded {
-            limit: ImageLimit::StoreEntries,
+            limit: ImageLimitKind::StoreEntries,
             maximum: MAX_FILES as u64,
         });
     }
@@ -407,22 +412,22 @@ fn collect<'data>(
         })?;
         if visited > MAX_RECORDS {
             return Err(Error::LimitExceeded {
-                limit: Limit::Records,
+                limit: LimitKind::Records,
                 maximum: MAX_RECORDS,
             });
         }
         if record.kind().is_blip() {
-            let blip = Blip::from_record(record)?;
+            let blip = Blip::from_record(record, Default::default())?;
             check_count(files.len(), 1)?;
             files.push(File::new(blip, None, files.len()));
         } else if record.kind() == RecordKind::Bse {
-            let entry = Entry::parse(record)?;
+            let entry = Entry::parse(record, Default::default())?;
             if let Some(file) = file_from_entry(&entry, delay_store, files.len())? {
                 check_count(files.len(), 1)?;
                 files.push(file);
             }
         } else if record.kind() == RecordKind::BStoreContainer {
-            let store = Store::from_record(record)?;
+            let store = Store::from_record(record, Default::default())?;
             check_count(files.len(), usize::from(store.len()))?;
             files.extend(all(&store, delay_store)?);
         } else if record.is_container() {
@@ -432,7 +437,7 @@ fn collect<'data>(
                         context: "maximum image depth",
                     })?;
                 return Err(Error::LimitExceeded {
-                    limit: Limit::Depth,
+                    limit: LimitKind::Depth,
                     maximum,
                 });
             }
@@ -497,7 +502,7 @@ mod tests {
     #[test]
     fn owned_file_reparses_without_a_self_reference() {
         let bytes = png_blip(b"png");
-        let blip = Blip::parse(&bytes).expect("valid PNG");
+        let blip = Blip::parse(&bytes, Default::default()).expect("valid PNG");
         let file = File::new(blip, Some("photo.old".to_string()), 4)
             .into_owned()
             .expect("copy image");
@@ -509,7 +514,7 @@ mod tests {
     #[test]
     fn producer_names_cannot_escape_the_output_directory() {
         let bytes = png_blip(b"png");
-        let blip = Blip::parse(&bytes).expect("valid PNG");
+        let blip = Blip::parse(&bytes, Default::default()).expect("valid PNG");
         let file = File::new(blip, Some("../../unsafe:name.old".to_string()), 4);
         assert_eq!(file.filename(), "unsafe_name.png");
     }
@@ -517,7 +522,7 @@ mod tests {
     #[test]
     fn producer_names_are_portable_and_bounded() {
         let bytes = png_blip(b"png");
-        let blip = Blip::parse(&bytes).expect("valid PNG");
+        let blip = Blip::parse(&bytes, Default::default()).expect("valid PNG");
         let reserved = File::new(blip.clone(), Some("CON.old".to_string()), 0);
         assert_eq!(reserved.filename(), "CON_.png");
 
@@ -533,7 +538,8 @@ mod tests {
     #[test]
     fn host_can_assign_a_stable_semantic_position() {
         let bytes = png_blip(b"png");
-        let file = File::new(Blip::parse(&bytes).unwrap(), None, 0).with_index(7);
+        let file =
+            File::new(Blip::parse(&bytes, Default::default()).unwrap(), None, 0).with_index(7);
         assert_eq!(file.index(), 7);
         assert_eq!(file.filename(), "image_007.png");
     }
@@ -557,6 +563,55 @@ mod tests {
     }
 
     #[test]
+    fn delayed_resolution_retains_the_entry_limit_with_a_broader_context() {
+        let blip = png_blip(b"png");
+        let entry = delayed_fbse(&blip, 0, &[]);
+        let mut bytes = vec![0x1f, 0, 0x01, 0xf0];
+        bytes.extend_from_slice(&u32::try_from(entry.len()).unwrap().to_le_bytes());
+        bytes.extend_from_slice(&entry);
+        let strict = super::super::Limits {
+            max_blip_bytes: 17,
+            max_store_entries: 1,
+        };
+        let store = Store::parse(&bytes, strict).expect("delayed metadata admitted");
+        let id = Id::new(1).unwrap();
+        assert!(matches!(
+            get(&store, id, Some(&blip)),
+            Err(Error::ImageLimitExceeded {
+                limit: ImageLimitKind::BlipBytes,
+                maximum: 17
+            })
+        ));
+        let broad = Context::new().with_delay(Delay::new(&blip, Default::default()));
+        assert!(matches!(
+            store.resolve(id, broad),
+            Err(Error::ImageLimitExceeded {
+                limit: ImageLimitKind::BlipBytes,
+                maximum: 17
+            })
+        ));
+        let exact = super::super::Limits {
+            max_blip_bytes: 20,
+            ..strict
+        };
+        let store = Store::parse(&bytes, exact).expect("exact limit store");
+        let resolved = store
+            .resolve(id, broad)
+            .expect("exact limit")
+            .expect("image");
+        assert_eq!(resolved.data(), b"png");
+        assert_eq!(resolved.data().as_ptr(), blip[25..].as_ptr());
+        let narrow_context = Context::new().with_delay(Delay::new(&blip, strict));
+        assert!(matches!(
+            store.resolve(id, narrow_context),
+            Err(Error::ImageLimitExceeded {
+                limit: ImageLimitKind::BlipBytes,
+                maximum: 17
+            })
+        ));
+    }
+
+    #[test]
     fn delay_accepts_a_headerless_record_sequence() {
         let first = png_blip(b"one");
         let second = png_blip(b"two");
@@ -574,7 +629,7 @@ mod tests {
         assert!(matches!(
             scan(&data),
             Err(Error::ImageLimitExceeded {
-                limit: ImageLimit::StoreEntries,
+                limit: ImageLimitKind::StoreEntries,
                 maximum: 4095,
             })
         ));

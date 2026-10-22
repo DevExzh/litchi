@@ -7428,6 +7428,7 @@ mod tests {
                 type_: 6_218,
                 data: rich_payload,
             }],
+            Default::default(),
         )
         .expect("synthetic rich payload object is valid");
         payload_object.archive_info.message_infos[0]
@@ -7439,6 +7440,7 @@ mod tests {
                 type_: 2_001,
                 data: rich_storage,
             }],
+            Default::default(),
         )
         .expect("synthetic rich storage object is valid");
         storage_object.archive_info.message_infos[0]
@@ -7450,6 +7452,7 @@ mod tests {
                 type_: 2_002,
                 data: Vec::new(),
             }],
+            Default::default(),
         )
         .expect("synthetic style object is valid");
 

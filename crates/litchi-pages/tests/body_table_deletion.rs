@@ -26,7 +26,7 @@ fn exact_bytes(package: &Package) -> TestResult<Vec<u8>> {
 }
 
 fn entry_data(bytes: &[u8], name: &str) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(bytes)?;
+    let catalog = Catalog::from_bytes(bytes, Default::default())?;
     catalog
         .iter()
         .find(|entry| entry.name() == name)
@@ -35,7 +35,7 @@ fn entry_data(bytes: &[u8], name: &str) -> TestResult<Vec<u8>> {
 }
 
 fn remove_metadata_member(bytes: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(bytes)?;
+    let catalog = Catalog::from_bytes(bytes, Default::default())?;
     if !catalog.iter().any(|entry| entry.name() == METADATA_MEMBER) {
         return Err("fixture has no PackageMetadata member to remove".into());
     }
@@ -47,7 +47,7 @@ fn remove_metadata_member(bytes: &[u8]) -> TestResult<Vec<u8>> {
 }
 
 fn member_names(bytes: &[u8]) -> TestResult<Vec<String>> {
-    Ok(Catalog::from_bytes(bytes)?
+    Ok(Catalog::from_bytes(bytes, Default::default())?
         .iter()
         .map(|entry| entry.name().to_owned())
         .collect())
@@ -55,8 +55,8 @@ fn member_names(bytes: &[u8]) -> TestResult<Vec<String>> {
 
 fn iwa_object_count(bytes: &[u8], name: &str) -> TestResult<usize> {
     let data = entry_data(bytes, name)?;
-    let stream = litchi_iwa_core::SnappyStream::decompress(&data)?;
-    let archive = litchi_iwa_core::Archive::parse(stream.as_bytes())?;
+    let stream = litchi_iwa_core::SnappyStream::decompress(&data, Default::default())?;
+    let archive = litchi_iwa_core::Archive::parse(stream.as_bytes(), Default::default())?;
     Ok(archive.objects.len())
 }
 
@@ -106,9 +106,9 @@ fn deletion_preserves_unrelated_zip_members_byte_for_byte() -> TestResult {
         .edit_body_table_deletion()
         .remove(BodyTableSelector::index(0))
         .and_then(|edit| edit.commit())?;
-    let before = Catalog::from_bytes(SOURCE)?;
+    let before = Catalog::from_bytes(SOURCE, Default::default())?;
     let after_bytes = exact_bytes(commit.package())?;
-    let after = Catalog::from_bytes(&after_bytes)?;
+    let after = Catalog::from_bytes(&after_bytes, Default::default())?;
 
     for entry in before
         .iter()
@@ -191,7 +191,7 @@ fn deletion_removes_empty_iwa_members_without_package_metadata_registration() ->
             entry_data(source, SHARED_IWA_MEMBER)?,
             "{label}: unrelated shared IWA member changed"
         );
-        for entry in Catalog::from_bytes(source)?
+        for entry in Catalog::from_bytes(source, Default::default())?
             .iter()
             .filter(|entry| !entry.name().ends_with(".iwa") && !PREVIEWS.contains(&entry.name()))
         {
@@ -215,7 +215,7 @@ fn deleted_previews_are_restored_by_the_inverse_patch() -> TestResult {
         .and_then(|edit| edit.commit())?;
     assert_eq!(commit.diagnostics().deleted_previews(), PREVIEWS.len());
     let changed = exact_bytes(commit.package())?;
-    let changed_catalog = Catalog::from_bytes(&changed)?;
+    let changed_catalog = Catalog::from_bytes(&changed, Default::default())?;
     assert!(
         PREVIEWS
             .iter()
@@ -244,7 +244,7 @@ fn patch_rejects_an_independently_reallocated_source_with_different_bytes() -> T
         .remove(BodyTableSelector::index(0))
         .and_then(|edit| edit.commit())?;
 
-    let source_catalog = Catalog::from_bytes(SOURCE)?;
+    let source_catalog = Catalog::from_bytes(SOURCE, Default::default())?;
     let altered_bytes = source_catalog.reassemble_to_bytes(
         &[EntryEdit::new("preview.jpg", b"independent source bytes")],
         PhysicalLimits::default(),

@@ -222,8 +222,7 @@ fn map_wire_error(error: litchi_iwa_common::Error) -> AxisSupportError {
         litchi_iwa_common::Error::Allocation { amount, .. } => {
             AxisSupportError::Allocation { amount }
         },
-        litchi_iwa_common::Error::InvalidFormat(_)
-        | litchi_iwa_common::Error::InvalidLimit { .. } => AxisSupportError::InvalidSource,
+        _ => AxisSupportError::InvalidSource,
     }
 }
 
@@ -970,7 +969,7 @@ pub(super) fn inspect_archive_references_strict(
         .map_err(map_archive_error)?;
     let mut visitor = StrictArchiveReferenceVisitor;
     object
-        .inspect_references_with_policy_and_limits(
+        .inspect_references_with_policy(
             &mut visitor,
             ArchiveReferencePolicy::RejectUnknownMetadata,
             archive_limits,
@@ -1084,7 +1083,7 @@ pub(super) fn validate_global_axis_references<'a>(
             budget.charge_work(1)?;
             charge_archive_reference_inspection(object, budget)?;
             object
-                .inspect_references_with_policy_and_limits(
+                .inspect_references_with_policy(
                     &mut visitor,
                     ArchiveReferencePolicy::RejectUnknownMetadata,
                     archive_limits,
@@ -2019,11 +2018,11 @@ fn verify_selected_archive_info_framing<B: LocalityBudget + ?Sized>(
         .map_err(map_archive_error)?;
     let source_bound = source_component
         .archive()
-        .encoded_len_with_limits(archive_limits)
+        .encoded_len(archive_limits)
         .map_err(map_core_error)?;
     let candidate_bound = candidate_component
         .archive()
-        .encoded_len_with_limits(archive_limits)
+        .encoded_len(archive_limits)
         .map_err(map_core_error)?;
     let source_compressed = source_entry.data();
     let candidate_compressed = candidate_entry.data();
@@ -2047,12 +2046,10 @@ fn verify_selected_archive_info_framing<B: LocalityBudget + ?Sized>(
         .archive()
         .snappy_limits()
         .map_err(map_archive_error)?;
-    let source_stream =
-        SnappyStream::decompress_with_limits(source_compressed, source_snappy_limits)
-            .map_err(map_core_error)?;
-    let candidate_stream =
-        SnappyStream::decompress_with_limits(candidate_compressed, candidate_snappy_limits)
-            .map_err(map_core_error)?;
+    let source_stream = SnappyStream::decompress(source_compressed, source_snappy_limits)
+        .map_err(map_core_error)?;
+    let candidate_stream = SnappyStream::decompress(candidate_compressed, candidate_snappy_limits)
+        .map_err(map_core_error)?;
     budget.charge_work(
         source_stream
             .as_bytes()

@@ -259,7 +259,7 @@ impl<'a> Placeholder<'a> {
                     "placeholder container has trailing OfficeArt records".to_owned(),
                 ));
             }
-            let shape = litchi_odraw::shape::Shape::try_from(record)?;
+            let shape = litchi_odraw::shape::Shape::from_record(record, Default::default())?;
             match shape.placeholder()? {
                 Some(info) => (
                     PlaceholderType::from(info.kind),

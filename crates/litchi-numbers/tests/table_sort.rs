@@ -71,14 +71,14 @@ fn rewrite_native_table_model(
     source: &[u8],
     mutate: impl FnOnce(&mut ArchiveObject, usize, &mut Vec<u8>) -> TestResult,
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let mut selected = None;
     for entry in catalog
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
     {
-        let stream = SnappyStream::decompress(entry.data())?;
-        let archive = Archive::parse(stream.as_bytes())?;
+        let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+        let archive = Archive::parse(stream.as_bytes(), Default::default())?;
         if archive.objects.iter().any(|object| {
             object
                 .messages
@@ -115,8 +115,10 @@ fn rewrite_native_table_model(
             type_: TABLE_MODEL_TYPE,
             data: model,
         },
+        Default::default(),
     )?;
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(&member, &compressed)],
         ArchiveLimits::default(),
@@ -124,13 +126,13 @@ fn rewrite_native_table_model(
 }
 
 fn model_payload(source: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     for entry in catalog
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
     {
-        let stream = SnappyStream::decompress(entry.data())?;
-        let archive = Archive::parse(stream.as_bytes())?;
+        let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+        let archive = Archive::parse(stream.as_bytes(), Default::default())?;
         for object in archive.objects {
             for message in object.messages {
                 if message.type_ == TABLE_MODEL_TYPE && table_one_model(&message.data) {
@@ -316,8 +318,8 @@ fn assert_model_field45_equal(source: &[u8], target: &[u8]) -> TestResult {
 }
 
 fn assert_exact_locality(source: &[u8], target: &[u8]) -> TestResult {
-    let source_catalog = Catalog::from_bytes(source)?;
-    let target_catalog = Catalog::from_bytes(target)?;
+    let source_catalog = Catalog::from_bytes(source, Default::default())?;
+    let target_catalog = Catalog::from_bytes(target, Default::default())?;
     let mut changed = Vec::new();
     for before in source_catalog.iter() {
         let after = target_catalog

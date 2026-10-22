@@ -290,16 +290,16 @@ fn two_table_formula_package() -> TestResult<Package> {
     const OWNER_MESSAGE_TYPE: u32 = 4_008;
 
     let source = std::fs::read(fixture_path())?;
-    let catalog = Catalog::from_bytes(&source)?;
+    let catalog = Catalog::from_bytes(&source, Default::default())?;
     let mut components = Vec::new();
     for member in catalog
         .iter()
         .filter(|member| member.name().ends_with(".iwa"))
     {
-        let stream = SnappyStream::decompress(member.data())?;
+        let stream = SnappyStream::decompress(member.data(), Default::default())?;
         components.push(SyntheticComponent {
             name: member.name().to_owned(),
-            archive: Archive::parse(stream.as_bytes())?,
+            archive: Archive::parse(stream.as_bytes(), Default::default())?,
             changed: false,
         });
     }
@@ -479,6 +479,7 @@ fn two_table_formula_package() -> TestResult<Package> {
             type_: TABLE_INFO_MESSAGE_TYPE,
             data: cloned_info_value.encode_to_vec(),
         },
+        Default::default(),
     )?;
 
     let mut cloned_model = components[model_component].archive.objects[model_object].clone();
@@ -516,6 +517,7 @@ fn two_table_formula_package() -> TestResult<Package> {
             type_: TABLE_MODEL_MESSAGE_TYPE,
             data: model_payload,
         },
+        Default::default(),
     )?;
 
     let mut cloned_tile = components[tile_component].archive.objects[tile_object].clone();
@@ -545,6 +547,7 @@ fn two_table_formula_package() -> TestResult<Package> {
             type_: OWNER_MESSAGE_TYPE,
             data: owner.encode_to_vec(),
         },
+        Default::default(),
     )?;
 
     sheet.drawable_infos.push(tsp::Reference {
@@ -560,6 +563,7 @@ fn two_table_formula_package() -> TestResult<Package> {
                 type_: SHEET_MESSAGE_TYPE,
                 data: sheet.encode_to_vec(),
             },
+            Default::default(),
         )?;
         components[sheet_component].changed = true;
     }
@@ -590,6 +594,7 @@ fn two_table_formula_package() -> TestResult<Package> {
                 type_: ENGINE_MESSAGE_TYPE,
                 data: engine.encode_to_vec(),
             },
+            Default::default(),
         )?;
         components[engine_component].changed = true;
     }
@@ -618,7 +623,10 @@ fn two_table_formula_package() -> TestResult<Package> {
     for component in components.iter().filter(|component| component.changed) {
         rewritten.push((
             component.name.as_str(),
-            SnappyStream::compress(&component.archive.to_bytes()?)?,
+            SnappyStream::compress(
+                &component.archive.to_bytes(Default::default())?,
+                Default::default(),
+            )?,
         ));
     }
     let edits = rewritten
@@ -635,14 +643,14 @@ fn data_list_entries(
     package: &[u8],
     kind: tst::table_data_list::ListType,
 ) -> TestResult<Vec<tst::table_data_list::ListEntry>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let mut entries = Vec::new();
     for member in catalog
         .iter()
         .filter(|member| member.name().ends_with(".iwa"))
     {
-        let stream = SnappyStream::decompress(member.data())?;
-        let archive = Archive::parse(stream.as_bytes())?;
+        let stream = SnappyStream::decompress(member.data(), Default::default())?;
+        let archive = Archive::parse(stream.as_bytes(), Default::default())?;
         for message in archive
             .objects
             .iter()
@@ -681,14 +689,14 @@ fn decode_offset(bytes: &[u8], width: usize) -> Option<usize> {
 }
 
 fn formula_cell(package: &[u8], position: At) -> TestResult<BncCell> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let mut matches = Vec::new();
     for member in catalog
         .iter()
         .filter(|member| member.name().ends_with(".iwa"))
     {
-        let stream = SnappyStream::decompress(member.data())?;
-        let archive = Archive::parse(stream.as_bytes())?;
+        let stream = SnappyStream::decompress(member.data(), Default::default())?;
+        let archive = Archive::parse(stream.as_bytes(), Default::default())?;
         for message in archive
             .objects
             .iter()

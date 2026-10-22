@@ -8,7 +8,7 @@ mod codec;
 mod model;
 mod validation;
 
-pub use codec::{parse, parse_with};
+pub use codec::parse;
 pub use model::{Bounds, Flags, Kind, Native, Shape};
 
 #[cfg(test)]

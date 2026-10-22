@@ -1,0 +1,101 @@
+{
+  "timings_excluded": true,
+  "results": [
+    {
+      "before": {
+        "route": "blip-small",
+        "iterations": 1,
+        "checksum": 229,
+        "store_size": 48,
+        "shape_size": 312
+      },
+      "after": {
+        "route": "blip-small",
+        "iterations": 1,
+        "checksum": 229,
+        "store_size": 48,
+        "shape_size": 312
+      }
+    },
+    {
+      "before": {
+        "route": "blip-large",
+        "iterations": 1,
+        "checksum": 2097317,
+        "store_size": 48,
+        "shape_size": 312
+      },
+      "after": {
+        "route": "blip-large",
+        "iterations": 1,
+        "checksum": 2097317,
+        "store_size": 48,
+        "shape_size": 312
+      }
+    },
+    {
+      "before": {
+        "route": "delayed",
+        "iterations": 1,
+        "checksum": 229,
+        "store_size": 48,
+        "shape_size": 312
+      },
+      "after": {
+        "route": "delayed",
+        "iterations": 1,
+        "checksum": 229,
+        "store_size": 48,
+        "shape_size": 312
+      }
+    },
+    {
+      "before": {
+        "route": "shape-parse",
+        "iterations": 1,
+        "checksum": 7,
+        "store_size": 48,
+        "shape_size": 312
+      },
+      "after": {
+        "route": "shape-parse",
+        "iterations": 1,
+        "checksum": 7,
+        "store_size": 48,
+        "shape_size": 312
+      }
+    },
+    {
+      "before": {
+        "route": "shape-record",
+        "iterations": 1,
+        "checksum": 7,
+        "store_size": 48,
+        "shape_size": 312
+      },
+      "after": {
+        "route": "shape-record",
+        "iterations": 1,
+        "checksum": 7,
+        "store_size": 48,
+        "shape_size": 312
+      }
+    },
+    {
+      "before": {
+        "route": "recursive",
+        "iterations": 1,
+        "checksum": 10368,
+        "store_size": 48,
+        "shape_size": 312
+      },
+      "after": {
+        "route": "recursive",
+        "iterations": 1,
+        "checksum": 10368,
+        "store_size": 48,
+        "shape_size": 312
+      }
+    }
+  ]
+}

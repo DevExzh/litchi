@@ -896,7 +896,7 @@ impl NumbersObjectCatalog {
                 catalog.record_semantic_decode(format!(
                     "storage object {storage_id} message {message_index}"
                 ))?;
-                let decoded = match litchi_iwa_text_wire::decode_storage_with_limits(
+                let decoded = match litchi_iwa_text_wire::decode_storage(
                     message.data.as_slice(),
                     numbers_text_storage_wire_limits(message.data.as_slice())?,
                 ) {
@@ -1176,6 +1176,7 @@ where
                 type_: message_type,
                 data,
             },
+            Default::default(),
         )?;
         let references = &mut object.archive_info.message_infos[message_index].object_references;
         let describes_sheets = references
@@ -1757,7 +1758,7 @@ pub(super) fn clone_numbers_object_metadata(
     messages: Vec<RawMessage>,
     remap: &HashMap<u64, u64>,
 ) -> Result<ArchiveObject> {
-    let mut cloned = ArchiveObject::new(new_identifier, messages)?;
+    let mut cloned = ArchiveObject::new(new_identifier, messages, Default::default())?;
     cloned.archive_info.should_merge = source.archive_info.should_merge;
     for ((target, source), message) in cloned
         .archive_info
@@ -1934,6 +1935,7 @@ pub(super) fn offset_numbers_drawable_clone(
                 type_: SHAPE_INFO_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -2045,6 +2047,7 @@ pub(super) fn replace_sheet_drawable_references(
             type_: message_type,
             data,
         },
+        Default::default(),
     )?;
     Ok(())
 }
@@ -2376,6 +2379,7 @@ pub(super) fn clone_single_payload_object(
             type_: source.messages[0].type_,
             data,
         }],
+        Default::default(),
     )?;
     cloned.archive_info.should_merge = source.archive_info.should_merge;
     let length = u32::try_from(cloned.messages[0].data.len())
@@ -2820,6 +2824,7 @@ pub(super) fn validate_and_trim_tiles(
                         type_: message_type,
                         data,
                     },
+                    Default::default(),
                 )?;
             }
             Ok(())
@@ -2884,6 +2889,7 @@ pub(super) fn resize_header_buckets(
                     type_: message_type,
                     data,
                 },
+                Default::default(),
             )?;
             Ok(())
         })?;
@@ -2947,6 +2953,7 @@ pub(super) fn resize_uid_map(
                 type_: message_type,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -3054,6 +3061,7 @@ pub(super) fn resize_stroke_sidecar(
                 type_: message_type,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -3659,6 +3667,7 @@ pub(super) fn rename_attached_table_in_package(
                 type_: message_type,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -3731,6 +3740,7 @@ pub(super) fn resize_attached_table_in_package(
                 type_: message_type,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -4505,6 +4515,7 @@ pub(super) fn ensure_comment_storage_metadata(
                 type_: COMMENT_STORAGE_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         if !before_has_author
             && let Some(author_id) = author_id
@@ -4566,6 +4577,7 @@ pub(super) fn update_comment_storage_text(
                 type_: COMMENT_STORAGE_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -4606,23 +4618,27 @@ pub(super) fn ensure_comment_table(
         .clone();
     let mut staged = package.clone();
     staged.update_archive(&model_archive, |archive| {
-        archive.insert_object(ArchiveObject::new(
-            table_id,
-            vec![RawMessage {
-                type_: 6005,
-                data: TableDataList {
-                    list_type: tst::table_data_list::ListType::CommentStorage as i32,
-                    next_list_id: 1,
-                    entries: Vec::new(),
-                    segments: Vec::new(),
-                    // Native Numbers and Keynote create cell-comment tables in
-                    // the original table-data-list mode. Keep the generated
-                    // graph wire-compatible with their inline thread storage.
-                    is_new_for_bnc: None,
-                }
-                .encode_to_vec(),
-            }],
-        )?)?;
+        archive.insert_object(
+            ArchiveObject::new(
+                table_id,
+                vec![RawMessage {
+                    type_: 6005,
+                    data: TableDataList {
+                        list_type: tst::table_data_list::ListType::CommentStorage as i32,
+                        next_list_id: 1,
+                        entries: Vec::new(),
+                        segments: Vec::new(),
+                        // Native Numbers and Keynote create cell-comment tables in
+                        // the original table-data-list mode. Keep the generated
+                        // graph wire-compatible with their inline thread storage.
+                        is_new_for_bnc: None,
+                    }
+                    .encode_to_vec(),
+                }],
+                Default::default(),
+            )?,
+            Default::default(),
+        )?;
         let object = archive
             .object_mut(location.descriptor.object_id)
             .ok_or_else(|| {
@@ -4659,6 +4675,7 @@ pub(super) fn ensure_comment_table(
                 type_: message_type,
                 data,
             },
+            Default::default(),
         )?;
         let references = &mut object.archive_info.message_infos[message_index].object_references;
         if !references.contains(&table_id) {
@@ -4723,6 +4740,7 @@ pub(super) fn append_comment_entry(
                 type_: message_type,
                 data,
             },
+            Default::default(),
         )?;
         let references = &mut object.archive_info.message_infos[message_index].object_references;
         if !references.contains(&storage_id) {
@@ -5538,6 +5556,7 @@ mod tests {
                     type_: message_type,
                     data: payload.clone(),
                 }],
+                Default::default(),
             )
             .unwrap();
             assert_eq!(table_info_message_index(&object).unwrap(), None);
@@ -5553,6 +5572,7 @@ mod tests {
                 type_: TABLE_INFO_MESSAGE_TYPES[0],
                 data: vec![0x80],
             }],
+            Default::default(),
         )
         .unwrap();
 
@@ -5575,6 +5595,7 @@ mod tests {
                     data: payload,
                 },
             ],
+            Default::default(),
         )
         .unwrap();
 
@@ -5601,6 +5622,7 @@ mod tests {
                 }
                 .encode_to_vec(),
             }],
+            Default::default(),
         )
         .unwrap();
 
@@ -5617,6 +5639,7 @@ mod tests {
                 type_: TABLE_INFO_MESSAGE_TYPES[0],
                 data: SPARSE_TABLE_MODEL.to_vec(),
             }],
+            Default::default(),
         )
         .unwrap();
 
@@ -5636,6 +5659,7 @@ mod tests {
                 type_: TABLE_INFO_MESSAGE_TYPES[0],
                 data: payload,
             }],
+            Default::default(),
         )
         .unwrap();
 
@@ -5652,6 +5676,7 @@ mod tests {
                 type_: TABLE_MODEL_MESSAGE_TYPE,
                 data: table_info_payload(41),
             }],
+            Default::default(),
         )
         .unwrap();
 
@@ -5669,6 +5694,7 @@ mod tests {
                 type_: TABLE_INFO_MESSAGE_TYPES[1],
                 data: vec![0x80],
             }],
+            Default::default(),
         )
         .unwrap();
 
@@ -5686,6 +5712,7 @@ mod tests {
                 type_: TABLE_INFO_MESSAGE_TYPES[1],
                 data: vec![0x12, 0x02, 0x08, 0x29],
             }],
+            Default::default(),
         )
         .unwrap();
 
@@ -5700,6 +5727,7 @@ mod tests {
                 type_: TABLE_INFO_MESSAGE_TYPES[0],
                 data: vec![0x12, 0x02, 0x08, 0x29],
             }],
+            Default::default(),
         )
         .unwrap();
         assert_eq!(
@@ -5789,6 +5817,7 @@ mod tests {
                     data: SPARSE_TABLE_MODEL.to_vec(),
                 },
             ],
+            Default::default(),
         )
         .unwrap();
 
@@ -5813,6 +5842,7 @@ mod tests {
                     data: SPARSE_TABLE_MODEL.to_vec(),
                 },
             ],
+            Default::default(),
         )
         .unwrap();
 
@@ -5833,6 +5863,7 @@ mod tests {
                     data: SPARSE_TABLE_MODEL.to_vec(),
                 },
             ],
+            Default::default(),
         )
         .unwrap();
 
@@ -5875,6 +5906,7 @@ mod tests {
                     data: SPARSE_TABLE_MODEL.to_vec(),
                 },
             ],
+            Default::default(),
         )
         .unwrap();
 
@@ -5890,6 +5922,7 @@ mod tests {
                 // field 6 encoded as a deliberately overlong varint.
                 data: vec![0x30, 0x81, 0x00],
             }],
+            Default::default(),
         )
         .unwrap();
 
@@ -5907,7 +5940,7 @@ mod strict_merge_info_tests {
             type_: 6_000,
             data: vec![0],
         };
-        let object = ArchiveObject::new(42, vec![message.clone()]).unwrap();
+        let object = ArchiveObject::new(42, vec![message.clone()], Default::default()).unwrap();
         assert!(
             attached_table_info_model_identifier(&object, &message)
                 .unwrap()

@@ -1042,11 +1042,9 @@ fn rewrite_movie(
         .map_err(map_archive_error)?;
     let snappy_limits = physical_limits.snappy_limits().map_err(map_archive_error)?;
     budget.source(entry.data().len())?;
-    let stream = SnappyStream::decompress_with_limits(entry.data(), snappy_limits)
-        .map_err(map_core_error)?;
+    let stream = SnappyStream::decompress(entry.data(), snappy_limits).map_err(map_core_error)?;
     budget.physical(stream.as_bytes().len())?;
-    let mut archive =
-        Archive::parse_with_limits(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
+    let mut archive = Archive::parse(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
     let object = archive
         .object(selection.movie_identifier)
         .ok_or(Error::InvalidSource)?;
@@ -1069,17 +1067,10 @@ fn rewrite_movie(
     // compression, and the package member replacement without claiming one
     // physical allocation.
     let encoded_bound = archive
-        .encoded_len_with_limits(archive_limits)
+        .encoded_len(archive_limits)
         .map_err(map_core_error)?;
-    let compressed_bound =
-        SnappyStream::maximum_compressed_len(encoded_bound).map_err(map_core_error)?;
-    if compressed_bound > snappy_limits.max_compressed_stream() {
-        return Err(Error::Limit {
-            kind: LimitKind::EntryBytes,
-            observed: compressed_bound as u64,
-            maximum: snappy_limits.max_compressed_stream() as u64,
-        });
-    }
+    let compressed_bound = SnappyStream::maximum_compressed_len(encoded_bound, snappy_limits)
+        .map_err(map_core_error)?;
     let package_bound = source
         .source_bytes()
         .len()
@@ -1110,7 +1101,7 @@ fn rewrite_movie(
     archive
         .object_mut(selection.movie_identifier)
         .ok_or(Error::InvalidSource)?
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             selection.message_index,
             RawMessage {
                 type_: MOVIE_MESSAGE_TYPE,
@@ -1119,11 +1110,9 @@ fn rewrite_movie(
             archive_limits,
         )
         .map_err(map_core_error)?;
-    let bytes = archive
-        .to_bytes_with_limits(archive_limits)
-        .map_err(map_core_error)?;
+    let bytes = archive.to_bytes(archive_limits).map_err(map_core_error)?;
     budget.physical(bytes.len())?;
-    let compressed = SnappyStream::compress(&bytes).map_err(map_core_error)?;
+    let compressed = SnappyStream::compress(&bytes, snappy_limits).map_err(map_core_error)?;
     let edit = EntryEdit::new(
         selection.slide_component_name.as_ref(),
         compressed.as_slice(),
@@ -1224,7 +1213,7 @@ fn verify_locality(
             }
             let mut expected = source_object.clone();
             expected
-                .replace_message_preserving_header_with_limits(
+                .replace_message_preserving_header(
                     selection.message_index,
                     candidate_message.clone(),
                     source
@@ -1306,9 +1295,8 @@ fn component_archive(package: &Package, name: &str) -> Result<Archive, Error> {
         .archive()
         .effective_archive_limits()
         .map_err(map_archive_error)?;
-    let stream =
-        SnappyStream::decompress_with_limits(entry.data(), snappy).map_err(map_core_error)?;
-    Archive::parse_with_limits(stream.as_bytes(), archive_limits).map_err(map_core_error)
+    let stream = SnappyStream::decompress(entry.data(), snappy).map_err(map_core_error)?;
+    Archive::parse(stream.as_bytes(), archive_limits).map_err(map_core_error)
 }
 
 fn unique_message(

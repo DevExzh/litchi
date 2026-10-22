@@ -318,7 +318,7 @@ pub(super) fn prepare(
             .limits()
             .effective_archive_limits()
             .map_err(super::map_archive_error)?;
-        let stream = SnappyStream::decompress_with_limits(
+        let stream = SnappyStream::decompress(
             entry.data(),
             source_catalog
                 .limits()
@@ -326,10 +326,10 @@ pub(super) fn prepare(
                 .map_err(super::map_archive_error)?,
         )
         .map_err(map_core_error)?;
-        let mut archive = Archive::parse_with_limits(stream.as_bytes(), archive_limits)
-            .map_err(map_core_error)?;
+        let mut archive =
+            Archive::parse(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
         archive
-            .validate_canonical_object_framing(stream.as_bytes())
+            .validate_canonical_object_framing(stream.as_bytes(), archive_limits)
             .map_err(map_core_error)?;
         apply_component_changes(
             &mut archive,
@@ -343,15 +343,14 @@ pub(super) fn prepare(
             budget,
         )?;
         let encoded_len = archive
-            .encoded_len_with_limits(archive_limits)
+            .encoded_len(archive_limits)
             .map_err(map_core_error)?;
         budget
             .charge_payload_work(encoded_len)
             .map_err(super::map_lock_error)?;
-        let encoded = archive
-            .to_bytes_with_limits(archive_limits)
-            .map_err(map_core_error)?;
-        let compressed = SnappyStream::compress(&encoded).map_err(map_core_error)?;
+        let encoded = archive.to_bytes(archive_limits).map_err(map_core_error)?;
+        let compressed =
+            SnappyStream::compress(&encoded, Default::default()).map_err(map_core_error)?;
         if compressed.is_empty() {
             return Err(Error::Verification);
         }
@@ -792,15 +791,11 @@ fn apply_component_changes(
             .ok_or(Error::InvalidSource)?;
         if object_references.is_empty() && data_references.is_empty() {
             object
-                .replace_message_preserving_header_with_limits(
-                    edit.message_index,
-                    replacement,
-                    archive_limits,
-                )
+                .replace_message_preserving_header(edit.message_index, replacement, archive_limits)
                 .map_err(map_core_error)?;
         } else {
             object
-                .replace_message_pruning_references_preserving_header_with_limits(
+                .replace_message_pruning_references_preserving_header(
                     edit.message_index,
                     replacement,
                     &object_references,
@@ -842,11 +837,7 @@ fn apply_component_changes(
             },
         };
         object
-            .replace_message_preserving_header_with_limits(
-                message_index,
-                replacement,
-                archive_limits,
-            )
+            .replace_message_preserving_header(message_index, replacement, archive_limits)
             .map_err(map_core_error)?;
     }
 
@@ -895,9 +886,7 @@ fn apply_component_changes(
     if removal_position != removals_by_index.len() {
         return Err(Error::InvalidSource);
     }
-    archive
-        .validate_with_limits(archive_limits)
-        .map_err(map_core_error)?;
+    archive.validate(archive_limits).map_err(map_core_error)?;
     Ok(())
 }
 

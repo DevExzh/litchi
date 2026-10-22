@@ -104,18 +104,18 @@ struct ChartPayload {
 }
 
 fn chart_payload(source: &[u8]) -> TestResult<ChartPayload> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let mut selected = None;
 
     for entry in catalog.iter() {
         if !entry.name().ends_with(".iwa") {
             continue;
         }
-        let stream = match SnappyStream::decompress(entry.data()) {
+        let stream = match SnappyStream::decompress(entry.data(), Default::default()) {
             Ok(stream) => stream,
             Err(_) => continue,
         };
-        let archive = match Archive::parse(stream.as_bytes()) {
+        let archive = match Archive::parse(stream.as_bytes(), Default::default()) {
             Ok(archive) => archive,
             Err(_) => continue,
         };
@@ -168,7 +168,7 @@ fn assert_chart_data_unchanged(source: &[u8], target: &[u8]) -> TestResult {
 }
 
 fn preview_members(source: &[u8]) -> TestResult<Vec<String>> {
-    Ok(Catalog::from_bytes(source)?
+    Ok(Catalog::from_bytes(source, Default::default())?
         .iter()
         .filter(|entry| ROOT_PREVIEWS.iter().any(|name| *name == entry.name()))
         .map(|entry| entry.name().to_owned())
@@ -176,17 +176,17 @@ fn preview_members(source: &[u8]) -> TestResult<Vec<String>> {
 }
 
 fn title_owner_member(source: &[u8], expected: &str) -> TestResult<String> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let mut selected = None;
     for entry in catalog.iter() {
         if !entry.name().ends_with(".iwa") {
             continue;
         }
-        let stream = match SnappyStream::decompress(entry.data()) {
+        let stream = match SnappyStream::decompress(entry.data(), Default::default()) {
             Ok(stream) => stream,
             Err(_) => continue,
         };
-        let archive = match Archive::parse(stream.as_bytes()) {
+        let archive = match Archive::parse(stream.as_bytes(), Default::default()) {
             Ok(archive) => archive,
             Err(_) => continue,
         };
@@ -216,7 +216,7 @@ fn title_owner_member(source: &[u8], expected: &str) -> TestResult<String> {
 }
 
 fn axis_owner_member(source: &[u8], axis: Axis, expected: &str) -> TestResult<String> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let kind = match axis {
         Axis::Category => keynote_chart_axis_title_codec::AxisTitleKind::Category,
         Axis::Value => keynote_chart_axis_title_codec::AxisTitleKind::Value,
@@ -226,11 +226,11 @@ fn axis_owner_member(source: &[u8], axis: Axis, expected: &str) -> TestResult<St
         if !entry.name().ends_with(".iwa") {
             continue;
         }
-        let stream = match SnappyStream::decompress(entry.data()) {
+        let stream = match SnappyStream::decompress(entry.data(), Default::default()) {
             Ok(stream) => stream,
             Err(_) => continue,
         };
-        let archive = match Archive::parse(stream.as_bytes()) {
+        let archive = match Archive::parse(stream.as_bytes(), Default::default()) {
             Ok(archive) => archive,
             Err(_) => continue,
         };
@@ -263,8 +263,8 @@ fn axis_owner_member(source: &[u8], axis: Axis, expected: &str) -> TestResult<St
 }
 
 fn assert_member_locality(source: &[u8], target: &[u8], changed_member: &str) -> TestResult {
-    let source_catalog = Catalog::from_bytes(source)?;
-    let target_catalog = Catalog::from_bytes(target)?;
+    let source_catalog = Catalog::from_bytes(source, Default::default())?;
+    let target_catalog = Catalog::from_bytes(target, Default::default())?;
     let previews = preview_members(source)?;
     let mut changed = false;
     let mut deleted = Vec::new();
@@ -403,8 +403,8 @@ fn native_chart_title_set_clear_reopens_preserves_data_and_inverse() -> TestResu
     assert_member_locality(&source, &changed_bytes, &owner)?;
     assert_eq!(changed.diagnostics().touched_components(), 1);
     assert_eq!(
-        Catalog::from_bytes(&changed_bytes)?.len(),
-        Catalog::from_bytes(&source)?.len() - previews.len()
+        Catalog::from_bytes(&changed_bytes, Default::default())?.len(),
+        Catalog::from_bytes(&source, Default::default())?.len() - previews.len()
     );
 
     let reopened = Package::from_bytes(&changed_bytes)?;

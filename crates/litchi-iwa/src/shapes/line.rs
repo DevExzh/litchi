@@ -194,6 +194,7 @@ pub(crate) fn set_shape_line_segment(
                 type_: SHAPE_INFO_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })

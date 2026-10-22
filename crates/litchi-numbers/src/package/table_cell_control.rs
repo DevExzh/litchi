@@ -599,7 +599,7 @@ fn rewrite(
     )?;
     for member in &native_output.members {
         if member.archive_bytes.len() > native_bound.archive_bytes
-            || SnappyStream::maximum_compressed_len(member.archive_bytes.len())
+            || SnappyStream::maximum_compressed_len(member.archive_bytes.len(), Default::default())
                 .map_err(|_| Error::Verification)?
                 > native_bound.compressed_bytes
         {
@@ -610,8 +610,9 @@ fn rewrite(
                 path,
             });
         }
-        let maximum_compressed = SnappyStream::maximum_compressed_len(member.archive_bytes.len())
-            .map_err(|_| Error::Verification)?;
+        let maximum_compressed =
+            SnappyStream::maximum_compressed_len(member.archive_bytes.len(), Default::default())
+                .map_err(|_| Error::Verification)?;
         budget.charge_compressed_bytes(maximum_compressed, path)?;
     }
     let metadata_bytes = popup::rewrite_component_save_tokens(
@@ -632,7 +633,8 @@ fn rewrite(
         .members
         .iter()
         .map(|member| {
-            SnappyStream::compress(&member.archive_bytes).map_err(|_| Error::Verification)
+            SnappyStream::compress(&member.archive_bytes, Default::default())
+                .map_err(|_| Error::Verification)
         })
         .collect::<Result<Vec<_>, _>>()?;
     let mut changed_names = native_output

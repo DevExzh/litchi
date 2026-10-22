@@ -285,6 +285,7 @@ pub(super) fn insert_attachment_reference(
                 type_: message_type,
                 data,
             },
+            Default::default(),
         )?;
         let info = storage_object
             .archive_info
@@ -302,7 +303,7 @@ pub(super) fn insert_attachment_reference(
             )));
         }
         info.object_references.push(identifier);
-        archive.insert_object(object)?;
+        archive.insert_object(object, Default::default())?;
         Ok(())
     })
 }

@@ -100,26 +100,35 @@ fn with_data_metadata_map(source: &[u8]) -> TestResult<Vec<u8>> {
         ..Default::default()
     });
     let source = fixture::replace_metadata_payload(source, metadata.encode_to_vec())?;
-    let document_stream =
-        SnappyStream::decompress(&fixture::member_bytes(&source, fixture::DOCUMENT_MEMBER)?)?;
-    let mut archive = Archive::parse(document_stream.as_bytes())?;
+    let document_stream = SnappyStream::decompress(
+        &fixture::member_bytes(&source, fixture::DOCUMENT_MEMBER)?,
+        Default::default(),
+    )?;
+    let mut archive = Archive::parse(document_stream.as_bytes(), Default::default())?;
 
     // Selected media are absent from the map, as in the native source.
     // A mapped DataInfo is deliberately outside final-GC admission.
     let map = Vec::new();
-    archive.insert_object(ArchiveObject::new(
-        500,
-        vec![RawMessage {
-            type_: 11_015,
-            data: map,
-        }],
-    )?)?;
+    archive.insert_object(
+        ArchiveObject::new(
+            500,
+            vec![RawMessage {
+                type_: 11_015,
+                data: map,
+            }],
+            Default::default(),
+        )?,
+        Default::default(),
+    )?;
     fixture::replace_document_archive(&source, archive)
 }
 
 fn with_repeated_content_owner(source: &[u8], repeats: usize) -> TestResult<Vec<u8>> {
     let repeats = u32::try_from(repeats)?;
-    let mut archive = Archive::parse(fixture::document_stream(source)?.as_slice())?;
+    let mut archive = Archive::parse(
+        fixture::document_stream(source)?.as_slice(),
+        Default::default(),
+    )?;
     let movie = archive
         .object_mut(fixture::MOVIES[0])
         .ok_or_else(|| io::Error::other("missing repeated-owner movie"))?;
@@ -155,7 +164,10 @@ fn with_repeated_content_owner(source: &[u8], repeats: usize) -> TestResult<Vec<
 }
 
 fn with_surviving_private_child_reference(source: &[u8]) -> TestResult<Vec<u8>> {
-    let mut archive = Archive::parse(fixture::document_stream(source)?.as_slice())?;
+    let mut archive = Archive::parse(
+        fixture::document_stream(source)?.as_slice(),
+        Default::default(),
+    )?;
     let movie = archive
         .object_mut(fixture::MOVIES[1])
         .ok_or_else(|| io::Error::other("missing surviving movie"))?;
@@ -172,7 +184,10 @@ fn with_slide_header_object_references(
     source: &[u8],
     update: impl FnOnce(&mut Vec<u64>),
 ) -> TestResult<Vec<u8>> {
-    let mut archive = Archive::parse(fixture::document_stream(source)?.as_slice())?;
+    let mut archive = Archive::parse(
+        fixture::document_stream(source)?.as_slice(),
+        Default::default(),
+    )?;
     let slide = archive
         .object_mut(fixture::SLIDE)
         .ok_or_else(|| io::Error::other("missing slide object"))?;
@@ -190,7 +205,10 @@ fn with_slide_header_field_info(
     references: Vec<u64>,
     field_type: FieldType,
 ) -> TestResult<Vec<u8>> {
-    let mut archive = Archive::parse(fixture::document_stream(source)?.as_slice())?;
+    let mut archive = Archive::parse(
+        fixture::document_stream(source)?.as_slice(),
+        Default::default(),
+    )?;
     let slide = archive
         .object_mut(fixture::SLIDE)
         .ok_or_else(|| io::Error::other("missing slide object"))?;
@@ -226,8 +244,9 @@ fn replace_native_component_object_payload(
             io::Error::other(format!("missing native object {identifier} type {type_}"))
         })?;
     message.data = payload;
-    let replacement = SnappyStream::compress(&archive.to_bytes()?)?;
-    let catalog = Catalog::from_bytes(source)?;
+    let replacement =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entries = catalog
         .iter()
         .map(|entry| {
@@ -267,12 +286,16 @@ fn native_selected_chunk_for_movie(source: &[u8], movie: u64) -> TestResult<(u64
 }
 
 fn physical_uncompressed_total(source: &[u8]) -> TestResult<u64> {
-    Catalog::from_bytes(source)?
+    Catalog::from_bytes(source, Default::default())?
         .iter()
         .try_fold(0_u64, |total, entry| {
             let size = if entry.name().ends_with(".iwa") {
-                u64::try_from(SnappyStream::decompress(entry.data())?.as_bytes().len())?
-                    .max(entry.metadata().uncompressed_size())
+                u64::try_from(
+                    SnappyStream::decompress(entry.data(), Default::default())?
+                        .as_bytes()
+                        .len(),
+                )?
+                .max(entry.metadata().uncompressed_size())
             } else {
                 entry.metadata().uncompressed_size()
             };
@@ -303,7 +326,7 @@ fn movie_count(package: &Package) -> TestResult<usize> {
 }
 
 fn data_member(source: &[u8], name: &str) -> TestResult<Option<Vec<u8>>> {
-    Ok(Catalog::from_bytes(source)?
+    Ok(Catalog::from_bytes(source, Default::default())?
         .iter()
         .find(|entry| entry.name() == name)
         .map(|entry| entry.data().to_vec()))
@@ -345,15 +368,15 @@ fn native_member_bytes(source: &[u8], name: &str) -> TestResult<Vec<u8>> {
 
 fn native_component_archives(source: &[u8]) -> TestResult<Vec<(String, Archive)>> {
     let mut archives = Vec::new();
-    for entry in Catalog::from_bytes(source)?.iter() {
+    for entry in Catalog::from_bytes(source, Default::default())?.iter() {
         if !entry.name().ends_with(".iwa") {
             continue;
         }
-        let stream = match SnappyStream::decompress(entry.data()) {
+        let stream = match SnappyStream::decompress(entry.data(), Default::default()) {
             Ok(stream) => stream.into_bytes(),
             Err(_) => continue,
         };
-        let archive = match Archive::parse(&stream) {
+        let archive = match Archive::parse(&stream, Default::default()) {
             Ok(archive) => archive,
             Err(_) => continue,
         };
@@ -2323,7 +2346,10 @@ fn native_saved_materialized_cache_candidate_has_strict_readback() -> TestResult
 #[test]
 fn duplicate_refuses_unproven_transitive_movie_header_reference() -> TestResult {
     let source = lifecycle_source()?;
-    let mut archive = Archive::parse(fixture::document_stream(&source)?.as_slice())?;
+    let mut archive = Archive::parse(
+        fixture::document_stream(&source)?.as_slice(),
+        Default::default(),
+    )?;
     archive
         .object_mut(fixture::MOVIES[0])
         .ok_or_else(|| io::Error::other("missing selected movie"))?

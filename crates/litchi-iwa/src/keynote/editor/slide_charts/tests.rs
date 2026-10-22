@@ -250,6 +250,7 @@ fn mutate_keynote_chart_non_style(
                     type_: CHART_NON_STYLE_MESSAGE_TYPE,
                     data,
                 },
+                Default::default(),
             )?;
             Ok(())
         })
@@ -360,6 +361,7 @@ fn mutate_keynote_chart_title_standin(editor: &mut Draft, drawable_object_id: u6
                     type_: CHART_NON_STYLE_MESSAGE_TYPE,
                     data: message.data,
                 },
+                Default::default(),
             )?;
             Ok(())
         })

@@ -17,6 +17,7 @@ use litchi_iwa_common::{
 
 /// Validation failures produced by text appearance conversions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Error {
     /// A shape shadow family other than a drop shadow was supplied for text.
     UnsupportedShadowFamily,

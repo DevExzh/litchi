@@ -38,9 +38,9 @@ mod zip;
 pub mod iwa {
     pub use litchi_iwa_core::archive::{FieldObjectReferenceTransition, ObjectReferenceTransition};
     pub use litchi_iwa_core::{
-        Archive, ArchiveInfo, ArchiveLimits, ArchiveObject, ArchiveReferenceOccurrence,
-        ArchiveReferencePolicy, ArchiveReferenceVisitor, Error, FieldInfo, FieldPath, FieldType,
-        LimitKind, MessageInfo, RawMessage, Result, SnappyLimits, SnappyStream, UnknownFieldRule,
+        Archive, ArchiveInfo, ArchiveObject, ArchiveReferenceOccurrence, ArchiveReferencePolicy,
+        ArchiveReferenceVisitor, Error, FieldInfo, FieldPath, FieldType, LimitKind, Limits,
+        MessageInfo, RawMessage, Result, SnappyLimits, SnappyStream, UnknownFieldRule,
     };
 }
 
@@ -219,8 +219,8 @@ fn detection_root_from_exact_document(
     let document = if let Some(entry) = document_entry {
         package::preflight_semantic_iwa(entry, entry.name())?;
         let compressed = archive.read_entry(entry)?;
-        let stream = SnappyStream::decompress_with_limits(&compressed, limits.snappy_limits()?)?;
-        Some(Archive::parse_objects_with_identifier_with_limits(
+        let stream = SnappyStream::decompress(&compressed, limits.snappy_limits()?)?;
+        Some(Archive::parse_objects_with_identifier(
             stream.as_bytes(),
             1,
             limits.effective_archive_limits()?,
@@ -358,8 +358,8 @@ fn inspect_direct_zip(archive: &ArchiveReader<'_>, limits: Limits) -> Result<Det
 
 fn parse_document(archive: &ArchiveReader<'_>, name: &str, limits: Limits) -> Result<Archive> {
     let compressed = archive.read(name)?;
-    let stream = SnappyStream::decompress_with_limits(&compressed, limits.snappy_limits()?)?;
-    Ok(Archive::parse_objects_with_identifier_with_limits(
+    let stream = SnappyStream::decompress(&compressed, limits.snappy_limits()?)?;
+    Ok(Archive::parse_objects_with_identifier(
         stream.as_bytes(),
         1,
         limits.effective_archive_limits()?,

@@ -204,7 +204,7 @@ fn ensure_descriptor_storage(
             descriptor.object_id,
         )?;
         package.update_archive(&tile_template_archive, |archive| {
-            Ok(archive.insert_object(object)?)
+            Ok(archive.insert_object(object, Default::default())?)
         })?;
         tiles.push(TileAllocation {
             key,
@@ -225,7 +225,7 @@ fn ensure_descriptor_storage(
             descriptor.object_id,
         )?;
         package.update_archive(&header_template_archive, |archive| {
-            Ok(archive.insert_object(object)?)
+            Ok(archive.insert_object(object, Default::default())?)
         })?;
         headers.push(HeaderBucketAllocation {
             object_id,
@@ -367,6 +367,7 @@ fn update_model_storage_references(
                 type_: message_type,
                 data,
             },
+            Default::default(),
         )?;
         let info = &mut object.archive_info.message_infos[message_index];
         extend_references(

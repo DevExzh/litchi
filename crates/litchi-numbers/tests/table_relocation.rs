@@ -74,6 +74,7 @@ fn object(identifier: u64, type_: u32, data: Vec<u8>) -> TestResult<ArchiveObjec
     Ok(ArchiveObject::new(
         identifier,
         vec![RawMessage { type_, data }],
+        Default::default(),
     )?)
 }
 
@@ -139,6 +140,7 @@ fn sidecars() -> TestResult<ArchiveObject> {
             .encode_to_vec(),
         })
         .collect(),
+        Default::default(),
     )?)
 }
 
@@ -207,7 +209,8 @@ fn fixture_with_destination_table(gamma: &str) -> TestResult<Vec<u8>> {
                 )?,
             ],
         }
-        .to_bytes()?,
+        .to_bytes(Default::default())?,
+        Default::default(),
     )?;
 
     let tables_component = SnappyStream::compress(
@@ -244,7 +247,8 @@ fn fixture_with_destination_table(gamma: &str) -> TestResult<Vec<u8>> {
                 sidecars()?,
             ],
         }
-        .to_bytes()?,
+        .to_bytes(Default::default())?,
+        Default::default(),
     )?;
 
     let unrelated_component = SnappyStream::compress(
@@ -255,9 +259,11 @@ fn fixture_with_destination_table(gamma: &str) -> TestResult<Vec<u8>> {
                     type_: 99_999,
                     data: b"unrelated Numbers component".to_vec(),
                 }],
+                Default::default(),
             )?],
         }
-        .to_bytes()?,
+        .to_bytes(Default::default())?,
+        Default::default(),
     )?;
 
     Ok(litchi_iwa_archive::package::to_bytes(
@@ -272,12 +278,12 @@ fn fixture_with_destination_table(gamma: &str) -> TestResult<Vec<u8>> {
 }
 
 fn component_stream(source: &[u8], member_name: &str) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == member_name)
         .ok_or_else(|| io::Error::other(format!("missing component {member_name}")))?;
-    Ok(SnappyStream::decompress(entry.data())?.into_bytes())
+    Ok(SnappyStream::decompress(entry.data(), Default::default())?.into_bytes())
 }
 
 fn rewrite_component(
@@ -285,13 +291,16 @@ fn rewrite_component(
     member_name: &str,
     mutate: impl FnOnce(&mut Archive) -> TestResult,
 ) -> TestResult<Vec<u8>> {
-    let mut archive = Archive::parse(&component_stream(source, member_name)?)?;
+    let mut archive = Archive::parse(&component_stream(source, member_name)?, Default::default())?;
     mutate(&mut archive)?;
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
-    Ok(Catalog::from_bytes(source)?.reassemble_to_bytes(
-        &[EntryEdit::new(member_name, &compressed)],
-        Limits::default(),
-    )?)
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
+    Ok(
+        Catalog::from_bytes(source, Default::default())?.reassemble_to_bytes(
+            &[EntryEdit::new(member_name, &compressed)],
+            Limits::default(),
+        )?,
+    )
 }
 
 fn with_duplicate_owner(source: &[u8]) -> TestResult<Vec<u8>> {
@@ -312,6 +321,7 @@ fn with_duplicate_owner(source: &[u8]) -> TestResult<Vec<u8>> {
                 type_: message.type_,
                 data: decoded.encode_to_vec(),
             },
+            Default::default(),
         )?;
         target.archive_info.message_infos[0]
             .object_references
@@ -338,6 +348,7 @@ fn with_parent_mismatch(source: &[u8]) -> TestResult<Vec<u8>> {
                 type_: message.type_,
                 data: decoded.encode_to_vec(),
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -362,6 +373,7 @@ fn with_missing_parent(source: &[u8]) -> TestResult<Vec<u8>> {
                 type_: message.type_,
                 data: decoded.encode_to_vec(),
             },
+            Default::default(),
         )?;
         let info = table_info
             .archive_info
@@ -393,6 +405,7 @@ fn with_malformed_table_info(source: &[u8]) -> TestResult<Vec<u8>> {
                 // fixture builder, gets to reject the malformed graph.
                 data: vec![0x0a, 0x80],
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -422,6 +435,7 @@ fn with_projection_unsupported_model(source: &[u8]) -> TestResult<Vec<u8>> {
                 type_: message.type_,
                 data: decoded.encode_to_vec(),
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -461,7 +475,7 @@ fn object_message(
     identifier: u64,
     message_type: u32,
 ) -> TestResult<Vec<u8>> {
-    let archive = Archive::parse(&component_stream(source, member_name)?)?;
+    let archive = Archive::parse(&component_stream(source, member_name)?, Default::default())?;
     archive
         .object(identifier)
         .and_then(|object| {
@@ -538,8 +552,8 @@ fn optional_table_parent(source: &[u8], table_identifier: u64) -> TestResult<Opt
 }
 
 fn assert_locality(source: &[u8], target: &[u8]) -> TestResult {
-    let source_catalog = Catalog::from_bytes(source)?;
-    let target_catalog = Catalog::from_bytes(target)?;
+    let source_catalog = Catalog::from_bytes(source, Default::default())?;
+    let target_catalog = Catalog::from_bytes(target, Default::default())?;
     let expected_changed = [DOCUMENT_MEMBER, TABLES_MEMBER];
     let mut changed = Vec::new();
     for before in source_catalog.iter() {
@@ -784,8 +798,8 @@ fn changed_move_appends_in_order_preserves_content_unknowns_and_locality() -> Te
         beta_model
     );
     assert_locality(&bytes, &target)?;
-    let source_catalog = Catalog::from_bytes(&bytes)?;
-    let target_catalog = Catalog::from_bytes(&target)?;
+    let source_catalog = Catalog::from_bytes(&bytes, Default::default())?;
+    let target_catalog = Catalog::from_bytes(&target, Default::default())?;
     let source_sentinel = source_catalog
         .iter()
         .find(|entry| entry.name() == SENTINEL_MEMBER)
@@ -918,8 +932,8 @@ fn physical_compatibility_preserves_missing_parent_and_round_trips() -> TestResu
         vec![GAMMA_INFO_ID, BETA_INFO_ID]
     );
     assert_eq!(optional_table_parent(&target, BETA_INFO_ID)?, None);
-    let source_catalog = Catalog::from_bytes(&source)?;
-    let target_catalog = Catalog::from_bytes(&target)?;
+    let source_catalog = Catalog::from_bytes(&source, Default::default())?;
+    let target_catalog = Catalog::from_bytes(&target, Default::default())?;
     let source_tables = source_catalog
         .iter()
         .find(|entry| entry.name() == TABLES_MEMBER)
@@ -964,7 +978,7 @@ fn changed_patch_is_exact_source_bound_and_inverse_restores_every_byte() -> Test
         bytes
     );
 
-    let tampered = Catalog::from_bytes(&bytes)?.reassemble_to_bytes(
+    let tampered = Catalog::from_bytes(&bytes, Default::default())?.reassemble_to_bytes(
         &[EntryEdit::new(
             SENTINEL_MEMBER,
             b"tampered unrelated sentinel",

@@ -208,7 +208,7 @@ fn maximum_physical_identifier(
         }
         let mut references = MaximumReferenceVisitor::default();
         let occurrence_count = object
-            .inspect_references_with_policy_and_limits(
+            .inspect_references_with_policy(
                 &mut references,
                 ArchiveReferencePolicy::RejectUnknownMetadata,
                 archive_limits,
@@ -1669,13 +1669,12 @@ fn build_owner_helper_objects(
             .map_err(|_| Error::Allocation { amount: 1 })?;
         messages.push(RawMessage { type_, data });
         objects.push(
-            ArchiveObject::new_with_limits(identifier, messages, archive_limits)
-                .map_err(map_core_error)?,
+            ArchiveObject::new(identifier, messages, archive_limits).map_err(map_core_error)?,
         );
     }
     let helper_archive = Archive { objects };
     let helper_bytes = helper_archive
-        .encoded_len_with_limits(archive_limits)
+        .encoded_len(archive_limits)
         .map_err(map_core_error)?;
     budget
         .charge_payload_bytes(helper_bytes)
@@ -1738,7 +1737,7 @@ fn rewrite_metadata_entry_for_creation(
         .get_mut(plan.route.object_index)
         .ok_or(Error::InvalidSource)?;
     object
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             plan.route.message_index,
             RawMessage {
                 type_: METADATA_MESSAGE_TYPE,
@@ -2337,7 +2336,7 @@ fn rewrite(
         .map(|objects| Archive { objects });
     let helper_archive_length = helper_archive
         .as_ref()
-        .map(|archive| archive.encoded_len_with_limits(archive_limits))
+        .map(|archive| archive.encoded_len(archive_limits))
         .transpose()
         .map_err(map_core_error)?
         .unwrap_or(0);
@@ -2559,7 +2558,7 @@ fn rewrite(
     };
     if let Some((aggregate_before, aggregate_after, fields)) = creation_transition.as_ref() {
         model_object
-            .replace_message_transitioning_object_references_with_canonical_fields_preserving_header_with_limits(
+            .replace_message_transitioning_object_references_with_canonical_fields_preserving_header(
                 graph.target.model_message_index,
                 model_message,
                 ObjectReferenceTransition {
@@ -2573,7 +2572,7 @@ fn rewrite(
             .map_err(map_core_error)?;
     } else {
         model_object
-            .replace_message_preserving_header_with_limits(
+            .replace_message_preserving_header(
                 graph.target.model_message_index,
                 model_message,
                 archive_limits,
@@ -2589,7 +2588,7 @@ fn rewrite(
         .map_err(map_codec_error)?
         .into_bytes();
     info_object
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             graph.target.info_message_index,
             RawMessage {
                 type_: graph.target.message_type,
@@ -2600,7 +2599,7 @@ fn rewrite(
         .map_err(map_core_error)?;
     if let Some(helper_archive) = helper_archive {
         archive
-            .append_objects_with_limits(helper_archive.objects, archive_limits)
+            .append_objects(helper_archive.objects, archive_limits)
             .map_err(map_core_error)?;
     }
     let compressed =
@@ -2668,7 +2667,7 @@ fn rewrite(
         return Err(Error::Verification);
     }
     let candidate_source =
-        SourceCatalog::from_shared_bytes_with_limits(output.into(), source.state.source.limits())
+        SourceCatalog::from_shared_bytes(output.into(), source.state.source.limits())
             .map_err(map_archive_error)?;
     let added_object_ids = creation_plan.as_ref().map_or_else(
         || Arc::from(Vec::<u64>::new()),

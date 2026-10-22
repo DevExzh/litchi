@@ -169,6 +169,7 @@ pub(super) fn delete_table_tile_row(
                     type_: message_type,
                     data,
                 },
+                Default::default(),
             )?;
             Ok(())
         })?;
@@ -294,6 +295,7 @@ pub(super) fn delete_row_headers(
                     type_: message_type,
                     data,
                 },
+                Default::default(),
             )?;
             Ok(())
         })?;

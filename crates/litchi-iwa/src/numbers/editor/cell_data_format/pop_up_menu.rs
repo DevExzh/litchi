@@ -112,13 +112,17 @@ pub(super) fn create_model(
         .collect(),
     };
     package.update_archive(archive_name, |archive| {
-        archive.insert_object(ArchiveObject::new(
-            identifier,
-            vec![RawMessage {
-                type_: MODEL_MESSAGE_TYPE,
-                data: model.encode_to_vec(),
-            }],
-        )?)?;
+        archive.insert_object(
+            ArchiveObject::new(
+                identifier,
+                vec![RawMessage {
+                    type_: MODEL_MESSAGE_TYPE,
+                    data: model.encode_to_vec(),
+                }],
+                Default::default(),
+            )?,
+            Default::default(),
+        )?;
         Ok(())
     })?;
     set_package_last_object_identifier(package, identifier)?;

@@ -1047,7 +1047,7 @@ fn rewrite_package(
         if entry.is_opaque() {
             return Err(Error::InvalidSource);
         }
-        let stream = SnappyStream::decompress_with_limits(
+        let stream = SnappyStream::decompress(
             entry.data(),
             source
                 .state
@@ -1057,8 +1057,7 @@ fn rewrite_package(
                 .map_err(map_archive_error)?,
         )
         .map_err(map_core_error)?;
-        let archive = Archive::parse_with_limits(stream.as_bytes(), archive_limits)
-            .map_err(map_core_error)?;
+        let archive = Archive::parse(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
         archives.push((name.to_owned(), archive));
     }
     let new_id = next_object_identifier(source)?;
@@ -1087,10 +1086,8 @@ fn rewrite_package(
     }
     let mut compressed = Vec::new();
     for (name, archive) in &archives {
-        let bytes = archive
-            .to_bytes_with_limits(archive_limits)
-            .map_err(map_core_error)?;
-        let data = SnappyStream::compress(&bytes).map_err(map_core_error)?;
+        let bytes = archive.to_bytes(archive_limits).map_err(map_core_error)?;
+        let data = SnappyStream::compress(&bytes, Default::default()).map_err(map_core_error)?;
         compressed.push((name.clone(), data));
     }
     let edits = compressed
@@ -1573,7 +1570,7 @@ fn replace_metadata_payload(
         .ok_or(Error::InvalidSource)?;
     validate_rewrite_metadata(object, index)?;
     object
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             index,
             RawMessage {
                 type_: PACKAGE_METADATA_MESSAGE_TYPE,
@@ -1760,6 +1757,7 @@ fn new_style_object(
             type_: SLIDE_STYLE_MESSAGE_TYPE,
             data,
         }],
+        Default::default(),
     )
     .map_err(map_core_error)?;
     let info = &mut replacement.archive_info.message_infos[0];
@@ -1837,7 +1835,7 @@ fn mutate_set(
             .ok_or(Error::InvalidSource)?;
     }
     stylesheet_archive
-        .insert_object_with_limits(style_object, archive_limits)
+        .insert_object(style_object, archive_limits)
         .map_err(map_core_error)?;
     Ok(())
 }
@@ -1922,7 +1920,7 @@ fn mutate_reset(
             archive_limits,
         )?;
         stylesheet_archive
-            .insert_object_with_limits(replacement, archive_limits)
+            .insert_object(replacement, archive_limits)
             .map_err(map_core_error)?;
     }
     Ok(())
@@ -2028,7 +2026,7 @@ fn patch_slide_style(
     let rewritten =
         rewrite_length_field(&data, SLIDE_STYLE_FIELD, Some(&replacement), wire_limits)?;
     object
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             index,
             RawMessage {
                 type_: SLIDE_MESSAGE_TYPE,
@@ -2062,7 +2060,7 @@ fn replace_style_data(
     let index = one_message_index(&object.messages, SLIDE_STYLE_MESSAGE_TYPE)?;
     validate_rewrite_metadata(object, index)?;
     object
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             index,
             RawMessage {
                 type_: SLIDE_STYLE_MESSAGE_TYPE,
@@ -2929,7 +2927,7 @@ fn patch_stylesheet(
         wire_limits,
     )?;
     object
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             index,
             RawMessage {
                 type_: STYLESHEET_MESSAGE_TYPE,

@@ -122,16 +122,16 @@ fn metadata_facts(
         .limits()
         .snappy_limits()
         .map_err(|_| Error::InvalidSource)?;
-    let stream = SnappyStream::decompress_with_limits(entry.data(), snappy_limits)
-        .map_err(|_| Error::InvalidSource)?;
+    let stream =
+        SnappyStream::decompress(entry.data(), snappy_limits).map_err(|_| Error::InvalidSource)?;
     let archive_limits = package
         .limits()
         .effective_archive_limits()
         .map_err(|_| Error::InvalidSource)?;
-    let archive = Archive::parse_with_limits(stream.as_bytes(), archive_limits)
-        .map_err(|_| Error::InvalidSource)?;
+    let archive =
+        Archive::parse(stream.as_bytes(), archive_limits).map_err(|_| Error::InvalidSource)?;
     archive
-        .validate_canonical_object_framing(stream.as_bytes())
+        .validate_canonical_object_framing(stream.as_bytes(), archive_limits)
         .map_err(|_| Error::InvalidSource)?;
     let mut payload = None;
     for object in &archive.objects {
@@ -809,7 +809,7 @@ fn rewrite_metadata_payload(
     if entry.is_opaque() {
         return Err(Error::InvalidSource);
     }
-    let stream = SnappyStream::decompress_with_limits(
+    let stream = SnappyStream::decompress(
         entry.data(),
         package
             .limits()
@@ -821,10 +821,10 @@ fn rewrite_metadata_payload(
         .limits()
         .effective_archive_limits()
         .map_err(|_| Error::InvalidSource)?;
-    let mut archive = Archive::parse_with_limits(stream.as_bytes(), archive_limits)
-        .map_err(|_| Error::InvalidSource)?;
+    let mut archive =
+        Archive::parse(stream.as_bytes(), archive_limits).map_err(|_| Error::InvalidSource)?;
     archive
-        .validate_canonical_object_framing(stream.as_bytes())
+        .validate_canonical_object_framing(stream.as_bytes(), archive_limits)
         .map_err(|_| Error::InvalidSource)?;
     let mut selected = None;
     for (object_index, object) in archive.objects.iter().enumerate() {
@@ -849,7 +849,7 @@ fn rewrite_metadata_payload(
         .get_mut(object_index)
         .ok_or(Error::InvalidSource)?;
     object
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             message_index,
             RawMessage {
                 type_: PACKAGE_METADATA_MESSAGE_TYPE,
@@ -859,9 +859,9 @@ fn rewrite_metadata_payload(
         )
         .map_err(|_| Error::InvalidSource)?;
     let serialized = archive
-        .to_bytes_with_limits(archive_limits)
+        .to_bytes(archive_limits)
         .map_err(|_| Error::InvalidSource)?;
-    SnappyStream::compress(&serialized).map_err(|_| Error::InvalidSource)
+    SnappyStream::compress(&serialized, Default::default()).map_err(|_| Error::InvalidSource)
 }
 
 fn rewrite_package(
@@ -933,7 +933,7 @@ fn rewrite_package(
         .limits()
         .effective_archive_limits()
         .map_err(|_| Error::InvalidSource)?;
-    let stream = SnappyStream::decompress_with_limits(
+    let stream = SnappyStream::decompress(
         archive_entry.data(),
         source
             .limits()
@@ -941,10 +941,10 @@ fn rewrite_package(
             .map_err(|_| Error::InvalidSource)?,
     )
     .map_err(|_| Error::InvalidSource)?;
-    let mut archive = Archive::parse_with_limits(stream.as_bytes(), archive_limits)
-        .map_err(|_| Error::InvalidSource)?;
+    let mut archive =
+        Archive::parse(stream.as_bytes(), archive_limits).map_err(|_| Error::InvalidSource)?;
     archive
-        .validate_canonical_object_framing(stream.as_bytes())
+        .validate_canonical_object_framing(stream.as_bytes(), archive_limits)
         .map_err(|_| Error::InvalidSource)?;
     let object = archive
         .object_mut(view.selection.soundtrack_identifier)
@@ -968,23 +968,22 @@ fn rewrite_package(
         data: rewritten_payload,
     };
     match matching_fields.as_slice() {
-        [field_index] => object
-            .replace_message_transitioning_data_references_preserving_header_with_limits(
-                view.selection.soundtrack_message_index,
-                replacement,
-                DataReferenceTransition {
-                    aggregate_before: &before_ids,
-                    aggregate_after: &after_ids,
-                    fields: &[FieldDataReferenceTransition {
-                        field_info_index: *field_index,
-                        expected_path: &[SOUNDTRACK_MEDIA_FIELD],
-                        before: &before_ids,
-                        after: &after_ids,
-                    }],
-                },
-                archive_limits,
-            ),
-        [] => object.replace_message_transitioning_data_references_preserving_header_with_limits(
+        [field_index] => object.replace_message_transitioning_data_references_preserving_header(
+            view.selection.soundtrack_message_index,
+            replacement,
+            DataReferenceTransition {
+                aggregate_before: &before_ids,
+                aggregate_after: &after_ids,
+                fields: &[FieldDataReferenceTransition {
+                    field_info_index: *field_index,
+                    expected_path: &[SOUNDTRACK_MEDIA_FIELD],
+                    before: &before_ids,
+                    after: &after_ids,
+                }],
+            },
+            archive_limits,
+        ),
+        [] => object.replace_message_transitioning_data_references_preserving_header(
             view.selection.soundtrack_message_index,
             replacement,
             DataReferenceTransition {
@@ -998,10 +997,10 @@ fn rewrite_package(
     }
     .map_err(|_| Error::InvalidSource)?;
     let serialized_soundtrack = archive
-        .to_bytes_with_limits(archive_limits)
+        .to_bytes(archive_limits)
         .map_err(|_| Error::InvalidSource)?;
-    let compressed_soundtrack =
-        SnappyStream::compress(&serialized_soundtrack).map_err(|_| Error::InvalidSource)?;
+    let compressed_soundtrack = SnappyStream::compress(&serialized_soundtrack, Default::default())
+        .map_err(|_| Error::InvalidSource)?;
 
     let mut data_additions = Vec::new();
     let mut owner_additions = Vec::new();

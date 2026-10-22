@@ -191,6 +191,7 @@ fn remove_theme_preset(
                 type_: location.message_type,
                 data: theme.encode()?,
             },
+            Default::default(),
         )?;
         remove_metadata_reference(
             &mut object.archive_info.message_infos[message_index],
@@ -259,6 +260,7 @@ fn remove_stylesheet_entry(
                 type_: STYLESHEET_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         remove_metadata_reference(
             &mut stylesheet.archive_info.message_infos[message_index],

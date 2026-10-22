@@ -58,7 +58,7 @@ fn rewrite_table_model(
     select: impl Fn(&tst::TableModelArchive) -> bool,
     mutate: impl FnOnce(&mut tst::TableModelArchive),
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let mut replacement = None;
     let mut mutate = Some(mutate);
 
@@ -66,8 +66,8 @@ fn rewrite_table_model(
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
     {
-        let stream = SnappyStream::decompress(entry.data())?;
-        let mut archive = Archive::parse(stream.as_bytes())?;
+        let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+        let mut archive = Archive::parse(stream.as_bytes(), Default::default())?;
         let mut changed = false;
         for object in &mut archive.objects {
             for message_index in 0..object.messages.len() {
@@ -90,6 +90,7 @@ fn rewrite_table_model(
                         type_: TABLE_MODEL_MESSAGE_TYPE,
                         data: model.encode_to_vec(),
                     },
+                    Default::default(),
                 )?;
                 changed = true;
                 break;
@@ -101,7 +102,8 @@ fn rewrite_table_model(
         if changed {
             replacement = Some((
                 entry.name().to_owned(),
-                SnappyStream::compress(&archive.to_bytes()?)?.to_vec(),
+                SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?
+                    .to_vec(),
             ));
             break;
         }
@@ -128,14 +130,14 @@ fn rewrite_native_table_model(
 /// this BNC tile and refuse; MergeReader must stop before it and still return
 /// the selected merge geometry.
 fn rewrite_native_table_tile_as_malformed(source: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let mut tile_identifier = None;
     for entry in catalog
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
     {
-        let stream = SnappyStream::decompress(entry.data())?;
-        let archive = Archive::parse(stream.as_bytes())?;
+        let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+        let archive = Archive::parse(stream.as_bytes(), Default::default())?;
         for object in &archive.objects {
             for message in &object.messages {
                 if message.type_ != TABLE_MODEL_MESSAGE_TYPE {
@@ -172,8 +174,8 @@ fn rewrite_native_table_tile_as_malformed(source: &[u8]) -> TestResult<Vec<u8>> 
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
     {
-        let stream = SnappyStream::decompress(entry.data())?;
-        let mut archive = Archive::parse(stream.as_bytes())?;
+        let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+        let mut archive = Archive::parse(stream.as_bytes(), Default::default())?;
         let mut changed = false;
         for object in &mut archive.objects {
             if object.archive_info.identifier != Some(tile_identifier) {
@@ -190,6 +192,7 @@ fn rewrite_native_table_tile_as_malformed(source: &[u8]) -> TestResult<Vec<u8>> 
                     type_: TILE_MESSAGE_TYPE,
                     data: vec![0xff],
                 },
+                Default::default(),
             )?;
             changed = true;
             break;
@@ -197,7 +200,8 @@ fn rewrite_native_table_tile_as_malformed(source: &[u8]) -> TestResult<Vec<u8>> 
         if changed {
             replacement = Some((
                 entry.name().to_owned(),
-                SnappyStream::compress(&archive.to_bytes()?)?.to_vec(),
+                SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?
+                    .to_vec(),
             ));
             break;
         }
@@ -216,13 +220,13 @@ fn rewrite_native_table_tile_as_malformed(source: &[u8]) -> TestResult<Vec<u8>> 
 /// index positions remain distinct, so only an exact name selector is
 /// ambiguous.
 fn duplicate_rooted_oracle_table_name(source: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == "Index/Document.iwa")
         .ok_or_else(|| "rooted oracle document component is missing".to_owned())?;
-    let stream = SnappyStream::decompress(entry.data())?;
-    let mut archive = Archive::parse(stream.as_bytes())?;
+    let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+    let mut archive = Archive::parse(stream.as_bytes(), Default::default())?;
     let mut changed = false;
     for object in &mut archive.objects {
         for message_index in 0..object.messages.len() {
@@ -243,6 +247,7 @@ fn duplicate_rooted_oracle_table_name(source: &[u8]) -> TestResult<Vec<u8>> {
                     type_: TABLE_MODEL_MESSAGE_TYPE,
                     data: model.encode_to_vec(),
                 },
+                Default::default(),
             )?;
             changed = true;
         }
@@ -250,7 +255,8 @@ fn duplicate_rooted_oracle_table_name(source: &[u8]) -> TestResult<Vec<u8>> {
     if !changed {
         return Err("rooted oracle second table model is missing".into());
     }
-    let component = SnappyStream::compress(&archive.to_bytes()?)?;
+    let component =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(entry.name(), component.as_slice())],
         ArchiveLimits::default(),
@@ -262,13 +268,13 @@ fn duplicate_rooted_oracle_table_name(source: &[u8]) -> TestResult<Vec<u8>> {
 /// multiply-rooted owner instead of selecting whichever repeated protobuf
 /// field happens to be visited first.
 fn duplicate_native_document_sheet_edge(source: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == "Index/Document.iwa")
         .ok_or_else(|| "native Numbers document component is missing".to_owned())?;
-    let stream = SnappyStream::decompress(entry.data())?;
-    let mut archive = Archive::parse(stream.as_bytes())?;
+    let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+    let mut archive = Archive::parse(stream.as_bytes(), Default::default())?;
     let document = archive
         .objects
         .iter_mut()
@@ -296,8 +302,10 @@ fn duplicate_native_document_sheet_edge(source: &[u8]) -> TestResult<Vec<u8>> {
             type_: DOCUMENT_MESSAGE_TYPE,
             data: decoded.encode_to_vec(),
         },
+        Default::default(),
     )?;
-    let component = SnappyStream::compress(&archive.to_bytes()?)?;
+    let component =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(entry.name(), component.as_slice())],
         ArchiveLimits::default(),
@@ -308,14 +316,14 @@ fn duplicate_native_document_sheet_edge(source: &[u8]) -> TestResult<Vec<u8>> {
 /// sheet message metadata's aggregate references unchanged.  This exercises
 /// the same ownership invariant at the table level.
 fn duplicate_native_sheet_table_edge(source: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let mut replacement = None;
     for entry in catalog
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
     {
-        let stream = SnappyStream::decompress(entry.data())?;
-        let mut archive = Archive::parse(stream.as_bytes())?;
+        let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+        let mut archive = Archive::parse(stream.as_bytes(), Default::default())?;
         let mut changed = false;
         for object in &mut archive.objects {
             let Some(message_index) = object.messages.iter().position(|message| {
@@ -343,6 +351,7 @@ fn duplicate_native_sheet_table_edge(source: &[u8]) -> TestResult<Vec<u8>> {
                     type_: SHEET_MESSAGE_TYPE,
                     data: sheet.encode_to_vec(),
                 },
+                Default::default(),
             )?;
             changed = true;
             break;
@@ -350,7 +359,8 @@ fn duplicate_native_sheet_table_edge(source: &[u8]) -> TestResult<Vec<u8>> {
         if changed {
             replacement = Some((
                 entry.name().to_owned(),
-                SnappyStream::compress(&archive.to_bytes()?)?.to_vec(),
+                SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?
+                    .to_vec(),
             ));
             break;
         }
@@ -371,15 +381,15 @@ fn duplicate_native_sheet_table_edge(source: &[u8]) -> TestResult<Vec<u8>> {
 /// `FieldInfo.path` declaration. Keeping both changes in this helper makes
 /// the integration test exercise the complete ownership contract.
 fn rewrite_native_sheet_as_form_based(source: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let mut replacement = None;
 
     for entry in catalog
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
     {
-        let stream = SnappyStream::decompress(entry.data())?;
-        let mut archive = Archive::parse(stream.as_bytes())?;
+        let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+        let mut archive = Archive::parse(stream.as_bytes(), Default::default())?;
         let mut changed = false;
         for object in &mut archive.objects {
             let Some(message_index) = object.messages.iter().position(|message| {
@@ -411,6 +421,7 @@ fn rewrite_native_sheet_as_form_based(source: &[u8]) -> TestResult<Vec<u8>> {
                     type_: FORM_BASED_SHEET_MESSAGE_TYPE,
                     data: form.encode_to_vec(),
                 },
+                Default::default(),
             )?;
             let info = object
                 .archive_info
@@ -428,7 +439,8 @@ fn rewrite_native_sheet_as_form_based(source: &[u8]) -> TestResult<Vec<u8>> {
         if changed {
             replacement = Some((
                 entry.name().to_owned(),
-                SnappyStream::compress(&archive.to_bytes()?)?.to_vec(),
+                SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?
+                    .to_vec(),
             ));
             break;
         }
@@ -448,13 +460,13 @@ fn rewrite_native_sheet_as_form_based(source: &[u8]) -> TestResult<Vec<u8>> {
 /// the focused merge reader proves the root, sheet, and table-info ownership
 /// edges before it inspects the selected model.
 fn decorate_rooted_oracle_metadata(source: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == "Index/Document.iwa")
         .ok_or_else(|| "Numbers document component is missing".to_owned())?;
-    let stream = SnappyStream::decompress(entry.data())?;
-    let mut archive = Archive::parse(stream.as_bytes())?;
+    let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+    let mut archive = Archive::parse(stream.as_bytes(), Default::default())?;
 
     for object in &mut archive.objects {
         let (message_type, references) = match object.archive_info.identifier {
@@ -477,7 +489,8 @@ fn decorate_rooted_oracle_metadata(source: &[u8]) -> TestResult<Vec<u8>> {
             .object_references = references;
     }
 
-    let component = SnappyStream::compress(&archive.to_bytes()?)?;
+    let component =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(entry.name(), component.as_slice())],
         ArchiveLimits::default(),
@@ -491,7 +504,7 @@ fn rewrite_message_metadata(
     select: impl Fn(&ArchiveObject, usize) -> bool,
     mutate: impl FnOnce(&mut ArchiveObject, usize),
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let mut replacement = None;
     let mut mutate = Some(mutate);
 
@@ -499,8 +512,8 @@ fn rewrite_message_metadata(
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
     {
-        let stream = SnappyStream::decompress(entry.data())?;
-        let mut archive = Archive::parse(stream.as_bytes())?;
+        let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+        let mut archive = Archive::parse(stream.as_bytes(), Default::default())?;
         let mut changed = false;
         for object in &mut archive.objects {
             for message_index in 0..object.messages.len() {
@@ -523,7 +536,8 @@ fn rewrite_message_metadata(
         if changed {
             replacement = Some((
                 entry.name().to_owned(),
-                SnappyStream::compress(&archive.to_bytes()?)?.to_vec(),
+                SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?
+                    .to_vec(),
             ));
             break;
         }
@@ -1151,7 +1165,7 @@ fn missing_name_queries_charge_fields_without_charging_opaque_bytes_as_fields() 
                 let mut message = object.messages[index].clone();
                 message.data.extend_from_slice(&padding);
                 object
-                    .replace_message_preserving_header(index, message)
+                    .replace_message_preserving_header(index, message, Default::default())
                     .expect("unknown payload padding preserves the IWA envelope");
             },
         )?;

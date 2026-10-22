@@ -154,6 +154,7 @@ fn mutate_pages_chart_non_style(
                     type_: CHART_NON_STYLE_MESSAGE_TYPE,
                     data,
                 },
+                Default::default(),
             )?;
             Ok(())
         })
@@ -227,6 +228,7 @@ fn mutate_pages_chart_caption(
                     type_: CHART_MESSAGE_TYPE,
                     data,
                 },
+                Default::default(),
             )?;
             Ok(())
         })
@@ -310,10 +312,10 @@ fn pages_chart_message_info(
 
 fn pages_archive_header(editor: &Draft, archive_name: &str, object_identifier: u64) -> Vec<u8> {
     let compressed = editor.package().entry(archive_name).unwrap();
-    let source = crate::snappy::SnappyStream::decompress(compressed)
+    let source = crate::snappy::SnappyStream::decompress(compressed, Default::default())
         .unwrap()
         .into_bytes();
-    let archive = crate::archive::Archive::parse(&source).unwrap();
+    let archive = crate::archive::Archive::parse(&source, Default::default()).unwrap();
     let object = archive.object(object_identifier).unwrap();
     let object_start = usize::try_from(object.header_offset).unwrap();
     let prefix_length = test_decode_varint(&source[object_start..]).1;
@@ -342,10 +344,10 @@ fn inject_pages_archive_unknown_header(
 ) -> Vec<u8> {
     let mut package = editor.package().clone();
     let compressed = package.entry(archive_name).unwrap().to_vec();
-    let source = crate::snappy::SnappyStream::decompress(&compressed)
+    let source = crate::snappy::SnappyStream::decompress(&compressed, Default::default())
         .unwrap()
         .into_bytes();
-    let archive = crate::archive::Archive::parse(&source).unwrap();
+    let archive = crate::archive::Archive::parse(&source, Default::default()).unwrap();
     let object = archive.object(object_identifier).unwrap();
     let object_start = usize::try_from(object.header_offset).unwrap();
     let (header_length, prefix_length) = test_decode_varint(&source[object_start..]);
@@ -367,7 +369,7 @@ fn inject_pages_archive_unknown_header(
     package
         .insert_entry(
             archive_name,
-            crate::snappy::SnappyStream::compress(&rewritten).unwrap(),
+            crate::snappy::SnappyStream::compress(&rewritten, Default::default()).unwrap(),
         )
         .unwrap();
     *editor = Draft::from_package(package).unwrap();
@@ -380,13 +382,17 @@ fn reserve_pages_three_byte_caption_identifier(editor: &mut Draft, archive_name:
         let mut package = editor.package().clone();
         package
             .update_archive(archive_name, |archive| {
-                archive.insert_object(crate::archive::ArchiveObject::new(
-                    16_383,
-                    vec![RawMessage {
-                        type_: 65_534,
-                        data: vec![0],
-                    }],
-                )?)?;
+                archive.insert_object(
+                    crate::archive::ArchiveObject::new(
+                        16_383,
+                        vec![RawMessage {
+                            type_: 65_534,
+                            data: vec![0],
+                        }],
+                        Default::default(),
+                    )?,
+                    Default::default(),
+                )?;
                 Ok(())
             })
             .unwrap();
@@ -545,6 +551,7 @@ fn make_pages_caption_storage_shared(
                     type_: crate::image_caption::CAPTION_INFO_MESSAGE_TYPE,
                     data,
                 },
+                Default::default(),
             )?;
             for identifier in
                 &mut object.archive_info.message_infos[message_index].object_references
@@ -591,6 +598,7 @@ fn make_pages_caption_info_shared(
                     type_: CHART_MESSAGE_TYPE,
                     data,
                 },
+                Default::default(),
             )?;
             let info = &mut object.archive_info.message_infos[message_index];
             for identifier in &mut info.object_references {
@@ -713,6 +721,7 @@ fn mutate_pages_chart_title_standin(editor: &mut Draft, drawable_object_id: u64)
                     type_: CHART_NON_STYLE_MESSAGE_TYPE,
                     data: message.data,
                 },
+                Default::default(),
             )?;
             Ok(())
         })
@@ -750,7 +759,7 @@ fn normalize_private_chart_styles_like_pages(editor: &Draft, drawable_object_id:
     package
         .update_archive(&stylesheet_archive_name, |archive| {
             for object in moved {
-                archive.insert_object(object)?;
+                archive.insert_object(object, Default::default())?;
             }
             let stylesheet = archive.object_mut(theme.stylesheet_id).unwrap();
             for info in &mut stylesheet.archive_info.message_infos {

@@ -171,6 +171,7 @@ fn patch_level(
                 type_: location.message_type,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -442,7 +443,7 @@ mod tests {
     }
 
     fn test_package(messages: Vec<RawMessage>) -> HostPackage {
-        let object = ArchiveObject::new(42, messages).unwrap();
+        let object = ArchiveObject::new(42, messages, Default::default()).unwrap();
         let mut package = HostPackage::new();
         package
             .replace_archive(

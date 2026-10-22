@@ -826,7 +826,7 @@ fn rewrite_headers(
             budget.charge_payload_work(ROOT_PREVIEW_NAMES.iter().map(|name| name.len()).sum())
         })
         .map_err(map_lock_error)?;
-    let stream = litchi_iwa_core::SnappyStream::decompress_with_limits(
+    let stream = litchi_iwa_core::SnappyStream::decompress(
         entry.data(),
         physical_limits.snappy_limits().map_err(map_archive_error)?,
     )
@@ -834,11 +834,10 @@ fn rewrite_headers(
     if stream.as_bytes().len() != stream_length {
         return Err(Error::InvalidSource);
     }
-    let mut archive =
-        litchi_iwa_core::Archive::parse_with_limits(stream.as_bytes(), archive_limits)
-            .map_err(map_core_error)?;
+    let mut archive = litchi_iwa_core::Archive::parse(stream.as_bytes(), archive_limits)
+        .map_err(map_core_error)?;
     archive
-        .validate_canonical_object_framing(stream.as_bytes())
+        .validate_canonical_object_framing(stream.as_bytes(), archive_limits)
         .map_err(map_core_error)?;
     let object = archive
         .objects
@@ -906,7 +905,7 @@ fn rewrite_headers(
         return Err(Error::Verification);
     }
     object
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             target.model_message_index,
             RawMessage {
                 type_: target.model_message_type,
@@ -915,13 +914,12 @@ fn rewrite_headers(
             archive_limits,
         )
         .map_err(map_core_error)?;
-    let raw = archive
-        .to_bytes_with_limits(archive_limits)
-        .map_err(map_core_error)?;
+    let raw = archive.to_bytes(archive_limits).map_err(map_core_error)?;
     if raw.len() > archive_bound {
         return Err(Error::Verification);
     }
-    let compressed = litchi_iwa_core::SnappyStream::compress(&raw).map_err(map_core_error)?;
+    let compressed = litchi_iwa_core::SnappyStream::compress(&raw, Default::default())
+        .map_err(map_core_error)?;
     if compressed.len() > compressed_bound {
         return Err(Error::Verification);
     }
@@ -937,9 +935,8 @@ fn rewrite_headers(
     if output.len() > package_output_bound {
         return Err(Error::Verification);
     }
-    let candidate_source =
-        SourceCatalog::from_shared_bytes_with_limits(output.into(), physical_limits)
-            .map_err(map_archive_error)?;
+    let candidate_source = SourceCatalog::from_shared_bytes(output.into(), physical_limits)
+        .map_err(map_archive_error)?;
     let candidate = Package::from_source_catalog(candidate_source).map_err(map_package_error)?;
     if settings_at_rewritten_target(&candidate, target, wire_limits)? != after
         || preview_count_after_reservation(&candidate) != 0
@@ -1510,9 +1507,8 @@ fn reopen_target(
     budget
         .charge_input_source(target.as_ref())
         .map_err(map_lock_error)?;
-    let catalog =
-        SourceCatalog::from_shared_bytes_with_limits(target, source.state.source.limits())
-            .map_err(map_archive_error)?;
+    let catalog = SourceCatalog::from_shared_bytes(target, source.state.source.limits())
+        .map_err(map_archive_error)?;
     budget
         .charge_source_catalog(&catalog)
         .map_err(map_lock_error)?;
@@ -1594,8 +1590,7 @@ fn map_common_wire_error(error: litchi_iwa_common::Error) -> Error {
             maximum: limit as u64,
         },
         litchi_iwa_common::Error::Allocation { amount, .. } => Error::Allocation { amount },
-        litchi_iwa_common::Error::InvalidFormat(_)
-        | litchi_iwa_common::Error::InvalidLimit { .. } => Error::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 

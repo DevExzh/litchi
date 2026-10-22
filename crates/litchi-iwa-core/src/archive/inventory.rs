@@ -627,6 +627,7 @@ mod tests {
                 type_: 7,
                 data: vec![1, 2, 3],
             }],
+            Default::default(),
         )?;
         let message = &mut object.archive_info.message_infos[0];
         message.versions = vec![1, 2];
@@ -706,6 +707,7 @@ mod tests {
                 type_: 2,
                 data: vec![0; 64],
             }],
+            Default::default(),
         )?;
         object.archive_info.message_infos[0].field_infos = (0..32)
             .map(|index| FieldInfo::new(vec![index; 128]))
@@ -741,6 +743,7 @@ mod tests {
                 type_: 2,
                 data: vec![0; 32],
             }],
+            Default::default(),
         )?;
         object.archive_info.message_infos[0].field_infos = (0..8)
             .map(|index| FieldInfo::new(vec![index; 16]))
@@ -792,6 +795,7 @@ mod tests {
                 type_: 2,
                 data: vec![3],
             }],
+            Default::default(),
         )?;
         let mut object_chunks = Chunks::default();
         let object_report = object

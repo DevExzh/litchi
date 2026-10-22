@@ -529,11 +529,9 @@ impl Package {
         {
             return Err(Error::PatchConflict);
         }
-        let candidate_source = SourceCatalog::from_shared_bytes_with_limits(
-            Arc::clone(&patch.target),
-            catalog.limits(),
-        )
-        .map_err(map_archive_error)?;
+        let candidate_source =
+            SourceCatalog::from_shared_bytes(Arc::clone(&patch.target), catalog.limits())
+                .map_err(map_archive_error)?;
         let candidate =
             Package::from_source_catalog(candidate_source).map_err(map_package_error)?;
         verify_candidate(
@@ -735,9 +733,8 @@ fn rewrite_document_settings(
     drop(edits);
     drop(deleted_previews);
     drop(compressed);
-    let candidate_source =
-        SourceCatalog::from_shared_bytes_with_limits(output.into(), catalog.limits())
-            .map_err(map_archive_error)?;
+    let candidate_source = SourceCatalog::from_shared_bytes(output.into(), catalog.limits())
+        .map_err(map_archive_error)?;
     let candidate = Package::from_source_catalog(candidate_source).map_err(map_package_error)?;
     verify_candidate(source, &candidate, after, None, 0)?;
     Ok((candidate, touched_components))
@@ -770,7 +767,7 @@ fn rewrite_settings_component(
             return Err(Error::Verification);
         }
         object
-            .replace_message_preserving_header_with_limits(
+            .replace_message_preserving_header(
                 message_index,
                 RawMessage {
                     type_: SETTINGS_MESSAGE_TYPE,
@@ -1136,13 +1133,7 @@ fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
         litchi_iwa_archive::Error::Allocation { amount, .. } => Error::Allocation { amount },
         litchi_iwa_archive::Error::Reassembly(_) => Error::Refused(Refusal::UnsupportedSource),
         litchi_iwa_archive::Error::Iwa(core_error) => map_core_error(core_error),
-        litchi_iwa_archive::Error::Io(_)
-        | litchi_iwa_archive::Error::Zip { .. }
-        | litchi_iwa_archive::Error::InvalidLimits(_)
-        | litchi_iwa_archive::Error::Encrypted
-        | litchi_iwa_archive::Error::SourceChanged { .. }
-        | litchi_iwa_archive::Error::DirectoryChanged { .. }
-        | litchi_iwa_archive::Error::InvalidBundle(_) => Error::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
@@ -1183,11 +1174,7 @@ fn map_core_error(error: litchi_iwa_core::Error) -> Error {
         litchi_iwa_core::Error::Allocation { requested, .. } => {
             Error::Allocation { amount: requested }
         },
-        litchi_iwa_core::Error::InvalidArchive { .. }
-        | litchi_iwa_core::Error::InvalidLimits { .. }
-        | litchi_iwa_core::Error::HeaderCodec { .. }
-        | litchi_iwa_core::Error::Io(_)
-        | litchi_iwa_core::Error::Snappy { .. } => Error::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
@@ -1217,8 +1204,7 @@ fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
             maximum: usize_to_u64(limit),
         },
         litchi_iwa_common::Error::Allocation { amount, .. } => Error::Allocation { amount },
-        litchi_iwa_common::Error::InvalidFormat(_)
-        | litchi_iwa_common::Error::InvalidLimit { .. } => Error::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 

@@ -22,7 +22,8 @@ fn root(bytes: &[u8]) -> Container<'_> {
 fn parse_emitted_group(bytes: &[u8]) -> litchi_odraw::shape::Shape<'_> {
     let root = root(bytes);
     assert_eq!(root.record().kind(), RecordKind::SpgrContainer);
-    litchi_odraw::shape::Shape::try_from(root.record().clone()).expect("table group")
+    litchi_odraw::shape::Shape::from_record(root.record().clone(), Default::default())
+        .expect("table group")
 }
 
 #[test]
@@ -121,7 +122,7 @@ fn emitted_group_is_detected_as_table_with_grid_and_text() {
     // host-defined, so validate it through the typed PPT projection.
     let (record, consumed) = Record::parse(&bytes, 0).unwrap();
     assert_eq!(consumed, bytes.len());
-    let typed = litchi_odraw::shape::Shape::try_from(record).unwrap();
+    let typed = litchi_odraw::shape::Shape::from_record(record, Default::default()).unwrap();
     assert_eq!(typed.client_anchor().unwrap().len(), 8);
     let group_anchor = crate::odraw::anchor(&typed).unwrap().unwrap();
     assert_eq!((group_anchor.left(), group_anchor.top()), (400, 480));

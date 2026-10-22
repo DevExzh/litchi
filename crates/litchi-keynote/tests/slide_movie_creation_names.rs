@@ -114,13 +114,13 @@ fn fresh_poster(source: &[u8]) -> TestResult<Vec<u8>> {
 
 fn metadata(package: &Package) -> TestResult<tsp::PackageMetadata> {
     let bytes = exact_bytes(package)?;
-    let catalog = Catalog::from_bytes(&bytes)?;
+    let catalog = Catalog::from_bytes(&bytes, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == METADATA_MEMBER)
         .ok_or_else(|| io::Error::other("missing PackageMetadata member"))?;
-    let decoded = SnappyStream::decompress(entry.data())?.into_bytes();
-    let archive = Archive::parse(&decoded)?;
+    let decoded = SnappyStream::decompress(entry.data(), Default::default())?.into_bytes();
+    let archive = Archive::parse(&decoded, Default::default())?;
     let mut payloads = archive.objects.iter().flat_map(|object| {
         object.messages.iter().filter_map(|message| {
             (message.type_ == METADATA_MESSAGE_TYPE).then_some(message.data.as_slice())
@@ -149,7 +149,7 @@ fn data_identifier(package: &Package, bytes: &[u8]) -> TestResult<u64> {
 
 fn append_orphan(source: &Package, name: &str, bytes: &[u8]) -> TestResult<Vec<u8>> {
     let source_bytes = exact_bytes(source)?;
-    let catalog = Catalog::from_bytes(&source_bytes)?;
+    let catalog = Catalog::from_bytes(&source_bytes, Default::default())?;
     Ok(catalog.reassemble_with_insertions_to_bytes(
         &[EntryInsertion::new(name, bytes)],
         Limits::default(),
@@ -158,7 +158,7 @@ fn append_orphan(source: &Package, name: &str, bytes: &[u8]) -> TestResult<Vec<u
 
 fn member_bytes(package: &Package, name: &str) -> TestResult<Vec<u8>> {
     let bytes = exact_bytes(package)?;
-    Catalog::from_bytes(&bytes)?
+    Catalog::from_bytes(&bytes, Default::default())?
         .iter()
         .find(|entry| entry.name() == name)
         .map(|entry| entry.data().to_vec())

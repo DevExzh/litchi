@@ -1244,18 +1244,16 @@ fn discover_slots_with_budget(
                     let limits = storage_rewrite_limits(source.state.source.limits())
                         .map_err(|_| Error::InvalidSource)?;
                     let residual = residual_storage_limits(limits, budget)?;
-                    let validation =
-                        litchi_iwa_text_wire::validate_storage_with_limits(payload, residual)
-                            .map_err(map_text_error)?;
+                    let validation = litchi_iwa_text_wire::validate_storage(payload, residual)
+                        .map_err(map_text_error)?;
                     if validation.storage_kind() != 1 {
                         return Err(Error::Refused(Refusal::UnsupportedDependency));
                     }
                     budget.charge_text_validation(payload.len(), validation)?;
                     budget.charge_text_allocation(validation)?;
                     let residual = residual_storage_limits(limits, budget)?;
-                    let decoded =
-                        litchi_iwa_text_wire::decode_storage_with_limits(payload, residual)
-                            .map_err(map_text_error)?;
+                    let decoded = litchi_iwa_text_wire::decode_storage(payload, residual)
+                        .map_err(map_text_error)?;
                     if decoded.validation() != validation {
                         return Err(Error::Verification);
                     }
@@ -1726,7 +1724,7 @@ fn precharge_archive_rewrite(
     budget: &mut TransactionBudget,
 ) -> Result<(usize, usize), Error> {
     let source_archive_bytes = archive
-        .encoded_len_with_limits(archive_limits)
+        .encoded_len(archive_limits)
         .map_err(map_core_error)?;
     let message_count = archive
         .objects
@@ -1751,8 +1749,8 @@ fn precharge_archive_rewrite(
         .and_then(|value| value.checked_add(rewritten_message_bytes))
         .and_then(|value| value.checked_add(framing_slack))
         .ok_or(Error::InvalidSource)?;
-    let compressed_bound =
-        SnappyStream::maximum_compressed_len(archive_bound).map_err(map_core_error)?;
+    let compressed_bound = SnappyStream::maximum_compressed_len(archive_bound, Default::default())
+        .map_err(map_core_error)?;
     budget.observe(LimitKind::OutputBytes, rewritten_message_bytes)?;
     budget.observe(LimitKind::OutputBytes, archive_bound)?;
     budget.observe(LimitKind::EntryBytes, compressed_bound)?;
@@ -1854,7 +1852,7 @@ fn precharge_candidate_catalog(
             .iter()
             .find(|(member, _, _)| *member == component.name())
             .map_or_else(
-                || component.archive().encoded_len_with_limits(archive_limits),
+                || component.archive().encoded_len(archive_limits),
                 |(_, _, archive_bound)| Ok(*archive_bound),
             )
             .map_err(map_core_error)?;
@@ -1925,8 +1923,8 @@ fn rewrite_storage_component(
         storage_rewrite_limits(source.state.source.limits()).map_err(|_| Error::InvalidSource)?,
         budget,
     )?;
-    let validation = litchi_iwa_text_wire::validate_storage_with_limits(&message.data, limits)
-        .map_err(map_text_error)?;
+    let validation =
+        litchi_iwa_text_wire::validate_storage(&message.data, limits).map_err(map_text_error)?;
     if validation.storage_kind() != 1 {
         return Err(Error::Refused(Refusal::UnsupportedDependency));
     }
@@ -1936,8 +1934,8 @@ fn rewrite_storage_component(
         storage_rewrite_limits(source.state.source.limits()).map_err(|_| Error::InvalidSource)?,
         budget,
     )?;
-    let validated = litchi_iwa_text_wire::decode_storage_with_limits(&message.data, limits)
-        .map_err(map_text_error)?;
+    let validated =
+        litchi_iwa_text_wire::decode_storage(&message.data, limits).map_err(map_text_error)?;
     if validated.validation() != validation {
         return Err(Error::Verification);
     }
@@ -1960,7 +1958,7 @@ fn rewrite_storage_component(
             ),
     )?;
     budget.charge(LimitKind::Allocations, 3)?;
-    let prepared = litchi_iwa_text_wire::prepare_storage_text_rewrite_with_behavior_and_limits(
+    let prepared = litchi_iwa_text_wire::prepare_storage_text_rewrite_with_behavior(
         &message.data,
         0..units,
         after,
@@ -2026,7 +2024,7 @@ fn rewrite_storage_component(
     archive
         .object_mut(storage_id)
         .ok_or(Error::InvalidSource)?
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             message_index,
             RawMessage {
                 type_: message_type,
@@ -2041,7 +2039,7 @@ fn rewrite_storage_component(
         )
         .map_err(map_core_error)?;
     let exact_archive_len = archive
-        .encoded_len_with_limits(
+        .encoded_len(
             source
                 .state
                 .source
@@ -2054,7 +2052,7 @@ fn rewrite_storage_component(
         return Err(Error::Verification);
     }
     let bytes = archive
-        .to_bytes_with_limits(
+        .to_bytes(
             source
                 .state
                 .source
@@ -2063,7 +2061,7 @@ fn rewrite_storage_component(
                 .map_err(map_archive_error)?,
         )
         .map_err(map_core_error)?;
-    let compressed = SnappyStream::compress(&bytes).map_err(map_core_error)?;
+    let compressed = SnappyStream::compress(&bytes, Default::default()).map_err(map_core_error)?;
     if compressed.len() > compressed_bound {
         return Err(Error::Verification);
     }
@@ -2180,7 +2178,7 @@ fn rewrite_metadata_tokens(
                 .ok_or(Error::InvalidSource)?,
         )
         .ok_or(Error::InvalidSource)?
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             message_index,
             RawMessage {
                 type_: METADATA_MESSAGE_TYPE,
@@ -2195,15 +2193,13 @@ fn rewrite_metadata_tokens(
         )
         .map_err(map_core_error)?;
     let exact_archive_len = archive
-        .encoded_len_with_limits(archive_limits)
+        .encoded_len(archive_limits)
         .map_err(map_core_error)?;
     if exact_archive_len > archive_bound {
         return Err(Error::Verification);
     }
-    let bytes = archive
-        .to_bytes_with_limits(archive_limits)
-        .map_err(map_core_error)?;
-    let compressed = SnappyStream::compress(&bytes).map_err(map_core_error)?;
+    let bytes = archive.to_bytes(archive_limits).map_err(map_core_error)?;
+    let compressed = SnappyStream::compress(&bytes, Default::default()).map_err(map_core_error)?;
     if compressed.len() > compressed_bound {
         return Err(Error::Verification);
     }

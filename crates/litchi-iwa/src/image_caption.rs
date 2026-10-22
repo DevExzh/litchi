@@ -782,6 +782,7 @@ pub(crate) fn standin_caption_object(identifier: u64) -> Result<ArchiveObject> {
             type_: STANDIN_CAPTION_MESSAGE_TYPE,
             data: tsd::StandinCaptionArchive::default().encode_to_vec(),
         }],
+        Default::default(),
     )?;
     object.archive_info.message_infos[0].versions = STANDIN_CAPTION_MESSAGE_VERSION.to_vec();
     Ok(object)
@@ -1100,6 +1101,7 @@ fn archive_object(
             type_: message_type,
             data: message.encode_to_vec(),
         }],
+        Default::default(),
     )?;
     let info = &mut object.archive_info.message_infos[0];
     info.versions = if profile == CaptionGraphProfile::Componentized

@@ -584,10 +584,10 @@ pub(super) fn ensure_generated_author(
         .ok_or(Error::InvalidSource)?;
     // `encode_annotation_author_with_report` already charges the payload
     // buffer. Transfer that buffer into RawMessage without copying it, then
-    // precharge the three heap vectors built by ArchiveObject::new_with_limits
+    // precharge the three heap vectors built by ArchiveObject::new
     // (messages, MessageInfo records, and their conventional version list).
     budget.charge_allocation_plan(nested_allocation_bytes, 3)?;
-    let object = ArchiveObject::new_with_limits(
+    let object = ArchiveObject::new(
         identifier,
         vec![litchi_iwa_core::RawMessage {
             type_: ANNOTATION_AUTHOR_MESSAGE_TYPE,
@@ -612,7 +612,7 @@ pub(super) fn ensure_generated_author(
         budget,
     )?;
     storage_archive
-        .insert_object_with_limits(object, archive_limits)
+        .insert_object(object, archive_limits)
         .map_err(|_| Error::InvalidSource)?;
 
     Ok(AuthorBinding {
@@ -1449,7 +1449,7 @@ fn effective_object_reference_census(
         for object in &archive.objects {
             let mut counts = ArchiveObjectReferenceCounts::default();
             let references = object
-                .inspect_references_with_policy_and_limits(
+                .inspect_references_with_policy(
                     &mut counts,
                     ArchiveReferencePolicy::RejectUnknownMetadata,
                     archive_limits,
@@ -1486,7 +1486,7 @@ fn effective_object_reference_census(
                 witnesses: &mut witnesses,
             };
             let references = object
-                .inspect_references_with_policy_and_limits(
+                .inspect_references_with_policy(
                     &mut collector,
                     ArchiveReferencePolicy::RejectUnknownMetadata,
                     archive_limits,
@@ -2325,7 +2325,7 @@ fn replace_metadata_payload(
     archive
         .object_mut(identifier)
         .ok_or(Error::InvalidSource)?
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             message_index,
             litchi_iwa_core::RawMessage {
                 type_: PACKAGE_METADATA_MESSAGE_TYPE,
@@ -2509,7 +2509,7 @@ fn replace_author_storage_message(
         });
     }
     object
-        .replace_message_transitioning_object_references_preserving_header_with_limits(
+        .replace_message_transitioning_object_references_preserving_header(
             message_index,
             litchi_iwa_core::RawMessage {
                 type_: ANNOTATION_AUTHOR_STORAGE_MESSAGE_TYPE,
@@ -2835,7 +2835,7 @@ pub(super) fn cleanup_generated_author_for_identifier(
                 found: false,
             };
             let reference_count = object
-                .inspect_references_with_policy_and_limits(
+                .inspect_references_with_policy(
                     &mut references,
                     ArchiveReferencePolicy::RejectUnknownMetadata,
                     archive_limits,
@@ -2932,7 +2932,7 @@ pub(super) fn cleanup_generated_author_for_identifier(
         )?;
     } else {
         storage_object
-            .replace_message_preserving_header_with_limits(
+            .replace_message_preserving_header(
                 location.message_index,
                 litchi_iwa_core::RawMessage {
                     type_: ANNOTATION_AUTHOR_STORAGE_MESSAGE_TYPE,

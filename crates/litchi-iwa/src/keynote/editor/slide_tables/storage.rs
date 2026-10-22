@@ -42,6 +42,7 @@ pub(super) fn set_table_geometry_in_package(
                 type_: original.type_,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })

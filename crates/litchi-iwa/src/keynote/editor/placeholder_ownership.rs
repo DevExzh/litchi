@@ -103,6 +103,7 @@ pub(super) fn patch(
                 type_: SLIDE_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })

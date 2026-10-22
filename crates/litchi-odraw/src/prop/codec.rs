@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 use super::model::{Anchor, Array, Id, Prop, Value};
 use super::package::Props;
-use super::{IS_BLIP, IS_COMPLEX, PROPERTY_ID_MASK};
+use super::{IS_BLIP, IS_COMPLEX, LINEAR_PROPERTIES, PROPERTY_ID_MASK};
 
 #[derive(Debug, Clone, Copy)]
 struct Descriptor {
@@ -50,8 +50,9 @@ impl<'data> Props<'data> {
             });
         }
 
-        let mut descriptors = Vec::with_capacity(count);
-        let mut by_id = HashMap::with_capacity(count);
+        let mut descriptors: Vec<Descriptor> = Vec::with_capacity(count);
+        let linear = count <= LINEAR_PROPERTIES;
+        let mut by_id = HashMap::with_capacity(if linear { 0 } else { count });
         for index in 0..count {
             let offset = index.checked_mul(6).ok_or(Error::ArithmeticOverflow {
                 context: "property-header offset",
@@ -65,7 +66,11 @@ impl<'data> Props<'data> {
             let raw_opid = u16::from_le_bytes([header[0], header[1]]);
             let raw_id = raw_opid & PROPERTY_ID_MASK;
             let id = Id::from(raw_id);
-            if by_id.insert(id, index).is_some() {
+            if if linear {
+                descriptors.iter().any(|descriptor| descriptor.id == id)
+            } else {
+                by_id.insert(id, index).is_some()
+            } {
                 return Err(Error::MalformedProperties {
                     reason: "duplicate property identifier",
                 });

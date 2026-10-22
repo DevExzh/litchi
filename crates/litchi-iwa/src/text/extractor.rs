@@ -116,6 +116,7 @@ mod tests {
                 type_: 2001,
                 data: payload,
             }],
+            Default::default(),
         )
         .unwrap_or_else(|error| panic!("valid archive object: {error}"));
 

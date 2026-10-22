@@ -106,6 +106,7 @@ pub(crate) fn insert_object_container(
             type_: OBJECT_CONTAINER_MESSAGE_TYPE,
             data: container.encode_to_vec(),
         }],
+        Default::default(),
     )?);
     archive_objects.extend(objects);
     let archive = Archive {
@@ -235,6 +236,7 @@ pub(crate) fn remove_object_container_objects(
                 type_: OBJECT_CONTAINER_MESSAGE_TYPE,
                 data: container.encode_to_vec(),
             },
+            Default::default(),
         )?;
         Ok(())
     })?;

@@ -749,11 +749,9 @@ impl Package {
             .precharge_candidate_reopen(self, patch.target_bytes.len(), Path::Package)
             .map_err(map_transaction_error)?;
 
-        let candidate_source = SourceCatalog::from_shared_bytes_with_limits(
-            Arc::clone(&patch.target_bytes),
-            source.limits(),
-        )
-        .map_err(map_archive_error)?;
+        let candidate_source =
+            SourceCatalog::from_shared_bytes(Arc::clone(&patch.target_bytes), source.limits())
+                .map_err(map_archive_error)?;
         let candidate =
             Package::from_source_catalog(candidate_source).map_err(map_package_error)?;
         budget
@@ -1087,7 +1085,7 @@ pub(crate) fn section_boundaries(
     let payload = transaction::selected_payload(package, target).map_err(map_transaction_error)?;
     let limits = storage_rewrite_limits(package.state.source.limits())
         .map_err(map_storage_wire_limits_error)?;
-    let storage = litchi_iwa_text_wire::storage_boundaries_with_limits(payload, limits)
+    let storage = litchi_iwa_text_wire::storage_boundaries(payload, limits)
         .map_err(map_text_rewrite_error)?;
     Ok(SectionBoundaries { storage, offset })
 }
@@ -1170,7 +1168,7 @@ fn rewrite_package_text(
     let residual_limits = budget
         .residual_storage_limits(rewrite_limits, path)
         .map_err(map_transaction_error)?;
-    let prepared = litchi_iwa_text_wire::prepare_storage_text_rewrite_with_behavior_and_limits(
+    let prepared = litchi_iwa_text_wire::prepare_storage_text_rewrite_with_behavior(
         payload,
         absolute_start..absolute_end,
         replacement,
@@ -1432,7 +1430,7 @@ fn verify_native_locality(
                 .map_err(map_transaction_error)?;
             let mut expected_object = before_object.clone();
             expected_object
-                .replace_message_preserving_header_with_limits(
+                .replace_message_preserving_header(
                     target.message_index,
                     after_message,
                     source_catalog
@@ -1448,7 +1446,7 @@ fn verify_native_locality(
             let mut expected_archive = litchi_iwa_core::Archive::new();
             expected_archive.objects.push(expected_object);
             let expected_bytes = expected_archive
-                .to_bytes_with_limits(archive_limits)
+                .to_bytes(archive_limits)
                 .map_err(map_core_error)?;
             budget
                 .charge_limit(
@@ -1457,9 +1455,8 @@ fn verify_native_locality(
                     Path::section(target.position),
                 )
                 .map_err(map_transaction_error)?;
-            let expected_archive =
-                litchi_iwa_core::Archive::parse_with_limits(&expected_bytes, archive_limits)
-                    .map_err(map_core_error)?;
+            let expected_archive = litchi_iwa_core::Archive::parse(&expected_bytes, archive_limits)
+                .map_err(map_core_error)?;
             let expected_object = expected_archive
                 .objects
                 .first()
@@ -1858,14 +1855,7 @@ fn map_archive_error(archive_error: litchi_iwa_archive::Error) -> Error {
         },
         litchi_iwa_archive::Error::Allocation { amount, .. } => Error::Allocation { amount },
         litchi_iwa_archive::Error::Iwa(core_error) => map_core_error(core_error),
-        litchi_iwa_archive::Error::Io(_)
-        | litchi_iwa_archive::Error::Zip { .. }
-        | litchi_iwa_archive::Error::InvalidLimits(_)
-        | litchi_iwa_archive::Error::Encrypted
-        | litchi_iwa_archive::Error::SourceChanged { .. }
-        | litchi_iwa_archive::Error::DirectoryChanged { .. }
-        | litchi_iwa_archive::Error::Reassembly(_)
-        | litchi_iwa_archive::Error::InvalidBundle(_) => Error::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
@@ -1901,11 +1891,7 @@ fn map_core_error(core_error: litchi_iwa_core::Error) -> Error {
         litchi_iwa_core::Error::Allocation { requested, .. } => {
             Error::Allocation { amount: requested }
         },
-        litchi_iwa_core::Error::InvalidArchive { .. }
-        | litchi_iwa_core::Error::InvalidLimits { .. }
-        | litchi_iwa_core::Error::HeaderCodec { .. }
-        | litchi_iwa_core::Error::Io(_)
-        | litchi_iwa_core::Error::Snappy { .. } => Error::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 

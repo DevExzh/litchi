@@ -124,7 +124,7 @@ impl<'data> Drawing<'data> {
 
     /// Validates the group/shape/container topology and shape atoms.
     pub(crate) fn validate_shapes(&self) -> Result<(), Error> {
-        litchi_odraw::shape::parse(self.data)
+        litchi_odraw::shape::parse(self.data, Default::default())
             .map_err(map_wire_error)
             .map(|_| ())?;
 

@@ -34,14 +34,17 @@ fn rewrite_first_table_model(
     source: &[u8],
     mutate: impl FnOnce(&mut tst::TableModelArchive),
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let mut replacement = None;
     let mut mutate = Some(mutate);
     for entry in catalog
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
     {
-        let mut archive = Archive::parse(SnappyStream::decompress(entry.data())?.as_bytes())?;
+        let mut archive = Archive::parse(
+            SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+            Default::default(),
+        )?;
         let mut changed = false;
         for object in &mut archive.objects {
             for message_index in 0..object.messages.len() {
@@ -65,6 +68,7 @@ fn rewrite_first_table_model(
                         type_: message_type,
                         data: model.encode_to_vec(),
                     },
+                    Default::default(),
                 )?;
                 changed = true;
                 break;
@@ -76,7 +80,8 @@ fn rewrite_first_table_model(
         if changed {
             replacement = Some((
                 entry.name().to_owned(),
-                SnappyStream::compress(&archive.to_bytes()?)?.to_vec(),
+                SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?
+                    .to_vec(),
             ));
             break;
         }

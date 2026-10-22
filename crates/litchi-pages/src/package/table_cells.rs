@@ -1264,7 +1264,7 @@ impl CellSidecarResolver for PagesCellSidecarResolver<'_, '_, '_, '_> {
             self.budget.wire().remaining_wire_work().max(1),
         )
         .map_err(|_| Error::InvalidSource)?;
-        let storage = litchi_iwa_text_wire::from_bytes_with_limits(storage_payload, limits)
+        let storage = litchi_iwa_text_wire::from_bytes(storage_payload, limits)
             .map_err(|_| Error::InvalidSource)?;
         self.budget.charge(storage.len())?;
         Ok(storage.into_text())
@@ -1773,8 +1773,7 @@ fn map_common_wire_error(error: litchi_iwa_common::Error) -> Error {
             maximum: usize_as_u64(limit),
         },
         litchi_iwa_common::Error::Allocation { amount, .. } => Error::Allocation { amount },
-        litchi_iwa_common::Error::InvalidFormat(_)
-        | litchi_iwa_common::Error::InvalidLimit { .. } => Error::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
@@ -1790,12 +1789,7 @@ fn map_common_table_error(error: litchi_iwa_common::table::model::Error) -> Erro
                 maximum: usize_as_u64(maximum),
             }
         },
-        litchi_iwa_common::table::model::Error::InvalidAddress { .. }
-        | litchi_iwa_common::table::model::Error::OutOfBounds { .. }
-        | litchi_iwa_common::table::model::Error::InvalidRange { .. }
-        | litchi_iwa_common::table::model::Error::CoordinateOverflow { .. }
-        | litchi_iwa_common::table::model::Error::DuplicatePosition { .. }
-        | litchi_iwa_common::table::model::Error::DuplicateTableName { .. } => Error::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 

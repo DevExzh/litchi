@@ -23,7 +23,7 @@ use litchi_iwa_archive::{
     package::{EntryEdit, ExactArtifacts},
 };
 use litchi_iwa_common::{WireLimits, wire::WireView};
-use litchi_iwa_core::{Archive, ArchiveLimits, RawMessage, SnappyStream};
+use litchi_iwa_core::{Archive, Limits as ArchiveLimits, RawMessage, SnappyStream};
 use litchi_iwa_protos::{
     keynote_media_lifecycle_codec as lifecycle_codec, package_metadata_codec as identity_codec,
     package_metadata_media_codec as media_codec,
@@ -887,7 +887,7 @@ fn load_metadata(
         .ok_or(Error::InvalidSource)?;
     let expected_stream_len = source_component
         .archive()
-        .encoded_len_with_limits(archive_limits)
+        .encoded_len(archive_limits)
         .map_err(|_| Error::InvalidSource)?;
     if expected_stream_len == 0 || expected_stream_len > snappy_limits.max_decompressed_stream() {
         return Err(Error::InvalidSource);
@@ -930,15 +930,15 @@ fn load_metadata(
         })
         .ok_or(Error::InvalidSource)?;
     budget.charge_allocations(parse_scratch)?;
-    let stream = SnappyStream::decompress_with_limits(entry.data(), tight_snappy_limits)
+    let stream = SnappyStream::decompress(entry.data(), tight_snappy_limits)
         .map_err(|_| Error::InvalidSource)?;
     if stream.as_bytes().len() != expected_stream_len {
         return Err(Error::InvalidSource);
     }
-    let archive = Archive::parse_with_limits(stream.as_bytes(), archive_limits)
-        .map_err(|_| Error::InvalidSource)?;
+    let archive =
+        Archive::parse(stream.as_bytes(), archive_limits).map_err(|_| Error::InvalidSource)?;
     archive
-        .validate_canonical_object_framing(stream.as_bytes())
+        .validate_canonical_object_framing(stream.as_bytes(), archive_limits)
         .map_err(|_| Error::InvalidSource)?;
     budget.charge_entries(archive.objects.len())?;
     for object in &archive.objects {
@@ -1577,7 +1577,7 @@ fn append_clones(
         clones.push(clone);
     }
     edited
-        .append_objects_with_limits(clones, archive_limits)
+        .append_objects(clones, archive_limits)
         .map_err(|_| Error::InvalidSource)
 }
 
@@ -1974,17 +1974,17 @@ fn serialize_component(
     budget: &mut LifecycleBudget,
 ) -> Result<Vec<u8>, Error> {
     let expected_length = archive
-        .encoded_len_with_limits(archive_limits)
+        .encoded_len(archive_limits)
         .map_err(|_| Error::InvalidSource)?;
     budget.charge_allocations(expected_length)?;
     let bytes = archive
-        .to_bytes_with_limits(archive_limits)
+        .to_bytes(archive_limits)
         .map_err(|_| Error::InvalidSource)?;
     if bytes.len() != expected_length {
         return Err(Error::InvalidSource);
     }
-    let maximum_compressed =
-        SnappyStream::maximum_compressed_len(bytes.len()).map_err(|_| Error::InvalidSource)?;
+    let maximum_compressed = SnappyStream::maximum_compressed_len(bytes.len(), snappy_limits)
+        .map_err(|_| Error::InvalidSource)?;
     // `compress` reserves its maximum stream bound and uses one compressed
     // frame scratch buffer at a time.  Charging that bound before entering
     // the encoder keeps the operation ledger valid if allocation fails.
@@ -1996,7 +1996,8 @@ fn serialize_component(
         .checked_mul(2)
         .ok_or(Error::InvalidSource)?;
     budget.charge_allocations(compression_allocation)?;
-    let compressed = SnappyStream::compress(&bytes).map_err(|_| Error::InvalidSource)?;
+    let compressed =
+        SnappyStream::compress(&bytes, snappy_limits).map_err(|_| Error::InvalidSource)?;
     if compressed.len() > snappy_limits.max_compressed_stream() {
         return Err(Error::Limit {
             kind: LimitKind::EntryBytes,
@@ -2335,7 +2336,7 @@ fn rewrite_lifecycle(
         .ok_or(Error::InvalidSource)?
         .archive();
     let component_clone_bytes = component_archive
-        .encoded_len_with_limits(archive_limits)
+        .encoded_len(archive_limits)
         .map_err(|_| Error::InvalidSource)?;
     budget.charge_allocations(component_clone_bytes)?;
     let mut edited_component = component_archive.clone();
@@ -2554,7 +2555,7 @@ fn rewrite_lifecycle(
     if matches!(action, LifecycleAction::Remove) {
         for identifier in source_ids.iter().copied() {
             edited_component
-                .remove_object_checked_with_limits(identifier, archive_limits)
+                .remove_object_checked(identifier, archive_limits)
                 .map_err(|_| Error::InvalidSource)?;
         }
     }
@@ -2626,7 +2627,7 @@ fn rewrite_lifecycle(
     metadata_archive
         .object_mut(metadata.object_identifier)
         .ok_or(Error::InvalidSource)?
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             metadata.message_index,
             RawMessage {
                 type_: PACKAGE_METADATA_MESSAGE_TYPE,

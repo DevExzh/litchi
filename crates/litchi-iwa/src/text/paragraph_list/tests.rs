@@ -929,6 +929,7 @@ fn multiple_list_boundaries_are_rejected_transactionally() {
                     type_: original.type_,
                     data: storage.encode_to_vec(),
                 },
+                Default::default(),
             )?;
             object.archive_info.message_infos[index]
                 .object_references

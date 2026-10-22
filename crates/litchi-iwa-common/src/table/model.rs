@@ -194,6 +194,7 @@ pub enum View<'a> {
 
 /// Errors returned by checked sparse table operations.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Error {
     /// An A1 selector is malformed.
     InvalidAddress {

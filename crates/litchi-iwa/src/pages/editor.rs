@@ -2188,7 +2188,9 @@ impl Draft {
                 })?;
                 clone_pages_drawable_graph_object(source_object, &remap)?
             };
-            staged.update_archive(&archive_name, |archive| Ok(archive.insert_object(cloned)?))?;
+            staged.update_archive(&archive_name, |archive| {
+                Ok(archive.insert_object(cloned, Default::default())?)
+            })?;
         }
 
         let new_drawable_id = remap[&source.drawable_id];
@@ -2483,7 +2485,7 @@ impl Draft {
                 clone_pages_section_graph_object(source_object, &remap, name)?
             };
             staged.update_archive(&graph.archive_name, |archive| {
-                Ok(archive.insert_object(cloned)?)
+                Ok(archive.insert_object(cloned, Default::default())?)
             })?;
         }
         let new_section_id = remap[&source_section_id];
@@ -3608,7 +3610,7 @@ fn clone_pages_object_metadata(
     messages: Vec<RawMessage>,
     remap: &HashMap<u64, u64>,
 ) -> Result<ArchiveObject> {
-    let mut cloned = ArchiveObject::new(new_identifier, messages)?;
+    let mut cloned = ArchiveObject::new(new_identifier, messages, Default::default())?;
     cloned.archive_info.should_merge = source.archive_info.should_merge;
     for ((target, source), message) in cloned
         .archive_info
@@ -3735,6 +3737,7 @@ fn offset_pages_body_drawable_clone(
                 type_: SHAPE_INFO_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })?;
@@ -3803,6 +3806,7 @@ pub(super) fn offset_pages_body_drawable_attachment_clone(
                 type_: DRAWABLE_ATTACHMENT_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -3984,6 +3988,7 @@ fn add_body_drawable_attachment(
                 type_: message_type,
                 data,
             },
+            Default::default(),
         )?;
         let info = &mut object.archive_info.message_infos[message_index];
         update_reference_list(&mut info.object_references, None, Some(attachment_id));
@@ -4086,7 +4091,11 @@ fn patch_pages_zorder(
                 "Pages drawable z-order patch failed validation".to_owned(),
             ));
         }
-        object.replace_message(message_index, RawMessage { type_: 10015, data })?;
+        object.replace_message(
+            message_index,
+            RawMessage { type_: 10015, data },
+            Default::default(),
+        )?;
         let info = &mut object.archive_info.message_infos[message_index];
         update_reference_list(&mut info.object_references, removed, added);
         for field in &mut info.field_infos {
@@ -4697,6 +4706,7 @@ where
                 type_: message_type,
                 data,
             },
+            Default::default(),
         )?;
         let info = &mut object.archive_info.message_infos[message_index];
         update_reference_list(&mut info.object_references, removed, added);
@@ -5707,6 +5717,7 @@ mod drawable_order_projection_tests {
                     data,
                 })
                 .collect(),
+            Default::default(),
         )
         .expect("drawable-order test object");
         let mut package = HostPackage::new();
@@ -5783,6 +5794,7 @@ mod drawable_order_projection_tests {
                 type_: PAGES_DRAWABLE_ORDER_MESSAGE_TYPE,
                 data: source,
             }],
+            Default::default(),
         )
         .expect("duplicate component object");
         let mut duplicate_components = HostPackage::new();
@@ -5919,6 +5931,7 @@ mod pages_object_index_tests {
                 type_: 1,
                 data: Vec::new(),
             }],
+            Default::default(),
         )
         .unwrap()
     }

@@ -68,8 +68,8 @@ fn converted_source() -> TestResult<Vec<u8>> {
 }
 
 fn assert_exact_locality(source: &[u8], target: &[u8]) -> TestResult {
-    let before = Catalog::from_bytes(source)?;
-    let after = Catalog::from_bytes(target)?;
+    let before = Catalog::from_bytes(source, Default::default())?;
+    let after = Catalog::from_bytes(target, Default::default())?;
     let mut changed = Vec::new();
     for entry in before.iter() {
         let candidate = after
@@ -221,13 +221,13 @@ fn rewrite_marker(source: &[u8], marker: u16) -> TestResult<Vec<u8>> {
 /// helper is deliberately scoped to the fixture's one tile member rather
 /// than exposing a general raw-package reader in the test API.
 fn native_fixture_cell(source: &[u8], row_index: u32, column: usize) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == "Index/Tables/Tile.iwa")
         .ok_or_else(|| io::Error::other("native Tile member is missing"))?;
-    let decompressed = SnappyStream::decompress(entry.data())?;
-    let archive = Archive::parse(decompressed.as_bytes())?;
+    let decompressed = SnappyStream::decompress(entry.data(), Default::default())?;
+    let archive = Archive::parse(decompressed.as_bytes(), Default::default())?;
     let message = archive
         .objects
         .iter()
@@ -287,13 +287,13 @@ fn native_fixture_cell(source: &[u8], row_index: u32, column: usize) -> TestResu
 /// This validates the type-260 provenance asserted by the focused Text test
 /// without making native identifiers part of the public Numbers API.
 fn native_fixture_format_type(source: &[u8], key: u32) -> TestResult<u32> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     for entry in catalog
         .iter()
         .filter(|entry| entry.name().starts_with("Index/Tables/DataList"))
     {
-        let decompressed = SnappyStream::decompress(entry.data())?;
-        let archive = Archive::parse(decompressed.as_bytes())?;
+        let decompressed = SnappyStream::decompress(entry.data(), Default::default())?;
+        let archive = Archive::parse(decompressed.as_bytes(), Default::default())?;
         for message in archive
             .objects
             .iter()
@@ -1269,11 +1269,8 @@ fn text_reopened_package_keeps_marker_family_and_selector_equivalence() -> TestR
 #[test]
 fn text_missing_metadata_is_rejected_without_publication() -> TestResult {
     let source = shared_source()?;
-    let without_metadata = Catalog::from_bytes(&source)?.reassemble_with_deletions_to_bytes(
-        &[],
-        &[fixture::METADATA_MEMBER],
-        Limits::default(),
-    )?;
+    let without_metadata = Catalog::from_bytes(&source, Default::default())?
+        .reassemble_with_deletions_to_bytes(&[], &[fixture::METADATA_MEMBER], Limits::default())?;
     assert_rejected_or_owner(&without_metadata)?;
     Ok(())
 }

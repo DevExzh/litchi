@@ -412,12 +412,10 @@ fn rewrite_bytes(source: &Package, target: &Target, after: Option<&Order>) -> Re
         .effective_archive_limits()
         .map_err(map_archive_error)?;
     let snappy_limits = physical_limits.snappy_limits().map_err(map_archive_error)?;
-    let stream = SnappyStream::decompress_with_limits(entry.data(), snappy_limits)
-        .map_err(map_core_error)?;
-    let mut archive =
-        Archive::parse_with_limits(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
+    let stream = SnappyStream::decompress(entry.data(), snappy_limits).map_err(map_core_error)?;
+    let mut archive = Archive::parse(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
     archive
-        .validate_canonical_object_framing(stream.as_bytes())
+        .validate_canonical_object_framing(stream.as_bytes(), archive_limits)
         .map_err(map_core_error)?;
     drop(stream);
     let object = archive
@@ -446,7 +444,7 @@ fn rewrite_bytes(source: &Package, target: &Target, after: Option<&Order>) -> Re
             .into_bytes()
     };
     object
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             target.native.message_index,
             RawMessage {
                 type_: target.native.message_type,
@@ -456,22 +454,10 @@ fn rewrite_bytes(source: &Package, target: &Target, after: Option<&Order>) -> Re
         )
         .map_err(map_core_error)?;
     archive
-        .encoded_len_with_limits(archive_limits)
+        .encoded_len(archive_limits)
         .map_err(map_core_error)?;
-    let rewritten = archive
-        .to_bytes_with_limits(archive_limits)
-        .map_err(map_core_error)?;
-    let compressed_bound =
-        SnappyStream::maximum_compressed_len(rewritten.len()).map_err(map_core_error)?;
-    if compressed_bound > snappy_limits.max_compressed_stream() {
-        return Err(Error::Limit {
-            kind: LimitKind::EntryBytes,
-            observed: u64::try_from(compressed_bound).unwrap_or(u64::MAX),
-            maximum: u64::try_from(snappy_limits.max_compressed_stream()).unwrap_or(u64::MAX),
-            path: Path::Package,
-        });
-    }
-    let compressed = SnappyStream::compress(&rewritten).map_err(map_core_error)?;
+    let rewritten = archive.to_bytes(archive_limits).map_err(map_core_error)?;
+    let compressed = SnappyStream::compress(&rewritten, snappy_limits).map_err(map_core_error)?;
     let edits = [EntryEdit::new(component.name(), compressed.as_slice())];
     let prepared = catalog
         .package()

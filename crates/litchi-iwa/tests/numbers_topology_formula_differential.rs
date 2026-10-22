@@ -72,7 +72,7 @@ fn list_type(data: &[u8]) -> Option<u64> {
 }
 
 fn objects(bytes: &[u8]) -> TestResult<Objects> {
-    let catalog = ComponentCatalog::from_bytes(bytes)?;
+    let catalog = ComponentCatalog::from_bytes(bytes, Default::default())?;
     let mut output = BTreeMap::new();
     for component in catalog.iter() {
         for object in &component.archive().objects {
@@ -673,14 +673,14 @@ fn unpack_records(container: &[u8], field: u32) -> TestResult<Vec<u8>> {
 
 /// Unpack every dependency record's edges.
 fn unpacked(bytes: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(bytes)?;
+    let catalog = Catalog::from_bytes(bytes, Default::default())?;
     let mut rewritten = Vec::new();
     for member in catalog
         .iter()
         .filter(|member| member.name().ends_with(".iwa"))
     {
-        let stream = SnappyStream::decompress(member.data())?;
-        let mut archive = Archive::parse(stream.as_bytes())?;
+        let stream = SnappyStream::decompress(member.data(), Default::default())?;
+        let mut archive = Archive::parse(stream.as_bytes(), Default::default())?;
         let mut changed = false;
         for object in &mut archive.objects {
             for message in &mut object.messages {
@@ -703,7 +703,7 @@ fn unpacked(bytes: &[u8]) -> TestResult<Vec<u8>> {
         if changed {
             rewritten.push((
                 member.name().to_owned(),
-                SnappyStream::compress(&archive.to_bytes()?)?,
+                SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?,
             ));
         }
     }

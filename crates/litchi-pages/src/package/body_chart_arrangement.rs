@@ -1053,9 +1053,8 @@ impl Package {
         // the transaction has crossed its last checked boundary.
         budget.candidate_reopen(target_len)?;
         let target_bytes = Arc::<[u8]>::from(target_owner.as_ref());
-        let catalog =
-            SourceCatalog::from_shared_bytes_with_limits(target_bytes, self.state.source.limits())
-                .map_err(map_archive_error)?;
+        let catalog = SourceCatalog::from_shared_bytes(target_bytes, self.state.source.limits())
+            .map_err(map_archive_error)?;
         let candidate = Package::from_source_catalog(catalog).map_err(|_| Error::Verification)?;
         let verified = resolve_target(
             &candidate,
@@ -1896,13 +1895,15 @@ pub(super) fn rewrite_chart_payload(
                 .ok_or(Error::InvalidSource)?;
             Ok::<_, Error>(bound.max(end))
         })?;
+    let physical = source.state.source.limits();
+    let snappy_limits = physical.snappy_limits().map_err(map_archive_error)?;
     let replacement_bound = encoded_len
         .checked_sub(original.len())
         .and_then(|value| value.checked_add(rewritten.len()))
         .and_then(|value| value.checked_add(64))
         .ok_or(Error::InvalidSource)?;
-    let compressed_bound =
-        SnappyStream::maximum_compressed_len(replacement_bound).map_err(map_core_error)?;
+    let compressed_bound = SnappyStream::maximum_compressed_len(replacement_bound, snappy_limits)
+        .map_err(map_core_error)?;
     let package_bound = source
         .state
         .source
@@ -1917,13 +1918,9 @@ pub(super) fn rewrite_chart_payload(
         archive_header_rewrite_requirements(object)?;
     let (serialization_allocations, serialization_retained, serialization_work) =
         archive_serialization_requirements(component.archive())?;
-    let physical = source.state.source.limits();
     let maximum_entry =
         usize::try_from(physical.max_entry_bytes()).map_err(|_| Error::InvalidSource)?;
-    let maximum_compressed = physical
-        .snappy_limits()
-        .map_err(map_archive_error)?
-        .max_compressed_stream();
+    let maximum_compressed = snappy_limits.max_compressed_stream();
     if replacement_bound > maximum_entry || compressed_bound > maximum_entry.min(maximum_compressed)
     {
         return Err(Error::Limit {
@@ -1933,11 +1930,13 @@ pub(super) fn rewrite_chart_payload(
         });
     }
     let frame_count = replacement_bound.div_ceil(SnappyStream::WRITE_CHUNK_SIZE);
-    let compression_scratch =
-        SnappyStream::maximum_compressed_len(replacement_bound.min(SnappyStream::WRITE_CHUNK_SIZE))
-            .map_err(map_core_error)?
-            .checked_add(32 * 1024)
-            .ok_or(Error::InvalidSource)?;
+    let compression_scratch = SnappyStream::maximum_compressed_len(
+        replacement_bound.min(SnappyStream::WRITE_CHUNK_SIZE),
+        Default::default(),
+    )
+    .map_err(map_core_error)?
+    .checked_add(32 * 1024)
+    .ok_or(Error::InvalidSource)?;
     // Pinned snap 1.1.2 retains a 16,384-entry u16 encoder table. Include it
     // alongside the decompressed stream, output, and transient frame buffers.
     let framing_allocations = frame_count.checked_add(3).ok_or(Error::InvalidSource)?;
@@ -1983,7 +1982,7 @@ pub(super) fn rewrite_chart_payload(
         .get_mut(target.drawable_object_index)
         .ok_or(Error::InvalidSource)?;
     object
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             target.drawable_message_index,
             RawMessage {
                 type_: CHART_MESSAGE_TYPE,
@@ -1992,8 +1991,8 @@ pub(super) fn rewrite_chart_payload(
             archive_limits,
         )
         .map_err(map_core_error)?;
-    let compressed =
-        page_layout::compress_archive(archive, archive_limits).map_err(|_| Error::InvalidSource)?;
+    let encoded = archive.to_bytes(archive_limits).map_err(map_core_error)?;
+    let compressed = SnappyStream::compress(&encoded, snappy_limits).map_err(map_core_error)?;
     let edits = [EntryEdit::new(target.component_name.as_ref(), &compressed)];
     let deleted_previews = match preview_mode {
         PreviewDeletionMode::Preserve => Vec::new(),
@@ -2011,9 +2010,8 @@ pub(super) fn rewrite_chart_payload(
     let output = prepared
         .execute(requirements.exact_limits())
         .map_err(map_archive_error)?;
-    let catalog =
-        SourceCatalog::from_shared_bytes_with_limits(output.into(), source.state.source.limits())
-            .map_err(map_archive_error)?;
+    let catalog = SourceCatalog::from_shared_bytes(output.into(), source.state.source.limits())
+        .map_err(map_archive_error)?;
     let package = Package::from_source_catalog(catalog).map_err(|_| Error::Verification)?;
     let target_previews = match preview_mode {
         PreviewDeletionMode::Preserve => 0,
@@ -2857,7 +2855,7 @@ pub(super) fn verify_locality(
             budget.work(clone_work)?;
             let mut expected = before.clone();
             expected
-                .replace_message_preserving_header_with_limits(
+                .replace_message_preserving_header(
                     target.drawable_message_index,
                     RawMessage {
                         type_: message.type_,
@@ -3034,8 +3032,7 @@ fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
             maximum: limit as u64,
         },
         litchi_iwa_common::Error::Allocation { amount, .. } => Error::Allocation { amount },
-        litchi_iwa_common::Error::InvalidFormat(_)
-        | litchi_iwa_common::Error::InvalidLimit { .. } => Error::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
@@ -3066,13 +3063,7 @@ fn map_archive_error(error: ArchiveError) -> Error {
         ArchiveError::Allocation { amount, .. } => Error::Allocation { amount },
         ArchiveError::Iwa(error) => map_core_error(error),
         ArchiveError::Reassembly(_) => Error::Refused(Refusal::UnsupportedSource),
-        ArchiveError::Io(_)
-        | ArchiveError::Zip { .. }
-        | ArchiveError::InvalidLimits(_)
-        | ArchiveError::Encrypted
-        | ArchiveError::SourceChanged { .. }
-        | ArchiveError::DirectoryChanged { .. }
-        | ArchiveError::InvalidBundle(_) => Error::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 

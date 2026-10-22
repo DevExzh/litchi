@@ -40,6 +40,7 @@ fn object(identifier: u64, message_type: u32, data: Vec<u8>) -> TestResult<Archi
             type_: message_type,
             data,
         }],
+        Default::default(),
     )?)
 }
 
@@ -149,8 +150,8 @@ fn build_fixture(malformed_reference: bool) -> TestResult<Fixture> {
         false,
     )?);
 
-    let decompressed = Archive { objects }.to_bytes()?;
-    let compressed = SnappyStream::compress(&decompressed)?;
+    let decompressed = Archive { objects }.to_bytes(Default::default())?;
+    let compressed = SnappyStream::compress(&decompressed, Default::default())?;
     let bytes = to_bytes(
         [("Index/Document.iwa", compressed.as_slice())],
         ArchiveLimits::default(),

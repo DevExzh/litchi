@@ -95,8 +95,8 @@ fn native_selectors_presence_noop_change_apply_inverse_and_locality() -> TestRes
     );
 
     let target = commit.package().exact_bytes();
-    let source_catalog = Catalog::from_bytes(&source)?;
-    let target_catalog = Catalog::from_bytes(&target)?;
+    let source_catalog = Catalog::from_bytes(&source, Default::default())?;
+    let target_catalog = Catalog::from_bytes(&target, Default::default())?;
     for (before, after) in source_catalog.iter().zip(target_catalog.iter()) {
         if before.data() == after.data() {
             assert_eq!(
@@ -242,7 +242,7 @@ fn raw_selected_header_scalars_fail_without_normalizing_source() -> TestResult<(
         let Ok(package) = Package::from_bytes(&malformed) else {
             // Some wrong-wire mutations are already rejected by the broader
             // semantic package ingress. That is an equally atomic refusal.
-            Catalog::from_bytes(&malformed)?;
+            Catalog::from_bytes(&malformed, Default::default())?;
             continue;
         };
         let before = package.exact_bytes();

@@ -828,7 +828,7 @@ fn map_cell_storage_decode_error(
 
 fn first_cell_storage_text(storage_id: u64, source: &[u8]) -> Result<String> {
     let limits = cell_storage_wire_limits(source)?;
-    let decoded = litchi_iwa_text_wire::decode_storage_with_limits(source, limits)
+    let decoded = litchi_iwa_text_wire::decode_storage(source, limits)
         .map_err(|error| map_cell_storage_decode_error(storage_id, error))?;
     let storage = decoded.storage();
     let Some(first_run) = storage.runs().first().copied() else {
@@ -984,9 +984,12 @@ fn promote_plain_cell(
                 type_: TABLE_DATA_LIST_MESSAGE_TYPE,
                 data: list.encode_to_vec(),
             }],
+            Default::default(),
         )?;
         object.archive_info.message_infos[0].versions = STANDARD_MESSAGE_VERSION.to_vec();
-        package.update_archive(&archive_name, |archive| Ok(archive.insert_object(object)?))?;
+        package.update_archive(&archive_name, |archive| {
+            Ok(archive.insert_object(object, Default::default())?)
+        })?;
         attach_rich_text_table(package, &archive_name, table_id, list_id)?;
     }
 
@@ -998,6 +1001,7 @@ fn promote_plain_cell(
             type_: STORAGE_MESSAGE_TYPE,
             data: storage_archive.encode_to_vec(),
         }],
+        Default::default(),
     )?;
     storage_object.archive_info.message_infos[0].versions = STANDARD_MESSAGE_VERSION.to_vec();
     storage_object.archive_info.message_infos[0].object_references = storage_references;
@@ -1016,14 +1020,15 @@ fn promote_plain_cell(
             type_: RICH_TEXT_PAYLOAD_MESSAGE_TYPE,
             data: payload.encode_to_vec(),
         }],
+        Default::default(),
     )?;
     payload_object.archive_info.message_infos[0].versions = STANDARD_MESSAGE_VERSION.to_vec();
     payload_object.archive_info.message_infos[0]
         .object_references
         .push(storage_id);
     package.update_archive(&archive_name, |archive| {
-        archive.insert_object(storage_object)?;
-        Ok(archive.insert_object(payload_object)?)
+        archive.insert_object(storage_object, Default::default())?;
+        Ok(archive.insert_object(payload_object, Default::default())?)
     })?;
 
     let locations = storage::object_locations(package)?;
@@ -1071,6 +1076,7 @@ fn promote_plain_cell(
                 type_: message_type,
                 data,
             },
+            Default::default(),
         )?;
         object.archive_info.message_infos[message_index]
             .object_references
@@ -1138,6 +1144,7 @@ fn attach_rich_text_table(
                 type_: message_type,
                 data,
             },
+            Default::default(),
         )?;
         object.archive_info.message_infos[message_index]
             .object_references
@@ -1316,7 +1323,7 @@ mod tests {
         let source = [first, unknown.clone(), second].concat();
 
         assert_eq!(first_cell_storage_text(17, &source).unwrap(), "first");
-        let decoded = litchi_iwa_text_wire::decode_storage_with_limits(
+        let decoded = litchi_iwa_text_wire::decode_storage(
             &source,
             cell_storage_wire_limits(&source).unwrap(),
         )
@@ -1344,7 +1351,7 @@ mod tests {
         assert_eq!(limits.max_nesting(), 4);
         assert_eq!(limits.max_rewrite_work(), source_bytes.saturating_mul(16));
         assert_eq!(
-            litchi_iwa_text_wire::decode_storage_with_limits(&source, limits)
+            litchi_iwa_text_wire::decode_storage(&source, limits)
                 .unwrap()
                 .storage()
                 .text(),

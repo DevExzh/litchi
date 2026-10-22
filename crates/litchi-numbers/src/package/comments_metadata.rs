@@ -1127,7 +1127,7 @@ pub(super) fn reject_unknown_archive_metadata(
     for component in source.state.components.catalog().iter() {
         for object in &component.archive().objects {
             object
-                .inspect_references_with_policy_and_limits(
+                .inspect_references_with_policy(
                     &mut Noop,
                     ArchiveReferencePolicy::RejectUnknownMetadata,
                     limits,

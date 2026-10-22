@@ -7,6 +7,7 @@ const DEFAULT_MITER_LIMIT: f32 = 4.0;
 
 /// Validation failures for shape-stroke values.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[non_exhaustive]
 pub enum Error {
     /// A stroke width was not finite.
     #[error("shape stroke width must be finite")]

@@ -509,11 +509,11 @@ fn rewrite_skip_state(source: &Package, intent: SkipIntent) -> Result<Package, E
     }
 
     let archive_limits = source.state.options.archive().effective_archive_limits()?;
-    let stream = SnappyStream::decompress_with_limits(
+    let stream = SnappyStream::decompress(
         entry.data(),
         source.state.options.archive().snappy_limits()?,
     )?;
-    let mut archive = Archive::parse_with_limits(stream.as_bytes(), archive_limits)?;
+    let mut archive = Archive::parse(stream.as_bytes(), archive_limits)?;
     let object = archive
         .object(record.node_identifier)
         .ok_or(Error::Refused(Refusal::InvalidTarget {
@@ -560,7 +560,7 @@ fn rewrite_skip_state(source: &Package, intent: SkipIntent) -> Result<Package, E
         .ok_or(Error::Refused(Refusal::InvalidTarget {
             reason: "selected slide node disappeared during staging",
         }))?
-        .replace_message_with_limits(
+        .replace_message(
             message_index,
             RawMessage {
                 type_: 4,
@@ -568,8 +568,8 @@ fn rewrite_skip_state(source: &Package, intent: SkipIntent) -> Result<Package, E
             },
             archive_limits,
         )?;
-    let rewritten_archive = archive.to_bytes_with_limits(archive_limits)?;
-    let compressed = SnappyStream::compress(&rewritten_archive)?;
+    let rewritten_archive = archive.to_bytes(archive_limits)?;
+    let compressed = SnappyStream::compress(&rewritten_archive, Default::default())?;
     let output = catalog.reassemble_to_bytes(
         &[EntryEdit::new(component_name, &compressed)],
         source.state.options.archive(),

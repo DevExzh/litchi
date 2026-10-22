@@ -12,7 +12,7 @@ fn decode_storage_text_payload(
     source: &[u8],
     limits: litchi_iwa_text_wire::Limits,
 ) -> Result<String> {
-    litchi_iwa_text_wire::from_bytes_with_limits(source, limits)
+    litchi_iwa_text_wire::from_bytes(source, limits)
         .map(litchi_iwa_text::storage::Storage::into_text)
         .map_err(|error| {
             Error::InvalidFormat(format!(
@@ -228,6 +228,7 @@ pub(super) fn offset_keynote_drawable_clone(
                 type_: SHAPE_INFO_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -340,7 +341,7 @@ pub(super) fn patch_slide_drawable_references(
                 ));
             }
         }
-        object.replace_message(message_index, RawMessage { type_: 5, data })?;
+        object.replace_message(message_index, RawMessage { type_: 5, data }, Default::default())?;
         let info = &mut object.archive_info.message_infos[message_index];
         if let Some(identifier) = remove {
             info.object_references
@@ -774,7 +775,7 @@ pub(super) fn clone_object_metadata(
     remap: &HashMap<u64, u64>,
     clear_data_references: bool,
 ) -> Result<ArchiveObject> {
-    let mut cloned = ArchiveObject::new(new_identifier, messages)?;
+    let mut cloned = ArchiveObject::new(new_identifier, messages, Default::default())?;
     cloned.archive_info.should_merge = source.archive_info.should_merge;
     for ((target, source), message) in cloned
         .archive_info

@@ -485,7 +485,7 @@ impl TransactionBudget {
             .map_err(map_archive_error)?;
         let source_archive_bytes = component
             .archive()
-            .encoded_len_with_limits(archive_limits)
+            .encoded_len(archive_limits)
             .map_err(map_core_error)?;
         let message_count = component
             .archive()
@@ -509,7 +509,8 @@ impl TransactionBudget {
             .and_then(|value| value.checked_add(framing_slack))
             .ok_or(Error::InvalidSource { path })?;
         let compressed_bound =
-            SnappyStream::maximum_compressed_len(archive_bound).map_err(map_core_error)?;
+            SnappyStream::maximum_compressed_len(archive_bound, Default::default())
+                .map_err(map_core_error)?;
         self.charge_limit(LimitKind::WireOutputBytes, rewritten_message_bytes, path)?;
         self.observe_limit(LimitKind::PayloadBytes, archive_bound, path)?;
         self.charge_limit(LimitKind::EntryBytes, compressed_bound, path)?;
@@ -1067,7 +1068,7 @@ pub(super) fn rewrite_package(
             return Err(Error::Verification { path });
         }
         object
-            .replace_message_preserving_header_with_limits(
+            .replace_message_preserving_header(
                 target.message_index,
                 RawMessage {
                     type_: target.message_type,
@@ -1152,9 +1153,8 @@ pub(super) fn rewrite_package(
             path: Path::Package,
         });
     }
-    let candidate_source =
-        SourceCatalog::from_shared_bytes_with_limits(output.into(), catalog.limits())
-            .map_err(map_archive_error)?;
+    let candidate_source = SourceCatalog::from_shared_bytes(output.into(), catalog.limits())
+        .map_err(map_archive_error)?;
     let candidate = Package::from_source_catalog(candidate_source).map_err(map_package_error)?;
     budget.charge_candidate_scan(&candidate, Path::Package)?;
     let target_layout_state = if invalidate_layout {
@@ -1218,14 +1218,14 @@ pub(super) fn editable_archive(
         .limits()
         .effective_archive_limits()
         .map_err(map_archive_error)?;
-    let stream = SnappyStream::decompress_with_limits(
+    let stream = SnappyStream::decompress(
         entry.data(),
         source.limits().snappy_limits().map_err(map_archive_error)?,
     )
     .map_err(map_core_error)?;
-    let archive = Archive::parse_with_limits(stream.as_bytes(), limits).map_err(map_core_error)?;
+    let archive = Archive::parse(stream.as_bytes(), limits).map_err(map_core_error)?;
     archive
-        .validate_canonical_object_framing(stream.as_bytes())
+        .validate_canonical_object_framing(stream.as_bytes(), limits)
         .map_err(map_core_error)?;
     Ok((archive, limits))
 }
@@ -1234,10 +1234,8 @@ pub(super) fn compress_archive(
     archive: Archive,
     limits: litchi_iwa_core::Limits,
 ) -> Result<Vec<u8>, Error> {
-    let bytes = archive
-        .to_bytes_with_limits(limits)
-        .map_err(map_core_error)?;
-    SnappyStream::compress(&bytes).map_err(map_core_error)
+    let bytes = archive.to_bytes(limits).map_err(map_core_error)?;
+    SnappyStream::compress(&bytes, Default::default()).map_err(map_core_error)
 }
 
 pub(super) fn unique_message(
@@ -1558,6 +1556,7 @@ mod tests {
                 type_: message_type,
                 data,
             }],
+            Default::default(),
         )?)
     }
 
@@ -1624,7 +1623,10 @@ mod tests {
                 vec![0x08, 0x00],
             )?);
         }
-        let compressed = SnappyStream::compress(&Archive { objects }.to_bytes()?)?;
+        let compressed = SnappyStream::compress(
+            &Archive { objects }.to_bytes(Default::default())?,
+            Default::default(),
+        )?;
         Ok(package::to_bytes(
             [("Index/Document.iwa", compressed.as_slice())],
             Limits::default(),

@@ -20,6 +20,6 @@ pub mod shape;
 pub mod write;
 
 pub use container::{Children, Container, Limits};
-pub use error::{Error, ImageLimit, Limit, Result};
+pub use error::{Error, LimitKind, Result};
 pub use parser::Parser;
 pub use record::{Record, RecordKind};

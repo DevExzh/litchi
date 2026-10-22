@@ -62,18 +62,18 @@ struct ChartPayload {
 }
 
 fn chart_payload(source: &[u8]) -> TestResult<ChartPayload> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let mut selected = None;
 
     for entry in catalog.iter() {
         if !entry.name().ends_with(".iwa") {
             continue;
         }
-        let stream = match SnappyStream::decompress(entry.data()) {
+        let stream = match SnappyStream::decompress(entry.data(), Default::default()) {
             Ok(stream) => stream,
             Err(_) => continue,
         };
-        let archive = match Archive::parse(stream.as_bytes()) {
+        let archive = match Archive::parse(stream.as_bytes(), Default::default()) {
             Ok(archive) => archive,
             Err(_) => continue,
         };
@@ -172,8 +172,8 @@ fn assert_native_table(package: &Package) -> TestResult {
 }
 
 fn assert_member_locality(source: &[u8], target: &[u8], changed_member: &str) -> TestResult {
-    let before = Catalog::from_bytes(source)?;
-    let after = Catalog::from_bytes(target)?;
+    let before = Catalog::from_bytes(source, Default::default())?;
+    let after = Catalog::from_bytes(target, Default::default())?;
     let mut changed = Vec::new();
     for entry in before.iter() {
         let candidate = after
@@ -212,8 +212,8 @@ fn assert_member_locality(source: &[u8], target: &[u8], changed_member: &str) ->
 }
 
 fn assert_data_assets_untouched(source: &[u8], target: &[u8]) -> TestResult {
-    let before = Catalog::from_bytes(source)?;
-    let after = Catalog::from_bytes(target)?;
+    let before = Catalog::from_bytes(source, Default::default())?;
+    let after = Catalog::from_bytes(target, Default::default())?;
     for entry in before
         .iter()
         .filter(|entry| entry.name().starts_with("Data/"))

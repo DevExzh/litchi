@@ -92,6 +92,7 @@ fn object(identifier: u64, type_: u32, data: Vec<u8>) -> TestResult<ArchiveObjec
     Ok(ArchiveObject::new(
         identifier,
         vec![RawMessage { type_, data }],
+        Default::default(),
     )?)
 }
 
@@ -159,6 +160,7 @@ fn table_info_object(
                 data: format!("after-table-info-{identifier}").into_bytes(),
             },
         ],
+        Default::default(),
     )?;
     object.archive_info.message_infos[1].object_references = vec![model];
     Ok(object)
@@ -182,6 +184,7 @@ fn sidecars() -> TestResult<ArchiveObject> {
             .encode_to_vec(),
         })
         .collect(),
+        Default::default(),
     )?)
 }
 
@@ -189,8 +192,8 @@ fn component_with_unknown_header(
     objects: Vec<ArchiveObject>,
     target_identifier: u64,
 ) -> TestResult<Vec<u8>> {
-    let bytes = Archive { objects }.to_bytes()?;
-    let parsed = Archive::parse(&bytes)?;
+    let bytes = Archive { objects }.to_bytes(Default::default())?;
+    let parsed = Archive::parse(&bytes, Default::default())?;
     let object = parsed
         .object(target_identifier)
         .ok_or_else(|| io::Error::other("synthetic target object is missing"))?;
@@ -211,8 +214,11 @@ fn component_with_unknown_header(
     encode_varint_into(&mut rewritten, u64::try_from(header.len())?);
     rewritten.extend_from_slice(&header);
     rewritten.extend_from_slice(&bytes[data_offset..]);
-    assert_eq!(Archive::parse(&rewritten)?.to_bytes()?, rewritten);
-    Ok(SnappyStream::compress(&rewritten)?)
+    assert_eq!(
+        Archive::parse(&rewritten, Default::default())?.to_bytes(Default::default())?,
+        rewritten
+    );
+    Ok(SnappyStream::compress(&rewritten, Default::default())?)
 }
 
 fn synthetic_package() -> TestResult<Vec<u8>> {
@@ -259,7 +265,8 @@ fn synthetic_package() -> TestResult<Vec<u8>> {
         &Archive {
             objects: vec![root, first_sheet, second_sheet],
         }
-        .to_bytes()?,
+        .to_bytes(Default::default())?,
+        Default::default(),
     )?;
     let tables = component_with_unknown_header(
         vec![
@@ -304,9 +311,11 @@ fn synthetic_package() -> TestResult<Vec<u8>> {
                     type_: 999,
                     data: b"unrelated Numbers component".to_vec(),
                 }],
+                Default::default(),
             )?],
         }
-        .to_bytes()?,
+        .to_bytes(Default::default())?,
+        Default::default(),
     )?;
     Ok(litchi_iwa_archive::package::to_bytes(
         [
@@ -320,7 +329,7 @@ fn synthetic_package() -> TestResult<Vec<u8>> {
 }
 
 fn legacy_package(flat: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(flat)?;
+    let catalog = Catalog::from_bytes(flat, Default::default())?;
     let inner_entries = catalog
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
@@ -341,12 +350,12 @@ fn legacy_package(flat: &[u8]) -> TestResult<Vec<u8>> {
 }
 
 fn component_stream(package: &[u8], name: &str) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == name)
         .ok_or_else(|| io::Error::other("missing synthetic Numbers component"))?;
-    Ok(SnappyStream::decompress(entry.data())?.into_bytes())
+    Ok(SnappyStream::decompress(entry.data(), Default::default())?.into_bytes())
 }
 
 fn rewrite_component(
@@ -355,10 +364,11 @@ fn rewrite_component(
     mutate: impl FnOnce(&mut Archive) -> TestResult,
 ) -> TestResult<Vec<u8>> {
     let stream = component_stream(package, name)?;
-    let mut archive = Archive::parse(&stream)?;
+    let mut archive = Archive::parse(&stream, Default::default())?;
     mutate(&mut archive)?;
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
-    let catalog = Catalog::from_bytes(package)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     Ok(catalog.reassemble_to_bytes(&[EntryEdit::new(name, &compressed)], Limits::default())?)
 }
 
@@ -391,6 +401,7 @@ fn with_selected_unknown_padding(package: &[u8], length: usize) -> TestResult<Ve
                 type_: TABLE_INFO_MESSAGE_TYPE,
                 data: payload,
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -439,6 +450,7 @@ fn with_dense_tables(package: &[u8], count: usize) -> TestResult<Vec<u8>> {
                 type_: SHEET_MESSAGE_TYPE,
                 data: sheet.encode_to_vec(),
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -465,6 +477,7 @@ fn with_form_based_first_sheet(package: &[u8]) -> TestResult<Vec<u8>> {
                 }
                 .encode_to_vec(),
             },
+            Default::default(),
         )?;
         let message_info = &mut object.archive_info.message_infos[message_index];
         message_info
@@ -495,6 +508,7 @@ fn with_legacy_table_infos(package: &[u8], identifiers: &[u64]) -> TestResult<Ve
                     type_: LEGACY_TABLE_INFO_MESSAGE_TYPE,
                     data: payload,
                 },
+                Default::default(),
             )?;
         }
         Ok(())
@@ -507,7 +521,7 @@ fn with_overlong_object_length_prefix(
     identifier: u64,
 ) -> TestResult<Vec<u8>> {
     let mut stream = component_stream(package, component)?;
-    let archive = Archive::parse(&stream)?;
+    let archive = Archive::parse(&stream, Default::default())?;
     let object = archive
         .object(identifier)
         .ok_or_else(|| io::Error::other("missing synthetic Numbers object"))?;
@@ -518,9 +532,9 @@ fn with_overlong_object_length_prefix(
     }
     stream[offset] |= 0x80;
     stream.insert(offset + 1, 0);
-    Archive::parse(&stream)?;
-    let compressed = SnappyStream::compress(&stream)?;
-    let catalog = Catalog::from_bytes(package)?;
+    Archive::parse(&stream, Default::default())?;
+    let compressed = SnappyStream::compress(&stream, Default::default())?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     Ok(
         catalog
             .reassemble_to_bytes(&[EntryEdit::new(component, &compressed)], Limits::default())?,
@@ -528,7 +542,10 @@ fn with_overlong_object_length_prefix(
 }
 
 fn message_payload(package: &[u8], identifier: u64, type_: u32) -> TestResult<Vec<u8>> {
-    let archive = Archive::parse(&component_stream(package, TABLES_MEMBER)?)?;
+    let archive = Archive::parse(
+        &component_stream(package, TABLES_MEMBER)?,
+        Default::default(),
+    )?;
     Ok(archive
         .object(identifier)
         .and_then(|object| {
@@ -544,7 +561,7 @@ fn message_payload(package: &[u8], identifier: u64, type_: u32) -> TestResult<Ve
 
 fn object_header(package: &[u8], identifier: u64) -> TestResult<Vec<u8>> {
     let stream = component_stream(package, TABLES_MEMBER)?;
-    let archive = Archive::parse(&stream)?;
+    let archive = Archive::parse(&stream, Default::default())?;
     let object = archive
         .object(identifier)
         .ok_or_else(|| io::Error::other("missing synthetic Numbers object"))?;
@@ -568,8 +585,8 @@ fn raw_fields(payload: &[u8], number: u32) -> TestResult<Vec<Vec<u8>>> {
 }
 
 fn assert_only_tables_component_changed(before: &[u8], after: &[u8]) -> TestResult {
-    let before = Catalog::from_bytes(before)?;
-    let after = Catalog::from_bytes(after)?;
+    let before = Catalog::from_bytes(before, Default::default())?;
+    let after = Catalog::from_bytes(after, Default::default())?;
     let before_entries = before.iter().collect::<Vec<_>>();
     let after_entries = after.iter().collect::<Vec<_>>();
     assert_eq!(before_entries.len(), after_entries.len());
@@ -681,6 +698,7 @@ fn missing_selectors_are_typed_and_duplicate_names_fail_ingress() -> TestResult 
                 type_: TABLE_MODEL_MESSAGE_TYPE,
                 data: table_model(ABSENT_TABLE_NAME).encode_to_vec(),
             },
+            Default::default(),
         )?;
         Ok(())
     })?;
@@ -922,10 +940,13 @@ fn flat_legacy_table_info_edits_preserve_presence_locality_and_exact_inverse() -
             .iter()
             .find(|message| message.type_ == TABLE_INFO_MESSAGE_TYPE)
             .ok_or_else(|| io::Error::other("missing canonical table-info message"))?;
-        object.push_message(RawMessage {
-            type_: LEGACY_TABLE_INFO_MESSAGE_TYPE,
-            data: canonical.data.clone(),
-        })?;
+        object.push_message(
+            RawMessage {
+                type_: LEGACY_TABLE_INFO_MESSAGE_TYPE,
+                data: canonical.data.clone(),
+            },
+            Default::default(),
+        )?;
         Ok(())
     })?;
     match Package::from_bytes(&dual) {
@@ -963,7 +984,7 @@ fn stale_tampered_replayed_and_cross_selector_patches_conflict() -> TestResult {
         Err(TableLockError::PatchConflict)
     ));
 
-    let catalog = Catalog::from_bytes(&bytes)?;
+    let catalog = Catalog::from_bytes(&bytes, Default::default())?;
     let tampered_bytes = catalog.reassemble_to_bytes(
         &[EntryEdit::new(
             "Data/sentinel.bin",
@@ -997,7 +1018,7 @@ fn malformed_selected_and_rooted_aliases_fail_closed_while_detached_refs_are_pre
             .find(|message| message.type_ == TABLE_INFO_MESSAGE_TYPE)
             .ok_or_else(|| io::Error::other("missing table-info message"))?
             .clone();
-        object.push_message(duplicate)?;
+        object.push_message(duplicate, Default::default())?;
         Ok(())
     })?;
     assert!(Package::from_bytes(&duplicate_payload).is_err());
@@ -1028,6 +1049,7 @@ fn malformed_selected_and_rooted_aliases_fail_closed_while_detached_refs_are_pre
                 type_: SHEET_MESSAGE_TYPE,
                 data: value.encode_to_vec(),
             },
+            Default::default(),
         )?;
         object.archive_info.message_infos[index]
             .object_references

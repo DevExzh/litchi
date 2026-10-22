@@ -152,7 +152,7 @@ pub(super) fn bootstrap_empty_table_graph(
 
     package.update_archive(&sheet_archive, |archive| {
         for object in objects {
-            archive.insert_object(object)?;
+            archive.insert_object(object, Default::default())?;
         }
         Ok(())
     })?;
@@ -540,6 +540,7 @@ fn table_object(
             type_: message_type,
             data: message.encode_to_vec(),
         }],
+        Default::default(),
     )?;
     object.archive_info.message_infos[0].versions = IWA_OBJECT_VERSION.to_vec();
     object.archive_info.message_infos[0].object_references = references.to_vec();

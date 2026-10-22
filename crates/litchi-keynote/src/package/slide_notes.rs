@@ -286,9 +286,8 @@ impl<'a> Edit<'a> {
             .effective_archive_limits()
             .map_err(map_archive_error)?;
         let limits = storage_rewrite_limits(package, archive_limits.max_message_bytes())?;
-        let boundaries =
-            litchi_iwa_text_wire::storage_boundaries_with_limits(&message.data, limits)
-                .map_err(map_text_rewrite_error)?;
+        let boundaries = litchi_iwa_text_wire::storage_boundaries(&message.data, limits)
+            .map_err(map_text_rewrite_error)?;
         Ok(boundaries.admits_combined_splice(hull))
     }
 
@@ -815,7 +814,7 @@ fn decode_notes_storage(
         .effective_archive_limits()
         .map_err(map_archive_error)?;
     let text_limits = storage_rewrite_limits(package, archive_limits.max_message_bytes())?;
-    let validated = litchi_iwa_text_wire::decode_storage_with_limits(payload, text_limits)
+    let validated = litchi_iwa_text_wire::decode_storage(payload, text_limits)
         .map_err(map_text_rewrite_error)?;
     let validation = validated.validation();
     budget
@@ -900,13 +899,12 @@ fn rewrite_notes(
     let archive_limits = physical_limits
         .effective_archive_limits()
         .map_err(map_archive_error)?;
-    let stream = SnappyStream::decompress_with_limits(
+    let stream = SnappyStream::decompress(
         entry.data(),
         physical_limits.snappy_limits().map_err(map_archive_error)?,
     )
     .map_err(map_core_error)?;
-    let mut archive =
-        Archive::parse_with_limits(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
+    let mut archive = Archive::parse(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
     validate_canonical_object_length_prefixes(stream.as_bytes(), &archive)?;
     let object = archive
         .object(expected_storage_identifier)
@@ -916,7 +914,7 @@ fn rewrite_notes(
     let start =
         usize::try_from(span.start().utf16_index()).map_err(|_error| Error::InvalidSource)?;
     let end = usize::try_from(span.end().utf16_index()).map_err(|_error| Error::InvalidSource)?;
-    let rewrite = litchi_iwa_text_wire::rewrite_storage_text_with_behavior_and_limits(
+    let rewrite = litchi_iwa_text_wire::rewrite_storage_text_with_behavior(
         &message.data,
         start..end,
         replacement,
@@ -938,7 +936,7 @@ fn rewrite_notes(
     archive
         .object_mut(expected_storage_identifier)
         .ok_or(Error::InvalidSource)?
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             message_index,
             RawMessage {
                 type_: STORAGE_MESSAGE_TYPE,
@@ -947,10 +945,9 @@ fn rewrite_notes(
             archive_limits,
         )
         .map_err(map_core_error)?;
-    let archive_bytes = archive
-        .to_bytes_with_limits(archive_limits)
-        .map_err(map_core_error)?;
-    let compressed = SnappyStream::compress(&archive_bytes).map_err(map_core_error)?;
+    let archive_bytes = archive.to_bytes(archive_limits).map_err(map_core_error)?;
+    let compressed =
+        SnappyStream::compress(&archive_bytes, Default::default()).map_err(map_core_error)?;
     let output = catalog
         .package()
         .reassemble_to_bytes(

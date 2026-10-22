@@ -220,10 +220,8 @@ fn rewrite_package_metadata(package: &Package, identity: &Identity) -> ReadResul
     })?;
     let limits = package.limits();
     let archive_limits = limits.effective_archive_limits()?;
-    let stream =
-        SnappyStream::decompress_with_limits(data, limits.snappy_limits()?).map_err(core_error)?;
-    let mut archive =
-        Archive::parse_with_limits(stream.as_bytes(), archive_limits).map_err(core_error)?;
+    let stream = SnappyStream::decompress(data, limits.snappy_limits()?).map_err(core_error)?;
+    let mut archive = Archive::parse(stream.as_bytes(), archive_limits).map_err(core_error)?;
     drop(stream);
     let object = archive
         .object_mut(PACKAGE_METADATA_OBJECT)
@@ -245,7 +243,7 @@ fn rewrite_package_metadata(package: &Package, identity: &Identity) -> ReadResul
             })
         })?;
     object
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             index,
             RawMessage {
                 type_: PACKAGE_METADATA_MESSAGE_TYPE,
@@ -254,10 +252,8 @@ fn rewrite_package_metadata(package: &Package, identity: &Identity) -> ReadResul
             archive_limits,
         )
         .map_err(core_error)?;
-    let bytes = archive
-        .to_bytes_with_limits(archive_limits)
-        .map_err(core_error)?;
-    SnappyStream::compress(&bytes).map_err(core_error)
+    let bytes = archive.to_bytes(archive_limits).map_err(core_error)?;
+    SnappyStream::compress(&bytes, Default::default()).map_err(core_error)
 }
 
 /// Rewrite the single occurrence of length-delimited `field` in a protobuf

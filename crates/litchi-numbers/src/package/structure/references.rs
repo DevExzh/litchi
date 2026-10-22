@@ -212,7 +212,7 @@ pub(in crate::package) fn replace(
         )
         .collect();
     object
-        .replace_message_transitioning_object_references_preserving_header_with_limits(
+        .replace_message_transitioning_object_references_preserving_header(
             index,
             RawMessage {
                 type_: message_type,

@@ -193,7 +193,8 @@ impl LegendStyleSlot {
         let mut archive_info = source.archive_info.clone();
         archive_info.identifier = Some(style_id);
         let messages = clone_vec_fallible(&source.messages, "legend style variation messages")?;
-        let mut variation = crate::archive::ArchiveObject::new(style_id, messages)?;
+        let mut variation =
+            crate::archive::ArchiveObject::new(style_id, messages, Default::default())?;
         variation.archive_info = archive_info;
         let message = variation.messages.get(self.message_index).ok_or_else(|| {
             Error::InvalidFormat(format!(
@@ -216,6 +217,7 @@ impl LegendStyleSlot {
                 type_: LEGEND_STYLE_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         let info = &mut variation.archive_info.message_infos[self.message_index];
         for identifier in [parent_style_id, stylesheet_id] {
@@ -288,6 +290,7 @@ impl LegendStyleSlot {
                     type_: LEGEND_STYLE_MESSAGE_TYPE,
                     data,
                 },
+                Default::default(),
             )?;
             Ok(())
         })
@@ -416,7 +419,7 @@ fn move_style_object(
         Error::InvalidFormat(format!("disposable legend style {style_id} disappeared"))
     })?;
     package.update_archive(destination_archive_name, |archive| {
-        Ok(archive.insert_object(style)?)
+        Ok(archive.insert_object(style, Default::default())?)
     })
 }
 
@@ -536,6 +539,7 @@ fn patch_chart_legend_style(
                 type_: CHART_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         let info = object
             .archive_info

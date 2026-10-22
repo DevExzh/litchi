@@ -77,6 +77,7 @@ fn materialize_image_object(object: &mut ArchiveObject, slide_id: u64) -> Result
             type_: IMAGE_MESSAGE_TYPE,
             data,
         },
+        Default::default(),
     )?;
     Ok(())
 }

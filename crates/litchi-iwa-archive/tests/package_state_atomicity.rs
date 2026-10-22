@@ -3,7 +3,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use litchi_iwa_archive::package::{GetOrInsertError, PackageState};
 use litchi_iwa_cache::{CacheError, WeightError};
-use litchi_iwa_core::{Archive, ArchiveLimits};
+use litchi_iwa_core::{Archive, Limits as ArchiveLimits};
 use litchi_iwa_package::{Entry, Error as EntryStoreError};
 
 fn state() -> PackageState {

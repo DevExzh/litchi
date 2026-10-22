@@ -537,9 +537,8 @@ fn rewrite_body_text(
 ) -> Result<Vec<u8>, Error> {
     let limits = super::storage_rewrite_limits(source.state.source.limits())
         .map_err(|_error| Error::InvalidSource)?;
-    let rewritten =
-        litchi_iwa_text_wire::rewrite_storage_text_with_limits(payload, range, replacement, limits)
-            .map_err(|_error| Error::Refused(Refusal::UnsupportedSource))?;
+    let rewritten = litchi_iwa_text_wire::rewrite_storage_text(payload, range, replacement, limits)
+        .map_err(|_error| Error::Refused(Refusal::UnsupportedSource))?;
     if !rewritten.removed_object_references().is_empty()
         || !rewritten.removed_object_references_by_field().is_empty()
         || !rewritten.changed()
@@ -553,7 +552,7 @@ fn rewrite_body_text(
 fn body_unit(source: &Package, payload: &[u8], index: usize) -> Result<Option<u16>, Error> {
     let limits = super::storage_rewrite_limits(source.state.source.limits())
         .map_err(|_error| Error::InvalidSource)?;
-    let storage = litchi_iwa_text_wire::decode_storage_with_limits(payload, limits)
+    let storage = litchi_iwa_text_wire::decode_storage(payload, limits)
         .map_err(|_error| Error::InvalidSource)?;
     Ok(storage.storage().text().encode_utf16().nth(index))
 }
@@ -752,7 +751,7 @@ fn add_section(
         };
         let message_type = message.type_;
         let mut cloned = object
-            .clone_with_identity_remap_with_limits(
+            .clone_with_identity_remap(
                 *identifier,
                 &pairs,
                 &[RawMessage {

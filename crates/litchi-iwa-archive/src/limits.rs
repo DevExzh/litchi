@@ -1,4 +1,4 @@
-use litchi_iwa_core::{ArchiveLimits, SnappyLimits, SnappyStream};
+use litchi_iwa_core::{Limits as ArchiveLimits, SnappyLimits, SnappyStream};
 
 use crate::{Error, LimitKind, Result};
 
@@ -156,6 +156,11 @@ impl Limits {
             max_stream_bytes.min(SnappyStream::MAX_UNCOMPRESSED_CHUNK),
             max_stream_bytes,
         )
+        .and_then(|limits| {
+            limits.with_compressed_stream_bytes(
+                usize::try_from(self.max_entry_bytes).unwrap_or(usize::MAX),
+            )
+        })
         .map_err(|error| Error::InvalidLimits(error.to_string()))
     }
 
@@ -180,6 +185,7 @@ impl Limits {
     /// The physical input ceiling is also the maximum in-memory artifact size
     /// for this bounded reassembly API. Callers that need a larger artifact
     /// must choose a larger profile, still subject to the format hard ceiling.
+    #[inline]
     pub(crate) fn check_output_size(self, size: u64) -> Result<()> {
         if size > self.max_input_bytes {
             return Err(Error::Limit {
@@ -221,6 +227,19 @@ impl Limits {
         retained_bytes: u64,
     ) -> Error {
         let (observed, maximum, original_maximum) = match &error {
+            litchi_iwa_core::Error::Limit {
+                kind:
+                    litchi_iwa_core::LimitKind::SnappyCompressedChunkBytes
+                    | litchi_iwa_core::LimitKind::SnappyCompressedStreamBytes,
+                observed,
+                maximum,
+            } => {
+                return Error::Limit {
+                    kind: LimitKind::EntryBytes,
+                    observed: u64::try_from(*observed).unwrap_or(u64::MAX),
+                    maximum: u64::try_from(*maximum).unwrap_or(u64::MAX),
+                };
+            },
             litchi_iwa_core::Error::Limit {
                 kind: litchi_iwa_core::LimitKind::SnappyChunkBytes,
                 observed,
@@ -380,8 +399,9 @@ mod tests {
             let profile =
                 SnappyLimits::new(maximum.min(SnappyStream::MAX_UNCOMPRESSED_CHUNK), maximum)
                     .expect("valid derived decoder ceiling");
-            let compressed = SnappyStream::compress(&vec![0x42; size]).expect("valid stream");
-            let failure = SnappyStream::decompress_with_limits(&compressed, profile)
+            let compressed = SnappyStream::compress(&vec![0x42; size], Default::default())
+                .expect("valid stream");
+            let failure = SnappyStream::decompress(&compressed, profile)
                 .expect_err("stream exceeds the selected ceiling");
             let mapped = limits.map_iwa_decode_error(failure, retained);
             if aggregate_binds {
@@ -398,6 +418,17 @@ mod tests {
                 ));
             }
         }
+    }
+
+    #[test]
+    fn compressed_stream_refusal_keeps_the_entry_resource() {
+        let limits = Limits::new(1_000, 10, 4, 100, 100).expect("valid physical limits");
+        let profile = limits.snappy_limits().expect("valid codec limits");
+        let compressed = SnappyStream::compress(&[42], Default::default()).expect("valid stream");
+        let error = SnappyStream::decompress(&compressed, profile).expect_err("entry too large");
+        assert!(matches!(limits.map_iwa_decode_error(error, 90),
+            Error::Limit { kind: LimitKind::EntryBytes, observed, maximum: 4 }
+                if observed == compressed.len() as u64));
     }
 
     #[test]

@@ -2184,10 +2184,11 @@ fn rewrite_physical(
     for component in staged_components {
         let encoded_len = component
             .archive
-            .encoded_len_with_limits(archive_limits)
+            .encoded_len(archive_limits)
             .map_err(|_| Error::InvalidSource { path })?;
-        let compressed_bound = SnappyStream::maximum_compressed_len(encoded_len)
-            .map_err(|_| Error::InvalidSource { path })?;
+        let compressed_bound =
+            SnappyStream::maximum_compressed_len(encoded_len, Default::default())
+                .map_err(|_| Error::InvalidSource { path })?;
         budget
             .output(
                 encoded_len
@@ -2206,7 +2207,7 @@ fn rewrite_physical(
             .map_err(|error| map_core(error, path))?;
         let decoded = component
             .archive
-            .to_bytes_with_limits(archive_limits)
+            .to_bytes(archive_limits)
             .map_err(|_| Error::InvalidSource { path })?;
         if decoded.len() != encoded_len {
             return Err(Error::Verification { path });
@@ -2220,8 +2221,8 @@ fn rewrite_physical(
         budget
             .scratch(compressed_bound)
             .map_err(|error| map_core(error, path))?;
-        let compressed =
-            SnappyStream::compress(&decoded).map_err(|_| Error::InvalidSource { path })?;
+        let compressed = SnappyStream::compress(&decoded, Default::default())
+            .map_err(|_| Error::InvalidSource { path })?;
         if compressed.len() > compressed_bound {
             return Err(Error::Verification { path });
         }
@@ -2980,7 +2981,7 @@ fn verify_changed_object_framing(
                     return Err(Error::Verification { path });
                 }
                 expected
-                    .replace_message_preserving_header_with_limits(
+                    .replace_message_preserving_header(
                         index,
                         RawMessage {
                             type_: candidate_message.type_,
@@ -3450,7 +3451,7 @@ fn replace_message(
     }
     let index = index.ok_or(Error::InvalidSource { path })?;
     object
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             index,
             RawMessage {
                 type_: message_type,

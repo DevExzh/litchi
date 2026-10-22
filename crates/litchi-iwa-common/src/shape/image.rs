@@ -17,6 +17,7 @@ const ENHANCEMENT_PRESENT: u8 = 1 << 2;
 
 /// Validation failures for normalized image-adjustment values.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
+#[non_exhaustive]
 pub enum Error {
     /// The supplied adjustment was NaN or infinite.
     #[error("image adjustment must be finite")]

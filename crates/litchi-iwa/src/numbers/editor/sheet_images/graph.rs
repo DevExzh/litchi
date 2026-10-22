@@ -694,7 +694,7 @@ pub(super) fn insert_image_caption(
     let objects = caption_objects(ids, image_id, image_width, text, kind, theme, language)?;
     package.update_archive(archive_name, |archive| {
         for object in objects {
-            archive.insert_object(object)?;
+            archive.insert_object(object, Default::default())?;
         }
         replace_image_caption_reference(archive, image_id, old_reference_id, ids.info, kind)
     })
@@ -710,7 +710,7 @@ pub(super) fn insert_image_caption_standin(
 ) -> Result<()> {
     let standin = standin_caption_object(standin_id)?;
     package.update_archive(archive_name, |archive| {
-        archive.insert_object(standin)?;
+        archive.insert_object(standin, Default::default())?;
         replace_image_caption_reference(archive, image_id, old_reference_id, standin_id, kind)
     })
 }
@@ -758,6 +758,7 @@ fn replace_image_caption_reference(
             type_: IMAGE_MESSAGE_TYPE,
             data,
         },
+        Default::default(),
     )?;
     replace_object_reference(
         &mut object.archive_info.message_infos[*message_index].object_references,
@@ -940,6 +941,7 @@ pub(super) fn set_image_geometry(
                 type_: IMAGE_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -982,6 +984,7 @@ pub(super) fn set_image_properties(
                 type_: IMAGE_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -1001,6 +1004,7 @@ fn numbers_image_object(
             type_: message_type,
             data: message.encode_to_vec(),
         }],
+        Default::default(),
     )?;
     let info = &mut object.archive_info.message_infos[0];
     info.versions = versions.to_vec();

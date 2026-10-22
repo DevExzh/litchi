@@ -709,7 +709,7 @@ fn validate_name_authority(
     for component in package.state.source.components().iter() {
         for object in &component.archive().objects {
             object
-                .inspect_references_with_policy_and_limits(
+                .inspect_references_with_policy(
                     &mut metadata_visitor,
                     ArchiveReferencePolicy::RejectUnknownMetadata,
                     archive_limits,
@@ -1333,7 +1333,7 @@ fn rewrite_name(
         return Err(Error::Verification);
     }
     object
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             target.model_message_index,
             RawMessage {
                 type_: TABLE_MODEL_MESSAGE_TYPE,
@@ -1407,9 +1407,8 @@ fn rewrite_name(
         .charge_input_source(&output)
         .and_then(|_| budget.charge_payload_work(output.len()))
         .map_err(map_lock_error)?;
-    let catalog =
-        SourceCatalog::from_shared_bytes_with_limits(output.into(), source.state.source.limits())
-            .map_err(map_archive_error)?;
+    let catalog = SourceCatalog::from_shared_bytes(output.into(), source.state.source.limits())
+        .map_err(map_archive_error)?;
     budget
         .charge_source_catalog(&catalog)
         .map_err(map_lock_error)?;
@@ -1557,9 +1556,8 @@ fn reopen_target(
     budget
         .charge_payload_work(target.len())
         .map_err(map_lock_error)?;
-    let catalog =
-        SourceCatalog::from_shared_bytes_with_limits(target, source.state.source.limits())
-            .map_err(map_archive_error)?;
+    let catalog = SourceCatalog::from_shared_bytes(target, source.state.source.limits())
+        .map_err(map_archive_error)?;
     budget
         .charge_source_catalog(&catalog)
         .map_err(map_lock_error)?;

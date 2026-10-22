@@ -194,6 +194,7 @@ impl ChartNonStyleSlot {
                     type_: CHART_NON_STYLE_MESSAGE_TYPE,
                     data,
                 },
+                Default::default(),
             )?;
             Ok(())
         })

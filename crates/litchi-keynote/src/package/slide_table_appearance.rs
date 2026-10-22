@@ -1518,12 +1518,12 @@ fn rewrite_native_appearance(
         budget.physical(entry.data().len())?;
         budget.scratch(entry.data().len())?;
         budget.allocations(2)?;
-        let stream = SnappyStream::decompress_with_limits(entry.data(), snappy_limits)
-            .map_err(map_core_error)?;
+        let stream =
+            SnappyStream::decompress(entry.data(), snappy_limits).map_err(map_core_error)?;
         budget.physical(stream.as_bytes().len())?;
         budget.retained(stream.as_bytes().len())?;
-        let mut archive = Archive::parse_with_limits(stream.as_bytes(), archive_limits)
-            .map_err(map_core_error)?;
+        let mut archive =
+            Archive::parse(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
         budget.objects(archive.objects.len())?;
         budget.messages(
             archive
@@ -1534,7 +1534,7 @@ fn rewrite_native_appearance(
                 .ok_or(Error::InvalidSource)?,
         )?;
         archive
-            .validate_canonical_object_framing(stream.as_bytes())
+            .validate_canonical_object_framing(stream.as_bytes(), archive_limits)
             .map_err(map_core_error)?;
         if name == selection.model_component.as_ref() {
             replace_model_in_archive(
@@ -1574,24 +1574,23 @@ fn rewrite_native_appearance(
             )?;
         }
         let encoded_len = archive
-            .encoded_len_with_limits(archive_limits)
+            .encoded_len(archive_limits)
             .map_err(map_core_error)?;
         budget.output(encoded_len)?;
         budget.entry_bytes(encoded_len)?;
         budget.total_bytes(encoded_len)?;
         let compressed_bound =
-            SnappyStream::maximum_compressed_len(encoded_len).map_err(map_core_error)?;
+            SnappyStream::maximum_compressed_len(encoded_len, Default::default())
+                .map_err(map_core_error)?;
         budget.output(compressed_bound)?;
         budget.wire_output(compressed_bound)?;
         budget.entry_bytes(compressed_bound)?;
         budget.scratch(compressed_bound)?;
-        let bytes = archive
-            .to_bytes_with_limits(archive_limits)
-            .map_err(map_core_error)?;
+        let bytes = archive.to_bytes(archive_limits).map_err(map_core_error)?;
         if bytes.len() != encoded_len {
             return Err(Error::Verification);
         }
-        let data = SnappyStream::compress(&bytes).map_err(map_core_error)?;
+        let data = SnappyStream::compress(&bytes, Default::default()).map_err(map_core_error)?;
         if data.len() > compressed_bound {
             return Err(Error::Verification);
         }
@@ -2453,12 +2452,10 @@ fn rewrite_metadata_entry(
         .archive()
         .snappy_limits()
         .map_err(map_archive_error)?;
-    let stream = SnappyStream::decompress_with_limits(entry.data(), snappy_limits)
-        .map_err(map_core_error)?;
+    let stream = SnappyStream::decompress(entry.data(), snappy_limits).map_err(map_core_error)?;
     budget.physical(stream.as_bytes().len())?;
     budget.retained(stream.as_bytes().len())?;
-    let mut archive =
-        Archive::parse_with_limits(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
+    let mut archive = Archive::parse(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
     budget.objects(archive.objects.len())?;
     budget.messages(
         archive
@@ -2469,7 +2466,7 @@ fn rewrite_metadata_entry(
             .ok_or(Error::InvalidSource)?,
     )?;
     archive
-        .validate_canonical_object_framing(stream.as_bytes())
+        .validate_canonical_object_framing(stream.as_bytes(), archive_limits)
         .map_err(map_core_error)?;
     let object = archive
         .object_mut(route.object_identifier)
@@ -2482,7 +2479,7 @@ fn rewrite_metadata_entry(
         return Err(Error::InvalidSource);
     }
     object
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             route.message_index,
             RawMessage {
                 type_: METADATA_MESSAGE_TYPE,
@@ -2492,24 +2489,22 @@ fn rewrite_metadata_entry(
         )
         .map_err(map_core_error)?;
     let encoded_len = archive
-        .encoded_len_with_limits(archive_limits)
+        .encoded_len(archive_limits)
         .map_err(map_core_error)?;
     budget.output(encoded_len)?;
     budget.entry_bytes(encoded_len)?;
     budget.total_bytes(encoded_len)?;
-    let compressed_bound =
-        SnappyStream::maximum_compressed_len(encoded_len).map_err(map_core_error)?;
+    let compressed_bound = SnappyStream::maximum_compressed_len(encoded_len, Default::default())
+        .map_err(map_core_error)?;
     budget.output(compressed_bound)?;
     budget.wire_output(compressed_bound)?;
     budget.entry_bytes(compressed_bound)?;
     budget.scratch(compressed_bound)?;
-    let bytes = archive
-        .to_bytes_with_limits(archive_limits)
-        .map_err(map_core_error)?;
+    let bytes = archive.to_bytes(archive_limits).map_err(map_core_error)?;
     if bytes.len() != encoded_len {
         return Err(Error::Verification);
     }
-    let data = SnappyStream::compress(&bytes).map_err(map_core_error)?;
+    let data = SnappyStream::compress(&bytes, Default::default()).map_err(map_core_error)?;
     if data.len() > compressed_bound {
         return Err(Error::Verification);
     }
@@ -2622,7 +2617,7 @@ fn append_style_object(
     }
     budget.allocations(2)?;
     budget.scratch(payload.len())?;
-    let mut object = ArchiveObject::new_with_limits(
+    let mut object = ArchiveObject::new(
         identifier,
         vec![RawMessage {
             type_: TABLE_STYLE_MESSAGE_TYPE,
@@ -2903,7 +2898,7 @@ fn replace_message_with_reference_transition(
         });
     }
     object
-        .replace_message_transitioning_object_references_preserving_header_with_limits(
+        .replace_message_transitioning_object_references_preserving_header(
             message_index,
             message,
             ObjectReferenceTransition {
@@ -4849,7 +4844,7 @@ fn validate_global_inbound_references(
     for component in package.state.source.components().iter() {
         for object in &component.archive().objects {
             object
-                .inspect_references_with_policy_and_limits(
+                .inspect_references_with_policy(
                     &mut visitor,
                     ArchiveReferencePolicy::RejectUnknownMetadata,
                     archive_limits,

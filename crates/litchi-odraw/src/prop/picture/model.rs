@@ -1,14 +1,4 @@
-use crate::{Error, Result};
-
-/// Maximum number of UTF-16 code units accepted in one `OfficeArt` name,
-/// excluding its terminating NUL.
-pub const MAX_NAME_UNITS: usize = 4096;
-
-/// Maximum encoded byte length of one `OfficeArt` name, including its NUL.
-pub const MAX_NAME_BYTES: usize = (MAX_NAME_UNITS + 1) * 2;
-
-/// Maximum `OfficeArt` property-record body retained by a picture snapshot.
-pub const MAX_SNAPSHOT_BYTES: usize = 16 * 1024 * 1024;
+use super::{Error, Refusal, RefusalKind, Result};
 
 /// The semantic meaning of a picture name.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -39,18 +29,22 @@ impl Flags {
     ///
     /// # Errors
     ///
-    /// Returns `Error::MalformedProperties` if `do_not_save` is set without
+    /// Returns `Error::Refused` with `RefusalKind::InvalidValue` if `do_not_save` is set without
     /// `link_to_file`, or if `link_to_file` is set for a comment name.
     pub fn new(kind: Kind, link_to_file: bool, do_not_save: bool) -> Result<Self> {
         if do_not_save && !link_to_file {
-            return Err(Error::MalformedProperties {
-                reason: "picture do-not-save requires link-to-file",
-            });
+            return Err(Error::Refused(Refusal::new(
+                RefusalKind::InvalidValue,
+                "picture_flags",
+                "picture do-not-save requires link-to-file",
+            )));
         }
         if link_to_file && matches!(kind, Kind::Comment) {
-            return Err(Error::MalformedProperties {
-                reason: "picture link-to-file requires a file or URL name",
-            });
+            return Err(Error::Refused(Refusal::new(
+                RefusalKind::InvalidValue,
+                "picture_flags",
+                "picture link-to-file requires a file or URL name",
+            )));
         }
         let kind_bits = match kind {
             Kind::Comment => 0,
@@ -67,27 +61,27 @@ impl Flags {
     ///
     /// # Errors
     ///
-    /// Returns `Error::MalformedProperties` if the kind bits hold the reserved
+    /// Returns `Error::Format` if the kind bits hold the reserved
     /// value 3, if do-not-save is set without link-to-file, or if link-to-file
     /// is set for a comment name.
     pub fn from_raw(raw: u32) -> Result<Self> {
         let kind = raw & Self::KIND_MASK;
         if kind == 3 {
-            return Err(Error::MalformedProperties {
+            return Err(Error::Format(crate::Error::MalformedProperties {
                 reason: "picture name kind uses a reserved flag value",
-            });
+            }));
         }
         let link_to_file = raw & Self::LINK_TO_FILE != 0;
         let do_not_save = raw & Self::DO_NOT_SAVE != 0;
         if do_not_save && !link_to_file {
-            return Err(Error::MalformedProperties {
+            return Err(Error::Format(crate::Error::MalformedProperties {
                 reason: "picture do-not-save requires link-to-file",
-            });
+            }));
         }
         if link_to_file && kind == 0 {
-            return Err(Error::MalformedProperties {
+            return Err(Error::Format(crate::Error::MalformedProperties {
                 reason: "picture link-to-file requires a file or URL name",
-            });
+            }));
         }
         Ok(Self(raw))
     }
@@ -128,7 +122,7 @@ impl Flags {
 }
 
 /// A checked, zero-copy view of one null-terminated `OfficeArt` Unicode name.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Name<'data> {
     raw: &'data [u8],
 }
@@ -154,7 +148,7 @@ impl<'data> Name<'data> {
     ///
     /// # Errors
     ///
-    /// Returns `Error::MalformedProperties` when the name is not valid
+    /// Returns `Error::Format` when the name is not valid
     /// UTF-16.
     pub fn text(self) -> Result<String> {
         let units = self
@@ -164,8 +158,10 @@ impl<'data> Name<'data> {
             .iter()
             .take(self.unit_len())
             .map(|pair| u16::from_le_bytes([pair[0], pair[1]]));
-        String::from_utf16(&units.collect::<Vec<_>>()).map_err(|_err| Error::MalformedProperties {
-            reason: "picture name is not valid UTF-16",
+        String::from_utf16(&units.collect::<Vec<_>>()).map_err(|_err| {
+            Error::Format(crate::Error::MalformedProperties {
+                reason: "picture name is not valid UTF-16",
+            })
         })
     }
 }
@@ -195,11 +191,11 @@ impl<'data> Metadata<'data> {
     }
 }
 
-/// One reversible before/after value in a picture snapshot patch.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// One reversible before/after value in a picture package patch.
+#[derive(Clone, PartialEq, Eq)]
 pub struct Change<T> {
-    before: Option<T>,
-    after: Option<T>,
+    pub(super) before: Option<T>,
+    pub(super) after: Option<T>,
 }
 
 impl<T> Change<T> {
@@ -207,13 +203,30 @@ impl<T> Change<T> {
         Self { before, after }
     }
 
-    /// Returns the value observed in the source snapshot.
+    /// Returns the value observed in the source package.
     pub fn before(&self) -> Option<&T> {
         self.before.as_ref()
     }
 
-    /// Returns the value published by the committed snapshot.
+    /// Returns the value published by the committed package.
     pub fn after(&self) -> Option<&T> {
         self.after.as_ref()
+    }
+}
+
+impl std::fmt::Debug for Name<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Name")
+            .field("utf16_units", &self.unit_len())
+            .finish_non_exhaustive()
+    }
+}
+
+impl<T> std::fmt::Debug for Change<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Change")
+            .field("before_present", &self.before.is_some())
+            .field("after_present", &self.after.is_some())
+            .finish_non_exhaustive()
     }
 }

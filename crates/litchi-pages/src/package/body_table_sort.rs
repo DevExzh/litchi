@@ -970,7 +970,7 @@ fn rewrite_model(
     }
     let replacement = output.into_bytes();
     object
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             target.native.model_message_index,
             RawMessage {
                 type_: TABLE_MODEL_MESSAGE_TYPE,
@@ -997,9 +997,8 @@ fn rewrite_model(
     let output = prepared_reassembly
         .execute(reassembly_requirements.exact_limits())
         .map_err(map_archive_error)?;
-    let candidate_source =
-        SourceCatalog::from_shared_bytes_with_limits(output.into(), catalog.limits())
-            .map_err(map_archive_error)?;
+    let candidate_source = SourceCatalog::from_shared_bytes(output.into(), catalog.limits())
+        .map_err(map_archive_error)?;
     table_lock::charge_reopen_work(&candidate_source, budget).map_err(map_lock_error)?;
     Package::from_source_catalog(candidate_source).map_err(map_package_error)
 }
@@ -1118,7 +1117,7 @@ fn reopen_candidate(
         .charge_output_bytes(bytes.len())
         .and_then(|_| budget.charge_payload_work(bytes.len()))
         .map_err(map_lock_error)?;
-    let catalog = SourceCatalog::from_shared_bytes_with_limits(
+    let catalog = SourceCatalog::from_shared_bytes(
         Arc::<[u8]>::from(bytes.as_ref()),
         source.state.source.limits(),
     )

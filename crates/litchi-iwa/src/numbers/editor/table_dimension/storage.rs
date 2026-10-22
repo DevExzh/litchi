@@ -429,6 +429,7 @@ pub(super) fn write_dimension_size(
                 type_: message_type,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })

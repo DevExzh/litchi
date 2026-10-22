@@ -136,6 +136,16 @@ Record 0362b also inventories the exact name `with_limits`; each migrated
 profile bans that name alongside the suffix. Raw and record constructors take
 their limits as a required argument.
 
+Record 0362d registers the ODraw picture family: `picture::Package` owns the
+record, `View` is read-only, and both edit commit and `Package::apply` return
+the shared triad. `Snapshot`/`Owned` publication is removed. Picture limits
+enter through options for owners and a required argument for raw projections;
+remaining ODraw raw/error/builder work stays open.
+
+Record 0362i names ODraw traversal resources `LimitKind` and image resources
+`image::LimitKind`. The former root names `Limit` and `ImageLimit` are deleted
+and banned; error variants and their existing observations stay unchanged.
+
 ### Migration status by wave (record 0351)
 
 Each wave flips only its own lines, so parallel waves do not edit the same
@@ -471,6 +481,21 @@ must expose `is_noop` and `inverse`. A member that is another crate's type
 (`pub type Commit = litchi_core::edit::Commit<..>`, a re-exported shared
 family type) is checked by that crate: rustdoc does not list a dependency's
 inherent methods.
+
+The physical iWork substrate and archive profiles (`iwa-core` and
+`iwa-archive`, record 0361d) also enforce the raw-operation limit vocabulary.
+Archive parse, mutation, serialization and catalog ingress require limits on
+their canonical methods; Snappy decoding and encoding require `SnappyLimits`.
+There are no default-limits overloads or `*_with_limits` aliases. The physical
+archive policy is `litchi_iwa_core::Limits`; its former `ArchiveLimits` and
+`ResourceLimits` aliases are removed. The archive's catalogs and frozen source
+projections are registered as immutable owners.
+
+The `iwa-text-wire` profile (record 0361g) applies the same rule to raw text
+projection, validation, decoding, boundary scans and rewrites. `from_bytes`
+requires `Limits`; the other raw operations require `RewriteLimits`, including
+the `with_behavior` variants. Their former `_with_limits` and `_and_limits`
+names are removed, with no default-policy twin.
 
 `families` lists fully qualified public module paths that have completed the
 shape migration. Each must expose types named `Edit`, `Patch`, `Commit`,

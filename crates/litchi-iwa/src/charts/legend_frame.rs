@@ -228,6 +228,7 @@ pub(crate) fn set_chart_legend_frame(
                     type_: CHART_MESSAGE_TYPE,
                     data,
                 },
+                Default::default(),
             )
             .map(|_| ())?)
     })

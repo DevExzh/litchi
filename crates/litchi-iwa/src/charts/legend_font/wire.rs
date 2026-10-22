@@ -147,6 +147,7 @@ pub(super) fn patch_existing_size(
                 type_: PARAGRAPH_STYLE_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })?;
@@ -237,6 +238,7 @@ pub(super) fn patch_existing_font(
                 type_: PARAGRAPH_STYLE_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })?;

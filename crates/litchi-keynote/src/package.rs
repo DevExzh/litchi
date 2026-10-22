@@ -706,7 +706,7 @@ impl Package {
 
     fn from_source_with_options(source: Arc<[u8]>, options: Profile) -> ReadResult<Self> {
         let limits = options.archive();
-        let source_catalog = SourceCatalog::from_shared_bytes_with_limits(source, limits)?;
+        let source_catalog = SourceCatalog::from_shared_bytes(source, limits)?;
         Self::from_source_catalog(source_catalog, options)
     }
 
@@ -1902,7 +1902,7 @@ impl SemanticBudget {
             reason: TextStorageFailure::Projection,
             path,
         })?;
-        let storage = litchi_iwa_text_wire::from_bytes_with_limits(payload, text_limits)
+        let storage = litchi_iwa_text_wire::from_bytes(payload, text_limits)
             .map_err(|error| self.map_text_error(&error, text_limits, path))?;
         self.charge_fragments(storage.runs().len(), path)?;
         self.charge_text(storage.len(), path)?;
@@ -4041,6 +4041,7 @@ fn map_wire_preflight_error(
         | litchi_iwa_common::Error::InvalidLimit { .. }) => {
             ReadError::InvalidFormat(format!("{context} wire preflight failed: {other}"))
         },
+        _ => ReadError::InvalidFormat(format!("{context} wire preflight failed")),
     }
 }
 

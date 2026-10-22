@@ -458,6 +458,7 @@ fn discover_structure_rejects_duplicate_valid_and_invalid_sections() {
                 data: invalid_section_data,
             },
         ],
+        Default::default(),
     )
     .unwrap();
 
@@ -863,6 +864,7 @@ fn update_zorder_payload(package: &mut HostPackage, update: impl FnOnce(&mut Vec
                     type_: 10015,
                     data: payload,
                 },
+                Default::default(),
             )?;
             Ok(())
         })
@@ -922,7 +924,9 @@ fn drawable_text_updates_preserve_unknown_wire_and_restore_exactly() {
             let object = archive.object_mut(65).unwrap();
             let mut message = object.messages[0].clone();
             append_unknown_varint(&mut message.data, 99, 990);
-            Ok(object.replace_message(0, message).map(|_| ())?)
+            Ok(object
+                .replace_message(0, message, Default::default())
+                .map(|_| ())?)
         })
         .unwrap();
     let mut editor = Draft::from_package(package).unwrap();
@@ -930,7 +934,7 @@ fn drawable_text_updates_preserve_unknown_wire_and_restore_exactly() {
         .package()
         .archive("Index/Document.iwa")
         .unwrap()
-        .to_bytes()
+        .to_bytes(Default::default())
         .unwrap();
     editor.set_drawable_text(64, "Temporary 東京").unwrap();
     editor
@@ -941,7 +945,7 @@ fn drawable_text_updates_preserve_unknown_wire_and_restore_exactly() {
             .package()
             .archive("Index/Document.iwa")
             .unwrap()
-            .to_bytes()
+            .to_bytes(Default::default())
             .unwrap(),
         baseline
     );
@@ -963,6 +967,7 @@ fn ambiguous_drawable_text_ownership_fails_transactionally() {
                     }
                     .encode_to_vec(),
                 },
+                Default::default(),
             )?;
             Ok(())
         })
@@ -1192,7 +1197,7 @@ fn text_box_graph_crud_preserves_unknown_fields_and_rejects_external_owners() {
                 let object = archive.object_mut(identifier).unwrap();
                 let mut message = object.messages[0].clone();
                 append_unknown_varint(&mut message.data, 99, identifier);
-                object.replace_message(0, message)?;
+                object.replace_message(0, message, Default::default())?;
             }
             Ok(())
         })
@@ -1216,7 +1221,7 @@ fn text_box_graph_crud_preserves_unknown_fields_and_rejects_external_owners() {
             external.archive_info.message_infos[0]
                 .object_references
                 .push(65);
-            Ok(archive.insert_object(external)?)
+            Ok(archive.insert_object(external, Default::default())?)
         })
         .unwrap();
     let mut editor = Draft::from_package(package).unwrap();
@@ -1247,6 +1252,7 @@ fn ambiguous_text_box_anchor_and_zorder_fail_transactionally() {
                     type_: 2001,
                     data: storage.encode_to_vec(),
                 },
+                Default::default(),
             )?;
             Ok(())
         })
@@ -1270,6 +1276,7 @@ fn ambiguous_text_box_anchor_and_zorder_fail_transactionally() {
                     type_: 10015,
                     data: value.encode_to_vec(),
                 },
+                Default::default(),
             )?;
             Ok(())
         })
@@ -1553,6 +1560,7 @@ fn test_package(text: &str) -> HostPackage {
                             type_: 10000,
                             data: root.encode_to_vec(),
                         }],
+                        Default::default(),
                     )
                     .unwrap(),
                     ArchiveObject::new(
@@ -1561,6 +1569,7 @@ fn test_package(text: &str) -> HostPackage {
                             type_: 2001,
                             data: storage.encode_to_vec(),
                         }],
+                        Default::default(),
                     )
                     .unwrap(),
                 ],
@@ -1600,6 +1609,7 @@ fn object(identifier: u64, message_type: u32, data: Vec<u8>) -> ArchiveObject {
             type_: message_type,
             data,
         }],
+        Default::default(),
     )
     .unwrap()
 }

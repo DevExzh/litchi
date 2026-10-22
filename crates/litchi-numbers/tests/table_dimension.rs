@@ -75,8 +75,8 @@ fn assert_native_invariants(package: &Package) -> TestResult {
 }
 
 fn assert_changed_locality(source: &[u8], target: &[u8], expected_member: &str) -> TestResult {
-    let source = Catalog::from_bytes(source)?;
-    let target = Catalog::from_bytes(target)?;
+    let source = Catalog::from_bytes(source, Default::default())?;
+    let target = Catalog::from_bytes(target, Default::default())?;
     let mut changed = Vec::new();
     for before in source.iter() {
         let after = target
@@ -110,15 +110,16 @@ fn rewrite_component(
     member: &str,
     mutate: impl FnOnce(&mut Archive) -> TestResult,
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == member)
         .ok_or_else(|| std::io::Error::other("selected component is missing"))?;
-    let stream = SnappyStream::decompress(entry.data())?;
-    let mut archive = Archive::parse(stream.as_bytes())?;
+    let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+    let mut archive = Archive::parse(stream.as_bytes(), Default::default())?;
     mutate(&mut archive)?;
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(member, &compressed)],
         ArchiveLimits::default(),
@@ -198,14 +199,14 @@ fn rewrite_native_table_model(
     source: &[u8],
     mutate: impl FnOnce(&mut ArchiveObject, usize, &mut Vec<u8>) -> TestResult,
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let mut selected = None;
     for entry in catalog
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
     {
-        let stream = SnappyStream::decompress(entry.data())?;
-        let archive = Archive::parse(stream.as_bytes())?;
+        let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+        let archive = Archive::parse(stream.as_bytes(), Default::default())?;
         if archive.objects.iter().any(|object| {
             object
                 .messages
@@ -242,8 +243,10 @@ fn rewrite_native_table_model(
             type_: 6_001,
             data: model,
         },
+        Default::default(),
     )?;
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(&member, &compressed)],
         ArchiveLimits::default(),
@@ -251,13 +254,13 @@ fn rewrite_native_table_model(
 }
 
 fn native_table_model(source: &[u8]) -> TestResult<tst::TableModelArchive> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     for entry in catalog
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
     {
-        let stream = SnappyStream::decompress(entry.data())?;
-        let archive = Archive::parse(stream.as_bytes())?;
+        let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+        let archive = Archive::parse(stream.as_bytes(), Default::default())?;
         for message in archive
             .objects
             .iter()
@@ -292,13 +295,13 @@ fn expand_native_to_second_row_bucket(source: &[u8], rows: u32) -> TestResult<Ve
 }
 
 fn selected_bucket_payload(source: &[u8], member: &str) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == member)
         .ok_or_else(|| std::io::Error::other("selected component is missing"))?;
-    let stream = SnappyStream::decompress(entry.data())?;
-    let archive = Archive::parse(stream.as_bytes())?;
+    let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+    let archive = Archive::parse(stream.as_bytes(), Default::default())?;
     Ok(archive
         .objects
         .iter()
@@ -310,7 +313,7 @@ fn selected_bucket_payload(source: &[u8], member: &str) -> TestResult<Vec<u8>> {
 }
 
 fn transaction_work_precharge(source: &[u8], target: &[u8]) -> TestResult<usize> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let mut observed = source.len().saturating_mul(2);
     if source != target {
         observed = observed.saturating_add(target.len().saturating_mul(2));
@@ -319,8 +322,8 @@ fn transaction_work_precharge(source: &[u8], target: &[u8]) -> TestResult<usize>
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
     {
-        let stream = SnappyStream::decompress(entry.data())?;
-        let archive = Archive::parse(stream.as_bytes())?;
+        let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+        let archive = Archive::parse(stream.as_bytes(), Default::default())?;
         for object in &archive.objects {
             for message in &object.messages {
                 observed = observed.saturating_add(message.data.len().saturating_mul(16));
@@ -696,6 +699,7 @@ fn clearing_canonical_and_nonminimal_headers_preserves_native_structure() -> Tes
                 type_: 6_006,
                 data: rewritten,
             },
+            Default::default(),
         )?;
         Ok(())
     })?;
@@ -745,6 +749,7 @@ fn malformed_duplicate_wrong_wire_and_wrong_type_buckets_refuse_atomically() -> 
                 type_: 6_006,
                 data: bucket.encode_to_vec(),
             },
+            Default::default(),
         )?;
         Ok(())
     })?;
@@ -768,6 +773,7 @@ fn malformed_duplicate_wrong_wire_and_wrong_type_buckets_refuse_atomically() -> 
                 type_: 6_006,
                 data: bucket.encode_to_vec(),
             },
+            Default::default(),
         )?;
         Ok(())
     })?;
@@ -782,8 +788,11 @@ fn malformed_duplicate_wrong_wire_and_wrong_type_buckets_refuse_atomically() -> 
             .ok_or_else(|| std::io::Error::other("column bucket message is missing"))?;
         let mut data = object.messages[message_index].data.clone();
         append_varint_field(&mut data, 2, 1)?;
-        object
-            .replace_message_preserving_header(message_index, RawMessage { type_: 6_006, data })?;
+        object.replace_message_preserving_header(
+            message_index,
+            RawMessage { type_: 6_006, data },
+            Default::default(),
+        )?;
         Ok(())
     })?;
     let wrong_type = rewrite_component(&source, COLUMNS, |archive| {
@@ -796,7 +805,11 @@ fn malformed_duplicate_wrong_wire_and_wrong_type_buckets_refuse_atomically() -> 
             .position(|message| message.type_ == 6_006)
             .ok_or_else(|| std::io::Error::other("column bucket message is missing"))?;
         let data = object.messages[message_index].data.clone();
-        object.replace_message_preserving_header(message_index, RawMessage { type_: 777, data })?;
+        object.replace_message_preserving_header(
+            message_index,
+            RawMessage { type_: 777, data },
+            Default::default(),
+        )?;
         Ok(())
     })?;
     let duplicate_message = rewrite_component(&source, COLUMNS, |archive| {
@@ -859,6 +872,7 @@ fn malformed_duplicate_wrong_wire_and_wrong_type_buckets_refuse_atomically() -> 
                     type_: 6_006,
                     data: bucket.encode_to_vec(),
                 },
+                Default::default(),
             )?;
             Ok(())
         })
@@ -928,6 +942,7 @@ fn changed_commit_preserves_unknown_header_bytes_and_existing_source_order() -> 
                 type_: 6_006,
                 data: rewritten,
             },
+            Default::default(),
         )?;
         Ok(())
     })?;
@@ -1139,6 +1154,7 @@ fn row_bucket_local_index_intervals_are_authoritative() -> TestResult {
                 type_: 6_006,
                 data: bucket.encode_to_vec(),
             },
+            Default::default(),
         )?;
         Ok(())
     })?;
@@ -1164,6 +1180,7 @@ fn row_bucket_local_index_intervals_are_authoritative() -> TestResult {
                 type_: 6_006,
                 data: bucket.encode_to_vec(),
             },
+            Default::default(),
         )?;
         Ok(())
     })?;

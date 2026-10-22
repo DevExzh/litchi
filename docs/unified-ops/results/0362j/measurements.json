@@ -1,0 +1,2747 @@
+{
+  "selection": "Every complete guarded block from every c0 attempt is retained, regardless of its value. Incomplete blocks remain in each raw inventory. Earlier production candidates are separate records.",
+  "comparisons": {
+    "sip": {
+      "blocks": 5,
+      "median_after_before": {
+        "first_mean_ns": 0.9475916152080338,
+        "steady_median_ns": 0.9094115889127256,
+        "commit_and_publication_mean_ns": 0.909847057748126,
+        "apply_mean_ns": 0.9277280549460313,
+        "inverse_mean_ns": 0.766308790485199,
+        "peak_rss_kib": 1.001682085786375,
+        "retained_bytes_per_patch": 1.0
+      },
+      "block_after_before": [
+        {
+          "first_mean_ns": 0.9173074404308337,
+          "steady_median_ns": 0.9112188668576398,
+          "commit_and_publication_mean_ns": 0.9115110683887422,
+          "apply_mean_ns": 0.942225053345249,
+          "inverse_mean_ns": 0.8392942390052088,
+          "peak_rss_kib": 1.003075329383963,
+          "retained_bytes_per_patch": 1.0
+        },
+        {
+          "first_mean_ns": 0.8997224769193387,
+          "steady_median_ns": 0.9088587483872343,
+          "commit_and_publication_mean_ns": 0.909847057748126,
+          "apply_mean_ns": 0.9432067204548439,
+          "inverse_mean_ns": 0.766308790485199,
+          "peak_rss_kib": 1.0003719937246276,
+          "retained_bytes_per_patch": 1.0
+        },
+        {
+          "first_mean_ns": 0.9669898164227004,
+          "steady_median_ns": 0.9094136601031736,
+          "commit_and_publication_mean_ns": 0.9098811884537628,
+          "apply_mean_ns": 0.8668430367017652,
+          "inverse_mean_ns": 0.5673972804964343,
+          "peak_rss_kib": 1.0019399896533885,
+          "retained_bytes_per_patch": 1.0
+        },
+        {
+          "first_mean_ns": 0.9475916152080338,
+          "steady_median_ns": 0.9094115889127256,
+          "commit_and_publication_mean_ns": 0.9090934743844721,
+          "apply_mean_ns": 0.9248201103462996,
+          "inverse_mean_ns": 0.845127464416477,
+          "peak_rss_kib": 1.0013101708074534,
+          "retained_bytes_per_patch": 1.0
+        },
+        {
+          "first_mean_ns": 0.9522439434877132,
+          "steady_median_ns": 0.909303809806105,
+          "commit_and_publication_mean_ns": 0.9096641304806224,
+          "apply_mean_ns": 0.9277280549460313,
+          "inverse_mean_ns": 0.633916764743133,
+          "peak_rss_kib": 1.001682085786375,
+          "retained_bytes_per_patch": 1.0
+        }
+      ],
+      "minimum_phase_ns": 578391142
+    },
+    "original": {
+      "blocks": 5,
+      "median_after_before": {
+        "first_mean_ns": 0.955049522139288,
+        "steady_median_ns": 0.881166127509403,
+        "commit_and_publication_mean_ns": 0.8686588247562046,
+        "apply_mean_ns": 0.7376691487690455,
+        "inverse_mean_ns": 0.915338402175019,
+        "peak_rss_kib": 0.1551555615705027,
+        "retained_bytes_per_patch": 0.156494140625
+      },
+      "block_after_before": [
+        {
+          "first_mean_ns": 0.9107134526017849,
+          "steady_median_ns": 0.881166127509403,
+          "commit_and_publication_mean_ns": 0.8686588247562046,
+          "apply_mean_ns": 0.7302292314130342,
+          "inverse_mean_ns": 0.915338402175019,
+          "peak_rss_kib": 0.15493656673400133,
+          "retained_bytes_per_patch": 0.156494140625
+        },
+        {
+          "first_mean_ns": 0.9652290618929231,
+          "steady_median_ns": 0.8727519033436877,
+          "commit_and_publication_mean_ns": 0.8629619183216148,
+          "apply_mean_ns": 0.7376691487690455,
+          "inverse_mean_ns": 0.9444771808642463,
+          "peak_rss_kib": 0.1551555615705027,
+          "retained_bytes_per_patch": 0.156494140625
+        },
+        {
+          "first_mean_ns": 0.9467749636602837,
+          "steady_median_ns": 0.8820927434140194,
+          "commit_and_publication_mean_ns": 0.8727601967341323,
+          "apply_mean_ns": 0.7418726005562789,
+          "inverse_mean_ns": 0.8202464465414124,
+          "peak_rss_kib": 0.15518239431854916,
+          "retained_bytes_per_patch": 0.156494140625
+        },
+        {
+          "first_mean_ns": 0.955049522139288,
+          "steady_median_ns": 0.8881596626496062,
+          "commit_and_publication_mean_ns": 0.877946999403223,
+          "apply_mean_ns": 0.737918290857472,
+          "inverse_mean_ns": 0.9291305318981465,
+          "peak_rss_kib": 0.15534068181476413,
+          "retained_bytes_per_patch": 0.156494140625
+        },
+        {
+          "first_mean_ns": 0.9675724562862815,
+          "steady_median_ns": 0.8766603561984917,
+          "commit_and_publication_mean_ns": 0.8673546537079676,
+          "apply_mean_ns": 0.7143789928103121,
+          "inverse_mean_ns": 0.7579596744921652,
+          "peak_rss_kib": 0.15512402203276848,
+          "retained_bytes_per_patch": 0.156494140625
+        }
+      ],
+      "minimum_phase_ns": 600600027
+    }
+  },
+  "runs": [
+    {
+      "name": "ppt-phase-c0-sip-v1",
+      "measurement_artifact": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-c0-sip-v1/measurements.json",
+        "bytes": 46587,
+        "sha256": "93d919cc872049d0f5bc45b145282b8a4db3eb746cf2ad49d22eca4cd2a84714"
+      },
+      "artifact_inventory": {
+        "path": "/home/zhuhe/code/litchi-worktrees/unified-ops-api/docs/unified-ops/results/0362j/ppt-phase-c0-sip-v1-artifacts.json",
+        "bytes": 180096,
+        "sha256": "fe9e97822e46040db3a79439b1912d5f42e035a10c6d038d1677d6687e1a385c"
+      },
+      "raw_bytes": 34427542,
+      "host_snapshots": 696,
+      "dirty_host_snapshots": [],
+      "measurement": {
+        "before_commit": "e4bdab60667470124c4da202477ba6bb1734f256",
+        "after_commit": "c0f346607bb28559ae21fa780c835dc70e87fb0b",
+        "runner": {
+          "path": "/home/zhuhe/code/litchi-worktrees/unified-ops-api/docs/unified-ops/results/0362g/ppt_phase_abba.py",
+          "bytes": 12064,
+          "sha256": "daf58fc8f54ecc30b105f934499ecb313975ebcbfe7a6410356afe6ab699a75c"
+        },
+        "harness": {
+          "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-replay-c0-source-20261021/crates/litchi-ppt/examples/scoped_patch_probe.rs",
+          "bytes": 7385,
+          "sha256": "0bd4d9c1bcad6319968024ff603ae77195810174e496d5394fbae1838021e549"
+        },
+        "binaries": {
+          "before": {
+            "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-sip-common-lock-20261021/sip-common-lock-scoped_patch_probe",
+            "bytes": 1770160,
+            "sha256": "61272a3cc329c27b8ad0dfa1c20934e4c95c6e7b0d57a0de8331bae868b01139"
+          },
+          "after": {
+            "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-replay-c0-source-20261021/protected/scoped_patch_probe-c0f346607b",
+            "bytes": 1763496,
+            "sha256": "e7c6db29e3dd65bf0178eeaa5e6b52fa57d2e7bd9871aacf70302dd17867b4aa"
+          }
+        },
+        "fixture": {
+          "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-replay-c0-source-20261021/test-data/unified-ops/0294/video.ppt",
+          "bytes": 43520,
+          "sha256": "f32f0614958a177a5195cd7537cdfd2efef52c57de4decc13cf65eadc66cdb8a"
+        },
+        "cpu": 29,
+        "blocks": 5,
+        "minimum_phase_ns": 150000000,
+        "calibration_target_ns": 500000000,
+        "host_checks": "before, every 100ms while the child runs, and after; own timer/probe descendants excluded",
+        "command": [
+          "python3",
+          "/home/zhuhe/code/litchi-worktrees/unified-ops-api/docs/unified-ops/results/0362g/ppt_phase_abba.py",
+          "--before",
+          "../.coord/ppt-sip-common-lock-20261021/sip-common-lock-scoped_patch_probe",
+          "--after",
+          "../.coord/ppt-replay-c0-source-20261021/protected/scoped_patch_probe-c0f346607b",
+          "--fixture",
+          "../.coord/ppt-replay-c0-source-20261021/test-data/unified-ops/0294/video.ppt",
+          "--out",
+          "../.coord/ppt-phase-c0-sip-v1",
+          "--before-commit",
+          "e4bdab60667470124c4da202477ba6bb1734f256",
+          "--after-commit",
+          "c0f346607bb28559ae21fa780c835dc70e87fb0b",
+          "--harness",
+          "../.coord/ppt-replay-c0-source-20261021/crates/litchi-ppt/examples/scoped_patch_probe.rs",
+          "--cpu",
+          "29",
+          "--blocks",
+          "5"
+        ],
+        "steady_span": "lower bound: floor(N/2)*(printed_median_ns-0.5); not commit_total_ns",
+        "commit_total_ns_scope": "complete commit loop including output serialization and patch retention",
+        "fidelity": "probe checks every inverse artifact byte-for-byte; compare source/target extents across endpoints",
+        "status": "complete; coordinator review pending",
+        "calibration": [
+          {
+            "name": "calibration-before",
+            "counts": [
+              1000,
+              1000,
+              10000
+            ],
+            "output": {
+              "patches": 1000,
+              "first_count": 1000,
+              "replay_count": 10000,
+              "source_len": 43520,
+              "target_len": 54784,
+              "retained_patch_bytes": 15384000,
+              "retained_payload_bytes": 15360000,
+              "retained_block_span_bytes": 24000,
+              "retained_block_span_count": 3000,
+              "retained_per_patch": 15384,
+              "first_total_ns": 198194342,
+              "commit_total_ns": 186370939,
+              "apply_total_ns": 173111944,
+              "inverse_apply_total_ns": 178186748,
+              "first_total_ms": 198.194,
+              "commit_total_ms": 186.371,
+              "apply_total_ms": 173.112,
+              "inverse_apply_total_ms": 178.187,
+              "commit_median_us": 181.99,
+              "apply_median_us": 17.09,
+              "inverse_apply_median_us": 17.48,
+              "first_commit_median_us": 198.421
+            },
+            "spans_ns": {
+              "first": 198194342,
+              "steady": 90994750.0,
+              "apply": 173111944,
+              "inverse": 178186748
+            },
+            "metrics": {
+              "first_mean_ns": 198194.342,
+              "steady_median_ns": 181990.0,
+              "commit_and_publication_mean_ns": 186370.939,
+              "apply_mean_ns": 17311.1944,
+              "inverse_mean_ns": 17818.6748,
+              "peak_rss_kib": 20364,
+              "retained_bytes_per_patch": 15384.0
+            },
+            "receipt": {
+              "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-c0-sip-v1/calibration-before.receipt.json",
+              "bytes": 1243,
+              "sha256": "33f1d8d219ad8fe92e5ed7f1aad2fb7b02781339311526689fc829c1fd06be13"
+            }
+          },
+          {
+            "name": "calibration-after",
+            "counts": [
+              1000,
+              1000,
+              10000
+            ],
+            "output": {
+              "patches": 1000,
+              "first_count": 1000,
+              "replay_count": 10000,
+              "source_len": 43520,
+              "target_len": 54784,
+              "retained_patch_bytes": 15384000,
+              "retained_payload_bytes": 15360000,
+              "retained_block_span_bytes": 24000,
+              "retained_block_span_count": 3000,
+              "retained_per_patch": 15384,
+              "first_total_ns": 184646540,
+              "commit_total_ns": 168036346,
+              "apply_total_ns": 158974408,
+              "inverse_apply_total_ns": 140898319,
+              "first_total_ms": 184.647,
+              "commit_total_ms": 168.036,
+              "apply_total_ms": 158.974,
+              "inverse_apply_total_ms": 140.898,
+              "commit_median_us": 163.266,
+              "apply_median_us": 15.73,
+              "inverse_apply_median_us": 13.95,
+              "first_commit_median_us": 183.571
+            },
+            "spans_ns": {
+              "first": 184646540,
+              "steady": 81632750.0,
+              "apply": 158974408,
+              "inverse": 140898319
+            },
+            "metrics": {
+              "first_mean_ns": 184646.54,
+              "steady_median_ns": 163266.0,
+              "commit_and_publication_mean_ns": 168036.346,
+              "apply_mean_ns": 15897.4408,
+              "inverse_mean_ns": 14089.8319,
+              "peak_rss_kib": 20264,
+              "retained_bytes_per_patch": 15384.0
+            },
+            "receipt": {
+              "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-c0-sip-v1/calibration-after.receipt.json",
+              "bytes": 1245,
+              "sha256": "d1e33ee7f160a4bf78c33d60afe1232b53069a4eaccdf29e122a9280705803e6"
+            }
+          }
+        ],
+        "paired": [
+          {
+            "block": 0,
+            "after_before": {
+              "first_mean_ns": 0.9173074404308337,
+              "steady_median_ns": 0.9112188668576398,
+              "commit_and_publication_mean_ns": 0.9115110683887422,
+              "apply_mean_ns": 0.942225053345249,
+              "inverse_mean_ns": 0.8392942390052088,
+              "peak_rss_kib": 1.003075329383963,
+              "retained_bytes_per_patch": 1.0
+            },
+            "legs": [
+              {
+                "name": "block-00-0-before",
+                "counts": [
+                  7400,
+                  3300,
+                  42600
+                ],
+                "output": {
+                  "patches": 7400,
+                  "first_count": 3300,
+                  "replay_count": 42600,
+                  "source_len": 43520,
+                  "target_len": 54784,
+                  "retained_patch_bytes": 113841600,
+                  "retained_payload_bytes": 113664000,
+                  "retained_block_span_bytes": 177600,
+                  "retained_block_span_count": 22200,
+                  "retained_per_patch": 15384,
+                  "first_total_ns": 633043853,
+                  "commit_total_ns": 1422382937,
+                  "apply_total_ns": 778417297,
+                  "inverse_apply_total_ns": 824521069,
+                  "first_total_ms": 633.044,
+                  "commit_total_ms": 1422.383,
+                  "apply_total_ms": 778.417,
+                  "inverse_apply_total_ms": 824.521,
+                  "commit_median_us": 187.791,
+                  "apply_median_us": 18.06,
+                  "inverse_apply_median_us": 18.72,
+                  "first_commit_median_us": 190.166
+                },
+                "spans_ns": {
+                  "first": 633043853,
+                  "steady": 694824850.0,
+                  "apply": 778417297,
+                  "inverse": 824521069
+                },
+                "metrics": {
+                  "first_mean_ns": 191831.4706060606,
+                  "steady_median_ns": 187791.0,
+                  "commit_and_publication_mean_ns": 192213.91040540542,
+                  "apply_mean_ns": 18272.706502347417,
+                  "inverse_mean_ns": 19354.954671361502,
+                  "peak_rss_kib": 123564,
+                  "retained_bytes_per_patch": 15384.0
+                },
+                "receipt": {
+                  "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-c0-sip-v1/block-00-0-before.receipt.json",
+                  "bytes": 1239,
+                  "sha256": "2d6014b47b8dff66bd0ea6fa6bc5ac5c446d5c547b70a6a31cf0391a2c31e8c5"
+                }
+              },
+              {
+                "name": "block-00-1-after",
+                "counts": [
+                  7400,
+                  3300,
+                  42600
+                ],
+                "output": {
+                  "patches": 7400,
+                  "first_count": 3300,
+                  "replay_count": 42600,
+                  "source_len": 43520,
+                  "target_len": 54784,
+                  "retained_patch_bytes": 113841600,
+                  "retained_payload_bytes": 113664000,
+                  "retained_block_span_bytes": 177600,
+                  "retained_block_span_count": 22200,
+                  "retained_per_patch": 15384,
+                  "first_total_ns": 603770291,
+                  "commit_total_ns": 1293925028,
+                  "apply_total_ns": 719181450,
+                  "inverse_apply_total_ns": 627185929,
+                  "first_total_ms": 603.77,
+                  "commit_total_ms": 1293.925,
+                  "apply_total_ms": 719.181,
+                  "inverse_apply_total_ms": 627.186,
+                  "commit_median_us": 170.821,
+                  "apply_median_us": 16.721,
+                  "inverse_apply_median_us": 14.55,
+                  "first_commit_median_us": 183.481
+                },
+                "spans_ns": {
+                  "first": 603770291,
+                  "steady": 632035850.0,
+                  "apply": 719181450,
+                  "inverse": 627185929
+                },
+                "metrics": {
+                  "first_mean_ns": 182960.69424242424,
+                  "steady_median_ns": 170821.0,
+                  "commit_and_publication_mean_ns": 174854.73351351352,
+                  "apply_mean_ns": 16882.193661971833,
+                  "inverse_mean_ns": 14722.674389671361,
+                  "peak_rss_kib": 123928,
+                  "retained_bytes_per_patch": 15384.0
+                },
+                "receipt": {
+                  "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-c0-sip-v1/block-00-1-after.receipt.json",
+                  "bytes": 1241,
+                  "sha256": "bc3516f6af9da58f4d07c310cafa4e116212fbba48bc8eb9228d43b8cf4b5ecd"
+                }
+              },
+              {
+                "name": "block-00-2-after",
+                "counts": [
+                  7400,
+                  3300,
+                  42600
+                ],
+                "output": {
+                  "patches": 7400,
+                  "first_count": 3300,
+                  "replay_count": 42600,
+                  "source_len": 43520,
+                  "target_len": 54784,
+                  "retained_patch_bytes": 113841600,
+                  "retained_payload_bytes": 113664000,
+                  "retained_block_span_bytes": 177600,
+                  "retained_block_span_count": 22200,
+                  "retained_per_patch": 15384,
+                  "first_total_ns": 591749653,
+                  "commit_total_ns": 1293380656,
+                  "apply_total_ns": 728043516,
+                  "inverse_apply_total_ns": 635958302,
+                  "first_total_ms": 591.75,
+                  "commit_total_ms": 1293.381,
+                  "apply_total_ms": 728.044,
+                  "inverse_apply_total_ms": 635.958,
+                  "commit_median_us": 170.815,
+                  "apply_median_us": 16.93,
+                  "inverse_apply_median_us": 14.76,
+                  "first_commit_median_us": 177.736
+                },
+                "spans_ns": {
+                  "first": 591749653,
+                  "steady": 632013650.0,
+                  "apply": 728043516,
+                  "inverse": 635958302
+                },
+                "metrics": {
+                  "first_mean_ns": 179318.07666666666,
+                  "steady_median_ns": 170815.0,
+                  "commit_and_publication_mean_ns": 174781.16972972974,
+                  "apply_mean_ns": 17090.22338028169,
+                  "inverse_mean_ns": 14928.598638497653,
+                  "peak_rss_kib": 123960,
+                  "retained_bytes_per_patch": 15384.0
+                },
+                "receipt": {
+                  "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-c0-sip-v1/block-00-2-after.receipt.json",
+                  "bytes": 1241,
+                  "sha256": "41c0614e8afc7468dc825466bb4553968c7e9896c4d2b2ea44aec5aa264a1fea"
+                }
+              },
+              {
+                "name": "block-00-3-before",
+                "counts": [
+                  7400,
+                  3300,
+                  42600
+                ],
+                "output": {
+                  "patches": 7400,
+                  "first_count": 3300,
+                  "replay_count": 42600,
+                  "source_len": 43520,
+                  "target_len": 54784,
+                  "retained_patch_bytes": 113841600,
+                  "retained_payload_bytes": 113664000,
+                  "retained_block_span_bytes": 177600,
+                  "retained_block_span_count": 22200,
+                  "retained_per_patch": 15384,
+                  "first_total_ns": 670248687,
+                  "commit_total_ns": 1416096785,
+                  "apply_total_ns": 757547981,
+                  "inverse_apply_total_ns": 680486558,
+                  "first_total_ms": 670.249,
+                  "commit_total_ms": 1416.097,
+                  "apply_total_ms": 757.548,
+                  "inverse_apply_total_ms": 680.487,
+                  "commit_median_us": 187.131,
+                  "apply_median_us": 17.62,
+                  "inverse_apply_median_us": 15.77,
+                  "first_commit_median_us": 201.576
+                },
+                "spans_ns": {
+                  "first": 670248687,
+                  "steady": 692382850.0,
+                  "apply": 757547981,
+                  "inverse": 680486558
+                },
+                "metrics": {
+                  "first_mean_ns": 203105.66272727272,
+                  "steady_median_ns": 187131.0,
+                  "commit_and_publication_mean_ns": 191364.4304054054,
+                  "apply_mean_ns": 17782.81645539906,
+                  "inverse_mean_ns": 15973.862863849765,
+                  "peak_rss_kib": 123564,
+                  "retained_bytes_per_patch": 15384.0
+                },
+                "receipt": {
+                  "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-c0-sip-v1/block-00-3-before.receipt.json",
+                  "bytes": 1239,
+                  "sha256": "2ea79873eb8d37bbadef0a382a137699bf734906ed573c8a957c2aac7404060c"
+                }
+              }
+            ]
+          },
+          {
+            "block": 1,
+            "after_before": {
+              "first_mean_ns": 0.8997224769193387,
+              "steady_median_ns": 0.9088587483872343,
+              "commit_and_publication_mean_ns": 0.909847057748126,
+              "apply_mean_ns": 0.9432067204548439,
+              "inverse_mean_ns": 0.766308790485199,
+              "peak_rss_kib": 1.0003719937246276,
+              "retained_bytes_per_patch": 1.0
+            },
+            "legs": [
+              {
+                "name": "block-01-0-before",
+                "counts": [
+                  7400,
+                  3300,
+                  42600
+                ],
+                "output": {
+                  "patches": 7400,
+                  "first_count": 3300,
+                  "replay_count": 42600,
+                  "source_len": 43520,
+                  "target_len": 54784,
+                  "retained_patch_bytes": 113841600,
+                  "retained_payload_bytes": 113664000,
+                  "retained_block_span_bytes": 177600,
+                  "retained_block_span_count": 22200,
+                  "retained_per_patch": 15384,
+                  "first_total_ns": 643637260,
+                  "commit_total_ns": 1424468558,
+                  "apply_total_ns": 768368053,
+                  "inverse_apply_total_ns": 690431337,
+                  "first_total_ms": 643.637,
+                  "commit_total_ms": 1424.469,
+                  "apply_total_ms": 768.368,
+                  "inverse_apply_total_ms": 690.431,
+                  "commit_median_us": 188.261,
+                  "apply_median_us": 17.82,
+                  "inverse_apply_median_us": 15.99,
+                  "first_commit_median_us": 194.621
+                },
+                "spans_ns": {
+                  "first": 643637260,
+                  "steady": 696563850.0,
+                  "apply": 768368053,
+                  "inverse": 690431337
+                },
+                "metrics": {
+                  "first_mean_ns": 195041.59393939393,
+                  "steady_median_ns": 188261.0,
+                  "commit_and_publication_mean_ns": 192495.75108108108,
+                  "apply_mean_ns": 18036.808755868544,
+                  "inverse_mean_ns": 16207.308380281691,
+                  "peak_rss_kib": 123692,
+                  "retained_bytes_per_patch": 15384.0
+                },
+                "receipt": {
+                  "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-c0-sip-v1/block-01-0-before.receipt.json",
+                  "bytes": 1239,
+                  "sha256": "6219b46a3ff1ce7700a3bf70615f178734af314b1d7132516a9fc2c9c23e0105"
+                }
+              },
+              {
+                "name": "block-01-1-after",
+                "counts": [
+                  7400,
+                  3300,
+                  42600
+                ],
+                "output": {
+                  "patches": 7400,
+                  "first_count": 3300,
+                  "replay_count": 42600,
+                  "source_len": 43520,
+                  "target_len": 54784,
+                  "retained_patch_bytes": 113841600,
+                  "retained_payload_bytes": 113664000,
+                  "retained_block_span_bytes": 177600,
+                  "retained_block_span_count": 22200,
+                  "retained_per_patch": 15384,
+                  "first_total_ns": 606063557,
+                  "commit_total_ns": 1294178412,
+                  "apply_total_ns": 726686191,
+                  "inverse_apply_total_ns": 631321466,
+                  "first_total_ms": 606.064,
+                  "commit_total_ms": 1294.178,
+                  "apply_total_ms": 726.686,
+                  "inverse_apply_total_ms": 631.321,
+                  "commit_median_us": 170.891,
+                  "apply_median_us": 16.881,
+                  "inverse_apply_median_us": 14.66,
+                  "first_commit_median_us": 183.061
+                },
+                "spans_ns": {
+                  "first": 606063557,
+                  "steady": 632294850.0,
+                  "apply": 726686191,
+                  "inverse": 631321466
+                },
+                "metrics": {
+                  "first_mean_ns": 183655.62333333332,
+                  "steady_median_ns": 170891.0,
+                  "commit_and_publication_mean_ns": 174888.9745945946,
+                  "apply_mean_ns": 17058.36129107981,
+                  "inverse_mean_ns": 14819.752723004694,
+                  "peak_rss_kib": 123704,
+                  "retained_bytes_per_patch": 15384.0
+                },
+                "receipt": {
+                  "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-c0-sip-v1/block-01-1-after.receipt.json",
+                  "bytes": 1241,
+                  "sha256": "6da25ab598c82ca3b7e217ea06c3231970454ff629a0bbb208319e5de5fb2fea"
+                }
+              },
+              {
+                "name": "block-01-2-after",
+                "counts": [
+                  7400,
+                  3300,
+                  42600
+                ],
+                "output": {
+                  "patches": 7400,
+                  "first_count": 3300,
+                  "replay_count": 42600,
+                  "source_len": 43520,
+                  "target_len": 54784,
+                  "retained_patch_bytes": 113841600,
+                  "retained_payload_bytes": 113664000,
+                  "retained_block_span_bytes": 177600,
+                  "retained_block_span_count": 22200,
+                  "retained_per_patch": 15384,
+                  "first_total_ns": 578391142,
+                  "commit_total_ns": 1288658564,
+                  "apply_total_ns": 745705364,
+                  "inverse_apply_total_ns": 831574512,
+                  "first_total_ms": 578.391,
+                  "commit_total_ms": 1288.659,
+                  "apply_total_ms": 745.705,
+                  "inverse_apply_total_ms": 831.575,
+                  "commit_median_us": 170.051,
+                  "apply_median_us": 17.31,
+                  "inverse_apply_median_us": 18.77,
+                  "first_commit_median_us": 174.391
+                },
+                "spans_ns": {
+                  "first": 578391142,
+                  "steady": 629186850.0,
+                  "apply": 745705364,
+                  "inverse": 831574512
+                },
+                "metrics": {
+                  "first_mean_ns": 175270.04303030303,
+                  "steady_median_ns": 170051.0,
+                  "commit_and_publication_mean_ns": 174143.0491891892,
+                  "apply_mean_ns": 17504.82075117371,
+                  "inverse_mean_ns": 19520.528450704227,
+                  "peak_rss_kib": 123704,
+                  "retained_bytes_per_patch": 15384.0
+                },
+                "receipt": {
+                  "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-c0-sip-v1/block-01-2-after.receipt.json",
+                  "bytes": 1241,
+                  "sha256": "3f0db4c46552270deb81a69a743885ec1ea6b9d47fa907ad558b9938c6bdd836"
+                }
+              },
+              {
+                "name": "block-01-3-before",
+                "counts": [
+                  7400,
+                  3300,
+                  42600
+                ],
+                "output": {
+                  "patches": 7400,
+                  "first_count": 3300,
+                  "replay_count": 42600,
+                  "source_len": 43520,
+                  "target_len": 54784,
+                  "retained_patch_bytes": 113841600,
+                  "retained_payload_bytes": 113664000,
+                  "retained_block_span_bytes": 177600,
+                  "retained_block_span_count": 22200,
+                  "retained_per_patch": 15384,
+                  "first_total_ns": 672829461,
+                  "commit_total_ns": 1414290939,
+                  "apply_total_ns": 792680573,
+                  "inverse_apply_total_ns": 1218584971,
+                  "first_total_ms": 672.829,
+                  "commit_total_ms": 1414.291,
+                  "apply_total_ms": 792.681,
+                  "inverse_apply_total_ms": 1218.585,
+                  "commit_median_us": 186.871,
+                  "apply_median_us": 18.38,
+                  "inverse_apply_median_us": 28.42,
+                  "first_commit_median_us": 204.481
+                },
+                "spans_ns": {
+                  "first": 672829461,
+                  "steady": 691420850.0,
+                  "apply": 792680573,
+                  "inverse": 1218584971
+                },
+                "metrics": {
+                  "first_mean_ns": 203887.71545454545,
+                  "steady_median_ns": 186871.0,
+                  "commit_and_publication_mean_ns": 191120.39716216217,
+                  "apply_mean_ns": 18607.525187793428,
+                  "inverse_mean_ns": 28605.28100938967,
+                  "peak_rss_kib": 123624,
+                  "retained_bytes_per_patch": 15384.0
+                },
+                "receipt": {
+                  "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-c0-sip-v1/block-01-3-before.receipt.json",
+                  "bytes": 1239,
+                  "sha256": "f8f90878bb57462285543f277684383f93f84e5bd319dc6ea22bb59714d1956c"
+                }
+              }
+            ]
+          },
+          {
+            "block": 2,
+            "after_before": {
+              "first_mean_ns": 0.9669898164227004,
+              "steady_median_ns": 0.9094136601031736,
+              "commit_and_publication_mean_ns": 0.9098811884537628,
+              "apply_mean_ns": 0.8668430367017652,
+              "inverse_mean_ns": 0.5673972804964343,
+              "peak_rss_kib": 1.0019399896533885,
+              "retained_bytes_per_patch": 1.0
+            },
+            "legs": [
+              {
+                "name": "block-02-0-before",
+                "counts": [
+                  7400,
+                  3300,
+                  42600
+                ],
+                "output": {
+                  "patches": 7400,
+                  "first_count": 3300,
+                  "replay_count": 42600,
+                  "source_len": 43520,
+                  "target_len": 54784,
+                  "retained_patch_bytes": 113841600,
+                  "retained_payload_bytes": 113664000,
+                  "retained_block_span_bytes": 177600,
+                  "retained_block_span_count": 22200,
+                  "retained_per_patch": 15384,
+                  "first_total_ns": 627408543,
+                  "commit_total_ns": 1418779121,
+                  "apply_total_ns": 781991060,
+                  "inverse_apply_total_ns": 1199197013,
+                  "first_total_ms": 627.409,
+                  "commit_total_ms": 1418.779,
+                  "apply_total_ms": 781.991,
+                  "inverse_apply_total_ms": 1199.197,
+                  "commit_median_us": 187.421,
+                  "apply_median_us": 18.15,
+                  "inverse_apply_median_us": 28.06,
+                  "first_commit_median_us": 188.741
+                },
+                "spans_ns": {
+                  "first": 627408543,
+                  "steady": 693455850.0,
+                  "apply": 781991060,
+                  "inverse": 1199197013
+                },
+                "metrics": {
+                  "first_mean_ns": 190123.8009090909,
+                  "steady_median_ns": 187421.0,
+                  "commit_and_publication_mean_ns": 191726.90824324323,
+                  "apply_mean_ns": 18356.59765258216,
+                  "inverse_mean_ns": 28150.164624413144,
+                  "peak_rss_kib": 123704,
+                  "retained_bytes_per_patch": 15384.0
+                },
+                "receipt": {
+                  "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-c0-sip-v1/block-02-0-before.receipt.json",
+                  "bytes": 1239,
+                  "sha256": "c4bc0894ef146a477a1a366002ead5d0f15501dab60d5f210fcabb539e5b319c"
+                }
+              },
+              {
+                "name": "block-02-1-after",
+                "counts": [
+                  7400,
+                  3300,
+                  42600
+                ],
+                "output": {
+                  "patches": 7400,
+                  "first_count": 3300,
+                  "replay_count": 42600,
+                  "source_len": 43520,
+                  "target_len": 54784,
+                  "retained_patch_bytes": 113841600,
+                  "retained_payload_bytes": 113664000,
+                  "retained_block_span_bytes": 177600,
+                  "retained_block_span_count": 22200,
+                  "retained_per_patch": 15384,
+                  "first_total_ns": 601015136,
+                  "commit_total_ns": 1291280332,
+                  "apply_total_ns": 723415011,
+                  "inverse_apply_total_ns": 637805413,
+                  "first_total_ms": 601.015,
+                  "commit_total_ms": 1291.28,
+                  "apply_total_ms": 723.415,
+                  "inverse_apply_total_ms": 637.805,
+                  "commit_median_us": 170.511,
+                  "apply_median_us": 16.82,
+                  "inverse_apply_median_us": 14.8,
+                  "first_commit_median_us": 180.851
+                },
+                "spans_ns": {
+                  "first": 601015136,
+                  "steady": 630888850.0,
+                  "apply": 723415011,
+                  "inverse": 637805413
+                },
+                "metrics": {
+                  "first_mean_ns": 182125.7987878788,
+                  "steady_median_ns": 170511.0,
+                  "commit_and_publication_mean_ns": 174497.34216216215,
+                  "apply_mean_ns": 16981.573028169016,
+                  "inverse_mean_ns": 14971.958051643192,
+                  "peak_rss_kib": 123960,
+                  "retained_bytes_per_patch": 15384.0
+                },
+                "receipt": {
+                  "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-c0-sip-v1/block-02-1-after.receipt.json",
+                  "bytes": 1241,
+                  "sha256": "f4eee35d7a04107fd63277c500afdce6adfc14adb248ba6e906362e34958f714"
+                }
+              },
+              {
+                "name": "block-02-2-after",
+                "counts": [
+                  7400,
+                  3300,
+                  42600
+                ],
+                "output": {
+                  "patches": 7400,
+                  "first_count": 3300,
+                  "replay_count": 42600,
+                  "source_len": 43520,
+                  "target_len": 54784,
+                  "retained_patch_bytes": 113841600,
+                  "retained_payload_bytes": 113664000,
+                  "retained_block_span_bytes": 177600,
+                  "retained_block_span_count": 22200,
+                  "retained_per_patch": 15384,
+                  "first_total_ns": 608292000,
+                  "commit_total_ns": 1290594978,
+                  "apply_total_ns": 709349062,
+                  "inverse_apply_total_ns": 637954706,
+                  "first_total_ms": 608.292,
+                  "commit_total_ms": 1290.595,
+                  "apply_total_ms": 709.349,
+                  "inverse_apply_total_ms": 637.955,
+                  "commit_median_us": 170.43,
+                  "apply_median_us": 16.481,
+                  "inverse_apply_median_us": 14.8,
+                  "first_commit_median_us": 182.926
+                },
+                "spans_ns": {
+                  "first": 608292000,
+                  "steady": 630589150.0,
+                  "apply": 709349062,
+                  "inverse": 637954706
+                },
+                "metrics": {
+                  "first_mean_ns": 184330.9090909091,
+                  "steady_median_ns": 170430.0,
+                  "commit_and_publication_mean_ns": 174404.72675675675,
+                  "apply_mean_ns": 16651.386431924882,
+                  "inverse_mean_ns": 14975.462582159624,
+                  "peak_rss_kib": 123944,
+                  "retained_bytes_per_patch": 15384.0
+                },
+                "receipt": {
+                  "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-c0-sip-v1/block-02-2-after.receipt.json",
+                  "bytes": 1241,
+                  "sha256": "d74a1ceac95326c965032c4bcd6e161fd45c58b7a767f6cf266b4d2b847f111c"
+                }
+              },
+              {
+                "name": "block-02-3-before",
+                "counts": [
+                  7400,
+                  3300,
+                  42600
+                ],
+                "output": {
+                  "patches": 7400,
+                  "first_count": 3300,
+                  "replay_count": 42600,
+                  "source_len": 43520,
+                  "target_len": 54784,
+                  "retained_patch_bytes": 113841600,
+                  "retained_payload_bytes": 113664000,
+                  "retained_block_span_bytes": 177600,
+                  "retained_block_span_count": 22200,
+                  "retained_per_patch": 15384,
+                  "first_total_ns": 623180776,
+                  "commit_total_ns": 1418816977,
+                  "apply_total_ns": 870861893,
+                  "inverse_apply_total_ns": 1049245415,
+                  "first_total_ms": 623.181,
+                  "commit_total_ms": 1418.817,
+                  "apply_total_ms": 870.862,
+                  "inverse_apply_total_ms": 1049.245,
+                  "commit_median_us": 187.481,
+                  "apply_median_us": 19.98,
+                  "inverse_apply_median_us": 24.83,
+                  "first_commit_median_us": 186.541
+                },
+                "spans_ns": {
+                  "first": 623180776,
+                  "steady": 693677850.0,
+                  "apply": 870861893,
+                  "inverse": 1049245415
+                },
+                "metrics": {
+                  "first_mean_ns": 188842.6593939394,
+                  "steady_median_ns": 187481.0,
+                  "commit_and_publication_mean_ns": 191732.02391891892,
+                  "apply_mean_ns": 20442.767441314554,
+                  "inverse_mean_ns": 24630.174061032863,
+                  "peak_rss_kib": 123720,
+                  "retained_bytes_per_patch": 15384.0
+                },
+                "receipt": {
+                  "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-c0-sip-v1/block-02-3-before.receipt.json",
+                  "bytes": 1239,
+                  "sha256": "076ac5ddec5f031a6df382cac303855a92e9096d34ada0d6f9a594704b66ada3"
+                }
+              }
+            ]
+          },
+          {
+            "block": 3,
+            "after_before": {
+              "first_mean_ns": 0.9475916152080338,
+              "steady_median_ns": 0.9094115889127256,
+              "commit_and_publication_mean_ns": 0.9090934743844721,
+              "apply_mean_ns": 0.9248201103462996,
+              "inverse_mean_ns": 0.845127464416477,
+              "peak_rss_kib": 1.0013101708074534,
+              "retained_bytes_per_patch": 1.0
+            },
+            "legs": [
+              {
+                "name": "block-03-0-before",
+                "counts": [
+                  7400,
+                  3300,
+                  42600
+                ],
+                "output": {
+                  "patches": 7400,
+                  "first_count": 3300,
+                  "replay_count": 42600,
+                  "source_len": 43520,
+                  "target_len": 54784,
+                  "retained_patch_bytes": 113841600,
+                  "retained_payload_bytes": 113664000,
+                  "retained_block_span_bytes": 177600,
+                  "retained_block_span_count": 22200,
+                  "retained_per_patch": 15384,
+                  "first_total_ns": 647884852,
+                  "commit_total_ns": 1420393046,
+                  "apply_total_ns": 768112315,
+                  "inverse_apply_total_ns": 685406265,
+                  "first_total_ms": 647.885,
+                  "commit_total_ms": 1420.393,
+                  "apply_total_ms": 768.112,
+                  "inverse_apply_total_ms": 685.406,
+                  "commit_median_us": 187.541,
+                  "apply_median_us": 17.82,
+                  "inverse_apply_median_us": 15.86,
+                  "first_commit_median_us": 195.261
+                },
+                "spans_ns": {
+                  "first": 647884852,
+                  "steady": 693899850.0,
+                  "apply": 768112315,
+                  "inverse": 685406265
+                },
+                "metrics": {
+                  "first_mean_ns": 196328.74303030304,
+                  "steady_median_ns": 187541.0,
+                  "commit_and_publication_mean_ns": 191945.00621621622,
+                  "apply_mean_ns": 18030.805516431927,
+                  "inverse_mean_ns": 16089.348943661971,
+                  "peak_rss_kib": 123700,
+                  "retained_bytes_per_patch": 15384.0
+                },
+                "receipt": {
+                  "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-c0-sip-v1/block-03-0-before.receipt.json",
+                  "bytes": 1239,
+                  "sha256": "e4fd4641ea07c945c65749bb0393a70ab0cbb745905eeb1607aac47074c81ec0"
+                }
+              },
+              {
+                "name": "block-03-1-after",
+                "counts": [
+                  7400,
+                  3300,
+                  42600
+                ],
+                "output": {
+                  "patches": 7400,
+                  "first_count": 3300,
+                  "replay_count": 42600,
+                  "source_len": 43520,
+                  "target_len": 54784,
+                  "retained_patch_bytes": 113841600,
+                  "retained_payload_bytes": 113664000,
+                  "retained_block_span_bytes": 177600,
+                  "retained_block_span_count": 22200,
+                  "retained_per_patch": 15384,
+                  "first_total_ns": 609275916,
+                  "commit_total_ns": 1286499760,
+                  "apply_total_ns": 718965720,
+                  "inverse_apply_total_ns": 634830802,
+                  "first_total_ms": 609.276,
+                  "commit_total_ms": 1286.5,
+                  "apply_total_ms": 718.966,
+                  "inverse_apply_total_ms": 634.831,
+                  "commit_median_us": 169.931,
+                  "apply_median_us": 16.71,
+                  "inverse_apply_median_us": 14.73,
+                  "first_commit_median_us": 183.571
+                },
+                "spans_ns": {
+                  "first": 609275916,
+                  "steady": 628742850.0,
+                  "apply": 718965720,
+                  "inverse": 634830802
+                },
+                "metrics": {
+                  "first_mean_ns": 184629.06545454546,
+                  "steady_median_ns": 169931.0,
+                  "commit_and_publication_mean_ns": 173851.31891891893,
+                  "apply_mean_ns": 16877.129577464788,
+                  "inverse_mean_ns": 14902.131502347418,
+                  "peak_rss_kib": 123700,
+                  "retained_bytes_per_patch": 15384.0
+                },
+                "receipt": {
+                  "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-c0-sip-v1/block-03-1-after.receipt.json",
+                  "bytes": 1241,
+                  "sha256": "9215ca5e6a44740d75c4be797b572454b3e907490ee1faf2cd955e464a3740b6"
+                }
+              },
+              {
+                "name": "block-03-2-after",
+                "counts": [
+                  7400,
+                  3300,
+                  42600
+                ],
+                "output": {
+                  "patches": 7400,
+                  "first_count": 3300,
+                  "replay_count": 42600,
+                  "source_len": 43520,
+                  "target_len": 54784,
+                  "retained_patch_bytes": 113841600,
+                  "retained_payload_bytes": 113664000,
+                  "retained_block_span_bytes": 177600,
+                  "retained_block_span_count": 22200,
+                  "retained_per_patch": 15384,
+                  "first_total_ns": 605764403,
+                  "commit_total_ns": 1293947777,
+                  "apply_total_ns": 712900607,
+                  "inverse_apply_total_ns": 636441389,
+                  "first_total_ms": 605.764,
+                  "commit_total_ms": 1293.948,
+                  "apply_total_ms": 712.901,
+                  "inverse_apply_total_ms": 636.441,
+                  "commit_median_us": 170.891,
+                  "apply_median_us": 16.57,
+                  "inverse_apply_median_us": 14.781,
+                  "first_commit_median_us": 182.211
+                },
+                "spans_ns": {
+                  "first": 605764403,
+                  "steady": 632294850.0,
+                  "apply": 712900607,
+                  "inverse": 636441389
+                },
+                "metrics": {
+                  "first_mean_ns": 183564.9706060606,
+                  "steady_median_ns": 170891.0,
+                  "commit_and_publication_mean_ns": 174857.8077027027,
+                  "apply_mean_ns": 16734.75603286385,
+                  "inverse_mean_ns": 14939.938708920188,
+                  "peak_rss_kib": 123920,
+                  "retained_bytes_per_patch": 15384.0
+                },
+                "receipt": {
+                  "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-c0-sip-v1/block-03-2-after.receipt.json",
+                  "bytes": 1241,
+                  "sha256": "bc0f32004948b2282c4e0477c8992f3ed8c055787477b6305895da91e6fb58d3"
+                }
+              },
+              {
+                "name": "block-03-3-before",
+                "counts": [
+                  7400,
+                  3300,
+                  42600
+                ],
+                "output": {
+                  "patches": 7400,
+                  "first_count": 3300,
+                  "replay_count": 42600,
+                  "source_len": 43520,
+                  "target_len": 54784,
+                  "retained_patch_bytes": 113841600,
+                  "retained_payload_bytes": 113664000,
+                  "retained_block_span_bytes": 177600,
+                  "retained_block_span_count": 22200,
+                  "retained_per_patch": 15384,
+                  "first_total_ns": 634355619,
+                  "commit_total_ns": 1418091235,
+                  "apply_total_ns": 780152381,
+                  "inverse_apply_total_ns": 818830959,
+                  "first_total_ms": 634.356,
+                  "commit_total_ms": 1418.091,
+                  "apply_total_ms": 780.152,
+                  "inverse_apply_total_ms": 818.831,
+                  "commit_median_us": 187.231,
+                  "apply_median_us": 18.1,
+                  "inverse_apply_median_us": 18.71,
+                  "first_commit_median_us": 190.921
+                },
+                "spans_ns": {
+                  "first": 634355619,
+                  "steady": 692752850.0,
+                  "apply": 780152381,
+                  "inverse": 818830959
+                },
+                "metrics": {
+                  "first_mean_ns": 192228.97545454546,
+                  "steady_median_ns": 187231.0,
+                  "commit_and_publication_mean_ns": 191633.95067567567,
+                  "apply_mean_ns": 18313.43617370892,
+                  "inverse_mean_ns": 19221.384014084506,
+                  "peak_rss_kib": 123596,
+                  "retained_bytes_per_patch": 15384.0
+                },
+                "receipt": {
+                  "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-c0-sip-v1/block-03-3-before.receipt.json",
+                  "bytes": 1239,
+                  "sha256": "523382072d1af90933ae53bf67db707d61d807d5c82c051714077bc52dce3ee3"
+                }
+              }
+            ]
+          },
+          {
+            "block": 4,
+            "after_before": {
+              "first_mean_ns": 0.9522439434877132,
+              "steady_median_ns": 0.909303809806105,
+              "commit_and_publication_mean_ns": 0.9096641304806224,
+              "apply_mean_ns": 0.9277280549460313,
+              "inverse_mean_ns": 0.633916764743133,
+              "peak_rss_kib": 1.001682085786375,
+              "retained_bytes_per_patch": 1.0
+            },
+            "legs": [
+              {
+                "name": "block-04-0-before",
+                "counts": [
+                  7400,
+                  3300,
+                  42600
+                ],
+                "output": {
+                  "patches": 7400,
+                  "first_count": 3300,
+                  "replay_count": 42600,
+                  "source_len": 43520,
+                  "target_len": 54784,
+                  "retained_patch_bytes": 113841600,
+                  "retained_payload_bytes": 113664000,
+                  "retained_block_span_bytes": 177600,
+                  "retained_block_span_count": 22200,
+                  "retained_per_patch": 15384,
+                  "first_total_ns": 625677751,
+                  "commit_total_ns": 1415864883,
+                  "apply_total_ns": 785277943,
+                  "inverse_apply_total_ns": 1210390011,
+                  "first_total_ms": 625.678,
+                  "commit_total_ms": 1415.865,
+                  "apply_total_ms": 785.278,
+                  "inverse_apply_total_ms": 1210.39,
+                  "commit_median_us": 186.951,
+                  "apply_median_us": 18.23,
+                  "inverse_apply_median_us": 28.301,
+                  "first_commit_median_us": 187.616
+                },
+                "spans_ns": {
+                  "first": 625677751,
+                  "steady": 691716850.0,
+                  "apply": 785277943,
+                  "inverse": 1210390011
+                },
+                "metrics": {
+                  "first_mean_ns": 189599.31848484848,
+                  "steady_median_ns": 186951.0,
+                  "commit_and_publication_mean_ns": 191333.0922972973,
+                  "apply_mean_ns": 18433.75453051643,
+                  "inverse_mean_ns": 28412.911056338027,
+                  "peak_rss_kib": 123700,
+                  "retained_bytes_per_patch": 15384.0
+                },
+                "receipt": {
+                  "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-c0-sip-v1/block-04-0-before.receipt.json",
+                  "bytes": 1239,
+                  "sha256": "bf6601f3191d7ed18a78fddfb7d4b9c319f8faf839af4b59d234dde1b1a33089"
+                }
+              },
+              {
+                "name": "block-04-1-after",
+                "counts": [
+                  7400,
+                  3300,
+                  42600
+                ],
+                "output": {
+                  "patches": 7400,
+                  "first_count": 3300,
+                  "replay_count": 42600,
+                  "source_len": 43520,
+                  "target_len": 54784,
+                  "retained_patch_bytes": 113841600,
+                  "retained_payload_bytes": 113664000,
+                  "retained_block_span_bytes": 177600,
+                  "retained_block_span_count": 22200,
+                  "retained_per_patch": 15384,
+                  "first_total_ns": 597497766,
+                  "commit_total_ns": 1289932509,
+                  "apply_total_ns": 728464270,
+                  "inverse_apply_total_ns": 638700387,
+                  "first_total_ms": 597.498,
+                  "commit_total_ms": 1289.933,
+                  "apply_total_ms": 728.464,
+                  "inverse_apply_total_ms": 638.7,
+                  "commit_median_us": 170.286,
+                  "apply_median_us": 16.94,
+                  "inverse_apply_median_us": 14.82,
+                  "first_commit_median_us": 180.201
+                },
+                "spans_ns": {
+                  "first": 597497766,
+                  "steady": 630056350.0,
+                  "apply": 728464270,
+                  "inverse": 638700387
+                },
+                "metrics": {
+                  "first_mean_ns": 181059.92909090908,
+                  "steady_median_ns": 170286.0,
+                  "commit_and_publication_mean_ns": 174315.2039189189,
+                  "apply_mean_ns": 17100.100234741785,
+                  "inverse_mean_ns": 14992.966830985915,
+                  "peak_rss_kib": 123960,
+                  "retained_bytes_per_patch": 15384.0
+                },
+                "receipt": {
+                  "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-c0-sip-v1/block-04-1-after.receipt.json",
+                  "bytes": 1241,
+                  "sha256": "9e4b2081aed0804e7d0d72bc14cb1c321d76ae074ba540de0464c1fb905ad0e2"
+                }
+              },
+              {
+                "name": "block-04-2-after",
+                "counts": [
+                  7400,
+                  3300,
+                  42600
+                ],
+                "output": {
+                  "patches": 7400,
+                  "first_count": 3300,
+                  "replay_count": 42600,
+                  "source_len": 43520,
+                  "target_len": 54784,
+                  "retained_patch_bytes": 113841600,
+                  "retained_payload_bytes": 113664000,
+                  "retained_block_span_bytes": 177600,
+                  "retained_block_span_count": 22200,
+                  "retained_per_patch": 15384,
+                  "first_total_ns": 608935200,
+                  "commit_total_ns": 1288392701,
+                  "apply_total_ns": 737197586,
+                  "inverse_apply_total_ns": 789425025,
+                  "first_total_ms": 608.935,
+                  "commit_total_ms": 1288.393,
+                  "apply_total_ms": 737.198,
+                  "inverse_apply_total_ms": 789.425,
+                  "commit_median_us": 170.231,
+                  "apply_median_us": 17.1,
+                  "inverse_apply_median_us": 17.98,
+                  "first_commit_median_us": 183.381
+                },
+                "spans_ns": {
+                  "first": 608935200,
+                  "steady": 629852850.0,
+                  "apply": 737197586,
+                  "inverse": 789425025
+                },
+                "metrics": {
+                  "first_mean_ns": 184525.81818181818,
+                  "steady_median_ns": 170231.0,
+                  "commit_and_publication_mean_ns": 174107.12175675677,
+                  "apply_mean_ns": 17305.10765258216,
+                  "inverse_mean_ns": 18531.103873239437,
+                  "peak_rss_kib": 123768,
+                  "retained_bytes_per_patch": 15384.0
+                },
+                "receipt": {
+                  "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-c0-sip-v1/block-04-2-after.receipt.json",
+                  "bytes": 1241,
+                  "sha256": "cd601c66cd8f9593f444818b6afa5b497049176669d6042318d3eec63b8021d6"
+                }
+              },
+              {
+                "name": "block-04-3-before",
+                "counts": [
+                  7400,
+                  3300,
+                  42600
+                ],
+                "output": {
+                  "patches": 7400,
+                  "first_count": 3300,
+                  "replay_count": 42600,
+                  "source_len": 43520,
+                  "target_len": 54784,
+                  "retained_patch_bytes": 113841600,
+                  "retained_payload_bytes": 113664000,
+                  "retained_block_span_bytes": 177600,
+                  "retained_block_span_count": 22200,
+                  "retained_per_patch": 15384,
+                  "first_total_ns": 641259124,
+                  "commit_total_ns": 1418505654,
+                  "apply_total_ns": 794562020,
+                  "inverse_apply_total_ns": 1042469499,
+                  "first_total_ms": 641.259,
+                  "commit_total_ms": 1418.506,
+                  "apply_total_ms": 794.562,
+                  "inverse_apply_total_ms": 1042.469,
+                  "commit_median_us": 187.53,
+                  "apply_median_us": 18.45,
+                  "inverse_apply_median_us": 24.83,
+                  "first_commit_median_us": 193.536
+                },
+                "spans_ns": {
+                  "first": 641259124,
+                  "steady": 693859150.0,
+                  "apply": 794562020,
+                  "inverse": 1042469499
+                },
+                "metrics": {
+                  "first_mean_ns": 194320.94666666666,
+                  "steady_median_ns": 187530.0,
+                  "commit_and_publication_mean_ns": 191689.95324324325,
+                  "apply_mean_ns": 18651.69061032864,
+                  "inverse_mean_ns": 24471.115,
+                  "peak_rss_kib": 123612,
+                  "retained_bytes_per_patch": 15384.0
+                },
+                "receipt": {
+                  "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-c0-sip-v1/block-04-3-before.receipt.json",
+                  "bytes": 1239,
+                  "sha256": "f644b0bf0ad69b1dc0b386abacd1db2ef2317023bed71e063cd846b8eec893ec"
+                }
+              }
+            ]
+          }
+        ],
+        "counts": [
+          7400,
+          3300,
+          42600
+        ],
+        "medians": {
+          "first_mean_ns": 0.9475916152080338,
+          "steady_median_ns": 0.9094115889127256,
+          "commit_and_publication_mean_ns": 0.909847057748126,
+          "apply_mean_ns": 0.9277280549460313,
+          "inverse_mean_ns": 0.766308790485199,
+          "peak_rss_kib": 1.001682085786375,
+          "retained_bytes_per_patch": 1.0
+        }
+      }
+    },
+    {
+      "name": "ppt-phase-c0-original-v1",
+      "measurement_artifact": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-c0-original-v1/measurements.json",
+        "bytes": 46673,
+        "sha256": "f6787661cf065b0777326166272b714abfaba85cbc2216a638afa69ded8f1133"
+      },
+      "artifact_inventory": {
+        "path": "/home/zhuhe/code/litchi-worktrees/unified-ops-api/docs/unified-ops/results/0362j/ppt-phase-c0-original-v1-artifacts.json",
+        "bytes": 191510,
+        "sha256": "655977c0256d45f0c0445e5cb1ba5ef8ce0c4e669fa1bee3429b32da09407a3c"
+      },
+      "raw_bytes": 36020493,
+      "host_snapshots": 728,
+      "dirty_host_snapshots": [],
+      "measurement": {
+        "before_commit": "e673d4addbf4b4224f377e419702a33b3d6958fe",
+        "after_commit": "c0f346607bb28559ae21fa780c835dc70e87fb0b",
+        "runner": {
+          "path": "/home/zhuhe/code/litchi-worktrees/unified-ops-api/docs/unified-ops/results/0362g/ppt_phase_abba.py",
+          "bytes": 12064,
+          "sha256": "daf58fc8f54ecc30b105f934499ecb313975ebcbfe7a6410356afe6ab699a75c"
+        },
+        "harness": {
+          "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-replay-c0-source-20261021/crates/litchi-ppt/examples/scoped_patch_probe.rs",
+          "bytes": 7385,
+          "sha256": "0bd4d9c1bcad6319968024ff603ae77195810174e496d5394fbae1838021e549"
+        },
+        "binaries": {
+          "before": {
+            "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-instrumented-baselines-20261021/original-e673d4addb-scoped_patch_probe",
+            "bytes": 1716976,
+            "sha256": "9f23a1a9119cfb541361e7661c3384a1b2c63c59ae9d95f4842f4a9c1d5a5b28"
+          },
+          "after": {
+            "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-replay-c0-source-20261021/protected/scoped_patch_probe-c0f346607b",
+            "bytes": 1763496,
+            "sha256": "e7c6db29e3dd65bf0178eeaa5e6b52fa57d2e7bd9871aacf70302dd17867b4aa"
+          }
+        },
+        "fixture": {
+          "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-replay-c0-source-20261021/test-data/unified-ops/0294/video.ppt",
+          "bytes": 43520,
+          "sha256": "f32f0614958a177a5195cd7537cdfd2efef52c57de4decc13cf65eadc66cdb8a"
+        },
+        "cpu": 29,
+        "blocks": 5,
+        "minimum_phase_ns": 150000000,
+        "calibration_target_ns": 500000000,
+        "host_checks": "before, every 100ms while the child runs, and after; own timer/probe descendants excluded",
+        "command": [
+          "python3",
+          "/home/zhuhe/code/litchi-worktrees/unified-ops-api/docs/unified-ops/results/0362g/ppt_phase_abba.py",
+          "--before",
+          "../.coord/ppt-instrumented-baselines-20261021/original-e673d4addb-scoped_patch_probe",
+          "--after",
+          "../.coord/ppt-replay-c0-source-20261021/protected/scoped_patch_probe-c0f346607b",
+          "--fixture",
+          "../.coord/ppt-replay-c0-source-20261021/test-data/unified-ops/0294/video.ppt",
+          "--out",
+          "../.coord/ppt-phase-c0-original-v1",
+          "--before-commit",
+          "e673d4addbf4b4224f377e419702a33b3d6958fe",
+          "--after-commit",
+          "c0f346607bb28559ae21fa780c835dc70e87fb0b",
+          "--harness",
+          "../.coord/ppt-replay-c0-source-20261021/crates/litchi-ppt/examples/scoped_patch_probe.rs",
+          "--cpu",
+          "29",
+          "--blocks",
+          "5"
+        ],
+        "steady_span": "lower bound: floor(N/2)*(printed_median_ns-0.5); not commit_total_ns",
+        "commit_total_ns_scope": "complete commit loop including output serialization and patch retention",
+        "fidelity": "probe checks every inverse artifact byte-for-byte; compare source/target extents across endpoints",
+        "status": "complete; coordinator review pending",
+        "calibration": [
+          {
+            "name": "calibration-before",
+            "counts": [
+              1000,
+              1000,
+              10000
+            ],
+            "output": {
+              "patches": 1000,
+              "first_count": 1000,
+              "replay_count": 10000,
+              "source_len": 43520,
+              "target_len": 54784,
+              "retained_patch_bytes": 98304000,
+              "retained_payload_bytes": 98304000,
+              "retained_block_span_bytes": 0,
+              "retained_block_span_count": 0,
+              "retained_per_patch": 98304,
+              "first_total_ns": 194448879,
+              "commit_total_ns": 199907724,
+              "apply_total_ns": 236235958,
+              "inverse_apply_total_ns": 206781617,
+              "first_total_ms": 194.449,
+              "commit_total_ms": 199.908,
+              "apply_total_ms": 236.236,
+              "inverse_apply_total_ms": 206.782,
+              "commit_median_us": 193.491,
+              "apply_median_us": 23.39,
+              "inverse_apply_median_us": 20.27,
+              "first_commit_median_us": 192.18
+            },
+            "spans_ns": {
+              "first": 194448879,
+              "steady": 96745250.0,
+              "apply": 236235958,
+              "inverse": 206781617
+            },
+            "metrics": {
+              "first_mean_ns": 194448.879,
+              "steady_median_ns": 193491.0,
+              "commit_and_publication_mean_ns": 199907.724,
+              "apply_mean_ns": 23623.5958,
+              "inverse_mean_ns": 20678.1617,
+              "peak_rss_kib": 111392,
+              "retained_bytes_per_patch": 98304.0
+            },
+            "receipt": {
+              "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-c0-original-v1/calibration-before.receipt.json",
+              "bytes": 1274,
+              "sha256": "8a637b784edb50ee763b933430ad8407386b21da32e7c0dd4008eb28ce34675d"
+            }
+          },
+          {
+            "name": "calibration-after",
+            "counts": [
+              1000,
+              1000,
+              10000
+            ],
+            "output": {
+              "patches": 1000,
+              "first_count": 1000,
+              "replay_count": 10000,
+              "source_len": 43520,
+              "target_len": 54784,
+              "retained_patch_bytes": 15384000,
+              "retained_payload_bytes": 15360000,
+              "retained_block_span_bytes": 24000,
+              "retained_block_span_count": 3000,
+              "retained_per_patch": 15384,
+              "first_total_ns": 175917777,
+              "commit_total_ns": 166997829,
+              "apply_total_ns": 154686348,
+              "inverse_apply_total_ns": 140302186,
+              "first_total_ms": 175.918,
+              "commit_total_ms": 166.998,
+              "apply_total_ms": 154.686,
+              "inverse_apply_total_ms": 140.302,
+              "commit_median_us": 162.895,
+              "apply_median_us": 15.33,
+              "inverse_apply_median_us": 13.88,
+              "first_commit_median_us": 174.261
+            },
+            "spans_ns": {
+              "first": 175917777,
+              "steady": 81447250.0,
+              "apply": 154686348,
+              "inverse": 140302186
+            },
+            "metrics": {
+              "first_mean_ns": 175917.777,
+              "steady_median_ns": 162895.0,
+              "commit_and_publication_mean_ns": 166997.829,
+              "apply_mean_ns": 15468.6348,
+              "inverse_mean_ns": 14030.2186,
+              "peak_rss_kib": 20304,
+              "retained_bytes_per_patch": 15384.0
+            },
+            "receipt": {
+              "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-c0-original-v1/calibration-after.receipt.json",
+              "bytes": 1265,
+              "sha256": "7142ac5d3aa96ac57dcf4f8cff18e58a66acb72cf338597f8022388006e84e8c"
+            }
+          }
+        ],
+        "paired": [
+          {
+            "block": 0,
+            "after_before": {
+              "first_mean_ns": 0.9107134526017849,
+              "steady_median_ns": 0.881166127509403,
+              "commit_and_publication_mean_ns": 0.8686588247562046,
+              "apply_mean_ns": 0.7302292314130342,
+              "inverse_mean_ns": 0.915338402175019,
+              "peak_rss_kib": 0.15493656673400133,
+              "retained_bytes_per_patch": 0.156494140625
+            },
+            "legs": [
+              {
+                "name": "block-00-0-before",
+                "counts": [
+                  7400,
+                  3500,
+                  42800
+                ],
+                "output": {
+                  "patches": 7400,
+                  "first_count": 3500,
+                  "replay_count": 42800,
+                  "source_len": 43520,
+                  "target_len": 54784,
+                  "retained_patch_bytes": 727449600,
+                  "retained_payload_bytes": 727449600,
+                  "retained_block_span_bytes": 0,
+                  "retained_block_span_count": 0,
+                  "retained_per_patch": 98304,
+                  "first_total_ns": 680620534,
+                  "commit_total_ns": 1493197138,
+                  "apply_total_ns": 1013979130,
+                  "inverse_apply_total_ns": 914463632,
+                  "first_total_ms": 680.621,
+                  "commit_total_ms": 1493.197,
+                  "apply_total_ms": 1013.979,
+                  "inverse_apply_total_ms": 914.464,
+                  "commit_median_us": 194.631,
+                  "apply_median_us": 23.44,
+                  "inverse_apply_median_us": 20.881,
+                  "first_commit_median_us": 193.896
+                },
+                "spans_ns": {
+                  "first": 680620534,
+                  "steady": 720132850.0,
+                  "apply": 1013979130,
+                  "inverse": 914463632
+                },
+                "metrics": {
+                  "first_mean_ns": 194463.00971428573,
+                  "steady_median_ns": 194631.0,
+                  "commit_and_publication_mean_ns": 201783.39702702704,
+                  "apply_mean_ns": 23691.1011682243,
+                  "inverse_mean_ns": 21365.972710280374,
+                  "peak_rss_kib": 797980,
+                  "retained_bytes_per_patch": 98304.0
+                },
+                "receipt": {
+                  "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-c0-original-v1/block-00-0-before.receipt.json",
+                  "bytes": 1270,
+                  "sha256": "1773e55920b3ee5742f1a3b7b79bfcd83b9c04127770a2127da3b2f724a91d73"
+                }
+              },
+              {
+                "name": "block-00-1-after",
+                "counts": [
+                  7400,
+                  3500,
+                  42800
+                ],
+                "output": {
+                  "patches": 7400,
+                  "first_count": 3500,
+                  "replay_count": 42800,
+                  "source_len": 43520,
+                  "target_len": 54784,
+                  "retained_patch_bytes": 113841600,
+                  "retained_payload_bytes": 113664000,
+                  "retained_block_span_bytes": 177600,
+                  "retained_block_span_count": 22200,
+                  "retained_per_patch": 15384,
+                  "first_total_ns": 600600027,
+                  "commit_total_ns": 1288630122,
+                  "apply_total_ns": 729452924,
+                  "inverse_apply_total_ns": 635724107,
+                  "first_total_ms": 600.6,
+                  "commit_total_ms": 1288.63,
+                  "apply_total_ms": 729.453,
+                  "inverse_apply_total_ms": 635.724,
+                  "commit_median_us": 170.281,
+                  "apply_median_us": 16.86,
+                  "inverse_apply_median_us": 14.681,
+                  "first_commit_median_us": 169.451
+                },
+                "spans_ns": {
+                  "first": 600600027,
+                  "steady": 630037850.0,
+                  "apply": 729452924,
+                  "inverse": 635724107
+                },
+                "metrics": {
+                  "first_mean_ns": 171600.00771428572,
+                  "steady_median_ns": 170281.0,
+                  "commit_and_publication_mean_ns": 174139.20567567568,
+                  "apply_mean_ns": 17043.29261682243,
+                  "inverse_mean_ns": 14853.366985981309,
+                  "peak_rss_kib": 123768,
+                  "retained_bytes_per_patch": 15384.0
+                },
+                "receipt": {
+                  "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-c0-original-v1/block-00-1-after.receipt.json",
+                  "bytes": 1261,
+                  "sha256": "79bb3c982d26ac1c696e482cb55c274a6e6e7baf953ce1486d1e0dafa4b149d5"
+                }
+              },
+              {
+                "name": "block-00-2-after",
+                "counts": [
+                  7400,
+                  3500,
+                  42800
+                ],
+                "output": {
+                  "patches": 7400,
+                  "first_count": 3500,
+                  "replay_count": 42800,
+                  "source_len": 43520,
+                  "target_len": 54784,
+                  "retained_patch_bytes": 113841600,
+                  "retained_payload_bytes": 113664000,
+                  "retained_block_span_bytes": 177600,
+                  "retained_block_span_count": 22200,
+                  "retained_per_patch": 15384,
+                  "first_total_ns": 633249283,
+                  "commit_total_ns": 1295453206,
+                  "apply_total_ns": 726823332,
+                  "inverse_apply_total_ns": 935805656,
+                  "first_total_ms": 633.249,
+                  "commit_total_ms": 1295.453,
+                  "apply_total_ms": 726.823,
+                  "inverse_apply_total_ms": 935.806,
+                  "commit_median_us": 171.296,
+                  "apply_median_us": 16.8,
+                  "inverse_apply_median_us": 20.98,
+                  "first_commit_median_us": 180.241
+                },
+                "spans_ns": {
+                  "first": 633249283,
+                  "steady": 633793350.0,
+                  "apply": 726823332,
+                  "inverse": 935805656
+                },
+                "metrics": {
+                  "first_mean_ns": 180928.36657142857,
+                  "steady_median_ns": 171296.0,
+                  "commit_and_publication_mean_ns": 175061.24405405406,
+                  "apply_mean_ns": 16981.85355140187,
+                  "inverse_mean_ns": 21864.61813084112,
+                  "peak_rss_kib": 123512,
+                  "retained_bytes_per_patch": 15384.0
+                },
+                "receipt": {
+                  "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-c0-original-v1/block-00-2-after.receipt.json",
+                  "bytes": 1261,
+                  "sha256": "19c17b7c334be11301d781bbbd64040f5e3a3ef86412e2072f416d8ee6d1a16c"
+                }
+              },
+              {
+                "name": "block-00-3-before",
+                "counts": [
+                  7400,
+                  3500,
+                  42800
+                ],
+                "output": {
+                  "patches": 7400,
+                  "first_count": 3500,
+                  "replay_count": 42800,
+                  "source_len": 43520,
+                  "target_len": 54784,
+                  "retained_patch_bytes": 727449600,
+                  "retained_payload_bytes": 727449600,
+                  "retained_block_span_bytes": 0,
+                  "retained_block_span_count": 0,
+                  "retained_per_patch": 98304,
+                  "first_total_ns": 674195634,
+                  "commit_total_ns": 1481599473,
+                  "apply_total_ns": 980293618,
+                  "inverse_apply_total_ns": 802420265,
+                  "first_total_ms": 674.196,
+                  "commit_total_ms": 1481.599,
+                  "apply_total_ms": 980.294,
+                  "inverse_apply_total_ms": 802.42,
+                  "commit_median_us": 193.011,
+                  "apply_median_us": 22.78,
+                  "inverse_apply_median_us": 18.55,
+                  "first_commit_median_us": 191.121
+                },
+                "spans_ns": {
+                  "first": 674195634,
+                  "steady": 714138850.0,
+                  "apply": 980293618,
+                  "inverse": 802420265
+                },
+                "metrics": {
+                  "first_mean_ns": 192627.324,
+                  "steady_median_ns": 193011.0,
+                  "commit_and_publication_mean_ns": 200216.145,
+                  "apply_mean_ns": 22904.056495327102,
+                  "inverse_mean_ns": 18748.13703271028,
+                  "peak_rss_kib": 798028,
+                  "retained_bytes_per_patch": 98304.0
+                },
+                "receipt": {
+                  "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-c0-original-v1/block-00-3-before.receipt.json",
+                  "bytes": 1270,
+                  "sha256": "39dcb9808bcb8df0dd502af046d06f857480c2bb76469ceb485c0208019e6544"
+                }
+              }
+            ]
+          },
+          {
+            "block": 1,
+            "after_before": {
+              "first_mean_ns": 0.9652290618929231,
+              "steady_median_ns": 0.8727519033436877,
+              "commit_and_publication_mean_ns": 0.8629619183216148,
+              "apply_mean_ns": 0.7376691487690455,
+              "inverse_mean_ns": 0.9444771808642463,
+              "peak_rss_kib": 0.1551555615705027,
+              "retained_bytes_per_patch": 0.156494140625
+            },
+            "legs": [
+              {
+                "name": "block-01-0-before",
+                "counts": [
+                  7400,
+                  3500,
+                  42800
+                ],
+                "output": {
+                  "patches": 7400,
+                  "first_count": 3500,
+                  "replay_count": 42800,
+                  "source_len": 43520,
+                  "target_len": 54784,
+                  "retained_patch_bytes": 727449600,
+                  "retained_payload_bytes": 727449600,
+                  "retained_block_span_bytes": 0,
+                  "retained_block_span_count": 0,
+                  "retained_per_patch": 98304,
+                  "first_total_ns": 665311799,
+                  "commit_total_ns": 1479333072,
+                  "apply_total_ns": 989585873,
+                  "inverse_apply_total_ns": 787129608,
+                  "first_total_ms": 665.312,
+                  "commit_total_ms": 1479.333,
+                  "apply_total_ms": 989.586,
+                  "inverse_apply_total_ms": 787.13,
+                  "commit_median_us": 193.856,
+                  "apply_median_us": 22.92,
+                  "inverse_apply_median_us": 18.15,
+                  "first_commit_median_us": 188.541
+                },
+                "spans_ns": {
+                  "first": 665311799,
+                  "steady": 717265350.0,
+                  "apply": 989585873,
+                  "inverse": 787129608
+                },
+                "metrics": {
+                  "first_mean_ns": 190089.08542857142,
+                  "steady_median_ns": 193856.0,
+                  "commit_and_publication_mean_ns": 199909.87459459458,
+                  "apply_mean_ns": 23121.165257009347,
+                  "inverse_mean_ns": 18390.878691588787,
+                  "peak_rss_kib": 798052,
+                  "retained_bytes_per_patch": 98304.0
+                },
+                "receipt": {
+                  "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-c0-original-v1/block-01-0-before.receipt.json",
+                  "bytes": 1270,
+                  "sha256": "d14473aae92604a0a32e84b3280107b6482adde7c3f91f107e4d20c59cc73f1e"
+                }
+              },
+              {
+                "name": "block-01-1-after",
+                "counts": [
+                  7400,
+                  3500,
+                  42800
+                ],
+                "output": {
+                  "patches": 7400,
+                  "first_count": 3500,
+                  "replay_count": 42800,
+                  "source_len": 43520,
+                  "target_len": 54784,
+                  "retained_patch_bytes": 113841600,
+                  "retained_payload_bytes": 113664000,
+                  "retained_block_span_bytes": 177600,
+                  "retained_block_span_count": 22200,
+                  "retained_per_patch": 15384,
+                  "first_total_ns": 640782822,
+                  "commit_total_ns": 1289603833,
+                  "apply_total_ns": 723341121,
+                  "inverse_apply_total_ns": 630186301,
+                  "first_total_ms": 640.783,
+                  "commit_total_ms": 1289.604,
+                  "apply_total_ms": 723.341,
+                  "inverse_apply_total_ms": 630.186,
+                  "commit_median_us": 170.476,
+                  "apply_median_us": 16.74,
+                  "inverse_apply_median_us": 14.55,
+                  "first_commit_median_us": 181.661
+                },
+                "spans_ns": {
+                  "first": 640782822,
+                  "steady": 630759350.0,
+                  "apply": 723341121,
+                  "inverse": 630186301
+                },
+                "metrics": {
+                  "first_mean_ns": 183080.8062857143,
+                  "steady_median_ns": 170476.0,
+                  "commit_and_publication_mean_ns": 174270.78824324324,
+                  "apply_mean_ns": 16900.49348130841,
+                  "inverse_mean_ns": 14723.978995327103,
+                  "peak_rss_kib": 123944,
+                  "retained_bytes_per_patch": 15384.0
+                },
+                "receipt": {
+                  "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-c0-original-v1/block-01-1-after.receipt.json",
+                  "bytes": 1261,
+                  "sha256": "64fdf039e0ed2e80ce712b3ef0b6803dd6744433761a2a73e3cd82a16eb5eacc"
+                }
+              },
+              {
+                "name": "block-01-2-after",
+                "counts": [
+                  7400,
+                  3500,
+                  42800
+                ],
+                "output": {
+                  "patches": 7400,
+                  "first_count": 3500,
+                  "replay_count": 42800,
+                  "source_len": 43520,
+                  "target_len": 54784,
+                  "retained_patch_bytes": 113841600,
+                  "retained_payload_bytes": 113664000,
+                  "retained_block_span_bytes": 177600,
+                  "retained_block_span_count": 22200,
+                  "retained_per_patch": 15384,
+                  "first_total_ns": 638547756,
+                  "commit_total_ns": 1288210886,
+                  "apply_total_ns": 748732261,
+                  "inverse_apply_total_ns": 957191987,
+                  "first_total_ms": 638.548,
+                  "commit_total_ms": 1288.211,
+                  "apply_total_ms": 748.732,
+                  "inverse_apply_total_ms": 957.192,
+                  "commit_median_us": 170.331,
+                  "apply_median_us": 17.29,
+                  "inverse_apply_median_us": 21.63,
+                  "first_commit_median_us": 182.081
+                },
+                "spans_ns": {
+                  "first": 638547756,
+                  "steady": 630222850.0,
+                  "apply": 748732261,
+                  "inverse": 957191987
+                },
+                "metrics": {
+                  "first_mean_ns": 182442.216,
+                  "steady_median_ns": 170331.0,
+                  "commit_and_publication_mean_ns": 174082.55216216217,
+                  "apply_mean_ns": 17493.74441588785,
+                  "inverse_mean_ns": 22364.298761682243,
+                  "peak_rss_kib": 123688,
+                  "retained_bytes_per_patch": 15384.0
+                },
+                "receipt": {
+                  "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-c0-original-v1/block-01-2-after.receipt.json",
+                  "bytes": 1261,
+                  "sha256": "e117fb0837655b324d98a5963333a8306067e1608d33ba15ee342d3bb23fa26a"
+                }
+              },
+              {
+                "name": "block-01-3-before",
+                "counts": [
+                  7400,
+                  3500,
+                  42800
+                ],
+                "output": {
+                  "patches": 7400,
+                  "first_count": 3500,
+                  "replay_count": 42800,
+                  "source_len": 43520,
+                  "target_len": 54784,
+                  "retained_patch_bytes": 727449600,
+                  "retained_payload_bytes": 727449600,
+                  "retained_block_span_bytes": 0,
+                  "retained_block_span_count": 0,
+                  "retained_per_patch": 98304,
+                  "first_total_ns": 660104756,
+                  "commit_total_ns": 1507837815,
+                  "apply_total_ns": 1005988138,
+                  "inverse_apply_total_ns": 893565617,
+                  "first_total_ms": 660.105,
+                  "commit_total_ms": 1507.838,
+                  "apply_total_ms": 1005.988,
+                  "inverse_apply_total_ms": 893.566,
+                  "commit_median_us": 196.641,
+                  "apply_median_us": 23.241,
+                  "inverse_apply_median_us": 20.48,
+                  "first_commit_median_us": 186.671
+                },
+                "spans_ns": {
+                  "first": 660104756,
+                  "steady": 727569850.0,
+                  "apply": 1005988138,
+                  "inverse": 893565617
+                },
+                "metrics": {
+                  "first_mean_ns": 188601.35885714286,
+                  "steady_median_ns": 196641.0,
+                  "commit_and_publication_mean_ns": 203761.8668918919,
+                  "apply_mean_ns": 23504.39574766355,
+                  "inverse_mean_ns": 20877.7013317757,
+                  "peak_rss_kib": 797972,
+                  "retained_bytes_per_patch": 98304.0
+                },
+                "receipt": {
+                  "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-c0-original-v1/block-01-3-before.receipt.json",
+                  "bytes": 1270,
+                  "sha256": "acd44ba29cf99965e89b53d01451cc603c1e125418b8fc25489d5ed4de5106d1"
+                }
+              }
+            ]
+          },
+          {
+            "block": 2,
+            "after_before": {
+              "first_mean_ns": 0.9467749636602837,
+              "steady_median_ns": 0.8820927434140194,
+              "commit_and_publication_mean_ns": 0.8727601967341323,
+              "apply_mean_ns": 0.7418726005562789,
+              "inverse_mean_ns": 0.8202464465414124,
+              "peak_rss_kib": 0.15518239431854916,
+              "retained_bytes_per_patch": 0.156494140625
+            },
+            "legs": [
+              {
+                "name": "block-02-0-before",
+                "counts": [
+                  7400,
+                  3500,
+                  42800
+                ],
+                "output": {
+                  "patches": 7400,
+                  "first_count": 3500,
+                  "replay_count": 42800,
+                  "source_len": 43520,
+                  "target_len": 54784,
+                  "retained_patch_bytes": 727449600,
+                  "retained_payload_bytes": 727449600,
+                  "retained_block_span_bytes": 0,
+                  "retained_block_span_count": 0,
+                  "retained_per_patch": 98304,
+                  "first_total_ns": 668746232,
+                  "commit_total_ns": 1483887927,
+                  "apply_total_ns": 995753889,
+                  "inverse_apply_total_ns": 793015836,
+                  "first_total_ms": 668.746,
+                  "commit_total_ms": 1483.888,
+                  "apply_total_ms": 995.754,
+                  "inverse_apply_total_ms": 793.016,
+                  "commit_median_us": 194.301,
+                  "apply_median_us": 23.051,
+                  "inverse_apply_median_us": 18.33,
+                  "first_commit_median_us": 189.851
+                },
+                "spans_ns": {
+                  "first": 668746232,
+                  "steady": 718911850.0,
+                  "apply": 995753889,
+                  "inverse": 793015836
+                },
+                "metrics": {
+                  "first_mean_ns": 191070.352,
+                  "steady_median_ns": 194301.0,
+                  "commit_and_publication_mean_ns": 200525.39554054054,
+                  "apply_mean_ns": 23265.27778037383,
+                  "inverse_mean_ns": 18528.40738317757,
+                  "peak_rss_kib": 798100,
+                  "retained_bytes_per_patch": 98304.0
+                },
+                "receipt": {
+                  "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-c0-original-v1/block-02-0-before.receipt.json",
+                  "bytes": 1270,
+                  "sha256": "b311c1951954f82aee400327796437e5c003bc3c1fcac08a01809ea7a1a8ef8b"
+                }
+              },
+              {
+                "name": "block-02-1-after",
+                "counts": [
+                  7400,
+                  3500,
+                  42800
+                ],
+                "output": {
+                  "patches": 7400,
+                  "first_count": 3500,
+                  "replay_count": 42800,
+                  "source_len": 43520,
+                  "target_len": 54784,
+                  "retained_patch_bytes": 113841600,
+                  "retained_payload_bytes": 113664000,
+                  "retained_block_span_bytes": 177600,
+                  "retained_block_span_count": 22200,
+                  "retained_per_patch": 15384,
+                  "first_total_ns": 639775067,
+                  "commit_total_ns": 1291397187,
+                  "apply_total_ns": 737055877,
+                  "inverse_apply_total_ns": 644445948,
+                  "first_total_ms": 639.775,
+                  "commit_total_ms": 1291.397,
+                  "apply_total_ms": 737.056,
+                  "inverse_apply_total_ms": 644.446,
+                  "commit_median_us": 170.61,
+                  "apply_median_us": 17.021,
+                  "inverse_apply_median_us": 14.83,
+                  "first_commit_median_us": 181.471
+                },
+                "spans_ns": {
+                  "first": 639775067,
+                  "steady": 631255150.0,
+                  "apply": 737055877,
+                  "inverse": 644445948
+                },
+                "metrics": {
+                  "first_mean_ns": 182792.87628571427,
+                  "steady_median_ns": 170610.0,
+                  "commit_and_publication_mean_ns": 174513.13337837838,
+                  "apply_mean_ns": 17220.931705607476,
+                  "inverse_mean_ns": 15057.14831775701,
+                  "peak_rss_kib": 123724,
+                  "retained_bytes_per_patch": 15384.0
+                },
+                "receipt": {
+                  "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-c0-original-v1/block-02-1-after.receipt.json",
+                  "bytes": 1261,
+                  "sha256": "8e561fada9b8c1fbfdf48091727ba1b012d25ed9641e521b4a8478bec4537fe0"
+                }
+              },
+              {
+                "name": "block-02-2-after",
+                "counts": [
+                  7400,
+                  3500,
+                  42800
+                ],
+                "output": {
+                  "patches": 7400,
+                  "first_count": 3500,
+                  "replay_count": 42800,
+                  "source_len": 43520,
+                  "target_len": 54784,
+                  "retained_patch_bytes": 113841600,
+                  "retained_payload_bytes": 113664000,
+                  "retained_block_span_bytes": 177600,
+                  "retained_block_span_count": 22200,
+                  "retained_per_patch": 15384,
+                  "first_total_ns": 621487403,
+                  "commit_total_ns": 1295997770,
+                  "apply_total_ns": 755119471,
+                  "inverse_apply_total_ns": 738663335,
+                  "first_total_ms": 621.487,
+                  "commit_total_ms": 1295.998,
+                  "apply_total_ms": 755.119,
+                  "inverse_apply_total_ms": 738.663,
+                  "commit_median_us": 170.991,
+                  "apply_median_us": 17.44,
+                  "inverse_apply_median_us": 16.85,
+                  "first_commit_median_us": 176.606
+                },
+                "spans_ns": {
+                  "first": 621487403,
+                  "steady": 632664850.0,
+                  "apply": 755119471,
+                  "inverse": 738663335
+                },
+                "metrics": {
+                  "first_mean_ns": 177567.82942857142,
+                  "steady_median_ns": 170991.0,
+                  "commit_and_publication_mean_ns": 175134.83378378378,
+                  "apply_mean_ns": 17642.978294392524,
+                  "inverse_mean_ns": 17258.489135514017,
+                  "peak_rss_kib": 123980,
+                  "retained_bytes_per_patch": 15384.0
+                },
+                "receipt": {
+                  "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-c0-original-v1/block-02-2-after.receipt.json",
+                  "bytes": 1261,
+                  "sha256": "cad4b43e22dfe29003bf1a7aac5cff837bc940368a8321ea439b6488edaf1086"
+                }
+              },
+              {
+                "name": "block-02-3-before",
+                "counts": [
+                  7400,
+                  3500,
+                  42800
+                ],
+                "output": {
+                  "patches": 7400,
+                  "first_count": 3500,
+                  "replay_count": 42800,
+                  "source_len": 43520,
+                  "target_len": 54784,
+                  "retained_patch_bytes": 727449600,
+                  "retained_payload_bytes": 727449600,
+                  "retained_block_span_bytes": 0,
+                  "retained_block_span_count": 0,
+                  "retained_per_patch": 98304,
+                  "first_total_ns": 663420881,
+                  "commit_total_ns": 1480723620,
+                  "apply_total_ns": 1015609446,
+                  "inverse_apply_total_ns": 893196020,
+                  "first_total_ms": 663.421,
+                  "commit_total_ms": 1480.724,
+                  "apply_total_ms": 1015.609,
+                  "inverse_apply_total_ms": 893.196,
+                  "commit_median_us": 192.961,
+                  "apply_median_us": 23.471,
+                  "inverse_apply_median_us": 20.461,
+                  "first_commit_median_us": 188.111
+                },
+                "spans_ns": {
+                  "first": 663420881,
+                  "steady": 713953850.0,
+                  "apply": 1015609446,
+                  "inverse": 893196020
+                },
+                "metrics": {
+                  "first_mean_ns": 189548.82314285715,
+                  "steady_median_ns": 192961.0,
+                  "commit_and_publication_mean_ns": 200097.7864864865,
+                  "apply_mean_ns": 23729.192663551403,
+                  "inverse_mean_ns": 20869.065887850466,
+                  "peak_rss_kib": 798112,
+                  "retained_bytes_per_patch": 98304.0
+                },
+                "receipt": {
+                  "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-c0-original-v1/block-02-3-before.receipt.json",
+                  "bytes": 1270,
+                  "sha256": "2500194475e93bd6ad549a2a227911a04ee7d3d3072a940e4cdf02b381b293bd"
+                }
+              }
+            ]
+          },
+          {
+            "block": 3,
+            "after_before": {
+              "first_mean_ns": 0.955049522139288,
+              "steady_median_ns": 0.8881596626496062,
+              "commit_and_publication_mean_ns": 0.877946999403223,
+              "apply_mean_ns": 0.737918290857472,
+              "inverse_mean_ns": 0.9291305318981465,
+              "peak_rss_kib": 0.15534068181476413,
+              "retained_bytes_per_patch": 0.156494140625
+            },
+            "legs": [
+              {
+                "name": "block-03-0-before",
+                "counts": [
+                  7400,
+                  3500,
+                  42800
+                ],
+                "output": {
+                  "patches": 7400,
+                  "first_count": 3500,
+                  "replay_count": 42800,
+                  "source_len": 43520,
+                  "target_len": 54784,
+                  "retained_patch_bytes": 727449600,
+                  "retained_payload_bytes": 727449600,
+                  "retained_block_span_bytes": 0,
+                  "retained_block_span_count": 0,
+                  "retained_per_patch": 98304,
+                  "first_total_ns": 662693951,
+                  "commit_total_ns": 1477933347,
+                  "apply_total_ns": 983530171,
+                  "inverse_apply_total_ns": 799480874,
+                  "first_total_ms": 662.694,
+                  "commit_total_ms": 1477.933,
+                  "apply_total_ms": 983.53,
+                  "inverse_apply_total_ms": 799.481,
+                  "commit_median_us": 193.521,
+                  "apply_median_us": 22.85,
+                  "inverse_apply_median_us": 18.46,
+                  "first_commit_median_us": 187.921
+                },
+                "spans_ns": {
+                  "first": 662693951,
+                  "steady": 716025850.0,
+                  "apply": 983530171,
+                  "inverse": 799480874
+                },
+                "metrics": {
+                  "first_mean_ns": 189341.12885714284,
+                  "steady_median_ns": 193521.0,
+                  "commit_and_publication_mean_ns": 199720.72256756757,
+                  "apply_mean_ns": 22979.676892523363,
+                  "inverse_mean_ns": 18679.459672897196,
+                  "peak_rss_kib": 797972,
+                  "retained_bytes_per_patch": 98304.0
+                },
+                "receipt": {
+                  "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-c0-original-v1/block-03-0-before.receipt.json",
+                  "bytes": 1270,
+                  "sha256": "5838bda212536142add09b9547fb4d10d219268abcb2a2efca975f4b27ae3e7d"
+                }
+              },
+              {
+                "name": "block-03-1-after",
+                "counts": [
+                  7400,
+                  3500,
+                  42800
+                ],
+                "output": {
+                  "patches": 7400,
+                  "first_count": 3500,
+                  "replay_count": 42800,
+                  "source_len": 43520,
+                  "target_len": 54784,
+                  "retained_patch_bytes": 113841600,
+                  "retained_payload_bytes": 113664000,
+                  "retained_block_span_bytes": 177600,
+                  "retained_block_span_count": 22200,
+                  "retained_per_patch": 15384,
+                  "first_total_ns": 631451956,
+                  "commit_total_ns": 1296885432,
+                  "apply_total_ns": 733283212,
+                  "inverse_apply_total_ns": 840420706,
+                  "first_total_ms": 631.452,
+                  "commit_total_ms": 1296.885,
+                  "apply_total_ms": 733.283,
+                  "inverse_apply_total_ms": 840.421,
+                  "commit_median_us": 171.311,
+                  "apply_median_us": 16.95,
+                  "inverse_apply_median_us": 18.901,
+                  "first_commit_median_us": 179.751
+                },
+                "spans_ns": {
+                  "first": 631451956,
+                  "steady": 633848850.0,
+                  "apply": 733283212,
+                  "inverse": 840420706
+                },
+                "metrics": {
+                  "first_mean_ns": 180414.84457142858,
+                  "steady_median_ns": 171311.0,
+                  "commit_and_publication_mean_ns": 175254.7881081081,
+                  "apply_mean_ns": 17132.785327102803,
+                  "inverse_mean_ns": 19635.99780373832,
+                  "peak_rss_kib": 123960,
+                  "retained_bytes_per_patch": 15384.0
+                },
+                "receipt": {
+                  "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-c0-original-v1/block-03-1-after.receipt.json",
+                  "bytes": 1261,
+                  "sha256": "6d8e036a4b77c40dd1b6429e5fd5d41dbae865e87765f8742cdb97f60dbf0a12"
+                }
+              },
+              {
+                "name": "block-03-2-after",
+                "counts": [
+                  7400,
+                  3500,
+                  42800
+                ],
+                "output": {
+                  "patches": 7400,
+                  "first_count": 3500,
+                  "replay_count": 42800,
+                  "source_len": 43520,
+                  "target_len": 54784,
+                  "retained_patch_bytes": 113841600,
+                  "retained_payload_bytes": 113664000,
+                  "retained_block_span_bytes": 177600,
+                  "retained_block_span_count": 22200,
+                  "retained_per_patch": 15384,
+                  "first_total_ns": 640705548,
+                  "commit_total_ns": 1304961412,
+                  "apply_total_ns": 730073334,
+                  "inverse_apply_total_ns": 646262272,
+                  "first_total_ms": 640.706,
+                  "commit_total_ms": 1304.961,
+                  "apply_total_ms": 730.073,
+                  "inverse_apply_total_ms": 646.262,
+                  "commit_median_us": 172.421,
+                  "apply_median_us": 16.87,
+                  "inverse_apply_median_us": 14.89,
+                  "first_commit_median_us": 181.171
+                },
+                "spans_ns": {
+                  "first": 640705548,
+                  "steady": 637955850.0,
+                  "apply": 730073334,
+                  "inverse": 646262272
+                },
+                "metrics": {
+                  "first_mean_ns": 183058.728,
+                  "steady_median_ns": 172421.0,
+                  "commit_and_publication_mean_ns": 176346.13675675675,
+                  "apply_mean_ns": 17057.78817757009,
+                  "inverse_mean_ns": 15099.585794392524,
+                  "peak_rss_kib": 123960,
+                  "retained_bytes_per_patch": 15384.0
+                },
+                "receipt": {
+                  "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-c0-original-v1/block-03-2-after.receipt.json",
+                  "bytes": 1261,
+                  "sha256": "2ef0197c2ccc1ea1fd159ab3cf3bd68afa30b6ec54119509611cf351e5cfbcbf"
+                }
+              },
+              {
+                "name": "block-03-3-before",
+                "counts": [
+                  7400,
+                  3500,
+                  42800
+                ],
+                "output": {
+                  "patches": 7400,
+                  "first_count": 3500,
+                  "replay_count": 42800,
+                  "source_len": 43520,
+                  "target_len": 54784,
+                  "retained_patch_bytes": 727449600,
+                  "retained_payload_bytes": 727449600,
+                  "retained_block_span_bytes": 0,
+                  "retained_block_span_count": 0,
+                  "retained_per_patch": 98304,
+                  "first_total_ns": 669339074,
+                  "commit_total_ns": 1485624642,
+                  "apply_total_ns": 999557339,
+                  "inverse_apply_total_ns": 800598907,
+                  "first_total_ms": 669.339,
+                  "commit_total_ms": 1485.625,
+                  "apply_total_ms": 999.557,
+                  "inverse_apply_total_ms": 800.599,
+                  "commit_median_us": 193.495,
+                  "apply_median_us": 23.17,
+                  "inverse_apply_median_us": 18.52,
+                  "first_commit_median_us": 189.701
+                },
+                "spans_ns": {
+                  "first": 669339074,
+                  "steady": 715929650.0,
+                  "apply": 999557339,
+                  "inverse": 800598907
+                },
+                "metrics": {
+                  "first_mean_ns": 191239.73542857144,
+                  "steady_median_ns": 193495.0,
+                  "commit_and_publication_mean_ns": 200760.08675675676,
+                  "apply_mean_ns": 23354.14343457944,
+                  "inverse_mean_ns": 18705.581939252337,
+                  "peak_rss_kib": 798004,
+                  "retained_bytes_per_patch": 98304.0
+                },
+                "receipt": {
+                  "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-c0-original-v1/block-03-3-before.receipt.json",
+                  "bytes": 1270,
+                  "sha256": "7d341daee17337d93dbcdf4c26dd12664a9ecc3e20b91981378450ce68bc9c8b"
+                }
+              }
+            ]
+          },
+          {
+            "block": 4,
+            "after_before": {
+              "first_mean_ns": 0.9675724562862815,
+              "steady_median_ns": 0.8766603561984917,
+              "commit_and_publication_mean_ns": 0.8673546537079676,
+              "apply_mean_ns": 0.7143789928103121,
+              "inverse_mean_ns": 0.7579596744921652,
+              "peak_rss_kib": 0.15512402203276848,
+              "retained_bytes_per_patch": 0.156494140625
+            },
+            "legs": [
+              {
+                "name": "block-04-0-before",
+                "counts": [
+                  7400,
+                  3500,
+                  42800
+                ],
+                "output": {
+                  "patches": 7400,
+                  "first_count": 3500,
+                  "replay_count": 42800,
+                  "source_len": 43520,
+                  "target_len": 54784,
+                  "retained_patch_bytes": 727449600,
+                  "retained_payload_bytes": 727449600,
+                  "retained_block_span_bytes": 0,
+                  "retained_block_span_count": 0,
+                  "retained_per_patch": 98304,
+                  "first_total_ns": 663245355,
+                  "commit_total_ns": 1493015539,
+                  "apply_total_ns": 999511403,
+                  "inverse_apply_total_ns": 798157651,
+                  "first_total_ms": 663.245,
+                  "commit_total_ms": 1493.016,
+                  "apply_total_ms": 999.511,
+                  "inverse_apply_total_ms": 798.158,
+                  "commit_median_us": 195.401,
+                  "apply_median_us": 23.16,
+                  "inverse_apply_median_us": 18.45,
+                  "first_commit_median_us": 188.091
+                },
+                "spans_ns": {
+                  "first": 663245355,
+                  "steady": 722981850.0,
+                  "apply": 999511403,
+                  "inverse": 798157651
+                },
+                "metrics": {
+                  "first_mean_ns": 189498.67285714287,
+                  "steady_median_ns": 195401.0,
+                  "commit_and_publication_mean_ns": 201758.8566216216,
+                  "apply_mean_ns": 23353.0701635514,
+                  "inverse_mean_ns": 18648.54324766355,
+                  "peak_rss_kib": 798116,
+                  "retained_bytes_per_patch": 98304.0
+                },
+                "receipt": {
+                  "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-c0-original-v1/block-04-0-before.receipt.json",
+                  "bytes": 1270,
+                  "sha256": "0dea776a71f3be7a74ff4c3b7d7a130407b6a10ede6ad4818eb7e08a61ac168d"
+                }
+              },
+              {
+                "name": "block-04-1-after",
+                "counts": [
+                  7400,
+                  3500,
+                  42800
+                ],
+                "output": {
+                  "patches": 7400,
+                  "first_count": 3500,
+                  "replay_count": 42800,
+                  "source_len": 43520,
+                  "target_len": 54784,
+                  "retained_patch_bytes": 113841600,
+                  "retained_payload_bytes": 113664000,
+                  "retained_block_span_bytes": 177600,
+                  "retained_block_span_count": 22200,
+                  "retained_per_patch": 15384,
+                  "first_total_ns": 648814924,
+                  "commit_total_ns": 1285065731,
+                  "apply_total_ns": 724883866,
+                  "inverse_apply_total_ns": 634753913,
+                  "first_total_ms": 648.815,
+                  "commit_total_ms": 1285.066,
+                  "apply_total_ms": 724.884,
+                  "inverse_apply_total_ms": 634.754,
+                  "commit_median_us": 169.83,
+                  "apply_median_us": 16.76,
+                  "inverse_apply_median_us": 14.67,
+                  "first_commit_median_us": 184.141
+                },
+                "spans_ns": {
+                  "first": 648814924,
+                  "steady": 628369150.0,
+                  "apply": 724883866,
+                  "inverse": 634753913
+                },
+                "metrics": {
+                  "first_mean_ns": 185375.69257142858,
+                  "steady_median_ns": 169830.0,
+                  "commit_and_publication_mean_ns": 173657.53121621622,
+                  "apply_mean_ns": 16936.538925233646,
+                  "inverse_mean_ns": 14830.698901869158,
+                  "peak_rss_kib": 123916,
+                  "retained_bytes_per_patch": 15384.0
+                },
+                "receipt": {
+                  "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-c0-original-v1/block-04-1-after.receipt.json",
+                  "bytes": 1261,
+                  "sha256": "16a6b3da4b67586eb57bac7f4832eca20ff03a8eaf96b81c5db73dcc33180b1c"
+                }
+              },
+              {
+                "name": "block-04-2-after",
+                "counts": [
+                  7400,
+                  3500,
+                  42800
+                ],
+                "output": {
+                  "patches": 7400,
+                  "first_count": 3500,
+                  "replay_count": 42800,
+                  "source_len": 43520,
+                  "target_len": 54784,
+                  "retained_patch_bytes": 113841600,
+                  "retained_payload_bytes": 113664000,
+                  "retained_block_span_bytes": 177600,
+                  "retained_block_span_count": 22200,
+                  "retained_per_patch": 15384,
+                  "first_total_ns": 638111818,
+                  "commit_total_ns": 1294280098,
+                  "apply_total_ns": 713057448,
+                  "inverse_apply_total_ns": 643560811,
+                  "first_total_ms": 638.112,
+                  "commit_total_ms": 1294.28,
+                  "apply_total_ms": 713.057,
+                  "inverse_apply_total_ms": 643.561,
+                  "commit_median_us": 170.991,
+                  "apply_median_us": 16.5,
+                  "inverse_apply_median_us": 14.871,
+                  "first_commit_median_us": 181.016
+                },
+                "spans_ns": {
+                  "first": 638111818,
+                  "steady": 632664850.0,
+                  "apply": 713057448,
+                  "inverse": 643560811
+                },
+                "metrics": {
+                  "first_mean_ns": 182317.6622857143,
+                  "steady_median_ns": 170991.0,
+                  "commit_and_publication_mean_ns": 174902.71594594594,
+                  "apply_mean_ns": 16660.220747663552,
+                  "inverse_mean_ns": 15036.467546728973,
+                  "peak_rss_kib": 123688,
+                  "retained_bytes_per_patch": 15384.0
+                },
+                "receipt": {
+                  "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-c0-original-v1/block-04-2-after.receipt.json",
+                  "bytes": 1261,
+                  "sha256": "85f1c544780ce7ddec4ca25c02edb440efb0bccd66491dd8be402f7a87833091"
+                }
+              },
+              {
+                "name": "block-04-3-before",
+                "counts": [
+                  7400,
+                  3500,
+                  42800
+                ],
+                "output": {
+                  "patches": 7400,
+                  "first_count": 3500,
+                  "replay_count": 42800,
+                  "source_len": 43520,
+                  "target_len": 54784,
+                  "retained_patch_bytes": 727449600,
+                  "retained_payload_bytes": 727449600,
+                  "retained_block_span_bytes": 0,
+                  "retained_block_span_count": 0,
+                  "retained_per_patch": 98304,
+                  "first_total_ns": 666811876,
+                  "commit_total_ns": 1480792024,
+                  "apply_total_ns": 1013343578,
+                  "inverse_apply_total_ns": 888363106,
+                  "first_total_ms": 666.812,
+                  "commit_total_ms": 1480.792,
+                  "apply_total_ms": 1013.344,
+                  "inverse_apply_total_ms": 888.363,
+                  "commit_median_us": 193.371,
+                  "apply_median_us": 23.416,
+                  "inverse_apply_median_us": 20.34,
+                  "first_commit_median_us": 188.841
+                },
+                "spans_ns": {
+                  "first": 666811876,
+                  "steady": 715470850.0,
+                  "apply": 1013343578,
+                  "inverse": 888363106
+                },
+                "metrics": {
+                  "first_mean_ns": 190517.67885714286,
+                  "steady_median_ns": 193371.0,
+                  "commit_and_publication_mean_ns": 200107.03027027028,
+                  "apply_mean_ns": 23676.251822429906,
+                  "inverse_mean_ns": 20756.147336448597,
+                  "peak_rss_kib": 798052,
+                  "retained_bytes_per_patch": 98304.0
+                },
+                "receipt": {
+                  "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-c0-original-v1/block-04-3-before.receipt.json",
+                  "bytes": 1270,
+                  "sha256": "009ff232a791f30131d309a5a1e429988060a43b47824d6ea4bd1b99742990b0"
+                }
+              }
+            ]
+          }
+        ],
+        "counts": [
+          7400,
+          3500,
+          42800
+        ],
+        "medians": {
+          "first_mean_ns": 0.955049522139288,
+          "steady_median_ns": 0.881166127509403,
+          "commit_and_publication_mean_ns": 0.8686588247562046,
+          "apply_mean_ns": 0.7376691487690455,
+          "inverse_mean_ns": 0.915338402175019,
+          "peak_rss_kib": 0.1551555615705027,
+          "retained_bytes_per_patch": 0.156494140625
+        }
+      }
+    }
+  ]
+}

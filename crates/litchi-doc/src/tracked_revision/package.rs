@@ -319,7 +319,7 @@ fn main_drawing(dgg_info: &[u8]) -> Result<MainDrawing<'_>> {
         let drawing_bytes = dgg_info
             .get(record_offset..drawing_end)
             .ok_or_else(|| corrupted("OfficeArt drawing extends past DggInfo"))?;
-        let shapes = litchi_odraw::shape::parse(drawing_bytes)
+        let shapes = litchi_odraw::shape::parse(drawing_bytes, Default::default())
             .map_err(|error| corrupted(format!("OfficeArt shapes are invalid: {error}")))?;
         if label == 0 {
             if main

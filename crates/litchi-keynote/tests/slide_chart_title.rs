@@ -32,6 +32,7 @@ fn object(identifier: u64, type_: u32, data: Vec<u8>) -> TestResult<ArchiveObjec
     Ok(ArchiveObject::new(
         identifier,
         vec![RawMessage { type_, data }],
+        Default::default(),
     )?)
 }
 
@@ -134,7 +135,10 @@ fn non_style_payload_state_with_unknown_title_fields(
 }
 
 fn component(objects: Vec<ArchiveObject>) -> TestResult<Vec<u8>> {
-    Ok(SnappyStream::compress(&Archive { objects }.to_bytes()?)?)
+    Ok(SnappyStream::compress(
+        &Archive { objects }.to_bytes(Default::default())?,
+        Default::default(),
+    )?)
 }
 
 fn synthetic_package() -> TestResult<Vec<u8>> {
@@ -212,7 +216,7 @@ fn synthetic_package_with_states(states: [(Option<bool>, Option<&str>); 2]) -> T
 fn synthetic_package_with_unknown_title_fields() -> TestResult<Vec<u8>> {
     let source = synthetic_package()?;
     let mut stream = document_stream(&source)?;
-    let mut archive = Archive::parse(&stream)?;
+    let mut archive = Archive::parse(&stream, Default::default())?;
     let object = archive
         .object_mut(NON_STYLES[0])
         .ok_or_else(|| io::Error::other("missing synthetic chart non-style object"))?;
@@ -222,15 +226,17 @@ fn synthetic_package_with_unknown_title_fields() -> TestResult<Vec<u8>> {
         .find(|message| message.type_ == CHART_NON_STYLE_MESSAGE_TYPE)
         .ok_or_else(|| io::Error::other("missing synthetic chart non-style message"))?;
     message.data = non_style_payload_state_with_unknown_title_fields(Some(true), Some("Revenue"))?;
-    stream = archive.to_bytes()?;
-    let compressed = SnappyStream::compress(&stream)?;
-    Ok(Catalog::from_bytes(&source)?.reassemble_to_bytes(
-        &[litchi_iwa_archive::package::EntryEdit::new(
-            DOCUMENT_MEMBER,
-            &compressed,
-        )],
-        Limits::default(),
-    )?)
+    stream = archive.to_bytes(Default::default())?;
+    let compressed = SnappyStream::compress(&stream, Default::default())?;
+    Ok(
+        Catalog::from_bytes(&source, Default::default())?.reassemble_to_bytes(
+            &[litchi_iwa_archive::package::EntryEdit::new(
+                DOCUMENT_MEMBER,
+                &compressed,
+            )],
+            Limits::default(),
+        )?,
+    )
 }
 
 fn exact_bytes(package: &Package) -> TestResult<Vec<u8>> {
@@ -240,16 +246,16 @@ fn exact_bytes(package: &Package) -> TestResult<Vec<u8>> {
 }
 
 fn document_stream(package: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or_else(|| io::Error::other("missing synthetic document component"))?;
-    Ok(SnappyStream::decompress(entry.data())?.into_bytes())
+    Ok(SnappyStream::decompress(entry.data(), Default::default())?.into_bytes())
 }
 
 fn message_payload(package: &[u8], identifier: u64, type_: u32) -> TestResult<Vec<u8>> {
-    let archive = Archive::parse(&document_stream(package)?)?;
+    let archive = Archive::parse(&document_stream(package)?, Default::default())?;
     let object = archive
         .object(identifier)
         .ok_or_else(|| io::Error::other("missing synthetic object"))?;
@@ -262,8 +268,8 @@ fn message_payload(package: &[u8], identifier: u64, type_: u32) -> TestResult<Ve
 }
 
 fn assert_only_document_payload_changed(before: &[u8], after: &[u8]) -> TestResult<()> {
-    let before_catalog = Catalog::from_bytes(before)?;
-    let after_catalog = Catalog::from_bytes(after)?;
+    let before_catalog = Catalog::from_bytes(before, Default::default())?;
+    let after_catalog = Catalog::from_bytes(after, Default::default())?;
     let mut changed = 0;
     for (before_entry, after_entry) in before_catalog.iter().zip(after_catalog.iter()) {
         assert_eq!(before_entry.name(), after_entry.name());
@@ -604,7 +610,7 @@ fn chart_title_selectors_and_graph_guards_fail_closed() -> TestResult<()> {
 
     let malformed = {
         let mut stream = document_stream(&bytes)?;
-        let mut archive = Archive::parse(&stream)?;
+        let mut archive = Archive::parse(&stream, Default::default())?;
         let object = archive
             .object_mut(CHARTS[0])
             .ok_or_else(|| io::Error::other("missing synthetic chart"))?;
@@ -627,9 +633,9 @@ fn chart_title_selectors_and_graph_guards_fail_closed() -> TestResult<()> {
             litchi_iwa_common::WireLimits::DEFAULT,
         )?;
         message.data = malformed_chart;
-        stream = archive.to_bytes()?;
-        let compressed = SnappyStream::compress(&stream)?;
-        Catalog::from_bytes(&bytes)?.reassemble_to_bytes(
+        stream = archive.to_bytes(Default::default())?;
+        let compressed = SnappyStream::compress(&stream, Default::default())?;
+        Catalog::from_bytes(&bytes, Default::default())?.reassemble_to_bytes(
             &[litchi_iwa_archive::package::EntryEdit::new(
                 DOCUMENT_MEMBER,
                 &compressed,
@@ -650,7 +656,7 @@ fn chart_title_selectors_and_graph_guards_fail_closed() -> TestResult<()> {
 fn chart_title_rejects_shared_title_standin_ownership() -> TestResult<()> {
     let source = synthetic_package()?;
     let mut stream = document_stream(&source)?;
-    let mut archive = Archive::parse(&stream)?;
+    let mut archive = Archive::parse(&stream, Default::default())?;
     let chart = archive
         .object_mut(CHARTS[1])
         .ok_or_else(|| io::Error::other("missing second synthetic chart"))?;
@@ -660,9 +666,9 @@ fn chart_title_rejects_shared_title_standin_ownership() -> TestResult<()> {
         .find(|message| message.type_ == CHART_MESSAGE_TYPE)
         .ok_or_else(|| io::Error::other("missing second synthetic chart message"))?;
     message.data = chart_payload_with_title(1, TITLES[0])?;
-    stream = archive.to_bytes()?;
-    let compressed = SnappyStream::compress(&stream)?;
-    let malformed = Catalog::from_bytes(&source)?.reassemble_to_bytes(
+    stream = archive.to_bytes(Default::default())?;
+    let compressed = SnappyStream::compress(&stream, Default::default())?;
+    let malformed = Catalog::from_bytes(&source, Default::default())?.reassemble_to_bytes(
         &[litchi_iwa_archive::package::EntryEdit::new(
             DOCUMENT_MEMBER,
             &compressed,
@@ -688,7 +694,7 @@ fn chart_title_rejects_shared_title_standin_ownership() -> TestResult<()> {
 fn chart_title_rejects_shared_non_style_ownership() -> TestResult<()> {
     let source = synthetic_package()?;
     let mut stream = document_stream(&source)?;
-    let mut archive = Archive::parse(&stream)?;
+    let mut archive = Archive::parse(&stream, Default::default())?;
     let chart = archive
         .object_mut(CHARTS[1])
         .ok_or_else(|| io::Error::other("missing second synthetic chart"))?;
@@ -698,9 +704,9 @@ fn chart_title_rejects_shared_non_style_ownership() -> TestResult<()> {
         .find(|message| message.type_ == CHART_MESSAGE_TYPE)
         .ok_or_else(|| io::Error::other("missing second synthetic chart message"))?;
     message.data = chart_payload_with_graph(TITLES[1], NON_STYLES[0])?;
-    stream = archive.to_bytes()?;
-    let compressed = SnappyStream::compress(&stream)?;
-    let malformed = Catalog::from_bytes(&source)?.reassemble_to_bytes(
+    stream = archive.to_bytes(Default::default())?;
+    let compressed = SnappyStream::compress(&stream, Default::default())?;
+    let malformed = Catalog::from_bytes(&source, Default::default())?.reassemble_to_bytes(
         &[litchi_iwa_archive::package::EntryEdit::new(
             DOCUMENT_MEMBER,
             &compressed,

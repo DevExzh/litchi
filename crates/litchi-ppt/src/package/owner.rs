@@ -309,6 +309,63 @@ impl Package {
         &self.inner.exact
     }
 
+    /// Check the already-admitted, root-reachable CFB directory for a
+    /// signature component.
+    ///
+    /// Scoped publication only needs the component's presence. Reusing the
+    /// retained directory avoids reparsing the exact bytes for every replay;
+    /// the source fences keep the answer tied to the same positional source
+    /// version as the package bytes. The traversal follows the same reachable
+    /// storage paths as the eager reader, rather than treating an orphaned
+    /// physical directory slot as a signature. When the event budget covers
+    /// the admitted index, the same reachable set is scanned directly (with
+    /// the root entry excluded); tighter budgets use the bounded path walk.
+    pub(crate) fn contains_signature_component(&self) -> Result<bool> {
+        let expected = self.inner.shared.source_version()?;
+        let directory_entry_count = self.inner.shared.directory_entries().count();
+        let maximum = self
+            .inner
+            .source_limits
+            .max_events()
+            .min(directory_entry_count);
+        if self.inner.source_limits.max_events() >= directory_entry_count {
+            let found = self
+                .inner
+                .shared
+                .directory_entries()
+                .filter(|entry| entry.entry_type != litchi_cfb::consts::STGTY_ROOT)
+                .any(|entry| crate::package::codec::is_signature_component(&entry.name));
+            ensure_source_version(&self.inner.shared, expected)?;
+            return Ok(found);
+        }
+        let mut pending = vec![Vec::<String>::new()];
+        let mut discovered = 0usize;
+        let mut found = false;
+        while let Some(path) = pending.pop() {
+            let refs = path.iter().map(String::as_str).collect::<Vec<_>>();
+            let remaining = maximum.saturating_sub(discovered);
+            self.inner
+                .shared
+                .visit_directory_entry_refs(&refs, remaining, |entry| {
+                    discovered = discovered.saturating_add(1);
+                    if crate::package::codec::is_signature_component(&entry.name) {
+                        found = true;
+                    }
+                    if entry.entry_type == litchi_cfb::consts::STGTY_STORAGE {
+                        let mut child = path.clone();
+                        child.push(entry.name.clone());
+                        pending.push(child);
+                    }
+                    Ok::<(), Error>(())
+                })?;
+            if found {
+                break;
+            }
+        }
+        ensure_source_version(&self.inner.shared, expected)?;
+        Ok(found)
+    }
+
     /// Seed the presentation's one-slide shape memo with shapes proven equal
     /// to a parse of slide `persist_id` of this package (record 0264).
     pub(crate) fn seed_slide_shapes(

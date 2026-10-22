@@ -304,7 +304,7 @@ where
     if !styled_creations.is_empty() {
         package.update_archive(chart_archive_name, |archive| {
             for object in styled_creations.drain(..) {
-                archive.insert_object(object)?;
+                archive.insert_object(object, Default::default())?;
             }
             Ok(())
         })?;
@@ -611,6 +611,7 @@ impl ChartSeriesNonStyleSlot {
                     type_: SERIES_NON_STYLE_MESSAGE_TYPE,
                     data,
                 },
+                Default::default(),
             )?;
             Ok(())
         })
@@ -711,6 +712,7 @@ fn patch_chart_series_non_style_references(
                 type_: CHART_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         let references =
             &mut object.archive_info.message_infos[chart_message_index].object_references;
@@ -766,6 +768,7 @@ fn chart_series_non_style_object(identifier: u64, data: Vec<u8>) -> Result<Archi
             type_: SERIES_NON_STYLE_MESSAGE_TYPE,
             data,
         }],
+        Default::default(),
     )?;
     object.archive_info.message_infos[0].versions = STANDARD_MESSAGE_VERSION.to_vec();
     Ok(object)

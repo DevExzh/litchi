@@ -176,7 +176,7 @@ fn assert_focused_name_readback(source: &[u8], label: &str) -> TestResult {
 }
 
 fn member_bytes(source: &[u8]) -> TestResult<BTreeMap<String, Vec<u8>>> {
-    Ok(Catalog::from_bytes(source)?
+    Ok(Catalog::from_bytes(source, Default::default())?
         .iter()
         .map(|entry| (entry.name().to_owned(), entry.data().to_vec()))
         .collect())
@@ -242,12 +242,15 @@ fn rewrite_metadata(
     source: &[u8],
     mutate: impl FnOnce(&mut tsp::PackageMetadata) -> TestResult<()>,
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == METADATA_MEMBER)
         .ok_or("missing Metadata.iwa")?;
-    let mut archive = Archive::parse(SnappyStream::decompress(entry.data())?.as_bytes())?;
+    let mut archive = Archive::parse(
+        SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+        Default::default(),
+    )?;
     let object = archive
         .objects
         .iter_mut()
@@ -271,8 +274,10 @@ fn rewrite_metadata(
             type_: METADATA_MESSAGE_TYPE,
             data: metadata.encode_to_vec(),
         },
+        Default::default(),
     )?;
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(METADATA_MEMBER, compressed.as_slice())],
         ArchiveLimits::default(),
@@ -297,12 +302,15 @@ fn remove_uuid_registration(source: &[u8], identifier: u64) -> TestResult<(Vec<u
 }
 
 fn first_unrelated_uuid(source: &[u8], selected: u64) -> TestResult<u64> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == METADATA_MEMBER)
         .ok_or("missing Metadata.iwa")?;
-    let archive = Archive::parse(SnappyStream::decompress(entry.data())?.as_bytes())?;
+    let archive = Archive::parse(
+        SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+        Default::default(),
+    )?;
     let object = archive
         .objects
         .iter()

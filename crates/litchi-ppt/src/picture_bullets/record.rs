@@ -162,15 +162,15 @@ impl PictureBullet {
             ));
         }
         let blip = if record.kind() == litchi_odraw::RecordKind::Bse {
-            let entry = Entry::parse(record)?;
+            let entry = Entry::parse(record, Default::default())?;
             let context = delay.map_or_else(Context::new, |data| {
-                Context::new().with_delay(Delay::new(data))
+                Context::new().with_delay(Delay::new(data, Default::default()))
             });
             entry.resolve(context)?.ok_or_else(|| {
                 Error::Corrupted("Picture-bullet FBSE is an empty slot".to_string())
             })?
         } else {
-            Blip::from_record(record)?
+            Blip::from_record(record, Default::default())?
         };
         if !picture_type_matches(self.picture_type, blip.kind()) {
             return Err(Error::Corrupted(
@@ -520,9 +520,9 @@ fn validate_officeart_record(
         ));
     }
     let kind = if image_record.kind() == litchi_odraw::RecordKind::Bse {
-        litchi_odraw::image::Entry::parse(image_record)?.kind()?
+        litchi_odraw::image::Entry::parse(image_record, Default::default())?.kind()?
     } else {
-        litchi_odraw::image::Blip::from_record(image_record)?.kind()
+        litchi_odraw::image::Blip::from_record(image_record, Default::default())?.kind()
     };
     if !picture_type_matches(picture_type, kind) {
         return Err(Error::Corrupted(

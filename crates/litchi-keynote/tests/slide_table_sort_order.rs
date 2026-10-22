@@ -94,7 +94,11 @@ fn object(
     data: Vec<u8>,
     references: &[u64],
 ) -> TestResult<ArchiveObject> {
-    let mut object = ArchiveObject::new(identifier, vec![RawMessage { type_, data }])?;
+    let mut object = ArchiveObject::new(
+        identifier,
+        vec![RawMessage { type_, data }],
+        Default::default(),
+    )?;
     object.archive_info.message_infos[0]
         .object_references
         .extend_from_slice(references);
@@ -362,12 +366,16 @@ fn synthetic_package(
     }
     objects.push(object(TITLE_STYLE, 2_022, paragraph_style_payload(), &[])?);
     objects.push(object(SHAPE_STYLE, 2_025, shape_style_payload(), &[])?);
-    let compressed = SnappyStream::compress(&Archive { objects }.to_bytes()?)?;
+    let compressed = SnappyStream::compress(
+        &Archive { objects }.to_bytes(Default::default())?,
+        Default::default(),
+    )?;
     let metadata = SnappyStream::compress(
         &Archive {
             objects: vec![object(METADATA_OBJECT, 11_006, metadata_payload()?, &[])?],
         }
-        .to_bytes()?,
+        .to_bytes(Default::default())?,
+        Default::default(),
     )?;
     Ok(litchi_iwa_archive::package::to_bytes(
         [
@@ -486,13 +494,14 @@ fn append_field_bytes(source: &[u8], field: u32, payload: &[u8]) -> TestResult<V
 }
 
 fn document_archive(package: &[u8]) -> TestResult<Archive> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or("missing document member")?;
     Ok(Archive::parse(
-        SnappyStream::decompress(entry.data())?.as_bytes(),
+        SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+        Default::default(),
     )?)
 }
 
@@ -512,14 +521,18 @@ fn rewrite_document_archive(
     package: &[u8],
     mutate: impl FnOnce(&mut Archive) -> TestResult<()>,
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or("missing document member")?;
-    let mut archive = Archive::parse(SnappyStream::decompress(entry.data())?.as_bytes())?;
+    let mut archive = Archive::parse(
+        SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+        Default::default(),
+    )?;
     mutate(&mut archive)?;
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(DOCUMENT_MEMBER, &compressed)],
         Limits::default(),
@@ -530,12 +543,15 @@ fn rewrite_metadata(
     package: &[u8],
     mutate: impl FnOnce(&mut tsp::PackageMetadata) -> TestResult<()>,
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == METADATA_MEMBER)
         .ok_or("missing metadata member")?;
-    let mut archive = Archive::parse(SnappyStream::decompress(entry.data())?.as_bytes())?;
+    let mut archive = Archive::parse(
+        SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+        Default::default(),
+    )?;
     let object = archive
         .object_mut(METADATA_OBJECT)
         .ok_or("missing metadata object")?;
@@ -553,8 +569,10 @@ fn rewrite_metadata(
             type_: 11_006,
             data: metadata.encode_to_vec(),
         },
+        Default::default(),
     )?;
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(METADATA_MEMBER, &compressed)],
         Limits::default(),
@@ -580,6 +598,7 @@ fn rewrite_model(
                 type_: TABLE_MODEL_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -594,7 +613,11 @@ fn rewrite_slide(
         let message = slide.messages.first().ok_or("missing slide message")?;
         let mut data = message.data.clone();
         mutate(&mut data)?;
-        slide.replace_message_preserving_header(0, RawMessage { type_: 5, data })?;
+        slide.replace_message_preserving_header(
+            0,
+            RawMessage { type_: 5, data },
+            Default::default(),
+        )?;
         Ok(())
     })
 }
@@ -625,12 +648,12 @@ fn rewrite_field_type(
 }
 
 fn rewrite_member(package: &[u8], name: &str, data: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     Ok(catalog.reassemble_to_bytes(&[EntryEdit::new(name, data)], Limits::default())?)
 }
 
 fn legacy_package_bytes(flat: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(flat)?;
+    let catalog = Catalog::from_bytes(flat, Default::default())?;
     let inner_entries = catalog
         .iter()
         .filter(|entry| {
@@ -656,7 +679,7 @@ fn legacy_package_bytes(flat: &[u8]) -> TestResult<Vec<u8>> {
 
 fn package_with_noncanonical_document_prefix(source: &[u8]) -> TestResult<Vec<u8>> {
     let archive = document_archive(source)?;
-    let canonical = archive.to_bytes()?;
+    let canonical = archive.to_bytes(Default::default())?;
     let (header_length, prefix_length) = litchi_iwa_common::decode_varint_from_bytes(&canonical)?;
     if prefix_length != 1 || header_length >= 0x80 {
         return Err("fixture expected a one-byte object prefix".into());
@@ -666,11 +689,11 @@ fn package_with_noncanonical_document_prefix(source: &[u8]) -> TestResult<Vec<u8
     noncanonical.push(u8::try_from(header_length)? | 0x80);
     noncanonical.push(0);
     noncanonical.extend_from_slice(&canonical[prefix_length..]);
-    Archive::parse(&noncanonical)?;
+    Archive::parse(&noncanonical, Default::default())?;
     rewrite_member(
         source,
         DOCUMENT_MEMBER,
-        &SnappyStream::compress(&noncanonical)?,
+        &SnappyStream::compress(&noncanonical, Default::default())?,
     )
 }
 
@@ -765,7 +788,7 @@ fn field_payloads(package: &[u8], field: u32) -> TestResult<Vec<Vec<u8>>> {
 }
 
 fn member_bytes(package: &[u8], name: &str) -> TestResult<Vec<u8>> {
-    Ok(Catalog::from_bytes(package)?
+    Ok(Catalog::from_bytes(package, Default::default())?
         .iter()
         .find(|entry| entry.name() == name)
         .ok_or("missing package member")?
@@ -774,8 +797,8 @@ fn member_bytes(package: &[u8], name: &str) -> TestResult<Vec<u8>> {
 }
 
 fn assert_locality(source: &[u8], target: &[u8]) -> TestResult {
-    let before = Catalog::from_bytes(source)?;
-    let after = Catalog::from_bytes(target)?;
+    let before = Catalog::from_bytes(source, Default::default())?;
+    let after = Catalog::from_bytes(target, Default::default())?;
     let changed = before
         .iter()
         .filter(|entry| {
@@ -1409,13 +1432,14 @@ fn model_graph_alias_and_missing_routes_are_atomic() -> TestResult {
 #[test]
 fn cross_component_model_inbound_is_rejected_without_source_mutation() -> TestResult {
     let source = source_without_sort()?;
-    let catalog = Catalog::from_bytes(&source)?;
+    let catalog = Catalog::from_bytes(&source, Default::default())?;
     let inbound = object(700, 7_000, vec![0x08, 0x01], &[MODELS[0]])?;
     let component = SnappyStream::compress(
         &Archive {
             objects: vec![inbound],
         }
-        .to_bytes()?,
+        .to_bytes(Default::default())?,
+        Default::default(),
     )?;
     let mut members = catalog
         .iter()
@@ -1433,13 +1457,14 @@ fn cross_component_model_inbound_is_rejected_without_source_mutation() -> TestRe
 #[test]
 fn cross_component_data_inbound_is_rejected_without_source_mutation() -> TestResult {
     let source = source_without_sort()?;
-    let catalog = Catalog::from_bytes(&source)?;
+    let catalog = Catalog::from_bytes(&source, Default::default())?;
     let inbound = data_reference_object(700, 7_000, vec![0x08, 0x01], MODELS[0])?;
     let component = SnappyStream::compress(
         &Archive {
             objects: vec![inbound],
         }
-        .to_bytes()?,
+        .to_bytes(Default::default())?,
+        Default::default(),
     )?;
     let mut members = catalog
         .iter()
@@ -1522,10 +1547,13 @@ fn all_known_table_role_aliases_are_rejected_atomically() -> TestResult {
     for role_type in TABLE_ROLE_MESSAGE_TYPES {
         let malformed_model = rewrite_document_archive(&fixture, |archive| {
             let model = archive.object_mut(MODELS[0]).ok_or("missing model")?;
-            model.push_message(RawMessage {
-                type_: role_type,
-                data: vec![0x08, 0x01],
-            })?;
+            model.push_message(
+                RawMessage {
+                    type_: role_type,
+                    data: vec![0x08, 0x01],
+                },
+                Default::default(),
+            )?;
             Ok(())
         })?;
         assert_rejected_atomically(&malformed_model)?;
@@ -1534,10 +1562,13 @@ fn all_known_table_role_aliases_are_rejected_atomically() -> TestResult {
             let table = archive
                 .object_mut(TABLE_INFOS[0])
                 .ok_or("missing table info")?;
-            table.push_message(RawMessage {
-                type_: role_type,
-                data: vec![0x08, 0x01],
-            })?;
+            table.push_message(
+                RawMessage {
+                    type_: role_type,
+                    data: vec![0x08, 0x01],
+                },
+                Default::default(),
+            )?;
             Ok(())
         })?;
         assert_rejected_atomically(&malformed_info)?;
@@ -1552,10 +1583,13 @@ fn role_alias_on_non_table_drawable_is_rejected_atomically() -> TestResult {
         let drawable = archive
             .object_mut(NON_TABLE_DRAWABLE)
             .ok_or("missing non-table drawable")?;
-        drawable.push_message(RawMessage {
-            type_: TABLE_STYLE_MESSAGE_TYPE,
-            data: vec![0x08, 0x01],
-        })?;
+        drawable.push_message(
+            RawMessage {
+                type_: TABLE_STYLE_MESSAGE_TYPE,
+                data: vec![0x08, 0x01],
+            },
+            Default::default(),
+        )?;
         Ok(())
     })?;
     assert_rejected_atomically(&malformed)

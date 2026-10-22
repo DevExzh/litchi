@@ -1105,10 +1105,10 @@ fn mutate_native_comment(source: &[u8], mutation: HostileMutation) -> Option<Vec
         if !entry.name().ends_with(".iwa") {
             continue;
         }
-        let Ok(stream) = SnappyStream::decompress(entry.data()) else {
+        let Ok(stream) = SnappyStream::decompress(entry.data(), Default::default()) else {
             continue;
         };
-        let Ok(archive) = Archive::parse(&stream.into_bytes()) else {
+        let Ok(archive) = Archive::parse(&stream.into_bytes(), Default::default()) else {
             continue;
         };
         for object in &archive.objects {
@@ -1162,8 +1162,8 @@ fn mutate_native_comment(source: &[u8], mutation: HostileMutation) -> Option<Vec
         if entry.name() != component {
             continue;
         }
-        let stream = SnappyStream::decompress(entry.data()).ok()?;
-        let mut archive = Archive::parse(&stream.into_bytes()).ok()?;
+        let stream = SnappyStream::decompress(entry.data(), Default::default()).ok()?;
+        let mut archive = Archive::parse(&stream.into_bytes(), Default::default()).ok()?;
         let object = archive.object_mut(identifier)?;
         let message = object.messages.get_mut(message_index)?;
         let mut payload = message.data.clone();
@@ -1199,7 +1199,7 @@ fn mutate_native_comment(source: &[u8], mutation: HostileMutation) -> Option<Vec
             }
         }
         message.data = payload;
-        replacement = Some(SnappyStream::compress(&archive.to_bytes().ok()?).ok()?);
+        replacement = Some(SnappyStream::compress(&archive.to_bytes().ok()?, Default::default()).ok()?);
         break;
     }
     let replacement = replacement?;
@@ -1229,10 +1229,10 @@ fn mutate_native_comment_header(source: &[u8]) -> Option<Vec<u8>> {
         if !entry.name().ends_with(".iwa") {
             continue;
         }
-        let Ok(stream) = SnappyStream::decompress(entry.data()) else {
+        let Ok(stream) = SnappyStream::decompress(entry.data(), Default::default()) else {
             continue;
         };
-        let Ok(archive) = Archive::parse(&stream.into_bytes()) else {
+        let Ok(archive) = Archive::parse(&stream.into_bytes(), Default::default()) else {
             continue;
         };
         for object in &archive.objects {
@@ -1263,8 +1263,8 @@ fn mutate_native_comment_header(source: &[u8]) -> Option<Vec<u8>> {
         if entry.name() != component {
             continue;
         }
-        let stream = SnappyStream::decompress(entry.data()).ok()?.into_bytes();
-        let archive = Archive::parse(&stream).ok()?;
+        let stream = SnappyStream::decompress(entry.data(), Default::default()).ok()?.into_bytes();
+        let archive = Archive::parse(&stream, Default::default()).ok()?;
         let object = archive.object(identifier)?;
         let header_offset = usize::try_from(object.header_offset).ok()?;
         let data_offset = usize::try_from(object.data_offset).ok()?;
@@ -1286,8 +1286,8 @@ fn mutate_native_comment_header(source: &[u8]) -> Option<Vec<u8>> {
         append_varint(&mut rewritten, u64::try_from(header.len()).ok()?);
         rewritten.extend_from_slice(&header);
         rewritten.extend_from_slice(stream.get(data_offset..)?);
-        Archive::parse(&rewritten).ok()?;
-        replacement = Some(SnappyStream::compress(&rewritten).ok()?);
+        Archive::parse(&rewritten, Default::default()).ok()?;
+        replacement = Some(SnappyStream::compress(&rewritten, Default::default()).ok()?);
         break;
     }
     let replacement = replacement?;

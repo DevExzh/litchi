@@ -64,7 +64,7 @@ fn native_table_model_id(editor: &numbers::Draft) -> TestResult<u64> {
 /// Full semantic construction must inspect the tile and reject this source;
 /// metadata readers must stop after the table model and still return merges.
 fn malformed_native_table_tile(source: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let tile_identifier = find_native_tile_identifier(&catalog)?;
 
     let mut replacement = None;
@@ -72,8 +72,8 @@ fn malformed_native_table_tile(source: &[u8]) -> TestResult<Vec<u8>> {
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
     {
-        let stream = SnappyStream::decompress(entry.data())?;
-        let mut archive = Archive::parse(stream.as_bytes())?;
+        let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+        let mut archive = Archive::parse(stream.as_bytes(), Default::default())?;
         let Some(object) = archive
             .objects
             .iter_mut()
@@ -92,10 +92,12 @@ fn malformed_native_table_tile(source: &[u8]) -> TestResult<Vec<u8>> {
                 type_: TILE_MESSAGE_TYPE,
                 data: vec![0xff],
             },
+            Default::default(),
         )?;
         replacement = Some((
             entry.name().to_owned(),
-            SnappyStream::compress(&archive.to_bytes()?)?.to_vec(),
+            SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?
+                .to_vec(),
         ));
         break;
     }
@@ -114,8 +116,8 @@ fn find_native_tile_identifier(catalog: &Catalog) -> TestResult<u64> {
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
     {
-        let stream = SnappyStream::decompress(entry.data())?;
-        let archive = Archive::parse(stream.as_bytes())?;
+        let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+        let archive = Archive::parse(stream.as_bytes(), Default::default())?;
         for object in &archive.objects {
             for message in &object.messages {
                 if message.type_ != TABLE_MODEL_MESSAGE_TYPE {
@@ -157,15 +159,15 @@ fn undeclared_model_reference_source() -> TestResult<(Vec<u8>, u64)> {
         .id();
     editor.merge_cells(table_id, Region::new(1, 0, 1, 2)?)?;
     let source = editor.to_bytes()?;
-    let catalog = Catalog::from_bytes(&source)?;
+    let catalog = Catalog::from_bytes(&source, Default::default())?;
 
     let mut replacement = None;
     for entry in catalog
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
     {
-        let stream = SnappyStream::decompress(entry.data())?;
-        let mut archive = Archive::parse(stream.as_bytes())?;
+        let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+        let mut archive = Archive::parse(stream.as_bytes(), Default::default())?;
         let mut changed = false;
         for object in &mut archive.objects {
             for (message_index, message) in object.messages.iter().enumerate() {
@@ -191,7 +193,8 @@ fn undeclared_model_reference_source() -> TestResult<(Vec<u8>, u64)> {
         if changed {
             replacement = Some((
                 entry.name().to_owned(),
-                SnappyStream::compress(&archive.to_bytes()?)?.to_vec(),
+                SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?
+                    .to_vec(),
             ));
             break;
         }

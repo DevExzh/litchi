@@ -649,6 +649,7 @@ mod tests {
                             type_: 6_000,
                             data: message.data,
                         },
+                        Default::default(),
                     )
                     .map(|_| ())?;
                 Ok(())
@@ -1517,6 +1518,7 @@ mod tests {
                         type_: message.type_,
                         data,
                     },
+                    Default::default(),
                 )?;
                 Ok(())
             })
@@ -1959,6 +1961,7 @@ mod tests {
                             type_: 6_000,
                             data: message.data,
                         },
+                        Default::default(),
                     )
                     .expect("retag legacy Keynote table model payload");
                 Ok(())
@@ -2209,6 +2212,7 @@ mod tests {
                         type_: message_type,
                         data: owner.encode_to_vec(),
                     },
+                    Default::default(),
                 )?;
                 source_object.archive_info.message_infos[message_index]
                     .object_references
@@ -2244,6 +2248,7 @@ mod tests {
                             type_: message.type_,
                             data: tile.encode_to_vec(),
                         },
+                        Default::default(),
                     )?;
                 }
                 if !found_tiled_host {
@@ -2251,38 +2256,42 @@ mod tests {
                         "Test formula host is absent from its dependency tiles".to_owned(),
                     ));
                 }
-                archive.insert_object(ArchiveObject::new(
-                    range_tile_id,
-                    vec![RawMessage {
-                        type_: 4_010,
-                        data: tsce::RangePrecedentsTileArchive {
-                            to_owner_id: target_owner_id,
-                            from_to_range: vec![
-                                tsce::range_precedents_tile_archive::FromToRangeArchive {
-                                    from_coord: tsce::CellCoordinateArchive {
-                                        column: Some(column),
-                                        row: Some(row),
-                                        ..Default::default()
-                                    },
-                                    refers_to_rect: tsce::CellRectArchive {
-                                        origin: tsce::CellCoordinateArchive {
-                                            column: Some(bounds.left),
-                                            row: Some(bounds.top),
+                archive.insert_object(
+                    ArchiveObject::new(
+                        range_tile_id,
+                        vec![RawMessage {
+                            type_: 4_010,
+                            data: tsce::RangePrecedentsTileArchive {
+                                to_owner_id: target_owner_id,
+                                from_to_range: vec![
+                                    tsce::range_precedents_tile_archive::FromToRangeArchive {
+                                        from_coord: tsce::CellCoordinateArchive {
+                                            column: Some(column),
+                                            row: Some(row),
                                             ..Default::default()
                                         },
-                                        size: tsce::ColumnRowSize {
-                                            num_columns: (bounds.right != bounds.left)
-                                                .then_some(bounds.right - bounds.left + 1),
-                                            num_rows: (bounds.bottom != bounds.top)
-                                                .then_some(bounds.bottom - bounds.top + 1),
+                                        refers_to_rect: tsce::CellRectArchive {
+                                            origin: tsce::CellCoordinateArchive {
+                                                column: Some(bounds.left),
+                                                row: Some(bounds.top),
+                                                ..Default::default()
+                                            },
+                                            size: tsce::ColumnRowSize {
+                                                num_columns: (bounds.right != bounds.left)
+                                                    .then_some(bounds.right - bounds.left + 1),
+                                                num_rows: (bounds.bottom != bounds.top)
+                                                    .then_some(bounds.bottom - bounds.top + 1),
+                                            },
                                         },
                                     },
-                                },
-                            ],
-                        }
-                        .encode_to_vec(),
-                    }],
-                )?)?;
+                                ],
+                            }
+                            .encode_to_vec(),
+                        }],
+                        Default::default(),
+                    )?,
+                    Default::default(),
+                )?;
                 dependency_ids = Some(NativeRangeDependencyIds {
                     source_owner_id: owner.internal_formula_owner_id,
                     external_owner_id: target_owner_id,
@@ -2398,20 +2407,28 @@ mod tests {
                         },
                     }],
                 };
-                archive.insert_object(ArchiveObject::new(
-                    first_object_id,
-                    vec![RawMessage {
-                        type_: 4_008,
-                        data: owner.encode_to_vec(),
-                    }],
-                )?)?;
-                archive.insert_object(ArchiveObject::new(
-                    range_tile_id,
-                    vec![RawMessage {
-                        type_: 4_010,
-                        data: range_tile.encode_to_vec(),
-                    }],
-                )?)?;
+                archive.insert_object(
+                    ArchiveObject::new(
+                        first_object_id,
+                        vec![RawMessage {
+                            type_: 4_008,
+                            data: owner.encode_to_vec(),
+                        }],
+                        Default::default(),
+                    )?,
+                    Default::default(),
+                )?;
+                archive.insert_object(
+                    ArchiveObject::new(
+                        range_tile_id,
+                        vec![RawMessage {
+                            type_: 4_010,
+                            data: range_tile.encode_to_vec(),
+                        }],
+                        Default::default(),
+                    )?,
+                    Default::default(),
+                )?;
                 proxy_ids = Some(NativeMergeRangeProxyIds {
                     object_id: first_object_id,
                     range_tile_id,

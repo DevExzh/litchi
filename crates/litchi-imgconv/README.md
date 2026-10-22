@@ -15,10 +15,10 @@ from the format-neutral OfficeArt crate back to this codec crate.
 
 ```rust
 use litchi_imgconv::{Options, to_png};
-use litchi_odraw::image::Blip;
+use litchi_odraw::image::{Blip, Limits};
 
 fn render(blip_bytes: &[u8]) -> litchi_core::error::Result<Vec<u8>> {
-    let blip = Blip::parse(blip_bytes)
+    let blip = Blip::parse(blip_bytes, Limits::default())
         .map_err(|error| litchi_core::error::Error::ParseError(error.to_string()))?;
     to_png(&blip, Options::default().width(800))
 }

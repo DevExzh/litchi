@@ -216,6 +216,7 @@ fn append_test_sort_order_payload(editor: &mut Draft, payload: &[u8]) {
                     type_: message.type_,
                     data,
                 },
+                Default::default(),
             )?;
             Ok(())
         })
@@ -250,6 +251,7 @@ fn set_test_table_locked(editor: &mut Draft) {
                     type_: message.type_,
                     data: info.encode_to_vec(),
                 },
+                Default::default(),
             )?;
             Ok(())
         })
@@ -398,7 +400,7 @@ fn replace_test_table_model_messages(package: &mut HostPackage, messages: Vec<Ra
                 .iter_mut()
                 .find(|object| object.archive_info.identifier == Some(10))
                 .expect("test table model");
-            *slot = ArchiveObject::new(10, messages)?;
+            *slot = ArchiveObject::new(10, messages, Default::default())?;
             Ok(())
         })
         .unwrap();
@@ -412,7 +414,7 @@ fn replace_test_table_info_messages(package: &mut HostPackage, messages: Vec<Raw
                 .iter_mut()
                 .find(|object| object.archive_info.identifier == Some(3))
                 .expect("test table info");
-            *slot = ArchiveObject::new(3, messages)?;
+            *slot = ArchiveObject::new(3, messages, Default::default())?;
             Ok(())
         })
         .unwrap();
@@ -893,6 +895,7 @@ fn duplicate_and_cross_sheet_drawable_ownership_fail_transactionally() {
                     type_: 2,
                     data: decoded.encode_to_vec(),
                 },
+                Default::default(),
             )?;
             Ok(())
         })
@@ -922,22 +925,27 @@ fn duplicate_and_cross_sheet_drawable_ownership_fail_transactionally() {
                     type_: 1,
                     data: document.encode_to_vec(),
                 },
+                Default::default(),
             )?;
-            archive.insert_object(ArchiveObject::new(
-                60,
-                vec![RawMessage {
-                    type_: 2,
-                    data: tn::SheetArchive {
-                        name: "Second".to_owned(),
-                        drawable_infos: vec![Reference {
-                            identifier: 50,
+            archive.insert_object(
+                ArchiveObject::new(
+                    60,
+                    vec![RawMessage {
+                        type_: 2,
+                        data: tn::SheetArchive {
+                            name: "Second".to_owned(),
+                            drawable_infos: vec![Reference {
+                                identifier: 50,
+                                ..Default::default()
+                            }],
                             ..Default::default()
-                        }],
-                        ..Default::default()
-                    }
-                    .encode_to_vec(),
-                }],
-            )?)?;
+                        }
+                        .encode_to_vec(),
+                    }],
+                    Default::default(),
+                )?,
+                Default::default(),
+            )?;
             Ok(())
         })
         .unwrap();
@@ -1107,18 +1115,23 @@ fn unsupported_sheet_drawable_duplicate_fails_transactionally() {
                     type_: SHEET_ARCHIVE_MESSAGE_TYPE,
                     data: decoded.encode_to_vec(),
                 },
+                Default::default(),
             )?;
-            archive.insert_object(ArchiveObject::new(
-                UNSUPPORTED_DRAWABLE_ID,
-                vec![RawMessage {
-                    type_: SHAPE_INFO_MESSAGE_TYPE,
-                    data: tswp::ShapeInfoArchive {
-                        is_text_box: Some(false),
-                        ..Default::default()
-                    }
-                    .encode_to_vec(),
-                }],
-            )?)?;
+            archive.insert_object(
+                ArchiveObject::new(
+                    UNSUPPORTED_DRAWABLE_ID,
+                    vec![RawMessage {
+                        type_: SHAPE_INFO_MESSAGE_TYPE,
+                        data: tswp::ShapeInfoArchive {
+                            is_text_box: Some(false),
+                            ..Default::default()
+                        }
+                        .encode_to_vec(),
+                    }],
+                    Default::default(),
+                )?,
+                Default::default(),
+            )?;
             Ok(())
         })
         .unwrap();
@@ -1166,6 +1179,7 @@ fn cross_table_dependency_sheet_duplicate_fails_transactionally() {
                     type_: FORMULA_OWNER_MESSAGE_TYPE,
                     data: owner.encode_to_vec(),
                 },
+                Default::default(),
             )?;
             Ok(())
         })
@@ -1197,6 +1211,7 @@ fn malformed_text_box_ownership_and_external_references_fail_transactionally() {
                     type_: 2,
                     data: decoded.encode_to_vec(),
                 },
+                Default::default(),
             )?;
             Ok(())
         })
@@ -1215,11 +1230,12 @@ fn malformed_text_box_ownership_and_external_references_fail_transactionally() {
                     type_: 999,
                     data: Vec::new(),
                 }],
+                Default::default(),
             )?;
             owner.archive_info.message_infos[0]
                 .object_references
                 .push(51);
-            Ok(archive.insert_object(owner)?)
+            Ok(archive.insert_object(owner, Default::default())?)
         })
         .unwrap();
     let mut editor = Draft::from_package(externally_referenced).unwrap();
@@ -1881,6 +1897,7 @@ fn source_created_dimension_storage_uses_neutral_codec_and_preserves_unknowns() 
                 type_: message_type,
                 data: augmented.clone(),
             },
+            Default::default(),
         )?;
         Ok(())
     })?;
@@ -1987,6 +2004,7 @@ fn source_created_dimension_storage_uses_neutral_codec_and_preserves_unknowns() 
                 type_: message_type,
                 data: std::mem::take(&mut duplicate_bucket),
             },
+            Default::default(),
         )?;
         Ok(())
     })?;
@@ -2017,12 +2035,16 @@ fn source_created_dimension_storage_uses_neutral_codec_and_preserves_unknowns() 
                     type_: 6_006,
                     data: replacement,
                 },
+                Default::default(),
             )?;
             if let Some(type_) = alternate_role {
-                object.push_message(RawMessage {
-                    type_,
-                    data: Vec::new(),
-                })?;
+                object.push_message(
+                    RawMessage {
+                        type_,
+                        data: Vec::new(),
+                    },
+                    Default::default(),
+                )?;
             }
             Ok(())
         })
@@ -2071,6 +2093,7 @@ fn source_created_dimension_storage_uses_neutral_codec_and_preserves_unknowns() 
                     type_: message_type,
                     data: model.encode_to_vec(),
                 },
+                Default::default(),
             )?;
             Ok(())
         })
@@ -2141,13 +2164,17 @@ fn source_created_dimension_storage_uses_neutral_codec_and_preserves_unknowns() 
         });
     })?;
     cross_slot.update_archive(&archive_name, |archive| {
-        archive.insert_object(ArchiveObject::new(
-            cross_slot_bucket_id,
-            vec![RawMessage {
-                type_: 6_006,
-                data: augmented.clone(),
-            }],
-        )?)?;
+        archive.insert_object(
+            ArchiveObject::new(
+                cross_slot_bucket_id,
+                vec![RawMessage {
+                    type_: 6_006,
+                    data: augmented.clone(),
+                }],
+                Default::default(),
+            )?,
+            Default::default(),
+        )?;
         Ok(())
     })?;
     assert_dimension_rejected_atomically(cross_slot, Dimension::Row(65_536))?;
@@ -2514,6 +2541,7 @@ fn edit_promotes_a_complete_legacy_tile_mirror_to_bnc() {
                     type_: message_type,
                     data: tile.encode_to_vec(),
                 },
+                Default::default(),
             )?;
             Ok(())
         })
@@ -3048,14 +3076,18 @@ fn empty_native_author_storage_supports_cell_comment_creation() {
     let mut package = test_package();
     package
         .update_archive("Index/Document.iwa", |archive| {
-            Ok(archive.insert_object(ArchiveObject::new(
-                90,
-                vec![RawMessage {
-                    type_: 213,
-                    data: crate::protobuf::tsk::AnnotationAuthorStorageArchive::default()
-                        .encode_to_vec(),
-                }],
-            )?)?)
+            Ok(archive.insert_object(
+                ArchiveObject::new(
+                    90,
+                    vec![RawMessage {
+                        type_: 213,
+                        data: crate::protobuf::tsk::AnnotationAuthorStorageArchive::default()
+                            .encode_to_vec(),
+                    }],
+                    Default::default(),
+                )?,
+                Default::default(),
+            )?)
         })
         .unwrap();
     let mut editor = Draft::from_package(package).unwrap();
@@ -3122,7 +3154,7 @@ fn noncanonical_comment_storage_fails_transactionally() {
             // A second singular text field was accepted by the old generated
             // decoder but is rejected by the strict CommentStorage codec.
             data.extend_from_slice(&[0x0a, 0x03, b'B', b'a', b'd']);
-            object.replace_message(0, RawMessage { type_: 3056, data })?;
+            object.replace_message(0, RawMessage { type_: 3056, data }, Default::default())?;
             Ok(())
         })
         .unwrap();
@@ -3158,6 +3190,7 @@ fn public_reader_applies_tile_row_origins() {
                     type_: model_type,
                     data: model.encode_to_vec(),
                 },
+                Default::default(),
             )?;
 
             let mut cell = BncCell::minimal();
@@ -3173,20 +3206,24 @@ fn public_reader_applies_tile_row_origins() {
                 has_wide_offsets: Some(false),
             };
             rebuild_row(&mut row, &[Some(cell.encode())])?;
-            archive.insert_object(ArchiveObject::new(
-                43,
-                vec![RawMessage {
-                    type_: 6002,
-                    data: Tile {
-                        numrows: 1,
-                        row_infos: vec![row],
-                        storage_version: Some(5),
-                        last_saved_in_bnc: Some(true),
-                        ..Default::default()
-                    }
-                    .encode_to_vec(),
-                }],
-            )?)?;
+            archive.insert_object(
+                ArchiveObject::new(
+                    43,
+                    vec![RawMessage {
+                        type_: 6002,
+                        data: Tile {
+                            numrows: 1,
+                            row_infos: vec![row],
+                            storage_version: Some(5),
+                            last_saved_in_bnc: Some(true),
+                            ..Default::default()
+                        }
+                        .encode_to_vec(),
+                    }],
+                    Default::default(),
+                )?,
+                Default::default(),
+            )?;
             Ok(())
         })
         .unwrap();
@@ -3296,6 +3333,7 @@ fn overwrites_formula_with_tiled_only_app_dependency_storage() {
                     type_: 4008,
                     data: dependencies.encode_to_vec(),
                 },
+                Default::default(),
             )?;
             Ok(())
         })
@@ -3551,6 +3589,7 @@ fn formula_dependency_tiles_use_app_dimensions_and_global_record_coordinates() {
                     type_: message_type,
                     data: model.encode_to_vec(),
                 },
+                Default::default(),
             )?;
             Ok(())
         })
@@ -4954,6 +4993,7 @@ fn duplicates_app_normalized_range_graph_and_removes_it_without_orphans() {
                     type_: message.type_,
                     data,
                 },
+                Default::default(),
             )?;
             owner_object.archive_info.message_infos[0]
                 .object_references
@@ -4992,13 +5032,17 @@ fn duplicates_app_normalized_range_graph_and_removes_it_without_orphans() {
                     },
                 )?;
             }
-            Ok(archive.insert_object(ArchiveObject::new(
-                RANGE_TILE_ID,
-                vec![RawMessage {
-                    type_: RANGE_TILE_MESSAGE_TYPE,
-                    data: tile_data,
-                }],
-            )?)?)
+            Ok(archive.insert_object(
+                ArchiveObject::new(
+                    RANGE_TILE_ID,
+                    vec![RawMessage {
+                        type_: RANGE_TILE_MESSAGE_TYPE,
+                        data: tile_data,
+                    }],
+                    Default::default(),
+                )?,
+                Default::default(),
+            )?)
         })
         .unwrap();
 
@@ -5169,6 +5213,7 @@ fn formula_table_duplicate_rejects_unsupported_dependencies_transactionally() {
                     type_: message.type_,
                     data: owner.encode_to_vec(),
                 },
+                Default::default(),
             )?;
             Ok(())
         })
@@ -5195,7 +5240,7 @@ fn resize_preserves_unknown_wire_and_restores_exact_component() {
                 let object = archive.object_mut(identifier).unwrap();
                 let mut message = object.messages[0].clone();
                 append_unknown_varint(&mut message.data, field_number, 900 + identifier);
-                object.replace_message(0, message)?;
+                object.replace_message(0, message, Default::default())?;
             }
             for (identifier, paths) in [
                 (30, vec![vec![5]]),
@@ -5215,7 +5260,7 @@ fn resize_preserves_unknown_wire_and_restores_exact_component() {
                         },
                     )?;
                 }
-                object.replace_message(0, message)?;
+                object.replace_message(0, message, Default::default())?;
             }
             Ok(())
         })
@@ -5225,7 +5270,7 @@ fn resize_preserves_unknown_wire_and_restores_exact_component() {
         .package()
         .archive("Index/Document.iwa")
         .unwrap()
-        .to_bytes()
+        .to_bytes(Default::default())
         .unwrap();
 
     editor
@@ -5239,7 +5284,7 @@ fn resize_preserves_unknown_wire_and_restores_exact_component() {
             .package()
             .archive("Index/Document.iwa")
             .unwrap()
-            .to_bytes()
+            .to_bytes(Default::default())
             .unwrap(),
         baseline
     );
@@ -5485,6 +5530,7 @@ fn table_cell_border_update_preserves_unknown_sidecar_layer_and_run_fields() {
                     type_: message.type_,
                     data,
                 },
+                Default::default(),
             )?;
 
             let layer = archive.object_mut(50).unwrap();
@@ -5506,6 +5552,7 @@ fn table_cell_border_update_preserves_unknown_sidecar_layer_and_run_fields() {
                         type_: message.type_,
                         data,
                     },
+                    Default::default(),
                 )
                 .map(drop)?)
         })
@@ -5613,6 +5660,7 @@ fn table_row_insertion_splits_crossing_stroke_runs_without_normalizing_unknown_f
                         type_: message.type_,
                         data,
                     },
+                    Default::default(),
                 )
                 .map(|_| ())?)
         })
@@ -5833,6 +5881,7 @@ fn appends_blank_table_row_without_allocating_storage() {
                     type_: message.type_,
                     data: owner.encode_to_vec(),
                 },
+                Default::default(),
             )?;
             Ok(())
         })
@@ -5878,6 +5927,7 @@ fn row_insert_rejects_missing_destination_tile_transactionally() {
                     type_: message.type_,
                     data: model.encode_to_vec(),
                 },
+                Default::default(),
             )?;
             Ok(())
         })
@@ -6002,6 +6052,7 @@ fn row_insert_rewrites_range_ast_and_preserves_unknown_formula_wire() {
                     type_: message.type_,
                     data,
                 },
+                Default::default(),
             )?;
             Ok(())
         })
@@ -6152,6 +6203,7 @@ fn row_insert_expands_footer_aggregate_and_delete_restores_exact_bytes() {
                         type_: message.type_,
                         data,
                     },
+                    Default::default(),
                 )?;
             }
             Ok(())
@@ -6267,6 +6319,7 @@ fn row_insert_roundtrips_app_normalized_footer_range_dependencies() {
                     type_: object.messages[0].type_,
                     data: formulas.encode_to_vec(),
                 },
+                Default::default(),
             )?;
             Ok(())
         })
@@ -6337,6 +6390,7 @@ fn row_insert_roundtrips_app_normalized_footer_range_dependencies() {
                     type_: FORMULA_OWNER_MESSAGE_TYPE,
                     data: owner.encode_to_vec(),
                 },
+                Default::default(),
             )?;
             let tile_object = archive.object_mut(cell_tile_id).unwrap();
             let mut tile =
@@ -6348,37 +6402,42 @@ fn row_insert_roundtrips_app_normalized_footer_range_dependencies() {
                     type_: 4_009,
                     data: tile.encode_to_vec(),
                 },
+                Default::default(),
             )?;
-            archive.insert_object(ArchiveObject::new(
-                RANGE_TILE_ID,
-                vec![RawMessage {
-                    type_: RANGE_TILE_MESSAGE_TYPE,
-                    data: tsce::RangePrecedentsTileArchive {
-                        to_owner_id: internal_owner_id,
-                        from_to_range: vec![
-                            tsce::range_precedents_tile_archive::FromToRangeArchive {
-                                from_coord: tsce::CellCoordinateArchive {
-                                    column: Some(1),
-                                    row: Some(3),
-                                    ..Default::default()
-                                },
-                                refers_to_rect: tsce::CellRectArchive {
-                                    origin: tsce::CellCoordinateArchive {
+            archive.insert_object(
+                ArchiveObject::new(
+                    RANGE_TILE_ID,
+                    vec![RawMessage {
+                        type_: RANGE_TILE_MESSAGE_TYPE,
+                        data: tsce::RangePrecedentsTileArchive {
+                            to_owner_id: internal_owner_id,
+                            from_to_range: vec![
+                                tsce::range_precedents_tile_archive::FromToRangeArchive {
+                                    from_coord: tsce::CellCoordinateArchive {
                                         column: Some(1),
-                                        row: Some(1),
+                                        row: Some(3),
                                         ..Default::default()
                                     },
-                                    size: tsce::ColumnRowSize {
-                                        num_rows: Some(2),
-                                        ..Default::default()
+                                    refers_to_rect: tsce::CellRectArchive {
+                                        origin: tsce::CellCoordinateArchive {
+                                            column: Some(1),
+                                            row: Some(1),
+                                            ..Default::default()
+                                        },
+                                        size: tsce::ColumnRowSize {
+                                            num_rows: Some(2),
+                                            ..Default::default()
+                                        },
                                     },
                                 },
-                            },
-                        ],
-                    }
-                    .encode_to_vec(),
-                }],
-            )?)?;
+                            ],
+                        }
+                        .encode_to_vec(),
+                    }],
+                    Default::default(),
+                )?,
+                Default::default(),
+            )?;
             Ok(())
         })
         .unwrap();
@@ -6407,6 +6466,7 @@ fn row_insert_roundtrips_app_normalized_footer_range_dependencies() {
                         type_: message.type_,
                         data,
                     },
+                    Default::default(),
                 )?;
             }
             Ok(())
@@ -6544,6 +6604,7 @@ fn row_insert_preserves_unknown_tile_header_and_dependency_record_fields() {
                         type_: message.type_,
                         data,
                     },
+                    Default::default(),
                 )?;
             }
             Ok(())
@@ -6572,6 +6633,7 @@ fn row_insert_preserves_unknown_tile_header_and_dependency_record_fields() {
                         type_: message.type_,
                         data,
                     },
+                    Default::default(),
                 )?;
             }
             Ok(())
@@ -6748,6 +6810,7 @@ fn appends_blank_table_column_and_grows_dependency_ranges() {
                     type_: message.type_,
                     data: owner.encode_to_vec(),
                 },
+                Default::default(),
             )?;
             Ok(())
         })
@@ -6822,6 +6885,7 @@ fn column_insert_rejects_short_cell_offset_tables_transactionally() {
                     type_: message.type_,
                     data: tile.encode_to_vec(),
                 },
+                Default::default(),
             )?;
             Ok(())
         })
@@ -6881,6 +6945,7 @@ fn column_insert_preserves_unknown_tile_header_and_dependency_record_fields() {
                         type_: message.type_,
                         data,
                     },
+                    Default::default(),
                 )?;
             }
             Ok(())
@@ -6909,6 +6974,7 @@ fn column_insert_preserves_unknown_tile_header_and_dependency_record_fields() {
                         type_: message.type_,
                         data,
                     },
+                    Default::default(),
                 )?;
             }
             Ok(())
@@ -7445,6 +7511,7 @@ fn focused_package_sort_order_is_typed_transactional_and_native_clear_compatible
                     type_: message.type_,
                     data,
                 },
+                Default::default(),
             )?;
             Ok(())
         })
@@ -7613,6 +7680,7 @@ fn focused_package_sort_order_rejects_duplicate_wire_fields_transactionally() {
                     type_: message.type_,
                     data,
                 },
+                Default::default(),
             )?;
             Ok(())
         })
@@ -7659,6 +7727,7 @@ fn focused_package_sort_order_rejects_malformed_nested_wire_transactionally() {
                     type_: message.type_,
                     data,
                 },
+                Default::default(),
             )?;
             Ok(())
         })
@@ -7724,6 +7793,7 @@ fn focused_compat_sort_order_rejects_duplicate_table_names_transactionally() {
                     type_: message.type_,
                     data: sheet.encode_to_vec(),
                 },
+                Default::default(),
             )?;
             Ok(())
         })
@@ -8451,6 +8521,7 @@ fn table_sort_rejects_missing_plain_text_storage_transactionally() {
                     type_: message.type_,
                     data: strings.encode_to_vec(),
                 },
+                Default::default(),
             )?;
             Ok(())
         })
@@ -8535,8 +8606,9 @@ fn table_string_storage_skips_invalid_root_candidate_without_mutation() {
                     // absent. The following valid candidate must still win.
                     data: vec![0x08, tst::table_data_list::ListType::String as u8],
                 },
+                Default::default(),
             )?;
-            object.push_message(valid)?;
+            object.push_message(valid, Default::default())?;
             Ok(())
         })
         .unwrap();
@@ -8580,22 +8652,27 @@ fn rich_text_payload_count_streams_root_and_segment_entries() {
                     }
                     .encode_to_vec(),
                 },
+                Default::default(),
             )?;
-            archive.insert_object(ArchiveObject::new(
-                60,
-                vec![RawMessage {
-                    type_: 6_011,
-                    data: TableDataListSegment {
-                        list_type: tst::table_data_list::ListType::RichTextPayload as i32,
-                        key_range: crate::protobuf::tsp::Range {
-                            location: 3,
-                            length: 2,
-                        },
-                        entries: vec![rich_text_list_entry(3, 99), rich_text_list_entry(4, 99)],
-                    }
-                    .encode_to_vec(),
-                }],
-            )?)?;
+            archive.insert_object(
+                ArchiveObject::new(
+                    60,
+                    vec![RawMessage {
+                        type_: 6_011,
+                        data: TableDataListSegment {
+                            list_type: tst::table_data_list::ListType::RichTextPayload as i32,
+                            key_range: crate::protobuf::tsp::Range {
+                                location: 3,
+                                length: 2,
+                            },
+                            entries: vec![rich_text_list_entry(3, 99), rich_text_list_entry(4, 99)],
+                        }
+                        .encode_to_vec(),
+                    }],
+                    Default::default(),
+                )?,
+                Default::default(),
+            )?;
             Ok(())
         })
         .unwrap();
@@ -8779,7 +8856,7 @@ fn table_string_storage_later_malformed_segment_fails_without_mutation() {
             // field. The read must publish no staged values on the later
             // malformed field.
             data.push(0x1a);
-            object.replace_message(0, RawMessage { type_: 6_011, data })?;
+            object.replace_message(0, RawMessage { type_: 6_011, data }, Default::default())?;
             Ok(())
         })
         .unwrap();
@@ -9057,24 +9134,29 @@ fn table_sort_moves_rows_across_tile_boundaries() {
                     type_: model_message.type_,
                     data: model.encode_to_vec(),
                 },
+                Default::default(),
             )?;
-            Ok(archive.insert_object(ArchiveObject::new(
-                31,
-                vec![RawMessage {
-                    type_: 6002,
-                    data: Tile {
-                        max_column: 0,
-                        max_row: 3,
-                        num_cells: 0,
-                        numrows: 0,
-                        row_infos: Vec::new(),
-                        storage_version: Some(5),
-                        last_saved_in_bnc: Some(true),
-                        should_use_wide_rows: None,
-                    }
-                    .encode_to_vec(),
-                }],
-            )?)?)
+            Ok(archive.insert_object(
+                ArchiveObject::new(
+                    31,
+                    vec![RawMessage {
+                        type_: 6002,
+                        data: Tile {
+                            max_column: 0,
+                            max_row: 3,
+                            num_cells: 0,
+                            numrows: 0,
+                            row_infos: Vec::new(),
+                            storage_version: Some(5),
+                            last_saved_in_bnc: Some(true),
+                            should_use_wide_rows: None,
+                        }
+                        .encode_to_vec(),
+                    }],
+                    Default::default(),
+                )?,
+                Default::default(),
+            )?)
         })
         .unwrap();
     let mut editor = Draft::from_package(package).unwrap();
@@ -9157,6 +9239,7 @@ fn table_sort_execution_keeps_explicit_border_layers_attached_to_cells() {
                         type_: message.type_,
                         data,
                     },
+                    Default::default(),
                 )?;
             }
             Ok(())
@@ -9505,6 +9588,7 @@ fn sheet_add_remove_preserves_raw_references_and_restores_exact_component() {
                         type_: message.type_,
                         data,
                     },
+                    Default::default(),
                 )
                 .map(|_| ())?)
         })
@@ -9514,7 +9598,7 @@ fn sheet_add_remove_preserves_raw_references_and_restores_exact_component() {
         .package()
         .archive("Index/Document.iwa")
         .unwrap()
-        .to_bytes()
+        .to_bytes(Default::default())
         .unwrap();
 
     let created = editor.add_empty_sheet("Temporary").unwrap();
@@ -9526,7 +9610,7 @@ fn sheet_add_remove_preserves_raw_references_and_restores_exact_component() {
             .package()
             .archive("Index/Document.iwa")
             .unwrap()
-            .to_bytes()
+            .to_bytes(Default::default())
             .unwrap(),
         baseline
     );
@@ -9800,7 +9884,7 @@ fn form_sheet_table_create_delete_restores_unknown_reference_bytes() {
             })?;
             append_unknown_varint(&mut data, 99, 990);
             Ok(object
-                .replace_message(0, RawMessage { type_: 3, data })
+                .replace_message(0, RawMessage { type_: 3, data }, Default::default())
                 .map(|_| ())?)
         })
         .unwrap();
@@ -9809,7 +9893,7 @@ fn form_sheet_table_create_delete_restores_unknown_reference_bytes() {
         .package()
         .archive("Index/Document.iwa")
         .unwrap()
-        .to_bytes()
+        .to_bytes(Default::default())
         .unwrap();
     let baseline_entries = editor
         .package()
@@ -9828,7 +9912,7 @@ fn form_sheet_table_create_delete_restores_unknown_reference_bytes() {
             .package()
             .archive("Index/Document.iwa")
             .unwrap()
-            .to_bytes()
+            .to_bytes(Default::default())
             .unwrap(),
         baseline
     );
@@ -9892,20 +9976,25 @@ fn package_with_string_segments(
                     type_: 6005,
                     data: list.encode_to_vec(),
                 },
+                Default::default(),
             )?;
             for (identifier, list_type, key_range, entries) in segment_specs {
-                archive.insert_object(ArchiveObject::new(
-                    identifier,
-                    vec![RawMessage {
-                        type_: 6_011,
-                        data: TableDataListSegment {
-                            list_type,
-                            key_range,
-                            entries,
-                        }
-                        .encode_to_vec(),
-                    }],
-                )?)?;
+                archive.insert_object(
+                    ArchiveObject::new(
+                        identifier,
+                        vec![RawMessage {
+                            type_: 6_011,
+                            data: TableDataListSegment {
+                                list_type,
+                                key_range,
+                                entries,
+                            }
+                            .encode_to_vec(),
+                        }],
+                        Default::default(),
+                    )?,
+                    Default::default(),
+                )?;
             }
             Ok(())
         })
@@ -9946,6 +10035,7 @@ fn move_table_data_list_entries_to_segment(
                         type_: message_type,
                         data: list.encode_to_vec(),
                     },
+                    Default::default(),
                 )?;
                 for reference in &references {
                     remove_message_object_reference(object, message_index, *reference);
@@ -9967,11 +10057,12 @@ fn move_table_data_list_entries_to_segment(
                     }
                     .encode_to_vec(),
                 }],
+                Default::default(),
             )?;
             segment_object.archive_info.message_infos[0]
                 .object_references
                 .extend(references);
-            Ok(archive.insert_object(segment_object)?)
+            Ok(archive.insert_object(segment_object, Default::default())?)
         })
         .unwrap();
 }
@@ -9993,6 +10084,7 @@ fn test_package_with_formula_error() -> HostPackage {
                     type_: model_type,
                     data: model.encode_to_vec(),
                 },
+                Default::default(),
             )?;
             model_object.archive_info.message_infos[0]
                 .object_references
@@ -10010,13 +10102,17 @@ fn test_package_with_formula_error() -> HostPackage {
                 segments: Vec::new(),
                 is_new_for_bnc: Some(true),
             };
-            archive.insert_object(ArchiveObject::new(
-                22,
-                vec![RawMessage {
-                    type_: 6005,
-                    data: errors.encode_to_vec(),
-                }],
-            )?)?;
+            archive.insert_object(
+                ArchiveObject::new(
+                    22,
+                    vec![RawMessage {
+                        type_: 6005,
+                        data: errors.encode_to_vec(),
+                    }],
+                    Default::default(),
+                )?,
+                Default::default(),
+            )?;
 
             let tile_object = archive.object_mut(30).unwrap();
             let tile_type = tile_object.messages[0].type_;
@@ -10034,6 +10130,7 @@ fn test_package_with_formula_error() -> HostPackage {
                     type_: tile_type,
                     data: tile.encode_to_vec(),
                 },
+                Default::default(),
             )?;
             Ok(())
         })
@@ -10058,6 +10155,7 @@ fn test_package_with_comments(shared: bool) -> HostPackage {
                     type_: model_type,
                     data: model.encode_to_vec(),
                 },
+                Default::default(),
             )?;
             model_object.archive_info.message_infos[0]
                 .object_references
@@ -10083,6 +10181,7 @@ fn test_package_with_comments(shared: bool) -> HostPackage {
                     type_: tile_type,
                     data: tile.encode_to_vec(),
                 },
+                Default::default(),
             )?;
 
             let list = TableDataList {
@@ -10106,49 +10205,58 @@ fn test_package_with_comments(shared: bool) -> HostPackage {
                     type_: 6005,
                     data: list.encode_to_vec(),
                 }],
+                Default::default(),
             )?;
             list_object.archive_info.message_infos[0]
                 .object_references
                 .push(61);
-            archive.insert_object(list_object)?;
-            archive.insert_object(ArchiveObject::new(
-                61,
-                vec![RawMessage {
-                    type_: 3056,
-                    data: tsd::CommentStorageArchive {
-                        text: Some("Original comment".to_owned()),
-                        creation_date: Some(crate::protobuf::tsp::Date { seconds: 123.5 }),
-                        replies: vec![Reference {
-                            identifier: 70,
+            archive.insert_object(list_object, Default::default())?;
+            archive.insert_object(
+                ArchiveObject::new(
+                    61,
+                    vec![RawMessage {
+                        type_: 3056,
+                        data: tsd::CommentStorageArchive {
+                            text: Some("Original comment".to_owned()),
+                            creation_date: Some(crate::protobuf::tsp::Date { seconds: 123.5 }),
+                            replies: vec![Reference {
+                                identifier: 70,
+                                ..Default::default()
+                            }],
+                            storage_uuid: Some(crate::protobuf::tsp::Uuid {
+                                lower: 61,
+                                upper: 62,
+                            }),
                             ..Default::default()
-                        }],
-                        storage_uuid: Some(crate::protobuf::tsp::Uuid {
-                            lower: 61,
-                            upper: 62,
-                        }),
-                        ..Default::default()
-                    }
-                    .encode_to_vec(),
-                }],
-            )?)?;
+                        }
+                        .encode_to_vec(),
+                    }],
+                    Default::default(),
+                )?,
+                Default::default(),
+            )?;
             archive.object_mut(61).unwrap().archive_info.message_infos[0]
                 .object_references
                 .push(70);
-            archive.insert_object(ArchiveObject::new(
-                70,
-                vec![RawMessage {
-                    type_: 3056,
-                    data: tsd::CommentStorageArchive {
-                        text: Some("Reply".to_owned()),
-                        storage_uuid: Some(crate::protobuf::tsp::Uuid {
-                            lower: 70,
-                            upper: 71,
-                        }),
-                        ..Default::default()
-                    }
-                    .encode_to_vec(),
-                }],
-            )?)?;
+            archive.insert_object(
+                ArchiveObject::new(
+                    70,
+                    vec![RawMessage {
+                        type_: 3056,
+                        data: tsd::CommentStorageArchive {
+                            text: Some("Reply".to_owned()),
+                            storage_uuid: Some(crate::protobuf::tsp::Uuid {
+                                lower: 70,
+                                upper: 71,
+                            }),
+                            ..Default::default()
+                        }
+                        .encode_to_vec(),
+                    }],
+                    Default::default(),
+                )?,
+                Default::default(),
+            )?;
             Ok(())
         })
         .unwrap();
@@ -10163,7 +10271,7 @@ fn add_unknown_comment_storage_field(package: &mut HostPackage, storage_id: u64)
             let object = archive.object_mut(storage_id).unwrap();
             let mut data = object.messages[0].data.clone();
             data.extend_from_slice(&unknown);
-            object.replace_message(0, RawMessage { type_: 3056, data })?;
+            object.replace_message(0, RawMessage { type_: 3056, data }, Default::default())?;
             Ok(())
         })
         .unwrap();
@@ -10201,6 +10309,7 @@ fn test_package_with_text_box() -> HostPackage {
                     type_: 2,
                     data: decoded.encode_to_vec(),
                 },
+                Default::default(),
             )?;
             sheet.archive_info.message_infos[0]
                 .object_references
@@ -10253,30 +10362,39 @@ fn test_package_with_text_box() -> HostPackage {
                     type_: SHAPE_INFO_MESSAGE_TYPE,
                     data: shape.encode_to_vec(),
                 }],
+                Default::default(),
             )?;
             shape_object.archive_info.message_infos[0].object_references = vec![2, 51, 52, 53];
-            archive.insert_object(shape_object)?;
+            archive.insert_object(shape_object, Default::default())?;
             for identifier in [51, 52] {
-                archive.insert_object(ArchiveObject::new(
-                    identifier,
-                    vec![RawMessage {
-                        type_: STANDIN_CAPTION_MESSAGE_TYPE,
-                        data: Vec::new(),
-                    }],
-                )?)?;
+                archive.insert_object(
+                    ArchiveObject::new(
+                        identifier,
+                        vec![RawMessage {
+                            type_: STANDIN_CAPTION_MESSAGE_TYPE,
+                            data: Vec::new(),
+                        }],
+                        Default::default(),
+                    )?,
+                    Default::default(),
+                )?;
             }
-            archive.insert_object(ArchiveObject::new(
-                53,
-                vec![RawMessage {
-                    type_: 2_001,
-                    data: tswp::StorageArchive {
-                        text: vec!["Source".to_owned()],
-                        in_document: Some(true),
-                        ..Default::default()
-                    }
-                    .encode_to_vec(),
-                }],
-            )?)?;
+            archive.insert_object(
+                ArchiveObject::new(
+                    53,
+                    vec![RawMessage {
+                        type_: 2_001,
+                        data: tswp::StorageArchive {
+                            text: vec!["Source".to_owned()],
+                            in_document: Some(true),
+                            ..Default::default()
+                        }
+                        .encode_to_vec(),
+                    }],
+                    Default::default(),
+                )?,
+                Default::default(),
+            )?;
             Ok(())
         })
         .unwrap();
@@ -10289,7 +10407,7 @@ fn replace_test_text_storage_messages(package: &mut HostPackage, messages: Vec<R
             let object = archive.object_mut(53).ok_or_else(|| {
                 Error::InvalidFormat("test text storage object is missing".to_owned())
             })?;
-            *object = ArchiveObject::new(53, messages)?;
+            *object = ArchiveObject::new(53, messages, Default::default())?;
             Ok(())
         })
         .unwrap();
@@ -10391,14 +10509,17 @@ fn numbers_text_storage_projection_rejects_duplicate_writable_candidates() {
             archive
                 .object_mut(53)
                 .ok_or_else(|| Error::InvalidFormat("test text storage is missing".to_owned()))?
-                .push_message(RawMessage {
-                    type_: 2_022,
-                    data: tswp::StorageArchive {
-                        text: vec!["Second".to_owned()],
-                        ..Default::default()
-                    }
-                    .encode_to_vec(),
-                })?;
+                .push_message(
+                    RawMessage {
+                        type_: 2_022,
+                        data: tswp::StorageArchive {
+                            text: vec!["Second".to_owned()],
+                            ..Default::default()
+                        }
+                        .encode_to_vec(),
+                    },
+                    Default::default(),
+                )?;
             Ok(())
         })
         .unwrap();
@@ -10460,7 +10581,7 @@ fn numbers_text_storage_info_uses_bounded_text_wire_projection() {
         .and_then(|(_, rest)| rest.split_once("    fn text_box_graph_current"))
         .map(|(body, _)| body)
         .expect("text storage info source boundary is present");
-    assert!(body.contains("decode_storage_with_limits"));
+    assert!(body.contains("decode_storage"));
     assert!(!body.contains("StorageArchive::decode"));
     assert!(!body.contains("storage.text.concat"));
 }
@@ -10486,7 +10607,7 @@ fn numbers_object_catalog_rejects_later_duplicate_ids_and_malformed_archives() {
     );
 
     let mut malformed = test_package_with_text_box();
-    let compressed = crate::snappy::SnappyStream::compress(&[0x80]).unwrap();
+    let compressed = crate::snappy::SnappyStream::compress(&[0x80], Default::default()).unwrap();
     malformed
         .insert_entry("Index/Later.iwa", compressed)
         .unwrap();
@@ -10556,6 +10677,7 @@ fn test_package_with_text_box_metadata() -> HostPackage {
                             type_: PACKAGE_METADATA_MESSAGE_TYPE,
                             data: metadata.encode_to_vec(),
                         }],
+                        Default::default(),
                     )
                     .unwrap(),
                 ],
@@ -10612,32 +10734,37 @@ fn add_test_stroke_layer(
                         type_: message.type_,
                         data: payload.encode_to_vec(),
                     },
+                    Default::default(),
                 )?;
                 sidecar.archive_info.message_infos[message_index]
                     .object_references
                     .push(identifier);
             }
-            Ok(archive.insert_object(ArchiveObject::new(
-                identifier,
-                vec![RawMessage {
-                    type_: STROKE_LAYER_MESSAGE_TYPE,
-                    data: tst::StrokeLayerArchive {
-                        row_column_index: Some(row_column_index),
-                        stroke_runs: runs
-                            .iter()
-                            .map(
-                                |&(origin, length)| tst::stroke_layer_archive::StrokeRunArchive {
-                                    origin: Some(origin),
-                                    length: Some(length),
-                                    order: Some(1),
-                                    ..Default::default()
-                                },
-                            )
-                            .collect(),
-                    }
-                    .encode_to_vec(),
-                }],
-            )?)?)
+            Ok(archive.insert_object(
+                ArchiveObject::new(
+                    identifier,
+                    vec![RawMessage {
+                        type_: STROKE_LAYER_MESSAGE_TYPE,
+                        data: tst::StrokeLayerArchive {
+                            row_column_index: Some(row_column_index),
+                            stroke_runs: runs
+                                .iter()
+                                .map(|&(origin, length)| {
+                                    tst::stroke_layer_archive::StrokeRunArchive {
+                                        origin: Some(origin),
+                                        length: Some(length),
+                                        order: Some(1),
+                                        ..Default::default()
+                                    }
+                                })
+                                .collect(),
+                        }
+                        .encode_to_vec(),
+                    }],
+                    Default::default(),
+                )?,
+                Default::default(),
+            )?)
         })
         .unwrap();
 }
@@ -10689,6 +10816,7 @@ fn add_test_conditional_style_storage(package: &mut HostPackage, has_entries: bo
                     type_: message.type_,
                     data: model.encode_to_vec(),
                 },
+                Default::default(),
             )?;
 
             let entries = has_entries
@@ -10703,32 +10831,40 @@ fn add_test_conditional_style_storage(package: &mut HostPackage, has_entries: bo
                 })
                 .into_iter()
                 .collect();
-            archive.insert_object(ArchiveObject::new(
-                CONDITIONAL_STYLE_TABLE_ID,
-                vec![RawMessage {
-                    type_: 6_005,
-                    data: TableDataList {
-                        list_type: tst::table_data_list::ListType::ConditionalStyle as i32,
-                        next_list_id: if has_entries { 2 } else { 1 },
-                        entries,
-                        segments: Vec::new(),
-                        is_new_for_bnc: Some(true),
-                    }
-                    .encode_to_vec(),
-                }],
-            )?)?;
-            if has_entries {
-                archive.insert_object(ArchiveObject::new(
-                    CONDITIONAL_STYLE_SET_ID,
+            archive.insert_object(
+                ArchiveObject::new(
+                    CONDITIONAL_STYLE_TABLE_ID,
                     vec![RawMessage {
-                        type_: 6_010,
-                        data: tst::ConditionalStyleSetArchive {
-                            rule_count: 1,
-                            ..Default::default()
+                        type_: 6_005,
+                        data: TableDataList {
+                            list_type: tst::table_data_list::ListType::ConditionalStyle as i32,
+                            next_list_id: if has_entries { 2 } else { 1 },
+                            entries,
+                            segments: Vec::new(),
+                            is_new_for_bnc: Some(true),
                         }
                         .encode_to_vec(),
                     }],
-                )?)?;
+                    Default::default(),
+                )?,
+                Default::default(),
+            )?;
+            if has_entries {
+                archive.insert_object(
+                    ArchiveObject::new(
+                        CONDITIONAL_STYLE_SET_ID,
+                        vec![RawMessage {
+                            type_: 6_010,
+                            data: tst::ConditionalStyleSetArchive {
+                                rule_count: 1,
+                                ..Default::default()
+                            }
+                            .encode_to_vec(),
+                        }],
+                        Default::default(),
+                    )?,
+                    Default::default(),
+                )?;
             }
             Ok(())
         })
@@ -10759,6 +10895,7 @@ fn add_test_app_native_topology_allocations(package: &mut HostPackage) {
                         type_: message.type_,
                         data: model.encode_to_vec(),
                     },
+                    Default::default(),
                 )
                 .map(|_| ())?)
         })
@@ -10791,6 +10928,7 @@ fn add_test_spill_dependency(package: &mut HostPackage) {
                         type_: message.type_,
                         data: owner.encode_to_vec(),
                     },
+                    Default::default(),
                 )
                 .map(|_| ())?)
         })
@@ -10937,6 +11075,7 @@ fn test_package() -> HostPackage {
                 type_: message_type,
                 data,
             }],
+            Default::default(),
         )
         .unwrap()
     };
@@ -11040,6 +11179,7 @@ fn test_package_with_calculation_engine() -> HostPackage {
                     type_: 4000,
                     data: engine.encode_to_vec(),
                 }],
+                Default::default(),
             )
             .unwrap(),
             ArchiveObject::new(
@@ -11048,6 +11188,7 @@ fn test_package_with_calculation_engine() -> HostPackage {
                     type_: 4008,
                     data: owner.encode_to_vec(),
                 }],
+                Default::default(),
             )
             .unwrap(),
         ],
@@ -11078,6 +11219,7 @@ fn test_package_with_column_headers_and_engine() -> HostPackage {
                     type_: message.type_,
                     data: model.encode_to_vec(),
                 },
+                Default::default(),
             )?;
             let headers = tst::HeaderStorageBucket {
                 bucket_hash_function: 1,
@@ -11092,13 +11234,17 @@ fn test_package_with_column_headers_and_engine() -> HostPackage {
                     })
                     .collect(),
             };
-            archive.insert_object(ArchiveObject::new(
-                43,
-                vec![RawMessage {
-                    type_: 6004,
-                    data: headers.encode_to_vec(),
-                }],
-            )?)?;
+            archive.insert_object(
+                ArchiveObject::new(
+                    43,
+                    vec![RawMessage {
+                        type_: 6004,
+                        data: headers.encode_to_vec(),
+                    }],
+                    Default::default(),
+                )?,
+                Default::default(),
+            )?;
             Ok(())
         })
         .unwrap();
@@ -11122,33 +11268,42 @@ fn test_package_with_cross_table_engine() -> HostPackage {
                     type_: sheet_type,
                     data: sheet_archive.encode_to_vec(),
                 },
+                Default::default(),
             )?;
 
             let mut target =
                 TableModelArchive::decode(archive.object(10).unwrap().messages[0].data.as_slice())?;
             target.table_id = "BD57CADC-10F6-658A-E24E-294B3170BBD8".to_owned();
             target.table_name = "Target".to_owned();
-            archive.insert_object(ArchiveObject::new(
-                4,
-                vec![RawMessage {
-                    type_: 6003,
-                    data: tst::TableInfoArchive {
-                        table_model: Reference {
-                            identifier: 11,
+            archive.insert_object(
+                ArchiveObject::new(
+                    4,
+                    vec![RawMessage {
+                        type_: 6003,
+                        data: tst::TableInfoArchive {
+                            table_model: Reference {
+                                identifier: 11,
+                                ..Default::default()
+                            },
                             ..Default::default()
-                        },
-                        ..Default::default()
-                    }
-                    .encode_to_vec(),
-                }],
-            )?)?;
-            archive.insert_object(ArchiveObject::new(
-                11,
-                vec![RawMessage {
-                    type_: 6000,
-                    data: target.encode_to_vec(),
-                }],
-            )?)?;
+                        }
+                        .encode_to_vec(),
+                    }],
+                    Default::default(),
+                )?,
+                Default::default(),
+            )?;
+            archive.insert_object(
+                ArchiveObject::new(
+                    11,
+                    vec![RawMessage {
+                        type_: 6000,
+                        data: target.encode_to_vec(),
+                    }],
+                    Default::default(),
+                )?,
+                Default::default(),
+            )?;
             Ok(())
         })
         .unwrap();
@@ -11171,16 +11326,17 @@ fn test_package_with_cross_table_engine() -> HostPackage {
                     type_: root_type,
                     data: engine.encode_to_vec(),
                 },
+                Default::default(),
             )?;
             root.archive_info.message_infos[0]
                 .object_references
                 .push(102);
-            archive.insert_object(ArchiveObject::new(
-                102,
-                vec![RawMessage {
-                    type_: 4008,
-                    data:
-                        tsce::FormulaOwnerDependenciesArchive {
+            archive.insert_object(
+                ArchiveObject::new(
+                    102,
+                    vec![RawMessage {
+                        type_: 4008,
+                        data: tsce::FormulaOwnerDependenciesArchive {
                             formula_owner_uid: crate::protobuf::tsp::Uuid {
                                 upper: 0xbd57_cadc_10f6_658a,
                                 lower: 0xe24e_294b_3170_bbd8,
@@ -11200,8 +11356,11 @@ fn test_package_with_cross_table_engine() -> HostPackage {
                             ..Default::default()
                         }
                         .encode_to_vec(),
-                }],
-            )?)?;
+                    }],
+                    Default::default(),
+                )?,
+                Default::default(),
+            )?;
             Ok(())
         })
         .unwrap();
@@ -11224,21 +11383,26 @@ fn two_sheet_package() -> HostPackage {
                     type_: 1,
                     data: document.encode_to_vec(),
                 },
+                Default::default(),
             )?;
             let info = &mut root.archive_info.message_infos[0];
             info.object_references.push(50);
             info.field_infos[0].object_references.push(50);
-            archive.insert_object(ArchiveObject::new(
-                50,
-                vec![RawMessage {
-                    type_: 2,
-                    data: tn::SheetArchive {
-                        name: "Second".to_owned(),
-                        ..Default::default()
-                    }
-                    .encode_to_vec(),
-                }],
-            )?)?;
+            archive.insert_object(
+                ArchiveObject::new(
+                    50,
+                    vec![RawMessage {
+                        type_: 2,
+                        data: tn::SheetArchive {
+                            name: "Second".to_owned(),
+                            ..Default::default()
+                        }
+                        .encode_to_vec(),
+                    }],
+                    Default::default(),
+                )?,
+                Default::default(),
+            )?;
             Ok(())
         })
         .unwrap();

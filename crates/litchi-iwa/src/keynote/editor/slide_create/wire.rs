@@ -98,6 +98,7 @@ pub(super) fn insert_slide_node(
                 type_: message_type,
                 data,
             },
+            Default::default(),
         )?;
         let info = &mut object.archive_info.message_infos[message_index];
         if !info.object_references.contains(&node_id) {
@@ -356,6 +357,7 @@ pub(super) fn materialize_slide_object(
             type_: SLIDE_MESSAGE_TYPE,
             data,
         },
+        Default::default(),
     )?;
     let info = &mut object.archive_info.message_infos[message_index];
     info.object_references
@@ -411,6 +413,7 @@ pub(super) fn clear_user_guides(archive: &mut Archive, guide_storage_id: u64) ->
             type_: GUIDE_STORAGE_MESSAGE_TYPE,
             data,
         },
+        Default::default(),
     )?;
     Ok(())
 }
@@ -518,6 +521,7 @@ pub(super) fn prepare_slide_number(
             type_: message_type,
             data,
         },
+        Default::default(),
     )?;
     let info = &mut storage.archive_info.message_infos[message_index];
     if !info.object_references.contains(&attachment_id) {
@@ -536,6 +540,7 @@ pub(super) fn prepare_slide_number(
             }
             .encode_to_vec(),
         }],
+        Default::default(),
     )?;
     attachment.archive_info.message_infos[0].versions = IWORK_MESSAGE_VERSIONS.to_vec();
     Ok(Some(attachment))

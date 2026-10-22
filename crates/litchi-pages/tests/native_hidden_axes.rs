@@ -90,14 +90,14 @@ struct SelectedComponent {
 }
 
 fn selected_component(source: &[u8]) -> TestResult<SelectedComponent> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let mut candidates = Vec::new();
     for entry in catalog
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
     {
-        let decompressed = SnappyStream::decompress(entry.data())?;
-        let archive = Archive::parse(decompressed.as_bytes())?;
+        let decompressed = SnappyStream::decompress(entry.data(), Default::default())?;
+        let archive = Archive::parse(decompressed.as_bytes(), Default::default())?;
         let info_ids = archive
             .objects
             .iter()
@@ -141,7 +141,7 @@ fn selected_component(source: &[u8]) -> TestResult<SelectedComponent> {
 }
 
 fn unselected_entries(source: &[u8], selected_component: &str) -> TestResult<Vec<EntrySnapshot>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let mut entries = catalog
         .iter()
         .filter(|entry| entry.name() != selected_component && !PREVIEWS.contains(&entry.name()))
@@ -157,13 +157,13 @@ fn unselected_entries(source: &[u8], selected_component: &str) -> TestResult<Vec
 }
 
 fn archive_for_member(source: &[u8], member: &str) -> TestResult<Archive> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == member)
         .ok_or_else(|| io::Error::other(format!("missing selected member {member}")))?;
-    let decompressed = SnappyStream::decompress(entry.data())?;
-    Ok(Archive::parse(decompressed.as_bytes())?)
+    let decompressed = SnappyStream::decompress(entry.data(), Default::default())?;
+    Ok(Archive::parse(decompressed.as_bytes(), Default::default())?)
 }
 
 fn assert_selected_member_locality(
@@ -205,14 +205,14 @@ struct DependencySnapshot {
 }
 
 fn dependency_objects(source: &[u8]) -> TestResult<Vec<DependencySnapshot>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let mut dependencies = Vec::new();
     for entry in catalog
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
     {
-        let decompressed = SnappyStream::decompress(entry.data())?;
-        let archive = Archive::parse(decompressed.as_bytes())?;
+        let decompressed = SnappyStream::decompress(entry.data(), Default::default())?;
+        let archive = Archive::parse(decompressed.as_bytes(), Default::default())?;
         for object in archive.objects {
             let Some(message_type) = object.primary_message_type() else {
                 continue;
@@ -271,7 +271,7 @@ fn assert_dependencies_preserved(before: &[DependencySnapshot], after: &[Depende
 
 fn without_previews(source: &[u8]) -> TestResult<Vec<u8>> {
     Ok(
-        Catalog::from_bytes(source)?.reassemble_with_deletions_to_bytes(
+        Catalog::from_bytes(source, Default::default())?.reassemble_with_deletions_to_bytes(
             &[],
             &PREVIEWS,
             Limits::default(),
@@ -446,12 +446,12 @@ fn native_hidden_axes_preserve_dependencies_locality_and_conflict_fences() -> Te
     assert_dependencies_preserved(&before_dependencies, &after_dependencies);
     assert_eq!(commit.diagnostics().touched_components(), 1);
     assert_eq!(commit.diagnostics().deleted_previews(), PREVIEWS.len());
-    let catalog = Catalog::from_bytes(&target)?;
+    let catalog = Catalog::from_bytes(&target, Default::default())?;
     for preview in PREVIEWS {
         assert!(catalog.iter().all(|entry| entry.name() != preview));
     }
 
-    let tampered_source = Catalog::from_bytes(&source)?.reassemble_to_bytes(
+    let tampered_source = Catalog::from_bytes(&source, Default::default())?.reassemble_to_bytes(
         &[EntryEdit::new("preview.jpg", b"tampered-preview")],
         Limits::default(),
     )?;

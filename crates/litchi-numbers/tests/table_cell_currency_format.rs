@@ -90,8 +90,8 @@ fn secondary_source() -> TestResult<Vec<u8>> {
 }
 
 fn assert_exact_locality(source: &[u8], target: &[u8]) -> TestResult {
-    let before = Catalog::from_bytes(source)?;
-    let after = Catalog::from_bytes(target)?;
+    let before = Catalog::from_bytes(source, Default::default())?;
+    let after = Catalog::from_bytes(target, Default::default())?;
     let mut changed = Vec::new();
     for entry in before.iter() {
         let candidate = after
@@ -1565,11 +1565,8 @@ fn currency_checked_native_fixture_selects_by_name_and_refuses_number_family() -
 #[test]
 fn currency_missing_metadata_is_rejected_without_publication() -> TestResult {
     let source = shared_source()?;
-    let without_metadata = Catalog::from_bytes(&source)?.reassemble_with_deletions_to_bytes(
-        &[],
-        &[fixture::METADATA_MEMBER],
-        Limits::default(),
-    )?;
+    let without_metadata = Catalog::from_bytes(&source, Default::default())?
+        .reassemble_with_deletions_to_bytes(&[], &[fixture::METADATA_MEMBER], Limits::default())?;
     assert_rejected_or_owner(&without_metadata)?;
     Ok(())
 }

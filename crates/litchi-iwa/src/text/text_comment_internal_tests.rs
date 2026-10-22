@@ -95,6 +95,7 @@ fn unknown_annotation_and_comment_fields_survive_updates() {
                     type_: original.type_,
                     data,
                 },
+                Default::default(),
             )?;
 
             for (object_id, field, value) in [
@@ -110,6 +111,7 @@ fn unknown_annotation_and_comment_fields_survive_updates() {
                         type_: original.type_,
                         data,
                     },
+                    Default::default(),
                 )?;
             }
             Ok(())
@@ -261,6 +263,7 @@ fn reply_updates_preserve_unknown_fields_and_identity() {
                     type_: original.type_,
                     data,
                 },
+                Default::default(),
             )?;
             Ok(())
         })

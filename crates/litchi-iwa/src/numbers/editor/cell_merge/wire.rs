@@ -119,6 +119,7 @@ pub(super) fn patch_table_model(
                 type_: message_type,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -163,6 +164,7 @@ pub(super) fn patch_table_model_wire(
                 type_: message_type,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })

@@ -437,6 +437,7 @@ mod tests {
                     type_: PACKAGE_METADATA_MESSAGE_TYPE,
                     data: metadata.encode_to_vec(),
                 },
+                Default::default(),
             )?;
             Ok(())
         })

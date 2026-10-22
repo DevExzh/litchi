@@ -1128,6 +1128,113 @@ impl SharedOleFile {
         self.index.dir_entries.len()
     }
 
+    /// Visits the direct children of one storage through the immutable,
+    /// already-validated directory index.
+    ///
+    /// The callback receives each entry in the same in-order traversal as
+    /// [`OleFile::visit_directory_entry_refs`].  `max_entries` bounds both
+    /// callbacks and the directory SIDs discovered while walking the sibling
+    /// tree, so a caller can preserve the raw reader's event limit without
+    /// reparsing the source or materializing a child vector.
+    pub fn visit_directory_entry_refs<F, E>(
+        &self,
+        path: &[&str],
+        max_entries: usize,
+        mut visit: F,
+    ) -> Result<(), E>
+    where
+        E: From<OleError>,
+        F: FnMut(&DirectoryEntry) -> Result<(), E>,
+    {
+        let first_child = {
+            let directory = if path.is_empty() {
+                self.index
+                    .root
+                    .as_ref()
+                    .ok_or(OleError::StreamNotFound)
+                    .map_err(E::from)?
+            } else {
+                self.find_entry(path).map_err(E::from)?
+            };
+            if directory.entry_type != crate::consts::STGTY_STORAGE
+                && directory.entry_type != crate::consts::STGTY_ROOT
+            {
+                return Err(E::from(OleError::InvalidFormat(
+                    "Not a directory".to_string(),
+                )));
+            }
+            directory.sid_child
+        };
+
+        let mut pending = Vec::new();
+        let mut current = first_child;
+        let mut discovered = 0usize;
+        while current != crate::consts::NOSTREAM || !pending.is_empty() {
+            while current != crate::consts::NOSTREAM {
+                if discovered >= max_entries {
+                    return Err(E::from(OleError::LimitExceeded {
+                        resource: "directory entries",
+                        observed: u64::try_from(discovered)
+                            .unwrap_or(u64::MAX)
+                            .saturating_add(1),
+                        maximum: u64::try_from(max_entries).unwrap_or(u64::MAX),
+                    }));
+                }
+                let current_index = usize::try_from(current).map_err(|_error| {
+                    E::from(OleError::CorruptedFile(
+                        "directory SID does not fit usize".to_string(),
+                    ))
+                })?;
+                let entry = self
+                    .index
+                    .dir_entries
+                    .get(current_index)
+                    .and_then(Option::as_ref)
+                    .ok_or_else(|| {
+                        E::from(OleError::CorruptedFile(
+                            "directory SID has no entry".to_string(),
+                        ))
+                    })?;
+                let left = entry.sid_left;
+                discovered = discovered.checked_add(1).ok_or_else(|| {
+                    E::from(OleError::CorruptedFile(
+                        "directory entry count overflow".to_string(),
+                    ))
+                })?;
+                pending.try_reserve_exact(1).map_err(|source| {
+                    E::from(OleError::allocation("directory traversal stack", source))
+                })?;
+                pending.push(current);
+                current = left;
+            }
+
+            let sid = pending.pop().ok_or_else(|| {
+                E::from(OleError::CorruptedFile(
+                    "directory traversal stack underflow".to_string(),
+                ))
+            })?;
+            let sid_index = usize::try_from(sid).map_err(|_error| {
+                E::from(OleError::CorruptedFile(
+                    "directory SID does not fit usize".to_string(),
+                ))
+            })?;
+            let entry = self
+                .index
+                .dir_entries
+                .get(sid_index)
+                .and_then(Option::as_ref)
+                .ok_or_else(|| {
+                    E::from(OleError::CorruptedFile(
+                        "directory SID has no entry".to_string(),
+                    ))
+                })?;
+            let right = entry.sid_right;
+            visit(entry)?;
+            current = right;
+        }
+        Ok(())
+    }
+
     /// Materializes one stream through immutable positional reads.
     ///
     /// Regular streams never acquire a shared lock or cursor. A selected small
@@ -4523,6 +4630,56 @@ mod tests {
         }
         assert!(file.exists(&["storage", "STREAM"]));
         assert!(!file.exists(&["storage", "bad/name"]));
+    }
+
+    #[test]
+    fn shared_directory_visit_preserves_order_and_discovery_bounds() {
+        let bytes = serialized_streams(&[
+            &["Storage", "Alpha"],
+            &["Storage", "Beta"],
+            &["Storage", "Gamma"],
+            &["Sibling"],
+        ]);
+        let eager = OleFile::open(Cursor::new(bytes.clone())).unwrap();
+        let file = shared(Arc::new(TestSource::new(bytes)));
+        for path in [&[][..], &["storage"][..]] {
+            let mut expected = Vec::new();
+            eager
+                .visit_directory_entry_refs(path, 3, |entry| {
+                    expected.push(entry.name.clone());
+                    Ok::<(), OleError>(())
+                })
+                .unwrap();
+            let mut actual = Vec::new();
+            file.visit_directory_entry_refs(path, expected.len(), |entry| {
+                actual.push(entry.name.clone());
+                Ok::<(), OleError>(())
+            })
+            .unwrap();
+            assert_eq!(actual, expected);
+
+            for maximum in [0, expected.len() - 1] {
+                let mut callbacks = 0;
+                let error = file
+                    .visit_directory_entry_refs(path, maximum, |_| {
+                        callbacks += 1;
+                        Ok::<(), OleError>(())
+                    })
+                    .unwrap_err();
+                assert!(matches!(error, OleError::LimitExceeded {
+                    resource: "directory entries", observed, maximum: ceiling,
+                } if observed == maximum as u64 + 1 && ceiling == maximum as u64));
+                assert!(callbacks <= maximum);
+            }
+        }
+        assert!(matches!(
+            file.visit_directory_entry_refs(&["Missing"], 3, |_| Ok::<(), OleError>(())),
+            Err(OleError::StreamNotFound)
+        ));
+        assert!(matches!(
+            file.visit_directory_entry_refs(&["Sibling"], 3, |_| Ok::<(), OleError>(())),
+            Err(OleError::InvalidFormat(_))
+        ));
     }
 
     #[test]

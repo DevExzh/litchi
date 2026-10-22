@@ -2460,7 +2460,7 @@ pub(super) fn replace_storage_text(
     .map_err(|error| {
         Error::InvalidFormat(format!("TSWP text-storage rewrite limit failed: {error}"))
     })?;
-    let rewrite = litchi_iwa_text_wire::rewrite_storage_text_with_behavior_and_limits(
+    let rewrite = litchi_iwa_text_wire::rewrite_storage_text_with_behavior(
         original,
         range,
         replacement,
@@ -2487,7 +2487,7 @@ pub(super) fn replace_storage_text(
         let object = archive.object_mut(object_id).ok_or_else(|| {
             Error::ParseError(format!("Text storage object {object_id} not found"))
         })?;
-        object.replace_message_pruning_object_references_preserving_header_with_limits(
+        object.replace_message_pruning_object_references_preserving_header(
             message_index,
             RawMessage {
                 type_: message_type,
@@ -2730,6 +2730,7 @@ mod tests {
                 }
                 .encode_to_vec(),
             }],
+            Default::default(),
         )
         .unwrap();
         let archive = Archive {
@@ -2904,7 +2905,7 @@ mod tests {
             .unwrap();
 
         let archive = editor.package().archive("Index/Document.iwa").unwrap();
-        let raw = archive.to_bytes().unwrap();
+        let raw = archive.to_bytes(Default::default()).unwrap();
         assert!(archive_header(&raw).ends_with(UNKNOWN_ARCHIVE_HEADER_FIELD));
         let object = archive.object(42).unwrap();
         assert!(
@@ -2944,7 +2945,7 @@ mod tests {
             .unwrap();
 
         let archive = editor.package().archive("Index/Document.iwa").unwrap();
-        let raw = archive.to_bytes().unwrap();
+        let raw = archive.to_bytes(Default::default()).unwrap();
         assert!(archive_header(&raw).ends_with(UNKNOWN_ARCHIVE_HEADER_FIELD));
         let object = archive.object(42).unwrap();
         let field_infos = &object.archive_info.message_infos[0].field_infos;
@@ -2985,7 +2986,8 @@ mod tests {
                 .is_empty()
         );
         assert!(
-            archive_header(&archive.to_bytes().unwrap()).ends_with(UNKNOWN_ARCHIVE_HEADER_FIELD)
+            archive_header(&archive.to_bytes(Default::default()).unwrap())
+                .ends_with(UNKNOWN_ARCHIVE_HEADER_FIELD)
         );
     }
 
@@ -3260,6 +3262,7 @@ mod tests {
                         type_: message_type,
                         data,
                     },
+                    Default::default(),
                 )?;
                 object.archive_info.message_infos[0].object_references = vec![10, 11, 77];
                 Ok(())
@@ -3268,7 +3271,7 @@ mod tests {
         let before = package
             .archive("Index/Document.iwa")
             .unwrap()
-            .to_bytes()
+            .to_bytes(Default::default())
             .unwrap();
         let mut editor = Draft::from_package(package);
         editor
@@ -3289,7 +3292,7 @@ mod tests {
             .package()
             .archive("Index/Document.iwa")
             .unwrap()
-            .to_bytes()
+            .to_bytes(Default::default())
             .unwrap();
         assert_eq!(after, before);
     }
@@ -3324,6 +3327,7 @@ mod tests {
                         type_: message_type,
                         data,
                     },
+                    Default::default(),
                 )?;
                 Ok(())
             })
@@ -3396,7 +3400,7 @@ mod tests {
     }
 
     fn test_package_with_messages(messages: Vec<RawMessage>) -> HostPackage {
-        let object = ArchiveObject::new(42, messages).unwrap();
+        let object = ArchiveObject::new(42, messages, Default::default()).unwrap();
         test_package_with_object(object)
     }
 
@@ -3417,16 +3421,21 @@ mod tests {
         object_references: Vec<u64>,
         field_infos: Vec<FieldInfo>,
     ) -> HostPackage {
-        let mut object = ArchiveObject::new(42, vec![RawMessage { type_: 2001, data }]).unwrap();
+        let mut object = ArchiveObject::new(
+            42,
+            vec![RawMessage { type_: 2001, data }],
+            Default::default(),
+        )
+        .unwrap();
         object.archive_info.message_infos[0].object_references = object_references;
         object.archive_info.message_infos[0].field_infos = field_infos;
         let source = Archive {
             objects: vec![object],
         }
-        .to_bytes()
+        .to_bytes(Default::default())
         .unwrap();
         let source = append_unknown_archive_header(&source);
-        let archive = Archive::parse(&source).unwrap();
+        let archive = Archive::parse(&source, Default::default()).unwrap();
         test_package_with_archive(archive)
     }
 

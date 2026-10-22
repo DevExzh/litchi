@@ -11,7 +11,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use litchi_iwa_archive::package::{EntryEdit, EntryInsertion};
 use litchi_iwa_common::WireLimits;
-use litchi_iwa_core::{Archive, ArchiveLimits, ArchiveObject, RawMessage, SnappyStream};
+use litchi_iwa_core::{Archive, ArchiveObject, Limits as ArchiveLimits, RawMessage, SnappyStream};
 use sha1::{Digest, Sha1};
 
 use super::metadata::{Registry, Uuid};
@@ -229,8 +229,7 @@ impl<'p> Workspace<'p> {
             return Err(StructureError::Unexpected("object identity collision"));
         }
         let limits = self.archive_limits;
-        self.archive_mut(member)?
-            .insert_object_with_limits(object, limits)?;
+        self.archive_mut(member)?.insert_object(object, limits)?;
         self.located.insert(identifier, member.to_owned());
         self.inserted += 1;
         Ok(())
@@ -354,7 +353,7 @@ impl<'p> Workspace<'p> {
             .collect::<Vec<_>>();
         pairs.sort_unstable();
         pairs.dedup();
-        Ok(source.clone_with_identity_remap_with_limits(
+        Ok(source.clone_with_identity_remap(
             new_identifier,
             &pairs,
             &messages,
@@ -401,7 +400,7 @@ impl<'p> Workspace<'p> {
             let object = archive
                 .object_mut(identifier)
                 .ok_or(StructureError::Registry("package metadata"))?;
-            object.replace_message_with_limits(
+            object.replace_message(
                 index,
                 RawMessage {
                     type_: PACKAGE_METADATA_MESSAGE_TYPE,
@@ -412,8 +411,11 @@ impl<'p> Workspace<'p> {
         }
         let mut encoded = Vec::with_capacity(self.changed.len() + self.created.len());
         for (member, archive) in self.changed.iter().chain(self.created.iter()) {
-            let bytes = archive.to_bytes_with_limits(limits)?;
-            encoded.push((member.clone(), SnappyStream::compress(&bytes)?));
+            let bytes = archive.to_bytes(limits)?;
+            encoded.push((
+                member.clone(),
+                SnappyStream::compress(&bytes, Default::default())?,
+            ));
         }
         let edits = encoded
             .iter()

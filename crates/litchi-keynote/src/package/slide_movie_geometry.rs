@@ -390,7 +390,10 @@ impl GeometryBudget {
         let mut object_count = 0usize;
         let mut message_count = 0usize;
         for component in package.state.source.components().iter() {
-            let archive_bytes = component.archive().encoded_len().map_err(map_core_error)?;
+            let archive_bytes = component
+                .archive()
+                .encoded_len(Default::default())
+                .map_err(map_core_error)?;
             work = work
                 .checked_add(component.name().len())
                 .and_then(|value| value.checked_add(archive_bytes))
@@ -1747,14 +1750,12 @@ where
         .map_err(map_archive_error)?;
     let snappy_limits = physical_limits.snappy_limits().map_err(map_archive_error)?;
     budget.physical(entry.data().len())?;
-    let stream = SnappyStream::decompress_with_limits(entry.data(), snappy_limits)
-        .map_err(map_core_error)?;
+    let stream = SnappyStream::decompress(entry.data(), snappy_limits).map_err(map_core_error)?;
     budget.physical(stream.as_bytes().len())?;
     budget.allocations(1)?;
     budget.retained(stream.as_bytes().len())?;
     budget.scratch(stream.as_bytes().len())?;
-    let mut archive =
-        Archive::parse_with_limits(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
+    let mut archive = Archive::parse(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
     charge_archive_inventory(&archive, budget)?;
     let object = archive
         .object(object_identifier)
@@ -1766,19 +1767,12 @@ where
         .data
         .as_slice();
     let encoded_bound = archive
-        .encoded_len_with_limits(archive_limits)
+        .encoded_len(archive_limits)
         .map_err(map_core_error)?
         .checked_add(original.len())
         .ok_or(Error::InvalidSource)?;
-    let compressed_bound =
-        SnappyStream::maximum_compressed_len(encoded_bound).map_err(map_core_error)?;
-    if compressed_bound > snappy_limits.max_compressed_stream() {
-        return Err(Error::Limit {
-            kind: LimitKind::EntryBytes,
-            observed: compressed_bound as u64,
-            maximum: snappy_limits.max_compressed_stream() as u64,
-        });
-    }
+    let compressed_bound = SnappyStream::maximum_compressed_len(encoded_bound, snappy_limits)
+        .map_err(map_core_error)?;
     let package_bound = source
         .source_bytes()
         .len()
@@ -1803,7 +1797,7 @@ where
     archive
         .object_mut(object_identifier)
         .ok_or(Error::InvalidSource)?
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             message_index,
             RawMessage {
                 type_: MOVIE_MESSAGE_TYPE,
@@ -1812,15 +1806,13 @@ where
             archive_limits,
         )
         .map_err(map_core_error)?;
-    let bytes = archive
-        .to_bytes_with_limits(archive_limits)
-        .map_err(map_core_error)?;
+    let bytes = archive.to_bytes(archive_limits).map_err(map_core_error)?;
     budget.physical(bytes.len())?;
     budget.work(compressed_bound)?;
     budget.allocations(1)?;
     budget.retained(compressed_bound)?;
     budget.scratch(compressed_bound)?;
-    let compressed = SnappyStream::compress(&bytes).map_err(map_core_error)?;
+    let compressed = SnappyStream::compress(&bytes, snappy_limits).map_err(map_core_error)?;
     let previews = super::rendering_invalidation::root_preview_deletions(catalog.package())
         .map_err(|_| Error::InvalidSource)?;
     let edit = EntryEdit::new(component_name, compressed.as_slice());
@@ -2041,7 +2033,7 @@ pub(crate) fn verify_locality(
             }
             let mut expected = source_object.clone();
             expected
-                .replace_message_preserving_header_with_limits(
+                .replace_message_preserving_header(
                     message_index,
                     candidate_message.clone(),
                     archive_limits,
@@ -2087,11 +2079,9 @@ fn component_archive(
         .effective_archive_limits()
         .map_err(map_archive_error)?;
     budget.physical(entry.data().len())?;
-    let stream =
-        SnappyStream::decompress_with_limits(entry.data(), snappy).map_err(map_core_error)?;
+    let stream = SnappyStream::decompress(entry.data(), snappy).map_err(map_core_error)?;
     budget.physical(stream.as_bytes().len())?;
-    let archive =
-        Archive::parse_with_limits(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
+    let archive = Archive::parse(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
     charge_archive_inventory(&archive, budget)?;
     Ok(archive)
 }
@@ -3448,7 +3438,7 @@ fn validate_global_movie_references(
                     .ok_or(Error::InvalidSource)?,
             )?;
             object
-                .inspect_references_with_policy_and_limits(
+                .inspect_references_with_policy(
                     &mut visitor,
                     ArchiveReferencePolicy::RejectUnknownMetadata,
                     archive_limits,

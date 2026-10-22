@@ -89,7 +89,7 @@ impl Draft {
 
         let mut staged = self.package.clone();
         staged.update_archive(&archive_name, |archive| {
-            Ok(archive.insert_object(cloned_sheet)?)
+            Ok(archive.insert_object(cloned_sheet, Default::default())?)
         })?;
         update_numbers_document(&mut staged, |document| {
             let matches = document
@@ -495,6 +495,7 @@ fn restore_table_geometry(
                         type_: message_type,
                         data,
                     },
+                    Default::default(),
                 )?;
             },
         }

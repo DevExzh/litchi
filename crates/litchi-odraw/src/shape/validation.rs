@@ -1,7 +1,7 @@
 //! `OfficeArt` shape topology, budget, and record validation.
 
 use crate::prop::{Anchor, Id, Props};
-use crate::{Container, Error, Limit, Record, RecordKind, Result};
+use crate::{Container, Error, LimitKind, Record, RecordKind, Result};
 
 use super::model::{Flags, Kind, Native};
 
@@ -18,12 +18,12 @@ impl Budget {
 
     pub(crate) fn visit(&mut self) -> Result<()> {
         self.records = self.records.checked_add(1).ok_or(Error::LimitExceeded {
-            limit: Limit::Records,
+            limit: LimitKind::Records,
             maximum: self.limits.max_records,
         })?;
         if self.records > self.limits.max_records {
             return Err(Error::LimitExceeded {
-                limit: Limit::Records,
+                limit: LimitKind::Records,
                 maximum: self.limits.max_records,
             });
         }
@@ -33,7 +33,7 @@ impl Budget {
     pub(crate) fn depth(&self, depth: u16) -> Result<()> {
         if depth > self.limits.max_depth {
             return Err(Error::LimitExceeded {
-                limit: Limit::Depth,
+                limit: LimitKind::Depth,
                 maximum: u32::from(self.limits.max_depth),
             });
         }
@@ -323,7 +323,7 @@ pub(crate) fn validate_atom_kind(
 
 pub(crate) fn next_depth(depth: u16) -> Result<u16> {
     depth.checked_add(1).ok_or(Error::LimitExceeded {
-        limit: Limit::Depth,
+        limit: LimitKind::Depth,
         maximum: u32::from(u16::MAX),
     })
 }

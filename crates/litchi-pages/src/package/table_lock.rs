@@ -1075,7 +1075,7 @@ fn validate_body_storage_wire(
         super::StorageWireLimitsError::Physical(error) => map_archive_error(error),
         super::StorageWireLimitsError::Wire(_) => Error::InvalidSource,
     })?;
-    let validation = litchi_iwa_text_wire::validate_storage_with_limits(payload, wire_limits)
+    let validation = litchi_iwa_text_wire::validate_storage(payload, wire_limits)
         .map_err(map_body_storage_wire_error)?;
     budget.charge_payload_work(validation.validation_work())?;
     Ok(BodyWireValidation {
@@ -1602,7 +1602,7 @@ fn rewrite_lock_state(
     budget.charge_payload_work(entry.data().len())?;
     let expected_stream_length = parsed_archive_source_length(component.archive())?;
     budget.charge_archive_inventory(expected_stream_length, component.archive())?;
-    let stream = SnappyStream::decompress_with_limits(
+    let stream = SnappyStream::decompress(
         entry.data(),
         physical_limits.snappy_limits().map_err(map_archive_error)?,
     )
@@ -1611,8 +1611,7 @@ fn rewrite_lock_state(
     if stream_length != expected_stream_length {
         return Err(Error::InvalidSource);
     }
-    let mut archive =
-        Archive::parse_with_limits(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
+    let mut archive = Archive::parse(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
     validate_canonical_object_length_prefixes(stream.as_bytes(), &archive, budget)?;
     let object = archive
         .objects
@@ -1715,7 +1714,7 @@ fn rewrite_lock_state(
         return Err(Error::Verification);
     }
     object
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             target.message_index,
             RawMessage {
                 type_: target.message_type,
@@ -1724,15 +1723,14 @@ fn rewrite_lock_state(
             archive_limits,
         )
         .map_err(map_core_error)?;
-    let rewritten = archive
-        .to_bytes_with_limits(archive_limits)
-        .map_err(map_core_error)?;
+    let rewritten = archive.to_bytes(archive_limits).map_err(map_core_error)?;
     if rewritten.len() > rewritten_bound {
         return Err(Error::Verification);
     }
     drop(stream);
     drop(archive);
-    let compressed = SnappyStream::compress(&rewritten).map_err(map_core_error)?;
+    let compressed =
+        SnappyStream::compress(&rewritten, Default::default()).map_err(map_core_error)?;
     if compressed.len() > compressed_bound {
         return Err(Error::Verification);
     }
@@ -2354,8 +2352,7 @@ fn reopen_shared(
 ) -> Result<Package, Error> {
     budget.charge_input_source(source.as_ref())?;
     budget.charge_payload_work(source.len())?;
-    let catalog =
-        SourceCatalog::from_shared_bytes_with_limits(source, limits).map_err(map_archive_error)?;
+    let catalog = SourceCatalog::from_shared_bytes(source, limits).map_err(map_archive_error)?;
     budget.charge_source_catalog(&catalog)?;
     charge_reopen_work(&catalog, budget)?;
     Package::from_source_catalog(catalog).map_err(map_package_error)
@@ -3124,13 +3121,7 @@ pub(crate) fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
         litchi_iwa_archive::Error::Allocation { amount, .. } => Error::Allocation { amount },
         litchi_iwa_archive::Error::Iwa(error) => map_core_error(error),
         litchi_iwa_archive::Error::Reassembly(_) => Error::Refused(Refusal::UnsupportedSource),
-        litchi_iwa_archive::Error::Io(_)
-        | litchi_iwa_archive::Error::Zip { .. }
-        | litchi_iwa_archive::Error::InvalidLimits(_)
-        | litchi_iwa_archive::Error::Encrypted
-        | litchi_iwa_archive::Error::SourceChanged { .. }
-        | litchi_iwa_archive::Error::DirectoryChanged { .. }
-        | litchi_iwa_archive::Error::InvalidBundle(_) => Error::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
@@ -3167,11 +3158,7 @@ fn map_core_error(error: litchi_iwa_core::Error) -> Error {
         litchi_iwa_core::Error::Allocation { requested, .. } => {
             Error::Allocation { amount: requested }
         },
-        litchi_iwa_core::Error::InvalidArchive { .. }
-        | litchi_iwa_core::Error::InvalidLimits { .. }
-        | litchi_iwa_core::Error::HeaderCodec { .. }
-        | litchi_iwa_core::Error::Io(_)
-        | litchi_iwa_core::Error::Snappy { .. } => Error::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
@@ -3197,8 +3184,7 @@ fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
             maximum: usize_as_u64(limit),
         },
         litchi_iwa_common::Error::Allocation { amount, .. } => Error::Allocation { amount },
-        litchi_iwa_common::Error::InvalidFormat(_)
-        | litchi_iwa_common::Error::InvalidLimit { .. } => Error::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
@@ -3269,9 +3255,8 @@ mod tests {
         .encode_to_vec();
         let rewrite_limits = super::super::storage_rewrite_limits(Limits::default())
             .unwrap_or_else(|_| panic!("default text-wire limits"));
-        let validation =
-            litchi_iwa_text_wire::validate_storage_with_limits(&payload, rewrite_limits)
-                .expect("oversized trailing run is within the test source ceiling");
+        let validation = litchi_iwa_text_wire::validate_storage(&payload, rewrite_limits)
+            .expect("oversized trailing run is within the test source ceiling");
         let exact_work = validation
             .validation_work()
             .checked_add(1)
@@ -3369,6 +3354,7 @@ mod tests {
                         type_: 10_000,
                         data: vec![1, 2, 3],
                     }],
+                    Default::default(),
                 )
                 .expect("first object"),
                 ArchiveObject::new(
@@ -3377,12 +3363,13 @@ mod tests {
                         type_: 2_001,
                         data: vec![4, 5, 6, 7],
                     }],
+                    Default::default(),
                 )
                 .expect("second object"),
             ],
         };
-        let source = archive.to_bytes().expect("archive bytes");
-        let parsed = Archive::parse(&source).expect("parsed archive");
+        let source = archive.to_bytes(Default::default()).expect("archive bytes");
+        let parsed = Archive::parse(&source, Default::default()).expect("parsed archive");
         assert_eq!(
             parsed_archive_source_length(&parsed).expect("source extent"),
             source.len()
@@ -3531,8 +3518,7 @@ mod tests {
             limits,
         )
         .expect("multi-member package");
-        let catalog =
-            SourceCatalog::from_bytes_with_limits(&source, limits).expect("source catalog");
+        let catalog = SourceCatalog::from_bytes(&source, limits).expect("source catalog");
         let mut budget = WireBudget::new(limits).expect("test wire budget");
 
         budget
@@ -3553,7 +3539,8 @@ mod tests {
         }
 
         let bound = snappy_compressed_bound(input.len()).expect("checked Snappy bound");
-        let compressed = SnappyStream::compress(&input).expect("Snappy compression");
+        let compressed =
+            SnappyStream::compress(&input, Default::default()).expect("Snappy compression");
 
         assert!(bound > input.len() + 64);
         assert!(compressed.len() <= bound);

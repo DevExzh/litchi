@@ -524,17 +524,21 @@ impl Draft {
             .ok_or_else(|| Error::ParseError("iWork object identifier overflow".to_owned()))?;
         let mut staged = self.package.clone();
         staged.update_archive("Index/Document.iwa", |archive| {
-            archive.insert_object(crate::archive::ArchiveObject::new(
-                identifier,
-                vec![RawMessage {
-                    type_: 2,
-                    data: tn::SheetArchive {
-                        name: name.to_owned(),
-                        ..Default::default()
-                    }
-                    .encode_to_vec(),
-                }],
-            )?)?;
+            archive.insert_object(
+                crate::archive::ArchiveObject::new(
+                    identifier,
+                    vec![RawMessage {
+                        type_: 2,
+                        data: tn::SheetArchive {
+                            name: name.to_owned(),
+                            ..Default::default()
+                        }
+                        .encode_to_vec(),
+                    }],
+                    Default::default(),
+                )?,
+                Default::default(),
+            )?;
             Ok(())
         })?;
         update_numbers_document(&mut staged, |document| {

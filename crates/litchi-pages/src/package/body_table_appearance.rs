@@ -466,7 +466,7 @@ impl Package {
         budget.charge_output_bytes(target_owner.len(), Path::Package)?;
         budget.charge_transaction_work(target_owner.len().saturating_mul(2), Path::Package)?;
         budget.preflight_candidate_reopen_bytes(target_owner.as_ref(), Path::Package)?;
-        let candidate_source = SourceCatalog::from_shared_bytes_with_limits(
+        let candidate_source = SourceCatalog::from_shared_bytes(
             Arc::<[u8]>::from(target_owner.as_slice()),
             self.state.source.limits(),
         )
@@ -618,11 +618,9 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
         .execute(requirements.exact_limits())
         .map_err(|error| map_archive_error(error, edit_path))?;
     budget.preflight_candidate_reopen_bytes(target_bytes.as_slice(), edit_path)?;
-    let candidate_source = SourceCatalog::from_shared_bytes_with_limits(
-        target_bytes.into(),
-        edit.source.state.source.limits(),
-    )
-    .map_err(|error| map_archive_error(error, edit_path))?;
+    let candidate_source =
+        SourceCatalog::from_shared_bytes(target_bytes.into(), edit.source.state.source.limits())
+            .map_err(|error| map_archive_error(error, edit_path))?;
     budget.preflight_candidate_catalog(&candidate_source, edit_path)?;
     let package =
         Package::from_source_catalog(candidate_source).map_err(|_| Error::Verification)?;
@@ -1128,8 +1126,9 @@ fn rewrite_native_appearance(
         .snappy_limits()
         .map_err(|error| map_archive_error(error, path))?;
     let maximum_archive_bytes = archive_limits.max_archive_bytes();
-    let maximum_compressed_bytes = SnappyStream::maximum_compressed_len(maximum_archive_bytes)
-        .map_err(|error| map_core_error(error, path))?;
+    let maximum_compressed_bytes =
+        SnappyStream::maximum_compressed_len(maximum_archive_bytes, Default::default())
+            .map_err(|error| map_core_error(error, path))?;
     budget.charge_allocations(
         component_indices.len().saturating_mul(4).saturating_add(8),
         path,
@@ -1200,12 +1199,12 @@ fn rewrite_native_appearance(
             return Err(Error::Refused(Refusal::UnsupportedSource));
         }
         budget.charge_transaction_work(entry.data().len(), path)?;
-        let stream = SnappyStream::decompress_with_limits(entry.data(), snappy_limits)
+        let stream = SnappyStream::decompress(entry.data(), snappy_limits)
             .map_err(|error| map_core_error(error, path))?;
-        let mut archive = Archive::parse_with_limits(stream.as_bytes(), archive_limits)
+        let mut archive = Archive::parse(stream.as_bytes(), archive_limits)
             .map_err(|error| map_core_error(error, path))?;
         archive
-            .validate_canonical_object_framing(stream.as_bytes())
+            .validate_canonical_object_framing(stream.as_bytes(), archive_limits)
             .map_err(|error| map_core_error(error, path))?;
         if component_index == target.native.component_index {
             replace_model_in_archive(
@@ -1244,10 +1243,10 @@ fn rewrite_native_appearance(
             )?;
         }
         let bytes = archive
-            .to_bytes_with_limits(archive_limits)
+            .to_bytes(archive_limits)
             .map_err(|error| map_core_error(error, path))?;
-        let compressed =
-            SnappyStream::compress(&bytes).map_err(|error| map_core_error(error, path))?;
+        let compressed = SnappyStream::compress(&bytes, Default::default())
+            .map_err(|error| map_core_error(error, path))?;
         edits.push(NativeEdit {
             name,
             data: compressed,
@@ -2450,14 +2449,15 @@ fn rewrite_metadata_entry(
         .effective_archive_limits()
         .map_err(|error| map_archive_error(error, path))?;
     let maximum_archive_bytes = archive_limits.max_archive_bytes();
-    let maximum_compressed_bytes = SnappyStream::maximum_compressed_len(maximum_archive_bytes)
-        .map_err(|error| map_core_error(error, path))?;
+    let maximum_compressed_bytes =
+        SnappyStream::maximum_compressed_len(maximum_archive_bytes, Default::default())
+            .map_err(|error| map_core_error(error, path))?;
     budget.charge_allocations(4, path)?;
     budget.charge_transaction_work(
         maximum_archive_bytes.saturating_add(maximum_compressed_bytes),
         path,
     )?;
-    let stream = SnappyStream::decompress_with_limits(
+    let stream = SnappyStream::decompress(
         entry.data(),
         physical
             .limits()
@@ -2465,10 +2465,10 @@ fn rewrite_metadata_entry(
             .map_err(|error| map_archive_error(error, path))?,
     )
     .map_err(|error| map_core_error(error, path))?;
-    let mut archive = Archive::parse_with_limits(stream.as_bytes(), archive_limits)
+    let mut archive = Archive::parse(stream.as_bytes(), archive_limits)
         .map_err(|error| map_core_error(error, path))?;
     archive
-        .validate_canonical_object_framing(stream.as_bytes())
+        .validate_canonical_object_framing(stream.as_bytes(), archive_limits)
         .map_err(|error| map_core_error(error, path))?;
     let object = archive
         .objects
@@ -2482,7 +2482,7 @@ fn rewrite_metadata_entry(
         return Err(Error::InvalidSource { path });
     }
     object
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             route.message_index,
             RawMessage {
                 type_: METADATA_MESSAGE_TYPE,
@@ -2492,9 +2492,10 @@ fn rewrite_metadata_entry(
         )
         .map_err(|error| map_core_error(error, path))?;
     let bytes = archive
-        .to_bytes_with_limits(archive_limits)
+        .to_bytes(archive_limits)
         .map_err(|error| map_core_error(error, path))?;
-    let compressed = SnappyStream::compress(&bytes).map_err(|error| map_core_error(error, path))?;
+    let compressed = SnappyStream::compress(&bytes, Default::default())
+        .map_err(|error| map_core_error(error, path))?;
     Ok(NativeEdit {
         name: METADATA_ENTRY_NAME.to_owned(),
         data: compressed,
@@ -2701,7 +2702,7 @@ fn append_style_object(
         type_: TABLE_STYLE_MESSAGE_TYPE,
         data: payload,
     });
-    let mut object = ArchiveObject::new_with_limits(identifier, messages, limits)
+    let mut object = ArchiveObject::new(identifier, messages, limits)
         .map_err(|error| map_core_error(error, path))?;
     let mut references = Vec::new();
     references
@@ -2905,7 +2906,7 @@ fn replace_message_with_reference_transition(
         });
     }
     object
-        .replace_message_transitioning_object_references_preserving_header_with_limits(
+        .replace_message_transitioning_object_references_preserving_header(
             message_index,
             message,
             ObjectReferenceTransition {
@@ -3408,7 +3409,7 @@ fn validate_global_style_inbound(
             budget.charge_references(object_references, path)?;
             budget.charge_transaction_work(object_work, path)?;
             object
-                .inspect_references_with_policy_and_limits(
+                .inspect_references_with_policy(
                     &mut authority,
                     ArchiveReferencePolicy::RejectUnknownMetadata,
                     archive_limits,

@@ -536,11 +536,9 @@ impl Package {
         {
             return Err(Error::PatchConflict);
         }
-        let candidate_source = SourceCatalog::from_shared_bytes_with_limits(
-            Arc::clone(&patch.target_bytes),
-            source.limits(),
-        )
-        .map_err(map_archive_error)?;
+        let candidate_source =
+            SourceCatalog::from_shared_bytes(Arc::clone(&patch.target_bytes), source.limits())
+                .map_err(map_archive_error)?;
         let candidate =
             Package::from_source_catalog(candidate_source).map_err(map_package_error)?;
         candidate.validate().map_err(map_package_error)?;
@@ -1013,9 +1011,8 @@ fn rewrite_package_footnote(
         .package()
         .reassemble_to_bytes(&edits, physical_limits)
         .map_err(map_archive_error)?;
-    let candidate_source =
-        SourceCatalog::from_shared_bytes_with_limits(output.into(), physical_limits)
-            .map_err(map_archive_error)?;
+    let candidate_source = SourceCatalog::from_shared_bytes(output.into(), physical_limits)
+        .map_err(map_archive_error)?;
     let candidate = Package::from_source_catalog(candidate_source).map_err(map_package_error)?;
     candidate.validate().map_err(map_package_error)?;
     let _ = changed_component_count(source, &candidate)?;
@@ -1247,7 +1244,7 @@ fn rewrite_component(
     if entry.is_opaque() {
         return Err(Error::InvalidSource);
     }
-    let stream = SnappyStream::decompress_with_limits(
+    let stream = SnappyStream::decompress(
         entry.data(),
         source_catalog
             .limits()
@@ -1255,8 +1252,7 @@ fn rewrite_component(
             .map_err(map_archive_error)?,
     )
     .map_err(map_core_error)?;
-    let mut archive =
-        Archive::parse_with_limits(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
+    let mut archive = Archive::parse(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
     let rewrite_limits =
         storage_rewrite_limits(source_catalog.limits()).map_err(map_storage_wire_limits_error)?;
 
@@ -1281,7 +1277,7 @@ fn rewrite_component(
         archive
             .object_mut(native_footnote.storage_identifier.get())
             .ok_or(Error::InvalidSource)?
-            .replace_message_preserving_header_with_limits(
+            .replace_message_preserving_header(
                 message_index,
                 RawMessage {
                     type_: message_type,
@@ -1319,7 +1315,7 @@ fn rewrite_component(
         archive
             .object_mut(native_footnote.reference_identifier.get())
             .ok_or(Error::InvalidSource)?
-            .replace_message_preserving_header_with_limits(
+            .replace_message_preserving_header(
                 message_index,
                 RawMessage {
                     type_: message_type,
@@ -1330,10 +1326,8 @@ fn rewrite_component(
             .map_err(map_core_error)?;
     }
 
-    let rewritten_archive = archive
-        .to_bytes_with_limits(archive_limits)
-        .map_err(map_core_error)?;
-    SnappyStream::compress(&rewritten_archive).map_err(map_core_error)
+    let rewritten_archive = archive.to_bytes(archive_limits).map_err(map_core_error)?;
+    SnappyStream::compress(&rewritten_archive, Default::default()).map_err(map_core_error)
 }
 
 /// Compare source and candidate logical members while allowing only decoded
@@ -1378,7 +1372,7 @@ fn rewrite_storage_payload(
     after: &str,
     rewrite_limits: litchi_iwa_text_wire::RewriteLimits,
 ) -> Result<Vec<u8>, Error> {
-    let storage = litchi_iwa_text_wire::decode_storage_with_limits(payload, rewrite_limits)
+    let storage = litchi_iwa_text_wire::decode_storage(payload, rewrite_limits)
         .map_err(map_text_rewrite_error)?
         .into_storage();
     let full_text = storage.text();
@@ -1397,7 +1391,7 @@ fn rewrite_storage_payload(
             observed: u64::MAX,
             maximum: u64::from(u32::MAX),
         })?;
-    let rewritten = litchi_iwa_text_wire::rewrite_storage_text_with_limits(
+    let rewritten = litchi_iwa_text_wire::rewrite_storage_text(
         payload,
         prefix_units..content_end,
         after,
@@ -1756,8 +1750,7 @@ fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
             maximum: usize_to_u64(limit),
         },
         litchi_iwa_common::Error::Allocation { amount, .. } => Error::Allocation { amount },
-        litchi_iwa_common::Error::InvalidFormat(_)
-        | litchi_iwa_common::Error::InvalidLimit { .. } => Error::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
@@ -1907,14 +1900,7 @@ fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
         },
         litchi_iwa_archive::Error::Allocation { amount, .. } => Error::Allocation { amount },
         litchi_iwa_archive::Error::Iwa(error) => map_core_error(error),
-        litchi_iwa_archive::Error::Io(_)
-        | litchi_iwa_archive::Error::Zip { .. }
-        | litchi_iwa_archive::Error::InvalidLimits(_)
-        | litchi_iwa_archive::Error::Encrypted
-        | litchi_iwa_archive::Error::SourceChanged { .. }
-        | litchi_iwa_archive::Error::DirectoryChanged { .. }
-        | litchi_iwa_archive::Error::Reassembly(_)
-        | litchi_iwa_archive::Error::InvalidBundle(_) => Error::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
@@ -1949,11 +1935,7 @@ fn map_core_error(error: litchi_iwa_core::Error) -> Error {
         litchi_iwa_core::Error::Allocation { requested, .. } => {
             Error::Allocation { amount: requested }
         },
-        litchi_iwa_core::Error::InvalidArchive { .. }
-        | litchi_iwa_core::Error::InvalidLimits { .. }
-        | litchi_iwa_core::Error::HeaderCodec { .. }
-        | litchi_iwa_core::Error::Io(_)
-        | litchi_iwa_core::Error::Snappy { .. } => Error::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
@@ -2301,11 +2283,11 @@ mod tests {
 
     #[test]
     fn borrowed_locations_keep_first_ordered_match_and_isolate_unrelated_ids() {
-        let first = ArchiveObject::new(7, Vec::new())
+        let first = ArchiveObject::new(7, Vec::new(), Default::default())
             .unwrap_or_else(|error| panic!("first object: {error}"));
-        let duplicate = ArchiveObject::new(7, Vec::new())
+        let duplicate = ArchiveObject::new(7, Vec::new(), Default::default())
             .unwrap_or_else(|error| panic!("duplicate object: {error}"));
-        let unrelated = ArchiveObject::new(8, Vec::new())
+        let unrelated = ArchiveObject::new(8, Vec::new(), Default::default())
             .unwrap_or_else(|error| panic!("unrelated object: {error}"));
         let mut objects = HashMap::new();
         objects

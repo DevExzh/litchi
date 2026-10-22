@@ -169,7 +169,7 @@ fn apply_patch(source: &Package, patch: &Patch) -> Result<Commit, Error> {
             transaction_path(Path::Package),
         )
         .map_err(map_transaction)?;
-    let catalog = SourceCatalog::from_shared_bytes_with_limits(
+    let catalog = SourceCatalog::from_shared_bytes(
         Arc::clone(patch.target_artifact()),
         source.state.source.limits(),
     )

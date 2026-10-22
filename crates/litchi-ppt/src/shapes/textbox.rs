@@ -917,7 +917,7 @@ mod tests {
     }
 
     fn parse_formatted_textbox(data: &[u8]) -> crate::package::Result<TextBox<'static>> {
-        let shapes = litchi_odraw::shape::parse(data)?;
+        let shapes = litchi_odraw::shape::parse(data, Default::default())?;
         let shape = shapes.first().ok_or_else(|| {
             crate::package::Error::Corrupted("test drawing contains no shape".to_owned())
         })?;

@@ -136,6 +136,7 @@ fn patch_document_scaffolding(package: &mut HostPackage) -> Result<()> {
                 type_: document_message_type,
                 data: decoded.encode_to_vec(),
             },
+            Default::default(),
         )?;
         for identifier in [
             TABLE_CALCULATION_ENGINE_OBJECT_ID,
@@ -170,22 +171,26 @@ fn patch_document_scaffolding(package: &mut HostPackage) -> Result<()> {
                 type_: theme_message_type,
                 data: decoded.encode()?,
             },
+            Default::default(),
         )?;
         append_object_reference(theme, TABLE_PRESET_OBJECT_ID);
 
-        archive.insert_object(raw_object_with_id(
-            TABLE_ATTACHMENT_OBJECT_ID,
-            TABLE_ATTACHMENT_MESSAGE_TYPE,
-            tswp::DrawableAttachmentArchive {
-                drawable: Some(raw_reference(TABLE_INFO_OBJECT_ID)),
-                h_offset_type: Some(TABLE_ATTACHMENT_OFFSET_TYPE),
-                h_offset: Some(TABLE_ATTACHMENT_OFFSET_POINTS),
-                v_offset_type: Some(TABLE_ATTACHMENT_OFFSET_TYPE),
-                v_offset: Some(TABLE_ATTACHMENT_OFFSET_POINTS),
-            }
-            .encode_to_vec(),
-            &[TABLE_INFO_OBJECT_ID],
-        )?)?;
+        archive.insert_object(
+            raw_object_with_id(
+                TABLE_ATTACHMENT_OBJECT_ID,
+                TABLE_ATTACHMENT_MESSAGE_TYPE,
+                tswp::DrawableAttachmentArchive {
+                    drawable: Some(raw_reference(TABLE_INFO_OBJECT_ID)),
+                    h_offset_type: Some(TABLE_ATTACHMENT_OFFSET_TYPE),
+                    h_offset: Some(TABLE_ATTACHMENT_OFFSET_POINTS),
+                    v_offset_type: Some(TABLE_ATTACHMENT_OFFSET_TYPE),
+                    v_offset: Some(TABLE_ATTACHMENT_OFFSET_POINTS),
+                }
+                .encode_to_vec(),
+                &[TABLE_INFO_OBJECT_ID],
+            )?,
+            Default::default(),
+        )?;
         Ok(())
     })
 }

@@ -434,8 +434,7 @@ impl Error {
                 litchi_iwa_common::Error::Allocation { amount, .. } => {
                     Some(ResourceError::Allocation { amount: *amount })
                 },
-                litchi_iwa_common::Error::InvalidFormat(_)
-                | litchi_iwa_common::Error::InvalidLimit { .. } => None,
+                _ => None,
             },
             Self::Io(_)
             | Self::Archive(_)
@@ -471,26 +470,26 @@ enum Components {
 
 impl Components {
     fn from_bytes(bytes: &[u8], limits: Limits) -> Result<Self> {
-        Ok(Self::PhysicalShared(Box::new(
-            SourceCatalog::from_bytes_with_limits(bytes, limits)?,
-        )))
+        Ok(Self::PhysicalShared(Box::new(SourceCatalog::from_bytes(
+            bytes, limits,
+        )?)))
     }
 
     fn from_shared_bytes(source: Arc<[u8]>, limits: Limits) -> Result<Self> {
         Ok(Self::PhysicalShared(Box::new(
-            SourceCatalog::from_shared_bytes_with_limits(source, limits)?,
+            SourceCatalog::from_shared_bytes(source, limits)?,
         )))
     }
 
     fn from_owned_bytes(source: Vec<u8>, limits: Limits) -> Result<Self> {
         Ok(Self::PhysicalOwned(Box::new(
-            OwnedSourceCatalog::__from_owned_bytes_with_limits(source, limits)?,
+            OwnedSourceCatalog::__from_owned_bytes(source, limits)?,
         )))
     }
 
     fn from_source_owner(source: SharedBytes, limits: Limits) -> Result<Self> {
         Ok(Self::PhysicalOwned(Box::new(
-            OwnedSourceCatalog::__from_source_owner_with_limits(source, limits)?,
+            OwnedSourceCatalog::__from_source_owner(source, limits)?,
         )))
     }
 
@@ -911,11 +910,8 @@ impl Package {
     /// assembled or a member name cannot be a file.
     pub fn save_directory(&self, path: impl AsRef<Path>) -> std::result::Result<(), SaveError> {
         let limits = self.state.options.archive();
-        let package = litchi_iwa_archive::package::Catalog::from_bytes_with_limits(
-            self.source_bytes(),
-            limits,
-        )
-        .map_err(SaveError::Bundle)?;
+        let package = litchi_iwa_archive::package::Catalog::from_bytes(self.source_bytes(), limits)
+            .map_err(SaveError::Bundle)?;
         litchi_iwa_archive::bundle::save(
             &package,
             limits,
@@ -2612,6 +2608,7 @@ mod tests {
                 .encode_to_vec(),
             })
             .collect(),
+            Default::default(),
         )
         .map_err(|error| Error::InvalidFormat(error.to_string()))?;
         let empty_cell = crate::cell::wire::BncCell::minimal().encode();
@@ -2686,6 +2683,7 @@ mod tests {
                 .encode_to_vec(),
             })
             .collect(),
+            Default::default(),
         )
         .map_err(|error| Error::InvalidFormat(error.to_string()))?;
         let first_model = tst::TableModelArchive {
@@ -2802,6 +2800,7 @@ mod tests {
                 data: list.encode_to_vec(),
             })
             .collect(),
+            Default::default(),
         )
         .map_err(|error| Error::InvalidFormat(error.to_string()))?;
         let mut formula_cell = crate::cell::wire::BncCell::minimal();
@@ -2885,8 +2884,9 @@ mod tests {
         for (name, archive) in archives {
             let iwa = SnappyStream::compress(
                 &archive
-                    .to_bytes()
+                    .to_bytes(Default::default())
                     .map_err(|error| Error::InvalidFormat(error.to_string()))?,
+                Default::default(),
             )
             .map_err(|error| Error::InvalidFormat(error.to_string()))?;
             entries.push((name, iwa));
@@ -3118,15 +3118,15 @@ mod tests {
         let mut decompressed = Archive {
             objects: vec![root, sheet.clone()],
         }
-        .to_bytes()
+        .to_bytes(Default::default())
         .map_err(|error| Error::InvalidFormat(error.to_string()))?;
         let duplicate = Archive {
             objects: vec![sheet],
         }
-        .to_bytes()
+        .to_bytes(Default::default())
         .map_err(|error| Error::InvalidFormat(error.to_string()))?;
         decompressed.extend_from_slice(&duplicate);
-        let iwa = SnappyStream::compress(&decompressed)
+        let iwa = SnappyStream::compress(&decompressed, Default::default())
             .map_err(|error| Error::InvalidFormat(error.to_string()))?;
         litchi_iwa_archive::package::to_bytes(
             [("Index/Document.iwa", iwa.as_slice())]
@@ -3159,13 +3159,13 @@ mod tests {
         let mut duplicate_component = Archive {
             objects: vec![sheet.clone()],
         }
-        .to_bytes()
+        .to_bytes(Default::default())
         .map_err(|error| Error::InvalidFormat(error.to_string()))?;
         duplicate_component.extend_from_slice(
             &Archive {
                 objects: vec![sheet.clone()],
             }
-            .to_bytes()
+            .to_bytes(Default::default())
             .map_err(|error| Error::InvalidFormat(error.to_string()))?,
         );
         let entries = [
@@ -3175,8 +3175,9 @@ mod tests {
                     &Archive {
                         objects: vec![sheet],
                     }
-                    .to_bytes()
+                    .to_bytes(Default::default())
                     .map_err(|error| Error::InvalidFormat(error.to_string()))?,
+                    Default::default(),
                 )
                 .map_err(|error| Error::InvalidFormat(error.to_string()))?,
             ),
@@ -3186,14 +3187,15 @@ mod tests {
                     &Archive {
                         objects: vec![root],
                     }
-                    .to_bytes()
+                    .to_bytes(Default::default())
                     .map_err(|error| Error::InvalidFormat(error.to_string()))?,
+                    Default::default(),
                 )
                 .map_err(|error| Error::InvalidFormat(error.to_string()))?,
             ),
             (
                 "Index/Sheet.iwa",
-                SnappyStream::compress(&duplicate_component)
+                SnappyStream::compress(&duplicate_component, Default::default())
                     .map_err(|error| Error::InvalidFormat(error.to_string()))?,
             ),
         ];
@@ -3212,7 +3214,7 @@ mod tests {
                 tn::DocumentArchive::default().encode_to_vec(),
             )?],
         }
-        .to_bytes()
+        .to_bytes(Default::default())
         .map_err(|error| Error::InvalidFormat(error.to_string()))?;
         let sheet = object(
             2,
@@ -3226,7 +3228,7 @@ mod tests {
         let canonical = Archive {
             objects: vec![sheet],
         }
-        .to_bytes()
+        .to_bytes(Default::default())
         .map_err(|error| Error::InvalidFormat(error.to_string()))?;
         let (header_length, prefix_length) = decode_varint_from_bytes(&canonical)
             .map_err(|error| Error::InvalidFormat(error.to_string()))?;
@@ -3256,11 +3258,11 @@ mod tests {
         raw_alias.extend_from_slice(&raw_header);
         raw_alias.extend_from_slice(payload);
 
-        let compressed_root = SnappyStream::compress(&root)
+        let compressed_root = SnappyStream::compress(&root, Default::default())
             .map_err(|error| Error::InvalidFormat(error.to_string()))?;
-        let compressed_canonical = SnappyStream::compress(&canonical)
+        let compressed_canonical = SnappyStream::compress(&canonical, Default::default())
             .map_err(|error| Error::InvalidFormat(error.to_string()))?;
-        let compressed_alias = SnappyStream::compress(&raw_alias)
+        let compressed_alias = SnappyStream::compress(&raw_alias, Default::default())
             .map_err(|error| Error::InvalidFormat(error.to_string()))?;
         let entries = [
             ("Index/Document.iwa", compressed_root),
@@ -3281,6 +3283,7 @@ mod tests {
                 type_: message_type,
                 data,
             }],
+            Default::default(),
         )
         .map_err(|error| Error::InvalidFormat(error.to_string()))
     }
@@ -3372,6 +3375,7 @@ mod tests {
                     data: pages.encode_to_vec(),
                 },
             ],
+            Default::default(),
         )
         .map_err(|error| Error::InvalidFormat(error.to_string()))?;
         let unrelated = package_bytes_from_archive(Archive {
@@ -3423,6 +3427,7 @@ mod tests {
                     data: tn::DocumentArchive::default().encode_to_vec(),
                 },
             ],
+            Default::default(),
         )
         .map_err(|error| Error::InvalidFormat(error.to_string()))?;
         let masked = package_bytes_from_archive(Archive {
@@ -3548,6 +3553,7 @@ mod tests {
                     data: tst::TableModelArchive::default().encode_to_vec(),
                 },
             ],
+            Default::default(),
         )
         .map_err(|error| Error::InvalidFormat(error.to_string()))?;
         let bytes = package_bytes_from_archive(Archive {
@@ -3579,6 +3585,7 @@ mod tests {
                     data: tst::TableModelArchive::default().encode_to_vec(),
                 },
             ],
+            Default::default(),
         )
         .map_err(|error| Error::InvalidFormat(error.to_string()))?;
         let bytes = package_bytes_from_archive(Archive {
@@ -3613,6 +3620,7 @@ mod tests {
                     data: tst::TableInfoArchive::default().encode_to_vec(),
                 },
             ],
+            Default::default(),
         )
         .map_err(|error| Error::InvalidFormat(error.to_string()))?;
         let bytes = package_bytes_from_archive(Archive {
@@ -3729,6 +3737,7 @@ mod tests {
                     data: tn::DocumentArchive::default().encode_to_vec(),
                 },
             ],
+            Default::default(),
         )
         .map_err(|error| Error::InvalidFormat(error.to_string()))?;
         let duplicate_bytes = package_bytes_from_archive(Archive {
@@ -4028,6 +4037,7 @@ mod tests {
                     data: vec![0xff],
                 },
             ],
+            Default::default(),
         )
         .map_err(|error| Error::InvalidFormat(error.to_string()))?;
         let bytes = package_bytes_from_archive(Archive {
@@ -4181,6 +4191,7 @@ mod tests {
                     data: info,
                 },
             ],
+            Default::default(),
         )
         .map_err(|error| Error::InvalidFormat(error.to_string()))?;
         let ambiguous_bytes = package_bytes_from_archive(Archive {

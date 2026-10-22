@@ -81,6 +81,7 @@ impl fmt::Display for HeaderOperation {
 
 /// Errors returned by the physical IWA substrate.
 #[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum Error {
     #[error("invalid IWA archive at byte {offset}: {reason}")]
     InvalidArchive { offset: usize, reason: &'static str },

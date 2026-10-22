@@ -46,6 +46,7 @@ fn object(identifier: u64, type_: u32, data: Vec<u8>) -> TestResult<ArchiveObjec
     Ok(ArchiveObject::new(
         identifier,
         vec![RawMessage { type_, data }],
+        Default::default(),
     )?)
 }
 
@@ -258,7 +259,10 @@ fn metadata_payload(last_identifier: u64) -> TestResult<Vec<u8>> {
 }
 
 fn component(objects: Vec<ArchiveObject>) -> TestResult<Vec<u8>> {
-    Ok(SnappyStream::compress(&Archive { objects }.to_bytes()?)?)
+    Ok(SnappyStream::compress(
+        &Archive { objects }.to_bytes(Default::default())?,
+        Default::default(),
+    )?)
 }
 
 fn synthetic_package() -> TestResult<Vec<u8>> {
@@ -365,21 +369,24 @@ fn exact_bytes(package: &Package) -> TestResult<Vec<u8>> {
 }
 
 fn document_stream(package: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or_else(|| io::Error::other("missing document"))?;
-    Ok(SnappyStream::decompress(entry.data())?.into_bytes())
+    Ok(SnappyStream::decompress(entry.data(), Default::default())?.into_bytes())
 }
 
 fn metadata_stream(package: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == METADATA_MEMBER)
         .ok_or_else(|| io::Error::other("missing metadata"))?;
-    let archive = Archive::parse(&SnappyStream::decompress(entry.data())?.into_bytes())?;
+    let archive = Archive::parse(
+        &SnappyStream::decompress(entry.data(), Default::default())?.into_bytes(),
+        Default::default(),
+    )?;
     archive
         .object(METADATA_OBJECT)
         .and_then(|object| {
@@ -393,7 +400,7 @@ fn metadata_stream(package: &[u8]) -> TestResult<Vec<u8>> {
 }
 
 fn movie_payload_from_package(package: &[u8], movie: u64) -> TestResult<Vec<u8>> {
-    let archive = Archive::parse(&document_stream(package)?)?;
+    let archive = Archive::parse(&document_stream(package)?, Default::default())?;
     archive
         .object(movie)
         .and_then(|object| {
@@ -407,8 +414,9 @@ fn movie_payload_from_package(package: &[u8], movie: u64) -> TestResult<Vec<u8>>
 }
 
 fn replace_document_archive(source: &[u8], archive: Archive) -> TestResult<Vec<u8>> {
-    let replacement = SnappyStream::compress(&archive.to_bytes()?)?;
-    let catalog = Catalog::from_bytes(source)?;
+    let replacement =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entries = catalog
         .iter()
         .map(|entry| {
@@ -426,7 +434,7 @@ fn replace_document_archive(source: &[u8], archive: Archive) -> TestResult<Vec<u
 }
 
 fn with_movie_payload(source: &[u8], movie: u64, payload: Vec<u8>) -> TestResult<Vec<u8>> {
-    let mut archive = Archive::parse(&document_stream(source)?)?;
+    let mut archive = Archive::parse(&document_stream(source)?, Default::default())?;
     archive
         .object_mut(movie)
         .ok_or_else(|| io::Error::other("missing movie"))?
@@ -501,7 +509,7 @@ fn reads_file_movie_playback_and_preserves_media_graph() -> TestResult<()> {
         movie_payload(0, true)
     );
     assert_eq!(
-        Catalog::from_bytes(&source)?
+        Catalog::from_bytes(&source, Default::default())?
             .iter()
             .find(|entry| entry.name() == "Data/movie.mov")
             .map(|entry| entry.data()),
@@ -555,14 +563,14 @@ fn replacement_updates_all_playback_fields_inverse_and_apply_exactly() -> TestRe
         movie_payload(1, true)
     );
     assert_eq!(
-        Catalog::from_bytes(&candidate)?
+        Catalog::from_bytes(&candidate, Default::default())?
             .iter()
             .find(|entry| entry.name() == "Data/poster.png")
             .map(|entry| entry.data()),
         Some(b"synthetic poster bytes".as_slice())
     );
-    let source_catalog = Catalog::from_bytes(&source)?;
-    let candidate_catalog = Catalog::from_bytes(&candidate)?;
+    let source_catalog = Catalog::from_bytes(&source, Default::default())?;
+    let candidate_catalog = Catalog::from_bytes(&candidate, Default::default())?;
     for name in ["preview.jpg", "preview-micro.jpg", "preview-web.jpg"] {
         assert_eq!(
             candidate_catalog
@@ -717,7 +725,7 @@ fn unknown_fields_are_retained_and_unsupported_media_are_refused() -> TestResult
 #[test]
 fn missing_metadata_and_ingress_limits_are_atomic() -> TestResult<()> {
     let source = synthetic_package()?;
-    let catalog = Catalog::from_bytes(&source)?;
+    let catalog = Catalog::from_bytes(&source, Default::default())?;
     let no_metadata = litchi_iwa_archive::package::to_bytes(
         catalog
             .iter()
@@ -734,7 +742,7 @@ fn missing_metadata_and_ingress_limits_are_atomic() -> TestResult<()> {
         .and_then(|edit| edit.commit())?;
     let candidate = exact_bytes(commit.package())?;
     assert!(
-        Catalog::from_bytes(&candidate)?
+        Catalog::from_bytes(&candidate, Default::default())?
             .iter()
             .all(|entry| entry.name() != METADATA_MEMBER)
     );

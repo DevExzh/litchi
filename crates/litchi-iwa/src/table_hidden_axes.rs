@@ -870,9 +870,10 @@ fn insert_hidden_state_objects(
                     type_: FILTER_SET_MESSAGE_TYPE,
                     data,
                 }],
+                Default::default(),
             )?;
             object.archive_info.message_infos[0].versions = STANDARD_MESSAGE_VERSION.to_vec();
-            archive.insert_object(object)?;
+            archive.insert_object(object, Default::default())?;
         }
         for (identifier, uid) in [
             (
@@ -896,9 +897,10 @@ fn insert_hidden_state_objects(
                     type_: HIDDEN_STATE_FORMULA_OWNER_MESSAGE_TYPE,
                     data,
                 }],
+                Default::default(),
             )?;
             object.archive_info.message_infos[0].versions = STANDARD_MESSAGE_VERSION.to_vec();
-            archive.insert_object(object)?;
+            archive.insert_object(object, Default::default())?;
         }
         Ok(())
     })?;
@@ -999,6 +1001,7 @@ fn patch_model(
                 type_: graph.model_message_type,
                 data,
             },
+            Default::default(),
         )?;
         let references =
             &mut object.archive_info.message_infos[graph.model_message_index].object_references;
@@ -1082,6 +1085,7 @@ fn patch_info(
                 type_: graph.info_message_type,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })

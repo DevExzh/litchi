@@ -56,14 +56,18 @@ fn rewrite_archive_member(
     member_name: &str,
     mutate: impl FnOnce(&mut Archive) -> TestResult<()>,
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == member_name)
         .ok_or_else(|| format!("missing archive member {member_name}"))?;
-    let mut archive = Archive::parse(SnappyStream::decompress(entry.data())?.as_bytes())?;
+    let mut archive = Archive::parse(
+        SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+        Default::default(),
+    )?;
     mutate(&mut archive)?;
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(member_name, compressed.as_slice())],
         Limits::default(),

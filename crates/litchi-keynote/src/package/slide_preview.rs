@@ -374,7 +374,7 @@ fn invalidate_if_needed_inner(
     budget: &mut ScanBudget,
 ) -> Result<bool, InvalidationError> {
     charge_scan_archive_structure(object, false, budget)?;
-    object.validate_with_limits(archive_limits)?;
+    object.validate(archive_limits)?;
     charge_scan_message_selection(object, budget)?;
     let message_index = selected_message_index(object)?;
     budget.add_work(1)?;
@@ -406,7 +406,7 @@ fn invalidate_if_needed_inner(
     // The core replacement revalidates the enclosing object and walks its
     // metadata again before its atomic commit.
     charge_scan_archive_structure(object, true, budget)?;
-    object.replace_message_pruning_references_preserving_header_with_limits(
+    object.replace_message_pruning_references_preserving_header(
         message_index,
         RawMessage {
             type_: SLIDE_NODE_MESSAGE_TYPE,
@@ -2762,6 +2762,7 @@ mod tests {
                 type_: SLIDE_NODE_MESSAGE_TYPE,
                 data: payload,
             }],
+            Default::default(),
         )?;
         let fields = &mut object.archive_info.message_infos[0].field_infos;
         fields
@@ -2786,6 +2787,7 @@ mod tests {
                     data: vec![0xa5; PAYLOAD_BYTES],
                 },
             ],
+            Default::default(),
         )?;
         let info = &mut object.archive_info.message_infos[1];
         info.versions.extend(
@@ -2879,6 +2881,7 @@ mod tests {
                 type_: SLIDE_NODE_MESSAGE_TYPE,
                 data: payload,
             }],
+            Default::default(),
         )?;
         object.archive_info.message_infos[0] = MessageInfo {
             object_references: vec![77, 78, 99],

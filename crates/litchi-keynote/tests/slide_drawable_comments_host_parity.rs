@@ -106,16 +106,16 @@ fn route_path(message_type: u32) -> Option<&'static [u32]> {
 
 fn component_archives(source: &[u8]) -> TestResult<Vec<(String, Archive)>> {
     let mut archives = Vec::new();
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     for entry in catalog.iter() {
         if !entry.name().ends_with(".iwa") {
             continue;
         }
-        let stream = match SnappyStream::decompress(entry.data()) {
+        let stream = match SnappyStream::decompress(entry.data(), Default::default()) {
             Ok(stream) => stream.into_bytes(),
             Err(_) => continue,
         };
-        let archive = match Archive::parse(&stream) {
+        let archive = match Archive::parse(&stream, Default::default()) {
             Ok(archive) => archive,
             Err(_) => continue,
         };
@@ -132,9 +132,9 @@ fn component_containing_object(source: &[u8], identifier: u64) -> TestResult<(St
 }
 
 fn replace_component(source: &[u8], component_name: &str, archive: Archive) -> TestResult<Vec<u8>> {
-    let bytes = archive.to_bytes()?;
-    let compressed = SnappyStream::compress(&bytes)?;
-    let catalog = Catalog::from_bytes(source)?;
+    let bytes = archive.to_bytes(Default::default())?;
+    let compressed = SnappyStream::compress(&bytes, Default::default())?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entries = catalog
         .iter()
         .map(|entry| {
@@ -253,6 +253,7 @@ fn reorder_slide_owned_drawables(archive: &mut Archive, slide_identifier: u64) -
             type_: SLIDE_MESSAGE_TYPE,
             data: output,
         },
+        Default::default(),
     )?;
     Ok(())
 }
@@ -297,6 +298,7 @@ fn morph_square_route(
             type_: message_type,
             data,
         },
+        Default::default(),
     )?;
     let (_, slide_identifier, _) = first_slide(source)?;
     if reverse_source_order {
@@ -501,6 +503,7 @@ fn attach_comment(source: &[u8], entry: &DrawableEntry, comment_id: u64) -> Test
             type_: entry.message_type,
             data,
         },
+        Default::default(),
     )?;
     replace_component(source, &component_name, archive)
 }
@@ -557,13 +560,14 @@ fn append_reply_and_second_root(
             type_: COMMENT_STORAGE_MESSAGE_TYPE,
             data: reply_payload,
         }],
+        Default::default(),
     )?;
     if let Some(author) = author.as_ref() {
         reply.archive_info.message_infos[0]
             .object_references
             .push(author.identifier);
     }
-    archive.insert_object(reply)?;
+    archive.insert_object(reply, Default::default())?;
 
     let mut root_payload = archive
         .object(root_identifier)
@@ -592,6 +596,7 @@ fn append_reply_and_second_root(
             type_: COMMENT_STORAGE_MESSAGE_TYPE,
             data: root_payload,
         },
+        Default::default(),
     )?;
 
     let second_root_payload = tsd::CommentStorageArchive {
@@ -614,6 +619,7 @@ fn append_reply_and_second_root(
             type_: COMMENT_STORAGE_MESSAGE_TYPE,
             data: second_root_payload,
         }],
+        Default::default(),
     )?;
     if let Some(author) = root.author {
         second_root.archive_info.message_infos[0]
@@ -623,7 +629,7 @@ fn append_reply_and_second_root(
     second_root.archive_info.message_infos[0]
         .object_references
         .push(reply_identifier);
-    archive.insert_object(second_root)?;
+    archive.insert_object(second_root, Default::default())?;
     Ok((
         replace_component(source, &component_name, archive)?,
         reply_identifier,
@@ -770,13 +776,13 @@ fn annotation_author_state(
 }
 
 fn native_watermark(source: &[u8]) -> TestResult<u64> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == "Index/Metadata.iwa")
         .ok_or_else(|| io::Error::other("missing native metadata component"))?;
-    let stream = SnappyStream::decompress(entry.data())?.into_bytes();
-    let archive = Archive::parse(&stream)?;
+    let stream = SnappyStream::decompress(entry.data(), Default::default())?.into_bytes();
+    let archive = Archive::parse(&stream, Default::default())?;
     let message = archive
         .objects
         .iter()
@@ -1305,7 +1311,11 @@ fn without_annotation_author_storage(source: &[u8]) -> TestResult<Vec<u8>> {
             object.archive_info.message_infos[message_index]
                 .object_references
                 .retain(|identifier| *identifier != storage_identifier);
-            object.replace_message(message_index, RawMessage { type_: 1, data })?;
+            object.replace_message(
+                message_index,
+                RawMessage { type_: 1, data },
+                Default::default(),
+            )?;
             changed = true;
             break;
         }

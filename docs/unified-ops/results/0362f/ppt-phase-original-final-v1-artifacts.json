@@ -1,0 +1,2692 @@
+[
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/abort.json",
+    "bytes": 328,
+    "sha256": "f2fecf3585c3b089748ff886a4b6b6cfdedb26a84d4ea5e7b909b62babdee353"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-0-before-after.host.json",
+    "bytes": 51982,
+    "sha256": "b286051dc56052573c00c4094986c887967451fe268eadabad44e86a93be34b2"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-0-before-before.host.json",
+    "bytes": 52064,
+    "sha256": "a68084b83c9eb18e89770b7154614e4dcdc643f63ebe6613a95dc30a17a31198"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-0-before-during-0001.host.json",
+    "bytes": 52695,
+    "sha256": "0c99e306abab7befc1b0ff701fc7737df41aa7f27ff97509fac748fefac39b72"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-0-before-during-0002.host.json",
+    "bytes": 52695,
+    "sha256": "4a500fb462b1323f2400f6f3a81d88f7d99a53870d7367ac033fe209bf7ba566"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-0-before-during-0003.host.json",
+    "bytes": 52695,
+    "sha256": "f3106f9e62b0c01a83a6bad2dfd533693792918ce07b7584765d70d2db440e42"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-0-before-during-0004.host.json",
+    "bytes": 52689,
+    "sha256": "e012eee8ccb72b9f87428f7eea8c1b62887ee2eba86f6a13c95c333f38e22061"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-0-before-during-0005.host.json",
+    "bytes": 52665,
+    "sha256": "12481e4e972d33e76a0d79a641e833740d23645265ec13d2dc8cddaa34ae0aec"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-0-before-during-0006.host.json",
+    "bytes": 52641,
+    "sha256": "28816c1e233679730066deddf8e8ed61ad1fe260e8ab4266e5f8b45856e8f415"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-0-before-during-0007.host.json",
+    "bytes": 52655,
+    "sha256": "ce29575590effe4878aaceb35d31eb1a1ecb8ab98d8745d80dba5c33f87ed3ae"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-0-before-during-0008.host.json",
+    "bytes": 52710,
+    "sha256": "78f3f3f7d89f49949d83d526622fd33774cec383edac8fc03e5136ae5844e596"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-0-before-during-0009.host.json",
+    "bytes": 52712,
+    "sha256": "2fba1e2cfbbc31f625c28541aec02c3e854eb5a891991dc4fbf7aa81d785e7df"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-0-before-during-0010.host.json",
+    "bytes": 52712,
+    "sha256": "45c50a808cb4d9c4b71f20404024978c58c23d230de0923faeedf44614043720"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-0-before-during-0011.host.json",
+    "bytes": 52676,
+    "sha256": "9753522c10538bee14d2967336b7af0ad4ab8f915fde59bb01435d558f926f0a"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-0-before-during-0012.host.json",
+    "bytes": 52655,
+    "sha256": "0ef305bb18d7334d4afd8c723ca571640dd5445ca51955df668537bd63002b7d"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-0-before-during-0013.host.json",
+    "bytes": 52658,
+    "sha256": "4b464e19b2ed43203787db86e73d82d7dba384cdacac79e3721c38693103d16f"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-0-before-during-0014.host.json",
+    "bytes": 52658,
+    "sha256": "6588f497d8a4b9841839d92bca78a6dda5c24e64d348bbac0b7a388299e72206"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-0-before-during-0015.host.json",
+    "bytes": 52610,
+    "sha256": "e8f71e3a2bce13ee6fe84ae4f0f104474d77a52ed41b4822f22c70e966679fc3"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-0-before-during-0016.host.json",
+    "bytes": 52622,
+    "sha256": "55f5c13e65dc2cdbb42ee7b6f2f012531b732f365703ddaadd671551bd20a670"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-0-before-during-0017.host.json",
+    "bytes": 52697,
+    "sha256": "c4b0af2c03250a3186f2294ae333c0ab3f50aabb2312fd5f5e9453e549fe6bd6"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-0-before-during-0018.host.json",
+    "bytes": 52714,
+    "sha256": "36ca9e10a45f6802b5aaba1b002396a5cc5665199e89b80bc0745a5f24b7f5d6"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-0-before-during-0019.host.json",
+    "bytes": 52726,
+    "sha256": "ae304150ae79f6e03ab8ca702fd047c140aedae457c4913dd4fc01cba1fd74cf"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-0-before-during-0020.host.json",
+    "bytes": 52714,
+    "sha256": "8214959669dcfd9721e9245259b4926652c66e2873a9f33571f662a92d5fc798"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-0-before-during-0021.host.json",
+    "bytes": 52702,
+    "sha256": "bf43bc725b8111499fad36e37dd1db3431729d0eb6105a5ae0d2353d395d58f3"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-0-before-during-0022.host.json",
+    "bytes": 52690,
+    "sha256": "163102686fbe9156a1a08d0f23455f36a8d0db8114ea59d77babe4136cb8f9c2"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-0-before-during-0023.host.json",
+    "bytes": 52678,
+    "sha256": "05d7c7ebfd6fad62e8c5dd3ff11401c9b9a520ceb811cb9344814517c96619d1"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-0-before-during-0024.host.json",
+    "bytes": 52678,
+    "sha256": "4952c74aefe894b7415a3aa6c3e465820f8514662ee12e7a7074cc623e62796a"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-0-before-during-0025.host.json",
+    "bytes": 52672,
+    "sha256": "c0417cdadcbe7096c6958b37e3013703b88be0dfb1bc67fad81d42623586a852"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-0-before-during-0026.host.json",
+    "bytes": 52738,
+    "sha256": "0158501e78b354a8aa58ae680b257bdc67764e99036567a85101197d9db901c7"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-0-before-during-0027.host.json",
+    "bytes": 52726,
+    "sha256": "01e3c43b9e6c960a7f163dfc6392a46c614d37be13093336992f1aa0aabb6086"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-0-before-during-0028.host.json",
+    "bytes": 52702,
+    "sha256": "871280f09e37fa307c57502002b0ed09f389de6c1d4dbb0423884d4f1f697493"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-0-before-during-0029.host.json",
+    "bytes": 52690,
+    "sha256": "e9d1e10cfdec0865d053cab7ed27e0d182b256df5b909e300294f02372e64333"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-0-before-during-0030.host.json",
+    "bytes": 52690,
+    "sha256": "7cebf9100d002aec30250ae8b6fa85c03fcfbf1025789a6c150fa2b9fcfddb7a"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-0-before-during-0031.host.json",
+    "bytes": 52655,
+    "sha256": "f523d93f0d63489e7e8615e254201f8bb0146f284873782ea65f77dced5cfb1f"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-0-before-during-0032.host.json",
+    "bytes": 52666,
+    "sha256": "577fdc362837a51034f460a4136f49bc2bc3dc624edd4c474948280432961c0b"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-0-before-during-0033.host.json",
+    "bytes": 52624,
+    "sha256": "d063a8f702b290918d8b063974d61ebaf92cad7e2cd9a6ed1a407decee9375d8"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-0-before-during-0034.host.json",
+    "bytes": 52429,
+    "sha256": "3a42691688db7e7693bae6955259456b539d1cd0e8016923c64bd1a1e078d6a0"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-0-before.parsed.json",
+    "bytes": 1485,
+    "sha256": "aaa382d79df8aca775cc90622bbb7fce116510d6b383a794d4f9ea4e2fc4c41f"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-0-before.receipt.json",
+    "bytes": 1261,
+    "sha256": "79bfd409349d76f4175279d0a607c935f6657021e1b7a479d2467c5076799a7a"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-0-before.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-0-before.stdout",
+    "bytes": 596,
+    "sha256": "b86d83ecf8510b44bcd788b8fa0325389aca0878ba2d1db5d3a283e27676f1fe"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-0-before.time",
+    "bytes": 938,
+    "sha256": "24a2e5eee446dfd17505f4007e77d308064673804eb211d61f009d54cb2f20c7"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-1-after-after.host.json",
+    "bytes": 51988,
+    "sha256": "0e2bf95509a32292945792fe8a69bba7b453bd5813c9131796572eaff5754773"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-1-after-before.host.json",
+    "bytes": 51988,
+    "sha256": "3a6ada9a03e706248fe23195a22895531975a845681d4482d66356cfe5990c85"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-1-after-during-0001.host.json",
+    "bytes": 52703,
+    "sha256": "e276d7ce3440c7103141c7943af684514484cd45dc43d9ce285fae728f21a0f4"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-1-after-during-0002.host.json",
+    "bytes": 52677,
+    "sha256": "9e502e7f21b49ec083877df2280fc1e6bca581787ef4333e977cb25a25f2b100"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-1-after-during-0003.host.json",
+    "bytes": 52697,
+    "sha256": "9d1157eb1dd318f387b428ce9de28375ee6a8bb3d6c42857c767891f1be71774"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-1-after-during-0004.host.json",
+    "bytes": 52691,
+    "sha256": "25a6eef34cd67cc79131f81f004e29f2409e60dafc93c8d9e7614c698e8b25e2"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-1-after-during-0005.host.json",
+    "bytes": 52685,
+    "sha256": "f294906e80bb6097c85b64ec2ddb77fd0064ee9d75c8421d8160b463053a20f3"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-1-after-during-0006.host.json",
+    "bytes": 52685,
+    "sha256": "915c97466650bf6373ef6fa232ab792895203acdf2ce728b0071b2e848d9d054"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-1-after-during-0007.host.json",
+    "bytes": 52685,
+    "sha256": "1274decfe08bd91730128a9a04c439f6764d58b4bf0be2079b752037ca953884"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-1-after-during-0008.host.json",
+    "bytes": 52643,
+    "sha256": "891b9d97ef3769844e77b55ddd468898f884a8d073df55fabf0c5fc79c38dc4a"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-1-after-during-0009.host.json",
+    "bytes": 52649,
+    "sha256": "02737647a23ba083cfc69973508d042328bbfe512e9983e62c739091319a2dd5"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-1-after-during-0010.host.json",
+    "bytes": 52685,
+    "sha256": "fa5d00b47089bfc530db3b9a74f332e71e6019763ad2535cee3e87ac2798f51f"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-1-after-during-0011.host.json",
+    "bytes": 52662,
+    "sha256": "026ee6e2a3447187f07238b676419fd60974fa2a54b1faebeda0d27bdf33a69e"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-1-after-during-0012.host.json",
+    "bytes": 52643,
+    "sha256": "5770cd4374dc97c1eadebb9def13da80ba7a217ba70a182ffae4e54c5ff72d3f"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-1-after-during-0013.host.json",
+    "bytes": 52619,
+    "sha256": "f9c0d608150551fcaae1e480057c03cfdc11678253698bc70171655597de60f0"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-1-after-during-0014.host.json",
+    "bytes": 52621,
+    "sha256": "fb8bc17b85f589d0d4b8d95e4e56caf9e7c55783e5e90ca408a087a727a7d043"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-1-after-during-0015.host.json",
+    "bytes": 52608,
+    "sha256": "a9bc65432b06ff9ff78079f15178bf765bd3d634252a7989107ad4c665be96bf"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-1-after-during-0016.host.json",
+    "bytes": 52621,
+    "sha256": "8000ee3adbc07e9226fdec76257b9b639c78422dac747c315c8a6d81e91ea43b"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-1-after-during-0017.host.json",
+    "bytes": 52579,
+    "sha256": "42907936898c7cecb1a6b703f0a30cada0ac88e58b981395d74b15552013b971"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-1-after-during-0018.host.json",
+    "bytes": 52615,
+    "sha256": "f79ea3c0aba8222b9c733d5ea6f061e2f0e5ac27541303c8bf9102c5d513feb4"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-1-after-during-0019.host.json",
+    "bytes": 52691,
+    "sha256": "43aefea1db1e14c4141350c293258a7fb1825cc2b140c0d8e3eb4c7dc2c4c64f"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-1-after-during-0020.host.json",
+    "bytes": 52693,
+    "sha256": "1027da0cde7a832ade2b59ee49551c973cd592047310490c33b05aaa6e8a4523"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-1-after-during-0021.host.json",
+    "bytes": 52699,
+    "sha256": "7192e1d3ca5b88308995822bc2b7bab73b5b8633ffce4ed126d0c39b0420fc20"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-1-after-during-0022.host.json",
+    "bytes": 52693,
+    "sha256": "f84e3baeb212a4b8c1dfe45e9a5c1e7ade05568999a7877f84e887102b6409e3"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-1-after-during-0023.host.json",
+    "bytes": 52663,
+    "sha256": "b4e9a7a23896764f7ebd143c98e0fa33bbb0671d821d6ed62107984ef9c2d15e"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-1-after-during-0024.host.json",
+    "bytes": 52643,
+    "sha256": "3d576af7de6f8d03456a0238a3746c397134e8bfd94746700dc59bd6e2819b59"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-1-after-during-0025.host.json",
+    "bytes": 52645,
+    "sha256": "f20a299fe52476aa110c956de032a0cf736091965a9ca912b058afe618b92d85"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-1-after-during-0026.host.json",
+    "bytes": 52632,
+    "sha256": "596b1f760773b427167de36ec62a13231b7c119a6cf7ee677dc57df2896757b6"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-1-after-during-0027.host.json",
+    "bytes": 52713,
+    "sha256": "107a1fbb362cf30f17f669ebb1ae22a4a62d63a998bdf14742c8ecb10ea1994e"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-1-after-during-0028.host.json",
+    "bytes": 52657,
+    "sha256": "08091776408e6c2cd9d3b01edd49ac3a44ec9ae8d9a8ff8b9da2bc7c6c89a2db"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-1-after-during-0029.host.json",
+    "bytes": 52613,
+    "sha256": "5afce7f79457635c56751a408e600eaa096e77b11038a594a68a00de26ead15d"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-1-after-during-0030.host.json",
+    "bytes": 52607,
+    "sha256": "587d5222f81bd36deb4f413dbbad48d00256dcde76b99ba56cf4bcc64ed9a6bd"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-1-after-during-0031.host.json",
+    "bytes": 52601,
+    "sha256": "d2ea79af5245e3dc2b004b81df22ea7091450f957e2575b882dd9711c476ec67"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-1-after.parsed.json",
+    "bytes": 1490,
+    "sha256": "c99c4f6547ef7be3aab1d0e80fe14c9f2e99aa6ae23f74939a8454e44ea9afd6"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-1-after.receipt.json",
+    "bytes": 1240,
+    "sha256": "5e68101bfff4507dff3c3f4d4b27e428f74b94a62f33c6140376e04fd5f407cd"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-1-after.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-1-after.stdout",
+    "bytes": 605,
+    "sha256": "c0a6d60e06aadfdb7ef0eb741de2a3778bba91ee62726d9ac8cb948297bebecb"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-1-after.time",
+    "bytes": 920,
+    "sha256": "788f2adf78533470fd64529c99f7c18cdea40856ea783ca59761129ad4ca4bac"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-2-after-after.host.json",
+    "bytes": 52008,
+    "sha256": "ee43fd1d8bccc9e93c89a0231873fdc3b67f194e3c763e0d5eb068cbdfa0255d"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-2-after-before.host.json",
+    "bytes": 51981,
+    "sha256": "3991ceec79a439ebaa0f256e9a6917c97a8d556c9aa6d9eb22e62e325030e29a"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-2-after-during-0001.host.json",
+    "bytes": 52577,
+    "sha256": "b2a6b990c2e1fde8e7b55c3d4902a0e9b64243d4560aa60ee854521ebad62313"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-2-after-during-0002.host.json",
+    "bytes": 52553,
+    "sha256": "44505300458396170b5059b0d5b891dd2fb917dcd65ad65de7fa99bdfe01e1c4"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-2-after-during-0003.host.json",
+    "bytes": 52547,
+    "sha256": "14317ce259673df281b2cb35fa14c89549f56d8843b1a12466c013b92784de6a"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-2-after-during-0004.host.json",
+    "bytes": 52678,
+    "sha256": "5d41fafb7379bc31f5048d4df4cdc796b306df0e02de412e9432ae2acae92b41"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-2-after-during-0005.host.json",
+    "bytes": 52714,
+    "sha256": "00da17b493f8ecc66893928a8b2687a05eaa9445cd2570eecd6db6e6fe2ac278"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-2-after-during-0006.host.json",
+    "bytes": 52708,
+    "sha256": "76c251b2b39af2a05ae28103c9d6f5f02373dba353a5c901302031ed6d3a3b59"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-2-after-during-0007.host.json",
+    "bytes": 52708,
+    "sha256": "9397b0f30d19cd5831b8dac4b58efcf8d6e32f6c493e5deb1ef8ea905a95a7e8"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-2-after-during-0008.host.json",
+    "bytes": 52708,
+    "sha256": "bd726d605e1237c79fdcca9cc8610058c8325a37f4d056efa825cab91aba83bd"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-2-after-during-0009.host.json",
+    "bytes": 52696,
+    "sha256": "e599b5f3a632696347238aaba73374e0030d1368e302dd10a3521e17c847c041"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-2-after-during-0010.host.json",
+    "bytes": 52673,
+    "sha256": "0ed3ef2c88d09a2501738517608894cf36c20f764bf4a31c0482756d456dabb7"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-2-after-during-0011.host.json",
+    "bytes": 52673,
+    "sha256": "dfb68d54edcf6a1244d8c05a744801b3dde71a982adab95b8b3ebd5dc1197681"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-2-after-during-0012.host.json",
+    "bytes": 52678,
+    "sha256": "1071cdd4032f2541de357d1701b6003ce65f7ef0f898736ac47ebfe6b4bcf2b6"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-2-after-during-0013.host.json",
+    "bytes": 52702,
+    "sha256": "bb3a5898a6892dc1795a63858588704ec95921bb000f10547022970d6e72f7f6"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-2-after-during-0014.host.json",
+    "bytes": 52696,
+    "sha256": "9e667ca689e07c0eb17a5bb992a1dd273390e51295bd42a8158f328b55add701"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-2-after-during-0015.host.json",
+    "bytes": 52690,
+    "sha256": "1d2ddd47d3d1ada2a7069bf74f9049cf6913998addbf3d043316baf9847a6129"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-2-after-during-0016.host.json",
+    "bytes": 52678,
+    "sha256": "ccc0ae1d5e0b189b422e2747a2e37f7adedd7abb4b5968a623cd80e126ddf9aa"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-2-after-during-0017.host.json",
+    "bytes": 52672,
+    "sha256": "e6e869b1dd1619ecadc93edbe4e4360e60694d40f4e06ec268242d98427de771"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-2-after-during-0018.host.json",
+    "bytes": 52647,
+    "sha256": "63913d862f940a72e48b9c6448fea65b97802ce8522a19426684d5a9ec423ef9"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-2-after-during-0019.host.json",
+    "bytes": 52654,
+    "sha256": "5d4732b704a7ebf44bc988c49f320e401a832bffc1720af504d41c8c73ecec0f"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-2-after-during-0020.host.json",
+    "bytes": 52623,
+    "sha256": "aca45a53999092b67b011fe77d8b20c34f2134bda07ca27e38f91705ac175ccd"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-2-after-during-0021.host.json",
+    "bytes": 52618,
+    "sha256": "9013febf16eeb458c2631e6233060f03da52f5299c5c81c1198a37818439e052"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-2-after-during-0022.host.json",
+    "bytes": 52702,
+    "sha256": "2bf98f070bed038c755ac0ea998c91e6bbdd5ffefc19c88dac3349976cc792b1"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-2-after-during-0023.host.json",
+    "bytes": 52702,
+    "sha256": "1a82e01a359984e6043788d2b1a7724d389de48b9c08e178366bf477e79b1ac7"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-2-after-during-0024.host.json",
+    "bytes": 52685,
+    "sha256": "451d6eb5010cc0ea7bd5594deb903b4fb1d6ef2cdc211b543e8dff78ea8109a0"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-2-after-during-0025.host.json",
+    "bytes": 52679,
+    "sha256": "8c0e0e66d483ae732f54b4c80997e912c9e442cf2466380ce27f257c11121d7f"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-2-after-during-0026.host.json",
+    "bytes": 52679,
+    "sha256": "30905e46fa83cee7a7a9c3f469336da445ee3106efb1e8f9915376cef7bf3484"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-2-after-during-0027.host.json",
+    "bytes": 52667,
+    "sha256": "765cb4232f26a465abeef46a6e2cafcc3702d13792a44b0912b106f72762c63c"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-2-after-during-0028.host.json",
+    "bytes": 52659,
+    "sha256": "21165bb457789205d5a01a49113dacb6e002054661bdd88a7b8881ea09e7ac0b"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-2-after-during-0029.host.json",
+    "bytes": 52646,
+    "sha256": "d9346aa7a56d3cd1b5e86dae48232d78bacb6fc1b159f2fd8bf89c2210c8f96f"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-2-after.parsed.json",
+    "bytes": 1493,
+    "sha256": "b5cb2c9c27491465bfe240e5c965842defdff213436cc93e77de99cf546939eb"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-2-after.receipt.json",
+    "bytes": 1240,
+    "sha256": "adb8b226bde842039ea4977ec529053399539e77ba15f2cbcf981383aff9fb7c"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-2-after.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-2-after.stdout",
+    "bytes": 605,
+    "sha256": "a076987189f6cc0e162f02509bda4e4c359c2fa65753fa3230b29f0937fb2e6c"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-2-after.time",
+    "bytes": 919,
+    "sha256": "e4f5836cc1236887c6f94e6b350daacb59584317461033b7bed7fab941624f4d"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-3-before-after.host.json",
+    "bytes": 51872,
+    "sha256": "fb9c035bc453a224a133ae3353fc363088c37a070c49d695d178a1521997b42f"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-3-before-before.host.json",
+    "bytes": 52008,
+    "sha256": "861589ae25a3b62b1a39d17c8d85b93c0147a6aa7f7a4c1a9ac3ee2bfbd71ab1"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-3-before-during-0001.host.json",
+    "bytes": 52693,
+    "sha256": "427fb18fde5b3380c276e4ca7a4e611026cd6529edfeff61f99b0b486fb38aac"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-3-before-during-0002.host.json",
+    "bytes": 52693,
+    "sha256": "8965f1fa7dec144aa90c1e983df1063ae8ebc4822a896baaba43e0f4d88ec6fe"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-3-before-during-0003.host.json",
+    "bytes": 52729,
+    "sha256": "6a67b64abd05b35abc6c107267a945039f580272355e2d8ae9995180ed2c7ba2"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-3-before-during-0004.host.json",
+    "bytes": 52529,
+    "sha256": "83cb295f0fe9a3ede43e7954e0acb6b1cc1ea56cdc7c293d7a941bec53ddd751"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-3-before-during-0005.host.json",
+    "bytes": 52534,
+    "sha256": "082dd6ed8ac19ea068b72b207b36175b37cfa661ebe426452761a57b0ddf49b8"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-3-before-during-0006.host.json",
+    "bytes": 52522,
+    "sha256": "753ea1f63a9c87ac032e65de0eee0676ba809d921a48a13b9e65da85b073e201"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-3-before-during-0007.host.json",
+    "bytes": 52508,
+    "sha256": "45b019cf9a1d0ca89dff35231db2c1609654a4583cdb65abce84dcebba1a7626"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-3-before-during-0008.host.json",
+    "bytes": 52516,
+    "sha256": "fc771ab14470d61cef81bc1eef872906c597a017037613b009bc9262075e21ac"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-3-before-during-0009.host.json",
+    "bytes": 52485,
+    "sha256": "d043916b3f584e45b304e61c8b519d8568ede94b7666f83563633f7ff99bc5b5"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-3-before-during-0010.host.json",
+    "bytes": 52497,
+    "sha256": "13119eafe993d43ff8d468ec439fc258a68a078044ef2d3c1796cb37e665d503"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-3-before-during-0011.host.json",
+    "bytes": 52573,
+    "sha256": "a362301f00de8794bb6e5e148a87b5a16dfd270a7b048b044a552c7fea9d9a60"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-3-before-during-0012.host.json",
+    "bytes": 52575,
+    "sha256": "0603a26b5c26802ef2bfb28906a5d97b9d11d61b6880fd40026717facbc2ff32"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-3-before-during-0013.host.json",
+    "bytes": 52561,
+    "sha256": "ca7595bcd9796e8e00c4af6310e609bfed39f4a924598009984fda90b88558b9"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-3-before-during-0014.host.json",
+    "bytes": 52547,
+    "sha256": "ba62172a86adca5c8ee6bc85de4245f0a43f934351a270686913ba6daffb3afc"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-3-before-during-0015.host.json",
+    "bytes": 52541,
+    "sha256": "ce080232de9fd6060e1cf3e9c2abead62bb9b1bc02fc99b59356d0f495728798"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-3-before-during-0016.host.json",
+    "bytes": 52542,
+    "sha256": "5f6122681e57e7b9e37bc2eca5a9c17ae6e87e0654572b64251fa825bc7de53a"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-3-before-during-0017.host.json",
+    "bytes": 52542,
+    "sha256": "7a03b87082e714906a9cac304b84264d6593fc6f814653f3af1c3166ca071d45"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-3-before-during-0018.host.json",
+    "bytes": 52521,
+    "sha256": "1a551668c2f38980024e89079ca1eec0e56cce83620ed012a79b4f006978726e"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-3-before-during-0019.host.json",
+    "bytes": 52533,
+    "sha256": "f4c6d5311eb4c1fc6970853075e5402ff7d520ff8eb68f61d28a71674a2be9e2"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-3-before-during-0020.host.json",
+    "bytes": 52570,
+    "sha256": "11b54f84780c9b85840664c2fcaabfa34d18ba11dc5ea6624cad91290ad6eb6e"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-3-before-during-0021.host.json",
+    "bytes": 52730,
+    "sha256": "393fd1e653226302884159a42c523247e6be66787d0e85b25d69e926e334d038"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-3-before-during-0022.host.json",
+    "bytes": 52776,
+    "sha256": "f1a7c408af64fb498ecf698497962398fd3d85d15cb151a452b3680b4845b9fb"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-3-before-during-0023.host.json",
+    "bytes": 52711,
+    "sha256": "c0209c028f68854410a04efa3b61f6f5357b65f2425aa5a1b69e0c6bc7eaa0ee"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-3-before-during-0024.host.json",
+    "bytes": 52706,
+    "sha256": "de51b298fc97d42eeed429508aea86f1f49e3bf231132e79f5cc6476ddc96b4a"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-3-before-during-0025.host.json",
+    "bytes": 52694,
+    "sha256": "10519f89eb04f1fd3c93b9620a4014809b2ebdea61eead93d388876ab32d7324"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-3-before-during-0026.host.json",
+    "bytes": 52688,
+    "sha256": "c890fa612fd877bdada50bd13ef978668af931cc42fb771247ae0ee8737bfffc"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-3-before-during-0027.host.json",
+    "bytes": 52664,
+    "sha256": "4fb80f9d93498f63c04870baecc4e0bbb608bbf7f880b5fd85ba5e1322fa4806"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-3-before-during-0028.host.json",
+    "bytes": 52670,
+    "sha256": "e501b9442fbdef02bca0eb52156c442a083c8f41301d5bc757c4816111691b01"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-3-before-during-0029.host.json",
+    "bytes": 52736,
+    "sha256": "0138480b81af23a50599f873e252ba7c53343d59adf4e724c494cf37dbb3deeb"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-3-before-during-0030.host.json",
+    "bytes": 52820,
+    "sha256": "61a948019ec59fc7554fe0be586b7d3a4f5a48f26b8a059730497181967794a3"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-3-before-during-0031.host.json",
+    "bytes": 52544,
+    "sha256": "b2a5eb18736447ecaa8917f7e7d05c621897339df8a518920597fe715b00f318"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-3-before-during-0032.host.json",
+    "bytes": 52538,
+    "sha256": "0b483e771bf46a93458f4fdf402f12db637f516e3a21027761fd5d1f95105901"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-3-before-during-0033.host.json",
+    "bytes": 52526,
+    "sha256": "e4aa8659cdbcefc8193b619c49881a1c339694f702aed31d79380696364a78ee"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-3-before-during-0034.host.json",
+    "bytes": 52319,
+    "sha256": "283c222745b441dd08e0e235f7f9f8128a22c4b7192121cde4476b10f80ddc85"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-3-before.parsed.json",
+    "bytes": 1486,
+    "sha256": "40c527f70dad60ba6aded92088337be29b55616f6ab88134508f111d7ee3a9dd"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-3-before.receipt.json",
+    "bytes": 1261,
+    "sha256": "ad5e90816548eee69ad418308c7c3f3f76e1032061015e233ad0662a7d311493"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-3-before.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-3-before.stdout",
+    "bytes": 596,
+    "sha256": "1463fecd368273f89f8a7a88a52e72d360bfa3ec85b46bf1f31a85ac2cf87145"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-00-3-before.time",
+    "bytes": 937,
+    "sha256": "28f7ba2cdd293bfe90a48a334664d81742c8efd3c8a004aaa48bed127872e63f"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-0-before-after.host.json",
+    "bytes": 51743,
+    "sha256": "d10a7883ead5613cf5ff47520348007ca7c268499794402f7b067b33a976df19"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-0-before-before.host.json",
+    "bytes": 51877,
+    "sha256": "5a05b3c9abb28ffbcffd46f9416ad7dc8b48f5729bb07c9117a6e24104ea47ad"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-0-before-during-0001.host.json",
+    "bytes": 52524,
+    "sha256": "53cb49f84abfc21eb848cc775331155225c8b55d68df9a44f2e304c725f218ff"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-0-before-during-0002.host.json",
+    "bytes": 52508,
+    "sha256": "e09ee4dda9e385f32d0790c507d419e712d451b6e2aea8bcc67e06547645ba21"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-0-before-during-0003.host.json",
+    "bytes": 52509,
+    "sha256": "dc8e581c8bca262c410c1a689fbac56fa7ead697ca476843899ffb747219d780"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-0-before-during-0004.host.json",
+    "bytes": 52373,
+    "sha256": "040fb3858dba4e970ff45be5fb64f838796010423c9919ff1337c7be868b73ea"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-0-before-during-0005.host.json",
+    "bytes": 52325,
+    "sha256": "919f09e547a72317117402f28986154aba20cda57a92594fffa6da70aeb31513"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-0-before-during-0006.host.json",
+    "bytes": 52294,
+    "sha256": "deac26f5e66dee0af1e5f49f9c9f8439a7e220ab208f02f011a167dd47192bd1"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-0-before-during-0007.host.json",
+    "bytes": 52288,
+    "sha256": "18c0d77afcadf87b0e25d2f4275fe2ceb7dfb0d42825f68a7a64879fff421cb6"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-0-before-during-0008.host.json",
+    "bytes": 52288,
+    "sha256": "7a79a444ddab7d8fec25fca5aff866a7553a578c7792e7325d68b043098e8641"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-0-before-during-0009.host.json",
+    "bytes": 52276,
+    "sha256": "26a4d7dcdac4205786bb4bdbbaa69a2079077437371ebdff10fc8d0e9999c957"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-0-before-during-0010.host.json",
+    "bytes": 52276,
+    "sha256": "1b53deb33d74627770f209da74ceb637e8b3bd2d13d06bc55872ff3c56e0dff7"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-0-before-during-0011.host.json",
+    "bytes": 52236,
+    "sha256": "50768c5611c5164d8a9d7570f2824ac86583d1df835be345ce42c51bec2af0ab"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-0-before-during-0012.host.json",
+    "bytes": 52279,
+    "sha256": "ec029221a9e658574844def6f60d1b086878988f2db7fdb705f86d48292a1931"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-0-before-during-0013.host.json",
+    "bytes": 52369,
+    "sha256": "6e76b656af7e7e85febcff0defb2196616dd046db409415f6b57adf0c26132ca"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-0-before-during-0014.host.json",
+    "bytes": 52381,
+    "sha256": "46dc5db0c51cf87b0b1371dfe30ed0a3da396a77f0967af665556c6904a68d54"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-0-before-during-0015.host.json",
+    "bytes": 52625,
+    "sha256": "c3744bcda1fe509e6353b26183df468c658e86d50e0a74749c170e4bd912c3c1"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-0-before-during-0016.host.json",
+    "bytes": 52311,
+    "sha256": "5abe4ebaec51b741da49a0535e3802e47c0d1708f2104f3829c3956cfe25da29"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-0-before-during-0017.host.json",
+    "bytes": 52299,
+    "sha256": "27f25d1cc7cea0f00c532733b3c428d31a23268954519df5426eb6dc8a167ed0"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-0-before-during-0018.host.json",
+    "bytes": 52287,
+    "sha256": "59abc48a0e279c38a6ee75a2f3366af0c29f4f234a824fadfa48151dbe8747fc"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-0-before-during-0019.host.json",
+    "bytes": 52295,
+    "sha256": "c1197e033d8c083b1276ef3d95235b4630c823875173a583eb5c2e761fad977b"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-0-before-during-0020.host.json",
+    "bytes": 52276,
+    "sha256": "c60f000c49337afb39c9db1db61373915645a28f6eadf5bc77aed5530461842e"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-0-before-during-0021.host.json",
+    "bytes": 52311,
+    "sha256": "6aad339f1216915a897278b2c638cd3c874f9c1e8a9a16277d071fa103226433"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-0-before-during-0022.host.json",
+    "bytes": 52377,
+    "sha256": "89ec23a1f3204c109fc52d6f32edc7e0fe101e1e90a90615d18862fd09eeceb4"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-0-before-during-0023.host.json",
+    "bytes": 52353,
+    "sha256": "ec75ecb156a45f08177188f67e440f259d90b4c99bb0a45febba6c25d5754b7f"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-0-before-during-0024.host.json",
+    "bytes": 52341,
+    "sha256": "ee434fd44b72e518c3015676ec7cc3caeccdf40cae8ea42812f6186b09c2eb4d"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-0-before-during-0025.host.json",
+    "bytes": 52320,
+    "sha256": "a80359e7f4261a3d498037db56ff34a115a96a489c62f8afe1d79342c79b55d9"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-0-before-during-0026.host.json",
+    "bytes": 52298,
+    "sha256": "98ddc841a2a97799c3cbad163e7accf5361d01b7be6f479087eaccfe1d5e28a5"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-0-before-during-0027.host.json",
+    "bytes": 52298,
+    "sha256": "f5c160a8d9503a5f228ea3c6593a2638e21a5bcaceeacca72bb44171b83adaf6"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-0-before-during-0028.host.json",
+    "bytes": 52282,
+    "sha256": "99e42c9778ad9bc1f014607911b9ab0f86806b317f6672b8cc1b29df3aa13792"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-0-before-during-0029.host.json",
+    "bytes": 52265,
+    "sha256": "bb25d892ef8d171f3ca4b4e7b682dd78e158272a22a1c049a4df0d0f42988bb2"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-0-before-during-0030.host.json",
+    "bytes": 52372,
+    "sha256": "4e842ebb9a0a73a12221d3246801cf71d34801e7d5faf1acc1c01a83c14ff8bb"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-0-before-during-0031.host.json",
+    "bytes": 52390,
+    "sha256": "c07dc5722fd7dc511d44029fd949dc800c95eceaedfd9f47a20e14347ead846d"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-0-before-during-0032.host.json",
+    "bytes": 52384,
+    "sha256": "fdb0aa6cfa9cd2a9c90757644b7f5ae3f53677fdb3f970ef5e95025935ff51fb"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-0-before-during-0033.host.json",
+    "bytes": 52396,
+    "sha256": "0143505401a15401e20c29ec081e1861bc66c47050c744b1b3d646346e42dd8c"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-0-before-during-0034.host.json",
+    "bytes": 52385,
+    "sha256": "ff4c6babd66708d0a711229b99d1b1b6ee28937b0a78e899ee229f3865f4c6ae"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-0-before-during-0035.host.json",
+    "bytes": 52385,
+    "sha256": "c5225c83c4df08b5a80ce713f51ea0300e61724ef0251f3af2a5d705e9fa8a78"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-0-before.parsed.json",
+    "bytes": 1485,
+    "sha256": "b7becd81b9931d69aa5151b8c9ec1ede1135dc94076e051f1dc7902ef48b9b4d"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-0-before.receipt.json",
+    "bytes": 1261,
+    "sha256": "7c689498983bea0d77df0e55d07b74667c28d566c6072d5949ef3675a4f1087d"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-0-before.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-0-before.stdout",
+    "bytes": 596,
+    "sha256": "8896a4cdafde7a7ee9929e98dc75ba679ab2d9954f69a6cafc3065750ad2a3b2"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-0-before.time",
+    "bytes": 937,
+    "sha256": "79f53046245269024aff4300b3c09f32b3238e6d2552094e9f8c4d14027d090b"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-1-after-after.host.json",
+    "bytes": 51821,
+    "sha256": "2ece3ece8ab9a0f69cefd715807850cc3ae317309741fdeeb868f80e576737f0"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-1-after-before.host.json",
+    "bytes": 51743,
+    "sha256": "87a85a3949348867a098304fac3c2e3a5beeaff3c139e56366f513c875d8bcba"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-1-after-during-0001.host.json",
+    "bytes": 52344,
+    "sha256": "654787f5cd4d2a6fdd66c9eadb6851a0f564be6728ef465c0f68cf41324b5b0c"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-1-after-during-0002.host.json",
+    "bytes": 52333,
+    "sha256": "3f27bf5ba53a72662c91a5bce0a56417a1db0812e1dc73abba19c03b3af3beb3"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-1-after-during-0003.host.json",
+    "bytes": 52299,
+    "sha256": "c36ccceaa0a8301f55f90ef15cf15d596e6be7c3a36269547ee7be3281ee3f97"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-1-after-during-0004.host.json",
+    "bytes": 52326,
+    "sha256": "7c5d5f98f08c1d0b92d79a6855393f3d08691c8a6a8ce04bbfd532826d22bb32"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-1-after-during-0005.host.json",
+    "bytes": 52298,
+    "sha256": "6003ea05afd0137d8e453416b0744248d720672c6cd00618b084c4ae2fb4baa5"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-1-after-during-0006.host.json",
+    "bytes": 52328,
+    "sha256": "ed718f1f27d14f4a550ce5d15c1a35162a33c51907dd25ecfdf359250a9bc72a"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-1-after-during-0007.host.json",
+    "bytes": 52244,
+    "sha256": "0025893207cc45c68f464c40e79d315b10c9b3b7a280c976bbc7a9e7c394126f"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-1-after-during-0008.host.json",
+    "bytes": 52217,
+    "sha256": "d5c2491f5dfd2277c1e73422a76517f4f1a8d9c0e8769f4604449f8b5809538e"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-1-after-during-0009.host.json",
+    "bytes": 52224,
+    "sha256": "f34bb0509b1c2126879f937ea6adf859134350d246e3bcc696f0462c563d7a66"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-1-after-during-0010.host.json",
+    "bytes": 52212,
+    "sha256": "c4879d8608cea3d2ff1c4faa8a6c2721a002877a6fad9901199281d5074d3d63"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-1-after-during-0011.host.json",
+    "bytes": 52212,
+    "sha256": "f841d625c772008cba133874cb6d1f5566b300925fb602f928dbc57e2264289b"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-1-after-during-0012.host.json",
+    "bytes": 52272,
+    "sha256": "3bc487c68e324218bc054721c6fe663c991254936e19d1ae787833a2da2aee8f"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-1-after-during-0013.host.json",
+    "bytes": 52332,
+    "sha256": "d619934d3be7e44998eef238892e335184df91e5208930844382c975326dbc0f"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-1-after-during-0014.host.json",
+    "bytes": 52338,
+    "sha256": "483654c12b162bc37389a60122e1f24b900b3d699654e61b4734d0b355a76dcf"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-1-after-during-0015.host.json",
+    "bytes": 52338,
+    "sha256": "4bbbb64a822cf6a7858bd9086d0488110fdb42e16d0810a1cd8d3975b106a8aa"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-1-after-during-0016.host.json",
+    "bytes": 52297,
+    "sha256": "c232721f165b49774c8d374b9737c0e23c8312a15d1bcb67b2ae305ce88821a0"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-1-after-during-0017.host.json",
+    "bytes": 52286,
+    "sha256": "477d81b91c7987668f0ec1f89cbed0ccd69b93bd1736bc6f3c3c1fc2bf511757"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-1-after-during-0018.host.json",
+    "bytes": 52286,
+    "sha256": "7853c2a9ca0ad762d7b793a4a2d53243b9f51ec979873fd915545db119c9e9bf"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-1-after-during-0019.host.json",
+    "bytes": 52268,
+    "sha256": "991234d686241d9b5047fb17ba2f4b0a28f8666d7597b48d02c841115b72a207"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-1-after-during-0020.host.json",
+    "bytes": 52317,
+    "sha256": "2856e66c1bd02def1de28b9db094f39840ff4848889a869343fe7ad7aa5c035c"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-1-after-during-0021.host.json",
+    "bytes": 52401,
+    "sha256": "0cabeaec52b7a8d698b61a73c38a7dcc2aa3097cdb404c0835087b1fd66a9d26"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-1-after-during-0022.host.json",
+    "bytes": 52407,
+    "sha256": "c2dbc80da58f5bfcc7c0311cc2b99a1188bef269a675c4be403870a4b28a1055"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-1-after-during-0023.host.json",
+    "bytes": 52401,
+    "sha256": "702ee58740892a716e377125158484f07a7af2f68960d6aed636ddb2f4801e43"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-1-after-during-0024.host.json",
+    "bytes": 52382,
+    "sha256": "df58f64a2b54ad8d2c891289af3c36544925a8405c251b7e839dc5028e7cfea5"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-1-after-during-0025.host.json",
+    "bytes": 52354,
+    "sha256": "8a097d6c0083a505ecb0608d33fb91278320542251f54ffb253f26366467e276"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-1-after-during-0026.host.json",
+    "bytes": 52332,
+    "sha256": "63134cacbcae3fef13adf14a8e5f2d520d545971cbb3c588ec9e43d0163c2cef"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-1-after-during-0027.host.json",
+    "bytes": 52331,
+    "sha256": "f73eefbe1becfdd3381d453aae9a1db816449226cb4d245efeab301a3bcfe586"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-1-after-during-0028.host.json",
+    "bytes": 52438,
+    "sha256": "c079f0c3b28a459ceca3b7573e5624ff2efb0250386cd9ebb4b7464559c09dc7"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-1-after-during-0029.host.json",
+    "bytes": 52341,
+    "sha256": "4790852ed4e80503ceffa36df4cb0ea64ec4e458d4611b21490e68800570f9e9"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-1-after-during-0030.host.json",
+    "bytes": 52405,
+    "sha256": "2e5d6dc03aa217dc620ec9072d00b1cd2b8be4eba20b08b8431a146a1eab43b2"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-1-after.parsed.json",
+    "bytes": 1491,
+    "sha256": "e028098ab22e20ae1aed970785ff98bc691c4007d67d8f49473ca8cd19fa7ab8"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-1-after.receipt.json",
+    "bytes": 1240,
+    "sha256": "19f281cd1f984f29c4f579318aa84d59d8096a06b2e20339758de841a2aba251"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-1-after.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-1-after.stdout",
+    "bytes": 605,
+    "sha256": "a676fdd127d06da2daa9c04c42f90f362d7f3f6958a4c70a24085631062c22ac"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-1-after.time",
+    "bytes": 920,
+    "sha256": "12acd6ab8a57ea63ce54631d896af68fedb4056639098ea01ba4aa0e2b9851b9"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-2-after-after.host.json",
+    "bytes": 51821,
+    "sha256": "8d4a9d0e2ac03066303d903b0894c39d5b0cdd058aad8c1bda25ecf9a0a6db71"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-2-after-before.host.json",
+    "bytes": 51826,
+    "sha256": "c9673c374a09351897e4f3f0465834fd2daf769a419a0aab26279d50019612b2"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-2-after-during-0001.host.json",
+    "bytes": 52427,
+    "sha256": "79af69b0be612a010d33d3f891de9dad659710a32d00cefe7c7bf02db51f3b20"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-2-after-during-0002.host.json",
+    "bytes": 52427,
+    "sha256": "c464697ce0655346428634e6122225fd311b7ace47cb099f596b9558665a2855"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-2-after-during-0003.host.json",
+    "bytes": 52408,
+    "sha256": "061dd836f13fbebc4179c80917b8076b2a6a3909ee690bfde2cf99670837637c"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-2-after-during-0004.host.json",
+    "bytes": 52437,
+    "sha256": "805e06ae64f45e9ebe661d736f179266bf381fc8d5055cc8694fc9ebf5723165"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-2-after-during-0005.host.json",
+    "bytes": 52437,
+    "sha256": "e3bb1e3850713050c819e58a71b42e816b137b2a1e6c2037e35c620d2423191f"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-2-after-during-0006.host.json",
+    "bytes": 52437,
+    "sha256": "0a62aa33c241367867cd9979b7dc336decc076a8d6c69a483c13ae4b6faa9012"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-2-after-during-0007.host.json",
+    "bytes": 52440,
+    "sha256": "4eb70a7107134f440ee37279c653ba9d4c871307657e14002ff23fcf2828f7ae"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-2-after-during-0008.host.json",
+    "bytes": 52458,
+    "sha256": "77924f3b5d5d88a4b2dafbe6b1e3b36fad64a56c6f25d4032ec7be59d4c2ea7f"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-2-after-during-0009.host.json",
+    "bytes": 52492,
+    "sha256": "6870d3f350c964d093b1de5263e02eb3fcf6c7afa9b95dc77206e4f35fcaf3cd"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-2-after-during-0010.host.json",
+    "bytes": 52480,
+    "sha256": "e42fc3723b4bb2d996fb894a4af16c1141ead470755deea3b14160c3d64b3f52"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-2-after-during-0011.host.json",
+    "bytes": 52468,
+    "sha256": "7102e17eb702d36f1433008eb24b55548ff901ffcd72df79fc2573163143bcfa"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-2-after-during-0012.host.json",
+    "bytes": 52438,
+    "sha256": "f833de88b9a1c0cb557b3c1e1ebcaea1f0dfe6daac3b6a06588f336449a1cf31"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-2-after-during-0013.host.json",
+    "bytes": 52438,
+    "sha256": "0b91571f0cedfca7f163d45413c64eb5e0396fdebb9d33e45e8f9e163bd62680"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-2-after-during-0014.host.json",
+    "bytes": 52426,
+    "sha256": "e27ea5ebc4668810a6baca28cffa5bd08ee0e3f791417bce4a23fa226a89f09f"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-2-after-during-0015.host.json",
+    "bytes": 52396,
+    "sha256": "13fa339471617f347f76d29be91b0d22adca7042881f39fc23e6bcd109129050"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-2-after-during-0016.host.json",
+    "bytes": 52360,
+    "sha256": "044a5568d6c2410ee12166459852a6bdcfad51fccd9320e1375a554d9119cd1a"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-2-after-during-0017.host.json",
+    "bytes": 52450,
+    "sha256": "11d142e87a1699d30a421f4f07c9324d583fe1eda3f7ca8ae27583d8fc1c9fad"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-2-after-during-0018.host.json",
+    "bytes": 52474,
+    "sha256": "35bead126b26b6a04cc90a64fb24b23273011d921b945811fe3cc72a0064c036"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-2-after-during-0019.host.json",
+    "bytes": 52468,
+    "sha256": "2323e550634caa6b22d5cea91310b80be51b589939f39f006c82bba10b7d3c44"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-2-after-during-0020.host.json",
+    "bytes": 52468,
+    "sha256": "f4a651cd49eba8e3585e54a9c4569eb92578e2b7be252b7cd88049dfbadb0945"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-2-after-during-0021.host.json",
+    "bytes": 52462,
+    "sha256": "c7611708e9d5c921306a83aebf5ce9f37fa70377548b89d5638c5d7d53752984"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-2-after-during-0022.host.json",
+    "bytes": 52462,
+    "sha256": "d8b15788b41492ab72faf12931d53d915ee13010e8626b8a92076e4fcc9ebf65"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-2-after-during-0023.host.json",
+    "bytes": 52456,
+    "sha256": "3e9d52a291bc62175838cfe2aec98556e91fd41d265f7a69231e6aace60d11d5"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-2-after-during-0024.host.json",
+    "bytes": 52456,
+    "sha256": "6a539af358efc32602a2799cd335e1cf34afd6f94ba918ded9c415d365027fce"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-2-after-during-0025.host.json",
+    "bytes": 52415,
+    "sha256": "8c077e0c673c9ecb8b7bf09597951e842e4506e7cc5124dca47a1f3b0ce9f0c2"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-2-after-during-0026.host.json",
+    "bytes": 52427,
+    "sha256": "78584958aafba26121d6059e813abe1dfdecefcc67804c08b52b53d4b0ba6027"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-2-after-during-0027.host.json",
+    "bytes": 52480,
+    "sha256": "44416c8494240857b68a4d52100e06cdade38ebaf38597afd4de3522c7a20fcf"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-2-after-during-0028.host.json",
+    "bytes": 52476,
+    "sha256": "676bad3279eafd44530b1c0b70e2f28ead128d0d5732a754b721c2036f9a51cb"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-2-after-during-0029.host.json",
+    "bytes": 52450,
+    "sha256": "108f612884013399e728d43400e8f8a7d9a376210932ae998193b29752bd8183"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-2-after-during-0030.host.json",
+    "bytes": 52446,
+    "sha256": "2abef8b48566b6fe707d937c97eaca60b665c0b542b1d754531c9912ca1c5a90"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-2-after.parsed.json",
+    "bytes": 1488,
+    "sha256": "2c42c01c41c4bdbac1f1d6120763e3d8b4d1870a42ccb7d1ab2dc150023d460c"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-2-after.receipt.json",
+    "bytes": 1240,
+    "sha256": "679a79942a6341b796222e3e3884d7ba9fbda385e272a9d6e8909ca6cdd6dde1"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-2-after.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-2-after.stdout",
+    "bytes": 605,
+    "sha256": "d21c6bd40f1b09e765c97eee6dccad4de4c5bb59cf57bb774d6fde6e7d2381ba"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-2-after.time",
+    "bytes": 921,
+    "sha256": "b724cf518a002a78ca6e400613be7be8a611c3f7cd6f84b3e719640ab04f5181"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-3-before-after.host.json",
+    "bytes": 51824,
+    "sha256": "943dd408504d026867041badeabda7c97ac2b68b2a9506b33ffc8b6ff0111884"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-3-before-before.host.json",
+    "bytes": 51829,
+    "sha256": "12223d5750182aad5443b9ebab8268f201a758e56fa7a123d48bb132e2b1e859"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-3-before-during-0001.host.json",
+    "bytes": 52463,
+    "sha256": "b8fe196284a4cdcd4abfe2cbcaeb5a762bfa79cc10365f5db44f5cbf093839e7"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-3-before-during-0002.host.json",
+    "bytes": 52397,
+    "sha256": "785e211baf34f276b2c7331864a29cf18b3e0a9fa5d634fc6c966b808e570e6e"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-3-before-during-0003.host.json",
+    "bytes": 52421,
+    "sha256": "d3c8dca689cc3a721131ecb57dd721053cad117301a140d0dbe59871729f9982"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-3-before-during-0004.host.json",
+    "bytes": 52487,
+    "sha256": "587fcc6d493e8179bf67b3b00b5573a020fcddf4250a3af2c42a6b3576fa3190"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-3-before-during-0005.host.json",
+    "bytes": 52493,
+    "sha256": "8f907274e7dd0e554a4394aa14be1e950e8e4240c2dcafaed7cecd3ad76be4c9"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-3-before-during-0006.host.json",
+    "bytes": 52517,
+    "sha256": "22cb8770b26853468ae7c9e50380cd56d80ffec1338acf70b288c5e978bb4db1"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-3-before-during-0007.host.json",
+    "bytes": 52511,
+    "sha256": "c54f43da3902b81af2b0ea4f67f8b8a2d4b6ad69f52366697a5f4199d116bbde"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-3-before-during-0008.host.json",
+    "bytes": 52505,
+    "sha256": "01e9dab6e246dac9eae45a2a0688716cc9c6fea1960e0d2aca946149aa7948d8"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-3-before-during-0009.host.json",
+    "bytes": 52473,
+    "sha256": "c791145ff867741548c9054b353a6e1701a90e4178c1013281ccb3f1da676428"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-3-before-during-0010.host.json",
+    "bytes": 52479,
+    "sha256": "c2a405a836e89d6340facd144916cf2df7eddf819595de7768b15671a0adbd53"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-3-before-during-0011.host.json",
+    "bytes": 52459,
+    "sha256": "e9383ad7a47e0da83896e8c5c82a5f2441e7f42725c27d2a36e7bf2702f1f7d1"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-3-before-during-0012.host.json",
+    "bytes": 52472,
+    "sha256": "0523c4eb005fbf163ec03846dfc19d3847b8e6a949c1f383463ad7bf8d573d36"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-3-before-during-0013.host.json",
+    "bytes": 52526,
+    "sha256": "70368e40f78538e48f46174017dd90f764858dd3ca41cd64c0c21d55d97b3848"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-3-before-during-0014.host.json",
+    "bytes": 52478,
+    "sha256": "dd4d49247c028169bcf838527322996de5b603d5b79acb60df8f9ead60bb8d59"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-3-before-during-0015.host.json",
+    "bytes": 52454,
+    "sha256": "dedef829e18a795f1e13b0a75af81274f4f35f7d5517cc1efaf6fdbc9718639d"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-3-before-during-0016.host.json",
+    "bytes": 52448,
+    "sha256": "d2d5e79cd1065bc2ac27c18ad75b90bad5557289335fd37737d18d947836a564"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-3-before-during-0017.host.json",
+    "bytes": 52439,
+    "sha256": "47807041b79b53922e1300ba3192f3dc896737c8b77143ad8360e6f75b0d49cf"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-3-before-during-0018.host.json",
+    "bytes": 52435,
+    "sha256": "556783971759567461b1f915788fc55536a166c3137807541ad9b92b1019b353"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-3-before-during-0019.host.json",
+    "bytes": 52422,
+    "sha256": "5279ebdfa9abda5e32d7f9147a207c2ed726e2b5168bf2d3c4c48c592139c8a6"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-3-before-during-0020.host.json",
+    "bytes": 52411,
+    "sha256": "d4b456e1f0be0cdbf5612278fa8501418d0db6f49a45014e512f07e459487798"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-3-before-during-0021.host.json",
+    "bytes": 52423,
+    "sha256": "f80e5feb2283d8daecfb31bc588597b7528790e5a227256164f57fc4e56ca5a9"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-3-before-during-0022.host.json",
+    "bytes": 52519,
+    "sha256": "5a12cd21d43a2be516c4b539d51cd92183a996fd9697dd9eeb4b897641e87025"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-3-before-during-0023.host.json",
+    "bytes": 52525,
+    "sha256": "046dc4c7d8624aa70ce8436a235da283db940a1ddf52befcb1da9b6ae2523d3f"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-3-before-during-0024.host.json",
+    "bytes": 52525,
+    "sha256": "6bb74e493f326c8b2db63a0be6437267a69874f959774a94624fa942e82a82f4"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-3-before-during-0025.host.json",
+    "bytes": 52519,
+    "sha256": "a94a6a99c367cb15ffc83aa41f93286316695efc91f54b224193281abfdf173c"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-3-before-during-0026.host.json",
+    "bytes": 52517,
+    "sha256": "a69cbb24a5e2564e9f372daf3633b0a9dbce64359ef36bda77b0641b1fcac934"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-3-before-during-0027.host.json",
+    "bytes": 52511,
+    "sha256": "e72ef34155c47dff29c39c521dbd8a7a388717e14631fdc56c1d189c1bb9a212"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-3-before-during-0028.host.json",
+    "bytes": 52505,
+    "sha256": "4c2bdf924f299e4a728794e07131f28ad4ef263ee13a4d80d48de28505982b28"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-3-before-during-0029.host.json",
+    "bytes": 52475,
+    "sha256": "7406d4cdc38305cfd2e5f30101650548516bfafac4938a606a5de9a5536e3367"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-3-before-during-0030.host.json",
+    "bytes": 52463,
+    "sha256": "32ddf630e0d50f5cb8048fcb0242ec84d5b8ba45e18280cbe4892cffb769eb96"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-3-before-during-0031.host.json",
+    "bytes": 52535,
+    "sha256": "e2359063bb9801eeef74bc60bbb7f9e6e187895f5a8a0e3f8a0b0199edc1124e"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-3-before-during-0032.host.json",
+    "bytes": 52524,
+    "sha256": "e37e33c89107860a354c109bdaf187fb5ebf0745b7657ffbe93f6d360721ded0"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-3-before-during-0033.host.json",
+    "bytes": 52496,
+    "sha256": "f070de1c88a8a5f7294467a898e6b750d3c3e674dac246297d93f0d18f780f6d"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-3-before-during-0034.host.json",
+    "bytes": 52484,
+    "sha256": "2668f8c318e79594bfbdfc456ad2081fb143ffa339485c4a5051d87091fe45cb"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-3-before-during-0035.host.json",
+    "bytes": 52466,
+    "sha256": "99030ab553a85673b76bb8891e2f022c0599a46eff0e0f8112bf0a713725ed22"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-3-before.parsed.json",
+    "bytes": 1485,
+    "sha256": "3fc7ef83f20a1e3d34d80c3f3037017a2cf69ddcff289bcee9286de01f9e479f"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-3-before.receipt.json",
+    "bytes": 1261,
+    "sha256": "28d7fd0e7ac1944f424ee8c20e90468703e48ca804e92e6c40cb68a5d7138674"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-3-before.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-3-before.stdout",
+    "bytes": 596,
+    "sha256": "aadfa2629b091291fa1d72f929c12c7cf2cce91ed2623998d01f483e17af5780"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-01-3-before.time",
+    "bytes": 938,
+    "sha256": "f87b39aefb5e31c5721c098906ab162c8c96a112bcb0eab730622d46466aa93d"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-0-before-after.host.json",
+    "bytes": 51832,
+    "sha256": "bd2bd90acee26ba63373d337f18fc558a1feae434edc779f876cff973f7e7a40"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-0-before-before.host.json",
+    "bytes": 51815,
+    "sha256": "e6f5bd59da4f40766800a7c135ad3c4b93e779c6a40d9691e3852ef4dee0b26f"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-0-before-during-0001.host.json",
+    "bytes": 52457,
+    "sha256": "256f0e21105a92f1cc3f411525c88ca0fa9a01b6bbf65d7765429ae46beae98a"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-0-before-during-0002.host.json",
+    "bytes": 52393,
+    "sha256": "4e1f177bea12840e93db237b1b0f6a4f66bc23ce24ab78e0eac9284c828752ad"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-0-before-during-0003.host.json",
+    "bytes": 52435,
+    "sha256": "876eaf75a1f3116de38adf45113481f4b2dfd20fa1b8644badc4ca8934061923"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-0-before-during-0004.host.json",
+    "bytes": 52508,
+    "sha256": "ab488cdbf1fcc3f119cee169e8da1adba9aec53782eb608596770256ee1bf1ec"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-0-before-during-0005.host.json",
+    "bytes": 52532,
+    "sha256": "1b159d65ce445f6e820a5a2761f381c6fc6d564eacdc2fd6499a626bc77bf2ff"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-0-before-during-0006.host.json",
+    "bytes": 52532,
+    "sha256": "a4d6ce1c9ae9ec147cb2718d280d26aab16b76889600648e84d42b017f6a4f16"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-0-before-during-0007.host.json",
+    "bytes": 52526,
+    "sha256": "e17d8b6865a4c1f6e4f328fb7041b154520dfebcb917bc58b636f2e1094652a9"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-0-before-during-0008.host.json",
+    "bytes": 52514,
+    "sha256": "c5bdfe31f176bd41b8a238c6efe79df07a9cd1d58ffa88fcdf3edc659fe4c428"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-0-before-during-0009.host.json",
+    "bytes": 52519,
+    "sha256": "12291d66e997cc6fccf49098fb89623aeb2eedf6f7f54ffb75dbe31f79d7f8a5"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-0-before-during-0010.host.json",
+    "bytes": 52507,
+    "sha256": "74b9384bde8db57cbbd18249c276361b00e83c14ec173b7267a62ecdc2221d6d"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-0-before-during-0011.host.json",
+    "bytes": 52449,
+    "sha256": "98451e706e85a2da2fca0127d0ef0f9e6dba317f6ae2a55c5eb466b6f7827e63"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-0-before-during-0012.host.json",
+    "bytes": 52491,
+    "sha256": "0f85f62865e67f33a2420dc165dfed9d4c3a72734f7417b88390d57496dbc22e"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-0-before-during-0013.host.json",
+    "bytes": 52516,
+    "sha256": "fe7aa5939a522142026309bad06550f619f1f919cb88ea2cad76f0091df81970"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-0-before-during-0014.host.json",
+    "bytes": 52508,
+    "sha256": "b1256e0cf8323da0c0bdaaae8e3659ef05e117704c54693a69e8ff07a7e91771"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-0-before-during-0015.host.json",
+    "bytes": 52490,
+    "sha256": "f9062d625afb960e6441d7b17870936b1aabcff24fb165ef9aca5ce885b606cb"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-0-before-during-0016.host.json",
+    "bytes": 52465,
+    "sha256": "8f2873d2f41e691d34ac14a01325589e6ad8858660bb212199245220bae2af5a"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-0-before-during-0017.host.json",
+    "bytes": 52478,
+    "sha256": "218b6cf31bba6e4283c218fbc7bc8be0fd71f12e35b8d237aa017ff06233bbb8"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-0-before-during-0018.host.json",
+    "bytes": 52472,
+    "sha256": "27fcb18b3e29439803fbe6c84e2a7dc68df96f74aba5977d134585dc2beb5638"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-0-before-during-0019.host.json",
+    "bytes": 52476,
+    "sha256": "cbd4dce2712a2e4707a94d869a033544742039a781dc931ac98dae7ef0a7b8ad"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-0-before-during-0020.host.json",
+    "bytes": 52422,
+    "sha256": "95e758c4dc4f2bad3331ded19de1ff0b304b970b36b03a87479873c0c5d63ffc"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-0-before-during-0021.host.json",
+    "bytes": 52464,
+    "sha256": "ff7dfbc22f36a039ff7c6cbdd3c84574417a376fbd331903453c71d1e3d3aa82"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-0-before-during-0022.host.json",
+    "bytes": 52536,
+    "sha256": "798875bb681ce59247dbdf8b399f843962a92e0480338dc9c29261f3e99598c5"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-0-before-during-0023.host.json",
+    "bytes": 52531,
+    "sha256": "e622a4ce61605aa614395b0e960b532f35111cb2a85afe0d576f8d6a4927b65f"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-0-before-during-0024.host.json",
+    "bytes": 52536,
+    "sha256": "e8b599cd3a6db36d67d4c4f9ed5dc3708d0fd8ac9a8e4db3f05df79f554870ac"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-0-before-during-0025.host.json",
+    "bytes": 52517,
+    "sha256": "4993725a20450beb1db27f5d18c4e6a2969586a23b2342c64573ae73ad70021f"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-0-before-during-0026.host.json",
+    "bytes": 52488,
+    "sha256": "1c1e1e89b342e2a2a46d4c251bf6728b09e69e2e208c5cea498ccf16cb64e333"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-0-before-during-0027.host.json",
+    "bytes": 52482,
+    "sha256": "a49a36c1be18278b5b3e34386279b6d429788efb7628fad495e45f293e37d5a4"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-0-before-during-0028.host.json",
+    "bytes": 52474,
+    "sha256": "e2e35d82469b9c6667f5af3a4f405e0a09b64c5fb103bd375889c4174f4d722c"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-0-before-during-0029.host.json",
+    "bytes": 52468,
+    "sha256": "591ce336ed1704f347de1b67555fa0626e940e1f8daa26304c1bb4e699cca6fd"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-0-before-during-0030.host.json",
+    "bytes": 52474,
+    "sha256": "f2d4507231aa63308769f62beee09810c6294c3876b5f0d12b45e7a1972c0413"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-0-before-during-0031.host.json",
+    "bytes": 52522,
+    "sha256": "acd41865bdb2c93c8265f37c42bf4c4c02000cfe05d9ac975c9b44570c2ad88d"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-0-before-during-0032.host.json",
+    "bytes": 52510,
+    "sha256": "81593d41792f6c6bf86eba797a33da64c43aad314db3c0ce24b66dae9bed8336"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-0-before-during-0033.host.json",
+    "bytes": 52480,
+    "sha256": "fb2bd1fedbe784e99286c0e949865eb5b45c4e0e4eea8e1cb2bd9f9f2dde7d42"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-0-before-during-0034.host.json",
+    "bytes": 52474,
+    "sha256": "55b120b9d6a4885124230d318d22d51d7c1b16b6c39ec0fad56e32d22845ff82"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-0-before.parsed.json",
+    "bytes": 1485,
+    "sha256": "abecc48bebaaab351e2239ab51646451cd43f2c2098bdbee7567ad7fe3649c0f"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-0-before.receipt.json",
+    "bytes": 1261,
+    "sha256": "b7c8e75aaf8632c586fe934f26a1096db4edb9e8c75ad516f49503323ed3e4b4"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-0-before.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-0-before.stdout",
+    "bytes": 596,
+    "sha256": "5b10cc80a136fd06399aeefe36a33a29fc49bb21ca939953578278ccacc67493"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-0-before.time",
+    "bytes": 937,
+    "sha256": "89d80ae5f0c02b9390daaa3b3ac29b5d894a465da831645e30921fc376970663"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-1-after-after.host.json",
+    "bytes": 51873,
+    "sha256": "53085cab38183acf5fd180c3e4ccf5baa0e9e02703f479031af1127437077ea3"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-1-after-before.host.json",
+    "bytes": 51832,
+    "sha256": "f4bc5dfcc6513a0b1cac5125244eec690146b53a9f6e7201202c8a5a97099d27"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-1-after-during-0001.host.json",
+    "bytes": 52433,
+    "sha256": "ac7425b7ec40e0ac9bc2b3f917b802df2837e8526671e0d9785ab4e8f9b1d975"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-1-after-during-0002.host.json",
+    "bytes": 52422,
+    "sha256": "26b5f8c5b2f4488f3ecef83a0fda1c5d0f366237d99c2be9ad036a3dd40a071a"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-1-after-during-0003.host.json",
+    "bytes": 52374,
+    "sha256": "935003d655fdb002415216f2be0907f88f21c6f2e3f853fef2b3faa66425756e"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-1-after-during-0004.host.json",
+    "bytes": 52398,
+    "sha256": "4d141874d3670d47cd774c28c024004aaf6142c4238b85195747c3743503d3a0"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-1-after-during-0005.host.json",
+    "bytes": 52458,
+    "sha256": "7b2ab31200bf54c10d66fac60d0794676526cc39d641f6d9083cc98cbb182b5e"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-1-after-during-0006.host.json",
+    "bytes": 52458,
+    "sha256": "04b7cc907a9a8d19f4d1988e6e89e70772ca74e0507c85551f5105f023a11776"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-1-after-during-0007.host.json",
+    "bytes": 52500,
+    "sha256": "0386f9e8f93811cc323e27e727f019279631e77a1b01ef1be858815c4f526053"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-1-after-during-0008.host.json",
+    "bytes": 52498,
+    "sha256": "5143087ab3e5dd807f3ac319b4d362f5e9759566b66cf186938455dee061e2fc"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-1-after-during-0009.host.json",
+    "bytes": 52486,
+    "sha256": "a2aa84cfefb5968d08f0e3afb639572bbbaa6ffdd730f81467329060ccae978d"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-1-after-during-0010.host.json",
+    "bytes": 52486,
+    "sha256": "eaa3b4bda41e4f52e44b43fbd00be47eccccce5397c3af5f4a23c8b6df27bd3e"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-1-after-during-0011.host.json",
+    "bytes": 52480,
+    "sha256": "ebb2ef0b3a7c62b342193d886b72dc16fef21afc590c135e078dba4af924d46d"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-1-after-during-0012.host.json",
+    "bytes": 52461,
+    "sha256": "73b6534396b1e2433b130902b468e1aa4d4a57918d6e5f42a0d44ab0018fbada"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-1-after-during-0013.host.json",
+    "bytes": 52467,
+    "sha256": "df22b4e908e86adcb1827d78598080fef952d856406b68f570b343daf3c7f3fa"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-1-after-during-0014.host.json",
+    "bytes": 52414,
+    "sha256": "8307af37d2a506bac35c446dfc2fc2fca553c967f0e3e6cb778579ada09468a4"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-1-after-during-0015.host.json",
+    "bytes": 52384,
+    "sha256": "db214de48a0963cb952a7687201ea31e7207740026127e229f0273e73b5aa8f2"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-1-after-during-0016.host.json",
+    "bytes": 52384,
+    "sha256": "36cdd59be2c39120a6b016a55e3794c2dff5a4896cb9ceb445d8df3e7cb0726f"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-1-after-during-0017.host.json",
+    "bytes": 52378,
+    "sha256": "1abc7c1bbda78397970b6e60ba622a4271d1aff5d4cbf444329523c714f6f0c9"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-1-after-during-0018.host.json",
+    "bytes": 52378,
+    "sha256": "e96e3058a18883f8e3730d5e5686111715454fed3498ca2d699bc9cca1761915"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-1-after-during-0019.host.json",
+    "bytes": 52378,
+    "sha256": "5b4172b4355f660c31e4716e6bc19c5d5a717e66fe7d28827fd9933067c711c8"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-1-after-during-0020.host.json",
+    "bytes": 52378,
+    "sha256": "ad16e68bd0291ee6ef529141948aaee17a4a3df9d9500a090c3763d3f0dff41a"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-1-after-during-0021.host.json",
+    "bytes": 52352,
+    "sha256": "31e84655f73f48e983752a2186be0ea6df615169a74c3a4b5e504b6f1f7d1e50"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-1-after-during-0022.host.json",
+    "bytes": 52363,
+    "sha256": "ae8ce2110c4f591a0e1f5fdaf076859fe3cbc1108cc76297b889d15bd50ad0a3"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-1-after-during-0023.host.json",
+    "bytes": 52490,
+    "sha256": "3fdff03641da05c76699e7511c0ef6ac518587b9ca923adccb5fa32d4f2ea41f"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-1-after-during-0024.host.json",
+    "bytes": 52487,
+    "sha256": "7e5641f8692a651218b657a07f9793b8f9938078342057c74722368d27f59563"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-1-after-during-0025.host.json",
+    "bytes": 52496,
+    "sha256": "b0c7df7595da06b5551ca348e7ed6e38b0c20990cda371a2f73e07a8b7a0fab3"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-1-after-during-0026.host.json",
+    "bytes": 52488,
+    "sha256": "ec8776908b2411469dd5d5d3c8df2926ca0eaa8164e8b05fb4887b65f838df8d"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-1-after-during-0027.host.json",
+    "bytes": 52470,
+    "sha256": "5bb8c0376623e3d6e5a076807d19f2bc8ac7fe2b8306f42863c023462561542d"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-1-after-during-0028.host.json",
+    "bytes": 52470,
+    "sha256": "9b0054f748e637b04e3bef80a5176106c69f6d98e26b6a095f1987192edaafe1"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-1-after-during-0029.host.json",
+    "bytes": 52457,
+    "sha256": "42d360e2419cae9a8a27b9c048c374867f462be4497a5bdbef606fc6864ffbc2"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-1-after-during-0030.host.json",
+    "bytes": 52445,
+    "sha256": "7236876a8c53bec5267080e690ccf44f7d6a62498139d85fdc9128d720f940fb"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-1-after.parsed.json",
+    "bytes": 1491,
+    "sha256": "2c486a803d16913aab7eb591bb300bc690c5598943065202c0dd3b7f09b02f61"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-1-after.receipt.json",
+    "bytes": 1240,
+    "sha256": "3d591507e17c699172c1d8f098f18f87237ef88e263d1c936325b06d349bd7b1"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-1-after.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-1-after.stdout",
+    "bytes": 605,
+    "sha256": "ab8753ea266abbe3e10de4ef0213a134ba7f0be31da4a6cf53ac7d82a8ded954"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-1-after.time",
+    "bytes": 920,
+    "sha256": "7e2c6445efae34b15d61711b97bb3120224febab669116647ef1c2ae8f946f17"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-2-after-after.host.json",
+    "bytes": 60424,
+    "sha256": "9edf041bdb86fa6c4dc84f9212a47341058fed6fc30953489264a8b7206e9fd6"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-2-after-before.host.json",
+    "bytes": 51873,
+    "sha256": "cd371e7453c6cd7d54490337fb916360fc20bdc2707df82bee68e755e005afe8"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-2-after-during-0001.host.json",
+    "bytes": 52474,
+    "sha256": "90f3dfafe5863ee1b700bc72ff42d007438584e453d8588a1c1b91689529b9ee"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-2-after-during-0002.host.json",
+    "bytes": 52462,
+    "sha256": "2bd13cc1bf0c12089cada3a0a9d90a32794cd3860f0ce4ccf346fca286fcb9d1"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-2-after-during-0003.host.json",
+    "bytes": 52427,
+    "sha256": "80277dfa67bd95b92e58060da6d0f20f9bd22a4073ebd9e2cfc59f7ec4b0febf"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-2-after-during-0004.host.json",
+    "bytes": 52421,
+    "sha256": "80494bd1ef4854223292a179eb2f7b5e90a4b9b509320d1b0db8e5f3dc6b1625"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-2-after-during-0005.host.json",
+    "bytes": 52426,
+    "sha256": "33b9f1ffa015866cd0a564ac7eedefc552f3e443da131d92f878e7b20ad98701"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-2-after-during-0006.host.json",
+    "bytes": 52420,
+    "sha256": "cac3b5dd60a6cad6e9341a5b47f1d5122d9ddb63be1d3f3fc1dff29feb3b4c6b"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-2-after-during-0007.host.json",
+    "bytes": 52384,
+    "sha256": "0a4337bf72f0e11fab72b5604e7ca1b9f52db01a0cd04829d24358d0be000b58"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-2-after-during-0008.host.json",
+    "bytes": 52390,
+    "sha256": "569930fe5788b936748eb6d93e1152e94e7604bdb6f02f0442855f3aca06377d"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-2-after-during-0009.host.json",
+    "bytes": 52438,
+    "sha256": "4b89ce3e9f9d8478ec298dc5290a9031d575a4f858a5bea155b1930c10de5b1a"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-2-after-during-0010.host.json",
+    "bytes": 52468,
+    "sha256": "b89b835c8b058ba73344ccd66df174d54220f0ec670582e527731464d21cd661"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-2-after-during-0011.host.json",
+    "bytes": 52492,
+    "sha256": "241468fb048bdaf336a62fd8f7f8b93cb540d869a03de24193428d9a82b58afa"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-2-after-during-0012.host.json",
+    "bytes": 52486,
+    "sha256": "678075d08aaedf2fc5622916d65cbfd80ee1d8bc10820c3cfff8182fcc090afa"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-2-after-during-0013.host.json",
+    "bytes": 52467,
+    "sha256": "3b2a350f4d0220fd59c5fdb99589f82068269daaf9887f0e96cb8624382b63b9"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-2-after-during-0014.host.json",
+    "bytes": 52480,
+    "sha256": "481c85ab91baeb5c3a53b6b8c2d5302cd7d8733bc68bbe136afe3d44ab385d97"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-2-after-during-0015.host.json",
+    "bytes": 52479,
+    "sha256": "382c6e006bea0ee3bfb847e2e3c6144abab28ec5539d929a231a17eba7577513"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-2-after-during-0016.host.json",
+    "bytes": 52467,
+    "sha256": "497e7575fb5f0a10bc93528669160926cd596c5ca9b41c042c479f5d299049ae"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-2-after-during-0017.host.json",
+    "bytes": 52451,
+    "sha256": "8b590b59637cdd656acd9de9ad2c1e88f56ea7b66ff10a7a48129daec42d1e6b"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-2-after-during-0018.host.json",
+    "bytes": 52476,
+    "sha256": "40a0f322ffd0b6e3e9205a89ec67d49bd318224179993f2eb6b8ea7d8319805d"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-2-after-during-0019.host.json",
+    "bytes": 52455,
+    "sha256": "adc7a68a1f457977a9d3ba3244c02a68b1eafcdeb150617eabd3287c44ad71cc"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-2-after-during-0020.host.json",
+    "bytes": 52437,
+    "sha256": "333897dab76569e2dbbc7f4d57527c7fc09bc7841538720ddafc6406c66b7ae6"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-2-after-during-0021.host.json",
+    "bytes": 52425,
+    "sha256": "0a80610c3f96a1ca97b2015945d97bc4faf21ffe335f928c6ea2e8e553f5f168"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-2-after-during-0022.host.json",
+    "bytes": 52419,
+    "sha256": "fd5711d41f54280221e091a496936452672d7327ae5ff54d7c66a5d36e1ff37d"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-2-after-during-0023.host.json",
+    "bytes": 52407,
+    "sha256": "507fbf63b896dff2041affc143c19907c6eda65390dbd78f495b37ea0fcef659"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-2-after-during-0024.host.json",
+    "bytes": 52407,
+    "sha256": "e06bab9a0861abbbfe32b9eb071064e54b473e4fcf14b345f4d1ca31191c8d91"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-2-after-during-0025.host.json",
+    "bytes": 52371,
+    "sha256": "55351fa5ccee10e554aa6602b277e4c6cde12a2ea53a241e7154206473bc0b94"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-2-after-during-0026.host.json",
+    "bytes": 60568,
+    "sha256": "1b49d8588f00d477f01c14e75e259cf82c0537f8841c8bb172f6d408cf767ee5"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-2-after-during-0027.host.json",
+    "bytes": 60994,
+    "sha256": "295b4d8061ddeccf57b4e28b667da9ec81929e1df858587ff733753f817775a8"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-2-after-during-0028.host.json",
+    "bytes": 61018,
+    "sha256": "4125a0515ddb222328b6c11442ea5d03a2e6e3453869bbd5256b4f62920a8e1f"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-2-after-during-0029.host.json",
+    "bytes": 60911,
+    "sha256": "976b300d40cfd531c6c935a7c1a2fd7b7b786110a44fd5566d5028845889d2be"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-2-after-during-0030.host.json",
+    "bytes": 61025,
+    "sha256": "0eae3ac248fb873532ade8f067dd0b670e3049476cb5d786db47264ac6669849"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-2-after.parsed.json",
+    "bytes": 1491,
+    "sha256": "af17c85e7b23feb9164023b533c602735b3ff2b3ce1d0b1796b67da3d5817b05"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-2-after.receipt.json",
+    "bytes": 1240,
+    "sha256": "785557289ef9daff95c47d53657964fd96ff07fd929024927ebd0c47615900e4"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-2-after.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-2-after.stdout",
+    "bytes": 605,
+    "sha256": "fb8275cd7423a601ea2af28da0be71db35f9389e82da3367ba887326465a0c07"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-2-after.time",
+    "bytes": 920,
+    "sha256": "2e47321eb5e5686e52b7282cbbb28c62f6c4321eda9457f6c2b89939317bc3f3"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-3-before-after.host.json",
+    "bytes": 62856,
+    "sha256": "deef020b0e37051cb1621f60d5b206741435d6460857c82e842bc4f3f8db47a5"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-3-before-before.host.json",
+    "bytes": 60424,
+    "sha256": "2b851fb95eaebce467245854365b32aaa45e31be0594761d15c9236915be2add"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-3-before-during-0001.host.json",
+    "bytes": 61060,
+    "sha256": "f401855190a2b59377c0e7a6b4890209a25313c887778cd6f7743ff5b8c80b00"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-3-before-during-0002.host.json",
+    "bytes": 61048,
+    "sha256": "8c7ef1e5a0f0d3dc9bb8961049ef54f54af7ae34d230ab33f1589f1d09cef522"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-3-before-during-0003.host.json",
+    "bytes": 61091,
+    "sha256": "5add2963bca0d7cf0d6d9efa6ef17bf0c58c67e3307e12afa746875a68a392d3"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-3-before-during-0004.host.json",
+    "bytes": 61088,
+    "sha256": "095805a21beb5aba7c1b5ad86776504715414cc474ee42349d06544bceb921a4"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-3-before-during-0005.host.json",
+    "bytes": 61157,
+    "sha256": "351c3021cfd68bb0ff58c84336fb032e518aec748e4da6b7d6baaede6021d828"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-3-before-during-0006.host.json",
+    "bytes": 61234,
+    "sha256": "7430fc14e03670501076c77fc761eca4079b3f830750064a66d2de6f6998a39f"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-3-before-during-0007.host.json",
+    "bytes": 61222,
+    "sha256": "e236e44e9b702ef506e97de439fa9740e1c4b6218252362d9ac7e7b0546be037"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-3-before-during-0008.host.json",
+    "bytes": 61222,
+    "sha256": "8323604ccefa4a8fed6ec310642970523f713f5206f5cd6d3497eff36cb42285"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-3-before-during-0009.host.json",
+    "bytes": 61205,
+    "sha256": "361c8e23b32c1f05af4d328afaf0ee38ce32de6dc5869815aa79c91c4369eb7a"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-3-before-during-0010.host.json",
+    "bytes": 61753,
+    "sha256": "b8a4aeb37a7a3ff118ef9b4892a1b7bdbd2952d194ef2eaac90373be8d1c93cf"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-3-before-during-0011.host.json",
+    "bytes": 63535,
+    "sha256": "23d207cd3e149f02cb7ea986a460fc82a436052a7b9804a2fbfb553f24bb0105"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-3-before-during-0012.host.json",
+    "bytes": 63489,
+    "sha256": "f4f613ffa043d3ad6a7e619ae340fc2bd8a64058da6dcc8eb18045651f1171f5"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-3-before-during-0013.host.json",
+    "bytes": 63505,
+    "sha256": "b7ed4af5438675bfb9487737d5a837b6c5985dab6293f3a6c00ba10390232b0c"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-3-before-during-0014.host.json",
+    "bytes": 63610,
+    "sha256": "26980095d13940e485fc9b5365639f5875c991b23832004a2bdb4ae6a3dd0703"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-3-before-during-0015.host.json",
+    "bytes": 63609,
+    "sha256": "6096f80e792bcb911c02fc160c0693fa2b34bbd23fbc231da4792be018525c86"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-3-before-during-0016.host.json",
+    "bytes": 63605,
+    "sha256": "0c0a61f00838cd091da3ad9c97a6d272d82d72659e7d3569dc9eb438fd3c00a4"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-3-before-during-0017.host.json",
+    "bytes": 63587,
+    "sha256": "6b803bc770d83abbc40fed58c4711cf78cd761e0a350b8993a1e424fcbdd06e9"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-3-before-during-0018.host.json",
+    "bytes": 63591,
+    "sha256": "790d60d082ad5505d8f3ace4be3c6a630cae4b2c8cf958956b6dbce82c8cbbe0"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-3-before-during-0019.host.json",
+    "bytes": 63568,
+    "sha256": "4db5685b2316b03cf2740ce5291157a80cd2e235669be3f33a9b4f8b47f388de"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-3-before-during-0020.host.json",
+    "bytes": 63558,
+    "sha256": "605d23a38a6f8eec1118fe46fa4a0783f6890afb226865d7a3bc09635495922c"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-3-before-during-0021.host.json",
+    "bytes": 63558,
+    "sha256": "ae1220b77d6da1e138561d93e214678e7f4ff6b53958e3aede5ac8c171eec819"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-3-before-during-0022.host.json",
+    "bytes": 63601,
+    "sha256": "70739f3209581b1e35e403611c67e8d016e37bc15851fb2022e23f4510524d40"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-3-before-during-0023.host.json",
+    "bytes": 63625,
+    "sha256": "b28dd3c9ca99cc34d968892b67073a54e832838231e7a1b49d95990418ce433b"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-3-before-during-0024.host.json",
+    "bytes": 63601,
+    "sha256": "3638a08b67831f00890be59a01716fdffab54621c3d0d254f0b8e3dd5a80b3da"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-3-before-during-0025.host.json",
+    "bytes": 63595,
+    "sha256": "886c98feb4f280b775d2312b168178e16b99d534a635e2dc58ad74ac1dafb810"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-3-before-during-0026.host.json",
+    "bytes": 63577,
+    "sha256": "5870bb243b8ba9e8567707eea934217e0f9df58227bf820af6d16cb5199cb3aa"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-3-before-during-0027.host.json",
+    "bytes": 63535,
+    "sha256": "66e68ddb30d699ea67a8cf95f09de5021823bca250b015bc1695166d49c74878"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-3-before-during-0028.host.json",
+    "bytes": 63522,
+    "sha256": "d6c6d478b5ac5d1037e969e761db1fae4227492c871aa2488f2d62a09a9cd676"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-3-before-during-0029.host.json",
+    "bytes": 63500,
+    "sha256": "16a3743e0a4271802aa6150973826df9538cff90dc17846aa6822bc3d3306db6"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-3-before-during-0030.host.json",
+    "bytes": 63487,
+    "sha256": "6326fd751f7ce7db186c978a5e9fc45437bbe1dc6be631dca1953e264245b965"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-3-before-during-0031.host.json",
+    "bytes": 63483,
+    "sha256": "28abf35fdb9f48a7e5f633fb56f2c1d28ba6574cf01dd527b1efd59bb584abb7"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-3-before-during-0032.host.json",
+    "bytes": 63487,
+    "sha256": "78b04b9e14859faf04389713f95b42953d678103aea317f0c5302e326a1c4510"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-3-before-during-0033.host.json",
+    "bytes": 63492,
+    "sha256": "47bba35403eab027a4869a6218a2e5f64c820b8a41b91d06c720206a02886480"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-3-before.parsed.json",
+    "bytes": 1484,
+    "sha256": "62d4d329cb86b4653230428801b4bb3d9e569ea0edccaeea1fbba0224fb322cd"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-3-before.receipt.json",
+    "bytes": 1261,
+    "sha256": "0dad213bff1631512633999ad8be7d2b518837d6f3b0a9ee8311124f4a6aafa0"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-3-before.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-3-before.stdout",
+    "bytes": 596,
+    "sha256": "57ef5f751cacd19a7f118e5e79a34b6566d727c6cce84f18ef764fe1ec99c4f1"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-02-3-before.time",
+    "bytes": 938,
+    "sha256": "652cbdad963d84220aaf320a712f084fcbc32c0ba19bfbd93074ea99a371908e"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-03-0-before-after.host.json",
+    "bytes": 63641,
+    "sha256": "4abecea6ba6d48d3a3dd71825fda8b2abb93c0aec1547e30728da8ec6d42ecdf"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-03-0-before-before.host.json",
+    "bytes": 62853,
+    "sha256": "bf160b8e3d7650ee401e613664d01de75727f730a2137f81dc3a8bc9ccac7da1"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-03-0-before-during-0001.host.json",
+    "bytes": 63421,
+    "sha256": "11b7f3f90dfd36923210bd7d55dcdbafd93aa77e9f2000b5b512e0d438d99500"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-03-0-before-during-0002.host.json",
+    "bytes": 63325,
+    "sha256": "9a7285f1c241d87c576b4fb32c942b985ab40772a77586e19aeadb334325586d"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-03-0-before-during-0003.host.json",
+    "bytes": 63325,
+    "sha256": "267e70770bdbfadcf595737ad6379d418e9e1fec2eaa575273b89b85ea6682b1"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-03-0-before-during-0004.host.json",
+    "bytes": 63319,
+    "sha256": "59dd0d07320ffa8748dda71dced6e0e6d019e72608134fe9497c7b579fda623f"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-03-0-before-during-0005.host.json",
+    "bytes": 63331,
+    "sha256": "b702f4efe5dbc8bad81affda684f820237125ef0ee24c0e9698b011a02059a4c"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-03-0-before-during-0006.host.json",
+    "bytes": 63435,
+    "sha256": "fd1566142c65a26fcc50723758fe810cf16b41117a7ffcfd636bd96c0cfdc592"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-03-0-before-during-0007.host.json",
+    "bytes": 63502,
+    "sha256": "5fbd0e78b1d82c6c680bb4f36a1c68d78da5478f520907b63f2dda1c0a347ae9"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-03-0-before-during-0008.host.json",
+    "bytes": 63478,
+    "sha256": "8255d76c58bc5ccac2e3745b2409869219b4bfb424a183c87f6dfb5ae002e87e"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-03-0-before-during-0009.host.json",
+    "bytes": 63448,
+    "sha256": "2b963e5c9aa09afe8a8348ea9e1a8a33a2c1874565321f34fd383eeb66afb9a3"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-03-0-before-during-0010.host.json",
+    "bytes": 63434,
+    "sha256": "d6dec3a6a615e43125e8cd391201b912a2b2b3c257d138da3addc54d08353f00"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-03-0-before-during-0011.host.json",
+    "bytes": 63439,
+    "sha256": "55943b70f9cae861aa7dfed9a28e42c70151b7e31f7588b4ed2ff23cb94c5766"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-03-0-before-during-0012.host.json",
+    "bytes": 63433,
+    "sha256": "d7764a835aa056f6c0caa507a50dab220e4af286e78051b098ab1f910b1f95b0"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-03-0-before-during-0013.host.json",
+    "bytes": 63387,
+    "sha256": "2daf4ffd4343ad0a0cd2016339ed05f0c408d83ed9c4bc6294e21bdb7480901e"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-03-0-before-during-0014.host.json",
+    "bytes": 63460,
+    "sha256": "68f11f3e81be44d5fdb0c28702fa2a945b2c10767950ddf2439bc9c47ee4e973"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-03-0-before-during-0015.host.json",
+    "bytes": 63522,
+    "sha256": "4a5cac17e8bd9ecc49955b5593fc951bd9408df9c9afe46b27e0cf97b70a85fb"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-03-0-before-during-0016.host.json",
+    "bytes": 63518,
+    "sha256": "281ceff6f003b324733122406760455ece4a5d6d21d9ff0670aa1691b81e67eb"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-03-0-before-during-0017.host.json",
+    "bytes": 63500,
+    "sha256": "dfb4ad3c6c499b65f37721a764dfa0aa9ed65147466fdabc0206f928caac1576"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-03-0-before-during-0018.host.json",
+    "bytes": 63494,
+    "sha256": "f3b8f5d39941b15b67497d88c6f74045a9668573b17305bb7530378c989863e6"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-03-0-before-during-0019.host.json",
+    "bytes": 63488,
+    "sha256": "49e928c3813fa2178da6f8068bfbbf4f6a49c480e249ddfe2fd1eec547ab1dc8"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-03-0-before-during-0020.host.json",
+    "bytes": 63471,
+    "sha256": "3955955beb3e07723e53bc6650bb61b725f09ab8433d1504fc410fa4481bb0fb"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-03-0-before-during-0021.host.json",
+    "bytes": 63465,
+    "sha256": "e843c3f92f5fed59072b7c76448a0aa2c96222f2c14f9272aea436cf0a8f0911"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-03-0-before-during-0022.host.json",
+    "bytes": 63467,
+    "sha256": "ead23ac946cbdec2e16c7942d0c488b7b782d993faac325fe34279ff54a969a7"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-03-0-before-during-0023.host.json",
+    "bytes": 63521,
+    "sha256": "4e3df6f71528673914def04ab9c13917b533112ad47a33665f0962a5a1c7116d"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-03-0-before-during-0024.host.json",
+    "bytes": 63550,
+    "sha256": "93aee9ba5620720c79f9a0ed0edd452dcecad0916353684b3dcf7dccc5a082d9"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-03-0-before-during-0025.host.json",
+    "bytes": 63509,
+    "sha256": "c558ef2ddc9de5f1e502669dfc56266bf4cbc1cff8fb95b3ac0abfce34281b88"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-03-0-before-during-0026.host.json",
+    "bytes": 63497,
+    "sha256": "506c6913220be74f9226c2269963b2eaa0d5c0ecfe961e337268664912317465"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-03-0-before-during-0027.host.json",
+    "bytes": 63491,
+    "sha256": "652aaafa16e285912042f901c05d805af5560620e1dc9f91b384c5fccea8e57f"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-03-0-before-during-0028.host.json",
+    "bytes": 63485,
+    "sha256": "cfb0f09b91e9b77ca66bc5764c25fe6607d56583c0b0171fbf422b4b822721fe"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-03-0-before-during-0029.host.json",
+    "bytes": 63461,
+    "sha256": "3df63607d54caffaf7b63a1ed686f3726a6f41fb70f1271ca04b8a7631f6dedd"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-03-0-before-during-0030.host.json",
+    "bytes": 63443,
+    "sha256": "aab3583b97597d9dc61ccdf05eec3bddc135034c123606b1fc69219c826846b1"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-03-0-before-during-0031.host.json",
+    "bytes": 63413,
+    "sha256": "ba75fd47c213396257ea7e26bc9ad798e5223488a51ed2fc7624e391fe88409c"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-03-0-before-during-0032.host.json",
+    "bytes": 63503,
+    "sha256": "75243419e2a5c243e098f8467167f56be23891ab572e823a3b7f66501dd6a544"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-03-0-before-during-0033.host.json",
+    "bytes": 63545,
+    "sha256": "450443893264b035bbc16809e6dad80d917596da318d1f13ac65b95da41f51a0"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-03-0-before.receipt.json",
+    "bytes": 1261,
+    "sha256": "09afdf741d7ac04299591696e59698363e2b40e4bfe754667686fa3861d44a26"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-03-0-before.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-03-0-before.stdout",
+    "bytes": 596,
+    "sha256": "bab37f340ea8a27c0a83ed3bd09bee2ae340df54720dd2759bc13540026a04d1"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/block-03-0-before.time",
+    "bytes": 937,
+    "sha256": "b6f848ccac821f8a8f74c798800944a8cc748bce79ea0385c86fc49162e202de"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/calibration-after-after.host.json",
+    "bytes": 52059,
+    "sha256": "bcf17b84d3f4029b9da0769f397ba523c110f71fd7eb2168a3216666403a3c6f"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/calibration-after-before.host.json",
+    "bytes": 51855,
+    "sha256": "202d6c119b09d23b3593ac01e4dea90ecc5ba70ec759db0ac0581dabd8d1dbea"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/calibration-after-during-0001.host.json",
+    "bytes": 52454,
+    "sha256": "059c32e07a7bcab86f6922a9aa52829348014db4f3ad0328914b47364d50f46e"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/calibration-after-during-0002.host.json",
+    "bytes": 52413,
+    "sha256": "4d6d17e74ab0c1cd791201ff203201cbe0021e3ab4476266e531ff786ec5b810"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/calibration-after-during-0003.host.json",
+    "bytes": 52418,
+    "sha256": "f1b877860e85b18b7a4d228a297cf58b919adc9dbf1b42d135e7d7425ed2adba"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/calibration-after-during-0004.host.json",
+    "bytes": 52394,
+    "sha256": "405761ba3017e36a8727e5423dd81a16dc9474a1daa59c2b9c099ba1e768f8ee"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/calibration-after-during-0005.host.json",
+    "bytes": 52388,
+    "sha256": "0a6e73612700ed975e5cf381192a1ab1060235d4acdb44e7edfa1372d65e7ef8"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/calibration-after-during-0006.host.json",
+    "bytes": 52490,
+    "sha256": "ef99d5021778264681ae73e9f11cf76fe1e6195abcbcd325405d4dd86370f697"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/calibration-after.parsed.json",
+    "bytes": 1452,
+    "sha256": "91f1a32b396eff938c7c4cc68e6a239a6b894fca17cbb812d457c4f97e27c3dd"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/calibration-after.receipt.json",
+    "bytes": 1244,
+    "sha256": "aa5e34bfc9b630f4f3049333301c81d281d3f717c53e9b8ae6c22eeb7d992b04"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/calibration-after.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/calibration-after.stdout",
+    "bytes": 599,
+    "sha256": "30d623ca0bcb8e53fc985d5e8848d455364b3bfd9306478043a002b6b79cfcf2"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/calibration-after.time",
+    "bytes": 918,
+    "sha256": "24dfe5c941e505ad2270e420a7b328f0fb2566098b72d9a12d55dea5e824c1a9"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/calibration-before-after.host.json",
+    "bytes": 51845,
+    "sha256": "badfc7b2f4c7e5199c2d5d6d8e29b013350e3247cd2932fb6358553267d5648d"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/calibration-before-before.host.json",
+    "bytes": 51871,
+    "sha256": "a377dad4683527058f8e741f8d198b7cd74c6e4e1e20077f150a995fc1735ab6"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/calibration-before-during-0001.host.json",
+    "bytes": 52494,
+    "sha256": "72ff4da69401324c1fbf44e18fa43b9f164e38d03fa3f3adb3c62142fe919ac6"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/calibration-before-during-0002.host.json",
+    "bytes": 52482,
+    "sha256": "5fd1867edc44a5274be481badac8d18998509ab45e052403a0f6d283f716bf6f"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/calibration-before-during-0003.host.json",
+    "bytes": 52482,
+    "sha256": "d9fdb18ba41c846a982feff30b9f94b28bf2c4c94addfb70fbe176ef3afe6f4c"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/calibration-before-during-0004.host.json",
+    "bytes": 52476,
+    "sha256": "b5b920a7dddba230118f0e45de8202695af31660ba555e31e5b479edf6ed3e3f"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/calibration-before-during-0005.host.json",
+    "bytes": 52512,
+    "sha256": "1eb1d3b5dd6b0bead8c79482b3f8420bf43a1faaf7fe5e7b94976d9cc3ffa399"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/calibration-before-during-0006.host.json",
+    "bytes": 52536,
+    "sha256": "ffbd1f09759704242372fd6791ecd77831efafb84d3742a26f886896902a2813"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/calibration-before-during-0007.host.json",
+    "bytes": 52518,
+    "sha256": "6817cedef1d3207433e6b871ab7af1ff344172510db851a84d575f683039a4c3"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/calibration-before-during-0008.host.json",
+    "bytes": 51908,
+    "sha256": "e819cb66bab95792e4a5182aad8666be6662f575ed9fc06534b4c615a14e9a5d"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/calibration-before.parsed.json",
+    "bytes": 1448,
+    "sha256": "7b1d845db616301b4a1e7486d4bbcfa5f1d0df93e3cb5cc643416ff8e5de0539"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/calibration-before.receipt.json",
+    "bytes": 1265,
+    "sha256": "9796d72e36f6c3cdc8e936c43322e3b88d515c019c73c3516a8c7af6e5124766"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/calibration-before.stderr",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/calibration-before.stdout",
+    "bytes": 592,
+    "sha256": "9d8713664d5ce08c7dea38275a64664b3c403f27c2a6e1160debeab90ae46aec"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/calibration-before.time",
+    "bytes": 937,
+    "sha256": "53230a8810f542f35f67f180112cb7620b5a4eeea19073df5dfff6f70eed5875"
+  },
+  {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-phase-original-final-v1/measurements.json",
+    "bytes": 30172,
+    "sha256": "94c1f3d352c450beae5c39e6fc8f990a2f506653199214084b59f0420602d589"
+  }
+]

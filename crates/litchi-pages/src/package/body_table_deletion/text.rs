@@ -8,9 +8,8 @@
 
 use litchi_iwa_text_wire::{
     RewriteBehavior, RewriteError, RewriteLimits, StorageRewrite, StorageRewriteExecutionLimits,
-    StorageRewriteExecutionReport, StorageRewritePrepareReport, StorageValidation,
-    decode_storage_with_limits, prepare_storage_text_rewrite_with_behavior_and_limits,
-    validate_storage_with_limits,
+    StorageRewriteExecutionReport, StorageRewritePrepareReport, StorageValidation, decode_storage,
+    prepare_storage_text_rewrite_with_behavior, validate_storage,
 };
 use std::num::NonZeroU64;
 
@@ -78,8 +77,7 @@ pub(super) fn prepare(
         .map_err(super::map_lock_error)?;
 
     let rewrite_limits = residual_rewrite_limits(source_catalog, budget)?;
-    let validation =
-        validate_storage_with_limits(payload, rewrite_limits).map_err(map_text_wire_error)?;
+    let validation = validate_storage(payload, rewrite_limits).map_err(map_text_wire_error)?;
     charge_validation(validation, rewrite_limits, budget)?;
 
     // Decode through text-wire's archive-free projection only to prove the
@@ -91,8 +89,7 @@ pub(super) fn prepare(
     // this already-proven validation; charging after it would leave the
     // temporary semantic text outside the cumulative transaction budget.
     charge_validation(validation, projection_limits, budget)?;
-    let decoded =
-        decode_storage_with_limits(payload, projection_limits).map_err(map_text_wire_error)?;
+    let decoded = decode_storage(payload, projection_limits).map_err(map_text_wire_error)?;
     let range_end = target
         .anchor_character_index
         .checked_add(1)
@@ -109,7 +106,7 @@ pub(super) fn prepare(
     // shared wire budget. Recompute the profile before the output-free plan so
     // a large source cannot borrow the full codec allowance twice.
     let rewrite_limits = residual_rewrite_limits(source_catalog, budget)?;
-    let prepared = prepare_storage_text_rewrite_with_behavior_and_limits(
+    let prepared = prepare_storage_text_rewrite_with_behavior(
         payload,
         target.anchor_character_index..range_end,
         "",
@@ -493,8 +490,8 @@ mod tests {
     use litchi_iwa_common::varint::encode_varint_into;
     use litchi_iwa_core::{FieldInfo, FieldPath, MessageInfo};
     use litchi_iwa_text_wire::{
-        RewriteBehavior, RewriteLimits, StorageRewriteExecutionLimits, decode_storage_with_limits,
-        prepare_storage_text_rewrite_with_behavior_and_limits,
+        RewriteBehavior, RewriteLimits, StorageRewriteExecutionLimits, decode_storage,
+        prepare_storage_text_rewrite_with_behavior,
     };
 
     fn length_delimited(number: u32, payload: &[u8]) -> Vec<u8> {
@@ -550,10 +547,10 @@ mod tests {
         attachment: u64,
     ) -> litchi_iwa_text_wire::StorageRewrite {
         let limits = RewriteLimits::default();
-        let decoded = decode_storage_with_limits(source, limits).expect("valid storage");
+        let decoded = decode_storage(source, limits).expect("valid storage");
         prove_selected_anchor(decoded.storage().text(), anchor).expect("selected anchor");
         let end = anchor.checked_add(1).expect("anchor end");
-        let prepared = prepare_storage_text_rewrite_with_behavior_and_limits(
+        let prepared = prepare_storage_text_rewrite_with_behavior(
             source,
             anchor..end,
             "",
@@ -585,7 +582,7 @@ mod tests {
         let source = storage(&["before after"], &[(7, 44)]);
         assert!(prove_selected_anchor("before after", 7).is_err());
         let limits = RewriteLimits::default();
-        let decoded = decode_storage_with_limits(&source, limits).expect("valid storage");
+        let decoded = decode_storage(&source, limits).expect("valid storage");
         assert!(prove_selected_anchor(decoded.storage().text(), 7).is_err());
     }
 
@@ -689,7 +686,7 @@ mod tests {
     #[test]
     fn malformed_storage_is_rejected_before_anchor_rewrite() {
         let malformed = [0x1a, 0x01, 0xff];
-        assert!(decode_storage_with_limits(&malformed, RewriteLimits::default()).is_err());
+        assert!(decode_storage(&malformed, RewriteLimits::default()).is_err());
     }
 
     #[test]
@@ -700,8 +697,8 @@ mod tests {
         assert_eq!(result.after_utf16_len(), 6);
         assert_eq!(result.removed_object_references(), [44]);
         assert_eq!(result.object_references_after(), [55]);
-        let decoded = decode_storage_with_limits(result.bytes(), RewriteLimits::default())
-            .expect("rewritten storage");
+        let decoded =
+            decode_storage(result.bytes(), RewriteLimits::default()).expect("rewritten storage");
         assert_eq!(decoded.storage().text(), "😀xy\u{fffc}z");
     }
 

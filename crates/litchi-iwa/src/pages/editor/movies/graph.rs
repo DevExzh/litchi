@@ -667,6 +667,7 @@ pub(super) fn set_movie_geometry(
                 type_: MOVIE_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -709,6 +710,7 @@ pub(super) fn set_movie_properties(
                 type_: MOVIE_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -761,6 +763,7 @@ pub(super) fn set_movie_attachment_position(
                 type_: DRAWABLE_ATTACHMENT_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -790,6 +793,7 @@ fn pages_movie_object(
             type_: message_type,
             data: message.encode_to_vec(),
         }],
+        Default::default(),
     )?;
     let info = &mut object.archive_info.message_infos[0];
     info.versions = versions.to_vec();

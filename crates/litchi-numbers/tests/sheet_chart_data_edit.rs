@@ -35,7 +35,7 @@ fn synthetic_source() -> TestResult<Vec<u8>> {
 
 fn synthetic_source_with_previews() -> TestResult<Vec<u8>> {
     let source = synthetic_source()?;
-    let catalog = Catalog::from_bytes(&source)?;
+    let catalog = Catalog::from_bytes(&source, Default::default())?;
     Ok(catalog.reassemble_with_insertions_to_bytes(
         &[
             EntryInsertion::new("preview.jpg", b"full preview"),
@@ -118,7 +118,7 @@ fn changed_chart_data_invalidates_previews_but_inverse_restores_exact_source() -
         .set(target)
         .commit()?;
     assert_eq!(changed.diagnostics().deleted_previews(), 3);
-    let target_catalog = Catalog::from_bytes(&exact_bytes(changed.package())?)?;
+    let target_catalog = Catalog::from_bytes(&exact_bytes(changed.package())?, Default::default())?;
     for name in ["preview.jpg", "preview-micro.jpg", "preview-web.jpg"] {
         assert!(target_catalog.iter().all(|entry| entry.name() != name));
     }

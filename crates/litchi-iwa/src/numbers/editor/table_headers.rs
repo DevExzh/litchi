@@ -106,6 +106,7 @@ pub(super) fn set_attached_table_header_settings(
                 type_: message_type,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })

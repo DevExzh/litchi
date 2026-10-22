@@ -1214,6 +1214,7 @@ mod tests {
                 type_,
                 data: payload.to_vec(),
             }],
+            Default::default(),
         )
         .expect("small canonical test object")
     }

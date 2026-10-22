@@ -268,8 +268,8 @@ fn native_explicit_outline_and_combined_changes_are_exact_and_reversible() -> Te
 }
 
 fn assert_exact_locality(source: &[u8], target: &[u8]) -> TestResult<()> {
-    let source = Catalog::from_bytes(source)?;
-    let target = Catalog::from_bytes(target)?;
+    let source = Catalog::from_bytes(source, Default::default())?;
+    let target = Catalog::from_bytes(target, Default::default())?;
     let mut changed_members = Vec::new();
 
     for before in source.iter() {

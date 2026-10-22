@@ -68,13 +68,13 @@ fn exact_bytes(package: &Package) -> TestResult<Vec<u8>> {
 }
 
 fn metadata(source: &[u8]) -> TestResult<tsp::PackageMetadata> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == fixture::METADATA_MEMBER)
         .ok_or_else(|| io::Error::other("missing metadata component"))?;
-    let decompressed = SnappyStream::decompress(entry.data())?.into_bytes();
-    let archive = Archive::parse(&decompressed)?;
+    let decompressed = SnappyStream::decompress(entry.data(), Default::default())?.into_bytes();
+    let archive = Archive::parse(&decompressed, Default::default())?;
     let payload = archive
         .objects
         .iter()
@@ -139,14 +139,14 @@ fn known_metadata_maximum(source: &[u8]) -> TestResult<u64> {
 }
 
 fn physical_maximum(source: &[u8]) -> TestResult<u64> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let mut maximum = 0;
     for entry in catalog
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
     {
-        let decompressed = SnappyStream::decompress(entry.data())?.into_bytes();
-        let archive = Archive::parse(&decompressed)?;
+        let decompressed = SnappyStream::decompress(entry.data(), Default::default())?.into_bytes();
+        let archive = Archive::parse(&decompressed, Default::default())?;
         for object in archive.objects {
             let identifier = object
                 .archive_info
@@ -159,14 +159,14 @@ fn physical_maximum(source: &[u8]) -> TestResult<u64> {
 }
 
 fn physical_ids(source: &[u8]) -> TestResult<BTreeSet<u64>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let mut identifiers = BTreeSet::new();
     for entry in catalog
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
     {
-        let decompressed = SnappyStream::decompress(entry.data())?.into_bytes();
-        let archive = Archive::parse(&decompressed)?;
+        let decompressed = SnappyStream::decompress(entry.data(), Default::default())?.into_bytes();
+        let archive = Archive::parse(&decompressed, Default::default())?;
         for object in archive.objects {
             identifiers.insert(
                 object
@@ -180,7 +180,7 @@ fn physical_ids(source: &[u8]) -> TestResult<BTreeSet<u64>> {
 }
 
 fn media_ids(source: &[u8]) -> TestResult<Vec<u64>> {
-    let archive = Archive::parse(&fixture::document_stream(source)?)?;
+    let archive = Archive::parse(&fixture::document_stream(source)?, Default::default())?;
     let slide = archive
         .object(fixture::SLIDE)
         .ok_or_else(|| io::Error::other("missing fixture slide"))?;
@@ -198,13 +198,13 @@ fn media_ids(source: &[u8]) -> TestResult<Vec<u64>> {
 }
 
 fn native_media_ids(source: &[u8]) -> TestResult<Vec<u64>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     for entry in catalog
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
     {
-        let decompressed = SnappyStream::decompress(entry.data())?.into_bytes();
-        let archive = Archive::parse(&decompressed)?;
+        let decompressed = SnappyStream::decompress(entry.data(), Default::default())?.into_bytes();
+        let archive = Archive::parse(&decompressed, Default::default())?;
         for object in &archive.objects {
             if object.archive_info.identifier != Some(NATIVE_SLIDE) {
                 continue;
@@ -299,7 +299,7 @@ fn append_movie_comment(payload: &[u8], root_identifier: u64) -> TestResult<Vec<
 }
 
 fn add_high_movie(source: &[u8], movie_identifier: u64) -> TestResult<Vec<u8>> {
-    let mut archive = Archive::parse(&fixture::document_stream(source)?)?;
+    let mut archive = Archive::parse(&fixture::document_stream(source)?, Default::default())?;
     let mut movie = archive
         .object(fixture::MOVIES[1])
         .cloned()
@@ -371,7 +371,7 @@ fn add_high_movie(source: &[u8], movie_identifier: u64) -> TestResult<Vec<u8>> {
 
 fn add_shared_comment_root(source: &[u8]) -> TestResult<Vec<u8>> {
     let source = add_high_movie(source, HIGHEST_COMMENTED_MOVIE)?;
-    let mut archive = Archive::parse(&fixture::document_stream(&source)?)?;
+    let mut archive = Archive::parse(&fixture::document_stream(&source)?, Default::default())?;
     for movie_identifier in [fixture::MOVIES[1], HIGHEST_COMMENTED_MOVIE] {
         let movie = archive
             .object_mut(movie_identifier)
@@ -387,21 +387,25 @@ fn add_shared_comment_root(source: &[u8]) -> TestResult<Vec<u8>> {
             .object_references
             .push(SHARED_COMMENT_ROOT);
     }
-    archive.insert_object(ArchiveObject::new(
-        SHARED_COMMENT_ROOT,
-        vec![RawMessage {
-            type_: COMMENT_STORAGE_MESSAGE_TYPE,
-            data: tsd::CommentStorageArchive {
-                text: Some("Shared watermark comment".to_owned()),
-                storage_uuid: Some(tsp::Uuid {
-                    lower: 0xfeed_face_dead_beef,
-                    upper: 0x0123_4567_89ab_cdef,
-                }),
-                ..Default::default()
-            }
-            .encode_to_vec(),
-        }],
-    )?)?;
+    archive.insert_object(
+        ArchiveObject::new(
+            SHARED_COMMENT_ROOT,
+            vec![RawMessage {
+                type_: COMMENT_STORAGE_MESSAGE_TYPE,
+                data: tsd::CommentStorageArchive {
+                    text: Some("Shared watermark comment".to_owned()),
+                    storage_uuid: Some(tsp::Uuid {
+                        lower: 0xfeed_face_dead_beef,
+                        upper: 0x0123_4567_89ab_cdef,
+                    }),
+                    ..Default::default()
+                }
+                .encode_to_vec(),
+            }],
+            Default::default(),
+        )?,
+        Default::default(),
+    )?;
     let source = fixture::replace_document_archive(&source, archive)?;
 
     let mut metadata = metadata(&source)?;
@@ -444,14 +448,18 @@ fn add_high_versioned_object(source: &[u8]) -> TestResult<Vec<u8>> {
 }
 
 fn add_survivor_above_watermark(source: &[u8]) -> TestResult<Vec<u8>> {
-    let mut archive = Archive::parse(&fixture::document_stream(source)?)?;
-    archive.insert_object(ArchiveObject::new(
-        MALFORMED_SURVIVOR,
-        vec![RawMessage {
-            type_: 9_999,
-            data: Vec::new(),
-        }],
-    )?)?;
+    let mut archive = Archive::parse(&fixture::document_stream(source)?, Default::default())?;
+    archive.insert_object(
+        ArchiveObject::new(
+            MALFORMED_SURVIVOR,
+            vec![RawMessage {
+                type_: 9_999,
+                data: Vec::new(),
+            }],
+            Default::default(),
+        )?,
+        Default::default(),
+    )?;
     fixture::replace_document_archive(source, archive)
 }
 
@@ -620,7 +628,7 @@ fn retained_shared_comment_storage_participates_in_released_watermark() -> TestR
         vec![fixture::MOVIES[0], fixture::MOVIES[1], fixture::AUDIO]
     );
     assert!(
-        Archive::parse(&fixture::document_stream(&candidate)?)?
+        Archive::parse(&fixture::document_stream(&candidate)?, Default::default())?
             .object(SHARED_COMMENT_ROOT)
             .is_some(),
         "shared comment storage must survive removal of one owner"

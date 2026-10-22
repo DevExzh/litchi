@@ -129,7 +129,9 @@ fn add_date_time_field_in_place(
             encode_table(table, boundaries).map(|table| (Some(table), Some(identifier), None))
         },
     )?;
-    package.update_archive(&archive_name, |archive| Ok(archive.insert_object(object)?))?;
+    package.update_archive(&archive_name, |archive| {
+        Ok(archive.insert_object(object, Default::default())?)
+    })?;
     set_package_last_object_identifier(package, identifier)?;
     Ok(TextDateTimeFieldId::from_native(identifier))
 }

@@ -3225,7 +3225,7 @@ fn prepare_metadata_token_entry(
         .limits()
         .effective_archive_limits()
         .map_err(|_| Error::InvalidSource { path })?;
-    let stream = SnappyStream::decompress_with_limits(
+    let stream = SnappyStream::decompress(
         entry.data(),
         physical
             .limits()
@@ -3233,16 +3233,16 @@ fn prepare_metadata_token_entry(
             .map_err(|_| Error::InvalidSource { path })?,
     )
     .map_err(|_| Error::InvalidSource { path })?;
-    let mut archive = Archive::parse_with_limits(stream.as_bytes(), archive_limits)
+    let mut archive = Archive::parse(stream.as_bytes(), archive_limits)
         .map_err(|_| Error::InvalidSource { path })?;
     archive
-        .validate_canonical_object_framing(stream.as_bytes())
+        .validate_canonical_object_framing(stream.as_bytes(), archive_limits)
         .map_err(|_| Error::InvalidSource { path })?;
     archive
         .objects
         .get_mut(route.object_index)
         .ok_or(Error::InvalidSource { path })?
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             route.message_index,
             RawMessage {
                 type_: super::metadata::MESSAGE_TYPE,
@@ -3252,9 +3252,10 @@ fn prepare_metadata_token_entry(
         )
         .map_err(|_| Error::InvalidSource { path })?;
     let bytes = archive
-        .to_bytes_with_limits(archive_limits)
+        .to_bytes(archive_limits)
         .map_err(|_| Error::InvalidSource { path })?;
-    let compressed = SnappyStream::compress(&bytes).map_err(|_| Error::InvalidSource { path })?;
+    let compressed = SnappyStream::compress(&bytes, Default::default())
+        .map_err(|_| Error::InvalidSource { path })?;
     Ok((super::metadata::ENTRY_NAME.to_owned(), compressed))
 }
 
@@ -3291,7 +3292,7 @@ fn rewrite_archives(
             .limits()
             .effective_archive_limits()
             .map_err(|_| Error::InvalidSource { path })?;
-        let stream = SnappyStream::decompress_with_limits(
+        let stream = SnappyStream::decompress(
             entry.data(),
             physical
                 .limits()
@@ -3299,10 +3300,10 @@ fn rewrite_archives(
                 .map_err(|_| Error::InvalidSource { path })?,
         )
         .map_err(|_| Error::InvalidSource { path })?;
-        let mut archive = Archive::parse_with_limits(stream.as_bytes(), archive_limits)
+        let mut archive = Archive::parse(stream.as_bytes(), archive_limits)
             .map_err(|_| Error::InvalidSource { path })?;
         archive
-            .validate_canonical_object_framing(stream.as_bytes())
+            .validate_canonical_object_framing(stream.as_bytes(), archive_limits)
             .map_err(|_| Error::InvalidSource { path })?;
         let start_mutations = mutation_cursor;
         while mutation_cursor < mutations.len()
@@ -3322,7 +3323,7 @@ fn rewrite_archives(
                         return Err(Error::InvalidSource { path });
                     }
                     object
-                        .replace_message_pruning_object_references_preserving_header_with_limits(
+                        .replace_message_pruning_object_references_preserving_header(
                             route.message_index,
                             RawMessage {
                                 type_: route.message_type,
@@ -3337,7 +3338,7 @@ fn rewrite_archives(
                     object_identifier, ..
                 } => {
                     archive
-                        .remove_object_checked_with_limits(*object_identifier, archive_limits)
+                        .remove_object_checked(*object_identifier, archive_limits)
                         .map_err(|_| Error::InvalidSource { path })?;
                 },
             }
@@ -3350,10 +3351,10 @@ fn rewrite_archives(
             return Err(Error::InvalidSource { path });
         }
         let rewritten = archive
-            .to_bytes_with_limits(archive_limits)
+            .to_bytes(archive_limits)
             .map_err(|_| Error::InvalidSource { path })?;
-        let compressed =
-            SnappyStream::compress(&rewritten).map_err(|_| Error::InvalidSource { path })?;
+        let compressed = SnappyStream::compress(&rewritten, Default::default())
+            .map_err(|_| Error::InvalidSource { path })?;
         outputs.try_reserve(1).map_err(|_| Error::Allocation {
             amount: outputs.len().saturating_add(1),
             path,
@@ -4412,7 +4413,7 @@ fn prove_archive_reference_ownership(
             // at each object boundary.
             charge_scan_work(&mut inspection_work, header_bytes.saturating_mul(4), path)?;
             let occurrences = object
-                .inspect_references_with_policy_and_limits(
+                .inspect_references_with_policy(
                     &mut census,
                     ArchiveReferencePolicy::RejectUnknownMetadata,
                     limits,

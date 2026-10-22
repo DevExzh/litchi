@@ -77,15 +77,14 @@ pub(super) fn rewrite(
     let archive_limits = physical_limits
         .effective_archive_limits()
         .map_err(map_archive_error)?;
-    let stream = SnappyStream::decompress_with_limits(
+    let stream = SnappyStream::decompress(
         entry.data(),
         physical_limits.snappy_limits().map_err(map_archive_error)?,
     )
     .map_err(map_core_error)?;
-    let mut archive =
-        Archive::parse_with_limits(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
+    let mut archive = Archive::parse(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
     archive
-        .validate_canonical_object_framing(stream.as_bytes())
+        .validate_canonical_object_framing(stream.as_bytes(), archive_limits)
         .map_err(map_core_error)?;
     drop(stream);
 
@@ -158,11 +157,10 @@ pub(super) fn rewrite(
     drop(reordered_child_identifiers);
 
     budget.charge_transaction_work(decoded_extent.saturating_mul(3))?;
-    let rewritten = archive
-        .to_bytes_with_limits(archive_limits)
-        .map_err(map_core_error)?;
+    let rewritten = archive.to_bytes(archive_limits).map_err(map_core_error)?;
     drop(archive);
-    let compressed = SnappyStream::compress(&rewritten).map_err(map_core_error)?;
+    let compressed =
+        SnappyStream::compress(&rewritten, Default::default()).map_err(map_core_error)?;
     let compressed_len = compressed.len();
     drop(rewritten);
     let package_bound = source
@@ -245,7 +243,7 @@ fn rewrite_owner(
     }
     budget.charge_transaction_work(report.work)?;
     object
-        .replace_message_reordering_object_references_preserving_header_with_limits(
+        .replace_message_reordering_object_references_preserving_header(
             target.message_index,
             RawMessage {
                 type_: target.message_type,
@@ -1168,6 +1166,7 @@ mod tests {
         Ok(ArchiveObject::new(
             identifier,
             vec![RawMessage { type_, data }],
+            Default::default(),
         )?)
     }
 
@@ -1235,7 +1234,10 @@ mod tests {
                 .encode_to_vec(),
             )?);
         }
-        let document_member = SnappyStream::compress(&Archive { objects }.to_bytes()?)?;
+        let document_member = SnappyStream::compress(
+            &Archive { objects }.to_bytes(Default::default())?,
+            Default::default(),
+        )?;
         let previews = [
             ("preview.jpg", b"preview".as_slice()),
             ("preview-micro.jpg", b"micro".as_slice()),
@@ -1377,6 +1379,7 @@ mod tests {
                 data: rewritten_data.clone(),
             },
             &reordered,
+            Default::default(),
         )?;
         assert_eq!(owner.messages[0].data, rewritten_data);
         assert_eq!(

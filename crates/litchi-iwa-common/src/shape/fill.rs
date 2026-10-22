@@ -46,6 +46,7 @@ const SIMPLE_STOP_COUNT: usize = 2;
 
 /// Validation failures for shape-gradient values.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[non_exhaustive]
 pub enum Error {
     /// The gradient angle was not finite.
     #[error("shape gradient angle must be finite")]

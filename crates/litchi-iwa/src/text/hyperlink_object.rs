@@ -78,6 +78,7 @@ pub(super) fn new_hyperlink_object(
             type_: HYPERLINK_MESSAGE_TYPE,
             data,
         }],
+        Default::default(),
     )?)
 }
 
@@ -122,6 +123,7 @@ pub(super) fn patch_hyperlink_target(
                 type_: HYPERLINK_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })

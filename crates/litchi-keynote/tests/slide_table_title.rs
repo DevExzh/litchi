@@ -48,7 +48,11 @@ fn object(
     data: Vec<u8>,
     references: &[u64],
 ) -> TestResult<ArchiveObject> {
-    let mut object = ArchiveObject::new(identifier, vec![RawMessage { type_, data }])?;
+    let mut object = ArchiveObject::new(
+        identifier,
+        vec![RawMessage { type_, data }],
+        Default::default(),
+    )?;
     object.archive_info.message_infos[0]
         .object_references
         .extend_from_slice(references);
@@ -194,7 +198,10 @@ fn synthetic_package() -> TestResult<Vec<u8>> {
     }
     objects.push(object(TITLE_STYLE, 2_022, paragraph_style_payload(), &[])?);
     objects.push(object(SHAPE_STYLE, 2_025, shape_style_payload(), &[])?);
-    let compressed = SnappyStream::compress(&Archive { objects }.to_bytes()?)?;
+    let compressed = SnappyStream::compress(
+        &Archive { objects }.to_bytes(Default::default())?,
+        Default::default(),
+    )?;
     Ok(litchi_iwa_archive::package::to_bytes(
         [
             ("Data/sentinel.bin", b"unrelated ZIP sentinel".as_slice()),
@@ -214,12 +221,15 @@ fn exact_bytes(package: &Package) -> TestResult<Vec<u8>> {
 }
 
 fn model_payload(package: &[u8], identifier: u64) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or_else(|| io::Error::other("missing synthetic document member"))?;
-    let archive = Archive::parse(&SnappyStream::decompress(entry.data())?.into_bytes())?;
+    let archive = Archive::parse(
+        &SnappyStream::decompress(entry.data(), Default::default())?.into_bytes(),
+        Default::default(),
+    )?;
     let object = archive
         .object(identifier)
         .ok_or_else(|| io::Error::other("missing synthetic table model"))?;
@@ -233,12 +243,15 @@ fn model_payload(package: &[u8], identifier: u64) -> TestResult<Vec<u8>> {
 }
 
 fn replace_model_payload(package: &[u8], identifier: u64, payload: Vec<u8>) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let document = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or_else(|| io::Error::other("missing synthetic document member"))?;
-    let mut archive = Archive::parse(&SnappyStream::decompress(document.data())?.into_bytes())?;
+    let mut archive = Archive::parse(
+        &SnappyStream::decompress(document.data(), Default::default())?.into_bytes(),
+        Default::default(),
+    )?;
     let object = archive
         .object_mut(identifier)
         .ok_or_else(|| io::Error::other("missing synthetic table model"))?;
@@ -249,7 +262,8 @@ fn replace_model_payload(package: &[u8], identifier: u64, payload: Vec<u8>) -> T
         .ok_or_else(|| io::Error::other("missing synthetic table-model message"))?;
     message.data = payload;
     object.archive_info.message_infos[0].length = message.data.len().try_into()?;
-    let replacement = SnappyStream::compress(&archive.to_bytes()?)?;
+    let replacement =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[litchi_iwa_archive::package::EntryEdit::new(
             DOCUMENT_MEMBER,
@@ -310,7 +324,7 @@ fn selector_read_noop_change_apply_inverse_and_locality() -> TestResult {
     );
     assert_eq!(model_payload(&candidate_bytes, MODELS[1])?, before_second);
     assert_ne!(model_payload(&candidate_bytes, MODELS[0])?, before_first);
-    let candidate_catalog = Catalog::from_bytes(&candidate_bytes)?;
+    let candidate_catalog = Catalog::from_bytes(&candidate_bytes, Default::default())?;
     assert!(
         PREVIEWS
             .iter()
@@ -351,12 +365,15 @@ fn positions_and_locks_fail_closed_without_mutating_source() -> TestResult {
     ));
     assert_eq!(exact_bytes(&package)?, source);
 
-    let catalog = Catalog::from_bytes(&source)?;
+    let catalog = Catalog::from_bytes(&source, Default::default())?;
     let document = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or_else(|| io::Error::other("missing document"))?;
-    let mut archive = Archive::parse(&SnappyStream::decompress(document.data())?.into_bytes())?;
+    let mut archive = Archive::parse(
+        &SnappyStream::decompress(document.data(), Default::default())?.into_bytes(),
+        Default::default(),
+    )?;
     let table = archive
         .object_mut(TABLE_INFOS[0])
         .ok_or_else(|| io::Error::other("missing table info"))?;
@@ -370,7 +387,8 @@ fn positions_and_locks_fail_closed_without_mutating_source() -> TestResult {
     }
     .encode_to_vec();
     table.archive_info.message_infos[0].length = table.messages[0].data.len().try_into()?;
-    let locked_member = SnappyStream::compress(&archive.to_bytes()?)?;
+    let locked_member =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     let locked_source = catalog.reassemble_to_bytes(
         &[litchi_iwa_archive::package::EntryEdit::new(
             DOCUMENT_MEMBER,

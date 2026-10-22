@@ -75,18 +75,21 @@ mod cases {
     /// build and graph APIs.  This is deliberately private test code: focused
     /// callers continue to select media by source-order semantic selectors.
     fn native_media_ids(source: &[u8]) -> TestResult<Vec<NativeMedia>> {
-        let catalog = Catalog::from_bytes(source)?;
+        let catalog = Catalog::from_bytes(source, Default::default())?;
         let mut movies = Vec::new();
         let mut slides = Vec::new();
         for entry in catalog
             .iter()
             .filter(|entry| entry.name().ends_with(".iwa"))
         {
-            let stream = match litchi_iwa_archive::iwa::SnappyStream::decompress(entry.data()) {
+            let stream = match litchi_iwa_archive::iwa::SnappyStream::decompress(
+                entry.data(),
+                Default::default(),
+            ) {
                 Ok(stream) => stream.into_bytes(),
                 Err(_) => continue,
             };
-            let archive = match Archive::parse(&stream) {
+            let archive = match Archive::parse(&stream, Default::default()) {
                 Ok(archive) => archive,
                 Err(_) => continue,
             };
@@ -166,13 +169,15 @@ mod cases {
     /// media through slide selectors and materialized data, rather than metadata
     /// identifiers.
     fn native_asset_count(source: &[u8]) -> TestResult<usize> {
-        let catalog = Catalog::from_bytes(source)?;
+        let catalog = Catalog::from_bytes(source, Default::default())?;
         let entry = catalog
             .iter()
             .find(|entry| entry.name() == "Index/Metadata.iwa")
             .ok_or_else(|| io::Error::other("missing metadata component"))?;
-        let stream = litchi_iwa_archive::iwa::SnappyStream::decompress(entry.data())?.into_bytes();
-        let archive = Archive::parse(&stream)?;
+        let stream =
+            litchi_iwa_archive::iwa::SnappyStream::decompress(entry.data(), Default::default())?
+                .into_bytes();
+        let archive = Archive::parse(&stream, Default::default())?;
         let message = archive
             .objects
             .iter()

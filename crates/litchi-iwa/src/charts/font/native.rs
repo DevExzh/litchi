@@ -589,6 +589,7 @@ fn patch_chart_style_references(
                 type_: CHART_MESSAGE_TYPE,
                 data: chart.encode()?,
             },
+            Default::default(),
         )?;
         let metadata = &mut object.archive_info.message_infos[message_index].object_references;
         metadata.retain(|identifier| !previous.contains(identifier));

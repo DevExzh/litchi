@@ -425,6 +425,7 @@ pub(super) fn variation_object(
             type_: LIST_STYLE_MESSAGE_TYPE,
             data,
         }],
+        Default::default(),
     )?;
     let info = &mut object.archive_info.message_infos[0];
     info.versions = STANDARD_MESSAGE_VERSION.to_vec();
@@ -458,6 +459,7 @@ pub(super) fn geometry_variation_object(
             type_: LIST_STYLE_MESSAGE_TYPE,
             data,
         }],
+        Default::default(),
     )?;
     let info = &mut object.archive_info.message_infos[0];
     info.versions = STANDARD_MESSAGE_VERSION.to_vec();
@@ -494,6 +496,7 @@ pub(super) fn indentation_variation_object(
             type_: LIST_STYLE_MESSAGE_TYPE,
             data,
         }],
+        Default::default(),
     )?;
     let info = &mut object.archive_info.message_infos[0];
     info.versions = STANDARD_MESSAGE_VERSION.to_vec();
@@ -528,6 +531,7 @@ pub(super) fn label_color_variation_object(
             type_: LIST_STYLE_MESSAGE_TYPE,
             data,
         }],
+        Default::default(),
     )?;
     let info = &mut object.archive_info.message_infos[0];
     info.versions = STANDARD_MESSAGE_VERSION.to_vec();
@@ -561,6 +565,7 @@ pub(super) fn number_format_variation_object(
             type_: LIST_STYLE_MESSAGE_TYPE,
             data,
         }],
+        Default::default(),
     )?;
     let info = &mut object.archive_info.message_infos[0];
     info.versions = STANDARD_MESSAGE_VERSION.to_vec();
@@ -594,6 +599,7 @@ pub(super) fn number_tiering_variation_object(
             type_: LIST_STYLE_MESSAGE_TYPE,
             data,
         }],
+        Default::default(),
     )?;
     let info = &mut object.archive_info.message_infos[0];
     info.versions = STANDARD_MESSAGE_VERSION.to_vec();
@@ -697,6 +703,7 @@ where
             type_: message_type,
             data,
         },
+        Default::default(),
     )?;
     Ok(())
 }
@@ -1542,6 +1549,7 @@ pub(super) fn style_object(
             type_: LIST_STYLE_MESSAGE_TYPE,
             data,
         }],
+        Default::default(),
     )?;
     object.archive_info.message_infos[0].versions = STANDARD_MESSAGE_VERSION.to_vec();
     Ok(object)
@@ -1732,6 +1740,7 @@ mod tests {
                 type_: 2_001,
                 data: vec![0x80],
             }],
+            Default::default(),
         )
         .unwrap();
         let mut package = HostPackage::new();
@@ -2014,6 +2023,7 @@ mod tests {
                     data: style.encode_to_vec(),
                 },
             ],
+            Default::default(),
         )
         .unwrap();
         let archive = crate::archive::Archive {

@@ -75,6 +75,7 @@ pub(super) fn patch_placeholder_presentation(
                 type_: PLACEHOLDER_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         replace_metadata_reference(object, index, old_style, new_style, label)
     })
@@ -126,6 +127,7 @@ pub(super) fn patch_slide_relationship(
                 type_: SLIDE_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         replace_metadata_reference(
             object,
@@ -181,6 +183,7 @@ pub(super) fn patch_node_template_uuid(
                 type_: SLIDE_NODE_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })

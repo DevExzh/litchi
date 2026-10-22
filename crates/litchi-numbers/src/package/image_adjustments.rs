@@ -1862,7 +1862,7 @@ fn rewrite_image(
         return Err(Error::InvalidSource);
     }
     let source_encoded_len = source_archive
-        .encoded_len_with_limits(archive_limits)
+        .encoded_len(archive_limits)
         .map_err(map_core_error)?;
     let options = budget.codec_options(original)?;
     let prepared =
@@ -1876,15 +1876,8 @@ fn rewrite_image(
         original.len(),
         requirements.output_bytes,
     )?;
-    let compressed_bound =
-        SnappyStream::maximum_compressed_len(encoded_bound).map_err(map_core_error)?;
-    if compressed_bound > snappy_limits.max_compressed_stream() {
-        return Err(Error::Limit {
-            kind: LimitKind::WireBytes,
-            observed: compressed_bound as u64,
-            maximum: snappy_limits.max_compressed_stream() as u64,
-        });
-    }
+    let compressed_bound = SnappyStream::maximum_compressed_len(encoded_bound, snappy_limits)
+        .map_err(map_core_error)?;
     budget.preflight_output(encoded_bound)?;
     budget.preflight_output(compressed_bound)?;
     budget.preflight_work(encoded_bound.saturating_add(compressed_bound))?;
@@ -1922,7 +1915,7 @@ fn rewrite_image(
     archive
         .object_mut(selection.image_identifier)
         .ok_or(Error::InvalidSource)?
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             selection.message_index,
             RawMessage {
                 type_: IMAGE_MESSAGE_TYPE,
@@ -1931,12 +1924,10 @@ fn rewrite_image(
             archive_limits,
         )
         .map_err(map_core_error)?;
-    let bytes = archive
-        .to_bytes_with_limits(archive_limits)
-        .map_err(map_core_error)?;
+    let bytes = archive.to_bytes(archive_limits).map_err(map_core_error)?;
     budget.output(bytes.len())?;
     budget.retained(bytes.len())?;
-    let compressed = SnappyStream::compress(&bytes).map_err(map_core_error)?;
+    let compressed = SnappyStream::compress(&bytes, snappy_limits).map_err(map_core_error)?;
     budget.retained(compressed.len())?;
     let edits = [EntryEdit::new(
         selection.component_name.as_ref(),
@@ -2022,7 +2013,7 @@ fn verify_locality(
         budget.retained(clone_retained)?;
         let mut expected = source_object.clone();
         expected
-            .replace_message_preserving_header_with_limits(
+            .replace_message_preserving_header(
                 selection.message_index,
                 RawMessage {
                     type_: IMAGE_MESSAGE_TYPE,
@@ -2374,7 +2365,7 @@ fn package_reopen_requirements(
             .ok_or(Error::InvalidSource)?;
         let encoded_len = component
             .archive()
-            .encoded_len_with_limits(archive_limits)
+            .encoded_len(archive_limits)
             .map_err(map_core_error)?;
         let (archive_allocations, archive_retained) =
             archive_clone_requirements(component.archive(), encoded_len)?;
@@ -2709,6 +2700,7 @@ mod graph_tests {
                 type_: super::IMAGE_MESSAGE_TYPE,
                 data: payload.clone(),
             }],
+            Default::default(),
         )
         .unwrap();
         let mut info = MessageInfo::new(super::IMAGE_MESSAGE_TYPE, payload.len() as u32);
@@ -2962,6 +2954,7 @@ mod graph_tests {
                 type_: super::IMAGE_MESSAGE_TYPE,
                 data: vec![0x0a, 0x00],
             }],
+            Default::default(),
         )
         .unwrap();
         let candidate_object = ArchiveObject::new(
@@ -2970,6 +2963,7 @@ mod graph_tests {
                 type_: super::IMAGE_MESSAGE_TYPE,
                 data: vec![0x0a, 0x02, 0x72, 0x00],
             }],
+            Default::default(),
         )
         .unwrap();
         let archive = Archive {

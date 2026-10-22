@@ -326,11 +326,11 @@ pub(crate) fn set_cell_border(
                 type_: STROKE_LAYER_MESSAGE_TYPE,
                 data: layer.encode_to_vec(),
             }],
+            Default::default(),
         )?;
-        package.update_archive(
-            sidecar_archive,
-            |archive| Ok(archive.insert_object(object)?),
-        )?;
+        package.update_archive(sidecar_archive, |archive| {
+            Ok(archive.insert_object(object, Default::default())?)
+        })?;
         side.references_mut(&mut current).push(tsp::Reference {
             identifier,
             ..Default::default()
@@ -359,6 +359,7 @@ pub(crate) fn set_cell_border(
                 type_: original.type_,
                 data,
             },
+            Default::default(),
         )?;
         if let Some(reference) = side
             .references(&current)
@@ -915,6 +916,7 @@ fn mutate(
                 type_: original.type_,
                 data,
             },
+            Default::default(),
         )?;
         let previous_layers = referenced_layer_identifiers(&previous);
         let retained = referenced_layer_identifiers(&current);
@@ -968,6 +970,7 @@ fn apply_layer_updates(package: &mut HostPackage, updates: &[LayerUpdate]) -> Re
                     type_: original.type_,
                     data,
                 },
+                Default::default(),
             )?;
             Ok(())
         })?;

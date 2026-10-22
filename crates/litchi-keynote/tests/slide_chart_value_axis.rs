@@ -149,7 +149,7 @@ mod value_axis {
     }
 
     fn without_previews(source: &[u8]) -> TestResult<Vec<u8>> {
-        let catalog = Catalog::from_bytes(source)?;
+        let catalog = Catalog::from_bytes(source, Default::default())?;
         let entries = catalog
             .iter()
             .filter(|entry| !PREVIEWS.contains(&entry.name()))

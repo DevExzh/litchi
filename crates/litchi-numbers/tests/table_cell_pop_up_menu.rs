@@ -112,6 +112,7 @@ fn object(identifier: u64, type_: u32, data: Vec<u8>) -> TestResult<ArchiveObjec
     Ok(ArchiveObject::new(
         identifier,
         vec![RawMessage { type_, data }],
+        Default::default(),
     )?)
 }
 
@@ -283,7 +284,7 @@ fn sidecars(mode: FixtureMode) -> TestResult<ArchiveObject> {
         }
         .encode_to_vec(),
     });
-    let mut sidecars = ArchiveObject::new(SIDECAR_ID, messages)?;
+    let mut sidecars = ArchiveObject::new(SIDECAR_ID, messages, Default::default())?;
     let control_message_index = sidecars.messages.iter().position(|message| {
         message.type_ == TABLE_DATA_LIST_TYPE
             && tst::TableDataList::decode(message.data.as_slice())
@@ -411,7 +412,10 @@ fn metadata(mode: FixtureMode) -> TestResult<Vec<u8>> {
 }
 
 fn compressed(objects: Vec<ArchiveObject>) -> TestResult<Vec<u8>> {
-    Ok(SnappyStream::compress(&Archive { objects }.to_bytes()?)?)
+    Ok(SnappyStream::compress(
+        &Archive { objects }.to_bytes(Default::default())?,
+        Default::default(),
+    )?)
 }
 
 fn fixture(mode: FixtureMode) -> TestResult<Vec<u8>> {
@@ -505,13 +509,14 @@ fn popup<T: AsRef<str>>(items: &[T], selection: InitialSelection) -> TestResult<
 }
 
 fn member_archive(source: &[u8], member: &str) -> TestResult<Archive> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == member)
         .ok_or_else(|| io::Error::other(format!("member {member} is missing")))?;
     Ok(Archive::parse(
-        SnappyStream::decompress(entry.data())?.as_bytes(),
+        SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+        Default::default(),
     )?)
 }
 
@@ -536,14 +541,18 @@ fn rewrite_member(
     member: &str,
     mut rewrite: impl FnMut(&mut Archive) -> TestResult,
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == member)
         .ok_or_else(|| io::Error::other(format!("member {member} is missing")))?;
-    let mut archive = Archive::parse(SnappyStream::decompress(entry.data())?.as_bytes())?;
+    let mut archive = Archive::parse(
+        SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+        Default::default(),
+    )?;
     rewrite(&mut archive)?;
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[litchi_iwa_archive::package::EntryEdit::new(
             member,
@@ -773,8 +782,8 @@ fn document_metadata_component(source: &[u8], identifier: u64) -> TestResult<tsp
 }
 
 fn changed_members(source: &[u8], target: &[u8]) -> TestResult<Vec<String>> {
-    let source = Catalog::from_bytes(source)?;
-    let target = Catalog::from_bytes(target)?;
+    let source = Catalog::from_bytes(source, Default::default())?;
+    let target = Catalog::from_bytes(target, Default::default())?;
     let mut changed = Vec::new();
     for before in source.iter() {
         let Some(after) = target.iter().find(|entry| entry.name() == before.name()) else {
@@ -791,8 +800,8 @@ fn changed_members(source: &[u8], target: &[u8]) -> TestResult<Vec<String>> {
 }
 
 fn assert_previews_invalidated(source: &[u8], target: &[u8]) -> TestResult {
-    let source = Catalog::from_bytes(source)?;
-    let target = Catalog::from_bytes(target)?;
+    let source = Catalog::from_bytes(source, Default::default())?;
+    let target = Catalog::from_bytes(target, Default::default())?;
     for name in ["preview.jpg", "preview-micro.jpg", "preview-web.jpg"] {
         assert!(
             source.iter().any(|entry| entry.name() == name),
@@ -1102,7 +1111,7 @@ fn append_unknown_popup_wire(source: &[u8]) -> TestResult<(Vec<u8>, Vec<u8>)> {
 }
 
 fn with_physical_popup_alias(source: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let alias_data = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
@@ -1166,7 +1175,7 @@ fn with_orphan_popup_model(source: &[u8], versioned_uuid: bool) -> TestResult<Ve
 }
 
 fn with_cross_component_popup_inbound(source: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let mut entries = catalog
         .iter()
         .map(|entry| (entry.name().to_owned(), entry.data().to_vec()))
@@ -1182,7 +1191,8 @@ fn with_cross_component_popup_inbound(source: &[u8]) -> TestResult<Vec<u8>> {
         &Archive {
             objects: vec![inbound],
         }
-        .to_bytes()?,
+        .to_bytes(Default::default())?,
+        Default::default(),
     )?;
     entries.push(("Index/PopupInbound.iwa".to_owned(), inbound_bytes));
     let source = litchi_iwa_archive::package::to_bytes(
@@ -1733,11 +1743,8 @@ fn popup_cross_component_physical_alias_is_rejected_atomically() -> TestResult {
 #[test]
 fn popup_missing_metadata_and_tight_ingress_fail_before_publication() -> TestResult {
     let source = fixture(FixtureMode::EmptyCells)?;
-    let without_metadata = Catalog::from_bytes(&source)?.reassemble_with_deletions_to_bytes(
-        &[],
-        &[METADATA_MEMBER],
-        Limits::default(),
-    )?;
+    let without_metadata = Catalog::from_bytes(&source, Default::default())?
+        .reassemble_with_deletions_to_bytes(&[], &[METADATA_MEMBER], Limits::default())?;
     let package = Package::from_bytes(&without_metadata)?;
     let before = package.exact_bytes();
     let menu = popup(&["One", "Two"], InitialSelection::Blank)?;
@@ -1852,11 +1859,12 @@ fn popup_unknown_overlong_and_group_bytes_are_preserved_when_ingress_admits_them
 #[test]
 fn popup_public_physical_and_semantic_limits_fail_before_publication() -> TestResult {
     let source_with_previews = fixture(FixtureMode::SharedPopup)?;
-    let source = Catalog::from_bytes(&source_with_previews)?.reassemble_with_deletions_to_bytes(
-        &[],
-        &["preview.jpg", "preview-micro.jpg", "preview-web.jpg"],
-        Limits::default(),
-    )?;
+    let source = Catalog::from_bytes(&source_with_previews, Default::default())?
+        .reassemble_with_deletions_to_bytes(
+            &[],
+            &["preview.jpg", "preview-micro.jpg", "preview-web.jpg"],
+            Limits::default(),
+        )?;
     // The replacement keeps the existing graph but grows the selected popup
     // payload beyond the source, allowing exact output-limit replay without
     // exceeding the codec's source-derived item budget.

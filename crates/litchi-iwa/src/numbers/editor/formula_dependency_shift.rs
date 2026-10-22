@@ -731,6 +731,7 @@ fn mutate_formula_dependencies(
                     type_: CELL_DEPENDENCY_TILE_MESSAGE_TYPE,
                     data,
                 },
+                Default::default(),
             )?;
         }
 
@@ -779,7 +780,7 @@ fn mutate_formula_dependencies(
                 &current_tile,
             )?;
             let message_type = object.messages[message_index].type_;
-            object.replace_message(message_index, RawMessage { type_: message_type, data })?;
+            object.replace_message(message_index, RawMessage { type_: message_type, data }, Default::default())?;
         }
 
         let data = rewrite_shifted_formula_owner_wire(&original, &previous, &current, axis)?;
@@ -793,6 +794,7 @@ fn mutate_formula_dependencies(
                 type_: message_type,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })?;
@@ -1421,6 +1423,7 @@ fn mutate_incoming_range_dependencies(
                 type_: message_type,
                 data,
             },
+            Default::default(),
         )?;
 
         for tile_id in range_tile_ids {
@@ -1468,6 +1471,7 @@ fn mutate_incoming_range_dependencies(
                     type_: message_type,
                     data,
                 },
+                Default::default(),
             )?;
         }
     }

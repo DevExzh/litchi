@@ -215,7 +215,7 @@ pub(super) fn rewrite_owned(
         workspace,
     )?;
     object
-        .replace_message_with_limits(
+        .replace_message(
             index,
             RawMessage {
                 type_: message_type,

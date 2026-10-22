@@ -55,6 +55,7 @@ fn synthetic_package() -> HostPackage {
             type_: PACKAGE_METADATA_MESSAGE_TYPE,
             data: synthetic_metadata(original),
         }],
+        Default::default(),
     )
     .unwrap();
     metadata_object.archive_info.message_infos[0].data_references = Vec::new();
@@ -68,6 +69,7 @@ fn synthetic_package() -> HostPackage {
             type_: 999,
             data: vec![1],
         }],
+        Default::default(),
     )
     .unwrap();
     document_object.archive_info.message_infos[0].data_references = vec![7];

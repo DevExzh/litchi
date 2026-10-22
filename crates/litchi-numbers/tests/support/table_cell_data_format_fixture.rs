@@ -1257,7 +1257,7 @@ pub(crate) fn duration_cross_owner_secondary_package() -> FixtureResult<Vec<u8>>
 /// authorize an exact preserve-mode owner edit.
 pub(crate) fn duration_non_exact_package() -> FixtureResult<Vec<u8>> {
     let flat = synthetic_package_for(FormatFamily::Duration, FormatSharing::Shared)?;
-    let catalog = Catalog::from_bytes(&flat)?;
+    let catalog = Catalog::from_bytes(&flat, Default::default())?;
     let inner_entries = catalog
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
@@ -1427,7 +1427,7 @@ fn sidecar_object(family: FormatFamily, sharing: FormatSharing) -> FixtureResult
             data: payload,
         });
     }
-    let mut sidecars = ArchiveObject::new(SIDECAR_ID, messages)?;
+    let mut sidecars = ArchiveObject::new(SIDECAR_ID, messages, Default::default())?;
     for info in &mut sidecars.archive_info.message_infos {
         info.data_references = vec![0x72_00 + u64::from(info.type_)];
     }
@@ -1703,22 +1703,27 @@ fn object(identifier: u64, type_: u32, data: Vec<u8>) -> FixtureResult<ArchiveOb
     Ok(ArchiveObject::new(
         identifier,
         vec![RawMessage { type_, data }],
+        Default::default(),
     )?)
 }
 
 fn compressed(objects: Vec<ArchiveObject>) -> FixtureResult<Vec<u8>> {
-    Ok(SnappyStream::compress(&Archive { objects }.to_bytes()?)?)
+    Ok(SnappyStream::compress(
+        &Archive { objects }.to_bytes(Default::default())?,
+        Default::default(),
+    )?)
 }
 
 /// Read one decompressed IWA member into an owned archive.
 pub(crate) fn member_archive(source: &[u8], member: &str) -> FixtureResult<Archive> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == member)
         .ok_or_else(|| io::Error::other(format!("member {member} is missing")))?;
     Ok(Archive::parse(
-        SnappyStream::decompress(entry.data())?.as_bytes(),
+        SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+        Default::default(),
     )?)
 }
 
@@ -1756,14 +1761,17 @@ pub(crate) fn rewrite_member(
 ) -> FixtureResult<Vec<u8>> {
     let mut archive = member_archive(source, member)?;
     mutate(&mut archive)?;
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
-    Ok(Catalog::from_bytes(source)?.reassemble_to_bytes(
-        &[litchi_iwa_archive::package::EntryEdit::new(
-            member,
-            &compressed,
-        )],
-        Limits::default(),
-    )?)
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
+    Ok(
+        Catalog::from_bytes(source, Default::default())?.reassemble_to_bytes(
+            &[litchi_iwa_archive::package::EntryEdit::new(
+                member,
+                &compressed,
+            )],
+            Limits::default(),
+        )?,
+    )
 }
 
 /// Rewrite the table member, the target of format edits in this fixture.

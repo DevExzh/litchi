@@ -471,6 +471,7 @@ fn numbers_audio_object(
             type_: message_type,
             data: message.encode_to_vec(),
         }],
+        Default::default(),
     )?;
     let info = &mut object.archive_info.message_infos[0];
     info.versions = versions.to_vec();

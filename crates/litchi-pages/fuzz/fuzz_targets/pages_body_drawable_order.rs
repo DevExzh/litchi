@@ -500,7 +500,7 @@ fn fixture_bytes(descriptor: &[u8], mode: u8) -> BuildResult<Vec<u8>> {
         )?);
     }
     let archive_bytes = Archive { objects }.to_bytes()?;
-    let compressed = SnappyStream::compress(&archive_bytes)?;
+    let compressed = SnappyStream::compress(&archive_bytes, Default::default())?;
 
     let sentinel = descriptor_payload(descriptor, 12);
     let preview_full = descriptor_payload(descriptor, 13);
@@ -581,7 +581,7 @@ fn object(identifier: u64, type_: u32, data: Vec<u8>) -> BuildResult<ArchiveObje
     Ok(ArchiveObject::new(
         identifier,
         vec![RawMessage { type_, data }],
-    )?)
+     Default::default(),)?)
 }
 
 fn exact_bytes(package: &Package) -> BuildResult<Vec<u8>> {
@@ -597,8 +597,8 @@ fn native_order(package: &Package) -> BuildResult<Vec<u64>> {
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or_else(|| io::Error::other("Pages document member is missing"))?;
-    let stream = SnappyStream::decompress(entry.data())?;
-    let archive = Archive::parse(&stream.into_bytes())?;
+    let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+    let archive = Archive::parse(&stream.into_bytes(), Default::default())?;
     let object = archive
         .object(ZORDER_IDENTIFIER)
         .ok_or_else(|| io::Error::other("Pages z-order object is missing"))?;

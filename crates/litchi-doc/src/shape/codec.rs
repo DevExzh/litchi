@@ -19,7 +19,7 @@ pub(crate) const FIB_INDEX_DGG_INFO: usize = 50;
 const RECORD_HEADER_LEN: usize = 8;
 
 fn project(data: &[u8]) -> std::io::Result<Vec<Shape>> {
-    litchi_odraw::shape::parse(data)
+    litchi_odraw::shape::parse(data, Default::default())
         .map_err(invalid_data)?
         .iter()
         .map(Shape::from_office_art)
@@ -406,7 +406,8 @@ mod tests {
     #[test]
     fn projection_exposes_group_identity_and_both_anchor_spaces() {
         let bytes = officeart_drawing();
-        let office_shapes = litchi_odraw::shape::parse(&bytes).expect("parse drawing");
+        let office_shapes =
+            litchi_odraw::shape::parse(&bytes, Default::default()).expect("parse drawing");
         let shapes = office_shapes
             .iter()
             .map(Shape::from_office_art)
@@ -469,7 +470,8 @@ mod tests {
 
         let mut source = Vec::new();
         write::container(&mut source, 0, OutContainer::Sp, &body).expect("write shape container");
-        let office_shapes = litchi_odraw::shape::parse(&source).expect("parse shape");
+        let office_shapes =
+            litchi_odraw::shape::parse(&source, Default::default()).expect("parse shape");
         let shape = Shape::from_office_art(&office_shapes[0]).expect("project shape");
 
         assert_eq!(shape.office_art_bytes(), source.as_slice());
@@ -501,7 +503,8 @@ mod tests {
 
         let mut bytes = Vec::new();
         write::container(&mut bytes, 0, OutContainer::Sp, &body).expect("write shape container");
-        let office_shapes = litchi_odraw::shape::parse(&bytes).expect("parse shape");
+        let office_shapes =
+            litchi_odraw::shape::parse(&bytes, Default::default()).expect("parse shape");
         let shape = Shape::from_office_art(&office_shapes[0]).expect("project shape");
 
         assert_eq!(shape.unknown_properties().len(), 3);

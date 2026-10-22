@@ -105,14 +105,14 @@ fn pages_table_package() -> TestResult<(Vec<u8>, u64, u64, pages::TableInfo)> {
 }
 
 fn component_archives(source: &[u8]) -> TestResult<BTreeMap<String, Archive>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let mut archives = BTreeMap::new();
     for entry in catalog
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
     {
-        let decompressed = SnappyStream::decompress(entry.data())?.into_bytes();
-        let archive = Archive::parse(&decompressed)?;
+        let decompressed = SnappyStream::decompress(entry.data(), Default::default())?.into_bytes();
+        let archive = Archive::parse(&decompressed, Default::default())?;
         if archives.insert(entry.name().to_owned(), archive).is_some() {
             return Err(io::Error::other(format!("duplicate IWA member {}", entry.name())).into());
         }
@@ -466,8 +466,8 @@ fn assert_unrelated_content_preserved(
     after: &[u8],
     drawable_id: DrawableId,
 ) -> TestResult<()> {
-    let before_catalog = Catalog::from_bytes(before)?;
-    let after_catalog = Catalog::from_bytes(after)?;
+    let before_catalog = Catalog::from_bytes(before, Default::default())?;
+    let after_catalog = Catalog::from_bytes(after, Default::default())?;
     let before_entries = before_catalog
         .iter()
         .map(|entry| (entry.name().to_owned(), entry.data().to_vec()))
@@ -552,8 +552,8 @@ fn table_snapshot(editor: &pages::Draft, model_object_id: u64) -> TestResult<Tab
 }
 
 fn assert_non_iwa_members_preserved(before: &[u8], after: &[u8]) -> TestResult<()> {
-    let before_catalog = Catalog::from_bytes(before)?;
-    let after_catalog = Catalog::from_bytes(after)?;
+    let before_catalog = Catalog::from_bytes(before, Default::default())?;
+    let after_catalog = Catalog::from_bytes(after, Default::default())?;
     let before_entries = before_catalog
         .iter()
         .filter(|entry| !entry.name().ends_with(".iwa"))

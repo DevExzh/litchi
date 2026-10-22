@@ -659,7 +659,7 @@ fn rewrite_chart_legend(
         .archive()
         .effective_archive_limits()
         .map_err(map_archive_error)?;
-    let stream = SnappyStream::decompress_with_limits(
+    let stream = SnappyStream::decompress(
         entry.data(),
         source
             .state
@@ -669,8 +669,7 @@ fn rewrite_chart_legend(
             .map_err(map_archive_error)?,
     )
     .map_err(map_core_error)?;
-    let mut archive =
-        Archive::parse_with_limits(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
+    let mut archive = Archive::parse(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
     validate_canonical_object_length_prefixes(stream.as_bytes(), &archive)?;
     let (message_index, message_data) = {
         let object = archive
@@ -697,7 +696,7 @@ fn rewrite_chart_legend(
     archive
         .object_mut(selection.non_style_identifier)
         .ok_or(Error::InvalidSource)?
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             message_index,
             RawMessage {
                 type_: CHART_NON_STYLE_MESSAGE_TYPE,
@@ -706,10 +705,8 @@ fn rewrite_chart_legend(
             archive_limits,
         )
         .map_err(map_core_error)?;
-    let bytes = archive
-        .to_bytes_with_limits(archive_limits)
-        .map_err(map_core_error)?;
-    let compressed = SnappyStream::compress(&bytes).map_err(map_core_error)?;
+    let bytes = archive.to_bytes(archive_limits).map_err(map_core_error)?;
+    let compressed = SnappyStream::compress(&bytes, Default::default()).map_err(map_core_error)?;
     let edit = EntryEdit::new(
         selection.non_style_component_name.as_str(),
         compressed.as_slice(),
@@ -985,7 +982,7 @@ fn verify_selected_chart_component(
     source: &Archive,
     candidate: &Archive,
     selected_identifier: u64,
-    archive_limits: litchi_iwa_core::ArchiveLimits,
+    archive_limits: litchi_iwa_core::Limits,
 ) -> Result<(), Error> {
     let mut selected_seen = false;
     for (source_object, candidate_object) in source.objects.iter().zip(&candidate.objects) {
@@ -1024,7 +1021,7 @@ fn verify_selected_chart_object(
     source: &ArchiveObject,
     candidate: &ArchiveObject,
     selected_message_index: usize,
-    archive_limits: litchi_iwa_core::ArchiveLimits,
+    archive_limits: litchi_iwa_core::Limits,
 ) -> Result<(), Error> {
     if source.archive_info.identifier != candidate.archive_info.identifier
         || source.archive_info.should_merge != candidate.archive_info.should_merge
@@ -1067,7 +1064,7 @@ fn verify_selected_chart_object(
         .clone();
     let mut expected = source.clone();
     expected
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             selected_message_index,
             candidate_message,
             archive_limits,

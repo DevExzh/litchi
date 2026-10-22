@@ -329,12 +329,10 @@ fn clone_message_info_with_identity_remap(
             "IWA clone diff read versions",
         )?,
     };
-    message_info
-        .validate_with_limits(limits)
-        .map_err(|error| match error {
-            Error::InvalidArchive { .. } | Error::Limit { .. } | Error::Allocation { .. } => error,
-            _ => Error::invalid_archive(message_index, "cloned MessageInfo is invalid"),
-        })?;
+    message_info.validate(limits).map_err(|error| match error {
+        Error::InvalidArchive { .. } | Error::Limit { .. } | Error::Allocation { .. } => error,
+        _ => Error::invalid_archive(message_index, "cloned MessageInfo is invalid"),
+    })?;
     Ok(message_info)
 }
 

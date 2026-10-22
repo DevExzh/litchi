@@ -1763,3 +1763,260 @@ See [0063](0063-source-pptx-modern-comments.md).
 - Coordinator follow-up [0359d](0359d-graph-package-owner.md): standalone Graph edits and replay now return `Commit<Package, Patch>`; Snapshot publication is removed and every consumer migrates. Edits start in constant time and replay shares validated bytes. All 136 targeted tests, clippy, locked harness, Graph owner/family glossary, 36 tooling tests and matrix checks pass. The initial attachment/heap regressions were repaired: final large attachment ABBA is 0.996–1.003×, replay median 0.081× and retained-history median 0.948×; peak history heap is 437.88 KB versus 439.69 KB. Untouched-CFB-stream sharing, nested raw chart/shared OLE audits and W4/W4b/W8 integration remain required.
 
 - Coordinator follow-up [0359e](0359e-object-capture-budgets.md): shared OLE core capture budgets now use typed kinds/counts; DOC public callbacks and XLS/core/sheet/unified conversions migrate together. Selected-object absolute depth and maximum-depth selector admission are fixed. All 4,141 distinct relevant tests, clippy, locked harness, four glossary profiles, boundaries and tooling pass (five pre-existing ignored tests). Direct budget checks repair the small-open cost; corrected-buffer ABBA and the longer large-replay follow-up are retained, with unchanged 21.30 MB peak heap. Raw shared OLE policies/publication, Graph sharing and W4/W4b/W8 integration remain required.
+
+- Coordinator follow-up [0362c](0362c-odraw-required-limits.md): ODraw image/shape/traversal entry points require limits and every consumer migrates. Delayed resolution enforces both retained byte policies; traversal removes an unnecessary stack allocation. The full initial consumer suite, final focused tests, all-consumer Clippy, harness, glossary and tooling pass. Final traversal ABBA is 0.965×; the focused nine-block delayed/shape-record medians are 0.999×/0.992×, with all initial and final samples retained. Remaining ODraw raw/owner/error work and W4/W4b/W8 integration stay required.
+
+
+- Coordinator follow-up [0362d](0362d-odraw-picture-package.md): ODraw picture publication now uses immutable `Package`/`View`, core `Commit`/diagnostics, exact content-bound patches, explicit options/raw limits and typed family errors. Every consumer migrates. The initial retained-memory regression was rejected and repaired with a shared base/delta, borrowed change getters and bounded small-table lookup. All 5,156 consumer tests, all-consumer Clippy, the doctest and glossary pass. Final measured medians are at or below baseline; small-history peak is 21,504 versus 21,864 bytes and large-history peak is 21,504 versus 270,551,176 bytes. Both initial and repaired receipts are retained. Remaining ODraw raw policies/builders/errors and W4/W4b/W5/W8 integration remain required.
+
+- Coordinator follow-up [0362e](0362e-staged-output-gate.md): the family gate now rejects artifact output on an `Edit`, and the inventory reports it even for unregistered families. Real-rustdoc coverage passes all 30 tooling tests. Review found OLE single-stream/batch publication bypasses and returned the pending wave for commit-only publication with every consumer migrated and no duplicate-render regression. Changed public OLE debug output and its error exhaustiveness also require correction. These are open engineering work; W4/W4b/W5/W8 integration and the final full gate remain required.
+
+- Coordinator follow-up [0361b](0361b-iwork-error-extensibility.md): 25 shared iWork errors are now non-exhaustive and every affected consumer migrates with them. The inventory detects missing attributes. Workspace all-target/all-feature compilation, eight-crate Clippy, 417 focused tests, 47 tooling tests, fresh common rustdoc and glossary pass. The common inventory's remaining raw `NestedFieldEdit` descriptor is reviewed as a naming-heuristic false positive. Other raw/shared API work, W4/W4b/W5/W8 integration, performance repairs and the final full gate remain required.
+
+- Coordinator follow-up [0361c](0361c-iwork-substrate-error-extensibility.md): the physical, archive, text-appearance and legacy iWork errors now follow the non-exhaustive contract, with every affected consumer migrated. Workspace all-target/all-feature compilation, eight-crate Clippy, 413 focused tests, four fresh rustdoc inventories, the iwa glossary profile, formatting and both locked tool checks pass. The inventory retains 45 required raw/archive `with_limits` migrations and the reviewed `EntryEdit` descriptor false positive. W4/W4b/W5/W8 integration, performance repairs and the final full gate remain required.
+
+- Coordinator follow-up [0361d](0361d-iwork-raw-limits.md) and repair [0361e](0361e-iwork-raw-performance-repair.md): physical IWA records, catalogs and Snappy operations now require limits on their canonical methods; all consumers migrate and 45 raw `with_limits` rows plus the limit aliases are removed. Output admission precedes allocation/writes, encoded entry ceilings propagate into the physical package, and exact-budget compression remains valid. The full seven-crate suite passes 5,088 tests; workspace compilation, seven-crate Clippy, fresh rustdoc/glossary, tooling, fuzz and locked tool checks pass. Final private repairs pass 314 substrate tests and Clippy. Initial framing, small-copy and compression regressions were rejected and repaired; final small/incompressible compression medians are 0.951×/0.682× with fewer allocations. The longer large-copy median is 1.002× with mixed blocks; all attempts remain recorded. Raw constructors, remaining owner-policy propagation, other shared/raw audits, W4/W4b/W5/W8 integration and the final full gate remain required.
+
+- Coordinator review [0360a](0360a-xlsx-resource-typing-review.md): W4's resource typing remains unaccepted. Several helpers infer kinds from strings and discard actual observations; a concrete OLE-object depth failure reports a node limit, and connection namespace-binding exhaustion reports bytes with the wrong ceiling. The wave is returned for explicit kinds/counts, preserved malformed-input classification and focused boundary/host checks. Exact signed no-op cross-copy replay remains legal; an unconditional refusal proposed during review was withdrawn. W4 repair, final native acceptance and integrated gates remain required.
+
+- Coordinator review [0362f](0362f-ppt-replay-performance-review.md): the PPT first-commit candidate is preserved on `uo2/ppt-0362f-candidate` at `be72b3a163`, not merged. Early candidate-length admission was repaired and targeted validation passes. Five guarded blocks improve original first commit to 0.9675×, but matched-Sip forward/inverse replay medians are 1.0077×/1.0466×, slower in four of five blocks. W8 must repair and remeasure replay; no performance exception is accepted. All completed, interrupted and superseded evidence remains recorded. Pending wave integration and the full final gate remain required.
+
+- Coordinator follow-up [0361g](0361g-iwork-text-wire-limits.md): seven raw text-wire APIs now take explicit limits under their canonical names; all 30 affected source/consumer files migrate together, including the separate fuzz target. All 2,767 targeted tests, five-crate compilation and Clippy, fuzz compilation, fresh rustdoc/glossary, inventory and formatting pass. Reproducible normalized body hashes confirm the implementation bodies are unchanged. The seven character-style raw entry points and retained owner-policy propagation remain required; empty heuristic inventory output is not full closure. W4/W4b/W5/W8 integration, performance repairs and the final full gate remain required.
+
+- Coordinator review [0362g](0362g-ppt-replay-buffer-review.md): the replay-buffer candidate `e3aa14d255` passes 2,109 distinct PPT/CFB tests and both Clippy checks, but remains unmerged. Five native blocks improve matched-Sip forward/inverse replay to 0.9685×/0.9141×; original-reference inverse remains 1.0121×, slower in three of five blocks. All observations are retained. Separate heap attribution reduces allocation calls and reported peak heap, so the small RSS delta is not treated as proof of a heap regression or waived as an exception. W8 has a separate in-place-buffer candidate awaiting validation and measurement; pending integrations and the full gate remain required.
+
+- Coordinator review [0362h](0362h-file-performance-review.md): W8's historical Part A timings remain recorded, but final acceptance needs equivalent leaf legs, validated published results, repeated-output measurements, calibrated raw timing totals and failure/host-overlap guards. The broad 1.05 threshold and unsupported code-placement attribution do not close the current contract. No production code is merged by this review; pending integrations, performance repairs and the final workspace gate remain required.
+
+- Coordinator follow-up [0362i](0362i-odraw-limit-kind-names.md): ODraw traversal and image resources now use `LimitKind` and `image::LimitKind`; both old root names are deleted and gated. All consumers migrate together. The 95 unit tests and doctest, all-target Clippy, fresh glossary, five-consumer all-target/all-feature compilation, tooling and formatting pass. Normalized source comparisons cover every changed Rust file and the unchanged relocated enum. Remaining ODraw raw/owner/error work, wave integration, native repairs and the final full gate stay required.
+
+- Coordinator acceptance [0362j](0362j-ppt-replay-in-place.md): the PPT first-commit candidate and both replay repairs integrate together. All eight source files match validated candidate `c0f346607b`; 2,110 distinct PPT/CFB tests and both Clippy checks pass. Five guarded blocks per reference improve every first/steady/forward/inverse comparison: original first commit 0.9550×, forward 0.7377×, inverse 0.9153×; matched-Sip inverse 0.7663×. The 0.1682% matched-Sip process RSS delta remains reported; full-workload heap attribution reduces allocation calls by 2,770,500 and reported peak heap from 117.96 MB to 117.90 MB, with unchanged retained patch bytes. This closes 0357b/0362f/0362g's PPT first-commit/replay performance repair. Remaining wave integration, raw/shared work, glossary/inventory closure and the final workspace gate stay required.
+
+- Coordinator acceptance [0361h](0361h-character-style-required-limits.md) and repair [0361ha](0361ha-character-style-output-repair.md): all seven raw character-style APIs require a wire policy, with every Pages/Numbers/Keynote consumer migrated and typed failures preserved. Aggregate admission precedes nested decoding and output allocation. All 57 raw unit tests, eight compile-fail doctests, 1,015 owner tests, four-crate Clippy and the raw glossary pass. The first memory regression was returned and repaired; every final allocation route is equal to or below the base, and all 11 native routes improve (0.3521–0.9618× medians). All 60 qualified ABBA blocks, the interrupted warmup and exact fixture/output comparisons remain recorded. Retained footnote policies, remaining raw/shared audits, wave integration and the final workspace gate stay required.
+
+- Coordinator follow-up [0361j](0361j-pages-registry-error-fidelity.md): Pages section text-style registry failures preserve their actual resource kind and counts, replacing the fabricated RegistryBytes 0/0 mapping. All 209 Pages library tests, the File classification regression and all-target/all-feature Pages/ops Clippy pass. Successful read/edit/commit/replay implementation bytes are unchanged. Remaining owner policies, shared error conversions, wave integration and the final full gate remain required.
+
+
+- Coordinator checkpoint (2026-10-22): the unpublished W8 Part A integration
+  candidate is committed on `uo2/coordinator-w8-part-a` through `4d464d60b7`
+  (`8c4ccb269f` assembly, `17d4cf011d` ODF/OPC isolation and `4d464d60b7` typed
+  ODF source errors). Its full ops library run passes 962 tests plus the added
+  DOCX policy-isolation regression; 217 doctests, all-feature and ODT-only
+  Clippy, and no-format compilation pass. It is not merged or performance
+  accepted. ODF semantic-policy propagation, File probe review, W4/W4b
+  integration, corpus dispositions and the final gate remain required.
+  W4's retained/replay memory repair continues on `uo2/w4-xlsx`; the latest
+  implementation removes duplicated deferred endpoint catalogs (`913ed0f3bd`)
+  and awaits matched allocation evidence. Protected constructor v4 binaries
+  and allocation/fidelity receipts are committed through `7686d7014c` on
+  `uo2/coordinator-constructors`; native qualification remains pending.
+  Numbers, Pages and Keynote owner Snappy policies remain active engineering
+  work. No new performance exception or redaction deferral is accepted, and
+  nothing has been pushed.
+
+- Coordinator documentation follow-up (2026-10-22): design §16.4 now names
+  the implemented `litchi-sheet-text` leaf and its facade re-export, and the
+  retired iWork facade now points to `File` and immutable leaf packages.
+  This closes the queued §16.4 update without changing the historical
+  measurement records. Remaining implementation, performance and final
+  integration work stays open.
+
+- Coordinator checkpoint (2026-10-22, after the ingress review): the W8 Part A
+  candidate now includes `8d6abdab69`, applying semantic options through all
+  ten prepared ODF owners and four flat families. Validation passes 2,752
+  affected library tests (965 File tests), the full 1,768-test ODS suite,
+  299 doctests, consumer compilation, Clippy, feature builds, selected
+  glossary profiles, boundaries and tracked disposition checks. The totals
+  overlap and are not a distinct-test sum. The candidate remains unmerged
+  and unqualified for native performance. The repaired File harness is
+  being integrated from `dd1052e06d`; its worker-source 109-route untimed
+  receipt is retained separately from the coordinator-source validation.
+  W4's `5e0672b53c` repair reduces retained history and replay peak memory
+  below its original baseline; source-owner admission still allocates more
+  and remains under repair. Numbers retained Snappy policy verification is
+  committed through `5232e9bcdb`, Pages/Keynote through `eaade0241d`, and
+  footnote validation through `660205a29c`. ODraw's final consumer checks
+  are recorded in `80ccd68391`; W5's retag optimization is awaiting fresh
+  allocation comparison. These branches are not accepted by this checkpoint.
+  Constructor evidence through `2f8fa9534b` retains four interrupted v4
+  native attempts with zero qualified blocks, including the worker-overlap
+  correction and the later unrelated host test. Required flat ODF raw
+  limits, remaining wave integration, native qualification, the complete
+  inventory and final gate stay open. Nothing has been pushed.
+
+- Coordinator checkpoint (2026-10-22, retained-header and integrated harness):
+  the Part A candidate through `fd5f513df6` now records all 109 untimed File
+  routes passing on integrated source `d39d179353`. Exact output and semantic
+  receipts match the worker run; native acceptance still awaits the final
+  integrated wave source. Constructor repair `536d7fdcca` closes the reproduced
+  stricter-policy bypass for retained unknown IWA headers; all 115 core tests
+  and Clippy pass. Its fresh matched-v5 build preserves all eight output files,
+  and all 15 allocation routes remain at or below the original reference.
+  V5 native qualification is pending; interrupted v4 attempts retain their
+  original source attribution. W4 continues repairing source-owner admission.
+  The W5 hybrid representation improves source-backed cells allocation but
+  leaves eager byte/peak residuals, so it remains under repair. Flat ODF raw
+  limits and the DOCX durable-ink Commit repair are active. These candidates
+  are unmerged; remaining content-matching replay, raw audits, complete
+  inventory/glossary closure, native qualification and the final gate remain
+  required. Nothing has been pushed.
+
+- Coordinator checkpoint (2026-10-22, W4/File assembly and replay review):
+  `uo2/coordinator-w4-integration` is committed and clean at `eafeed22a4`,
+  combining W4 `b6a5d10935` with Part A `fd5f513df6`. The merge fixes the
+  facade sparkline example, six harness detector consumers, the iWork-only
+  detector feature build and the combined harness lockfile. Nine affected
+  crates pass all-target/all-feature compilation; 119 PPTX metadata tests,
+  boundary/matrix checks, formatting and locked all-target harness compilation
+  pass. The feature matrix has 27 initial passes and all four repaired iWork
+  cases pass on rerun. Record 0360c retains every failed and successful log.
+  This is an integration candidate, not trunk or performance acceptance.
+  A dry XLSB merge identifies three source conflicts plus generated matrices
+  and lockfiles; the actual XLSB merge remains coordinator work.
+
+  DOCX durable Ink source-owner repair `76148455d5` and receipt `f97f0eef7a`
+  pass 58 integration tests, 1,489 library tests and 170 doctests, with every
+  matched allocation metric at or below baseline. This closes the earlier
+  allocation returns; native qualification remains open. Flat ODF receipt
+  `965beae5c9` independently verifies both 606-file source sets, protected
+  binaries, equal locks and all 36 raw allocation legs. Constructor protocol
+  `c72ebf4816` resumes only missing verified blocks without changing the five
+  required blocks per route or host/timing guards. Its first matched-v5
+  attempt was interrupted by an unrelated build during calibration; receipt
+  `631fc7be4a` retains it with zero qualified blocks. All heavy-command holds
+  are released.
+
+  W4's `72940100a1` policy compaction improves memory but leaves owner
+  admission above the original specialized-family baseline; it remains
+  returned. `528e04e6d5` fixes no-op metadata base admission and passes its
+  focused common/XLSX tests. W5's captured-package reuse and state compaction
+  through `cf3c9a4eb6` pass focused/full affected tests but retain eager XLS
+  allocation/peak residuals. File replay `bb745b0d8c` uses a bounded streaming
+  content proof. Its signed-state review preserves existing facade admission:
+  signed files cannot create an Edit, while leaf exact signed no-op replay
+  remains legal. PPTX cross-copy replay and the remaining leaf content scope
+  repairs are still under review and validation.
+
+  Review found additional replay-shape debt: DOCX/PPTX metadata and several
+  primary/source-backed replay methods still return Package/Self. These need
+  Commit migration with all consumers, shared triad review and gate/inventory
+  coverage. Raw ODF XML policy work from 0362n, remaining wave integration,
+  native qualification, the complete inventory/glossary and final 53-check
+  gate remain required. Nothing has been pushed.
+
+- Coordinator checkpoint (2026-10-22, XLSB assembly): the candidate on
+  `uo2/coordinator-w4-integration` is committed through `f3fed35c0d`, with
+  source merge `933ce43de3`. Record 0360d retains all failed and successful
+  validation attempts. The final source passes 1,317 XLSB tests (11 ignored
+  doctests), 23 facade tests, 36 unified XLSB tests, eleven-package
+  all-target/all-feature Clippy, the XLSB-only ops Clippy profile, the main
+  harness and all nine XLSB harness checks, both XLSB glossary profiles,
+  formatting and tooling checks. OPC/XLDM tests pass 824 cases. These
+  totals overlap earlier runs and do not represent the final workspace gate.
+  The assembly remains outside trunk pending performance qualification and
+  the remaining source repairs. The standalone XLSB raw API audit is
+  committed as `3267b9d627` (0360e); its required policy migrations remain.
+
+  Shared metadata scope candidate `00e6add236` is returned by
+  [0360ab](0360ab-w4-metadata-composition-review.md): independent assertions
+  reproduce inverse failure after creating a family while others are absent,
+  and refusal to compose a cancelled edit with a disjoint family change.
+  The worker's subsequent repair is under review, including independently
+  captured scopes and actual relationship-ID transitions. DOCX/PPTX metadata
+  Commit migration is committed as `2eca82b0f8` from the assembled API, with
+  focused suites, consumer checks and Clippy passing; integration with the
+  repaired common scope still requires validation. The general replay
+  return-shape gate and other primary replay migrations remain required.
+
+  W4 cold-reader allocation measurements also expose three extra calls and
+  1,016 extra bytes per first cell/style/cursor read against its original
+  reference; this is returned for attribution and repair, alongside the
+  source-owner admission residual. ODF raw policy testing found the default
+  token ceiling narrowed historical ODS admission. Its worker repair
+  preserves the owner default envelope while retaining explicit caller
+  policies, with further edited/replayed-owner propagation checks pending.
+  W5 deferred XLS projection remains a reviewed proposal, not an accepted
+  implementation; commit-time target validation must remain intact. Native
+  qualification, remaining integrations, the complete inventory/glossary
+  sweep and final 53-check gate remain required. Nothing has been pushed.
+
+- Coordinator checkpoint (2026-10-22, return contracts and metadata scope):
+  `0dfb00b590` lands the return-type gate and inventory on trunk. Registered
+  local edits must return their family's Commit, and registered owner replay
+  must publish that owner. DOCX minimal/full profiles now verify 39/40 replay
+  returns. Record 0362q retains 38 focused tests within 1,332 passing tooling
+  tests and both fresh DOCX rustdoc profiles. Its full inventory still has
+  35 rows, including four replay returns; the remaining raw/model/projection
+  rows require migration or documented contract classification.
+
+  The metadata integration candidate is committed as `5532099873` on
+  `uo2/coordinator-metadata-integration`. It combines DOCX/PPTX Commit replay
+  with the shared-property repairs through `9f9fa3930a`, preserving the W4b
+  deferred snapshot helpers. All 17 common transaction tests pass, including
+  the two regressions returned by 0360ab and creation-ID/removal-inbound
+  guards. The fresh run passes 472 common tests, 230 focused format tests,
+  five-package all-target/all-feature Clippy and formatting. Record 0362o
+  retains the exact source proof and all command logs by size/hash. This
+  closes the correctness return; performance qualification and trunk
+  integration remain open.
+
+  Primary PPTX/DOCX/RTF replay Commit migration is committed separately as
+  `1c7eb1e84c` (0362p), with migrated crate/tool consumers and locked harness
+  checks. Its coordinator integration and result-rule registrations remain.
+  ODF policy propagation `747cfd072d` is returned by 0362nb because its raw
+  reader exposes a core error and reconstructs the precise ODF dimension
+  after conversion. Repair `1042fd7ecc` returns the crate error directly;
+  raw tests and affected checks pass, with full post-repair validation still
+  underway. No performance acceptance is claimed for either ODF revision.
+
+  Three workers continue W4 cold-reader allocation repair, ODF/XLSB raw-policy
+  work and the remaining DOCX API audit. Native qualification, remaining
+  integrations, the complete inventory/glossary sweep and final 53-check gate
+  remain required. Nothing has been pushed.
+
+- Coordinator checkpoint (2026-10-22, replay integration and raw-policy repairs):
+  `fddfbdb0a0` extends the return gate to direct shared Commit types, nested
+  type arguments and declared method generic parameters. Record 0362qa retains
+  1,334 passing tooling tests and the existing DOCX profile checks. All five
+  RTF replay returns also verify against the worker's fresh candidate capture;
+  its inventory has no remaining rows in the implemented categories. Those
+  RTF source changes and policy registrations are not on trunk yet.
+
+  The combined replay/metadata candidate is committed as `ad1c6cede8` on
+  `uo2/coordinator-replay-integration`, in the metadata integration worktree.
+  Record 0362pa fixes inverse RTF tail replay diagnostics and migrates the
+  remaining ops Commit consumers. Record 0362u describes the assembly and
+  bounded validation. Full merged testing additionally found a stale ODF
+  replacement-range assertion and W4's accidental DOCX durable-error mapping
+  change; both are repaired in the merge commit. The ops library suite now
+  passes all 969 tests. The remaining 225-group affected-package run, consumer
+  harness checks and final receipts are still in progress. This is not the
+  final workspace gate or trunk performance acceptance.
+
+  RTF primary/durable/redaction replay is committed through `cbf4e30276`, and
+  logical tail replay span storage through `30ca8a13d8`. Its matched 1 MiB
+  probe removes one 1,048,606-byte allocation from forward and inverse replay,
+  with unchanged authored allocation totals and exact authored/durable bytes.
+  The fresh ops consumer check on that standalone branch still encounters the
+  DOCX/PPTX consumers already repaired by the coordinator; the complete merged
+  source remains the required validation target. DOCX paragraph-stream API
+  cleanup is committed as `b96137acb4`; paragraph-copy raw codec limits remain
+  in progress.
+
+  XLSB raw-policy work is committed through `8d59abb26f`: comments/calc,
+  styles and host style parsers, filters/page breaks/cell watches, and named
+  ranges now take required retained raw limits, with their consumers and
+  tests migrated. The last slice passes 741 library tests, integration tests
+  and Clippy. Remaining formula, XML and host raw codec slices are required.
+  ODF's raw reader repair passes its full affected suites and Clippy. Review
+  0362nca found one remaining namespace URI conversion through a coarse core
+  error; source repair `3f802aec9d` now creates that typed error at its origin.
+  Coordinator integration and native qualification remain open.
+
+  W4's cold-reader prototype restores reference allocation counts, leaving
+  +8 allocated bytes and +16 peak bytes per measured operation. Source review
+  0360ac returns its defined-name storage change because proof-backed reopens
+  retain duplicate catalogues. The repair must preserve shared history and
+  include managed/custom-policy admission measurements. No performance
+  exception is granted. Three workers continue these bounded repairs; native
+  qualification, remaining integrations, the complete inventory/glossary sweep
+  and final 53-check gate remain required. Nothing has been pushed.

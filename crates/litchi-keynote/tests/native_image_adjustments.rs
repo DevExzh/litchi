@@ -63,13 +63,13 @@ fn replacement_adjustments() -> TestResult<ImageAdjustments> {
 }
 
 fn image_archive(package: &[u8]) -> TestResult<tsd::ImageArchive> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let slide = catalog
         .iter()
         .find(|entry| entry.name() == SLIDE_MEMBER)
         .ok_or_else(|| io::Error::other("native image slide member is missing"))?;
-    let bytes = SnappyStream::decompress(slide.data())?.into_bytes();
-    let archive = Archive::parse(&bytes)?;
+    let bytes = SnappyStream::decompress(slide.data(), Default::default())?.into_bytes();
+    let archive = Archive::parse(&bytes, Default::default())?;
     let mut selected = None;
     for object in &archive.objects {
         for message in &object.messages {
@@ -93,13 +93,13 @@ fn image_archive(package: &[u8]) -> TestResult<tsd::ImageArchive> {
 }
 
 fn slide_contains_marker(package: &[u8], marker: &[u8]) -> TestResult<bool> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let slide = catalog
         .iter()
         .find(|entry| entry.name() == SLIDE_MEMBER)
         .ok_or_else(|| io::Error::other("native image slide member is missing"))?;
-    let bytes = SnappyStream::decompress(slide.data())?.into_bytes();
-    let archive = Archive::parse(&bytes)?;
+    let bytes = SnappyStream::decompress(slide.data(), Default::default())?.into_bytes();
+    let archive = Archive::parse(&bytes, Default::default())?;
     Ok(archive.objects.iter().any(|object| {
         object.messages.iter().any(|message| {
             message
@@ -148,8 +148,8 @@ fn assert_native_image_preserved(source: &[u8], candidate: &[u8]) -> TestResult 
 }
 
 fn assert_asset_unchanged(source: &[u8], candidate: &[u8]) -> TestResult {
-    let source_catalog = Catalog::from_bytes(source)?;
-    let candidate_catalog = Catalog::from_bytes(candidate)?;
+    let source_catalog = Catalog::from_bytes(source, Default::default())?;
+    let candidate_catalog = Catalog::from_bytes(candidate, Default::default())?;
     let source_asset = source_catalog
         .iter()
         .find(|entry| entry.name() == IMAGE_ASSET_MEMBER)
@@ -167,8 +167,8 @@ fn assert_asset_unchanged(source: &[u8], candidate: &[u8]) -> TestResult {
 }
 
 fn assert_exact_locality(source: &[u8], candidate: &[u8]) -> TestResult {
-    let source_catalog = Catalog::from_bytes(source)?;
-    let candidate_catalog = Catalog::from_bytes(candidate)?;
+    let source_catalog = Catalog::from_bytes(source, Default::default())?;
+    let candidate_catalog = Catalog::from_bytes(candidate, Default::default())?;
     let mut changed = Vec::new();
     for source_entry in source_catalog.iter() {
         let candidate_entry = candidate_catalog

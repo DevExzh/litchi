@@ -16,7 +16,7 @@ use litchi_iwa_archive::SourceCatalog;
 use litchi_iwa_archive::package::{EntryEdit, EntryInsertion, ExactArtifacts};
 use litchi_iwa_common::WireLimits;
 use litchi_iwa_core::archive::{FieldObjectReferenceTransition, ObjectReferenceTransition};
-use litchi_iwa_core::{Archive, ArchiveLimits, ArchiveObject, RawMessage, SnappyStream};
+use litchi_iwa_core::{Archive, ArchiveObject, Limits as ArchiveLimits, RawMessage, SnappyStream};
 use litchi_iwa_protos::{
     keynote_media_creation_codec as media_creation_codec,
     keynote_media_lifecycle_codec as lifecycle_codec, keynote_show_codec,
@@ -843,7 +843,7 @@ pub(super) fn publish_candidate(
     budget.charge_allocation_events(1)?;
     let appended = media_objects.into_iter().chain(builds).collect::<Vec<_>>();
     slide_archive
-        .append_objects_with_limits(appended, context.archive_limits)
+        .append_objects(appended, context.archive_limits)
         .map_err(|_| SlideAudioCreationError::InvalidSource)?;
     rewrite_slide_archive(
         &mut slide_archive,
@@ -1749,7 +1749,7 @@ pub(super) fn new_archive_object(
     data_references: &[u64],
     limits: ArchiveLimits,
 ) -> Result<ArchiveObject, SlideAudioCreationError> {
-    let mut object = ArchiveObject::new_with_limits(
+    let mut object = ArchiveObject::new(
         identifier,
         vec![RawMessage {
             type_: message_type,
@@ -2162,7 +2162,7 @@ fn replace_slide_message_with_refs(
         });
     }
     object
-        .replace_message_transitioning_object_references_preserving_header_with_limits(
+        .replace_message_transitioning_object_references_preserving_header(
             message_index,
             RawMessage {
                 type_: SLIDE_MESSAGE_TYPE,
@@ -2205,7 +2205,7 @@ pub(super) fn archive_clone_allocation_bound(
     limits: ArchiveLimits,
 ) -> Result<usize, SlideAudioCreationError> {
     let mut amount = archive
-        .encoded_len_with_limits(limits)
+        .encoded_len(limits)
         .map_err(|_| SlideAudioCreationError::InvalidSource)?;
     amount = amount
         .checked_add(size_of::<Archive>())
@@ -2220,7 +2220,7 @@ pub(super) fn archive_clone_allocation_bound(
         .ok_or(SlideAudioCreationError::InvalidSource)?;
     for object in &archive.objects {
         // ArchiveObject keeps raw and canonical header copies private in the
-        // neutral archive layer.  `encoded_len_with_limits` accounts for the
+        // neutral archive layer.  `encoded_len` accounts for the
         // serialized framing, so reserve two additional header-sized buffers
         // for the retained source-preserving pair without exposing either
         // buffer or changing the archive's preservation behavior.
@@ -2359,7 +2359,7 @@ pub(super) fn prepare_node_cache_edit(
         let node = slide_archive
             .object_mut(context.slide_node_identifier)
             .ok_or(SlideAudioCreationError::InvalidSource)?;
-        node.replace_message_preserving_header_with_limits(
+        node.replace_message_preserving_header(
             message_index,
             RawMessage {
                 type_: SLIDE_NODE_MESSAGE_TYPE,
@@ -2383,7 +2383,7 @@ pub(super) fn prepare_node_cache_edit(
     let node = archive
         .object_mut(context.slide_node_identifier)
         .ok_or(SlideAudioCreationError::InvalidSource)?;
-    node.replace_message_preserving_header_with_limits(
+    node.replace_message_preserving_header(
         message_index,
         RawMessage {
             type_: SLIDE_NODE_MESSAGE_TYPE,
@@ -2419,20 +2419,20 @@ pub(super) fn serialize_component(
     budget: &mut CreationBudget,
 ) -> Result<Vec<u8>, SlideAudioCreationError> {
     let expected = archive
-        .encoded_len_with_limits(archive_limits)
+        .encoded_len(archive_limits)
         .map_err(|_| SlideAudioCreationError::InvalidSource)?;
     budget.charge_allocations(expected)?;
     let bytes = archive
-        .to_bytes_with_limits(archive_limits)
+        .to_bytes(archive_limits)
         .map_err(|_| SlideAudioCreationError::InvalidSource)?;
     if bytes.len() != expected {
         return Err(SlideAudioCreationError::InvalidSource);
     }
-    let compressed_bound = SnappyStream::maximum_compressed_len(bytes.len())
+    let compressed_bound = SnappyStream::maximum_compressed_len(bytes.len(), snappy_limits)
         .map_err(|_| SlideAudioCreationError::InvalidSource)?;
     budget.charge_allocations(compressed_bound)?;
-    let compressed =
-        SnappyStream::compress(&bytes).map_err(|_| SlideAudioCreationError::InvalidSource)?;
+    let compressed = SnappyStream::compress(&bytes, snappy_limits)
+        .map_err(|_| SlideAudioCreationError::InvalidSource)?;
     if compressed.len() > snappy_limits.max_compressed_stream() {
         return Err(SlideAudioCreationError::Limit {
             kind: SlideAudioCreationLimitKind::EntryBytes,

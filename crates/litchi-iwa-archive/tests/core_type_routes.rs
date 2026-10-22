@@ -22,6 +22,7 @@ fn sample_archive() -> iwa::Archive {
             type_: 99,
             data: vec![0x08, 0x01],
         }],
+        Default::default(),
     )
     .expect("sample archive object should be valid");
     object.archive_info = archive_info;
@@ -34,7 +35,7 @@ fn sample_archive() -> iwa::Archive {
 fn archive_owned_routes_preserve_core_type_identity() {
     fn accepts_archive(_: &iwa::Archive) {}
     fn accepts_core_archive(_: &iwa_core::Archive) {}
-    fn accepts_core_archive_limits(_: iwa_core::ArchiveLimits) {}
+    fn accepts_core_archive_limits(_: iwa_core::Limits) {}
     fn accepts_core_error(_: iwa_core::Error) {}
     fn accepts_core_limit_kind(_: iwa_core::LimitKind) {}
     fn accepts_core_result(_: iwa_core::Result<iwa_core::Archive>) {}
@@ -45,7 +46,7 @@ fn archive_owned_routes_preserve_core_type_identity() {
             "Index/Document.iwa".to_owned(),
             Vec::new(),
         )],
-        iwa::ArchiveLimits::default(),
+        iwa::Limits::default(),
     )
     .expect("package state should accept one entry");
     let source = sample_archive();
@@ -59,7 +60,7 @@ fn archive_owned_routes_preserve_core_type_identity() {
     accepts_archive(parsed.as_ref());
     accepts_core_archive(parsed.as_ref());
 
-    let routed_archive_limits = iwa::ArchiveLimits::default();
+    let routed_archive_limits = iwa::Limits::default();
     accepts_core_archive_limits(routed_archive_limits);
     let routed_result: iwa::Result<iwa::Archive> = Ok(source);
     accepts_core_result(routed_result);
@@ -82,14 +83,12 @@ fn routed_archive_and_snappy_values_round_trip_with_references() -> iwa::Result<
     fn accepts_core_visitor<T: iwa_core::ArchiveReferenceVisitor>(_: &mut T) {}
 
     let archive = sample_archive();
-    let decompressed = archive.to_bytes()?;
-    let compressed = iwa::SnappyStream::compress(&decompressed)?;
-    let stream =
-        iwa::SnappyStream::decompress_with_limits(&compressed, iwa::SnappyLimits::default())?;
+    let decompressed = archive.to_bytes(Default::default())?;
+    let compressed = iwa::SnappyStream::compress(&decompressed, Default::default())?;
+    let stream = iwa::SnappyStream::decompress(&compressed, iwa::SnappyLimits::default())?;
     assert_eq!(stream.as_bytes(), decompressed.as_slice());
 
-    let reparsed =
-        iwa::Archive::parse_with_limits(stream.as_bytes(), iwa::ArchiveLimits::default())?;
+    let reparsed = iwa::Archive::parse(stream.as_bytes(), iwa::Limits::default())?;
     assert_eq!(
         reparsed.objects[0].archive_info,
         archive.objects[0].archive_info
@@ -113,10 +112,10 @@ fn routed_archive_and_snappy_values_round_trip_with_references() -> iwa::Result<
     accepts_core_visitor(&mut references);
     let policy = iwa::ArchiveReferencePolicy::KnownReferences;
     accepts_core_policy(policy);
-    let count = reparsed.objects[0].inspect_references_with_policy_and_limits(
+    let count = reparsed.objects[0].inspect_references_with_policy(
         &mut references,
         policy,
-        iwa::ArchiveLimits::default(),
+        iwa::Limits::default(),
     )?;
     assert_eq!(count, 4);
     assert_eq!(references.0.len(), count);
@@ -147,7 +146,7 @@ fn routed_archive_and_snappy_values_round_trip_with_references() -> iwa::Result<
     );
     let _ = iwa::LimitKind::ArchiveBytes;
     assert!(matches!(
-        iwa::Archive::parse(&[0]),
+        iwa::Archive::parse(&[0], Default::default()),
         Err(iwa::Error::InvalidArchive { .. })
     ));
 

@@ -106,17 +106,17 @@ fn reassemble_object<F>(source: &[u8], identifier: u64, mutate: F) -> Vec<u8>
 where
     F: FnOnce(&mut ArchiveObject),
 {
-    let catalog = Catalog::from_bytes(source).expect("source catalog");
+    let catalog = Catalog::from_bytes(source, Default::default()).expect("source catalog");
     let mut component_name = None;
     let mut selected_archive = None;
     for entry in catalog
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
     {
-        let Ok(stream) = SnappyStream::decompress(entry.data()) else {
+        let Ok(stream) = SnappyStream::decompress(entry.data(), Default::default()) else {
             continue;
         };
-        let Ok(archive) = Archive::parse(stream.as_bytes()) else {
+        let Ok(archive) = Archive::parse(stream.as_bytes(), Default::default()) else {
             continue;
         };
         if archive.object(identifier).is_some() {
@@ -135,8 +135,11 @@ where
             .object_mut(identifier)
             .expect("selected object in archive"),
     );
-    let encoded = archive.to_bytes().expect("mutated archive");
-    let compressed = SnappyStream::compress(&encoded).expect("mutated component");
+    let encoded = archive
+        .to_bytes(Default::default())
+        .expect("mutated archive");
+    let compressed =
+        SnappyStream::compress(&encoded, Default::default()).expect("mutated component");
     catalog
         .reassemble_to_bytes(
             &[EntryEdit::new(&component_name, compressed.as_slice())],
@@ -163,6 +166,7 @@ where
                 type_: message_type,
                 data,
             },
+            Default::default(),
         )
         .expect("replace message payload");
 }
@@ -317,15 +321,15 @@ fn append_nonzero_mediator(payload: &mut Vec<u8>) {
 }
 
 fn first_unrelated_object(source: &[u8], selection: &ChartSelection) -> (u64, usize) {
-    let catalog = Catalog::from_bytes(source).expect("source catalog");
+    let catalog = Catalog::from_bytes(source, Default::default()).expect("source catalog");
     for entry in catalog
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
     {
-        let Ok(stream) = SnappyStream::decompress(entry.data()) else {
+        let Ok(stream) = SnappyStream::decompress(entry.data(), Default::default()) else {
             continue;
         };
-        let Ok(archive) = Archive::parse(stream.as_bytes()) else {
+        let Ok(archive) = Archive::parse(stream.as_bytes(), Default::default()) else {
             continue;
         };
         for object in &archive.objects {
@@ -611,7 +615,7 @@ fn forge_patch(source_bytes: &[u8], patch: &Patch, target_bytes: Vec<u8>) -> Pat
 }
 
 fn mutate_unrelated_member(source: &[u8]) -> Vec<u8> {
-    let catalog = Catalog::from_bytes(source).expect("candidate catalog");
+    let catalog = Catalog::from_bytes(source, Default::default()).expect("candidate catalog");
     let entry = catalog
         .iter()
         .find(|entry| {
@@ -648,12 +652,13 @@ fn mutate_selected_payload(source: &[u8], selection: &ChartSelection) -> Vec<u8>
 }
 
 fn restore_one_preview(source: &[u8], preview_source: &[u8]) -> Vec<u8> {
-    let source_catalog = Catalog::from_bytes(preview_source).expect("preview source catalog");
+    let source_catalog =
+        Catalog::from_bytes(preview_source, Default::default()).expect("preview source catalog");
     let preview = source_catalog
         .iter()
         .find(|entry| entry.name() == "preview.jpg")
         .expect("native preview");
-    Catalog::from_bytes(source)
+    Catalog::from_bytes(source, Default::default())
         .expect("candidate catalog")
         .reassemble_with_insertions_to_bytes(
             &[EntryInsertion::new("preview.jpg", preview.data())],
@@ -733,13 +738,14 @@ fn unknown_reference_metadata_is_preserved_for_reads_and_noops_but_blocks_title_
     let (component, _) = package
         .object_with_component(identifier)
         .expect("unrelated component");
-    let catalog = Catalog::from_bytes(&source).expect("source catalog");
+    let catalog = Catalog::from_bytes(&source, Default::default()).expect("source catalog");
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == component)
         .expect("component entry");
-    let stream = SnappyStream::decompress(entry.data()).expect("component stream");
-    let archive = Archive::parse(stream.as_bytes()).expect("component archive");
+    let stream =
+        SnappyStream::decompress(entry.data(), Default::default()).expect("component stream");
+    let archive = Archive::parse(stream.as_bytes(), Default::default()).expect("component archive");
     let object = archive.object(identifier).expect("unrelated object");
     let offset = usize::try_from(object.header_offset).expect("header offset");
     let (length, prefix) =
@@ -755,7 +761,8 @@ fn unknown_reference_metadata_is_preserved_for_reads_and_noops_but_blocks_title_
     );
     rewritten.extend_from_slice(&header);
     rewritten.extend_from_slice(&stream.as_bytes()[end..]);
-    let compressed = SnappyStream::compress(&rewritten).expect("changed component");
+    let compressed =
+        SnappyStream::compress(&rewritten, Default::default()).expect("changed component");
     let opaque = catalog
         .reassemble_to_bytes(&[EntryEdit::new(component, &compressed)], Limits::default())
         .expect("opaque package");

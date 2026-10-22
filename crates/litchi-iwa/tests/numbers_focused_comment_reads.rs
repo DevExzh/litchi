@@ -44,13 +44,14 @@ struct WireComment {
 }
 
 fn member_archive(source: &[u8], name: &str) -> TestResult<Archive> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == name)
         .ok_or_else(|| io::Error::other(format!("missing archive member {name}")))?;
     Ok(Archive::parse(
-        SnappyStream::decompress(entry.data())?.as_bytes(),
+        SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+        Default::default(),
     )?)
 }
 
@@ -58,12 +59,15 @@ fn rewrite_storage_payload<F>(source: &[u8], identifier: u64, rewrite: F) -> Tes
 where
     F: FnOnce(&mut tsd::CommentStorageArchive),
 {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == fixture::DOCUMENT_MEMBER)
         .ok_or_else(|| io::Error::other("comment fixture document member is missing"))?;
-    let mut archive = Archive::parse(SnappyStream::decompress(entry.data())?.as_bytes())?;
+    let mut archive = Archive::parse(
+        SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+        Default::default(),
+    )?;
     let object = archive
         .objects
         .iter_mut()
@@ -79,7 +83,8 @@ where
     let mut payload = tsd::CommentStorageArchive::decode(message.data.as_slice())?;
     rewrite(&mut payload);
     message.data = payload.encode_to_vec();
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(
             fixture::DOCUMENT_MEMBER,
@@ -93,12 +98,15 @@ fn rewrite_author_payload<F>(source: &[u8], identifier: u64, rewrite: F) -> Test
 where
     F: FnOnce(&mut tsk::AnnotationAuthorArchive),
 {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == fixture::DOCUMENT_MEMBER)
         .ok_or_else(|| io::Error::other("comment fixture document member is missing"))?;
-    let mut archive = Archive::parse(SnappyStream::decompress(entry.data())?.as_bytes())?;
+    let mut archive = Archive::parse(
+        SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+        Default::default(),
+    )?;
     let object = archive
         .objects
         .iter_mut()
@@ -112,7 +120,8 @@ where
     let mut payload = tsk::AnnotationAuthorArchive::decode(message.data.as_slice())?;
     rewrite(&mut payload);
     message.data = payload.encode_to_vec();
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(
             fixture::DOCUMENT_MEMBER,
@@ -123,14 +132,15 @@ where
 }
 
 fn all_archives(source: &[u8]) -> TestResult<Vec<Archive>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let mut archives = Vec::new();
     for entry in catalog
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
     {
         archives.push(Archive::parse(
-            SnappyStream::decompress(entry.data())?.as_bytes(),
+            SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+            Default::default(),
         )?);
     }
     Ok(archives)

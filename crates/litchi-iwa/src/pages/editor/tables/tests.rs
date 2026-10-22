@@ -2038,9 +2038,12 @@ fn first_table_bootstrap_rejects_reserved_id_collision_transactionally() {
                     type_: u32::MAX,
                     data: Vec::new(),
                 }],
+                Default::default(),
             )
             .map_err(Error::from)?;
-            archive.insert_object(object).map_err(Error::from)
+            archive
+                .insert_object(object, Default::default())
+                .map_err(Error::from)
         })
         .unwrap();
     let mut editor = Draft::from_package(package).unwrap();

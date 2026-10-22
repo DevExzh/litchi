@@ -38,13 +38,13 @@ fn rewrite_slide_payload(
     source: &[u8],
     rewrite: impl FnOnce(&[u8]) -> TestResult<Vec<u8>>,
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == SLIDE_MEMBER)
         .ok_or_else(|| io::Error::other("missing native slide member"))?;
-    let stream = SnappyStream::decompress(entry.data())?;
-    let mut archive = Archive::parse(stream.as_bytes())?;
+    let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+    let mut archive = Archive::parse(stream.as_bytes(), Default::default())?;
     let slide = archive
         .object_mut(SLIDE_IDENTIFIER)
         .ok_or_else(|| io::Error::other("missing native slide object"))?;
@@ -60,8 +60,10 @@ fn rewrite_slide_payload(
             type_: SLIDE_MESSAGE_TYPE,
             data: rewritten,
         },
+        Default::default(),
     )?;
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(SLIDE_MEMBER, &compressed)],
         Limits::default(),
@@ -220,8 +222,8 @@ fn native_visible_noop_hide_apply_inverse_and_locality() -> TestResult<()> {
     );
     let target = bytes(commit.package())?;
     assert_eq!(commit.diagnostics().deleted_previews(), 3);
-    let before = Catalog::from_bytes(&source)?;
-    let after = Catalog::from_bytes(&target)?;
+    let before = Catalog::from_bytes(&source, Default::default())?;
+    let after = Catalog::from_bytes(&target, Default::default())?;
     for (left, right) in before.iter().zip(after.iter()) {
         if left.data() == right.data() {
             assert_eq!(

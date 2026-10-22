@@ -1552,9 +1552,7 @@ fn has_legacy_table_model_wire_shape(data: &[u8]) -> Result<bool> {
                 })
             },
             litchi_iwa_common::Error::InvalidFormat(_) => Ok(false),
-            common_error @ (litchi_iwa_common::Error::LimitExceeded { .. }
-            | litchi_iwa_common::Error::Allocation { .. }
-            | litchi_iwa_common::Error::InvalidLimit { .. }) => Err(Error::Common(common_error)),
+            common_error => Err(Error::Common(common_error)),
         };
     }
     if present != REQUIRED {
@@ -3879,9 +3877,8 @@ impl<'a> TableDataExtractor<'a> {
             .map_err(|_error| {
                 Error::InvalidFormat("Numbers rich-text limits are invalid".to_owned())
             })?;
-            let validation =
-                litchi_iwa_text_wire::validate_storage_with_limits(&message.data, rewrite_limits)
-                    .map_err(map_rich_text_rewrite_error)?;
+            let validation = litchi_iwa_text_wire::validate_storage(&message.data, rewrite_limits)
+                .map_err(map_rich_text_rewrite_error)?;
             budget.payload_fields = projection_charge(
                 budget.payload_fields,
                 validation.fields(),
@@ -3913,8 +3910,8 @@ impl<'a> TableDataExtractor<'a> {
         } else {
             None
         };
-        let storage = litchi_iwa_text_wire::from_bytes_with_limits(&message.data, limits)
-            .map_err(map_rich_text_error)?;
+        let storage =
+            litchi_iwa_text_wire::from_bytes(&message.data, limits).map_err(map_rich_text_error)?;
         if self.document_projection {
             if validated_text_len != Some(storage.len()) {
                 return Err(Error::InvalidFormat(
@@ -6668,15 +6665,15 @@ mod tests {
     }
 
     fn archive_object(identifier: u64, messages: Vec<RawMessage>) -> super::Result<ArchiveObject> {
-        ArchiveObject::new(identifier, messages)
+        ArchiveObject::new(identifier, messages, Default::default())
             .map_err(|error| Error::InvalidFormat(error.to_string()))
     }
 
     fn compatibility_package(objects: Vec<ArchiveObject>) -> super::Result<Vec<u8>> {
         let archive = Archive { objects }
-            .to_bytes()
+            .to_bytes(Default::default())
             .map_err(|error| Error::InvalidFormat(error.to_string()))?;
-        let stream = SnappyStream::compress(&archive)
+        let stream = SnappyStream::compress(&archive, Default::default())
             .map_err(|error| Error::InvalidFormat(error.to_string()))?;
         Ok(litchi_iwa_archive::package::to_bytes(
             [("Index/Document.iwa", stream.as_slice())],

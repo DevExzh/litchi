@@ -119,7 +119,7 @@ fn picture_block_layout_matches_ms_doc() {
 
     // Embedded BLIP record.
     let blip = &bse[BSE_HEADER_LEN..BSE_HEADER_LEN + blip_size];
-    let parsed = litchi_odraw::image::Blip::parse(blip).unwrap();
+    let parsed = litchi_odraw::image::Blip::parse(blip, Default::default()).unwrap();
     assert_eq!(parsed.kind(), BlipKind::Png);
     assert_eq!(parsed.record().instance(), 0x6e0);
     // The BLIP UID matches the BSE rgbUid, and the payload is byte-identical.
@@ -164,7 +164,7 @@ fn picture_block_bse_parses_with_crate_reader() {
     let (_ver, _inst, _record_type, sp_len) = parse_record_header(&block, PICF_HEADER_LEN);
     let bse_offset = PICF_HEADER_LEN + RECORD_HEADER_LEN + sp_len as usize;
     let (record, _) = Record::parse(&block, bse_offset).unwrap();
-    let bse = Entry::parse(record).unwrap();
+    let bse = Entry::parse(record, Default::default()).unwrap();
     assert_eq!(bse.kind().unwrap(), BlipKind::Jpeg);
     assert!(matches!(
         bse.storage().unwrap(),
@@ -436,7 +436,7 @@ fn dgg_info_bse_blips_parse_with_crate_reader() {
     let expected = [(BlipKind::Png, png.data()), (BlipKind::Jpeg, jpeg.data())];
     for (bse_record, (kind, payload)) in bses.iter().zip(expected.iter()) {
         let (record, _) = Record::parse(&dgg, bse_record.0).unwrap();
-        let bse = Entry::parse(record).unwrap();
+        let bse = Entry::parse(record, Default::default()).unwrap();
         assert_eq!(bse.kind().unwrap(), *kind);
         let blip = bse.resolve(Context::new()).unwrap().unwrap();
         assert_eq!(blip.data(), *payload);

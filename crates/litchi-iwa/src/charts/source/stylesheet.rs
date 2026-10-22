@@ -154,6 +154,7 @@ fn register_chart_styles_staged(
                 type_: STYLESHEET_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         let info = stylesheet
             .archive_info
@@ -311,6 +312,7 @@ fn unregister_chart_styles_staged(
                 type_: STYLESHEET_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         let info = stylesheet
             .archive_info
@@ -488,7 +490,8 @@ mod tests {
     use super::*;
 
     fn stylesheet_object(messages: Vec<RawMessage>) -> crate::archive::ArchiveObject {
-        crate::archive::ArchiveObject::new(1, messages).expect("test object should be valid")
+        crate::archive::ArchiveObject::new(1, messages, Default::default())
+            .expect("test object should be valid")
     }
 
     #[test]

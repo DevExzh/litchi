@@ -66,11 +66,15 @@ fn object(
     Ok(litchi_iwa_core::ArchiveObject::new(
         identifier,
         vec![RawMessage { type_, data }],
+        Default::default(),
     )?)
 }
 
 fn component(objects: Vec<litchi_iwa_core::ArchiveObject>) -> TestResult<Vec<u8>> {
-    Ok(SnappyStream::compress(&Archive { objects }.to_bytes()?)?)
+    Ok(SnappyStream::compress(
+        &Archive { objects }.to_bytes(Default::default())?,
+        Default::default(),
+    )?)
 }
 
 /// Build a complete, strict, two-item Keynote soundtrack package.
@@ -219,13 +223,13 @@ fn rewrite_iwa_object<F>(
 where
     F: FnMut(&mut litchi_iwa_core::ArchiveObject, usize) -> TestResult<()>,
 {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     for entry in catalog
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
     {
-        let stream = SnappyStream::decompress(entry.data())?;
-        let mut archive = Archive::parse(stream.as_bytes())?;
+        let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+        let mut archive = Archive::parse(stream.as_bytes(), Default::default())?;
         for object in &mut archive.objects {
             if object.archive_info.identifier != Some(object_identifier) {
                 continue;
@@ -238,7 +242,8 @@ where
                 continue;
             };
             rewrite(object, index)?;
-            let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
+            let compressed =
+                SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
             return Ok(catalog.reassemble_to_bytes(
                 &[litchi_iwa_archive::package::EntryEdit::new(
                     entry.name(),
@@ -270,6 +275,7 @@ fn fixture_without_soundtrack() -> TestResult<Vec<u8>> {
                 type_: 2,
                 data: show.encode_to_vec(),
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -293,6 +299,7 @@ fn fixture_with_empty_soundtrack() -> TestResult<Vec<u8>> {
                 type_: 21,
                 data: soundtrack.encode_to_vec(),
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -324,6 +331,7 @@ fn fixture_with_shared_first_media() -> TestResult<Vec<u8>> {
                 type_: 21,
                 data: soundtrack.encode_to_vec(),
             },
+            Default::default(),
         )?;
         Ok(())
     })?;
@@ -353,6 +361,7 @@ fn fixture_with_shared_first_media() -> TestResult<Vec<u8>> {
                 type_: 11_006,
                 data: metadata.encode_to_vec(),
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -379,7 +388,7 @@ fn audio(filename: &str, data: &[u8]) -> TestResult<AudioSource> {
 }
 
 fn entries(source: &[u8]) -> TestResult<HashMap<String, Vec<u8>>> {
-    Ok(Catalog::from_bytes(source)?
+    Ok(Catalog::from_bytes(source, Default::default())?
         .iter()
         .map(|entry| (entry.name().to_owned(), entry.data().to_vec()))
         .collect())
@@ -431,13 +440,13 @@ fn append_unknown_soundtrack_field(source: &[u8]) -> TestResult<Vec<u8>> {
     // lifecycle transaction.  The selected payload is length-delimited, so
     // appending an unknown varint is enough to exercise the preservation path.
     const UNKNOWN: &[u8] = &[0xa0, 0x06, 0x07];
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     for entry in catalog
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
     {
-        let stream = SnappyStream::decompress(entry.data())?;
-        let mut archive = Archive::parse(stream.as_bytes())?;
+        let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+        let mut archive = Archive::parse(stream.as_bytes(), Default::default())?;
         for object in &mut archive.objects {
             let Some(index) = object
                 .messages
@@ -448,8 +457,13 @@ fn append_unknown_soundtrack_field(source: &[u8]) -> TestResult<Vec<u8>> {
             };
             let mut data = object.messages[index].data.clone();
             data.extend_from_slice(UNKNOWN);
-            object.replace_message_preserving_header(index, RawMessage { type_: 21, data })?;
-            let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
+            object.replace_message_preserving_header(
+                index,
+                RawMessage { type_: 21, data },
+                Default::default(),
+            )?;
+            let compressed =
+                SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
             return Ok(catalog.reassemble_to_bytes(
                 &[litchi_iwa_archive::package::EntryEdit::new(
                     entry.name(),
@@ -463,13 +477,13 @@ fn append_unknown_soundtrack_field(source: &[u8]) -> TestResult<Vec<u8>> {
 }
 
 fn soundtrack_payload(source: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     for entry in catalog
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
     {
-        let stream = SnappyStream::decompress(entry.data())?;
-        let archive = Archive::parse(stream.as_bytes())?;
+        let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+        let archive = Archive::parse(stream.as_bytes(), Default::default())?;
         for object in &archive.objects {
             if let Some(message) = object.messages.iter().find(|message| message.type_ == 21) {
                 return Ok(message.data.clone());
@@ -483,13 +497,13 @@ fn append_external_reference(source: &[u8]) -> TestResult<Vec<u8>> {
     // Add an explicit external marker to one selected DataReference.  The
     // strict owner must reject the source before it allocates a lifecycle
     // rewrite, and the immutable package bytes must stay unchanged.
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     for entry in catalog
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
     {
-        let stream = SnappyStream::decompress(entry.data())?;
-        let mut archive = Archive::parse(stream.as_bytes())?;
+        let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+        let mut archive = Archive::parse(stream.as_bytes(), Default::default())?;
         for object in &mut archive.objects {
             let Some(index) = object.messages.iter().position(|message| {
                 message.type_ == 21 && object.archive_info.identifier == Some(SOUNDTRACK_OBJECT)
@@ -526,8 +540,10 @@ fn append_external_reference(source: &[u8]) -> TestResult<Vec<u8>> {
                     type_: 21,
                     data: rewritten,
                 },
+                Default::default(),
             )?;
-            let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
+            let compressed =
+                SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
             return Ok(catalog.reassemble_to_bytes(
                 &[litchi_iwa_archive::package::EntryEdit::new(
                     entry.name(),
@@ -541,13 +557,13 @@ fn append_external_reference(source: &[u8]) -> TestResult<Vec<u8>> {
 }
 
 fn without_soundtrack_field_info(source: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     for entry in catalog
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
     {
-        let stream = SnappyStream::decompress(entry.data())?;
-        let mut archive = Archive::parse(stream.as_bytes())?;
+        let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+        let mut archive = Archive::parse(stream.as_bytes(), Default::default())?;
         let Some(object) = archive.objects.iter_mut().find(|object| {
             object.archive_info.identifier == Some(SOUNDTRACK_OBJECT)
                 && object.messages.iter().any(|message| message.type_ == 21)
@@ -566,7 +582,8 @@ fn without_soundtrack_field_info(source: &[u8]) -> TestResult<Vec<u8>> {
             .ok_or("soundtrack message info was absent")?;
         info.field_infos
             .retain(|field| field.path.as_slice() != [3]);
-        let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
+        let compressed =
+            SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
         return Ok(catalog.reassemble_to_bytes(
             &[litchi_iwa_archive::package::EntryEdit::new(
                 entry.name(),
@@ -579,13 +596,13 @@ fn without_soundtrack_field_info(source: &[u8]) -> TestResult<Vec<u8>> {
 }
 
 fn soundtrack_has_field_info(source: &[u8]) -> TestResult<bool> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     for entry in catalog
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
     {
-        let stream = SnappyStream::decompress(entry.data())?;
-        let archive = Archive::parse(stream.as_bytes())?;
+        let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+        let archive = Archive::parse(stream.as_bytes(), Default::default())?;
         for object in &archive.objects {
             if object.archive_info.identifier != Some(SOUNDTRACK_OBJECT) {
                 continue;
@@ -644,7 +661,7 @@ fn duplicate_media_occurrences_keep_shared_data_and_inverse_exact() -> TestResul
         ]
     );
 
-    let before_catalog = Catalog::from_bytes(&source)?;
+    let before_catalog = Catalog::from_bytes(&source, Default::default())?;
     let mut edit = package.edit_soundtrack_items()?;
     edit.remove(Position::new(0))?;
     let commit = edit.commit()?;
@@ -658,7 +675,7 @@ fn duplicate_media_occurrences_keep_shared_data_and_inverse_exact() -> TestResul
     );
 
     let target = bytes(commit.package())?;
-    let after_catalog = Catalog::from_bytes(&target)?;
+    let after_catalog = Catalog::from_bytes(&target, Default::default())?;
     assert_eq!(
         after_catalog
             .iter()
@@ -710,7 +727,7 @@ fn read_add_insert_replace_remove_are_ordered_and_semantic() -> TestResult {
     let inserted = insert.commit()?;
     let inserted_bytes = bytes(inserted.package())?;
     assert_eq!(
-        Catalog::from_bytes(&inserted_bytes)?
+        Catalog::from_bytes(&inserted_bytes, Default::default())?
             .iter()
             .filter(|entry| entry.name().starts_with("Data/"))
             .count(),
@@ -881,9 +898,9 @@ fn changed_item_transaction_preserves_unknown_fields_and_unselected_zip_records(
     let commit = edit.commit()?;
     let target = bytes(commit.package())?;
     let after_entries = entries(&target)?;
-    let after_catalog = Catalog::from_bytes(&target)?;
+    let after_catalog = Catalog::from_bytes(&target, Default::default())?;
     assert_untouched_zip_records(
-        &Catalog::from_bytes(&source)?,
+        &Catalog::from_bytes(&source, Default::default())?,
         &after_catalog,
         &[
             DOCUMENT_MEMBER,

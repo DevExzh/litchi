@@ -29,7 +29,7 @@ pub(super) fn insert_conditional_style_graph(
         conditional_style_graph_objects(style_set_id, rules, formula_owner_uuid, &identifiers)?;
     package.update_archive(archive_name, |archive| {
         for object in objects {
-            archive.insert_object(object)?;
+            archive.insert_object(object, Default::default())?;
         }
         Ok(())
     })
@@ -51,7 +51,10 @@ pub(super) fn replace_conditional_style_graph(
         .next()
         .expect("a conditional-style graph always has a style-set object");
     package.update_archive(archive_name, |archive| {
-        if archive.upsert_object(style_set)?.is_none() {
+        if archive
+            .upsert_object(style_set, Default::default())?
+            .is_none()
+        {
             return Err(Error::InvalidFormat(
                 "conditional-highlight replacement lost its style-set identity".to_owned(),
             ));
@@ -80,7 +83,7 @@ pub(super) fn replace_conditional_style_graph(
             .and_then(|identifier| object_locations.get(&identifier))
             .unwrap_or(fallback_archive);
         package.update_archive(object_archive, |archive| {
-            archive.upsert_object(object)?;
+            archive.upsert_object(object, Default::default())?;
             Ok(())
         })?;
     }
@@ -238,6 +241,7 @@ fn conditional_style_graph_objects(
             type_: CONDITIONAL_STYLE_SET_MESSAGE_TYPE,
             data: style_set.encode_to_vec(),
         }],
+        Default::default(),
     )?;
     let info = &mut set_object.archive_info.message_infos[0];
     info.versions = NATIVE_MESSAGE_VERSION.to_vec();
@@ -327,6 +331,7 @@ fn style_object(identifier: u64, message_type: u32, data: Vec<u8>) -> Result<Arc
             type_: message_type,
             data,
         }],
+        Default::default(),
     )?;
     object.archive_info.message_infos[0].versions = NATIVE_MESSAGE_VERSION.to_vec();
     Ok(object)

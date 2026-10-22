@@ -489,7 +489,168 @@
         "litchi_docx::Package",
         "litchi_docx::source_backed::Package"
       ],
-      "family_methods": true
+      "family_methods": true,
+      "result_methods": [
+        {
+          "method": "litchi_docx::Package::apply",
+          "ok": "litchi_docx::document::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_alt_chunks",
+          "ok": "litchi_docx::alt::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_attached_template",
+          "ok": "litchi_docx::attached_template::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_bibliography",
+          "ok": "litchi_docx::bibliography::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_chart",
+          "ok": "litchi_docx::chart::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_conflicts",
+          "ok": "litchi_docx::revision::conflict::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_content_controls",
+          "ok": "litchi_docx::content_control::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_custom_xml",
+          "ok": "litchi_docx::custom_xml::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_document_variables",
+          "ok": "litchi_docx::document_variables::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_durable_document",
+          "ok": "litchi_docx::document::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_fonts",
+          "ok": "litchi_docx::font::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_glossary",
+          "ok": "litchi_docx::glossary::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_ink",
+          "ok": "litchi_docx::ink::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_mail_merge",
+          "ok": "litchi_docx::mail_merge::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_numbering",
+          "ok": "litchi_docx::numbering::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_opc",
+          "ok": "litchi_docx::opc::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_ribbon",
+          "ok": "litchi_docx::ribbon::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_settings_extensions",
+          "ok": "litchi_docx::settings::extensions::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_stories",
+          "ok": "litchi_docx::package::story::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_styles_with_effects",
+          "ok": "litchi_docx::styles::effects::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_task_panes",
+          "ok": "litchi_docx::task_panes::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_tracked_revisions",
+          "ok": "litchi_docx::revision::authoring::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_web",
+          "ok": "litchi_docx::web::Commit"
+        },
+        {
+          "method": "litchi_docx::source_backed::Package::apply_alt_chunk_payload",
+          "ok": "litchi_docx::source_backed::alt_chunk_payload::Commit"
+        },
+        {
+          "method": "litchi_docx::source_backed::Package::apply_document",
+          "ok": "litchi_docx::document::Commit",
+          "type_args": [
+            "litchi_docx::source_backed::Package"
+          ]
+        },
+        {
+          "method": "litchi_docx::source_backed::Package::apply_document_variables",
+          "ok": "litchi_docx::source_backed::document_variables::Commit"
+        },
+        {
+          "method": "litchi_docx::source_backed::Package::apply_external_hyperlink_detachment",
+          "ok": "litchi_docx::source_backed::hyperlink_detachment::Commit"
+        },
+        {
+          "method": "litchi_docx::source_backed::Package::apply_external_hyperlink_redaction",
+          "ok": "litchi_docx::source_backed::hyperlink_redaction::Commit"
+        },
+        {
+          "method": "litchi_docx::source_backed::Package::apply_glossary_text_batch",
+          "ok": "litchi_docx::source_backed::glossary_text::Commit"
+        },
+        {
+          "method": "litchi_docx::source_backed::Package::apply_paragraph_stream",
+          "ok": "litchi_docx::source_backed::paragraph_stream::Commit"
+        },
+        {
+          "method": "litchi_docx::source_backed::Package::apply_plain_paragraph_copy",
+          "ok": "litchi_docx::source_backed::plain_paragraph_copy::Commit"
+        },
+        {
+          "method": "litchi_docx::source_backed::Package::apply_plain_paragraph_removal",
+          "ok": "litchi_docx::source_backed::plain_paragraph_removal::Commit"
+        },
+        {
+          "method": "litchi_docx::source_backed::Package::apply_section_layout",
+          "ok": "litchi_docx::source_backed::section_layout::Commit"
+        },
+        {
+          "method": "litchi_docx::source_backed::Package::apply_story_hyperlink_redaction",
+          "ok": "litchi_docx::source_backed::story_hyperlink_redaction::Commit"
+        },
+        {
+          "method": "litchi_docx::source_backed::Package::apply_story_text",
+          "ok": "litchi_docx::source_backed::story_text_edit::Commit"
+        },
+        {
+          "method": "litchi_docx::source_backed::Package::apply_svg",
+          "ok": "litchi_docx::source_backed::svg::Commit"
+        },
+        {
+          "method": "litchi_docx::source_backed::Package::apply_tail_append",
+          "ok": "litchi_docx::source_backed::tail_append::Commit"
+        },
+        {
+          "method": "litchi_docx::source_backed::Package::apply_tail_append_patch",
+          "ok": "litchi_docx::source_backed::paragraph_stream::Commit"
+        },
+        {
+          "method": "litchi_docx::source_backed::Package::apply_tail_append_stream_patch",
+          "ok": "litchi_docx::source_backed::paragraph_stream::Commit"
+        }
+      ]
     },
     {
       "id": "docx-full",
@@ -878,7 +1039,172 @@
         "litchi_docx::Package",
         "litchi_docx::source_backed::Package"
       ],
-      "family_methods": true
+      "family_methods": true,
+      "result_methods": [
+        {
+          "method": "litchi_docx::Package::apply",
+          "ok": "litchi_docx::document::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_alt_chunks",
+          "ok": "litchi_docx::alt::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_attached_template",
+          "ok": "litchi_docx::attached_template::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_bibliography",
+          "ok": "litchi_docx::bibliography::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_chart",
+          "ok": "litchi_docx::chart::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_conflicts",
+          "ok": "litchi_docx::revision::conflict::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_content_controls",
+          "ok": "litchi_docx::content_control::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_custom_xml",
+          "ok": "litchi_docx::custom_xml::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_document_variables",
+          "ok": "litchi_docx::document_variables::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_durable_document",
+          "ok": "litchi_docx::document::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_fonts",
+          "ok": "litchi_docx::font::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_glossary",
+          "ok": "litchi_docx::glossary::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_ink",
+          "ok": "litchi_docx::ink::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_mail_merge",
+          "ok": "litchi_docx::mail_merge::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_numbering",
+          "ok": "litchi_docx::numbering::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_opc",
+          "ok": "litchi_docx::opc::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_ribbon",
+          "ok": "litchi_docx::ribbon::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_settings_extensions",
+          "ok": "litchi_docx::settings::extensions::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_stories",
+          "ok": "litchi_docx::package::story::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_styles_with_effects",
+          "ok": "litchi_docx::styles::effects::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_task_panes",
+          "ok": "litchi_docx::task_panes::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_tracked_revisions",
+          "ok": "litchi_docx::revision::authoring::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_vba",
+          "ok": "litchi_docx::vba::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_web",
+          "ok": "litchi_docx::web::Commit"
+        },
+        {
+          "method": "litchi_docx::source_backed::Package::apply_alt_chunk_payload",
+          "ok": "litchi_docx::source_backed::alt_chunk_payload::Commit"
+        },
+        {
+          "method": "litchi_docx::source_backed::Package::apply_document",
+          "ok": "litchi_docx::document::Commit",
+          "type_args": [
+            "litchi_docx::source_backed::Package"
+          ]
+        },
+        {
+          "method": "litchi_docx::source_backed::Package::apply_document_variables",
+          "ok": "litchi_docx::source_backed::document_variables::Commit"
+        },
+        {
+          "method": "litchi_docx::source_backed::Package::apply_external_hyperlink_detachment",
+          "ok": "litchi_docx::source_backed::hyperlink_detachment::Commit"
+        },
+        {
+          "method": "litchi_docx::source_backed::Package::apply_external_hyperlink_redaction",
+          "ok": "litchi_docx::source_backed::hyperlink_redaction::Commit"
+        },
+        {
+          "method": "litchi_docx::source_backed::Package::apply_glossary_text_batch",
+          "ok": "litchi_docx::source_backed::glossary_text::Commit"
+        },
+        {
+          "method": "litchi_docx::source_backed::Package::apply_paragraph_stream",
+          "ok": "litchi_docx::source_backed::paragraph_stream::Commit"
+        },
+        {
+          "method": "litchi_docx::source_backed::Package::apply_plain_paragraph_copy",
+          "ok": "litchi_docx::source_backed::plain_paragraph_copy::Commit"
+        },
+        {
+          "method": "litchi_docx::source_backed::Package::apply_plain_paragraph_removal",
+          "ok": "litchi_docx::source_backed::plain_paragraph_removal::Commit"
+        },
+        {
+          "method": "litchi_docx::source_backed::Package::apply_section_layout",
+          "ok": "litchi_docx::source_backed::section_layout::Commit"
+        },
+        {
+          "method": "litchi_docx::source_backed::Package::apply_story_hyperlink_redaction",
+          "ok": "litchi_docx::source_backed::story_hyperlink_redaction::Commit"
+        },
+        {
+          "method": "litchi_docx::source_backed::Package::apply_story_text",
+          "ok": "litchi_docx::source_backed::story_text_edit::Commit"
+        },
+        {
+          "method": "litchi_docx::source_backed::Package::apply_svg",
+          "ok": "litchi_docx::source_backed::svg::Commit"
+        },
+        {
+          "method": "litchi_docx::source_backed::Package::apply_tail_append",
+          "ok": "litchi_docx::source_backed::tail_append::Commit"
+        },
+        {
+          "method": "litchi_docx::source_backed::Package::apply_tail_append_patch",
+          "ok": "litchi_docx::source_backed::paragraph_stream::Commit"
+        },
+        {
+          "method": "litchi_docx::source_backed::Package::apply_tail_append_stream_patch",
+          "ok": "litchi_docx::source_backed::paragraph_stream::Commit"
+        }
+      ]
     },
     {
       "id": "opc-minimal",
@@ -12176,6 +12502,103 @@
       "families": []
     },
     {
+      "id": "iwa-text-wire",
+      "package": "litchi-iwa-text-wire",
+      "default_features": true,
+      "features": [],
+      "banned_names": [
+        {
+          "name": "_with_limits",
+          "scope": "litchi_iwa_text_wire",
+          "replacement": "raw text-wire and character-style calls take required limits on their canonical names (records 0361g and 0361h)",
+          "match": "suffix"
+        },
+        {
+          "name": "_and_limits",
+          "scope": "litchi_iwa_text_wire",
+          "replacement": "behavior variants also take required limits without a limit suffix (record 0361g)",
+          "match": "suffix"
+        }
+      ],
+      "families": []
+    },
+    {
+      "id": "iwa-core",
+      "package": "litchi-iwa-core",
+      "default_features": true,
+      "features": [],
+      "banned_names": [
+        {
+          "name": "_with_limits",
+          "scope": "litchi_iwa_core",
+          "replacement": "raw IWA operations require an explicit limits argument (record 0361d)",
+          "match": "suffix"
+        },
+        {
+          "name": "_with_policy_and_limits",
+          "scope": "litchi_iwa_core",
+          "replacement": "use the policy variant with required limits (record 0361d)",
+          "match": "suffix"
+        },
+        {
+          "name": "ArchiveLimits",
+          "scope": "litchi_iwa_core",
+          "replacement": "use the canonical physical Limits type (record 0361d)"
+        },
+        {
+          "name": "ResourceLimits",
+          "scope": "litchi_iwa_core",
+          "replacement": "use the canonical physical Limits type (record 0361d)"
+        }
+      ],
+      "families": [],
+      "immutable_owners": [
+        "litchi_iwa_core::SnappyStream"
+      ]
+    },
+    {
+      "id": "iwa-archive",
+      "package": "litchi-iwa-archive",
+      "default_features": true,
+      "features": [
+        "internal-iwork-source"
+      ],
+      "banned_names": [
+        {
+          "name": "_with_limits",
+          "scope": "litchi_iwa_archive",
+          "replacement": "raw IWA operations require an explicit limits argument (record 0361d)",
+          "match": "suffix"
+        },
+        {
+          "name": "_with_policy_and_limits",
+          "scope": "litchi_iwa_archive",
+          "replacement": "use the policy variant with required limits (record 0361d)",
+          "match": "suffix"
+        },
+        {
+          "name": "ArchiveLimits",
+          "scope": "litchi_iwa_archive",
+          "replacement": "use the canonical physical Limits type (record 0361d)"
+        },
+        {
+          "name": "ResourceLimits",
+          "scope": "litchi_iwa_archive",
+          "replacement": "use the canonical physical Limits type (record 0361d)"
+        }
+      ],
+      "families": [],
+      "immutable_owners": [
+        "litchi_iwa_archive::ComponentCatalog",
+        "litchi_iwa_archive::SourceCatalog",
+        "litchi_iwa_archive::OwnedSourceCatalog",
+        "litchi_iwa_archive::LogicalSourceCatalog",
+        "litchi_iwa_archive::FrozenDirectoryBundle",
+        "litchi_iwa_archive::SemanticProjection",
+        "litchi_iwa_archive::package::Catalog"
+      ]
+    },
+    {
       "id": "iwa-common",
       "package": "litchi-iwa-common",
       "default_features": true,
@@ -13163,6 +13586,16 @@
           "name": "Editor",
           "scope": "litchi_iwa",
           "replacement": "the host's per-format working copies are drafts: pages::Draft, keynote::Draft, numbers::Draft (record 0351 §2.1 rule 7, record 0361)"
+        },
+        {
+          "name": "ArchiveLimits",
+          "scope": "litchi_iwa",
+          "replacement": "use the canonical physical Limits type (record 0361d)"
+        },
+        {
+          "name": "ResourceLimits",
+          "scope": "litchi_iwa",
+          "replacement": "use the canonical physical Limits type (record 0361d)"
         }
       ],
       "families": [],
@@ -18619,6 +19052,117 @@
         }
       ],
       "families": []
+    },
+    {
+      "id": "odraw",
+      "package": "litchi-odraw",
+      "default_features": false,
+      "features": [],
+      "banned_names": [
+        {
+          "name": "Limit",
+          "scope": "litchi_odraw",
+          "recursive": false,
+          "replacement": "use LimitKind (record 0362i)"
+        },
+        {
+          "name": "ImageLimit",
+          "scope": "litchi_odraw",
+          "recursive": false,
+          "replacement": "use image::LimitKind (record 0362i)"
+        },
+        {
+          "name": "parse_with",
+          "scope": "litchi_odraw",
+          "replacement": "use parse(data, limits)"
+        },
+        {
+          "name": "from_record_with",
+          "scope": "litchi_odraw",
+          "replacement": "use from_record(record, limits)"
+        },
+        {
+          "name": "find_recursive_with",
+          "scope": "litchi_odraw",
+          "replacement": "use find_recursive(kind, limits)"
+        },
+        {
+          "name": "with_limits",
+          "scope": "litchi_odraw",
+          "replacement": "use new(data, limits)"
+        },
+        {
+          "name": "Snapshot",
+          "scope": "litchi_odraw::prop::picture",
+          "replacement": "use Package and its View (record 0362d)"
+        },
+        {
+          "name": "Owned",
+          "scope": "litchi_odraw::prop::picture",
+          "replacement": "Commit returns a Package (record 0362d)"
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_odraw::prop::picture",
+          "replacement": "use package() on Commit or view() on Package (record 0362d)"
+        },
+        {
+          "name": "into_snapshot",
+          "scope": "litchi_odraw::prop::picture",
+          "replacement": "use Commit::into_package (record 0362d)"
+        },
+        {
+          "name": "encode",
+          "scope": "litchi_odraw::prop::picture",
+          "replacement": "use Package::write_to, save or to_bytes (record 0362d)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_odraw::prop::picture",
+          "replacement": "use Edit (record 0362d)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_odraw::prop::picture",
+          "replacement": "drop the Edit (record 0362d)"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_odraw::prop::picture",
+          "replacement": "use diagnostics().changed() (record 0362d)"
+        },
+        {
+          "name": "MAX_NAME_UNITS",
+          "scope": "litchi_odraw::prop::picture",
+          "replacement": "configure Limits through options (record 0362d)"
+        },
+        {
+          "name": "MAX_NAME_BYTES",
+          "scope": "litchi_odraw::prop::picture",
+          "replacement": "configure Limits through options (record 0362d)"
+        },
+        {
+          "name": "MAX_SNAPSHOT_BYTES",
+          "scope": "litchi_odraw::prop::picture",
+          "replacement": "configure Limits through options (record 0362d)"
+        }
+      ],
+      "families": [
+        "litchi_odraw::prop::picture"
+      ],
+      "immutable_owners": [
+        "litchi_odraw::image::Blip",
+        "litchi_odraw::image::Entry",
+        "litchi_odraw::image::Store",
+        "litchi_odraw::image::Delay",
+        "litchi_odraw::shape::Shape",
+        "litchi_odraw::Parser",
+        "litchi_odraw::Container",
+        "litchi_odraw::prop::picture::Package",
+        "litchi_odraw::prop::picture::View",
+        "litchi_odraw::prop::Props"
+      ],
+      "family_methods": true
     }
   ]
 }

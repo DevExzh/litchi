@@ -82,6 +82,7 @@ pub(super) fn new_bookmark_object(
             type_: BOOKMARK_MESSAGE_TYPE,
             data: bookmark.encode_to_vec(),
         }],
+        Default::default(),
     )?)
 }
 
@@ -132,6 +133,7 @@ pub(super) fn patch_bookmark_settings(
                 type_: BOOKMARK_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })

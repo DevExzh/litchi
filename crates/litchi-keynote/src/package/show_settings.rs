@@ -797,7 +797,7 @@ fn validate_component_framing(
         return Err(Error::InvalidSource);
     }
     let physical_limits = package.state.options.archive();
-    let stream = SnappyStream::decompress_with_limits(
+    let stream = SnappyStream::decompress(
         entry.data(),
         physical_limits.snappy_limits().map_err(map_archive_error)?,
     )
@@ -890,13 +890,12 @@ fn rewrite_package_settings(
     let archive_limits = physical_limits
         .effective_archive_limits()
         .map_err(map_archive_error)?;
-    let stream = SnappyStream::decompress_with_limits(
+    let stream = SnappyStream::decompress(
         entry.data(),
         physical_limits.snappy_limits().map_err(map_archive_error)?,
     )
     .map_err(map_core_error)?;
-    let mut archive =
-        Archive::parse_with_limits(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
+    let mut archive = Archive::parse(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
     validate_canonical_object_length_prefixes(stream.as_bytes(), &archive)?;
     drop(stream);
     let object = archive
@@ -920,7 +919,7 @@ fn rewrite_package_settings(
     archive
         .object_mut(show_identifier)
         .ok_or(Error::InvalidSource)?
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             message_index,
             RawMessage {
                 type_: SHOW_MESSAGE_TYPE,
@@ -929,11 +928,10 @@ fn rewrite_package_settings(
             archive_limits,
         )
         .map_err(map_core_error)?;
-    let rewritten_archive = archive
-        .to_bytes_with_limits(archive_limits)
-        .map_err(map_core_error)?;
+    let rewritten_archive = archive.to_bytes(archive_limits).map_err(map_core_error)?;
     drop(archive);
-    let compressed = SnappyStream::compress(&rewritten_archive).map_err(map_core_error)?;
+    let compressed =
+        SnappyStream::compress(&rewritten_archive, Default::default()).map_err(map_core_error)?;
     drop(rewritten_archive);
     let preview_plan =
         super::rendering_invalidation::root_preview_deletions(source_catalog.package())
@@ -1745,14 +1743,7 @@ fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
         },
         litchi_iwa_archive::Error::Allocation { amount, .. } => Error::Allocation { amount },
         litchi_iwa_archive::Error::Iwa(core_error) => map_core_error(core_error),
-        litchi_iwa_archive::Error::Io(_)
-        | litchi_iwa_archive::Error::Zip { .. }
-        | litchi_iwa_archive::Error::InvalidLimits(_)
-        | litchi_iwa_archive::Error::Encrypted
-        | litchi_iwa_archive::Error::SourceChanged { .. }
-        | litchi_iwa_archive::Error::DirectoryChanged { .. }
-        | litchi_iwa_archive::Error::Reassembly(_)
-        | litchi_iwa_archive::Error::InvalidBundle(_) => Error::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
@@ -1791,11 +1782,7 @@ fn map_core_error(error: litchi_iwa_core::Error) -> Error {
         litchi_iwa_core::Error::Allocation { requested, .. } => {
             Error::Allocation { amount: requested }
         },
-        litchi_iwa_core::Error::InvalidArchive { .. }
-        | litchi_iwa_core::Error::InvalidLimits { .. }
-        | litchi_iwa_core::Error::HeaderCodec { .. }
-        | litchi_iwa_core::Error::Io(_)
-        | litchi_iwa_core::Error::Snappy { .. } => Error::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
@@ -1825,8 +1812,7 @@ fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
             maximum: usize_to_u64(limit),
         },
         litchi_iwa_common::Error::Allocation { amount, .. } => Error::Allocation { amount },
-        litchi_iwa_common::Error::InvalidFormat(_)
-        | litchi_iwa_common::Error::InvalidLimit { .. } => Error::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 

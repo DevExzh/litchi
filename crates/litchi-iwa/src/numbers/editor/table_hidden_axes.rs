@@ -136,7 +136,11 @@ mod tests {
                 })?;
                 let message = object.messages[info_message_index].clone();
                 let data = crate::wire::patch_length_delimited_field(&message.data, 1, true, None)?;
-                object.replace_message(info_message_index, RawMessage { type_: 6_003, data })?;
+                object.replace_message(
+                    info_message_index,
+                    RawMessage { type_: 6_003, data },
+                    Default::default(),
+                )?;
                 Ok(())
             })
             .unwrap();

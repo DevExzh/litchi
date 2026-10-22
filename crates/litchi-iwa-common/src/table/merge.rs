@@ -29,6 +29,7 @@ impl fmt::Display for Axis {
 
 /// Failure while constructing or transforming a merged-cell region.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Error {
     /// The row span is zero.
     ZeroRows,

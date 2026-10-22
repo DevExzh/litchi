@@ -140,15 +140,14 @@ pub(super) fn rewrite(
     let archive_limits = physical_limits
         .effective_archive_limits()
         .map_err(map_archive_error)?;
-    let stream = SnappyStream::decompress_with_limits(
+    let stream = SnappyStream::decompress(
         entry.data(),
         physical_limits.snappy_limits().map_err(map_archive_error)?,
     )
     .map_err(map_core_error)?;
-    let mut archive =
-        Archive::parse_with_limits(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
+    let mut archive = Archive::parse(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
     archive
-        .validate_canonical_object_framing(stream.as_bytes())
+        .validate_canonical_object_framing(stream.as_bytes(), archive_limits)
         .map_err(map_core_error)?;
     drop(stream);
     let object =
@@ -181,7 +180,7 @@ pub(super) fn rewrite(
     }
     let data = rewritten_payload(&message.data, target.settings, after, budget)?;
     object
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             target.native.message_index,
             RawMessage {
                 type_: target.native.message_type,
@@ -191,12 +190,11 @@ pub(super) fn rewrite(
         )
         .map_err(map_core_error)?;
     budget.charge_transaction_work(archive_extent(&archive)?.saturating_mul(3))?;
-    let rewritten = archive
-        .to_bytes_with_limits(archive_limits)
-        .map_err(map_core_error)?;
+    let rewritten = archive.to_bytes(archive_limits).map_err(map_core_error)?;
     drop(archive);
     budget.charge_transaction_work(rewritten.len().saturating_mul(3))?;
-    let compressed = SnappyStream::compress(&rewritten).map_err(map_core_error)?;
+    let compressed =
+        SnappyStream::compress(&rewritten, Default::default()).map_err(map_core_error)?;
     drop(rewritten);
     let (package_bound, reassembly_work) =
         reassembly_cost(source.source_bytes().len(), compressed.len())?;

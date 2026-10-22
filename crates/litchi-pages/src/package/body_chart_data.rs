@@ -516,7 +516,7 @@ impl Package {
             .candidate_reopen(target_len)
             .map_err(map_arrangement_error)?;
         let target_bytes = Arc::<[u8]>::from(target_owner.as_ref());
-        let catalog = litchi_iwa_archive::SourceCatalog::from_shared_bytes_with_limits(
+        let catalog = litchi_iwa_archive::SourceCatalog::from_shared_bytes(
             target_bytes,
             self.state.source.limits(),
         )

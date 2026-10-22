@@ -6,6 +6,7 @@ const MAX_NATIVE_AXIS_STEP_COUNT: u32 = i32::MAX as u32;
 
 /// Validation failures for value-axis step counts.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
+#[non_exhaustive]
 pub enum Error {
     /// A major-step count was zero.
     #[error("chart value-axis major step count must be positive")]

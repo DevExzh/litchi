@@ -74,11 +74,15 @@ fn object(identifier: u64, type_: u32, data: Vec<u8>) -> TestResult<ArchiveObjec
     Ok(ArchiveObject::new(
         identifier,
         vec![RawMessage { type_, data }],
+        Default::default(),
     )?)
 }
 
 fn compressed(objects: Vec<ArchiveObject>) -> TestResult<Vec<u8>> {
-    Ok(SnappyStream::compress(&Archive { objects }.to_bytes()?)?)
+    Ok(SnappyStream::compress(
+        &Archive { objects }.to_bytes(Default::default())?,
+        Default::default(),
+    )?)
 }
 
 fn append_unknown(data: &mut Vec<u8>, field: u32, value: u64) -> TestResult {
@@ -368,12 +372,15 @@ fn exact_bytes(package: &Package) -> TestResult<Vec<u8>> {
 }
 
 fn metadata_payload_from_bytes(bytes: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(bytes)?;
+    let catalog = Catalog::from_bytes(bytes, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == METADATA_MEMBER)
         .ok_or_else(|| io::Error::other("metadata component is missing"))?;
-    let archive = Archive::parse(&SnappyStream::decompress(entry.data())?.into_bytes())?;
+    let archive = Archive::parse(
+        &SnappyStream::decompress(entry.data(), Default::default())?.into_bytes(),
+        Default::default(),
+    )?;
     archive
         .objects
         .first()
@@ -397,22 +404,23 @@ fn component(metadata: &tsp::PackageMetadata, identifier: u64) -> TestResult<&ts
 }
 
 fn object_ids(bytes: &[u8], member: &str) -> TestResult<Vec<u64>> {
-    let catalog = Catalog::from_bytes(bytes)?;
+    let catalog = Catalog::from_bytes(bytes, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == member)
         .ok_or_else(|| io::Error::other("component is missing"))?;
-    Ok(
-        Archive::parse(&SnappyStream::decompress(entry.data())?.into_bytes())?
-            .objects
-            .into_iter()
-            .filter_map(|object| object.archive_info.identifier)
-            .collect(),
-    )
+    Ok(Archive::parse(
+        &SnappyStream::decompress(entry.data(), Default::default())?.into_bytes(),
+        Default::default(),
+    )?
+    .objects
+    .into_iter()
+    .filter_map(|object| object.archive_info.identifier)
+    .collect())
 }
 
 fn has_entry(bytes: &[u8], name: &str) -> TestResult<bool> {
-    Ok(Catalog::from_bytes(bytes)?
+    Ok(Catalog::from_bytes(bytes, Default::default())?
         .iter()
         .any(|entry| entry.name() == name))
 }
@@ -422,14 +430,18 @@ fn rewrite_member(
     member: &str,
     edit: impl FnOnce(&mut Archive) -> TestResult,
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == member)
         .ok_or_else(|| io::Error::other("component is missing"))?;
-    let mut archive = Archive::parse(&SnappyStream::decompress(entry.data())?.into_bytes())?;
+    let mut archive = Archive::parse(
+        &SnappyStream::decompress(entry.data(), Default::default())?.into_bytes(),
+        Default::default(),
+    )?;
     edit(&mut archive)?;
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(member, compressed.as_slice())],
         Limits::default(),
@@ -453,14 +465,18 @@ fn rewrite_object_payload(
             .first()
             .ok_or_else(|| io::Error::other("message is missing"))?;
         let (type_, data) = edit(message.type_, message.data.clone())?;
-        object.replace_message_preserving_header(0, RawMessage { type_, data })?;
+        object.replace_message_preserving_header(
+            0,
+            RawMessage { type_, data },
+            Default::default(),
+        )?;
         Ok(())
     })
 }
 
 fn without_member(source: &[u8], member: &str) -> TestResult<Vec<u8>> {
     Ok(
-        Catalog::from_bytes(source)?.reassemble_with_deletions_to_bytes(
+        Catalog::from_bytes(source, Default::default())?.reassemble_with_deletions_to_bytes(
             &[],
             &[member],
             Limits::default(),
@@ -802,12 +818,15 @@ fn assert_metadata_unknowns(bytes: &[u8]) -> TestResult {
 }
 
 fn assert_graph_unknowns(bytes: &[u8]) -> TestResult {
-    let catalog = Catalog::from_bytes(bytes)?;
+    let catalog = Catalog::from_bytes(bytes, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or_else(|| io::Error::other("document component is missing"))?;
-    let archive = Archive::parse(&SnappyStream::decompress(entry.data())?.into_bytes())?;
+    let archive = Archive::parse(
+        &SnappyStream::decompress(entry.data(), Default::default())?.into_bytes(),
+        Default::default(),
+    )?;
     for identifier in [
         BODY_IDENTIFIER,
         FIRST_REFERENCE_IDENTIFIER,

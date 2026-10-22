@@ -251,7 +251,7 @@ pub fn capture(
         (Some(index), false) => index,
     };
     let index = members.remove(index);
-    let catalog = Catalog::from_bytes_with_limits(&index.data, archive)?;
+    let catalog = Catalog::from_bytes(&index.data, archive)?;
     // The converted package is the captured bytes plus ZIP framing: a local
     // and a central record per inserted member (each under 100 bytes plus
     // the name twice) and one end record.

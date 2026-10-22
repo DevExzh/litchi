@@ -253,3 +253,33 @@ fn color_ref_is_lossless_and_decodes_only_direct_rgb() {
     assert_eq!(scheme.flags(), 0x08);
     assert_eq!(scheme.rgb(), None);
 }
+
+#[test]
+fn compact_and_indexed_tables_preserve_lookup_order_and_duplicate_rejection() {
+    for count in [0_u16, 1, 16, 17, 64] {
+        let mut data = Vec::new();
+        for index in 0..count {
+            push_property(&mut data, 0x600 + index, i32::from(index));
+        }
+        let record = opt_record(&data, count);
+        let props = Props::parse(&record).expect("table");
+        assert_eq!(props.len(), usize::from(count));
+        for index in 0..count {
+            let id = Id::from(0x600 + index);
+            assert!(props.has(id));
+            assert_eq!(props.get_int(id), Some(i32::from(index)));
+            assert_eq!(
+                props.iter().nth(usize::from(index)).expect("ordered").id(),
+                id
+            );
+        }
+        assert!(!props.has(Id::from(0x700)));
+        if count > 0 {
+            push_property(&mut data, 0x4600, -1);
+            assert!(matches!(
+                Props::parse(&opt_record(&data, count + 1)),
+                Err(Error::MalformedProperties { .. })
+            ));
+        }
+    }
+}

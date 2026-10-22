@@ -229,7 +229,7 @@ fn set_chart_reference_lines_staged(
     if !additions.is_empty() {
         package.update_archive(chart_archive_name, |archive| {
             for (_, _, object) in additions.drain(..) {
-                archive.insert_object(object)?;
+                archive.insert_object(object, Default::default())?;
             }
             Ok(())
         })?;
@@ -530,6 +530,7 @@ fn replace_slot_data(
                 type_: REFERENCE_LINE_NON_STYLE_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -645,6 +646,7 @@ fn patch_reference_line_graph(
                 type_: CHART_MESSAGE_TYPE,
                 data: chart.encode()?,
             },
+            Default::default(),
         )?;
         let metadata = &mut object
             .archive_info
@@ -880,6 +882,7 @@ fn reference_line_object(identifier: u64, reference_line: &Line) -> Result<Archi
             type_: REFERENCE_LINE_NON_STYLE_MESSAGE_TYPE,
             data: canonical_reference_line(reference_line)?,
         }],
+        Default::default(),
     )?;
     object
         .archive_info

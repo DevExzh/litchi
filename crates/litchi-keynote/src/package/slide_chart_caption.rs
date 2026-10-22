@@ -343,7 +343,11 @@ impl CaptionBudget {
                 .ok_or(Error::InvalidSource)?;
             let archive = component.archive();
             work = work
-                .checked_add(archive.encoded_len().map_err(map_core_error)?)
+                .checked_add(
+                    archive
+                        .encoded_len(Default::default())
+                        .map_err(map_core_error)?,
+                )
                 .ok_or(Error::InvalidSource)?;
             for object in &archive.objects {
                 work = work
@@ -383,7 +387,10 @@ impl CaptionBudget {
         }
         let mut work = 0usize;
         for component in package.state.source.components().iter() {
-            let archive_bytes = component.archive().encoded_len().map_err(map_core_error)?;
+            let archive_bytes = component
+                .archive()
+                .encoded_len(Default::default())
+                .map_err(map_core_error)?;
             work = work
                 .checked_add(component.name().len())
                 .and_then(|value| value.checked_add(archive_bytes))
@@ -461,25 +468,41 @@ impl CaptionBudget {
         snappy_limits: litchi_iwa_core::SnappyLimits,
     ) -> Result<usize, Error> {
         let encoded = archive
-            .encoded_len_with_limits(archive_limits)
+            .encoded_len(archive_limits)
             .map_err(map_core_error)?;
         let compressed_bound =
-            SnappyStream::maximum_compressed_len(encoded).map_err(map_core_error)?;
-        if compressed_bound > snappy_limits.max_compressed_stream() {
-            return Err(Error::Limit {
-                kind: LimitKind::EntryBytes,
-                observed: usize_to_u64(compressed_bound),
-                maximum: usize_to_u64(snappy_limits.max_compressed_stream()),
-            });
-        }
+            SnappyStream::maximum_compressed_len(encoded, snappy_limits).map_err(map_core_error)?;
         self.charge_work(
             encoded
                 .checked_add(compressed_bound)
                 .ok_or(Error::InvalidSource)?,
         )?;
         self.charge_output(encoded)?;
+        let chunk_size = SnappyStream::WRITE_CHUNK_SIZE.min(snappy_limits.max_uncompressed_chunk());
+        let frame_count = encoded.div_ceil(chunk_size);
+        // Admit the temporary-frame fallback under tight encoded ceilings;
+        // direct encoding into reserved output needs no separate frame Vec.
+        let frame_scratch = if encoded == 0 {
+            0
+        } else {
+            SnappyStream::maximum_compressed_len(encoded.min(chunk_size), Default::default())
+                .map_err(map_core_error)?
+                .checked_sub(4)
+                .ok_or(Error::InvalidSource)?
+        };
+        // snap 1.1.2 allocates its 16,384-entry u16 table once when a
+        // block exceeds the 1,024-entry inline table.
+        let encoder_allocations = usize::from(encoded.min(chunk_size) > 1_024);
+        let encoder_scratch = encoder_allocations * 32 * 1024;
+        self.charge_scratch(
+            frame_scratch
+                .checked_add(encoder_scratch)
+                .ok_or(Error::InvalidSource)?,
+        )?;
         self.charge_allocation(
-            2,
+            frame_count
+                .checked_add(2 + encoder_allocations)
+                .ok_or(Error::InvalidSource)?,
             encoded
                 .checked_add(compressed_bound)
                 .ok_or(Error::InvalidSource)?,
@@ -1882,10 +1905,9 @@ pub(super) fn rewrite_caption_graph_operation_with_budget(
         if entry.is_opaque() {
             return Err(Error::InvalidSource);
         }
-        let stream = SnappyStream::decompress_with_limits(entry.data(), snappy_limits)
-            .map_err(map_core_error)?;
-        let archive = Archive::parse_with_limits(stream.as_bytes(), archive_limits)
-            .map_err(map_core_error)?;
+        let stream =
+            SnappyStream::decompress(entry.data(), snappy_limits).map_err(map_core_error)?;
+        let archive = Archive::parse(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
         validate_canonical_object_framing(&archive, stream.as_bytes())?;
         archives.push((name.clone(), archive));
     }
@@ -1970,7 +1992,7 @@ pub(super) fn rewrite_caption_graph_operation_with_budget(
     )?;
     for object in graph_objects {
         slide_archive
-            .insert_object_with_limits(object, archive_limits)
+            .insert_object(object, archive_limits)
             .map_err(map_core_error)?;
     }
 
@@ -2029,10 +2051,8 @@ pub(super) fn rewrite_caption_graph_operation_with_budget(
             amount: archives.len(),
         })?;
     for (name, archive) in &archives {
-        let bytes = archive
-            .to_bytes_with_limits(archive_limits)
-            .map_err(map_core_error)?;
-        let data = SnappyStream::compress(&bytes).map_err(map_core_error)?;
+        let bytes = archive.to_bytes(archive_limits).map_err(map_core_error)?;
+        let data = SnappyStream::compress(&bytes, snappy_limits).map_err(map_core_error)?;
         compressed.push((name.clone(), data));
     }
     budget.charge_allocation(1, 0)?;
@@ -2152,9 +2172,10 @@ pub(super) fn rewrite_existing_caption_text_with_metadata_budget(
     let snappy_limits = physical_limits.snappy_limits().map_err(map_archive_error)?;
     budget.charge_archive_snappy_plan(&metadata_archive, archive_limits, snappy_limits)?;
     let metadata_bytes = metadata_archive
-        .to_bytes_with_limits(archive_limits)
+        .to_bytes(archive_limits)
         .map_err(map_core_error)?;
-    let metadata_compressed = SnappyStream::compress(&metadata_bytes).map_err(map_core_error)?;
+    let metadata_compressed =
+        SnappyStream::compress(&metadata_bytes, snappy_limits).map_err(map_core_error)?;
     let edit = EntryEdit::new(metadata_name.as_str(), metadata_compressed.as_slice());
     let native_catalog = physical_catalog(&native_candidate)?;
     let prepared_reassembly = native_catalog
@@ -2264,7 +2285,7 @@ fn replace_metadata_payload(
         return Err(Error::InvalidSource);
     }
     object
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             index,
             RawMessage {
                 type_: PACKAGE_METADATA_MESSAGE_TYPE,
@@ -2700,6 +2721,7 @@ fn canonical_standin(identifier: u64) -> Result<ArchiveObject, Error> {
             type_: STANDIN_MESSAGE_TYPE,
             data: graph_codec::canonical_standin_payload().to_vec(),
         }],
+        Default::default(),
     )
     .map_err(map_core_error)?;
     object.archive_info.message_infos[0].versions = vec![10, 1, 0];
@@ -2778,6 +2800,7 @@ fn caption_graph_objects(
                 type_: types[index],
                 data: payload,
             }],
+            Default::default(),
         )
         .map_err(map_core_error)?;
         object.archive_info.message_infos[0].versions = vec![1, 0, 5];
@@ -3214,7 +3237,7 @@ fn patch_caption_edge(
     };
     let mut rewritten_object = source_object.clone();
     rewritten_object
-        .replace_message_transitioning_object_references_preserving_header_with_limits(
+        .replace_message_transitioning_object_references_preserving_header(
             0,
             RawMessage {
                 type_: message_type,
@@ -3657,12 +3680,12 @@ fn archive_for_member(package: &Package, name: &str) -> Result<Archive, Error> {
         .find(|entry| entry.name() == name)
         .ok_or(Error::Verification)?;
     let physical_limits = package.state.options.archive();
-    let stream = SnappyStream::decompress_with_limits(
+    let stream = SnappyStream::decompress(
         entry.data(),
         physical_limits.snappy_limits().map_err(map_archive_error)?,
     )
     .map_err(map_core_error)?;
-    let archive = Archive::parse_with_limits(
+    let archive = Archive::parse(
         stream.as_bytes(),
         physical_limits
             .effective_archive_limits()
@@ -3675,7 +3698,7 @@ fn archive_for_member(package: &Package, name: &str) -> Result<Archive, Error> {
 
 fn validate_canonical_object_framing(archive: &Archive, source: &[u8]) -> Result<(), Error> {
     archive
-        .validate_canonical_object_framing(source)
+        .validate_canonical_object_framing(source, Default::default())
         .map_err(map_core_error)
 }
 

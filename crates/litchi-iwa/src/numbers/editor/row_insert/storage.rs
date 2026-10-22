@@ -163,6 +163,7 @@ pub(super) fn shift_table_tile_rows(
                     type_: message_type,
                     data,
                 },
+                Default::default(),
             )?;
             Ok(())
         })?;
@@ -297,6 +298,7 @@ pub(super) fn shift_row_headers(
                     type_: message_type,
                     data,
                 },
+                Default::default(),
             )?;
             Ok(())
         })?;
@@ -378,6 +380,7 @@ pub(super) fn insert_row_uid(
                 type_: message_type,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -411,6 +414,7 @@ pub(super) fn set_table_row_count(
                 type_: message_type,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })

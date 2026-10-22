@@ -24,7 +24,7 @@ const MAX_REFERENCE_SEARCH_STEPS: usize = usize::BITS as usize + 1;
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
 fn member_bytes(name: &str) -> TestResult<Vec<u8>> {
-    Catalog::from_bytes(NATIVE_SOURCE)?
+    Catalog::from_bytes(NATIVE_SOURCE, Default::default())?
         .iter()
         .find(|entry| entry.name() == name)
         .map(|entry| entry.data().to_vec())

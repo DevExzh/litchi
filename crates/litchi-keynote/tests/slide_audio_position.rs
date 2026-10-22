@@ -68,15 +68,15 @@ fn exact_bytes(package: &Package) -> TestResult<Vec<u8>> {
 
 fn native_archives(source: &[u8]) -> TestResult<Vec<(String, Archive)>> {
     let mut archives = Vec::new();
-    for entry in Catalog::from_bytes(source)?.iter() {
+    for entry in Catalog::from_bytes(source, Default::default())?.iter() {
         if !entry.name().ends_with(".iwa") {
             continue;
         }
-        let stream = match SnappyStream::decompress(entry.data()) {
+        let stream = match SnappyStream::decompress(entry.data(), Default::default()) {
             Ok(stream) => stream.into_bytes(),
             Err(_) => continue,
         };
-        let archive = match Archive::parse(&stream) {
+        let archive = match Archive::parse(&stream, Default::default()) {
             Ok(archive) => archive,
             Err(_) => continue,
         };
@@ -453,8 +453,9 @@ fn strict_native_saved_readback(expected: Point) -> TestResult {
 }
 
 fn replace_component(source: &[u8], name: &str, archive: &Archive) -> TestResult<Vec<u8>> {
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
-    let catalog = Catalog::from_bytes(source)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let entries = catalog
         .iter()
         .map(|entry| {
@@ -996,7 +997,7 @@ fn native_audio_position_preserves_unselected_graph_and_invalidates_previews() -
     assert!(commit.diagnostics().changed());
     assert!(commit.diagnostics().deleted_previews() > 0);
     assert!(
-        Catalog::from_bytes(&candidate)?
+        Catalog::from_bytes(&candidate, Default::default())?
             .iter()
             .all(|entry| !entry.name().starts_with("preview"))
     );

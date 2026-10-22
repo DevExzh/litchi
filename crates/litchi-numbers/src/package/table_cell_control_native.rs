@@ -8,8 +8,8 @@
 use std::mem::size_of;
 
 use litchi_iwa_core::{
-    Archive, ArchiveLimits, ArchiveObject, ArchiveReferenceKind, ArchiveReferenceOccurrence,
-    ArchiveReferencePolicy, ArchiveReferenceVisitor, SnappyStream,
+    Archive, ArchiveObject, ArchiveReferenceKind, ArchiveReferenceOccurrence,
+    ArchiveReferencePolicy, ArchiveReferenceVisitor, Limits as ArchiveLimits, SnappyStream,
 };
 use litchi_iwa_protos::{
     numbers_table_cell_control_codec as control_codec,
@@ -409,7 +409,7 @@ pub(super) fn preflight_copy_on_write_scalar_control(
     let archive_bytes = graph_archive_bound
         .saturating_add(graph_member_bound)
         .saturating_add(64 * 1024);
-    let compressed_bytes = SnappyStream::maximum_compressed_len(archive_bytes)
+    let compressed_bytes = SnappyStream::maximum_compressed_len(archive_bytes, Default::default())
         .map_err(|_| Error::InvalidSource { path })?;
     // These are operation-local private staging reservations.  The exact
     // prepared list requirements are charged by `apply_list_mutation`'s
@@ -443,14 +443,14 @@ pub(super) fn archive_serialized_bound(
     limits: ArchiveLimits,
     path: Path,
 ) -> Result<usize, Error> {
-    // `encoded_len_with_limits` is allocation-free and uses the same retained
-    // raw-header selection as `to_bytes_with_limits`.  A structural estimate
+    // `encoded_len` is allocation-free and uses the same retained
+    // raw-header selection as `to_bytes`.  A structural estimate
     // is insufficient here: an ArchiveObject may preserve unknown/noncanonical
     // ArchiveInfo bytes in `original_header`, which can be larger than the
     // regenerated canonical header.  Resolve the exact bounded length before
     // charging any clone or serialization allocation.
     archive
-        .encoded_len_with_limits(limits)
+        .encoded_len(limits)
         .map_err(|_| Error::InvalidSource { path })
 }
 
@@ -880,7 +880,7 @@ pub(super) fn rewrite_scalar_control(
     )
     .map_err(|_| Error::InvalidSource { path })?;
 
-    // `to_bytes_with_limits` performs the same length calculation internally,
+    // `to_bytes` performs the same length calculation internally,
     // but its output Vec is allocated before this transaction budget can see
     // the result.  Preflight every source/candidate pair while both archives
     // are still private, so the aggregate scratch/work/retained ceilings and
@@ -899,10 +899,10 @@ pub(super) fn rewrite_scalar_control(
             .ok_or(Error::InvalidSource { path })?
             .archive();
         let source_length = source_archive
-            .encoded_len_with_limits(archive_limits)
+            .encoded_len(archive_limits)
             .map_err(|_| Error::InvalidSource { path })?;
         let candidate_length = candidate
-            .encoded_len_with_limits(archive_limits)
+            .encoded_len(archive_limits)
             .map_err(|_| Error::InvalidSource { path })?;
         source_serialized_bytes = source_serialized_bytes
             .checked_add(source_length)
@@ -957,10 +957,10 @@ pub(super) fn rewrite_scalar_control(
         // proves that no late archive-header change can make the output Vec
         // exceed the amount charged to the transaction.
         let expected_archive_bytes = archive
-            .encoded_len_with_limits(archive_limits)
+            .encoded_len(archive_limits)
             .map_err(|_| Error::InvalidSource { path })?;
         let archive_bytes = archive
-            .to_bytes_with_limits(archive_limits)
+            .to_bytes(archive_limits)
             .map_err(|_| Error::InvalidSource { path })?;
         if archive_bytes.len() != expected_archive_bytes {
             return Err(Error::Verification);
@@ -2169,7 +2169,7 @@ pub(super) fn require_exclusive_selected_model_reference(
                 unexpected: false,
             };
             let occurrences = object
-                .inspect_references_with_policy_and_limits(
+                .inspect_references_with_policy(
                     &mut probe,
                     ArchiveReferencePolicy::RejectUnknownMetadata,
                     archive_limits,

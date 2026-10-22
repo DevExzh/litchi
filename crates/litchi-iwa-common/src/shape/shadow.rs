@@ -8,6 +8,7 @@ const MAX_BLUR_RADIUS: u32 = i32::MAX as u32;
 
 /// Validation failures for shape-shadow values.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[non_exhaustive]
 pub enum Error {
     /// An angle was not finite.
     #[error("shape shadow angle must be finite")]

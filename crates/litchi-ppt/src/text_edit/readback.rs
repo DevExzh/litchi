@@ -247,7 +247,7 @@ fn convert_changed_shape(
     // topology) read only the unchanged `Sp` atom, which the source parse
     // already accepted at this position; a standalone parse builds the same
     // shape value.
-    let escher = litchi_odraw::shape::parse(container).ok()?;
+    let escher = litchi_odraw::shape::parse(container, Default::default()).ok()?;
     let [escher] = escher.as_slice() else {
         return None;
     };

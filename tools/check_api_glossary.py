@@ -3,16 +3,20 @@
 
 Rules live in api_glossary.json; each migration explicitly registers its bans
 and completed transaction families. A ban matches a name exactly, or as a
-prefix/suffix when it says so ("match"). Record 0351 adds two shape rules:
+prefix/suffix when it says so ("match"). Record 0351 adds shape rules:
 "immutable_owners" lists owner types (a format's Package and projections)
 whose public methods must not take `&mut self`, and "family_methods" makes
-every registered family also expose the commit-triad accessors.
+every registered family expose the commit-triad accessors and return its
+Commit from Edit::commit. "result_methods" pins a method's Result payload to a
+specific Commit (including nested types and method type parameters); owner
+replay must publish that owner. Local aliases are resolved by identity, not
+spelling. Direct shared core Commit types use their canonical dependency path.
 Each profile builds its own feature-specific rustdoc JSON; --json/--profile
 checks an existing document instead. Names are matched exactly under a public
 path prefix, never by substring. A ban with recursive=false matches direct
 children of its scope, preserving unrelated nested domain vocabulary. Family
-checks assert six exported type names,
-not transaction semantics (which remain Rust/CRUD test obligations).
+checks verify exported types and these method shapes. Transaction semantics
+remain Rust/CRUD test obligations.
 """
 from __future__ import annotations
 
@@ -26,6 +30,11 @@ import sys
 import tempfile
 from pathlib import Path
 from typing import Any
+
+try:
+    from .rustdoc_return_types import ReturnTypes
+except ImportError:  # Direct command-line execution.
+    from rustdoc_return_types import ReturnTypes
 
 ROOT = Path(__file__).resolve().parents[1]
 POLICY = ROOT / "tools/api_glossary.json"
@@ -44,8 +53,22 @@ FAMILY_METHODS = {
 }
 FAMILY_FORBIDDEN = {"Edit": frozenset({"rollback", "is_changed", "snapshot"}),
                     "Commit": frozenset({"snapshot", "into_snapshot", "is_changed"})}
+# An edit stages changes; only its committed package exposes artifact output.
+# Keep this shared with the debt inventory so an unregistered family is still
+# reported. These names identify output, not ordinary read projections or
+# preparation methods such as `prepare`/`plan`.
+EDIT_OUTPUT_NAMES = frozenset({
+    "to_bytes", "into_bytes", "to_plain_bytes", "to_encrypted_bytes",
+    "to_reencrypted_bytes", "write_to", "save", "save_plain", "save_encrypted",
+    "save_reencrypted", "save_with_durability",
+})
 TYPE_KINDS = frozenset({"struct", "enum", "union", "type_alias"})
 IDENTIFIER = re.compile(r"[A-Za-z_][A-Za-z_0-9]*\Z")
+
+
+def is_edit_output(name: str) -> bool:
+    """Known artifact-output verbs that bypass Edit::commit (record 0351)."""
+    return name in EDIT_OUTPUT_NAMES or name.endswith(("_with_rendered", "_to_stream"))
 
 
 def read_json(path: Path) -> Any:
@@ -63,7 +86,7 @@ def checked_policy(value: Any) -> list[dict[str, Any]]:
     seen = set()
     for profile in value["profiles"]:
         fields = {"id", "package", "default_features", "features", "banned_names", "families"}
-        optional = {"delegated_globs", "immutable_owners", "family_methods"}
+        optional = {"delegated_globs", "immutable_owners", "family_methods", "result_methods"}
         if (not isinstance(profile, dict) or not fields <= set(profile)
                 or set(profile) - (fields | optional)):
             raise ValueError("profile requires exactly " + ", ".join(sorted(fields))
@@ -90,11 +113,28 @@ def checked_policy(value: Any) -> list[dict[str, Any]]:
             raise ValueError("features must be unique Cargo feature names")
         crate = profile["package"].replace("-", "_")
 
-        def check_path(path: Any) -> None:
-            if not isinstance(path, str) or not all(IDENTIFIER.fullmatch(p) for p in path.split("::")):
+        def check_path(path: Any, *, local=True) -> None:
+            if (not isinstance(path, str) or not all(IDENTIFIER.fullmatch(p) for p in path.split("::"))
+                    or (not local and len(path.split("::")) < 2)):
                 raise ValueError("scope/family must be a fully qualified Rust path")
-            if path.split("::")[0] != crate:
+            if local and path.split("::")[0] != crate:
                 raise ValueError(f"scope/family must start with {crate}")
+
+        def check_type(spec: Any) -> None:
+            if isinstance(spec, str):
+                check_path(spec, local=False)
+            elif isinstance(spec, dict) and set(spec) == {"generic"}:
+                name = spec["generic"]
+                if not isinstance(name, str) or not IDENTIFIER.fullmatch(name) or name == "Self":
+                    raise ValueError("type generic must name a method type parameter")
+            elif isinstance(spec, dict) and {"path"} <= set(spec) <= {"path", "type_args"}:
+                check_path(spec["path"], local=False)
+                if not isinstance(spec.get("type_args", []), list):
+                    raise ValueError("nested type_args must be an array")
+                for arg in spec.get("type_args", []):
+                    check_type(arg)
+            else:
+                raise ValueError("type argument must be a path, parameter or nested nominal type")
 
         bans = profile["banned_names"]
         if not isinstance(bans, list):
@@ -132,6 +172,25 @@ def checked_policy(value: Any) -> list[dict[str, Any]]:
             check_path(owner)
         if len(set(owners)) != len(owners):
             raise ValueError("duplicate immutable owner")
+        results = profile.get("result_methods", [])
+        if not isinstance(results, list):
+            raise ValueError("result_methods must be an array")
+        seen_methods = set()
+        for result in results:
+            if (not isinstance(result, dict) or not {"method", "ok"} <= set(result)
+                    or set(result) - {"method", "ok", "type_args"}):
+                raise ValueError("result method requires method and ok, with optional type_args")
+            check_path(result["method"])
+            check_path(result["ok"], local=False)
+            if result["ok"].split("::")[-1] not in {"Commit", "BatchCommit"}:
+                raise ValueError("result method ok must name Commit or BatchCommit")
+            if result["method"] in seen_methods:
+                raise ValueError("duplicate result method")
+            seen_methods.add(result["method"])
+            if not isinstance(result.get("type_args", []), list):
+                raise ValueError("result method type_args must be an array")
+            for arg in result.get("type_args", []):
+                check_type(arg)
     return value["profiles"]
 
 
@@ -219,6 +278,9 @@ class Surface:
             raise ValueError("rustdoc must not include private items")
         self.crate_id = item["crate_id"]
         self.exports: dict[tuple[str, ...], str] = {}
+        # Preserve aliases at their public spelling: traversing the nominal
+        # target must not discard the alias's generic substitutions.
+        self.item_ids: dict[tuple[str, ...], str] = {}
         self.names: set[tuple[tuple[str, ...], str]] = set()
         # Method receivers ("&mut self", "&self", "self") by caller-visible
         # path, and dependency paths behind re-exports and type aliases.
@@ -258,6 +320,7 @@ class Surface:
                 raise ValueError(f"missing local rustdoc item {item_id}")
             if exported:
                 self.exports[path] = entry["kind"]
+                self.item_ids.setdefault(path, item_id)
             self.names.add((path, path[-1]))
             self.foreign[path] = tuple(entry["path"])
             return
@@ -306,6 +369,7 @@ class Surface:
             return
         if exported:
             self.exports[path] = kind
+            self.item_ids.setdefault(path, item_id)
         self.names.add((path, path[-1]))
         if kind == "function":
             receiver = self_receiver(data)
@@ -371,6 +435,7 @@ def violations(document: Any, profile: dict[str, Any]) -> list[str]:
     except (KeyError, TypeError, AttributeError) as error:
         raise ValueError(f"invalid rustdoc graph structure: {error}") from error
     failures = set()
+    return_types = ReturnTypes(surface)
     for ban in profile["banned_names"]:
         scope = tuple(ban["scope"].split("::"))
         if not any(path[:len(scope)] == scope for path, _ in surface.names):
@@ -415,8 +480,28 @@ def violations(document: Any, profile: dict[str, Any]) -> list[str]:
             present = methods.get(member, set())
             for method in sorted(required - present):
                 failures.add(f"{family}::{name} requires method {method} (record 0351)")
-            for method in sorted(FAMILY_FORBIDDEN.get(name, frozenset()) & present):
+            forbidden = FAMILY_FORBIDDEN.get(name, frozenset()) & present
+            if name == "Edit":
+                forbidden = forbidden | {method for method in present if is_edit_output(method)}
+            for method in sorted(forbidden):
                 failures.add(f"{family}::{name} exposes forbidden method {method} (record 0351)")
+        commit_method = path + ("Edit", "commit")
+        if (commit_method in surface.item_ids and path + ("Edit",) not in surface.foreign
+                and surface.exports.get(path + ("Commit",)) in TYPE_KINDS
+                and (not return_types.is_commit(path + ("Commit",))
+                     or not return_types.matches_result(commit_method, path + ("Commit",)))):
+            failures.add(f"{family}::Edit::commit must return Result<{family}::Commit> (record 0351)")
+    for rule in profile.get("result_methods", []):
+        method = tuple(rule["method"].split("::"))
+        expected = tuple(rule["ok"].split("::"))
+        args = [return_types.policy_type(arg, method)
+                for arg in rule.get("type_args", [])]
+        if (surface.exports.get(method) != "function" or not return_types.is_commit(expected)
+                or any(arg is None for arg in args)
+                or not return_types.matches_result(method, expected, args)
+                or ((method[-1] == "apply" or method[-1].startswith("apply_"))
+                    and not return_types.matches_owner(method, expected, args))):
+            failures.add(f"{rule['method']} must return Result<{rule['ok']}> (record 0351)")
     return sorted(failures)
 
 
@@ -471,10 +556,11 @@ def main(argv: list[str] | None = None) -> int:
         families = sum(len(p["families"]) for p in profiles)
         owners = sum(len(p.get("immutable_owners", [])) for p in profiles)
         strict = sum(1 for p in profiles if p.get("family_methods"))
+        results = sum(len(p.get("result_methods", [])) for p in profiles)
         print(
             f"API glossary: {len(profiles)} profiles, {bans} banned names, "
             f"{families} transaction families checked, {owners} immutable owners, "
-            f"family methods in {strict} profiles"
+            f"family methods in {strict} profiles, {results} explicit result contracts"
         )
         return 0
     except (ValueError, OSError, subprocess.CalledProcessError) as error:

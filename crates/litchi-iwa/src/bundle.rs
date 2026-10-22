@@ -18,7 +18,7 @@ use std::io::{Cursor, Read};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use crate::archive::{Archive, ArchiveLimits as IwaArchiveLimits, ArchiveObject, extract_text};
+use crate::archive::{Archive, ArchiveObject, Limits as IwaArchiveLimits, extract_text};
 #[cfg(test)]
 use crate::archive::{CoreError, CoreLimitKind};
 use crate::snappy::SnappyStream;
@@ -972,9 +972,8 @@ impl Bundle {
     /// Parse a ZIP archive from raw bytes and extract all IWA files
     fn parse_zip_bytes(bytes: &[u8], limits: BundleLimits) -> Result<Vec<(String, Archive)>> {
         let ingress_limits = limits.archive_ingress_limits()?;
-        let catalog =
-            litchi_iwa_archive::ComponentCatalog::from_bytes_with_limits(bytes, ingress_limits)
-                .map_err(map_archive_ingress_error)?;
+        let catalog = litchi_iwa_archive::ComponentCatalog::from_bytes(bytes, ingress_limits)
+            .map_err(map_archive_ingress_error)?;
         Ok(catalog
             .into_iter()
             .map(litchi_iwa_archive::Component::into_parts)
@@ -1578,7 +1577,7 @@ fn optional_regular_file(path: &Path, label: &str) -> Result<bool> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::archive::{Archive, ArchiveLimits as IwaArchiveLimits, ArchiveObject, RawMessage};
+    use crate::archive::{Archive, ArchiveObject, Limits as IwaArchiveLimits, RawMessage};
     use std::fs;
 
     fn zip(entries: &[(&str, &[u8])]) -> Vec<u8> {
@@ -1723,6 +1722,7 @@ mod tests {
                         type_: 99,
                         data: vec![1, 2, 3],
                     }],
+                    Default::default(),
                 )?,
                 ArchiveObject::new(
                     2,
@@ -1730,10 +1730,12 @@ mod tests {
                         type_: 100,
                         data: vec![4, 5, 6],
                     }],
+                    Default::default(),
                 )?,
             ],
         };
-        let compressed = SnappyStream::compress(&source.to_bytes()?)?;
+        let compressed =
+            SnappyStream::compress(&source.to_bytes(Default::default())?, Default::default())?;
         let index = zip(&[("Index/Document.iwa", &compressed)]);
         let bytes = zip(&[("legacy.pages/Index.zip", &index)]);
 
@@ -1796,7 +1798,7 @@ mod tests {
         assert!(BundleLimits::new(1, 1, 1, 1, 0).is_err());
         assert!(BundleLimits::new(BundleLimits::MAX_INPUT_BYTES + 1, 1, 1, 1, 1).is_err());
 
-        let compressed = SnappyStream::compress(&[0_u8; 64])?;
+        let compressed = SnappyStream::compress(&[0_u8; 64], Default::default())?;
         let bytes = zip(&[("Index/Document.iwa", &compressed)]);
 
         let tight_stream = BundleLimits::new(
@@ -2140,6 +2142,7 @@ mod tests {
                         type_: 7,
                         data: Vec::new(),
                     }],
+                    Default::default(),
                 )?,
                 ArchiveObject::new(
                     3,
@@ -2147,6 +2150,7 @@ mod tests {
                         type_: 8,
                         data: Vec::new(),
                     }],
+                    Default::default(),
                 )?,
             ],
         };
@@ -2158,6 +2162,7 @@ mod tests {
                         type_: 7,
                         data: Vec::new(),
                     }],
+                    Default::default(),
                 )?,
                 ArchiveObject::new(
                     4,
@@ -2165,6 +2170,7 @@ mod tests {
                         type_: 9,
                         data: Vec::new(),
                     }],
+                    Default::default(),
                 )?,
             ],
         };
@@ -2232,6 +2238,7 @@ mod tests {
                 type_: 7,
                 data: vec![1],
             }],
+            Default::default(),
         )?;
         length_mismatch.archive_info.message_infos[0].length = 9;
         let mut duplicate = ArchiveObject::new(
@@ -2240,6 +2247,7 @@ mod tests {
                 type_: 8,
                 data: Vec::new(),
             }],
+            Default::default(),
         )?;
         duplicate.archive_info.message_infos.clear();
 

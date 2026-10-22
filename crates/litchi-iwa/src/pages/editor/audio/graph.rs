@@ -708,6 +708,7 @@ pub(super) fn set_audio_geometry(
                 type_: AUDIO_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -750,6 +751,7 @@ pub(super) fn set_audio_properties(
                 type_: AUDIO_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -802,6 +804,7 @@ pub(super) fn set_audio_attachment_position(
                 type_: DRAWABLE_ATTACHMENT_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -831,6 +834,7 @@ fn pages_audio_object(
             type_: message_type,
             data: message.encode_to_vec(),
         }],
+        Default::default(),
     )?;
     let info = &mut object.archive_info.message_infos[0];
     info.versions = versions.to_vec();

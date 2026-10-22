@@ -95,6 +95,7 @@ pub(super) fn new_date_time_object(identifier: u64, settings: &Settings) -> Resu
             type_: DATE_TIME_MESSAGE_TYPE,
             data: field.encode_to_vec(),
         }],
+        Default::default(),
     )?)
 }
 
@@ -188,6 +189,7 @@ pub(super) fn patch_date_time_settings(
                 type_: DATE_TIME_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })

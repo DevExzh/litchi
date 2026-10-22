@@ -110,7 +110,11 @@ fn object(
     data: Vec<u8>,
     references: &[u64],
 ) -> TestResult<ArchiveObject> {
-    let mut object = ArchiveObject::new(identifier, vec![RawMessage { type_, data }])?;
+    let mut object = ArchiveObject::new(
+        identifier,
+        vec![RawMessage { type_, data }],
+        Default::default(),
+    )?;
     object.archive_info.message_infos[0]
         .object_references
         .extend_from_slice(references);
@@ -709,7 +713,10 @@ fn source_package_with_tiles(
         )?,
     ]);
 
-    let document_bytes = SnappyStream::compress(&Archive { objects }.to_bytes()?)?;
+    let document_bytes = SnappyStream::compress(
+        &Archive { objects }.to_bytes(Default::default())?,
+        Default::default(),
+    )?;
     let metadata_bytes = SnappyStream::compress(
         &Archive {
             objects: vec![object(
@@ -719,7 +726,8 @@ fn source_package_with_tiles(
                 &[],
             )?],
         }
-        .to_bytes()?,
+        .to_bytes(Default::default())?,
+        Default::default(),
     )?;
     Ok(litchi_iwa_archive::package::to_bytes(
         [
@@ -744,24 +752,26 @@ fn package_bytes(package: &Package) -> TestResult<Vec<u8>> {
 }
 
 fn document_archive(package: &[u8]) -> TestResult<Archive> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or("missing document component")?;
     Ok(Archive::parse(
-        SnappyStream::decompress(entry.data())?.as_bytes(),
+        SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+        Default::default(),
     )?)
 }
 
 fn metadata_archive(package: &[u8]) -> TestResult<Archive> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == METADATA_MEMBER)
         .ok_or("missing metadata component")?;
     Ok(Archive::parse(
-        SnappyStream::decompress(entry.data())?.as_bytes(),
+        SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+        Default::default(),
     )?)
 }
 
@@ -783,14 +793,18 @@ fn rewrite_document(
     package: &[u8],
     mutate: impl FnOnce(&mut Archive) -> TestResult<()>,
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or("missing document component")?;
-    let mut archive = Archive::parse(SnappyStream::decompress(entry.data())?.as_bytes())?;
+    let mut archive = Archive::parse(
+        SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+        Default::default(),
+    )?;
     mutate(&mut archive)?;
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[litchi_iwa_archive::package::EntryEdit::new(
             DOCUMENT_MEMBER,
@@ -807,14 +821,16 @@ fn rewrite_document_stream(
     package: &[u8],
     mutate: impl FnOnce(&mut Vec<u8>) -> TestResult<()>,
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or("missing document component")?;
-    let mut stream = SnappyStream::decompress(entry.data())?.as_bytes().to_vec();
+    let mut stream = SnappyStream::decompress(entry.data(), Default::default())?
+        .as_bytes()
+        .to_vec();
     mutate(&mut stream)?;
-    let compressed = SnappyStream::compress(&stream)?;
+    let compressed = SnappyStream::compress(&stream, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[litchi_iwa_archive::package::EntryEdit::new(
             DOCUMENT_MEMBER,
@@ -828,12 +844,15 @@ fn rewrite_metadata(
     package: &[u8],
     mutate: impl FnOnce(&mut tsp::PackageMetadata) -> TestResult<()>,
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == METADATA_MEMBER)
         .ok_or("missing metadata component")?;
-    let mut archive = Archive::parse(SnappyStream::decompress(entry.data())?.as_bytes())?;
+    let mut archive = Archive::parse(
+        SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+        Default::default(),
+    )?;
     let metadata = archive
         .object_mut(METADATA_OBJECT)
         .ok_or("missing metadata object")?;
@@ -850,8 +869,10 @@ fn rewrite_metadata(
             type_: METADATA_MESSAGE_TYPE,
             data: payload.encode_to_vec(),
         },
+        Default::default(),
     )?;
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[litchi_iwa_archive::package::EntryEdit::new(
             METADATA_MEMBER,
@@ -870,13 +891,14 @@ fn rewrite_table_info(package: &[u8], locked: bool) -> TestResult<Vec<u8>> {
                 type_: TABLE_INFO_MESSAGE_TYPE,
                 data: table_info_payload(locked),
             },
+            Default::default(),
         )?;
         Ok(())
     })
 }
 
 fn rewrite_entry(package: &[u8], name: &str, data: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[litchi_iwa_archive::package::EntryEdit::new(name, data)],
         Limits::default(),
@@ -902,6 +924,7 @@ fn rewrite_model_wire(package: &[u8], field: u32, payload: &[u8]) -> TestResult<
                 type_: TABLE_MODEL_MESSAGE_TYPE,
                 data: bytes,
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -933,6 +956,7 @@ fn rewrite_object_wire(
                 type_: message_type,
                 data: bytes,
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -1052,6 +1076,7 @@ fn rewrite_tile_cell(
                 type_: TILE_MESSAGE_TYPE,
                 data: payload.encode_to_vec(),
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -1083,6 +1108,7 @@ fn rewrite_numeric_body_keys(package: &[u8], values: [f64; BODY_COUNT]) -> TestR
                 type_: TILE_MESSAGE_TYPE,
                 data: payload.encode_to_vec(),
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -1105,6 +1131,7 @@ fn rewrite_padded_offsets(package: &[u8]) -> TestResult<Vec<u8>> {
                 type_: TILE_MESSAGE_TYPE,
                 data: payload.encode_to_vec(),
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -1133,6 +1160,7 @@ fn rewrite_pre_bnc_sidecars(package: &[u8]) -> TestResult<Vec<u8>> {
                 type_: TILE_MESSAGE_TYPE,
                 data: payload.encode_to_vec(),
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -1161,6 +1189,7 @@ fn rewrite_pre_bnc_only(package: &[u8]) -> TestResult<Vec<u8>> {
                 type_: TILE_MESSAGE_TYPE,
                 data: payload.encode_to_vec(),
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -1194,6 +1223,7 @@ fn rewrite_string_entry_sidecars(package: &[u8]) -> TestResult<Vec<u8>> {
                 type_: TABLE_DATA_LIST_MESSAGE_TYPE,
                 data: payload.encode_to_vec(),
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -1214,6 +1244,7 @@ fn rewrite_uid_map(
                 type_: COLUMN_ROW_UID_MAP_MESSAGE_TYPE,
                 data: payload.encode_to_vec(),
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -1241,6 +1272,7 @@ fn rewrite_formula_registry(package: &[u8]) -> TestResult<Vec<u8>> {
                 type_: TABLE_DATA_LIST_MESSAGE_TYPE,
                 data: payload.encode_to_vec(),
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -1301,6 +1333,7 @@ fn source_with_aggregate_only_optional_format(
                 type_: TABLE_MODEL_MESSAGE_TYPE,
                 data: payload.encode_to_vec(),
             },
+            Default::default(),
         )?;
         model.archive_info.message_infos[0]
             .object_references
@@ -1596,8 +1629,8 @@ fn uid_map_indexes(package: &[u8]) -> TestResult<(Vec<u32>, Vec<u32>, Vec<u32>, 
 }
 
 fn assert_locality(source: &[u8], target: &[u8]) -> TestResult {
-    let before = Catalog::from_bytes(source)?;
-    let after = Catalog::from_bytes(target)?;
+    let before = Catalog::from_bytes(source, Default::default())?;
+    let after = Catalog::from_bytes(target, Default::default())?;
     for entry in before.iter() {
         if PREVIEWS.contains(&entry.name()) {
             assert!(
@@ -1676,7 +1709,7 @@ fn assert_canonical_source_admitted(source: &[u8]) -> TestResult {
 #[test]
 fn canonical_fixture_has_exact_metadata_and_unrelated_entries() -> TestResult {
     let source = source(Scope::EntireTable)?;
-    let catalog = Catalog::from_bytes(&source)?;
+    let catalog = Catalog::from_bytes(&source, Default::default())?;
     assert_eq!(
         catalog.iter().map(|entry| entry.name()).collect::<Vec<_>>(),
         vec![
@@ -1942,8 +1975,13 @@ fn full_sort_moves_body_rows_and_sparse_headers_but_not_header_or_footer() -> Te
     );
     assert_locality(&source, &target)?;
     assert_eq!(
-        Catalog::from_bytes(&source)?.iter().count(),
-        Catalog::from_bytes(&target)?.iter().count() + PREVIEWS.len()
+        Catalog::from_bytes(&source, Default::default())?
+            .iter()
+            .count(),
+        Catalog::from_bytes(&target, Default::default())?
+            .iter()
+            .count()
+            + PREVIEWS.len()
     );
     Ok(())
 }
@@ -1983,7 +2021,7 @@ fn duplicate_sort_keys_are_stable_and_selected_ranges_are_body_relative() -> Tes
         ]
     );
     assert!(
-        Catalog::from_bytes(&target)?
+        Catalog::from_bytes(&target, Default::default())?
             .iter()
             .all(|entry| !PREVIEWS.contains(&entry.name()))
     );
@@ -2050,7 +2088,7 @@ fn exact_noop_repeated_sort_preserves_every_byte_and_preview() -> TestResult {
     assert_eq!(second.diagnostics().moved_rows(), 0);
     assert_eq!(package_bytes(second.package())?, target);
     assert!(
-        Catalog::from_bytes(&target)?
+        Catalog::from_bytes(&target, Default::default())?
             .iter()
             .all(|entry| !PREVIEWS.contains(&entry.name()))
     );
@@ -2152,6 +2190,7 @@ fn selector_lock_missing_order_scope_and_range_fail_atomically() -> TestResult {
                 type_: TABLE_MODEL_MESSAGE_TYPE,
                 data: payload,
             },
+            Default::default(),
         )?;
         Ok(())
     })?;
@@ -2248,6 +2287,7 @@ fn unsupported_row_affine_and_malformed_storage_fail_before_publication() -> Tes
                 type_: TILE_MESSAGE_TYPE,
                 data: payload.encode_to_vec(),
             },
+            Default::default(),
         )?;
         Ok(())
     })?;

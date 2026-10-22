@@ -508,7 +508,7 @@ fn install_table_template(package: &mut HostPackage, language: &str, locale: &st
     }
     package.update_archive(DOCUMENT_ARCHIVE_ENTRY, |archive| {
         for object in table_objects {
-            archive.insert_object(object)?;
+            archive.insert_object(object, Default::default())?;
         }
         Ok(())
     })?;
@@ -522,7 +522,7 @@ fn install_table_template(package: &mut HostPackage, language: &str, locale: &st
     });
     package.update_archive(STYLESHEET_ARCHIVE_ENTRY, |archive| {
         for object in style_objects {
-            archive.insert_object(object)?;
+            archive.insert_object(object, Default::default())?;
         }
         Ok(())
     })?;
@@ -552,6 +552,7 @@ fn install_table_template(package: &mut HostPackage, language: &str, locale: &st
                 type_: message_type,
                 data: decoded.encode()?,
             },
+            Default::default(),
         )?;
         let references = &mut theme.archive_info.message_infos[message_index].object_references;
         if !references.contains(&TABLE_PRESET_TEMPLATE) {
@@ -1662,6 +1663,7 @@ fn raw_object(
             type_: message_type.value(),
             data,
         }],
+        Default::default(),
     )?;
     object.archive_info.message_infos[0].versions = vec![1, 0, 5];
     object.archive_info.message_infos[0].object_references = references.to_vec();

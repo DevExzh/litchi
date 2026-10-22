@@ -116,7 +116,7 @@ fn native_with_metadata(
     identifier: Option<&[u8]>,
 ) -> TestResult<Vec<u8>> {
     let source = std::fs::read(fixture("numbers/basic.numbers"))?;
-    let catalog = Catalog::from_bytes(&source)?;
+    let catalog = Catalog::from_bytes(&source, Default::default())?;
     let mut entries = catalog
         .iter()
         .filter(|entry| {
@@ -189,6 +189,7 @@ fn archive_object(identifier: u64, type_: u32, data: Vec<u8>) -> TestResult<Arch
     Ok(ArchiveObject::new(
         identifier,
         vec![RawMessage { type_, data }],
+        Default::default(),
     )?)
 }
 
@@ -240,6 +241,7 @@ fn synthetic_formula_source() -> TestResult<Vec<u8>> {
             data: list.encode_to_vec(),
         })
         .collect(),
+        Default::default(),
     )?;
     lists.archive_info.message_infos[2]
         .object_references
@@ -357,7 +359,10 @@ fn synthetic_formula_source() -> TestResult<Vec<u8>> {
             .encode_to_vec(),
         )?,
     ];
-    let iwa = SnappyStream::compress(&Archive { objects }.to_bytes()?)?;
+    let iwa = SnappyStream::compress(
+        &Archive { objects }.to_bytes(Default::default())?,
+        Default::default(),
+    )?;
     Ok(litchi_iwa_archive::package::to_bytes(
         [("Index/Document.iwa", iwa.as_slice())],
         ArchiveLimits::default(),
@@ -715,7 +720,8 @@ fn missing_rooted_sheet_refuses_without_partial_publication() -> TestResult {
         &Archive {
             objects: vec![root],
         }
-        .to_bytes()?,
+        .to_bytes(Default::default())?,
+        Default::default(),
     )?;
     let bytes = litchi_iwa_archive::package::to_bytes(
         [("Index/Document.iwa", iwa.as_slice())],
@@ -909,7 +915,7 @@ fn checked_limit_constructors_reject_only_invalid_profiles() {
 #[test]
 fn canonical_metadata_authorities_ignore_malformed_near_names() -> TestResult {
     let source = std::fs::read(fixture("numbers/basic.numbers"))?;
-    let catalog = Catalog::from_bytes(&source)?;
+    let catalog = Catalog::from_bytes(&source, Default::default())?;
     let malformed = b"not a plist";
     let mut entries = vec![
         ("A/Properties.plist", malformed.as_slice()),
@@ -1077,7 +1083,7 @@ fn metadata_duplicate_keys_refuse_and_history_version_takes_precedence() -> Test
 fn canonical_metadata_hard_limit_is_exact_before_publication() -> TestResult {
     const MAX_SIDECAR_BYTES: usize = 64 * 1024;
     let source = std::fs::read(fixture("numbers/basic.numbers"))?;
-    let catalog = Catalog::from_bytes(&source)?;
+    let catalog = Catalog::from_bytes(&source, Default::default())?;
     let prefix = b"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n\
         <!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \
         \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n\

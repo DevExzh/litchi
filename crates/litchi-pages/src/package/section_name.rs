@@ -578,11 +578,9 @@ impl Package {
             return Err(Error::PatchConflict);
         }
 
-        let candidate_source = SourceCatalog::from_shared_bytes_with_limits(
-            Arc::clone(&patch.target_bytes),
-            source.limits(),
-        )
-        .map_err(map_archive_error)?;
+        let candidate_source =
+            SourceCatalog::from_shared_bytes(Arc::clone(&patch.target_bytes), source.limits())
+                .map_err(map_archive_error)?;
         let candidate =
             Package::from_source_catalog(candidate_source).map_err(map_package_error)?;
         candidate.validate().map_err(map_package_error)?;
@@ -625,13 +623,12 @@ fn rewrite_package_name(
     let archive_limits = physical_limits
         .effective_archive_limits()
         .map_err(map_archive_error)?;
-    let stream = SnappyStream::decompress_with_limits(
+    let stream = SnappyStream::decompress(
         entry.data(),
         physical_limits.snappy_limits().map_err(map_archive_error)?,
     )
     .map_err(map_core_error)?;
-    let mut archive =
-        Archive::parse_with_limits(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
+    let mut archive = Archive::parse(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
     let object = archive
         .object(identifier.get())
         .ok_or(Error::InvalidSource)?;
@@ -657,7 +654,7 @@ fn rewrite_package_name(
     archive
         .object_mut(identifier.get())
         .ok_or(Error::InvalidSource)?
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             message_index,
             RawMessage {
                 type_: SECTION_MESSAGE_TYPE,
@@ -666,10 +663,9 @@ fn rewrite_package_name(
             archive_limits,
         )
         .map_err(map_core_error)?;
-    let rewritten_archive = archive
-        .to_bytes_with_limits(archive_limits)
-        .map_err(map_core_error)?;
-    let compressed = SnappyStream::compress(&rewritten_archive).map_err(map_core_error)?;
+    let rewritten_archive = archive.to_bytes(archive_limits).map_err(map_core_error)?;
+    let compressed =
+        SnappyStream::compress(&rewritten_archive, Default::default()).map_err(map_core_error)?;
     let output = source_catalog
         .package()
         .reassemble_to_bytes(
@@ -677,9 +673,8 @@ fn rewrite_package_name(
             physical_limits,
         )
         .map_err(map_archive_error)?;
-    let candidate_source =
-        SourceCatalog::from_shared_bytes_with_limits(output.into(), physical_limits)
-            .map_err(map_archive_error)?;
+    let candidate_source = SourceCatalog::from_shared_bytes(output.into(), physical_limits)
+        .map_err(map_archive_error)?;
     let candidate = Package::from_source_catalog(candidate_source).map_err(map_package_error)?;
     candidate.validate().map_err(map_package_error)?;
     verify_candidate(source, &candidate, position, after)?;
@@ -999,14 +994,7 @@ fn map_archive_error(archive_error: litchi_iwa_archive::Error) -> Error {
         },
         litchi_iwa_archive::Error::Allocation { amount, .. } => Error::Allocation { amount },
         litchi_iwa_archive::Error::Iwa(core_error) => map_core_error(core_error),
-        litchi_iwa_archive::Error::Io(_)
-        | litchi_iwa_archive::Error::Zip { .. }
-        | litchi_iwa_archive::Error::InvalidLimits(_)
-        | litchi_iwa_archive::Error::Encrypted
-        | litchi_iwa_archive::Error::SourceChanged { .. }
-        | litchi_iwa_archive::Error::DirectoryChanged { .. }
-        | litchi_iwa_archive::Error::Reassembly(_)
-        | litchi_iwa_archive::Error::InvalidBundle(_) => Error::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
@@ -1045,11 +1033,7 @@ fn map_core_error(core_error: litchi_iwa_core::Error) -> Error {
         litchi_iwa_core::Error::Allocation { requested, .. } => {
             Error::Allocation { amount: requested }
         },
-        litchi_iwa_core::Error::InvalidArchive { .. }
-        | litchi_iwa_core::Error::InvalidLimits { .. }
-        | litchi_iwa_core::Error::HeaderCodec { .. }
-        | litchi_iwa_core::Error::Io(_)
-        | litchi_iwa_core::Error::Snappy { .. } => Error::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
@@ -1079,8 +1063,7 @@ fn map_wire_error(wire_error: litchi_iwa_common::Error) -> Error {
             maximum: usize_to_u64(limit),
         },
         litchi_iwa_common::Error::Allocation { amount, .. } => Error::Allocation { amount },
-        litchi_iwa_common::Error::InvalidFormat(_)
-        | litchi_iwa_common::Error::InvalidLimit { .. } => Error::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 

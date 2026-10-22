@@ -1865,6 +1865,7 @@ impl Classify for litchi_ppt::package::edit::Error {
                     },
                     kind => kind.classify(),
                 },
+                _ => Class::of(Code::InternalError),
             },
             Self::Signed => Class::suggest(Code::DocumentProtected, SIGNED_SUGGESTION),
             Self::InvalidLimit { .. } => Class::of(Code::InvalidArgument),

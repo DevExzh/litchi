@@ -79,6 +79,7 @@ pub(super) fn shift_table_tile_columns(
                         type_: message_type,
                         data,
                     },
+                    Default::default(),
                 )?;
             }
             Ok(())
@@ -176,6 +177,7 @@ pub(super) fn shift_column_headers(
                 type_: message_type,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -255,6 +257,7 @@ pub(super) fn insert_column_uid(
                 type_: message_type,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -288,6 +291,7 @@ pub(super) fn set_table_column_count(
                 type_: message_type,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })

@@ -1265,7 +1265,7 @@ pub(super) fn read_owned_storage_text(
         .archive()
         .effective_archive_limits()
         .map_err(map_archive_error)?;
-    let decoded = litchi_iwa_text_wire::decode_storage_with_limits(
+    let decoded = litchi_iwa_text_wire::decode_storage(
         &message.data,
         storage_rewrite_limits(source, archive_limits.max_message_bytes())?,
     )
@@ -1291,7 +1291,7 @@ pub(super) fn owned_storage_admits_combined_splice(
         .archive()
         .effective_archive_limits()
         .map_err(map_archive_error)?;
-    let boundaries = litchi_iwa_text_wire::storage_boundaries_with_limits(
+    let boundaries = litchi_iwa_text_wire::storage_boundaries(
         &message.data,
         storage_rewrite_limits(source, archive_limits.max_message_bytes())?,
     )
@@ -1353,18 +1353,18 @@ pub(super) fn rewrite_owned_storage_text(
         if entry.is_opaque() {
             return Err(Error::InvalidSource);
         }
-        let stream = SnappyStream::decompress_with_limits(
+        let stream = SnappyStream::decompress(
             entry.data(),
             physical_limits.snappy_limits().map_err(map_archive_error)?,
         )
         .map_err(map_core_error)?;
-        let mut archive = Archive::parse_with_limits(stream.as_bytes(), archive_limits)
-            .map_err(map_core_error)?;
+        let mut archive =
+            Archive::parse(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
         validate_canonical_object_length_prefixes(stream.as_bytes(), &archive)?;
         if let Some(object) = archive.object(storage_identifier) {
             let (message_index, message) = one_message(&object.messages, STORAGE_MESSAGE_TYPE)?;
             validate_selected_storage_metadata(object, message_index)?;
-            let rewrite = litchi_iwa_text_wire::rewrite_storage_text_with_behavior_and_limits(
+            let rewrite = litchi_iwa_text_wire::rewrite_storage_text_with_behavior(
                 &message.data,
                 span.clone(),
                 replacement,
@@ -1385,7 +1385,7 @@ pub(super) fn rewrite_owned_storage_text(
             archive
                 .object_mut(storage_identifier)
                 .ok_or(Error::InvalidSource)?
-                .replace_message_preserving_header_with_limits(
+                .replace_message_preserving_header(
                     message_index,
                     RawMessage {
                         type_: STORAGE_MESSAGE_TYPE,
@@ -1406,10 +1406,9 @@ pub(super) fn rewrite_owned_storage_text(
             )
             .map_err(map_slide_preview_error)?;
         }
-        let archive_bytes = archive
-            .to_bytes_with_limits(archive_limits)
-            .map_err(map_core_error)?;
-        let compressed = SnappyStream::compress(&archive_bytes).map_err(map_core_error)?;
+        let archive_bytes = archive.to_bytes(archive_limits).map_err(map_core_error)?;
+        let compressed =
+            SnappyStream::compress(&archive_bytes, Default::default()).map_err(map_core_error)?;
         compressed_components.push((*component_name, compressed));
     }
     if !storage_changed || !node_changed {

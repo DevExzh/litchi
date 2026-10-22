@@ -279,6 +279,7 @@ pub(super) fn ensure_volatile_owner(
                 type_: CALCULATION_ENGINE_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         let references = &mut engine.archive_info.message_infos[message_index].object_references;
         for &identifier in &owner_ids {
@@ -382,6 +383,7 @@ fn append_host(
                 type_: CALCULATION_ENGINE_MESSAGE_TYPE,
                 data: engine_data,
             },
+            Default::default(),
         )?;
 
         owner
@@ -441,6 +443,7 @@ fn append_host(
                 type_: owner_message_type,
                 data: owner.encode_to_vec(),
             },
+            Default::default(),
         )?;
 
         let tile_object = archive.object_mut(tile_id).ok_or_else(|| {
@@ -470,6 +473,7 @@ fn append_host(
                 type_: CELL_RECORD_TILE_MESSAGE_TYPE,
                 data: tile.encode_to_vec(),
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -828,10 +832,11 @@ fn insert_owner(
             type_: FORMULA_OWNER_MESSAGE_TYPE,
             data: owner.encode_to_vec(),
         }],
+        Default::default(),
     )?;
     object.archive_info.message_infos[0].versions = OWNER_MESSAGE_VERSION.to_vec();
     object.archive_info.message_infos[0].object_references = tile_id.into_iter().collect();
-    Ok(archive.insert_object(object)?)
+    Ok(archive.insert_object(object, Default::default())?)
 }
 
 fn insert_tile(
@@ -845,9 +850,10 @@ fn insert_tile(
             type_: CELL_RECORD_TILE_MESSAGE_TYPE,
             data: tile.encode_to_vec(),
         }],
+        Default::default(),
     )?;
     object.archive_info.message_infos[0].versions = TILE_MESSAGE_VERSION.to_vec();
-    Ok(archive.insert_object(object)?)
+    Ok(archive.insert_object(object, Default::default())?)
 }
 
 fn checked_next_identifier(identifier: u64) -> Result<u64> {

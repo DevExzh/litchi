@@ -69,19 +69,23 @@ fn object(identifier: u64, type_: u32, data: Vec<u8>) -> TestResult<ArchiveObjec
     Ok(ArchiveObject::new(
         identifier,
         vec![RawMessage { type_, data }],
+        Default::default(),
     )?)
 }
 
 fn component(objects: Vec<ArchiveObject>) -> TestResult<Vec<u8>> {
-    Ok(SnappyStream::compress(&Archive { objects }.to_bytes()?)?)
+    Ok(SnappyStream::compress(
+        &Archive { objects }.to_bytes(Default::default())?,
+        Default::default(),
+    )?)
 }
 
 fn component_with_unknown_header(
     objects: Vec<ArchiveObject>,
     target_identifier: u64,
 ) -> TestResult<Vec<u8>> {
-    let bytes = Archive { objects }.to_bytes()?;
-    let parsed = Archive::parse(&bytes)?;
+    let bytes = Archive { objects }.to_bytes(Default::default())?;
+    let parsed = Archive::parse(&bytes, Default::default())?;
     let object = parsed
         .object(target_identifier)
         .ok_or_else(|| io::Error::other("synthetic target object is missing"))?;
@@ -102,8 +106,11 @@ fn component_with_unknown_header(
     encode_varint_into(&mut rewritten, u64::try_from(header.len())?);
     rewritten.extend_from_slice(&header);
     rewritten.extend_from_slice(&bytes[data_offset..]);
-    assert_eq!(Archive::parse(&rewritten)?.to_bytes()?, rewritten);
-    Ok(SnappyStream::compress(&rewritten)?)
+    assert_eq!(
+        Archive::parse(&rewritten, Default::default())?.to_bytes(Default::default())?,
+        rewritten
+    );
+    Ok(SnappyStream::compress(&rewritten, Default::default())?)
 }
 
 fn mixed_settings() -> TestResult<Settings> {
@@ -227,6 +234,7 @@ fn view_objects() -> TestResult<Vec<ArchiveObject>> {
                 data: b"after-rooted-view-state".to_vec(),
             },
         ],
+        Default::default(),
     )?;
     root.archive_info.message_infos[1].object_references = vec![LAYOUT_STATE_IDENTIFIER];
     let mut root_field = FieldInfo::new(vec![1]);
@@ -348,6 +356,7 @@ fn synthetic_package(
                 data: b"after-settings".to_vec(),
             },
         ],
+        Default::default(),
     )?;
     let detached_settings = object(
         DETACHED_SETTINGS_IDENTIFIER,
@@ -399,7 +408,7 @@ fn synthetic_package(
 }
 
 fn legacy_package(flat: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(flat)?;
+    let catalog = Catalog::from_bytes(flat, Default::default())?;
     let inner_entries = catalog
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
@@ -419,12 +428,12 @@ fn legacy_package(flat: &[u8]) -> TestResult<Vec<u8>> {
 }
 
 fn component_stream(package: &[u8], name: &str) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == name)
         .ok_or_else(|| io::Error::other("missing synthetic Pages component"))?;
-    Ok(SnappyStream::decompress(entry.data())?.into_bytes())
+    Ok(SnappyStream::decompress(entry.data(), Default::default())?.into_bytes())
 }
 
 fn rewrite_component(
@@ -433,10 +442,11 @@ fn rewrite_component(
     mutate: impl FnOnce(&mut Archive) -> TestResult,
 ) -> TestResult<Vec<u8>> {
     let stream = component_stream(package, component)?;
-    let mut archive = Archive::parse(&stream)?;
+    let mut archive = Archive::parse(&stream, Default::default())?;
     mutate(&mut archive)?;
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
-    let catalog = Catalog::from_bytes(package)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     Ok(
         catalog
             .reassemble_to_bytes(&[EntryEdit::new(component, &compressed)], Limits::default())?,
@@ -465,6 +475,7 @@ fn rewrite_settings_payload(
                 type_: SETTINGS_MESSAGE_TYPE,
                 data: payload,
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -476,7 +487,7 @@ fn with_overlong_object_length_prefix(
     identifier: u64,
 ) -> TestResult<Vec<u8>> {
     let mut stream = component_stream(package, component)?;
-    let archive = Archive::parse(&stream)?;
+    let archive = Archive::parse(&stream, Default::default())?;
     let object = archive
         .object(identifier)
         .ok_or_else(|| io::Error::other("missing synthetic Pages object"))?;
@@ -487,9 +498,9 @@ fn with_overlong_object_length_prefix(
     }
     stream[offset] |= 0x80;
     stream.insert(offset + 1, 0);
-    Archive::parse(&stream)?;
-    let compressed = SnappyStream::compress(&stream)?;
-    let catalog = Catalog::from_bytes(package)?;
+    Archive::parse(&stream, Default::default())?;
+    let compressed = SnappyStream::compress(&stream, Default::default())?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     Ok(
         catalog
             .reassemble_to_bytes(&[EntryEdit::new(component, &compressed)], Limits::default())?,
@@ -502,7 +513,7 @@ fn message_payload(
     identifier: u64,
     message_type: u32,
 ) -> TestResult<Vec<u8>> {
-    let archive = Archive::parse(&component_stream(package, component)?)?;
+    let archive = Archive::parse(&component_stream(package, component)?, Default::default())?;
     Ok(archive
         .object(identifier)
         .and_then(|object| {
@@ -518,7 +529,7 @@ fn message_payload(
 
 fn object_header(package: &[u8], component: &str, identifier: u64) -> TestResult<Vec<u8>> {
     let stream = component_stream(package, component)?;
-    let archive = Archive::parse(&stream)?;
+    let archive = Archive::parse(&stream, Default::default())?;
     let object = archive
         .object(identifier)
         .ok_or_else(|| io::Error::other("missing synthetic Pages object"))?;
@@ -532,7 +543,7 @@ fn object_header(package: &[u8], component: &str, identifier: u64) -> TestResult
 
 fn object_bytes(package: &[u8], component: &str, identifier: u64) -> TestResult<Vec<u8>> {
     let stream = component_stream(package, component)?;
-    let archive = Archive::parse(&stream)?;
+    let archive = Archive::parse(&stream, Default::default())?;
     let object = archive
         .object(identifier)
         .ok_or_else(|| io::Error::other("missing synthetic Pages object"))?;
@@ -547,14 +558,14 @@ fn object_bytes(package: &[u8], component: &str, identifier: u64) -> TestResult<
 }
 
 fn object_location(package: &[u8], identifier: u64) -> TestResult<(String, ArchiveObject)> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let mut found = None;
     for entry in catalog
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
     {
-        let stream = SnappyStream::decompress(entry.data())?.into_bytes();
-        let archive = Archive::parse(&stream)?;
+        let stream = SnappyStream::decompress(entry.data(), Default::default())?.into_bytes();
+        let archive = Archive::parse(&stream, Default::default())?;
         let Some(object) = archive.object(identifier) else {
             continue;
         };
@@ -597,15 +608,15 @@ fn raw_fields(payload: &[u8], number: u32) -> TestResult<Vec<Vec<u8>>> {
 }
 
 fn entry_names(package: &[u8]) -> TestResult<Vec<String>> {
-    Ok(Catalog::from_bytes(package)?
+    Ok(Catalog::from_bytes(package, Default::default())?
         .iter()
         .map(|entry| entry.name().to_owned())
         .collect())
 }
 
 fn assert_locality(before: &[u8], after: &[u8], changed_components: &[&str]) -> TestResult {
-    let before = Catalog::from_bytes(before)?;
-    let after = Catalog::from_bytes(after)?;
+    let before = Catalog::from_bytes(before, Default::default())?;
+    let after = Catalog::from_bytes(after, Default::default())?;
     for old in before.iter() {
         if PREVIEW_NAMES.contains(&old.name()) {
             assert!(after.iter().all(|entry| entry.name() != old.name()));
@@ -650,6 +661,7 @@ fn rewrite_document_payload(
                 type_: DOCUMENT_MESSAGE_TYPE,
                 data: payload,
             },
+            Default::default(),
         )?;
         Ok(())
     })
@@ -848,8 +860,10 @@ fn combined_change_is_atomic_preserves_locality_and_inverts_exactly() -> TestRes
         )?,
         source_cache
     );
-    let changed_view_archive =
-        Archive::parse(&component_stream(&changed_bytes, VIEW_STATE_MEMBER)?)?;
+    let changed_view_archive = Archive::parse(
+        &component_stream(&changed_bytes, VIEW_STATE_MEMBER)?,
+        Default::default(),
+    )?;
     let changed_view_object = changed_view_archive
         .object(VIEW_STATE_ROOT_IDENTIFIER)
         .ok_or_else(|| io::Error::other("changed rooted view state is missing"))?;
@@ -1149,6 +1163,7 @@ fn stale_rooted_cache_headers_and_no_layout_merge_diff_fail_atomically() -> Test
                 type_: VIEW_STATE_ROOT_MESSAGE_TYPE,
                 data: payload.encode_to_vec(),
             },
+            Default::default(),
         )?;
         Ok(())
     })?;
@@ -1403,7 +1418,7 @@ fn patches_reject_replay_inverse_on_source_tamper_and_competing_targets() -> Tes
         Err(SettingsError::PatchConflict)
     ));
 
-    let catalog = Catalog::from_bytes(&bytes)?;
+    let catalog = Catalog::from_bytes(&bytes, Default::default())?;
     let tampered_bytes = catalog.reassemble_to_bytes(
         &[EntryEdit::new(
             "Data/sentinel.bin",
@@ -1446,6 +1461,7 @@ fn output_limit_is_typed_and_failure_is_atomic() -> TestResult {
                     type_: DOCUMENT_MESSAGE_TYPE,
                     data: payload.encode_to_vec(),
                 },
+                Default::default(),
             )?;
             let info = &mut document.archive_info.message_infos[message];
             info.object_references
@@ -1547,7 +1563,7 @@ fn native_basic_pages_combined_change_preserves_text_and_inverts_exactly() -> Te
         .ok_or_else(|| io::Error::other("native layout-state reference is missing"))?
         .identifier;
     let source_view_info = view_root.archive_info.message_infos[view_index].clone();
-    let preview_count = Catalog::from_bytes(&bytes)?
+    let preview_count = Catalog::from_bytes(&bytes, Default::default())?
         .iter()
         .filter(|entry| PREVIEW_NAMES.contains(&entry.name()))
         .count();
@@ -1605,7 +1621,7 @@ fn native_basic_pages_combined_change_preserves_text_and_inverts_exactly() -> Te
     assert_eq!(*target_view_info, expected_view_info);
     for preview in PREVIEW_NAMES {
         assert!(
-            Catalog::from_bytes(&changed_bytes)?
+            Catalog::from_bytes(&changed_bytes, Default::default())?
                 .iter()
                 .all(|entry| entry.name() != preview)
         );

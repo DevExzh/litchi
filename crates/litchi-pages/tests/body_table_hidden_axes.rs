@@ -326,7 +326,11 @@ fn object(
     data: Vec<u8>,
     references: &[u64],
 ) -> TestResult<ArchiveObject> {
-    let mut object = ArchiveObject::new(identifier, vec![RawMessage { type_, data }])?;
+    let mut object = ArchiveObject::new(
+        identifier,
+        vec![RawMessage { type_, data }],
+        Default::default(),
+    )?;
     object.archive_info.message_infos[0]
         .object_references
         .extend_from_slice(references);
@@ -841,7 +845,8 @@ fn synthetic_package(
     }
 
     let archive = Archive { objects };
-    let component = SnappyStream::compress(&archive.to_bytes()?)?;
+    let component =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     let mut members: Vec<(&str, &[u8])> = vec![
         ("Data/sentinel.bin", b"untouched-sentinel"),
         (DOCUMENT_MEMBER, component.as_slice()),
@@ -895,12 +900,15 @@ fn metadata_uuid_entry(identifier: u64) -> tsp::ObjectUuidMapEntry {
 /// shape remains covered separately; these tests opt into a registry-bearing
 /// shape with one unrelated physical component as well.
 fn metadata_package(source: &[u8]) -> TestResult<Vec<u8>> {
-    let source_catalog = Catalog::from_bytes(source)?;
+    let source_catalog = Catalog::from_bytes(source, Default::default())?;
     let document = source_catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or("missing document member")?;
-    let archive = Archive::parse(SnappyStream::decompress(document.data())?.as_bytes())?;
+    let archive = Archive::parse(
+        SnappyStream::decompress(document.data(), Default::default())?.as_bytes(),
+        Default::default(),
+    )?;
     let mut identifiers = archive
         .objects
         .iter()
@@ -948,7 +956,8 @@ fn metadata_package(source: &[u8]) -> TestResult<Vec<u8>> {
                 &[],
             )?],
         }
-        .to_bytes()?,
+        .to_bytes(Default::default())?,
+        Default::default(),
     )?;
     let mut members = source_catalog
         .iter()
@@ -964,7 +973,8 @@ fn metadata_package(source: &[u8]) -> TestResult<Vec<u8>> {
                 &[],
             )?],
         }
-        .to_bytes()?,
+        .to_bytes(Default::default())?,
+        Default::default(),
     )?;
     members.push((UNRELATED_MEMBER.to_owned(), unrelated_component));
     members.push((METADATA_MEMBER.to_owned(), metadata_component));
@@ -1049,13 +1059,14 @@ fn explicit_zero_count_package() -> TestResult<Vec<u8>> {
 }
 
 fn document_archive(package: &[u8]) -> TestResult<Archive> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or("missing document member")?;
     Ok(Archive::parse(
-        SnappyStream::decompress(entry.data())?.as_bytes(),
+        SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+        Default::default(),
     )?)
 }
 
@@ -1115,7 +1126,7 @@ fn assert_aggregate_rewrite_preserves_unselected_source(
 }
 
 fn member_bytes(package: &[u8], name: &str) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     Ok(catalog
         .iter()
         .find(|entry| entry.name() == name)
@@ -1125,12 +1136,15 @@ fn member_bytes(package: &[u8], name: &str) -> TestResult<Vec<u8>> {
 }
 
 fn metadata_payload_from_package(package: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == METADATA_MEMBER)
         .ok_or("missing metadata member")?;
-    let archive = Archive::parse(SnappyStream::decompress(entry.data())?.as_bytes())?;
+    let archive = Archive::parse(
+        SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+        Default::default(),
+    )?;
     archive
         .object(METADATA_OBJECT_IDENTIFIER)
         .ok_or("missing metadata object")?
@@ -1151,12 +1165,15 @@ fn rewrite_metadata(
     package: &[u8],
     mutate: impl FnOnce(&mut tsp::PackageMetadata) -> TestResult<()>,
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == METADATA_MEMBER)
         .ok_or("missing metadata member")?;
-    let mut archive = Archive::parse(SnappyStream::decompress(entry.data())?.as_bytes())?;
+    let mut archive = Archive::parse(
+        SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+        Default::default(),
+    )?;
     let metadata_object = archive
         .object_mut(METADATA_OBJECT_IDENTIFIER)
         .ok_or("missing metadata object")?;
@@ -1174,8 +1191,10 @@ fn rewrite_metadata(
             type_: METADATA_MESSAGE_TYPE,
             data: metadata.encode_to_vec(),
         },
+        Default::default(),
     )?;
-    let component = SnappyStream::compress(&archive.to_bytes()?)?;
+    let component =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(METADATA_MEMBER, component.as_slice())],
         Limits::default(),
@@ -1260,18 +1279,21 @@ fn metadata_watermark_near_max(package: &[u8]) -> TestResult<Vec<u8>> {
 
 fn metadata_physical_id_collision(package: &[u8]) -> TestResult<Vec<u8>> {
     rewrite_document_archive(package, |archive| {
-        archive.insert_object(object(
-            METADATA_OBJECT_IDENTIFIER,
-            FILTER_SET_MESSAGE_TYPE,
-            filter_set_payload()?,
-            &[],
-        )?)?;
+        archive.insert_object(
+            object(
+                METADATA_OBJECT_IDENTIFIER,
+                FILTER_SET_MESSAGE_TYPE,
+                filter_set_payload()?,
+                &[],
+            )?,
+            Default::default(),
+        )?;
         Ok(())
     })
 }
 
 fn metadata_misrouted_member(package: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let metadata = catalog
         .iter()
         .find(|entry| entry.name() == METADATA_MEMBER)
@@ -1298,12 +1320,15 @@ fn metadata_misrouted_member(package: &[u8]) -> TestResult<Vec<u8>> {
 }
 
 fn append_metadata_unknown(package: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == METADATA_MEMBER)
         .ok_or("missing metadata member")?;
-    let mut archive = Archive::parse(SnappyStream::decompress(entry.data())?.as_bytes())?;
+    let mut archive = Archive::parse(
+        SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+        Default::default(),
+    )?;
     let metadata_object = archive
         .object_mut(METADATA_OBJECT_IDENTIFIER)
         .ok_or("missing metadata object")?;
@@ -1320,8 +1345,10 @@ fn append_metadata_unknown(package: &[u8]) -> TestResult<Vec<u8>> {
             type_: METADATA_MESSAGE_TYPE,
             data: payload,
         },
+        Default::default(),
     )?;
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(METADATA_MEMBER, compressed.as_slice())],
         Limits::default(),
@@ -1332,14 +1359,18 @@ fn rewrite_document_archive(
     package: &[u8],
     mutate: impl FnOnce(&mut Archive) -> TestResult<()>,
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or("missing document member")?;
-    let mut archive = Archive::parse(SnappyStream::decompress(entry.data())?.as_bytes())?;
+    let mut archive = Archive::parse(
+        SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+        Default::default(),
+    )?;
     mutate(&mut archive)?;
-    let component = SnappyStream::compress(&archive.to_bytes()?)?;
+    let component =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(DOCUMENT_MEMBER, &component)],
         Limits::default(),
@@ -1347,13 +1378,13 @@ fn rewrite_document_archive(
 }
 
 fn object_header_bytes(package: &[u8], identifier: u64) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or("missing document member")?;
-    let decompressed = SnappyStream::decompress(entry.data())?.into_bytes();
-    let archive = Archive::parse(&decompressed)?;
+    let decompressed = SnappyStream::decompress(entry.data(), Default::default())?.into_bytes();
+    let archive = Archive::parse(&decompressed, Default::default())?;
     let object = archive
         .object(identifier)
         .ok_or_else(|| format!("missing object {identifier}"))?;
@@ -1377,13 +1408,13 @@ fn rewrite_raw_object_header(
     identifier: u64,
     mutate: impl FnOnce(&[u8]) -> TestResult<Vec<u8>>,
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or("missing document member")?;
-    let decompressed = SnappyStream::decompress(entry.data())?.into_bytes();
-    let archive = Archive::parse(&decompressed)?;
+    let decompressed = SnappyStream::decompress(entry.data(), Default::default())?.into_bytes();
+    let archive = Archive::parse(&decompressed, Default::default())?;
     let object = archive
         .object(identifier)
         .ok_or_else(|| format!("missing object {identifier}"))?;
@@ -1417,7 +1448,7 @@ fn rewrite_raw_object_header(
             .get(header_end..)
             .ok_or("object payload is truncated")?,
     );
-    let component = SnappyStream::compress(&rewritten)?;
+    let component = SnappyStream::compress(&rewritten, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(DOCUMENT_MEMBER, &component)],
         Limits::default(),
@@ -1497,13 +1528,13 @@ fn rewrite_native_archive(
     package: &[u8],
     mutate: impl FnOnce(&mut Archive) -> TestResult<()>,
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry_name = catalog
         .iter()
         .find(|entry| {
-            SnappyStream::decompress(entry.data())
+            SnappyStream::decompress(entry.data(), Default::default())
                 .ok()
-                .and_then(|bytes| Archive::parse(bytes.as_bytes()).ok())
+                .and_then(|bytes| Archive::parse(bytes.as_bytes(), Default::default()).ok())
                 .is_some_and(|archive| archive.object(NATIVE_TABLE_MODEL_IDENTIFIER).is_some())
         })
         .map(|entry| entry.name().to_owned())
@@ -1512,10 +1543,11 @@ fn rewrite_native_archive(
         .iter()
         .find(|entry| entry.name() == entry_name)
         .ok_or("missing native table-model archive")?;
-    let decompressed = SnappyStream::decompress(entry.data())?.into_bytes();
-    let mut archive = Archive::parse(&decompressed)?;
+    let decompressed = SnappyStream::decompress(entry.data(), Default::default())?.into_bytes();
+    let mut archive = Archive::parse(&decompressed, Default::default())?;
     mutate(&mut archive)?;
-    let component = SnappyStream::compress(&archive.to_bytes()?)?;
+    let component =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(&entry_name, &component)],
         Limits::default(),
@@ -1527,7 +1559,7 @@ fn rewrite_native_archive(
 /// in Document.  This is deliberately a physical move, not a metadata-only
 /// alias, so the focused owner must prove the package-wide dependency route.
 fn move_formula_owner_to_calculation_engine(package: &[u8], index: usize) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     if catalog
         .iter()
         .any(|entry| entry.name() == CALCULATION_ENGINE_MEMBER)
@@ -1538,7 +1570,10 @@ fn move_formula_owner_to_calculation_engine(package: &[u8], index: usize) -> Tes
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or("missing document member")?;
-    let mut document = Archive::parse(SnappyStream::decompress(document_entry.data())?.as_bytes())?;
+    let mut document = Archive::parse(
+        SnappyStream::decompress(document_entry.data(), Default::default())?.as_bytes(),
+        Default::default(),
+    )?;
     let owner_identifier = table_formula_owner(index);
     let owner_position = document
         .objects
@@ -1588,9 +1623,11 @@ fn move_formula_owner_to_calculation_engine(package: &[u8], index: usize) -> Tes
         &Archive {
             objects: vec![engine, owner],
         }
-        .to_bytes()?,
+        .to_bytes(Default::default())?,
+        Default::default(),
     )?;
-    let document = SnappyStream::compress(&document.to_bytes()?)?;
+    let document =
+        SnappyStream::compress(&document.to_bytes(Default::default())?, Default::default())?;
 
     let mut members = catalog
         .iter()
@@ -1617,12 +1654,15 @@ fn clear_calculation_engine_formula_owner_metadata(
     package: &[u8],
     index: usize,
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == CALCULATION_ENGINE_MEMBER)
         .ok_or("missing calculation-engine member")?;
-    let mut archive = Archive::parse(SnappyStream::decompress(entry.data())?.as_bytes())?;
+    let mut archive = Archive::parse(
+        SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+        Default::default(),
+    )?;
     let owner = archive
         .object_mut(table_formula_owner(index))
         .ok_or("missing calculation-engine formula-owner object")?;
@@ -1639,7 +1679,8 @@ fn clear_calculation_engine_formula_owner_metadata(
     metadata.object_references.clear();
     metadata.data_references.clear();
     metadata.field_infos.clear();
-    let component = SnappyStream::compress(&archive.to_bytes()?)?;
+    let component =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(CALCULATION_ENGINE_MEMBER, &component)],
         Limits::default(),
@@ -1651,12 +1692,15 @@ fn rewrite_calculation_engine_archive(
     index: usize,
     mutate: impl FnOnce(&mut ArchiveObject, &mut tsce::CalculationEngineArchive) -> TestResult<()>,
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == CALCULATION_ENGINE_MEMBER)
         .ok_or("missing calculation-engine member")?;
-    let mut archive = Archive::parse(SnappyStream::decompress(entry.data())?.as_bytes())?;
+    let mut archive = Archive::parse(
+        SnappyStream::decompress(entry.data(), Default::default())?.as_bytes(),
+        Default::default(),
+    )?;
     let engine = archive
         .object_mut(
             CALCULATION_ENGINE_OBJECT_BASE
@@ -1673,7 +1717,8 @@ fn rewrite_calculation_engine_archive(
         tsce::CalculationEngineArchive::decode(engine.messages[message_index].data.as_slice())?;
     mutate(engine, &mut decoded)?;
     engine.messages[message_index].data = decoded.encode_to_vec();
-    let component = SnappyStream::compress(&archive.to_bytes()?)?;
+    let component =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(CALCULATION_ENGINE_MEMBER, &component)],
         Limits::default(),
@@ -1930,10 +1975,13 @@ fn append_duplicate_model_message(package: &[u8], index: usize) -> TestResult<Ve
             .ok_or("missing table-model message")?
             .data
             .clone();
-        model.push_message(RawMessage {
-            type_: TABLE_MODEL_MESSAGE_TYPE,
-            data: payload,
-        })?;
+        model.push_message(
+            RawMessage {
+                type_: TABLE_MODEL_MESSAGE_TYPE,
+                data: payload,
+            },
+            Default::default(),
+        )?;
         Ok(())
     })
 }
@@ -1950,10 +1998,13 @@ fn append_duplicate_info_message(package: &[u8], index: usize) -> TestResult<Vec
             .ok_or("missing table-info message")?
             .data
             .clone();
-        info.push_message(RawMessage {
-            type_: TABLE_INFO_MESSAGE_TYPE,
-            data: payload,
-        })?;
+        info.push_message(
+            RawMessage {
+                type_: TABLE_INFO_MESSAGE_TYPE,
+                data: payload,
+            },
+            Default::default(),
+        )?;
         Ok(())
     })
 }
@@ -2009,7 +2060,7 @@ fn append_duplicate_formula_owner(package: &[u8], index: usize) -> TestResult<Ve
             .clone();
         let mut duplicate = owner;
         duplicate.archive_info.identifier = Some(table_formula_owner(index) + 10_000);
-        archive.insert_object(duplicate)?;
+        archive.insert_object(duplicate, Default::default())?;
         Ok(())
     })
 }
@@ -3450,7 +3501,7 @@ fn rewrite_is_local_to_selected_table_and_invalidates_only_root_previews() -> Te
             "unselected object {identifier} or its archive metadata changed"
         );
     }
-    let catalog = Catalog::from_bytes(&target)?;
+    let catalog = Catalog::from_bytes(&target, Default::default())?;
     for preview in PREVIEWS {
         assert!(catalog.iter().all(|entry| entry.name() != preview));
     }
@@ -3558,7 +3609,8 @@ fn output_and_wire_limits_reject_before_publication() -> TestResult {
         .set(requested.clone())
         .commit()?;
     assert_eq!(partial_commit.diagnostics().deleted_previews(), 1);
-    let partial_catalog = Catalog::from_bytes(&partial_commit.package().exact_bytes())?;
+    let partial_catalog =
+        Catalog::from_bytes(&partial_commit.package().exact_bytes(), Default::default())?;
     assert!(
         partial_catalog
             .iter()
@@ -4649,18 +4701,18 @@ fn native_object_message_payload(
     identifier: u64,
     type_: u32,
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| {
-            SnappyStream::decompress(entry.data())
+            SnappyStream::decompress(entry.data(), Default::default())
                 .ok()
-                .and_then(|bytes| Archive::parse(bytes.as_bytes()).ok())
+                .and_then(|bytes| Archive::parse(bytes.as_bytes(), Default::default()).ok())
                 .is_some_and(|archive| archive.object(identifier).is_some())
         })
         .ok_or_else(|| format!("missing native object archive for {identifier}"))?;
-    let decompressed = SnappyStream::decompress(entry.data())?.into_bytes();
-    let archive = Archive::parse(&decompressed)?;
+    let decompressed = SnappyStream::decompress(entry.data(), Default::default())?.into_bytes();
+    let archive = Archive::parse(&decompressed, Default::default())?;
     Ok(archive
         .object(identifier)
         .ok_or_else(|| format!("missing native object {identifier}"))?
@@ -4797,7 +4849,7 @@ fn without_previews(package: &[u8]) -> TestResult<Vec<u8>> {
 
 fn without_preview_subset(package: &[u8], previews: &[&str]) -> TestResult<Vec<u8>> {
     Ok(
-        Catalog::from_bytes(package)?.reassemble_with_deletions_to_bytes(
+        Catalog::from_bytes(package, Default::default())?.reassemble_with_deletions_to_bytes(
             &[],
             previews,
             Limits::default(),
@@ -5476,7 +5528,7 @@ fn metadata_bearing_ownerless_creation_round_trips_rows_columns_and_both() -> Te
             member_bytes(&target, UNRELATED_MEMBER)?,
             source_other_archive
         );
-        let target_catalog = Catalog::from_bytes(&target)?;
+        let target_catalog = Catalog::from_bytes(&target, Default::default())?;
         for preview in PREVIEWS {
             assert!(target_catalog.iter().all(|entry| entry.name() != preview));
         }
@@ -5812,7 +5864,7 @@ fn set_clear_reset_and_noop_preserve_exact_source_and_presence() -> TestResult {
     assert!(replay_again.patch().is_noop());
     assert_eq!(replay_again.package().exact_bytes(), source);
 
-    let tampered_source = Catalog::from_bytes(&source)?.reassemble_to_bytes(
+    let tampered_source = Catalog::from_bytes(&source, Default::default())?.reassemble_to_bytes(
         &[EntryEdit::new("Data/sentinel.bin", b"tampered-noop")],
         Limits::default(),
     )?;
@@ -5898,7 +5950,7 @@ fn changed_axes_have_exact_apply_inverse_and_conflict_fences() -> TestResult {
         commit.patch().before().clone()
     );
 
-    let tampered_source = Catalog::from_bytes(&source)?.reassemble_to_bytes(
+    let tampered_source = Catalog::from_bytes(&source, Default::default())?.reassemble_to_bytes(
         &[EntryEdit::new("Data/sentinel.bin", b"tampered")],
         Limits::default(),
     )?;
@@ -5907,10 +5959,11 @@ fn changed_axes_have_exact_apply_inverse_and_conflict_fences() -> TestResult {
         tampered.apply_body_table_hidden_axes(commit.patch()),
         Err(Error::PatchConflict)
     ));
-    let tampered_target_source = Catalog::from_bytes(&target)?.reassemble_to_bytes(
-        &[EntryEdit::new("Data/sentinel.bin", b"tampered-target")],
-        Limits::default(),
-    )?;
+    let tampered_target_source = Catalog::from_bytes(&target, Default::default())?
+        .reassemble_to_bytes(
+            &[EntryEdit::new("Data/sentinel.bin", b"tampered-target")],
+            Limits::default(),
+        )?;
     let tampered_target = Package::from_bytes(&tampered_target_source)?;
     assert!(matches!(
         tampered_target.apply_body_table_hidden_axes(&commit.patch().inverse()),

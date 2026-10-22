@@ -154,7 +154,7 @@ fn object_message<'a>(
 }
 
 fn slide_references(bytes: &[u8]) -> TestResult<SlideReferences> {
-    let catalog = SourceCatalog::from_bytes(bytes)?;
+    let catalog = SourceCatalog::from_bytes(bytes, Default::default())?;
     let slide = kn::SlideArchive::decode(object_message(
         &catalog,
         SLIDE_MEMBER,
@@ -189,7 +189,7 @@ fn slide_references(bytes: &[u8]) -> TestResult<SlideReferences> {
 }
 
 fn metadata_payload(bytes: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = SourceCatalog::from_bytes(bytes)?;
+    let catalog = SourceCatalog::from_bytes(bytes, Default::default())?;
     let component = catalog.components().get(METADATA_MEMBER).ok_or_else(|| {
         io::Error::other(format!(
             "component {METADATA_MEMBER} is missing from the package"
@@ -230,7 +230,7 @@ fn metadata_facts(bytes: &[u8]) -> TestResult<MetadataFacts> {
 }
 
 fn snapshot(bytes: &[u8], editor: &keynote::Draft) -> TestResult<SlideSnapshot> {
-    let catalog = SourceCatalog::from_bytes(bytes)?;
+    let catalog = SourceCatalog::from_bytes(bytes, Default::default())?;
     let slide = editor
         .slides()?
         .into_iter()
@@ -276,7 +276,7 @@ fn assert_roots_present(
     references: SlideReferences,
     snapshot: &SlideSnapshot,
 ) -> TestResult {
-    let catalog = SourceCatalog::from_bytes(bytes)?;
+    let catalog = SourceCatalog::from_bytes(bytes, Default::default())?;
     let object_ids = catalog
         .components()
         .iter()

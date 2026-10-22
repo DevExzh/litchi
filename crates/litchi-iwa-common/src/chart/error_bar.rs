@@ -27,6 +27,7 @@ pub const MAX_CUSTOM_VALUES_PER_SIDE: usize = 1_000_000;
 
 /// Validation failures for chart error-bar values.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
+#[non_exhaustive]
 pub enum Error {
     /// A fixed error magnitude was NaN or infinite.
     #[error("chart fixed error-bar value must be finite")]

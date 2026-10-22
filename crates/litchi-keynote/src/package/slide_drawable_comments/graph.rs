@@ -19,8 +19,8 @@ use std::sync::Arc;
 use litchi_core::Position;
 use litchi_iwa_common::{WireLimits, wire::WireView};
 use litchi_iwa_core::{
-    ArchiveLimits, ArchiveObject, ArchiveReferenceKind, ArchiveReferenceOccurrence,
-    ArchiveReferencePolicy, ArchiveReferenceVisitor, MessageInfo,
+    ArchiveObject, ArchiveReferenceKind, ArchiveReferenceOccurrence, ArchiveReferencePolicy,
+    ArchiveReferenceVisitor, Limits as ArchiveLimits, MessageInfo,
 };
 use litchi_iwa_protos::{annotation_author_codec, comment_storage_codec};
 
@@ -582,7 +582,7 @@ fn census_core_header_root_reference(
         found: false,
     };
     let observed = object
-        .inspect_references_with_policy_and_limits(
+        .inspect_references_with_policy(
             &mut visitor,
             ArchiveReferencePolicy::RejectUnknownMetadata,
             archive_limits,

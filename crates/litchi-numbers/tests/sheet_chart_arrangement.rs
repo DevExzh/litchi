@@ -46,8 +46,8 @@ fn commit_arrangement(
 }
 
 fn assert_locality(source: &[u8], target: &[u8]) -> TestResult {
-    let before = Catalog::from_bytes(source)?;
-    let after = Catalog::from_bytes(target)?;
+    let before = Catalog::from_bytes(source, Default::default())?;
+    let after = Catalog::from_bytes(target, Default::default())?;
     let mut changed = Vec::new();
     for entry in before.iter() {
         let candidate = after
@@ -301,7 +301,7 @@ fn chart_arrangement_fixture_has_cross_component_profile_and_untouched_assets() 
         )?
         .is_empty()
     );
-    let catalog = Catalog::from_bytes(&source)?;
+    let catalog = Catalog::from_bytes(&source, Default::default())?;
     for member in [
         DOCUMENT_MEMBER,
         CALCULATION_MEMBER,

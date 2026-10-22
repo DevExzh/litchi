@@ -151,6 +151,7 @@ pub(crate) fn insert_private_style(
                 type_: STYLESHEET_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         let info = &mut object.archive_info.message_infos[*index];
         if info.object_references.contains(&style_id) {
@@ -159,7 +160,7 @@ pub(crate) fn insert_private_style(
             )));
         }
         info.object_references.push(style_id);
-        archive.insert_object(style)?;
+        archive.insert_object(style, Default::default())?;
         Ok(())
     })
 }
@@ -199,6 +200,7 @@ mod tests {
                         type_: 99,
                         data: vec![0],
                     }],
+                    Default::default(),
                 )
                 .unwrap(),
             ],

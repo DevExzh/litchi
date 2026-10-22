@@ -280,7 +280,7 @@ fn assert_member_unchanged(before: &[u8], after: Option<&[u8]>, name: &str) {
 }
 
 fn member(source: &[u8], name: &str) -> Option<Vec<u8>> {
-    Catalog::from_bytes(source)
+    Catalog::from_bytes(source, Default::default())
         .ok()?
         .iter()
         .find(|entry| entry.name() == name)

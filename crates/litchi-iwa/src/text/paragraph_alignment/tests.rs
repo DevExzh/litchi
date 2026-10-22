@@ -4452,6 +4452,7 @@ fn multiple_paragraph_boundaries_are_rejected_transactionally() {
                         type_: message_type,
                         data: text_storage.encode_to_vec(),
                     },
+                    Default::default(),
                 )
                 .unwrap();
             Ok(())
@@ -4611,13 +4612,13 @@ fn paragraph_style_mutations_use_the_resolved_storage_with_a_2022_style_sibling(
     .encode_to_vec();
     package
         .update_archive(&location.wire.archive_name, |archive| {
-            archive
-                .object_mut(storage_id.get())
-                .unwrap()
-                .push_message(RawMessage {
+            archive.object_mut(storage_id.get()).unwrap().push_message(
+                RawMessage {
                     type_: 2_022,
                     data: style_data.clone(),
-                })?;
+                },
+                Default::default(),
+            )?;
             Ok(())
         })
         .unwrap();
@@ -4675,6 +4676,7 @@ fn paragraph_style_anchor_rejects_a_stale_message_type_transactionally() {
                     type_: 99_999,
                     data: original.data,
                 },
+                Default::default(),
             )?;
             Ok(())
         })
@@ -4761,6 +4763,7 @@ fn paragraph_style_mutation_uses_exact_native_style_anchor_with_sibling_payload(
                     type_: 99_999,
                     data: style_after.message.data.clone(),
                 },
+                Default::default(),
             )?;
             Ok(())
         })
@@ -4772,6 +4775,7 @@ fn paragraph_style_mutation_uses_exact_native_style_anchor_with_sibling_payload(
             type_: style_after.message_type,
             data: style_after.message.data.clone(),
         }],
+        Default::default(),
     )
     .unwrap();
     assert!(
@@ -4864,6 +4868,7 @@ fn named_paragraph_style_rename_uses_exact_native_anchor_with_sibling_payload() 
                     type_: 99_999,
                     data: style_after.message.data.clone(),
                 },
+                Default::default(),
             )?;
             Ok(())
         })

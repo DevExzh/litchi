@@ -1362,6 +1362,7 @@ fn insert_style_entry(
                 type_: message_type,
                 data,
             },
+            Default::default(),
         )?;
         storage::add_message_object_reference(object, index, style_id, style_id);
         Ok(())

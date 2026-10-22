@@ -66,12 +66,13 @@ fn exact_bytes(package: &Package) -> TestResult<Vec<u8>> {
 }
 
 fn native_archives(source: &[u8]) -> TestResult<Vec<Archive>> {
-    Catalog::from_bytes(source)?
+    Catalog::from_bytes(source, Default::default())?
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
         .map(|entry| {
             Ok(Archive::parse(
-                &SnappyStream::decompress(entry.data())?.into_bytes(),
+                &SnappyStream::decompress(entry.data(), Default::default())?.into_bytes(),
+                Default::default(),
             )?)
         })
         .collect()

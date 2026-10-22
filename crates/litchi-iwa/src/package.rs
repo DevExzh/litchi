@@ -5,7 +5,7 @@ use std::io::{Read, Write};
 use std::path::{Component, Path};
 use std::sync::Arc;
 
-use crate::archive::{Archive, ArchiveLimits as IwaArchiveLimits};
+use crate::archive::{Archive, Limits as IwaArchiveLimits};
 #[cfg(test)]
 use crate::archive::{CoreError, CoreLimitKind};
 use crate::snappy::{SnappyLimits, SnappyStream};
@@ -341,6 +341,11 @@ impl PackageLimits {
             max_stream_bytes.min(SnappyStream::MAX_UNCOMPRESSED_CHUNK),
             max_stream_bytes,
         )
+        .and_then(|limits| {
+            limits.with_compressed_stream_bytes(
+                usize::try_from(self.max_entry_bytes).unwrap_or(usize::MAX),
+            )
+        })
         .map_err(|error| Error::Snappy(error.to_string()))
     }
 
@@ -530,7 +535,7 @@ impl Package {
         source: &dyn ReadAt,
         limits: PackageLimits,
     ) -> Result<Self> {
-        let catalog = litchi_iwa_archive::package::Catalog::from_read_at_with_limits(
+        let catalog = litchi_iwa_archive::package::Catalog::from_read_at(
             source,
             limits.physical_archive_limits()?,
         )?;
@@ -558,7 +563,7 @@ impl Package {
             Error::InvalidFormat("iWork package input length does not fit u64".to_owned())
         })?;
         limits.check_input_size(input_size, "iWork package input")?;
-        let catalog = litchi_iwa_archive::package::Catalog::from_shared_bytes_with_limits(
+        let catalog = litchi_iwa_archive::package::Catalog::from_shared_bytes(
             Arc::clone(&source),
             limits.physical_archive_limits()?,
         )?;
@@ -868,10 +873,9 @@ impl Package {
                 "package entry {normalized} is a legacy operation log, not an IWA object archive"
             )));
         }
-        let stream =
-            SnappyStream::decompress_with_limits(compressed, self.limits.snappy_limits()?)?;
+        let stream = SnappyStream::decompress(compressed, self.limits.snappy_limits()?)?;
         let weight = stream.as_bytes().len().max(1);
-        let archive = Archive::parse_with_limits(stream.as_bytes(), archive_limits)?;
+        let archive = Archive::parse(stream.as_bytes(), archive_limits)?;
         Ok((archive, weight))
     }
 
@@ -888,9 +892,9 @@ impl Package {
                 "Package entry {normalized} is not an IWA component"
             )));
         }
-        let data = archive.to_bytes_with_limits(self.limits.effective_archive_limits()?)?;
+        let data = archive.to_bytes(self.limits.effective_archive_limits()?)?;
         self.limits.check_iwa_stream_size(data.len())?;
-        let compressed = SnappyStream::compress(&data)?;
+        let compressed = SnappyStream::compress(&data, self.limits.snappy_limits()?)?;
         // Preserve the existing mutation validation boundary even when the
         // replacement turns out to be an exact no-op.
         self.validate_state()?;
@@ -939,9 +943,9 @@ impl Package {
             .state
             .position(before)
             .ok_or_else(|| Error::Bundle(format!("IWA insertion anchor not found: {before}")))?;
-        let data = archive.to_bytes_with_limits(self.limits.effective_archive_limits()?)?;
+        let data = archive.to_bytes(self.limits.effective_archive_limits()?)?;
         self.limits.check_iwa_stream_size(data.len())?;
-        let compressed = SnappyStream::compress(&data)?;
+        let compressed = SnappyStream::compress(&data, self.limits.snappy_limits()?)?;
         self.validate_entry_update(None, &compressed)?;
         let state = Arc::make_mut(&mut self.state);
         state
@@ -959,7 +963,7 @@ impl Package {
     {
         let mut archive = self.archive(name)?;
         update(&mut archive)?;
-        archive.validate_with_limits(self.limits.effective_archive_limits()?)?;
+        archive.validate(self.limits.effective_archive_limits()?)?;
         self.replace_archive(name, &archive)?;
         Ok(())
     }
@@ -1111,11 +1115,9 @@ impl Package {
     fn reassembled_source(&self, name: &str, data: &[u8]) -> Option<Arc<[u8]>> {
         let source = self.source.as_ref()?;
         let limits = self.limits.physical_archive_limits().ok()?;
-        let catalog = litchi_iwa_archive::package::Catalog::from_shared_bytes_with_limits(
-            Arc::clone(source),
-            limits,
-        )
-        .ok()?;
+        let catalog =
+            litchi_iwa_archive::package::Catalog::from_shared_bytes(Arc::clone(source), limits)
+                .ok()?;
         let bytes = catalog
             .reassemble_to_bytes(
                 &[litchi_iwa_archive::package::EntryEdit::new(name, data)],
@@ -1325,6 +1327,7 @@ mod tests {
                         type_: 99,
                         data: vec![1, 2, 3],
                     }],
+                    Default::default(),
                 )
                 .unwrap(),
             ],
@@ -1340,6 +1343,7 @@ mod tests {
                     type_: 100,
                     data: vec![4, 5, 6],
                 }],
+                Default::default(),
             )
             .unwrap(),
         );
@@ -1355,7 +1359,7 @@ mod tests {
     }
 
     fn physical_entries(bytes: &[u8]) -> Vec<(String, Vec<u8>)> {
-        litchi_iwa_archive::package::Catalog::from_bytes(bytes)
+        litchi_iwa_archive::package::Catalog::from_bytes(bytes, Default::default())
             .unwrap()
             .into_iter()
             .map(litchi_iwa_archive::package::Entry::into_parts)
@@ -1363,7 +1367,11 @@ mod tests {
     }
 
     fn legacy_package() -> Vec<u8> {
-        let compressed = SnappyStream::compress(&archive().to_bytes().unwrap()).unwrap();
+        let compressed = SnappyStream::compress(
+            &archive().to_bytes(Default::default()).unwrap(),
+            Default::default(),
+        )
+        .unwrap();
         let index = zip(&[("Index/Document.iwa", &compressed)]);
         zip(&[
             ("mac.numbers/preview.jpg", b"preview"),
@@ -1437,7 +1445,8 @@ mod tests {
 
     #[test]
     fn replacing_an_archive_preserves_flat_source_physical_records() -> crate::Result<()> {
-        let compressed = SnappyStream::compress(&archive().to_bytes()?)?;
+        let compressed =
+            SnappyStream::compress(&archive().to_bytes(Default::default())?, Default::default())?;
         let mut source = zip(&[
             ("Index/Document.iwa", &compressed),
             ("preview.jpg", b"preview"),
@@ -1448,7 +1457,8 @@ mod tests {
             .copy_from_slice(&(comment.len() as u16).to_le_bytes());
         source.extend_from_slice(comment);
 
-        let before_catalog = litchi_iwa_archive::package::Catalog::from_bytes(&source)?;
+        let before_catalog =
+            litchi_iwa_archive::package::Catalog::from_bytes(&source, Default::default())?;
         let before_preview = before_catalog
             .iter()
             .find(|entry| entry.name() == "preview.jpg")
@@ -1461,7 +1471,8 @@ mod tests {
 
         let output = package.to_bytes()?;
         assert!(output.ends_with(comment));
-        let after_catalog = litchi_iwa_archive::package::Catalog::from_bytes(&output)?;
+        let after_catalog =
+            litchi_iwa_archive::package::Catalog::from_bytes(&output, Default::default())?;
         let after_preview = after_catalog
             .iter()
             .find(|entry| entry.name() == "preview.jpg")
@@ -1480,7 +1491,8 @@ mod tests {
 
     #[test]
     fn shared_component_catalog_retains_cache_identity_and_original_limits() -> crate::Result<()> {
-        let compressed = SnappyStream::compress(&archive().to_bytes()?)?;
+        let compressed =
+            SnappyStream::compress(&archive().to_bytes(Default::default())?, Default::default())?;
         let source = zip(&[("Index/Document.iwa", &compressed)]);
         let profile = PackageLimits::new_with_limits(8_192, 2, 1_024, 4_096, 2_048)?;
         let package = Package::from_bytes_with_limits(&source, profile)?;
@@ -1523,7 +1535,8 @@ mod tests {
 
     #[test]
     fn identical_archive_replacement_is_an_exact_source_noop() -> crate::Result<()> {
-        let compressed = SnappyStream::compress(&archive().to_bytes()?)?;
+        let compressed =
+            SnappyStream::compress(&archive().to_bytes(Default::default())?, Default::default())?;
         let source = zip(&[
             ("Index/Document.iwa", &compressed),
             ("preview.jpg", b"preview"),
@@ -1543,7 +1556,8 @@ mod tests {
     #[test]
     fn identical_entry_replacement_preserves_state_source_revision_and_cache() -> crate::Result<()>
     {
-        let compressed = SnappyStream::compress(&archive().to_bytes()?)?;
+        let compressed =
+            SnappyStream::compress(&archive().to_bytes(Default::default())?, Default::default())?;
         let source: Arc<[u8]> = zip(&[
             ("Index/Document.iwa", &compressed),
             ("preview.jpg", b"preview"),
@@ -1573,7 +1587,10 @@ mod tests {
         let mut changed = package.clone();
         let changed_state = Arc::clone(&changed.state);
         let changed_revision = changed.mutation_revision();
-        let replacement = SnappyStream::compress(&archive_with_two_objects().to_bytes()?)?;
+        let replacement = SnappyStream::compress(
+            &archive_with_two_objects().to_bytes(Default::default())?,
+            Default::default(),
+        )?;
         assert_eq!(
             changed.insert_entry("Index/Document.iwa", replacement.clone())?,
             Some(compressed)
@@ -1723,10 +1740,40 @@ mod tests {
     }
 
     #[test]
+    fn compressed_entry_limits_reach_archive_writes_without_mutation() -> crate::Result<()> {
+        for maximum in [1, 4] {
+            let limits = PackageLimits::new(10, maximum, 1_000)?;
+            let source = zip(&[("Index/Document.iwa", &[]), ("anchor", &[])]);
+            let mut package = Package::from_bytes_with_limits(&source, limits)?;
+            let empty = Archive::new();
+            package.replace_archive("Index/Document.iwa", &empty)?;
+            let before = package.to_bytes()?;
+            for error in [
+                package
+                    .replace_archive("Index/Document.iwa", &archive())
+                    .unwrap_err(),
+                package
+                    .insert_archive_before("Index/Other.iwa", &archive(), "anchor")
+                    .unwrap_err(),
+            ] {
+                assert!(
+                    matches!(error, Error::IwaCore(core) if matches!(core.as_ref(),
+                    CoreError::Limit { kind: CoreLimitKind::SnappyCompressedStreamBytes, maximum: observed, .. }
+                    if *observed as u64 == maximum))
+                );
+            }
+            assert_eq!(package.to_bytes()?, before);
+            assert_eq!(package.entry("Index/Document.iwa"), Some([].as_slice()));
+            assert!(!package.contains_entry("Index/Other.iwa"));
+        }
+        Ok(())
+    }
+
+    #[test]
     fn package_limits_bound_file_input_and_lazy_iwa_decompression() {
-        let decompressed = archive().to_bytes().unwrap();
+        let decompressed = archive().to_bytes(Default::default()).unwrap();
         assert!(decompressed.len() > 8);
-        let compressed = SnappyStream::compress(&decompressed).unwrap();
+        let compressed = SnappyStream::compress(&decompressed, Default::default()).unwrap();
         let bytes = zip(&[("Index/Document.iwa", &compressed)]);
 
         let input_limits = PackageLimits::new(
@@ -1777,8 +1824,8 @@ mod tests {
     #[test]
     fn custom_archive_limits_reach_lazy_parse_before_payload_allocation() -> crate::Result<()> {
         let source = archive_with_two_objects();
-        let decompressed = source.to_bytes()?;
-        let compressed = SnappyStream::compress(&decompressed)?;
+        let decompressed = source.to_bytes(Default::default())?;
+        let compressed = SnappyStream::compress(&decompressed, Default::default())?;
         let bytes = zip(&[("Index/Document.iwa", &compressed)]);
 
         let archive_limits = IwaArchiveLimits::default().with_objects(1)?;
@@ -1871,7 +1918,11 @@ mod tests {
 
     #[test]
     fn package_limits_apply_to_legacy_nested_index_zip() {
-        let compressed = SnappyStream::compress(&archive().to_bytes().unwrap()).unwrap();
+        let compressed = SnappyStream::compress(
+            &archive().to_bytes(Default::default()).unwrap(),
+            Default::default(),
+        )
+        .unwrap();
         let index = zip(&[
             ("Index/Document.iwa", &compressed),
             ("Index/Metadata.iwa", &compressed),
@@ -1895,7 +1946,11 @@ mod tests {
 
     #[test]
     fn package_limits_apply_to_flattened_legacy_entry_count() {
-        let compressed = SnappyStream::compress(&archive().to_bytes().unwrap()).unwrap();
+        let compressed = SnappyStream::compress(
+            &archive().to_bytes(Default::default()).unwrap(),
+            Default::default(),
+        )
+        .unwrap();
         let index = zip(&[
             ("Index/Document.iwa", &compressed),
             ("Index/Metadata.iwa", &compressed),
@@ -1933,6 +1988,7 @@ mod tests {
                         type_: 100,
                         data: vec![4, 5],
                     },
+                    Default::default(),
                 )?;
                 Ok(())
             })
@@ -2244,7 +2300,11 @@ mod tests {
         package
             .insert_entry(
                 "Index/Document.iwa",
-                SnappyStream::compress(&archive().to_bytes().unwrap()).unwrap(),
+                SnappyStream::compress(
+                    &archive().to_bytes(Default::default()).unwrap(),
+                    Default::default(),
+                )
+                .unwrap(),
             )
             .unwrap();
 
@@ -2271,7 +2331,11 @@ mod tests {
     #[test]
     fn structural_mutations_rebuild_the_shared_name_index() {
         let mut package = Package::new();
-        let expected_archive = SnappyStream::compress(&archive().to_bytes().unwrap()).unwrap();
+        let expected_archive = SnappyStream::compress(
+            &archive().to_bytes(Default::default()).unwrap(),
+            Default::default(),
+        )
+        .unwrap();
         package.insert_entry("Data/a", vec![1]).unwrap();
         package.insert_entry("Data/b", vec![2]).unwrap();
         package
@@ -2383,7 +2447,8 @@ mod tests {
 
     #[test]
     fn exact_source_update_failure_keeps_source_bytes_atomic() -> crate::Result<()> {
-        let compressed = SnappyStream::compress(&archive().to_bytes()?)?;
+        let compressed =
+            SnappyStream::compress(&archive().to_bytes(Default::default())?, Default::default())?;
         let source = zip(&[
             ("Index/Document.iwa", &compressed),
             ("preview.jpg", b"preview"),

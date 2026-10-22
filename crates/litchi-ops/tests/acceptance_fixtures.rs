@@ -722,15 +722,17 @@ fn keynote_shapes() -> Vec<u8> {
         .unwrap();
 
     let width = LINE_WIDTH.to_le_bytes();
-    let catalog = Catalog::from_bytes(&written).unwrap();
+    let catalog = Catalog::from_bytes(&written, Default::default()).unwrap();
     let mut replaced: Vec<(String, Vec<u8>)> = Vec::new();
     let (mut lines, mut groups) = (0, 0);
     for entry in catalog.iter() {
         if !(entry.name().starts_with("Index/Slide") && entry.name().ends_with(".iwa")) {
             continue;
         }
-        let stream = SnappyStream::decompress(entry.data()).unwrap().into_bytes();
-        let mut archive = Archive::parse(&stream).unwrap();
+        let stream = SnappyStream::decompress(entry.data(), Default::default())
+            .unwrap()
+            .into_bytes();
+        let mut archive = Archive::parse(&stream, Default::default()).unwrap();
         let mut changed = false;
         for object in &mut archive.objects {
             let Some(index) = object
@@ -779,7 +781,11 @@ fn keynote_shapes() -> Vec<u8> {
             changed = true;
         }
         if changed {
-            let bytes = SnappyStream::compress(&archive.to_bytes().unwrap()).unwrap();
+            let bytes = SnappyStream::compress(
+                &archive.to_bytes(Default::default()).unwrap(),
+                Default::default(),
+            )
+            .unwrap();
             replaced.push((entry.name().to_owned(), bytes));
         }
     }

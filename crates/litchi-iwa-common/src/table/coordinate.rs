@@ -57,6 +57,7 @@ impl fmt::Display for AddressError {
 
 /// Failure while constructing or parsing a compact coordinate selector.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Error {
     /// The range bounds are inverted on at least one axis.
     InvalidRange {

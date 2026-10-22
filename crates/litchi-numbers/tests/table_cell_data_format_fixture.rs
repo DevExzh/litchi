@@ -65,7 +65,7 @@ fn malformed_modes_are_deterministic_and_keep_unrelated_members() -> TestResult 
             "corruption is not deterministic: {corruption:?}"
         );
 
-        let catalog = Catalog::from_bytes(&first)?;
+        let catalog = Catalog::from_bytes(&first, Default::default())?;
         let sentinel = catalog
             .iter()
             .find(|entry| entry.name() == fixture::SENTINEL_MEMBER)

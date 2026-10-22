@@ -68,6 +68,7 @@ fn unknown_table_payload_and_nested_date_fields_survive_updates() {
                     type_: original.type_,
                     data,
                 },
+                Default::default(),
             )?;
             let object = archive.object_mut(field.id.object_id()).unwrap();
             let original = &object.messages[0];
@@ -81,6 +82,7 @@ fn unknown_table_payload_and_nested_date_fields_survive_updates() {
                     type_: original.type_,
                     data,
                 },
+                Default::default(),
             )?;
             Ok(())
         })
@@ -131,13 +133,13 @@ fn date_time_mutations_use_the_resolved_storage_with_a_2022_style_sibling() {
     .encode_to_vec();
     package
         .update_archive(&location.archive_name, |archive| {
-            archive
-                .object_mut(storage_id.get())
-                .unwrap()
-                .push_message(RawMessage {
+            archive.object_mut(storage_id.get()).unwrap().push_message(
+                RawMessage {
                     type_: 2_022,
                     data: style_data.clone(),
-                })?;
+                },
+                Default::default(),
+            )?;
             Ok(())
         })
         .unwrap();
@@ -192,6 +194,7 @@ fn malformed_instant_and_additional_owner_fail_without_mutation() {
                     type_: original.type_,
                     data,
                 },
+                Default::default(),
             )?;
             Ok(())
         })

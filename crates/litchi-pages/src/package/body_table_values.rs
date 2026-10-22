@@ -569,7 +569,7 @@ fn publish(edit: &Edit<'_>) -> Result<Package, Error> {
             .iter()
             .position(|message| message.type_ == message_type)
             .ok_or(Error::InvalidSource)?;
-        object.replace_message_preserving_header_with_limits(
+        object.replace_message_preserving_header(
             index,
             RawMessage {
                 type_: message_type,
@@ -580,8 +580,11 @@ fn publish(edit: &Edit<'_>) -> Result<Package, Error> {
     }
     let mut encoded: Vec<(String, Vec<u8>)> = Vec::new();
     for (name, archive) in &members {
-        let bytes = archive.to_bytes_with_limits(archive_limits)?;
-        encoded.push((name.clone(), SnappyStream::compress(&bytes)?));
+        let bytes = archive.to_bytes(archive_limits)?;
+        encoded.push((
+            name.clone(),
+            SnappyStream::compress(&bytes, Default::default())?,
+        ));
     }
     let edits: Vec<EntryEdit<'_>> = encoded
         .iter()

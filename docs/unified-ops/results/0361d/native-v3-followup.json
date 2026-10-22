@@ -1,0 +1,241 @@
+{
+  "baseline_commit": "e63a1fe3534bcaaae2ce367339f7f8275877baef",
+  "cpu": 29,
+  "blocks": 9,
+  "target_ms": 1000,
+  "source_sha256": "9bcfddea884b2b295f395cb4cb2fc62e88dc107ce8cf196a4129dfccb83a728b",
+  "runner_sha256": "51403a56cea89ef76546a8022611390856e03d64520b5e65dd4b304a3f4b0c46",
+  "rustc": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2\n",
+  "locks": {
+    "before": "9af16e09b318748dfcffdbed26d82dd85361f8a80d11bd77633e559b4e75cfc1",
+    "after": "9af16e09b318748dfcffdbed26d82dd85361f8a80d11bd77633e559b4e75cfc1"
+  },
+  "binaries": {
+    "before": {
+      "timed": {
+        "bytes": 875864,
+        "sha256": "12021956c919f4c62c5f62284f134901ac127722e7a8a25600034e48954c8f15"
+      },
+      "allocations": {
+        "bytes": 918032,
+        "sha256": "1f161a9e13397e70563298df00bf7f5564d21f17019973285b6a78b33b6b681e"
+      }
+    },
+    "after": {
+      "timed": {
+        "bytes": 875632,
+        "sha256": "88601e669685ad973a2d26ec6272812ad84982b038a8f814bf4e7ef94be0d184"
+      },
+      "allocations": {
+        "bytes": 917584,
+        "sha256": "597d64ed8ea9b5f4a4e1348be958794f27655ff957b6d92781861ce7a78748a8"
+      }
+    }
+  },
+  "status": "rejected: small compression remains slower in eight of nine longer blocks; returned for allocation/copy repair",
+  "rows": [
+    {
+      "route": "compress-small",
+      "after_before": [
+        1.0707245819061186,
+        1.0416190457247403,
+        0.9393865425313584,
+        1.0687990607017983,
+        1.0096770784901568,
+        1.1011805004647233,
+        1.0207780765837573,
+        1.1287967357784499,
+        1.0432106322129975
+      ],
+      "allocations": {
+        "before": {
+          "route": "compress-small",
+          "iterations": 1,
+          "ns": 390,
+          "checksum": "dd8553a283c0d28389d66234c31fec889433dd43ba7f1670cf2e539173b36c37",
+          "bytes": 86,
+          "bound": 1230,
+          "peak": 2456,
+          "retained": 0,
+          "allocated": 2456,
+          "allocations": 2
+        },
+        "after": {
+          "route": "compress-small",
+          "iterations": 1,
+          "ns": 350,
+          "checksum": "dd8553a283c0d28389d66234c31fec889433dd43ba7f1670cf2e539173b36c37",
+          "bytes": 86,
+          "bound": 1230,
+          "peak": 2456,
+          "retained": 0,
+          "allocated": 2456,
+          "allocations": 2
+        }
+      },
+      "fidelity": true,
+      "minimum_leg_ns": 868107126,
+      "eligible": true,
+      "median_after_before": 1.0432106322129975
+    },
+    {
+      "route": "compress-large",
+      "after_before": [
+        0.9983101161754112,
+        1.002487309410015,
+        0.9880245854351702,
+        1.0152339543753752,
+        1.005386405913584,
+        1.0237740791438819,
+        1.0037204398593873,
+        1.0056464836045267,
+        0.9836910396771917
+      ],
+      "allocations": {
+        "before": {
+          "route": "compress-large",
+          "iterations": 1,
+          "ns": 232531,
+          "checksum": "16a062d5eb83551a632f9b77d9b2bf23a1e2ed18bebb8aa1b307786ab1861b01",
+          "bytes": 199104,
+          "bound": 4895616,
+          "peak": 5004874,
+          "retained": 0,
+          "allocated": 9823744,
+          "allocations": 66
+        },
+        "after": {
+          "route": "compress-large",
+          "iterations": 1,
+          "ns": 233761,
+          "checksum": "16a062d5eb83551a632f9b77d9b2bf23a1e2ed18bebb8aa1b307786ab1861b01",
+          "bytes": 199104,
+          "bound": 4895616,
+          "peak": 5004874,
+          "retained": 0,
+          "allocated": 9823744,
+          "allocations": 66
+        }
+      },
+      "fidelity": true,
+      "minimum_leg_ns": 981343891,
+      "eligible": true,
+      "median_after_before": 1.0037204398593873
+    },
+    {
+      "route": "write-large",
+      "after_before": [
+        0.9807186795727175,
+        1.016442053534624,
+        1.0432790294915149,
+        1.056657203692038,
+        0.9072566853306726,
+        0.9491711840972754,
+        1.0986786977312466,
+        1.0226995908383576,
+        1.045530590169869
+      ],
+      "allocations": {
+        "before": {
+          "route": "write-large",
+          "iterations": 1,
+          "ns": 91930,
+          "checksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0,
+          "bound": 4895616,
+          "peak": 0,
+          "retained": 0,
+          "allocated": 0,
+          "allocations": 0
+        },
+        "after": {
+          "route": "write-large",
+          "iterations": 1,
+          "ns": 81840,
+          "checksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0,
+          "bound": 4895616,
+          "peak": 0,
+          "retained": 0,
+          "allocated": 0,
+          "allocations": 0
+        }
+      },
+      "fidelity": true,
+      "minimum_leg_ns": 946379076,
+      "eligible": true,
+      "median_after_before": 1.0226995908383576
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/native-v3-followup/measurements.json",
+      "bytes": 175906,
+      "sha256": "fe51c10a98033f1f3f05a50d182767d4c129df9951b2df11ffe496ec9e5180ec"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/native-v3-followup/samples.jsonl",
+      "bytes": 73842,
+      "sha256": "69b2e1d29a28e57738aa2b1794f1e692e562083dc47137b9dfc64cd3c47d7375"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/native-v3-followup.log",
+      "bytes": 595,
+      "sha256": "55eec3c90a10ce126eea9a603232d022c4714d9d0dc7df03b9b83fc04240d174"
+    }
+  ],
+  "build_artifacts": [
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/probe-v3/before/source-digests.json",
+      "bytes": 59186,
+      "sha256": "baa5273285bfbfd5ed8b37116836876281bb87be61ea38e430285e77dd2ddbf7"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/probe-v3/before/build-timed.log",
+      "bytes": 4047,
+      "sha256": "3c7fefa83c743efa510c8d60c5f60bc24716254cbc27c42f628b4874aa9eecbc"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/probe-v3/before/build-allocations.log",
+      "bytes": 259,
+      "sha256": "93ca956dbd2b26ef6da02d33f3bbe50c2cb494ecf71bbfec8ff8f9f54a92b178"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/probe-v3/after/source-digests.json",
+      "bytes": 59186,
+      "sha256": "72a3dcddcdb0e7aada675c745fc7afd4ab06344a52069944be625389836af16d"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/probe-v3/after/build-timed.log",
+      "bytes": 4038,
+      "sha256": "c398c6ab1c0fc253c3008933bfdee5e95d936849c14336c9507e88fac651f214"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/probe-v3/after/build-allocations.log",
+      "bytes": 258,
+      "sha256": "815d81d12a5e243800d74d423b6d4112c57c152d1cb78699b98159a64a412c50"
+    }
+  ],
+  "command": [
+    "taskset",
+    "-c",
+    "29",
+    "python3",
+    "docs/unified-ops/results/0361d/snappy-probe.py",
+    "run",
+    "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/probe-v3",
+    "--results-dir",
+    "/home/zhuhe/code/litchi-worktrees/.coord/iwa-raw-limits/native-v3-followup",
+    "--blocks",
+    "9",
+    "--target-ms",
+    "1000",
+    "--route",
+    "compress-small",
+    "--route",
+    "compress-large",
+    "--route",
+    "write-large"
+  ],
+  "allocation_metric_scope": "Incremental operation peak/retained bytes over live fixture and warm result; separately instrumented binaries, not RSS."
+}

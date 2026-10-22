@@ -2370,10 +2370,10 @@ fn rewrite_display_format(
             .ok_or(Error::InvalidSource { path })?
             .archive();
         let source_length = source_archive
-            .encoded_len_with_limits(archive_limits)
+            .encoded_len(archive_limits)
             .map_err(|_| Error::InvalidSource { path })?;
         let candidate_length = candidate
-            .encoded_len_with_limits(archive_limits)
+            .encoded_len(archive_limits)
             .map_err(|_| Error::InvalidSource { path })?;
         source_serialized_bytes = source_serialized_bytes
             .checked_add(source_length)
@@ -2423,10 +2423,10 @@ fn rewrite_display_format(
         )
         .map_err(|_| Error::Verification)?;
         let expected_archive_bytes = archive
-            .encoded_len_with_limits(archive_limits)
+            .encoded_len(archive_limits)
             .map_err(|_| Error::InvalidSource { path })?;
         let archive_bytes = archive
-            .to_bytes_with_limits(archive_limits)
+            .to_bytes(archive_limits)
             .map_err(|_| Error::InvalidSource { path })?;
         if archive_bytes.len() != expected_archive_bytes {
             return Err(Error::Verification);
@@ -5902,7 +5902,7 @@ pub(super) fn rewrite_custom_format(
         )
         .map_err(|_| Error::Verification)?;
         let archive_bytes = archive
-            .to_bytes_with_limits(archive_limits)
+            .to_bytes(archive_limits)
             .map_err(|_| Error::InvalidSource { path })?;
         budget.charge_payload_bytes(archive_bytes.len(), path)?;
         let member_name = source

@@ -61,7 +61,11 @@ fn object(
     data: Vec<u8>,
     references: &[u64],
 ) -> TestResult<ArchiveObject> {
-    let mut object = ArchiveObject::new(identifier, vec![RawMessage { type_, data }])?;
+    let mut object = ArchiveObject::new(
+        identifier,
+        vec![RawMessage { type_, data }],
+        Default::default(),
+    )?;
     object.archive_info.message_infos[0]
         .object_references
         .extend_from_slice(references);
@@ -233,7 +237,8 @@ fn synthetic_package_with_table_count_mode(
         )?);
     }
     let archive = Archive { objects };
-    let component = SnappyStream::compress(&archive.to_bytes()?)?;
+    let component =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(litchi_iwa_archive::package::to_bytes(
         [
             ("Data/sentinel.bin", b"untouched".as_slice()),
@@ -339,13 +344,13 @@ fn cumulative_table_info_wire_budget_scales_with_unique_tables() -> TestResult<(
 }
 
 fn table_info_payload(package: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or("missing document component")?;
-    let stream = SnappyStream::decompress(entry.data())?;
-    let archive = Archive::parse(stream.as_bytes())?;
+    let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+    let archive = Archive::parse(stream.as_bytes(), Default::default())?;
     let object = archive
         .object(DRAWABLE_IDENTIFIER)
         .ok_or("missing drawable")?;
@@ -362,15 +367,16 @@ fn rewrite_document_archive(
     package: &[u8],
     mutate: impl FnOnce(&mut Archive) -> TestResult<()>,
 ) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or("missing document component")?;
-    let stream = SnappyStream::decompress(entry.data())?;
-    let mut archive = Archive::parse(stream.as_bytes())?;
+    let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+    let mut archive = Archive::parse(stream.as_bytes(), Default::default())?;
     mutate(&mut archive)?;
-    let component = SnappyStream::compress(&archive.to_bytes()?)?;
+    let component =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(DOCUMENT_MEMBER, &component)],
         Limits::default(),
@@ -378,12 +384,12 @@ fn rewrite_document_archive(
 }
 
 fn noncanonical_document_prefix(package: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or("missing document component")?;
-    let stream = SnappyStream::decompress(entry.data())?;
+    let stream = SnappyStream::decompress(entry.data(), Default::default())?;
     let mut bytes = stream.as_bytes().to_vec();
     let (_, prefix_length) = decode_varint_from_bytes(&bytes)?;
     let mut prefix = bytes
@@ -394,7 +400,7 @@ fn noncanonical_document_prefix(package: &[u8]) -> TestResult<Vec<u8>> {
     *last |= 0x80;
     prefix.push(0);
     bytes.splice(0..prefix_length, prefix);
-    let component = SnappyStream::compress(&bytes)?;
+    let component = SnappyStream::compress(&bytes, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(DOCUMENT_MEMBER, &component)],
         Limits::default(),
@@ -488,7 +494,7 @@ fn has_unknown_table_info_field(payload: &[u8]) -> TestResult<bool> {
 }
 
 fn sentinel_payload(package: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     Ok(catalog
         .iter()
         .find(|entry| entry.name() == "Data/sentinel.bin")
@@ -607,7 +613,7 @@ fn selectors_conflicts_and_unrelated_members_are_checked() -> TestResult<()> {
         Err(BodyTableLockError::PatchConflict)
     ));
 
-    let catalog = Catalog::from_bytes(&source)?;
+    let catalog = Catalog::from_bytes(&source, Default::default())?;
     let tampered_source = catalog.reassemble_to_bytes(
         &[EntryEdit::new(
             "Data/sentinel.bin",
@@ -1336,13 +1342,13 @@ fn stale_body_table_metadata_is_not_reported_as_a_missing_table() -> TestResult<
 #[test]
 fn missing_rooted_table_edge_fails_closed_at_the_table_lock_adapter() -> TestResult<()> {
     let source = synthetic_package(None)?;
-    let catalog = Catalog::from_bytes(&source)?;
+    let catalog = Catalog::from_bytes(&source, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or("missing document component")?;
-    let stream = SnappyStream::decompress(entry.data())?;
-    let mut archive = Archive::parse(stream.as_bytes())?;
+    let stream = SnappyStream::decompress(entry.data(), Default::default())?;
+    let mut archive = Archive::parse(stream.as_bytes(), Default::default())?;
     let body = archive.object_mut(BODY_IDENTIFIER).ok_or("missing body")?;
     let body_message_index = body
         .messages
@@ -1365,8 +1371,10 @@ fn missing_rooted_table_edge_fails_closed_at_the_table_lock_adapter() -> TestRes
             type_: BODY_MESSAGE_TYPE,
             data: storage.encode_to_vec(),
         },
+        Default::default(),
     )?;
-    let component = SnappyStream::compress(&archive.to_bytes()?)?;
+    let component =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
     let malformed = catalog.reassemble_to_bytes(
         &[EntryEdit::new(DOCUMENT_MEMBER, &component)],
         Limits::default(),

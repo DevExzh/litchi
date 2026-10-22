@@ -19,6 +19,6 @@ pub mod write;
 pub use file::{File, all, container, delay, get, record, record_with_delay, scan, store};
 pub use model::{
     Bitmap, Blip, Block, Blocks, Compression, Context, Delay, DelayBlocks, Embedded, Entry, Id,
-    JpegFlavor, Kind, Limits, Meta, MetaHeader, Name, Offset, Opaque, Point, Rect, Storage, Store,
-    Uid, Uids,
+    JpegFlavor, Kind, LimitKind, Limits, Meta, MetaHeader, Name, Offset, Opaque, Point, Rect,
+    Storage, Store, Uid, Uids,
 };

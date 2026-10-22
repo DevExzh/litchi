@@ -94,8 +94,8 @@ fn native_unit(unit: Unit) -> u32 {
 }
 
 fn assert_exact_locality(source: &[u8], target: &[u8]) -> TestResult {
-    let before = Catalog::from_bytes(source)?;
-    let after = Catalog::from_bytes(target)?;
+    let before = Catalog::from_bytes(source, Default::default())?;
+    let after = Catalog::from_bytes(target, Default::default())?;
     let mut changed = Vec::new();
     for entry in before.iter() {
         let candidate = after
@@ -1821,11 +1821,8 @@ fn duration_reopened_package_keeps_family_and_selector_equivalence() -> TestResu
 #[test]
 fn duration_missing_metadata_is_rejected_without_publication() -> TestResult {
     let source = source()?;
-    let without_metadata = Catalog::from_bytes(&source)?.reassemble_with_deletions_to_bytes(
-        &[],
-        &[fixture::METADATA_MEMBER],
-        Limits::default(),
-    )?;
+    let without_metadata = Catalog::from_bytes(&source, Default::default())?
+        .reassemble_with_deletions_to_bytes(&[], &[fixture::METADATA_MEMBER], Limits::default())?;
     assert_rejected_or_owner(&without_metadata)?;
     Ok(())
 }

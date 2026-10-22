@@ -968,6 +968,7 @@ mod tests {
                 .into_iter()
                 .map(|(type_, data)| RawMessage { type_, data })
                 .collect(),
+            Default::default(),
         )
         .expect("synthetic object is valid")
     }

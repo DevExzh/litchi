@@ -63,7 +63,7 @@ fn fresh(
     data: Vec<u8>,
     references: Vec<u64>,
 ) -> Result<ArchiveObject, Error> {
-    let mut object = ArchiveObject::new_with_limits(
+    let mut object = ArchiveObject::new(
         identifier,
         vec![RawMessage {
             type_: message_type,
@@ -343,7 +343,7 @@ pub(super) fn add_table(
         workspace
             .object_mut(engine_id)
             .map_err(lift)?
-            .replace_message_transitioning_object_references_preserving_header_with_limits(
+            .replace_message_transitioning_object_references_preserving_header(
                 engine_index,
                 RawMessage {
                     type_: CALCULATION_ENGINE_MESSAGE_TYPE,

@@ -1,0 +1,368 @@
+{
+  "record": "0362q",
+  "base": "bda325e95882ecb04341fcc70e5f84c5294b32e8",
+  "scope": "Tooling and DOCX replay-return policy only; no production Rust changes or performance qualification.",
+  "sources": [
+    {
+      "path": "tools/rustdoc_return_types.py",
+      "bytes": 7818,
+      "sha256": "cfb46534b7ec24d5d36f558a793e57a6cd0d0e1e9d879aa411b62cd3441dc92a"
+    },
+    {
+      "path": "tools/check_api_glossary.py",
+      "bytes": 28855,
+      "sha256": "491e71e748cff56ef06ad77f2ed1a2d3bc5b63c85bf9eebdc8f3b032a33d26e2"
+    },
+    {
+      "path": "tools/api_debt_inventory.py",
+      "bytes": 12962,
+      "sha256": "09211ab3e2f9b7b76aad7af1befb7f70ed87693285e9d15485032cb07d76bf6a"
+    },
+    {
+      "path": "tools/api_glossary.json",
+      "bytes": 743688,
+      "sha256": "0f046a58f5c6d0da0065837256f141b7af1c345adf47a483bf8dc103380fabb5"
+    },
+    {
+      "path": "tools/test_check_api_glossary.py",
+      "bytes": 29213,
+      "sha256": "69b30fdb9010ff433b779a5e9bea34a8318e57869db690fc76868c3ad0c98d2d"
+    }
+  ],
+  "fresh_rustdoc": [
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-contract/docx-minimal.json",
+      "bytes": 77218594,
+      "sha256": "732aec310c8e88430440683a00cd48166371ef9e6446008757792d029956a48f"
+    },
+    {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-contract/docx-full.json",
+      "bytes": 79021739,
+      "sha256": "0318526d0e504fda4fe017663164c47d22308a93357e807ef47487b931106aa8"
+    }
+  ],
+  "checks": [
+    {
+      "attempt": "v1",
+      "receipt": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-contract/validation-v1/checks.json",
+        "bytes": 2683,
+        "sha256": "5e172ac8ed2a53e4174ba79944810f1e9a257eb7a3701739d939f8ac27d3cac1"
+      },
+      "checks": [
+        {
+          "command": [
+            "python3",
+            "-m",
+            "unittest",
+            "tools.test_check_api_glossary"
+          ],
+          "exit": 0,
+          "seconds": 0.6242067519342527,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-contract/validation-v1/check-0.log",
+          "bytes": 133,
+          "sha256": "bc345bcabb7df91d145e5ddcd14d52d7d9a231b919557bab843dbc2fa4d17804"
+        },
+        {
+          "command": [
+            "python3",
+            "tools/check_api_glossary.py",
+            "--profile",
+            "docx-minimal",
+            "--target-dir",
+            "/home/zhuhe/code/litchi-worktrees/unified-ops-api/target"
+          ],
+          "exit": 0,
+          "seconds": 25.48575021594297,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-contract/validation-v1/check-1.log",
+          "bytes": 2064,
+          "sha256": "353107116e6b617167ffe620f4bbee088310ab98cfe87e4007462f626e4feec1"
+        },
+        {
+          "command": [
+            "python3",
+            "-c",
+            "import pathlib,shutil,hashlib,json; p=pathlib.Path('/home/zhuhe/code/litchi-worktrees/unified-ops-api/target/doc/litchi_docx.json'); q=pathlib.Path('/home/zhuhe/code/litchi-worktrees/.coord/replay-return-contract/docx-minimal.json'); shutil.copyfile(p,q); print(json.dumps(dict(path=str(q),bytes=q.stat().st_size,sha256=hashlib.sha256(q.read_bytes()).hexdigest())))"
+          ],
+          "exit": 0,
+          "seconds": 0.09588901395909488,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-contract/validation-v1/check-2.log",
+          "bytes": 191,
+          "sha256": "b460ba4ee15fbeaacda9d3146263178f515b3706c13844bbcca21365b4f7c1aa"
+        },
+        {
+          "command": [
+            "python3",
+            "tools/check_api_glossary.py",
+            "--profile",
+            "docx-full",
+            "--target-dir",
+            "/home/zhuhe/code/litchi-worktrees/unified-ops-api/target"
+          ],
+          "exit": 0,
+          "seconds": 33.80901453597471,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-contract/validation-v1/check-3.log",
+          "bytes": 3587,
+          "sha256": "a11e00ea7ef931ec325830d78a6e45ffc73c833d9619b7e9f580d138f01e8f85"
+        },
+        {
+          "command": [
+            "python3",
+            "-c",
+            "import pathlib,shutil,hashlib,json; p=pathlib.Path('/home/zhuhe/code/litchi-worktrees/unified-ops-api/target/doc/litchi_docx.json'); q=pathlib.Path('/home/zhuhe/code/litchi-worktrees/.coord/replay-return-contract/docx-full.json'); shutil.copyfile(p,q); print(json.dumps(dict(path=str(q),bytes=q.stat().st_size,sha256=hashlib.sha256(q.read_bytes()).hexdigest())))"
+          ],
+          "exit": 0,
+          "seconds": 0.0942188169574365,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-contract/validation-v1/check-4.log",
+          "bytes": 188,
+          "sha256": "e8541e97b407aeebdc71e8b6e63554fc51b184fa8b6da323f4014f69f3ac3be4"
+        }
+      ]
+    },
+    {
+      "attempt": "v2",
+      "receipt": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-contract/validation-v2/checks.json",
+        "bytes": 2064,
+        "sha256": "535812ce54d22ca4dd7127cedf76607f4946cb4a17279b92d3513a91ce949851"
+      },
+      "checks": [
+        {
+          "command": [
+            "python3",
+            "-m",
+            "unittest",
+            "tools.test_check_api_glossary",
+            "tools.test_officecli_corpus",
+            "tools.test_officecli_capability_delta",
+            "tools.test_no_3rdparty_references",
+            "tools.test_check_crate_boundaries",
+            "tools.test_non_iwork_gate",
+            "tools.test_unified_bench_matrix",
+            "tools.test_check_iwork_leaf_public_api"
+          ],
+          "exit": 0,
+          "seconds": 34.2444596629357,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-contract/validation-v2/check-0.log",
+          "bytes": 633483,
+          "sha256": "ad6a0a5f12fdee2d669eae7a948f4b03c14c12598069fd3ee884b81ab1ad3d07"
+        },
+        {
+          "command": [
+            "python3",
+            "tools/check_api_glossary.py",
+            "--profile",
+            "docx-minimal",
+            "--json",
+            "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-contract/docx-minimal.json"
+          ],
+          "exit": 0,
+          "seconds": 2.7806924919132143,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-contract/validation-v2/check-1.log",
+          "bytes": 125,
+          "sha256": "9e60fc093b9d6e7f2cb17e8dfa8d0c017224e792c403dc038d6c6d80018be3dd"
+        },
+        {
+          "command": [
+            "python3",
+            "tools/check_api_glossary.py",
+            "--profile",
+            "docx-full",
+            "--json",
+            "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-contract/docx-full.json"
+          ],
+          "exit": 0,
+          "seconds": 2.760060520027764,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-contract/validation-v2/check-2.log",
+          "bytes": 125,
+          "sha256": "2c166a7eee79cb0b00ce9040118241b9c22286f1f8ceac295084d2bb40df48e7"
+        },
+        {
+          "command": [
+            "python3",
+            "tools/api_debt_inventory.py",
+            "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-contract/docx-full.json"
+          ],
+          "exit": 1,
+          "seconds": 2.9685518199112266,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-contract/validation-v2/check-3.log",
+          "bytes": 1048,
+          "sha256": "b28baed3e1eefbd86035cfc74e95b0029682e82a26df6c1d3cebe26d6d780ded"
+        }
+      ]
+    },
+    {
+      "attempt": "v3",
+      "receipt": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-contract/validation-v3/checks.json",
+        "bytes": 2065,
+        "sha256": "97dce01f997c3113bff2360e844fde0e3a9772630c12b16c980d448187785ed2"
+      },
+      "checks": [
+        {
+          "command": [
+            "python3",
+            "-m",
+            "unittest",
+            "tools.test_check_api_glossary",
+            "tools.test_officecli_corpus",
+            "tools.test_officecli_capability_delta",
+            "tools.test_no_3rdparty_references",
+            "tools.test_check_crate_boundaries",
+            "tools.test_non_iwork_gate",
+            "tools.test_unified_bench_matrix",
+            "tools.test_check_iwork_leaf_public_api"
+          ],
+          "exit": 0,
+          "seconds": 32.36514258792158,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-contract/validation-v3/check-0.log",
+          "bytes": 633484,
+          "sha256": "aa28897939ef9cf68b4743e213f2de747a45aaf18013351862af70ebdd426852"
+        },
+        {
+          "command": [
+            "python3",
+            "tools/check_api_glossary.py",
+            "--profile",
+            "docx-minimal",
+            "--json",
+            "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-contract/docx-minimal.json"
+          ],
+          "exit": 0,
+          "seconds": 2.8811037060804665,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-contract/validation-v3/check-1.log",
+          "bytes": 155,
+          "sha256": "da4458936686a45736d6034f4f62afd03f5108134c177cd6c98011ec9f47403a"
+        },
+        {
+          "command": [
+            "python3",
+            "tools/check_api_glossary.py",
+            "--profile",
+            "docx-full",
+            "--json",
+            "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-contract/docx-full.json"
+          ],
+          "exit": 0,
+          "seconds": 2.8010417399927974,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-contract/validation-v3/check-2.log",
+          "bytes": 155,
+          "sha256": "5a9f20c8206911ac29f27b8849a07562fa14c1fb0c936d36c173b952ef0f17e8"
+        },
+        {
+          "command": [
+            "python3",
+            "tools/api_debt_inventory.py",
+            "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-contract/docx-full.json"
+          ],
+          "exit": 0,
+          "seconds": 2.538204842945561,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-contract/validation-v3/check-3.log",
+          "bytes": 4251,
+          "sha256": "4f53bf083e9e9ce59fbe8384d9e8839919bd07d80dc8ecdc171a1926f0bddc42"
+        }
+      ]
+    },
+    {
+      "attempt": "v4",
+      "receipt": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-contract/validation-v4/checks.json",
+        "bytes": 2065,
+        "sha256": "3fd0f27bee134db64375466cf44c8eb7ed1fa4bc8fbf2fd98c9a8addd842fade"
+      },
+      "checks": [
+        {
+          "command": [
+            "python3",
+            "-m",
+            "unittest",
+            "tools.test_check_api_glossary",
+            "tools.test_officecli_corpus",
+            "tools.test_officecli_capability_delta",
+            "tools.test_no_3rdparty_references",
+            "tools.test_check_crate_boundaries",
+            "tools.test_non_iwork_gate",
+            "tools.test_unified_bench_matrix",
+            "tools.test_check_iwork_leaf_public_api"
+          ],
+          "exit": 0,
+          "seconds": 32.76462684303988,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-contract/validation-v4/check-0.log",
+          "bytes": 633485,
+          "sha256": "9ccc9c029225d4002a727c96d099ecebcd05476805f7396124cdf0d8e94d471c"
+        },
+        {
+          "command": [
+            "python3",
+            "tools/check_api_glossary.py",
+            "--profile",
+            "docx-minimal",
+            "--json",
+            "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-contract/docx-minimal.json"
+          ],
+          "exit": 0,
+          "seconds": 2.6837936990195885,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-contract/validation-v4/check-1.log",
+          "bytes": 155,
+          "sha256": "da4458936686a45736d6034f4f62afd03f5108134c177cd6c98011ec9f47403a"
+        },
+        {
+          "command": [
+            "python3",
+            "tools/check_api_glossary.py",
+            "--profile",
+            "docx-full",
+            "--json",
+            "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-contract/docx-full.json"
+          ],
+          "exit": 0,
+          "seconds": 2.8875902299769223,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-contract/validation-v4/check-2.log",
+          "bytes": 155,
+          "sha256": "5a9f20c8206911ac29f27b8849a07562fa14c1fb0c936d36c173b952ef0f17e8"
+        },
+        {
+          "command": [
+            "python3",
+            "tools/api_debt_inventory.py",
+            "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-contract/docx-full.json"
+          ],
+          "exit": 0,
+          "seconds": 2.463899409980513,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-return-contract/validation-v4/check-3.log",
+          "bytes": 4483,
+          "sha256": "c9f20d012fc961656721df0564f5edc5f8969fc3922fd4dfce1dda85d41385f8"
+        }
+      ]
+    }
+  ],
+  "final_tool_unit_tests": 1332,
+  "final_glossary_tests": 38,
+  "registered_result_methods": {
+    "docx-minimal": 39,
+    "docx-full": 40
+  },
+  "inventory": {
+    "rows": 35,
+    "by_category": {
+      "replay_return": 4,
+      "edit_type": 8,
+      "commit_type": 11,
+      "commit_snapshot": 7,
+      "commit_return": 3,
+      "with_limits": 2
+    },
+    "remaining_replay": [
+      "litchi_docx::Package::apply_durable_ink",
+      "litchi_docx::Package::apply_durable_ink_with_options",
+      "litchi_docx::Package::apply_metadata",
+      "litchi_docx::source_backed::Package::apply"
+    ]
+  },
+  "validation_notes": [
+    "v1 builds fresh minimal/full rustdoc from the unchanged Rust source at the recorded base. Later iterations change Python/policy only and reuse those exact JSON bytes.",
+    "v2 has a failed inventory invocation because capture filenames differ from the crate name; inventory now reads graph identity. v3 and v4 retain successful reruns.",
+    "Additional transient implementation unit-test failures were observed in the terminal before retained validation; they are not acceptance evidence.",
+    "Cached other-crate exploration was diagnostic only, not fresh full-workspace validation. Whole-workspace inventory and the final gate remain open."
+  ]
+}

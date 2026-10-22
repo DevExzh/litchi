@@ -31,6 +31,7 @@ fn object(identifier: u64, message_type: u32, data: Vec<u8>) -> TestResult<Archi
             type_: message_type,
             data,
         }],
+        Default::default(),
     )?)
 }
 
@@ -50,7 +51,11 @@ fn sidecars(identifier: u64) -> TestResult<ArchiveObject> {
         .encode_to_vec(),
     })
     .collect();
-    Ok(ArchiveObject::new(identifier, messages)?)
+    Ok(ArchiveObject::new(
+        identifier,
+        messages,
+        Default::default(),
+    )?)
 }
 
 fn table_model(name: &str, sidecar_id: u64) -> tst::TableModelArchive {
@@ -134,7 +139,10 @@ fn table_info_object(identifier: u64, model_id: u64) -> TestResult<ArchiveObject
 }
 
 fn package_bytes(objects: Vec<ArchiveObject>) -> TestResult<Vec<u8>> {
-    let iwa = SnappyStream::compress(&Archive { objects }.to_bytes()?)?;
+    let iwa = SnappyStream::compress(
+        &Archive { objects }.to_bytes(Default::default())?,
+        Default::default(),
+    )?;
     Ok(litchi_iwa_archive::package::to_bytes(
         [("Index/Document.iwa", iwa.as_slice())],
         litchi_iwa_archive::Limits::default(),
@@ -164,6 +172,7 @@ fn compatibility_oracle_objects(reverse_physical_order: bool) -> TestResult<Vec<
                 data: first_payload,
             },
         ],
+        Default::default(),
     )?;
     let mut objects = vec![
         root_object([2])?,

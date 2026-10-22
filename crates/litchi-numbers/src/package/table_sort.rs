@@ -928,7 +928,8 @@ impl TransactionBudget {
         self.charge_entry_bytes(entry_bytes, path)?;
         let archive_bytes = archive_limits.max_archive_bytes();
         let compressed_bound =
-            SnappyStream::maximum_compressed_len(archive_bytes).map_err(map_core_error)?;
+            SnappyStream::maximum_compressed_len(archive_bytes, Default::default())
+                .map_err(map_core_error)?;
         self.charge_transaction_work(
             archive_bytes
                 .saturating_add(compressed_bound)
@@ -1441,17 +1442,16 @@ fn rewrite(
         .effective_archive_limits()
         .map_err(map_archive_error)?;
     budget.preflight_physical_entry(entry.data().len(), archive_limits, Path::Package)?;
-    let stream = SnappyStream::decompress_with_limits(
+    let stream = SnappyStream::decompress(
         entry.data(),
         physical_limits.snappy_limits().map_err(map_archive_error)?,
     )
     .map_err(map_core_error)?;
     budget.charge_payload_bytes(stream.as_bytes().len(), Path::Package)?;
     budget.charge_total_payload_bytes(stream.as_bytes().len(), Path::Package)?;
-    let mut archive =
-        Archive::parse_with_limits(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
+    let mut archive = Archive::parse(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
     archive
-        .validate_canonical_object_framing(stream.as_bytes())
+        .validate_canonical_object_framing(stream.as_bytes(), archive_limits)
         .map_err(map_core_error)?;
     let object = archive
         .objects
@@ -1480,7 +1480,7 @@ fn rewrite(
         Path::Package,
     )?;
     object
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             target.native.message_index,
             RawMessage {
                 type_: TABLE_MODEL_MESSAGE_TYPE,
@@ -1490,26 +1490,16 @@ fn rewrite(
         )
         .map_err(map_core_error)?;
     let encoded_bound = archive
-        .encoded_len_with_limits(archive_limits)
+        .encoded_len(archive_limits)
         .map_err(map_core_error)?;
     budget.charge_transaction_work(encoded_bound, Path::Package)?;
-    let rewritten = archive
-        .to_bytes_with_limits(archive_limits)
-        .map_err(map_core_error)?;
-    let compressed_bound =
-        SnappyStream::maximum_compressed_len(rewritten.len()).map_err(map_core_error)?;
+    let rewritten = archive.to_bytes(archive_limits).map_err(map_core_error)?;
     let snappy_limits = physical_limits.snappy_limits().map_err(map_archive_error)?;
-    if compressed_bound > snappy_limits.max_compressed_stream() {
-        return Err(Error::Limit {
-            kind: LimitKind::EntryBytes,
-            observed: u64::try_from(compressed_bound).unwrap_or(u64::MAX),
-            maximum: u64::try_from(snappy_limits.max_compressed_stream()).unwrap_or(u64::MAX),
-            path: Path::Package,
-        });
-    }
+    let compressed_bound = SnappyStream::maximum_compressed_len(rewritten.len(), snappy_limits)
+        .map_err(map_core_error)?;
     budget.charge_transaction_work(compressed_bound, Path::Package)?;
     budget.charge_scratch_bytes(compressed_bound, Path::Package)?;
-    let compressed = SnappyStream::compress(&rewritten).map_err(map_core_error)?;
+    let compressed = SnappyStream::compress(&rewritten, snappy_limits).map_err(map_core_error)?;
     let edits = [EntryEdit::new(component_name, compressed.as_slice())];
     let prepared = catalog
         .package()

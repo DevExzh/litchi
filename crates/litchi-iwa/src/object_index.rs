@@ -911,6 +911,7 @@ mod tests {
                     type_: 42,
                     data: Vec::new(),
                 }],
+                Default::default(),
             )
             .unwrap()
         };
@@ -992,6 +993,7 @@ mod tests {
                 type_: 42,
                 data: Vec::new(),
             }],
+            Default::default(),
         )
         .unwrap();
         let mut index = ObjectIndex::new();
@@ -1013,6 +1015,7 @@ mod tests {
                 type_: 43,
                 data: Vec::new(),
             }],
+            Default::default(),
         )
         .unwrap();
         let mut edited = snapshot.clone();
@@ -1045,6 +1048,7 @@ mod tests {
                 type_: 42,
                 data: Vec::new(),
             }],
+            Default::default(),
         )
         .unwrap();
         let mut index = ObjectIndex::new();
@@ -1073,6 +1077,7 @@ mod tests {
                     type_: u32::try_from(identifier).unwrap(),
                     data: Vec::new(),
                 }],
+                Default::default(),
             )
             .unwrap()
         };
@@ -1106,6 +1111,7 @@ mod tests {
                     type_: 42,
                     data: Vec::new(),
                 }],
+                Default::default(),
             )
             .unwrap()
         };
@@ -1166,6 +1172,7 @@ mod tests {
                         type_: 42,
                         data: Vec::new(),
                     }],
+                    Default::default(),
                 )
                 .unwrap()
             })
@@ -1201,6 +1208,7 @@ mod tests {
                 type_: 6005,
                 data: vec![0x80, 0xff, 0x00],
             }],
+            Default::default(),
         )
         .unwrap();
         let mut index = ObjectIndex::new();
@@ -1228,6 +1236,7 @@ mod tests {
                 type_: 42,
                 data: Vec::new(),
             }],
+            Default::default(),
         )
         .unwrap();
         let archive = Archive {
@@ -1262,6 +1271,7 @@ mod tests {
                         type_: object_type,
                         data: Vec::new(),
                     }],
+                    Default::default(),
                 )
                 .unwrap();
                 object.archive_info.message_infos[0].type_ = object_type;
@@ -1306,6 +1316,7 @@ mod tests {
                         type_: 41,
                         data: Vec::new(),
                     }],
+                    Default::default(),
                 )
                 .unwrap(),
             ],
@@ -1318,6 +1329,7 @@ mod tests {
                         type_: 42,
                         data: Vec::new(),
                     }],
+                    Default::default(),
                 )
                 .unwrap(),
             ],
@@ -1371,6 +1383,7 @@ mod tests {
                     type_: 42,
                     data: Vec::new(),
                 }],
+                Default::default(),
             )
             .unwrap()
         };
@@ -1424,6 +1437,7 @@ mod tests {
                     type_: message_type,
                     data: Vec::new(),
                 }],
+                Default::default(),
             )
             .unwrap()
         };
@@ -1474,6 +1488,7 @@ mod tests {
                 type_: 42,
                 data: Vec::new(),
             }],
+            Default::default(),
         )
         .unwrap();
         let mut index = ObjectIndex::new();
@@ -1502,6 +1517,7 @@ mod tests {
                 type_: 42,
                 data: Vec::new(),
             }],
+            Default::default(),
         )
         .unwrap();
         let archive = Archive {
@@ -1524,6 +1540,7 @@ mod tests {
                 type_: 42,
                 data: Vec::new(),
             }],
+            Default::default(),
         )
         .unwrap();
         object.archive_info.identifier = None;

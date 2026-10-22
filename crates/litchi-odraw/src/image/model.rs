@@ -11,12 +11,24 @@ use crate::{Error, Record, Result};
 pub(super) const FBSE_FIXED_LEN: usize = 36;
 pub(super) const MAX_STORE_ENTRIES: u16 = 0x0FFF;
 
+/// A bounded resource used while parsing `OfficeArt` image records.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LimitKind {
+    /// Maximum size of one BLIP record body.
+    BlipBytes,
+    /// Maximum number of file blocks in one BLIP store.
+    StoreEntries,
+}
+
 /// Resource ceilings for `OfficeArt` image parsing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Limits {
     /// Largest accepted BLIP body.
     pub max_blip_bytes: u32,
-    /// Largest accepted BLIP-store entry count.
+    /// Largest accepted BLIP-store entry count, and the maximum number of
+    /// blocks visited by [`Delay::iter`]. Direct offset lookup through
+    /// [`Delay::at`] parses one block without enumerating preceding blocks;
+    /// it uses `max_blip_bytes`, rather than this traversal count.
     pub max_store_entries: u16,
 }
 

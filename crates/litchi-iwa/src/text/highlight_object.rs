@@ -361,6 +361,7 @@ pub(super) fn new_highlight_object(
             }
             .encode_to_vec(),
         }],
+        Default::default(),
     )?;
     object.archive_info.message_infos[0]
         .object_references
@@ -431,6 +432,7 @@ pub(super) fn update_annotation_comment_text(
                 type_: original.type_,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })

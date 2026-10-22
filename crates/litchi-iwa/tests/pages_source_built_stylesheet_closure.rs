@@ -34,14 +34,14 @@ const NATIVE_SOURCE_BUILT_TABLE_STYLESHEET_SAVED: &[u8] = include_bytes!(concat!
 ));
 
 fn component_archives(source: &[u8]) -> TestResult<BTreeMap<String, Archive>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let mut archives = BTreeMap::new();
     for entry in catalog
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
     {
-        let decompressed = SnappyStream::decompress(entry.data())?.into_bytes();
-        let archive = Archive::parse(&decompressed)?;
+        let decompressed = SnappyStream::decompress(entry.data(), Default::default())?.into_bytes();
+        let archive = Archive::parse(&decompressed, Default::default())?;
         if archives.insert(entry.name().to_owned(), archive).is_some() {
             return Err(io::Error::other(format!("duplicate IWA member {}", entry.name())).into());
         }

@@ -1296,6 +1296,7 @@ pub(crate) fn variation_object(
             type_: PARAGRAPH_STYLE_MESSAGE_TYPE,
             data,
         }],
+        Default::default(),
     )?;
     object.archive_info.message_infos[0].versions = STANDARD_MESSAGE_VERSION.to_vec();
     object.archive_info.message_infos[0]
@@ -1500,7 +1501,7 @@ fn replace_variation_in_archive(
             "iWork paragraph style {style_id} anchored metadata length changed unexpectedly"
         )));
     }
-    object.replace_message(location.message_index, message)?;
+    object.replace_message(location.message_index, message, Default::default())?;
     let info = &mut object.archive_info.message_infos[location.message_index];
     sync_managed_field_info(
         &mut info.field_infos,
@@ -1544,7 +1545,8 @@ pub(crate) fn redefine_named_style(
     let source = archive.object(style_id).ok_or_else(|| {
         Error::InvalidFormat(format!("iWork paragraph style {style_id} is missing"))
     })?;
-    let mut replacement = ArchiveObject::new(style_id, source.messages.clone())?;
+    let mut replacement =
+        ArchiveObject::new(style_id, source.messages.clone(), Default::default())?;
     replacement.archive_info.message_infos = source.archive_info.message_infos.clone();
     replacement.archive_info.should_merge = source.archive_info.should_merge;
     let message_index = location.message_index;
@@ -1655,6 +1657,7 @@ pub(crate) fn redefine_named_style(
             type_: PARAGRAPH_STYLE_MESSAGE_TYPE,
             data,
         },
+        Default::default(),
     )?;
     replace_variation(package, &location, replacement)
 }

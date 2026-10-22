@@ -47,11 +47,15 @@ fn object(identifier: u64, type_: u32, data: Vec<u8>) -> TestResult<ArchiveObjec
     Ok(ArchiveObject::new(
         identifier,
         vec![RawMessage { type_, data }],
+        Default::default(),
     )?)
 }
 
 fn component(objects: Vec<ArchiveObject>) -> TestResult<Vec<u8>> {
-    Ok(SnappyStream::compress(&Archive { objects }.to_bytes()?)?)
+    Ok(SnappyStream::compress(
+        &Archive { objects }.to_bytes(Default::default())?,
+        Default::default(),
+    )?)
 }
 
 fn solid(red: f32, green: f32, blue: f32, alpha: f32) -> Background {
@@ -170,6 +174,7 @@ fn package_with_first_message_metadata(
                 data: b"after-section".to_vec(),
             },
         ],
+        Default::default(),
     )?;
     if field_object_reference {
         let mut field = FieldInfo::new(vec![30]);
@@ -188,7 +193,7 @@ fn package_with_first_message_metadata(
         object(1, 10_000, root.encode_to_vec())?,
         object(BODY_IDENTIFIER, 2_001, body.encode_to_vec())?,
         first_section,
-        ArchiveObject::new(SECOND_SECTION_IDENTIFIER, vec![second])?,
+        ArchiveObject::new(SECOND_SECTION_IDENTIFIER, vec![second], Default::default())?,
     ];
     if aliased_preserved_references {
         objects.push(object(60, 888, b"shared template".to_vec())?);
@@ -213,7 +218,7 @@ fn package(first: Option<&[u8]>, second: Option<&[u8]>) -> TestResult<Vec<u8>> {
 }
 
 fn legacy_package_bytes(flat: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(flat)?;
+    let catalog = Catalog::from_bytes(flat, Default::default())?;
     let inner_entries = catalog
         .iter()
         .filter(|entry| {
@@ -237,16 +242,16 @@ fn legacy_package_bytes(flat: &[u8]) -> TestResult<Vec<u8>> {
 }
 
 fn document_stream(package: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or_else(|| io::Error::other("document member missing"))?;
-    Ok(SnappyStream::decompress(entry.data())?.into_bytes())
+    Ok(SnappyStream::decompress(entry.data(), Default::default())?.into_bytes())
 }
 
 fn message_payload(package: &[u8], identifier: u64) -> TestResult<Vec<u8>> {
-    let archive = Archive::parse(&document_stream(package)?)?;
+    let archive = Archive::parse(&document_stream(package)?, Default::default())?;
     let object = archive
         .object(identifier)
         .ok_or_else(|| io::Error::other("section missing"))?;
@@ -282,8 +287,8 @@ fn fields_except_background(payload: &[u8]) -> TestResult<Vec<Vec<u8>>> {
 }
 
 fn assert_untouched_zip_members(before: &[u8], after: &[u8]) -> TestResult<()> {
-    let before_catalog = Catalog::from_bytes(before)?;
-    let after_catalog = Catalog::from_bytes(after)?;
+    let before_catalog = Catalog::from_bytes(before, Default::default())?;
+    let after_catalog = Catalog::from_bytes(after, Default::default())?;
     let before_entries = before_catalog.iter().collect::<Vec<_>>();
     let after_entries = after_catalog.iter().collect::<Vec<_>>();
     assert_eq!(before_entries.len(), after_entries.len());

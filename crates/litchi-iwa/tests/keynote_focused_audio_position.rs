@@ -95,16 +95,19 @@ fn focused_drawable_type(message_type: u32) -> bool {
 }
 
 fn focused_drawable_selector(source: &[u8], drawable_id: u64) -> TestResult<DrawableSelector> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     for entry in catalog
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
     {
-        let stream = match litchi_iwa_archive::iwa::SnappyStream::decompress(entry.data()) {
+        let stream = match litchi_iwa_archive::iwa::SnappyStream::decompress(
+            entry.data(),
+            Default::default(),
+        ) {
             Ok(stream) => stream.into_bytes(),
             Err(_) => continue,
         };
-        let archive = match Archive::parse(&stream) {
+        let archive = match Archive::parse(&stream, Default::default()) {
             Ok(archive) => archive,
             Err(_) => continue,
         };
@@ -141,18 +144,21 @@ fn focused_drawable_selector(source: &[u8], drawable_id: u64) -> TestResult<Draw
 /// comment observations. This is a private test oracle; production callers
 /// continue to select media through the focused semantic package API.
 fn native_media_ids(source: &[u8]) -> TestResult<Vec<(u64, MovieKind)>> {
-    let catalog = Catalog::from_bytes(source)?;
+    let catalog = Catalog::from_bytes(source, Default::default())?;
     let mut movies = Vec::new();
     let mut slides = Vec::new();
     for entry in catalog
         .iter()
         .filter(|entry| entry.name().ends_with(".iwa"))
     {
-        let stream = match litchi_iwa_archive::iwa::SnappyStream::decompress(entry.data()) {
+        let stream = match litchi_iwa_archive::iwa::SnappyStream::decompress(
+            entry.data(),
+            Default::default(),
+        ) {
             Ok(stream) => stream.into_bytes(),
             Err(_) => continue,
         };
-        let archive = match Archive::parse(&stream) {
+        let archive = match Archive::parse(&stream, Default::default()) {
             Ok(archive) => archive,
             Err(_) => continue,
         };

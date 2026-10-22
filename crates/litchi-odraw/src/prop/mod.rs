@@ -34,3 +34,5 @@ pub use package::Props;
 const IS_BLIP: u16 = 0x4000;
 const IS_COMPLEX: u16 = 0x8000;
 const PROPERTY_ID_MASK: u16 = 0x3FFF;
+// Bounded linear lookup avoids a hash allocation for the common tiny table.
+const LINEAR_PROPERTIES: usize = 16;

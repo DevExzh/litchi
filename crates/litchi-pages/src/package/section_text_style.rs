@@ -23,8 +23,8 @@ use litchi_iwa_archive::package::{EntryEdit, OwnedExactArtifacts, SharedBytes};
 use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
 use litchi_iwa_protos::package_metadata_codec::{
     Batch, ComponentDescriptor, ComponentSelector, ExternalReferenceAddition, ObjectUuidAddition,
-    ObjectUuidDescriptor, PackageMetadataVisitor, RewriteError, RewriteOptions, UuidBits,
-    inspect_package_metadata_with_visitor, rewrite_package_metadata,
+    ObjectUuidDescriptor, PackageMetadataVisitor, RewriteError, RewriteLimit, RewriteOptions,
+    UuidBits, inspect_package_metadata_with_visitor, rewrite_package_metadata,
 };
 use litchi_iwa_text::TextSpan;
 use litchi_iwa_text_wire::CharacterProperties;
@@ -55,6 +55,20 @@ pub enum LimitKind {
     Identifiers,
     /// Bytes of the package registry.
     RegistryBytes,
+    /// Wire fields inspected or emitted in the package registry.
+    RegistryFields,
+    /// Work performed while inspecting or rewriting the package registry.
+    RegistryWork,
+    /// Nested wire messages in the package registry.
+    RegistryNesting,
+    /// Components inspected in the package registry.
+    RegistryComponents,
+    /// References inspected in the package registry.
+    RegistryReferences,
+    /// Additions staged in the package registry.
+    RegistryAdditions,
+    /// A bounded character-style wire operation.
+    Wire(litchi_iwa_common::LimitKind),
 }
 
 impl fmt::Display for LimitKind {
@@ -62,6 +76,13 @@ impl fmt::Display for LimitKind {
         formatter.write_str(match self {
             Self::Identifiers => "object identifiers",
             Self::RegistryBytes => "registry bytes",
+            Self::RegistryFields => "registry fields",
+            Self::RegistryWork => "registry work",
+            Self::RegistryNesting => "registry nesting",
+            Self::RegistryComponents => "registry components",
+            Self::RegistryReferences => "registry references",
+            Self::RegistryAdditions => "registry additions",
+            Self::Wire(kind) => return kind.fmt(formatter),
         })
     }
 }
@@ -164,6 +185,18 @@ impl From<litchi_iwa_text_wire::CharStyleError> for Error {
     fn from(error: litchi_iwa_text_wire::CharStyleError) -> Self {
         match error {
             litchi_iwa_text_wire::CharStyleError::Span => Self::Refused(Refusal::InvalidSpan),
+            litchi_iwa_text_wire::CharStyleError::Limit {
+                kind,
+                observed,
+                maximum,
+            } => Self::Limit {
+                kind: LimitKind::Wire(kind),
+                observed: observed as u64,
+                maximum: maximum as u64,
+            },
+            litchi_iwa_text_wire::CharStyleError::Allocation { amount } => {
+                Self::Allocation { amount }
+            },
             _ => Self::InvalidSource,
         }
     }
@@ -182,14 +215,44 @@ fn map_rewrite(error: &RewriteError) -> Error {
     if let Some(amount) = error.allocation_request() {
         return Error::Allocation { amount };
     }
-    if error.resource_limit().is_some() {
-        return Error::Limit {
-            kind: LimitKind::RegistryBytes,
-            observed: 0,
-            maximum: 0,
-        };
+    let (kind, observed, maximum) = match error.resource_limit() {
+        Some(
+            RewriteLimit::InputBytes { observed, maximum }
+            | RewriteLimit::OutputBytes { observed, maximum },
+        ) => (LimitKind::RegistryBytes, observed as u64, maximum as u64),
+        Some(RewriteLimit::Fields { observed, maximum }) => {
+            (LimitKind::RegistryFields, observed as u64, maximum as u64)
+        },
+        Some(RewriteLimit::Work { observed, maximum }) => {
+            (LimitKind::RegistryWork, observed as u64, maximum as u64)
+        },
+        Some(RewriteLimit::Nesting { observed, maximum }) => (
+            LimitKind::RegistryNesting,
+            u64::from(observed),
+            u64::from(maximum),
+        ),
+        Some(RewriteLimit::Components { observed, maximum }) => (
+            LimitKind::RegistryComponents,
+            observed as u64,
+            maximum as u64,
+        ),
+        Some(RewriteLimit::References { observed, maximum }) => (
+            LimitKind::RegistryReferences,
+            observed as u64,
+            maximum as u64,
+        ),
+        Some(RewriteLimit::Additions { observed, maximum }) => (
+            LimitKind::RegistryAdditions,
+            observed as u64,
+            maximum as u64,
+        ),
+        _ => return Error::InvalidSource,
+    };
+    Error::Limit {
+        kind,
+        observed,
+        maximum,
     }
-    Error::InvalidSource
 }
 
 /// One run of a section's text and the character properties its style
@@ -446,20 +509,51 @@ fn unique_message(object: &ArchiveObject, message_type: u32) -> Result<usize, Er
     found.ok_or(Error::InvalidSource)
 }
 
-fn reference_field(payload: &[u8], number: u32) -> Result<Option<u64>, Error> {
-    let view =
-        litchi_iwa_common::wire::WireView::parse(payload, litchi_iwa_common::WireLimits::DEFAULT)
-            .map_err(|_error| Error::InvalidSource)?;
+fn map_style_wire(error: litchi_iwa_common::Error) -> Error {
+    match error {
+        litchi_iwa_common::Error::LimitExceeded {
+            kind,
+            observed,
+            limit,
+        } => Error::Limit {
+            kind: LimitKind::Wire(kind),
+            observed: observed as u64,
+            maximum: limit as u64,
+        },
+        litchi_iwa_common::Error::Allocation { amount, .. } => Error::Allocation { amount },
+        _ => Error::InvalidSource,
+    }
+}
+
+fn style_wire_limits(package: &Package) -> Result<litchi_iwa_common::WireLimits, Error> {
+    let maximum = package
+        .state
+        .source
+        .limits()
+        .effective_archive_limits()
+        .map_err(|error| map_archive(&error))?
+        .max_message_bytes();
+    litchi_iwa_common::WireLimits::default()
+        .with_input_bytes(maximum.min(litchi_iwa_common::WireLimits::MAX_INPUT_BYTES))
+        .and_then(|limits| {
+            limits.with_output_bytes(maximum.min(litchi_iwa_common::WireLimits::MAX_OUTPUT_BYTES))
+        })
+        .map_err(map_style_wire)
+}
+
+fn reference_field(
+    payload: &[u8],
+    number: u32,
+    wire: litchi_iwa_common::WireLimits,
+) -> Result<Option<u64>, Error> {
+    let view = litchi_iwa_common::wire::WireView::parse(payload, wire).map_err(map_style_wire)?;
     let mut found = None;
     for field in view.fields() {
         if field.number() != number {
             continue;
         }
-        let inner = litchi_iwa_common::wire::WireView::parse(
-            field.payload(),
-            litchi_iwa_common::WireLimits::DEFAULT,
-        )
-        .map_err(|_error| Error::InvalidSource)?;
+        let inner = litchi_iwa_common::wire::WireView::parse(field.payload(), wire)
+            .map_err(map_style_wire)?;
         for reference in inner.fields() {
             if reference.number() == 1 {
                 let (value, _) =
@@ -476,9 +570,10 @@ fn reference_field(payload: &[u8], number: u32) -> Result<Option<u64>, Error> {
 
 /// The runs of section `section` and the properties their styles set.
 fn section_runs(package: &Package, section: Position) -> Result<Box<[Run]>, Error> {
+    let wire = style_wire_limits(package)?;
     let range = section_range(package, section)?;
     let (_, object, index) = body_storage(package)?;
-    let runs = litchi_iwa_text_wire::char_style_runs(&object.messages[index].data)?;
+    let runs = litchi_iwa_text_wire::char_style_runs(&object.messages[index].data, wire)?;
     let mut output = Vec::new();
     for (position, run) in runs.iter().enumerate() {
         let end = runs
@@ -510,6 +605,7 @@ const MAX_STYLE_DEPTH: usize = 16;
 
 /// The character properties `style` and its parent chain set.
 fn effective_style(package: &Package, style: u64) -> Result<CharacterProperties, Error> {
+    let wire = style_wire_limits(package)?;
     let mut properties = CharacterProperties::new();
     let mut current = Some(style);
     for _ in 0..MAX_STYLE_DEPTH {
@@ -521,8 +617,10 @@ fn effective_style(package: &Package, style: u64) -> Result<CharacterProperties,
             break;
         };
         let payload = &object.messages[message].data;
-        properties.inherit(&litchi_iwa_text_wire::character_style_properties(payload)?);
-        current = litchi_iwa_text_wire::character_style_parent(payload)?;
+        properties.inherit(&litchi_iwa_text_wire::character_style_properties(
+            payload, wire,
+        )?);
+        current = litchi_iwa_text_wire::character_style_parent(payload, wire)?;
     }
     Ok(properties)
 }
@@ -626,9 +724,9 @@ pub(super) fn parse_member(package: &Package, name: &str) -> Result<Archive, Err
     let archive_limits = limits
         .effective_archive_limits()
         .map_err(|error| map_archive(&error))?;
-    let stream = SnappyStream::decompress_with_limits(entry.data(), snappy)?;
-    let archive = Archive::parse_with_limits(stream.as_bytes(), archive_limits)?;
-    archive.validate_canonical_object_framing(stream.as_bytes())?;
+    let stream = SnappyStream::decompress(entry.data(), snappy)?;
+    let archive = Archive::parse(stream.as_bytes(), archive_limits)?;
+    archive.validate_canonical_object_framing(stream.as_bytes(), archive_limits)?;
     Ok(archive)
 }
 
@@ -654,6 +752,7 @@ fn publish(
     source: &Package,
     spans: &[(std::ops::Range<usize>, &CharacterProperties)],
 ) -> Result<(Package, usize), Error> {
+    let wire = style_wire_limits(source)?;
     let catalog = &source.state.source;
     let limits = catalog.limits();
     let archive_limits = limits
@@ -668,8 +767,8 @@ fn publish(
         .ok_or(Error::InvalidSource)?
         .object_references
         .clone();
-    let stylesheet =
-        reference_field(&payload, 2)?.ok_or(Error::Refused(Refusal::UnsupportedDependency))?;
+    let stylesheet = reference_field(&payload, 2, wire)?
+        .ok_or(Error::Refused(Refusal::UnsupportedDependency))?;
     let storage_member = component_name_of(source, storage)?;
     let sheet_member = component_name_of(source, stylesheet)?;
     let text_len = native_body(source)
@@ -762,7 +861,8 @@ fn publish(
     let mut taken = registry.uuids.clone();
     let mut uuids: Vec<(u64, UuidBits)> = Vec::new();
     for (range, properties) in spans {
-        let previous = litchi_iwa_text_wire::styles_in_span(&payload, text_len, range.clone())?;
+        let previous =
+            litchi_iwa_text_wire::styles_in_span(&payload, text_len, range.clone(), wire)?;
         let mut mapping: Vec<(Option<u64>, u64)> = Vec::new();
         for parent in previous {
             if let Some(parent) = parent
@@ -777,9 +877,10 @@ fn publish(
                 observed: u64::MAX,
                 maximum: u64::MAX,
             })?;
-            let data =
-                litchi_iwa_text_wire::character_style_variation(parent, stylesheet, properties);
-            let mut object = ArchiveObject::new_with_limits(
+            let data = litchi_iwa_text_wire::character_style_variation(
+                parent, stylesheet, properties, wire,
+            )?;
+            let mut object = ArchiveObject::new(
                 identifier,
                 vec![RawMessage {
                     type_: CHARACTER_STYLE_MESSAGE_TYPE,
@@ -794,7 +895,7 @@ fn publish(
                 .ok_or(Error::InvalidSource)?;
             info.versions.clone_from(&versions);
             info.object_references = parent.into_iter().chain([stylesheet]).collect();
-            sheet_archive.insert_object_with_limits(object, archive_limits)?;
+            sheet_archive.insert_object(object, archive_limits)?;
             // The stylesheet lists the new style.
             let sheet = sheet_archive
                 .object_mut(stylesheet)
@@ -804,6 +905,7 @@ fn publish(
                 &sheet.messages[sheet_index].data,
                 identifier,
                 parent,
+                wire,
             )?;
             let before = sheet.archive_info.message_infos[sheet_index]
                 .object_references
@@ -813,22 +915,21 @@ fn publish(
             // A native header whose field-local references the aggregate
             // list does not repeat cannot be transitioned; its payload is
             // then replaced with the header kept as it is.
-            let declared = sheet
-                .replace_message_transitioning_object_references_preserving_header_with_limits(
-                    sheet_index,
-                    RawMessage {
-                        type_: STYLESHEET_MESSAGE_TYPE,
-                        data: sheet_data.clone(),
-                    },
-                    litchi_iwa_core::archive::ObjectReferenceTransition {
-                        aggregate_before: &before,
-                        aggregate_after: &after,
-                        fields: &[],
-                    },
-                    archive_limits,
-                );
+            let declared = sheet.replace_message_transitioning_object_references_preserving_header(
+                sheet_index,
+                RawMessage {
+                    type_: STYLESHEET_MESSAGE_TYPE,
+                    data: sheet_data.clone(),
+                },
+                litchi_iwa_core::archive::ObjectReferenceTransition {
+                    aggregate_before: &before,
+                    aggregate_after: &after,
+                    fields: &[],
+                },
+                archive_limits,
+            );
             if declared.is_err() {
-                sheet.replace_message_preserving_header_with_limits(
+                sheet.replace_message_preserving_header(
                     sheet_index,
                     RawMessage {
                         type_: STYLESHEET_MESSAGE_TYPE,
@@ -841,20 +942,26 @@ fn publish(
             created.push(identifier);
             mapping.push((parent, identifier));
         }
-        payload = litchi_iwa_text_wire::restyle_span(&payload, text_len, range.clone(), |style| {
-            mapping
-                .iter()
-                .find(|(parent, _)| *parent == style)
-                .map(|(_, created)| *created)
-        })?;
+        payload = litchi_iwa_text_wire::restyle_span(
+            &payload,
+            text_len,
+            range.clone(),
+            |style| {
+                mapping
+                    .iter()
+                    .find(|(parent, _)| *parent == style)
+                    .map(|(_, created)| *created)
+            },
+            wire,
+        )?;
     }
     // The storage's new reference list.
-    let still: BTreeSet<u64> = litchi_iwa_text_wire::char_style_runs(&payload)?
+    let still: BTreeSet<u64> = litchi_iwa_text_wire::char_style_runs(&payload, wire)?
         .iter()
         .filter_map(|run| run.style)
         .collect();
     let old_styles: BTreeSet<u64> =
-        litchi_iwa_text_wire::char_style_runs(&storage_object.messages[storage_index].data)?
+        litchi_iwa_text_wire::char_style_runs(&storage_object.messages[storage_index].data, wire)?
             .iter()
             .filter_map(|run| run.style)
             .collect();
@@ -871,7 +978,7 @@ fn publish(
     {
         let archive = storage_archive.as_mut().unwrap_or(&mut sheet_archive);
         let object = archive.object_mut(storage).ok_or(Error::InvalidSource)?;
-        object.replace_message_transitioning_object_references_preserving_header_with_limits(
+        object.replace_message_transitioning_object_references_preserving_header(
             storage_index,
             RawMessage {
                 type_: STORAGE_MESSAGE_TYPE,
@@ -923,7 +1030,7 @@ fn publish(
     metadata_archive
         .object_mut(metadata_object)
         .ok_or(Error::InvalidSource)?
-        .replace_message_preserving_header_with_limits(
+        .replace_message_preserving_header(
             metadata_index,
             RawMessage {
                 type_: METADATA_MESSAGE_TYPE,
@@ -935,8 +1042,11 @@ fn publish(
     // Reassemble once and reopen.
     let mut encoded: Vec<(String, Vec<u8>)> = Vec::new();
     let mut encode = |name: &str, archive: &Archive| -> Result<(), Error> {
-        let bytes = archive.to_bytes_with_limits(archive_limits)?;
-        encoded.push((name.to_owned(), SnappyStream::compress(&bytes)?));
+        let bytes = archive.to_bytes(archive_limits)?;
+        encoded.push((
+            name.to_owned(),
+            SnappyStream::compress(&bytes, Default::default())?,
+        ));
         Ok(())
     };
     encode(&sheet_member, &sheet_archive)?;
@@ -1064,4 +1174,89 @@ fn resolve(package: &Package, selector: SectionSelector<'_>) -> Result<Position,
         .map_err(|_error| Error::Refused(Refusal::SectionNotFound))?
         .ok_or(Error::Refused(Refusal::SectionNotFound))?;
     Ok(Position::new(selected.index()))
+}
+
+#[cfg(test)]
+mod wire_error_tests {
+    use super::{Error, LimitKind, Registry, RewriteOptions, map_rewrite};
+    use litchi_iwa_protos::package_metadata_codec::inspect_package_metadata_with_visitor;
+
+    #[test]
+    fn registry_limits_keep_the_codec_resource_and_counts() {
+        // A last-object identifier and an unknown varint field are valid
+        // registry wire data. Both count toward the explicit wire policy.
+        let source = [8, 1, 0xa0, 1, 7];
+        let inspect = |input, fields, work| {
+            inspect_package_metadata_with_visitor(
+                &source,
+                RewriteOptions::new(input, 100, fields, work, 64, 10, 10, 10),
+                &mut Registry::default(),
+            )
+        };
+        let report = inspect(source.len(), 100, 1_000)
+            .expect("bounded registry inspection")
+            .report();
+        // The codec charges both its preflight and visitor passes.
+        inspect(source.len(), report.fields(), report.work_bytes())
+            .expect("exact aggregate limits");
+        let input = inspect(source.len() - 1, report.fields(), report.work_bytes()).unwrap_err();
+        assert!(matches!(
+            map_rewrite(&input),
+            Error::Limit {
+                kind: LimitKind::RegistryBytes,
+                observed: 5,
+                maximum: 4,
+            }
+        ));
+        let fields = inspect(source.len(), report.fields() - 1, report.work_bytes()).unwrap_err();
+        assert!(matches!(
+            map_rewrite(&fields),
+            Error::Limit {
+                kind: LimitKind::RegistryFields,
+                observed,
+                maximum,
+            } if observed == report.fields() as u64 && maximum == (report.fields() - 1) as u64
+        ));
+        let work = inspect(source.len(), report.fields(), report.work_bytes() - 1).unwrap_err();
+        assert!(matches!(
+            map_rewrite(&work),
+            Error::Limit {
+                kind: LimitKind::RegistryWork,
+                observed,
+                maximum,
+            } if observed == report.work_bytes() as u64 && maximum == (report.work_bytes() - 1) as u64
+        ));
+        let malformed = inspect_package_metadata_with_visitor(
+            &[0],
+            RewriteOptions::new(10, 100, 10, 1_000, 64, 10, 10, 10),
+            &mut Registry::default(),
+        )
+        .unwrap_err();
+        assert!(matches!(map_rewrite(&malformed), Error::InvalidSource));
+    }
+
+    #[test]
+    fn character_style_resource_errors_survive_the_owner_boundary() {
+        let error = Error::from(litchi_iwa_text_wire::CharStyleError::Limit {
+            kind: litchi_iwa_common::LimitKind::RewriteWork,
+            observed: 11,
+            maximum: 10,
+        });
+        assert!(matches!(
+            error,
+            Error::Limit {
+                kind: LimitKind::Wire(litchi_iwa_common::LimitKind::RewriteWork),
+                observed: 11,
+                maximum: 10,
+            }
+        ));
+        assert!(matches!(
+            Error::from(litchi_iwa_text_wire::CharStyleError::Allocation { amount: 42 }),
+            Error::Allocation { amount: 42 }
+        ));
+        assert!(matches!(
+            Error::from(litchi_iwa_text_wire::CharStyleError::Invalid),
+            Error::InvalidSource
+        ));
+    }
 }

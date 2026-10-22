@@ -398,9 +398,9 @@ fn observe_all_settings(before: Settings) {
 }
 
 fn assert_exact_preview_locality(source_bytes: &[u8], target_bytes: &[u8]) {
-    let source = Catalog::from_bytes(source_bytes)
+    let source = Catalog::from_bytes(source_bytes, Default::default())
         .unwrap_or_else(|error| panic!("title source catalog must reopen: {error}"));
-    let target = Catalog::from_bytes(target_bytes)
+    let target = Catalog::from_bytes(target_bytes, Default::default())
         .unwrap_or_else(|error| panic!("title target catalog must reopen: {error}"));
     let mut changed_members = Vec::new();
     let mut deleted_previews = 0usize;

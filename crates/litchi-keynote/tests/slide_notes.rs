@@ -51,19 +51,23 @@ fn object(identifier: u64, type_: u32, value: &impl prost::Message) -> TestResul
             type_,
             data: value.encode_to_vec(),
         }],
+        Default::default(),
     )?)
 }
 
 fn component(objects: Vec<ArchiveObject>) -> TestResult<Vec<u8>> {
-    Ok(SnappyStream::compress(&Archive { objects }.to_bytes()?)?)
+    Ok(SnappyStream::compress(
+        &Archive { objects }.to_bytes(Default::default())?,
+        Default::default(),
+    )?)
 }
 
 fn component_with_unknown_header(
     objects: Vec<ArchiveObject>,
     target_identifier: u64,
 ) -> TestResult<Vec<u8>> {
-    let bytes = Archive { objects }.to_bytes()?;
-    let parsed = Archive::parse(&bytes)?;
+    let bytes = Archive { objects }.to_bytes(Default::default())?;
+    let parsed = Archive::parse(&bytes, Default::default())?;
     let object = parsed
         .object(target_identifier)
         .ok_or_else(|| io::Error::other("synthetic target object is missing"))?;
@@ -96,9 +100,9 @@ fn component_with_unknown_header(
     with_unknown.extend_from_slice(&header);
     with_unknown.extend_from_slice(&bytes[data_offset..]);
 
-    let reparsed = Archive::parse(&with_unknown)?;
-    assert_eq!(reparsed.to_bytes()?, with_unknown);
-    Ok(SnappyStream::compress(&with_unknown)?)
+    let reparsed = Archive::parse(&with_unknown, Default::default())?;
+    assert_eq!(reparsed.to_bytes(Default::default())?, with_unknown);
+    Ok(SnappyStream::compress(&with_unknown, Default::default())?)
 }
 
 fn slide(identifier: u64, name: &str, note: Option<u64>) -> kn::SlideArchive {
@@ -187,6 +191,7 @@ fn synthetic_package(dependent_note_content: bool) -> TestResult<Vec<u8>> {
                 data: b"after-note-message".to_vec(),
             },
         ],
+        Default::default(),
     )?;
     note_object.archive_info.message_infos[1].object_references = vec![NOTE_STORAGE];
     let storage_object = ArchiveObject::new(
@@ -205,6 +210,7 @@ fn synthetic_package(dependent_note_content: bool) -> TestResult<Vec<u8>> {
                 data: b"after-storage-message".to_vec(),
             },
         ],
+        Default::default(),
     )?;
 
     let mut first_slide_object = object(
@@ -229,6 +235,7 @@ fn synthetic_package(dependent_note_content: bool) -> TestResult<Vec<u8>> {
                     type_: 999,
                     data: PRIVATE_MARKER.to_vec(),
                 }],
+                Default::default(),
             )?,
         ],
         NOTE_STORAGE,
@@ -239,6 +246,7 @@ fn synthetic_package(dependent_note_content: bool) -> TestResult<Vec<u8>> {
             type_: 999,
             data: b"unrelated-iwa-component".to_vec(),
         }],
+        Default::default(),
     )?])?;
     Ok(litchi_iwa_archive::package::to_bytes(
         [
@@ -251,12 +259,12 @@ fn synthetic_package(dependent_note_content: bool) -> TestResult<Vec<u8>> {
 }
 
 fn document_stream(package: &[u8]) -> TestResult<Vec<u8>> {
-    let catalog = Catalog::from_bytes(package)?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     let entry = catalog
         .iter()
         .find(|entry| entry.name() == DOCUMENT_MEMBER)
         .ok_or_else(|| io::Error::other("missing synthetic Keynote document member"))?;
-    Ok(SnappyStream::decompress(entry.data())?.into_bytes())
+    Ok(SnappyStream::decompress(entry.data(), Default::default())?.into_bytes())
 }
 
 fn rewrite_document(
@@ -264,10 +272,11 @@ fn rewrite_document(
     mutate: impl FnOnce(&mut Archive) -> TestResult<()>,
 ) -> TestResult<Vec<u8>> {
     let stream = document_stream(package)?;
-    let mut archive = Archive::parse(&stream)?;
+    let mut archive = Archive::parse(&stream, Default::default())?;
     mutate(&mut archive)?;
-    let compressed = SnappyStream::compress(&archive.to_bytes()?)?;
-    let catalog = Catalog::from_bytes(package)?;
+    let compressed =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(DOCUMENT_MEMBER, &compressed)],
         Limits::default(),
@@ -297,6 +306,7 @@ fn with_movie_drawable(
                 type_: 5,
                 data: value.encode_to_vec(),
             },
+            Default::default(),
         )?;
         archive.objects.push(ArchiveObject::new(
             drawable_identifier,
@@ -304,6 +314,7 @@ fn with_movie_drawable(
                 type_: MOVIE_MESSAGE_TYPE,
                 data: payload,
             }],
+            Default::default(),
         )?);
         Ok(())
     })
@@ -317,7 +328,7 @@ fn minimal_movie_payload() -> Vec<u8> {
 
 fn with_overlong_object_length_prefix(package: &[u8], identifier: u64) -> TestResult<Vec<u8>> {
     let mut stream = document_stream(package)?;
-    let archive = Archive::parse(&stream)?;
+    let archive = Archive::parse(&stream, Default::default())?;
     let object = archive
         .object(identifier)
         .ok_or_else(|| io::Error::other("missing synthetic Keynote object"))?;
@@ -328,9 +339,9 @@ fn with_overlong_object_length_prefix(package: &[u8], identifier: u64) -> TestRe
     }
     stream[offset] |= 0x80;
     stream.insert(offset + 1, 0);
-    Archive::parse(&stream)?;
-    let compressed = SnappyStream::compress(&stream)?;
-    let catalog = Catalog::from_bytes(package)?;
+    Archive::parse(&stream, Default::default())?;
+    let compressed = SnappyStream::compress(&stream, Default::default())?;
+    let catalog = Catalog::from_bytes(package, Default::default())?;
     Ok(catalog.reassemble_to_bytes(
         &[EntryEdit::new(DOCUMENT_MEMBER, &compressed)],
         Limits::default(),
@@ -339,7 +350,7 @@ fn with_overlong_object_length_prefix(package: &[u8], identifier: u64) -> TestRe
 
 fn message_payload(package: &[u8], identifier: u64, type_: u32) -> TestResult<Vec<u8>> {
     let stream = document_stream(package)?;
-    let archive = Archive::parse(&stream)?;
+    let archive = Archive::parse(&stream, Default::default())?;
     let object = archive
         .object(identifier)
         .ok_or_else(|| io::Error::other("missing synthetic Keynote object"))?;
@@ -353,7 +364,7 @@ fn message_payload(package: &[u8], identifier: u64, type_: u32) -> TestResult<Ve
 
 fn object_header(package: &[u8], identifier: u64) -> TestResult<Vec<u8>> {
     let stream = document_stream(package)?;
-    let archive = Archive::parse(&stream)?;
+    let archive = Archive::parse(&stream, Default::default())?;
     let object = archive
         .object(identifier)
         .ok_or_else(|| io::Error::other("missing synthetic Keynote object"))?;
@@ -371,8 +382,8 @@ fn object_header(package: &[u8], identifier: u64) -> TestResult<Vec<u8>> {
 }
 
 fn assert_only_document_payload_changed(before: &[u8], after: &[u8]) -> TestResult<()> {
-    let before_catalog = Catalog::from_bytes(before)?;
-    let after_catalog = Catalog::from_bytes(after)?;
+    let before_catalog = Catalog::from_bytes(before, Default::default())?;
+    let after_catalog = Catalog::from_bytes(after, Default::default())?;
     let before_entries = before_catalog.iter().collect::<Vec<_>>();
     let after_entries = after_catalog.iter().collect::<Vec<_>>();
     assert_eq!(before_entries.len(), after_entries.len());
@@ -453,6 +464,7 @@ fn notes_snapshot_strictly_rejects_malformed_known_table_and_keeps_source_immuta
                 type_: STORAGE_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })?;
@@ -747,7 +759,7 @@ fn changed_notes_preserve_unknowns_scope_and_exact_inverse_application() -> Test
         Some("Speaker 🚀 notes".to_owned())
     );
 
-    let catalog = Catalog::from_bytes(&bytes)?;
+    let catalog = Catalog::from_bytes(&bytes, Default::default())?;
     let equivalent_bytes = catalog.reassemble_to_bytes(
         &[EntryEdit::new(
             "Data/sentinel.bin",
@@ -796,6 +808,7 @@ fn duplicate_names_missing_graph_and_malformed_references_fail_closed() -> TestR
                 type_: 5,
                 data: value.encode_to_vec(),
             },
+            Default::default(),
         )?;
         Ok(())
     })?;
@@ -824,7 +837,11 @@ fn duplicate_names_missing_graph_and_malformed_references_fail_closed() -> TestR
                 &reference(NOTE_OBJECT).encode_to_vec(),
                 litchi_iwa_common::WireLimits::DEFAULT,
             )?;
-            object.replace_message_preserving_header(index, RawMessage { type_: 5, data })?;
+            object.replace_message_preserving_header(
+                index,
+                RawMessage { type_: 5, data },
+                Default::default(),
+            )?;
             Ok(())
         })?,
         rewrite_document(&bytes, |archive| {
@@ -848,6 +865,7 @@ fn duplicate_names_missing_graph_and_malformed_references_fail_closed() -> TestR
                     type_: NOTE_MESSAGE_TYPE,
                     data: Vec::new(),
                 },
+                Default::default(),
             )?;
             Ok(())
         })?,
@@ -873,6 +891,7 @@ fn duplicate_names_missing_graph_and_malformed_references_fail_closed() -> TestR
                     type_: NOTE_MESSAGE_TYPE,
                     data,
                 },
+                Default::default(),
             )?;
             Ok(())
         })?,
@@ -891,6 +910,7 @@ fn duplicate_names_missing_graph_and_malformed_references_fail_closed() -> TestR
                     type_: NOTE_MESSAGE_TYPE,
                     data: vec![0x0a, 0x00],
                 },
+                Default::default(),
             )?;
             Ok(())
         })?,
@@ -912,6 +932,7 @@ fn duplicate_names_missing_graph_and_malformed_references_fail_closed() -> TestR
                     }
                     .encode_to_vec(),
                 },
+                Default::default(),
             )?;
             Ok(())
         })?,
@@ -931,7 +952,7 @@ fn duplicate_names_missing_graph_and_malformed_references_fail_closed() -> TestR
                 .find(|message| message.type_ == STORAGE_MESSAGE_TYPE)
                 .ok_or_else(|| io::Error::other("missing storage message"))?
                 .clone();
-            object.push_message(duplicate)?;
+            object.push_message(duplicate, Default::default())?;
             Ok(())
         })?,
         rewrite_document(&bytes, |archive| {
@@ -949,6 +970,7 @@ fn duplicate_names_missing_graph_and_malformed_references_fail_closed() -> TestR
                     type_: STORAGE_MESSAGE_TYPE,
                     data: vec![0x1a, 0x80],
                 },
+                Default::default(),
             )?;
             Ok(())
         })?,
@@ -1058,6 +1080,7 @@ fn metadata_and_payload_ownership_aliases_fail_closed() -> TestResult<()> {
                 type_: 5,
                 data: value.encode_to_vec(),
             },
+            Default::default(),
         )?;
         Ok(())
     })?;
@@ -1088,6 +1111,7 @@ fn metadata_and_payload_ownership_aliases_fail_closed() -> TestResult<()> {
                 type_: NOTE_MESSAGE_TYPE,
                 data,
             },
+            Default::default(),
         )?;
         Ok(())
     })?;

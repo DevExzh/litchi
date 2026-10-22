@@ -46,6 +46,7 @@ impl fmt::Display for LimitKind {
 
 /// Errors raised at the physical iWork ingress boundary.
 #[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
 pub enum Error {
     /// A filesystem operation failed.
     #[error("iWork archive I/O error: {0}")]
