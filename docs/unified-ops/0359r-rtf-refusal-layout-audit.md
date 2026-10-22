@@ -62,6 +62,20 @@ requires caller-side descriptors or allocation, or loses the public accessors'
 exact strings. A format-local compact error variant would violate the shared
 `Error::Refused(Refusal)` contract. None is acceptable for this audit.
 
+As a separate RTF-only code-layout experiment, both private constructors were
+temporarily changed to `#[cold] #[inline(never)]` functions. This was intended
+to keep fixed refusal construction out of successful edit bodies while leaving
+the shared value unchanged. The 380-test RTF library suite passed, and a
+non-specialized probe confirmed that a valid span still succeeds while an
+empty span returns the same `UnsupportedContent` refusal. The experiment made
+the exact producer larger: `set_text_underline` grew from 1,248 bytes and 312
+instructions to 1,392 bytes and 352 instructions. The refusal branch gained a
+call and temporary result storage, and the successful operation path changed
+from the inlined vector push sequence to a longer capacity/copy sequence. The
+refusal-contract benchmark binary grew from 4,139,552 bytes to 4,165,728
+bytes. This experiment was also reverted; the native timing comparison remains
+open for a future guarded host window.
+
 The fixed operation and reason strings, `RefusalKind`, display text, error
 classification, capability, fidelity and allocation behavior therefore stay
 unchanged. The 0359b refusal-route ratio remains an owner follow-up for a

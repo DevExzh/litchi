@@ -29,6 +29,18 @@
   "validation": {
     "core_tests": "cargo test --offline -p litchi-core --lib",
     "core_tests_result": "252 passed",
+    "cold_constructor_experiment": {
+      "change": "edit::Error and tail_append::Error private refusal constructors #[cold] #[inline(never)]",
+      "rtf_lib_tests": "380 passed",
+      "normal_set_text_underline": {"bytes": 1248, "instructions": 312},
+      "cold_set_text_underline": {"bytes": 1392, "instructions": 352},
+      "normal_binary": {"size": 4139552, "sha256": "410c67b99fa00d4e79b01da04a24e846a18765fda226941e42af50655415fe73"},
+      "cold_binary": {"size": 4165728, "sha256": "b75f5726d84b126883baa927fad69b1ea26f7257419542b8e419723aaf6e2c3f"},
+      "normal_disassembly": {"path": "/home/zhuhe/rtf-success-normal-set.asm", "size": 13917, "sha256": "293eca3966e8d194fe4e72eb78b4c8fcd00f3e88d9ab287a8d0aeeaf8db7989f"},
+      "cold_disassembly": {"path": "/home/zhuhe/rtf-success-cold-set.asm", "size": 15351, "sha256": "cddb993ff0c2438e07510831f982a3a878a736aea945f67446c9bd504e8132d7"},
+      "native_timing": "not run; host busy",
+      "implementation_landed": false
+    },
     "native_timing": "not run; host busy and experiment rejected by static evidence",
     "heap_change": "none observed in 0359b; no source allocation was added"
   }
