@@ -172,6 +172,125 @@ struct ArchiveInfoAdmission {
     message_count: usize,
 }
 
+/// Admission totals accumulated while a message collection is built.
+///
+/// The collection owns its certificate only while it controls all mutable
+/// access to the contained records. Converting an ordinary `Vec<MessageInfo>`
+/// therefore produces an uncertified collection and keeps the raw constructor
+/// path fully checked.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct MessageInfoCollectionAdmission {
+    encoded_messages_length: usize,
+    header_fields: usize,
+    max_message_nesting: usize,
+    header_memory: usize,
+    metadata_items: usize,
+    message_count: usize,
+}
+
+impl MessageInfoCollectionAdmission {
+    fn empty() -> Self {
+        Self {
+            encoded_messages_length: 0,
+            header_fields: 0,
+            max_message_nesting: 0,
+            header_memory: 0,
+            metadata_items: 0,
+            message_count: 0,
+        }
+    }
+
+    fn archive_info_with_options(
+        self,
+        identifier: Option<u64>,
+        should_merge: Option<bool>,
+    ) -> Result<ArchiveInfoAdmission> {
+        let mut header_length = 0usize;
+        if let Some(identifier) = identifier {
+            header_length = varint_field_length(1, identifier)?;
+        }
+        header_length = checked_encoded_add(header_length, self.encoded_messages_length)?;
+        if let Some(should_merge) = should_merge {
+            header_length = checked_encoded_add(
+                header_length,
+                varint_field_length(3, u64::from(should_merge))?,
+            )?;
+        }
+        let mut header_fields = self.header_fields;
+        header_fields = header_fields
+            .checked_add(usize::from(identifier.is_some()))
+            .and_then(|value| value.checked_add(usize::from(should_merge.is_some())))
+            .ok_or_else(|| Error::invalid_archive(0, "ArchiveInfo field count overflow"))?;
+        let header_nesting = if self.message_count == 0 {
+            0
+        } else {
+            1usize
+                .checked_add(self.max_message_nesting)
+                .ok_or_else(|| Error::invalid_archive(0, "ArchiveInfo nesting overflow"))?
+        };
+        let header_memory = size_of::<ArchiveInfo>()
+            .checked_add(self.header_memory)
+            .ok_or_else(|| Error::invalid_archive(0, "neutral metadata memory overflow"))?;
+        Ok(ArchiveInfoAdmission {
+            header_length,
+            header_fields,
+            header_nesting,
+            header_memory,
+            metadata_items: self.metadata_items,
+            message_count: self.message_count,
+        })
+    }
+
+    fn archive_info(self, identifier: u64) -> Result<ArchiveInfoAdmission> {
+        self.archive_info_with_options(Some(identifier), None)
+    }
+
+    fn push(&mut self, admission: MessageInfoAdmission, limits: Limits) -> Result<()> {
+        let message_count = self
+            .message_count
+            .checked_add(1)
+            .ok_or_else(|| Error::invalid_archive(0, "ArchiveInfo message count overflow"))?;
+        if message_count > limits.max_messages_per_object() {
+            return Err(limit(
+                LimitKind::MessagesPerObject,
+                message_count,
+                limits.max_messages_per_object(),
+            ));
+        }
+        self.encoded_messages_length = checked_encoded_add(
+            self.encoded_messages_length,
+            length_delimited_field_length(2, admission.encoded_length)?,
+        )?;
+        self.header_fields = self
+            .header_fields
+            .checked_add(
+                1usize
+                    .checked_add(admission.header_fields)
+                    .ok_or_else(|| Error::invalid_archive(0, "ArchiveInfo field count overflow"))?,
+            )
+            .ok_or_else(|| Error::invalid_archive(0, "ArchiveInfo field count overflow"))?;
+        self.max_message_nesting = self.max_message_nesting.max(admission.header_nesting);
+        self.header_memory = checked_memory_add(self.header_memory, admission.header_memory)?;
+        self.metadata_items = self
+            .metadata_items
+            .checked_add(1)
+            .and_then(|value| value.checked_add(admission.metadata_items))
+            .ok_or_else(|| Error::invalid_archive(0, "ArchiveInfo metadata count overflow"))?;
+        self.message_count = message_count;
+        Ok(())
+    }
+}
+
+/// Exact admission totals for one decoded or authoring-built MessageInfo.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct MessageInfoAdmission {
+    encoded_length: usize,
+    header_fields: usize,
+    header_nesting: usize,
+    header_memory: usize,
+    metadata_items: usize,
+}
+
 impl ArchiveInfoAdmission {
     fn check(self, limits: Limits) -> Result<()> {
         if self.message_count > limits.max_messages_per_object() {
@@ -713,8 +832,7 @@ impl ArchiveInfo {
                         error.to_string(),
                     )
                 })?;
-        let archive_info = archive_info_from_codec(decoded)?;
-        let admission = check_archive_info_constructor(&archive_info, limits)?;
+        let (archive_info, admission) = archive_info_from_codec_with_admission(decoded, limits)?;
         Ok((archive_info, admission))
     }
 
@@ -722,19 +840,36 @@ impl ArchiveInfo {
     ///
     /// An identifier of zero is preserved; identifier policy remains a later
     /// archive validation concern. The supplied limits admit the complete
-    /// neutral header before this record is published.
-    pub fn new(identifier: u64, message_infos: Vec<MessageInfo>, limits: Limits) -> Result<Self> {
+    /// neutral header before this record is published. A
+    /// [`MessageInfoCollection`] carries totals from its bounded construction
+    /// path, while an ordinary `Vec<MessageInfo>` remains a fully checked raw
+    /// input.
+    pub fn new(
+        identifier: u64,
+        message_infos: impl Into<MessageInfoCollection>,
+        limits: Limits,
+    ) -> Result<Self> {
         let default_limits = limits == Limits::default();
         let limits = if default_limits {
             limits
         } else {
             limits.validate()?
         };
+        let message_infos = message_infos.into();
+        let (message_infos, collection_admission, collection_limits) = message_infos.into_parts();
         let value = Self {
             identifier: Some(identifier),
             message_infos,
             should_merge: None,
         };
+        if let (Some(collection_admission), Some(collection_limits)) =
+            (collection_admission, collection_limits)
+            && collection_limits == limits
+        {
+            let admission = collection_admission.archive_info(identifier)?;
+            admission.check(limits)?;
+            return Ok(value);
+        }
         // A default-profile minimal record has fixed metadata cardinalities:
         // its message count, four fields per message, three version values,
         // and fixed neutral allocations are all below the hard ceilings. The
@@ -928,6 +1063,196 @@ impl MessageInfo {
             add_count(&mut count, path.path.len())?;
         }
         Ok(count)
+    }
+}
+
+/// A message metadata collection that retains admission work performed while
+/// its contents are assembled.
+///
+/// `ArchiveInfo::new` consumes this collection and can publish the aggregate
+/// record without scanning every message again. `as_mut_slice`, `get_mut`,
+/// and the structural mutation methods invalidate the certificate before
+/// exposing mutable state, so callers retain the same public mutation
+/// capability as the raw `Vec<MessageInfo>` constructor path.
+#[derive(Debug, Clone)]
+pub struct MessageInfoCollection {
+    message_infos: Vec<MessageInfo>,
+    admission: Option<MessageInfoCollectionAdmission>,
+    limits: Option<Limits>,
+}
+
+impl From<Vec<MessageInfo>> for MessageInfoCollection {
+    fn from(message_infos: Vec<MessageInfo>) -> Self {
+        Self {
+            message_infos,
+            admission: None,
+            limits: None,
+        }
+    }
+}
+
+impl MessageInfoCollection {
+    /// Start a bounded message collection.
+    pub fn new(limits: Limits) -> Result<Self> {
+        Self::with_capacity(0, limits)
+    }
+
+    /// Start a bounded message collection with reserved element capacity.
+    pub fn with_capacity(capacity: usize, limits: Limits) -> Result<Self> {
+        let limits = limits.validate()?;
+        if capacity > limits.max_messages_per_object() {
+            return Err(limit(
+                LimitKind::MessagesPerObject,
+                capacity,
+                limits.max_messages_per_object(),
+            ));
+        }
+        let mut message_infos = Vec::new();
+        message_infos
+            .try_reserve_exact(capacity)
+            .map_err(|_| Error::allocation("IWA message metadata", capacity))?;
+        Ok(Self {
+            message_infos,
+            admission: Some(MessageInfoCollectionAdmission::empty()),
+            limits: Some(limits),
+        })
+    }
+
+    /// Add an already assembled message and admit its complete neutral shape.
+    pub fn push(&mut self, message_info: MessageInfo) -> Result<()> {
+        let limits = self
+            .limits
+            .ok_or_else(|| Error::invalid_archive(0, "message collection has no limits"))?;
+        let message_count = self
+            .message_infos
+            .len()
+            .checked_add(1)
+            .ok_or_else(|| Error::invalid_archive(0, "ArchiveInfo message count overflow"))?;
+        if message_count > limits.max_messages_per_object() {
+            return Err(limit(
+                LimitKind::MessagesPerObject,
+                message_count,
+                limits.max_messages_per_object(),
+            ));
+        }
+        let admission = message_info_admission(&message_info, limits)?;
+        if let Some(collection_admission) = self.admission.as_mut() {
+            collection_admission.push(admission, limits)?;
+        }
+        self.message_infos.push(message_info);
+        Ok(())
+    }
+
+    /// Add conventional metadata while accumulating its admission totals.
+    ///
+    /// This is the single-pass authoring route for the common
+    /// `MessageInfo::new` shape: the fixed version vector is constructed once,
+    /// and the collection certificate records the exact aggregate totals.
+    pub fn push_new(&mut self, type_: u32, length: usize) -> Result<()> {
+        let limits = self
+            .limits
+            .ok_or_else(|| Error::invalid_archive(0, "message collection has no limits"))?;
+        let message_count = self
+            .message_infos
+            .len()
+            .checked_add(1)
+            .ok_or_else(|| Error::invalid_archive(0, "ArchiveInfo message count overflow"))?;
+        if message_count > limits.max_messages_per_object() {
+            return Err(limit(
+                LimitKind::MessagesPerObject,
+                message_count,
+                limits.max_messages_per_object(),
+            ));
+        }
+        check_message_length(length, limits)?;
+        let length = u32::try_from(length)
+            .map_err(|_| Error::invalid_archive(0, "message payload exceeds u32"))?;
+        let admission = minimal_message_info_admission(type_, length)?;
+        // The default profile's fixed minimal shape is far below every
+        // structural ceiling. Its aggregate certificate is checked when the
+        // collection is consumed, so the hot authoring path needs only the
+        // message-byte and count checks above. Tight profiles still receive
+        // the exact per-message first-failure check before publication.
+        if limits != Limits::default() {
+            check_constructor_header(
+                admission.encoded_length,
+                admission.header_fields,
+                admission.header_nesting,
+                admission.header_memory,
+                admission.metadata_items,
+                limits,
+            )?;
+        }
+        let message_info = MessageInfo::try_new(type_, length)?;
+        if let Some(collection_admission) = self.admission.as_mut() {
+            collection_admission.push(admission, limits)?;
+        }
+        self.message_infos.push(message_info);
+        Ok(())
+    }
+
+    /// Borrow the collection without invalidating its admission certificate.
+    #[must_use]
+    pub fn as_slice(&self) -> &[MessageInfo] {
+        &self.message_infos
+    }
+
+    /// Borrow one message without invalidating its admission certificate.
+    #[must_use]
+    pub fn get(&self, index: usize) -> Option<&MessageInfo> {
+        self.message_infos.get(index)
+    }
+
+    /// Borrow the collection mutably and discard its admission certificate.
+    pub fn as_mut_slice(&mut self) -> &mut [MessageInfo] {
+        self.admission = None;
+        &mut self.message_infos
+    }
+
+    /// Borrow one message mutably and discard its admission certificate.
+    pub fn get_mut(&mut self, index: usize) -> Option<&mut MessageInfo> {
+        self.admission = None;
+        self.message_infos.get_mut(index)
+    }
+
+    /// Remove one message and discard the certificate.
+    pub fn remove(&mut self, index: usize) -> MessageInfo {
+        self.admission = None;
+        self.message_infos.remove(index)
+    }
+
+    /// Remove every message and restart an empty certified collection when its
+    /// original bounded profile is still available.
+    pub fn clear(&mut self) {
+        self.message_infos.clear();
+        self.admission = self.limits.map(|_| MessageInfoCollectionAdmission::empty());
+    }
+
+    /// Return the number of messages currently held.
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.message_infos.len()
+    }
+
+    /// Return whether no messages are currently held.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.message_infos.is_empty()
+    }
+
+    /// Iterate over messages without invalidating the certificate.
+    pub fn iter(&self) -> std::slice::Iter<'_, MessageInfo> {
+        self.message_infos.iter()
+    }
+
+    fn into_parts(
+        self,
+    ) -> (
+        Vec<MessageInfo>,
+        Option<MessageInfoCollectionAdmission>,
+        Option<Limits>,
+    ) {
+        (self.message_infos, self.admission, self.limits)
     }
 }
 
@@ -1152,6 +1477,289 @@ fn minimal_message_info_memory() -> Result<usize> {
         .ok_or_else(|| Error::invalid_archive(0, "message metadata memory overflow"))
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct FieldInfoAdmission {
+    encoded_length: usize,
+    header_fields: usize,
+    header_memory: usize,
+    metadata_items: usize,
+}
+
+fn field_info_admission(info: &FieldInfo) -> Result<FieldInfoAdmission> {
+    let path_length = encoded_field_path_length(&info.path)?;
+    let mut encoded_length = length_delimited_field_length(1, path_length)?;
+    if let Some(value) = info.r#type {
+        encoded_length = checked_encoded_add(
+            encoded_length,
+            varint_field_length(2, enum_wire_value(value.raw_value()))?,
+        )?;
+    }
+    if let Some(value) = info.unknown_field_rule {
+        encoded_length = checked_encoded_add(
+            encoded_length,
+            varint_field_length(3, enum_wire_value(value.raw_value()))?,
+        )?;
+    }
+    if let Some(value) = info.known_field_rule {
+        encoded_length = checked_encoded_add(
+            encoded_length,
+            varint_field_length(6, enum_wire_value(value.raw_value()))?,
+        )?;
+    }
+    encoded_length = checked_encoded_add(
+        encoded_length,
+        packed_u64_field_length(4, &info.object_references)?,
+    )?;
+    encoded_length = checked_encoded_add(
+        encoded_length,
+        packed_u64_field_length(5, &info.data_references)?,
+    )?;
+    encoded_length = checked_encoded_add(
+        encoded_length,
+        packed_u32_field_length(7, &info.known_field_version)?,
+    )?;
+    if let Some(feature_identifier) = &info.known_field_feature_identifier {
+        encoded_length = checked_encoded_add(
+            encoded_length,
+            length_delimited_field_length(8, feature_identifier.len())?,
+        )?;
+    }
+
+    let mut header_fields = 1usize;
+    for present in [
+        info.r#type.is_some(),
+        info.unknown_field_rule.is_some(),
+        !info.object_references.is_empty(),
+        !info.data_references.is_empty(),
+        info.known_field_rule.is_some(),
+        !info.known_field_version.is_empty(),
+        info.known_field_feature_identifier.is_some(),
+    ] {
+        header_fields = header_fields
+            .checked_add(usize::from(present))
+            .ok_or_else(|| Error::invalid_archive(0, "field count overflow"))?;
+    }
+    header_fields = header_fields
+        .checked_add(field_path_header_field_count(&info.path))
+        .ok_or_else(|| Error::invalid_archive(0, "field count overflow"))?;
+
+    let mut metadata_items = 1usize;
+    for value in [
+        info.path.path.len(),
+        info.object_references.len(),
+        info.data_references.len(),
+        info.known_field_version.len(),
+        usize::from(info.known_field_feature_identifier.is_some()),
+    ] {
+        metadata_items = metadata_items
+            .checked_add(value)
+            .ok_or_else(|| Error::invalid_archive(0, "metadata item count overflow"))?;
+    }
+
+    let mut header_memory = size_of::<FieldInfo>();
+    header_memory = checked_memory_add(header_memory, field_path_bytes(&info.path)?)?;
+    header_memory = checked_memory_add(
+        header_memory,
+        info.object_references
+            .len()
+            .checked_mul(size_of::<u64>())
+            .ok_or_else(|| Error::invalid_archive(0, "field metadata memory overflow"))?,
+    )?;
+    header_memory = checked_memory_add(
+        header_memory,
+        info.data_references
+            .len()
+            .checked_mul(size_of::<u64>())
+            .ok_or_else(|| Error::invalid_archive(0, "field metadata memory overflow"))?,
+    )?;
+    header_memory = checked_memory_add(
+        header_memory,
+        info.known_field_version
+            .len()
+            .checked_mul(size_of::<u32>())
+            .ok_or_else(|| Error::invalid_archive(0, "field metadata memory overflow"))?,
+    )?;
+    header_memory = checked_memory_add(
+        header_memory,
+        info.known_field_feature_identifier
+            .as_deref()
+            .map_or(0, str::len),
+    )?;
+
+    Ok(FieldInfoAdmission {
+        encoded_length,
+        header_fields,
+        header_memory,
+        metadata_items,
+    })
+}
+
+fn minimal_message_info_admission(type_: u32, length: u32) -> Result<MessageInfoAdmission> {
+    let encoded_length = minimal_message_info_encoded_length(type_, length)?;
+    Ok(MessageInfoAdmission {
+        encoded_length,
+        header_fields: 3,
+        header_nesting: 0,
+        header_memory: minimal_message_info_memory()?,
+        metadata_items: DEFAULT_MESSAGE_VERSIONS.len(),
+    })
+}
+
+fn message_info_admission(info: &MessageInfo, limits: Limits) -> Result<MessageInfoAdmission> {
+    let length = usize::try_from(info.length)
+        .map_err(|_| Error::invalid_archive(0, "message length exceeds usize"))?;
+    check_message_length(length, limits)?;
+
+    let mut encoded_length = varint_field_length(1, u64::from(info.type_))?;
+    encoded_length =
+        checked_encoded_add(encoded_length, packed_u32_field_length(2, &info.versions)?)?;
+    encoded_length = checked_encoded_add(
+        encoded_length,
+        varint_field_length(3, u64::from(info.length))?,
+    )?;
+    let mut header_fields = 2usize;
+    for present in [
+        !info.versions.is_empty(),
+        !info.object_references.is_empty(),
+        !info.data_references.is_empty(),
+        info.base_message_index.is_some(),
+        !info.diff_merge_version.is_empty(),
+        info.diff_field_path.is_some(),
+        !info.diff_read_version.is_empty(),
+    ] {
+        header_fields = header_fields
+            .checked_add(usize::from(present))
+            .ok_or_else(|| Error::invalid_archive(0, "message field count overflow"))?;
+    }
+    header_fields = header_fields
+        .checked_add(info.field_infos.len())
+        .and_then(|value| value.checked_add(info.fields_to_remove.len()))
+        .ok_or_else(|| Error::invalid_archive(0, "message field count overflow"))?;
+
+    let mut metadata_items = 0usize;
+    for value in [
+        info.versions.len(),
+        info.field_infos.len(),
+        info.object_references.len(),
+        info.data_references.len(),
+        info.diff_merge_version.len(),
+        usize::from(info.diff_field_path.is_some()),
+        info.fields_to_remove.len(),
+        info.diff_read_version.len(),
+    ] {
+        metadata_items = metadata_items
+            .checked_add(value)
+            .ok_or_else(|| Error::invalid_archive(0, "metadata item count overflow"))?;
+    }
+
+    let mut header_memory = size_of::<MessageInfo>();
+    for (length, element_size) in [
+        (info.versions.len(), size_of::<u32>()),
+        (info.object_references.len(), size_of::<u64>()),
+        (info.data_references.len(), size_of::<u64>()),
+        (info.diff_merge_version.len(), size_of::<u32>()),
+        (info.diff_read_version.len(), size_of::<u32>()),
+    ] {
+        header_memory = checked_memory_add(
+            header_memory,
+            length
+                .checked_mul(element_size)
+                .ok_or_else(|| Error::invalid_archive(0, "message metadata memory overflow"))?,
+        )?;
+    }
+
+    for field_info in &info.field_infos {
+        let admission = field_info_admission(field_info)?;
+        encoded_length = checked_encoded_add(
+            encoded_length,
+            length_delimited_field_length(4, admission.encoded_length)?,
+        )?;
+        header_fields = header_fields
+            .checked_add(admission.header_fields)
+            .ok_or_else(|| Error::invalid_archive(0, "message field count overflow"))?;
+        metadata_items = metadata_items
+            .checked_add(admission.metadata_items)
+            .ok_or_else(|| Error::invalid_archive(0, "metadata item count overflow"))?;
+        header_memory = checked_memory_add(header_memory, admission.header_memory)?;
+    }
+    encoded_length = checked_encoded_add(
+        encoded_length,
+        packed_u64_field_length(5, &info.object_references)?,
+    )?;
+    encoded_length = checked_encoded_add(
+        encoded_length,
+        packed_u64_field_length(6, &info.data_references)?,
+    )?;
+    if let Some(base_message_index) = info.base_message_index {
+        encoded_length = checked_encoded_add(
+            encoded_length,
+            varint_field_length(7, u64::from(base_message_index))?,
+        )?;
+    }
+    encoded_length = checked_encoded_add(
+        encoded_length,
+        packed_u32_field_length(8, &info.diff_merge_version)?,
+    )?;
+    if let Some(path) = &info.diff_field_path {
+        let path_length = encoded_field_path_length(path)?;
+        encoded_length = checked_encoded_add(
+            encoded_length,
+            length_delimited_field_length(9, path_length)?,
+        )?;
+        header_fields = header_fields
+            .checked_add(field_path_header_field_count(path))
+            .ok_or_else(|| Error::invalid_archive(0, "message field count overflow"))?;
+        metadata_items = metadata_items
+            .checked_add(path.path.len())
+            .ok_or_else(|| Error::invalid_archive(0, "metadata item count overflow"))?;
+        header_memory = checked_memory_add(header_memory, field_path_bytes(path)?)?;
+    }
+    for path in &info.fields_to_remove {
+        let path_length = encoded_field_path_length(path)?;
+        encoded_length = checked_encoded_add(
+            encoded_length,
+            length_delimited_field_length(10, path_length)?,
+        )?;
+        header_fields = header_fields
+            .checked_add(field_path_header_field_count(path))
+            .ok_or_else(|| Error::invalid_archive(0, "message field count overflow"))?;
+        metadata_items = metadata_items
+            .checked_add(path.path.len())
+            .ok_or_else(|| Error::invalid_archive(0, "metadata item count overflow"))?;
+        header_memory = checked_memory_add(header_memory, field_path_bytes(path)?)?;
+    }
+    header_memory = checked_memory_add(
+        header_memory,
+        info.fields_to_remove
+            .len()
+            .checked_mul(size_of::<FieldPath>())
+            .ok_or_else(|| Error::invalid_archive(0, "message metadata memory overflow"))?,
+    )?;
+    encoded_length = checked_encoded_add(
+        encoded_length,
+        packed_u32_field_length(11, &info.diff_read_version)?,
+    )?;
+    let header_nesting = if info.field_infos.is_empty() {
+        usize::from(info.diff_field_path.is_some() || !info.fields_to_remove.is_empty())
+    } else {
+        2
+    };
+    if metadata_items > limits.max_metadata_items() {
+        return Err(limit(
+            LimitKind::MetadataItems,
+            metadata_items,
+            limits.max_metadata_items(),
+        ));
+    }
+    Ok(MessageInfoAdmission {
+        encoded_length,
+        header_fields,
+        header_nesting,
+        header_memory,
+        metadata_items,
+    })
+}
+
 fn check_archive_info_constructor(
     info: &ArchiveInfo,
     limits: Limits,
@@ -1186,25 +1794,41 @@ fn check_archive_info_constructor(
         .ok_or_else(|| Error::invalid_archive(0, "ArchiveInfo field count overflow"))?;
     let mut header_nesting = usize::from(message_count != 0);
     let mut header_memory = size_of::<ArchiveInfo>();
+    let mut encoded_messages_length = 0usize;
     for message_info in &info.message_infos {
-        message_info.validate(limits)?;
+        let admission = message_info_admission(message_info, limits)?;
+        encoded_messages_length = checked_encoded_add(
+            encoded_messages_length,
+            length_delimited_field_length(2, admission.encoded_length)?,
+        )?;
         add_limited(
             &mut metadata_items,
-            message_info.metadata_item_count()?,
+            admission.metadata_items,
             LimitKind::MetadataItems,
             limits.max_metadata_items(),
         )?;
         header_fields = header_fields
-            .checked_add(message_info_header_field_count(message_info)?)
+            .checked_add(admission.header_fields)
             .ok_or_else(|| Error::invalid_archive(0, "ArchiveInfo field count overflow"))?;
         header_nesting = header_nesting.max(
             1usize
-                .checked_add(message_info_header_nesting(message_info)?)
+                .checked_add(admission.header_nesting)
                 .ok_or_else(|| Error::invalid_archive(0, "ArchiveInfo nesting overflow"))?,
         );
-        header_memory = checked_memory_add(header_memory, message_info_memory(message_info)?)?;
+        header_memory = checked_memory_add(header_memory, admission.header_memory)?;
     }
-    let header_length = archive_info_encoded_len(info)?;
+    let mut header_length = varint_field_length(
+        1,
+        info.identifier
+            .expect("archive identifier was checked above"),
+    )?;
+    header_length = checked_encoded_add(header_length, encoded_messages_length)?;
+    if let Some(should_merge) = info.should_merge {
+        header_length = checked_encoded_add(
+            header_length,
+            varint_field_length(3, u64::from(should_merge))?,
+        )?;
+    }
     check_constructor_header(
         header_length,
         header_fields,
@@ -1371,6 +1995,7 @@ fn field_path_bytes(path: &FieldPath) -> Result<usize> {
         .ok_or_else(|| Error::invalid_archive(0, "field path memory overflow"))
 }
 
+#[cfg(test)]
 fn field_info_memory(info: &FieldInfo) -> Result<usize> {
     let mut memory = size_of::<FieldInfo>();
     // `FieldInfo.path` is inline in the record; only its owned component
@@ -1405,6 +2030,7 @@ fn field_info_memory(info: &FieldInfo) -> Result<usize> {
     )
 }
 
+#[cfg(test)]
 fn message_info_memory(info: &MessageInfo) -> Result<usize> {
     let mut memory = size_of::<MessageInfo>();
     for (length, element_size) in [
@@ -1446,6 +2072,7 @@ fn field_path_header_field_count(path: &FieldPath) -> usize {
     usize::from(!path.path.is_empty())
 }
 
+#[cfg(test)]
 fn field_info_header_field_count(info: &FieldInfo) -> Result<usize> {
     let mut fields = 1usize; // required nested FieldPath
     for present in [
@@ -1466,6 +2093,7 @@ fn field_info_header_field_count(info: &FieldInfo) -> Result<usize> {
         .ok_or_else(|| Error::invalid_archive(0, "field count overflow"))
 }
 
+#[cfg(test)]
 fn message_info_header_field_count(info: &MessageInfo) -> Result<usize> {
     let mut fields = 2usize; // required type and length
     for present in [
@@ -1503,6 +2131,7 @@ fn message_info_header_field_count(info: &MessageInfo) -> Result<usize> {
     Ok(fields)
 }
 
+#[cfg(test)]
 fn message_info_header_nesting(info: &MessageInfo) -> Result<usize> {
     let nested = if info.field_infos.is_empty() {
         usize::from(info.diff_field_path.is_some() || !info.fields_to_remove.is_empty())
@@ -7788,21 +8417,47 @@ fn restore_replaced_message(
     info.length = old_length;
 }
 
-fn archive_info_from_codec(value: archive_codec::ArchiveInfo) -> Result<ArchiveInfo> {
+fn archive_info_from_codec_with_admission(
+    value: archive_codec::ArchiveInfo,
+    limits: Limits,
+) -> Result<(ArchiveInfo, ArchiveInfoAdmission)> {
+    if value.identifier.is_none() {
+        return Err(Error::invalid_archive(
+            0,
+            "object is missing its archive identifier",
+        ));
+    }
+    if value.message_infos.len() > limits.max_messages_per_object() {
+        return Err(limit(
+            LimitKind::MessagesPerObject,
+            value.message_infos.len(),
+            limits.max_messages_per_object(),
+        ));
+    }
     let mut message_infos = Vec::new();
     message_infos
         .try_reserve_exact(value.message_infos.len())
         .map_err(|_| {
             Error::allocation("IWA neutral message metadata", value.message_infos.len())
         })?;
+    let mut collection_admission = MessageInfoCollectionAdmission::empty();
     for message_info in value.message_infos {
-        message_infos.push(message_info_from_codec(message_info)?);
+        let message_info = message_info_from_codec(message_info)?;
+        let admission = message_info_admission(&message_info, limits)?;
+        collection_admission.push(admission, limits)?;
+        message_infos.push(message_info);
     }
-    Ok(ArchiveInfo {
-        identifier: value.identifier,
-        message_infos,
-        should_merge: value.should_merge,
-    })
+    let admission =
+        collection_admission.archive_info_with_options(value.identifier, value.should_merge)?;
+    admission.check(limits)?;
+    Ok((
+        ArchiveInfo {
+            identifier: value.identifier,
+            message_infos,
+            should_merge: value.should_merge,
+        },
+        admission,
+    ))
 }
 
 fn archive_info_to_codec(value: &ArchiveInfo) -> Result<archive_codec::ArchiveInfo> {
@@ -8084,6 +8739,54 @@ impl<'a> CanonicalHeaderProbe<'a> {
         Ok(())
     }
 
+    fn is_comparing(&self) -> bool {
+        self.target.is_some()
+    }
+
+    /// Read a canonical length from the target without doing a second walk of
+    /// the current metadata. The target is generated by the same canonical
+    /// encoder, so comparing the target's exact varint spelling through
+    /// `varint` below still rejects noncanonical or truncated targets.
+    fn target_varint(&self) -> Option<u64> {
+        let target = self.target?;
+        let bytes = target.get(self.offset..)?;
+        let mut value = 0u64;
+        for (index, byte) in bytes.iter().copied().enumerate() {
+            if index >= MAX_VARINT_BYTES {
+                return None;
+            }
+            let shift = index * 7;
+            if index == MAX_VARINT_BYTES - 1 && byte > 1 {
+                return None;
+            }
+            value |= u64::from(byte & 0x7f) << shift;
+            if byte & 0x80 == 0 {
+                return Some(value);
+            }
+        }
+        None
+    }
+
+    fn resolve_length(&mut self, computed: Option<usize>) -> Result<usize> {
+        match (self.target, computed) {
+            (None, Some(length)) => Ok(length),
+            (Some(_), None) => {
+                let length = self
+                    .target_varint()
+                    .and_then(|length| usize::try_from(length).ok());
+                if let Some(length) = length {
+                    return Ok(length);
+                }
+                self.matches = false;
+                Ok(0)
+            },
+            _ => Err(Error::invalid_archive(
+                0,
+                "canonical header length source is missing",
+            )),
+        }
+    }
+
     fn varint(&mut self, value: u64) -> Result<()> {
         let mut encoded = [0u8; MAX_VARINT_BYTES];
         self.bytes(encode_varint(value, &mut encoded))
@@ -8101,13 +8804,14 @@ impl<'a> CanonicalHeaderProbe<'a> {
     fn length_delimited_field<F>(
         &mut self,
         number: u32,
-        payload_length: usize,
+        payload_length: Option<usize>,
         write_payload: F,
     ) -> Result<()>
     where
         F: FnOnce(&mut Self) -> Result<()>,
     {
         self.field_key(number, 2)?;
+        let payload_length = self.resolve_length(payload_length)?;
         self.varint(
             u64::try_from(payload_length)
                 .map_err(|_| Error::invalid_archive(0, "ArchiveInfo field length exceeds u64"))?,
@@ -8296,8 +9000,15 @@ fn emit_canonical_archive_info(
         probe.varint_field(1, identifier)?;
     }
     for (message_info, message) in info.message_infos.iter().zip(&object.messages) {
-        let payload_length =
-            encoded_message_info_length(message_info, message.type_, message.data.len())?;
+        let payload_length = if probe.is_comparing() {
+            None
+        } else {
+            Some(encoded_message_info_length(
+                message_info,
+                message.type_,
+                message.data.len(),
+            )?)
+        };
         probe.length_delimited_field(2, payload_length, |probe| {
             emit_canonical_message_info(probe, message_info, message.type_, message.data.len())
         })?;
@@ -8324,7 +9035,11 @@ fn emit_canonical_message_info(
         ),
     )?;
     for field_info in &info.field_infos {
-        let payload_length = encoded_field_info_length(field_info)?;
+        let payload_length = if probe.is_comparing() {
+            None
+        } else {
+            Some(encoded_field_info_length(field_info)?)
+        };
         probe.length_delimited_field(4, payload_length, |probe| {
             emit_canonical_field_info(probe, field_info)
         })?;
@@ -8336,13 +9051,21 @@ fn emit_canonical_message_info(
     }
     emit_packed_u32(probe, 8, &info.diff_merge_version)?;
     if let Some(path) = &info.diff_field_path {
-        let payload_length = encoded_field_path_length(path)?;
+        let payload_length = if probe.is_comparing() {
+            None
+        } else {
+            Some(encoded_field_path_length(path)?)
+        };
         probe.length_delimited_field(9, payload_length, |probe| {
             emit_canonical_field_path(probe, path)
         })?;
     }
     for path in &info.fields_to_remove {
-        let payload_length = encoded_field_path_length(path)?;
+        let payload_length = if probe.is_comparing() {
+            None
+        } else {
+            Some(encoded_field_path_length(path)?)
+        };
         probe.length_delimited_field(10, payload_length, |probe| {
             emit_canonical_field_path(probe, path)
         })?;
@@ -8351,7 +9074,11 @@ fn emit_canonical_message_info(
 }
 
 fn emit_canonical_field_info(probe: &mut CanonicalHeaderProbe<'_>, info: &FieldInfo) -> Result<()> {
-    let payload_length = encoded_field_path_length(&info.path)?;
+    let payload_length = if probe.is_comparing() {
+        None
+    } else {
+        Some(encoded_field_path_length(&info.path)?)
+    };
     probe.length_delimited_field(1, payload_length, |probe| {
         emit_canonical_field_path(probe, &info.path)
     })?;
@@ -8383,7 +9110,7 @@ fn emit_canonical_field_info(probe: &mut CanonicalHeaderProbe<'_>, info: &FieldI
     }
     emit_packed_u32(probe, 7, &info.known_field_version)?;
     if let Some(feature_identifier) = &info.known_field_feature_identifier {
-        probe.length_delimited_field(8, feature_identifier.len(), |probe| {
+        probe.length_delimited_field(8, Some(feature_identifier.len()), |probe| {
             probe.bytes(feature_identifier.as_bytes())
         })?;
     }
@@ -8429,7 +9156,11 @@ fn emit_packed_u32(
     if values.is_empty() {
         return Ok(());
     }
-    let payload_length = packed_u32_length(values)?;
+    let payload_length = if probe.is_comparing() {
+        None
+    } else {
+        Some(packed_u32_length(values)?)
+    };
     probe.length_delimited_field(number, payload_length, |probe| {
         for value in values {
             probe.varint(u64::from(*value))?;
@@ -8446,7 +9177,11 @@ fn emit_packed_u64(
     if values.is_empty() {
         return Ok(());
     }
-    let payload_length = packed_u64_length(values)?;
+    let payload_length = if probe.is_comparing() {
+        None
+    } else {
+        Some(packed_u64_length(values)?)
+    };
     probe.length_delimited_field(number, payload_length, |probe| {
         for value in values {
             probe.varint(*value)?;
@@ -9126,8 +9861,8 @@ mod tests {
         CanonicalObjectReferenceField, CanonicalObjectReferenceFields, DEFAULT_MESSAGE_VERSIONS,
         DataReferencePruning, DataReferenceTransition, Error, FieldDataReferenceTransition,
         FieldInfo, FieldObjectReferenceTransition, FieldPath, FieldType, KnownFieldRule,
-        MESSAGE_INFO_CONSTRUCTIONS, MessageInfo, ObjectReferenceTransition, RawMessage,
-        UnknownFieldRule, archive_info_encoded_len, archive_info_to_codec,
+        MESSAGE_INFO_CONSTRUCTIONS, MessageInfo, MessageInfoCollection, ObjectReferenceTransition,
+        RawMessage, UnknownFieldRule, archive_info_encoded_len, archive_info_to_codec,
         check_archive_info_constructor, encode_archive_info, encode_varint,
         encode_varint_with_width, encoded_field_info_length, encoded_field_path_length,
         encoded_message_info_length, field_info_header_field_count, field_info_memory,
@@ -9471,6 +10206,42 @@ mod tests {
             } if observed == Limits::MAX_MESSAGE_BYTES + 1
                 && maximum == Limits::MAX_MESSAGE_BYTES
         ));
+        Ok(())
+    }
+
+    #[test]
+    fn message_info_collection_admission_is_invalidated_by_public_mutation() -> Result<()> {
+        let limits = Limits::default();
+        let mut collection = MessageInfoCollection::with_capacity(2, limits)?;
+        collection.push_new(7, 1)?;
+        collection.push_new(8, 2)?;
+        let archive = ArchiveInfo::new(42, collection, limits)?;
+        assert_eq!(archive.message_infos.len(), 2);
+
+        let mut collection = MessageInfoCollection::new(limits)?;
+        collection.push_new(7, 1)?;
+        collection
+            .get_mut(0)
+            .expect("the pushed message exists")
+            .length = u32::try_from(Limits::MAX_MESSAGE_BYTES + 1)
+            .expect("the hard message limit fits in the wire u32");
+        let error = ArchiveInfo::new(42, collection, limits)
+            .expect_err("a public mutation must force exact admission");
+        assert!(matches!(
+            error,
+            Error::Limit {
+                kind: LimitKind::MessageBytes,
+                observed,
+                maximum,
+            } if observed == Limits::MAX_MESSAGE_BYTES + 1
+                && maximum == Limits::MAX_MESSAGE_BYTES
+        ));
+
+        let mut collection = MessageInfoCollection::new(limits)?;
+        collection.push_new(7, 1)?;
+        collection.as_mut_slice()[0].versions.clear();
+        let archive = ArchiveInfo::new(42, collection, limits)?;
+        assert!(archive.message_infos[0].versions.is_empty());
         Ok(())
     }
 

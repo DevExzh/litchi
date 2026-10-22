@@ -132,6 +132,35 @@ There is no cached header generation, inventory allocation, or provenance
 allocation on this route. The constructor performance remains returned for
 repair and owner review. No native qualification was run.
 
+## 0361fdc retained-validation repair
+
+The retained validation return was traced to the canonical comparison doing
+two metadata walks for every length-delimited field: it first calculated each
+nested encoded length and then emitted the same fields into the comparison
+probe. `CanonicalHeaderProbe` now reads the cached canonical length delimiter,
+checks its exact varint spelling, and uses that length while emitting the
+current public projection. The comparison remains exact, so public mutations,
+unknown-field provenance and noncanonical source bytes retain their existing
+selection and error behavior. The source repair also removes the duplicate
+minimal structural check from `MessageInfoCollection::push_new`; strict
+profiles still run the per-message check and the aggregate certificate is
+checked at publication.
+
+The reduced receipt is
+[`constructor-v13-retained-stream.json`](results/0361fd/constructor-v13-retained-stream.json),
+2,936 bytes. It records the external binary and callgrind-capture hashes and
+the exact command inputs. At eight messages and 12,000 iterations, the
+retained-validation candidate is 90,507,877 Ir versus 110,434,841 Ir for the
+base (0.819×); output checksum, size and SHA-256 are unchanged. The candidate
+binary predates the final `push_new`-only source simplification, which does not
+touch the retained-validation route. The earlier generic `push(MessageInfo)`
+end-to-end constructor experiment measured 107,689,426 Ir versus 27,558,801
+base Ir and is explicitly rejected; the quiet-window constructor measurement
+must use `push_new` and include its collection setup.
+
+This is deterministic instruction evidence only. Native qualification remains
+pending, and the constructor end-to-end measurement is still open.
+
 ## Validation and workspace hygiene
 
 The source passed `cargo fmt --all -- --check`,

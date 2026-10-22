@@ -20,7 +20,8 @@ pub use archive::{
     ArchiveReferenceVisitor, CanonicalFieldDataReferenceOperation,
     CanonicalFieldDataReferenceTransition, CanonicalObjectReferenceField,
     CanonicalObjectReferenceFields, DataReferenceTransition, FieldDataReferenceTransition,
-    FieldInfo, FieldPath, FieldType, KnownFieldRule, MessageInfo, RawMessage, UnknownFieldRule,
+    FieldInfo, FieldPath, FieldType, KnownFieldRule, MessageInfo, MessageInfoCollection,
+    RawMessage, UnknownFieldRule,
 };
 pub use error::{Error, HeaderKind, HeaderOperation, LimitKind, Result};
 pub use limits::Limits;

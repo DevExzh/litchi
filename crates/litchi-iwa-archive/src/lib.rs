@@ -40,7 +40,8 @@ pub mod iwa {
     pub use litchi_iwa_core::{
         Archive, ArchiveInfo, ArchiveObject, ArchiveReferenceOccurrence, ArchiveReferencePolicy,
         ArchiveReferenceVisitor, Error, FieldInfo, FieldPath, FieldType, LimitKind, Limits,
-        MessageInfo, RawMessage, Result, SnappyLimits, SnappyStream, UnknownFieldRule,
+        MessageInfo, MessageInfoCollection, RawMessage, Result, SnappyLimits, SnappyStream,
+        UnknownFieldRule,
     };
 }
 
