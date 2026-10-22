@@ -2,7 +2,7 @@
 
 use super::model::{Cache, Part};
 use crate::error::Result;
-use litchi_opc::{OpcPackage, PackURI};
+use litchi_opc::{OpcPackage, PackURI, SourceLimits};
 
 /// Load and validate all workbook-owned timeline caches.
 pub fn load_caches(package: &OpcPackage, workbook: &PackURI) -> Result<Vec<Cache>> {
@@ -16,7 +16,16 @@ pub fn load_parts(package: &OpcPackage, workbook: &PackURI) -> Result<Vec<Part>>
 
 /// Validate every timeline cache/view edge and orphan rule.
 pub fn validate_graph(package: &OpcPackage, workbook: &PackURI) -> Result<()> {
-    load_caches(package, workbook)?;
-    load_parts(package, workbook)?;
+    let limits = package.read_limits();
+    validate_graph_with_limits(package, workbook, &limits)
+}
+
+pub(crate) fn validate_graph_with_limits(
+    package: &OpcPackage,
+    workbook: &PackURI,
+    limits: &SourceLimits,
+) -> Result<()> {
+    crate::timelines::load_timeline_caches_limited(package, workbook, limits)?;
+    crate::timelines::load_timelines_limited(package, workbook, limits)?;
     Ok(())
 }

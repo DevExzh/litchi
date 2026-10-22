@@ -22,16 +22,42 @@ use crate::Package;
 use crate::error::Result;
 use crate::part_edit::{Staged, family};
 use litchi_opc::{OpcPackage, PackURI, SourceLimits};
+use std::collections::HashSet;
 
 family!("timeline");
 
 pub use crate::opc::LimitKind;
+
+/// Configuration for one timeline edit.
+///
+/// The package's retained source policy remains authoritative. A supplied
+/// policy can only tighten that policy for this edit.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct EditOptions {
+    limits: Option<SourceLimits>,
+}
+
+impl EditOptions {
+    /// Tighten this edit's source policy.
+    #[must_use]
+    pub const fn limits(mut self, limits: SourceLimits) -> Self {
+        self.limits = Some(limits);
+        self
+    }
+
+    /// Return the optional per-edit policy.
+    #[must_use]
+    pub const fn limits_value(self) -> Option<SourceLimits> {
+        self.limits
+    }
+}
 
 /// A staged timeline edit of one [`Package`]. Dropping it discards it.
 #[derive(Debug, Clone)]
 pub struct Edit {
     staged: Staged,
     workbook: PackURI,
+    limits: SourceLimits,
 }
 
 impl Package {
@@ -42,10 +68,23 @@ impl Package {
     /// Returns the encryption-policy error for a package whose mutations are
     /// refused, and the validation errors of the timeline graph.
     pub fn edit_timelines(&self) -> Result<Edit> {
+        self.edit_timelines_with_options(EditOptions::default())
+    }
+
+    /// Start a timeline edit with an optional tighter source policy.
+    pub fn edit_timelines_with_options(&self, options: EditOptions) -> Result<Edit> {
         let staged = Staged::new(self, "edit_timelines")?;
         let workbook = staged.opc().main_document_part()?.partname().clone();
-        super::validation::graph(staged.opc(), &workbook)?;
-        Ok(Edit { staged, workbook })
+        let limits = staged
+            .opc()
+            .read_limits()
+            .min(options.limits.unwrap_or_else(|| staged.opc().read_limits()));
+        super::validation::graph_with_limits(staged.opc(), &workbook, &limits)?;
+        Ok(Edit {
+            staged,
+            workbook,
+            limits,
+        })
     }
 
     /// Apply a timeline patch to a new package; this one is unchanged. An
@@ -91,19 +130,43 @@ impl Edit {
     /// This is the raw identity escape for the timeline edit family. The
     /// complete candidate graph is checked against `limits`, and publication
     /// still happens only through [`Self::commit`].
-    pub fn insert_caches(&mut self, values: &[raw::Cache], limits: &SourceLimits) -> Result<()> {
-        let limits = crate::raw::effective_limits(self.staged.opc(), *limits);
+    pub fn insert_caches(&mut self, values: &[raw::Cache]) -> Result<()> {
+        let limits = self.limits;
+        crate::raw::check_limit(
+            litchi_opc::SourceLimitKind::RelationshipsPerPart,
+            values.len() as u64,
+            limits.max_relationships_per_part() as u64,
+        )?;
+        crate::raw::check_new_part_count(self.staged.opc(), values.len(), &limits)?;
+        let mut ids = HashSet::with_capacity(values.len());
+        let mut targets = HashSet::<String>::with_capacity(values.len());
         for value in values {
-            raw::preflight_cache(value, self.workbook.base_uri(), &limits)?;
+            let uri = raw::validate_cache_identity(value, self.workbook.base_uri(), &limits)?;
+            if !ids.insert(value.relationship_id.as_str()) {
+                return Err(crate::error::invalid(
+                    "duplicate View Cache relationship ID",
+                ));
+            }
+            if !targets.insert(uri.to_string()) {
+                return Err(crate::error::invalid("duplicate View Cache part name"));
+            }
+            crate::raw::check_new_relationship_identity(
+                self.staged.opc(),
+                &self.workbook,
+                &value.relationship_id,
+                &uri,
+            )?;
         }
-        let values = values
+        let prepared = values
             .iter()
             .cloned()
-            .map(raw::Cache::into_model)
-            .collect::<Vec<_>>();
+            .map(|value| raw::prepare_cache(value, self.workbook.base_uri(), &limits))
+            .collect::<Result<Vec<_>>>()?;
         let workbook = self.workbook.clone();
         self.apply_raw(&limits, move |candidate| {
-            crate::timelines::store_timeline_caches_limited(candidate, &workbook, &values, &limits)
+            crate::timelines::store_timeline_caches_prepared_limited(
+                candidate, &workbook, &prepared, &limits,
+            )
         })
     }
 
@@ -142,14 +205,21 @@ impl Edit {
 
     /// Insert a worksheet Timelines part with its caller-selected worksheet,
     /// relationship ID and part name.
-    pub fn insert_part(&mut self, value: raw::Part, limits: &SourceLimits) -> Result<()> {
-        let limits = crate::raw::effective_limits(self.staged.opc(), *limits);
-        raw::preflight_part(&value, &limits)?;
-        let value = value.into_model();
+    pub fn insert_part(&mut self, value: raw::Part) -> Result<()> {
+        let limits = self.limits;
+        crate::raw::check_new_part_count(self.staged.opc(), 1, &limits)?;
+        let (uri, worksheet) = raw::validate_part_identity(&value, &limits)?;
+        crate::raw::check_new_relationship_identity(
+            self.staged.opc(),
+            &worksheet,
+            &value.relationship_id,
+            &uri,
+        )?;
+        let prepared = raw::prepare_part(value, &limits)?;
         let workbook = self.workbook.clone();
         self.apply_raw(&limits, move |candidate| {
-            crate::timelines::store_worksheet_timelines_limited(
-                candidate, &workbook, &value, &limits,
+            crate::timelines::store_worksheet_timelines_prepared_limited(
+                candidate, &workbook, &prepared, &limits,
             )
         })
     }
@@ -215,28 +285,29 @@ impl Edit {
     /// signed package and the workbook validation errors of the staged
     /// package.
     pub fn commit(self) -> Result<Commit> {
-        super::validation::graph(self.staged.opc(), &self.workbook)?;
+        super::validation::graph_with_limits(self.staged.opc(), &self.workbook, &self.limits)?;
         Ok(Commit::new(self.staged.commit()?))
     }
 
     fn apply<T>(&mut self, operation: impl FnOnce(&mut OpcPackage) -> Result<T>) -> Result<T> {
         let workbook = &self.workbook;
+        let limits = self.limits;
         self.staged.update(|candidate| {
             let value = operation(candidate)?;
-            super::validation::graph(candidate, workbook)?;
+            super::validation::graph_with_limits(candidate, workbook, &limits)?;
             Ok(value)
         })
     }
 
     fn apply_raw<T>(
         &mut self,
-        _limits: &SourceLimits,
+        limits: &SourceLimits,
         operation: impl FnOnce(&mut OpcPackage) -> Result<T>,
     ) -> Result<T> {
         let workbook = &self.workbook;
         self.staged.update(|candidate| {
             let value = operation(candidate)?;
-            super::validation::graph(candidate, workbook)?;
+            super::validation::graph_with_limits(candidate, workbook, limits)?;
             Ok(value)
         })
     }

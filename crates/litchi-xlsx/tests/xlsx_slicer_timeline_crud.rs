@@ -108,17 +108,16 @@ fn raw_slicer_insert_preserves_identity_replay_inverse_and_untouched_bytes() {
         .unwrap()
         .build()
         .unwrap();
-    let mut limited = source.edit_slicers().unwrap();
+    let mut limited = source
+        .edit_slicers_with_options(slicer::EditOptions::default().limits(tight_limits))
+        .unwrap();
     assert!(
         limited
-            .insert_cache(
-                slicer::raw::Cache {
-                    relationship_id: "rIdRejectedSlicerCache".into(),
-                    part_name: "/xl/slicerCaches/rejected.xml".into(),
-                    definition: slicer_cache("RejectedCache", "State"),
-                },
-                &tight_limits,
-            )
+            .insert_cache(slicer::raw::Cache {
+                relationship_id: "rIdRejectedSlicerCache".into(),
+                part_name: "/xl/slicerCaches/rejected.xml".into(),
+                definition: slicer_cache("RejectedCache", "State"),
+            },)
             .is_err()
     );
     assert!(limited.cache("RejectedCache").unwrap().is_none());
@@ -131,33 +130,31 @@ fn raw_slicer_insert_preserves_identity_replay_inverse_and_untouched_bytes() {
         .unwrap()
         .build()
         .unwrap();
-    let mut writer_limited = source.edit_slicers().unwrap();
+    let mut writer_limited = source
+        .edit_slicers_with_options(slicer::EditOptions::default().limits(part_limited))
+        .unwrap();
     assert!(
         writer_limited
-            .insert_cache(
-                slicer::raw::Cache {
-                    relationship_id: "rIdRejectedWriter".into(),
-                    part_name: "/xl/slicerCaches/rejected-writer.xml".into(),
-                    definition: slicer_cache("RejectedWriter", "State"),
-                },
-                &part_limited,
-            )
+            .insert_cache(slicer::raw::Cache {
+                relationship_id: "rIdRejectedWriter".into(),
+                part_name: "/xl/slicerCaches/rejected-writer.xml".into(),
+                definition: slicer_cache("RejectedWriter", "State"),
+            },)
             .is_err()
     );
     assert!(writer_limited.cache("RejectedWriter").unwrap().is_none());
-    let mut edit = source.edit_slicers().unwrap();
-    edit.insert_cache(
-        slicer::raw::Cache {
-            relationship_id: "rIdNativeSlicerCache".into(),
-            part_name: "/xl/slicerCaches/native-cache.xml".into(),
-            definition: slicer::raw::parse_cache(
-                slicer_cache_xml("NativeCache", "State").as_bytes(),
-                &limits,
-            )
-            .unwrap(),
-        },
-        &limits,
-    )
+    let mut edit = source
+        .edit_slicers_with_options(slicer::EditOptions::default().limits(limits))
+        .unwrap();
+    edit.insert_cache(slicer::raw::Cache {
+        relationship_id: "rIdNativeSlicerCache".into(),
+        part_name: "/xl/slicerCaches/native-cache.xml".into(),
+        definition: slicer::raw::parse_cache(
+            slicer_cache_xml("NativeCache", "State").as_bytes(),
+            &limits,
+        )
+        .unwrap(),
+    })
     .unwrap();
     edit.insert_part(
         &worksheet,
@@ -170,7 +167,6 @@ fn raw_slicer_insert_preserves_identity_replay_inverse_and_untouched_bytes() {
             )
             .unwrap(),
         },
-        &limits,
     )
     .unwrap();
     let commit = edit.commit().unwrap();
@@ -281,33 +277,33 @@ fn raw_timeline_insert_preserves_identity_replay_inverse_and_untouched_bytes() {
         part_name: "/xl/timelineCaches/rejected.xml".into(),
         definition: timeline_cache("RejectedTimelineCache", "Date"),
     };
-    let mut limited = source.edit_timelines().unwrap();
-    assert!(limited.insert_caches(&[rejected], &tight_limits).is_err());
-    let mut edit = source.edit_timelines().unwrap();
+    let mut limited = source
+        .edit_timelines_with_options(
+            litchi_xlsx::timeline::EditOptions::default().limits(tight_limits),
+        )
+        .unwrap();
+    assert!(limited.insert_caches(&[rejected]).is_err());
+    let mut edit = source
+        .edit_timelines_with_options(litchi_xlsx::timeline::EditOptions::default().limits(limits))
+        .unwrap();
     let cache_value = timeline_cache("NativeTimelineCache", "Date");
     let cache_xml = litchi_xlsx::timeline::codec::write_cache(&cache_value).unwrap();
-    edit.insert_caches(
-        &[litchi_xlsx::timeline::raw::Cache {
-            relationship_id: "rIdNativeTimelineCache".into(),
-            part_name: "/xl/timelineCaches/native-cache.xml".into(),
-            definition: litchi_xlsx::timeline::raw::parse_cache(&cache_xml, &limits).unwrap(),
-        }],
-        &limits,
-    )
+    edit.insert_caches(&[litchi_xlsx::timeline::raw::Cache {
+        relationship_id: "rIdNativeTimelineCache".into(),
+        part_name: "/xl/timelineCaches/native-cache.xml".into(),
+        definition: litchi_xlsx::timeline::raw::parse_cache(&cache_xml, &limits).unwrap(),
+    }])
     .unwrap();
     let views_value = litchi_xlsx::timeline::Views {
         timelines: vec![timeline("NativeTimeline", "NativeTimelineCache")],
     };
     let views_xml = litchi_xlsx::timeline::codec::write_views(&views_value).unwrap();
-    edit.insert_part(
-        litchi_xlsx::timeline::raw::Part {
-            worksheet_part_name: worksheet.to_string(),
-            relationship_id: "rIdNativeTimeline".into(),
-            part_name: "/xl/timelines/native.xml".into(),
-            timelines: litchi_xlsx::timeline::raw::parse_part(&views_xml, &limits).unwrap(),
-        },
-        &limits,
-    )
+    edit.insert_part(litchi_xlsx::timeline::raw::Part {
+        worksheet_part_name: worksheet.to_string(),
+        relationship_id: "rIdNativeTimeline".into(),
+        part_name: "/xl/timelines/native.xml".into(),
+        timelines: litchi_xlsx::timeline::raw::parse_part(&views_xml, &limits).unwrap(),
+    })
     .unwrap();
     let commit = edit.commit().unwrap();
     assert!(commit.diagnostics().changed());
@@ -369,6 +365,64 @@ fn raw_timeline_insert_preserves_identity_replay_inverse_and_untouched_bytes() {
     let noop = source.edit_timelines().unwrap().commit().unwrap();
     assert!(noop.patch().is_noop());
     assert!(!noop.diagnostics().changed());
+}
+
+#[test]
+fn raw_identity_admission_uses_archive_member_spelling_and_global_relationship_budget() {
+    let (package, _) = package();
+    let source = litchi_xlsx::Package::from_opc(package).unwrap();
+    let target =
+        PackURI::new("/xl/slicerCaches/member-name-that-is-longer-than-existing-rels.xml").unwrap();
+    let member_limit = target.membername().len() as u64;
+    let value = || slicer::raw::Cache {
+        relationship_id: "rIdMemberName".into(),
+        part_name: target.to_string(),
+        definition: slicer_cache("MemberName", "State"),
+    };
+
+    // The absolute URI is one byte longer than the archive member spelling;
+    // a limit equal to the member must still admit this valid OPC path.
+    let mut valid = source
+        .edit_slicers_with_options(
+            slicer::EditOptions::default().limits(
+                SourceLimits::builder()
+                    .max_archive_member_name_bytes(member_limit)
+                    .unwrap()
+                    .build()
+                    .unwrap(),
+            ),
+        )
+        .unwrap();
+    valid.insert_cache(value()).unwrap();
+
+    let mut rejected = source
+        .edit_slicers_with_options(
+            slicer::EditOptions::default().limits(
+                SourceLimits::builder()
+                    .max_archive_member_name_bytes(member_limit - 1)
+                    .unwrap()
+                    .build()
+                    .unwrap(),
+            ),
+        )
+        .unwrap();
+    assert!(rejected.insert_cache(value()).is_err());
+
+    // The root-to-workbook and workbook-to-sheet edges already consume the
+    // two-edge policy. Admission must include other owners when charging the
+    // new workbook relationship.
+    let mut aggregate = source
+        .edit_slicers_with_options(
+            slicer::EditOptions::default().limits(
+                SourceLimits::builder()
+                    .max_total_relationships(2)
+                    .unwrap()
+                    .build()
+                    .unwrap(),
+            ),
+        )
+        .unwrap();
+    assert!(aggregate.insert_cache(value()).is_err());
 }
 
 #[test]

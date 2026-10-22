@@ -10,6 +10,18 @@ use super::{Definition, Slicers};
 use crate::error::Result;
 use litchi_opc::SourceLimits;
 
+pub(crate) struct PreparedCache {
+    pub(crate) value: crate::slicer_cache::Cache,
+    pub(crate) uri: litchi_opc::PackURI,
+    pub(crate) xml: Vec<u8>,
+}
+
+pub(crate) struct PreparedPart {
+    pub(crate) value: crate::slicer_cache::views::SlicerPart,
+    pub(crate) uri: litchi_opc::PackURI,
+    pub(crate) xml: Vec<u8>,
+}
+
 /// A Slicer Cache definition with caller-selected OPC identity.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Cache {
@@ -31,11 +43,27 @@ impl Cache {
     }
 }
 
-pub(crate) fn preflight_cache(
+pub(crate) fn prepare_cache(
+    value: Cache,
+    owner_base_uri: &str,
+    limits: &SourceLimits,
+) -> Result<PreparedCache> {
+    let uri = validate_cache_identity(&value, owner_base_uri, limits)?;
+    let xml = super::codec::write_limited(&value.definition, crate::raw::output_ceiling(limits))?;
+    crate::raw::check_output_bytes(xml.len(), limits)?;
+    Ok(PreparedCache {
+        value: value.into_model(),
+        uri,
+        xml,
+    })
+}
+
+pub(crate) fn validate_cache_identity(
     value: &Cache,
     owner_base_uri: &str,
     limits: &SourceLimits,
-) -> Result<()> {
+) -> Result<litchi_opc::PackURI> {
+    crate::raw::validate_relationship_id(&value.relationship_id)?;
     crate::raw::check_limit(
         litchi_opc::SourceLimitKind::XmlAttributeBytes,
         value.relationship_id.len() as u64,
@@ -45,11 +73,14 @@ pub(crate) fn preflight_cache(
     let part_uri = litchi_opc::PackURI::new(&value.part_name).map_err(|error| {
         crate::Error::Invalid(format!("invalid Slicer Cache part URI: {error}"))
     })?;
+    if !part_uri.as_str().starts_with("/xl/slicerCaches/") || !part_uri.as_str().ends_with(".xml") {
+        return Err(crate::Error::Invalid(
+            "Slicer Cache part must be under /xl/slicerCaches and end in .xml".into(),
+        ));
+    }
+    crate::raw::check_part_member_name(&part_uri, limits)?;
     crate::raw::check_relationship_target(&part_uri, owner_base_uri, limits)?;
-    let maximum = usize::try_from(limits.max_part_bytes()).unwrap_or(usize::MAX);
-    let output = super::codec::write_limited(&value.definition, maximum)?;
-    crate::raw::check_output_bytes(output.len(), limits)?;
-    Ok(())
+    Ok(part_uri)
 }
 
 /// A worksheet Slicers part with caller-selected OPC identity.
@@ -73,11 +104,28 @@ impl Part {
     }
 }
 
-pub(crate) fn preflight_part(
+pub(crate) fn prepare_part(
+    value: Part,
+    owner_base_uri: &str,
+    limits: &SourceLimits,
+) -> Result<PreparedPart> {
+    let uri = validate_part_identity(&value, owner_base_uri, limits)?;
+    let xml =
+        super::codec::write_views_limited(&value.slicers, crate::raw::output_ceiling(limits))?;
+    crate::raw::check_output_bytes(xml.len(), limits)?;
+    Ok(PreparedPart {
+        value: value.into_model(),
+        uri,
+        xml,
+    })
+}
+
+pub(crate) fn validate_part_identity(
     value: &Part,
     owner_base_uri: &str,
     limits: &SourceLimits,
-) -> Result<()> {
+) -> Result<litchi_opc::PackURI> {
+    crate::raw::validate_relationship_id(&value.relationship_id)?;
     crate::raw::check_limit(
         litchi_opc::SourceLimitKind::XmlAttributeBytes,
         value.relationship_id.len() as u64,
@@ -86,11 +134,14 @@ pub(crate) fn preflight_part(
     crate::raw::check_source_bytes(value.part_name.len(), limits)?;
     let part_uri = litchi_opc::PackURI::new(&value.part_name)
         .map_err(|error| crate::Error::Invalid(format!("invalid Slicers part URI: {error}")))?;
+    if !part_uri.as_str().starts_with("/xl/slicers/") || !part_uri.as_str().ends_with(".xml") {
+        return Err(crate::Error::Invalid(
+            "Slicers part must be under /xl/slicers and end in .xml".into(),
+        ));
+    }
+    crate::raw::check_part_member_name(&part_uri, limits)?;
     crate::raw::check_relationship_target(&part_uri, owner_base_uri, limits)?;
-    let maximum = usize::try_from(limits.max_part_bytes()).unwrap_or(usize::MAX);
-    let output = super::codec::write_views_limited(&value.slicers, maximum)?;
-    crate::raw::check_output_bytes(output.len(), limits)?;
-    Ok(())
+    Ok(part_uri)
 }
 
 /// Parse one native Slicer Cache definition under the caller's raw limits.

@@ -12,7 +12,7 @@ pub mod package;
 pub mod raw;
 pub mod validation;
 
-pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
+pub use edit::{Commit, Diagnostics, Edit, EditOptions, Error, LimitKind, Patch};
 pub use model::{
     Cache, Data, DataKind, Definition, ExtensionList, Part, PivotTable, Slicer,
     SlicerExtensionList, Slicers,

@@ -80,7 +80,8 @@ impl IntegrationXml {
 }
 
 pub fn load_timeline_caches(package: &OpcPackage, workbook_name: &PackURI) -> Result<Vec<Cache>> {
-    load_timeline_caches_limited(package, workbook_name, &SourceLimits::default())
+    let limits = package.read_limits();
+    load_timeline_caches_limited(package, workbook_name, &limits)
 }
 
 pub(crate) fn load_timeline_caches_limited(
@@ -182,7 +183,7 @@ pub(crate) fn load_timeline_caches_limited(
             )));
         }
     }
-    let maximum = usize::try_from(limits.max_part_bytes()).unwrap_or(usize::MAX);
+    let maximum = crate::raw::output_ceiling(limits);
     for cache in &output {
         super::codec::preflight_cache_definition_limited(&cache.definition, maximum)?;
     }
@@ -201,7 +202,8 @@ pub fn store_timeline_caches(
     workbook_name: &PackURI,
     caches: &[Cache],
 ) -> Result<()> {
-    store_timeline_caches_limited(package, workbook_name, caches, &SourceLimits::default())
+    let limits = package.read_limits();
+    store_timeline_caches_limited(package, workbook_name, caches, &limits)
 }
 
 pub(crate) fn store_timeline_caches_limited(
@@ -210,14 +212,40 @@ pub(crate) fn store_timeline_caches_limited(
     caches: &[Cache],
     limits: &SourceLimits,
 ) -> Result<()> {
-    if caches.is_empty() {
+    let prepared = caches
+        .iter()
+        .cloned()
+        .map(|cache| {
+            crate::timeline::raw::prepare_cache(
+                crate::timeline::raw::Cache {
+                    relationship_id: cache.relationship_id,
+                    part_name: cache.part_name,
+                    definition: cache.definition,
+                },
+                workbook_name.base_uri(),
+                limits,
+            )
+        })
+        .collect::<Result<Vec<_>>>()?;
+    store_timeline_caches_prepared_limited(package, workbook_name, &prepared, limits)
+}
+
+pub(crate) fn store_timeline_caches_prepared_limited(
+    package: &mut OpcPackage,
+    workbook_name: &PackURI,
+    prepared: &[crate::timeline::raw::PreparedCache],
+    limits: &SourceLimits,
+) -> Result<()> {
+    if prepared.is_empty() {
         return Err(invalid("at least one View Cache is required for storage"));
     }
-    let maximum = usize::try_from(limits.max_part_bytes()).unwrap_or(usize::MAX);
-    for cache in caches {
-        super::codec::preflight_cache_definition_limited(&cache.definition, maximum)?;
-    }
-    validate_cache_set(caches)?;
+    crate::raw::check_limit(
+        litchi_opc::SourceLimitKind::RelationshipsPerPart,
+        prepared.len() as u64,
+        limits.max_relationships_per_part() as u64,
+    )?;
+    crate::raw::check_new_part_count(package, prepared.len(), limits)?;
+    validate_cache_set(prepared.iter().map(|cache| &cache.value))?;
     if !load_timeline_caches_limited(package, workbook_name, limits)?.is_empty() {
         return Err(invalid("workbook already contains View Caches"));
     }
@@ -226,51 +254,33 @@ pub(crate) fn store_timeline_caches_limited(
     let (core, rel) = source_namespaces(&root, "workbook")?;
     let mut targets = HashSet::new();
     let mut ids = HashSet::new();
-    let mut additions = Vec::with_capacity(caches.len());
-    let mut plans = Vec::with_capacity(caches.len());
-    for cache in caches {
-        validate_relationship_id(&cache.relationship_id)?;
-        if !ids.insert(cache.relationship_id.clone()) {
+    let mut additions = Vec::with_capacity(prepared.len());
+    for cache in prepared {
+        let value = &cache.value;
+        if !ids.insert(value.relationship_id.clone()) {
             return Err(invalid("duplicate View Cache relationship ID"));
         }
-        if workbook.rels().get(&cache.relationship_id).is_some() {
+        if workbook.rels().get(&value.relationship_id).is_some() {
             return Err(invalid(format!(
                 "workbook relationship ID '{}' already exists",
-                cache.relationship_id
+                value.relationship_id
             )));
         }
-        let uri = PackURI::new(&cache.part_name)
-            .map_err(|error| Error::Invalid(format!("invalid View Cache part URI: {error}")))?;
-        if !uri.as_str().starts_with("/xl/timelineCaches/") || !uri.as_str().ends_with(".xml") {
-            return Err(invalid(format!(
-                "View Cache part '{uri}' must be under /xl/timelineCaches and end in .xml"
-            )));
-        }
-        if !targets.insert(uri.to_string())
-            || package
-                .iter_parts()
-                .any(|part| part.partname().as_str() == uri.as_str())
-        {
+        let uri = cache.uri.clone();
+        if !targets.insert(uri.to_string()) || package.get_part(&uri).is_ok() {
             return Err(invalid(format!("View Cache target '{uri}' already exists")));
         }
         additions.push((
-            cache.relationship_id.clone(),
+            value.relationship_id.clone(),
             TIMELINE_CACHE_RELATIONSHIP_TYPE.to_owned(),
             uri.relative_ref(workbook_name.base_uri()),
         ));
     }
     crate::raw::check_relationship_insertions(package, workbook_name, &additions, limits)?;
-    for cache in caches {
-        let uri = PackURI::new(&cache.part_name)
-            .map_err(|error| Error::Invalid(format!("invalid View Cache part URI: {error}")))?;
-        let xml = super::codec::write_timeline_cache_definition_limited(
-            &cache.definition,
-            usize::try_from(limits.max_part_bytes()).unwrap_or(usize::MAX),
-        )?;
-        crate::raw::check_output_bytes(xml.len(), limits)?;
-        plans.push((cache.relationship_id.clone(), uri, xml));
-    }
-    let refs: Vec<String> = plans.iter().map(|plan| plan.0.clone()).collect();
+    let refs: Vec<String> = prepared
+        .iter()
+        .map(|cache| cache.value.relationship_id.clone())
+        .collect();
     let fragment = integration_extension(
         core,
         rel,
@@ -288,32 +298,46 @@ pub(crate) fn store_timeline_caches_limited(
         &fragment,
         limits,
     )?;
+    let added_bytes = prepared.iter().try_fold(0usize, |total, cache| {
+        total
+            .checked_add(cache.xml.len())
+            .ok_or_else(|| limit("aggregate part bytes"))
+    })?;
+    crate::raw::check_part_budget_with_replacements(
+        package,
+        prepared.len(),
+        added_bytes,
+        &[(workbook_name, updated.len())],
+        limits,
+    )?;
     crate::signature_policy::ensure_unsigned(package)?;
-    for (_, uri, xml) in &plans {
+    for cache in prepared {
         package.add_part(Box::new(BlobPart::new(
-            uri.clone(),
+            cache.uri.clone(),
             TIMELINE_CACHE_CONTENT_TYPE.into(),
-            xml.clone(),
+            cache.xml.clone(),
         )));
     }
-    for (id, uri, _) in &plans {
+    for cache in prepared {
         package
             .get_part_mut(workbook_name)?
             .rels_mut()
             .add_relationship(
                 TIMELINE_CACHE_RELATIONSHIP_TYPE.into(),
-                uri.relative_ref(workbook_name.base_uri()),
-                id.clone(),
+                cache.uri.relative_ref(workbook_name.base_uri()),
+                cache.value.relationship_id.clone(),
                 false,
             );
     }
     package.get_part_mut(workbook_name)?.set_blob(updated);
+    package.source_content_types_with_limits(*limits)?;
     Ok(())
 }
 
 /// Load every worksheet Views part and cross-validate views against View Caches.
 pub fn load_timelines(package: &OpcPackage, workbook_name: &PackURI) -> Result<Vec<Part>> {
-    load_timelines_limited(package, workbook_name, &SourceLimits::default())
+    let limits = package.read_limits();
+    load_timelines_limited(package, workbook_name, &limits)
 }
 
 pub(crate) fn load_timelines_limited(
@@ -446,7 +470,8 @@ pub fn store_worksheet_timelines(
     workbook_name: &PackURI,
     value: &Part,
 ) -> Result<()> {
-    store_worksheet_timelines_limited(package, workbook_name, value, &SourceLimits::default())
+    let limits = package.read_limits();
+    store_worksheet_timelines_limited(package, workbook_name, value, &limits)
 }
 
 pub(crate) fn store_worksheet_timelines_limited(
@@ -455,6 +480,25 @@ pub(crate) fn store_worksheet_timelines_limited(
     value: &Part,
     limits: &SourceLimits,
 ) -> Result<()> {
+    let prepared = crate::timeline::raw::prepare_part(
+        crate::timeline::raw::Part {
+            worksheet_part_name: value.worksheet_part_name.clone(),
+            relationship_id: value.relationship_id.clone(),
+            part_name: value.part_name.clone(),
+            timelines: value.timelines.clone(),
+        },
+        limits,
+    )?;
+    store_worksheet_timelines_prepared_limited(package, workbook_name, &prepared, limits)
+}
+
+pub(crate) fn store_worksheet_timelines_prepared_limited(
+    package: &mut OpcPackage,
+    workbook_name: &PackURI,
+    prepared: &crate::timeline::raw::PreparedPart,
+    limits: &SourceLimits,
+) -> Result<()> {
+    let value = &prepared.value;
     validate_views_local(&value.timelines)?;
     let caches = load_timeline_caches_limited(package, workbook_name, limits)?;
     let cache_names: HashSet<String> = caches
@@ -476,26 +520,9 @@ pub(crate) fn store_worksheet_timelines_limited(
     {
         return Err(invalid("worksheet already contains a Views part"));
     }
-    let mut combined = existing;
-    combined.push(value.clone());
-    validate_global_views(&combined)?;
-    validate_relationship_id(&value.relationship_id)?;
-    let worksheet_uri = PackURI::new(&value.worksheet_part_name)
-        .map_err(|error| Error::Invalid(format!("invalid Views worksheet part URI: {error}")))?;
-    let target_uri = PackURI::new(&value.part_name)
-        .map_err(|error| Error::Invalid(format!("invalid Views part URI: {error}")))?;
-    if !target_uri.as_str().starts_with("/xl/timelines/") || !target_uri.as_str().ends_with(".xml")
-    {
-        return Err(invalid(
-            "Views part must be under /xl/timelines and end in .xml",
-        ));
-    }
-    if package
-        .iter_parts()
-        .any(|part| part.partname().as_str() == target_uri.as_str())
-    {
-        return Err(invalid(format!("Views part '{target_uri}' already exists")));
-    }
+    validate_global_views(existing.iter().chain(std::iter::once(value)))?;
+    let worksheet_uri = prepared.worksheet.clone();
+    let target_uri = prepared.uri.clone();
     let worksheet = package.get_part(&worksheet_uri)?;
     if worksheet.content_type() != ct::SML_WORKSHEET {
         return Err(invalid(format!(
@@ -527,16 +554,28 @@ pub(crate) fn store_worksheet_timelines_limited(
         &fragment,
         limits,
     )?;
-    let xml = super::codec::write_timelines_limited(
-        &value.timelines,
-        usize::try_from(limits.max_part_bytes()).unwrap_or(usize::MAX),
+    crate::raw::check_relationship_insertions(
+        package,
+        &worksheet_uri,
+        &[(
+            value.relationship_id.clone(),
+            TIMELINES_RELATIONSHIP_TYPE.to_owned(),
+            target_uri.relative_ref(worksheet_uri.base_uri()),
+        )],
+        limits,
     )?;
-    crate::raw::check_output_bytes(xml.len(), limits)?;
+    crate::raw::check_part_budget_with_replacements(
+        package,
+        1,
+        prepared.xml.len(),
+        &[(&worksheet_uri, updated.len())],
+        limits,
+    )?;
     crate::signature_policy::ensure_unsigned(package)?;
     package.add_part(Box::new(BlobPart::new(
         target_uri.clone(),
         TIMELINES_CONTENT_TYPE.into(),
-        xml,
+        prepared.xml.clone(),
     )));
     package
         .get_part_mut(&worksheet_uri)?
@@ -548,6 +587,7 @@ pub(crate) fn store_worksheet_timelines_limited(
             false,
         );
     package.get_part_mut(&worksheet_uri)?.set_blob(updated);
+    package.source_content_types_with_limits(*limits)?;
     Ok(())
 }
 
@@ -612,9 +652,7 @@ fn integration_extension(
     ids: &[String],
     limits: &SourceLimits,
 ) -> Result<Vec<u8>> {
-    let maximum = usize::try_from(limits.max_part_bytes())
-        .unwrap_or(usize::MAX)
-        .min(MAX_REWRITE_BYTES);
+    let maximum = crate::raw::output_ceiling(limits).min(MAX_REWRITE_BYTES);
     let mut output = IntegrationXml::new(maximum);
     output.append(b"<ext xmlns=\"")?;
     output.escape(core)?;
@@ -761,9 +799,7 @@ fn insert_extension(
         return Ok(output);
     }
     let position = root_close.ok_or_else(|| invalid("missing source root closing element"))?;
-    let maximum = usize::try_from(limits.max_part_bytes())
-        .unwrap_or(usize::MAX)
-        .min(MAX_REWRITE_BYTES);
+    let maximum = crate::raw::output_ceiling(limits).min(MAX_REWRITE_BYTES);
     let mut wrapper = IntegrationXml::new(maximum);
     wrapper.append(b"<extLst xmlns=\"")?;
     wrapper.escape(core)?;

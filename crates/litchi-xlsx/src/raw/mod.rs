@@ -85,6 +85,101 @@ pub(crate) fn check_output_bytes(
     )
 }
 
+/// The strictest payload ceiling must be applied by the writer itself. This
+/// keeps a caller's aggregate policy from being discovered only after the
+/// serializer has already allocated the output buffer.
+pub(crate) fn output_ceiling(limits: &litchi_opc::SourceLimits) -> usize {
+    let ceiling = limits
+        .max_part_bytes()
+        .min(limits.max_total_part_bytes())
+        .min(usize::MAX as u64);
+    usize::try_from(ceiling).unwrap_or(usize::MAX)
+}
+
+/// Admit an OPC part URI under the ZIP member-name policy. The policy applies
+/// to the archive spelling (`membername`), while relationship target limits
+/// are checked separately on the relative reference.
+pub(crate) fn check_part_member_name(
+    part: &litchi_opc::PackURI,
+    limits: &litchi_opc::SourceLimits,
+) -> crate::Result<()> {
+    check_limit(
+        litchi_opc::SourceLimitKind::ArchiveMemberNameBytes,
+        part.membername().len() as u64,
+        limits.max_archive_member_name_bytes(),
+    )
+}
+
+/// Validate the lexical form used by relationship `Id` attributes before a
+/// raw value is serialized or cloned into a staged model.
+pub(crate) fn validate_relationship_id(value: &str) -> crate::Result<()> {
+    let mut bytes = value.bytes();
+    let Some(first) = bytes.next() else {
+        return Err(crate::Error::Invalid(
+            "relationship ID cannot be empty".into(),
+        ));
+    };
+    if !(first.is_ascii_alphabetic() || first == b'_')
+        || !bytes.all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-' | b'.'))
+    {
+        return Err(crate::Error::Invalid(
+            "relationship ID is not a valid XML identifier".into(),
+        ));
+    }
+    Ok(())
+}
+
+/// Check the identity slots that a raw insertion will occupy before its
+/// typed payload is cloned or serialized.
+pub(crate) fn check_new_relationship_identity(
+    package: &litchi_opc::OpcPackage,
+    owner: &litchi_opc::PackURI,
+    relationship_id: &str,
+    target: &litchi_opc::PackURI,
+) -> crate::Result<()> {
+    validate_relationship_id(relationship_id)?;
+    let owner_part = package
+        .part_metadata(owner)
+        .ok_or_else(|| litchi_opc::OpcError::PartNotFound(owner.to_string()))?;
+    if owner_part.rels().get(relationship_id).is_some() {
+        return Err(crate::Error::Invalid(
+            "relationship ID already exists on the owner".into(),
+        ));
+    }
+    if package.part_metadata(target).is_some() {
+        return Err(crate::Error::Invalid(
+            "raw insertion target part already exists".into(),
+        ));
+    }
+    Ok(())
+}
+
+/// Admit the graph-count portion of a raw insertion before the caller's
+/// payload is cloned or serialized. The byte budget is checked after the
+/// bounded writer knows the replacement length; part counts do not need that
+/// materialization.
+pub(crate) fn check_new_part_count(
+    package: &litchi_opc::OpcPackage,
+    added_parts: usize,
+    limits: &litchi_opc::SourceLimits,
+) -> crate::Result<()> {
+    let count = package
+        .part_count()
+        .checked_add(added_parts)
+        .ok_or_else(|| {
+            limit_error(
+                litchi_opc::SourceLimitKind::Parts,
+                u64::MAX,
+                limits.max_parts() as u64,
+            )
+        })?;
+    check_limit(
+        litchi_opc::SourceLimitKind::Parts,
+        count as u64,
+        limits.max_parts() as u64,
+    )
+}
+
 /// Admit an internal relationship target before its relative spelling is
 /// allocated. `PackURI::relative_ref_len` follows the writer without building
 /// the target string, so a tight target policy cannot be bypassed by an
@@ -99,16 +194,6 @@ pub(crate) fn check_relationship_target(
         target.relative_ref_len(owner_base_uri) as u64,
         limits.max_relationship_target_bytes() as u64,
     )
-}
-
-/// Keep a raw operation inside both the caller's requested policy and the
-/// policy retained when the package was opened. A later raw call may tighten
-/// that policy, but it cannot widen the package's original admission.
-pub(crate) fn effective_limits(
-    package: &litchi_opc::OpcPackage,
-    requested: litchi_opc::SourceLimits,
-) -> litchi_opc::SourceLimits {
-    requested.min(package.read_limits())
 }
 
 /// Admit one XML member under the caller's raw read policy before a format
@@ -258,7 +343,11 @@ pub(crate) fn check_relationship_insertions(
     }
     let source = package.source_relationships_with_limits(owner, *limits)?;
     let plan = source.plan_edit(&edits, &[], *limits)?;
-    let relationship_parts = usize::from(plan.member_present());
+    let (existing_parts, existing_bytes, existing_events, existing_count, current) =
+        relationship_budget(package, owner, limits)?;
+    let relationship_parts = existing_parts
+        .saturating_sub(usize::from(current.member_present()))
+        .saturating_add(usize::from(plan.member_present()));
     if relationship_parts > limits.max_relationship_parts() {
         return Err(limit_error(
             litchi_opc::SourceLimitKind::RelationshipParts,
@@ -266,25 +355,136 @@ pub(crate) fn check_relationship_insertions(
             limits.max_relationship_parts() as u64,
         ));
     }
-    if plan.final_len() > limits.max_total_relationship_xml_bytes() {
+    let total_bytes = existing_bytes
+        .saturating_sub(current.final_len() as u64)
+        .saturating_add(plan.final_len() as u64);
+    if total_bytes > limits.max_total_relationship_xml_bytes() as u64 {
         return Err(limit_error(
             litchi_opc::SourceLimitKind::TotalRelationshipXmlBytes,
-            plan.final_len() as u64,
+            total_bytes,
             limits.max_total_relationship_xml_bytes() as u64,
         ));
     }
-    if plan.event_count() > limits.max_total_relationship_xml_events() {
+    let total_events = existing_events
+        .saturating_sub(current.event_count() as u64)
+        .saturating_add(plan.event_count() as u64);
+    if total_events > limits.max_total_relationship_xml_events() as u64 {
         return Err(limit_error(
             litchi_opc::SourceLimitKind::TotalRelationshipXmlEvents,
-            plan.event_count() as u64,
+            total_events,
             limits.max_total_relationship_xml_events() as u64,
         ));
     }
-    if plan.relationship_count() > limits.max_total_relationships() {
+    let total_count = existing_count
+        .saturating_sub(current.relationship_count())
+        .saturating_add(plan.relationship_count());
+    if total_count > limits.max_total_relationships() {
         return Err(limit_error(
             litchi_opc::SourceLimitKind::TotalRelationships,
-            plan.relationship_count() as u64,
+            total_count as u64,
             limits.max_total_relationships() as u64,
+        ));
+    }
+    Ok(())
+}
+
+/// Return the package-wide relationship ledger once for an operation. The
+/// owner plan is returned so callers can replace that owner's old metrics with
+/// the planned metrics without counting it twice. This preserves the required
+/// cross-owner integrity accounting while avoiding one package scan per raw
+/// insertion in a batch.
+fn relationship_budget(
+    package: &litchi_opc::OpcPackage,
+    owner: &litchi_opc::PackURI,
+    limits: &litchi_opc::SourceLimits,
+) -> crate::Result<(usize, u64, u64, usize, litchi_opc::RelationshipSourcePlan)> {
+    let root =
+        litchi_opc::PackURI::new("/").map_err(|error| crate::Error::Invalid(error.to_string()))?;
+    let mut parts = 0usize;
+    let mut bytes = 0u64;
+    let mut events = 0u64;
+    let mut relationships = 0usize;
+    let mut owner_plan = None;
+
+    let mut add = |candidate: &litchi_opc::PackURI| -> crate::Result<()> {
+        let plan = package.plan_source_relationships_with_limits(candidate, *limits)?;
+        parts = parts.saturating_add(usize::from(plan.member_present()));
+        bytes = bytes.saturating_add(plan.final_len() as u64);
+        events = events.saturating_add(plan.event_count() as u64);
+        relationships = relationships.saturating_add(plan.relationship_count());
+        if candidate == owner {
+            owner_plan = Some(plan);
+        }
+        Ok(())
+    };
+
+    add(&root)?;
+    for part in package.iter_parts() {
+        add(part.partname())?;
+    }
+    let owner_plan = owner_plan.ok_or_else(|| {
+        crate::Error::Invalid("relationship owner is not present in package".into())
+    })?;
+    Ok((parts, bytes, events, relationships, owner_plan))
+}
+
+/// Admit aggregate part count and payload bytes before adding new raw parts.
+/// Existing payloads are measured once per operation; callers pass only the
+/// new part bytes because the source owner rewrites are checked separately by
+/// their bounded rewrite helpers.
+pub(crate) fn check_part_budget(
+    package: &litchi_opc::OpcPackage,
+    added_parts: usize,
+    added_bytes: usize,
+    limits: &litchi_opc::SourceLimits,
+) -> crate::Result<()> {
+    check_part_budget_with_replacements(package, added_parts, added_bytes, &[], limits)
+}
+
+/// Admit aggregate payload bytes while accounting for replacements of
+/// existing parts. `replacements` contains the old part and its prospective
+/// new length; added parts are counted separately.
+pub(crate) fn check_part_budget_with_replacements(
+    package: &litchi_opc::OpcPackage,
+    added_parts: usize,
+    added_bytes: usize,
+    replacements: &[(&litchi_opc::PackURI, usize)],
+    limits: &litchi_opc::SourceLimits,
+) -> crate::Result<()> {
+    let count = package
+        .part_count()
+        .checked_add(added_parts)
+        .ok_or_else(|| {
+            limit_error(
+                litchi_opc::SourceLimitKind::Parts,
+                u64::MAX,
+                limits.max_parts() as u64,
+            )
+        })?;
+    if count > limits.max_parts() {
+        return Err(limit_error(
+            litchi_opc::SourceLimitKind::Parts,
+            count as u64,
+            limits.max_parts() as u64,
+        ));
+    }
+    let mut total = 0u64;
+    for part in package.iter_parts() {
+        let size = package.get_part(part.partname())?.blob().len() as u64;
+        total = total.saturating_add(size);
+    }
+    for (name, replacement_len) in replacements {
+        let old = package.get_part(name)?.blob().len() as u64;
+        total = total
+            .saturating_sub(old)
+            .saturating_add(*replacement_len as u64);
+    }
+    let total = total.saturating_add(added_bytes as u64);
+    if total > limits.max_total_part_bytes() {
+        return Err(limit_error(
+            litchi_opc::SourceLimitKind::TotalPartBytes,
+            total,
+            limits.max_total_part_bytes(),
         ));
     }
     Ok(())

@@ -405,7 +405,8 @@ pub fn load_slicer_parts(
     package: &OpcPackage,
     worksheet_name: &PackURI,
 ) -> Result<Vec<SlicerPart>> {
-    load_slicer_parts_limited(package, worksheet_name, &SourceLimits::default())
+    let limits = package.read_limits();
+    load_slicer_parts_limited(package, worksheet_name, &limits)
 }
 
 pub(crate) fn load_slicer_parts_limited(
@@ -448,7 +449,8 @@ pub fn store_slicer_part(
     worksheet_name: &PackURI,
     value: &SlicerPart,
 ) -> Result<()> {
-    store_slicer_part_limited(package, worksheet_name, value, &SourceLimits::default())
+    let limits = package.read_limits();
+    store_slicer_part_limited(package, worksheet_name, value, &limits)
 }
 
 pub(crate) fn store_slicer_part_limited(
@@ -457,16 +459,30 @@ pub(crate) fn store_slicer_part_limited(
     value: &SlicerPart,
     limits: &SourceLimits,
 ) -> Result<()> {
+    let prepared = crate::slicer::raw::prepare_part(
+        crate::slicer::raw::Part {
+            relationship_id: value.relationship_id.clone(),
+            part_name: value.part_name.clone(),
+            slicers: value.slicers.clone(),
+        },
+        worksheet_name.base_uri(),
+        limits,
+    )?;
+    store_slicer_part_prepared_limited(package, worksheet_name, &prepared, limits)
+}
+
+pub(crate) fn store_slicer_part_prepared_limited(
+    package: &mut OpcPackage,
+    worksheet_name: &PackURI,
+    prepared: &crate::slicer::raw::PreparedPart,
+    limits: &SourceLimits,
+) -> Result<()> {
+    let value = &prepared.value;
     validate_package_graph(package)?;
     load_slicer_parts_limited(package, worksheet_name, limits)?;
     validate_relationship_id(&value.relationship_id)?;
-    let xml = write_slicers_limited(
-        &value.slicers,
-        usize::try_from(limits.max_part_bytes()).unwrap_or(usize::MAX),
-    )?;
-    crate::raw::check_output_bytes(xml.len(), limits)?;
-    let part_name = PackURI::new(&value.part_name)
-        .map_err(|error| invalid(format!("invalid Slicers part URI: {error}")))?;
+    let xml = &prepared.xml;
+    let part_name = prepared.uri.clone();
     let worksheet = package.get_part(worksheet_name)?;
     require_worksheet(worksheet.partname(), worksheet.content_type())?;
     let count = worksheet
@@ -493,20 +509,18 @@ pub(crate) fn store_slicer_part_limited(
         )],
         limits,
     )?;
-    if package
-        .iter_parts()
-        .any(|part| part.partname() == &part_name)
-    {
+    if package.get_part(&part_name).is_ok() {
         return Err(invalid(format!(
             "Slicers part '{part_name}' already exists"
         )));
     }
+    crate::raw::check_part_budget(package, 1, xml.len(), limits)?;
     let target = part_name.relative_ref(worksheet_name.base_uri());
     crate::signature_policy::ensure_unsigned(package)?;
     package.try_add_part(Box::new(BlobPart::new(
         part_name,
         SLICERS_CONTENT_TYPE.into(),
-        xml,
+        xml.clone(),
     )))?;
     package
         .get_part_mut(worksheet_name)?
@@ -517,6 +531,7 @@ pub(crate) fn store_slicer_part_limited(
             value.relationship_id.clone(),
             false,
         );
+    package.source_content_types_with_limits(*limits)?;
     Ok(())
 }
 

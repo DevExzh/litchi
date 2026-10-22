@@ -2176,6 +2176,11 @@ impl OpcPackage {
         self.content_types_source_state.reset();
         self.signature_graph_tracked = true;
         let partname = part.partname().clone();
+        self.read_limits.check(
+            crate::limits::SourceLimitKind::ArchiveMemberNameBytes,
+            partname.membername().len() as u64,
+            self.read_limits.max_archive_member_name_bytes(),
+        )?;
         self.validate_new_part_name(&partname)?;
         self.mark_content_types_invalid_if_uncovered(&*part);
         self.parts

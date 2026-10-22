@@ -25,10 +25,36 @@ family!("slicer");
 
 pub use crate::opc::LimitKind;
 
+/// Configuration for one slicer edit.
+///
+/// The package's retained source policy is always authoritative.  A caller
+/// may supply a tighter policy for this edit; the two policies are
+/// intersected before any raw value is admitted.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct EditOptions {
+    limits: Option<SourceLimits>,
+}
+
+impl EditOptions {
+    /// Tighten this edit's source policy.
+    #[must_use]
+    pub const fn limits(mut self, limits: SourceLimits) -> Self {
+        self.limits = Some(limits);
+        self
+    }
+
+    /// Return the optional per-edit policy.
+    #[must_use]
+    pub const fn limits_value(self) -> Option<SourceLimits> {
+        self.limits
+    }
+}
+
 /// A staged slicer edit of one [`Package`]. Dropping it discards it.
 #[derive(Debug, Clone)]
 pub struct Edit {
     staged: Staged,
+    limits: SourceLimits,
 }
 
 impl Package {
@@ -39,9 +65,18 @@ impl Package {
     /// Returns the encryption-policy error for a package whose mutations are
     /// refused, and the validation errors of the slicer graph.
     pub fn edit_slicers(&self) -> Result<Edit> {
+        self.edit_slicers_with_options(EditOptions::default())
+    }
+
+    /// Start a slicer edit with an optional tighter source policy.
+    pub fn edit_slicers_with_options(&self, options: EditOptions) -> Result<Edit> {
         let staged = Staged::new(self, "edit_slicers")?;
-        super::validation::graph(staged.opc())?;
-        Ok(Edit { staged })
+        let limits = staged
+            .opc()
+            .read_limits()
+            .min(options.limits.unwrap_or_else(|| staged.opc().read_limits()));
+        super::validation::graph_with_limits(staged.opc(), &limits)?;
+        Ok(Edit { staged, limits })
     }
 
     /// Apply a slicer patch to a new package; this one is unchanged. An
@@ -87,13 +122,22 @@ impl Edit {
     /// This is the raw identity escape for the slicer edit family. The
     /// complete candidate graph is checked against `limits`, and publication
     /// still happens only through [`Self::commit`].
-    pub fn insert_cache(&mut self, value: raw::Cache, limits: &SourceLimits) -> Result<()> {
-        let limits = crate::raw::effective_limits(self.staged.opc(), *limits);
+    pub fn insert_cache(&mut self, value: raw::Cache) -> Result<()> {
+        let limits = self.limits;
+        crate::raw::check_new_part_count(self.staged.opc(), 1, &limits)?;
         let workbook = self.staged.opc().main_document_part()?.partname().clone();
-        raw::preflight_cache(&value, workbook.base_uri(), &limits)?;
-        let value = value.into_model();
+        let uri = raw::validate_cache_identity(&value, workbook.base_uri(), &limits)?;
+        crate::raw::check_new_relationship_identity(
+            self.staged.opc(),
+            &workbook,
+            &value.relationship_id,
+            &uri,
+        )?;
+        let prepared = raw::prepare_cache(value, workbook.base_uri(), &limits)?;
         self.apply_raw(&limits, move |candidate| {
-            crate::slicer_cache::package::store_slicer_cache_in_place(candidate, &value, &limits)
+            crate::slicer_cache::package::store_slicer_cache_prepared_in_place(
+                candidate, &prepared, &limits,
+            )
         })
     }
 
@@ -130,19 +174,21 @@ impl Edit {
 
     /// Insert a worksheet Slicers part with its caller-selected native
     /// relationship ID and part name.
-    pub fn insert_part(
-        &mut self,
-        worksheet: &PackURI,
-        value: raw::Part,
-        limits: &SourceLimits,
-    ) -> Result<()> {
-        let limits = crate::raw::effective_limits(self.staged.opc(), *limits);
+    pub fn insert_part(&mut self, worksheet: &PackURI, value: raw::Part) -> Result<()> {
+        let limits = self.limits;
+        crate::raw::check_new_part_count(self.staged.opc(), 1, &limits)?;
         let worksheet = worksheet.clone();
-        raw::preflight_part(&value, worksheet.base_uri(), &limits)?;
-        let value = value.into_model();
+        let uri = raw::validate_part_identity(&value, worksheet.base_uri(), &limits)?;
+        crate::raw::check_new_relationship_identity(
+            self.staged.opc(),
+            &worksheet,
+            &value.relationship_id,
+            &uri,
+        )?;
+        let prepared = raw::prepare_part(value, worksheet.base_uri(), &limits)?;
         self.apply_raw(&limits, move |candidate| {
-            crate::slicer_cache::views::store_slicer_part_limited(
-                candidate, &worksheet, &value, &limits,
+            crate::slicer_cache::views::store_slicer_part_prepared_limited(
+                candidate, &worksheet, &prepared, &limits,
             )
         })
     }
@@ -208,26 +254,27 @@ impl Edit {
     /// signed package and the workbook validation errors of the staged
     /// package.
     pub fn commit(self) -> Result<Commit> {
-        super::validation::graph(self.staged.opc())?;
+        super::validation::graph_with_limits(self.staged.opc(), &self.limits)?;
         Ok(Commit::new(self.staged.commit()?))
     }
 
     fn apply<T>(&mut self, operation: impl FnOnce(&mut OpcPackage) -> Result<T>) -> Result<T> {
+        let limits = self.limits;
         self.staged.update(|candidate| {
             let value = operation(candidate)?;
-            super::validation::graph(candidate)?;
+            super::validation::graph_with_limits(candidate, &limits)?;
             Ok(value)
         })
     }
 
     fn apply_raw<T>(
         &mut self,
-        _limits: &SourceLimits,
+        limits: &SourceLimits,
         operation: impl FnOnce(&mut OpcPackage) -> Result<T>,
     ) -> Result<T> {
         self.staged.update(|candidate| {
             let value = operation(candidate)?;
-            super::validation::graph(candidate)?;
+            super::validation::graph_with_limits(candidate, limits)?;
             Ok(value)
         })
     }
