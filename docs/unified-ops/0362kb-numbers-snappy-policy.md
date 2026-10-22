@@ -40,6 +40,13 @@ explicit caller values, so the refusal was not a lost-policy or defaulting
 failure. Both focused tests pass with exact output and source-preservation
 assertions.
 
+The package-level boundary test
+`retained_physical_catalog_uses_selected_public_snappy_profile` additionally
+inspects the actual retained `SourceCatalog` inside `Package::state`; it does
+not reconstruct archive limits from `OpenOptions` getters. This verifies that
+the catalog consumed by writers carries the selected entry ceiling and derives
+the matching compressed-stream ceiling.
+
 The changed source has no common codec or `PROGRESS` edits. The focused mapping
 test checks compressed-stream limit and allocation classification. Validation:
 
