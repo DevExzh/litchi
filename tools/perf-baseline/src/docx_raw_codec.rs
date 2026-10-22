@@ -104,11 +104,8 @@ fn story_archive() -> Result<Vec<u8>, Box<dyn Error>> {
 fn prepare() -> Result<Prepared, Box<dyn Error>> {
     let sanitize_limits = sanitize::Limits::default();
     let xml = main_xml();
-    let sanitize_snapshot = sanitize::Snapshot::from_xml(
-        xml.clone(),
-        relationships(),
-        sanitize_limits,
-    )?;
+    let sanitize_snapshot =
+        sanitize::Snapshot::from_xml(xml.clone(), relationships(), sanitize_limits)?;
     let redact_snapshot = redact::Snapshot::from_xml(
         xml,
         relationships(),
@@ -134,7 +131,11 @@ fn verify_semantics(prepared: &Prepared) -> Result<(), Box<dyn Error>> {
     let source_xml = prepared.sanitize_snapshot.xml_bytes().to_vec();
     let forward = prepared.sanitize_snapshot.plan().apply()?;
     let detached = forward.apply(&prepared.sanitize_snapshot)?;
-    if detached.xml_bytes().windows(WRAPPER.len()).any(|window| window == WRAPPER) {
+    if detached
+        .xml_bytes()
+        .windows(WRAPPER.len())
+        .any(|window| window == WRAPPER)
+    {
         return Err("sanitizer semantic output retained the hyperlink wrapper".into());
     }
     let restored = forward.inverse().apply(&detached)?;
@@ -151,7 +152,10 @@ fn verify_semantics(prepared: &Prepared) -> Result<(), Box<dyn Error>> {
         prepared.sanitize_limits,
     )?;
     redaction_codec.apply(&redaction)?;
-    if redaction_codec.xml_bytes().windows(WRAPPER.len()).any(|window| window == WRAPPER)
+    if redaction_codec
+        .xml_bytes()
+        .windows(WRAPPER.len())
+        .any(|window| window == WRAPPER)
         || redaction_codec.removed_relationship_ids().is_empty()
     {
         return Err("redactor semantic output retained the hyperlink wrapper".into());
@@ -167,8 +171,14 @@ fn verify_semantics(prepared: &Prepared) -> Result<(), Box<dyn Error>> {
     )?;
     story_codec.apply(&story_patch)?;
     if story_codec.parts().iter().any(|part| {
-        part.xml().windows(WRAPPER.len()).any(|window| window == WRAPPER)
-    }) {
+        part.xml()
+            .windows(WRAPPER.len())
+            .any(|window| window == WRAPPER)
+    }) || story_codec
+        .parts()
+        .iter()
+        .all(|part| part.removed_relationship_ids().is_empty())
+    {
         return Err("story redactor semantic output retained the hyperlink wrapper".into());
     }
     Ok(())
@@ -237,11 +247,7 @@ fn parse(args: &[OsString]) -> Result<(usize, usize, PathBuf), Box<dyn Error>> {
     if samples == 0 {
         return Err("--samples must be positive".into());
     }
-    Ok((
-        samples,
-        warmup,
-        output.ok_or("--output is required")?,
-    ))
+    Ok((samples, warmup, output.ok_or("--output is required")?))
 }
 
 pub fn run_from_args(args: impl IntoIterator<Item = OsString>) -> Result<(), Box<dyn Error>> {
