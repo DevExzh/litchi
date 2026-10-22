@@ -1123,9 +1123,21 @@ impl SourceBackedPresentation {
             .with_verified_member_reader("content.xml", |reader| {
                 Parser::write_slides_text_from_reader(reader, &mut writer, paragraph_separator)
             });
-        let progress = writer.progress();
         let result = match result {
             Ok(()) => Ok(()),
+            Err(SourceMemberReaderError::Core { error, .. })
+                if encrypted_member_cannot_stream(&error) =>
+            {
+                match self.read_content_xml() {
+                    Ok(content_xml) => {
+                        Parser::write_slides_text_to(&content_xml, &mut writer, paragraph_separator)
+                    },
+                    Err(source) => Err(TextOutputError::Document {
+                        source,
+                        progress: writer.progress(),
+                    }),
+                }
+            },
             Err(SourceMemberReaderError::Callback(error)) => Err(error),
             Err(SourceMemberReaderError::Core {
                 error,
@@ -1135,13 +1147,14 @@ impl SourceBackedPresentation {
                 progress: callback_error
                     .as_ref()
                     .map(TextOutputError::progress)
-                    .unwrap_or(progress),
+                    .unwrap_or_else(|| writer.progress()),
             }),
             Err(_) => Err(TextOutputError::Document {
                 source: Error::InvalidFormat("ODP content.xml source text read failed".to_string()),
-                progress,
+                progress: writer.progress(),
             }),
         };
+        let progress = writer.progress();
         if let Err(source) = self.check_source() {
             return Err(TextOutputError::Document { source, progress });
         }

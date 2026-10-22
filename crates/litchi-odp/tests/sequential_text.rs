@@ -14,6 +14,9 @@ use litchi_core::{
 };
 use litchi_odp::{Package, Presentation, SourceBackedPresentation};
 
+#[path = "../../litchi-odf-common/tests/support/odf_rezip.rs"]
+mod odf_rezip;
+
 const MIME: &str = "application/vnd.oasis.opendocument.presentation";
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const DRAW: &str = "urn:oasis:names:tc:opendocument:xmlns:drawing:1.0";
@@ -28,6 +31,18 @@ fn package(body: &str) -> Vec<u8> {
     writer.set_mimetype(MIME).unwrap();
     writer.add_file("content.xml", content.as_bytes()).unwrap();
     writer.finish_to_bytes().unwrap()
+}
+
+fn package_with_prologue_doctype(body: &str) -> Vec<u8> {
+    let bytes = package(body);
+    odf_rezip::edit_member(&bytes, "content.xml", |xml| {
+        let end = xml.find("?>").map_or(0, |index| index + 2);
+        format!(
+            "{}<!DOCTYPE office:document-content PUBLIC \"-//OpenOffice.org//DTD OfficeDocument 1.0//EN\" \"office.dtd\">{}",
+            &xml[..end],
+            &xml[end..]
+        )
+    })
 }
 
 fn representative_package() -> Vec<u8> {
@@ -99,6 +114,28 @@ fn controls_entities_cdata_utf8_and_custom_separators_match_semantics() {
     assert_eq!(output, expected.as_bytes());
     assert_eq!(bytes_written, expected.len() as u64);
     assert_eq!(objects_written, 1);
+}
+
+#[test]
+fn source_backed_sink_matches_owned_with_prologue_doctype() {
+    let bytes = package_with_prologue_doctype(
+        r#"<draw:page><draw:frame><draw:text-box><text:p>doctype text</text:p></draw:text-box></draw:frame></draw:page>"#,
+    );
+    let eager = Package::from_bytes(&bytes).unwrap().presentation().unwrap();
+    let source =
+        SourceBackedPresentation::from_read_at(Arc::new(CountingSource::new(bytes))).unwrap();
+
+    let mut eager_output = Vec::new();
+    eager
+        .write_text_to(&mut eager_output, TextOutputOptions::default())
+        .unwrap();
+    let mut source_output = Vec::new();
+    source
+        .write_text_to(&mut source_output, TextOutputOptions::default())
+        .unwrap();
+
+    assert_eq!(source_output, eager_output);
+    assert_eq!(source_output, b"doctype text");
 }
 
 #[test]

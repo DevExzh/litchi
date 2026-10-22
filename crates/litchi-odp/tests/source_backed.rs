@@ -528,6 +528,15 @@ fn source_facade_supports_password_protected_content() {
     .unwrap();
     assert_eq!(source.content_xml().unwrap(), eager.content_xml());
     assert_eq!(source.text().unwrap(), eager.text().unwrap());
+    let mut eager_text = Vec::new();
+    eager
+        .write_text_to(&mut eager_text, litchi_core::TextOutputOptions::default())
+        .unwrap();
+    let mut source_text = Vec::new();
+    source
+        .write_text_to(&mut source_text, litchi_core::TextOutputOptions::default())
+        .unwrap();
+    assert_eq!(source_text, eager_text);
     assert!(
         SourceBackedPresentation::from_read_at_with_password(
             Arc::new(CountingSource::new(bytes)),

@@ -2888,6 +2888,10 @@ impl Parser {
         let mut element_names = SinkElementNameBudget::default();
 
         loop {
+            // `read_resolved_event_into` appends into the caller-owned event
+            // buffer. Clear before every read so early `continue` paths do not
+            // retain one serialized event per document element.
+            event_buffer.clear();
             let (namespace, event) =
                 reader
                     .read_resolved_event_into(&mut event_buffer)
