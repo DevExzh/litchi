@@ -153,7 +153,7 @@ fn patch_requires_the_exact_source_and_failed_edits_are_transactional() {
         .unwrap();
     assert!(matches!(
         patch.apply(&different_source),
-        Err(litchi_cfb::OleError::InvalidFormat(_))
+        Err(crate::Error::PatchConflict)
     ));
 }
 

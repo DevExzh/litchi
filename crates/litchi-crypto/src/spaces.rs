@@ -57,6 +57,8 @@ pub const ENCRYPTION_NAME: &str = "Microsoft.Container.EncryptionTransform";
 
 #[derive(Debug)]
 pub enum Error {
+    /// The recipient does not match the patch's recorded base snapshot.
+    PatchConflict,
     Invalid(String),
     Ole(OleError),
 }
@@ -64,6 +66,9 @@ pub enum Error {
 impl fmt::Display for Error {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::PatchConflict => {
+                formatter.write_str("DataSpaces patch base does not match recipient")
+            },
             Self::Invalid(message) => write!(formatter, "invalid DataSpaces structure: {message}"),
             Self::Ole(error) => write!(formatter, "OLE DataSpaces error: {error}"),
         }
@@ -73,7 +78,7 @@ impl fmt::Display for Error {
 impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
-            Self::Invalid(_) => None,
+            Self::PatchConflict | Self::Invalid(_) => None,
             Self::Ole(error) => Some(error),
         }
     }
@@ -675,12 +680,10 @@ impl Patch {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Invalid`] when `source` is not this patch's base snapshot.
+    /// Returns [`Error::PatchConflict`] when `source` is not this patch's base snapshot.
     pub fn apply(&self, source: &Snapshot) -> Result<Snapshot, Error> {
         if source.revision() != self.base || source.source.as_ref() != self.before.as_ref() {
-            return Err(invalid(
-                "DataSpaces patch source does not match its base snapshot",
-            ));
+            return Err(Error::PatchConflict);
         }
         Ok(Snapshot {
             graph: self.after_graph.clone(),
@@ -3185,7 +3188,7 @@ mod tests {
 
         assert!(matches!(
             commit.patch().apply(commit.package()),
-            Err(Error::Invalid(_))
+            Err(Error::PatchConflict)
         ));
     }
 

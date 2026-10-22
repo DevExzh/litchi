@@ -316,6 +316,8 @@ pub enum Error {
     StreamNotFound(String),
     /// Corrupted file
     Corrupted(String),
+    /// The recipient does not match the patch's recorded base snapshot.
+    PatchConflict,
     /// A bounded package output buffer could not be reserved.
     Allocation {
         /// Output resource whose allocation failed.
@@ -391,6 +393,7 @@ impl std::fmt::Display for Error {
             Error::InvalidFormat(s) => write!(f, "Invalid format: {s}"),
             Error::StreamNotFound(s) => write!(f, "Stream not found: {s}"),
             Error::Corrupted(s) => write!(f, "Corrupted file: {s}"),
+            Error::PatchConflict => f.write_str("DOC patch base does not match recipient"),
             Error::Allocation { resource, source } => {
                 write!(f, "could not reserve {resource}: {source}")
             },
@@ -443,6 +446,7 @@ impl std::error::Error for Error {
             Self::InvalidFormat(_)
             | Self::StreamNotFound(_)
             | Self::Corrupted(_)
+            | Self::PatchConflict
             | Self::ProtectionDenied(_)
             | Self::InvalidLimit { .. }
             | Self::Limit { .. }
@@ -624,6 +628,7 @@ impl From<Error> for litchi_core::Error {
             Error::InvalidFormat(s) => litchi_core::Error::InvalidFormat(s),
             Error::StreamNotFound(s) => litchi_core::Error::ComponentNotFound(s),
             Error::Corrupted(s) => litchi_core::Error::CorruptedFile(s),
+            Error::PatchConflict => litchi_core::Error::PatchConflict,
             Error::Allocation { resource, source } => {
                 litchi_core::Error::Allocation { resource, source }
             },
@@ -666,6 +671,9 @@ impl From<Error> for litchi_core::Error {
 
 impl From<litchi_ole_common::Error> for Error {
     fn from(error: litchi_ole_common::Error) -> Self {
-        Self::Object(error)
+        match error {
+            litchi_ole_common::Error::PatchConflict => Self::PatchConflict,
+            error => Self::Object(error),
+        }
     }
 }

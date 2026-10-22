@@ -398,7 +398,7 @@ fn body_saved_selection_edit_is_source_bound_reversible_and_atomic() {
         .expect("mismatched saved-selection");
     assert!(matches!(
         patch.apply(&mismatched_selection),
-        Err(PackageError::Corrupted(_))
+        Err(PackageError::PatchConflict)
     ));
 
     let foreign = Snapshot::open(

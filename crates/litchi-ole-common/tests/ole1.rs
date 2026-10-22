@@ -679,7 +679,7 @@ fn limits_are_checked_before_admission_and_stale_patch_is_rejected() {
     );
     assert!(matches!(
         commit.patch().apply(&other),
-        Err(OleError::InvalidFormat(_))
+        Err(litchi_ole_common::Error::PatchConflict)
     ));
 }
 

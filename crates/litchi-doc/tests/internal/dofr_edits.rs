@@ -320,7 +320,7 @@ fn changed_dofr_patch_requires_the_complete_source_owner() {
         .expect("mismatched Dofr records");
     assert!(matches!(
         foreign_patch.apply(&mismatched_records),
-        Err(PackageError::Corrupted(_))
+        Err(PackageError::PatchConflict)
     ));
     let mut edit = foreign.edit().expect("foreign edit");
 

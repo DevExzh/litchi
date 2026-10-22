@@ -211,7 +211,7 @@ fn filetime_conversions_and_reversible_patches_are_source_checked() {
     assert!(patch.revert(&different).is_err());
     assert!(matches!(
         patch.apply(&different),
-        Err(litchi_cfb::OleError::InvalidFormat(_))
+        Err(crate::Error::PatchConflict)
     ));
 }
 

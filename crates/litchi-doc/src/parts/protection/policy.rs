@@ -257,9 +257,7 @@ impl PackagePatch {
     /// capability. The source bytes must still match exactly.
     pub fn apply_with_policy(&self, source: &[u8], policy: ProtectionPolicy) -> Result<Vec<u8>> {
         if source != self.inner.before() {
-            return Err(PackageError::InvalidFormat(
-                "DOC package patch source snapshot does not match".into(),
-            ));
+            return Err(PackageError::PatchConflict);
         }
         if !self.inner.is_noop() {
             policy.authorize(self.before_protection)?;

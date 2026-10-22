@@ -178,7 +178,7 @@ fn protected_package_allows_noop_but_requires_explicit_authorization_for_metadat
     assert!(committed.snapshot().value().is_some());
     assert!(matches!(
         committed.package_patch().apply(&original),
-        Err(PackageError::InvalidFormat(_))
+        Err(PackageError::PatchConflict)
     ));
     assert_eq!(
         committed
