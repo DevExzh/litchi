@@ -273,8 +273,10 @@ impl crate::workbook::source::deferred::Change for super::Patch {
         &self,
         package: &SourceBackedPackage,
     ) -> Option<crate::workbook::source::deferred::Catalog> {
-        (package.read_limits() == *self.after().catalog.limits)
+        let catalog = self.after().catalog_proof().ok()?;
+        (package.read_limits() == *catalog.limits)
             .then(|| self.after().deferred_catalog())
+            .flatten()
     }
 
     fn catalog_xml(&self) -> Option<&[u8]> {
@@ -299,7 +301,6 @@ impl SourceBackedWorkbook {
         let view = self.view()?;
         let package = view.edit_package()?;
         let source_owner = view.tab_state_source_owner();
-        let shared_catalog = view.shared_catalog_proof();
         let snapshot_cache = view.tab_state_snapshot();
         let before = match snapshot_cache.get() {
             Some(snapshot) => {
@@ -307,27 +308,21 @@ impl SourceBackedWorkbook {
                 // creating the closure. Keep the same source fence when a
                 // cached immutable closure is reused.
                 package.source_version()?;
-                Arc::clone(snapshot)
+                (**snapshot).clone()
             },
             None => {
-                let snapshot = Arc::new(Snapshot::load_source_backed_from_owner(
-                    package,
-                    source_owner,
-                    Arc::new(()),
-                    shared_catalog,
-                )?);
+                let snapshot =
+                    Snapshot::load_source_backed_from_owner(package, source_owner, Arc::new(()))?;
+                // The first edit of an owner keeps its snapshot to itself; a
+                // repeated edit caches one shared copy.
                 if view.tab_state_snapshot_should_cache() {
-                    Arc::clone(snapshot_cache.get_or_init(|| snapshot))
+                    (**snapshot_cache.get_or_init(|| Arc::new(snapshot))).clone()
                 } else {
                     snapshot
                 }
             },
         };
-        Edit::new(
-            self.clone(),
-            (*before).clone(),
-            options.limits.unwrap_or_default(),
-        )
+        Edit::new(self.clone(), before, options.limits.unwrap_or_default())
     }
 
     /// Replay a tab-state patch onto this workbook.
@@ -416,6 +411,9 @@ impl Edit {
     pub fn commit(self) -> Result<Commit> {
         let package = self.workbook.edit_package()?;
         package.check_execution()?;
+        // A committed patch may outlive the source owner: capture the
+        // catalog proof the snapshot has so far only linked.
+        self.before.catalog_proof()?;
         let visibility_changed = self
             .staged_visibility
             .iter()

@@ -42,7 +42,7 @@ impl SourceWorksheet {
         self.owner.execution_check()?;
         if self.data.kind != WorksheetKind::Worksheet {
             return Err(Error::NotWorksheet {
-                sheet: self.data.name.clone(),
+                sheet: self.data.name().to_owned(),
             });
         }
         let package = &self.owner.package;

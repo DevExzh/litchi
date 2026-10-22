@@ -190,7 +190,7 @@ impl SourceWorksheet {
             Ok(())
         } else {
             Err(Error::NotWorksheet {
-                sheet: self.data.name.clone(),
+                sheet: self.data.name().to_owned(),
             })
         };
         self.finish_result(checked)?;
@@ -241,7 +241,7 @@ impl SourceWorksheet {
     /// keeps (the one with more rows).
     fn publish_prefix(&self, prefix: Arc<Prefix>) -> Arc<Prefix> {
         let weight = prefix.weight();
-        match self.owner.reader().values.publish(
+        match self.owner.values.publish(
             self.data.position,
             Cached::Prefix(Arc::clone(&prefix)),
             weight,
@@ -254,7 +254,6 @@ impl SourceWorksheet {
     fn cached_prefix(&self) -> Option<Arc<Prefix>> {
         match self
             .owner
-            .reader()
             .values
             .get(self.data.position, Axis::Prefix, false)?
         {

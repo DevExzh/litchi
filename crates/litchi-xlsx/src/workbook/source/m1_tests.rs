@@ -597,10 +597,32 @@ fn deferred_views_reuse_the_lineage_catalog_policy_and_reject_mismatch() {
         &proof.limits,
         &second_view.inner.source_limits()
     ));
-    assert!(Arc::ptr_eq(
-        &first_view.inner.owner_options,
-        &second_view.inner.owner_options
-    ));
+    // Every proof-backed owner borrows the proof's name storage; no reopen
+    // retains a duplicate catalogue (pointer identity of the names and of
+    // each name's string backing).
+    assert!(first_view.inner.defined_names.is_none());
+    assert!(second_view.inner.defined_names.is_none());
+    for (index, name) in proof.defined_names.iter().enumerate() {
+        assert_eq!(
+            first_view.defined_names()[index].name.as_ptr(),
+            name.name.as_ptr()
+        );
+        assert_eq!(
+            second_view.defined_names()[index].name.as_ptr(),
+            name.name.as_ptr()
+        );
+    }
+    assert_eq!(
+        first_view.defined_names().as_ptr(),
+        proof.defined_names.as_ptr()
+    );
+    assert_eq!(
+        second_view.defined_names().as_ptr(),
+        proof.defined_names.as_ptr()
+    );
+    let first_owner_options = first_view.inner.owner_options();
+    let second_owner_options = second_view.inner.owner_options();
+    assert!(Arc::ptr_eq(&first_owner_options, &second_owner_options));
 
     let mismatch = SourceBackedWorkbook::from_read_at_with_options_and_shared_catalog(
         ProbeSource::new(bytes),

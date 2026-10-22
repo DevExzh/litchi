@@ -10,7 +10,7 @@ use litchi_opc::{
 
 use crate::error::{Error, Result, TabEditBlock, allocation, invalid};
 use crate::source_payload::SourcePayload;
-use crate::workbook::source::{SourceCatalogProof, validate_sheet_graph};
+use crate::workbook::source::{SourceCatalogProof, SourceInner, validate_sheet_graph};
 use crate::{Visibility, WorksheetKind, raw};
 
 const CHARTSHEET_REL: &str =
@@ -55,6 +55,55 @@ impl Tab {
     }
 }
 
+/// The shared empty touched-sheet closure of a freshly loaded snapshot; an
+/// empty `Arc` slice would otherwise allocate its header per load.
+fn no_touched_parts() -> Arc<[TouchedPart]> {
+    static EMPTY: OnceLock<Arc<[TouchedPart]>> = OnceLock::new();
+    Arc::clone(EMPTY.get_or_init(|| Arc::from([])))
+}
+
+/// The immutable catalog records and ingress policy of a snapshot.
+///
+/// A snapshot started from a read-only source owner does not need the
+/// catalog until it is committed or replayed, so it only links the owner;
+/// [`Self::proof`] captures the owner's shared proof on first use and every
+/// committed snapshot carries the captured proof.
+#[derive(Clone, Debug)]
+pub(super) struct CatalogLink {
+    proof: OnceLock<Arc<SourceCatalogProof>>,
+    owner: Weak<SourceInner>,
+}
+
+impl CatalogLink {
+    pub(super) fn ready(proof: Arc<SourceCatalogProof>) -> Self {
+        Self {
+            proof: OnceLock::from(proof),
+            owner: Weak::new(),
+        }
+    }
+
+    pub(super) fn owner(owner: &Arc<SourceInner>) -> Self {
+        match owner.catalog_proof_if_ready() {
+            Some(proof) => Self::ready(proof),
+            None => Self {
+                proof: OnceLock::new(),
+                owner: Arc::downgrade(owner),
+            },
+        }
+    }
+
+    /// The captured catalog proof.
+    pub(super) fn proof(&self) -> Result<&Arc<SourceCatalogProof>> {
+        if let Some(proof) = self.proof.get() {
+            return Ok(proof);
+        }
+        let owner = self.owner.upgrade().ok_or_else(|| {
+            invalid("tab-state source owner was released before its catalog was captured")
+        })?;
+        Ok(self.proof.get_or_init(|| owner.catalog_proof()))
+    }
+}
+
 /// Semantic tab state plus its exact workbook and touched-sheet closure.
 #[derive(Clone, Debug)]
 pub struct Snapshot {
@@ -63,7 +112,7 @@ pub struct Snapshot {
     /// Immutable catalog records and ingress policy shared by the snapshot,
     /// deferred catalog, and exact restore endpoint. A tab-state edit does
     /// not change names or the source policy.
-    pub(super) catalog: Arc<SourceCatalogProof>,
+    pub(super) catalog: CatalogLink,
     pub(super) source: SourceState,
     origin: Option<Arc<()>>,
 }
@@ -103,7 +152,7 @@ impl Snapshot {
         let snapshot = Self {
             tabs,
             active,
-            catalog: shared_catalog,
+            catalog: CatalogLink::ready(shared_catalog),
             source: SourceState {
                 workbook: PartState::new(
                     workbook.partname().clone(),
@@ -112,7 +161,7 @@ impl Snapshot {
                     "tab-state workbook content type",
                 )?,
                 graph: Arc::new(GraphBinding::ready(graph)),
-                touched: Arc::from([]),
+                touched: no_touched_parts(),
             },
             origin: Some(origin),
         };
@@ -125,20 +174,18 @@ impl Snapshot {
 
     pub(super) fn load_source_backed_from_owner(
         package: &SourceBackedPackage,
-        owner: Arc<crate::workbook::source::SourceInner>,
+        owner: Arc<SourceInner>,
         origin: Arc<()>,
-        shared_catalog: Arc<SourceCatalogProof>,
     ) -> Result<Self> {
         if !owner.tab_state_catalog_is_clean() {
-            return Self::load_source_backed_with_catalog(package, origin, shared_catalog);
+            return Self::load_source_backed_with_catalog(package, origin, owner.catalog_proof());
         }
         package.check_execution()?;
         let source_version = package.source_version()?;
         let workbook = package.main_document_part()?;
         require_workbook_content_type(workbook.content_type())?;
         let workbook_bytes = SourcePayload::from_part_data(package, workbook.data()?)?;
-        let limits = package.read_limits();
-        if limits != *shared_catalog.limits {
+        if !owner.admitted_under(&package.read_limits()) {
             return Err(invalid("tab-state source limits changed during snapshot"));
         }
         let graph = owner.tab_state_graph(Arc::downgrade(&owner));
@@ -153,7 +200,7 @@ impl Snapshot {
             .map_err(|source| allocation("tab-state semantic catalog", source))?;
         for (position, sheet) in owner.sheets.iter().enumerate() {
             tabs.push(Tab {
-                name: copy_boxed(&sheet.name, "tab-state sheet name")?,
+                name: copy_boxed(sheet.name(), "tab-state sheet name")?,
                 visibility: sheet.visibility.clone(),
                 active: position == active,
             });
@@ -161,7 +208,7 @@ impl Snapshot {
         let snapshot = Self {
             tabs: tabs.into(),
             active,
-            catalog: shared_catalog,
+            catalog: CatalogLink::owner(&owner),
             source: SourceState {
                 workbook: PartState::new(
                     workbook.partname().clone(),
@@ -170,7 +217,7 @@ impl Snapshot {
                     "tab-state workbook content type",
                 )?,
                 graph,
-                touched: Arc::from([]),
+                touched: no_touched_parts(),
             },
             origin: Some(origin),
         };
@@ -197,7 +244,7 @@ impl Snapshot {
         Ok(Self {
             tabs,
             active,
-            catalog,
+            catalog: CatalogLink::ready(catalog),
             source: SourceState {
                 workbook: PartState::new(
                     workbook.partname().clone(),
@@ -234,7 +281,8 @@ impl Snapshot {
         workbook: Vec<u8>,
         touched: Vec<(usize, Vec<u8>)>,
     ) -> Result<Self> {
-        let catalog = raw::parse_catalog(&workbook, before.catalog.limits.as_ref())?;
+        let before_catalog = before.catalog.proof()?;
+        let catalog = raw::parse_catalog(&workbook, before_catalog.limits.as_ref())?;
         let graph = before.source.graph.data()?;
         let (tabs, active) = semantic_tabs(&catalog)?;
         if catalog.sheets.len() != graph.sheets.len()
@@ -252,7 +300,7 @@ impl Snapshot {
                 "tab-state rewrite changed workbook sheet topology or relationships",
             ));
         }
-        if catalog.defined_names.as_slice() != before.catalog.defined_names.as_ref() {
+        if catalog.defined_names.as_slice() != before_catalog.defined_names.as_ref() {
             return Err(invalid(
                 "tab-state rewrite changed the defined-name catalog",
             ));
@@ -283,7 +331,7 @@ impl Snapshot {
         Ok(Self {
             tabs,
             active,
-            catalog: Arc::clone(&before.catalog),
+            catalog: CatalogLink::ready(Arc::clone(before_catalog)),
             source: SourceState {
                 workbook: PartState::new(
                     before.source.workbook.uri.clone(),
@@ -316,11 +364,17 @@ impl Snapshot {
         self.tabs.get(self.active)
     }
 
-    pub(super) fn deferred_catalog(&self) -> crate::workbook::source::deferred::Catalog {
-        crate::workbook::source::deferred::Catalog {
-            defined_names: self.catalog.defined_names.clone(),
+    pub(super) fn deferred_catalog(&self) -> Option<crate::workbook::source::deferred::Catalog> {
+        let catalog = self.catalog.proof().ok()?;
+        Some(crate::workbook::source::deferred::Catalog {
+            defined_names: catalog.defined_names.clone(),
             active_sheet: (!self.tabs.is_empty()).then_some(self.active),
-        }
+        })
+    }
+
+    /// The captured catalog proof (see [`CatalogLink::proof`]).
+    pub(super) fn catalog_proof(&self) -> Result<&Arc<SourceCatalogProof>> {
+        self.catalog.proof()
     }
 
     /// Resolved workbook Part name.
@@ -441,7 +495,7 @@ impl Eq for SourceState {}
 pub(crate) enum GraphBinding {
     Ready(GraphData),
     Source {
-        owner: Weak<crate::workbook::source::SourceInner>,
+        owner: Weak<SourceInner>,
         sheets: Arc<[Arc<crate::workbook::source::SourceSheetData>]>,
         data: OnceLock<Arc<GraphData>>,
     },
@@ -472,7 +526,7 @@ impl GraphBinding {
     }
 
     pub(crate) fn source(
-        owner: Weak<crate::workbook::source::SourceInner>,
+        owner: Weak<SourceInner>,
         sheets: Arc<[Arc<crate::workbook::source::SourceSheetData>]>,
     ) -> Self {
         Self::Source {
@@ -657,13 +711,13 @@ fn capture_source_graph_from_owner(
         }
         if sheets[..position]
             .iter()
-            .any(|previous| previous.relationship_id == sheet.relationship_id)
+            .any(|previous| previous.relationship_id() == sheet.relationship_id())
         {
             return Err(invalid("workbook sheet relationship ID is repeated"));
         }
         let relationship = workbook
             .rels()
-            .get(&sheet.relationship_id)
+            .get(sheet.relationship_id())
             .ok_or_else(|| invalid("tab-state sheet relationship disappeared"))?;
         if relationship.target_mode() != TargetMode::Internal {
             return Err(invalid("tab-state sheet relationship cannot be external"));
@@ -677,7 +731,7 @@ fn capture_source_graph_from_owner(
                 if part.content_type() != ct::SML_WORKSHEET {
                     return Err(invalid(format!(
                         "sheet '{}' has content type '{}', expected '{}'",
-                        sheet.name,
+                        sheet.name(),
                         part.content_type(),
                         ct::SML_WORKSHEET
                     )));
@@ -688,7 +742,7 @@ fn capture_source_graph_from_owner(
                 if part.content_type() != CHARTSHEET_CONTENT_TYPE {
                     return Err(invalid(format!(
                         "sheet '{}' has content type '{}', expected '{}'",
-                        sheet.name,
+                        sheet.name(),
                         part.content_type(),
                         CHARTSHEET_CONTENT_TYPE
                     )));
@@ -703,7 +757,7 @@ fn capture_source_graph_from_owner(
             return Err(invalid("tab-state sheet kind changed"));
         }
         bindings.push(SheetBinding {
-            name: copy_boxed(&sheet.name, "tab-state graph sheet name")?,
+            name: copy_boxed(sheet.name(), "tab-state graph sheet name")?,
             sheet_id: sheet.sheet_id,
             kind: sheet.kind,
             part: PartDescriptor {
