@@ -377,6 +377,7 @@ fn archive_code(error: &litchi_iwa_archive::Error) -> Code {
     match error {
         E::Limit { .. } => Code::LimitExceeded,
         E::Io(_) => Code::IoError,
+        E::SourceChanged { .. } | E::DirectoryChanged { .. } => Code::IoError,
         E::Allocation { .. } => Code::InternalError,
         _ => Code::CorruptFile,
     }
@@ -386,6 +387,7 @@ fn detection_code(error: &litchi_iwa_detect::Error) -> Code {
     match error {
         litchi_iwa_detect::Error::LimitExceeded { .. } => Code::LimitExceeded,
         litchi_iwa_detect::Error::Io(_) => Code::IoError,
+        litchi_iwa_detect::Error::SourceChanged => Code::IoError,
         _ => Code::CorruptFile,
     }
 }
@@ -397,6 +399,7 @@ fn pages_code(error: &litchi_pages::PackageError) -> Code {
         E::Io(_) => Code::IoError,
         E::Detection(error) => detection_code(error),
         E::Archive(error) => archive_code(error),
+        E::UnexpectedFormat { .. } | E::NotOfficeFile => Code::UnsupportedFormat,
         E::Limit { .. }
         | E::Semantic(
             litchi_pages::Error::TooManySections { .. }
@@ -584,6 +587,7 @@ fn keynote_code(error: &litchi_keynote::ReadError) -> Code {
         E::Io(_) => Code::IoError,
         E::Detection(error) => detection_code(error),
         E::Archive(error) => archive_code(error),
+        E::UnexpectedFormat { .. } => Code::UnsupportedFormat,
         E::SemanticLimit { .. } | E::PayloadLimit { .. } => Code::LimitExceeded,
         E::Allocation { .. } => Code::InternalError,
         _ => Code::CorruptFile,
@@ -675,6 +679,7 @@ fn numbers_code(error: &litchi_numbers::Error) -> Code {
         E::Io(_) => Code::IoError,
         E::Detection(error) => detection_code(error),
         E::Archive(error) => archive_code(error),
+        E::UnexpectedFormat { .. } => Code::UnsupportedFormat,
         E::SemanticLimit { .. } | E::InputTooLarge { .. } => Code::LimitExceeded,
         _ => Code::CorruptFile,
     }
@@ -750,5 +755,63 @@ mod tests {
             }));
             assert_eq!(locked.code(), Code::DocumentProtected);
         }
+    }
+
+    #[test]
+    fn iwork_source_freshness_errors_are_io_errors() {
+        use super::{archive_code, detection_code};
+        use litchi_core::SourceVersion;
+        use litchi_iwa_archive::Error as ArchiveError;
+
+        assert_eq!(
+            archive_code(&ArchiveError::SourceChanged {
+                expected: SourceVersion::new(1, 1),
+                observed: SourceVersion::new(1, 2),
+            }),
+            Code::IoError
+        );
+        assert_eq!(
+            archive_code(&ArchiveError::DirectoryChanged {
+                context: "test directory capture",
+            }),
+            Code::IoError
+        );
+        assert_eq!(
+            detection_code(&litchi_iwa_detect::Error::SourceChanged),
+            Code::IoError
+        );
+    }
+
+    #[test]
+    fn iwork_package_wrong_kinds_are_unsupported_formats() {
+        use litchi_core::FileFormat;
+
+        #[cfg(feature = "pages")]
+        {
+            assert_eq!(
+                super::pages_code(&litchi_pages::PackageError::UnexpectedFormat {
+                    detected: FileFormat::Keynote,
+                }),
+                Code::UnsupportedFormat
+            );
+            assert_eq!(
+                super::pages_code(&litchi_pages::PackageError::NotOfficeFile),
+                Code::UnsupportedFormat
+            );
+        }
+        #[cfg(feature = "keynote")]
+        assert_eq!(
+            super::keynote_code(&litchi_keynote::ReadError::UnexpectedFormat {
+                detected: FileFormat::Pages,
+            }),
+            Code::UnsupportedFormat
+        );
+        #[cfg(feature = "numbers")]
+        assert_eq!(
+            super::numbers_code(&litchi_numbers::Error::UnexpectedFormat {
+                detected: FileFormat::Pages,
+            }),
+            Code::UnsupportedFormat
+        );
     }
 }
