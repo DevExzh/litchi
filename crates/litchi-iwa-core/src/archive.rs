@@ -971,6 +971,7 @@ impl ArchiveInfo {
     /// [`MessageInfoCollection`] carries totals from its bounded construction
     /// path, while an ordinary `Vec<MessageInfo>` remains a fully checked raw
     /// input.
+    #[inline]
     pub fn new(
         identifier: u64,
         message_infos: impl Into<MessageInfoCollection>,
@@ -1017,21 +1018,24 @@ impl ArchiveInfo {
 
 #[inline]
 fn default_archive_info_bounds_are_safe(message_infos: &[MessageInfo]) -> bool {
-    message_infos.len() <= Limits::MAX_MESSAGES_PER_OBJECT
-        && message_infos.iter().all(|message_info| {
-            let shape = (message_info.versions.len() ^ DEFAULT_MESSAGE_VERSIONS.len())
-                | message_info.field_infos.len()
-                | message_info.object_references.len()
-                | message_info.data_references.len()
-                | usize::from(message_info.base_message_index.is_some())
-                | message_info.diff_merge_version.len()
-                | usize::from(message_info.diff_field_path.is_some())
-                | message_info.fields_to_remove.len()
-                | message_info.diff_read_version.len();
-            shape == 0
-                && usize::try_from(message_info.length)
-                    .is_ok_and(|length| length <= Limits::MAX_MESSAGE_BYTES)
-        })
+    if message_infos.len() > Limits::MAX_MESSAGES_PER_OBJECT {
+        return false;
+    }
+    for message_info in message_infos {
+        let shape = (message_info.versions.len() ^ DEFAULT_MESSAGE_VERSIONS.len())
+            | message_info.field_infos.len()
+            | message_info.object_references.len()
+            | message_info.data_references.len()
+            | usize::from(message_info.base_message_index.is_some())
+            | message_info.diff_merge_version.len()
+            | usize::from(message_info.diff_field_path.is_some())
+            | message_info.fields_to_remove.len()
+            | message_info.diff_read_version.len();
+        if shape != 0 || u64::from(message_info.length) > Limits::MAX_MESSAGE_BYTES as u64 {
+            return false;
+        }
+    }
+    true
 }
 
 /// Metadata for one payload in an archive object.
@@ -1056,6 +1060,7 @@ impl MessageInfo {
     /// `length` is checked against the message-byte budget before it is
     /// narrowed to the wire `u32` representation. The fixed version vector
     /// is allocated only after the header and metadata budgets are admitted.
+    #[inline]
     pub fn new(type_: u32, length: usize, limits: Limits) -> Result<Self> {
         let default_limits = limits.is_default_profile();
         let limits = if default_limits {
@@ -1075,9 +1080,7 @@ impl MessageInfo {
             .map_err(|_| {
                 Error::allocation("IWA message versions", DEFAULT_MESSAGE_VERSIONS.len())
             })?;
-        versions.push(1);
-        versions.push(0);
-        versions.push(5);
+        versions.extend(DEFAULT_MESSAGE_VERSIONS);
         Ok(Self {
             type_,
             versions,
@@ -1104,9 +1107,7 @@ impl MessageInfo {
             .map_err(|_| {
                 Error::allocation("IWA message versions", DEFAULT_MESSAGE_VERSIONS.len())
             })?;
-        versions.push(1);
-        versions.push(0);
-        versions.push(5);
+        versions.extend(DEFAULT_MESSAGE_VERSIONS);
         Ok(Self {
             type_,
             versions,
