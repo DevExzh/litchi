@@ -227,8 +227,8 @@ pub enum File {
     /// An encrypted input: neither readable nor editable until it is
     /// unlocked with its password.
     Locked(Locked),
-    /// A signed input: readable through the file it wraps; editing must
-    /// consume the signature explicitly.
+    /// A signed input: readable through the file it wraps; changed editing
+    /// must consume the signature explicitly, while exact no-ops preserve it.
     Signed(Signed),
 }
 
@@ -337,8 +337,9 @@ impl File {
     }
 
     /// Whether the file is still signed: a [`File::Signed`], or the file one
-    /// wraps ([`Signed::file`]). Editing it is refused until
-    /// [`Signed::unsign`] consumes the signature.
+    /// wraps ([`Signed::file`]). Exact no-op edits preserve its signed bytes;
+    /// changed edits are refused until [`Signed::unsign`] consumes the
+    /// signature.
     ///
     /// The file [`Signed::unsign`] returns is not signed in this sense,
     /// although its bytes keep the signature until its first write removes

@@ -411,15 +411,75 @@ fn signature_authorization_is_bound_and_inverse_never_restores_signatures() {
             }),
         )
         .unwrap();
-        let error = file
-            .edit::<()>(|_| panic!("signed closure ran"))
-            .unwrap_err();
-        assert_eq!(error.code(), Code::DocumentProtected);
         let File::Signed(signed) = file else {
             panic!("signed fixture")
         };
         let signed_outer = File::Signed(signed.clone());
         let signed_inner = signed.file().clone();
+        let signed_noop = signed_outer.edit(|_| Ok(())).unwrap();
+        assert!(signed_noop.patch().is_noop());
+        let reopened_signed = litchi_ops::open_bytes(SIGNED.to_vec()).unwrap();
+        let replayed = signed_noop.patch().apply(&reopened_signed).unwrap();
+        assert!(replayed.is_signed());
+        assert_eq!(replayed.to_bytes().unwrap(), SIGNED);
+        let signed_leaf_noop = signed_inner.edit(|_| Ok(())).unwrap();
+        let reopened_signed_leaf = match litchi_ops::open_bytes(SIGNED.to_vec()).unwrap() {
+            File::Signed(signed) => signed.file().clone(),
+            _ => panic!("signed fixture"),
+        };
+        let replayed_leaf = signed_leaf_noop
+            .patch()
+            .apply(&reopened_signed_leaf)
+            .unwrap();
+        assert!(replayed_leaf.is_signed());
+        assert_eq!(replayed_leaf.to_bytes().unwrap(), SIGNED);
+        let original_text = text(&signed_inner);
+        let setter_noop = signed_outer
+            .edit(|tx| tx.set("/body/p[1]/r[1]", props! {"text" => original_text.clone()}))
+            .unwrap_or_else(|error| panic!("setter no-op: {error}; leaf={:?}", error.leaf()));
+        assert!(setter_noop.patch().is_noop());
+        assert!(setter_noop.file().is_signed());
+        assert_eq!(setter_noop.file().to_bytes().unwrap(), SIGNED);
+        let leaf_setter_noop = signed_inner
+            .set("/body/p[1]/r[1]", props! {"text" => original_text.clone()})
+            .unwrap_or_else(|error| panic!("leaf setter no-op: {error}; leaf={:?}", error.leaf()));
+        assert!(leaf_setter_noop.is_signed());
+        assert_eq!(leaf_setter_noop.to_bytes().unwrap(), SIGNED);
+        let facade_setter_noop = signed_outer
+            .set("/body/p[1]/r[1]", props! {"text" => original_text})
+            .unwrap_or_else(|error| {
+                panic!("facade setter no-op: {error}; leaf={:?}", error.leaf())
+            });
+        assert!(facade_setter_noop.is_signed());
+        assert_eq!(facade_setter_noop.to_bytes().unwrap(), SIGNED);
+        assert_eq!(
+            signed_inner
+                .edit(|tx| tx.set("/body/p[1]/r[1]", props! {"text" => "blocked"}))
+                .unwrap_err()
+                .code(),
+            Code::DocumentProtected
+        );
+        assert_eq!(
+            signed_outer
+                .edit(|tx| tx.set("/body/p[1]/r[1]", props! {"text" => "blocked"}))
+                .unwrap_err()
+                .code(),
+            Code::DocumentProtected
+        );
+        assert_eq!(
+            signed_inner
+                .set("/body/p[1]/r[1]", props! {"text" => "blocked"})
+                .unwrap_err()
+                .code(),
+            Code::DocumentProtected
+        );
+        assert_eq!(
+            signed_outer
+                .set("/body/p[1]/r[1]", props! {"text" => "blocked"})
+                .unwrap_err()
+                .code(),
+            Code::DocumentProtected
+        );
         let unsigned = signed.unsign();
         let baseline = unsigned.to_bytes().unwrap();
         let commit = unsigned
@@ -433,6 +493,16 @@ fn signature_authorization_is_bound_and_inverse_never_restores_signatures() {
             commit.patch().apply(&signed_outer).unwrap_err().code(),
             Code::DocumentProtected
         );
+        assert_eq!(
+            commit
+                .patch()
+                .inverse()
+                .apply(&signed_outer)
+                .unwrap_err()
+                .code(),
+            Code::DocumentProtected,
+            "an inverse of an authorized changed edit cannot restore a signed state"
+        );
         let restored = commit.patch().inverse().apply(commit.file()).unwrap();
         assert!(!restored.is_signed());
         assert_eq!(restored.to_bytes().unwrap(), baseline);
@@ -444,15 +514,32 @@ fn signature_authorization_is_bound_and_inverse_never_restores_signatures() {
         let noop = unsigned.edit(|_| Ok(())).unwrap();
         assert!(noop.patch().is_noop());
         assert_eq!(noop.file().to_bytes().unwrap(), baseline);
-        for recipient in [&signed_inner, &signed_outer] {
+        let genuinely_unsigned = litchi_ops::open_bytes(baseline.clone()).unwrap();
+        assert!(!genuinely_unsigned.is_signed());
+        let unsigned_noop = genuinely_unsigned.edit(|_| Ok(())).unwrap();
+        for recipient in [&genuinely_unsigned, &unsigned] {
             let replayed = noop.patch().apply(recipient).unwrap();
-            assert!(replayed.is_signed());
-            assert_eq!(replayed.to_bytes().unwrap(), SIGNED);
+            assert!(!replayed.is_signed());
+            assert_eq!(replayed.to_bytes().unwrap(), baseline);
         }
+        assert_eq!(
+            unsigned_noop
+                .patch()
+                .apply(&signed_outer)
+                .unwrap_err()
+                .code(),
+            Code::InvalidInput,
+            "an ordinary unsigned base cannot match a signed recipient"
+        );
+        assert_eq!(
+            noop.patch().apply(&signed_outer).unwrap_err().code(),
+            Code::InvalidInput,
+            "an authorized unsigned base cannot match a signed recipient"
+        );
         let other = litchi_ops::open_bytes(SIGNED_OTHER.to_vec()).unwrap();
         assert!(other.is_signed());
         assert_eq!(
-            noop.patch().apply(&other).unwrap_err().code(),
+            signed_noop.patch().apply(&other).unwrap_err().code(),
             Code::InvalidInput,
             "a signed recipient with different recorded bytes is a patch conflict"
         );
@@ -468,12 +555,22 @@ fn source_guards_survive_signature_removal_promotion_to_eager_owner() {
         panic!("signed fixture")
     };
     let signed_target = File::Signed(signed.clone());
+    let signed_noop = signed_target.edit(|_| Ok(())).unwrap();
     let unsigned = signed.unsign();
     let noop = unsigned.edit(|_| Ok(())).unwrap();
     let commit = unsigned
         .edit(|tx| tx.set("/body/p[1]/r[1]", props! {"text" => "unsigned edit"}))
         .unwrap();
     std::fs::write(&path, b"changed physical source").unwrap();
+    assert_eq!(
+        signed_noop
+            .patch()
+            .apply(&signed_target)
+            .unwrap_err()
+            .code(),
+        Code::IoError,
+        "a signed no-op checks its retained source before replay"
+    );
     assert_eq!(
         noop.patch().apply(&signed_target).unwrap_err().code(),
         Code::IoError,

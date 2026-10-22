@@ -703,6 +703,27 @@ impl Docx {
     /// when the source changed; and the leaf's typed failures otherwise.
     pub(crate) fn edit(&self) -> Result<DocxEditor> {
         self.edit_policy()?;
+        self.edit_inner()
+    }
+
+    /// Build a native writer for the unified setter's signed no-op path. The
+    /// native commit still rejects a changed result, while an unchanged
+    /// result returns the original package and signature byte-identically.
+    pub(crate) fn edit_for_write(&self) -> Result<DocxEditor> {
+        if self.0.signature() != Signature::Signed {
+            self.edit_policy()?;
+        } else if !self.0.retain_source {
+            return Err(Error::new(
+                Code::UnsupportedCapability,
+                "the DOCX document was opened without retaining its source for editing",
+            )
+            .with_format(FileFormat::Docx)
+            .with_suggestion("reopen the document without `OpenOptions::retain_source(false)`"));
+        }
+        self.edit_inner()
+    }
+
+    fn edit_inner(&self) -> Result<DocxEditor> {
         if self.0.signature() == Signature::RemovalAuthorized {
             return self
                 .unsigned_package()

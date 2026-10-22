@@ -43,13 +43,17 @@ pub enum SignatureOrigin {
 /// [`Signed::file`] returns it for format-specific reads. Opening verifies
 /// nothing; the signature is only detected, from package metadata.
 ///
-/// Editing must consume the signature explicitly (ADR 0006), so that no edit
-/// can strip a signature silently:
+/// Changed editing must consume the signature explicitly (ADR 0006), so that
+/// no edit can strip a signature silently:
 ///
-/// - While the file is signed, every edit refuses with
+/// - An empty or exact no-op edit may commit and preserves the signed
+///   publication byte-identically. That includes the wrapped file returned by
+///   [`Signed::file`] and the outer `File::Signed` facade.
+/// - A changed edit while the file is signed refuses with
 ///   [`Code::DocumentProtected`](crate::Code::DocumentProtected) and a
-///   suggestion naming [`Signed::unsign`]. That holds for the wrapped file
-///   too: [`Signed::file`] returns a file that reads but does not edit.
+///   suggestion naming [`Signed::unsign`]. The wrapped file follows the same
+///   rule: [`Signed::file`] can prove an exact no-op but cannot publish a
+///   changed result.
 /// - [`Signed::unsign`] consumes the signature and returns the file. Its
 ///   first write removes the signature parts, through the format's own
 ///   explicit removal, and publishes the document without them.
@@ -129,8 +133,8 @@ impl Signed {
     }
 
     /// The readable file the signature covers. It reads like any file of
-    /// its format; its edits refuse until [`Self::unsign`] consumes the
-    /// signature.
+    /// its format; exact no-op edits preserve its signed bytes, while changed
+    /// edits refuse until [`Self::unsign`] consumes the signature.
     #[must_use]
     pub fn file(&self) -> &File {
         &self.0.file

@@ -220,10 +220,11 @@ impl Docx {
     }
 
     /// The general route's work for one direct body paragraph and one
-    /// `text` value: the editor first (the same security refusals), the
-    /// same property admission, then the paragraph text replacement.
+    /// `text` value: the editor first (including the signed exact-no-op
+    /// exception), the same property admission, then the paragraph text
+    /// replacement.
     fn set_paragraph_text(&self, position: Position, props: &Props<'_>) -> Result<Self> {
-        let editor = self.edit()?;
+        let editor = self.edit_for_write()?;
         let assignments = admit_assignments(TargetKind::Paragraph, props)?;
         let target = Target {
             selection: Selection::Body(WriteSelection::Paragraph(position)),
@@ -250,9 +251,9 @@ impl Docx {
         props: impl IntoProps<'v>,
         command_text: bool,
     ) -> Result<O> {
-        // Build the editor first.  Besides refusing signed/read-only handles,
-        // this makes an empty property list honor the same security policy as
-        // a non-empty write.
+        // Build the editor first. Besides preserving the signed exact-no-op
+        // exception and refusing read-only handles, this makes an empty
+        // property list honor the same security policy as a non-empty write.
         // Core document properties on `/` or `/metadata` (record 0338); the
         // metadata route applies the same edit policy without building a
         // main-document editor.
@@ -267,7 +268,7 @@ impl Docx {
         } else {
             Err(props)
         };
-        let editor = self.edit()?;
+        let editor = self.edit_for_write()?;
         let nodes = self.resolve_targets(target)?;
         let props = match props {
             Ok(props) => props,

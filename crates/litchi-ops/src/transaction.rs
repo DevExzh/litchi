@@ -139,8 +139,9 @@ impl<T> fmt::Debug for Commit<T> {
 /// already-validated endpoint without a ZIP round trip. Source freshness is
 /// checked in both directions.
 ///
-/// Signature consumption precedes editing. Inverse replay restores the
-/// authorized unsigned logical source and never recreates a signed state.
+/// Signature consumption precedes changed editing. An empty or exact no-op
+/// transaction may retain a signed publication, and inverse replay restores
+/// the authorized unsigned logical source without recreating a signed state.
 /// This is not a durable or cross-process patch format.
 #[derive(Clone)]
 pub struct Patch {
@@ -268,8 +269,8 @@ impl Patch {
             }
             let target = if exact_noop && file.is_signed() {
                 // Retain the recipient wrapper and signature bytes. The
-                // fingerprint above proves it is the patch base; cloning the
-                // recorded unsigned endpoint would silently discard them.
+                // fingerprint above proves it is the patch base; returning a
+                // different retained endpoint could silently discard them.
                 file.clone()
             } else {
                 target.clone()
@@ -285,22 +286,27 @@ impl Patch {
         result
     }
     fn check_sources(&self) -> Result<()> {
-        check_source(&self.inner.source)?;
+        let check = if self.is_noop() {
+            check_source_for_replay
+        } else {
+            check_source
+        };
+        check(&self.inner.source)?;
         // Ordered retained endpoints are already validated by their leaf
         // commits. Check every source guard, including a source promoted to
         // an eager unsigned owner; the last endpoint alone is insufficient.
         if self.inverse {
             for step in self.inner.steps.iter().rev() {
-                check_source(&step.after)?;
-                check_source(&step.before)?;
+                check(&step.after)?;
+                check(&step.before)?;
             }
         } else {
             for step in &self.inner.steps {
-                check_source(&step.before)?;
-                check_source(&step.after)?;
+                check(&step.before)?;
+                check(&step.after)?;
             }
         }
-        check_source(&self.inner.target)
+        check(&self.inner.target)
     }
 }
 
@@ -499,6 +505,9 @@ impl File {
             }
             edit.flush_pending()?;
             let changed = changed(&edit.steps)?;
+            if changed && self.is_signed() {
+                return Err(crate::Error::signed(self.format().ok_or_else(pending)?));
+            }
             // Canonical no-op collapse: public replay uses these endpoints,
             // never the last step owner. Keep steps only as guarded history.
             let file = if changed { edit.current } else { self.clone() };
@@ -524,7 +533,11 @@ impl File {
             patch.check_sources()?;
             Ok(Commit::new(file, patch, diagnostics, value))
         })();
-        check_source(self)?;
+        if self.is_signed() {
+            check_source_for_replay(self)?;
+        } else {
+            check_source(self)?;
+        }
         result
     }
 }
@@ -3258,7 +3271,32 @@ impl Edit {
                 }
                 .into());
             }
-            let (steps, value) = operation(&self.current)?;
+            let (steps, value) = if let File::Signed(signed) = &self.current {
+                // The signed wrapper is a read facade around the format leaf.
+                // Let the leaf stage a setter so its native commit can prove
+                // whether the request is an exact no-op.  A successful
+                // signed operation must still be byte-identical; retain the
+                // outer wrapper for every resulting endpoint so no step can
+                // publish an unwrapped signature disposition.
+                let outer = self.current.clone();
+                let (steps, value) = operation(signed.file())?;
+                let mut wrapped = Vec::with_capacity(steps.len());
+                for step in steps {
+                    if !same_content_for_replay(&step.before, &step.after, true)? {
+                        return Err(crate::Error::signed(
+                            self.current.format().ok_or_else(pending)?,
+                        ));
+                    }
+                    wrapped.push(Step {
+                        before: outer.clone(),
+                        after: outer.clone(),
+                        ..step
+                    });
+                }
+                (wrapped, value)
+            } else {
+                operation(&self.current)?
+            };
             let bytes = steps.iter().fold(self.snapshot_bytes, |bytes, step| {
                 bytes.saturating_add(step.snapshot_bytes)
             });
@@ -3822,65 +3860,26 @@ fn same_content(left: &File, right: &File) -> Result<bool> {
     Ok(stream_fingerprint(left)? == stream_fingerprint(right)?)
 }
 
-#[cfg(any(
-    feature = "doc",
-    feature = "docx",
-    feature = "ppt",
-    feature = "pptx",
-    feature = "xls",
-    feature = "xlsx",
-    feature = "xlsb"
-))]
-fn recorded_content(file: &File) -> File {
-    if file.is_signed() {
-        file.clone()
-    } else {
-        // `Signed::unsign` marks the same retained owner as
-        // `RemovalAuthorized`; its ordinary writer removes signature parts.
-        // Replay must authenticate the bytes that were recorded before that
-        // authorization, so restore the signed disposition for this bounded
-        // proof without changing either caller-owned handle.
-        file.with_signature(crate::format::signature::Signature::Signed)
-    }
-}
-
-#[cfg(not(any(
-    feature = "doc",
-    feature = "docx",
-    feature = "ppt",
-    feature = "pptx",
-    feature = "xls",
-    feature = "xlsx",
-    feature = "xlsb"
-)))]
-fn recorded_content(file: &File) -> File {
-    file.clone()
-}
-
-/// Compare a replay recipient with the recorded base. Signed no-op replay
-/// intentionally ignores only the signature disposition: the format and the
-/// bytes still have to match, and the bounded stream proof uses the actual
-/// published file through the facade. Changed patches keep the stricter
-/// [`same_content`] policy.
-fn same_content_for_replay(left: &File, right: &File, exact_noop: bool) -> Result<bool> {
+/// Compare a replay recipient with the recorded base. Exact no-op replay
+/// compares each endpoint's actual published bytes, including signature
+/// parts; changed patches keep the stricter [`same_content`] policy.
+pub(crate) fn same_content_for_replay(left: &File, right: &File, exact_noop: bool) -> Result<bool> {
     if !exact_noop || (!left.is_signed() && !right.is_signed()) {
         return same_content(left, right);
     }
     if matches!(left, File::Locked(_))
         || matches!(right, File::Locked(_))
         || left.format() != right.format()
+        || !same_security_disposition(left, right)
     {
         return Ok(false);
     }
-    let left = recorded_content(left);
-    let right = recorded_content(right);
-    Ok(stream_fingerprint(&left)? == stream_fingerprint(&right)?)
+    Ok(stream_fingerprint(left)? == stream_fingerprint(right)?)
 }
 
 /// Content equality cannot transfer a signature or encryption disposition.
-/// The outer `apply` fence rejects the protected variants, while this helper
-/// keeps an authorized plain owner from matching a differently protected
-/// owner whose publication happens to have equal bytes.
+/// This helper keeps an endpoint whose publication happens to be equal from
+/// matching a differently protected endpoint.
 fn same_security_disposition(left: &File, right: &File) -> bool {
     if left.is_signed() != right.is_signed() {
         return false;
@@ -3940,6 +3939,13 @@ impl Write for DigestSink {
 }
 
 fn admit(file: &File) -> Result<()> {
+    // A signed source may establish an exact no-op patch.  The closure is
+    // still allowed to run so that the transaction can distinguish that
+    // source-only case from an attempted mutation; every mutation path below
+    // keeps the signed refusal and the final changed check is a second fence.
+    if file.is_signed() {
+        return check_source_for_replay(file);
+    }
     match file {
         #[cfg(feature = "doc")]
         File::Doc(handle) => {
@@ -3996,56 +4002,15 @@ fn admit(file: &File) -> Result<()> {
     }
 }
 fn check_source(file: &File) -> Result<()> {
-    match file {
-        #[cfg(feature = "doc")]
-        File::Doc(handle) => {
-            handle.check_source()?;
-            if handle.signature() == crate::format::signature::Signature::Signed {
-                return Err(crate::Error::signed(litchi_core::FileFormat::Doc));
-            }
-            Ok(())
-        },
-        #[cfg(feature = "pptx")]
-        File::Pptx(handle) => handle.check_source(),
-        #[cfg(feature = "docx")]
-        File::Docx(handle) => {
-            handle.owner().check_source()?;
-            if handle.signature() == crate::format::signature::Signature::Signed {
-                return Err(crate::Error::signed(litchi_core::FileFormat::Docx));
-            }
-            Ok(())
-        },
-        #[cfg(feature = "xlsx")]
-        File::Xlsx(handle) => handle.check_source(),
-        #[cfg(feature = "xlsb")]
-        File::Xlsb(handle) => handle.check_source(),
-        #[cfg(feature = "xls")]
-        File::Xls(handle) => handle.check_source(),
-        #[cfg(feature = "ppt")]
-        File::Ppt(handle) => handle.check_source(),
-        #[cfg(feature = "rtf")]
-        File::Rtf(_) => Ok(()),
-        #[cfg(feature = "ods")]
-        File::Ods(handle) => handle.check_source(),
-        #[cfg(feature = "odt")]
-        File::Odt(handle) | File::Oth(handle) | File::Odm(handle) => handle.check_source(),
-        #[cfg(odf_objects)]
-        File::Odg(handle)
-        | File::Odc(handle)
-        | File::Odi(handle)
-        | File::Odb(handle)
-        | File::Odf(handle) => handle.check_source(),
-        #[cfg(feature = "iwork-adapter")]
-        File::Pages(handle) | File::Keynote(handle) | File::Numbers(handle) => {
-            handle.check_source()
-        },
-        #[cfg(feature = "odp")]
-        File::Odp(handle) => handle.check_source(),
-        File::Signed(signed) => Err(crate::Error::signed(signed.format())),
-        File::Locked(locked) => Err(locked.read_error()),
-        #[allow(unreachable_patterns)]
-        _ => Err(pending()),
+    // Source freshness wins over the protected-state classification.  The
+    // leaf checks below deliberately validate the retained owner without
+    // consuming the signed no-op exception; this fence adds the refusal only
+    // to changed edits and replay patches.
+    check_source_for_replay(file)?;
+    if file.is_signed() {
+        return Err(crate::Error::signed(file.format().ok_or_else(pending)?));
     }
+    Ok(())
 }
 
 /// Check retained source freshness while leaving the signature disposition
