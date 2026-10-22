@@ -1784,12 +1784,18 @@ mod tests {
         "urn:oasis:names:tc:opendocument:xmlns:presentation:1.0";
 
     fn source_package(content: &str) -> Arc<dyn ReadAt> {
+        let manifest = format!(
+            r#"<manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><manifest:file-entry manifest:full-path="/" manifest:media-type="{ODF_PRESENTATION}"/><manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"/></manifest:manifest>"#,
+        );
         let mut writer = StreamingArchiveWriter::new();
         writer
             .write_stored("mimetype", ODF_PRESENTATION.as_bytes())
             .unwrap();
         writer
             .write_deflated(ODF_CONTENT, content.as_bytes())
+            .unwrap();
+        writer
+            .write_deflated("META-INF/manifest.xml", manifest.as_bytes())
             .unwrap();
         Arc::new(OwnedSource::new(writer.finish_to_bytes().unwrap()))
     }
