@@ -14,6 +14,7 @@ use litchi_core::Position;
 use litchi_doc::Package;
 use litchi_doc::body_text::{Error, Refusal, Snapshot, TransactionLimits};
 use litchi_doc::builder::Builder;
+use litchi_doc::package::Error as PackageError;
 use litchi_doc::parts::fib::FileInformationBlock;
 use litchi_doc::tracked_revision::{RevisionKind, RevisionMetadata};
 use litchi_doc::writer::{CharacterFormatting, ParagraphFormatting};
@@ -305,12 +306,20 @@ fn signed_dofr_noop_is_allowed_but_changed_source_is_refused() {
 fn changed_dofr_patch_requires_the_complete_source_owner() {
     let source = Snapshot::open(doc_with_dofr(2, false), Limits::default()).expect("source");
     let foreign = Snapshot::open_bounded(
-        doc_with_dofr_and_stw_user(2, base_doc_with_text("bravo"), None, None),
+        doc_with_dofr_and_stw_user(3, base_doc_with_text("bravo"), None, None),
         Limits::default(),
         TransactionLimits::new(1, 1024, 1024),
     )
     .expect("foreign source");
     let foreign_patch = changed_frame_patch(&source, 1);
+    let foreign_records = foreign
+        .dofr_records()
+        .expect("foreign Dofr read")
+        .expect("foreign Dofr records");
+    assert!(matches!(
+        foreign_patch.apply(&foreign_records),
+        Err(PackageError::Corrupted(_))
+    ));
     let mut edit = foreign.edit().expect("foreign edit");
 
     assert!(matches!(
@@ -341,6 +350,20 @@ fn reopened_identical_source_with_different_limits_accepts_dofr_patch() {
     assert_eq!(reopened.bytes(), source.bytes());
 
     let patch = changed_frame_patch(&source, 1);
+    let source_records = source
+        .dofr_records()
+        .expect("Dofr read")
+        .expect("Dofr records");
+    let reopened_records = reopened
+        .dofr_records()
+        .expect("reopened Dofr read")
+        .expect("reopened Dofr records");
+    let applied = patch
+        .apply(&reopened_records)
+        .expect("same-content raw patch");
+    assert_eq!(applied.source_bytes(), patch.replacement_bytes());
+    assert_eq!(source_records.source_bytes(), patch.source_bytes());
+
     let mut edit = reopened.edit().expect("reopened edit");
     assert!(edit.apply_dofr_patch(&patch).expect("same-source patch"));
     let committed = edit.commit().expect("reopened commit");

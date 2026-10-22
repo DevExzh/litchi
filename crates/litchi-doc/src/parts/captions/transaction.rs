@@ -174,7 +174,7 @@ impl Patch {
     /// Applies this patch to the exact source snapshot.
     pub fn apply(&self, source: &Snapshot) -> Result<Snapshot, Error> {
         if source != &self.before {
-            return Err(Error::Conflict);
+            return Err(Error::PatchConflict);
         }
         Ok(self.after.clone())
     }
@@ -202,15 +202,15 @@ pub use litchi_core::edit::Diagnostics;
 pub enum Error {
     /// The candidate violates a bounded caption invariant.
     Invalid(PackageError),
-    /// The transaction was created from a different snapshot.
-    Conflict,
+    /// The patch was created from a different snapshot.
+    PatchConflict,
 }
 
 impl std::fmt::Display for Error {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Invalid(error) => error.fmt(formatter),
-            Self::Conflict => formatter.write_str("caption transaction snapshot conflict"),
+            Self::PatchConflict => formatter.write_str("caption transaction snapshot conflict"),
         }
     }
 }

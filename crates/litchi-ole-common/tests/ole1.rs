@@ -672,7 +672,15 @@ fn limits_are_checked_before_admission_and_stale_patch_is_rejected() {
     let mut other_edit = snapshot.edit();
     other_edit.set_width(4).unwrap();
     let other = other_edit.commit().unwrap().into_package();
-    assert!(commit.patch().apply(&other).is_err());
+    let equal_content = ObjectSnapshot::parse(snapshot.bytes(), Limits::default()).unwrap();
+    assert_eq!(
+        commit.patch().apply(&equal_content).unwrap().bytes(),
+        commit.package().bytes()
+    );
+    assert!(matches!(
+        commit.patch().apply(&other),
+        Err(OleError::InvalidFormat(_))
+    ));
 }
 
 #[test]

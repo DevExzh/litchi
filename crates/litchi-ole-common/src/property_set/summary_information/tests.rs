@@ -195,6 +195,13 @@ fn filetime_conversions_and_reversible_patches_are_source_checked() {
     let patch = commit.patch();
     let forward = patch.apply(&source).unwrap();
     assert_eq!(forward, *commit.package());
+
+    // A separately decoded section with the same content is still a valid
+    // replay target; the patch is bound to bytes, not to an allocation.
+    let reparsed_stream = Stream::parse(&Stream::new(source.clone()).to_bytes().unwrap()).unwrap();
+    let reparsed = Snapshot::from_stream(&reparsed_stream).unwrap();
+    assert_eq!(patch.apply(reparsed.section()).unwrap(), *commit.package());
+
     assert_eq!(patch.revert(&forward).unwrap(), source);
 
     let mut different = forward.clone();
@@ -202,7 +209,10 @@ fn filetime_conversions_and_reversible_patches_are_source_checked() {
         .add(SUBJECT, Value::Lpstr("wrong".into()))
         .unwrap();
     assert!(patch.revert(&different).is_err());
-    assert!(patch.apply(&different).is_err());
+    assert!(matches!(
+        patch.apply(&different),
+        Err(litchi_cfb::OleError::InvalidFormat(_))
+    ));
 }
 
 #[test]

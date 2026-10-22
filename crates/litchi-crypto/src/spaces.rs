@@ -3172,7 +3172,21 @@ mod tests {
             ]
         );
         assert_eq!(commit.patch().apply(&snapshot).unwrap(), *commit.package());
-        assert!(commit.patch().apply(commit.package()).is_err());
+
+        // A separately opened package with the same DataSpaces content is a
+        // valid replay target.  The patch is source-content bound, not tied
+        // to the original snapshot allocation.
+        let mut equal_ole = OleFile::open(Cursor::new(editable_package())).unwrap();
+        let equal_source = Snapshot::from_ole(&mut equal_ole).unwrap().unwrap();
+        assert_eq!(
+            commit.patch().apply(&equal_source).unwrap(),
+            *commit.package()
+        );
+
+        assert!(matches!(
+            commit.patch().apply(commit.package()),
+            Err(Error::Invalid(_))
+        ));
     }
 
     #[test]
