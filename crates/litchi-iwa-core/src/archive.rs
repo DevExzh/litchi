@@ -1135,7 +1135,31 @@ impl MessageInfoCollection {
                 limits.max_messages_per_object(),
             ));
         }
-        let admission = message_info_admission(&message_info, limits)?;
+        let admission = if is_minimal_message_info(&message_info) {
+            // `MessageInfo::new` admits this conventional shape before it
+            // publishes the record. Recompute the current public length and
+            // use the same fixed-shape totals only after checking the exact
+            // current shape above; a mutation of any public nested field
+            // falls through to the general admission path.
+            let length = usize::try_from(message_info.length)
+                .map_err(|_| Error::invalid_archive(0, "message length exceeds usize"))?;
+            check_message_length(length, limits)?;
+            let admission =
+                minimal_message_info_admission(message_info.type_, message_info.length)?;
+            if limits != Limits::default() {
+                check_constructor_header(
+                    admission.encoded_length,
+                    admission.header_fields,
+                    admission.header_nesting,
+                    admission.header_memory,
+                    admission.metadata_items,
+                    limits,
+                )?;
+            }
+            admission
+        } else {
+            message_info_admission(&message_info, limits)?
+        };
         if let Some(collection_admission) = self.admission.as_mut() {
             collection_admission.push(admission, limits)?;
         }

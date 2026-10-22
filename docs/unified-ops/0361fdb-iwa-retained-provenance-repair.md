@@ -161,6 +161,16 @@ must use `push_new` and include its collection setup.
 This is deterministic instruction evidence only. Native qualification remains
 pending, and the constructor end-to-end measurement is still open.
 
+The generic collection route now specializes `push(MessageInfo)` when the
+current public record still exactly has the conventional fixed version vector
+and empty optional metadata. It recomputes the current public length and
+applies the caller's current limits before using the fixed-shape totals; a
+mutation of length, versions or any nested field takes the existing complete
+admission path. This removes the duplicate general metadata walk after
+`MessageInfo::new` without trusting a cached length or public field state.
+The matched generic and `push_new` end-to-end counts remain pending until the
+coordinator releases a build window.
+
 ## Validation and workspace hygiene
 
 The source passed `cargo fmt --all -- --check`,
