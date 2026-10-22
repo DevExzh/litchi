@@ -10,6 +10,7 @@ use crate::archive::{Archive, Limits as IwaArchiveLimits};
 use crate::archive::{CoreError, CoreLimitKind};
 use crate::snappy::{SnappyLimits, SnappyStream};
 use crate::{Error, Result};
+use litchi_core::edit::{Commit as SharedCommit, Diagnostics};
 use litchi_core::ReadAt;
 use litchi_iwa_archive::package::{
     GetOrInsertError, PackageEntry, PackageEntryStoreError, PackagePatch, PackageState, ParseError,
@@ -123,55 +124,11 @@ pub struct Package {
     source: Option<Arc<[u8]>>,
 }
 
-/// An immutable, cheaply shareable package snapshot.
-#[derive(Debug, Clone)]
-pub struct Snapshot {
-    state: Arc<PackageState>,
-    limits: PackageLimits,
-    source: Option<Arc<[u8]>>,
-}
+/// The reversible package-entry patch produced by an iWork package edit.
+pub type Patch = PackagePatch;
 
-/// The published result of an atomic package-level snapshot edit.
-///
-/// A commit owns the callback's result together with the immutable snapshot
-/// produced after the candidate edit passed package-state validation. The
-/// source snapshot used to start the edit is never mutated. The commit also
-/// retains a source-checked, reversible package patch whose entry payloads
-/// continue to share the snapshots' copy-on-write allocations.
-#[must_use = "a commit contains the published snapshot"]
-#[derive(Debug)]
-pub struct Commit<T> {
-    value: T,
-    snapshot: Snapshot,
-    patch: PackagePatch,
-}
-
-impl<T> Commit<T> {
-    /// Borrow the callback's result.
-    pub fn value(&self) -> &T {
-        &self.value
-    }
-
-    /// Borrow the immutable snapshot published by the commit.
-    pub fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
-    }
-
-    /// Borrow the reversible package patch produced by this commit.
-    pub fn patch(&self) -> &PackagePatch {
-        &self.patch
-    }
-
-    /// Consume the commit and return its result and published snapshot.
-    pub fn into_parts(self) -> (T, Snapshot) {
-        (self.value, self.snapshot)
-    }
-
-    /// Consume the commit and return its result, snapshot, and patch.
-    pub fn into_parts_with_patch(self) -> (T, Snapshot, PackagePatch) {
-        (self.value, self.snapshot, self.patch)
-    }
-}
+/// The shared package/patch/diagnostics result of an iWork package edit.
+pub type Commit = SharedCommit<Package, Patch>;
 
 /// Resource ceilings applied while ingesting one iWork package.
 ///
@@ -662,13 +619,52 @@ impl Package {
         self.mutation_revision
     }
 
-    /// Capture an immutable package snapshot without copying package entries.
-    pub fn snapshot(&self) -> Snapshot {
-        Snapshot {
-            state: Arc::clone(&self.state),
+    /// Apply a source-checked package patch and publish the resulting package.
+    ///
+    /// A patch records the complete ordered package-entry base, so it can be
+    /// replayed on any package with matching content. The source package is
+    /// never mutated; a successful call returns the shared package/patch/
+    /// diagnostics triad. A no-op patch retains exact source provenance and
+    /// reports unchanged diagnostics.
+    pub fn apply(&self, patch: &Patch) -> Result<Commit> {
+        self.validate_state()?;
+        let state = self.state.apply_patch(patch).map_err(package_patch_error)?;
+        let target = Self {
+            state: Arc::new(state),
             limits: self.limits,
-            source: self.source.clone(),
-        }
+            mutation_revision: 0,
+            // An exact no-op patch leaves both the ordered entry table and
+            // physical package bytes unchanged. Non-empty patches have no
+            // physical reassembly proof at this boundary.
+            source: patch.is_empty().then(|| self.source.clone()).flatten(),
+        };
+        target.validate_state()?;
+        Ok(SharedCommit::new(
+            target,
+            patch.clone(),
+            Diagnostics::new(!patch.is_empty()),
+        ))
+    }
+
+    /// Stage a raw package edit for crate-internal codec adapters.
+    ///
+    /// The host package has no public raw mutators: format-owned editors are
+    /// the public staging surface. Internal adapters retain this bounded
+    /// copy-on-write seam so they can publish the same package/patch/
+    /// diagnostics triad without exposing a second mutable owner API.
+    pub(crate) fn edit_with<F>(&self, edit: F) -> Result<Commit>
+    where
+        F: FnOnce(&mut Package) -> Result<()>,
+    {
+        let mut candidate = self.clone();
+        edit(&mut candidate)?;
+        candidate.validate_state()?;
+        let patch = self.state.patch_to(&candidate.state);
+        Ok(SharedCommit::new(
+            candidate,
+            patch.clone(),
+            Diagnostics::new(!patch.is_empty()),
+        ))
     }
 
     pub fn entry_names(&self) -> impl Iterator<Item = &str> {
@@ -1131,140 +1127,6 @@ impl Package {
     fn mark_mutated(&mut self) {
         self.mutation_revision = self.mutation_revision.wrapping_add(1);
         self.source = None;
-    }
-}
-
-impl Snapshot {
-    /// Return the number of retained package members.
-    pub fn len(&self) -> usize {
-        self.state.len()
-    }
-
-    /// Report whether the package contains no members.
-    pub fn is_empty(&self) -> bool {
-        self.state.is_empty()
-    }
-
-    /// Return the resource profile retained by this immutable snapshot.
-    pub const fn limits(&self) -> PackageLimits {
-        self.limits
-    }
-
-    /// Enumerate package members in preserved source order.
-    pub fn entry_names(&self) -> impl Iterator<Item = &str> {
-        self.state.iter().map(PackageEntry::name)
-    }
-
-    /// Borrow one package member without copying it.
-    pub fn entry(&self, name: &str) -> Option<&[u8]> {
-        let name = normalize_entry_name(name);
-        let position = self.state.position(name)?;
-        Some(self.state.get_at(position)?.data())
-    }
-
-    /// Validate this immutable snapshot without creating serialized output.
-    ///
-    /// The check borrows the shared package state and applies the same
-    /// resource and entry-name invariants as [`Package::validate`].
-    pub fn validate(&self) -> Result<()> {
-        self.edit().validate()
-    }
-
-    /// Apply a source-checked package patch without mutating this snapshot.
-    pub fn apply(&self, patch: &PackagePatch) -> Result<Self> {
-        self.validate()?;
-        let state = self.state.apply_patch(patch).map_err(package_patch_error)?;
-        let target = Self {
-            state: Arc::new(state),
-            limits: self.limits,
-            // An exact no-op patch leaves both the ordered entry table and
-            // the physical package bytes unchanged. Preserve that source
-            // provenance so replaying a no-op remains byte-for-byte exact.
-            // Non-empty patches have no physical reassembly proof here and
-            // therefore intentionally lose preserve-mode provenance.
-            source: patch.is_empty().then(|| self.source.clone()).flatten(),
-        };
-        target.validate()?;
-        Ok(target)
-    }
-
-    /// Start a mutable copy-on-write edit from this snapshot.
-    pub fn edit(&self) -> Package {
-        Package {
-            state: Arc::clone(&self.state),
-            limits: self.limits,
-            mutation_revision: 0,
-            source: self.source.clone(),
-        }
-    }
-
-    /// Stage, validate, and publish one atomic copy-on-write edit.
-    ///
-    /// The callback receives a private mutable package view. If it returns an
-    /// error, or if the resulting package violates its configured limits or
-    /// member-name invariants, no new snapshot is published and the source
-    /// snapshot remains unchanged.
-    pub fn edit_with<T, F>(&self, edit: F) -> Result<Commit<T>>
-    where
-        F: FnOnce(&mut Package) -> Result<T>,
-    {
-        let mut candidate = self.edit();
-        let value = edit(&mut candidate)?;
-        candidate.validate_state()?;
-        let snapshot = candidate.snapshot();
-        Ok(Commit {
-            value,
-            patch: self.state.patch_to(&snapshot.state),
-            snapshot,
-        })
-    }
-
-    /// Encode the unchanged snapshot as an iWork ZIP package.
-    pub fn to_bytes(&self) -> Result<Vec<u8>> {
-        self.edit().to_bytes()
-    }
-
-    /// Stream the unchanged snapshot as a ZIP to a caller-owned sink.
-    pub fn write_to<W: Write>(&self, sink: W) -> Result<()> {
-        self.edit().write_to(sink)
-    }
-
-    /// Atomically save the unchanged snapshot to a regular file.
-    pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<()> {
-        self.edit().save(path)
-    }
-
-    /// Report whether a normalized package member exists without creating an
-    /// editable package view.
-    pub fn contains_entry(&self, name: &str) -> bool {
-        self.state.position(normalize_entry_name(name)).is_some()
-    }
-
-    /// Enumerate object-archive members in preserved source order.
-    pub fn iwa_entry_names(&self) -> impl Iterator<Item = &str> {
-        self.state.iwa_entry_names()
-    }
-
-    /// Locate the package's calculation-engine component without first
-    /// materializing an editable package.
-    pub fn calculation_engine_entry_name(&self) -> Result<Option<&str>> {
-        let mut entries = self
-            .iwa_entry_names()
-            .filter(|name| is_calculation_engine_entry_name(name));
-        let Some(entry) = entries.next() else {
-            return Ok(None);
-        };
-        if entries.next().is_some() {
-            return Err(Error::InvalidFormat(
-                "iWork package contains multiple CalculationEngine components".to_owned(),
-            ));
-        }
-        Ok(Some(entry))
-    }
-
-    /// Parse a compressed `.iwa` member from this immutable snapshot.
-    pub fn archive(&self, name: &str) -> Result<Archive> {
-        self.edit().archive(name)
     }
 }
 
@@ -1798,7 +1660,7 @@ mod tests {
         .unwrap();
         let mut package = Package::from_bytes_with_limits(&bytes, stream_limits).unwrap();
         assert_eq!(package.limits(), stream_limits);
-        assert_eq!(package.snapshot().limits(), stream_limits);
+        assert_eq!(package.limits(), stream_limits);
         let error = package.archive("Index/Document.iwa").unwrap_err();
         assert!(matches!(
             error,
@@ -1890,7 +1752,7 @@ mod tests {
         package
             .insert_entry("Data/asset", vec![1, 2, 3, 4])
             .unwrap();
-        let snapshot = package.snapshot();
+        let snapshot = package.clone();
 
         assert!(package.validate().is_ok());
         assert!(snapshot.validate().is_ok());
@@ -2128,8 +1990,8 @@ mod tests {
             .insert_entry("Data/original", b"original".to_vec())
             .unwrap();
 
-        let snapshot = package.snapshot();
-        let mut edit = snapshot.edit();
+        let snapshot = package.clone();
+        let mut edit = snapshot.clone();
         assert_eq!(snapshot.limits(), package.limits());
         assert_eq!(edit.limits(), package.limits());
         assert_eq!(
@@ -2147,17 +2009,17 @@ mod tests {
     }
 
     #[test]
-    fn snapshot_edit_with_publishes_a_validated_commit() -> crate::Result<()> {
+    fn package_edit_with_publishes_a_validated_commit() -> crate::Result<()> {
         let mut package = Package::new();
         package.insert_entry("Data/original", b"original".to_vec())?;
-        let source = package.snapshot();
+        let source = package.clone();
 
         let commit = source.edit_with(|edit| {
             edit.insert_entry("Data/changed", b"changed".to_vec())?;
-            Ok(edit.len())
+            Ok(())
         })?;
 
-        assert_eq!(commit.value(), &2);
+        assert!(commit.diagnostics().changed());
         assert_eq!(commit.patch().version(), PackagePatch::VERSION);
         assert_eq!(commit.patch().len(), 1);
         let change = &commit.patch().changes()[0];
@@ -2167,18 +2029,21 @@ mod tests {
         assert_eq!(change.after_len(), Some(7));
         assert_eq!(source.len(), 1);
         assert_eq!(source.entry("Data/changed"), None);
-        assert_eq!(commit.snapshot().len(), 2);
+        assert_eq!(commit.package().len(), 2);
         assert_eq!(
-            commit.snapshot().entry("Data/changed"),
+            commit.package().entry("Data/changed"),
             Some(b"changed".as_slice())
         );
 
         let replayed = source.apply(commit.patch())?;
-        assert_eq!(replayed.entry("Data/changed"), Some(b"changed".as_slice()));
-        let reverted = replayed.apply(&commit.patch().inverse())?;
-        assert_eq!(reverted.entry("Data/changed"), None);
         assert_eq!(
-            reverted.entry("Data/original"),
+            replayed.package().entry("Data/changed"),
+            Some(b"changed".as_slice())
+        );
+        let reverted = replayed.package().apply(&commit.patch().inverse())?;
+        assert_eq!(reverted.package().entry("Data/changed"), None);
+        assert_eq!(
+            reverted.package().entry("Data/original"),
             Some(b"original".as_slice())
         );
         Ok(())
@@ -2193,35 +2058,44 @@ mod tests {
             .copy_from_slice(&(comment.len() as u16).to_le_bytes());
         bytes.extend_from_slice(comment);
 
-        let source = Package::from_bytes(&bytes)?.snapshot();
+        let source = Package::from_bytes(&bytes)?;
         assert!(source.source.is_some());
         let commit = source.edit_with(|_| Ok(()))?;
         assert!(commit.patch().is_empty());
+        assert!(!commit.diagnostics().changed());
 
         let replayed = source.apply(commit.patch())?;
-        assert!(replayed.source.is_some());
+        assert!(replayed.package().source.is_some());
         assert!(Arc::ptr_eq(
             source.source.as_ref().expect("source provenance"),
-            replayed.source.as_ref().expect("replayed provenance")
+            replayed
+                .package()
+                .source
+                .as_ref()
+                .expect("replayed provenance")
         ));
-        assert_eq!(replayed.to_bytes()?, bytes);
+        assert_eq!(replayed.package().to_bytes()?, bytes);
 
         let inverse = commit.patch().inverse();
         assert!(inverse.is_empty());
-        let reverted = replayed.apply(&inverse)?;
-        assert!(reverted.source.is_some());
+        let reverted = replayed.package().apply(&inverse)?;
+        assert!(reverted.package().source.is_some());
         assert!(Arc::ptr_eq(
             source.source.as_ref().expect("source provenance"),
-            reverted.source.as_ref().expect("inverse provenance")
+            reverted
+                .package()
+                .source
+                .as_ref()
+                .expect("inverse provenance")
         ));
-        assert_eq!(reverted.to_bytes()?, bytes);
+        assert_eq!(reverted.package().to_bytes()?, bytes);
 
         let changed = source.edit_with(|edit| {
             edit.insert_entry("Data/changed", b"changed".to_vec())?;
             Ok(())
         })?;
         assert!(!changed.patch().is_empty());
-        assert!(source.apply(changed.patch())?.source.is_none());
+        assert!(source.apply(changed.patch())?.package().source.is_none());
         Ok(())
     }
 
@@ -2229,7 +2103,7 @@ mod tests {
     fn package_patch_rejects_a_stale_source() -> crate::Result<()> {
         let mut package = Package::new();
         package.insert_entry("Data/original", b"original".to_vec())?;
-        let source = package.snapshot();
+        let source = package.clone();
         let commit = source.edit_with(|edit| {
             edit.insert_entry("Data/changed", b"changed".to_vec())?;
             Ok(())
@@ -2237,16 +2111,16 @@ mod tests {
 
         let mut stale = Package::new();
         stale.insert_entry("Data/original", b"different".to_vec())?;
-        let error = stale.snapshot().apply(commit.patch()).unwrap_err();
+        let error = stale.apply(commit.patch()).unwrap_err();
         assert!(matches!(error, Error::PatchConflict));
         Ok(())
     }
 
     #[test]
-    fn snapshot_edit_with_discards_callback_failures() -> crate::Result<()> {
+    fn package_edit_with_discards_callback_failures() -> crate::Result<()> {
         let mut package = Package::new();
         package.insert_entry("Data/original", b"original".to_vec())?;
-        let source = package.snapshot();
+        let source = package.clone();
 
         let error = source.edit_with(|edit| -> crate::Result<()> {
             edit.insert_entry("Data/changed", b"changed".to_vec())?;
@@ -2260,13 +2134,13 @@ mod tests {
     }
 
     #[test]
-    fn snapshot_edit_with_discards_candidates_that_fail_final_validation() {
+    fn package_edit_with_discards_candidates_that_fail_final_validation() {
         let limits = PackageLimits::new(1, 4, 4).unwrap();
         let mut package = empty_package_with_limits(limits);
         package
             .insert_entry("Data/asset", vec![1, 2, 3, 4])
             .unwrap();
-        let source = package.snapshot();
+        let source = package.clone();
 
         let error = source.edit_with(|edit| {
             edit.entry_mut("Data/asset").unwrap().push(5);
@@ -2309,18 +2183,17 @@ mod tests {
             )
             .unwrap();
 
-        let snapshot = package.snapshot();
-        assert!(snapshot.contains_entry("/Index/Document.iwa"));
+        assert!(package.contains_entry("/Index/Document.iwa"));
         assert_eq!(
-            snapshot.iwa_entry_names().collect::<Vec<_>>(),
+            package.iwa_entry_names().collect::<Vec<_>>(),
             ["Index/Document.iwa", "Index/CalculationEngine-174.iwa"]
         );
         assert_eq!(
-            snapshot.calculation_engine_entry_name().unwrap(),
+            package.calculation_engine_entry_name().unwrap(),
             Some("Index/CalculationEngine-174.iwa")
         );
         assert_eq!(
-            snapshot
+            package
                 .archive("Index/Document.iwa")
                 .unwrap()
                 .objects
@@ -2361,8 +2234,8 @@ mod tests {
     fn assert_send_sync<T: Send + Sync>() {}
 
     #[test]
-    fn snapshots_are_send_and_sync() {
-        assert_send_sync::<Snapshot>();
+    fn packages_are_send_and_sync() {
+        assert_send_sync::<Package>();
     }
 
     #[test]
@@ -2485,7 +2358,7 @@ mod tests {
         let mut streamed = Vec::new();
         package.write_to(&mut streamed).unwrap();
         let mut snapshot_streamed = Vec::new();
-        package.snapshot().write_to(&mut snapshot_streamed).unwrap();
+        package.clone().write_to(&mut snapshot_streamed).unwrap();
 
         assert_eq!(streamed, expected);
         assert_eq!(snapshot_streamed, expected);
