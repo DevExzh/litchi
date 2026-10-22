@@ -1,11 +1,17 @@
-# 0362ye — ODP strict-open structural facts
+# 0362ye — ODP deferred append structural facts
 
-This candidate removes the duplicate format-owned `content.xml` structural
-scan from the default ODP tail-append path.  The source-backed owner already
-admits `content.xml` at open.  That same bounded XML pass now records only the
-append proof's immutable facts: decoded member length, the insertion offset
-after the direct page prefix, and the direct page count.  The source owner
-does not retain the XML or parser events.
+The returned candidate moved the append-only namespace and page parser into
+every source open.  That made open do more work than the historical ODP
+UTF-8/body admission pass, even though the parser was bounded and its facts
+were small.  This repair restores the original open boundary and computes
+append facts only when an append is prepared.
+
+The first successful append scan records only the proof's immutable facts:
+decoded member length, the insertion offset after the direct page prefix, and
+the direct page count.  They are held in a shared `OnceLock` containing no XML
+or parser events, so shares and subsequent uncancelled appends can reuse the
+bounded result.  The common insertion plan still streams `content.xml` and
+proves the source hash, exact splice, and final candidate.
 
 The common `SourceContentInsertionPlan` still streams `content.xml` after the
 authored page is constructed.  It continues to prove source freshness,
@@ -16,38 +22,38 @@ proof.
 
 ## Admission and policy parity
 
-The structural pass is opportunistic.  If its XML parser reports a parser,
-depth, token, event, resource, or allocation error, the owner retries the
-historical bounded UTF-8/body probe.  I/O, committed-I/O, and source-change
-errors remain primary.  This preserves the previous open admission for
-malformed XML, unusual depth, unsupported body shape, and entity/DOCTYPE
-inputs.  A source containing a DOCTYPE is never given cached append facts,
-because the existing append scanner deliberately refuses that source.
+Open continues to run the historical bounded UTF-8/body probe.  It does not
+run the append namespace parser, so malformed XML, unusual depth, unsupported
+body shapes, entity/DOCTYPE inputs, and their existing error timing remain at
+the previous admission boundary.  A source containing a DOCTYPE remains
+accepted by open and is refused by the append scanner as before.
 
-Default tail-append and replay reuse cached facts only when the operation has
-no execution context or cancellation token.  Those policies use the existing
+After a successful default append scan, subsequent tail-append and replay
+operations reuse the cached facts only when the operation has no execution
+context or cancellation token.  Policy-bearing operations use the existing
 scanner so input/work accounting, cancellation checkpoints, and error timing
 remain unchanged.  Caller-selected content and slide limits are checked
 before reuse; the common insertion plan rechecks the source revision before
-and during its proof.  Shares copy the small facts value, while deferred
+and during its proof.  Shares reuse the small facts cell while deferred
 owners keep the same source association.
 
-The source/test implementation starts at commit `126a2bb945` on branch
-`uo2/odp-heap-repair`; policy and limit-precedence follow-ups are
-`f58aa3b76c` and `3178136432`.  Regression coverage includes direct
-bounded-fact collection, malformed XML open fallback with semantic-read
-failure, and DOCTYPE open acceptance with append refusal.
+Regression coverage pins malformed XML open fallback with semantic-read
+failure, DOCTYPE open acceptance with append refusal, and the fact that open
+leaves the append scan deferred until a successful prepare.  The source
+repair is staged for commit on branch `uo2/odp-heap-repair`; the earlier
+structural-facts commits `126a2bb945`, `f58aa3b76c`, and `3178136432` remain
+returned evidence.
 
 ## Performance status
 
 The prior 0362yd matched evidence remains returned: its default append route
 performed one strict-open content pass, one append structural pass, and the
 common insertion pass, with approximately 113.9 KiB of open-phase allocation
-attributed to the extra Deflate decoder/state.  This candidate removes the
-append structural pass while retaining the strict open pass and common proof.
-The new candidate must still be rebuilt and rerun against the accepted e4a
-baseline with the same allocator and route-local Callgrind lifecycles.  The
-0362yd receipts are not used as qualification for this repair.
+attributed to the extra Deflate decoder/state.  This repair removes the
+extra parser from open while retaining the append scan and common proof.  It
+must still be rebuilt and rerun against the accepted e4a baseline with the
+same allocator and route-local Callgrind lifecycles.  The 0362yd receipts are
+not used as qualification for this repair.
 
 ## Validation to complete
 
