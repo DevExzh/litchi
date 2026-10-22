@@ -89,6 +89,7 @@ impl FieldPath {
     /// The path is a raw metadata record, so its limits are required even
     /// though the vector is already owned by the caller.  Empty paths and
     /// zero-valued components are valid wire values.
+    #[inline]
     pub fn new(path: Vec<u32>, limits: Limits) -> Result<Self> {
         let limits = limits.validate()?;
         let value = Self { path };
@@ -448,14 +449,14 @@ pub struct FieldInfo {
 impl FieldInfo {
     /// Construct metadata for a field path with every optional wire field
     /// absent.
+    #[inline]
     pub fn new(path: FieldPath, limits: Limits) -> Result<Self> {
         let limits = limits.validate()?;
-        let value = Self {
+        check_minimal_field_info_constructor(&path, limits)?;
+        Ok(Self {
             path,
             ..Self::default()
-        };
-        check_field_info_constructor(&value, limits)?;
-        Ok(value)
+        })
     }
 
     /// Resolve the schema default without changing encoded presence.
@@ -767,9 +768,10 @@ fn check_constructor_header(
     Ok(())
 }
 
+#[inline]
 fn check_field_path_constructor(path: &FieldPath, limits: Limits) -> Result<()> {
     let metadata_items = path.path.len();
-    let header_length = encoded_field_path_length(path)?;
+    let header_length = admitted_path_header_length(path, false, limits)?;
     let header_fields = usize::from(!path.path.is_empty());
     let header_memory = field_path_memory(path)?;
     check_constructor_header(
@@ -782,11 +784,49 @@ fn check_field_path_constructor(path: &FieldPath, limits: Limits) -> Result<()> 
     )
 }
 
-fn check_field_info_constructor(info: &FieldInfo, limits: Limits) -> Result<()> {
-    let metadata_items = field_info_metadata_item_count(info)?;
-    let header_length = encoded_field_info_length(info)?;
-    let header_fields = field_info_header_field_count(info)?;
-    let header_memory = field_info_memory(info)?;
+// A u32 component occupies at most five varint bytes. When that upper
+// bound fits, admission does not need to inspect the components. Tight
+// ceilings take the exact path, preserving both acceptance and error counts.
+#[inline]
+fn admitted_path_header_length(path: &FieldPath, nested: bool, limits: Limits) -> Result<usize> {
+    let upper = if path.path.is_empty() {
+        Some(0)
+    } else {
+        path.path
+            .len()
+            .checked_mul(5)
+            .and_then(|payload| payload.checked_add(1 + u64_varint_length(payload as u64)))
+    };
+    let upper = upper.and_then(|length| {
+        if nested {
+            length.checked_add(1 + u64_varint_length(length as u64))
+        } else {
+            Some(length)
+        }
+    });
+    if let Some(upper) = upper
+        && upper <= limits.max_header_bytes()
+    {
+        return Ok(upper);
+    }
+    let exact = encoded_field_path_length(path)?;
+    if nested {
+        length_delimited_field_length(1, exact)
+    } else {
+        Ok(exact)
+    }
+}
+
+#[inline]
+fn check_minimal_field_info_constructor(path: &FieldPath, limits: Limits) -> Result<()> {
+    let metadata_items = path
+        .path
+        .len()
+        .checked_add(1)
+        .ok_or_else(|| Error::invalid_archive(0, "metadata item count overflow"))?;
+    let header_length = admitted_path_header_length(path, true, limits)?;
+    let header_fields = 1 + usize::from(!path.path.is_empty());
+    let header_memory = checked_memory_add(size_of::<FieldInfo>(), field_path_bytes(path)?)?;
     check_constructor_header(
         header_length,
         header_fields,
@@ -1113,20 +1153,6 @@ fn message_info_header_nesting(info: &MessageInfo) -> Result<usize> {
         2
     };
     Ok(nested)
-}
-
-fn field_info_metadata_item_count(info: &FieldInfo) -> Result<usize> {
-    let mut count = 1usize;
-    for amount in [
-        info.path.path.len(),
-        info.object_references.len(),
-        info.data_references.len(),
-        info.known_field_version.len(),
-        usize::from(info.known_field_feature_identifier.is_some()),
-    ] {
-        add_count(&mut count, amount)?;
-    }
-    Ok(count)
 }
 
 fn checked_memory_add(left: usize, right: usize) -> Result<usize> {
@@ -8579,9 +8605,9 @@ mod tests {
         UnknownFieldRule, archive_info_encoded_len, archive_info_to_codec, encode_archive_info,
         encode_varint, encode_varint_with_width, encoded_field_info_length,
         encoded_field_path_length, encoded_message_info_length, field_info_header_field_count,
-        field_info_memory, field_info_metadata_item_count, field_path_memory,
-        message_info_header_field_count, message_info_header_nesting, message_info_memory,
-        minimal_message_info_encoded_length, varint_len,
+        field_info_memory, field_path_memory, message_info_header_field_count,
+        message_info_header_nesting, message_info_memory, minimal_message_info_encoded_length,
+        varint_len,
     };
     use crate::{LimitKind, Limits, Result};
     use litchi_iwa_protos::archive_codec;
@@ -8844,6 +8870,45 @@ mod tests {
     }
 
     #[test]
+    fn constructor_path_bounds_preserve_exact_varint_boundary_admission() -> Result<()> {
+        let defaults = Limits::default();
+        for value in [0, 127, 128, 16_383, 16_384, u32::MAX] {
+            for count in [0, 1, 25, 26, 127, 128] {
+                let path = FieldPath {
+                    path: vec![value; count],
+                };
+                let exact = encoded_field_path_length(&path)?;
+                let loose = FieldPath::new(path.path.clone(), defaults)?;
+                assert_eq!(loose, path);
+                if exact > 0 {
+                    assert_eq!(
+                        FieldPath::new(path.path.clone(), defaults.with_header_bytes(exact)?)?,
+                        path,
+                    );
+                    let error =
+                        FieldPath::new(path.path.clone(), defaults.with_header_bytes(exact - 1)?)
+                            .expect_err("one-under path bytes");
+                    assert!(matches!(error, Error::Limit {
+                        kind: LimitKind::HeaderBytes, observed, maximum,
+                    } if observed == exact && maximum == exact - 1));
+                }
+                let field = FieldInfo::new(path.clone(), defaults)?;
+                let exact = encoded_field_info_length(&field)?;
+                assert_eq!(
+                    FieldInfo::new(path.clone(), defaults.with_header_bytes(exact)?)?,
+                    field,
+                );
+                let error = FieldInfo::new(path, defaults.with_header_bytes(exact - 1)?)
+                    .expect_err("one-under field bytes");
+                assert!(matches!(error, Error::Limit {
+                    kind: LimitKind::HeaderBytes, observed, maximum,
+                } if observed == exact && maximum == exact - 1));
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
     fn raw_metadata_constructors_enforce_each_header_budget_at_the_boundary() -> Result<()> {
         let defaults = Limits::default();
         assert!(FieldPath::new(Vec::new(), defaults).is_ok());
@@ -8961,7 +9026,6 @@ mod tests {
             }
         ));
         let field_metadata = 1 + 2;
-        assert_eq!(field_info_metadata_item_count(&field)?, field_metadata);
         assert!(
             FieldInfo::new(
                 field.path.clone(),
