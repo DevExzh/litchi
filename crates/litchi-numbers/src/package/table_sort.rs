@@ -923,13 +923,13 @@ impl TransactionBudget {
         &mut self,
         entry_bytes: usize,
         archive_limits: litchi_iwa_core::Limits,
+        snappy_limits: litchi_iwa_core::SnappyLimits,
         path: Path,
     ) -> Result<(), Error> {
         self.charge_entry_bytes(entry_bytes, path)?;
         let archive_bytes = archive_limits.max_archive_bytes();
-        let compressed_bound =
-            SnappyStream::maximum_compressed_len(archive_bytes, Default::default())
-                .map_err(map_core_error)?;
+        let compressed_bound = SnappyStream::maximum_compressed_len(archive_bytes, snappy_limits)
+            .map_err(map_core_error)?;
         self.charge_transaction_work(
             archive_bytes
                 .saturating_add(compressed_bound)
@@ -1438,10 +1438,16 @@ fn rewrite(
     }
     table_headers::rewrite::preflight_transaction_work(source, None).map_err(map_header_error)?;
     let physical_limits = catalog.limits();
+    let snappy_limits = physical_limits.snappy_limits().map_err(map_archive_error)?;
     let archive_limits = physical_limits
         .effective_archive_limits()
         .map_err(map_archive_error)?;
-    budget.preflight_physical_entry(entry.data().len(), archive_limits, Path::Package)?;
+    budget.preflight_physical_entry(
+        entry.data().len(),
+        archive_limits,
+        snappy_limits,
+        Path::Package,
+    )?;
     let stream = SnappyStream::decompress(
         entry.data(),
         physical_limits.snappy_limits().map_err(map_archive_error)?,

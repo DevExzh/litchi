@@ -683,6 +683,7 @@ fn map_root_error(error: RootError, path: Path) -> Error {
                 RootLimitKind::WireWork => LimitKind::Work,
                 RootLimitKind::TextBytes => LimitKind::TextBytes,
                 RootLimitKind::References => LimitKind::References,
+                RootLimitKind::CompressedBytes => LimitKind::CompressedBytes,
             },
             observed,
             maximum,
@@ -751,6 +752,45 @@ fn map_budget_error(error: BudgetError, path: Path) -> Error {
             ..
         })
         | BudgetError::InvalidSource { .. } => Error::InvalidSource { path },
+    }
+}
+
+fn map_core_error(error: litchi_iwa_core::Error, path: Path) -> Error {
+    match error {
+        litchi_iwa_core::Error::Limit {
+            kind,
+            observed,
+            maximum,
+        } => Error::Limit {
+            kind: match kind {
+                litchi_iwa_core::LimitKind::Objects => LimitKind::PayloadObjects,
+                litchi_iwa_core::LimitKind::Messages
+                | litchi_iwa_core::LimitKind::MessagesPerObject => LimitKind::PayloadMessages,
+                litchi_iwa_core::LimitKind::HeaderFields
+                | litchi_iwa_core::LimitKind::MetadataItems => LimitKind::Fields,
+                litchi_iwa_core::LimitKind::HeaderNesting => LimitKind::Nesting,
+                litchi_iwa_core::LimitKind::SnappyFrames => LimitKind::PayloadItems,
+                litchi_iwa_core::LimitKind::SnappyCompressedChunkBytes
+                | litchi_iwa_core::LimitKind::SnappyCompressedStreamBytes => {
+                    LimitKind::CompressedBytes
+                },
+                litchi_iwa_core::LimitKind::ArchiveBytes
+                | litchi_iwa_core::LimitKind::ObjectBytes
+                | litchi_iwa_core::LimitKind::MessageBytes
+                | litchi_iwa_core::LimitKind::HeaderBytes
+                | litchi_iwa_core::LimitKind::HeaderMemoryBytes
+                | litchi_iwa_core::LimitKind::SnappyChunkBytes
+                | litchi_iwa_core::LimitKind::SnappyStreamBytes => LimitKind::PayloadBytes,
+            },
+            observed,
+            maximum,
+            path,
+        },
+        litchi_iwa_core::Error::Allocation { requested, .. } => Error::Allocation {
+            amount: requested,
+            path,
+        },
+        _ => Error::InvalidSource { path },
     }
 }
 
@@ -1447,7 +1487,7 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
     for member_edit in &native.member_edits {
         let maximum_compressed =
             SnappyStream::maximum_compressed_len(member_edit.member_bytes.len(), snappy_limits)
-                .map_err(|_| Error::InvalidSource { path })?;
+                .map_err(|error| map_core_error(error, path))?;
         budget
             .charge_compressed_bytes(maximum_compressed, BudgetPath::Package)
             .and_then(|_| budget.charge_retained_bytes(maximum_compressed, BudgetPath::Package))
@@ -1462,7 +1502,7 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
             })
             .map_err(|error| map_budget_error(error, path))?;
         let bytes = SnappyStream::compress(&member_edit.member_bytes, snappy_limits)
-            .map_err(|_| Error::Verification)?;
+            .map_err(|error| map_core_error(error, path))?;
         if bytes.len() > maximum_compressed {
             return Err(Error::Verification);
         }
@@ -1587,7 +1627,7 @@ fn pack_reply_metadata(
         .and_then(|_| budget.charge_transaction_work(entry.data().len(), BudgetPath::Package))
         .map_err(|error| map_budget_error(error, path))?;
     let stream = SnappyStream::decompress(entry.data(), snappy_limits)
-        .map_err(|_| Error::InvalidSource { path })?;
+        .map_err(|error| map_core_error(error, path))?;
     let mut archive = Archive::parse(stream.as_bytes(), archive_limits)
         .map_err(|_| Error::InvalidSource { path })?;
     let message_count = archive
@@ -1610,7 +1650,7 @@ fn pack_reply_metadata(
         .encoded_len(archive_limits)
         .map_err(|_| Error::InvalidSource { path })?;
     let maximum_compressed = SnappyStream::maximum_compressed_len(estimated, snappy_limits)
-        .map_err(|_| Error::InvalidSource { path })?;
+        .map_err(|error| map_core_error(error, path))?;
     budget
         .charge_output(estimated, BudgetPath::Package)
         .and_then(|_| budget.charge_retained_bytes(estimated, BudgetPath::Package))
@@ -1628,8 +1668,8 @@ fn pack_reply_metadata(
     if bytes.len() > estimated {
         return Err(Error::Verification);
     }
-    let compressed =
-        SnappyStream::compress(&bytes, snappy_limits).map_err(|_| Error::InvalidSource { path })?;
+    let compressed = SnappyStream::compress(&bytes, snappy_limits)
+        .map_err(|error| map_core_error(error, path))?;
     if compressed.len() > maximum_compressed
         || compressed.len() > snappy_limits.max_compressed_stream()
     {

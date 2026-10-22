@@ -137,6 +137,7 @@ pub(super) fn rewrite(
             .saturating_add(archive_extent(component.archive())?.saturating_mul(3)),
     )?;
     let physical_limits = source_catalog.limits();
+    let snappy_limits = physical_limits.snappy_limits().map_err(map_archive_error)?;
     let archive_limits = physical_limits
         .effective_archive_limits()
         .map_err(map_archive_error)?;
@@ -193,8 +194,7 @@ pub(super) fn rewrite(
     let rewritten = archive.to_bytes(archive_limits).map_err(map_core_error)?;
     drop(archive);
     budget.charge_transaction_work(rewritten.len().saturating_mul(3))?;
-    let compressed =
-        SnappyStream::compress(&rewritten, Default::default()).map_err(map_core_error)?;
+    let compressed = SnappyStream::compress(&rewritten, snappy_limits).map_err(map_core_error)?;
     drop(rewritten);
     let (package_bound, reassembly_work) =
         reassembly_cost(source.source_bytes().len(), compressed.len())?;

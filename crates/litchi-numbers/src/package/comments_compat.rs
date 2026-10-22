@@ -657,9 +657,9 @@ fn map_core_error(error: litchi_iwa_core::Error) -> Error {
                 | CoreLimitKind::MetadataItems
                 | CoreLimitKind::SnappyFrames => super::LimitKind::References,
                 CoreLimitKind::HeaderNesting => super::LimitKind::WireWork,
-                CoreLimitKind::SnappyStreamBytes
-                | CoreLimitKind::SnappyCompressedChunkBytes
-                | CoreLimitKind::SnappyCompressedStreamBytes => super::LimitKind::WireBytes,
+                CoreLimitKind::SnappyStreamBytes => super::LimitKind::WireBytes,
+                CoreLimitKind::SnappyCompressedChunkBytes
+                | CoreLimitKind::SnappyCompressedStreamBytes => super::LimitKind::CompressedBytes,
             },
             observed,
             maximum,

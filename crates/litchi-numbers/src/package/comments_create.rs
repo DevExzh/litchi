@@ -481,7 +481,7 @@ impl<'a> Archives<'a> {
                     .snappy_limits()
                     .map_err(|_| Error::InvalidSource { path })?,
             )
-            .map_err(|_| Error::InvalidSource { path })?;
+            .map_err(|error| super::map_core_error(error, path))?;
             let archive = Archive::parse(stream.as_bytes(), self.limits)
                 .map_err(|_| Error::InvalidSource { path })?;
             archive
@@ -514,6 +514,11 @@ impl<'a> Archives<'a> {
                 amount: self.parsed.len(),
                 path,
             })?;
+        let snappy_limits = self
+            .physical
+            .limits()
+            .snappy_limits()
+            .map_err(|_| Error::InvalidSource { path })?;
         for (component_index, (mut archive, parsed_objects)) in self.parsed {
             if archive.objects.len() != parsed_objects {
                 archive
@@ -523,8 +528,8 @@ impl<'a> Archives<'a> {
             let bytes = archive
                 .to_bytes(self.limits)
                 .map_err(|_| Error::InvalidSource { path })?;
-            let compressed = SnappyStream::compress(&bytes, Default::default())
-                .map_err(|_| Error::InvalidSource { path })?;
+            let compressed = SnappyStream::compress(&bytes, snappy_limits)
+                .map_err(|error| super::map_core_error(error, path))?;
             let name = self
                 .source
                 .state
@@ -1465,14 +1470,12 @@ pub(super) fn pack_metadata(
         .limits()
         .effective_archive_limits()
         .map_err(|_| Error::InvalidSource { path })?;
-    let stream = SnappyStream::decompress(
-        entry.data(),
-        physical
-            .limits()
-            .snappy_limits()
-            .map_err(|_| Error::InvalidSource { path })?,
-    )
-    .map_err(|_| Error::InvalidSource { path })?;
+    let snappy_limits = physical
+        .limits()
+        .snappy_limits()
+        .map_err(|_| Error::InvalidSource { path })?;
+    let stream = SnappyStream::decompress(entry.data(), snappy_limits)
+        .map_err(|error| super::map_core_error(error, path))?;
     let mut archive =
         Archive::parse(stream.as_bytes(), limits).map_err(|_| Error::InvalidSource { path })?;
     archive
@@ -1491,5 +1494,6 @@ pub(super) fn pack_metadata(
     let bytes = archive
         .to_bytes(limits)
         .map_err(|_| Error::InvalidSource { path })?;
-    SnappyStream::compress(&bytes, Default::default()).map_err(|_| Error::InvalidSource { path })
+    SnappyStream::compress(&bytes, snappy_limits)
+        .map_err(|error| super::map_core_error(error, path))
 }

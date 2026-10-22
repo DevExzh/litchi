@@ -15,7 +15,7 @@ use litchi_iwa_core::archive::{
     ArchiveReferenceVisitor, FieldObjectReferenceTransition, ObjectReferenceTransition,
 };
 use litchi_iwa_core::{
-    Archive, ArchiveObject, FieldInfo, FieldType, Limits, RawMessage, SnappyStream,
+    Archive, ArchiveObject, FieldInfo, FieldType, Limits, RawMessage, SnappyLimits, SnappyStream,
 };
 use litchi_iwa_protos::{
     numbers_table_cell_control_codec as control_codec,
@@ -79,6 +79,7 @@ pub(super) struct NativePopUpInput<'source> {
     pub(super) new_popup_model_identifier: Option<u64>,
     pub(super) desired: Option<NativePopUpValue<'source>>,
     pub(super) limits: Limits,
+    pub(super) snappy_limits: SnappyLimits,
     pub(super) path: Path,
 }
 
@@ -130,6 +131,7 @@ pub(super) struct NativePopUpGraphInput<'source> {
     pub(super) new_popup_model_identifier: Option<u64>,
     pub(super) desired: Option<NativePopUpValue<'source>>,
     pub(super) limits: Limits,
+    pub(super) snappy_limits: SnappyLimits,
     pub(super) path: Path,
 }
 
@@ -469,7 +471,7 @@ fn rewrite_native_popup_menu_transition(
     // charged by their prepared plans where available.
     let maximum_archive_bytes = input.limits.max_archive_bytes();
     let maximum_compressed_bytes =
-        SnappyStream::maximum_compressed_len(maximum_archive_bytes, Default::default())
+        SnappyStream::maximum_compressed_len(maximum_archive_bytes, input.snappy_limits)
             .map_err(|_| NativePopUpError::Limit)?;
     budget
         .charge_allocations(12, input.path)
@@ -782,6 +784,7 @@ pub(super) fn rewrite_native_popup_menu_multi(
         new_popup_model_identifier: input.new_popup_model_identifier,
         desired: input.desired,
         limits: input.limits,
+        snappy_limits: input.snappy_limits,
         path: input.path,
     };
     let transition = rewrite_native_popup_menu_transition(synthetic, budget, true)?;
@@ -859,6 +862,7 @@ pub(super) fn existing_popup_model_identifiers_multi(
         new_popup_model_identifier: input.new_popup_model_identifier,
         desired: input.desired,
         limits: input.limits,
+        snappy_limits: input.snappy_limits,
         path: input.path,
     };
     existing_popup_model_identifiers(synthetic, budget, input.path)

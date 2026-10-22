@@ -592,6 +592,10 @@ fn rewrite(
         return Err(Error::Refused(Refusal::UnsupportedSource));
     }
     let source_owner = source_catalog.__source_owner();
+    let snappy_limits = source_catalog
+        .limits()
+        .snappy_limits()
+        .map_err(|_| Error::Verification)?;
     let mut budget = popup::TransactionBudget::for_cell_control(source);
     budget.charge_package_source(source_catalog, native_path(path))?;
     let target = popup::resolve_cell(
@@ -631,8 +635,8 @@ fn rewrite(
     let mut compression_allocations = 3usize;
     for member in &native_output.members {
         if member.archive_bytes.len() > native_bound.archive_bytes
-            || SnappyStream::maximum_compressed_len(member.archive_bytes.len(), Default::default())
-                .map_err(|_| Error::Verification)?
+            || SnappyStream::maximum_compressed_len(member.archive_bytes.len(), snappy_limits)
+                .map_err(|error| map_popup_error(popup::map_core_error(error, native_path(path))))?
                 > native_bound.compressed_bytes
         {
             return Err(Error::Limit {
@@ -643,8 +647,10 @@ fn rewrite(
             });
         }
         let maximum_compressed =
-            SnappyStream::maximum_compressed_len(member.archive_bytes.len(), Default::default())
-                .map_err(|_| Error::Verification)?;
+            SnappyStream::maximum_compressed_len(member.archive_bytes.len(), snappy_limits)
+                .map_err(|error| {
+                    map_popup_error(popup::map_core_error(error, native_path(path)))
+                })?;
         maximum_compressed_bytes = maximum_compressed_bytes
             .checked_add(maximum_compressed)
             .ok_or(Error::Verification)?;
@@ -693,8 +699,9 @@ fn rewrite(
         })?;
     for member in &native_output.members {
         compressed_members.push(
-            SnappyStream::compress(&member.archive_bytes, Default::default())
-                .map_err(|_| Error::Verification)?,
+            SnappyStream::compress(&member.archive_bytes, snappy_limits).map_err(|error| {
+                map_popup_error(popup::map_core_error(error, native_path(path)))
+            })?,
         );
     }
     let mut changed_names = Vec::new();

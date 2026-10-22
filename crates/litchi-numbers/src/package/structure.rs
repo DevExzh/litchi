@@ -518,6 +518,11 @@ impl<'p> Working<'p> {
             .map(|(name, _)| name.clone())
             .collect();
         metadata::apply(&mut self, registry, last, &emptied)?;
+        let snappy_limits = self
+            .catalog
+            .limits()
+            .snappy_limits()
+            .map_err(|error| map_archive(&error))?;
         let mut encoded: Vec<(String, Vec<u8>)> = Vec::new();
         for (name, edited) in &self.edited {
             if !edited.dirty || emptied.contains(name) {
@@ -527,8 +532,8 @@ impl<'p> Working<'p> {
                 .archive
                 .to_bytes(self.archive_limits)
                 .map_err(|error| map_core(&error))?;
-            let compressed = SnappyStream::compress(&bytes, Default::default())
-                .map_err(|error| map_core(&error))?;
+            let compressed =
+                SnappyStream::compress(&bytes, snappy_limits).map_err(|error| map_core(&error))?;
             encoded.push((name.clone(), compressed));
         }
         let mut deleted: Vec<&str> = previews.clone();

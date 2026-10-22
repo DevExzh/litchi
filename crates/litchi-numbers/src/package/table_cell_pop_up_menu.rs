@@ -207,6 +207,53 @@ impl From<Refusal> for Error {
     }
 }
 
+/// Preserve resource and allocation failures from the bounded Snappy
+/// encoder at the Numbers transaction boundary.  Compression uses the same
+/// retained package limits as decoding, so a caller-selected compressed
+/// entry ceiling is an ordinary typed refusal rather than a verification
+/// failure.
+pub(super) fn map_core_error(error: litchi_iwa_core::Error, path: Path) -> Error {
+    match error {
+        litchi_iwa_core::Error::Limit {
+            kind,
+            observed,
+            maximum,
+        } => Error::Limit {
+            kind: map_core_limit_kind(kind),
+            observed: u64::try_from(observed).unwrap_or(u64::MAX),
+            maximum: u64::try_from(maximum).unwrap_or(u64::MAX),
+            path,
+        },
+        litchi_iwa_core::Error::Allocation { requested, .. } => Error::Allocation {
+            amount: requested,
+            path,
+        },
+        _ => Error::InvalidSource { path },
+    }
+}
+
+const fn map_core_limit_kind(kind: litchi_iwa_core::LimitKind) -> LimitKind {
+    match kind {
+        litchi_iwa_core::LimitKind::Objects => LimitKind::PayloadObjects,
+        litchi_iwa_core::LimitKind::Messages | litchi_iwa_core::LimitKind::MessagesPerObject => {
+            LimitKind::PayloadMessages
+        },
+        litchi_iwa_core::LimitKind::HeaderFields
+        | litchi_iwa_core::LimitKind::MetadataItems
+        | litchi_iwa_core::LimitKind::SnappyFrames => LimitKind::PayloadItems,
+        litchi_iwa_core::LimitKind::HeaderNesting => LimitKind::WireNesting,
+        litchi_iwa_core::LimitKind::SnappyCompressedChunkBytes
+        | litchi_iwa_core::LimitKind::SnappyCompressedStreamBytes => LimitKind::CompressedBytes,
+        litchi_iwa_core::LimitKind::ArchiveBytes
+        | litchi_iwa_core::LimitKind::ObjectBytes
+        | litchi_iwa_core::LimitKind::MessageBytes
+        | litchi_iwa_core::LimitKind::HeaderBytes
+        | litchi_iwa_core::LimitKind::HeaderMemoryBytes
+        | litchi_iwa_core::LimitKind::SnappyChunkBytes
+        | litchi_iwa_core::LimitKind::SnappyStreamBytes => LimitKind::PayloadBytes,
+    }
+}
+
 /// A selector-first Pop-Up Menu edit staged against one package snapshot.
 pub struct Edit<'a> {
     source: &'a Package,
@@ -576,7 +623,6 @@ pub(super) struct TransactionBudget {
     remaining_input_bytes: usize,
     remaining_output_bytes: usize,
     remaining_entries: usize,
-    remaining_entry_bytes: usize,
     remaining_total_entry_bytes: usize,
     remaining_payload_bytes: usize,
     remaining_payload_objects: usize,
@@ -665,7 +711,6 @@ impl TransactionBudget {
             remaining_input_bytes: max_input_bytes,
             remaining_output_bytes: max_output_bytes,
             remaining_entries: max_entries,
-            remaining_entry_bytes: max_entry_bytes,
             remaining_total_entry_bytes: max_total_entry_bytes,
             remaining_payload_bytes: max_payload_bytes,
             remaining_payload_objects: max_payload_objects,
@@ -775,13 +820,15 @@ impl TransactionBudget {
     }
 
     pub(super) fn charge_entry_bytes(&mut self, amount: usize, path: Path) -> Result<(), Error> {
-        Self::charge(
-            &mut self.remaining_entry_bytes,
-            self.max_entry_bytes,
-            amount,
-            LimitKind::EntryBytes,
-            path,
-        )
+        if amount > self.max_entry_bytes {
+            return Err(Error::Limit {
+                kind: LimitKind::EntryBytes,
+                observed: u64::try_from(amount).unwrap_or(u64::MAX),
+                maximum: u64::try_from(self.max_entry_bytes).unwrap_or(u64::MAX),
+                path,
+            });
+        }
+        Ok(())
     }
 
     pub(super) fn charge_total_entry_bytes(
@@ -1594,6 +1641,10 @@ fn rewrite_native_entry(
         .components
         .physical()
         .ok_or(Error::Refused(Refusal::UnsupportedSource))?;
+    let snappy_limits = physical
+        .limits()
+        .snappy_limits()
+        .map_err(|_| Error::InvalidSource { path })?;
     let archive_limits = physical
         .limits()
         .effective_archive_limits()
@@ -1635,6 +1686,7 @@ fn rewrite_native_entry(
         new_popup_model_identifier: Some(fresh_identifier),
         desired,
         limits: archive_limits,
+        snappy_limits,
         path,
     };
     let graph_input = popup_native::NativePopUpGraphInput {
@@ -1659,6 +1711,7 @@ fn rewrite_native_entry(
         new_popup_model_identifier: Some(fresh_identifier),
         desired,
         limits: archive_limits,
+        snappy_limits,
         path,
     };
     let copy_on_write_candidates = if same_component {
@@ -1757,15 +1810,15 @@ fn rewrite_native_entry(
     budget.charge_allocations(member_edits.len(), path)?;
     for edit in &mut member_edits {
         let maximum_compressed =
-            SnappyStream::maximum_compressed_len(edit.member_bytes.len(), Default::default())
-                .map_err(|_| Error::InvalidSource { path })?;
+            SnappyStream::maximum_compressed_len(edit.member_bytes.len(), snappy_limits)
+                .map_err(|error| map_core_error(error, path))?;
         budget.charge_compressed_bytes(maximum_compressed, path)?;
         budget.charge_transaction_work(
             edit.member_bytes.len().saturating_add(maximum_compressed),
             path,
         )?;
-        edit.member_bytes = SnappyStream::compress(&edit.member_bytes, Default::default())
-            .map_err(|_| Error::InvalidSource { path })?;
+        edit.member_bytes = SnappyStream::compress(&edit.member_bytes, snappy_limits)
+            .map_err(|error| map_core_error(error, path))?;
     }
     let added_model = match output.added_object_identifiers.as_slice() {
         [] => None,
@@ -2240,14 +2293,12 @@ fn pack_metadata_payload(
         .limits()
         .effective_archive_limits()
         .map_err(|_| Error::InvalidSource { path })?;
-    let stream = SnappyStream::decompress(
-        entry.data(),
-        physical
-            .limits()
-            .snappy_limits()
-            .map_err(|_| Error::InvalidSource { path })?,
-    )
-    .map_err(|_| Error::InvalidSource { path })?;
+    let snappy_limits = physical
+        .limits()
+        .snappy_limits()
+        .map_err(|_| Error::InvalidSource { path })?;
+    let stream = SnappyStream::decompress(entry.data(), snappy_limits)
+        .map_err(|error| map_core_error(error, path))?;
     let source_payload_bytes = stream.as_bytes().len();
     let mut archive = Archive::parse(stream.as_bytes(), archive_limits)
         .map_err(|_| Error::InvalidSource { path })?;
@@ -2263,8 +2314,8 @@ fn pack_metadata_payload(
         .saturating_sub(old_message_bytes)
         .saturating_add(payload.len());
     let maximum_compressed =
-        SnappyStream::maximum_compressed_len(archive_upper_bound, Default::default())
-            .map_err(|_| Error::InvalidSource { path })?;
+        SnappyStream::maximum_compressed_len(archive_upper_bound, snappy_limits)
+            .map_err(|error| map_core_error(error, path))?;
     budget.charge_payload_bytes(archive_upper_bound, path)?;
     budget.charge_compressed_bytes(maximum_compressed, path)?;
     budget.charge_transaction_work(archive_upper_bound.saturating_add(maximum_compressed), path)?;
@@ -2272,8 +2323,8 @@ fn pack_metadata_payload(
     let archive_bytes = archive
         .to_bytes(archive_limits)
         .map_err(|_| Error::InvalidSource { path })?;
-    let compressed = SnappyStream::compress(&archive_bytes, Default::default())
-        .map_err(|_| Error::InvalidSource { path })?;
+    let compressed = SnappyStream::compress(&archive_bytes, snappy_limits)
+        .map_err(|error| map_core_error(error, path))?;
     if archive_bytes.len() > archive_upper_bound || compressed.len() > maximum_compressed {
         return Err(Error::Limit {
             kind: LimitKind::PayloadBytes,
@@ -3682,5 +3733,46 @@ impl storage_codec::StorageVisitor for ListCollector {
     ) -> Result<(), storage_codec::DecodeError> {
         self.segments = self.segments.saturating_add(1);
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Error, LimitKind, Path, map_core_error};
+
+    #[test]
+    fn bounded_snappy_failures_keep_typed_resource_kinds() {
+        let limit = map_core_error(
+            litchi_iwa_core::Error::Limit {
+                kind: litchi_iwa_core::LimitKind::SnappyCompressedStreamBytes,
+                observed: 9,
+                maximum: 8,
+            },
+            Path::Package,
+        );
+        assert_eq!(
+            limit,
+            Error::Limit {
+                kind: LimitKind::CompressedBytes,
+                observed: 9,
+                maximum: 8,
+                path: Path::Package,
+            }
+        );
+
+        let allocation = map_core_error(
+            litchi_iwa_core::Error::Allocation {
+                resource: "test",
+                requested: 12,
+            },
+            Path::Package,
+        );
+        assert_eq!(
+            allocation,
+            Error::Allocation {
+                amount: 12,
+                path: Path::Package,
+            }
+        );
     }
 }
