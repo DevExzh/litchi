@@ -132,17 +132,20 @@ fn sequential_addressing_and_all_five_verbs_match_single_operation_oracle() {
 }
 
 #[test]
-fn replay_is_bound_to_exact_handle_not_document_bytes() {
+fn replay_accepts_byte_identical_reopens_and_rejects_other_content() {
     for eager in [false, true] {
         let file = open(eager);
         let commit = file
             .edit(|tx| tx.set("/body/p[1]/r[1]", props! {"text" => "new"}))
             .unwrap();
-        conflict(commit.patch().apply(&open(eager)).unwrap_err());
+        assert_eq!(text(&commit.patch().apply(&open(eager)).unwrap()), "new");
         conflict(commit.patch().apply(commit.file()).unwrap_err());
         conflict(commit.patch().inverse().apply(&file).unwrap_err());
         let reopened = litchi_ops::open_bytes(commit.file().to_bytes().unwrap()).unwrap();
-        conflict(commit.patch().inverse().apply(&reopened).unwrap_err());
+        assert_eq!(
+            text(&commit.patch().inverse().apply(&reopened).unwrap()),
+            "FIRST_PRIVATE"
+        );
         let first = commit.patch().apply(&file).unwrap();
         assert_eq!(
             text(&commit.patch().inverse().apply(&first).unwrap()),
@@ -151,7 +154,14 @@ fn replay_is_bound_to_exact_handle_not_document_bytes() {
         assert_eq!(text(&commit.patch().apply(&file).unwrap()), "new");
         let noop = file.edit(|_| Ok(())).unwrap();
         assert!(noop.patch().is_noop());
-        conflict(noop.patch().apply(&open(eager)).unwrap_err());
+        assert_eq!(
+            noop.patch()
+                .apply(&open(eager))
+                .unwrap()
+                .to_bytes()
+                .unwrap(),
+            file.to_bytes().unwrap()
+        );
     }
 }
 
@@ -425,6 +435,11 @@ fn signature_authorization_is_bound_and_inverse_never_restores_signatures() {
         let noop = unsigned.edit(|_| Ok(())).unwrap();
         assert!(noop.patch().is_noop());
         assert_eq!(noop.file().to_bytes().unwrap(), baseline);
+        assert_eq!(
+            noop.patch().apply(&signed_inner).unwrap_err().code(),
+            Code::DocumentProtected,
+            "a no-op patch must not bypass a signed recipient"
+        );
     }
 }
 
@@ -531,6 +546,13 @@ fn locked_input_refuses_before_closure_execution() {
         .edit::<()>(|_| panic!("locked closure ran"))
         .unwrap_err();
     assert_eq!(error.code(), Code::DocumentProtected);
+    let plain = open(false);
+    let noop = plain.edit(|_| Ok(())).unwrap();
+    assert_eq!(
+        noop.patch().apply(&locked).unwrap_err().code(),
+        Code::DocumentProtected,
+        "a no-op patch must not bypass a locked recipient"
+    );
 }
 
 #[cfg(feature = "encryption")]
@@ -552,6 +574,13 @@ fn unlocked_encrypted_input_refuses_without_dropping_publication_protection() {
     assert_eq!(
         file.to_bytes().unwrap_err().code(),
         Code::UnsupportedCapability
+    );
+    let plain = open(false);
+    let noop = plain.edit(|_| Ok(())).unwrap();
+    assert_eq!(
+        noop.patch().apply(&file).unwrap_err().code(),
+        Code::UnsupportedCapability,
+        "a no-op patch must not bypass encrypted publication policy"
     );
     let report = serde_json::to_value(file.capabilities()).unwrap();
     assert!(

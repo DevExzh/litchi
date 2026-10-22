@@ -106,7 +106,8 @@ impl BatchCommit {
     pub fn into_file(self) -> File {
         self.file
     }
-    /// Owner-bound, process-local reversible history.
+    /// Process-local reversible history; same-format equal-content reopened
+    /// inputs are admitted by the patch's bounded content proof.
     #[must_use]
     pub const fn patch(&self) -> &Patch {
         &self.patch

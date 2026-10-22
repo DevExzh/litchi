@@ -2902,6 +2902,18 @@
   {
    "record": "0362o",
    "reason": "DOCX/PPTX metadata Commit and common scope integration validation; retained commands and source parity contain no paired performance measurement."
+  },
+  {
+   "record": "0362pa",
+   "reason": "Primary replay diagnostics/consumer integration return and repair, with failed and successful correctness/Clippy logs; no paired performance measurement."
+  },
+  {
+   "record": "0362ha",
+   "reason": "Corrected File qualification protocol and 109 untimed route validation; native paired qualification remains required, with no new accepted timing rows."
+  },
+  {
+   "record": "0362hc",
+   "reason": "Prepared/flat ODF option propagation source and validation receipts; no paired performance measurement or native acceptance."
   }
  ]
 }

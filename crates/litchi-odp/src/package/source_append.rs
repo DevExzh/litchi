@@ -359,15 +359,22 @@ impl Diagnostics {
 /// The exact, reversible change of a tail append: the presentations it was
 /// committed between and the SHA-256 proofs of their `content.xml`.
 ///
-/// It replays onto (a share of) the presentation it was committed on, and
-/// its inverse onto (a share of) the commit's presentation; any other
-/// presentation is refused with [`Error::PatchConflict`].
+/// It replays onto (a share of) the presentation it was committed on, or
+/// onto an independently opened presentation with equal `content.xml`. Its
+/// inverse removes the authored page through the same bounded replacement
+/// proof; an unrelated content source is refused with [`Error::PatchConflict`].
 #[derive(Clone)]
 pub struct Patch {
     before: Arc<SourceBackedPresentation>,
     after: Arc<SourceBackedPresentation>,
     source_content_sha256: [u8; 32],
     target_content_sha256: [u8; 32],
+    before_proof: SourceProof,
+    after_proof: SourceProof,
+    fragment: Arc<[u8]>,
+    limits: Limits,
+    options: SourceContentPublicationOptions,
+    removes_source_range: bool,
 }
 
 impl Patch {
@@ -386,6 +393,12 @@ impl Patch {
             after: Arc::clone(&self.before),
             source_content_sha256: self.target_content_sha256,
             target_content_sha256: self.source_content_sha256,
+            before_proof: self.after_proof.clone(),
+            after_proof: self.before_proof.clone(),
+            fragment: Arc::clone(&self.fragment),
+            limits: self.limits,
+            options: self.options.clone(),
+            removes_source_range: !self.removes_source_range,
         }
     }
 
@@ -462,25 +475,117 @@ impl SourceBackedPresentation {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::PatchConflict`] unless this presentation is a share
-    /// of the patch's before presentation.
+    /// Returns [`Error::PatchConflict`] when the presentation has different
+    /// `content.xml` bytes, or when its structure does not match the bounded
+    /// source proof captured by the patch.
     pub fn apply_tail_append(&self, patch: &Patch) -> std::result::Result<Commit, Error> {
-        if !self.same_share(&patch.before) {
-            return Err(Error::PatchConflict {
-                operation: "odp.tail_append.apply",
-                reason: "a tail-append patch replays only onto the presentation it was made on",
-            });
+        if self.same_share(&patch.before) {
+            self.check_source().map_err(Error::Invalid)?;
+            return Ok(Commit::new(
+                patch.after.share(),
+                patch.clone(),
+                Diagnostics {
+                    changed: !patch.is_noop(),
+                    proof: None,
+                },
+            ));
         }
-        self.check_source().map_err(Error::Invalid)?;
-        Ok(Commit::new(
-            patch.after.share(),
-            patch.clone(),
-            Diagnostics {
-                changed: !patch.is_noop(),
-                proof: None,
-            },
-        ))
+        rebase_patch(self, patch)
     }
+}
+
+fn rebase_patch(
+    recipient: &SourceBackedPresentation,
+    patch: &Patch,
+) -> std::result::Result<Commit, Error> {
+    recipient.check_source().map_err(Error::Invalid)?;
+    let base = recipient.effective().map_err(Error::Invalid)?;
+    let expected = &patch.before_proof;
+    let package = Arc::clone(&base.package);
+    let facts = scan_source(&package, patch.limits, &patch.options)?;
+    if facts.content_bytes != expected.content_bytes
+        || facts.insert_at != expected.insert_at
+        || facts.slide_count != expected.slide_count
+    {
+        return Err(Error::PatchConflict {
+            operation: "odp.tail_append.apply",
+            reason: "the recipient content structure differs from the recorded base",
+        });
+    }
+
+    let removes = patch.removes_source_range;
+    let remove_length = if removes {
+        u64::try_from(patch.fragment.len()).map_err(|_| {
+            invalid("ODP tail-append patch fragment length exceeds the replay range")
+        })?
+    } else {
+        0
+    };
+    let replacement_offset = if removes {
+        expected
+            .insert_at
+            .checked_sub(remove_length)
+            .ok_or(Error::PatchConflict {
+                operation: "odp.tail_append.apply",
+                reason: "the recorded inverse range precedes the recipient content",
+            })?
+    } else {
+        expected.insert_at
+    };
+    let fragment = if removes {
+        AuthoredXmlFragment::empty()
+    } else {
+        AuthoredXmlFragment::markup(patch.fragment.as_ref().to_vec()).map_err(Error::Invalid)?
+    };
+    let candidate_token_bytes = patch
+        .limits
+        .max_fragment_bytes
+        .saturating_add(1024)
+        .clamp(1, 64 * 1024 * 1024);
+    let common = SourceContentInsertionPlan::prepare_replacement_with_validator(
+        package,
+        replacement_offset,
+        remove_length,
+        fragment,
+        XmlStreamLimits::new(
+            patch.limits.max_content_xml_bytes,
+            256,
+            4_000_000,
+            1_000_000,
+            candidate_token_bytes,
+        )
+        .map_err(Error::Invalid)?,
+        &patch.options,
+        |_event, _tracker| Ok(()),
+    )
+    .map_err(Error::Plan)?;
+    if common.source_content_sha256() != patch.source_content_sha256
+        || common.target_content_sha256() != patch.target_content_sha256
+        || common.source_content_length() != expected.content_bytes
+        || common.target_content_length() != patch.after_proof.content_bytes
+    {
+        return Err(Error::PatchConflict {
+            operation: "odp.tail_append.apply",
+            reason: "the recipient content bytes differ from the recorded base",
+        });
+    }
+
+    let options = patch.options.clone();
+    let package = base.deferred(common, options);
+    let rebased = Patch {
+        before: Arc::new(base.share()),
+        after: Arc::new(package.share()),
+        ..patch.clone()
+    };
+    recipient.check_source().map_err(Error::Invalid)?;
+    Ok(Commit::new(
+        package,
+        rebased,
+        Diagnostics {
+            changed: !patch.is_noop(),
+            proof: None,
+        },
+    ))
 }
 
 impl<'a> Edit<'a> {
@@ -596,6 +701,7 @@ impl<'a> Edit<'a> {
             source,
             common,
             options,
+            limits,
             proof: SourceProof {
                 source_version,
                 content_bytes,
@@ -621,6 +727,7 @@ pub struct Plan<'a> {
     source: &'a SourceBackedPresentation,
     common: SourceContentInsertionPlan,
     options: SourceContentPublicationOptions,
+    limits: Limits,
     proof: SourceProof,
 }
 
@@ -701,17 +808,59 @@ impl Plan<'_> {
             source,
             common,
             options,
+            limits,
             proof,
         } = self;
         let base = source.effective().map_err(Error::Invalid)?;
         let source_content_sha256 = common.source_content_sha256();
         let target_content_sha256 = common.target_content_sha256();
+        let fragment: Arc<[u8]> = Arc::from(common.authored_fragment_bytes());
+        let options_for_patch = options.clone();
         let package = base.deferred(common, options);
+        let after_proof = SourceProof {
+            source_version: proof.source_version,
+            content_bytes: proof
+                .content_bytes
+                .checked_add(u64::try_from(fragment.len()).map_err(|_| {
+                    Error::Invalid(CoreError::InvalidFormat(
+                        "ODP tail-append fragment length exceeds u64".to_string(),
+                    ))
+                })?)
+                .ok_or_else(|| {
+                    Error::Invalid(CoreError::InvalidFormat(
+                        "ODP tail-append target content length overflows u64".to_string(),
+                    ))
+                })?,
+            insert_at: proof
+                .insert_at
+                .checked_add(u64::try_from(fragment.len()).map_err(|_| {
+                    Error::Invalid(CoreError::InvalidFormat(
+                        "ODP tail-append fragment length exceeds u64".to_string(),
+                    ))
+                })?)
+                .ok_or_else(|| {
+                    Error::Invalid(CoreError::InvalidFormat(
+                        "ODP tail-append insertion offset overflows u64".to_string(),
+                    ))
+                })?,
+            slide_count: proof.slide_count.checked_add(1).ok_or_else(|| {
+                Error::Invalid(CoreError::InvalidFormat(
+                    "ODP tail-append slide count overflows usize".to_string(),
+                ))
+            })?,
+            page_name: proof.page_name.clone(),
+        };
         let patch = Patch {
             before: Arc::new(source.share()),
             after: Arc::new(package.share()),
             source_content_sha256,
             target_content_sha256,
+            before_proof: proof.clone(),
+            after_proof,
+            fragment,
+            limits,
+            options: options_for_patch,
+            removes_source_range: false,
         };
         Ok(Commit::new(
             package,
@@ -1873,6 +2022,53 @@ mod tests {
         assert_eq!(restored_bytes, source_bytes);
         assert!(matches!(
             chained.package().apply_tail_append(commit.patch()),
+            Err(Error::PatchConflict { .. })
+        ));
+    }
+
+    #[test]
+    fn equal_content_recipients_rebase_forward_and_inverse_tail_append() {
+        let content = format!(
+            r#"<office:document-content xmlns:office="{OFFICE_NAMESPACE_UTF8}" xmlns:draw="{DRAW_NAMESPACE_UTF8}"><office:body><office:presentation><draw:page draw:name="page1"/></office:presentation></office:body></office:document-content>"#,
+        );
+        let source = source_package(&content);
+        let mut source_bytes = vec![0; usize::try_from(source.len().unwrap()).unwrap()];
+        source.read_at(0, &mut source_bytes).unwrap();
+        let owner = SourceBackedPresentation::from_read_at(Arc::new(OwnedSource::new(
+            source_bytes.clone(),
+        )))
+        .unwrap();
+        let independent = SourceBackedPresentation::from_read_at(Arc::new(OwnedSource::new(
+            source_bytes.clone(),
+        )))
+        .unwrap();
+        let commit = owner
+            .edit_tail_append("title", "body")
+            .unwrap()
+            .commit()
+            .unwrap();
+
+        let rebased = independent.apply_tail_append(commit.patch()).unwrap();
+        let mut rebased_bytes = Vec::new();
+        rebased.package().write_to(&mut rebased_bytes).unwrap();
+        let mut committed_bytes = Vec::new();
+        commit.package().write_to(&mut committed_bytes).unwrap();
+        assert_eq!(rebased_bytes, committed_bytes);
+
+        let target_copy =
+            SourceBackedPresentation::from_read_at(Arc::new(OwnedSource::new(rebased_bytes)))
+                .unwrap();
+        let restored = target_copy
+            .apply_tail_append(&commit.patch().inverse())
+            .unwrap();
+        let mut restored_bytes = Vec::new();
+        restored.package().write_to(&mut restored_bytes).unwrap();
+        assert_eq!(restored_bytes, source_bytes);
+
+        let wrong_content = content.replace("page1", "pageX");
+        let wrong = SourceBackedPresentation::from_read_at(source_package(&wrong_content)).unwrap();
+        assert!(matches!(
+            wrong.apply_tail_append(commit.patch()),
             Err(Error::PatchConflict { .. })
         ));
     }

@@ -5657,22 +5657,63 @@ fn cross_slide_copy_family_publishes_a_source_backed_package() -> TestResult {
     );
 
     // Replay onto the same destination, and the inverse onto the commit's
-    // own package; the inverse refuses any other package.
+    // own package.
     let replayed = destination.apply_cross_slide_copy(&patch)?.into_package();
     assert_eq!(replayed.to_bytes()?, streamed);
+    assert!(
+        replayed.same_source_owner(&copied_package),
+        "same-owner replay should retain the published package identity"
+    );
     let restored = copied_package
         .apply_cross_slide_copy(&patch.inverse())?
         .into_package();
     assert_eq!(restored.to_bytes()?, destination_bytes);
+    assert!(
+        restored.same_source_owner(&destination),
+        "same-owner inverse should retain the original package identity"
+    );
     assert!(matches!(
         destination.apply_cross_slide_copy(&patch.inverse()),
         Err(Error::PatchConflict)
     ));
-    // The patch is exact-source: another opening of the same bytes is
-    // another source.
+    // Another opening of the same bytes is an independent recipient, but its
+    // content still matches the recorded base. The output is deferred onto
+    // that recipient and therefore keeps its own source policy.
     let reopened = Package::from_read_at(Arc::new(OwnedSource::new(destination_bytes.clone())))?;
+    let replayed = reopened.apply_cross_slide_copy(&patch)?.into_package();
+    assert_eq!(replayed.to_bytes()?, streamed);
+
+    // An independently opened recipient may carry a tighter source policy;
+    // replay must retain that policy while proving the recorded bytes.
+    let recipient_limits = SourceLimits::builder()
+        .max_input_bytes(destination_bytes.len() as u64)
+        .map_err(|error| Error::Invalid(error.to_string()))?
+        .build()?;
+    let strict_reopened = Package::from_read_at_with_options(
+        Arc::new(OwnedSource::new(destination_bytes.clone())),
+        crate::OpenOptions::default().source_limits(recipient_limits),
+    )?;
+    let strict_replayed = strict_reopened
+        .apply_cross_slide_copy(&patch)?
+        .into_package();
+    assert_eq!(strict_replayed.to_bytes()?, streamed);
+
+    let reopened_after = Package::from_read_at(Arc::new(OwnedSource::new(streamed.clone())))?;
+    let restored = reopened_after
+        .apply_cross_slide_copy(&patch.inverse())?
+        .into_package();
+    assert_eq!(restored.to_bytes()?, destination_bytes);
+
+    // A same-shaped but changed recipient is still refused.
+    let wrong = replace_text_member(
+        &destination_bytes,
+        "ppt/slides/slide2.xml",
+        "Destination Last",
+        "Destination Other",
+    )?;
+    let wrong = Package::from_read_at(Arc::new(OwnedSource::new(wrong)))?;
     assert!(matches!(
-        reopened.apply_cross_slide_copy(&patch),
+        wrong.apply_cross_slide_copy(&patch),
         Err(Error::PatchConflict)
     ));
 

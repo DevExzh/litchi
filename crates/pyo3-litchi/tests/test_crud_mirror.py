@@ -53,8 +53,8 @@ edit's result to be refused with the recorded codes. The patch-inverse row
 (record 0347) requires ``Commit.patch`` to replay onto its source File
 (the commit's bytes), its ``inverse()`` to restore the exact source bytes,
 the patch on its own result to be refused with the recorded code, and a
-byte-identical, separately opened copy to refuse or accept the patch as the
-Rust row reports.
+same-format byte-identical, separately opened copy to accept the patch
+through the bounded content proof.
 
 Rerun: ``crates/pyo3-litchi/tests/run_tests.sh --no-build -k crud_mirror``;
 set ``LITCHI_MIRROR_VERBOSE=1`` to print the replayed cells per verb.
@@ -615,14 +615,16 @@ class Adr0008MirrorTest(unittest.TestCase):
         foreign = L.open_bytes(before)
         try:
             applied = patch.apply(foreign)
-        except L.LitchiError:
-            copy = "refuses (owner-bound)"
-        else:
             if applied.to_bytes() != after:
                 raise AssertionError("a byte-identical copy took the patch to other bytes")
-            copy = "accepts (content-checked)"
-        if f"a byte-identical reopened copy {copy}" not in row["note"]:
-            raise AssertionError(f"a byte-identical reopened copy {copy}; Rust: {row['note']}")
+        except L.LitchiError as error:
+            raise AssertionError(
+                f"a byte-identical reopened copy refused {error.code}; Rust: {row['note']}"
+            ) from error
+        finally:
+            foreign.close()
+        if "a byte-identical reopened copy accepts (content-checked)" not in row["note"]:
+            raise AssertionError(f"Rust did not record content-checked replay: {row['note']}")
 
     @staticmethod
     def _compose(cl, row):

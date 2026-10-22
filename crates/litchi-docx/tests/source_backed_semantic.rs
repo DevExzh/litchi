@@ -1018,7 +1018,7 @@ fn effective_owner_refuses_unmigrated_operations_and_foreign_candidates() {
         } else {
             let applied = applied.unwrap();
             let (mut written, mut expected) = (Vec::new(), Vec::new());
-            applied.write_to(&mut written).unwrap();
+            applied.package().write_to(&mut written).unwrap();
             effective.write_to(&mut expected).unwrap();
             assert_eq!(written, expected);
         }
@@ -1211,8 +1211,10 @@ fn retained_semantic_patches_chain_and_inverse_without_reopening() {
         let restored = next
             .apply(&second.patch().inverse())
             .unwrap()
+            .into_package()
             .apply(&first.patch().inverse())
-            .unwrap();
+            .unwrap()
+            .into_package();
         let mut before = Vec::new();
         source.write_to(&mut before).unwrap();
         let mut after = Vec::new();
@@ -1322,11 +1324,14 @@ fn retained_semantic_apply_preserves_declaration_bom_and_revision_spelling() {
     )
     .unwrap();
     let committed = edit.commit().unwrap();
-    let next = owner.apply(committed.patch()).unwrap();
+    let next = owner.apply(committed.patch()).unwrap().into_package();
     let snapshot = next.document_snapshot().unwrap();
     assert!(snapshot.xml_bytes().starts_with(b"\xef\xbb\xbf<?xml"));
     assert_eq!(snapshot.xml_bytes(), committed.patch().target().xml_bytes());
-    let restored = next.apply(&committed.patch().inverse()).unwrap();
+    let restored = next
+        .apply(&committed.patch().inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(
         restored.document_snapshot().unwrap().xml_bytes(),
         xml.as_bytes()
@@ -1366,6 +1371,7 @@ fn canonical_source_edit_owns_package_and_isolates_staged_clones() {
             owner
                 .apply(&patch.inverse())
                 .unwrap()
+                .into_package()
                 .document()
                 .unwrap()
                 .extract_text()

@@ -388,7 +388,7 @@ impl Package {
     ///
     /// Refuses pending authoring state, signed changes,
     /// stale resources, and invalid or unbounded candidate graphs.
-    pub fn apply(&self, patch: &crate::opened::Patch) -> Result<Self> {
+    pub fn apply(&self, patch: &crate::opened::Patch) -> Result<crate::opened::Commit> {
         if !patch.is_noop() {
             super::signature::refuse_signed_change(&self.opc)?;
         }
@@ -404,7 +404,11 @@ impl Package {
             candidate.validate_signature_edit_from(&self.opc)?;
         }
         snapshot.owner_state = std::sync::Arc::new(self.opened_owner_state());
-        Ok(Self::from_opened_candidate(candidate, &snapshot))
+        Ok(crate::opened::Commit::new(
+            Self::from_opened_candidate(candidate, &snapshot),
+            snapshot,
+            patch.clone(),
+        ))
     }
 
     fn opened_owner_state(&self) -> OpenedOwnerState {

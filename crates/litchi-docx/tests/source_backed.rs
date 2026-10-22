@@ -402,6 +402,7 @@ fn document_commit_edits_only_the_main_part_and_reopens() {
     let published = package
         .apply(commit.patch())
         .and_then(|committed| {
+            let committed = committed.into_package();
             committed.write_to(&mut output)?;
             committed.document_snapshot()
         })
@@ -459,6 +460,7 @@ fn exact_noop_reproduces_every_source_byte() {
     package
         .apply(commit.patch())
         .and_then(|committed| {
+            let committed = committed.into_package();
             committed.write_to(&mut output)?;
             committed.document_snapshot()
         })
@@ -485,7 +487,7 @@ fn rolled_back_document_operations_use_the_exact_signed_source_path() {
 
     assert_eq!(commit.patch().operations().len(), 2);
     assert!(commit.patch().is_noop());
-    let retained = package.apply(commit.patch()).unwrap();
+    let retained = package.apply(commit.patch()).unwrap().into_package();
     let mut retained_output = Vec::new();
     retained.write_to(&mut retained_output).unwrap();
     assert_eq!(retained_output, source_bytes);
@@ -503,6 +505,7 @@ fn rolled_back_document_operations_use_the_exact_signed_source_path() {
     package
         .apply(commit.patch())
         .and_then(|committed| {
+            let committed = committed.into_package();
             committed.write_to(&mut output)?;
             committed.document_snapshot()
         })
@@ -524,6 +527,7 @@ fn stale_commit_and_changed_source_fail_before_output() {
     let mut output = Vec::new();
     assert!(matches!(
         package.apply(commit.patch()).and_then(|committed| {
+            let committed = committed.into_package();
             committed.write_to(&mut output)?;
             committed.document_snapshot()
         }),
@@ -544,6 +548,7 @@ fn stale_commit_and_changed_source_fail_before_output() {
     let stale_package = source_backed::Package::from_read_at(stale_read_at).unwrap();
     assert!(matches!(
         stale_package.apply(commit.patch()).and_then(|committed| {
+            let committed = committed.into_package();
             committed.write_to(&mut output)?;
             committed.document_snapshot()
         }),
@@ -571,6 +576,7 @@ fn markup_compatibility_branch_selection_is_refused_before_output() {
 
     assert!(matches!(
         package.apply(commit.patch()).and_then(|committed| {
+            let committed = committed.into_package();
             committed.write_to(&mut output)?;
             committed.document_snapshot()
         }),
@@ -603,6 +609,7 @@ fn signed_changes_are_refused_but_signed_noops_are_exact() {
     package
         .apply(noop.patch())
         .and_then(|committed| {
+            let committed = committed.into_package();
             committed.write_to(&mut output)?;
             committed.document_snapshot()
         })
@@ -619,6 +626,7 @@ fn signed_changes_are_refused_but_signed_noops_are_exact() {
     output.clear();
     assert!(matches!(
         package.apply(commit.patch()).and_then(|committed| {
+            let committed = committed.into_package();
             committed.write_to(&mut output)?;
             committed.document_snapshot()
         }),
@@ -646,6 +654,7 @@ fn sequential_sink_failure_is_typed_as_incomplete_output() {
 
     assert!(matches!(
         package.apply(commit.patch()).and_then(|committed| {
+            let committed = committed.into_package();
             committed.write_to(&mut sink)?;
             committed.document_snapshot()
         }),
@@ -675,6 +684,7 @@ fn strict_main_document_relationship_uses_the_same_overlay_contract() {
     package
         .apply(commit.patch())
         .and_then(|committed| {
+            let committed = committed.into_package();
             committed.write_to(&mut output)?;
             committed.document_snapshot()
         })
@@ -865,6 +875,7 @@ fn shared_source_publishes_repeatedly_without_reopen_or_consumption() {
         shared
             .apply(commit.patch())
             .and_then(|committed| {
+                let committed = committed.into_package();
                 committed.write_to(&mut failure)?;
                 committed.document_snapshot()
             })
@@ -874,6 +885,7 @@ fn shared_source_publishes_repeatedly_without_reopen_or_consumption() {
     shared
         .apply(commit.patch())
         .and_then(|committed| {
+            let committed = committed.into_package();
             committed.write_to(&mut first)?;
             committed.document_snapshot()
         })
@@ -882,6 +894,7 @@ fn shared_source_publishes_repeatedly_without_reopen_or_consumption() {
     package
         .apply(commit.patch())
         .and_then(|committed| {
+            let committed = committed.into_package();
             committed.write_to(&mut second)?;
             committed.document_snapshot()
         })
@@ -899,6 +912,7 @@ fn shared_source_publishes_repeatedly_without_reopen_or_consumption() {
     shared
         .apply(noop.patch())
         .and_then(|committed| {
+            let committed = committed.into_package();
             committed.write_to(&mut original)?;
             committed.document_snapshot()
         })
@@ -908,6 +922,7 @@ fn shared_source_publishes_repeatedly_without_reopen_or_consumption() {
     let mut rejected = Vec::new();
     assert!(matches!(
         shared.apply(commit.patch()).and_then(|committed| {
+            let committed = committed.into_package();
             committed.write_to(&mut rejected)?;
             committed.document_snapshot()
         }),
@@ -936,6 +951,7 @@ fn concurrent_source_shares_keep_the_same_noop_artifact() {
             package
                 .apply(commit.patch())
                 .and_then(|committed| {
+                    let committed = committed.into_package();
                     committed.write_to(&mut output)?;
                     committed.document_snapshot()
                 })

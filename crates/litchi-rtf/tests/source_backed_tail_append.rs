@@ -37,13 +37,17 @@ fn context() -> ExecutionContext {
 }
 
 fn open(bytes: &[u8]) -> Package {
+    open_with_limits(bytes, TailAppendPublicationLimits::new(3, 2))
+}
+
+fn open_with_limits(bytes: &[u8], limits: TailAppendPublicationLimits) -> Package {
     let document = Document::from_bytes(bytes).unwrap();
     let source: Arc<dyn ReadAt> = Arc::new(OwnedSource::new(bytes.to_vec()));
     Package::open_with_options(
         &document,
         source,
         context(),
-        OpenOptions::new().publication_limits(TailAppendPublicationLimits::new(3, 2)),
+        OpenOptions::new().publication_limits(limits),
     )
     .unwrap()
 }
@@ -112,8 +116,19 @@ fn the_patch_is_an_exact_pair() {
         .unwrap();
     assert_eq!(bytes_of(restored.package()), SOURCE);
     let other = open(SOURCE);
+    let copied = other.apply_tail_append(commit.patch()).unwrap();
+    assert_eq!(bytes_of(copied.package()), bytes_of(commit.package()));
+    let independent_target = open(&bytes_of(commit.package()));
+    let independently_restored = independent_target
+        .apply_tail_append(&commit.patch().inverse())
+        .unwrap();
+    assert_eq!(bytes_of(independently_restored.package()), SOURCE);
+    let strict = open_with_limits(SOURCE, TailAppendPublicationLimits::new(1, 1));
+    let strict_copy = strict.apply_tail_append(commit.patch()).unwrap();
+    assert_eq!(bytes_of(strict_copy.package()), bytes_of(commit.package()));
+    let wrong = open(br#"{\rtf1\ansi A\par D}"#);
     assert!(matches!(
-        other.apply_tail_append(commit.patch()),
+        wrong.apply_tail_append(commit.patch()),
         Err(TailAppendPublicationError::Plan(
             litchi_rtf::tail_append::Error::PatchConflict
         ))

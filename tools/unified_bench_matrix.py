@@ -3556,7 +3556,7 @@ def outputs(rows, conflicts, agreements, cur):
 
 # Record 0344: evidence under `results/` belongs to the record its name
 # starts with (`0328/`, `0255-python-overhead.json`, `0251a-docx-…/`).
-EVIDENCE_NAME = re.compile(r"^(\d{4}[a-z]?)(?=[-.]|$)")
+EVIDENCE_NAME = re.compile(r"^(\d{4}[a-z]*)(?=[-.]|$)")
 # The matrix collects records from 0249 on (record 0289).
 FIRST_RECORD = 249
 

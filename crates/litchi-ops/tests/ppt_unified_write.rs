@@ -240,9 +240,14 @@ fn edit_history_batch_modes_and_rollback_are_atomic() {
             .expect("transaction");
         assert!(commit.diagnostics().changed());
         let reopened = eager(&before);
-        assert!(
-            commit.patch().apply(&reopened).is_err(),
-            "history belongs to the exact immutable handle, not equal bytes"
+        assert_eq!(
+            commit
+                .patch()
+                .apply(&reopened)
+                .expect("a byte-identical copy takes the patch")
+                .to_bytes()
+                .expect("publish reopened replay"),
+            commit.file().to_bytes().expect("publish committed file")
         );
         assert_eq!(text(commit.file(), FIRST), "staged");
         assert_eq!(

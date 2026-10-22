@@ -150,7 +150,12 @@ fn eager_and_source_slide_properties_escape_names_and_use_producer_bool_spelling
 
     let durable = transported(&patch);
     assert_eq!(
-        source.apply(&durable).unwrap().to_bytes().unwrap(),
+        source
+            .apply(&durable)
+            .unwrap()
+            .into_package()
+            .to_bytes()
+            .unwrap(),
         changed_bytes
     );
 
@@ -260,11 +265,12 @@ fn source_slide_properties_compose_with_shape_geometry_removal_and_reorder() {
     );
 
     let durable = transported(&patch);
-    let replayed = source.apply(&durable).unwrap();
+    let replayed = source.apply(&durable).unwrap().into_package();
     assert_eq!(replayed.to_bytes().unwrap(), changed_bytes);
     let restored = open_source(&changed_bytes)
         .apply(&transported(&durable.inverse()))
-        .unwrap();
+        .unwrap()
+        .into_package();
     assert_eq!(members(&restored.to_bytes().unwrap()), members(&before));
 }
 
@@ -467,6 +473,7 @@ fn combined_primary_properties_match_sequential_edits_and_preserve_prior_staging
         source
             .apply(&transported(&patch))
             .unwrap()
+            .into_package()
             .to_bytes()
             .unwrap(),
         changed.to_bytes().unwrap()
@@ -475,6 +482,7 @@ fn combined_primary_properties_match_sequential_edits_and_preserve_prior_staging
         changed
             .apply(&transported(&patch).inverse())
             .unwrap()
+            .into_package()
             .to_bytes()
             .unwrap(),
         before
@@ -499,7 +507,15 @@ fn inserted_slide_properties_survive_durable_topology_transport() {
     let (changed, patch) = edit.commit().unwrap().into_parts();
     let durable = transported(&patch);
     let bytes = changed.to_bytes().unwrap();
-    assert_eq!(source.apply(&durable).unwrap().to_bytes().unwrap(), bytes);
+    assert_eq!(
+        source
+            .apply(&durable)
+            .unwrap()
+            .into_package()
+            .to_bytes()
+            .unwrap(),
+        bytes
+    );
     let reopened = open_source(&bytes);
     assert_eq!(
         reopened
@@ -516,6 +532,7 @@ fn inserted_slide_properties_survive_durable_topology_transport() {
         reopened
             .apply(&durable.inverse())
             .unwrap()
+            .into_package()
             .to_bytes()
             .unwrap(),
         before

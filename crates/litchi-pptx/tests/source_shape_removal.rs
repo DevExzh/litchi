@@ -273,11 +273,19 @@ fn source_shape_removal_patch_transports_inverts_and_reopens() {
     let after_bytes = after.to_bytes().unwrap();
 
     assert_eq!(
-        source.apply(&patch).unwrap().to_bytes().unwrap(),
+        source
+            .apply(&patch)
+            .unwrap()
+            .into_package()
+            .to_bytes()
+            .unwrap(),
         after_bytes
     );
     let inverse = transported(&patch.inverse());
-    let restored = open_source(&after_bytes).apply(&inverse).unwrap();
+    let restored = open_source(&after_bytes)
+        .apply(&inverse)
+        .unwrap()
+        .into_package();
     assert_eq!(members(&restored.to_bytes().unwrap()), members(&before));
 }
 
@@ -293,7 +301,12 @@ fn source_shape_removal_composes_set_add_and_remove() {
     let (after, patch) = edit.commit().unwrap().into_parts();
     let patch = transported(&patch);
     assert_eq!(
-        source.apply(&patch).unwrap().to_bytes().unwrap(),
+        source
+            .apply(&patch)
+            .unwrap()
+            .into_package()
+            .to_bytes()
+            .unwrap(),
         after.to_bytes().unwrap()
     );
     let inverse = transported(&patch.inverse());
@@ -302,6 +315,7 @@ fn source_shape_removal_composes_set_add_and_remove() {
             &open_source(&after.to_bytes().unwrap())
                 .apply(&inverse)
                 .unwrap()
+                .into_package()
                 .to_bytes()
                 .unwrap()
         ),
@@ -330,13 +344,21 @@ fn source_shape_removal_then_add_replaces_removed_highest_id() {
     let patch = transported(&patch);
     let after_bytes = after.to_bytes().unwrap();
     assert_eq!(
-        source.apply(&patch).unwrap().to_bytes().unwrap(),
+        source
+            .apply(&patch)
+            .unwrap()
+            .into_package()
+            .to_bytes()
+            .unwrap(),
         after_bytes
     );
     assert_eq!(source_texts(&after), ["slide 0 shape 0", "replacement"]);
 
     let inverse = transported(&patch.inverse());
-    let restored = open_source(&after_bytes).apply(&inverse).unwrap();
+    let restored = open_source(&after_bytes)
+        .apply(&inverse)
+        .unwrap()
+        .into_package();
     assert_eq!(members(&restored.to_bytes().unwrap()), members(&before));
 }
 
@@ -593,6 +615,7 @@ fn source_multiple_removals_transport_but_retained_name_tampering_does_not() {
             &open_source(&after.to_bytes().unwrap())
                 .apply(&inverse)
                 .unwrap()
+                .into_package()
                 .to_bytes()
                 .unwrap()
         ),
@@ -648,11 +671,17 @@ fn source_removal_envelope_carries_slide_topology_and_shape_changes() {
     let patch = SourcePatch::from_bytes(&wire).unwrap();
     let after_bytes = after.to_bytes().unwrap();
     assert_eq!(
-        source.apply(&patch).unwrap().to_bytes().unwrap(),
+        source
+            .apply(&patch)
+            .unwrap()
+            .into_package()
+            .to_bytes()
+            .unwrap(),
         after_bytes
     );
     let restored = open_source(&after_bytes)
         .apply(&transported(&patch.inverse()))
-        .unwrap();
+        .unwrap()
+        .into_package();
     assert_eq!(members(&restored.to_bytes().unwrap()), members(&before));
 }

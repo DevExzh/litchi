@@ -2615,7 +2615,7 @@ fn slide_copy_plan_applies_atomically_rewrites_ownership_and_reopens() -> Result
     let reopened_root = reopened.opened_presentation()?;
     assert_eq!(reopened_root.slides().len(), 2);
     assert_eq!(reopened_root.slides()[1].part_name(), &copied_slide);
-    reopened = reopened.apply(&durable_inverse)?;
+    reopened = reopened.apply(&durable_inverse)?.into_package();
     assert_eq!(part_states(&reopened), before);
     assert_eq!(reopened.to_bytes()?, source_bytes);
     Ok(())
@@ -3285,7 +3285,7 @@ fn slide_removal_plan_refuses_policy_surfaces_bounds_and_stale_graphs() -> Resul
     let before_generic = part_states(&forged_target);
     assert!(forged_target.apply(&inner).is_err());
     assert_eq!(part_states(&forged_target), before_generic);
-    let mut forged_target = template.apply(&inner)?;
+    let mut forged_target = template.apply(&inner)?.into_package();
     add_inbound_slide_owner(&mut forged_target, &selected, &owner)?;
     let target_revision = forged_target.opened_presentation()?.revision();
     let mut forged_source = opened_plain_slides_package(2)?;
@@ -3368,7 +3368,7 @@ fn composes_order_shape_and_notes_in_one_durable_inverse_commit() -> Result<()> 
         .map(|name| name.as_str().to_owned())
         .collect();
 
-    package = package.apply(&decoded)?;
+    package = package.apply(&decoded)?.into_package();
     let published = package.opened_presentation()?;
     assert_eq!(published.slides()[0].name(), "Slide 257");
     let presentation = package.presentation()?;
@@ -3396,7 +3396,7 @@ fn composes_order_shape_and_notes_in_one_durable_inverse_commit() -> Result<()> 
     let bytes = package.to_bytes()?;
     let mut reopened = Package::from_bytes(&bytes)?;
     assert_eq!(reopened.opened_presentation()?.slides()[0].id(), 257);
-    reopened = reopened.apply(&inverse)?;
+    reopened = reopened.apply(&inverse)?.into_package();
     let restored = reopened.opened_presentation()?;
     assert_eq!(restored.revision(), source_revision);
     assert_eq!(part_states(&reopened), before);
@@ -3419,7 +3419,7 @@ fn atomic_shape_text_batch_composes_in_one_opened_transaction() -> Result<()> {
         2
     );
     let commit = edit.commit()?;
-    package = package.apply(commit.patch())?;
+    package = package.apply(commit.patch())?.into_package();
     let slide = package
         .presentation()?
         .slide(0)?
@@ -3445,7 +3445,7 @@ fn disjoint_patches_join_and_same_part_edits_conflict() -> Result<()> {
     assert!(!shape_patch.conflicts_with(&notes_patch));
     let joined = shape_patch.join(&notes_patch)?;
     assert_eq!(joined.resource_count(), 2);
-    package = package.apply(&joined)?;
+    package = package.apply(&joined)?.into_package();
     assert!(
         package
             .presentation()?
@@ -3580,7 +3580,7 @@ fn real_powerpoint_fixture_round_trips_an_exact_no_op() -> Result<()> {
     assert!(!edit.set_shape_text(0_usize, shape_position, &original_text)?);
     let patch = Patch::from_bytes(&edit.commit()?.into_patch().to_bytes()?, Limits::default())?;
     assert!(patch.is_noop());
-    package = package.apply(&patch)?;
+    package = package.apply(&patch)?.into_package();
     let saved = package.to_bytes()?;
     let reopened = Package::from_bytes(&saved)?;
     assert_eq!(
@@ -3670,7 +3670,7 @@ fn one_opened_transaction_spans_complex_ordinary_domains_and_full_reopen() -> Re
     assert!(commit.patch().resource_count() >= 10);
     let durable = Patch::from_bytes(&commit.patch().to_bytes()?, Limits::default())?;
     let inverse = durable.inverse();
-    package = package.apply(&durable)?;
+    package = package.apply(&durable)?.into_package();
     let bytes = package.to_bytes()?;
     let mut reopened = Package::from_bytes(&bytes)?;
 
@@ -3704,7 +3704,7 @@ fn one_opened_transaction_spans_complex_ordinary_domains_and_full_reopen() -> Re
     );
     crate::master_layout::validate_master_layout_graph(&reopened.opc)?;
 
-    reopened = reopened.apply(&inverse)?;
+    reopened = reopened.apply(&inverse)?.into_package();
     assert_eq!(part_states(&reopened), before);
     Ok(())
 }
@@ -3731,7 +3731,7 @@ fn three_way_plan_is_immutable_and_history_supports_redo() -> Result<()> {
     let selected = plan.resolve(0, Resolution::Right)?;
     assert_eq!(plan.unresolved_count(), 1);
     let merged = selected.finish()?;
-    package = package.apply(&merged)?;
+    package = package.apply(&merged)?.into_package();
     assert!(
         package
             .presentation()?
@@ -3754,11 +3754,11 @@ fn three_way_plan_is_immutable_and_history_supports_redo() -> Result<()> {
         .pop_undo()
         .ok_or_else(|| Error::Invalid("undo disappeared".into()))?;
     assert_eq!(history.redo_len(), 1);
-    package = package.apply(&undo)?;
+    package = package.apply(&undo)?.into_package();
     let redo = history
         .pop_redo()
         .ok_or_else(|| Error::Invalid("redo disappeared".into()))?;
-    package = package.apply(&redo)?;
+    package = package.apply(&redo)?.into_package();
     assert!(
         package.presentation()?.slides()?[0]
             .text()?
@@ -3801,7 +3801,7 @@ fn slide_removal_and_dependency_transfer_are_durable_and_reversible() -> Result<
     )?;
     assert!(!copied_relationship.is_empty());
     let transfer_patch = transfer.commit()?.into_patch();
-    destination = destination.apply(&transfer_patch)?;
+    destination = destination.apply(&transfer_patch)?.into_package();
     let opened = destination.opened_presentation()?;
     let slide = destination.opc.get_part(opened.slides()[0].part_name())?;
     let related = crate::chart::related(&destination.opc, slide)?;
@@ -3819,17 +3819,17 @@ fn slide_removal_and_dependency_transfer_are_durable_and_reversible() -> Result<
                 .contains_part(&relationship.target_partname()?)
         );
     }
-    destination = destination.apply(&transfer_patch.inverse())?;
+    destination = destination.apply(&transfer_patch.inverse())?.into_package();
     assert_eq!(part_states(&destination), destination_before);
 
     let mut removal = destination.opened_presentation()?.edit();
     let removed = removal.remove_slide(1_usize)?;
     let removed_part = removed.part_name().clone();
     let removal_patch = removal.commit()?.into_patch();
-    destination = destination.apply(&removal_patch)?;
+    destination = destination.apply(&removal_patch)?.into_package();
     assert_eq!(destination.opened_presentation()?.slides().len(), 1);
     assert!(!destination.opc.contains_part(&removed_part));
-    destination = destination.apply(&removal_patch.inverse())?;
+    destination = destination.apply(&removal_patch.inverse())?.into_package();
     assert_eq!(part_states(&destination), destination_before);
     Ok(())
 }
@@ -3868,7 +3868,7 @@ fn real_complex_chart_deck_survives_transaction_and_full_reopen() -> Result<()> 
     )?;
     let patch = edit.commit()?.into_patch();
     let inverse = patch.inverse();
-    package = package.apply(&patch)?;
+    package = package.apply(&patch)?.into_package();
     let saved = package.to_bytes()?;
     let mut reopened = Package::from_bytes(&saved)?;
     let reopened_root = reopened.opened_presentation()?;
@@ -3880,7 +3880,7 @@ fn real_complex_chart_deck_survives_transaction_and_full_reopen() -> Result<()> 
         crate::comments::load_presentation_comments(&reopened.opc)?
             .is_some_and(|comments| comments.slides[0].comments[0].text == "Fixture transaction")
     );
-    reopened = reopened.apply(&inverse)?;
+    reopened = reopened.apply(&inverse)?.into_package();
     assert_eq!(part_states(&reopened), before);
     Ok(())
 }
@@ -4021,7 +4021,8 @@ fn general_shapes_picture_parts_and_modern_extensions_are_atomic_and_reversible(
     assert!(patch.resource_count() >= 5);
     package = package
         .apply(&patch)
-        .map_err(|error| Error::Invalid(format!("apply modern patch: {error}")))?;
+        .map_err(|error| Error::Invalid(format!("apply modern patch: {error}")))?
+        .into_package();
     let bytes = package
         .to_bytes()
         .map_err(|error| Error::Invalid(format!("write modern package: {error}")))?;
@@ -4070,12 +4071,12 @@ fn general_shapes_picture_parts_and_modern_extensions_are_atomic_and_reversible(
     let undo = history
         .pop_undo()
         .ok_or_else(|| Error::Invalid("shape/comment undo disappeared".into()))?;
-    reopened = reopened.apply(&undo)?;
+    reopened = reopened.apply(&undo)?.into_package();
     assert_eq!(part_states(&reopened), before);
     let redo = history
         .pop_redo()
         .ok_or_else(|| Error::Invalid("shape/comment redo disappeared".into()))?;
-    reopened = reopened.apply(&redo)?;
+    reopened = reopened.apply(&redo)?.into_package();
     assert!(
         crate::modern_comments::load_modern_comment_graph(&reopened.opc)?
             .authors
@@ -4087,11 +4088,11 @@ fn general_shapes_picture_parts_and_modern_extensions_are_atomic_and_reversible(
     assert!(cleanup.remove_modern_comment(1_usize, COMMENT)?);
     assert!(cleanup.remove_modern_comment_author(AUTHOR)?);
     let cleanup = cleanup.commit()?.into_patch();
-    reopened = reopened.apply(&cleanup)?;
+    reopened = reopened.apply(&cleanup)?.into_package();
     let empty_graph = crate::modern_comments::load_modern_comment_graph(&reopened.opc)?;
     assert!(empty_graph.authors.is_none());
     assert!(empty_graph.comments.is_empty());
-    reopened = reopened.apply(&cleanup.inverse())?;
+    reopened = reopened.apply(&cleanup.inverse())?.into_package();
     assert_eq!(part_states(&reopened), with_modern_graph);
     Ok(())
 }
@@ -4112,7 +4113,7 @@ fn picture_shape_transfer_copies_relationship_closure_and_remaps_identity() -> R
         (100, 100, 900_000, 600_000),
     )?;
     let source_patch = source_edit.commit()?.into_patch();
-    source_package = source_package.apply(&source_patch)?;
+    source_package = source_package.apply(&source_patch)?.into_package();
     let source_bytes = source_package.to_bytes()?;
     let source_package = Package::from_bytes(&source_bytes)?;
     let source_root = source_package.opened_presentation()?;
@@ -4131,7 +4132,7 @@ fn picture_shape_transfer_copies_relationship_closure_and_remaps_identity() -> R
     let transferred_id =
         transfer.transfer_shape(&source_root, 0_usize, source_position, 1_usize)?;
     let transfer_patch = transfer.commit()?.into_patch();
-    destination = destination.apply(&transfer_patch)?;
+    destination = destination.apply(&transfer_patch)?.into_package();
     let bytes = destination.to_bytes()?;
     let mut reopened = Package::from_bytes(&bytes)?;
     let opened = reopened.opened_presentation()?;
@@ -4164,10 +4165,10 @@ fn picture_shape_transfer_copies_relationship_closure_and_remaps_identity() -> R
     let mut removal = reopened.opened_presentation()?.edit();
     assert!(removal.remove_shape(1_usize, transferred_name.as_str())?);
     let removal_patch = removal.commit()?.into_patch();
-    reopened = reopened.apply(&removal_patch)?;
+    reopened = reopened.apply(&removal_patch)?.into_package();
     assert!(!reopened.opc.contains_part(&image_target));
-    reopened = reopened.apply(&removal_patch.inverse())?;
-    reopened = reopened.apply(&transfer_patch.inverse())?;
+    reopened = reopened.apply(&removal_patch.inverse())?.into_package();
+    reopened = reopened.apply(&transfer_patch.inverse())?.into_package();
     assert_eq!(part_states(&reopened), before);
     Ok(())
 }
@@ -4186,7 +4187,7 @@ fn grouped_connector_transfer_remaps_identity_closure_and_is_durable() -> Result
     let _chart_shape_id =
         authored_shapes.add_chart(0_usize, &chart, "Chart", (0, 0, 1_000_000, 1_000_000))?;
     let authored_patch = authored_shapes.commit()?.into_patch();
-    source_package = source_package.apply(&authored_patch)?;
+    source_package = source_package.apply(&authored_patch)?.into_package();
     add_group_connector_transfer_fixture(&mut source_package)?;
     let source_package = Package::from_bytes(&source_package.to_bytes()?)?;
     let source_root = source_package.opened_presentation()?;
@@ -4330,7 +4331,7 @@ fn grouped_connector_transfer_remaps_identity_closure_and_is_durable() -> Result
     assert!(!transfer_patch.conflicts_with(&notes_patch));
     let merged = Patch::three_way(&destination_root, &transfer_patch, &notes_patch)?.finish()?;
     let durable = Patch::from_bytes(&merged.to_bytes()?, Limits::default())?;
-    destination = destination.apply(&durable)?;
+    destination = destination.apply(&durable)?.into_package();
 
     let mut reopened = Package::from_bytes(&destination.to_bytes()?)?;
     let opened = reopened.opened_presentation()?;
@@ -4537,12 +4538,12 @@ fn grouped_connector_transfer_remaps_identity_closure_and_is_durable() -> Result
         .pop_undo()
         .ok_or_else(|| Error::Invalid("group transfer undo disappeared".into()))?;
     assert_eq!(undo, durable.inverse());
-    reopened = reopened.apply(&undo)?;
+    reopened = reopened.apply(&undo)?.into_package();
     assert_eq!(part_states(&reopened), before);
     let redo = history
         .pop_redo()
         .ok_or_else(|| Error::Invalid("group transfer redo disappeared".into()))?;
-    reopened = reopened.apply(&redo)?;
+    reopened = reopened.apply(&redo)?.into_package();
     assert_eq!(part_states(&reopened), after);
     Ok(())
 }
@@ -4562,7 +4563,7 @@ fn disjoint_new_shape_and_modern_comment_changes_merge_automatically() -> Result
     let modern = modern.commit()?.into_patch();
     assert!(!shape.conflicts_with(&modern));
     let merged = Patch::three_way(&base, &shape, &modern)?.finish()?;
-    package = package.apply(&merged)?;
+    package = package.apply(&merged)?.into_package();
     let reopened = Package::from_bytes(&package.to_bytes()?)?;
     assert!(
         crate::modern_comments::load_modern_comment_graph(&reopened.opc)?
@@ -5137,7 +5138,7 @@ fn memoized_recapture_equals_a_cold_recapture() -> Result<()> {
     // A bare durable-patch replay runs through the facade's retained memo: it
     // holds no snapshot, so without the carry it would hash from cold.
     let inverse = Patch::from_bytes(&forward.inverse().to_bytes()?, Limits::default())?;
-    package = package.apply(&inverse)?;
+    package = package.apply(&inverse)?.into_package();
     let replayed = package.opened_presentation()?;
     assert_eq!(replayed.revision(), source.revision());
     assert_memo_names_only_its_own_package("replay", &replayed);
@@ -5938,7 +5939,13 @@ fn smartart_add_replace_and_remove_keep_the_part_graph_consistent() -> Result<()
     let (removed, _) = edit.commit()?.into_parts();
     assert!(names(&removed).is_empty());
     assert_eq!(
-        part_states(&package.apply(&patch)?.apply(&patch.inverse())?),
+        part_states(
+            &package
+                .apply(&patch)?
+                .into_package()
+                .apply(&patch.inverse())?
+                .into_package()
+        ),
         before
     );
     Ok(())

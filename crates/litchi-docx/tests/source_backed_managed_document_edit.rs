@@ -62,7 +62,7 @@ impl PublishDocument for source_backed::Package {
         writer: impl Write,
         commit: &Commit,
     ) -> Result<Published, TransactionError> {
-        let applied = self.apply_document(commit.patch())?;
+        let applied = self.apply(commit.patch())?;
         applied.package().write_to(writer)?;
         Ok(Published {
             patch: applied.patch().clone(),
@@ -76,8 +76,8 @@ impl PublishDocument for source_backed::Package {
         publication: &Published,
     ) -> Result<litchi_docx::document::Snapshot, TransactionError> {
         let restored = self.apply(&publication.patch.inverse())?;
-        restored.write_to(writer)?;
-        restored.document_snapshot()
+        restored.package().write_to(writer)?;
+        restored.package().document_snapshot()
     }
 }
 
@@ -954,6 +954,7 @@ fn managed_signed_noop_and_equal_setter_preserve_exact_source() {
     package
         .apply(noop.patch())
         .and_then(|committed| {
+            let committed = committed.into_package();
             committed.write_to(&mut output)?;
             committed.document_snapshot()
         })
@@ -966,7 +967,10 @@ fn managed_signed_noop_and_equal_setter_preserve_exact_source() {
         .unwrap();
     let retained = package.with_prepared_topology(topology).unwrap();
     let retained_noop = retained.edit().unwrap().commit().unwrap();
-    let applied = retained.apply(retained_noop.patch()).unwrap();
+    let applied = retained
+        .apply(retained_noop.patch())
+        .unwrap()
+        .into_package();
     let mut retained_output = Vec::new();
     applied.write_to(&mut retained_output).unwrap();
     assert_eq!(retained_output, source);
@@ -988,6 +992,7 @@ fn managed_signed_noop_and_equal_setter_preserve_exact_source() {
     package
         .apply(commit.patch())
         .and_then(|committed| {
+            let committed = committed.into_package();
             committed.write_to(&mut output)?;
             committed.document_snapshot()
         })
@@ -1016,6 +1021,7 @@ fn managed_signed_noop_and_equal_setter_preserve_exact_source() {
     let mut output = Vec::new();
     assert!(matches!(
         package.apply(commit.patch()).and_then(|committed| {
+            let committed = committed.into_package();
             committed.write_to(&mut output)?;
             committed.document_snapshot()
         }),
@@ -1139,6 +1145,7 @@ fn managed_revision_dispositions_are_refused_like_revision_text_replacement() {
         package
             .apply(commit.patch())
             .and_then(|committed| {
+                let committed = committed.into_package();
                 committed.write_to(&mut output)?;
                 committed.document_snapshot()
             })
@@ -1255,6 +1262,7 @@ fn unmanaged_foreign_package_with_equal_main_xml_refuses_stale_commit_before_out
         source_backed::Package::from_read_at(Arc::new(OwnedSource::new(second))).unwrap();
     let mut output = Vec::new();
     let result = second_package.apply(commit.patch()).and_then(|committed| {
+        let committed = committed.into_package();
         committed.write_to(&mut output)?;
         committed.document_snapshot()
     });
@@ -1425,6 +1433,7 @@ fn managed_revert_to_original_publishes_exact_noop_bytes() {
     package
         .apply(commit.patch())
         .and_then(|committed| {
+            let committed = committed.into_package();
             committed.write_to(&mut output)?;
             committed.document_snapshot()
         })
@@ -1507,6 +1516,7 @@ fn managed_noop_inverse_and_changed_publication_preserve_untouched_media() {
     package
         .apply(noop.patch())
         .and_then(|committed| {
+            let committed = committed.into_package();
             committed.write_to(&mut noop_output)?;
             committed.document_snapshot()
         })
@@ -1533,6 +1543,7 @@ fn managed_noop_inverse_and_changed_publication_preserve_untouched_media() {
     package
         .apply(commit.patch())
         .and_then(|committed| {
+            let committed = committed.into_package();
             committed.write_to(&mut output)?;
             committed.document_snapshot()
         })
@@ -1578,6 +1589,7 @@ fn managed_protected_settings_noop_preserves_relationship_and_payload_exactly() 
     package
         .apply(commit.patch())
         .and_then(|committed| {
+            let committed = committed.into_package();
             committed.write_to(&mut output)?;
             committed.document_snapshot()
         })
@@ -1636,6 +1648,7 @@ fn managed_changed_publication_enforces_settings_protection_flags() {
         let commit = edit.commit().unwrap();
         let mut output = Vec::new();
         let result = package.apply(commit.patch()).and_then(|committed| {
+            let committed = committed.into_package();
             committed.write_to(&mut output)?;
             committed.document_snapshot()
         });
@@ -1670,6 +1683,7 @@ fn changed_publication_preserves_standard_ignorable_settings_for_managed_and_unm
     package
         .apply(commit.patch())
         .and_then(|committed| {
+            let committed = committed.into_package();
             committed.write_to(&mut managed_output)?;
             committed.document_snapshot()
         })
@@ -1689,6 +1703,7 @@ fn changed_publication_preserves_standard_ignorable_settings_for_managed_and_unm
     unmanaged_package
         .apply(commit.patch())
         .and_then(|committed| {
+            let committed = committed.into_package();
             committed.write_to(&mut unmanaged_output)?;
             committed.document_snapshot()
         })
@@ -1712,6 +1727,7 @@ fn protected_track_revisions_with_ignorable_extension_remains_refused() {
     let commit = edit.commit().unwrap();
     let mut managed_output = Vec::new();
     let result = package.apply(commit.patch()).and_then(|committed| {
+        let committed = committed.into_package();
         committed.write_to(&mut managed_output)?;
         committed.document_snapshot()
     });
@@ -1731,6 +1747,7 @@ fn protected_track_revisions_with_ignorable_extension_remains_refused() {
     let result = unmanaged_package
         .apply(commit.patch())
         .and_then(|committed| {
+            let committed = committed.into_package();
             committed.write_to(&mut unmanaged_output)?;
             committed.document_snapshot()
         });
@@ -1792,6 +1809,7 @@ fn changed_publication_rejects_unresolved_ignorable_and_active_mce_controls() {
         let commit = edit.commit().unwrap();
         let mut output = Vec::new();
         let result = package.apply(commit.patch()).and_then(|committed| {
+            let committed = committed.into_package();
             committed.write_to(&mut output)?;
             committed.document_snapshot()
         });
@@ -1818,6 +1836,7 @@ fn managed_changed_publication_rejects_mixed_settings_dialect_before_output() {
     let commit = edit.commit().unwrap();
     let mut output = Vec::new();
     let result = package.apply(commit.patch()).and_then(|committed| {
+        let committed = committed.into_package();
         committed.write_to(&mut output)?;
         committed.document_snapshot()
     });
@@ -1857,6 +1876,7 @@ fn managed_changed_publication_rejects_settings_mce_and_dtd_before_output() {
         let commit = edit.commit().unwrap();
         let mut output = Vec::new();
         let result = package.apply(commit.patch()).and_then(|committed| {
+            let committed = committed.into_package();
             committed.write_to(&mut output)?;
             committed.document_snapshot()
         });
@@ -1897,6 +1917,7 @@ fn managed_changed_publication_rejects_settings_mce_and_dtd_before_output() {
         let commit = edit.commit().unwrap();
         let mut output = Vec::new();
         let result = package.apply(commit.patch()).and_then(|committed| {
+            let committed = committed.into_package();
             committed.write_to(&mut output)?;
             committed.document_snapshot()
         });
@@ -1933,6 +1954,7 @@ fn managed_source_document_admits_word_markup_compatibility() {
     unmanaged
         .apply(commit.patch())
         .and_then(|committed| {
+            let committed = committed.into_package();
             committed.write_to(&mut expected)?;
             committed.document_snapshot()
         })
@@ -1950,6 +1972,7 @@ fn managed_source_document_admits_word_markup_compatibility() {
     package
         .apply(commit.patch())
         .and_then(|committed| {
+            let committed = committed.into_package();
             committed.write_to(&mut output)?;
             committed.document_snapshot()
         })
@@ -2182,6 +2205,7 @@ fn managed_source_change_refuses_publication_before_sink_output() {
 
     let mut output = Vec::new();
     let result = package.apply(commit.patch()).and_then(|committed| {
+        let committed = committed.into_package();
         committed.write_to(&mut output)?;
         committed.document_snapshot()
     });
@@ -2214,6 +2238,7 @@ fn managed_cancellation_refuses_edit_and_publication_without_output() {
     cancellation_source.cancel();
     let mut output = Vec::new();
     let result = package.apply(commit.patch()).and_then(|committed| {
+        let committed = committed.into_package();
         committed.write_to(&mut output)?;
         committed.document_snapshot()
     });
@@ -2295,6 +2320,7 @@ fn managed_publication_reports_a_partial_sink_failure() {
         limit: 1,
     };
     let result = package.apply(commit.patch()).and_then(|committed| {
+        let committed = committed.into_package();
         committed.write_to(&mut sink)?;
         committed.document_snapshot()
     });
@@ -2341,6 +2367,7 @@ fn managed_changed_publication_preserves_readback_and_releases_snapshot_budget()
     let published = package
         .apply(commit.patch())
         .and_then(|committed| {
+            let committed = committed.into_package();
             committed.write_to(&mut output)?;
             committed.document_snapshot()
         })
@@ -2384,6 +2411,7 @@ fn managed_foreign_equal_main_xml_refuses_commit_before_output() {
     let (second_budget, _second_cancellation, second_package) = managed(second, 1 << 20);
     let mut output = Vec::new();
     let result = second_package.apply(commit.patch()).and_then(|committed| {
+        let committed = committed.into_package();
         committed.write_to(&mut output)?;
         committed.document_snapshot()
     });
@@ -2418,6 +2446,7 @@ fn managed_source_change_during_current_part_read_refuses_before_output() {
 
     let mut output = Vec::new();
     let result = package.apply(commit.patch()).and_then(|committed| {
+        let committed = committed.into_package();
         committed.write_to(&mut output)?;
         committed.document_snapshot()
     });
@@ -2451,6 +2480,7 @@ fn managed_cancellation_during_current_part_read_refuses_before_output() {
 
     let mut output = Vec::new();
     let result = package.apply(commit.patch()).and_then(|committed| {
+        let committed = committed.into_package();
         committed.write_to(&mut output)?;
         committed.document_snapshot()
     });
@@ -2483,6 +2513,7 @@ fn shared_package_reservations_live_until_the_last_source_owner_drops() {
     let published = shared
         .apply(commit.patch())
         .and_then(|committed| {
+            let committed = committed.into_package();
             committed.write_to(&mut output)?;
             committed.document_snapshot()
         })

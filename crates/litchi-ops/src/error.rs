@@ -1309,7 +1309,7 @@ impl Classify for litchi_docx::document::Error {
             Self::PatchConflict => Class::of(Code::InvalidInput),
             Self::SemanticPrecondition => Class::of(Code::InvalidArgument),
             Self::Durable(_) | Self::Composition(_) | Self::InvalidDurable(_) => {
-                Class::of(Code::InvalidArgument)
+                Class::of(Code::InvalidInput)
             },
             _ => Class::of(Code::CorruptFile),
         }
@@ -1399,7 +1399,9 @@ impl Classify for litchi_pptx::Error {
             },
             Self::SlideCopyPlan { kind, .. } => kind.kind().classify(),
             Self::ShapeTransfer { kind, .. } => kind.kind().classify(),
-            Self::Allocation { .. } | Self::Internal { .. } => Class::of(Code::InternalError),
+            Self::Allocation { .. }
+            | Self::CapacityOverflow { .. }
+            | Self::Internal { .. } => Class::of(Code::InternalError),
             _ => Class::of(Code::CorruptFile),
         }
     }

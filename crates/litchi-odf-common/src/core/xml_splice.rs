@@ -153,6 +153,16 @@ impl XmlSourcePart {
 }
 
 impl AuthoredXmlFragment {
+    /// Construct an empty audited fragment for a bounded source replacement.
+    ///
+    /// Deletion plans use this marker together with a non-empty source range;
+    /// it never represents an authored XML node and therefore cannot be used
+    /// to bypass the markup audit.
+    #[doc(hidden)]
+    pub const fn empty() -> Self {
+        Self { bytes: Vec::new() }
+    }
+
     /// Return the audited authored bytes.
     ///
     /// The returned slice is the exact compact fragment supplied to the

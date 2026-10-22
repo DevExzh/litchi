@@ -1,0 +1,221 @@
+{
+  "record": "0362pa",
+  "returned_candidate": "1c7eb1e84c",
+  "candidate_rtf_source_sha256": "c3fb43adb9da9b38d4c036c2f9f64ab8ac6da589feb56de184b9ba0e4252e08c",
+  "regression_patch": {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/diagnostics-regression.patch",
+    "bytes": 2151,
+    "sha256": "e8c8337f1660459b24ea222d631df364283e3065ca849a7a4a2053d556c0aaf8"
+  },
+  "regression_attempts": [
+    {
+      "attempt": "v1",
+      "checks": [
+        {
+          "command": [
+            "cargo",
+            "test",
+            "--offline",
+            "--locked",
+            "-p",
+            "litchi-rtf",
+            "--test",
+            "logical_tail_append",
+            "replay_commit_diagnostics_measure_forward_inverse_and_noop_output"
+          ],
+          "exit": 101,
+          "seconds": 0.15971011796500534,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/regression-v1/check-0.log",
+          "bytes": 276,
+          "sha256": "d87f847102ad06f8bd586b06457d5a500770488479de9c805352a179f9426c2a"
+        }
+      ]
+    },
+    {
+      "attempt": "v2",
+      "checks": [
+        {
+          "command": [
+            "cargo",
+            "test",
+            "--offline",
+            "-p",
+            "litchi-rtf",
+            "--test",
+            "logical_tail_append",
+            "replay_commit_diagnostics_measure_forward_inverse_and_noop_output"
+          ],
+          "exit": 101,
+          "seconds": 13.52189884800464,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/regression-v2/check-0.log",
+          "bytes": 1487,
+          "sha256": "59850d5240667803e66ff03cb8037a5b2b8abf58734d0960d93bafd5d8e9c6bf"
+        }
+      ]
+    },
+    {
+      "attempt": "v3",
+      "checks": [
+        {
+          "command": [
+            "cargo",
+            "test",
+            "--offline",
+            "--locked",
+            "-p",
+            "litchi-rtf",
+            "--test",
+            "logical_tail_append",
+            "replay_commit_diagnostics_measure_forward_inverse_and_noop_output"
+          ],
+          "exit": 0,
+          "seconds": 9.445441695977934,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/regression-v3/check-0.log",
+          "bytes": 523,
+          "sha256": "2dc96e8468c954b3ee8ddb89aed58a1d5ee7a44e9f3c1174964f9055dbe610b5"
+        }
+      ]
+    }
+  ],
+  "fixed_source": {
+    "path": "/home/zhuhe/code/litchi-worktrees/uo2-coordinator-metadata-integration/crates/litchi-rtf/src/tail_append.rs",
+    "bytes": 180345,
+    "sha256": "02ab298d8764a8de1231dcd982d72aa906843859ab6ff53e11d52dd21a94097b"
+  },
+  "test_source": {
+    "path": "/home/zhuhe/code/litchi-worktrees/uo2-coordinator-metadata-integration/crates/litchi-rtf/tests/logical_tail_append.rs",
+    "bytes": 41387,
+    "sha256": "6df712046b04efdb63c88c2b0f0f750bef1c0486a88c8feeb47653206c262664"
+  },
+  "other_integration_returns": [
+    {
+      "command": [
+        "cargo",
+        "clippy",
+        "--offline",
+        "--locked",
+        "-p",
+        "litchi-cfb",
+        "-p",
+        "litchi-odf-common",
+        "-p",
+        "litchi-odp",
+        "-p",
+        "litchi-pptx",
+        "-p",
+        "litchi-docx",
+        "-p",
+        "litchi-rtf",
+        "-p",
+        "litchi-xls",
+        "-p",
+        "litchi-ops",
+        "-p",
+        "litchi-py",
+        "--all-targets",
+        "--all-features",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 101,
+      "seconds": 66.97975588298868,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/validation-v1/check-11.log",
+      "bytes": 4889,
+      "sha256": "61abc0c8f8b7b2c13334a4e3facc9cb7cefa32ad2867131994deb5a9d62a801e"
+    },
+    {
+      "command": [
+        "cargo",
+        "clippy",
+        "--offline",
+        "--locked",
+        "-p",
+        "litchi-cfb",
+        "-p",
+        "litchi-odf-common",
+        "-p",
+        "litchi-odp",
+        "-p",
+        "litchi-pptx",
+        "-p",
+        "litchi-docx",
+        "-p",
+        "litchi-rtf",
+        "-p",
+        "litchi-xls",
+        "-p",
+        "litchi-ops",
+        "-p",
+        "litchi-py",
+        "--all-targets",
+        "--all-features",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 101,
+      "seconds": 271.1971228600014,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/validation-v2/check-6.log",
+      "bytes": 9042,
+      "sha256": "efe8b2ffff477fee24765c6631bdb3a108bd5eb04c154dc1ea56d2ceda835fa8"
+    }
+  ],
+  "final_clippy_fmt": [
+    {
+      "command": [
+        "cargo",
+        "clippy",
+        "--offline",
+        "--locked",
+        "-p",
+        "litchi-cfb",
+        "-p",
+        "litchi-odf-common",
+        "-p",
+        "litchi-odp",
+        "-p",
+        "litchi-pptx",
+        "-p",
+        "litchi-docx",
+        "-p",
+        "litchi-rtf",
+        "-p",
+        "litchi-xls",
+        "-p",
+        "litchi-ops",
+        "-p",
+        "litchi-py",
+        "--all-targets",
+        "--all-features",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0,
+      "seconds": 152.89832729904447,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/validation-v3/check-0.log",
+      "bytes": 1055,
+      "sha256": "0c7e21b1617be733949d6e9ac50d065197ea1109e6503ac922adfea1371391f7"
+    },
+    {
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--",
+        "--check"
+      ],
+      "exit": 0,
+      "seconds": 30.684799859998748,
+      "log": "/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/validation-v3/check-1.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "notes": [
+    "v1 stopped at the ignored workspace lock: incoming File replay adds sha2 to the ops dependency list. v2 refreshed that one lock entry offline and reproduced the diagnostic failure. v3 passes locked after the repair.",
+    "Nine-package Clippy then exposed an XLS io_other_error lint and three missed ops test consumers. The integration repairs them and retains both failed and successful runs.",
+    "Full merged tests and native performance qualification are separate obligations; no performance acceptance is claimed."
+  ]
+}

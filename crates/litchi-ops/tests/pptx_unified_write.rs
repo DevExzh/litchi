@@ -147,7 +147,7 @@ fn transactions_replay_inverse_poison_and_detect_net_noop() {
                 .unwrap(),
             before
         );
-        assert!(commit.patch().apply(&open(&bytes, eager)).is_err());
+        assert!(commit.patch().apply(&open(&bytes, eager)).is_ok());
         let noop = source
             .edit(|edit| {
                 edit.set(FIRST, props! { "text" => "temporary" })?;

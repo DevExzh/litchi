@@ -139,7 +139,12 @@ fn source_insertion_places_the_new_slide_in_a_section() {
     let mut package = Package::from_bytes(&updated.to_bytes().unwrap()).unwrap();
     assert_eq!(membership(&mut package), [vec![0, 1], vec![2, 3]]);
     assert_eq!(
-        updated.apply(&patch.inverse()).unwrap().to_bytes().unwrap(),
+        updated
+            .apply(&patch.inverse())
+            .unwrap()
+            .into_package()
+            .to_bytes()
+            .unwrap(),
         source.to_bytes().unwrap()
     );
 }

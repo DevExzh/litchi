@@ -163,13 +163,15 @@ fn malformed_unselected_transform_stays_opaque_during_geometry_and_addition() {
         source
             .apply(&transported(&patch))
             .unwrap()
+            .into_package()
             .to_bytes()
             .unwrap(),
         after_bytes
     );
     let restored = open(&after_bytes)
         .apply(&transported(&patch.inverse()))
-        .unwrap();
+        .unwrap()
+        .into_package();
     assert_eq!(members(&restored.to_bytes().unwrap()), members(&before));
 }
 
@@ -199,12 +201,15 @@ fn source_shape_properties_compose_text_and_bounds_for_both_conformances() {
         assert_eq!(values(&after, 0)[1].1, Some((300, 400, 900, 1_000)));
         assert_eq!(source.to_bytes().unwrap(), before);
 
-        let replayed = source.apply(&transported(&patch)).unwrap();
+        let replayed = source.apply(&transported(&patch)).unwrap().into_package();
         assert_eq!(replayed.to_bytes().unwrap(), after.to_bytes().unwrap());
         assert!(patch.to_bytes().unwrap().starts_with(b"LPSX0002"));
 
         let reopened = open(&after.to_bytes().unwrap());
-        let restored = reopened.apply(&transported(&patch.inverse())).unwrap();
+        let restored = reopened
+            .apply(&transported(&patch.inverse()))
+            .unwrap()
+            .into_package();
         assert_eq!(members(&restored.to_bytes().unwrap()), members(&before));
         for (name, payload) in members(&before) {
             if name != "ppt/slides/slide1.xml" {
@@ -274,13 +279,15 @@ fn appended_text_box_then_geometry_stays_in_the_v2_edit_surface() {
         source
             .apply(&transported(&patch))
             .unwrap()
+            .into_package()
             .to_bytes()
             .unwrap(),
         after.to_bytes().unwrap()
     );
     let restored = open(&after.to_bytes().unwrap())
         .apply(&transported(&patch.inverse()))
-        .unwrap();
+        .unwrap()
+        .into_package();
     assert_eq!(members(&restored.to_bytes().unwrap()), members(&before));
 }
 
@@ -390,6 +397,7 @@ fn inserted_slide_text_box_and_properties_replay_as_one_v3_revision() {
         source
             .apply(&transported(&patch))
             .unwrap()
+            .into_package()
             .to_bytes()
             .unwrap(),
         after.to_bytes().unwrap()
@@ -403,7 +411,8 @@ fn inserted_slide_text_box_and_properties_replay_as_one_v3_revision() {
     );
     let restored = open(&after.to_bytes().unwrap())
         .apply(&transported(&patch.inverse()))
-        .unwrap();
+        .unwrap()
+        .into_package();
     assert_eq!(members(&restored.to_bytes().unwrap()), members(&before));
 }
 

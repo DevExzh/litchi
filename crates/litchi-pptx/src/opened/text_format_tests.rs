@@ -235,7 +235,7 @@ fn source_owner_matches_eager_owner() -> Result<()> {
     let reopened = Package::from_bytes(&after.to_bytes()?)?;
     assert_eq!(slide_xml(&reopened)?, slide_xml(&eager)?);
     assert_eq!(
-        after.apply(&patch.inverse())?.to_bytes()?,
+        after.apply(&patch.inverse())?.into_package().to_bytes()?,
         source.to_bytes()?
     );
     Ok(())
@@ -340,7 +340,7 @@ fn source_owner_writes_shape_properties_like_the_eager_owner() -> Result<()> {
     let reopened = Package::from_bytes(&after.to_bytes()?)?;
     assert_eq!(slide_xml(&reopened)?, slide_xml(&eager)?);
     assert_eq!(
-        after.apply(&patch.inverse())?.to_bytes()?,
+        after.apply(&patch.inverse())?.into_package().to_bytes()?,
         source.to_bytes()?
     );
     Ok(())
@@ -530,7 +530,7 @@ fn notes_pages_take_run_edits() -> Result<()> {
     };
     assert_eq!(notes_text(&after)?.as_deref(), Some("Speaker final"));
     assert_eq!(
-        notes_text(&after.apply(&patch.inverse())?)?.as_deref(),
+        notes_text(&after.apply(&patch.inverse())?.into_package())?.as_deref(),
         Some("Speaker draft")
     );
     // A slide without notes refuses.

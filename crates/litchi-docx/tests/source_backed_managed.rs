@@ -512,6 +512,7 @@ fn managed_main_document_edits_retain_source_and_candidate_reservations() {
     package
         .apply(commit.patch())
         .and_then(|committed| {
+            let committed = committed.into_package();
             committed.write_to(&mut output)?;
             committed.document_snapshot()
         })

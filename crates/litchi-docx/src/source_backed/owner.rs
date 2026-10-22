@@ -121,7 +121,7 @@ impl Package {
     /// # Errors
     /// Refuses stale patches, protection/tracked revisions, signatures, unsupported
     /// source provenance, transfers, source changes and resource failures.
-    pub fn apply(&self, patch: &crate::document::Patch) -> TransactionResult<Self> {
+    fn apply_package(&self, patch: &crate::document::Patch) -> TransactionResult<Self> {
         self.check_source()?;
         // A package writing exactly the commit's before artifact (a share of
         // it, or a reopened copy of its bytes) gets the commit's exact after
@@ -200,11 +200,11 @@ impl Package {
     ///
     /// # Errors
     /// Returns the failures of [`Self::apply`].
-    pub fn apply_document(
+    pub fn apply(
         &self,
         patch: &crate::document::Patch,
     ) -> TransactionResult<crate::document::Commit<Self>> {
-        let package = self.apply(patch)?;
+        let package = self.apply_package(patch)?;
         let diagnostics =
             crate::document::Diagnostics::new(patch.operations().len(), !patch.is_noop());
         let patch = patch.clone().with_restore(self.clone(), package.clone());

@@ -192,9 +192,9 @@ impl Diagnostics {
 }
 
 /// An exact, reversible source-backed tail-append patch: the pair of
-/// packages it was committed between. It replays onto a share of the
-/// package it was committed on, its inverse onto a share of the commit's
-/// package, and refuses any other package.
+/// packages it was committed between. It replays onto the recorded source
+/// content, including an independently opened equal-content package, and its
+/// inverse onto the recorded target content. Other content is refused.
 #[derive(Clone)]
 pub struct Patch {
     before: Package,
@@ -251,20 +251,42 @@ impl Package {
         Ok(Edit { base, inner })
     }
 
-    /// Replay a source-backed tail-append patch onto the exact package it
-    /// was made from.
+    /// Replay a source-backed tail-append patch onto the recorded source
+    /// content, including an independently opened equal-content package.
     ///
     /// # Errors
     ///
     /// Returns [`Error::Plan`] with a conflict for another package.
     pub fn apply_tail_append(&self, patch: &Patch) -> Result<Commit, Error> {
-        if !self.same_package(&patch.before) {
+        if self.same_package(&patch.before) {
+            return Ok(Commit::new(
+                patch.after.clone(),
+                patch.clone(),
+                patch.diagnostics.clone(),
+            ));
+        }
+
+        let recipient = self.replay_digest()?;
+        let recorded = patch.before.replay_digest()?;
+        if recipient != recorded {
             return Err(Error::Plan(crate::tail_append::Error::PatchConflict));
         }
-        Ok(Commit::new(
-            patch.after.clone(),
-            patch.clone(),
-            patch.diagnostics.clone(),
-        ))
+        if !patch.diagnostics.changed() {
+            return Ok(Commit::new(
+                self.clone(),
+                patch.clone(),
+                patch.diagnostics.clone(),
+            ));
+        }
+
+        let (plan, inverse) = if let Some(plan) = patch.after.pending_plan() {
+            (plan, false)
+        } else if let Some(plan) = patch.before.pending_plan() {
+            (plan, true)
+        } else {
+            return Err(Error::Plan(crate::tail_append::Error::PatchConflict));
+        };
+        let after = self.rebase_plan(plan, inverse)?;
+        Ok(Commit::new(after, patch.clone(), patch.diagnostics.clone()))
     }
 }

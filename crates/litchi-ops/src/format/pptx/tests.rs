@@ -542,7 +542,7 @@ fn shared_source_promotion_retains_one_lineage_and_live_readers() {
     let mut edit = package.edit().unwrap();
     edit.set_shape_text(0, shape, "promoted edit").unwrap();
     let commit = edit.commit().unwrap();
-    let replayed = repeated.apply(commit.patch()).unwrap();
+    let replayed = repeated.apply(commit.patch()).unwrap().into_package();
     assert_eq!(
         replayed.to_bytes().unwrap(),
         commit.package().to_bytes().unwrap()
@@ -928,7 +928,10 @@ fn reopened_structural_inverse_drives_effective_catalog_and_related_reads() {
     let (removed, patch) = edit.commit().unwrap().into_parts();
     let inverse = pptx::source::Patch::from_bytes(&patch.inverse().to_bytes().unwrap()).unwrap();
     let reopened = open_source_package(removed.to_bytes().unwrap());
-    let restored_native = source_owner(&reopened).apply(&inverse).unwrap();
+    let restored_native = source_owner(&reopened)
+        .apply(&inverse)
+        .unwrap()
+        .into_package();
     assert!(restored_native.source_position(Position::new(1)).is_err());
     let restored = reopened.adopt_source(restored_native).unwrap();
 

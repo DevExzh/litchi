@@ -519,8 +519,9 @@ fn build_preflight(fixture: &Fixture, mode: EditMode) -> AnyResult<Preflight> {
     let inverse_ok = inverse.xml_bytes() == patch.source().xml_bytes();
     let mut expected_output = Vec::new();
     package.apply(commit.patch()).and_then(|committed| {
-        committed.write_to(&mut expected_output)?;
-        committed.document_snapshot()
+        let package = committed.into_package();
+        package.write_to(&mut expected_output)?;
+        package.document_snapshot()
     })?;
     let expected_output_sha256 = sha256_hex(&expected_output);
     if !verify_output(fixture, &expected_output, &fixture.replacement_text)? {
@@ -565,8 +566,9 @@ fn build_managed_preflight(
     drop(inverse);
     let mut output = Vec::with_capacity(expected_output.len());
     let published = package.apply(commit.patch()).and_then(|committed| {
-        committed.write_to(&mut output)?;
-        committed.document_snapshot()
+        let package = committed.into_package();
+        package.write_to(&mut output)?;
+        package.document_snapshot()
     })?;
     drop(published);
     drop(commit);
@@ -678,8 +680,9 @@ fn run_sample(
 
     let phase_started = Instant::now();
     let published = package.apply(commit.patch()).and_then(|committed| {
-        committed.write_to(&mut output)?;
-        committed.document_snapshot()
+        let package = committed.into_package();
+        package.write_to(&mut output)?;
+        package.document_snapshot()
     })?;
     drop(published);
     let publish_ns = elapsed_ns(phase_started)?;

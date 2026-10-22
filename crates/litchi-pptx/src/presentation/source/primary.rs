@@ -22,6 +22,7 @@ use std::sync::Arc;
 use litchi_core::{Position, ReadAt, Reservation};
 use litchi_opc::constants::relationship_type as rt;
 use litchi_opc::{PackURI, PartData, TargetMode};
+use sha2::{Digest, Sha256};
 
 use super::{
     MAX_SOURCE_BACKED_SLIDE_BATCH, SourceBackedPresentation, SourceBackedPresentationEditor,
@@ -74,8 +75,8 @@ impl RootPayload {
 /// updated.save("updated.pptx")?;
 /// let transported = Patch::from_bytes(&patch.to_bytes()?)?;
 /// let reopened = Package::open("deck.pptx")?;
-/// let replayed = reopened.apply(&transported)?;
-/// let restored = replayed.apply(&transported.inverse())?;
+/// let replayed = reopened.apply(&transported)?.into_package();
+/// let restored = replayed.apply(&transported.inverse())?.into_package();
 /// assert_eq!(restored.to_bytes()?, source.to_bytes()?);
 /// # Ok(())
 /// # }
@@ -319,34 +320,94 @@ impl Package {
         Ok(equal)
     }
 
+    /// Compare the bytes a replay would publish without requiring the two
+    /// packages to share a source lineage.
+    ///
+    /// This is deliberately private to source-backed replay.  The public
+    /// [`Self::same_content`] contract remains a same-owner semantic
+    /// comparison, while a replay recipient may be an independent open of
+    /// the exact artifact recorded by a patch.  Pristine packages use the
+    /// retained source artifact fingerprint directly; an edited package is
+    /// streamed through a bounded hash sink, so this proof never constructs
+    /// a second full output buffer.
+    pub(super) fn same_replay_content(&self, other: &Self) -> Result<bool> {
+        Ok(self.replay_content_fingerprint()? == other.replay_content_fingerprint()?)
+    }
+
+    fn replay_content_fingerprint(&self) -> Result<(u64, [u8; 32])> {
+        let effective = self.effective()?;
+        if !std::ptr::eq(effective, self) {
+            return effective.replay_content_fingerprint();
+        }
+        self.check()?;
+        if self.is_pristine() {
+            let artifact = self.owner.package.source_artifact();
+            return Ok((
+                artifact.len(),
+                artifact.fingerprint().map_err(Error::from)?.into_sha256(),
+            ));
+        }
+        let mut sink = ReplayHashWriter {
+            digest: Sha256::new(),
+            bytes: 0,
+        };
+        self.write_to(&mut sink)
+            .map_err(map_replay_hash_write_error)?;
+        Ok((sink.bytes, sink.digest.finalize().into()))
+    }
+
+    /// Rebase a replayed artifact onto this package's source policy.
+    ///
+    /// The artifact remains deferred and is streamed only when the recipient
+    /// is written.  Both the recipient source and the recorded artifact source
+    /// are checked before and after publication, while the deferred options
+    /// and execution context come from the recipient package.
+    pub(super) fn deferred_replay_from(&self, artifact: &Self) -> Result<Self> {
+        let recipient = self.effective()?.clone();
+        let check_recipient = recipient.clone();
+        let recorded = artifact.clone();
+        Ok(recipient.deferred(move |writer| {
+            check_recipient.check()?;
+            let result = recorded.write_to(writer);
+            check_recipient.check()?;
+            result
+        }))
+    }
+
     /// Replay an exact-source patch without changing this package.
-    pub fn apply(&self, patch: &Patch) -> Result<Self> {
+    pub fn apply(&self, patch: &Patch) -> Result<Commit> {
         let this = self.effective()?;
         if !std::ptr::eq(this, self) {
             return this.apply(patch);
         }
         self.check()?;
-        let (source, before_root, before_order, after_root, after_order, changes) = match &patch
-            .data
-        {
-            PatchData::Local {
-                source,
-                before_root,
-                before_order,
-                after_root,
-                after_order,
-                changes,
-            } => (
-                source,
-                before_root,
-                before_order,
-                after_root,
-                after_order,
-                changes,
-            ),
-            PatchData::Durable(data) => return durable::apply(self, data, patch.shape_removals),
-            PatchData::Topology(data) => return data.apply(self, patch.shape_removals),
-        };
+        let (source, before_root, before_order, after_root, after_order, changes) =
+            match &patch.data {
+                PatchData::Local {
+                    source,
+                    before_root,
+                    before_order,
+                    after_root,
+                    after_order,
+                    changes,
+                } => (
+                    source,
+                    before_root,
+                    before_order,
+                    after_root,
+                    after_order,
+                    changes,
+                ),
+                PatchData::Durable(data) => {
+                    return durable::apply(self, data, patch.shape_removals)
+                        .map(|package| commit_of(package, patch.clone()));
+                },
+                PatchData::Topology(data) => {
+                    return data
+                        .apply(self, patch.shape_removals)
+                        .map(|package| commit_of(package, patch.clone()));
+                },
+            };
         source.check()?;
         if !self.same_source_owner(source)
             || self.root.as_bytes() != before_root.as_bytes()
@@ -369,7 +430,7 @@ impl Package {
             candidate = candidate.with_snapshot(after)?;
         }
         candidate.check()?;
-        Ok(candidate)
+        Ok(commit_of(candidate, patch.clone()))
     }
 
     /// Serialize with exact no-op and raw-copy preservation of untouched members.
@@ -762,6 +823,130 @@ impl Package {
             None => RootPayload::Edited(xml),
         };
         self.with_order(root, ordered)
+    }
+}
+
+struct ReplayHashWriter {
+    digest: Sha256,
+    bytes: u64,
+}
+
+fn map_replay_hash_write_error(error: Error) -> Error {
+    match error {
+        Error::Io(error) if is_replay_hash_error(&error) => Error::CapacityOverflow {
+            resource: "replay content fingerprint",
+        },
+        Error::Opc(litchi_opc::OpcError::IoError(error)) if is_replay_hash_error(&error) => {
+            Error::CapacityOverflow {
+                resource: "replay content fingerprint",
+            }
+        },
+        error => error,
+    }
+}
+
+fn is_replay_hash_error(error: &std::io::Error) -> bool {
+    error
+        .get_ref()
+        .and_then(|source| source.downcast_ref::<ReplayHashError>())
+        .is_some()
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ReplayHashError {
+    InputLengthExceedsU64,
+    LengthOverflow,
+}
+
+impl std::fmt::Display for ReplayHashError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(match self {
+            Self::InputLengthExceedsU64 => "replay input length exceeds u64",
+            Self::LengthOverflow => "replay content length overflows u64",
+        })
+    }
+}
+
+impl std::error::Error for ReplayHashError {}
+
+impl Write for ReplayHashWriter {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        let amount = u64::try_from(bytes.len())
+            .map_err(|_| std::io::Error::other(ReplayHashError::InputLengthExceedsU64))?;
+        let total = self
+            .bytes
+            .checked_add(amount)
+            .ok_or_else(|| std::io::Error::other(ReplayHashError::LengthOverflow))?;
+        self.digest.update(bytes);
+        self.bytes = total;
+        Ok(bytes.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod replay_hash_tests {
+    use super::{ReplayHashError, ReplayHashWriter, map_replay_hash_write_error};
+    use crate::Error;
+    use sha2::{Digest, Sha256};
+    use std::io::Write;
+
+    #[test]
+    fn replay_hash_writer_rejects_length_overflow() {
+        let mut writer = ReplayHashWriter {
+            digest: Sha256::new(),
+            bytes: u64::MAX,
+        };
+        let error = writer
+            .write_all(b"x")
+            .expect_err("a length past u64::MAX must be refused");
+        assert_eq!(error.kind(), std::io::ErrorKind::Other);
+        assert!(matches!(
+            error
+                .get_ref()
+                .and_then(|source| source.downcast_ref::<ReplayHashError>()),
+            Some(ReplayHashError::LengthOverflow)
+        ));
+        assert_eq!(writer.bytes, u64::MAX);
+        assert_eq!(writer.digest.clone().finalize(), Sha256::digest([]));
+    }
+
+    #[test]
+    fn replay_hash_boundary_maps_wrapped_capacity_error() {
+        let source = std::io::Error::other(ReplayHashError::LengthOverflow);
+        let error = map_replay_hash_write_error(Error::Opc(litchi_opc::OpcError::IoError(source)));
+        assert!(matches!(
+            error,
+            Error::CapacityOverflow {
+                resource: "replay content fingerprint"
+            }
+        ));
+    }
+
+    #[test]
+    fn replay_hash_boundary_maps_direct_capacity_error() {
+        let source = std::io::Error::other(ReplayHashError::InputLengthExceedsU64);
+        let error = map_replay_hash_write_error(Error::Io(source));
+        assert!(matches!(
+            error,
+            Error::CapacityOverflow {
+                resource: "replay content fingerprint"
+            }
+        ));
+    }
+
+    #[test]
+    fn replay_hash_boundary_preserves_destination_io() {
+        let source = std::io::Error::new(std::io::ErrorKind::BrokenPipe, "sink");
+        let error = map_replay_hash_write_error(Error::Opc(litchi_opc::OpcError::IoError(source)));
+        assert!(matches!(
+            error,
+            Error::Opc(litchi_opc::OpcError::IoError(error))
+                if error.kind() == std::io::ErrorKind::BrokenPipe
+        ));
     }
 }
 
@@ -1341,7 +1526,10 @@ impl Edit {
     /// edit.remove_slide(Position::new(0))?;
     /// let (updated, patch) = edit.commit()?.into_parts();
     /// assert_eq!(updated.presentation()?.slide_count()?, 1);
-    /// assert_eq!(updated.apply(&patch.inverse())?.to_bytes()?, source.to_bytes()?);
+    /// assert_eq!(
+    ///     updated.apply(&patch.inverse())?.into_package().to_bytes()?,
+    ///     source.to_bytes()?
+    /// );
     /// # Ok(())
     /// # }
     /// ```

@@ -56,16 +56,33 @@ fn an_ole_frame_under_markup_compatibility_is_removed_on_the_source_bytes() {
     // The local inverse, the transported forward patch and the durable
     // inverse after reopening all restore exactly.
     assert_eq!(
-        updated.apply(&patch.inverse()).unwrap().to_bytes().unwrap(),
+        updated
+            .apply(&patch.inverse())
+            .unwrap()
+            .into_package()
+            .to_bytes()
+            .unwrap(),
         source.to_bytes().unwrap()
     );
     let forward = Patch::from_bytes(&patch.to_bytes().unwrap()).unwrap();
     assert_eq!(
-        slide(&open(OLE).apply(&forward).unwrap().to_bytes().unwrap()),
+        slide(
+            &open(OLE)
+                .apply(&forward)
+                .unwrap()
+                .into_package()
+                .to_bytes()
+                .unwrap()
+        ),
         expected
     );
     let inverse = Patch::from_bytes(&patch.inverse().to_bytes().unwrap()).unwrap();
-    let restored = open(&output).apply(&inverse).unwrap().to_bytes().unwrap();
+    let restored = open(&output)
+        .apply(&inverse)
+        .unwrap()
+        .into_package()
+        .to_bytes()
+        .unwrap();
     assert_eq!(slide(&restored), before);
 }
 
@@ -96,7 +113,12 @@ fn a_plain_shape_beside_the_frame_is_removed_too() {
     assert!(output.contains("mc:AlternateContent"));
     assert!(!output.contains("Rectangle 4"));
     assert_eq!(
-        updated.apply(&patch.inverse()).unwrap().to_bytes().unwrap(),
+        updated
+            .apply(&patch.inverse())
+            .unwrap()
+            .into_package()
+            .to_bytes()
+            .unwrap(),
         source.to_bytes().unwrap()
     );
 }

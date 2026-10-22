@@ -911,8 +911,11 @@ fn run_case_with_opener(
     match case {
         Case::OpenIdentify => {
             if identify_facade {
-                let format = litchi::detect_file_format_from_bytes(&corpus.bytes)
-                    .ok_or_else(|| "facade could not identify the XLSB fixture".to_string())?;
+                let format = litchi::detect_file_format_from_bytes(
+                    &corpus.bytes,
+                    &litchi::common::SourceLimits::default(),
+                )
+                .ok_or_else(|| "facade could not identify the XLSB fixture".to_string())?;
                 if format != FileFormat::Xlsb {
                     return Err(format!("facade identified fixture as {format:?}, not XLSB").into());
                 }

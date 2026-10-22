@@ -489,7 +489,172 @@
         "litchi_docx::Package",
         "litchi_docx::source_backed::Package"
       ],
-      "family_methods": true
+      "family_methods": true,
+      "result_methods": [
+        {
+          "method": "litchi_docx::Package::apply",
+          "ok": "litchi_docx::document::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_alt_chunks",
+          "ok": "litchi_docx::alt::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_attached_template",
+          "ok": "litchi_docx::attached_template::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_bibliography",
+          "ok": "litchi_docx::bibliography::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_chart",
+          "ok": "litchi_docx::chart::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_conflicts",
+          "ok": "litchi_docx::revision::conflict::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_content_controls",
+          "ok": "litchi_docx::content_control::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_custom_xml",
+          "ok": "litchi_docx::custom_xml::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_document_variables",
+          "ok": "litchi_docx::document_variables::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_durable_document",
+          "ok": "litchi_docx::document::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_fonts",
+          "ok": "litchi_docx::font::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_glossary",
+          "ok": "litchi_docx::glossary::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_ink",
+          "ok": "litchi_docx::ink::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_mail_merge",
+          "ok": "litchi_docx::mail_merge::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_metadata",
+          "ok": "litchi_docx::metadata::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_numbering",
+          "ok": "litchi_docx::numbering::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_opc",
+          "ok": "litchi_docx::opc::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_ribbon",
+          "ok": "litchi_docx::ribbon::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_settings_extensions",
+          "ok": "litchi_docx::settings::extensions::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_stories",
+          "ok": "litchi_docx::package::story::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_styles_with_effects",
+          "ok": "litchi_docx::styles::effects::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_task_panes",
+          "ok": "litchi_docx::task_panes::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_tracked_revisions",
+          "ok": "litchi_docx::revision::authoring::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_web",
+          "ok": "litchi_docx::web::Commit"
+        },
+        {
+          "method": "litchi_docx::source_backed::Package::apply",
+          "ok": "litchi_docx::document::Commit",
+          "type_args": [
+            "litchi_docx::source_backed::Package"
+          ]
+        },
+        {
+          "method": "litchi_docx::source_backed::Package::apply_alt_chunk_payload",
+          "ok": "litchi_docx::source_backed::alt_chunk_payload::Commit"
+        },
+        {
+          "method": "litchi_docx::source_backed::Package::apply_document_variables",
+          "ok": "litchi_docx::source_backed::document_variables::Commit"
+        },
+        {
+          "method": "litchi_docx::source_backed::Package::apply_external_hyperlink_detachment",
+          "ok": "litchi_docx::source_backed::hyperlink_detachment::Commit"
+        },
+        {
+          "method": "litchi_docx::source_backed::Package::apply_external_hyperlink_redaction",
+          "ok": "litchi_docx::source_backed::hyperlink_redaction::Commit"
+        },
+        {
+          "method": "litchi_docx::source_backed::Package::apply_glossary_text_batch",
+          "ok": "litchi_docx::source_backed::glossary_text::Commit"
+        },
+        {
+          "method": "litchi_docx::source_backed::Package::apply_paragraph_stream",
+          "ok": "litchi_docx::source_backed::paragraph_stream::Commit"
+        },
+        {
+          "method": "litchi_docx::source_backed::Package::apply_plain_paragraph_copy",
+          "ok": "litchi_docx::source_backed::plain_paragraph_copy::Commit"
+        },
+        {
+          "method": "litchi_docx::source_backed::Package::apply_plain_paragraph_removal",
+          "ok": "litchi_docx::source_backed::plain_paragraph_removal::Commit"
+        },
+        {
+          "method": "litchi_docx::source_backed::Package::apply_section_layout",
+          "ok": "litchi_docx::source_backed::section_layout::Commit"
+        },
+        {
+          "method": "litchi_docx::source_backed::Package::apply_story_hyperlink_redaction",
+          "ok": "litchi_docx::source_backed::story_hyperlink_redaction::Commit"
+        },
+        {
+          "method": "litchi_docx::source_backed::Package::apply_story_text",
+          "ok": "litchi_docx::source_backed::story_text_edit::Commit"
+        },
+        {
+          "method": "litchi_docx::source_backed::Package::apply_svg",
+          "ok": "litchi_docx::source_backed::svg::Commit"
+        },
+        {
+          "method": "litchi_docx::source_backed::Package::apply_tail_append",
+          "ok": "litchi_docx::source_backed::tail_append::Commit"
+        },
+        {
+          "method": "litchi_docx::source_backed::Package::apply_tail_append_patch",
+          "ok": "litchi_docx::source_backed::paragraph_stream::Commit"
+        },
+        {
+          "method": "litchi_docx::source_backed::Package::apply_tail_append_stream_patch",
+          "ok": "litchi_docx::source_backed::paragraph_stream::Commit"
+        }
+      ]
     },
     {
       "id": "docx-full",
@@ -878,7 +1043,176 @@
         "litchi_docx::Package",
         "litchi_docx::source_backed::Package"
       ],
-      "family_methods": true
+      "family_methods": true,
+      "result_methods": [
+        {
+          "method": "litchi_docx::Package::apply",
+          "ok": "litchi_docx::document::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_alt_chunks",
+          "ok": "litchi_docx::alt::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_attached_template",
+          "ok": "litchi_docx::attached_template::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_bibliography",
+          "ok": "litchi_docx::bibliography::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_chart",
+          "ok": "litchi_docx::chart::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_conflicts",
+          "ok": "litchi_docx::revision::conflict::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_content_controls",
+          "ok": "litchi_docx::content_control::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_custom_xml",
+          "ok": "litchi_docx::custom_xml::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_document_variables",
+          "ok": "litchi_docx::document_variables::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_durable_document",
+          "ok": "litchi_docx::document::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_fonts",
+          "ok": "litchi_docx::font::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_glossary",
+          "ok": "litchi_docx::glossary::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_ink",
+          "ok": "litchi_docx::ink::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_mail_merge",
+          "ok": "litchi_docx::mail_merge::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_metadata",
+          "ok": "litchi_docx::metadata::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_numbering",
+          "ok": "litchi_docx::numbering::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_opc",
+          "ok": "litchi_docx::opc::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_ribbon",
+          "ok": "litchi_docx::ribbon::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_settings_extensions",
+          "ok": "litchi_docx::settings::extensions::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_stories",
+          "ok": "litchi_docx::package::story::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_styles_with_effects",
+          "ok": "litchi_docx::styles::effects::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_task_panes",
+          "ok": "litchi_docx::task_panes::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_tracked_revisions",
+          "ok": "litchi_docx::revision::authoring::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_vba",
+          "ok": "litchi_docx::vba::Commit"
+        },
+        {
+          "method": "litchi_docx::Package::apply_web",
+          "ok": "litchi_docx::web::Commit"
+        },
+        {
+          "method": "litchi_docx::source_backed::Package::apply",
+          "ok": "litchi_docx::document::Commit",
+          "type_args": [
+            "litchi_docx::source_backed::Package"
+          ]
+        },
+        {
+          "method": "litchi_docx::source_backed::Package::apply_alt_chunk_payload",
+          "ok": "litchi_docx::source_backed::alt_chunk_payload::Commit"
+        },
+        {
+          "method": "litchi_docx::source_backed::Package::apply_document_variables",
+          "ok": "litchi_docx::source_backed::document_variables::Commit"
+        },
+        {
+          "method": "litchi_docx::source_backed::Package::apply_external_hyperlink_detachment",
+          "ok": "litchi_docx::source_backed::hyperlink_detachment::Commit"
+        },
+        {
+          "method": "litchi_docx::source_backed::Package::apply_external_hyperlink_redaction",
+          "ok": "litchi_docx::source_backed::hyperlink_redaction::Commit"
+        },
+        {
+          "method": "litchi_docx::source_backed::Package::apply_glossary_text_batch",
+          "ok": "litchi_docx::source_backed::glossary_text::Commit"
+        },
+        {
+          "method": "litchi_docx::source_backed::Package::apply_paragraph_stream",
+          "ok": "litchi_docx::source_backed::paragraph_stream::Commit"
+        },
+        {
+          "method": "litchi_docx::source_backed::Package::apply_plain_paragraph_copy",
+          "ok": "litchi_docx::source_backed::plain_paragraph_copy::Commit"
+        },
+        {
+          "method": "litchi_docx::source_backed::Package::apply_plain_paragraph_removal",
+          "ok": "litchi_docx::source_backed::plain_paragraph_removal::Commit"
+        },
+        {
+          "method": "litchi_docx::source_backed::Package::apply_section_layout",
+          "ok": "litchi_docx::source_backed::section_layout::Commit"
+        },
+        {
+          "method": "litchi_docx::source_backed::Package::apply_story_hyperlink_redaction",
+          "ok": "litchi_docx::source_backed::story_hyperlink_redaction::Commit"
+        },
+        {
+          "method": "litchi_docx::source_backed::Package::apply_story_text",
+          "ok": "litchi_docx::source_backed::story_text_edit::Commit"
+        },
+        {
+          "method": "litchi_docx::source_backed::Package::apply_svg",
+          "ok": "litchi_docx::source_backed::svg::Commit"
+        },
+        {
+          "method": "litchi_docx::source_backed::Package::apply_tail_append",
+          "ok": "litchi_docx::source_backed::tail_append::Commit"
+        },
+        {
+          "method": "litchi_docx::source_backed::Package::apply_tail_append_patch",
+          "ok": "litchi_docx::source_backed::paragraph_stream::Commit"
+        },
+        {
+          "method": "litchi_docx::source_backed::Package::apply_tail_append_stream_patch",
+          "ok": "litchi_docx::source_backed::paragraph_stream::Commit"
+        }
+      ]
     },
     {
       "id": "opc-minimal",
@@ -2412,7 +2746,201 @@
         "litchi_pptx::Package",
         "litchi_pptx::source::Package"
       ],
-      "family_methods": true
+      "family_methods": true,
+      "result_methods": [
+        {
+          "method": "litchi_pptx::Package::apply",
+          "ok": "litchi_pptx::opened::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_author_presence",
+          "ok": "litchi_pptx::comments::collaboration::presence::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_caption_tracks",
+          "ok": "litchi_pptx::presentation_properties::metadata::tracks::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_change_tracking",
+          "ok": "litchi_pptx::change_tracking::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_changes_info",
+          "ok": "litchi_pptx::presentation_properties::metadata::changes::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_charts",
+          "ok": "litchi_pptx::chart::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_color_maps",
+          "ok": "litchi_pptx::presentation_properties::metadata::color_map::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_comment_threading",
+          "ok": "litchi_pptx::comments::collaboration::threading::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_comments",
+          "ok": "litchi_pptx::comments::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_content_parts",
+          "ok": "litchi_pptx::presentation::embedded::content_parts::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_cross_slide_copy",
+          "ok": "litchi_pptx::opened::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_custom_shows",
+          "ok": "litchi_pptx::presentation_properties::metadata::custom_show::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_fonts",
+          "ok": "litchi_pptx::font::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_guides",
+          "ok": "litchi_pptx::presentation_properties::metadata::guides::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_ink",
+          "ok": "litchi_pptx::presentation::embedded::ink::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_ink_actions",
+          "ok": "litchi_pptx::presentation::embedded::ink_actions::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_laser_traces",
+          "ok": "litchi_pptx::laser::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_master_layout",
+          "ok": "litchi_pptx::master_layout::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_math_properties",
+          "ok": "litchi_pptx::presentation_properties::math::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_media",
+          "ok": "litchi_pptx::media_parts::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_metadata",
+          "ok": "litchi_pptx::metadata::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_model3d",
+          "ok": "litchi_pptx::model3d::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_modern_comments",
+          "ok": "litchi_pptx::modern_comments::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_notes",
+          "ok": "litchi_pptx::notes::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_ole_objects",
+          "ok": "litchi_pptx::presentation::embedded::ole::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_opc",
+          "ok": "litchi_pptx::opc::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_placeholder_type_extension",
+          "ok": "litchi_pptx::master_layout::placeholder::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_read_only_recommended",
+          "ok": "litchi_pptx::presentation_properties::read_only_recommended::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_revision_info",
+          "ok": "litchi_pptx::presentation_properties::metadata::revision::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_shape_classification",
+          "ok": "litchi_pptx::shape::classification::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_shape_design_element",
+          "ok": "litchi_pptx::shape::designer::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_shape_designer_properties",
+          "ok": "litchi_pptx::shape::designer::properties::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_shape_tags",
+          "ok": "litchi_pptx::tag::shape::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_show_events",
+          "ok": "litchi_pptx::presentation_properties::metadata::events::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_slide_controls",
+          "ok": "litchi_pptx::presentation::embedded::controls::slide::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_slide_designer_tags",
+          "ok": "litchi_pptx::presentation_properties::metadata::designer_tags::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_slide_ole_objects",
+          "ok": "litchi_pptx::presentation::embedded::ole::slide::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_slide_removal",
+          "ok": "litchi_pptx::opened::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_slide_sync",
+          "ok": "litchi_pptx::presentation_properties::metadata::slide_sync::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_structure",
+          "ok": "litchi_pptx::presentation_properties::metadata::structure::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_styles",
+          "ok": "litchi_pptx::table::style::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_tags",
+          "ok": "litchi_pptx::tag::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_task_panes",
+          "ok": "litchi_pptx::web::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_themes",
+          "ok": "litchi_pptx::shape::theme::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_zooms",
+          "ok": "litchi_pptx::shape::zoom::Commit"
+        },
+        {
+          "method": "litchi_pptx::source::Package::apply",
+          "ok": "litchi_pptx::source::Commit"
+        },
+        {
+          "method": "litchi_pptx::source::Package::apply_cross_slide_copy",
+          "ok": "litchi_pptx::source::cross_slide_copy::Commit"
+        },
+        {
+          "method": "litchi_pptx::source::Package::apply_svg_images",
+          "ok": "litchi_pptx::source::svg::Commit"
+        }
+      ]
     },
     {
       "id": "pptx-full",
@@ -3152,7 +3680,205 @@
         "litchi_pptx::Package",
         "litchi_pptx::source::Package"
       ],
-      "family_methods": true
+      "family_methods": true,
+      "result_methods": [
+        {
+          "method": "litchi_pptx::Package::apply",
+          "ok": "litchi_pptx::opened::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_author_presence",
+          "ok": "litchi_pptx::comments::collaboration::presence::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_caption_tracks",
+          "ok": "litchi_pptx::presentation_properties::metadata::tracks::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_change_tracking",
+          "ok": "litchi_pptx::change_tracking::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_changes_info",
+          "ok": "litchi_pptx::presentation_properties::metadata::changes::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_charts",
+          "ok": "litchi_pptx::chart::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_color_maps",
+          "ok": "litchi_pptx::presentation_properties::metadata::color_map::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_comment_threading",
+          "ok": "litchi_pptx::comments::collaboration::threading::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_comments",
+          "ok": "litchi_pptx::comments::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_content_parts",
+          "ok": "litchi_pptx::presentation::embedded::content_parts::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_cross_slide_copy",
+          "ok": "litchi_pptx::opened::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_custom_shows",
+          "ok": "litchi_pptx::presentation_properties::metadata::custom_show::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_fonts",
+          "ok": "litchi_pptx::font::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_guides",
+          "ok": "litchi_pptx::presentation_properties::metadata::guides::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_ink",
+          "ok": "litchi_pptx::presentation::embedded::ink::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_ink_actions",
+          "ok": "litchi_pptx::presentation::embedded::ink_actions::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_laser_traces",
+          "ok": "litchi_pptx::laser::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_master_layout",
+          "ok": "litchi_pptx::master_layout::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_math_properties",
+          "ok": "litchi_pptx::presentation_properties::math::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_media",
+          "ok": "litchi_pptx::media_parts::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_metadata",
+          "ok": "litchi_pptx::metadata::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_model3d",
+          "ok": "litchi_pptx::model3d::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_modern_comments",
+          "ok": "litchi_pptx::modern_comments::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_notes",
+          "ok": "litchi_pptx::notes::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_ole_objects",
+          "ok": "litchi_pptx::presentation::embedded::ole::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_opc",
+          "ok": "litchi_pptx::opc::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_placeholder_type_extension",
+          "ok": "litchi_pptx::master_layout::placeholder::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_read_only_recommended",
+          "ok": "litchi_pptx::presentation_properties::read_only_recommended::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_revision_info",
+          "ok": "litchi_pptx::presentation_properties::metadata::revision::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_shape_classification",
+          "ok": "litchi_pptx::shape::classification::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_shape_design_element",
+          "ok": "litchi_pptx::shape::designer::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_shape_designer_properties",
+          "ok": "litchi_pptx::shape::designer::properties::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_shape_tags",
+          "ok": "litchi_pptx::tag::shape::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_show_events",
+          "ok": "litchi_pptx::presentation_properties::metadata::events::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_slide_controls",
+          "ok": "litchi_pptx::presentation::embedded::controls::slide::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_slide_designer_tags",
+          "ok": "litchi_pptx::presentation_properties::metadata::designer_tags::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_slide_ole_objects",
+          "ok": "litchi_pptx::presentation::embedded::ole::slide::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_slide_removal",
+          "ok": "litchi_pptx::opened::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_slide_sync",
+          "ok": "litchi_pptx::presentation_properties::metadata::slide_sync::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_structure",
+          "ok": "litchi_pptx::presentation_properties::metadata::structure::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_styles",
+          "ok": "litchi_pptx::table::style::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_tags",
+          "ok": "litchi_pptx::tag::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_task_panes",
+          "ok": "litchi_pptx::web::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_themes",
+          "ok": "litchi_pptx::shape::theme::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_vba",
+          "ok": "litchi_pptx::presentation::embedded::vba::Commit"
+        },
+        {
+          "method": "litchi_pptx::Package::apply_zooms",
+          "ok": "litchi_pptx::shape::zoom::Commit"
+        },
+        {
+          "method": "litchi_pptx::source::Package::apply",
+          "ok": "litchi_pptx::source::Commit"
+        },
+        {
+          "method": "litchi_pptx::source::Package::apply_cross_slide_copy",
+          "ok": "litchi_pptx::source::cross_slide_copy::Commit"
+        },
+        {
+          "method": "litchi_pptx::source::Package::apply_svg_images",
+          "ok": "litchi_pptx::source::svg::Commit"
+        }
+      ]
     },
     {
       "id": "xlsx-minimal",
@@ -10623,7 +11349,17 @@
         "litchi_rtf::Document",
         "litchi_rtf::source_backed::Package"
       ],
-      "family_methods": true
+      "family_methods": true,
+      "result_methods": [
+        {
+          "method": "litchi_rtf::Package::apply_tail_append",
+          "ok": "litchi_rtf::tail_append::Commit"
+        },
+        {
+          "method": "litchi_rtf::source_backed::Package::apply_tail_append",
+          "ok": "litchi_rtf::source_backed::tail_append::Commit"
+        }
+      ]
     },
     {
       "id": "ole-common",

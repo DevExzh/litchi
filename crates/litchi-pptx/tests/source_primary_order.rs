@@ -196,7 +196,7 @@ fn order_patch_replays_after_reopen_and_inverse_restores_original() {
 
     let durable = litchi_pptx::source::Patch::from_bytes(&patch.to_bytes().unwrap()).unwrap();
     let reopened = fresh(&bytes);
-    let replayed = reopened.apply(&durable).unwrap();
+    let replayed = reopened.apply(&durable).unwrap().into_package();
     assert_eq!(replayed.to_bytes().unwrap(), changed.to_bytes().unwrap());
     assert_eq!(texts(&replayed), ["B*", "C", "A"]);
     assert_eq!(
@@ -207,7 +207,7 @@ fn order_patch_replays_after_reopen_and_inverse_restores_original() {
     let inverse =
         litchi_pptx::source::Patch::from_bytes(&durable.inverse().to_bytes().unwrap()).unwrap();
     let reopened_changed = fresh(&replayed.to_bytes().unwrap());
-    let restored = reopened_changed.apply(&inverse).unwrap();
+    let restored = reopened_changed.apply(&inverse).unwrap().into_package();
     assert_eq!(restored.to_bytes().unwrap(), bytes);
     assert_eq!(texts(&restored), ["A", "B", "C"]);
     assert_eq!(
@@ -235,7 +235,7 @@ fn text_patch_authored_after_order_refuses_the_original_revision() {
     assert!(matches!(source.apply(&durable), Err(Error::PatchConflict)));
 
     let reopened_ordered = fresh(&ordered.to_bytes().unwrap());
-    let accepted = reopened_ordered.apply(&durable).unwrap();
+    let accepted = reopened_ordered.apply(&durable).unwrap().into_package();
     assert_eq!(texts(&accepted), ["B*", "C", "A"]);
     assert_eq!(
         source_positions(&accepted),
@@ -278,7 +278,12 @@ fn signed_noop_order_is_exact_but_changed_primary_edits_are_refused() {
     assert!(noop.patch().is_noop());
     assert_eq!(noop.package().to_bytes().unwrap(), SIGNED_FIXTURE);
     assert_eq!(
-        source.apply(noop.patch()).unwrap().to_bytes().unwrap(),
+        source
+            .apply(noop.patch())
+            .unwrap()
+            .into_package()
+            .to_bytes()
+            .unwrap(),
         SIGNED_FIXTURE
     );
 

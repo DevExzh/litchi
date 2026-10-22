@@ -4,7 +4,8 @@
 //! same bytes through both the retained source and eager owner routes.  The
 //! assertions exercise the facade contract rather than a format-specific
 //! editor: old snapshots stay unchanged, cell properties round-trip through
-//! the node view, and retained patches remain bound to their input owner.
+//! the node view, and retained patches replay onto independently opened equal
+//! content after their source proof.
 #![cfg(feature = "xlsx")]
 
 use std::fs;
@@ -2773,10 +2774,10 @@ fn xlsx_transaction_retains_native_patch_and_inverse_endpoints() {
             commit
                 .patch()
                 .apply(&reopened)
-                .expect_err("foreign owner")
-                .code(),
-            Code::InvalidInput,
-            "patch replay must be bound to the original owner lineage"
+                .expect("a byte-identical copy takes the patch")
+                .to_bytes()
+                .expect("publish reopened replay"),
+            commit.file().to_bytes().expect("publish committed file")
         );
     }
 }

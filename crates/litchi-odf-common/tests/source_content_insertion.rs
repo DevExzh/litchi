@@ -472,7 +472,7 @@ fn invalid_offset_token_and_document_are_rejected_before_publication() {
     assert!(matches!(
         error,
         SourceContentPublicationError::Core(Error::InvalidFormat(reason))
-            if reason.contains("offset")
+            if reason == "content.xml replacement range exceeds decoded source length"
     ));
 
     let tiny_tokens =

@@ -3459,7 +3459,7 @@ impl Diagnostics {
 /// assert!(commit.diagnostics().changed());
 /// assert!(!commit.patch().is_noop());
 /// let (changed, patch) = commit.into_parts();
-/// let mut restored = changed.apply(&patch.inverse())?;
+/// let mut restored = changed.apply(&patch.inverse())?.into_package();
 /// assert_eq!(restored.to_bytes()?, bytes);
 /// # Ok(())
 /// # }

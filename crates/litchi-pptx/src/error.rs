@@ -406,6 +406,16 @@ pub enum Error {
         source: TryReserveError,
     },
 
+    /// A bounded structural byte count overflowed before publication.
+    ///
+    /// This carries no fabricated observed or configured value: the
+    /// operation could not represent the count in its structural type.
+    #[error("PPTX {resource} capacity overflow")]
+    CapacityOverflow {
+        /// Structural byte count that overflowed.
+        resource: &'static str,
+    },
+
     /// A related part has a content type forbidden by `PresentationML`.
     #[error("invalid PPTX content type: expected {expected}, got {actual}")]
     ContentType {

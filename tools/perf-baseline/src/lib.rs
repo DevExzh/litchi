@@ -17054,11 +17054,13 @@ fn verify_rtf_logical_tail_gates(
         appended,
     )?;
 
-    let applied = source.apply_tail_append(changed.patch())?;
+    let applied = source.apply_tail_append(changed.patch())?.into_package();
     if applied.to_bytes()? != expected {
         return Err("RTF logical-tail in-memory patch replay differs from publication".into());
     }
-    let restored = applied.apply_tail_append(&changed.patch().inverse())?;
+    let restored = applied
+        .apply_tail_append(&changed.patch().inverse())?
+        .into_package();
     if restored.to_bytes()? != source.to_bytes()? {
         return Err("RTF logical-tail in-memory inverse did not restore exact source".into());
     }
@@ -49867,7 +49869,10 @@ fn publish_docx_source_edit<W: Write>(
     let materializations = usize::try_from(package.cache_diagnostics().successful_loads)?;
     // Record 0355a: the detached commit replays onto the package, and the
     // committed package is written; callers compare the output bytes.
-    package.apply(commit.patch())?.write_to(writer)?;
+    package
+        .apply(commit.patch())?
+        .into_package()
+        .write_to(writer)?;
     Ok((materializations, commit))
 }
 
@@ -51329,7 +51334,7 @@ fn publish_pptx_source_edit<W: Write>(
     if !commit.diagnostics().changed() {
         return Err("PPTX source edit produced an unchanged commit".into());
     }
-    let replayed = package.apply(commit.patch())?;
+    let replayed = package.apply(commit.patch())?.into_package();
     if replayed.apply(&commit.patch().inverse()).is_err() {
         return Err("PPTX source edit inverse rejected its candidate".into());
     }
@@ -51459,7 +51464,7 @@ fn publish_pptx_batch_edit<W: Write>(
         if !commit.diagnostics().changed() {
             return Err("PPTX source-backed batch produced an unchanged commit".into());
         }
-        let replayed = package.apply(commit.patch())?;
+        let replayed = package.apply(commit.patch())?.into_package();
         if replayed.apply(&commit.patch().inverse()).is_err() {
             return Err("PPTX source-backed batch inverse rejected its candidate".into());
         }
@@ -51489,7 +51494,7 @@ fn publish_pptx_batch_edit<W: Write>(
         let published = package.opened_presentation()?;
         if package
             .apply(&inverse)
-            .and_then(|restored| restored.apply(&inverse.inverse()))
+            .and_then(|restored| restored.into_package().apply(&inverse.inverse()))
             .is_err()
         {
             return Err("PPTX eager batch inverse/forward replay failed".into());
@@ -51629,7 +51634,7 @@ fn publish_pptx_multi_slide_batch_edit<W: Write>(
         if !commit.diagnostics().changed() {
             return Err("PPTX source-backed multi-slide batch produced no changes".into());
         }
-        let replayed = package.apply(commit.patch())?;
+        let replayed = package.apply(commit.patch())?.into_package();
         if replayed.apply(&commit.patch().inverse()).is_err() {
             return Err("PPTX source-backed multi-slide inverse rejected its candidate".into());
         }
@@ -51667,7 +51672,7 @@ fn publish_pptx_multi_slide_batch_edit<W: Write>(
     let published = package.opened_presentation()?;
     if package
         .apply(&inverse)
-        .and_then(|restored| restored.apply(&inverse.inverse()))
+        .and_then(|restored| restored.into_package().apply(&inverse.inverse()))
         .is_err()
     {
         return Err("PPTX eager multi-slide batch inverse/forward replay failed".into());

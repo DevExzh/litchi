@@ -318,10 +318,10 @@ fn eager_shape_property_batch_composes_text_and_bounds_and_replays() {
     );
     assert_eq!(original.to_bytes().unwrap(), source_bytes);
 
-    let replayed = original.apply(&patch).unwrap();
+    let replayed = original.apply(&patch).unwrap().into_package();
     let changed_bytes = changed_package.to_bytes().unwrap();
     assert_eq!(replayed.to_bytes().unwrap(), changed_bytes);
-    let restored = replayed.apply(&patch.inverse()).unwrap();
+    let restored = replayed.apply(&patch.inverse()).unwrap().into_package();
     assert_eq!(restored.to_bytes().unwrap(), source_bytes);
 }
 

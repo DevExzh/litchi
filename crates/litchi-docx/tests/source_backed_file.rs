@@ -234,6 +234,7 @@ fn exact_noop_and_changed_document_overlay_preserve_raw_unselected_members() {
     package
         .apply(noop.patch())
         .and_then(|committed| {
+            let committed = committed.into_package();
             committed.write_to(&mut output)?;
             committed.document_snapshot()
         })
@@ -249,6 +250,7 @@ fn exact_noop_and_changed_document_overlay_preserve_raw_unselected_members() {
     package
         .apply(commit.patch())
         .and_then(|committed| {
+            let committed = committed.into_package();
             committed.write_to(&mut changed)?;
             committed.document_snapshot()
         })

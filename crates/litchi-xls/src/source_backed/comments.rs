@@ -93,8 +93,8 @@ impl SourceBackedWorkbook {
         })
     }
 
-    /// Replay a source-backed comment patch onto the exact workbook it was
-    /// made from.
+    /// Replay a source-backed comment patch onto matching workbook content,
+    /// including an independently opened equal-content workbook.
     ///
     /// # Errors
     ///

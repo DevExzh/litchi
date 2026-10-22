@@ -30,7 +30,7 @@
 //! opened with.
 
 use std::fmt;
-use std::io::Write;
+use std::io::{self, Write};
 use std::path::Path;
 use std::sync::{Arc, OnceLock};
 
@@ -176,6 +176,37 @@ impl Package {
     /// Whether two handles are shares of one opened (or committed) package.
     pub(crate) fn same_package(&self, other: &Self) -> bool {
         Arc::ptr_eq(&self.inner, &other.inner)
+    }
+
+    /// Stream and authenticate the exact bytes this package would publish.
+    /// The sink discards bytes, so this proof remains bounded by the
+    /// publication plan's windows rather than materializing the artifact.
+    pub(crate) fn replay_digest(&self) -> Result<(usize, String), TailAppendPublicationError> {
+        let mut sink = io::sink();
+        let report = self.write_to(&mut sink)?;
+        Ok((report.bytes(), report.target_digest().to_owned()))
+    }
+
+    /// Rebase a validated source splice onto this package's source and
+    /// publication policy.  The plan authenticates the recipient bytes before
+    /// it is published, and the committed package retains this recipient's
+    /// context and options.
+    pub(crate) fn rebase_plan(
+        &self,
+        plan: &TailAppendSourcePublicationPlan,
+        inverse: bool,
+    ) -> Result<Self, TailAppendPublicationError> {
+        let plan = plan.rebase(
+            Arc::clone(&self.inner.source),
+            self.inner.proof.clone(),
+            self.inner.options.publication_limits,
+            inverse,
+        )?;
+        Ok(self.committed(plan))
+    }
+
+    pub(crate) fn pending_plan(&self) -> Option<&TailAppendSourcePublicationPlan> {
+        self.inner.pending.as_ref()
     }
 
     /// The options this package was opened with.

@@ -38,7 +38,12 @@ fn remove_and_invert(bytes: &'static [u8], position: usize, remaining: usize) {
         remaining
     );
     assert_eq!(
-        updated.apply(&patch.inverse()).unwrap().to_bytes().unwrap(),
+        updated
+            .apply(&patch.inverse())
+            .unwrap()
+            .into_package()
+            .to_bytes()
+            .unwrap(),
         source.to_bytes().unwrap()
     );
 }
@@ -94,13 +99,23 @@ fn remove_owned_and_invert(
         remaining
     );
     assert_eq!(
-        updated.apply(&patch.inverse()).unwrap().to_bytes().unwrap(),
+        updated
+            .apply(&patch.inverse())
+            .unwrap()
+            .into_package()
+            .to_bytes()
+            .unwrap(),
         source.to_bytes().unwrap()
     );
     // The durable inverse carries the removed Parts' exact images.
     let wire = patch.inverse().to_bytes().unwrap();
     let durable = litchi_pptx::source::Patch::from_bytes(&wire).unwrap();
-    let restored = reopened.apply(&durable).unwrap().to_bytes().unwrap();
+    let restored = reopened
+        .apply(&durable)
+        .unwrap()
+        .into_package()
+        .to_bytes()
+        .unwrap();
     let restored_names = member_names(&restored);
     for part in owned.iter().chain(kept) {
         assert!(
@@ -116,7 +131,12 @@ fn remove_owned_and_invert(
     );
     // The forward patch replays on a fresh open of the source.
     let forward = litchi_pptx::source::Patch::from_bytes(&patch.to_bytes().unwrap()).unwrap();
-    let replayed = open(bytes).apply(&forward).unwrap().to_bytes().unwrap();
+    let replayed = open(bytes)
+        .apply(&forward)
+        .unwrap()
+        .into_package()
+        .to_bytes()
+        .unwrap();
     assert_eq!(member_names(&replayed), names);
 }
 
@@ -241,18 +261,28 @@ fn a_picture_shared_by_two_removed_slides_leaves_with_them() {
     let names = member_names(&output);
     assert!(!names.iter().any(|name| name == "ppt/media/image1.jpg"));
     assert_eq!(
-        updated.apply(&patch.inverse()).unwrap().to_bytes().unwrap(),
+        updated
+            .apply(&patch.inverse())
+            .unwrap()
+            .into_package()
+            .to_bytes()
+            .unwrap(),
         source.to_bytes().unwrap()
     );
     // The composed patch proves joint ownership on a fresh source and
     // its durable inverse restores the picture after reopening.
     let forward = litchi_pptx::source::Patch::from_bytes(&patch.to_bytes().unwrap()).unwrap();
-    let replayed = open(shared).apply(&forward).unwrap();
+    let replayed = open(shared).apply(&forward).unwrap().into_package();
     assert_eq!(member_names(&replayed.to_bytes().unwrap()), names);
     let reopened = Package::from_read_at(Arc::new(OwnedSource::new(output))).unwrap();
     let inverse =
         litchi_pptx::source::Patch::from_bytes(&patch.inverse().to_bytes().unwrap()).unwrap();
-    let restored = reopened.apply(&inverse).unwrap().to_bytes().unwrap();
+    let restored = reopened
+        .apply(&inverse)
+        .unwrap()
+        .into_package()
+        .to_bytes()
+        .unwrap();
     assert_eq!(
         member(&restored, "ppt/media/image1.jpg"),
         member(shared, "ppt/media/image1.jpg")
@@ -297,7 +327,7 @@ fn the_eager_editor_removes_owned_parts_too() {
         assert!(!names.iter().any(|name| name == part), "{part} stayed");
     }
     assert!(names.iter().any(|name| name == "ppt/commentAuthors.xml"));
-    let restored = updated.apply(&patch.inverse()).unwrap();
+    let restored = updated.apply(&patch.inverse()).unwrap().into_package();
     let restored_names = member_names(&restored.to_bytes().unwrap());
     assert!(
         restored_names

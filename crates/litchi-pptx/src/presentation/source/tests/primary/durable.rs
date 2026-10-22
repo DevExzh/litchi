@@ -57,13 +57,14 @@ fn durable_round_trip_reopens_source_and_replays_inverse_without_reading_unselec
     assert_eq!(patch.to_bytes().unwrap(), encoded);
     drop(source);
     let reopened = fresh(bytes.clone());
-    let candidate = reopened.apply(&patch).unwrap();
+    let candidate = reopened.apply(&patch).unwrap().into_package();
     assert_eq!(text(&candidate, 0), "portable change");
     assert_eq!(reopened.to_bytes().unwrap(), bytes);
     assert_eq!(
         candidate
             .apply(&patch.inverse())
             .unwrap()
+            .into_package()
             .to_bytes()
             .unwrap(),
         bytes
@@ -71,7 +72,7 @@ fn durable_round_trip_reopens_source_and_replays_inverse_without_reading_unselec
     let inverse = Patch::from_bytes(&patch.inverse().to_bytes().unwrap()).unwrap();
     let reopened_changed = fresh(candidate.to_bytes().unwrap());
     assert_eq!(
-        text(&reopened_changed.apply(&inverse).unwrap(), 0),
+        text(&reopened_changed.apply(&inverse).unwrap().into_package(), 0),
         "First slide"
     );
     assert!(reopened_changed.apply(&patch).is_err());
@@ -85,7 +86,13 @@ fn durable_replay_preserves_unrelated_destination_overlay() {
     let destination = fresh(bytes);
     let mut edit = destination.edit().unwrap();
     edit.set_shape_text(1, 0_usize, "right").unwrap();
-    let candidate = edit.commit().unwrap().into_package().apply(&patch).unwrap();
+    let candidate = edit
+        .commit()
+        .unwrap()
+        .into_package()
+        .apply(&patch)
+        .unwrap()
+        .into_package();
     assert_eq!(text(&candidate, 0), "left");
     assert_eq!(text(&candidate, 1), "right");
 }
@@ -181,12 +188,13 @@ fn native_empty_text_and_cdata_changes_transport_and_inverse_exactly() {
         let bytes = with_first_slide(xml.as_bytes());
         let patch = Patch::from_bytes(&wire(&fresh(bytes.clone()), "transported")).unwrap();
         let source = fresh(bytes.clone());
-        let candidate = source.apply(&patch).unwrap();
+        let candidate = source.apply(&patch).unwrap().into_package();
         assert_eq!(text(&candidate, 0), "transported");
         assert_eq!(
             candidate
                 .apply(&patch.inverse())
                 .unwrap()
+                .into_package()
                 .to_bytes()
                 .unwrap(),
             bytes
@@ -241,6 +249,7 @@ fn durable_noop_preserves_signed_source_and_changed_signed_replay_refuses() {
         fresh(signed.clone())
             .apply(&noop)
             .unwrap()
+            .into_package()
             .to_bytes()
             .unwrap(),
         signed
@@ -273,7 +282,7 @@ fn managed_destination_policy_and_retained_payloads_are_independent_of_encoding_
             .execution_context(context),
     )
     .unwrap();
-    let candidate = destination.apply(&patch).unwrap();
+    let candidate = destination.apply(&patch).unwrap().into_package();
     let scene = candidate
         .presentation()
         .unwrap()
@@ -347,7 +356,7 @@ fn managed_replay_budget_failure_is_atomic_and_recovers() {
     drop(pressure);
     assert_eq!(budget.used(Resource::Memory), used);
     assert_eq!(destination.to_bytes().unwrap(), bytes);
-    let candidate = destination.apply(&patch).unwrap();
+    let candidate = destination.apply(&patch).unwrap().into_package();
     assert_eq!(text(&candidate, 0), "portable");
     drop((candidate, destination));
     assert_eq!(budget.used(Resource::Memory), 0);
@@ -397,7 +406,10 @@ fn decoding_does_not_replace_explicit_source_limits_with_defaults() {
     .unwrap();
     let source = Package::from_presentation(&projection).unwrap();
     let patch = Patch::from_bytes(&wire(&source, "portable")).unwrap();
-    assert_eq!(text(&source.apply(&patch).unwrap(), 0), "portable");
+    assert_eq!(
+        text(&source.apply(&patch).unwrap().into_package(), 0),
+        "portable"
+    );
     assert!(fresh(bytes).apply(&patch).is_err());
 }
 
@@ -434,7 +446,7 @@ fn durable_text_and_order_patches_allow_large_unchanged_catalogs() {
     edit.move_slide(Position::new(39), Position::new(0))
         .unwrap();
     let patch = Patch::from_bytes(&edit.commit().unwrap().patch().to_bytes().unwrap()).unwrap();
-    let replayed = fresh(bytes).apply(&patch).unwrap();
+    let replayed = fresh(bytes).apply(&patch).unwrap().into_package();
     assert_eq!(text(&replayed, 0), "last");
     assert_eq!(replayed.presentation().unwrap().slide_count().unwrap(), 40);
 }
@@ -452,10 +464,15 @@ fn durable_text_only_replay_keeps_positional_owner_contexts_supported() {
     let bytes = litchi_opc::PackageWriter::to_bytes(&raw).unwrap();
     let source = fresh(bytes.clone());
     let patch = Patch::from_bytes(&wire(&source, "text only")).unwrap();
-    let changed = fresh(bytes.clone()).apply(&patch).unwrap();
+    let changed = fresh(bytes.clone()).apply(&patch).unwrap().into_package();
     assert_eq!(text(&changed, 0), "text only");
     assert_eq!(
-        changed.apply(&patch.inverse()).unwrap().to_bytes().unwrap(),
+        changed
+            .apply(&patch.inverse())
+            .unwrap()
+            .into_package()
+            .to_bytes()
+            .unwrap(),
         bytes
     );
 }

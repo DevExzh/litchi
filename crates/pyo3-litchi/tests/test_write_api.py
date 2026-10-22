@@ -886,7 +886,7 @@ class PatchTests(WriteAssertions):
 
     def assertRoundTrip(self, source, commit):
         """The patch replays onto ``source``, its inverse restores it, and
-        both refuse any other File."""
+        a separately opened equal-content source is also accepted."""
         before, after = source.to_bytes(), commit.file.to_bytes()
         patch = commit.patch
         self.assertIsInstance(patch, L.Patch)
@@ -894,6 +894,11 @@ class PatchTests(WriteAssertions):
         self.assertEqual(patch.apply(source).to_bytes(), after)
         self.assertEqual(patch.inverse().apply(commit.file).to_bytes(), before)
         self.assertEqual(patch.inverse().inverse().apply(source).to_bytes(), after)
+        reopened = L.open_bytes(before)
+        try:
+            self.assertEqual(patch.apply(reopened).to_bytes(), after)
+        finally:
+            reopened.close()
         for stale, target in ((patch, commit.file), (patch.inverse(), source)):
             error = raised(lambda stale=stale, target=target: stale.apply(target))
             self.assertIsInstance(error, L.LitchiError)

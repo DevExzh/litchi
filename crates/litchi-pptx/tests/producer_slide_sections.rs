@@ -68,17 +68,28 @@ fn check(
     let output = updated.to_bytes().unwrap();
     assert_eq!(sections(&output), expected);
     assert_eq!(
-        updated.apply(&patch.inverse()).unwrap().to_bytes().unwrap(),
+        updated
+            .apply(&patch.inverse())
+            .unwrap()
+            .into_package()
+            .to_bytes()
+            .unwrap(),
         source.to_bytes().unwrap()
     );
     let reopened = open(&output);
     let inverse = Patch::from_bytes(&patch.inverse().to_bytes().unwrap()).unwrap();
-    let restored = reopened.apply(&inverse).unwrap().to_bytes().unwrap();
+    let restored = reopened
+        .apply(&inverse)
+        .unwrap()
+        .into_package()
+        .to_bytes()
+        .unwrap();
     assert_eq!(presentation_xml(&restored), presentation_xml(source_bytes));
     let forward = Patch::from_bytes(&patch.to_bytes().unwrap()).unwrap();
     let replayed = open(source_bytes)
         .apply(&forward)
         .unwrap()
+        .into_package()
         .to_bytes()
         .unwrap();
     assert_eq!(presentation_xml(&replayed), presentation_xml(&output));
@@ -188,7 +199,12 @@ fn an_inserted_slide_joins_the_section_of_the_slide_before_it() {
     assert_eq!(&sections[0][..4], &[256, 257, 258, 259]);
     assert_eq!(sections[1], [260, 261, 262, 263, 264, 265, 266]);
     assert_eq!(
-        updated.apply(&patch.inverse()).unwrap().to_bytes().unwrap(),
+        updated
+            .apply(&patch.inverse())
+            .unwrap()
+            .into_package()
+            .to_bytes()
+            .unwrap(),
         source.to_bytes().unwrap()
     );
 }

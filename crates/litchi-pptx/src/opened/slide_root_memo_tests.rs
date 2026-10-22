@@ -1007,7 +1007,7 @@ fn a_refused_memo_reservation_is_a_typed_allocation_error_and_leaves_no_partial_
     assert_eq!(package.to_bytes()?, published_before);
 
     // Without the refusal every step succeeds and equals the cold path.
-    package = package.apply(&patch)?;
+    package = package.apply(&patch)?.into_package();
     let published = package.opened_presentation()?;
     assert_same_snapshot("published", &published, &cold_capture(&published)?);
     assert_same_snapshot(
