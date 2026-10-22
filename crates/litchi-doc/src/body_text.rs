@@ -1953,8 +1953,7 @@ impl Edit {
             Some(rendered) => rendered,
             None => self
                 .editor
-                .clone()
-                .finish_unchecked()
+                .finish_unchecked_in_place()
                 .map_err(Error::Invalid)?,
         };
         self.authorize_candidate(bytes)
