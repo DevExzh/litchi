@@ -4929,7 +4929,7 @@ impl GlossaryBatchSnapshot {
             });
         }
         entries.sort_unstable_by_key(|entry| entry.layout.root_start_end);
-        validate_batch_ranges(&entries, bytes.len())?;
+        validate_batch_ranges(&entries, self.raw_bytes().len())?;
         for (canonical_index, entry) in entries.iter_mut().enumerate() {
             entry.selector_index = canonical_index;
         }
@@ -5195,6 +5195,7 @@ impl GlossaryBatchPatch {
             });
         }
         entries.sort_unstable_by_key(|entry| entry.layout.root_start_end);
+        validate_batch_ranges(&entries, bytes.len())?;
         for (canonical_index, entry) in entries.iter_mut().enumerate() {
             entry.selector_index = canonical_index;
         }
