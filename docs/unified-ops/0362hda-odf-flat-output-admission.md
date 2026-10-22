@@ -66,7 +66,13 @@ intentionally deferred until the coordinator grants a quiet measurement
 window. Target size was 4.6 GiB at handoff; no benchmark binaries or large
 evidence files were added.
 
-## Full ODS gate and matched allocation receipt
+## Full ODS gate and initial matched allocation receipt
+
+The first matched allocation capture below used an embedded fixture and one
+fresh process per route. It remains useful as historical evidence, but the
+portable-source, four-leg receipt in the final section supersedes it for
+qualification. In particular, the embedded probe's source hash and binary
+hashes must not be used as the reproducibility inputs for the final result.
 
 The complete bounded ODS gate was rerun after this follow-up, rather than only
 the library target:
@@ -86,7 +92,7 @@ kept outside the checkout at
 largest reported target was 5,892,730,880 bytes; the final target directory
 was 5.5 GiB.
 
-The matched non-timing probe uses the same source file and fixture for both
+The initial matched non-timing probe uses the same source file and fixture for both
 endpoints. The base endpoint is `8d6abdab69`; the final endpoint is
 `384205d218`. Both probe lockfiles are 38,627 bytes with SHA-256
 `5b181fd886d5315fd56250db98226fa44aa2fc5d5bd0d5f3eb895732e65dfeab`, the
@@ -141,8 +147,43 @@ the final endpoint. These routes confirm the empty-element attempted-depth
 check, retained-depth recheck, and independent-source content proof without
 retaining a second flat source.
 
-The JSON receipts are outside the checkout at
+The initial JSON receipts are outside the checkout at
 `/home/zhuhe/code/litchi-worktrees/.coord/w8-odf-flat-limits/matched-results-20261022/`;
 the base and final JSONL files are 4,359 and 3,604 bytes. Native latency and
 allocator qualification beyond this fresh-process count/retention probe
 remain coordinator work.
+
+## Portable four-leg qualification receipt
+
+The committed probe source is
+[`flat-qualification-probe.rs`](results/0362hda/flat-qualification-probe.rs)
+(17,783 bytes, SHA-256
+`d101b76120a33438bf99c113bfce3892607d1e28706166c610fb4ee673a9a5f8`). It
+accepts the tracked fixture path as a runtime argument, so the source no
+longer embeds a checkout-relative file. The compact receipt is
+[`flat-qualification-receipt.json`](results/0362hda/flat-qualification-receipt.json)
+(17,617 bytes, SHA-256
+`e76aabd2de362870c5637879565815effb2a299620e401edba5bb13af9dde674`).
+
+Both endpoints were rebuilt from the same probe source and lockfile. The base
+binary is 3,563,672 bytes (SHA-256
+`7c6e576e709b9bdc3e1aaacb1a22b016c0eeeae921039b5decf1b16217973fef`), and the
+final binary is 2,794,872 bytes (SHA-256
+`694c9eb532dc6516cdd48d569b9e0f8460161defe344f465a17de7253725684d`). The
+lockfile is 38,627 bytes with SHA-256
+`5b181fd886d5315fd56250db98226fa44aa2fc5d5bd0d5f3eb895732e65dfeab`; the
+tracked fixture is 31,441 bytes with SHA-256
+`9b65ff2a65ceb92409a78c831ae74bbff82c51abe0203684467903091956ef53`.
+
+Each of the nine routes ran in four fresh processes in the order
+`base → final → final → base`. Every endpoint's two legs had identical route
+status, output metadata and allocation counters, including the refusal routes.
+The final endpoint rejected same-length foreign content with
+`PatchConflict` and rejected the retained-depth output with typed
+`Limit(Semantic(Depth), observed=3, maximum=2)`; the base endpoint accepted
+both routes under its historical range-only behavior. Successful output bytes
+and hashes matched within each endpoint. The split route's final allocation
+ratios against base were 0.607 calls, 0.409 requested bytes, 0.652 retained
+bytes and 0.665 peak bytes. The other successful routes had identical
+allocation counters. This is fresh-process allocation evidence only; no
+latency claim is made.
