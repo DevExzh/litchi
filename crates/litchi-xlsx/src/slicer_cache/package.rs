@@ -210,16 +210,12 @@ pub(crate) fn store_slicer_cache_prepared_in_place(
         Err(litchi_opc::OpcError::PartNotFound(_)) => {},
         Err(error) => return Err(error.into()),
     }
-    crate::raw::check_relationship_insertions(
-        package,
-        &workbook_name,
-        &[(
-            value.relationship_id.clone(),
-            SLICER_CACHE_RELATIONSHIP_TYPE.to_owned(),
-            uri.relative_ref(workbook_name.base_uri()),
-        )],
-        limits,
-    )?;
+    let additions = [(
+        value.relationship_id.clone(),
+        SLICER_CACHE_RELATIONSHIP_TYPE.to_owned(),
+        uri.relative_ref(workbook_name.base_uri()),
+    )];
+    let budget = crate::raw::prepare_package_budget(package, &workbook_name, &additions, limits)?;
     let ids = existing
         .iter()
         .map(|cache| cache.relationship_id.clone())
@@ -234,8 +230,9 @@ pub(crate) fn store_slicer_cache_prepared_in_place(
         X14,
         limits,
     )?;
-    crate::raw::check_part_budget_with_replacements(
+    crate::raw::check_part_budget_with_ledger(
         package,
+        &budget,
         1,
         xml.len(),
         &[(&workbook_name, updated.len())],

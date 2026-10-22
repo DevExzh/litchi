@@ -55,6 +55,10 @@ impl EditOptions {
 pub struct Edit {
     staged: Staged,
     limits: SourceLimits,
+    /// The current staged graph has passed `graph_with_limits`. It is cleared
+    /// before a candidate replacement and restored only after validation;
+    /// `reset` returns to the already validated source graph.
+    graph_validated: bool,
 }
 
 impl Package {
@@ -76,7 +80,11 @@ impl Package {
             .read_limits()
             .min(options.limits.unwrap_or_else(|| staged.opc().read_limits()));
         super::validation::graph_with_limits(staged.opc(), &limits)?;
-        Ok(Edit { staged, limits })
+        Ok(Edit {
+            staged,
+            limits,
+            graph_validated: true,
+        })
     }
 
     /// Apply a slicer patch to a new package; this one is unchanged. An
@@ -243,6 +251,7 @@ impl Edit {
     /// Discard every staged change.
     pub fn reset(&mut self) {
         self.staged.reset();
+        self.graph_validated = true;
     }
 
     /// Validate the staged slicer graph and publish it to a new package. An
@@ -254,17 +263,22 @@ impl Edit {
     /// signed package and the workbook validation errors of the staged
     /// package.
     pub fn commit(self) -> Result<Commit> {
-        super::validation::graph_with_limits(self.staged.opc(), &self.limits)?;
+        if !self.graph_validated {
+            super::validation::graph_with_limits(self.staged.opc(), &self.limits)?;
+        }
         Ok(Commit::new(self.staged.commit()?))
     }
 
     fn apply<T>(&mut self, operation: impl FnOnce(&mut OpcPackage) -> Result<T>) -> Result<T> {
         let limits = self.limits;
-        self.staged.update(|candidate| {
+        self.graph_validated = false;
+        let value = self.staged.update(|candidate| {
             let value = operation(candidate)?;
             super::validation::graph_with_limits(candidate, &limits)?;
             Ok(value)
-        })
+        })?;
+        self.graph_validated = true;
+        Ok(value)
     }
 
     fn apply_raw<T>(
@@ -272,10 +286,13 @@ impl Edit {
         limits: &SourceLimits,
         operation: impl FnOnce(&mut OpcPackage) -> Result<T>,
     ) -> Result<T> {
-        self.staged.update(|candidate| {
+        self.graph_validated = false;
+        let value = self.staged.update(|candidate| {
             let value = operation(candidate)?;
             super::validation::graph_with_limits(candidate, limits)?;
             Ok(value)
-        })
+        })?;
+        self.graph_validated = true;
+        Ok(value)
     }
 }

@@ -333,7 +333,7 @@ pub(crate) fn store_timeline_caches_prepared_limited(
             uri.relative_ref(workbook_name.base_uri()),
         ));
     }
-    crate::raw::check_relationship_insertions(package, workbook_name, &additions, limits)?;
+    let budget = crate::raw::prepare_package_budget(package, workbook_name, &additions, limits)?;
     let refs: Vec<String> = prepared
         .iter()
         .map(|cache| cache.value.relationship_id.clone())
@@ -360,8 +360,9 @@ pub(crate) fn store_timeline_caches_prepared_limited(
             .checked_add(cache.xml.len())
             .ok_or_else(|| limit("aggregate part bytes"))
     })?;
-    crate::raw::check_part_budget_with_replacements(
+    crate::raw::check_part_budget_with_ledger(
         package,
+        &budget,
         prepared.len(),
         added_bytes,
         &[(workbook_name, updated.len())],
@@ -629,6 +630,12 @@ pub(crate) fn store_worksheet_timelines_prepared_limited(
     }
     let root = super::codec::parse_document_limited(worksheet.blob(), limits)?;
     let (core, rel) = source_namespaces(&root, "worksheet")?;
+    let additions = [(
+        value.relationship_id.clone(),
+        TIMELINES_RELATIONSHIP_TYPE.to_owned(),
+        target_uri.relative_ref(worksheet_uri.base_uri()),
+    )];
+    let budget = crate::raw::prepare_package_budget(package, &worksheet_uri, &additions, limits)?;
     let fragment = integration_extension(
         core,
         rel,
@@ -646,18 +653,9 @@ pub(crate) fn store_worksheet_timelines_prepared_limited(
         &fragment,
         limits,
     )?;
-    crate::raw::check_relationship_insertions(
+    crate::raw::check_part_budget_with_ledger(
         package,
-        &worksheet_uri,
-        &[(
-            value.relationship_id.clone(),
-            TIMELINES_RELATIONSHIP_TYPE.to_owned(),
-            target_uri.relative_ref(worksheet_uri.base_uri()),
-        )],
-        limits,
-    )?;
-    crate::raw::check_part_budget_with_replacements(
-        package,
+        &budget,
         1,
         prepared.xml.len(),
         &[(&worksheet_uri, updated.len())],

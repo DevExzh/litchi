@@ -540,22 +540,18 @@ pub(crate) fn store_slicer_part_prepared_limited(
             value.relationship_id
         )));
     }
-    crate::raw::check_relationship_insertions(
-        package,
-        worksheet_name,
-        &[(
-            value.relationship_id.clone(),
-            SLICERS_RELATIONSHIP_TYPE.to_owned(),
-            part_name.relative_ref(worksheet_name.base_uri()),
-        )],
-        limits,
-    )?;
     if package.get_part(&part_name).is_ok() {
         return Err(invalid(format!(
             "Slicers part '{part_name}' already exists"
         )));
     }
-    crate::raw::check_part_budget(package, 1, xml.len(), limits)?;
+    let additions = [(
+        value.relationship_id.clone(),
+        SLICERS_RELATIONSHIP_TYPE.to_owned(),
+        part_name.relative_ref(worksheet_name.base_uri()),
+    )];
+    let budget = crate::raw::prepare_package_budget(package, worksheet_name, &additions, limits)?;
+    crate::raw::check_part_budget_with_ledger(package, &budget, 1, xml.len(), &[], limits)?;
     let target = part_name.relative_ref(worksheet_name.base_uri());
     crate::signature_policy::ensure_unsigned(package)?;
     package.try_add_part(Box::new(BlobPart::new(

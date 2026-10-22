@@ -58,6 +58,10 @@ pub struct Edit {
     staged: Staged,
     workbook: PackURI,
     limits: SourceLimits,
+    /// The current staged graph has passed `graph_with_limits`. Every public
+    /// replacement goes through `apply`/`apply_raw`, and `reset` returns to
+    /// the already validated source graph.
+    graph_validated: bool,
 }
 
 impl Package {
@@ -84,6 +88,7 @@ impl Package {
             staged,
             workbook,
             limits,
+            graph_validated: true,
         })
     }
 
@@ -274,6 +279,7 @@ impl Edit {
     /// Discard every staged change.
     pub fn reset(&mut self) {
         self.staged.reset();
+        self.graph_validated = true;
     }
 
     /// Validate the staged timeline graph and publish it to a new package.
@@ -285,18 +291,23 @@ impl Edit {
     /// signed package and the workbook validation errors of the staged
     /// package.
     pub fn commit(self) -> Result<Commit> {
-        super::validation::graph_with_limits(self.staged.opc(), &self.workbook, &self.limits)?;
+        if !self.graph_validated {
+            super::validation::graph_with_limits(self.staged.opc(), &self.workbook, &self.limits)?;
+        }
         Ok(Commit::new(self.staged.commit()?))
     }
 
     fn apply<T>(&mut self, operation: impl FnOnce(&mut OpcPackage) -> Result<T>) -> Result<T> {
         let workbook = &self.workbook;
         let limits = self.limits;
-        self.staged.update(|candidate| {
+        self.graph_validated = false;
+        let value = self.staged.update(|candidate| {
             let value = operation(candidate)?;
             super::validation::graph_with_limits(candidate, workbook, &limits)?;
             Ok(value)
-        })
+        })?;
+        self.graph_validated = true;
+        Ok(value)
     }
 
     fn apply_raw<T>(
@@ -305,10 +316,13 @@ impl Edit {
         operation: impl FnOnce(&mut OpcPackage) -> Result<T>,
     ) -> Result<T> {
         let workbook = &self.workbook;
-        self.staged.update(|candidate| {
+        self.graph_validated = false;
+        let value = self.staged.update(|candidate| {
             let value = operation(candidate)?;
             super::validation::graph_with_limits(candidate, workbook, limits)?;
             Ok(value)
-        })
+        })?;
+        self.graph_validated = true;
+        Ok(value)
     }
 }

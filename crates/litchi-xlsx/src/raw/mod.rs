@@ -306,18 +306,32 @@ fn limit_error(kind: litchi_opc::SourceLimitKind, observed: u64, maximum: u64) -
     })
 }
 
-/// Admit a batch of newly authored internal relationships before any payload
-/// serializer or relationship mutation runs. Existing source relationship
-/// members retain their exact bytes; the affected owner uses the source-bound
-/// fragment plan that the mutation will publish. The admission is scoped to
-/// this owner so a raw edit does not add an unrelated package-wide scan to its
-/// already bounded family read.
-pub(crate) fn check_relationship_insertions(
+/// The package-wide metrics needed by one raw insertion admission. This is
+/// deliberately an operation-local value: it is never reused after the
+/// package can change, so the relationship and payload proof cannot become
+/// stale between admission and publication.
+pub(crate) struct PackageBudget {
+    relationship_parts: usize,
+    relationship_bytes: u64,
+    relationship_events: u64,
+    relationship_count: usize,
+    part_bytes: u64,
+    owner_plan: litchi_opc::RelationshipSourcePlan,
+}
+
+/// Admit one raw insertion's relationships and aggregate payload in one
+/// package pass before any relationship mutation or payload publication runs.
+/// Existing source relationship members retain their exact bytes; the
+/// affected owner uses the source-bound fragment plan that the mutation will
+/// publish. The ledger includes every relationship owner and every existing
+/// part, preserving the cross-owner proof without paying for two independent
+/// package scans.
+pub(crate) fn prepare_package_budget(
     package: &litchi_opc::OpcPackage,
     owner: &litchi_opc::PackURI,
     additions: &[(String, String, String)],
     limits: &litchi_opc::SourceLimits,
-) -> crate::Result<()> {
+) -> crate::Result<PackageBudget> {
     if additions.len() > limits.max_relationships_per_part() {
         return Err(limit_error(
             litchi_opc::SourceLimitKind::RelationshipsPerPart,
@@ -343,10 +357,10 @@ pub(crate) fn check_relationship_insertions(
     }
     let source = package.source_relationships_with_limits(owner, *limits)?;
     let plan = source.plan_edit(&edits, &[], *limits)?;
-    let (existing_parts, existing_bytes, existing_events, existing_count, current) =
-        relationship_budget(package, owner, limits)?;
-    let relationship_parts = existing_parts
-        .saturating_sub(usize::from(current.member_present()))
+    let budget = package_budget(package, owner, plan, limits)?;
+    let relationship_parts = budget
+        .relationship_parts
+        .saturating_sub(usize::from(budget.owner_plan.member_present()))
         .saturating_add(usize::from(plan.member_present()));
     if relationship_parts > limits.max_relationship_parts() {
         return Err(limit_error(
@@ -355,8 +369,9 @@ pub(crate) fn check_relationship_insertions(
             limits.max_relationship_parts() as u64,
         ));
     }
-    let total_bytes = existing_bytes
-        .saturating_sub(current.final_len() as u64)
+    let total_bytes = budget
+        .relationship_bytes
+        .saturating_sub(budget.owner_plan.final_len() as u64)
         .saturating_add(plan.final_len() as u64);
     if total_bytes > limits.max_total_relationship_xml_bytes() as u64 {
         return Err(limit_error(
@@ -365,8 +380,9 @@ pub(crate) fn check_relationship_insertions(
             limits.max_total_relationship_xml_bytes() as u64,
         ));
     }
-    let total_events = existing_events
-        .saturating_sub(current.event_count() as u64)
+    let total_events = budget
+        .relationship_events
+        .saturating_sub(budget.owner_plan.event_count() as u64)
         .saturating_add(plan.event_count() as u64);
     if total_events > limits.max_total_relationship_xml_events() as u64 {
         return Err(limit_error(
@@ -375,8 +391,9 @@ pub(crate) fn check_relationship_insertions(
             limits.max_total_relationship_xml_events() as u64,
         ));
     }
-    let total_count = existing_count
-        .saturating_sub(current.relationship_count())
+    let total_count = budget
+        .relationship_count
+        .saturating_sub(budget.owner_plan.relationship_count())
         .saturating_add(plan.relationship_count());
     if total_count > limits.max_total_relationships() {
         return Err(limit_error(
@@ -385,67 +402,15 @@ pub(crate) fn check_relationship_insertions(
             limits.max_total_relationships() as u64,
         ));
     }
-    Ok(())
+    Ok(budget)
 }
 
-/// Return the package-wide relationship ledger once for an operation. The
-/// owner plan is returned so callers can replace that owner's old metrics with
-/// the planned metrics without counting it twice. This preserves the required
-/// cross-owner integrity accounting while avoiding one package scan per raw
-/// insertion in a batch.
-fn relationship_budget(
+/// Check the aggregate payload budget using the package ledger prepared
+/// before serializers or relationship mutations ran. The package is still
+/// unchanged, so the ledger is valid for this final admission step.
+pub(crate) fn check_part_budget_with_ledger(
     package: &litchi_opc::OpcPackage,
-    owner: &litchi_opc::PackURI,
-    limits: &litchi_opc::SourceLimits,
-) -> crate::Result<(usize, u64, u64, usize, litchi_opc::RelationshipSourcePlan)> {
-    let root =
-        litchi_opc::PackURI::new("/").map_err(|error| crate::Error::Invalid(error.to_string()))?;
-    let mut parts = 0usize;
-    let mut bytes = 0u64;
-    let mut events = 0u64;
-    let mut relationships = 0usize;
-    let mut owner_plan = None;
-
-    let mut add = |candidate: &litchi_opc::PackURI| -> crate::Result<()> {
-        let plan = package.plan_source_relationships_with_limits(candidate, *limits)?;
-        parts = parts.saturating_add(usize::from(plan.member_present()));
-        bytes = bytes.saturating_add(plan.final_len() as u64);
-        events = events.saturating_add(plan.event_count() as u64);
-        relationships = relationships.saturating_add(plan.relationship_count());
-        if candidate == owner {
-            owner_plan = Some(plan);
-        }
-        Ok(())
-    };
-
-    add(&root)?;
-    for part in package.iter_parts() {
-        add(part.partname())?;
-    }
-    let owner_plan = owner_plan.ok_or_else(|| {
-        crate::Error::Invalid("relationship owner is not present in package".into())
-    })?;
-    Ok((parts, bytes, events, relationships, owner_plan))
-}
-
-/// Admit aggregate part count and payload bytes before adding new raw parts.
-/// Existing payloads are measured once per operation; callers pass only the
-/// new part bytes because the source owner rewrites are checked separately by
-/// their bounded rewrite helpers.
-pub(crate) fn check_part_budget(
-    package: &litchi_opc::OpcPackage,
-    added_parts: usize,
-    added_bytes: usize,
-    limits: &litchi_opc::SourceLimits,
-) -> crate::Result<()> {
-    check_part_budget_with_replacements(package, added_parts, added_bytes, &[], limits)
-}
-
-/// Admit aggregate payload bytes while accounting for replacements of
-/// existing parts. `replacements` contains the old part and its prospective
-/// new length; added parts are counted separately.
-pub(crate) fn check_part_budget_with_replacements(
-    package: &litchi_opc::OpcPackage,
+    budget: &PackageBudget,
     added_parts: usize,
     added_bytes: usize,
     replacements: &[(&litchi_opc::PackURI, usize)],
@@ -468,11 +433,7 @@ pub(crate) fn check_part_budget_with_replacements(
             limits.max_parts() as u64,
         ));
     }
-    let mut total = 0u64;
-    for part in package.iter_parts() {
-        let size = package.get_part(part.partname())?.blob().len() as u64;
-        total = total.saturating_add(size);
-    }
+    let mut total = budget.part_bytes;
     for (name, replacement_len) in replacements {
         let old = package.get_part(name)?.blob().len() as u64;
         total = total
@@ -488,6 +449,63 @@ pub(crate) fn check_part_budget_with_replacements(
         ));
     }
     Ok(())
+}
+
+/// Return relationship and payload totals from one operation-local package
+/// pass. Payload access is intentional: aggregate part-byte admission must
+/// account for the exact bytes that would remain after the replacement.
+fn package_budget(
+    package: &litchi_opc::OpcPackage,
+    owner: &litchi_opc::PackURI,
+    owner_plan: litchi_opc::RelationshipSourcePlan,
+    limits: &litchi_opc::SourceLimits,
+) -> crate::Result<PackageBudget> {
+    let root =
+        litchi_opc::PackURI::new("/").map_err(|error| crate::Error::Invalid(error.to_string()))?;
+    let mut relationship_parts = 0usize;
+    let mut relationship_bytes = 0u64;
+    let mut relationship_events = 0u64;
+    let mut relationship_count = 0usize;
+    let mut part_bytes = 0u64;
+    let mut owner_plan_seen = false;
+
+    let mut add = |candidate: &litchi_opc::PackURI, payload_len: Option<usize>| {
+        let plan = if candidate == owner {
+            owner_plan_seen = true;
+            owner_plan
+        } else {
+            package.plan_source_relationships_with_limits(candidate, *limits)?
+        };
+        relationship_parts = relationship_parts.saturating_add(usize::from(plan.member_present()));
+        relationship_bytes = relationship_bytes.saturating_add(plan.final_len() as u64);
+        relationship_events = relationship_events.saturating_add(plan.event_count() as u64);
+        relationship_count = relationship_count.saturating_add(plan.relationship_count());
+        if let Some(payload_len) = payload_len {
+            part_bytes = part_bytes.saturating_add(payload_len as u64);
+        }
+        Ok(())
+    };
+
+    add(&root, None)?;
+    for part in package.try_iter_parts() {
+        let part = part?;
+        let partname = part.partname();
+        let payload_len = part.blob().len();
+        add(partname, Some(payload_len))?;
+    }
+    if !owner_plan_seen {
+        return Err(crate::Error::Invalid(
+            "relationship owner is not present in package".into(),
+        ));
+    }
+    Ok(PackageBudget {
+        relationship_parts,
+        relationship_bytes,
+        relationship_events,
+        relationship_count,
+        part_bytes,
+        owner_plan,
+    })
 }
 
 /// Parse only the direct worksheet-grid defaults from one `WorksheetPart`.
