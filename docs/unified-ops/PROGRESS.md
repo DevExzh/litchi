@@ -2110,3 +2110,43 @@ See [0063](0063-source-pptx-modern-comments.md).
   Final semantic integration tests, native qualification, corpus dispositions,
   inventory/glossary closure and the complete assembled gate remain required.
   Nothing has been pushed.
+
+- Coordinator checkpoint (2026-10-22, bounded raw models and semantic assembly):
+  Record 0362uc now records all nine combined legacy/ODF semantic groups on
+  `50122ae80a`: 750 tests pass. The runner stopped at its target-size guard
+  before the final ODT group, then passed that group after obsolete check-only
+  metadata was moved outside the target. Both stops and external log hashes
+  are retained; the eight passing groups were not repeated.
+
+  The assembly advances through `8d50e23436`. It integrates bounded DOCX
+  variables through `7dae046af8`, the paragraph raw-codec repair through
+  `e1af87ed91`, DOC body-toggle staging through `2452934481`, signed exact
+  no-op replay through `ba8f9610aa`, and DOCX/iWork error classifications
+  through `938108c265`. Raw paragraph replay accepts reopened matching XML;
+  package replay keeps its full artifact proof and preflights recipient limits
+  before copying. The combined checks on this head are running: variables,
+  the five related DOCX integration suites, DOC atomicity, and DOC/DOCX facade
+  suites have passed. This is an assembly checkpoint, not final acceptance.
+
+  Review record 0360ada returns XLSX raw batch admission, retained-policy and
+  owner-options gaps. Record 0359sa returns legacy raw stale-base errors that
+  still use corruption categories; actual stale replay must be PatchConflict.
+  ODP progress repair now also preserves secondary callback diagnostics; its
+  inline error growth was caught and corrected before integration. The ODP
+  streaming correctness repairs pass on their branch, while matched original
+  0358a lifecycle measurements remain in progress.
+
+  DOC and RTF measurement attribution was tightened. DOC's historical
+  single-route whole-process profile included an unselected 1k batch seed;
+  route-local ordinary-edit instructions are 0.988216 of base, and the probe
+  selection correction is queued as `428bf4d44a`. The RTF cold parser delta
+  disappears with matched executable path/arguments/environment, as recorded
+  in `eabd1d9f47`; native timing and heap qualification remain required. iWork
+  fixes the mutable MessageInfo length admission bypass, but its constructor
+  cost and one retained-validation case remain returned.
+
+  Remaining DOCX raw/document/section/story migrations, signed same-value and
+  cancelling edits, IWA detection consumers, W4/W4b returns, public ODF error
+  boundaries, final inventory/glossary, corpus dispositions, native performance
+  qualification and the complete assembled gate remain required. Only the
+  comprehensive redaction audit is deferred. Nothing has been pushed.

@@ -13,6 +13,13 @@ length but not its grammar. Admit these inexpensive batch invariants before
 serialization or model cloning, and avoid serializing the same model again
 when the admitted bytes can be carried into staging.
 
+Owner edit verbs also take a per-call `&SourceLimits` on this candidate.
+Record 0351 §2.5 requires owner configuration through retained state or
+`edit_x_with_options(EditOptions)`. Preserve the ability to tighten a raw
+insertion through that options entry; the raw parser/record functions retain
+their required explicit limits argument. A raw argument type does not make its
+owner edit method a raw parser.
+
 The limited raw path retains the caller/package intersection, but public load
 helpers and the final graph validation use default limits on reparsing. Thread
 the effective policy through these reads. An opened package's tighter policy
