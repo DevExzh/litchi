@@ -80,7 +80,6 @@ pub(crate) enum RestoreEndpoint {
         package: Arc<SourceBackedPackage>,
         publisher: Arc<dyn DeferredPublisher>,
         fingerprint: OnceLock<(u64, [u8; 32])>,
-        catalog: Option<Catalog>,
         pending: Weak<Deferred>,
     },
 }
@@ -96,13 +95,11 @@ impl Clone for RestoreEndpoint {
                 package,
                 publisher,
                 fingerprint,
-                catalog,
                 pending,
             } => Self::Deferred {
                 package: Arc::clone(package),
                 publisher: Arc::clone(publisher),
                 fingerprint: clone_fingerprint(fingerprint),
-                catalog: catalog.clone(),
                 pending: pending.clone(),
             },
         }
@@ -144,7 +141,6 @@ impl RestoreEndpoint {
                 package: workbook.inner.package_handle(),
                 publisher: Arc::clone(&pending.publish),
                 fingerprint: OnceLock::new(),
-                catalog: pending.catalog.clone(),
                 pending: Arc::downgrade(pending),
             },
         }
@@ -222,7 +218,7 @@ impl RestoreEndpoint {
         let Self::Deferred {
             package: recorded_package,
             publisher,
-            catalog,
+            pending,
             ..
         } = self
         else {
@@ -233,7 +229,12 @@ impl RestoreEndpoint {
         // from that already-retained package instead of copying all of the
         // SourceLimits fields into every deferred endpoint.
         if package.read_limits() == recorded_package.read_limits() {
-            return Ok(catalog.clone());
+            if let Some(catalog) = pending
+                .upgrade()
+                .and_then(|pending| pending.catalog().cloned())
+            {
+                return Ok(Some(catalog));
+            }
         }
         publisher.catalog(package)
     }

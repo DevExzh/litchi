@@ -645,6 +645,26 @@ fn cross_owner_noop_preserves_signed_artifact_and_changed_replay_checks_policy()
 }
 
 #[test]
+fn deferred_endpoint_replays_after_committed_owner_is_dropped() {
+    let source = fixture(Fixture::default());
+    let producer = open_editor(source.clone());
+    let mut edit = producer.edit_tab_state().unwrap();
+    edit.hide("Three").unwrap();
+    let commit = edit.commit().unwrap();
+    let expected = commit.package().to_bytes().unwrap();
+    let patch = commit.patch().clone();
+    drop(commit);
+    drop(producer);
+
+    // The deferred endpoint no longer has its pending owner. It must recover
+    // the workbook catalog from its immutable publisher while preserving the
+    // exact recipient-policy and artifact checks.
+    let recipient = open_editor(source);
+    let replayed = recipient.apply_tab_state(&patch).unwrap();
+    assert_eq!(replayed.package().to_bytes().unwrap(), expected);
+}
+
+#[test]
 fn replay_rechecks_tab_state_target_under_recipient_source_limits() {
     // Keep the before workbook above the bounded extraction scratch size so an
     // exact max_part_bytes policy can admit the source while refusing the
