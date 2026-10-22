@@ -14,8 +14,20 @@ class ReturnTypes:
     def __init__(self, surface):
         self.surface = surface
 
-    def type_at(self, path: tuple[str, ...], args=()):
+    def type_id(self, path: tuple[str, ...]):
         item_id = self.surface.item_ids.get(path)
+        if item_id is not None:
+            return item_id
+        # Direct dependency types need not have a re-export in the caller.
+        # Only canonical external nominal paths qualify, with unique identity.
+        candidates = [key for key, value in self.surface.paths.items()
+                      if tuple(value["path"]) == path
+                      and value["crate_id"] != self.surface.crate_id
+                      and value["kind"] in {"struct", "enum", "union", "type_alias"}]
+        return candidates[0] if len(candidates) == 1 else None
+
+    def type_at(self, path: tuple[str, ...], args=()):
+        item_id = self.type_id(path)
         if item_id is None:
             return None
         return self.resolve({"resolved_path": {
@@ -26,10 +38,37 @@ class ReturnTypes:
         }})
 
     def raw_type_at(self, path: tuple[str, ...]):
-        item_id = self.surface.item_ids.get(path)
+        item_id = self.type_id(path)
         return {"resolved_path": {"id": item_id, "args": None}} if item_id is not None else None
 
+    def policy_type(self, spec, method):
+        """Build a checked type from paths, nested types and method binders."""
+        if isinstance(spec, str):
+            return self.raw_type_at(tuple(spec.split("::")))
+        if not isinstance(spec, dict):
+            return None
+        if set(spec) == {"generic"}:
+            function = self.surface.index.get(self.surface.item_ids.get(method), {}).get("inner", {}).get("function", {})
+            parameters = {p["name"] for p in function.get("generics", {}).get("params", [])
+                          if "type" in p["kind"]}
+            name = spec["generic"]
+            return {"generic": name} if name != "Self" and name in parameters else None
+        if not {"path"} <= set(spec) <= {"path", "type_args"}:
+            return None
+        value = self.raw_type_at(tuple(spec["path"].split("::")))
+        args = [self.policy_type(arg, method) for arg in spec.get("type_args", [])]
+        if value is None or any(arg is None for arg in args):
+            return None
+        value["resolved_path"]["args"] = {"angle_bracketed": {
+            "args": [{"type": arg} for arg in args], "constraints": [],
+        }}
+        return value
+
     def is_commit(self, path: tuple[str, ...]):
+        if path == ("litchi_core", "edit", "Commit") and self.type_id(path) is not None:
+            # This shared contract is enforced in the core crate. Arbitrary
+            # foreign types merely named Commit are not trusted here.
+            return True
         foreign = self.surface.foreign.get(path)
         if foreign:
             # Dependency members are checked in their defining crate, just as

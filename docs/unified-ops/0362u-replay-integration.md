@@ -53,3 +53,10 @@ old full-run schedule: preserve completed and failed group receipts, integrate
 the committed RTF, DOCX, durable-Ink and raw-policy slices, then run affected
 validation on the combined source. The interrupted 225-group run is partial
 evidence, not a complete test or acceptance gate.
+
+The trunk merge brings in `a18593385c`, including 0362qa's shared generic
+return checker. Its four Python implementation/test files match trunk
+exactly; the assembled glossary retains the newer DOCX/PPTX/RTF registrations
+and all W4/File profiles. Curated matrix exclusions are the union of both
+parents, without overwriting a conflicting disposition. All 40 return-checker
+tests and `unified_bench_matrix.py --check` pass after this resolution.

@@ -113,7 +113,7 @@ def rows(document, crate: str, result_rules=None):
     verified_results = set()
     for rule in result_rules:
         path = tuple(rule["method"].split("::"))
-        args = [return_types.raw_type_at(tuple(arg.split("::")))
+        args = [return_types.policy_type(arg, path)
                 for arg in rule.get("type_args", [])]
         if (return_types.is_commit(tuple(rule["ok"].split("::")))
                 and not any(arg is None for arg in args)

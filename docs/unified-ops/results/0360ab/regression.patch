@@ -1,0 +1,21 @@
+diff --git a/crates/litchi-ooxml-common/src/properties/transaction_tests.rs b/crates/litchi-ooxml-common/src/properties/transaction_tests.rs
+index 4cae8c1493..77a2f3983c 100644
+--- a/crates/litchi-ooxml-common/src/properties/transaction_tests.rs
++++ b/crates/litchi-ooxml-common/src/properties/transaction_tests.rs
+@@ -268,6 +268,7 @@ fn composed_no_op_scopes_are_checked_instead_of_dropped() {
+     // it retains the affected before image and remains an authenticated
+     // no-op on the original owner only.
+     let round_trip = changed.compose(&changed.inverse()).unwrap();
++    round_trip.compose(&app_patch).expect("a cancelled core edit can precede an app edit");
+     let mut exact = source.clone();
+     assert!(!round_trip.apply(&mut exact).unwrap());
+     let mut after = source.clone();
+@@ -292,6 +293,8 @@ fn composed_no_op_scope_authenticates_absent_property_families() {
+     let composed = no_op.compose(&changed).unwrap();
+     let mut composed_package = empty.clone();
+     composed.apply(&mut composed_package).unwrap();
++    composed.inverse().apply(&mut composed_package).expect("the inverse accepts its own publication with other families absent");
++    composed.apply(&mut composed_package).unwrap();
+     let mut expected = empty.clone();
+     changed.apply(&mut expected).unwrap();
+     assert_eq!(
