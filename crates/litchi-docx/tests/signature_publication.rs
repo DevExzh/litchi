@@ -4,7 +4,8 @@
 )]
 use litchi_core::Position;
 use litchi_docx::Package;
-use litchi_docx::document::{HistoryLimits, RevisionKind};
+use litchi_docx::document::composition::HistoryLimits;
+use litchi_docx::document::{RevisionKind, raw};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter};
 use std::io::Cursor;
@@ -52,7 +53,7 @@ fn revision_publication_requires_explicit_unsign_and_keeps_noops_exact() {
     let original = signed_source();
     let mut package = Package::from_reader(Cursor::new(original.as_slice())).unwrap();
     let snapshot = package.document_snapshot().unwrap();
-    let noop = snapshot.edit().commit().unwrap();
+    let noop = package.edit().unwrap().commit().unwrap();
     let unchanged = package.apply(noop.patch()).unwrap().into_package();
     assert!(std::ptr::eq(package.opc_package(), unchanged.opc_package()));
     assert!(package.is_signed());
@@ -60,7 +61,7 @@ fn revision_publication_requires_explicit_unsign_and_keeps_noops_exact() {
     assert_eq!(bytes(&unchanged), original);
     assert_eq!(bytes(&package), original);
 
-    let mut edit = snapshot.edit();
+    let mut edit = package.clone().unsign().edit().unwrap();
     edit.accept_revision(Position::new(0), RevisionKind::Insertion, Position::new(0))
         .unwrap();
     let commit = edit.commit().unwrap();
@@ -96,7 +97,7 @@ fn revision_publication_requires_explicit_unsign_and_keeps_noops_exact() {
     assert!(!package.is_signed());
     assert_eq!(
         package.document_snapshot().unwrap().xml_bytes(),
-        commit.snapshot().xml_bytes()
+        commit.patch().target().xml_bytes()
     );
     package = package
         .apply_durable_document(&durable.inverse())
@@ -113,11 +114,11 @@ fn signed_undo_and_redo_restore_history_cursor_on_refusal() {
     let original = signed_source();
     let source = Package::from_reader(Cursor::new(original.as_slice())).unwrap();
     let snapshot = source.document_snapshot().unwrap();
-    let mut edit = snapshot.edit();
+    let mut edit = source.clone().unsign().edit().unwrap();
     edit.accept_revision(Position::new(0), RevisionKind::Insertion, Position::new(0))
         .unwrap();
     let commit = edit.commit().unwrap();
-    let target = signed_document(commit.snapshot().xml_bytes());
+    let target = signed_document(commit.patch().target().xml_bytes());
     let package = Package::from_reader(Cursor::new(target.as_slice())).unwrap();
     let mut history = snapshot.history(HistoryLimits::new(4, 4 * 1024 * 1024));
     history.record(commit.clone()).unwrap();
@@ -125,7 +126,10 @@ fn signed_undo_and_redo_restore_history_cursor_on_refusal() {
     assert!(package.undo_document(&mut history).is_err());
     assert!(history.can_undo());
     assert!(!history.can_redo());
-    assert_eq!(history.current().xml_bytes(), commit.snapshot().xml_bytes());
+    assert_eq!(
+        history.current().xml_bytes(),
+        commit.patch().target().xml_bytes()
+    );
     assert_eq!(bytes(&package), target);
 
     assert!(history.undo());
@@ -327,13 +331,14 @@ fn opaque_signature_members_allow_noop_but_refuse_raw_and_semantic_changes() {
 
     let mut package = Package::from_reader(Cursor::new(original)).unwrap();
     let snapshot = package.document_snapshot().unwrap();
-    let mut edit = snapshot.edit();
+    let mut edit =
+        raw::Tree::from_xml(snapshot.xml_bytes().to_vec(), raw::Limits::default()).unwrap();
     edit.accept_revision(Position::new(0), RevisionKind::Insertion, Position::new(0))
         .unwrap();
-    let commit = edit.commit().unwrap();
+    let patch = edit.patch().unwrap();
     package = package.unsign();
     assert!(package.is_signed());
-    assert!(package.apply(commit.patch()).is_err());
+    assert!(package.apply(&patch).is_err());
     assert_eq!(
         package.document_snapshot().unwrap().xml_bytes(),
         snapshot.xml_bytes()

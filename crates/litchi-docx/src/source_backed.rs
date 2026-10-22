@@ -161,6 +161,26 @@ pub struct Package {
     /// The pending output of a committed package (record 0355a); its
     /// physical source is the materialized output.
     deferred: Option<Arc<deferred::Deferred>>,
+    /// A complete-artifact fingerprint memo for a generic source or an
+    /// immutable effective topology. Owned physical sources use the memo
+    /// already retained by `SourceArtifact` and keep this field empty.
+    artifact_fingerprint: Option<ArtifactFingerprintMemo>,
+}
+
+#[derive(Clone)]
+enum ArtifactFingerprintMemo {
+    Source(Arc<Mutex<Option<(SourceVersion, [u8; 32])>>>),
+    Effective(Arc<OnceLock<(u64, [u8; 32])>>),
+}
+
+impl ArtifactFingerprintMemo {
+    fn source() -> Self {
+        Self::Source(Arc::new(Mutex::new(None)))
+    }
+
+    fn effective() -> Self {
+        Self::Effective(Arc::new(OnceLock::new()))
+    }
 }
 
 /// A checked selector for one active `w:altChunk` anchor in the main story.
@@ -424,6 +444,11 @@ impl Package {
         let main = package.main_document_part()?;
         validate_document_main_content_type(main.content_type())?;
         package.check_execution()?;
+        let artifact_fingerprint = if package.source_artifact().has_fingerprint_memo() {
+            None
+        } else {
+            Some(ArtifactFingerprintMemo::source())
+        };
         // The report starts with the packaging repairs made at open; see
         // `crate::leniency`.
         let mut tolerance = crate::leniency::ToleranceReport::default();
@@ -439,6 +464,7 @@ impl Package {
             main_admission: Arc::new(Mutex::new(None)),
             main_snapshot: Arc::new(Mutex::new(None)),
             deferred: None,
+            artifact_fingerprint,
         })
     }
 
@@ -1250,11 +1276,12 @@ impl Package {
         )?)
     }
 
-    /// Load the exact raw main-document bytes as a semantic transaction
-    /// snapshot.
+    /// Load the exact raw main-document bytes as the source for the canonical
+    /// owner edit. Standalone XML changes use [`crate::document::raw::Tree`]
+    /// with a required [`crate::document::raw::Limits`] policy.
     ///
-    /// The snapshot edits and publishes the source bytes while readers see
-    /// the markup-compatibility projection, so a document is admitted only
+    /// The owner edits and publishes the retained source bytes while readers
+    /// see the markup-compatibility projection, so a document is admitted only
     /// when the two agree on everything either reads (one bounded proof, no
     /// projection built): it never mentions the markup-compatibility
     /// namespace, binds it and uses nothing in it, or carries one valid
@@ -1288,8 +1315,9 @@ impl Package {
     /// Start an isolated semantic edit retaining this complete source owner.
     ///
     /// Commit returns a new immutable package without serializing a ZIP.
-    /// For the transitional raw stream publishers, explicitly start with
-    /// `document_snapshot()?.edit()` instead.
+    /// For standalone XML editing, use [`crate::document::raw::Tree`] with a
+    /// required [`crate::document::raw::Limits`] policy; package publication
+    /// continues through this owner edit.
     ///
     /// # Errors
     ///
@@ -1297,6 +1325,29 @@ impl Package {
     pub fn edit(&self) -> TransactionResult<crate::document::Edit<Self>> {
         let (_, snapshot) = self.main_document_snapshot("edit", true)?;
         Ok(crate::document::Edit::new(self.clone(), snapshot.edit()))
+    }
+
+    /// Publish one joined document composition through this source owner. The
+    /// source identity and current source version are checked before staging,
+    /// then all accepted operations share one validation and deferred package
+    /// publication pass.
+    pub fn apply_composition(
+        &self,
+        composition: crate::document::composition::Composition,
+    ) -> TransactionResult<crate::document::Commit<Self>> {
+        let (source, operations, artifact_fingerprint) = composition.into_parts();
+        let (_, current) = self.main_document_snapshot("apply_composition", true)?;
+        if current.xml_bytes() != source.xml_bytes() {
+            return Err(crate::document::Error::PatchConflict);
+        }
+        if let Some(expected) = artifact_fingerprint
+            && self.output_fingerprint()? != expected
+        {
+            return Err(crate::document::Error::PatchConflict);
+        }
+        let mut edit = crate::document::Edit::new(self.clone(), current.edit());
+        edit.apply_composition_operations(&operations)?;
+        edit.commit()
     }
 
     /// Capture document variables from the existing internal settings Part.

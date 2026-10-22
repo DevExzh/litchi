@@ -578,14 +578,15 @@ validates and publishes through the existing immutable application engine;
 `publish_document_commit` are removed. Minimal/full profiles ban their return
 and ban `snapshot` on the canonical commit type.
 
-Standalone XML and source-backed publication explicitly use the transitional
-`document::snapshot::{Edit, Commit}` types. They are distinct nominal types,
-not aliases for the canonical package family. Snapshot composition/history and
-source stream publishers still require owner migration; no complete family is
-registered until that work and the remaining limit/policy contracts are finished. The root patch still
-uses main-XML equality for ordinary eager sources; full package lineage remains
-required for owner-wide conformance. Broad content-safe Debug cleanup remains
-pending beyond the new canonical Edit/Commit implementations.
+Standalone XML editing uses `document::raw::Tree` with required caller-selected
+`document::raw::Limits`; it emits bytes and reversible patches without a raw
+snapshot-publishing commit. Package-bound eager and source-backed edits both
+publish the canonical `document::Commit<P>`. Bounded planning lives under
+`document::composition`: `Prepared` and `Composition` retain recoverable join
+and three-way state, while `Package::apply_composition` performs the one
+owner validation/publication pass. Owner-created compositions bind the complete
+artifact, so equal-content reopened packages are accepted and a changed
+untouched part is refused; a raw XML composition retains XML-only scope.
 
 ## 16. Retained OPC topology foundation (record 0023)
 
@@ -669,12 +670,11 @@ shape for both owners. Source commit checks exact XML identity, protection,
 signatures and source/execution fences through immutable `apply`. Generic Debug
 never formats the owner or authored content.
 
-Legacy stream/history publishers explicitly consume raw
-`document::snapshot::Commit`; their callers start with
-`document_snapshot()?.edit()`. This is not a compatibility alias for the ordinary
-owner entry point. Record 0032 supplies typed `LimitKind`; full family registration still needs
-caller-selected semantic limits, remaining policy vocabulary and specialized ownership migration. Managed donor snapshot
-refusal and unmanaged copy/rescan costs recorded in 0030 remain open.
+History is exposed by `document::composition::History` and records the
+canonical owner commit. Source-backed publication retains deferred output and
+source freshness checks. Record 0032 supplies typed `LimitKind`; raw XML
+admission additionally bounds depth, element count, attributes and attribute
+bytes before layout retention.
 
 
 ## 24. Primary DOCX typed limit errors (record 0032)
@@ -733,7 +733,8 @@ sequences. Run positions here count direct run children, matching
 `NewParagraph` and `NewRun` carry text and typed local properties for these edit
 operations. They are not additional package owners or transaction families.
 Public transactions retain the existing `commit().into_package()` and immutable
-`apply(&patch)` paths. XML-only callers still use `document::snapshot::Edit`.
+`apply(&patch)` paths. XML-only callers use `document::raw::Tree`; composition
+planning and publication use `document::composition` and an owner route.
 
 `LimitKind::FormattingStagingBytes` identifies a conservative fixed staging
 bound for property plans and generated markup. Managed formatting operations
@@ -2721,7 +2722,7 @@ does.
 | `document::ElementStep::SectionProperties` | the body-final `w:sectPr`, position 0, first step only | ✅ 0319 |
 | `Edit::insert_break_at(paragraph, at, RunBreakType) -> Position` | a new run holding one `w:br`, before direct run `at` or appended; returns the new run's position (record 0319, P1 marks) | ✅ 0319 |
 | `Edit::{insert_bookmark_at(paragraph, at, name, text) -> i64, insert_field_at(paragraph, at, instruction, result) -> Position}` (snapshot and package edits); `document::fields::Update::{Instruction, RenameBookmark, RemoveBookmark}` | a bookmark around optional text (the identifier after the largest), a complex field with its cached result, before direct run `at` or appended; field instruction sets mark the field `w:dirty`; bookmark renames and marker-only removals, spliced through `refresh_fields` (record 0325) | ✅ 0325 |
-| `Edit::edit_story(StoryTarget, FnOnce(&mut snapshot::Edit) -> Result<T, E>)`, `document::StoryTarget::{Part, Note}` | runs the main document's element-path verbs on a header, footer or note story wrapped as a document body, and splices the result back into the part; an unchanged story stages nothing (record 0325) | ✅ 0325 |
+| `Edit::edit_story(StoryTarget, FnOnce(&mut raw::Tree) -> Result<T, E>)`, `document::StoryTarget::{Part, Note}` | runs the main document's element-path verbs on a header, footer or note story wrapped as a document body, and splices the result back into the part; an unchanged story stages nothing (record 0325) | ✅ 0325 |
 | `source_backed::Document::{bookmarks, text_boxes}` | the main story's bookmarks and text boxes, as the eager `Document` reads them | ✅ 0319 |
 
 ## XLSX worksheet feature families (record 0320)
@@ -2957,7 +2958,7 @@ See [0338](unified-ops/0338-xlsx-p0-root-metadata-json-paths.md).
 ## DOCX and PPTX v1 closure (record 0342)
 
 No new transaction family: the DOCX verbs live on the primary
-`document::Edit` (both owners) and its `snapshot::Edit`, beside
+`document::Edit` (both owners) and the standalone `raw::Tree`, beside
 `format_paragraph_at`/`format_run_at`; the PPTX verb on the primary
 `opened::Edit`, beside the record 0333 `set_table_*` verbs.
 
@@ -2972,7 +2973,7 @@ No new transaction family: the DOCX verbs live on the primary
 ## DOCX P0 final: cells, grid columns, hyperlink tips, comment threads (record 0345)
 
 No new transaction family: the grid and tooltip verbs live on the primary
-`document::Edit` (both owners) and its `snapshot::Edit`, beside
+`document::Edit` (both owners) and the standalone `raw::Tree`, beside
 `insert_row_at` and `set_hyperlink_target_at`; the comment verbs stay on the
 eager package-bound `Edit` beside `add_comment_at`/`set_comment`. Native
 comment identifiers remain the selectors these verbs take; `w14:paraId`

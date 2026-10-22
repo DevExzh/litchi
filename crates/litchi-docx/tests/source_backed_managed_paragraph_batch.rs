@@ -16,11 +16,13 @@ use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionError, ExecutionLimits, Limits,
     OwnedSource, Position, ReadAt, Resource, SourceVersion,
 };
-use litchi_docx::document::{Error as TransactionError, ParagraphTextReplacement, Refusal};
+use litchi_docx::document::{Commit, Error as TransactionError, ParagraphTextReplacement, Refusal};
 use litchi_docx::{Error, SourceLimits, source_backed};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{OpcError, OpcPackage, PackURI};
 use soapberry_zip::office::StreamingArchiveWriter;
+
+type ManagedCommit = Commit<source_backed::Package>;
 
 /// Record 0355a: a detached main-document commit replays onto a
 /// source-backed package (`Package::apply`), and its inverse patch restores
@@ -42,7 +44,7 @@ trait PublishDocument {
     fn publish_with_inverse(
         &self,
         writer: impl io::Write,
-        commit: &litchi_docx::document::snapshot::Commit,
+        commit: &ManagedCommit,
     ) -> Result<Published, TransactionError>;
     fn publish_inverse(
         &self,
@@ -55,13 +57,13 @@ impl PublishDocument for source_backed::Package {
     fn publish_with_inverse(
         &self,
         writer: impl io::Write,
-        commit: &litchi_docx::document::snapshot::Commit,
+        commit: &ManagedCommit,
     ) -> Result<Published, TransactionError> {
         let applied = self.apply(commit.patch())?;
         applied.package().write_to(writer)?;
         Ok(Published {
             patch: applied.patch().clone(),
-            snapshot: commit.snapshot().clone(),
+            snapshot: commit.patch().target().clone(),
         })
     }
 
@@ -294,16 +296,17 @@ fn managed_batch_matches_repeated_scalar_xml_and_preserves_unknown_members() {
 
     let (batch_budget, _batch_cancel, batch_package) = managed(source.clone());
     let batch_snapshot = batch_package.document_snapshot().unwrap();
-    let mut batch_edit = batch_snapshot.edit();
+    let mut batch_edit = batch_package.edit().unwrap();
     batch_edit
         .replace_body_paragraph_texts(&replacements)
         .unwrap();
     let batch_commit = batch_edit.commit().unwrap();
-    let batch_xml = batch_commit.snapshot().xml_bytes().to_vec();
+    let batch_xml = batch_commit.patch().target().xml_bytes().to_vec();
     for replacement in &replacements {
         assert_eq!(
             batch_commit
-                .snapshot()
+                .patch()
+                .target()
                 .paragraph(replacement.position())
                 .unwrap()
                 .text()
@@ -328,14 +331,14 @@ fn managed_batch_matches_repeated_scalar_xml_and_preserves_unknown_members() {
 
     let (scalar_budget, _scalar_cancel, scalar_package) = managed(source.clone());
     let scalar_snapshot = scalar_package.document_snapshot().unwrap();
-    let mut scalar_edit = scalar_snapshot.edit();
+    let mut scalar_edit = scalar_package.edit().unwrap();
     for replacement in &replacements {
         scalar_edit
             .replace_paragraph_text(replacement.position(), replacement.text())
             .unwrap();
     }
     let scalar_commit = scalar_edit.commit().unwrap();
-    assert_eq!(batch_xml, scalar_commit.snapshot().xml_bytes());
+    assert_eq!(batch_xml, scalar_commit.patch().target().xml_bytes());
     let mut scalar_output = Vec::new();
     scalar_package
         .apply(scalar_commit.patch())
@@ -369,7 +372,7 @@ fn managed_batch_forward_and_inverse_are_source_checked() {
     let source = source_bytes();
     let (budget, _cancel, package) = managed(source.clone());
     let snapshot = package.document_snapshot().unwrap();
-    let mut edit = snapshot.edit();
+    let mut edit = package.edit().unwrap();
     edit.replace_body_paragraph_texts(&replacements()).unwrap();
     let commit = edit.commit().unwrap();
     let mut output = Vec::new();
@@ -402,7 +405,7 @@ fn managed_batch_forward_and_inverse_are_source_checked() {
     )
     .unwrap();
     let snapshot = package.document_snapshot().unwrap();
-    let mut edit = snapshot.edit();
+    let mut edit = package.edit().unwrap();
     edit.replace_body_paragraph_texts(&replacements()).unwrap();
     let commit = edit.commit().unwrap();
     mutable.bump_revision();
@@ -433,12 +436,12 @@ fn managed_batch_noop_and_revert_restore_the_exact_source_owner() {
     let (budget, _cancel, package) = managed(source.clone());
     let snapshot = package.document_snapshot().unwrap();
     let source_ptr = snapshot.xml_bytes().as_ptr();
-    let mut edit = snapshot.edit();
+    let mut edit = package.edit().unwrap();
     edit.replace_body_paragraph_texts(&original).unwrap();
     let commit = edit.commit().unwrap();
     assert!(!commit.diagnostics().changed());
     assert!(commit.patch().operations().is_empty());
-    assert_eq!(commit.snapshot().xml_bytes().as_ptr(), source_ptr);
+    assert_eq!(commit.patch().target().xml_bytes().as_ptr(), source_ptr);
     let mut output = Vec::new();
     package
         .apply(commit.patch())
@@ -457,14 +460,14 @@ fn managed_batch_noop_and_revert_restore_the_exact_source_owner() {
     let (budget, _cancel, package) = managed(source.clone());
     let snapshot = package.document_snapshot().unwrap();
     let source_ptr = snapshot.xml_bytes().as_ptr();
-    let mut edit = snapshot.edit();
+    let mut edit = package.edit().unwrap();
     edit.replace_body_paragraph_texts(&replacements()).unwrap();
     assert_ne!(edit.projected().xml_bytes().as_ptr(), source_ptr);
     edit.replace_body_paragraph_texts(&original).unwrap();
     let commit = edit.commit().unwrap();
     assert!(!commit.diagnostics().changed());
     assert!(commit.patch().operations().is_empty());
-    assert_eq!(commit.snapshot().xml_bytes().as_ptr(), source_ptr);
+    assert_eq!(commit.patch().target().xml_bytes().as_ptr(), source_ptr);
     let mut output = Vec::new();
     package
         .apply(commit.patch())
@@ -488,13 +491,13 @@ fn managed_batch_composes_with_scalar_edits_in_either_order() {
 
     let (first_budget, _cancel, first_package) = managed(source.clone());
     let first_snapshot = first_package.document_snapshot().unwrap();
-    let mut first_edit = first_snapshot.edit();
+    let mut first_edit = first_package.edit().unwrap();
     first_edit
         .replace_paragraph_text(Position::new(1), "second scalar")
         .unwrap();
     first_edit.replace_body_paragraph_texts(&batch).unwrap();
     let first_commit = first_edit.commit().unwrap();
-    let first_xml = first_commit.snapshot().xml_bytes().to_vec();
+    let first_xml = first_commit.patch().target().xml_bytes().to_vec();
     let mut first_output = Vec::new();
     first_package
         .apply(first_commit.patch())
@@ -508,7 +511,7 @@ fn managed_batch_composes_with_scalar_edits_in_either_order() {
 
     let (second_budget, _cancel, second_package) = managed(source);
     let second_snapshot = second_package.document_snapshot().unwrap();
-    let mut second_edit = second_snapshot.edit();
+    let mut second_edit = second_package.edit().unwrap();
     second_edit.replace_body_paragraph_texts(&batch).unwrap();
     second_edit
         .replace_paragraph_text(Position::new(1), "second scalar")
@@ -525,11 +528,12 @@ fn managed_batch_composes_with_scalar_edits_in_either_order() {
         .unwrap();
     drop(second_package);
 
-    assert_eq!(first_xml, second_commit.snapshot().xml_bytes());
+    assert_eq!(first_xml, second_commit.patch().target().xml_bytes());
     assert_eq!(first_output, second_output);
     assert_eq!(
         first_commit
-            .snapshot()
+            .patch()
+            .target()
             .paragraph(Position::new(1))
             .unwrap()
             .text()
@@ -548,7 +552,7 @@ fn managed_batch_composes_with_scalar_edits_in_either_order() {
 fn managed_batch_rejects_empty_duplicate_and_unsorted_selectors_atomically() {
     let (budget, _cancel, package) = managed(source_bytes());
     let snapshot = package.document_snapshot().unwrap();
-    let mut edit = snapshot.edit();
+    let mut edit = package.edit().unwrap();
     let before = edit.projected().xml_bytes().to_vec();
     for invalid in [
         Vec::new(),
@@ -581,7 +585,7 @@ fn managed_batch_rejects_empty_duplicate_and_unsorted_selectors_atomically() {
 fn managed_batch_late_leaf_failures_leave_the_staged_projection_unchanged() {
     let (budget, _cancel, package) = managed(source_bytes());
     let snapshot = package.document_snapshot().unwrap();
-    let mut edit = snapshot.edit();
+    let mut edit = package.edit().unwrap();
     edit.replace_paragraph_text(Position::new(0), "first scalar")
         .unwrap();
     let staged = edit.projected().xml_bytes().to_vec();
@@ -630,7 +634,7 @@ fn managed_batch_late_leaf_failures_leave_the_staged_projection_unchanged() {
 fn managed_batch_cancellation_work_and_memory_failures_are_typed_and_release_owners() {
     let (budget, cancellation, package) = managed(source_bytes());
     let snapshot = package.document_snapshot().unwrap();
-    let mut edit = snapshot.edit();
+    let mut edit = package.edit().unwrap();
     let before = edit.projected().xml_bytes().to_vec();
     let work_before = budget.used(Resource::Work);
     let input_before = budget.used(Resource::InputBytes);
@@ -655,9 +659,9 @@ fn managed_batch_cancellation_work_and_memory_failures_are_typed_and_release_own
     assert_eq!(probe_budget.used(Resource::Memory), 0);
 
     let (budget, _cancel, package) =
-        managed_with_work(source_bytes(), FINITE_MEMORY, baseline_work + 1);
+        managed_with_work(source_bytes(), FINITE_MEMORY, baseline_work + 11_000);
     let snapshot = package.document_snapshot().unwrap();
-    let mut edit = snapshot.edit();
+    let mut edit = package.edit().unwrap();
     let before = edit.projected().xml_bytes().to_vec();
     let work_before = budget.used(Resource::Work);
     let input_before = budget.used(Resource::InputBytes);
@@ -678,7 +682,7 @@ fn managed_batch_cancellation_work_and_memory_failures_are_typed_and_release_own
 
     let (budget, _cancel, package) = managed(source_bytes());
     let snapshot = package.document_snapshot().unwrap();
-    let mut edit = snapshot.edit();
+    let mut edit = package.edit().unwrap();
     let before = edit.projected().xml_bytes().to_vec();
     let remaining = budget
         .limit(Resource::Memory)
@@ -711,7 +715,7 @@ fn managed_signed_batch_noop_is_exact_and_change_is_refused() {
 
     let (budget, _cancel, package) = managed(source.clone());
     let snapshot = package.document_snapshot().unwrap();
-    let mut edit = snapshot.edit();
+    let mut edit = package.edit().unwrap();
     edit.replace_body_paragraph_texts(&original).unwrap();
     let commit = edit.commit().unwrap();
     assert!(!commit.diagnostics().changed());
@@ -732,7 +736,7 @@ fn managed_signed_batch_noop_is_exact_and_change_is_refused() {
 
     let (budget, _cancel, package) = managed(source);
     let snapshot = package.document_snapshot().unwrap();
-    let mut edit = snapshot.edit();
+    let mut edit = package.edit().unwrap();
     let result = edit.replace_body_paragraph_texts(&replacements());
     assert!(matches!(
         result,
@@ -749,7 +753,7 @@ fn managed_scalar_paragraph_controls_preserve_projection_and_noops() {
     let (_budget, _cancel, package) = managed(source_bytes());
     let snapshot = package.document_snapshot().unwrap();
     let original = snapshot.xml_bytes().to_vec();
-    let mut edit = snapshot.edit();
+    let mut edit = package.edit().unwrap();
     edit.replace_paragraph_text(Position::new(0), "first\tline\nsecond")
         .unwrap();
     assert_eq!(
@@ -774,86 +778,77 @@ fn managed_scalar_paragraph_controls_preserve_projection_and_noops() {
 
 #[test]
 fn bulk_inline_controls_match_scalar_edits_and_are_reversible() {
-    use litchi_docx::document::Snapshot;
     let (_budget, _cancel, package) = managed(source_bytes());
-    for snapshot in [
-        Snapshot::from_xml(document_xml()).unwrap(),
-        package.document_snapshot().unwrap(),
-    ] {
-        let original = snapshot.xml_bytes().to_vec();
-        let replacements = [
-            ParagraphTextReplacement::new(Position::new(0), "first\tline\nsecond"),
-            ParagraphTextReplacement::new(Position::new(2), "\nthird\t\n"),
-        ];
-        let mut batch = snapshot.edit();
-        batch.replace_body_paragraph_texts(&replacements).unwrap();
-        let mut scalar = snapshot.edit();
-        for replacement in &replacements {
-            scalar
-                .replace_paragraph_text(replacement.position(), replacement.text())
-                .unwrap();
-        }
-        assert_eq!(
-            batch.projected().xml_bytes(),
-            scalar.projected().xml_bytes()
-        );
-        let commit = batch.commit().unwrap();
-        assert_eq!(commit.snapshot().paragraph_count(), 4);
-        for replacement in &replacements {
-            assert_eq!(
-                commit
-                    .snapshot()
-                    .paragraph(replacement.position())
-                    .unwrap()
-                    .text()
-                    .unwrap(),
-                replacement.text()
-            );
-        }
-        let mut repeat = commit.snapshot().edit();
-        repeat.replace_body_paragraph_texts(&replacements).unwrap();
-        let repeat = repeat.commit().unwrap();
-        assert!(!repeat.diagnostics().changed());
-        assert_eq!(repeat.snapshot().xml_bytes(), commit.snapshot().xml_bytes());
+    let original = package.document_snapshot().unwrap().xml_bytes().to_vec();
+    let replacements = [
+        ParagraphTextReplacement::new(Position::new(0), "first\tline\nsecond"),
+        ParagraphTextReplacement::new(Position::new(2), "\nthird\t\n"),
+    ];
+    let mut batch = package.edit().unwrap();
+    batch.replace_body_paragraph_texts(&replacements).unwrap();
+    let mut scalar = package.edit().unwrap();
+    for replacement in &replacements {
+        scalar
+            .replace_paragraph_text(replacement.position(), replacement.text())
+            .unwrap();
+    }
+    assert_eq!(
+        batch.projected().xml_bytes(),
+        scalar.projected().xml_bytes()
+    );
+    let commit = batch.commit().unwrap();
+    assert_eq!(commit.patch().target().paragraph_count(), 4);
+    for replacement in &replacements {
         assert_eq!(
             commit
                 .patch()
-                .inverse()
-                .apply(commit.snapshot())
+                .target()
+                .paragraph(replacement.position())
                 .unwrap()
-                .xml_bytes(),
-            original
+                .text()
+                .unwrap(),
+            replacement.text()
         );
-        assert_eq!(snapshot.xml_bytes(), original);
     }
+    let mut repeat = commit.package().edit().unwrap();
+    repeat.replace_body_paragraph_texts(&replacements).unwrap();
+    let repeat = repeat.commit().unwrap();
+    assert!(!repeat.diagnostics().changed());
+    assert_eq!(
+        repeat.patch().target().xml_bytes(),
+        commit.patch().target().xml_bytes()
+    );
+    assert_eq!(
+        commit
+            .patch()
+            .inverse()
+            .apply(commit.patch().target())
+            .unwrap()
+            .xml_bytes(),
+        original
+    );
 }
 
 #[test]
 fn late_invalid_bulk_control_preserves_an_earlier_staged_edit() {
-    use litchi_docx::document::Snapshot;
     let (_budget, _cancel, package) = managed(source_bytes());
-    for snapshot in [
-        Snapshot::from_xml(document_xml()).unwrap(),
-        package.document_snapshot().unwrap(),
-    ] {
-        for invalid in ["bad\rtext", "bad\u{b}text", "bad\u{1}text"] {
-            let mut edit = snapshot.edit();
-            edit.replace_paragraph_text(Position::new(1), "staged\ntext")
-                .unwrap();
-            let staged = edit.projected().xml_bytes().to_vec();
-            let replacements = [
-                ParagraphTextReplacement::new(Position::new(0), "valid\tfirst"),
-                ParagraphTextReplacement::new(Position::new(2), invalid),
-            ];
-            assert!(matches!(
-                edit.replace_body_paragraph_texts(&replacements),
-                Err(TransactionError::Refused {
-                    position: 2,
-                    reason: Refusal::StructuralText
-                })
-            ));
-            assert_eq!(edit.projected().xml_bytes(), staged);
-        }
+    for invalid in ["bad\rtext", "bad\u{b}text", "bad\u{1}text"] {
+        let mut edit = package.edit().unwrap();
+        edit.replace_paragraph_text(Position::new(1), "staged\ntext")
+            .unwrap();
+        let staged = edit.projected().xml_bytes().to_vec();
+        let replacements = [
+            ParagraphTextReplacement::new(Position::new(0), "valid\tfirst"),
+            ParagraphTextReplacement::new(Position::new(2), invalid),
+        ];
+        assert!(matches!(
+            edit.replace_body_paragraph_texts(&replacements),
+            Err(TransactionError::Refused {
+                position: 2,
+                reason: Refusal::StructuralText
+            })
+        ));
+        assert_eq!(edit.projected().xml_bytes(), staged);
     }
 }
 
@@ -862,7 +857,7 @@ fn managed_bulk_controls_publish_reopen_and_restore_the_exact_archive() {
     let source = source_bytes();
     let (budget, _cancel, package) = managed(source.clone());
     let snapshot = package.document_snapshot().unwrap();
-    let mut edit = snapshot.edit();
+    let mut edit = package.edit().unwrap();
     edit.replace_body_paragraph_texts(&[
         ParagraphTextReplacement::new(Position::new(0), "first\tline\nsecond"),
         ParagraphTextReplacement::new(Position::new(2), "third\nline"),

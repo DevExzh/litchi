@@ -509,13 +509,13 @@ fn build_fixture(paragraph_count: usize, replacement_count: usize) -> AnyResult<
 fn build_preflight(fixture: &Fixture, mode: EditMode) -> AnyResult<Preflight> {
     let package =
         source_backed::Package::from_read_at(Arc::new(OwnedSource::new(fixture.archive.clone())))?;
-    let mut edit = package.document_snapshot()?.edit();
+    let mut edit = package.edit()?;
     stage_edit(&mut edit, fixture, mode)?;
     let commit = edit.commit()?;
     let patch = commit.patch().clone();
     let forward = patch.apply(patch.source())?;
-    let inverse = patch.inverse().apply(commit.snapshot())?;
-    let forward_ok = forward.xml_bytes() == commit.snapshot().xml_bytes();
+    let inverse = patch.inverse().apply(commit.patch().target())?;
+    let forward_ok = forward.xml_bytes() == commit.patch().target().xml_bytes();
     let inverse_ok = inverse.xml_bytes() == patch.source().xml_bytes();
     let mut expected_output = Vec::new();
     package.apply(commit.patch()).and_then(|committed| {
@@ -554,13 +554,13 @@ fn build_managed_preflight(
             .cache_limits(SourceCacheLimits::new(CACHE_BYTES, CACHE_ENTRIES)?)
             .execution_context(context),
     )?;
-    let mut edit = package.document_snapshot()?.edit();
+    let mut edit = package.edit()?;
     stage_edit(&mut edit, fixture, mode)?;
     let commit = edit.commit()?;
     let patch = commit.patch().clone();
     let forward = patch.apply(patch.source())?;
-    let inverse = patch.inverse().apply(commit.snapshot())?;
-    let forward_ok = forward.xml_bytes() == commit.snapshot().xml_bytes();
+    let inverse = patch.inverse().apply(commit.patch().target())?;
+    let forward_ok = forward.xml_bytes() == commit.patch().target().xml_bytes();
     let inverse_ok = inverse.xml_bytes() == patch.source().xml_bytes();
     drop(forward);
     drop(inverse);
@@ -587,8 +587,8 @@ fn build_managed_preflight(
     Ok((forward_ok, inverse_ok, output_exact_ok))
 }
 
-fn stage_edit(
-    edit: &mut litchi_docx::document::snapshot::Edit,
+fn stage_edit<P: Clone>(
+    edit: &mut litchi_docx::document::Edit<P>,
     fixture: &Fixture,
     mode: EditMode,
 ) -> AnyResult<()> {
@@ -668,7 +668,7 @@ fn run_sample(
     let cache_before = package.cache_diagnostics();
 
     let phase_started = Instant::now();
-    let mut edit = package.document_snapshot()?.edit();
+    let mut edit = package.edit()?;
     stage_edit(&mut edit, fixture, config.mode)?;
     let edit_ns = elapsed_ns(phase_started)?;
 

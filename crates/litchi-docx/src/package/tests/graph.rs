@@ -365,77 +365,106 @@ fn package_root_three_way_transfer_history_and_durable_reopen_are_coupled() {
 
     let source = receiver.document_snapshot().unwrap();
     let composition_limits = litchi_core::patch::CompositionLimits::new(8, 16, 48, 8);
-    let mut text = source.edit();
-    text.replace_run_text(
-        litchi_core::Position::new(0),
-        litchi_core::Position::new(0),
-        "receiver edited",
-    )
-    .unwrap();
-    let mut left = source.compose(composition_limits);
-    left.join(text.prepare(composition_limits, "receiver-text").unwrap())
-        .unwrap();
-    let mut transfer = source.edit();
-    transfer
-        .insert_paragraph_transfer(litchi_core::Position::new(1), &plan)
-        .unwrap()
-        .replace_body_hyperlink_texts(&[
-            crate::document::HyperlinkTextReplacement::new(
-                crate::document::ParagraphHyperlinkAddress::new(
-                    litchi_core::Position::new(0),
-                    litchi_core::Position::new(0),
-                ),
-                "receiver link edited",
-            ),
-            crate::document::HyperlinkTextReplacement::new(
-                crate::document::ParagraphHyperlinkAddress::new(
-                    litchi_core::Position::new(1),
-                    litchi_core::Position::new(0),
-                ),
-                "transferred outer link edited",
-            ),
-        ])
-        .unwrap()
-        .replace_nested_content_control_hyperlink_text(
-            litchi_core::Position::new(1),
-            &[litchi_core::Position::new(0), litchi_core::Position::new(0)],
+    let build_composition = || {
+        let mut text = source.edit();
+        text.replace_run_text(
             litchi_core::Position::new(0),
-            "transferred control edited",
+            litchi_core::Position::new(0),
+            "receiver edited",
         )
         .unwrap();
-    let mut right = source.compose(composition_limits);
-    right
-        .join(
-            transfer
-                .prepare(composition_limits, "paragraph-transfer")
-                .unwrap(),
-        )
-        .unwrap();
-    let three_way = source.plan_three_way(left, right).unwrap();
-    assert!(three_way.is_clean());
-    let commit = three_way.finish().unwrap().commit().unwrap();
+        let mut left = receiver.compose(composition_limits).unwrap();
+        left.join(text.prepare(composition_limits, "receiver-text").unwrap())
+            .unwrap();
+        let mut transfer = source.edit();
+        transfer
+            .insert_paragraph_transfer(litchi_core::Position::new(1), &plan)
+            .unwrap()
+            .replace_body_hyperlink_texts(&[
+                crate::document::HyperlinkTextReplacement::new(
+                    crate::document::ParagraphHyperlinkAddress::new(
+                        litchi_core::Position::new(0),
+                        litchi_core::Position::new(0),
+                    ),
+                    "receiver link edited",
+                ),
+                crate::document::HyperlinkTextReplacement::new(
+                    crate::document::ParagraphHyperlinkAddress::new(
+                        litchi_core::Position::new(1),
+                        litchi_core::Position::new(0),
+                    ),
+                    "transferred outer link edited",
+                ),
+            ])
+            .unwrap()
+            .replace_nested_content_control_hyperlink_text(
+                litchi_core::Position::new(1),
+                &[litchi_core::Position::new(0), litchi_core::Position::new(0)],
+                litchi_core::Position::new(0),
+                "transferred control edited",
+            )
+            .unwrap();
+        let mut right = receiver.compose(composition_limits).unwrap();
+        right
+            .join(
+                transfer
+                    .prepare(composition_limits, "paragraph-transfer")
+                    .unwrap(),
+            )
+            .unwrap();
+        source
+            .plan_three_way(left, right)
+            .unwrap()
+            .finish()
+            .unwrap()
+    };
+    let wrong_artifact = transfer_package(
+        receiver_xml,
+        "receiverLink",
+        "receiverImage",
+        b"different image",
+    );
+    assert_eq!(
+        wrong_artifact.document_snapshot().unwrap().xml_bytes(),
+        source.xml_bytes()
+    );
+    assert!(matches!(
+        wrong_artifact.apply_composition(build_composition()),
+        Err(crate::document::Error::PatchConflict)
+    ));
+    let commit = receiver.apply_composition(build_composition()).unwrap();
     assert!(
-        std::str::from_utf8(commit.snapshot().xml_bytes())
+        std::str::from_utf8(commit.patch().target().xml_bytes())
             .unwrap()
             .contains("transferred control edited")
     );
     assert!(
-        std::str::from_utf8(commit.snapshot().xml_bytes())
+        std::str::from_utf8(commit.patch().target().xml_bytes())
             .unwrap()
             .contains("receiver link edited")
     );
     assert!(
-        std::str::from_utf8(commit.snapshot().xml_bytes())
+        std::str::from_utf8(commit.patch().target().xml_bytes())
             .unwrap()
             .contains("transferred outer link edited")
     );
     assert!(
-        std::str::from_utf8(commit.snapshot().xml_bytes())
+        std::str::from_utf8(commit.patch().target().xml_bytes())
             .unwrap()
             .contains("w:tooltip=\"receiver link\"")
     );
+
+    let reopened_receiver =
+        Package::from_reader(Cursor::new(receiver.to_bytes().unwrap())).unwrap();
+    let reopened_commit = reopened_receiver
+        .apply_composition(build_composition())
+        .unwrap();
+    assert_eq!(
+        reopened_commit.patch().target().xml_bytes(),
+        commit.patch().target().xml_bytes()
+    );
     assert!(
-        std::str::from_utf8(commit.snapshot().xml_bytes())
+        std::str::from_utf8(commit.patch().target().xml_bytes())
             .unwrap()
             .contains("w:tooltip=\"transferred nested link\"")
     );
@@ -457,7 +486,7 @@ fn package_root_three_way_transfer_history_and_durable_reopen_are_coupled() {
         )
         .unwrap();
     let relationships_before = document_relationship_inventory(&receiver);
-    let history_budget = u64::try_from(commit.snapshot().xml_bytes().len()).unwrap() * 2;
+    let history_budget = u64::try_from(commit.patch().target().xml_bytes().len()).unwrap() * 2;
     let mut history = source.history(litchi_core::patch::HistoryLimits::new(4, history_budget));
     receiver = receiver
         .publish_document_commit_with_history(commit.clone(), &mut history)
@@ -487,7 +516,7 @@ fn package_root_three_way_transfer_history_and_durable_reopen_are_coupled() {
     let reopened = Package::from_reader(Cursor::new(output.into_inner())).unwrap();
     assert_eq!(
         reopened.document_snapshot().unwrap().xml_bytes(),
-        commit.snapshot().xml_bytes()
+        commit.patch().target().xml_bytes()
     );
     assert_eq!(
         document_relationship_inventory(&reopened),
@@ -507,7 +536,7 @@ fn package_root_three_way_transfer_history_and_durable_reopen_are_coupled() {
     let durable_reopened = Package::from_reader(Cursor::new(durable_output.into_inner())).unwrap();
     assert_eq!(
         durable_reopened.document_snapshot().unwrap().xml_bytes(),
-        commit.snapshot().xml_bytes()
+        commit.patch().target().xml_bytes()
     );
 
     let mut stale_receiver =
@@ -567,7 +596,7 @@ fn package_root_three_way_transfer_history_and_durable_reopen_are_coupled() {
     let copied_plan = mismatched
         .plan_paragraph_transfer_from(&donor, litchi_core::Position::new(0))
         .unwrap();
-    let mut copied_edit = mismatched_source.edit();
+    let mut copied_edit = mismatched.edit().unwrap();
     copied_edit
         .insert_paragraph_transfer(litchi_core::Position::new(1), &copied_plan)
         .unwrap();

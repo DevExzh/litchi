@@ -142,7 +142,7 @@ pub(crate) fn validate_document_main_content_type(content_type: &str) -> Result<
 #[derive(Clone)]
 pub struct Package {
     /// The underlying OPC package
-    pub(super) opc: Shared<OpcPackage>,
+    pub(super) opc: SharedOpc,
     /// Package-scoped clean paragraph memo; entries are invalidated by source
     /// allocation identity when the main relationship or payload changes.
     pub(super) paragraph_index_cache: std::sync::Arc<ParagraphIndexCache>,
@@ -195,6 +195,85 @@ impl<T> std::ops::Deref for Shared<T> {
 impl<T: Clone> std::ops::DerefMut for Shared<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         std::sync::Arc::make_mut(&mut self.0)
+    }
+}
+
+/// The OPC graph's output memo belongs with that graph, rather than in a
+/// package-wide one-entry table. Keeping the weak key and digest inline makes
+/// package clones independent without allocating an invalidation counter for
+/// every shared metadata field.
+///
+/// A clone copies the memo for the same immutable graph. `Arc::make_mut`
+/// dissociates any live weak key before an in-place mutation, so a changed
+/// branch cannot reuse its old digest while the original branch keeps its
+/// memo. A failed or no-op mutable borrow may therefore recompute on that
+/// branch, but it cannot publish a stale fingerprint.
+pub(super) struct SharedOpc {
+    value: std::sync::Arc<OpcPackage>,
+    fingerprint: std::sync::Mutex<Option<(std::sync::Weak<OpcPackage>, [u8; 32])>>,
+}
+
+impl Clone for SharedOpc {
+    fn clone(&self) -> Self {
+        Self {
+            value: std::sync::Arc::clone(&self.value),
+            fingerprint: std::sync::Mutex::new(
+                self.fingerprint
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .clone(),
+            ),
+        }
+    }
+}
+
+impl SharedOpc {
+    pub(super) fn shared(&self) -> std::sync::Arc<OpcPackage> {
+        std::sync::Arc::clone(&self.value)
+    }
+
+    pub(super) fn fingerprint(&self) -> Option<[u8; 32]> {
+        let current = std::sync::Arc::downgrade(&self.value);
+        self.fingerprint
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .as_ref()
+            .filter(|(cached, _)| cached.strong_count() != 0 && cached.ptr_eq(&current))
+            .map(|(_, fingerprint)| *fingerprint)
+    }
+
+    pub(super) fn remember_fingerprint(&self, fingerprint: [u8; 32]) {
+        *self
+            .fingerprint
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) =
+            Some((std::sync::Arc::downgrade(&self.value), fingerprint));
+    }
+}
+
+impl From<OpcPackage> for SharedOpc {
+    fn from(value: OpcPackage) -> Self {
+        Self {
+            value: std::sync::Arc::new(value),
+            fingerprint: std::sync::Mutex::new(None),
+        }
+    }
+}
+
+impl std::ops::Deref for SharedOpc {
+    type Target = OpcPackage;
+
+    fn deref(&self) -> &Self::Target {
+        &self.value
+    }
+}
+
+impl std::ops::DerefMut for SharedOpc {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        // `Arc::make_mut` dissociates live weak references before returning a
+        // mutable graph, which fences the old digest without a generation
+        // counter or a package-wide invalidation allocation.
+        std::sync::Arc::make_mut(&mut self.value)
     }
 }
 

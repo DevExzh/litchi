@@ -5,6 +5,23 @@ use super::transfer::{
     apply_graph_change, apply_transfer_graph, relationship_graph_digest,
     relationship_graph_digest_opc,
 };
+use sha2::{Digest as _, Sha256};
+use std::io::{self, Write};
+
+struct ArtifactFingerprintWriter {
+    hasher: Sha256,
+}
+
+impl Write for ArtifactFingerprintWriter {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        self.hasher.update(bytes);
+        Ok(bytes.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
 
 /// The main-document bytes `apply` publishes.
 enum MainReplacement {
@@ -37,6 +54,60 @@ impl Package {
     pub fn edit(&self) -> Result<crate::document::Edit, crate::document::Error> {
         self.document_snapshot()
             .map(|snapshot| crate::document::Edit::new(self.clone(), snapshot.edit()))
+    }
+
+    /// Start a bounded composition tied to this package's complete artifact.
+    /// Reopened equal-content packages may publish it; a package with a
+    /// different untouched part is refused before document staging.
+    pub fn compose(
+        &self,
+        limits: litchi_core::patch::CompositionLimits,
+    ) -> Result<crate::document::composition::Composition, crate::document::Error> {
+        let source = self.document_snapshot()?;
+        let fingerprint = self.artifact_fingerprint()?;
+        Ok(source
+            .compose(limits)
+            .with_artifact_fingerprint(fingerprint))
+    }
+
+    fn artifact_fingerprint(&self) -> Result<[u8; 32], crate::document::Error> {
+        if let Some(fingerprint) = self.opc.fingerprint() {
+            return Ok(fingerprint);
+        }
+        let mut writer = ArtifactFingerprintWriter {
+            hasher: Sha256::new(),
+        };
+        self.write_to(&mut writer)?;
+        let digest = writer.hasher.finalize();
+        let mut fingerprint = [0_u8; 32];
+        fingerprint.copy_from_slice(&digest);
+        // `SharedOpc` keeps this memo inline with the immutable graph state;
+        // cloning the package copies the memo while a later mutation clears
+        // only that branch.
+        self.opc.remember_fingerprint(fingerprint);
+        Ok(fingerprint)
+    }
+
+    /// Publish one joined document composition through the complete package
+    /// owner. All accepted operations are staged in one edit and validated in
+    /// one commit; the composition's exact source must still be current.
+    pub fn apply_composition(
+        &self,
+        composition: crate::document::composition::Composition,
+    ) -> Result<crate::document::Commit, crate::document::Error> {
+        let (source, operations, artifact_fingerprint) = composition.into_parts();
+        let current = self.document_snapshot()?;
+        if current.xml_bytes() != source.xml_bytes() {
+            return Err(crate::document::Error::PatchConflict);
+        }
+        if let Some(expected) = artifact_fingerprint
+            && self.artifact_fingerprint()? != expected
+        {
+            return Err(crate::document::Error::PatchConflict);
+        }
+        let mut edit = crate::document::Edit::new(self.clone(), current.edit());
+        edit.apply_composition_operations(&operations)?;
+        edit.commit()
     }
 
     /// Capture an immutable, source-preserving main-document snapshot.
@@ -259,8 +330,8 @@ impl Package {
     /// Returns a stale-source, history-bound, or package-validation error.
     pub fn publish_document_commit_with_history(
         &self,
-        commit: crate::document::snapshot::Commit,
-        history: &mut crate::document::History,
+        commit: crate::document::Commit,
+        history: &mut crate::document::composition::History,
     ) -> Result<crate::document::Commit, crate::document::Error> {
         if history.current().xml_bytes() != commit.patch().source().xml_bytes() {
             return Err(crate::document::Error::PatchConflict);
@@ -295,7 +366,7 @@ impl Package {
     /// failure restores the history cursor before returning.
     pub fn undo_document(
         &self,
-        history: &mut crate::document::History,
+        history: &mut crate::document::composition::History,
     ) -> Result<crate::document::Commit, crate::document::Error> {
         self.publish_history_transition(history, false)
     }
@@ -309,7 +380,7 @@ impl Package {
     /// failure restores the history cursor before returning.
     pub fn redo_document(
         &self,
-        history: &mut crate::document::History,
+        history: &mut crate::document::composition::History,
     ) -> Result<crate::document::Commit, crate::document::Error> {
         self.publish_history_transition(history, true)
     }
@@ -412,7 +483,7 @@ impl Package {
 
     fn publish_history_transition(
         &self,
-        history: &mut crate::document::History,
+        history: &mut crate::document::composition::History,
         redo: bool,
     ) -> Result<crate::document::Commit, crate::document::Error> {
         let current = self.document_snapshot()?;

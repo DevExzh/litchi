@@ -17,6 +17,10 @@ pub enum LimitKind {
     XmlDepth,
     /// XML elements.
     XmlElements,
+    /// Attributes on one XML element.
+    XmlAttributes,
+    /// Raw attribute bytes on one XML element.
+    XmlAttributeBytes,
     /// Block content control path.
     BlockContentControlPath,
     /// Composite hyperlink replacements.
@@ -149,6 +153,8 @@ impl std::fmt::Display for LimitKind {
             Self::XmlBytes => "XML bytes",
             Self::XmlDepth => "XML depth",
             Self::XmlElements => "XML elements",
+            Self::XmlAttributes => "XML attributes",
+            Self::XmlAttributeBytes => "XML attribute bytes",
             Self::BlockContentControlPath => "block content control path",
             Self::CompositeHyperlinkReplacements => "composite hyperlink replacements",
             Self::CompositeParagraphReplacements => "composite paragraph replacements",

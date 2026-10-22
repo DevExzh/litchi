@@ -1255,7 +1255,7 @@ fn execute_api(
     let open_ns = phase_elapsed(open_started)?;
 
     let edit_staging_started = phase_start(config.phase_diagnostics);
-    let mut edit = package.document_snapshot()?.edit();
+    let mut edit = package.edit()?;
     edit.replace_paragraph_text(
         Position::new(prepared.target_position),
         &prepared.replacement_text,
@@ -1271,7 +1271,7 @@ fn execute_api(
     let commit_operations = commit.diagnostics().operations();
     let commit_identity_verified = commit.patch().source().xml_bytes()
         == prepared.source_document_xml.as_slice()
-        && commit.snapshot().xml_bytes() == prepared.candidate_document_xml.as_slice();
+        && commit.patch().target().xml_bytes() == prepared.candidate_document_xml.as_slice();
     let cache_live = package.cache_diagnostics();
     let materializations = cache_live
         .successful_loads

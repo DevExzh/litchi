@@ -12,8 +12,10 @@ use litchi_core::patch::{
 };
 use serde_json::Value;
 
+#[cfg(test)]
+use super::Commit;
 use super::{
-    Commit, CompositionLimits, Edit, Error as TransactionError, GraphChange, HistoryLimits,
+    CompositionLimits, Edit, Error as TransactionError, GraphChange, HistoryLimits,
     MAX_DOCUMENT_XML_BYTES, MAX_OPERATIONS, ManagedAdmission, Operation, Patch, ReplacedPart,
     Result as TransactionResult, RevisionAction, RevisionKind, Snapshot, SourceIdentity,
     TableCellAddress, TransferGraph, TransferPart, TransferRelationship, XmlStorage,
@@ -83,11 +85,11 @@ struct TransferGraphDecoder<'a> {
 }
 
 /// One independently prepared DOCX document edit.
-pub struct PreparedEdit {
+pub struct Prepared {
     inner: SubEdit<Lineage, Vec<Operation>>,
 }
 
-impl PreparedEdit {
+impl Prepared {
     /// Stable caller-selected composition identifier.
     #[must_use]
     pub fn identifier(&self) -> &str {
@@ -101,10 +103,10 @@ impl PreparedEdit {
     }
 }
 
-impl fmt::Debug for PreparedEdit {
+impl fmt::Debug for Prepared {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("PreparedEdit")
+            .debug_struct("Prepared")
             .field("identifier_bytes", &self.identifier().len())
             .field("operations", &self.operations().len())
             .finish()
@@ -114,7 +116,7 @@ impl fmt::Debug for PreparedEdit {
 /// Recoverable failure to join one prepared document edit.
 pub struct JoinError {
     failure: Box<litchi_core::patch::SubEditJoinFailure>,
-    rejected: Box<PreparedEdit>,
+    rejected: Box<Prepared>,
 }
 
 impl JoinError {
@@ -126,7 +128,7 @@ impl JoinError {
 
     /// Recover the rejected prepared edit.
     #[must_use]
-    pub fn into_rejected(self) -> PreparedEdit {
+    pub fn into_rejected(self) -> Prepared {
         *self.rejected
     }
 }
@@ -144,20 +146,36 @@ impl fmt::Debug for JoinError {
 pub struct Composition {
     source: Snapshot,
     joined: JoinedSubEdits<Lineage, Vec<Operation>>,
+    artifact_fingerprint: Option<[u8; 32]>,
 }
 
 impl Composition {
+    /// Borrow the exact immutable source used by this composition.
+    #[must_use]
+    pub const fn source(&self) -> &Snapshot {
+        &self.source
+    }
+
+    /// Bind this plan to the complete package artifact that supplied its
+    /// source document. Package owners use this proof to reject a package
+    /// whose untouched parts differ while still accepting an independently
+    /// reopened equal-content artifact.
+    pub(crate) fn with_artifact_fingerprint(mut self, fingerprint: [u8; 32]) -> Self {
+        self.artifact_fingerprint = Some(fingerprint);
+        self
+    }
+
     /// Join work only when its exact source and semantic effects are disjoint.
     ///
     /// # Errors
     ///
     /// Returns a structured common refusal while retaining the rejected edit.
-    pub fn join(&mut self, incoming: PreparedEdit) -> Result<&mut Self, JoinError> {
+    pub fn join(&mut self, incoming: Prepared) -> Result<&mut Self, JoinError> {
         if let Err(error) = self.joined.join(incoming.inner) {
             let (failure, rejected) = error.into_parts();
             return Err(JoinError {
                 failure: Box::new(failure),
-                rejected: Box::new(PreparedEdit { inner: rejected }),
+                rejected: Box::new(Prepared { inner: rejected }),
             });
         }
         Ok(self)
@@ -175,20 +193,20 @@ impl Composition {
         self.joined.is_empty()
     }
 
-    /// Commit every accepted edit atomically in stable identifier order.
+    /// Consume the plan into its exact source and one stable operation batch.
     ///
-    /// # Errors
-    ///
-    /// Returns a semantic precondition, bound, or XML validation error without
-    /// changing the immutable source snapshot.
-    pub fn commit(self) -> TransactionResult<Commit> {
-        let mut edit = self.source.edit();
-        for prepared in self.joined.into_sub_edits() {
-            for operation in prepared.into_payload() {
-                edit.apply_operation(&operation)?;
-            }
-        }
-        edit.commit()
+    /// Publication is owned by an eager or source-backed package. Keeping this
+    /// extraction crate-private prevents a composition from publishing a raw
+    /// document snapshot while retaining the one validation/commit pass of the
+    /// planner.
+    pub(crate) fn into_parts(self) -> (Snapshot, Vec<Operation>, Option<[u8; 32]>) {
+        let artifact_fingerprint = self.artifact_fingerprint;
+        let operations = self
+            .joined
+            .into_sub_edits()
+            .flat_map(|prepared| prepared.into_payload())
+            .collect();
+        (self.source, operations, artifact_fingerprint)
     }
 }
 
@@ -234,6 +252,7 @@ impl fmt::Debug for ThreeWayError {
 pub struct ThreeWayPlan {
     source: Snapshot,
     inner: ThreeWayMergePlan<Lineage, Vec<Operation>>,
+    artifact_fingerprint: Option<[u8; 32]>,
 }
 
 impl ThreeWayPlan {
@@ -263,12 +282,21 @@ impl ThreeWayPlan {
     ///
     /// Returns this unchanged plan while conflicts remain unresolved.
     pub fn finish(self) -> Result<Composition, Box<Self>> {
-        let Self { source, inner } = self;
+        let Self {
+            source,
+            inner,
+            artifact_fingerprint,
+        } = self;
         match inner.finish() {
-            Ok(joined) => Ok(Composition { source, joined }),
+            Ok(joined) => Ok(Composition {
+                source,
+                joined,
+                artifact_fingerprint,
+            }),
             Err(unresolved) => Err(Box::new(Self {
                 source,
                 inner: *unresolved,
+                artifact_fingerprint,
             })),
         }
     }
@@ -341,14 +369,17 @@ impl History {
         self.inner.limits()
     }
 
-    pub(crate) fn ensure_can_record(&self, commit: &Commit) -> TransactionResult<()> {
-        if self.current().is_managed() || commit.snapshot().is_managed() {
+    pub(crate) fn ensure_can_record<P>(
+        &self,
+        commit: &crate::document::Commit<P>,
+    ) -> TransactionResult<()> {
+        if self.current().is_managed() || commit.patch().target().is_managed() {
             return Err(TransactionError::Document(crate::Error::internal(
                 "document.history.ensure_can_record",
                 "managed history metadata has no retained reservation ledger",
             )));
         }
-        let bytes = history_weight(commit)?;
+        let bytes = history_weight(commit.patch().target(), commit.patch())?;
         if bytes > self.limits().max_weight() {
             return Err(litchi_core::patch::PatchError::HistoryWeight {
                 observed: bytes,
@@ -370,15 +401,49 @@ impl History {
     ///
     /// Returns a history-weight error without changing history when the
     /// published transition alone exceeds the configured byte budget.
-    pub fn record(&mut self, commit: Commit) -> TransactionResult<Vec<Snapshot>> {
-        if self.current().is_managed() || commit.snapshot().is_managed() {
+    pub fn record<P>(
+        &mut self,
+        commit: crate::document::Commit<P>,
+    ) -> TransactionResult<Vec<Snapshot>> {
+        if self.current().is_managed() || commit.patch().target().is_managed() {
             return Err(TransactionError::Document(crate::Error::internal(
                 "document.history.record",
                 "managed history metadata has no retained reservation ledger",
             )));
         }
-        let weight = history_weight(&commit)?;
-        let graph = history_graph_transition(commit.patch.operations())?;
+        let weight = history_weight(commit.patch().target(), commit.patch())?;
+        let graph = history_graph_transition(commit.patch().operations())?;
+        let invalidated_redo = self.redo_graph.len();
+        let discarded = self
+            .inner
+            .record(commit.patch().target().clone(), weight)
+            .map_err(TransactionError::from)?;
+        self.pending_graph = None;
+        self.redo_graph.clear();
+        self.undo_graph.push_back(graph);
+        let evicted = discarded.len().saturating_sub(invalidated_redo);
+        for _ in 0..evicted {
+            let _discarded = self.undo_graph.pop_front();
+        }
+        Ok(discarded)
+    }
+
+    /// Record an internal codec transaction for the transaction module's
+    /// differential tests. Public callers record the canonical owner commit
+    /// through [`Self::record`].
+    #[cfg(test)]
+    pub(crate) fn record_transaction(
+        &mut self,
+        commit: Commit,
+    ) -> TransactionResult<Vec<Snapshot>> {
+        if self.current().is_managed() || commit.snapshot().is_managed() {
+            return Err(TransactionError::Document(crate::Error::internal(
+                "document.history.record_transaction",
+                "managed history metadata has no retained reservation ledger",
+            )));
+        }
+        let weight = history_weight(commit.snapshot(), commit.patch())?;
+        let graph = history_graph_transition(commit.patch().operations())?;
         let invalidated_redo = self.redo_graph.len();
         let discarded = self
             .inner
@@ -430,6 +495,7 @@ impl Snapshot {
         Composition {
             source: self.clone(),
             joined: JoinedSubEdits::new(self.lineage(), limits),
+            artifact_fingerprint: None,
         }
     }
 
@@ -451,11 +517,26 @@ impl Snapshot {
                 right: Box::new(right),
             });
         }
+        let artifact_fingerprint = match (left.artifact_fingerprint, right.artifact_fingerprint) {
+            (Some(left), Some(right)) if left == right => Some(left),
+            (None, None) => None,
+            _ => {
+                return Err(ThreeWayError {
+                    failure: ThreeWayMergeFailure::DifferentLineage,
+                    left: Box::new(left),
+                    right: Box::new(right),
+                });
+            },
+        };
         let source = self.clone();
         let left_source = left.source.clone();
         let right_source = right.source.clone();
         match ThreeWayMergePlan::new(left.joined, right.joined) {
-            Ok(inner) => Ok(ThreeWayPlan { source, inner }),
+            Ok(inner) => Ok(ThreeWayPlan {
+                source,
+                inner,
+                artifact_fingerprint,
+            }),
             Err(error) => {
                 let failure = error.failure().clone();
                 let (left_joined, right_joined) = error.into_branches();
@@ -464,10 +545,12 @@ impl Snapshot {
                     left: Box::new(Composition {
                         source: left_source,
                         joined: left_joined,
+                        artifact_fingerprint,
                     }),
                     right: Box::new(Composition {
                         source: right_source,
                         joined: right_joined,
+                        artifact_fingerprint,
                     }),
                 })
             },
@@ -588,13 +671,7 @@ impl Edit {
         self,
         limits: CompositionLimits,
         identifier: impl Into<String>,
-    ) -> TransactionResult<PreparedEdit> {
-        if self.base.is_managed() {
-            return Err(TransactionError::Document(crate::Error::internal(
-                "document.edit.prepare",
-                "durable composition metadata has no managed owner reservation",
-            )));
-        }
+    ) -> TransactionResult<Prepared> {
         let (reads, writes) = operation_effects(&self.operations, self.base.paragraph_count());
         let inner = SubEdit::new(
             self.base.lineage(),
@@ -604,7 +681,7 @@ impl Edit {
             writes,
             self.operations,
         )?;
-        Ok(PreparedEdit { inner })
+        Ok(Prepared { inner })
     }
 }
 
@@ -790,15 +867,14 @@ pub(crate) fn durable_transfer_operations<Mode>(
         .collect()
 }
 
-fn history_weight(commit: &Commit) -> TransactionResult<u64> {
-    let mut bytes = u64::try_from(commit.snapshot().xml_bytes().len()).map_err(|_error| {
-        TransactionError::Limit {
+fn history_weight(snapshot: &Snapshot, patch: &Patch) -> TransactionResult<u64> {
+    let mut bytes =
+        u64::try_from(snapshot.xml_bytes().len()).map_err(|_error| TransactionError::Limit {
             kind: crate::document::LimitKind::HistoryTransitionBytes,
             maximum: usize::MAX,
-            observed: commit.snapshot().xml_bytes().len(),
-        }
-    })?;
-    if let Some(transition) = history_graph_transition(commit.patch.operations())? {
+            observed: snapshot.xml_bytes().len(),
+        })?;
+    if let Some(transition) = history_graph_transition(patch.operations())? {
         for part in transition.graph.parts.iter() {
             let part_bytes =
                 u64::try_from(part.blob.len()).map_err(|_error| TransactionError::Limit {

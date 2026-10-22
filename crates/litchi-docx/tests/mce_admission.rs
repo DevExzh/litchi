@@ -9,8 +9,6 @@
 //! the same rule to the owning package and the managed route (stage 3), and
 //! keeps every real hazard refused.
 
-use litchi_docx::document::snapshot::Edit;
-
 use std::io::Cursor;
 use std::num::{NonZeroU64, NonZeroUsize};
 use std::sync::Arc;
@@ -19,7 +17,7 @@ use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits, OwnedSource, Position,
     Resource,
 };
-use litchi_docx::document::{Error as TransactionError, Snapshot};
+use litchi_docx::document::{Edit, Error as TransactionError, raw};
 use litchi_docx::{Error, Package, SourceLimits, source_backed};
 use litchi_ooxml_common::mce::admission::{Admission, admit};
 use litchi_ooxml_common::mce::{self, Capabilities};
@@ -151,7 +149,7 @@ fn managed(bytes: &[u8]) -> (Budget, CancellationSource, source_backed::Package)
 
 /// The edit record 0008's probe made: replace the text of the first
 /// paragraph the grammar accepts, or append one paragraph when none is.
-fn first_edit(edit: &mut Edit) {
+fn first_edit<P: Clone>(edit: &mut Edit<P>) {
     let count = edit.source().paragraph_count();
     for position in 0..count {
         if edit
@@ -164,20 +162,6 @@ fn first_edit(edit: &mut Edit) {
     edit.insert_paragraph(Position::new(count), "UO-0011 appended")
         .unwrap();
 }
-fn first_eager_edit(edit: &mut litchi_docx::document::Edit) {
-    let count = edit.source().paragraph_count();
-    for position in 0..count {
-        if edit
-            .replace_paragraph_text(Position::new(position), "UO-0011 replaced")
-            .is_ok()
-        {
-            return;
-        }
-    }
-    edit.insert_paragraph(Position::new(count), "UO-0011 appended")
-        .unwrap();
-}
-
 fn is_protection_refusal(error: &TransactionError) -> bool {
     matches!(
             error,
@@ -230,8 +214,7 @@ fn source_backed_edits_publish_what_the_eager_owner_publishes() {
 
         let package = source(&original);
         let mut edit = package
-            .document_snapshot()
-            .map(|snapshot| snapshot.edit())
+            .edit()
             .unwrap_or_else(|error| panic!("{name}: {error}"));
         first_edit(&mut edit);
         let commit = edit.commit().unwrap();
@@ -246,7 +229,7 @@ fn source_backed_edits_publish_what_the_eager_owner_publishes() {
         let mut edit = owner
             .edit()
             .unwrap_or_else(|error| panic!("{name}: {error}"));
-        first_eager_edit(&mut edit);
+        first_edit(&mut edit);
         let eager_result = edit.commit();
 
         if protected {
@@ -308,12 +291,7 @@ fn exact_no_ops_republish_every_fixture_byte_for_byte() {
     for name in all_fixtures() {
         let original = fixture(name);
         let package = source(&original);
-        let commit = package
-            .document_snapshot()
-            .unwrap()
-            .edit()
-            .commit()
-            .unwrap();
+        let commit = package.edit().unwrap().commit().unwrap();
         assert!(commit.patch().is_noop());
         let mut published = Vec::new();
         package
@@ -351,8 +329,11 @@ fn raw_and_processed_main_parts_agree_on_what_transactions_read() {
             matches!(processed.xml, std::borrow::Cow::Owned(_)),
             "{name}"
         );
-        let source = Snapshot::from_xml(raw.clone()).unwrap();
-        let visible = Snapshot::from_xml(processed.xml.into_owned()).unwrap();
+        let source = raw::Tree::from_xml(raw.clone(), raw::Limits::default()).unwrap();
+        let visible =
+            raw::Tree::from_xml(processed.xml.into_owned(), raw::Limits::default()).unwrap();
+        let source = source.projected();
+        let visible = visible.projected();
         assert_eq!(
             source.paragraph_count(),
             visible.paragraph_count(),

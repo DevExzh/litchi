@@ -982,7 +982,7 @@ fn effective_owner_refuses_unmigrated_operations_and_foreign_candidates() {
     let physical =
         SourceBackedPackage::from_vec(package_bytes(effective_xml("before"), None, false)).unwrap();
     let owner = source_backed::Package::from_source_backed_package(physical.clone()).unwrap();
-    let commit = owner.document_snapshot().unwrap().edit().commit().unwrap();
+    let commit = owner.edit().unwrap().commit().unwrap();
     for changed in [false, true] {
         let mut plan = litchi_opc::SourceTopologyPlan::new();
         if changed {
@@ -1256,9 +1256,9 @@ fn retained_semantic_apply_preserves_graph_edits_and_effective_protection() {
         let owner = owner
             .with_prepared_topology(physical.prepare_topology(plan).unwrap())
             .unwrap();
-        let noop = owner.document_snapshot().unwrap().edit().commit().unwrap();
+        let noop = owner.edit().unwrap().commit().unwrap();
         owner.apply(noop.patch()).unwrap();
-        let mut edit = owner.document_snapshot().unwrap().edit();
+        let mut edit = owner.edit().unwrap();
         edit.replace_paragraph_text(litchi_core::Position::new(0), "after")
             .unwrap();
         let committed = edit.commit().unwrap();

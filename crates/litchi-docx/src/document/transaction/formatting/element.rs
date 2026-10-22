@@ -1085,11 +1085,13 @@ impl Edit {
     ///
     /// ```
     /// use litchi_core::Position;
-    /// use litchi_docx::document::{ElementPath, ElementStep, Snapshot};
+    /// use litchi_docx::document::{raw, ElementPath, ElementStep};
     /// use litchi_docx::properties::Justification;
     ///
-    /// let snapshot = Snapshot::from_xml(
-    ///     r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tr><w:tc><w:p><w:r><w:t>x</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:body></w:document>"#,
+    /// let mut edit = raw::Tree::from_xml(
+    ///     br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tr><w:tc><w:p><w:r><w:t>x</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:body></w:document>"#
+    ///         .to_vec(),
+    ///     raw::Limits::default(),
     /// )?;
     /// let path = ElementPath::new([
     ///     ElementStep::Table(Position::new(0)),
@@ -1097,12 +1099,11 @@ impl Edit {
     ///     ElementStep::Cell(Position::new(0)),
     ///     ElementStep::Paragraph(Position::new(0)),
     /// ]);
-    /// let mut edit = snapshot.edit();
     /// edit.format_paragraph_at(&path, |paragraph| {
     ///     paragraph.justification = Some(Justification::Center);
     /// })?;
-    /// let commit = edit.commit()?;
-    /// let xml = std::str::from_utf8(commit.snapshot().xml_bytes())?;
+    /// let bytes = edit.to_bytes(raw::Limits::default())?;
+    /// let xml = std::str::from_utf8(&bytes)?;
     /// assert!(xml.contains(r#"<w:tc><w:p><w:pPr><w:jc w:val="center"/></w:pPr>"#));
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
@@ -1142,21 +1143,22 @@ impl Edit {
     ///
     /// ```
     /// use litchi_core::Position;
-    /// use litchi_docx::document::{ElementPath, ElementStep, Snapshot};
+    /// use litchi_docx::document::{raw, ElementPath, ElementStep};
     /// use litchi_docx::properties::{Border, BorderStyle, EighthPoints};
     ///
-    /// let snapshot = Snapshot::from_xml(
-    ///     r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tblPr><w:tblW w:w="0" w:type="auto"/></w:tblPr><w:tr><w:tc><w:p/></w:tc></w:tr></w:tbl></w:body></w:document>"#,
+    /// let mut edit = raw::Tree::from_xml(
+    ///     br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tblPr><w:tblW w:w="0" w:type="auto"/></w:tblPr><w:tr><w:tc><w:p/></w:tc></w:tr></w:tbl></w:body></w:document>"#
+    ///         .to_vec(),
+    ///     raw::Limits::default(),
     /// )?;
     /// let path = ElementPath::new([ElementStep::Table(Position::new(0))]);
-    /// let mut edit = snapshot.edit();
     /// edit.format_table_at(&path, |table| {
     ///     let mut border = Border::new(BorderStyle::from_xml("double").unwrap());
     ///     border.size = Some(EighthPoints(8));
     ///     table.borders.get_or_insert_default().top = Some(border);
     /// })?;
-    /// let commit = edit.commit()?;
-    /// let xml = std::str::from_utf8(commit.snapshot().xml_bytes())?;
+    /// let bytes = edit.to_bytes(raw::Limits::default())?;
+    /// let xml = std::str::from_utf8(&bytes)?;
     /// assert!(xml.contains(r#"<w:tblW w:w="0" w:type="auto"/><w:tblBorders><w:top w:val="double" w:sz="8"/></w:tblBorders>"#));
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
@@ -1191,23 +1193,24 @@ impl Edit {
     ///
     /// ```
     /// use litchi_core::Position;
-    /// use litchi_docx::document::{ElementPath, ElementStep, Snapshot};
+    /// use litchi_docx::document::{raw, ElementPath, ElementStep};
     /// use litchi_docx::properties::{Height, HeightRule, Twips};
     ///
-    /// let snapshot = Snapshot::from_xml(
-    ///     r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tr><w:tc><w:p/></w:tc></w:tr></w:tbl></w:body></w:document>"#,
+    /// let mut edit = raw::Tree::from_xml(
+    ///     br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tr><w:tc><w:p/></w:tc></w:tr></w:tbl></w:body></w:document>"#
+    ///         .to_vec(),
+    ///     raw::Limits::default(),
     /// )?;
     /// let path = ElementPath::new([
     ///     ElementStep::Table(Position::new(0)),
     ///     ElementStep::Row(Position::new(0)),
     /// ]);
-    /// let mut edit = snapshot.edit();
     /// edit.format_row_at(&path, |row| {
     ///     row.header = Some(true);
     ///     row.height = Some(Height::new(Twips(400), Some(HeightRule::Exact)));
     /// })?;
-    /// let commit = edit.commit()?;
-    /// let xml = std::str::from_utf8(commit.snapshot().xml_bytes())?;
+    /// let bytes = edit.to_bytes(raw::Limits::default())?;
+    /// let xml = std::str::from_utf8(&bytes)?;
     /// assert!(xml.contains(r#"<w:tr><w:trPr><w:trHeight w:val="400" w:hRule="exact"/><w:tblHeader/></w:trPr>"#));
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
@@ -1782,19 +1785,19 @@ impl Edit {
     ///
     /// ```
     /// use litchi_core::Position;
-    /// use litchi_docx::document::{ElementPath, ElementStep, Snapshot};
+    /// use litchi_docx::document::{raw, ElementPath, ElementStep};
     ///
-    /// let snapshot = Snapshot::from_xml(
-    ///     r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:hyperlink w:anchor="Intro"><w:r><w:t>Intro</w:t></w:r></w:hyperlink></w:p></w:body></w:document>"#,
+    /// let mut edit = raw::Tree::from_xml(
+    ///     br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:hyperlink w:anchor="Intro"><w:r><w:t>Intro</w:t></w:r></w:hyperlink></w:p></w:body></w:document>"#
+    ///         .to_vec(),
+    ///     raw::Limits::default(),
     /// )?;
-    /// let mut edit = snapshot.edit();
     /// let link = ElementPath::new([
     ///     ElementStep::Paragraph(Position::new(0)),
     ///     ElementStep::Hyperlink(Position::new(0)),
     /// ]);
     /// edit.set_hyperlink_tooltip_at(&link, Some("Jump to the introduction"))?;
-    /// let commit = edit.commit()?;
-    /// assert!(String::from_utf8_lossy(commit.snapshot().xml_bytes())
+    /// assert!(String::from_utf8_lossy(&edit.to_bytes(raw::Limits::default())?)
     ///     .contains(r#"w:tooltip="Jump to the introduction""#));
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
@@ -2184,18 +2187,19 @@ impl Edit {
     /// ```
     /// use litchi_core::Position;
     /// use litchi_docx::document::{
-    ///     ElementAnchor, ElementPath, ElementStep, NewParagraph, NewRun, Snapshot,
+    ///     raw, ElementAnchor, ElementPath, ElementStep, NewParagraph, NewRun,
     /// };
     ///
-    /// let snapshot = Snapshot::from_xml(
-    ///     r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tr><w:tc><w:p/></w:tc></w:tr></w:tbl></w:body></w:document>"#,
+    /// let mut edit = raw::Tree::from_xml(
+    ///     br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:tbl><w:tr><w:tc><w:p/></w:tc></w:tr></w:tbl></w:body></w:document>"#
+    ///         .to_vec(),
+    ///     raw::Limits::default(),
     /// )?;
     /// let cell = ElementPath::new([
     ///     ElementStep::Table(Position::new(0)),
     ///     ElementStep::Row(Position::new(0)),
     ///     ElementStep::Cell(Position::new(0)),
     /// ]);
-    /// let mut edit = snapshot.edit();
     /// let position = edit.insert_paragraph_at(
     ///     &cell,
     ///     ElementAnchor::End,
@@ -2245,16 +2249,16 @@ impl Edit {
     ///
     /// ```
     /// use litchi_core::Position;
-    /// use litchi_docx::document::{ElementAnchor, ElementPath, NewTable, Snapshot};
+    /// use litchi_docx::document::{raw, ElementAnchor, ElementPath, NewTable};
     ///
-    /// let snapshot = Snapshot::from_xml(
-    ///     r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/><w:sectPr/></w:body></w:document>"#,
+    /// let mut edit = raw::Tree::from_xml(
+    ///     br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p/><w:sectPr/></w:body></w:document>"#
+    ///         .to_vec(),
+    ///     raw::Limits::default(),
     /// )?;
-    /// let mut edit = snapshot.edit();
     /// let table = NewTable::new(2, 2)?.with_cell_text(1, 1, "d");
     /// assert_eq!(edit.insert_table_at(&ElementPath::body(), ElementAnchor::End, &table)?, Position::new(0));
-    /// let commit = edit.commit()?;
-    /// assert_eq!(commit.snapshot().table_count(), 1);
+    /// assert_eq!(edit.projected().table_count(), 1);
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     ///
