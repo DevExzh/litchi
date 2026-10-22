@@ -451,6 +451,11 @@ impl Package {
         let main = package.main_document_part()?;
         validate_document_main_content_type(main.content_type())?;
         package.check_execution()?;
+        let artifact_fingerprint = if package.source_artifact().has_fingerprint_memo() {
+            None
+        } else {
+            Some(ArtifactFingerprintMemo::source())
+        };
         // The report starts with the packaging repairs made at open; see
         // `crate::leniency`.
         let mut tolerance = crate::leniency::ToleranceReport::default();
@@ -466,11 +471,7 @@ impl Package {
             main_admission: Arc::new(Mutex::new(None)),
             main_snapshot: Arc::new(Mutex::new(None)),
             deferred: None,
-            artifact_fingerprint: if package.source_artifact().has_fingerprint_memo() {
-                None
-            } else {
-                Some(ArtifactFingerprintMemo::source())
-            },
+            artifact_fingerprint,
         })
     }
 
