@@ -1164,7 +1164,9 @@ fn check_minimal_archive_info_constructor(
         .ok_or_else(|| Error::invalid_archive(0, "neutral metadata memory overflow"))?;
     let mut header_length = varint_field_length(1, identifier)?;
     for message_info in &info.message_infos {
-        message_info.validate(limits)?;
+        let message_length = usize::try_from(message_info.length)
+            .map_err(|_| Error::invalid_archive(0, "message length exceeds usize"))?;
+        check_message_length(message_length, limits)?;
         add_limited(
             &mut metadata_items,
             DEFAULT_MESSAGE_VERSIONS.len(),
