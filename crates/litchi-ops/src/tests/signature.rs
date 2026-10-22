@@ -10,10 +10,9 @@
 //!    through the editor the builder returns publishes the edit, the output
 //!    carries no signature part, and the clone that was not unsigned still
 //!    refuses;
-//! 4. an exact no-op through the leaf entry the builder reaches keeps the
-//!    signed input byte for byte (the OOXML leaves); the compound-file leaves
-//!    refuse a signed container outright, so they have no signed no-op path,
-//!    and the test pins that refusal instead.
+//! 4. exact no-ops created through both the signed leaf and the unified
+//!    facade replay only onto an independently opened recipient with the same
+//!    published bytes; an authorized unsigned no-op stays unsigned.
 //!
 //! The DOCX, PPTX and XLSX fixtures are producer-signed (Apache POI's
 //! `xmldsign` corpus). No signed XLSB or compound-file fixture exists, so
@@ -654,7 +653,49 @@ fn every_signed_input_follows_the_explicit_signature_policy() {
             assert!(signed.file().is_signed(), "{what}");
             assert_signed_refusal(&builder_refusal(signed.file()), input.format, &what);
 
-            // 3. `unsign` authorizes a changed commit for the returned file
+            // 3. A signed no-op is created from the signed source itself and
+            // replays onto an independently opened signed recipient without
+            // changing its wrapper or publication bytes.
+            let signed_noop = file
+                .edit(|_| Ok(()))
+                .unwrap_or_else(|error| panic!("{what}: unified signed no-op: {error:?}"));
+            assert!(signed_noop.patch().is_noop(), "{what}");
+            let reopened_signed = crate::open_bytes(file.to_bytes().unwrap())
+                .unwrap_or_else(|error| panic!("{what}: reopen signed: {error:?}"));
+            let replayed = signed_noop
+                .patch()
+                .apply(&reopened_signed)
+                .unwrap_or_else(|error| panic!("{what}: unified signed replay: {error:?}"));
+            assert!(replayed.is_signed(), "{what}: replay lost signature");
+            assert_eq!(
+                replayed.to_bytes().unwrap(),
+                file.to_bytes().unwrap(),
+                "{what}: unified replay changed signed bytes"
+            );
+            let leaf_noop = signed
+                .file()
+                .edit(|_| Ok(()))
+                .unwrap_or_else(|error| panic!("{what}: leaf signed no-op: {error:?}"));
+            let reopened_leaf = match crate::open_bytes(file.to_bytes().unwrap()) {
+                Ok(File::Signed(reopened)) => reopened.file().clone(),
+                Ok(other) => panic!("{what}: expected signed leaf, got {other:?}"),
+                Err(error) => panic!("{what}: reopen signed leaf: {error:?}"),
+            };
+            let replayed_leaf = leaf_noop
+                .patch()
+                .apply(&reopened_leaf)
+                .unwrap_or_else(|error| panic!("{what}: leaf signed replay: {error:?}"));
+            assert!(
+                replayed_leaf.is_signed(),
+                "{what}: leaf replay lost signature"
+            );
+            assert_eq!(
+                replayed_leaf.to_bytes().unwrap(),
+                file.to_bytes().unwrap(),
+                "{what}: leaf replay changed signed bytes"
+            );
+
+            // 4. `unsign` authorizes a changed commit for the returned file
             // only; its output carries no signature part.
             let unsigned = signed.clone().unsign();
             assert!(!unsigned.is_signed(), "{what}");
@@ -663,6 +704,32 @@ fn every_signed_input_follows_the_explicit_signature_policy() {
                 unsigned.text().unwrap(),
                 text,
                 "{what}: unsign rewrote nothing"
+            );
+            let unsigned_bytes = unsigned.to_bytes().unwrap();
+            let reopened_unsigned = crate::open_bytes(unsigned_bytes.clone())
+                .unwrap_or_else(|error| panic!("{what}: reopen unsigned: {error:?}"));
+            assert!(!reopened_unsigned.is_signed(), "{what}");
+            let noop = unsigned
+                .edit(|_| Ok(()))
+                .unwrap_or_else(|error| panic!("{what}: authorized unsigned no-op: {error:?}"));
+            assert!(noop.patch().is_noop(), "{what}");
+            let replayed = noop
+                .patch()
+                .apply(&reopened_unsigned)
+                .unwrap_or_else(|error| panic!("{what}: unsigned replay: {error:?}"));
+            assert!(
+                !replayed.is_signed(),
+                "{what}: unsigned replay gained signature"
+            );
+            assert_eq!(
+                replayed.to_bytes().unwrap(),
+                unsigned_bytes,
+                "{what}: unsigned replay changed bytes"
+            );
+            assert_eq!(
+                noop.patch().apply(&file).unwrap_err().code(),
+                Code::InvalidInput,
+                "{what}: unsigned replay matched signed bytes"
             );
             assert_signed_refusal(&builder_refusal(signed.file()), input.format, &what);
             let (output, expected) = changed_commit(&unsigned);
@@ -675,7 +742,7 @@ fn every_signed_input_follows_the_explicit_signature_policy() {
             );
         }
 
-        // 4. An exact no-op keeps the signed input, signature included.
+        // 5. The per-format leaf transaction still keeps a signed exact no-op.
         assert_exact_noop(input);
     }
 }
@@ -695,14 +762,17 @@ fn an_unlocked_signed_package_is_not_unsigned_into_the_clear() {
     let file = locked
         .unlock(crate::Password::new("signed".to_owned()))
         .unwrap();
-    let File::Signed(signed) = file else {
+    let File::Signed(signed) = &file else {
         panic!("the unlocked package is signed");
     };
+    let signed_noop = file.edit(|_| Ok(())).unwrap();
+    let error = signed_noop.patch().apply(&file).unwrap_err();
+    assert_eq!(error.code(), Code::UnsupportedCapability, "{error:?}");
     assert_signed_refusal(
         &builder_refusal(signed.file()),
         FileFormat::Docx,
         "unlocked",
     );
-    let error = builder_refusal(&signed.unsign());
+    let error = builder_refusal(&signed.clone().unsign());
     assert_eq!(error.code(), Code::UnsupportedCapability, "{error:?}");
 }

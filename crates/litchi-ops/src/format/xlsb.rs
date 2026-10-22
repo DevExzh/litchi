@@ -231,6 +231,12 @@ impl Xlsb {
         if self.signature() == Signature::Signed {
             return Err(signature::refusal(FileFormat::Xlsb));
         }
+        self.check_source_for_replay()
+    }
+
+    /// Check retained source freshness while allowing an exact no-op replay
+    /// to preserve the recipient's existing signature disposition.
+    pub(crate) fn check_source_for_replay(&self) -> Result<()> {
         self.0.owner.ensure_current()
     }
 

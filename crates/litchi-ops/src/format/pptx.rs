@@ -406,6 +406,13 @@ impl Pptx {
         if self.signature() == Signature::Signed {
             return Err(signature::refusal(FileFormat::Pptx));
         }
+        self.check_source_for_replay()
+    }
+
+    /// Check retained source freshness and the protection policy that is
+    /// independent of the signature disposition. Exact no-op patch replay
+    /// uses this after proving the recipient bytes match the patch base.
+    pub(crate) fn check_source_for_replay(&self) -> Result<()> {
         #[cfg(feature = "encryption")]
         if self.requires_reencryption() {
             return Err(Error::new(

@@ -527,8 +527,20 @@ impl File {
         _target: impl IntoTarget<'p>,
         _props: impl IntoProps<'v>,
     ) -> Result<File> {
+        if let Self::Signed(signed) = self {
+            // A signed setter may still prove an exact no-op through the leaf
+            // editor. Keep the outer wrapper and its original publication;
+            // a changed native commit remains protected and can never strip
+            // the signature implicitly.
+            let target = _target.into_target()?;
+            let props = crate::Props::from_props(_props)?;
+            let updated = signed.file().set(target, props)?;
+            if !crate::transaction::same_content_for_replay(&updated, signed.file(), true)? {
+                return Err(protected(self));
+            }
+            return Ok(self.clone());
+        }
         let _props = match self {
-            Self::Signed(_) => return Err(protected(self)),
             Self::Locked(locked) => return Err(locked.read_error()),
             #[allow(unreachable_patterns)]
             _ => crate::Props::from_props(_props)?,
@@ -594,7 +606,6 @@ impl File {
             Self::Odp(handle) => handle
                 .set(_target.into_target()?, _props)
                 .map(|commit| Self::Odp(commit.after)),
-            Self::Signed(_) => Err(protected(self)),
             Self::Locked(locked) => Err(locked.read_error()),
             #[allow(unreachable_patterns)]
             _ => Err(pending(self, "setting properties")),
@@ -740,7 +751,7 @@ fn protected(file: &File) -> Error {
         file,
         Error::new(
             Code::DocumentProtected,
-            "a signed document cannot be edited",
+            "a signed document cannot be changed",
         ),
     )
     .with_suggestion("consume the signature with `Signed::unsign` before editing")
