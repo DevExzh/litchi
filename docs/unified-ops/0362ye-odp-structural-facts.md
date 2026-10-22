@@ -32,10 +32,11 @@ before reuse; the common insertion plan rechecks the source revision before
 and during its proof.  Shares copy the small facts value, while deferred
 owners keep the same source association.
 
-The source/test implementation is commit `126a2bb945` on branch
-`uo2/odp-heap-repair`.  Regression coverage includes direct bounded-fact
-collection, malformed XML open fallback with semantic-read failure, and
-DOCTYPE open acceptance with append refusal.
+The source/test implementation starts at commit `126a2bb945` on branch
+`uo2/odp-heap-repair`; policy and limit-precedence follow-ups are
+`f58aa3b76c` and `3178136432`.  Regression coverage includes direct
+bounded-fact collection, malformed XML open fallback with semantic-read
+failure, and DOCTYPE open acceptance with append refusal.
 
 ## Performance status
 
