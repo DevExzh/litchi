@@ -943,8 +943,8 @@ fn build_materialized_candidate(
     let expected = independent_candidate_xml(source_xml_bytes, &append_text(count))?;
     let output_xml = commit.projected().xml_bytes();
     let candidate_xml_expected = output_xml == expected.as_slice();
-    let wire = commit.patch().to_bytes()?;
-    let durable = litchi_docx::source_backed::paragraph_copy::Patch::from_bytes(&wire)?;
+    let wire = commit.patch().to_bytes(limits)?;
+    let durable = litchi_docx::source_backed::paragraph_copy::Patch::from_bytes(&wire, limits)?;
     let replayed = durable.apply(&snapshot)?;
     let replay_verified = replayed.xml_bytes() == output_xml;
     if !candidate_xml_expected || !replay_verified {

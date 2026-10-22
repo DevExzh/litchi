@@ -69,3 +69,11 @@ tests pass, including forward/inverse/no-op diagnostic assertions. All five
 RTF result rules now register in the assembled policy and pass against the
 worker's fresh unchanged public-surface capture. The command receipts are in
 `results/0362u/rtf-integration.json`; full combined checks remain required.
+
+DOCX paragraph-copy integration through `9f1b3eb45f` applies cleanly after
+0362r. It retains the required raw codec limits and all migrated consumers,
+and replaces the private recursive `TailChange` enum with one direction bit.
+That removes the inverse Box allocation and the unfiltered Clippy failure
+recorded by 0362ua. The worker's final source passes 2,270 all-target tests,
+87 focused tail/index tests and strict all-feature Clippy; combined validation
+is still required and is not inferred from that standalone result.

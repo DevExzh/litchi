@@ -184,9 +184,9 @@ fn publication_raw_copies_unselected_members_and_inverse_restores_exact_artifact
         .inverse()
         .durable()
         .unwrap()
-        .to_bytes()
+        .to_bytes(Limits::default())
         .unwrap();
-    let durable_inverse = Patch::from_bytes(&inverse_wire).unwrap();
+    let durable_inverse = Patch::from_bytes(&inverse_wire, Limits::default()).unwrap();
     let mut durable_restored = Vec::new();
     open(output.clone())
         .apply_plain_paragraph_copy(&durable_inverse.clone().into())
@@ -212,12 +212,24 @@ fn durable_forward_inverse_are_canonical_and_reject_whole_artifact_staleness() {
     edit.copy_plain_paragraph(Position::new(2), Position::new(1))
         .unwrap();
     let commit = edit.commit();
-    let wire = commit.patch().to_bytes().unwrap();
+    let wire = commit.patch().to_bytes(Limits::default()).unwrap();
+    let caller_limits = Limits::new(1024, 4, 100, 8, 2048, wire.len() - 1).unwrap();
+    assert!(matches!(
+        commit.patch().to_bytes(caller_limits),
+        Err(Error::Limit {
+            kind: source_backed::paragraph_copy::LimitKind::DurablePatchBytes,
+            ..
+        })
+    ));
+    assert!(matches!(
+        Patch::from_bytes(&wire, caller_limits),
+        Err(Error::InvalidDurable)
+    ));
     let live_applied = commit.patch().apply(&snapshot).unwrap();
     assert_eq!(live_applied.xml_bytes(), commit.projected().xml_bytes());
-    assert_eq!(wire, commit.patch().to_bytes().unwrap());
-    let durable = Patch::from_bytes(&wire).unwrap();
-    assert_eq!(durable.to_bytes().unwrap(), wire);
+    assert_eq!(wire, commit.patch().to_bytes(Limits::default()).unwrap());
+    let durable = Patch::from_bytes(&wire, Limits::default()).unwrap();
+    assert_eq!(durable.to_bytes(Limits::default()).unwrap(), wire);
     let applied = durable.apply(&snapshot).unwrap();
     assert_eq!(applied.xml_bytes(), commit.projected().xml_bytes());
     let mut published = Vec::new();
@@ -226,8 +238,8 @@ fn durable_forward_inverse_are_canonical_and_reject_whole_artifact_staleness() {
         .and_then(|committed| Ok(committed.package().write_to(&mut published)?))
         .unwrap();
     assert_eq!(reopened_texts(published), ["a", "c", "b", "c"]);
-    let inverse_wire = durable.inverse().to_bytes().unwrap();
-    let inverse = Patch::from_bytes(&inverse_wire).unwrap();
+    let inverse_wire = durable.inverse().to_bytes(Limits::default()).unwrap();
+    let inverse = Patch::from_bytes(&inverse_wire, Limits::default()).unwrap();
     let restored = inverse.apply(&applied).unwrap();
     assert_eq!(restored.xml_bytes(), snapshot.xml_bytes());
 
@@ -244,7 +256,7 @@ fn durable_forward_inverse_are_canonical_and_reject_whole_artifact_staleness() {
     let mut tampered = wire;
     tampered[58..62].copy_from_slice(&0u32.to_le_bytes());
     assert!(matches!(
-        Patch::from_bytes(&tampered),
+        Patch::from_bytes(&tampered, Limits::default()),
         Err(Error::InvalidDurable)
     ));
 }
@@ -353,7 +365,7 @@ fn positions_operation_count_and_resource_limits_are_failure_atomic() {
     edit.copy_plain_paragraph(Position::new(0), Position::new(1))
         .unwrap();
     assert!(matches!(
-        edit.commit().patch().to_bytes(),
+        edit.commit().patch().to_bytes(Limits::default()),
         Err(Error::Limit {
             kind: source_backed::paragraph_copy::LimitKind::DurablePatchBytes,
             ..

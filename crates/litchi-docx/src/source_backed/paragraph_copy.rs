@@ -502,11 +502,16 @@ impl Patch {
     }
 
     /// Encode a canonical bounded durable patch.
-    pub fn to_bytes(&self) -> Result<Vec<u8>> {
+    pub fn to_bytes(&self, limits: Limits) -> Result<Vec<u8>> {
         let total = HEADER_BYTES
             .checked_add(self.before.len())
             .and_then(|value| value.checked_add(self.after.len()))
             .ok_or(Error::InvalidDurable)?;
+        check_limit(
+            LimitKind::DurablePatchBytes,
+            limits.max_durable_bytes,
+            total,
+        )?;
         check_limit(
             LimitKind::DurablePatchBytes,
             self.limits.max_durable_bytes,
@@ -553,8 +558,8 @@ impl Patch {
     }
 
     /// Decode and fully validate a canonical bounded durable patch.
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
-        if bytes.len() > Limits::default().max_durable_bytes || bytes.len() < HEADER_BYTES {
+    pub fn from_bytes(bytes: &[u8], limits: Limits) -> Result<Self> {
+        if bytes.len() > limits.max_durable_bytes || bytes.len() < HEADER_BYTES {
             return Err(Error::InvalidDurable);
         }
         let mut cursor = 0usize;
@@ -820,11 +825,16 @@ impl RemovalPatch {
     }
 
     /// Encode a canonical bounded durable removal patch.
-    pub fn to_bytes(&self) -> Result<Vec<u8>> {
+    pub fn to_bytes(&self, limits: Limits) -> Result<Vec<u8>> {
         let total = HEADER_BYTES
             .checked_add(self.before.len())
             .and_then(|value| value.checked_add(self.after.len()))
             .ok_or(Error::InvalidDurable)?;
+        check_limit(
+            LimitKind::DurablePatchBytes,
+            limits.max_durable_bytes,
+            total,
+        )?;
         check_limit(
             LimitKind::DurablePatchBytes,
             self.limits.max_durable_bytes,
@@ -868,8 +878,8 @@ impl RemovalPatch {
     }
 
     /// Decode and semantically validate a canonical bounded removal patch.
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
-        if bytes.len() > Limits::default().max_durable_bytes || bytes.len() < HEADER_BYTES {
+    pub fn from_bytes(bytes: &[u8], limits: Limits) -> Result<Self> {
+        if bytes.len() > limits.max_durable_bytes || bytes.len() < HEADER_BYTES {
             return Err(Error::InvalidDurable);
         }
         let mut cursor = 0usize;
