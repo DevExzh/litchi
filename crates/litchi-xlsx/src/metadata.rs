@@ -204,13 +204,20 @@ impl Package {
     /// before state and [`Error::Signed`] for a changed patch of a signed
     /// workbook.
     pub fn apply_metadata(&self, patch: &Patch) -> Result<Commit> {
+        if patch.is_noop() {
+            // An exact no-op still authenticates every recorded property
+            // family, but it must not clone the complete OPC graph merely to
+            // discover that no bytes will change.
+            patch.check(self.opc())?;
+            return Ok(Commit {
+                package: self.clone(),
+                patch: patch.clone(),
+                diagnostics: patch.diagnostics(),
+            });
+        }
         let mut candidate = self.opc().clone();
         patch.apply(&mut candidate)?;
-        let package = if patch.is_noop() {
-            self.clone()
-        } else {
-            self.adopt_metadata(candidate)?
-        };
+        let package = self.adopt_metadata(candidate)?;
         Ok(Commit {
             package,
             patch: patch.clone(),

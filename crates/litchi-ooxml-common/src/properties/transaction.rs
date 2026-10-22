@@ -1303,6 +1303,28 @@ impl Patch {
     /// or when one family is removed and then created again under another
     /// part or relationship (one [`Change`] keeps one relationship).
     pub fn compose(&self, next: &Self) -> Result<Self> {
+        // A generated no-op carries a complete, exact before scope. A
+        // changed patch only carries before images for its changed families,
+        // so silently composing the two would discard the no-op's remaining
+        // authentication scope. Reject that composition rather than turning
+        // an exact patch into a selectively authenticated one. Two scoped
+        // no-ops are composable only when they describe the same owner; this
+        // also covers absent families whose free relationship IDs and part
+        // names are part of their scope.
+        if self.changes.is_empty() && next.changes.is_empty() {
+            if let (Some(first), Some(second)) = (&self.scope, &next.scope)
+                && first != second
+            {
+                return Err(Error::Conflict(
+                    "the composed no-op scopes describe different property owners".to_owned(),
+                ));
+            }
+        } else if self.scope.is_some() || next.scope.is_some() {
+            return Err(Error::Conflict(
+                "an exact no-op scope cannot be composed with a changed property patch".to_owned(),
+            ));
+        }
+
         let mut changes = Vec::new();
         for family in [Family::Core, Family::App, Family::Custom] {
             let first = self.changes.iter().find(|change| change.family == family);

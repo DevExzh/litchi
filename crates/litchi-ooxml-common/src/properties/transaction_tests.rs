@@ -213,6 +213,62 @@ fn an_exact_no_op_patch_rejects_a_different_property_owner() {
 }
 
 #[test]
+fn composed_no_op_scopes_are_checked_instead_of_dropped() {
+    let source = full();
+    let snapshot = Snapshot::read(&source, Host::Word).unwrap();
+    let (_, no_op, _) = snapshot.plan().finish().unwrap();
+    let (changed_state, changed) = edited(&snapshot, "Changed");
+    let (_, changed_no_op, _) = changed_state.plan().finish().unwrap();
+
+    // A generated no-op authenticates all three property families. It cannot
+    // be silently reduced to the changed family's before image in either
+    // composition order.
+    assert!(matches!(no_op.compose(&changed), Err(Error::Conflict(_))));
+    assert!(matches!(
+        changed.compose(&changed_no_op),
+        Err(Error::Conflict(_))
+    ));
+
+    // The same exact owner remains composable, while a different property
+    // state is rejected even though both patches are semantic no-ops.
+    assert!(no_op.compose(&no_op).unwrap().is_noop());
+    assert!(matches!(
+        no_op.compose(&changed_no_op),
+        Err(Error::Conflict(_))
+    ));
+
+    // The inverse composition of a changed patch has no complete scope, so
+    // it retains the affected before image and remains an authenticated
+    // no-op on the original owner only.
+    let round_trip = changed.compose(&changed.inverse()).unwrap();
+    let mut exact = source.clone();
+    assert!(!round_trip.apply(&mut exact).unwrap());
+    let mut after = source.clone();
+    changed.apply(&mut after).unwrap();
+    assert!(matches!(
+        round_trip.apply(&mut after),
+        Err(Error::Conflict(_))
+    ));
+}
+
+#[test]
+fn composed_no_op_scope_authenticates_absent_property_families() {
+    let empty = OpcPackage::new();
+    let snapshot = Snapshot::read(&empty, Host::Excel).unwrap();
+    let (_, no_op, _) = snapshot.plan().finish().unwrap();
+    assert!(no_op.compose(&no_op).unwrap().is_noop());
+    let mut exact = empty.clone();
+    assert!(!no_op.apply(&mut exact).unwrap());
+
+    let (changed_state, _) = edited(&snapshot, "Created");
+    let (_, changed_no_op, _) = changed_state.plan().finish().unwrap();
+    assert!(matches!(
+        no_op.compose(&changed_no_op),
+        Err(Error::Conflict(_))
+    ));
+}
+
+#[test]
 fn fields_no_family_stores_are_refused_not_dropped() {
     let snapshot = Snapshot::read(&full(), Host::Word).unwrap();
     let updates: [(Field, fn(&mut Metadata)); 3] = [
