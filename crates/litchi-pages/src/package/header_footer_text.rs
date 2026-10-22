@@ -1721,6 +1721,7 @@ fn precharge_archive_rewrite(
     original_message_bytes: usize,
     rewritten_message_bytes: usize,
     archive_limits: litchi_iwa_core::Limits,
+    snappy_limits: litchi_iwa_core::SnappyLimits,
     budget: &mut TransactionBudget,
 ) -> Result<(usize, usize), Error> {
     let source_archive_bytes = archive
@@ -1749,7 +1750,7 @@ fn precharge_archive_rewrite(
         .and_then(|value| value.checked_add(rewritten_message_bytes))
         .and_then(|value| value.checked_add(framing_slack))
         .ok_or(Error::InvalidSource)?;
-    let compressed_bound = SnappyStream::maximum_compressed_len(archive_bound, Default::default())
+    let compressed_bound = SnappyStream::maximum_compressed_len(archive_bound, snappy_limits)
         .map_err(map_core_error)?;
     budget.observe(LimitKind::OutputBytes, rewritten_message_bytes)?;
     budget.observe(LimitKind::OutputBytes, archive_bound)?;
@@ -1968,16 +1969,24 @@ fn rewrite_storage_component(
     .map_err(map_text_error)?;
     let requirements = prepared.execution_requirements();
     budget.charge_text_requirements(requirements)?;
+    let archive_limits = source
+        .state
+        .source
+        .limits()
+        .effective_archive_limits()
+        .map_err(map_archive_error)?;
+    let snappy_limits = source
+        .state
+        .source
+        .limits()
+        .snappy_limits()
+        .map_err(map_archive_error)?;
     let (archive_bound, compressed_bound) = precharge_archive_rewrite(
         component.archive(),
         message.data.len(),
         requirements.output_bytes(),
-        source
-            .state
-            .source
-            .limits()
-            .effective_archive_limits()
-            .map_err(map_archive_error)?,
+        archive_limits,
+        snappy_limits,
         budget,
     )?;
     let rewritten = prepared
@@ -2061,7 +2070,7 @@ fn rewrite_storage_component(
                 .map_err(map_archive_error)?,
         )
         .map_err(map_core_error)?;
-    let compressed = SnappyStream::compress(&bytes, Default::default()).map_err(map_core_error)?;
+    let compressed = SnappyStream::compress(&bytes, snappy_limits).map_err(map_core_error)?;
     if compressed.len() > compressed_bound {
         return Err(Error::Verification);
     }
@@ -2158,11 +2167,18 @@ fn rewrite_metadata_tokens(
         .limits()
         .effective_archive_limits()
         .map_err(map_archive_error)?;
+    let snappy_limits = source
+        .state
+        .source
+        .limits()
+        .snappy_limits()
+        .map_err(map_archive_error)?;
     let (archive_bound, compressed_bound) = precharge_archive_rewrite(
         component.archive(),
         payload.len(),
         prepared.execution_requirements().output_bytes(),
         archive_limits,
+        snappy_limits,
         budget,
     )?;
     let output = prepared
@@ -2199,7 +2215,7 @@ fn rewrite_metadata_tokens(
         return Err(Error::Verification);
     }
     let bytes = archive.to_bytes(archive_limits).map_err(map_core_error)?;
-    let compressed = SnappyStream::compress(&bytes, Default::default()).map_err(map_core_error)?;
+    let compressed = SnappyStream::compress(&bytes, snappy_limits).map_err(map_core_error)?;
     if compressed.len() > compressed_bound {
         return Err(Error::Verification);
     }

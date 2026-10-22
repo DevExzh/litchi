@@ -821,6 +821,10 @@ fn rewrite_metadata_payload(
         .limits()
         .effective_archive_limits()
         .map_err(|_| Error::InvalidSource)?;
+    let snappy_limits = package
+        .limits()
+        .snappy_limits()
+        .map_err(|_| Error::InvalidSource)?;
     let mut archive =
         Archive::parse(stream.as_bytes(), archive_limits).map_err(|_| Error::InvalidSource)?;
     archive
@@ -861,7 +865,7 @@ fn rewrite_metadata_payload(
     let serialized = archive
         .to_bytes(archive_limits)
         .map_err(|_| Error::InvalidSource)?;
-    SnappyStream::compress(&serialized, Default::default()).map_err(|_| Error::InvalidSource)
+    SnappyStream::compress(&serialized, snappy_limits).map_err(|_| Error::InvalidSource)
 }
 
 fn rewrite_package(
@@ -933,6 +937,10 @@ fn rewrite_package(
         .limits()
         .effective_archive_limits()
         .map_err(|_| Error::InvalidSource)?;
+    let snappy_limits = catalog
+        .limits()
+        .snappy_limits()
+        .map_err(|_| Error::InvalidSource)?;
     let stream = SnappyStream::decompress(
         archive_entry.data(),
         source
@@ -999,7 +1007,7 @@ fn rewrite_package(
     let serialized_soundtrack = archive
         .to_bytes(archive_limits)
         .map_err(|_| Error::InvalidSource)?;
-    let compressed_soundtrack = SnappyStream::compress(&serialized_soundtrack, Default::default())
+    let compressed_soundtrack = SnappyStream::compress(&serialized_soundtrack, snappy_limits)
         .map_err(|_| Error::InvalidSource)?;
 
     let mut data_additions = Vec::new();

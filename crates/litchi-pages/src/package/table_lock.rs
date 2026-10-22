@@ -1575,6 +1575,7 @@ fn rewrite_lock_state(
 ) -> Result<Package, Error> {
     let source_catalog = physical_source(source)?;
     let physical_limits = source_catalog.limits();
+    let snappy_limits = physical_limits.snappy_limits().map_err(map_archive_error)?;
     if State::from_locked(target.explicit_locked.unwrap_or(false)) != before {
         return Err(Error::InvalidSource);
     }
@@ -1602,11 +1603,7 @@ fn rewrite_lock_state(
     budget.charge_payload_work(entry.data().len())?;
     let expected_stream_length = parsed_archive_source_length(component.archive())?;
     budget.charge_archive_inventory(expected_stream_length, component.archive())?;
-    let stream = SnappyStream::decompress(
-        entry.data(),
-        physical_limits.snappy_limits().map_err(map_archive_error)?,
-    )
-    .map_err(map_core_error)?;
+    let stream = SnappyStream::decompress(entry.data(), snappy_limits).map_err(map_core_error)?;
     let stream_length = stream.as_bytes().len();
     if stream_length != expected_stream_length {
         return Err(Error::InvalidSource);
@@ -1729,8 +1726,7 @@ fn rewrite_lock_state(
     }
     drop(stream);
     drop(archive);
-    let compressed =
-        SnappyStream::compress(&rewritten, Default::default()).map_err(map_core_error)?;
+    let compressed = SnappyStream::compress(&rewritten, snappy_limits).map_err(map_core_error)?;
     if compressed.len() > compressed_bound {
         return Err(Error::Verification);
     }

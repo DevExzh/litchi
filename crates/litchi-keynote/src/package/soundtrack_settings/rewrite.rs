@@ -196,8 +196,7 @@ pub(super) fn rewrite_and_verify(
         return Err(Error::Verification);
     }
     let serialized_len = serialized.len();
-    let compressed =
-        SnappyStream::compress(&serialized, Default::default()).map_err(map_core_error)?;
+    let compressed = SnappyStream::compress(&serialized, snappy_limits).map_err(map_core_error)?;
     let compressed_len = compressed.len();
     drop(serialized);
     let package_bound = source_bytes

@@ -725,7 +725,7 @@ fn rewrite_name(
     let encoded_bound = archive
         .encoded_len(archive_limits)
         .map_err(map_core_native_error)?;
-    let compressed_bound = SnappyStream::maximum_compressed_len(encoded_bound, Default::default())
+    let compressed_bound = SnappyStream::maximum_compressed_len(encoded_bound, snappy_limits)
         .map_err(map_core_native_error)?;
     budget
         .output(
@@ -748,7 +748,7 @@ fn rewrite_name(
         return Err(Error::Verification);
     }
     let compressed =
-        SnappyStream::compress(&bytes, Default::default()).map_err(map_core_native_error)?;
+        SnappyStream::compress(&bytes, snappy_limits).map_err(map_core_native_error)?;
     if compressed.len() > compressed_bound {
         return Err(Error::Verification);
     }

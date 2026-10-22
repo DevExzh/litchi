@@ -1932,7 +1932,7 @@ pub(super) fn rewrite_chart_payload(
     let frame_count = replacement_bound.div_ceil(SnappyStream::WRITE_CHUNK_SIZE);
     let compression_scratch = SnappyStream::maximum_compressed_len(
         replacement_bound.min(SnappyStream::WRITE_CHUNK_SIZE),
-        Default::default(),
+        snappy_limits,
     )
     .map_err(map_core_error)?
     .checked_add(32 * 1024)

@@ -707,6 +707,10 @@ fn moved_order(before: &[u64], intent: Intent) -> Result<Box<[u64]>, Error> {
 
 fn rewrite_slide_order(source: &Package, intent: Intent, after: &[u64]) -> Result<Package, Error> {
     let source_catalog = source.editable_source_catalog()?;
+    let snappy_limits = source_catalog
+        .limits()
+        .snappy_limits()
+        .map_err(map_archive_error)?;
     let show_identifier = source.root_show_identifier().map_err(map_read_error)?;
     let mut components = source_catalog
         .components()
@@ -788,7 +792,7 @@ fn rewrite_slide_order(source: &Package, intent: Intent, after: &[u64]) -> Resul
     let mut rewritten_stream = stream.into_bytes();
     rewritten_stream[message_start..message_end].copy_from_slice(&rewritten);
     let compressed =
-        SnappyStream::compress(&rewritten_stream, Default::default()).map_err(map_core_error)?;
+        SnappyStream::compress(&rewritten_stream, snappy_limits).map_err(map_core_error)?;
     let output = source_catalog
         .package()
         .reassemble_to_bytes(

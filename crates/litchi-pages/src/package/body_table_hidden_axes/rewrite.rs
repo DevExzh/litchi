@@ -1746,8 +1746,8 @@ fn rewrite_metadata_entry_for_creation(
             archive_limits,
         )
         .map_err(map_core_error)?;
-    let compressed =
-        page_layout::compress_archive(archive, archive_limits).map_err(map_page_layout_error)?;
+    let compressed = page_layout::compress_archive(source, archive, archive_limits)
+        .map_err(map_page_layout_error)?;
     if compressed.len() > compressed_bound {
         return Err(Error::Verification);
     }
@@ -2602,8 +2602,8 @@ fn rewrite(
             .append_objects(helper_archive.objects, archive_limits)
             .map_err(map_core_error)?;
     }
-    let compressed =
-        page_layout::compress_archive(archive, archive_limits).map_err(map_page_layout_error)?;
+    let compressed = page_layout::compress_archive(source, archive, archive_limits)
+        .map_err(map_page_layout_error)?;
     if compressed.len() > compressed_bound {
         return Err(Error::Verification);
     }

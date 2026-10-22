@@ -395,6 +395,13 @@ impl<'p> Workspace<'p> {
         let registry = self.registry.encode()?;
         let (identifier, index) = self.registry_location;
         let limits = self.archive_limits;
+        let snappy_limits = self
+            .package
+            .state
+            .options
+            .archive()
+            .snappy_limits()
+            .map_err(|_| StructureError::Registry("Snappy limits"))?;
         {
             let archive = self.archive_mut(METADATA_MEMBER)?;
             let object = archive
@@ -414,7 +421,7 @@ impl<'p> Workspace<'p> {
             let bytes = archive.to_bytes(limits)?;
             encoded.push((
                 member.clone(),
-                SnappyStream::compress(&bytes, Default::default())?,
+                SnappyStream::compress(&bytes, snappy_limits)?,
             ));
         }
         let edits = encoded

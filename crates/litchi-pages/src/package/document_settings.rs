@@ -781,7 +781,7 @@ fn rewrite_settings_component(
         page_layout::invalidate_view_state_in_archive(source, &mut archive, view, limits)
             .map_err(map_page_layout_error)?;
     }
-    page_layout::compress_archive(archive, limits).map_err(map_page_layout_error)
+    page_layout::compress_archive(source, archive, limits).map_err(map_page_layout_error)
 }
 
 fn rewrite_view_component(
@@ -792,7 +792,7 @@ fn rewrite_view_component(
         .map_err(map_page_layout_error)?;
     page_layout::invalidate_view_state_in_archive(source, &mut archive, view, limits)
         .map_err(map_page_layout_error)?;
-    page_layout::compress_archive(archive, limits).map_err(map_page_layout_error)
+    page_layout::compress_archive(source, archive, limits).map_err(map_page_layout_error)
 }
 
 fn root_payload(package: &Package) -> Result<&[u8], Error> {

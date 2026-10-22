@@ -1436,6 +1436,10 @@ fn publish_selection(
         .limits()
         .effective_archive_limits()
         .map_err(map_archive_error)?;
+    let snappy_limits = catalog
+        .limits()
+        .snappy_limits()
+        .map_err(map_archive_error)?;
     let wire_limits = source.wire_limits().map_err(map_wire_error)?;
     let names = [
         selection.show_component,
@@ -1522,8 +1526,7 @@ fn publish_selection(
             wire_limits,
         )?;
         let bytes = archive.to_bytes(limits).map_err(map_core_error)?;
-        let compressed =
-            SnappyStream::compress(&bytes, Default::default()).map_err(map_core_error)?;
+        let compressed = SnappyStream::compress(&bytes, snappy_limits).map_err(map_core_error)?;
         budget.allocation(compressed.len())?;
         rewritten.push((name, compressed));
     }

@@ -943,7 +943,7 @@ fn rewrite_document_component(
     if let Some(location) = view_location {
         invalidate_view_state_in_archive(source, &mut archive, location, limits)?;
     }
-    compress_archive(archive, limits)
+    compress_archive(source, archive, limits)
 }
 
 fn rewrite_view_state_component(
@@ -952,7 +952,7 @@ fn rewrite_view_state_component(
 ) -> Result<Vec<u8>, Error> {
     let (mut archive, limits) = editable_archive(source, &location.component_name)?;
     invalidate_view_state_in_archive(source, &mut archive, location, limits)?;
-    compress_archive(archive, limits)
+    compress_archive(source, archive, limits)
 }
 
 pub(super) fn invalidate_view_state_in_archive(
@@ -1202,12 +1202,19 @@ pub(super) fn editable_archive(
 }
 
 pub(super) fn compress_archive(
+    source: &Package,
     archive: Archive,
     limits: litchi_iwa_core::Limits,
 ) -> Result<Vec<u8>, Error> {
     let bytes = archive.to_bytes(limits).map_err(map_core_error)?;
     drop(archive);
-    SnappyStream::compress(&bytes, Default::default()).map_err(map_core_error)
+    let snappy_limits = source
+        .state
+        .source
+        .limits()
+        .snappy_limits()
+        .map_err(map_archive_error)?;
+    SnappyStream::compress(&bytes, snappy_limits).map_err(map_core_error)
 }
 
 pub(super) fn unique_message(

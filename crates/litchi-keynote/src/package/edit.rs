@@ -509,6 +509,7 @@ fn rewrite_skip_state(source: &Package, intent: SkipIntent) -> Result<Package, E
     }
 
     let archive_limits = source.state.options.archive().effective_archive_limits()?;
+    let snappy_limits = source.state.options.archive().snappy_limits()?;
     let stream = SnappyStream::decompress(
         entry.data(),
         source.state.options.archive().snappy_limits()?,
@@ -569,7 +570,7 @@ fn rewrite_skip_state(source: &Package, intent: SkipIntent) -> Result<Package, E
             archive_limits,
         )?;
     let rewritten_archive = archive.to_bytes(archive_limits)?;
-    let compressed = SnappyStream::compress(&rewritten_archive, Default::default())?;
+    let compressed = SnappyStream::compress(&rewritten_archive, snappy_limits)?;
     let output = catalog.reassemble_to_bytes(
         &[EntryEdit::new(component_name, &compressed)],
         source.state.options.archive(),

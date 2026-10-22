@@ -899,6 +899,7 @@ fn rewrite_notes(
     let archive_limits = physical_limits
         .effective_archive_limits()
         .map_err(map_archive_error)?;
+    let snappy_limits = physical_limits.snappy_limits().map_err(map_archive_error)?;
     let stream = SnappyStream::decompress(
         entry.data(),
         physical_limits.snappy_limits().map_err(map_archive_error)?,
@@ -947,7 +948,7 @@ fn rewrite_notes(
         .map_err(map_core_error)?;
     let archive_bytes = archive.to_bytes(archive_limits).map_err(map_core_error)?;
     let compressed =
-        SnappyStream::compress(&archive_bytes, Default::default()).map_err(map_core_error)?;
+        SnappyStream::compress(&archive_bytes, snappy_limits).map_err(map_core_error)?;
     let output = catalog
         .package()
         .reassemble_to_bytes(

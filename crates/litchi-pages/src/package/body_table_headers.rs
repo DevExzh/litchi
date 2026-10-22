@@ -749,6 +749,7 @@ fn rewrite_headers(
     let archive_limits = physical_limits
         .effective_archive_limits()
         .map_err(map_archive_error)?;
+    let snappy_limits = physical_limits.snappy_limits().map_err(map_archive_error)?;
     let original_message_length = source_message.data.len();
     let rewritten_message_bound =
         table_header_rewrite_bound(original_message_length).ok_or(Error::InvalidSource)?;
@@ -918,8 +919,8 @@ fn rewrite_headers(
     if raw.len() > archive_bound {
         return Err(Error::Verification);
     }
-    let compressed = litchi_iwa_core::SnappyStream::compress(&raw, Default::default())
-        .map_err(map_core_error)?;
+    let compressed =
+        litchi_iwa_core::SnappyStream::compress(&raw, snappy_limits).map_err(map_core_error)?;
     if compressed.len() > compressed_bound {
         return Err(Error::Verification);
     }
