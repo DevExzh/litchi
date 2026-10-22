@@ -388,10 +388,10 @@ fn empty_cell_props_are_true_noops_for_both_owner_routes() {
                 Ok::<_, litchi_ops::Error>(())
             })
             .expect("empty cell props transaction");
-        assert!(!commit.diagnostics.changed());
-        assert!(commit.patch.is_noop());
+        assert!(!commit.diagnostics().changed());
+        assert!(commit.patch().is_noop());
         assert_eq!(
-            commit.file.to_bytes().expect("publish transaction no-op"),
+            commit.file().to_bytes().expect("publish transaction no-op"),
             before
         );
         assert_eq!(original.to_bytes().expect("publish detached owner"), before);
@@ -563,10 +563,13 @@ fn workbook_query_fanout_edits_all_stored_cells_atomically() {
         let commit = original
             .edit(|transaction| transaction.set(selector.clone(), props! { "value" => "query" }))
             .expect("edit query matches");
-        assert!(commit.diagnostics.changed());
-        assert_eq!(commit.diagnostics.operations(), 1);
-        assert_eq!(cell_text(&commit.file, A1).as_deref(), Some("query"));
-        assert_eq!(cell_text(&commit.file, SECOND_A1).as_deref(), Some("query"));
+        assert!(commit.diagnostics().changed());
+        assert_eq!(commit.diagnostics().operations(), 1);
+        assert_eq!(cell_text(commit.file(), A1).as_deref(), Some("query"));
+        assert_eq!(
+            cell_text(commit.file(), SECOND_A1).as_deref(),
+            Some("query")
+        );
         assert_eq!(original.to_bytes().expect("publish original"), before);
     }
 }
@@ -583,22 +586,22 @@ fn transactions_replay_inverse_and_reject_foreign_snapshots() {
                 Ok::<_, litchi_ops::Error>(())
             })
             .expect("commit XLS transaction");
-        assert!(commit.diagnostics.changed());
-        assert_eq!(commit.diagnostics.operations(), 2);
+        assert!(commit.diagnostics().changed());
+        assert_eq!(commit.diagnostics().operations(), 2);
         assert_eq!(
             commit
-                .patch
+                .patch()
                 .apply(&original)
                 .expect("replay patch")
                 .to_bytes()
                 .expect("publish replay"),
-            commit.file.to_bytes().expect("publish commit")
+            commit.file().to_bytes().expect("publish commit")
         );
         assert_eq!(
             commit
-                .patch
+                .patch()
                 .inverse()
-                .apply(&commit.file)
+                .apply(commit.file())
                 .expect("inverse patch")
                 .to_bytes()
                 .expect("publish inverse"),
@@ -607,7 +610,7 @@ fn transactions_replay_inverse_and_reject_foreign_snapshots() {
         let foreign = open_owner(&before, eager);
         assert_eq!(
             commit
-                .patch
+                .patch()
                 .apply(&foreign)
                 .expect_err("foreign patch source")
                 .code(),
@@ -646,27 +649,27 @@ fn atomic_and_best_effort_batches_keep_item_attribution_and_rollback() {
             )
             .expect("best-effort batch");
         assert!(matches!(
-            &best_effort.results[0],
+            &best_effort.results()[0],
             ItemResult::Applied(result) if result.changed
         ));
         assert!(matches!(
-            &best_effort.results[1],
+            &best_effort.results()[1],
             ItemResult::Failed(error) if error.item() == Some(1)
         ));
         assert!(matches!(
-            &best_effort.results[2],
+            &best_effort.results()[2],
             ItemResult::Applied(result) if result.changed
         ));
-        assert_eq!(cell_text(&best_effort.file, A1).as_deref(), Some("best"));
+        assert_eq!(cell_text(best_effort.file(), A1).as_deref(), Some("best"));
         assert_eq!(
-            cell_text(&best_effort.file, SECOND_A1).as_deref(),
+            cell_text(best_effort.file(), SECOND_A1).as_deref(),
             Some("suffix")
         );
         assert_eq!(
             best_effort
-                .patch
+                .patch()
                 .inverse()
-                .apply(&best_effort.file)
+                .apply(best_effort.file())
                 .expect("inverse best-effort batch")
                 .to_bytes()
                 .expect("publish inverse batch"),
@@ -686,9 +689,10 @@ fn target_staged_and_snapshot_limits_fail_atomically() {
         .build()
         .expect("expanded target profile");
     let expanded = original
-        .edit_with_limits(&expanded_limits, |transaction| {
-            transaction.set("Data!A1:C2", props! { "value" => "too many" })
-        })
+        .edit_with_options(
+            litchi_ops::EditOptions::new().semantic_limits(expanded_limits),
+            |transaction| transaction.set("Data!A1:C2", props! { "value" => "too many" }),
+        )
         .expect_err("range exceeds expanded-target limit");
     assert_eq!(expanded.code(), Code::LimitExceeded);
     assert_eq!(
@@ -704,9 +708,10 @@ fn target_staged_and_snapshot_limits_fail_atomically() {
         .build()
         .expect("staged byte profile");
     let staged = original
-        .edit_with_limits(&staged_limits, |transaction| {
-            transaction.set(A1, props! { "value" => "staged" })
-        })
+        .edit_with_options(
+            litchi_ops::EditOptions::new().semantic_limits(staged_limits),
+            |transaction| transaction.set(A1, props! { "value" => "staged" }),
+        )
         .expect_err("staged payload exceeds bound");
     assert_eq!(staged.code(), Code::LimitExceeded);
     assert_eq!(
@@ -717,7 +722,7 @@ fn target_staged_and_snapshot_limits_fail_atomically() {
     let probe = original
         .edit(|transaction| transaction.set(A1, props! { "value" => "snapshot" }))
         .expect("measure snapshot charge");
-    let charge = probe.diagnostics.snapshot_bytes();
+    let charge = probe.diagnostics().snapshot_bytes();
     assert!(charge > 0);
     let snapshot_limits = SemanticLimits::builder()
         .max_snapshot_bytes(charge - 1)
@@ -725,9 +730,10 @@ fn target_staged_and_snapshot_limits_fail_atomically() {
         .build()
         .expect("snapshot byte profile");
     let snapshot = original
-        .edit_with_limits(&snapshot_limits, |transaction| {
-            transaction.set(A1, props! { "value" => "snapshot" })
-        })
+        .edit_with_options(
+            litchi_ops::EditOptions::new().semantic_limits(snapshot_limits),
+            |transaction| transaction.set(A1, props! { "value" => "snapshot" }),
+        )
         .expect_err("snapshot charge exceeds bound");
     assert_eq!(snapshot.code(), Code::LimitExceeded);
     assert_eq!(

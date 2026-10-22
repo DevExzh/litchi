@@ -242,10 +242,13 @@ fn explicit_merge_list_cache_does_not_hide_selected_node_limits() {
             .build()
             .expect("valid selected-node limit");
         let error = original
-            .edit_with_limits(&limits, |transaction| {
-                transaction.set(root_query("cell"), props! { "merge" => "B2:C3" })?;
-                Ok::<_, litchi_ops::Error>(())
-            })
+            .edit_with_options(
+                litchi_ops::EditOptions::new().semantic_limits(limits),
+                |transaction| {
+                    transaction.set(root_query("cell"), props! { "merge" => "B2:C3" })?;
+                    Ok::<_, litchi_ops::Error>(())
+                },
+            )
             .expect_err("cached per-sheet planning must still count selected cells");
         assert_eq!(error.code(), Code::LimitExceeded);
         assert_eq!(
@@ -271,7 +274,7 @@ fn explicit_merge_geometry_can_share_one_edit_with_disjoint_cell_payloads() {
                 Ok::<_, litchi_ops::Error>(())
             })
             .expect("merge and disjoint selected-cell payloads share one edit");
-        assert_eq!(commit.diagnostics.commits(), 1);
+        assert_eq!(commit.diagnostics().commits(), 1);
 
         for sheet in [1, 2] {
             let a1 = format!("/sheet[{sheet}]/A1");
@@ -279,7 +282,7 @@ fn explicit_merge_geometry_can_share_one_edit_with_disjoint_cell_payloads() {
             let b2 = format!("/sheet[{sheet}]/B2");
             assert_eq!(
                 commit
-                    .file
+                    .file()
                     .get(&a1)
                     .expect("resolve selected A1")
                     .view()
@@ -290,7 +293,7 @@ fn explicit_merge_geometry_can_share_one_edit_with_disjoint_cell_payloads() {
             );
             assert_eq!(
                 commit
-                    .file
+                    .file()
                     .get(&h1)
                     .expect("resolve selected H1")
                     .view()
@@ -300,7 +303,7 @@ fn explicit_merge_geometry_can_share_one_edit_with_disjoint_cell_payloads() {
                 Some("rewritten")
             );
             assert_eq!(
-                cell_property(&commit.file, &b2, "merge").as_deref(),
+                cell_property(commit.file(), &b2, "merge").as_deref(),
                 Some("B2:C3")
             );
         }
@@ -525,17 +528,17 @@ fn merge_transaction_replays_inverse_and_keeps_source_immutable() {
                 Ok::<_, litchi_ops::Error>(())
             })
             .expect("stage merge transaction");
-        assert!(commit.diagnostics.changed());
-        assert_eq!(commit.diagnostics.operations(), 1);
-        let replayed = commit.patch.apply(&original).expect("replay merge patch");
+        assert!(commit.diagnostics().changed());
+        assert_eq!(commit.diagnostics().operations(), 1);
+        let replayed = commit.patch().apply(&original).expect("replay merge patch");
         assert_eq!(
             replayed.to_bytes().expect("serialize replay"),
-            commit.file.to_bytes().expect("serialize target")
+            commit.file().to_bytes().expect("serialize target")
         );
         let restored = commit
-            .patch
+            .patch()
             .inverse()
-            .apply(&commit.file)
+            .apply(commit.file())
             .expect("inverse merge patch");
         assert_eq!(
             restored.to_bytes().expect("serialize inverse"),
@@ -570,10 +573,13 @@ fn duplicate_merge_selectors_deduplicate_and_limits_are_checked_before_edit() {
             .build()
             .expect("valid staged limit");
         let limited = original
-            .edit_with_limits(&limits, |transaction| {
-                transaction.set(RANGE_A1_B2, props! { "merge" => true })?;
-                Ok::<_, litchi_ops::Error>(())
-            })
+            .edit_with_options(
+                litchi_ops::EditOptions::new().semantic_limits(limits),
+                |transaction| {
+                    transaction.set(RANGE_A1_B2, props! { "merge" => true })?;
+                    Ok::<_, litchi_ops::Error>(())
+                },
+            )
             .expect_err("merge staging must honor the byte limit");
         assert_eq!(limited.code(), Code::LimitExceeded);
     }
@@ -591,10 +597,13 @@ fn no_op_selected_cells_still_consume_the_expansion_limit() {
             .build()
             .expect("valid target limit");
         let error = original
-            .edit_with_limits(&limits, |transaction| {
-                transaction.set(root_query("cell"), props! { "merge" => false })?;
-                Ok::<_, litchi_ops::Error>(())
-            })
+            .edit_with_options(
+                litchi_ops::EditOptions::new().semantic_limits(limits),
+                |transaction| {
+                    transaction.set(root_query("cell"), props! { "merge" => false })?;
+                    Ok::<_, litchi_ops::Error>(())
+                },
+            )
             .expect_err("selected no-op cells still count toward expansion");
         assert_eq!(error.code(), Code::LimitExceeded);
         assert_eq!(
@@ -615,20 +624,26 @@ fn sweep_expansion_is_bounded_and_explicit_lists_deduplicate() {
             .build()
             .unwrap();
         let merged = original
-            .edit_with_limits(&limits, |transaction| {
-                transaction.set(CELL_A1, props! { "merge" => "A1:B2,A1:B2" })?;
-                Ok::<_, litchi_ops::Error>(())
-            })
+            .edit_with_options(
+                litchi_ops::EditOptions::new().semantic_limits(limits),
+                |transaction| {
+                    transaction.set(CELL_A1, props! { "merge" => "A1:B2,A1:B2" })?;
+                    Ok::<_, litchi_ops::Error>(())
+                },
+            )
             .expect("duplicate list entries consume one intent")
-            .file
+            .file()
             .set(RANGE_D1_E2, props! { "merge" => true })
             .expect("second merge");
         let before = merged.to_bytes().unwrap();
         let error = merged
-            .edit_with_limits(&limits, |transaction| {
-                transaction.set("/sheet[1]/A1:E2", props! { "merge" => "sweep" })?;
-                Ok::<_, litchi_ops::Error>(())
-            })
+            .edit_with_options(
+                litchi_ops::EditOptions::new().semantic_limits(limits),
+                |transaction| {
+                    transaction.set("/sheet[1]/A1:E2", props! { "merge" => "sweep" })?;
+                    Ok::<_, litchi_ops::Error>(())
+                },
+            )
             .expect_err("one range selects two merge intents");
         assert_eq!(error.code(), Code::LimitExceeded);
         assert_eq!(merged.to_bytes().unwrap(), before);
@@ -652,13 +667,16 @@ fn huge_merge_is_one_structural_target_without_cell_expansion() {
             .build()
             .expect("valid target limit");
         let merged = original
-            .edit_with_limits(&limits, |transaction| {
-                transaction.set(range, props! { "merge" => true })?;
-                Ok::<_, litchi_ops::Error>(())
-            })
+            .edit_with_options(
+                litchi_ops::EditOptions::new().semantic_limits(limits),
+                |transaction| {
+                    transaction.set(range, props! { "merge" => true })?;
+                    Ok::<_, litchi_ops::Error>(())
+                },
+            )
             .expect("large merge must not expand its cells");
         assert_eq!(
-            cell_property(&merged.file, CELL_A1, "merge").as_deref(),
+            cell_property(merged.file(), CELL_A1, "merge").as_deref(),
             Some("A1:XFD1048576")
         );
     }
@@ -678,23 +696,23 @@ fn cell_payload_and_merge_share_one_native_edit_while_merge_is_a_barrier() {
                 Ok::<_, litchi_ops::Error>(())
             })
             .expect("cell payload and merge share one native edit");
-        assert_eq!(mixed.diagnostics.operations(), 1);
-        assert_eq!(mixed.diagnostics.commits(), 1);
+        assert_eq!(mixed.diagnostics().operations(), 1);
+        assert_eq!(mixed.diagnostics().commits(), 1);
         assert_eq!(
-            cell_property(&mixed.file, CELL_D1, "merge").as_deref(),
+            cell_property(mixed.file(), CELL_D1, "merge").as_deref(),
             Some("D1:E2")
         );
 
         let barrier = mixed
-            .file
+            .file()
             .edit(|transaction| {
                 transaction.set(CELL_A1, props! { "value" => "changed" })?;
                 transaction.set(RANGE_F1_G2, props! { "merge" => true })?;
                 Ok::<_, litchi_ops::Error>(())
             })
             .expect("cell-to-merge transaction");
-        assert_eq!(barrier.diagnostics.operations(), 2);
-        assert_eq!(barrier.diagnostics.commits(), 2);
+        assert_eq!(barrier.diagnostics().operations(), 2);
+        assert_eq!(barrier.diagnostics().commits(), 2);
     }
 }
 
@@ -712,10 +730,13 @@ fn merge_ingress_and_multi_sheet_rename_are_bounded_before_publication() {
             .collect::<Vec<_>>()
             .join(",");
         let error = original
-            .edit_with_limits(&limits, |transaction| {
-                transaction.set(CELL_A1, Props::new().with("merge", repeated.as_str()))?;
-                Ok::<_, litchi_ops::Error>(())
-            })
+            .edit_with_options(
+                litchi_ops::EditOptions::new().semantic_limits(limits),
+                |transaction| {
+                    transaction.set(CELL_A1, Props::new().with("merge", repeated.as_str()))?;
+                    Ok::<_, litchi_ops::Error>(())
+                },
+            )
             .expect_err("duplicate list text is bounded before deduplication");
         assert_eq!(error.code(), Code::LimitExceeded);
         let error = original
@@ -745,14 +766,14 @@ fn unmerge_and_cell_payload_broadcast_share_one_atomic_native_commit() {
                 Ok::<_, litchi_ops::Error>(())
             })
             .expect("unmerge precedes payload validation in one native edit");
-        assert_eq!(commit.diagnostics.commits(), 1);
+        assert_eq!(commit.diagnostics().commits(), 1);
         assert_eq!(
-            node_property(&commit.file, RANGE_A1_B2, "merge").as_deref(),
+            node_property(commit.file(), RANGE_A1_B2, "merge").as_deref(),
             Some("false")
         );
         assert_eq!(
             commit
-                .file
+                .file()
                 .get(CELL_B1)
                 .unwrap()
                 .view()

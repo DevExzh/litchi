@@ -314,7 +314,7 @@ pub(crate) fn apply_operation(
     publication.replace(proof, authored)?;
     let target_bytes =
         replace_content_xml_spliced(document.transaction_package(), &replacement, publication)?;
-    let target = Package::from_vec(target_bytes)?;
+    let target = Package::from_vec_with_xml_limits(target_bytes, destination.xml_limits_value())?;
     let target_document = target.document()?;
     require_raw_untouched_members(
         document.transaction_package(),

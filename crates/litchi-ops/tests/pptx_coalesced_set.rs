@@ -153,36 +153,36 @@ fn atomic_batch_coalesces_one_thousand_distinct_shapes_with_per_item_changes() {
         let commit = source
             .batch(items, BatchMode::Atomic)
             .expect("coalesced thousand-item batch");
-        assert_eq!(commit.results.len(), LARGE_SHAPE_COUNT);
-        assert_eq!(commit.diagnostics.operations(), LARGE_SHAPE_COUNT);
-        assert_eq!(commit.diagnostics.commits(), 1);
-        assert!(commit.diagnostics.changed());
+        assert_eq!(commit.results().len(), LARGE_SHAPE_COUNT);
+        assert_eq!(commit.diagnostics().operations(), LARGE_SHAPE_COUNT);
+        assert_eq!(commit.diagnostics().commits(), 1);
+        assert!(commit.diagnostics().changed());
         assert!(matches!(
-            &commit.results[0],
+            &commit.results()[0],
             ItemResult::Applied(applied) if !applied.changed
         ));
-        assert!(commit.results[1..].iter().all(|result| matches!(
+        assert!(commit.results()[1..].iter().all(|result| matches!(
             result,
             ItemResult::Applied(applied) if applied.changed
         )));
-        assert_eq!(text(&commit.file, 1), "original-0");
-        assert_eq!(text(&commit.file, 256), "batch-256");
-        assert_eq!(text(&commit.file, LARGE_SHAPE_COUNT), "batch-1000");
+        assert_eq!(text(commit.file(), 1), "original-0");
+        assert_eq!(text(commit.file(), 256), "batch-256");
+        assert_eq!(text(commit.file(), LARGE_SHAPE_COUNT), "batch-1000");
         assert_eq!(source.to_bytes().expect("source remains unchanged"), before);
         assert_eq!(
             commit
-                .patch
+                .patch()
                 .apply(&source)
                 .expect("replay batch")
                 .to_bytes()
                 .expect("serialize replay"),
-            commit.file.to_bytes().expect("serialize target")
+            commit.file().to_bytes().expect("serialize target")
         );
         assert_eq!(
             commit
-                .patch
+                .patch()
                 .inverse()
-                .apply(&commit.file)
+                .apply(commit.file())
                 .expect("inverse batch")
                 .to_bytes()
                 .expect("serialize inverse"),
@@ -220,10 +220,10 @@ fn mixed_shape_batch_coalesces_geometry_and_text_and_reports_noops() {
                 BatchMode::Atomic,
             )
             .expect("mixed coalesced batch");
-        assert_eq!(commit.diagnostics.operations(), 4);
-        assert_eq!(commit.diagnostics.commits(), 1);
+        assert_eq!(commit.diagnostics().operations(), 4);
+        assert_eq!(commit.diagnostics().commits(), 1);
         let changed = commit
-            .results
+            .results()
             .iter()
             .map(|result| match result {
                 ItemResult::Applied(applied) => applied.changed,
@@ -231,11 +231,11 @@ fn mixed_shape_batch_coalesces_geometry_and_text_and_reports_noops() {
             })
             .collect::<Vec<_>>();
         assert_eq!(changed, [false, true, false, true]);
-        assert_eq!(text(&commit.file, 2), "changed");
-        assert_eq!(length(&commit.file, 2, "x"), 914_400);
-        assert_eq!(length(&commit.file, 2, "width"), 1_828_800);
-        assert_eq!(length(&commit.file, 4, "y"), 1_828_800);
-        assert_eq!(length(&commit.file, 4, "height"), 2_743_200);
+        assert_eq!(text(commit.file(), 2), "changed");
+        assert_eq!(length(commit.file(), 2, "x"), 914_400);
+        assert_eq!(length(commit.file(), 2, "width"), 1_828_800);
+        assert_eq!(length(commit.file(), 4, "y"), 1_828_800);
+        assert_eq!(length(commit.file(), 4, "height"), 2_743_200);
         assert_eq!(source.to_bytes().expect("source remains unchanged"), before);
     }
 }
@@ -259,27 +259,27 @@ fn edit_coalesces_mixed_shape_sets_and_replays_one_native_step() {
                 Ok::<_, litchi_ops::Error>(())
             })
             .expect("coalesced closure edit");
-        assert_eq!(commit.diagnostics.operations(), 2);
-        assert_eq!(commit.diagnostics.commits(), 1);
-        assert!(commit.diagnostics.changed());
-        assert_eq!(text(&commit.file, 1), "edited");
-        assert_eq!(length(&commit.file, 1, "x"), 914_400);
-        assert_eq!(length(&commit.file, 2, "height"), 2_743_200);
+        assert_eq!(commit.diagnostics().operations(), 2);
+        assert_eq!(commit.diagnostics().commits(), 1);
+        assert!(commit.diagnostics().changed());
+        assert_eq!(text(commit.file(), 1), "edited");
+        assert_eq!(length(commit.file(), 1, "x"), 914_400);
+        assert_eq!(length(commit.file(), 2, "height"), 2_743_200);
         assert_eq!(source.to_bytes().expect("source remains unchanged"), before);
         assert_eq!(
             commit
-                .patch
+                .patch()
                 .apply(&source)
                 .expect("replay closure edit")
                 .to_bytes()
                 .expect("serialize replay"),
-            commit.file.to_bytes().expect("serialize target")
+            commit.file().to_bytes().expect("serialize target")
         );
         assert_eq!(
             commit
-                .patch
+                .patch()
                 .inverse()
-                .apply(&commit.file)
+                .apply(commit.file())
                 .expect("inverse closure edit")
                 .to_bytes()
                 .expect("serialize inverse"),
@@ -300,8 +300,8 @@ fn repeated_targets_reads_metadata_and_structure_close_direct_runs() {
                 Ok::<_, litchi_ops::Error>(())
             })
             .expect("repeated target edit");
-        assert_eq!(repeated.diagnostics.commits(), 2);
-        assert_eq!(text(&repeated.file, 1), "second");
+        assert_eq!(repeated.diagnostics().commits(), 2);
+        assert_eq!(text(repeated.file(), 1), "second");
 
         let read_barrier = source
             .edit(|edit| {
@@ -311,8 +311,8 @@ fn repeated_targets_reads_metadata_and_structure_close_direct_runs() {
                 Ok::<_, litchi_ops::Error>(())
             })
             .expect("read barrier edit");
-        assert_eq!(read_barrier.diagnostics.commits(), 2);
-        assert_eq!(text(&read_barrier.file, 3), "after read");
+        assert_eq!(read_barrier.diagnostics().commits(), 2);
+        assert_eq!(text(read_barrier.file(), 3), "after read");
 
         let structural_barrier = source
             .edit(|edit| {
@@ -323,9 +323,9 @@ fn repeated_targets_reads_metadata_and_structure_close_direct_runs() {
                 Ok::<_, litchi_ops::Error>(())
             })
             .expect("structural barrier edit");
-        assert_eq!(structural_barrier.diagnostics.commits(), 3);
-        assert_eq!(text(&structural_barrier.file, 1), "before add");
-        assert_eq!(text(&structural_barrier.file, 2), "after add");
+        assert_eq!(structural_barrier.diagnostics().commits(), 3);
+        assert_eq!(text(structural_barrier.file(), 1), "before add");
+        assert_eq!(text(structural_barrier.file(), 2), "after add");
 
         let metadata = source
             .batch(
@@ -337,10 +337,10 @@ fn repeated_targets_reads_metadata_and_structure_close_direct_runs() {
                 BatchMode::Atomic,
             )
             .expect("metadata barrier batch");
-        assert_eq!(metadata.diagnostics.operations(), 2);
-        assert_eq!(metadata.diagnostics.commits(), 2);
+        assert_eq!(metadata.diagnostics().operations(), 2);
+        assert_eq!(metadata.diagnostics().commits(), 2);
         assert!(matches!(
-            &metadata.results[1],
+            &metadata.results()[1],
             ItemResult::Applied(applied) if !applied.changed
         ));
 
@@ -354,8 +354,8 @@ fn repeated_targets_reads_metadata_and_structure_close_direct_runs() {
                 BatchMode::Atomic,
             )
             .expect("direct path batch");
-        assert_eq!(query.diagnostics.commits(), 1);
-        assert_eq!(text(&query.file, 3), "after query");
+        assert_eq!(query.diagnostics().commits(), 1);
+        assert_eq!(text(query.file(), 3), "after query");
     }
 }
 
@@ -377,11 +377,11 @@ fn selector_and_metadata_are_explicit_batch_barriers() {
                 BatchMode::Atomic,
             )
             .expect("selector barrier batch");
-        assert_eq!(commit.diagnostics.operations(), 3);
-        assert_eq!(commit.diagnostics.commits(), 3);
-        assert_eq!(text(&commit.file, 1), "selected");
-        assert_eq!(text(&commit.file, 2), "selected");
-        assert_eq!(text(&commit.file, 3), "after selector");
+        assert_eq!(commit.diagnostics().operations(), 3);
+        assert_eq!(commit.diagnostics().commits(), 3);
+        assert_eq!(text(commit.file(), 1), "selected");
+        assert_eq!(text(commit.file(), 2), "selected");
+        assert_eq!(text(commit.file(), 3), "after selector");
     }
 }
 
@@ -463,11 +463,11 @@ fn best_effort_isolates_a_late_malformed_transform_from_valid_shape_sets() {
             )
             .expect("best-effort batch should isolate malformed item");
         assert!(matches!(
-            &commit.results[0],
+            &commit.results()[0],
             ItemResult::Applied(applied) if applied.changed
         ));
         assert!(matches!(
-            &commit.results[1],
+            &commit.results()[1],
             ItemResult::Failed(error)
                 if error.item() == Some(1)
                     && matches!(
@@ -476,26 +476,26 @@ fn best_effort_isolates_a_late_malformed_transform_from_valid_shape_sets() {
                     )
         ));
         assert!(matches!(
-            &commit.results[2],
+            &commit.results()[2],
             ItemResult::Applied(applied) if applied.changed
         ));
-        assert_eq!(length(&commit.file, 1, "x"), 914_400);
-        assert_eq!(length(&commit.file, 2, "x"), 2_743_200);
+        assert_eq!(length(commit.file(), 1, "x"), 914_400);
+        assert_eq!(length(commit.file(), 2, "x"), 2_743_200);
         assert_eq!(source.to_bytes().expect("source remains unchanged"), before);
         assert_eq!(
             commit
-                .patch
+                .patch()
                 .apply(&source)
                 .expect("replay best-effort result")
                 .to_bytes()
                 .expect("serialize replay"),
-            commit.file.to_bytes().expect("serialize target")
+            commit.file().to_bytes().expect("serialize target")
         );
         assert_eq!(
             commit
-                .patch
+                .patch()
                 .inverse()
-                .apply(&commit.file)
+                .apply(commit.file())
                 .expect("inverse best-effort result")
                 .to_bytes()
                 .expect("serialize inverse"),
@@ -526,11 +526,11 @@ fn coalesced_text_batches_split_the_native_text_cap_but_keep_one_commit() {
             BatchMode::Atomic,
         )
         .expect("coalesced text batches split at the native aggregate cap");
-    assert_eq!(commit.diagnostics.operations(), 2);
-    assert_eq!(commit.diagnostics.commits(), 1);
-    assert!(commit.diagnostics.changed());
-    assert_eq!(text(&commit.file, 1).len(), text_bytes);
-    assert_eq!(text(&commit.file, 2).len(), text_bytes);
+    assert_eq!(commit.diagnostics().operations(), 2);
+    assert_eq!(commit.diagnostics().commits(), 1);
+    assert!(commit.diagnostics().changed());
+    assert_eq!(text(commit.file(), 1).len(), text_bytes);
+    assert_eq!(text(commit.file(), 2).len(), text_bytes);
     assert_eq!(source.to_bytes().expect("source remains unchanged"), before);
 }
 
@@ -546,14 +546,14 @@ fn operation_and_staged_byte_limits_reject_before_publication() {
             .build()
             .expect("build operation limit");
         let operation_error = source
-            .batch_with_limits(
+            .batch_with_options(
                 [
                     shape_item(1, Props::new().with("text", "one")),
                     shape_item(2, Props::new().with("text", "two")),
                     shape_item(3, Props::new().with("text", "three")),
                 ],
                 BatchMode::Atomic,
-                &operation_limit,
+                litchi_ops::EditOptions::new().semantic_limits(operation_limit),
             )
             .expect_err("operation limit");
         assert_eq!(operation_error.code(), Code::LimitExceeded);
@@ -566,10 +566,10 @@ fn operation_and_staged_byte_limits_reject_before_publication() {
             .build()
             .expect("build staged-byte limit");
         let staged_error = source
-            .batch_with_limits(
+            .batch_with_options(
                 [shape_item(1, Props::new().with("text", "too large"))],
                 BatchMode::Atomic,
-                &staged_limit,
+                litchi_ops::EditOptions::new().semantic_limits(staged_limit),
             )
             .expect_err("staged-byte limit");
         assert_eq!(staged_error.code(), Code::LimitExceeded);
@@ -598,11 +598,11 @@ fn alternating_text_and_geometry_commands_share_a_shape_run() {
                 BatchMode::Atomic,
             )
             .expect("alternating same-slide shape commands");
-        assert_eq!(commit.diagnostics.commits(), 1);
-        assert_eq!(commit.results.len(), LARGE_SHAPE_COUNT);
-        assert!(commit.results.iter().all(|item| matches!(item,
+        assert_eq!(commit.diagnostics().commits(), 1);
+        assert_eq!(commit.results().len(), LARGE_SHAPE_COUNT);
+        assert!(commit.results().iter().all(|item| matches!(item,
             ItemResult::Applied(applied) if applied.changed)));
-        let output = commit.file.to_bytes().expect("serialize command result");
+        let output = commit.file().to_bytes().expect("serialize command result");
         let package = litchi_pptx::Package::from_bytes(&output).expect("open result");
         let presentation = package.presentation().expect("presentation");
         let slide = presentation.slide(0).expect("slide access").expect("slide");

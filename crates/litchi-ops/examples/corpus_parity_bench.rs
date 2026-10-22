@@ -281,12 +281,12 @@ mod enabled {
         assert_eq!(
             file.apply_with(&item, &refuse)
                 .unwrap()
-                .file
+                .file()
                 .to_bytes()
                 .unwrap(),
             file.apply_with(&item, &warn)
                 .unwrap()
-                .file
+                .file()
                 .to_bytes()
                 .unwrap()
         );
@@ -311,12 +311,12 @@ mod enabled {
         assert_eq!(
             file.batch_with(&items, &refuse)
                 .unwrap()
-                .file
+                .file()
                 .to_bytes()
                 .unwrap(),
             file.batch_with(&items, &warn)
                 .unwrap()
-                .file
+                .file()
                 .to_bytes()
                 .unwrap()
         );

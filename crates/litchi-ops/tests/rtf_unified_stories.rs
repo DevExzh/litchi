@@ -256,16 +256,16 @@ fn query_fanout_publishes_one_native_transaction() {
     let commit = source
         .edit(|edit| edit.set(scoped("tc"), props! {"text" => "x"}))
         .unwrap();
-    assert_eq!(commit.diagnostics.operations(), 1);
+    assert_eq!(commit.diagnostics().operations(), 1);
     for path in [
         "/body/tbl[1]/tr[1]/tc[1]",
         "/body/tbl[1]/tr[1]/tc[2]",
         "/body/tbl[1]/tr[2]/tc[1]",
         "/body/tbl[1]/tr[2]/tc[2]",
     ] {
-        assert_eq!(text(&commit.file, path), "x");
+        assert_eq!(text(commit.file(), path), "x");
     }
-    let restored = commit.patch.inverse().apply(&commit.file).unwrap();
+    let restored = commit.patch().inverse().apply(commit.file()).unwrap();
     assert_eq!(restored.to_bytes().unwrap(), input().as_bytes());
 }
 
@@ -288,7 +288,7 @@ fn batches_mix_destination_kinds_atomically() {
             BatchMode::Atomic,
         )
         .unwrap();
-    let file = &result.file;
+    let file = result.file();
     assert_eq!(text(file, "/body/tbl[1]/tr[1]/tc[1]"), "one");
     assert_eq!(text(file, "/footnote[1]"), "two");
     assert_eq!(text(file, "/endnote[1]"), "three");
@@ -421,14 +421,17 @@ fn direct_destination_sets_coalesce_into_one_publication() {
             edit.set("/comments/comment[1]", props! {"text" => "e"})
         })
         .unwrap();
-    assert_eq!(commit.diagnostics.operations(), 5);
-    assert_eq!(commit.diagnostics.commits(), 1);
-    assert_eq!(commit.file.to_bytes().unwrap(), oracle.to_bytes().unwrap());
+    assert_eq!(commit.diagnostics().operations(), 5);
+    assert_eq!(commit.diagnostics().commits(), 1);
+    assert_eq!(
+        commit.file().to_bytes().unwrap(),
+        oracle.to_bytes().unwrap()
+    );
     assert_eq!(
         commit
-            .patch
+            .patch()
             .inverse()
-            .apply(&commit.file)
+            .apply(commit.file())
             .unwrap()
             .to_bytes()
             .unwrap(),
@@ -443,9 +446,9 @@ fn direct_destination_sets_coalesce_into_one_publication() {
             edit.set("/body/tbl[1]/tr[1]/tc[1]", props! {"text" => "b"})
         })
         .unwrap();
-    assert_eq!(commit.diagnostics.commits(), 2);
-    assert_eq!(text(&commit.file, "/body/tbl[1]/tr[1]/tc[1]"), "b");
-    assert_eq!(text(&commit.file, "/header[1]"), "h");
+    assert_eq!(commit.diagnostics().commits(), 2);
+    assert_eq!(text(commit.file(), "/body/tbl[1]/tr[1]/tc[1]"), "b");
+    assert_eq!(text(commit.file(), "/header[1]"), "h");
 }
 
 #[test]
@@ -499,14 +502,14 @@ fn direct_picture_removals_coalesce_into_one_commit() {
             Ok(())
         })
         .unwrap();
-    assert_eq!(commit.diagnostics.commits(), 1);
-    assert_eq!(commit.diagnostics.operations(), paths.len());
+    assert_eq!(commit.diagnostics().commits(), 1);
+    assert_eq!(commit.diagnostics().operations(), paths.len());
     assert_eq!(
-        commit.file.to_bytes().unwrap(),
+        commit.file().to_bytes().unwrap(),
         sequential.to_bytes().unwrap()
     );
-    assert_eq!(commit.file.query("picture").unwrap().count(), 1);
-    let undone = commit.patch.inverse().apply(&commit.file).unwrap();
+    assert_eq!(commit.file().query("picture").unwrap().count(), 1);
+    let undone = commit.patch().inverse().apply(commit.file()).unwrap();
     assert_eq!(undone.to_bytes().unwrap(), pictures_input());
 }
 
@@ -528,14 +531,14 @@ fn picture_removal_runs_close_at_barriers_and_attribute_errors() {
             Ok(())
         })
         .unwrap();
-    assert_eq!(commit.diagnostics.commits(), 4);
+    assert_eq!(commit.diagnostics().commits(), 4);
     let mut sequential = source.clone();
     sequential = sequential.remove("/body/p[1]/picture[1]").unwrap();
     sequential = sequential.remove("/body/p[1]/picture[1]").unwrap();
     sequential = sequential.remove(scoped("picture[1]")).unwrap();
     sequential = sequential.remove("/body/p[3]/picture[1]").unwrap();
     assert_eq!(
-        commit.file.to_bytes().unwrap(),
+        commit.file().to_bytes().unwrap(),
         sequential.to_bytes().unwrap()
     );
 
@@ -569,14 +572,14 @@ fn picture_removal_runs_split_at_the_native_cap() {
             Ok(())
         })
         .unwrap();
-    assert_eq!(commit.diagnostics.commits(), 2);
-    assert_eq!(commit.file.query("picture").unwrap().count(), 0);
+    assert_eq!(commit.diagnostics().commits(), 2);
+    assert_eq!(commit.file().query("picture").unwrap().count(), 0);
     let mut sequential = source.clone();
     for _ in 0..70 {
         sequential = sequential.remove("/body/p[1]/picture[1]").unwrap();
     }
     assert_eq!(
-        commit.file.to_bytes().unwrap(),
+        commit.file().to_bytes().unwrap(),
         sequential.to_bytes().unwrap()
     );
 }

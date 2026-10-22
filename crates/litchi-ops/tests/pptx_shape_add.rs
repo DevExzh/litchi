@@ -65,7 +65,7 @@ fn create_populate_edit_save_and_reopen_without_native_escape_hatches() {
             Ok(())
         })
         .unwrap();
-    let file = &commit.file;
+    let file = commit.file();
     assert_eq!(text(file, "/slide[1]/shape[1]"), "edited & <escaped>");
     assert_eq!(text(file, "/slide[1]/shape[2]"), "");
     for (key, value) in [
@@ -80,12 +80,12 @@ fn create_populate_edit_save_and_reopen_without_native_escape_hatches() {
     assert_eq!(length(file, "/slide[1]/shape[2]", "y"), 0);
     assert_eq!(source.to_bytes().unwrap(), before);
     assert_eq!(
-        commit.patch.apply(&source).unwrap().to_bytes().unwrap(),
+        commit.patch().apply(&source).unwrap().to_bytes().unwrap(),
         file.to_bytes().unwrap()
     );
     assert_eq!(
         commit
-            .patch
+            .patch()
             .inverse()
             .apply(file)
             .unwrap()
@@ -176,14 +176,17 @@ fn shape_addition_has_strict_properties_placement_and_atomic_limits() {
         .unwrap();
     assert!(
         source
-            .edit_with_limits(&limits, |edit| edit
-                .add("/slide[1]", shape().prop("text", "abc")))
+            .edit_with_options(
+                litchi_ops::EditOptions::new().semantic_limits(limits),
+                |edit| edit.add("/slide[1]", shape().prop("text", "abc"))
+            )
             .is_ok()
     );
     let error = source
-        .edit_with_limits(&limits, |edit| {
-            edit.add("/slide[1]", shape().prop("text", "abcd"))
-        })
+        .edit_with_options(
+            litchi_ops::EditOptions::new().semantic_limits(limits),
+            |edit| edit.add("/slide[1]", shape().prop("text", "abcd")),
+        )
         .unwrap_err();
     assert_eq!(error.code(), Code::LimitExceeded);
     assert_eq!(source.to_bytes().unwrap(), before);
@@ -223,14 +226,14 @@ fn source_shape_add_is_reversible_and_keeps_source_adoption() {
         .edit(|edit| edit.add("/slide[1]", shape().prop("text", "transaction shape")))
         .expect("source-backed managed shape insertion");
     assert_eq!(
-        commit.patch.apply(&source).unwrap().to_bytes().unwrap(),
-        commit.file.to_bytes().unwrap()
+        commit.patch().apply(&source).unwrap().to_bytes().unwrap(),
+        commit.file().to_bytes().unwrap()
     );
     assert_eq!(
         commit
-            .patch
+            .patch()
             .inverse()
-            .apply(&commit.file)
+            .apply(commit.file())
             .unwrap()
             .to_bytes()
             .unwrap(),
@@ -275,9 +278,9 @@ fn shape_batches_preserve_atomic_and_best_effort_boundaries() {
         Some(1)
     );
     let result = source.batch(commands(), BatchMode::BestEffort).unwrap();
-    assert!(matches!(&result.results[1], ItemResult::Failed(error) if error.item() == Some(1)));
-    assert_eq!(text(&result.file, "/slide[1]/shape[2]"), "batch text");
-    assert!(result.file.get("/slide[1]/shape[3]").is_err());
+    assert!(matches!(&result.results()[1], ItemResult::Failed(error) if error.item() == Some(1)));
+    assert_eq!(text(result.file(), "/slide[1]/shape[2]"), "batch text");
+    assert!(result.file().get("/slide[1]/shape[3]").is_err());
     assert_eq!(source.to_bytes().unwrap(), before);
 }
 
@@ -311,12 +314,12 @@ fn authored_text_preserves_escaping_whitespace_and_unicode() {
                     )
                 })
                 .unwrap();
-            assert_eq!(text(&commit.file, "/slide[1]/shape[1]"), replacement);
+            assert_eq!(text(commit.file(), "/slide[1]/shape[1]"), replacement);
             assert_eq!(
                 commit
-                    .patch
+                    .patch()
                     .inverse()
-                    .apply(&commit.file)
+                    .apply(commit.file())
                     .unwrap()
                     .to_bytes()
                     .unwrap(),

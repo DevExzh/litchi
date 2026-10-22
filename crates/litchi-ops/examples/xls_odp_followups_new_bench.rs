@@ -227,7 +227,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                     Ok(())
                 })?
-                .file
+                .file()
                 .to_bytes()?;
             // Both legs open the package and read every shape's shared
             // `bold`: the leaf leg through the scene and style API.

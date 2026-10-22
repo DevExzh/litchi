@@ -107,16 +107,16 @@ fn scoped_union_removes_descending_positions_and_all_slide_removal_is_atomic() {
     let commit = source
         .edit(|edit| edit.remove(selected))
         .expect("remove two selected slides");
-    assert_eq!(texts(&commit.file), ["C"]);
+    assert_eq!(texts(commit.file()), ["C"]);
     assert_eq!(
-        commit.patch.apply(&source).unwrap().to_bytes().unwrap(),
-        commit.file.to_bytes().unwrap()
+        commit.patch().apply(&source).unwrap().to_bytes().unwrap(),
+        commit.file().to_bytes().unwrap()
     );
     assert_eq!(
         commit
-            .patch
+            .patch()
             .inverse()
-            .apply(&commit.file)
+            .apply(commit.file())
             .unwrap()
             .to_bytes()
             .unwrap(),
@@ -203,12 +203,12 @@ fn source_backed_query_transaction_batch_and_inverse_are_failure_atomic() {
     let commit = source
         .edit(|edit| edit.remove(query))
         .expect("source query removal");
-    assert_eq!(texts(&commit.file), ["C"]);
+    assert_eq!(texts(commit.file()), ["C"]);
     assert_eq!(
         commit
-            .patch
+            .patch()
             .inverse()
-            .apply(&commit.file)
+            .apply(commit.file())
             .unwrap()
             .to_bytes()
             .unwrap(),
@@ -227,14 +227,14 @@ fn source_backed_query_transaction_batch_and_inverse_are_failure_atomic() {
         .batch(commands(), BatchMode::BestEffort)
         .expect("source best-effort batch");
     assert!(matches!(
-        &best_effort.results[0],
+        &best_effort.results()[0],
         ItemResult::Applied(applied) if applied.changed
     ));
     assert!(matches!(
-        &best_effort.results[1],
+        &best_effort.results()[1],
         ItemResult::Failed(error) if error.item() == Some(1) && error.code() == Code::PathNotFound
     ));
-    assert_eq!(texts(&best_effort.file), ["A", "C"]);
+    assert_eq!(texts(best_effort.file()), ["A", "C"]);
     assert_eq!(source.to_bytes().unwrap(), original_bytes);
 }
 
@@ -245,17 +245,17 @@ fn removal_patch_replays_inverts_reopens_and_allows_following_edits() {
     let commit = source
         .edit(|edit| edit.remove("/slide[2]"))
         .expect("remove middle slide in one edit");
-    assert_eq!(texts(&commit.file), ["A", "C"]);
+    assert_eq!(texts(commit.file()), ["A", "C"]);
 
     assert_eq!(
-        commit.patch.apply(&source).unwrap().to_bytes().unwrap(),
-        commit.file.to_bytes().unwrap()
+        commit.patch().apply(&source).unwrap().to_bytes().unwrap(),
+        commit.file().to_bytes().unwrap()
     );
     assert_eq!(
         commit
-            .patch
+            .patch()
             .inverse()
-            .apply(&commit.file)
+            .apply(commit.file())
             .unwrap()
             .to_bytes()
             .unwrap(),
@@ -264,7 +264,7 @@ fn removal_patch_replays_inverts_reopens_and_allows_following_edits() {
     assert_eq!(source.to_bytes().unwrap(), original_bytes);
 
     let edited = commit
-        .file
+        .file()
         .set("/slide[2]/shape[1]", props! { "text" => "updated C" })
         .expect("edit a surviving slide");
     assert_eq!(texts(&edited), ["A", "updated C"]);
@@ -285,9 +285,10 @@ fn removal_honors_expanded_target_and_staged_byte_limits() {
         .build()
         .unwrap();
     let target_error = source
-        .edit_with_limits(&target_limit, |edit| {
-            edit.remove(scoped_slide_query("slide[1], slide[2]"))
-        })
+        .edit_with_options(
+            litchi_ops::EditOptions::new().semantic_limits(target_limit),
+            |edit| edit.remove(scoped_slide_query("slide[1], slide[2]")),
+        )
         .expect_err("two slides exceed the target bound");
     assert_eq!(target_error.code(), Code::LimitExceeded);
     assert_eq!(source.to_bytes().unwrap(), original_bytes);
@@ -299,8 +300,10 @@ fn removal_honors_expanded_target_and_staged_byte_limits() {
         .unwrap();
     assert!(
         source
-            .edit_with_limits(&exact_limit, |edit| edit
-                .remove(scoped_slide_query("slide[1], slide[2]")))
+            .edit_with_options(
+                litchi_ops::EditOptions::new().semantic_limits(exact_limit),
+                |edit| edit.remove(scoped_slide_query("slide[1], slide[2]"))
+            )
             .is_ok()
     );
 
@@ -310,7 +313,10 @@ fn removal_honors_expanded_target_and_staged_byte_limits() {
         .build()
         .unwrap();
     let staged_error = source
-        .edit_with_limits(&staged_limit, |edit| edit.remove("/slide[2]"))
+        .edit_with_options(
+            litchi_ops::EditOptions::new().semantic_limits(staged_limit),
+            |edit| edit.remove("/slide[2]"),
+        )
         .expect_err("one removal exceeds the staged action bound");
     assert_eq!(staged_error.code(), Code::LimitExceeded);
     assert_eq!(source.to_bytes().unwrap(), original_bytes);
@@ -339,18 +345,18 @@ fn removal_batches_are_atomic_or_best_effort_at_item_boundaries() {
         .batch(commands(), BatchMode::BestEffort)
         .expect("best-effort removal");
     assert!(matches!(
-        &best_effort.results[0],
+        &best_effort.results()[0],
         ItemResult::Applied(applied) if applied.changed
     ));
     assert!(matches!(
-        &best_effort.results[1],
+        &best_effort.results()[1],
         ItemResult::Failed(error) if error.item() == Some(1) && error.code() == Code::PathNotFound
     ));
     assert!(matches!(
-        &best_effort.results[2],
+        &best_effort.results()[2],
         ItemResult::Applied(applied) if applied.changed
     ));
-    assert_eq!(texts(&best_effort.file), ["A"]);
+    assert_eq!(texts(best_effort.file()), ["A"]);
     assert_eq!(source.to_bytes().unwrap(), original_bytes);
 }
 

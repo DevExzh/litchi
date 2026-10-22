@@ -2053,12 +2053,12 @@ fn run_format(spec: &Spec) -> Report {
                 let file = &fixtures[*fixture].file;
                 let props = Props::new().with(key.as_str(), value.as_str());
                 let edit = guarded(|| file.edit(|tx| tx.set(path.as_str(), &props)))
-                    .and_then(|commit| republish(&commit.file));
+                    .and_then(|commit| republish(commit.file()));
                 let mut item = BatchItem::new("set");
                 item.path = Some(path.as_str().into());
                 item.props = Some(props.clone());
                 let batch = guarded(|| file.batch([item], BatchMode::Atomic))
-                    .and_then(|commit| republish(&commit.file));
+                    .and_then(|commit| republish(commit.file()));
                 (
                     edit.map_or_else(
                         |error| observed_error(&claim("edit"), error),
@@ -2358,7 +2358,7 @@ fn adr_atomic(spec: &Spec, fixtures: &[Fixture], candidate: &Candidate) -> AdrOb
         // The first item alone changes the document, so the refusal below
         // rolls a real change back.
         let alone = guarded(|| origin.batch([first.clone()], BatchMode::Atomic))?;
-        if guarded(|| alone.file.to_bytes())? == before {
+        if guarded(|| alone.file().to_bytes())? == before {
             return Err("item 0 alone does not change the document".to_owned());
         }
         let code = match attempt(|| origin.batch([first, second], BatchMode::Atomic)) {
@@ -2456,8 +2456,9 @@ fn adr_atomic(spec: &Spec, fixtures: &[Fixture], candidate: &Candidate) -> AdrOb
 }
 
 /// Patch inverse: an edit's patch replays onto its source, its inverse
-/// restores the exact source bytes, and a separately opened copy of the
-/// source refuses it (typed).
+/// restores the exact source bytes, the patch refuses another artifact
+/// (typed), and a separately opened, byte-identical copy of the source takes
+/// it (content identity, record 0362).
 fn adr_inverse(fixtures: &[Fixture], candidate: &Candidate) -> Result<AdrObserved, String> {
     let fixture = &fixtures[candidate.fixture];
     let before = guarded(|| fixture.file.to_bytes())?;
@@ -2467,38 +2468,38 @@ fn adr_inverse(fixtures: &[Fixture], candidate: &Candidate) -> Result<AdrObserve
             .file
             .edit(|tx| tx.set(candidate.path.as_str(), &props))
     })?;
-    if !commit.diagnostics.changed() {
+    if !commit.diagnostics().changed() {
         // Not a change: the caller tries the next candidate.
         return Err("the edit changed nothing".to_owned());
     }
     let run = || -> Result<(usize, &'static str, bool, &'static str), String> {
-        let after = guarded(|| commit.file.to_bytes())?;
+        let after = guarded(|| commit.file().to_bytes())?;
         if after == before {
             return Err("the edit's bytes equal the source".to_owned());
         }
-        let forward = guarded(|| commit.patch.apply(&fixture.file))?;
+        let forward = guarded(|| commit.patch().apply(&fixture.file))?;
         if guarded(|| forward.to_bytes())? != after {
             return Err("the patch replayed onto its source differs from the commit".to_owned());
         }
-        let inverse = commit.patch.inverse();
-        let restored = guarded(|| inverse.apply(&commit.file))?;
+        let inverse = commit.patch().inverse();
+        let restored = guarded(|| inverse.apply(commit.file()))?;
         if guarded(|| restored.to_bytes())? != before {
             return Err("the inverse patch does not restore the exact source bytes".to_owned());
         }
         // Another artifact: the edited result is not the patch's source.
-        let code = match attempt(|| commit.patch.apply(&commit.file)) {
+        let code = match attempt(|| commit.patch().apply(commit.file())) {
             Ok(_) => return Err("the patch applied to its own result".to_owned()),
             Err(error) => typed(error).map_err(|error| format!("stale apply: {error}"))?,
         };
-        // A separately opened, byte-identical copy: owner-bound patches
-        // refuse it, content-checked ones accept it (reported, not required).
+        // A separately opened, byte-identical copy takes the patch: a patch
+        // applies by content identity in every format (record 0362).
         let foreign = guarded(|| open_bytes(before.clone()))?;
-        let copy = match attempt(|| commit.patch.apply(&foreign)) {
+        let copy = match attempt(|| commit.patch().apply(&foreign)) {
             Ok(applied) if guarded(|| applied.to_bytes())? == after => "accepts (content-checked)",
             Ok(_) => return Err("a byte-identical copy took the patch to other bytes".to_owned()),
             Err(error) => {
-                typed(error).map_err(|error| format!("copy apply: {error}"))?;
-                "refuses (owner-bound)"
+                let code = typed(error).map_err(|error| format!("copy apply: {error}"))?;
+                return Err(format!("a byte-identical copy refused the patch: `{code}`"));
             },
         };
         let input = input_bytes(&fixture.label).is_some_and(|input| input == before);
@@ -2548,12 +2549,12 @@ fn adr_compose(fixtures: &[Fixture], a: &Candidate, b: &Candidate) -> Result<Adr
         )
     });
     let (first, second) = (first?, second?);
-    if !first.diagnostics.changed() || !second.diagnostics.changed() {
+    if !first.diagnostics().changed() || !second.diagnostics().changed() {
         return Err("an edit changed nothing".to_owned());
     }
     let run = || -> Result<(&'static str, &'static str, &'static str), String> {
-        let ab = guarded(|| first.file.set(b.path.as_str(), &props_b))?;
-        let ba = guarded(|| second.file.set(a.path.as_str(), &props_a))?;
+        let ab = guarded(|| first.file().set(b.path.as_str(), &props_b))?;
+        let ba = guarded(|| second.file().set(a.path.as_str(), &props_a))?;
         let value = |file: &File, candidate: &Candidate| {
             current(file, &candidate.path, &candidate.key).or_else(|| {
                 let node = file.get(candidate.path.as_str()).ok()?;
@@ -2561,7 +2562,7 @@ fn adr_compose(fixtures: &[Fixture], a: &Candidate, b: &Candidate) -> Result<Adr
                 Some(format!("text {text}"))
             })
         };
-        let (want_a, want_b) = (value(&first.file, a), value(&second.file, b));
+        let (want_a, want_b) = (value(first.file(), a), value(second.file(), b));
         for (order, composed) in [("a then b", &ab), ("b then a", &ba)] {
             let reopened = republish(composed)?;
             if value(&reopened, a) != want_a || value(&reopened, b) != want_b {
@@ -2577,7 +2578,7 @@ fn adr_compose(fixtures: &[Fixture], a: &Candidate, b: &Candidate) -> Result<Adr
         // insertion order, the same document (text, node tree, both
         // values).
         let ab_bytes = guarded(|| ab.to_bytes())?;
-        let again = guarded(|| first.file.set(b.path.as_str(), &props_b))?;
+        let again = guarded(|| first.file().set(b.path.as_str(), &props_b))?;
         if guarded(|| again.to_bytes())? != ab_bytes {
             return Err("a then b is not repeatable".to_owned());
         }
@@ -2593,11 +2594,11 @@ fn adr_compose(fixtures: &[Fixture], a: &Candidate, b: &Candidate) -> Result<Adr
             }
             "the same document (text, node tree, both values; bytes differ in the order new strings, links or records are written)"
         };
-        let stale_a = match attempt(|| second.patch.apply(&first.file)) {
+        let stale_a = match attempt(|| second.patch().apply(first.file())) {
             Ok(_) => return Err("b's patch applied to a's result".to_owned()),
             Err(error) => typed(error).map_err(|error| format!("b's patch on a: {error}"))?,
         };
-        let stale_b = match attempt(|| first.patch.apply(&second.file)) {
+        let stale_b = match attempt(|| first.patch().apply(second.file())) {
             Ok(_) => return Err("a's patch applied to b's result".to_owned()),
             Err(error) => typed(error).map_err(|error| format!("a's patch on b: {error}"))?,
         };

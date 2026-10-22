@@ -739,14 +739,18 @@ fn batch(file: &File, items: &Plan) -> (File, Vec<bool>, usize) {
         )
         .unwrap();
     let changes = commit
-        .results
+        .results()
         .iter()
         .map(|result| match result {
             litchi_ops::ItemResult::Applied(applied) => applied.changed,
             other => panic!("unexpected result {other:?}"),
         })
         .collect();
-    (commit.file, changes, commit.diagnostics.commits())
+    (
+        commit.file().clone(),
+        changes,
+        commit.diagnostics().commits(),
+    )
 }
 
 /// The same items applied one `set` at a time.
@@ -976,8 +980,8 @@ fn sequential_changes(file: &File, items: &Plan) -> (Vec<bool>, Vec<u8>) {
         let commit = current
             .edit(|edit| edit.set(path.as_str(), props.clone()))
             .unwrap();
-        changes.push(commit.diagnostics.changed());
-        current = commit.file;
+        changes.push(commit.diagnostics().changed());
+        current = commit.file().clone();
     }
     (changes, current.to_bytes().unwrap())
 }

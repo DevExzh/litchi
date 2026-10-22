@@ -296,9 +296,9 @@ fn move_placements_match_native_order_and_leave_the_input_unchanged() {
             let noop = source
                 .edit(|edit| edit.move_to("/slide[2]", placement))
                 .unwrap();
-            assert!(!noop.diagnostics.changed());
-            assert!(noop.patch.is_noop());
-            assert_eq!(noop.file.to_bytes().unwrap(), before);
+            assert!(!noop.diagnostics().changed());
+            assert!(noop.patch().is_noop());
+            assert_eq!(noop.file().to_bytes().unwrap(), before);
         }
 
         let before_anchor = source
@@ -375,17 +375,17 @@ fn structural_transaction_replays_inverts_and_batches_atomically() {
                 edit.swap("/slide[1]", "/slide[2]")
             })
             .expect("structural transaction");
-        assert_eq!(slide_texts(&commit.file), ["D", "C", "A"]);
-        let committed = commit.file.to_bytes().expect("commit bytes");
+        assert_eq!(slide_texts(commit.file()), ["D", "C", "A"]);
+        let committed = commit.file().to_bytes().expect("commit bytes");
         assert_eq!(
-            commit.patch.apply(&source).unwrap().to_bytes().unwrap(),
+            commit.patch().apply(&source).unwrap().to_bytes().unwrap(),
             committed
         );
         assert_eq!(
             commit
-                .patch
+                .patch()
                 .inverse()
-                .apply(&commit.file)
+                .apply(commit.file())
                 .unwrap()
                 .to_bytes()
                 .unwrap(),
@@ -410,11 +410,11 @@ fn structural_transaction_replays_inverts_and_batches_atomically() {
             .batch(commands(), BatchMode::BestEffort)
             .expect("best effort batch");
         assert!(matches!(
-            &best_effort.results[1],
+            &best_effort.results()[1],
             litchi_ops::ItemResult::Failed(error)
                 if error.item() == Some(1) && error.code() == Code::PathNotFound
         ));
-        assert_eq!(slide_texts(&best_effort.file), ["D", "C", "A", "B"]);
+        assert_eq!(slide_texts(best_effort.file()), ["D", "C", "A", "B"]);
         assert_eq!(source.to_bytes().expect("best effort source"), before);
     });
 }
@@ -499,7 +499,10 @@ fn structural_limits_reject_before_native_publication() {
     for limits in limits {
         assert_eq!(
             source
-                .edit_with_limits(&limits, |edit| edit.remove(selected.clone()))
+                .edit_with_options(
+                    litchi_ops::EditOptions::new().semantic_limits(limits),
+                    |edit| edit.remove(selected.clone())
+                )
                 .expect_err("structural limit")
                 .code(),
             Code::LimitExceeded

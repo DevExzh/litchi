@@ -31,8 +31,7 @@ pub(crate) fn json_text(data: &Bound<'_, PyAny>) -> PyResult<Vec<u8>> {
 
 /// The one record of `source`, under `limits`.
 pub(crate) fn record(source: &[u8], limits: &SemanticLimits) -> Result<Record, Failure> {
-    let data =
-        Data::from_json_with_limits(source, limits).map_err(|error| Failure::read(&error))?;
+    let data = Data::from_json(source, limits).map_err(|error| Failure::read(&error))?;
     let mut records = data.into_records();
     if records.len() != 1 {
         return Err(
@@ -79,7 +78,8 @@ pub(crate) fn commit(
     py: Python<'_>,
     commit: litchi::transaction::Commit<Summary>,
 ) -> PyResult<Commit> {
-    let summary = commit.value;
+    let diagnostics = *commit.diagnostics();
+    let (file, patch, summary) = commit.into_parts();
     let dict = PyDict::new(py);
     dict.set_item("replacements", summary.replacements())?;
     dict.set_item("fields", summary.fields())?;
@@ -88,10 +88,10 @@ pub(crate) fn commit(
     dict.set_item("unresolved", PyList::new(py, summary.unresolved())?)?;
     Commit::new(
         py,
-        commit.file,
-        Some(crate::write::Patch::one(commit.patch)),
-        commit.diagnostics.changed(),
-        commit.diagnostics.operations(),
+        file,
+        Some(crate::write::Patch::one(patch)),
+        diagnostics.changed(),
+        diagnostics.operations(),
         None,
         Some(dict.into_any().unbind()),
     )

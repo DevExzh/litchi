@@ -53,10 +53,10 @@ Every failure is one `litchi::Error` with a stable `litchi::Code`.
 `docx`, `pptx`, `xlsx`, and `xlsb` re-export `SourceLimits`, the shared checked
 OPC package-ingestion policy. Ordinary constructors use bounded defaults.
 Construct a profile from those defaults with `SourceLimits::builder()` and supply
-it to the matching contextual API: DOCX `Package::*_with_options` via
-`OpenOptions::source_limits`, PPTX `Package::*_with_limits`,
-XLSX `Package::*_with_limits` or `Workbook::*_with_limits`, and XLSB
-`Workbook::new_with_limits`.
+it through the format's `OpenOptions` (`Package::open_with_options`,
+`from_bytes_with_options`, …), or to the unified layer through
+`litchi::OpenOptions::ooxml_limits` (`open_with`, `open_bytes_with`, and the
+detection functions, which take the `OpenOptions` they would be opened with).
 
 The policy bounds compressed input, ZIP member counts, names, directory
 metadata, compressed and uncompressed member sizes, materialized OPC parts,

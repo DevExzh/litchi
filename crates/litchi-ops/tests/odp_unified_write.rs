@@ -127,9 +127,9 @@ fn exact_noops_publish_the_source_bytes() {
             Ok(())
         })
         .unwrap();
-    assert!(!commit.diagnostics.changed());
-    assert!(commit.patch.is_noop());
-    assert_eq!(commit.file.to_bytes().unwrap(), before);
+    assert!(!commit.diagnostics().changed());
+    assert!(commit.patch().is_noop());
+    assert_eq!(commit.file().to_bytes().unwrap(), before);
 }
 
 #[test]
@@ -294,10 +294,10 @@ fn batches_coalesce_into_one_leaf_commit() {
             Ok(())
         })
         .unwrap();
-    assert_eq!(commit.diagnostics.operations(), 6);
-    assert_eq!(commit.diagnostics.commits(), 1);
-    assert_eq!(text(&commit.file, "/slide[1]/shape[2]/paragraph[5]"), "e");
-    let restored = commit.patch.inverse().apply(&commit.file).unwrap();
+    assert_eq!(commit.diagnostics().operations(), 6);
+    assert_eq!(commit.diagnostics().commits(), 1);
+    assert_eq!(text(commit.file(), "/slide[1]/shape[2]/paragraph[5]"), "e");
+    let restored = commit.patch().inverse().apply(commit.file()).unwrap();
     assert_eq!(restored.to_bytes().unwrap(), file.to_bytes().unwrap());
 
     // A story set and then one of its paragraphs: the second resolves
@@ -309,8 +309,8 @@ fn batches_coalesce_into_one_leaf_commit() {
             Ok(())
         })
         .unwrap();
-    assert_eq!(commit.diagnostics.commits(), 2);
-    assert_eq!(text(&commit.file, "/slide[1]/shape[2]"), "x\nz");
+    assert_eq!(commit.diagnostics().commits(), 2);
+    assert_eq!(text(commit.file(), "/slide[1]/shape[2]"), "x\nz");
 
     // A failed batch leaves the input unchanged and names the item.
     let before = file.to_bytes().unwrap();

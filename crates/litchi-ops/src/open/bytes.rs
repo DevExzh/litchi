@@ -28,6 +28,7 @@ pub(super) fn open<T: ZipTail>(
     tail: &T,
     ooxml_hint: Option<FileFormat>,
 ) -> Result<File> {
+    let detection_limits = options.detection_limits();
     if let Some(limit) = options.max_input_bytes {
         super::check_input_len(u64::try_from(bytes.len()).unwrap_or(u64::MAX), limit)?;
     }
@@ -41,6 +42,18 @@ pub(super) fn open<T: ZipTail>(
             .ok()
             .flatten()
     {
+        let maximum = detection_limits.odf().max_input_bytes();
+        let observed = u64::try_from(bytes.len()).unwrap_or(u64::MAX);
+        if observed > maximum {
+            return Err(Error::from(litchi_odf_common::Error::Limit {
+                kind: litchi_odf_common::LimitKind::Source(
+                    litchi_odf_common::SourceLimitKind::InputBytes,
+                ),
+                observed,
+                maximum,
+            })
+            .with_format(format));
+        }
         #[cfg(feature = "ods")]
         if format == FileFormat::Ods {
             return Ok(File::Ods(crate::format::ods::Ods::from_flat(
@@ -100,14 +113,19 @@ pub(super) fn open<T: ZipTail>(
         )?));
     }
     if mask.is_zip() {
-        return zip(bytes, options, tail);
+        return zip(bytes, options, &detection_limits, tail);
     }
     Err(Error::unsupported_format(None))
 }
 
 /// Classify an in-memory ZIP: an ordinary ODF package first, then OOXML
 /// through one OPC index, then the lower-precedence candidates.
-fn zip<T: ZipTail>(bytes: Vec<u8>, options: &OpenOptions, tail: &T) -> Result<File> {
+fn zip<T: ZipTail>(
+    bytes: Vec<u8>,
+    options: &OpenOptions,
+    detection_limits: &crate::detect::SourceLimits,
+    tail: &T,
+) -> Result<File> {
     #[cfg(any(feature = "odt", feature = "ods", feature = "odp", odf_objects))]
     let odf = litchi_odf_common::detect::packaged_mime(
         &bytes,
@@ -119,22 +137,23 @@ fn zip<T: ZipTail>(bytes: Vec<u8>, options: &OpenOptions, tail: &T) -> Result<Fi
     if odf.is_some()
         && litchi_odf_common::detect::packaged_has_ooxml_catalog(
             &bytes,
-            litchi_odf_common::detect::CatalogProbeLimits::default(),
+            litchi_odf_common::detect::CatalogProbeLimits::default()
+                .with_neutral_input_budget(super::NEUTRAL_MAX_INPUT_BYTES),
         ) == Some(false)
     {
-        return zip_fallback(bytes, options, tail);
+        return zip_fallback(bytes, options, detection_limits, tail);
     }
     #[cfg(not(any(feature = "odt", feature = "ods", feature = "odp", odf_objects)))]
     let odf: Option<FileFormat> = None;
 
     #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
-    let bytes = match ooxml(bytes, options, odf)? {
+    let bytes = match ooxml(bytes, options, detection_limits, odf)? {
         Ok(file) => return Ok(file),
         Err(bytes) => bytes,
     };
     #[cfg(not(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")))]
     let _ = odf;
-    zip_fallback(bytes, options, tail)
+    zip_fallback(bytes, options, detection_limits, tail)
 }
 
 /// Probe an in-memory ZIP as OOXML through exactly one OPC index. A package
@@ -144,11 +163,12 @@ fn zip<T: ZipTail>(bytes: Vec<u8>, options: &OpenOptions, tail: &T) -> Result<Fi
 fn ooxml(
     bytes: Vec<u8>,
     options: &OpenOptions,
+    detection_limits: &crate::detect::SourceLimits,
     odf: Option<FileFormat>,
 ) -> Result<std::result::Result<File, Vec<u8>>> {
     use std::sync::Arc;
 
-    let limits = options.ooxml_limits.unwrap_or_default();
+    let limits = detection_limits.ooxml();
     if options.source_mode == crate::SourceMode::Eager {
         // The eager detection route retains the caller's owned archive.  A
         // borrowed `from_bytes` package has no preservation records, so an
@@ -222,18 +242,38 @@ fn reclaim(shared: std::sync::Arc<Vec<u8>>) -> Vec<u8> {
 pub(super) fn zip_fallback<T: ZipTail>(
     bytes: Vec<u8>,
     options: &OpenOptions,
+    detection_limits: &crate::detect::SourceLimits,
     tail: &T,
 ) -> Result<File> {
     #[cfg(any(feature = "odt", feature = "ods", feature = "odp", odf_objects))]
-    let bytes = match litchi_odf_common::detect::prepared_or_original(
-        bytes,
-        litchi_odf_common::SourceLimits::default(),
-    ) {
+    let bytes = match litchi_odf_common::detect::prepared_or_original(bytes, detection_limits.odf())
+    {
         Ok(prepared) => return super::odf_from_prepared(prepared, options),
-        Err(bytes) => bytes,
+        Err(bytes) => {
+            // Preparation returns ownership on rejection. Once the bounded
+            // MIME probe identifies ODF, let its ordinary owner report the
+            // typed source failure instead of turning it into an unknown
+            // format. Successful preparation still transfers its one index.
+            match litchi_odf_common::detect::packaged_mime(
+                &bytes,
+                litchi_odf_common::detect::Limits::default(),
+            )
+            .ok()
+            .flatten()
+            {
+                Some(format) => litchi_odf_common::OwnedPackage::from_bytes_with_options(
+                    bytes,
+                    litchi_odf_common::OpenOptions::new().source_limits(detection_limits.odf()),
+                )
+                .map_err(litchi_odf_common::Error::from)
+                .map_err(|error| Error::from(error).with_format(format))?
+                .into_inner(),
+                None => bytes,
+            }
+        },
     };
     #[cfg(not(any(feature = "odt", feature = "ods", feature = "odp", odf_objects)))]
-    let _ = options;
+    let _ = (options, detection_limits);
     #[cfg(feature = "iwork-adapter")]
     let bytes = match crate::format::iwork::Iwork::detect_bytes(bytes, options)? {
         crate::format::iwork::Detected::Opened(file) => return Ok(file.into_file()),

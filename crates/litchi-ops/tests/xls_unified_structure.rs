@@ -290,17 +290,17 @@ fn structure_edits_compose_in_transactions_with_exact_inverse() {
                 Ok::<_, litchi_ops::Error>(())
             })
             .unwrap();
-        assert_eq!(names(&commit.file), ["Extra", "Notes", "Data"]);
-        assert_eq!(text(&commit.file, "/Data/A1"), "changed");
+        assert_eq!(names(commit.file()), ["Extra", "Notes", "Data"]);
+        assert_eq!(text(commit.file(), "/Data/A1"), "changed");
         assert_eq!(
-            commit.patch.apply(&owner).unwrap().to_bytes().unwrap(),
-            commit.file.to_bytes().unwrap()
+            commit.patch().apply(&owner).unwrap().to_bytes().unwrap(),
+            commit.file().to_bytes().unwrap()
         );
         assert_eq!(
             commit
-                .patch
+                .patch()
                 .inverse()
-                .apply(&commit.file)
+                .apply(commit.file())
                 .unwrap()
                 .to_bytes()
                 .unwrap(),
@@ -324,7 +324,7 @@ fn batches_carry_structure_items_with_attribution() {
     let result = owner
         .batch(vec![add.clone(), swap.clone()], BatchMode::Atomic)
         .unwrap();
-    assert_eq!(names(&result.file), ["Batch", "Archive", "Notes", "Data"]);
+    assert_eq!(names(result.file()), ["Batch", "Archive", "Notes", "Data"]);
     let error = owner
         .batch(vec![add, swap, bad], BatchMode::Atomic)
         .unwrap_err();

@@ -439,9 +439,26 @@ impl Package {
     pub fn from_prepared_package(
         prepared: litchi_odf_common::PreparedPackage,
     ) -> std::result::Result<Self, PackageError> {
-        Ok(Self::from_presentation(
-            Presentation::from_prepared_package(prepared)?,
-        ))
+        Self::from_prepared_package_with_options(prepared, OpenOptions::new())
+    }
+
+    /// Adopt a prepared package under the semantic limits in `options`.
+    /// Its source limits were applied when the archive was prepared.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::from_prepared_package`], plus a typed semantic limit failure.
+    pub fn from_prepared_package_with_options(
+        prepared: litchi_odf_common::PreparedPackage,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, PackageError> {
+        if prepared.format() != litchi_core::FileFormat::Odp {
+            return Err(Error::UnexpectedFormat {
+                detected: prepared.format(),
+            }
+            .into());
+        }
+        Self::from_opened(prepared.into_package(), options)
     }
 
     fn from_opened(

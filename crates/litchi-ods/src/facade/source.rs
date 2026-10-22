@@ -22,7 +22,7 @@ use litchi_core::{
     Error, Metadata, ReadAt, Result, SequentialTextWriter, SourceVersion, TextObjectKind,
     TextOutputError, TextOutputOptions, TextOutputReport,
 };
-use litchi_odf_common::{Error as OdfError, OpenOptions};
+use litchi_odf_common::{Error as OdfError, OpenOptions, XmlStreamLimits};
 use litchi_odf_common::{
     core::{
         SourceBackedPackage, SourceContentPublicationError, SourceContentPublicationOptions,
@@ -71,6 +71,8 @@ pub struct SourceBackedSpreadsheet {
     content_layout: OnceLock<crate::worksheet::package::ContentLayout>,
     /// Package repairs followed by the content repairs of the open parse.
     tolerance: litchi_odf_common::leniency::ToleranceReport,
+    /// The caller-selected raw XML policy retained by this source owner.
+    xml_limits: XmlStreamLimits,
     /// Whether `content_xml` is a committed replacement of the source's
     /// `content.xml` member rather than the member itself.
     replaced: bool,
@@ -225,10 +227,18 @@ impl SourceBackedSpreadsheet {
             )?,
         };
         check_semantic_part_sizes(&package, options.semantic_limits_value())?;
-        Ok(Self::from_package(source, package)?)
+        Ok(Self::from_package(
+            source,
+            package,
+            options.xml_limits_value(),
+        )?)
     }
 
-    fn from_package(source: Arc<dyn ReadAt>, package: SourceBackedPackage) -> Result<Self> {
+    fn from_package(
+        source: Arc<dyn ReadAt>,
+        package: SourceBackedPackage,
+        xml_limits: XmlStreamLimits,
+    ) -> Result<Self> {
         let source_version = package.source_version()?;
         let parsed = (|| {
             let mimetype = package.mimetype()?;
@@ -249,7 +259,7 @@ impl SourceBackedSpreadsheet {
             let doctype =
                 litchi_odf_common::core::private::neutralize_prologue_doctype(&mut content_xml);
             validate_content_part(&content_xml, BODY_MARKER, FAMILY_NAME)?;
-            let open_parse = crate::open_parse::OpenParse::run(&content_xml)?;
+            let open_parse = crate::open_parse::OpenParse::run(&content_xml, xml_limits)?;
             let styles_xml = if package.has_file("styles.xml")? {
                 Some(
                     String::from_utf8(package.get_file("styles.xml")?).map_err(|error| {
@@ -285,7 +295,7 @@ impl SourceBackedSpreadsheet {
                 mut sheets,
                 tolerance: content_tolerance,
             } = outputs;
-            crate::worksheet::codec::apply_table_metadata(&content_xml, &mut sheets)?;
+            crate::worksheet::codec::apply_table_metadata(&content_xml, &mut sheets, xml_limits)?;
             Ok((
                 content_xml,
                 styles_xml,
@@ -329,6 +339,7 @@ impl SourceBackedSpreadsheet {
             edit_protection: OnceLock::new(),
             content_layout: OnceLock::new(),
             tolerance,
+            xml_limits,
             replaced: false,
             deferred: None,
         })
@@ -352,6 +363,7 @@ impl SourceBackedSpreadsheet {
             edit_protection: OnceLock::new(),
             content_layout: OnceLock::new(),
             tolerance: self.tolerance.clone(),
+            xml_limits: self.xml_limits,
             replaced: self.replaced,
             deferred: self.deferred.clone(),
         }
@@ -403,7 +415,7 @@ impl SourceBackedSpreadsheet {
         self.check_source()?;
         let parsed = (|| {
             validate_content_part(&content_xml, BODY_MARKER, FAMILY_NAME)?;
-            let open_parse = crate::open_parse::OpenParse::run(&content_xml)?;
+            let open_parse = crate::open_parse::OpenParse::run(&content_xml, self.xml_limits)?;
             let (settings, outputs) = open_parse.finish()?;
             let crate::open_parse::OpenOutputs {
                 location: _location,
@@ -411,7 +423,11 @@ impl SourceBackedSpreadsheet {
                 mut sheets,
                 tolerance: content_tolerance,
             } = outputs;
-            crate::worksheet::codec::apply_table_metadata(&content_xml, &mut sheets)?;
+            crate::worksheet::codec::apply_table_metadata(
+                &content_xml,
+                &mut sheets,
+                self.xml_limits,
+            )?;
             Ok((definitions, sheets, settings, content_tolerance))
         })();
         let (definitions, sheets, settings, content_tolerance) =
@@ -991,11 +1007,18 @@ impl SourceBackedSpreadsheet {
                 SourceContentPublicationError::Core(error) => error,
                 other => Error::from(OdfError::from(other)),
             })?;
-            let result = crate::Package::from_bytes(&bytes).map_err(Error::from);
+            let result = crate::Package::from_bytes_with_options(
+                &bytes,
+                OpenOptions::new().xml_limits(self.xml_limits),
+            )
+            .map_err(Error::from);
             return prefer_current(source.as_ref(), source_version, result);
         }
         let package = prefer_current(source.as_ref(), source_version, self.package.materialize())?;
-        let result = crate::Package::from_materialized(package);
+        let result = crate::Package::from_materialized(
+            package,
+            OpenOptions::new().xml_limits(self.xml_limits),
+        );
         prefer_current(source.as_ref(), source_version, result)
     }
 }

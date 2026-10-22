@@ -136,7 +136,7 @@ fn query_fanout_uses_one_native_batch_and_history_has_exact_endpoints() {
     let source = file();
     let selector = query("r[italic=true], r[text=Tail]");
     let commit = source.edit(|edit| edit.set(selector, all_props())).unwrap();
-    assert_eq!(commit.diagnostics.operations(), 1);
+    assert_eq!(commit.diagnostics().operations(), 1);
     let native = litchi_rtf::Package::from_bytes(INPUT).unwrap();
     let mut edit = native.edit();
     edit.patch_body_run_formats(&[
@@ -145,26 +145,26 @@ fn query_fanout_uses_one_native_batch_and_history_has_exact_endpoints() {
     ])
     .unwrap();
     assert_eq!(
-        commit.file.to_bytes().unwrap(),
+        commit.file().to_bytes().unwrap(),
         edit.commit().unwrap().package().to_bytes().unwrap()
     );
-    assert_eq!(commit.file.query("r[outline=true]").unwrap().count(), 2);
+    assert_eq!(commit.file().query("r[outline=true]").unwrap().count(), 2);
     assert_eq!(
-        commit.patch.apply(&source).unwrap().to_bytes().unwrap(),
-        commit.file.to_bytes().unwrap()
+        commit.patch().apply(&source).unwrap().to_bytes().unwrap(),
+        commit.file().to_bytes().unwrap()
     );
     assert_eq!(
         commit
-            .patch
+            .patch()
             .inverse()
-            .apply(&commit.file)
+            .apply(commit.file())
             .unwrap()
             .to_bytes()
             .unwrap(),
         INPUT
     );
     assert!(matches!(
-        commit.patch.apply(&file()).unwrap_err().leaf(),
+        commit.patch().apply(&file()).unwrap_err().leaf(),
         Source::Transaction(Error::PatchConflict)
     ));
 }
@@ -176,8 +176,8 @@ fn clearing_flags_preserves_runs_and_repeated_assignments_are_exact_noops() {
     let noop = source
         .edit(|edit| edit.set("/body/p[1]/r[2]", all_props()))
         .unwrap();
-    assert!(!noop.diagnostics.changed());
-    assert_eq!(noop.file.to_bytes().unwrap(), before);
+    assert!(!noop.diagnostics().changed());
+    assert_eq!(noop.file().to_bytes().unwrap(), before);
     let cleared=source.set("/body/p[1]/r[2]",props! {"bold"=>false,"italic"=>false,"underline"=>"none","strike"=>false,"dstrike"=>false,"vanish"=>false,"caps"=>false,"smallcaps"=>false,"outline"=>false}).unwrap();
     for key in [
         "bold",
@@ -333,7 +333,10 @@ fn fanout_limits_count_compound_run_updates_and_bound_publication() {
         ),
     ] {
         let err = source
-            .edit_with_limits(&limits, |edit| edit.set(query("r"), all_props()))
+            .edit_with_options(
+                litchi_ops::EditOptions::new().semantic_limits(limits),
+                |edit| edit.set(query("r"), all_props()),
+            )
             .unwrap_err();
         assert!(
             matches!(err.leaf(),Source::Transaction(Error::Limit{kind:actual,..}) if *actual==kind),
@@ -346,9 +349,12 @@ fn fanout_limits_count_compound_run_updates_and_bound_publication() {
         .build()
         .unwrap();
     let commit = source
-        .edit_with_limits(&limits, |edit| edit.set("/body/p[1]/r[2]", all_props()))
+        .edit_with_options(
+            litchi_ops::EditOptions::new().semantic_limits(limits),
+            |edit| edit.set("/body/p[1]/r[2]", all_props()),
+        )
         .unwrap();
-    assert_eq!(property(&commit.file, "/body/p[1]/r[2]", "size"), "14pt");
+    assert_eq!(property(commit.file(), "/body/p[1]/r[2]", "size"), "14pt");
     assert_eq!(source.to_bytes().unwrap(), INPUT);
 }
 
@@ -367,14 +373,14 @@ fn atomic_and_best_effort_batches_and_sequential_queries_keep_their_contract() {
     let best = source
         .batch([command(), invalid()], BatchMode::BestEffort)
         .unwrap();
-    assert_eq!(property(&best.file, "/body/p[1]/r[2]", "bold"), "true");
+    assert_eq!(property(best.file(), "/body/p[1]/r[2]", "bold"), "true");
     let commit = source
         .edit(|edit| {
             edit.set("/body/p[1]/r[2]", props! {"outline"=>true})?;
             edit.set(query("r[outline=true]"), props! {"strike"=>true})
         })
         .unwrap();
-    assert_eq!(commit.file.query("r[strike=true]").unwrap().count(), 1);
+    assert_eq!(commit.file().query("r[strike=true]").unwrap().count(), 1);
     assert_eq!(source.to_bytes().unwrap(), INPUT);
 }
 
@@ -471,8 +477,8 @@ fn empty_assignments_and_retained_native_source_policy_remain_consistent() {
     let noop = source
         .edit(|edit| edit.set("/body/p[1]/r[2]", Props::new()))
         .unwrap();
-    assert!(!noop.diagnostics.changed());
-    assert_eq!(noop.file.to_bytes().unwrap(), INPUT);
+    assert!(!noop.diagnostics().changed());
+    assert_eq!(noop.file().to_bytes().unwrap(), INPUT);
     let changed = source.set("/body/p[1]/r[2]", all_props()).unwrap();
     assert_eq!(property(&changed, "/body/p[1]/r[2]", "bold"), "true");
     let limits = litchi_rtf::SourceLimits::builder()

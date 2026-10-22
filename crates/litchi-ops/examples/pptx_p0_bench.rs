@@ -194,7 +194,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let unified = || {
                     file.batch(items.clone(), BatchMode::Atomic)
                         .expect("batch")
-                        .file
+                        .into_file()
                 };
                 let chunks: Vec<&[TextAssignment<'_>]> = edits.chunks(256).collect();
                 let leaf_bytes = if eager {
@@ -261,7 +261,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let unified = || {
                     file.batch(items.clone(), BatchMode::Atomic)
                         .expect("batch")
-                        .file
+                        .into_file()
                 };
                 let same = leaf_once()? == unified().to_bytes()?;
                 report(

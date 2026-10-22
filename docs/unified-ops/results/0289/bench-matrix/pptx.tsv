@@ -27,6 +27,7 @@ pptx	add	run_add		unified/leaf		501.39	508.96	µs	1.016	1.015–1.016	1.10 (sing
 pptx	add	shape add + write	1,000 shapes	unified/leaf		27691.2	27833.9	µs	1.006	1.004–1.006	1.10 (single-op write)	meets	0317	parsed:0317/pptx-large-after-1.txt (+1 more)	
 pptx	add	shape add + write, committed handle	1,000 shapes	unified/leaf		27691.2	24266.0	µs	0.879	0.873–0.879	1.10 (single-op write)	meets	0317	parsed:0317/pptx-large-after-1.txt (+1 more)	
 pptx	add	slide_add_title_text		unified/leaf		2843.6	2846.5	µs	1.001	1.001–1.001	1.10 (single-op write)	meets	0346	parsed:0346/pptx-p0-final-bench-run1.jsonl (+1 more)	
+pptx	batch	File batch1k (pptx, W8 head vs base)	1k ops	after/before		12206.0	12488.5	µs	1.023	1.013–1.023	none	no-budget	0362	parsed:0362/run1/probe-1-before.json (+7 more)	follow-up 0362ha: historical measurements retained; the blanket 1.05 threshold and code-placement explanation were returned on review. Matched current-source performance qualification remains required.
 pptx	batch	batch1k (run_format)		after/before (unified leg)		13863.2	13740.6	µs	0.991		1.05 (no regression above 5%, record 0356)	meets	0356	parsed:0356/contract-after-run1a.jsonl (+11 more)	
 pptx	batch	batch1k (run_format)		after/before (unified leg)		14304.8	14081.7	µs	0.984		1.05 (no regression above 5%, record 0356a)	meets	0356a	parsed:0356a/contract-after-run1a.jsonl (+11 more)	
 pptx	batch	batch1k (shape_text)		after/before (unified leg)		10274.2	10236.4	µs	0.996		1.05 (no regression above 5%, record 0356)	meets	0356	parsed:0356/contract-after-run1a.jsonl (+11 more)	
@@ -425,6 +426,7 @@ pptx	get (view)	pptx run format eager		after/before		4487.0	4517.0	ns	1.007		1.0
 pptx	get (view)	pptx run format source		after/before		3428.0	3394.0	ns	0.990		1.05 (no regression above 5%, record 0325)	meets	0325	parsed:0325/read-regression.txt	
 pptx	get (view)	pptx shape[1] format eager		after/before		5530.0	5640.0	ns	1.020		1.05 (no regression above 5%, record 0325)	meets	0325	parsed:0325/read-regression.txt	
 pptx	get (view)	pptx shape[1] format source		after/before		4409.0	4532.0	ns	1.028		1.05 (no regression above 5%, record 0325)	meets	0325	parsed:0325/read-regression.txt	
+pptx	merge	File merge (pptx, W8 head vs base)		after/before		1831.9	1864.9	µs	1.018	1.016–1.018	none	no-budget	0362	parsed:0362/run1/probe-1-before.json (+7 more)	follow-up 0362ha: historical measurements retained; the blanket 1.05 threshold and code-placement explanation were returned on review. Matched current-source performance qualification remains required.
 pptx	metadata set	set / title		unified/native		73.52	73.98	µs	1.006		1.10 (single-op write)	meets	0338	parsed:0338/p0-residue-bench.txt	
 pptx	metadata set	set /metadata title (eager open)		unified/leaf		71.86	72.63	µs	1.013	1.010–1.013	1.10 (single-op write)	meets	0253	parsed:0253/ooxml-metadata-bench.txt	
 pptx	metadata set	set /metadata title (eager open)		unified/leaf		70.11	70.85	µs	1.015	1.006–1.015	1.10 (single-op write)	meets	0262	parsed:0262/meta-2-meta-after.txt (+1 more)	
@@ -439,6 +441,7 @@ pptx	move (slide)	move a slide of slide-sections.pptx		unified/native		226.61	22
 pptx	move (slide)	move slide 1 after slide 2 of shapes.pptx		unified/native		105.15	106.38	µs	1.016	1.007–1.016	1.10 (single-op write)	meets	0303	parsed:0303/pptx-gaps-bench-abba.jsonl	
 pptx	move (slide)	move slide 1 after slide 2 of shapes.pptx (native leg)		after/before (native)		104.88	105.23	µs	1.004	1.003–1.004	1.05 (no regression above 5%, record 0303)	meets	0303	parsed:0303/pptx-gaps-bench-abba.jsonl	
 pptx	move (slide)	move slide 1 after slide 2 of shapes.pptx (unified leg)		after/before (unified)		105.71	106.46	µs	1.009	1.006–1.009	1.05 (no regression above 5%, record 0303)	meets	0303	parsed:0303/pptx-gaps-bench-abba.jsonl	
+pptx	open	File open get (pptx, W8 head vs base)		after/before		436.71	454.00	µs	1.040	1.023–1.040	none	no-budget	0362	parsed:0362/run1/probe-1-before.json (+7 more)	follow-up 0362ha: historical measurements retained; the blanket 1.05 threshold and code-placement explanation were returned on review. Matched current-source performance qualification remains required.
 pptx	open	open (comments)		after/before (leaf leg)		1614.8	1626.7	µs	1.007		1.05 (no regression above 5%, record 0356)	meets	0356	parsed:0356/contract-after-run1a.jsonl (+11 more)	
 pptx	open	open (comments)		after/before (leaf leg)		1638.1	1617.1	µs	0.987		1.05 (no regression above 5%, record 0356a)	meets	0356a	parsed:0356a/contract-after-run1a.jsonl (+11 more)	
 pptx	open	open (comments)		after/before (unified leg)		726.77	724.02	µs	0.996		1.05 (no regression above 5%, record 0356)	meets	0356	parsed:0356/contract-after-run1a.jsonl (+11 more)	
@@ -676,6 +679,7 @@ pptx	save	save twice (deck20)		after/before (leaf leg)		1810.7	1820.3	µs	1.005	
 pptx	save	save twice (deck20)		after/before (leaf leg)		1818.1	1817.6	µs	1.000		1.05 (no regression above 5%, record 0356a)	meets	0356a	parsed:0356a/contract-after-run1a.jsonl (+11 more)	
 pptx	save	save twice (deck20)		after/before (unified leg)		232.72	229.75	µs	0.987		1.05 (no regression above 5%, record 0356)	meets	0356	parsed:0356/contract-after-run1a.jsonl (+11 more)	
 pptx	save	save twice (deck20)		after/before (unified leg)		232.46	233.47	µs	1.004		1.05 (no regression above 5%, record 0356a)	meets	0356a	parsed:0356a/contract-after-run1a.jsonl (+11 more)	
+pptx	set	File set (pptx, W8 head vs base)		after/before		1925.9	1961.9	µs	1.019	1.015–1.019	none	no-budget	0362	parsed:0362/run1/probe-1-before.json (+7 more)	follow-up 0362ha: historical measurements retained; the blanket 1.05 threshold and code-placement explanation were returned on review. Matched current-source performance qualification remains required.
 pptx	set	cell_fill		unified/leaf		515.15	554.83	µs	1.077		1.10 (single-op write)	meets	0333	parsed:0333/pptx-p0-bench-run1.jsonl (+1 more)	
 pptx	set	comment_author_set		unified/leaf		460.27	498.95	µs	1.086	1.082–1.086	1.10 (single-op write)	meets	0346	parsed:0346/pptx-p0-final-bench-run1.jsonl (+1 more)	
 pptx	set	comment_date_set		unified/leaf		423.91	460.63	µs	1.088	1.085–1.088	1.10 (single-op write)	meets	0346	parsed:0346/pptx-p0-final-bench-run1.jsonl (+1 more)	

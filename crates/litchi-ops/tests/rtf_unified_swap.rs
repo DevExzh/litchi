@@ -57,16 +57,16 @@ fn swapping_empty_and_terminal_paragraphs_preserves_count_and_exact_undo() {
                 .unwrap();
             let mut expected = vec!["First", "", "Third"];
             expected.swap(a, b);
-            assert_eq!(paragraphs(&commit.file), expected);
+            assert_eq!(paragraphs(commit.file()), expected);
             assert_eq!(
-                paragraphs(&open_bytes(commit.file.to_bytes().unwrap()).unwrap()),
+                paragraphs(&open_bytes(commit.file().to_bytes().unwrap()).unwrap()),
                 expected
             );
             assert_eq!(
                 commit
-                    .patch
+                    .patch()
                     .inverse()
-                    .apply(&commit.file)
+                    .apply(commit.file())
                     .unwrap()
                     .to_bytes()
                     .unwrap(),
@@ -87,9 +87,9 @@ fn same_position_is_an_exact_noop_even_on_protected_or_formatted_sources() {
         let commit = source
             .edit(|edit| edit.swap("/body/p[1]", "/body/paragraph[1]"))
             .unwrap();
-        assert!(!commit.diagnostics.changed());
-        assert_eq!(commit.diagnostics.operations(), 1);
-        assert_eq!(commit.file.to_bytes().unwrap(), input);
+        assert!(!commit.diagnostics().changed());
+        assert_eq!(commit.diagnostics().operations(), 1);
+        assert_eq!(commit.file().to_bytes().unwrap(), input);
     }
 }
 
@@ -100,8 +100,8 @@ fn swapping_identical_plain_paragraphs_is_an_exact_noop() {
     let commit = source
         .edit(|edit| edit.swap("/body/p[1]", "/body/p[2]"))
         .unwrap();
-    assert!(!commit.diagnostics.changed());
-    assert_eq!(commit.file.to_bytes().unwrap(), bytes);
+    assert!(!commit.diagnostics().changed());
+    assert_eq!(commit.file().to_bytes().unwrap(), bytes);
 }
 
 #[test]
@@ -116,26 +116,26 @@ fn mixed_edits_keep_sequential_paths_and_identity_bound_history() {
         })
         .unwrap();
     assert_eq!(
-        paragraphs(&commit.file),
+        paragraphs(commit.file()),
         ["changed", "Third", "First", "last"]
     );
-    assert_eq!(commit.diagnostics.operations(), 4);
+    assert_eq!(commit.diagnostics().operations(), 4);
     assert_eq!(
-        commit.patch.apply(&source).unwrap().to_bytes().unwrap(),
-        commit.file.to_bytes().unwrap()
+        commit.patch().apply(&source).unwrap().to_bytes().unwrap(),
+        commit.file().to_bytes().unwrap()
     );
     assert_eq!(
         commit
-            .patch
+            .patch()
             .inverse()
-            .apply(&commit.file)
+            .apply(commit.file())
             .unwrap()
             .to_bytes()
             .unwrap(),
         INPUT
     );
     assert!(matches!(
-        commit.patch.apply(&file()).unwrap_err().leaf(),
+        commit.patch().apply(&file()).unwrap_err().leaf(),
         Source::Transaction(Error::PatchConflict)
     ));
 }
@@ -162,11 +162,11 @@ fn atomic_and_best_effort_batches_attribute_swap_failures() {
     );
     let best = source.batch(items(), BatchMode::BestEffort).unwrap();
     assert_eq!(
-        paragraphs(&best.file),
+        paragraphs(best.file()),
         ["Second", "Fourth", "Third", "First"]
     );
     assert!(
-        matches!(&best.results[1], litchi_ops::ItemResult::Failed(error) if error.item() == Some(1))
+        matches!(&best.results()[1], litchi_ops::ItemResult::Failed(error) if error.item() == Some(1))
     );
     assert_eq!(source.to_bytes().unwrap(), INPUT);
 }
@@ -201,7 +201,10 @@ fn resource_limits_count_distinct_targets_and_preserve_input() {
         ),
     ] {
         let error = source
-            .edit_with_limits(&limits, |edit| edit.swap("/body/p[1]", "/body/p[2]"))
+            .edit_with_options(
+                litchi_ops::EditOptions::new().semantic_limits(limits),
+                |edit| edit.swap("/body/p[1]", "/body/p[2]"),
+            )
             .unwrap_err();
         assert!(
             matches!(error.leaf(), Source::Transaction(Error::Limit {kind: actual, ..}) if *actual == kind),
@@ -214,19 +217,25 @@ fn resource_limits_count_distinct_targets_and_preserve_input() {
         .build()
         .unwrap();
     let same = source
-        .edit_with_limits(&limits, |edit| edit.swap("/body/p[1]", "/body/p[1]"))
+        .edit_with_options(
+            litchi_ops::EditOptions::new().semantic_limits(limits),
+            |edit| edit.swap("/body/p[1]", "/body/p[1]"),
+        )
         .unwrap();
-    assert!(!same.diagnostics.changed());
+    assert!(!same.diagnostics().changed());
     let limits = SemanticLimits::builder()
         .max_operations(1)
         .unwrap()
         .build()
         .unwrap();
     let error = source
-        .edit_with_limits(&limits, |edit| {
-            edit.swap("/body/p[1]", "/body/p[2]")?;
-            edit.swap("/body/p[1]", "/body/p[2]")
-        })
+        .edit_with_options(
+            litchi_ops::EditOptions::new().semantic_limits(limits),
+            |edit| {
+                edit.swap("/body/p[1]", "/body/p[2]")?;
+                edit.swap("/body/p[1]", "/body/p[2]")
+            },
+        )
         .unwrap_err();
     assert_eq!(error.code(), Code::LimitExceeded);
     assert_eq!(source.to_bytes().unwrap(), INPUT);

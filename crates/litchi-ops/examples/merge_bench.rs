@@ -244,8 +244,12 @@ fn main() {
                 .expect("leaf document")
                 .text()
                 .expect("leaf text"),
-            match &merged.file {
-                File::Docx(_) => merged.file.text().expect("unified text").replace('\n', ""),
+            match merged.file() {
+                File::Docx(_) => merged
+                    .file()
+                    .text()
+                    .expect("unified text")
+                    .replace('\n', ""),
                 _ => unreachable!(),
             },
             "both legs produce the same text"
@@ -259,7 +263,7 @@ fn main() {
         let unified_leg = || {
             for record in &unified_records {
                 let commit = file.merge(record, &Options::new()).expect("merge");
-                let bytes = commit.file.to_bytes().expect("unified bytes");
+                let bytes = commit.file().to_bytes().expect("unified bytes");
                 std::hint::black_box(bytes);
             }
         };
@@ -282,7 +286,10 @@ fn main() {
         &OpenOptions::new().source_mode(SourceMode::Eager),
     )
     .expect("template");
-    let summary = file.merge(&record, &Options::new()).expect("merge").value;
+    let summary = file
+        .merge(&record, &Options::new())
+        .expect("merge")
+        .into_value();
     assert_eq!(summary.replacements(), 10_000);
     results.insert(
         "placeholders-10k".to_owned(),

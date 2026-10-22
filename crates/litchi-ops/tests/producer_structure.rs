@@ -331,7 +331,7 @@ fn docx_alt_chunk_after_the_final_section_is_editable() {
     let relative = "libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx";
     let (file, bytes) = input(relative);
     let commit = file.edit(|_| Ok(())).unwrap();
-    assert_eq!(commit.file.to_bytes().unwrap(), bytes);
+    assert_eq!(commit.file().to_bytes().unwrap(), bytes);
     // Text edits before the tail are admitted; the tail stays untouched.
     let changed = file
         .set("/body/p[1]", Props::new().with("text", "Litchi"))
@@ -354,5 +354,5 @@ fn docx_alt_chunk_after_the_final_section_is_editable() {
 fn doc_word_padded_papx_is_editable() {
     let (file, bytes) = input("poi/test-data/document/test.doc");
     let commit = file.edit(|_| Ok(())).unwrap();
-    assert_eq!(commit.file.to_bytes().unwrap(), bytes);
+    assert_eq!(commit.file().to_bytes().unwrap(), bytes);
 }

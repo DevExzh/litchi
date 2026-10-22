@@ -422,17 +422,21 @@ fn a_batch_of_paragraph_sets_is_one_leaf_transaction() {
             Ok(())
         })
         .expect("edit");
-    assert_eq!(commit.diagnostics.operations(), 300);
-    assert_eq!(commit.diagnostics.commits(), 1);
+    assert_eq!(commit.diagnostics().operations(), 300);
+    assert_eq!(commit.diagnostics().commits(), 1);
     assert_eq!(
-        paragraphs(&reopen(&commit.file)),
+        paragraphs(&reopen(commit.file())),
         [
             "round 99 paragraph 1",
             "round 99 paragraph 2",
             "round 99 paragraph 3"
         ]
     );
-    let restored = commit.patch.inverse().apply(&commit.file).expect("inverse");
+    let restored = commit
+        .patch()
+        .inverse()
+        .apply(commit.file())
+        .expect("inverse");
     assert_eq!(restored.to_bytes().unwrap(), file.to_bytes().unwrap());
 }
 
@@ -448,7 +452,7 @@ fn a_batch_mixing_structure_and_sets_keeps_its_order() {
             Ok(())
         })
         .expect("edit");
-    assert_eq!(paragraphs(&reopen(&commit.file)), ["A", "2026-08-07", "C"]);
+    assert_eq!(paragraphs(&reopen(commit.file())), ["A", "2026-08-07", "C"]);
 }
 
 #[test]
@@ -473,7 +477,11 @@ fn paragraph_fonts_are_written() {
     let commit = file
         .edit(|tx| tx.set("/body/p[1]", props! { "font.italic" => true }))
         .expect("italic");
-    let restored = commit.patch.inverse().apply(&commit.file).expect("inverse");
+    let restored = commit
+        .patch()
+        .inverse()
+        .apply(commit.file())
+        .expect("inverse");
     assert_eq!(restored.to_bytes().unwrap(), file.to_bytes().unwrap());
     let error = file
         .set("/body/p[1]", props! { "font.size" => "-3pt" })
@@ -491,7 +499,7 @@ fn body_table_cells_take_values() {
             Ok(())
         })
         .expect("cell values");
-    let reopened = reopen(&written.file);
+    let reopened = reopen(written.file());
     assert_eq!(
         text(&reopened, "/body/tbl[1]/tr[1]/tc[1]").as_deref(),
         Some("Header")
@@ -501,13 +509,13 @@ fn body_table_cells_take_values() {
         Some("number")
     );
     let restored = written
-        .patch
+        .patch()
         .inverse()
-        .apply(&written.file)
+        .apply(written.file())
         .expect("inverse");
     assert_eq!(restored.to_bytes().unwrap(), file.to_bytes().unwrap());
     let cleared = written
-        .file
+        .file()
         .set(
             "/body/tbl[1]/tr[1]/tc[1]",
             props! { "value" => litchi_ops::PropValue::Null },
@@ -608,7 +616,11 @@ fn body_tables_are_added_with_seeded_text() {
             Ok(())
         })
         .expect("edit");
-    let restored = edited.patch.inverse().apply(&edited.file).expect("inverse");
+    let restored = edited
+        .patch()
+        .inverse()
+        .apply(edited.file())
+        .expect("inverse");
     assert_eq!(restored.to_bytes().unwrap(), file.to_bytes().unwrap());
     // Removing the new table's paragraph removes the table with it.
     let removed = reopened.remove("/body/p[1]").expect("remove");

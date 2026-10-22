@@ -91,8 +91,8 @@ fn exact_noop_returns_the_source_bytes() {
         .unwrap();
     assert_eq!(unchanged.to_bytes().unwrap(), source);
     let commit = file.edit(|_| Ok(())).unwrap();
-    assert!(!commit.diagnostics.changed());
-    assert_eq!(commit.file.to_bytes().unwrap(), source);
+    assert!(!commit.diagnostics().changed());
+    assert_eq!(commit.file().to_bytes().unwrap(), source);
 }
 
 #[test]
@@ -317,11 +317,11 @@ fn coalesced_batch_commits_once_and_inverts() {
             Ok(())
         })
         .unwrap();
-    assert!(commit.diagnostics.changed());
-    let edited = reopen(&commit.file);
+    assert!(commit.diagnostics().changed());
+    let edited = reopen(commit.file());
     assert_eq!(text(&edited, "/body/p[7]"), "q7");
     assert_eq!(prop(&edited, "/body/p[7]", "bold").as_deref(), Some("true"));
-    let restored = commit.patch.inverse().apply(&commit.file).unwrap();
+    let restored = commit.patch().inverse().apply(commit.file()).unwrap();
     assert_eq!(restored.to_bytes().unwrap(), source);
 }
 
@@ -337,7 +337,7 @@ fn batch_runs_split_at_replaced_content() {
             Ok(())
         })
         .unwrap();
-    let file = reopen(&commit.file);
+    let file = reopen(commit.file());
     assert_eq!(text(&file, "/body/p[1]/r[1]"), "one run");
     assert_eq!(
         prop(&file, "/body/p[1]/r[1]", "italic").as_deref(),

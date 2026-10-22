@@ -584,7 +584,7 @@ mod tests {
     /// A password-protected workbook reports the leaf's refusal, as the
     /// facade did; the unified opener turns it into `File::Locked`.
     fn open_bytes(bytes: Vec<u8>) -> Result<Xls> {
-        match detect_format_smart(bytes) {
+        match detect_format_smart(bytes, &crate::detect::SourceLimits::default()) {
             Some(DetectedFormat::Xls(ole)) => {
                 match Xls::from_ole_file(ole, &OpenOptions::default(), None)? {
                     LegacyOpen::Opened(xls) => Ok(xls),

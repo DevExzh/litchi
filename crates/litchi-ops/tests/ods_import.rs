@@ -43,16 +43,16 @@ fn imports_native_values_in_one_commit() {
     let commit = original
         .import("/Sheet1", SOURCE, &Options::csv().header(true))
         .unwrap();
-    let summary = &commit.value;
+    let summary = commit.value();
     assert_eq!((summary.rows(), summary.columns()), (3, 4));
     assert_eq!(summary.cells(), 12);
     assert_eq!(summary.numbers(), 2);
     assert_eq!(summary.booleans(), 2);
     assert_eq!(summary.dates(), 2);
     assert_eq!(summary.dates_as_text(), 0);
-    assert_eq!(commit.diagnostics.commits(), 1);
+    assert_eq!(commit.diagnostics().commits(), 1);
     assert_eq!(original.to_bytes().unwrap(), before);
-    for file in [commit.file.clone(), reopen(&commit.file)] {
+    for file in [commit.file().clone(), reopen(commit.file())] {
         assert_eq!(text(&file, "/Sheet1/A1").as_deref(), Some("name"));
         assert_eq!(text(&file, "/Sheet1/A3").as_deref(), Some("Lovelace, A."));
         assert_eq!(text(&file, "/Sheet1/B3").as_deref(), Some("-2.5"));
@@ -73,7 +73,7 @@ fn imports_native_values_in_one_commit() {
             Some("1815-12-10T08:30:00")
         );
     }
-    let restored = commit.patch.inverse().apply(&commit.file).unwrap();
+    let restored = commit.patch().inverse().apply(commit.file()).unwrap();
     assert_eq!(restored.to_bytes().unwrap(), before);
 }
 
@@ -87,10 +87,10 @@ fn origins_empty_fields_noops_and_refusals() {
     let commit = file
         .import("/Sheet1/B2", b"x,y\n", &Options::csv())
         .unwrap();
-    assert_eq!(text(&commit.file, "/Sheet1/C2").as_deref(), Some("y"));
+    assert_eq!(text(commit.file(), "/Sheet1/C2").as_deref(), Some("y"));
     let cleared = file.import("/Sheet1", b",new\n", &Options::csv()).unwrap();
-    assert_eq!(cleared.value.empty(), 1);
-    let reopened = reopen(&cleared.file);
+    assert_eq!(cleared.value().empty(), 1);
+    let reopened = reopen(cleared.file());
     assert_eq!(text(&reopened, "/Sheet1/B1").as_deref(), Some("new"));
     assert!(
         text(&reopened, "/Sheet1/A1").is_none_or(|value| value.is_empty() || value == "(empty)")
@@ -99,7 +99,7 @@ fn origins_empty_fields_noops_and_refusals() {
     assert!(
         file.import("/Sheet1", b"", &Options::csv())
             .unwrap()
-            .patch
+            .patch()
             .is_noop()
     );
     assert_eq!(
@@ -116,5 +116,5 @@ fn origins_empty_fields_noops_and_refusals() {
     assert_eq!(error.format(), Some(FileFormat::Ods));
     // A formula-looking field is text by default.
     let plain = file.import("/Sheet1", b"=1+1\n", &Options::csv()).unwrap();
-    assert_eq!(text(&plain.file, "/Sheet1/A1").as_deref(), Some("=1+1"));
+    assert_eq!(text(plain.file(), "/Sheet1/A1").as_deref(), Some("=1+1"));
 }

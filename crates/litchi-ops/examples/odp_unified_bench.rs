@@ -101,7 +101,8 @@ mod enabled {
             Ok(())
         })
         .expect("unified batch")
-        .file
+        .file()
+        .clone()
     }
 
     pub(super) fn run(rounds: usize) {

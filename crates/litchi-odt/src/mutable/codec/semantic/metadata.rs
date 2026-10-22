@@ -8,7 +8,13 @@ impl MutableDocument {
     /// Inspect RDFa and inline `text:meta` declarations in the authoritative
     /// content snapshot.
     pub(crate) fn in_content_metadata(&self) -> Result<ContentMetadata> {
-        self.with_content_xml(|xml| content_metadata::parse_part(xml, crate::MetadataPart::Content))
+        self.with_content_xml(|xml| {
+            content_metadata::parse_part_with_xml_limits(
+                xml,
+                crate::MetadataPart::Content,
+                self.xml_limits,
+            )
+        })
     }
 
     /// Set or clear RDFa on one paragraph while retaining unrelated XML.
@@ -17,16 +23,23 @@ impl MutableDocument {
         position: Position,
         value: &RdfaAttributes,
     ) -> Result<()> {
-        let updated = self
-            .with_content_xml(|xml| content_metadata::set_paragraph_rdfa(xml, position, value))?;
+        let updated = self.with_content_xml(|xml| {
+            content_metadata::set_paragraph_rdfa_with_xml_limits(
+                xml,
+                position,
+                value,
+                self.xml_limits,
+            )
+        })?;
         self.content_xml = Some(updated);
         Ok(())
     }
 
     /// Set or clear RDFa on a uniquely named bookmark start.
     pub(crate) fn set_bookmark_rdfa(&mut self, name: &str, value: &RdfaAttributes) -> Result<()> {
-        let updated =
-            self.with_content_xml(|xml| content_metadata::set_bookmark_rdfa(xml, name, value))?;
+        let updated = self.with_content_xml(|xml| {
+            content_metadata::set_bookmark_rdfa_with_xml_limits(xml, name, value, self.xml_limits)
+        })?;
         self.content_xml = Some(updated);
         Ok(())
     }
@@ -37,32 +50,51 @@ impl MutableDocument {
         position: Position,
         value: &RdfaAttributes,
     ) -> Result<()> {
-        let updated = self
-            .with_content_xml(|xml| content_metadata::set_text_meta_rdfa(xml, position, value))?;
+        let updated = self.with_content_xml(|xml| {
+            content_metadata::set_text_meta_rdfa_with_xml_limits(
+                xml,
+                position,
+                value,
+                self.xml_limits,
+            )
+        })?;
         self.content_xml = Some(updated);
         Ok(())
     }
 
     /// Insert an inline `text:meta` into a paragraph.
     pub(crate) fn insert_text_meta(&mut self, paragraph: Position, value: &TextMeta) -> Result<()> {
-        let updated =
-            self.with_content_xml(|xml| content_metadata::insert_text_meta(xml, paragraph, value))?;
+        let updated = self.with_content_xml(|xml| {
+            content_metadata::insert_text_meta_with_xml_limits(
+                xml,
+                paragraph,
+                value,
+                self.xml_limits,
+            )
+        })?;
         self.content_xml = Some(updated);
         Ok(())
     }
 
     /// Replace one inline `text:meta` occurrence.
     pub(crate) fn replace_text_meta(&mut self, position: Position, value: &TextMeta) -> Result<()> {
-        let updated =
-            self.with_content_xml(|xml| content_metadata::replace_text_meta(xml, position, value))?;
+        let updated = self.with_content_xml(|xml| {
+            content_metadata::replace_text_meta_with_xml_limits(
+                xml,
+                position,
+                value,
+                self.xml_limits,
+            )
+        })?;
         self.content_xml = Some(updated);
         Ok(())
     }
 
     /// Remove one inline `text:meta` occurrence.
     pub(crate) fn remove_text_meta(&mut self, position: Position) -> Result<()> {
-        let updated =
-            self.with_content_xml(|xml| content_metadata::remove_text_meta(xml, position))?;
+        let updated = self.with_content_xml(|xml| {
+            content_metadata::remove_text_meta_with_xml_limits(xml, position, self.xml_limits)
+        })?;
         self.content_xml = Some(updated);
         Ok(())
     }

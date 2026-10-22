@@ -68,7 +68,8 @@ pub(crate) fn commit(
     py: Python<'_>,
     commit: litchi::transaction::Commit<Summary>,
 ) -> PyResult<Commit> {
-    let summary = commit.value;
+    let diagnostics = *commit.diagnostics();
+    let (file, patch, summary) = commit.into_parts();
     let fields = PyList::empty(py);
     for field in summary.fields() {
         let entry = PyDict::new(py);
@@ -85,10 +86,10 @@ pub(crate) fn commit(
     dict.set_item("fields", fields)?;
     Commit::new(
         py,
-        commit.file,
-        Some(crate::write::Patch::one(commit.patch)),
-        commit.diagnostics.changed(),
-        commit.diagnostics.operations(),
+        file,
+        Some(crate::write::Patch::one(patch)),
+        diagnostics.changed(),
+        diagnostics.operations(),
         None,
         Some(dict.into_any().unbind()),
     )

@@ -59,12 +59,12 @@ fn atomic_batch_coalesces_thousand_direct_removals_and_reports_virtual_noop() {
         .batch(items, BatchMode::Atomic)
         .expect("remove direct cells in one atomic batch");
 
-    assert_eq!(commit.diagnostics.operations(), 1_000);
-    assert_eq!(commit.diagnostics.commits(), 1);
-    assert_eq!(commit.results.len(), 1_000);
+    assert_eq!(commit.diagnostics().operations(), 1_000);
+    assert_eq!(commit.diagnostics().commits(), 1);
+    assert_eq!(commit.results().len(), 1_000);
     assert!(
         commit
-            .results
+            .results()
             .iter()
             .all(|result| matches!(result, ItemResult::Applied(applied) if applied.changed))
     );
@@ -72,9 +72,9 @@ fn atomic_batch_coalesces_thousand_direct_removals_and_reports_virtual_noop() {
     let missing = open(fixture())
         .batch([remove("/sheet[1]/Z999".to_owned())], BatchMode::Atomic)
         .expect("removing a virtual cell is an exact no-op");
-    assert!(!missing.diagnostics.changed());
+    assert!(!missing.diagnostics().changed());
     assert!(matches!(
-        &missing.results[0],
+        &missing.results()[0],
         ItemResult::Applied(applied) if !applied.changed
     ));
 }

@@ -262,7 +262,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             Ok(())
                         })
                         .expect("edit");
-                    black_box(commit.file);
+                    black_box(commit.file());
                 },
             );
             report(&format!("batch_bold_{count}"), paragraphs, result);
@@ -284,7 +284,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
                 Ok(())
             })?
-            .file
+            .file()
             .to_bytes()?;
         assert_eq!(
             leaf_bytes, unified_bytes,

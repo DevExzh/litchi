@@ -178,7 +178,7 @@ mod bench {
                 let package = litchi_odt::Package::from_bytes(&bytes)?;
                 let file = open_bytes(bytes)?;
                 let item = find_item("needle", "done");
-                assert_eq!(file.apply(&item)?.value.matched(), Some(matches));
+                assert_eq!(file.apply(&item)?.value().matched(), Some(matches));
                 let props = Props::new().with("find", "needle").with("replace", "done");
                 let result = paired(
                     || {
@@ -205,8 +205,8 @@ mod bench {
                     let commit = file
                         .merge(&record, &MergeOptions::new())
                         .expect("unified merge");
-                    assert_eq!(commit.value.replacements(), paragraphs);
-                    black_box(commit.file);
+                    assert_eq!(commit.value().replacements(), paragraphs);
+                    black_box(commit.file());
                 },
             );
             report("odt_merge".to_owned(), paragraphs, result);
@@ -233,7 +233,7 @@ mod bench {
                 let reader = package.document();
                 let file: File = open_bytes(bytes)?;
                 let item = find_item("needle", "done");
-                assert_eq!(file.apply(&item)?.value.matched(), Some(matches));
+                assert_eq!(file.apply(&item)?.value().matched(), Some(matches));
                 let props = Props::new().with("find", "needle").with("replace", "done");
                 let result = paired(
                     || {
@@ -305,8 +305,8 @@ mod bench {
                     let commit = file
                         .import("/Sheet1", csv.as_bytes(), &options)
                         .expect("unified import");
-                    assert_eq!(commit.value.cells(), rows_count * 4);
-                    black_box(commit.file);
+                    assert_eq!(commit.value().cells(), rows_count * 4);
+                    black_box(commit.file());
                 },
             );
             report("ods_import".to_owned(), rows_count, result);

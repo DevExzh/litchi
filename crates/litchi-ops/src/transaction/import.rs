@@ -1,7 +1,7 @@
 //! [`File::import`] and [`Edit::import`]: one CSV/TSV import is one
 //! mutation and one native commit (record 0266).
 
-use super::{Commit, Edit, Error, LimitKind, SemanticLimits};
+use super::{Commit, Edit, EditOptions, Error, LimitKind, SemanticLimits};
 use crate::import::{self, Options, Summary};
 use crate::path::IntoPath;
 use crate::{Code, File, Result};
@@ -21,7 +21,7 @@ impl File {
     /// for unusable options, [`Code::InvalidValue`] for an over-long field,
     /// [`Code::OutOfRange`] when the data leaves the grid,
     /// [`Code::LimitExceeded`] past the default
-    /// [`SemanticLimits`], path errors for the target, and
+    /// [`EditOptions`], path errors for the target, and
     /// [`Code::UnsupportedCapability`] for other formats. The original handle
     /// is unchanged on failure.
     ///
@@ -33,10 +33,10 @@ impl File {
     ///
     /// let file = litchi_ops::create(FileFormat::Xlsx)?;
     /// let commit = file.import("/Sheet1/B2", b"1,2\n3,4\n", &Options::csv())?;
-    /// assert_eq!((commit.value.rows(), commit.value.columns()), (2, 2));
-    /// let cell = commit.file.get("/Sheet1/C3")?;
+    /// assert_eq!((commit.value().rows(), commit.value().columns()), (2, 2));
+    /// let cell = commit.file().get("/Sheet1/C3")?;
     /// assert_eq!(cell.view().text()?.as_deref(), Some("4"));
-    /// assert!(file.import("/Sheet1", b"", &Options::csv())?.patch.is_noop());
+    /// assert!(file.import("/Sheet1", b"", &Options::csv())?.patch().is_noop());
     /// # }
     /// # Ok::<(), litchi_ops::Error>(())
     /// ```
@@ -46,22 +46,23 @@ impl File {
         source: &[u8],
         options: &Options,
     ) -> Result<Commit<Summary>> {
-        self.import_with_limits(target, source, options, &SemanticLimits::default())
+        self.import_with_options(target, source, options, EditOptions::default())
     }
 
-    /// [`Self::import`] under caller-selected transaction limits: raise
-    /// `max_expanded_targets` and `max_staged_bytes` for large sources.
+    /// [`Self::import`] under caller-selected [`EditOptions`]: raise the
+    /// semantic limits' `max_expanded_targets` and `max_staged_bytes` for
+    /// large sources.
     ///
     /// # Errors
     /// As [`Self::import`].
-    pub fn import_with_limits<'p>(
+    pub fn import_with_options<'p>(
         &self,
         target: impl IntoPath<'p>,
         source: &[u8],
         options: &Options,
-        limits: &SemanticLimits,
+        edit_options: EditOptions,
     ) -> Result<Commit<Summary>> {
-        self.edit_with_limits(limits, |edit| edit.import(target, source, options))
+        self.edit_with_options(edit_options, |edit| edit.import(target, source, options))
     }
 }
 

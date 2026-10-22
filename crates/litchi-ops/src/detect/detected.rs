@@ -12,6 +12,7 @@
     reason = "moved verbatim from the facade (M0a S4), which does not inherit the workspace lints"
 )]
 
+use super::SourceLimits;
 use super::tail::{NoZipTail, ZipTail};
 
 /// Detected format with reusable parsed owners or moved source bytes.
@@ -175,6 +176,13 @@ impl std::fmt::Debug for DetectedFormat {
 /// - ODS and ODP files: return the moved bytes after package detection
 /// - RTF files: return the moved bytes after detection
 ///
+/// `limits` bounds every raw probe used by detection, including the common
+/// input length and enabled container profiles. OLE, RTF and ODF detection
+/// retains its existing format-specific behavior under those limits.
+/// ODF-marked
+/// packages with a present or uncertain OOXML catalog fail closed on hard OPC
+/// policy errors.
+///
 /// An Apple iWork package is not recognized: this detector runs no
 /// [`ZipTail`]. [`detect_format_smart_with_tail`] takes one.
 ///
@@ -186,8 +194,8 @@ impl std::fmt::Debug for DetectedFormat {
 ///
 /// * `Some(DetectedFormat)` - Format detected with a reusable owner or byte buffer
 /// * `None` - Format not recognized
-pub fn detect_format_smart(bytes: Vec<u8>) -> Option<DetectedFormat> {
-    detect_format_smart_with_tail(bytes, &NoZipTail)
+pub fn detect_format_smart(bytes: Vec<u8>, limits: &SourceLimits) -> Option<DetectedFormat> {
+    detect_format_smart_with_tail(bytes, limits, &NoZipTail)
 }
 
 /// [`detect_format_smart`] with a lowest-precedence ZIP candidate.
@@ -196,15 +204,21 @@ pub fn detect_format_smart(bytes: Vec<u8>) -> Option<DetectedFormat> {
 /// [`tail`](super::tail) for when it runs.
 pub fn detect_format_smart_with_tail<T: ZipTail>(
     bytes: Vec<u8>,
+    limits: &SourceLimits,
     tail: &T,
 ) -> Option<DetectedFormat> {
+    if !limits.accepts_input_len(bytes.len() as u64) {
+        return None;
+    }
     #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
     {
-        detect_format_smart_with_limits_and_tail(bytes, crate::opc::SourceLimits::default(), tail)
+        detect_ooxml_smart(bytes, limits, tail)
     }
 
     #[cfg(not(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")))]
-    detect_format_smart_without_ooxml(bytes, tail)
+    {
+        detect_format_smart_without_ooxml(bytes, limits, tail)
+    }
 }
 
 #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
@@ -292,9 +306,26 @@ pub(crate) fn read_path_source_bytes(
 #[cfg(not(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")))]
 fn detect_format_smart_without_ooxml<T: ZipTail>(
     bytes: Vec<u8>,
+    limits: &SourceLimits,
     tail: &T,
 ) -> Option<DetectedFormat> {
     use litchi_core::detection::simd_utils::check_office_signatures;
+
+    // The iWork-only build still receives the required source policy through
+    // the public detector, but its ZIP tail owns the only format-specific
+    // probe. Keep the parameter in the shared helper signature without
+    // tripping the workspace's deny-unused profile in that feature set.
+    #[cfg(not(any(
+        feature = "odt",
+        feature = "ods",
+        feature = "odp",
+        odf_objects,
+        feature = "rtf",
+        feature = "doc",
+        feature = "ppt",
+        feature = "xls"
+    )))]
+    let _ = limits;
 
     #[cfg(not(any(feature = "pages", feature = "keynote", feature = "numbers")))]
     let _ = tail;
@@ -304,10 +335,9 @@ fn detect_format_smart_without_ooxml<T: ZipTail>(
     }
 
     #[cfg(any(feature = "odt", feature = "ods", feature = "odp", odf_objects))]
-    if let Some(format) =
-        litchi_odf_common::detect::flat(&bytes, litchi_odf_common::detect::Limits::default())
-            .ok()
-            .flatten()
+    if let Some(format) = litchi_odf_common::detect::flat(&bytes, limits.odf_detect_limits())
+        .ok()
+        .flatten()
     {
         return Some(DetectedFormat::FlatOdf(format, bytes));
     }
@@ -316,13 +346,15 @@ fn detect_format_smart_without_ooxml<T: ZipTail>(
 
     #[cfg(feature = "rtf")]
     if mask.is_rtf() {
-        return Some(DetectedFormat::Rtf(bytes));
+        return limits
+            .accepts_rtf_input_len(bytes.len() as u64)
+            .then_some(DetectedFormat::Rtf(bytes));
     }
 
     #[cfg(any(feature = "doc", feature = "ppt", feature = "xls"))]
     if mask.is_ole2() {
         let cursor = std::io::Cursor::new(bytes);
-        if let Ok(ole_file) = litchi_cfb::OleFile::open(cursor) {
+        if let Ok(ole_file) = litchi_cfb::OleFile::open_with_limits(cursor, limits.cfb()) {
             // An encrypted OOXML package, even beside a stub `WordDocument`
             // stream (record 0341).
             if ole_file.exists(&["EncryptionInfo"]) && ole_file.exists(&["EncryptedPackage"]) {
@@ -346,15 +378,14 @@ fn detect_format_smart_without_ooxml<T: ZipTail>(
 
     #[cfg(feature = "rtf")]
     if !mask.is_ole2() && !mask.is_zip() && super::is_compressed_rtf(&bytes) {
-        return Some(DetectedFormat::Rtf(bytes));
+        return limits
+            .accepts_rtf_input_len(bytes.len() as u64)
+            .then_some(DetectedFormat::Rtf(bytes));
     }
 
     if mask.is_zip() {
         #[cfg(any(feature = "odt", feature = "ods", feature = "odp", odf_objects))]
-        let bytes = match litchi_odf_common::detect::prepared_or_original(
-            bytes,
-            litchi_odf_common::SourceLimits::default(),
-        ) {
+        let bytes = match litchi_odf_common::detect::prepared_or_original(bytes, limits.odf()) {
             Ok(prepared) => {
                 let format = prepared.format();
                 return match format {
@@ -384,31 +415,12 @@ fn detect_format_smart_without_ooxml<T: ZipTail>(
     None
 }
 
-/// Detect a format while applying an explicit OPC resource policy to an OOXML
-/// ZIP candidate.
-///
-/// The policy is used when a ZIP candidate must be ruled in or out as OOXML.
-/// OLE, RTF and ODF detection retains its existing format-specific behavior
-/// after the ODF detector proves an ordinary package under its own finite
-/// policy. ODF-marked packages with a present or uncertain OOXML catalog fail
-/// closed on hard OPC policy errors. As [`detect_format_smart`], it runs no
-/// [`ZipTail`], so an iWork package is not recognized.
+/// [`detect_format_smart_with_tail`] in an OOXML build, under the OPC
+/// resource policy `limits`.
 #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
-pub fn detect_format_smart_with_limits(
+pub(crate) fn detect_ooxml_smart<T: ZipTail>(
     bytes: Vec<u8>,
-    limits: crate::opc::SourceLimits,
-) -> Option<DetectedFormat> {
-    detect_format_smart_with_limits_and_tail(bytes, limits, &NoZipTail)
-}
-
-/// [`detect_format_smart_with_limits`] with a lowest-precedence ZIP candidate.
-///
-/// `tail` classifies a ZIP input that every other candidate declined; see
-/// [`tail`](super::tail) for when it runs.
-#[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
-pub fn detect_format_smart_with_limits_and_tail<T: ZipTail>(
-    bytes: Vec<u8>,
-    limits: crate::opc::SourceLimits,
+    source_limits: &SourceLimits,
     tail: &T,
 ) -> Option<DetectedFormat> {
     #[cfg(not(any(feature = "pages", feature = "keynote", feature = "numbers")))]
@@ -429,10 +441,9 @@ pub fn detect_format_smart_with_limits_and_tail<T: ZipTail>(
     }
 
     #[cfg(any(feature = "odt", feature = "ods", feature = "odp", odf_objects))]
-    if let Some(format) =
-        litchi_odf_common::detect::flat(&bytes, litchi_odf_common::detect::Limits::default())
-            .ok()
-            .flatten()
+    if let Some(format) = litchi_odf_common::detect::flat(&bytes, source_limits.odf_detect_limits())
+        .ok()
+        .flatten()
     {
         return Some(DetectedFormat::FlatOdf(format, bytes));
     }
@@ -443,14 +454,16 @@ pub fn detect_format_smart_with_limits_and_tail<T: ZipTail>(
     // Check RTF first (simplest check, no parsing needed)
     #[cfg(feature = "rtf")]
     if mask.is_rtf() {
-        return Some(DetectedFormat::Rtf(bytes));
+        return source_limits
+            .accepts_rtf_input_len(bytes.len() as u64)
+            .then_some(DetectedFormat::Rtf(bytes));
     }
 
     // Check OLE2 signature (DOC, PPT, XLS) - parse OleFile once
     #[cfg(any(feature = "doc", feature = "ppt", feature = "xls"))]
     if mask.is_ole2() {
         let cursor = std::io::Cursor::new(bytes);
-        if let Ok(ole_file) = litchi_cfb::OleFile::open(cursor) {
+        if let Ok(ole_file) = litchi_cfb::OleFile::open_with_limits(cursor, source_limits.cfb()) {
             // An encrypted OOXML package, even beside a stub `WordDocument`
             // stream (record 0341).
             if ole_file.exists(&["EncryptionInfo"]) && ole_file.exists(&["EncryptedPackage"]) {
@@ -475,7 +488,9 @@ pub fn detect_format_smart_with_limits_and_tail<T: ZipTail>(
 
     #[cfg(feature = "rtf")]
     if !mask.is_ole2() && !mask.is_zip() && super::is_compressed_rtf(&bytes) {
-        return Some(DetectedFormat::Rtf(bytes));
+        return source_limits
+            .accepts_rtf_input_len(bytes.len() as u64)
+            .then_some(DetectedFormat::Rtf(bytes));
     }
 
     // Check ZIP candidates in the same order as the ordinary detector.
@@ -484,12 +499,10 @@ pub fn detect_format_smart_with_limits_and_tail<T: ZipTail>(
             any(feature = "odt", feature = "ods", feature = "odp", odf_objects),
             any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")
         ))]
-        let odf_mime = litchi_odf_common::detect::packaged_mime(
-            &bytes,
-            litchi_odf_common::detect::Limits::default(),
-        )
-        .ok()
-        .flatten();
+        let odf_mime =
+            litchi_odf_common::detect::packaged_mime(&bytes, source_limits.odf_detect_limits())
+                .ok()
+                .flatten();
         #[cfg(all(
             any(feature = "odt", feature = "ods", feature = "odp", odf_objects),
             any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")
@@ -497,7 +510,7 @@ pub fn detect_format_smart_with_limits_and_tail<T: ZipTail>(
         let normal_odf = odf_mime.is_some()
             && litchi_odf_common::detect::packaged_has_ooxml_catalog(
                 &bytes,
-                litchi_odf_common::detect::CatalogProbeLimits::default(),
+                source_limits.odf_catalog_limits(),
             ) == Some(false);
         #[cfg(all(
             not(any(feature = "odt", feature = "ods", feature = "odp", odf_objects)),
@@ -510,7 +523,7 @@ pub fn detect_format_smart_with_limits_and_tail<T: ZipTail>(
         if !normal_odf {
             #[cfg(any(test, feature = "test-support"))]
             super::record_opc_probe();
-            match crate::opc::OpcPackage::from_bytes_with_limits(&bytes, limits) {
+            match crate::opc::OpcPackage::from_bytes_with_limits(&bytes, source_limits.ooxml()) {
                 Ok(package) => {
                     if let Some(format) =
                         crate::detect::ooxml::detect_ooxml_format_from_package(&package)
@@ -534,28 +547,26 @@ pub fn detect_format_smart_with_limits_and_tail<T: ZipTail>(
         }
 
         #[cfg(any(feature = "odt", feature = "ods", feature = "odp", odf_objects))]
-        let bytes = match litchi_odf_common::detect::prepared_or_original(
-            bytes,
-            litchi_odf_common::SourceLimits::default(),
-        ) {
-            Ok(prepared) => {
-                let format = prepared.format();
-                return match format {
-                    #[cfg(feature = "odt")]
-                    FileFormat::Odt => Some(DetectedFormat::Odt(prepared)),
-                    #[cfg(feature = "odp")]
-                    FileFormat::Odp => {
-                        Some(DetectedFormat::Odp(prepared.into_package().into_inner()))
-                    },
-                    #[cfg(feature = "ods")]
-                    FileFormat::Ods => {
-                        Some(DetectedFormat::Ods(prepared.into_package().into_inner()))
-                    },
-                    _ => None,
-                };
-            },
-            Err(bytes) => bytes,
-        };
+        let bytes =
+            match litchi_odf_common::detect::prepared_or_original(bytes, source_limits.odf()) {
+                Ok(prepared) => {
+                    let format = prepared.format();
+                    return match format {
+                        #[cfg(feature = "odt")]
+                        FileFormat::Odt => Some(DetectedFormat::Odt(prepared)),
+                        #[cfg(feature = "odp")]
+                        FileFormat::Odp => {
+                            Some(DetectedFormat::Odp(prepared.into_package().into_inner()))
+                        },
+                        #[cfg(feature = "ods")]
+                        FileFormat::Ods => {
+                            Some(DetectedFormat::Ods(prepared.into_package().into_inner()))
+                        },
+                        _ => None,
+                    };
+                },
+                Err(bytes) => bytes,
+            };
 
         #[cfg(any(feature = "pages", feature = "keynote", feature = "numbers"))]
         return tail.detect_owned(bytes);
@@ -739,9 +750,9 @@ impl PreparedDetection {
     any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"),
     any(unix, windows)
 ))]
-pub(crate) fn detect_and_prepare_path_with_limits<T: ZipTail>(
+pub(crate) fn detect_and_prepare_path<T: ZipTail>(
     path: &std::path::Path,
-    limits: crate::opc::SourceLimits,
+    limits: &SourceLimits,
     tail: &T,
 ) -> Option<PreparedDetection> {
     use litchi_core::ReadAt;
@@ -749,7 +760,7 @@ pub(crate) fn detect_and_prepare_path_with_limits<T: ZipTail>(
     // Every early exit reports exactly what the neutral detector reports. The
     // prepared handle is an optimization; it never changes a classification.
     let unprepared = || {
-        super::functions::detect_file_format_with_tail(path, tail)
+        super::functions::detect_file_format_with_tail(path, limits, tail)
             .map(PreparedDetection::unprepared)
     };
 
@@ -777,7 +788,7 @@ pub(crate) fn detect_and_prepare_path_with_limits<T: ZipTail>(
     let Ok(input_bytes) = source.len() else {
         return unprepared();
     };
-    if input_bytes > limits.max_input_bytes() {
+    if !limits.accepts_input_len(input_bytes) {
         return unprepared();
     }
 
@@ -785,10 +796,10 @@ pub(crate) fn detect_and_prepare_path_with_limits<T: ZipTail>(
     // OpenDocument package is never probed as OPC.
     #[cfg(any(feature = "odt", feature = "ods", feature = "odp", odf_objects))]
     {
-        let catalog_limits = super::catalog_probe_limits(crate::opc::SourceLimits::default());
+        let catalog_limits = limits.odf_catalog_limits();
         match litchi_odf_common::detect::packaged_mime_read_at(
             source.as_ref(),
-            litchi_odf_common::detect::Limits::default(),
+            limits.odf_detect_limits(),
         ) {
             Ok(Some(_odf_format)) => {
                 match litchi_odf_common::detect::packaged_has_ooxml_catalog_read_at(
@@ -813,7 +824,7 @@ pub(crate) fn detect_and_prepare_path_with_limits<T: ZipTail>(
     super::record_opc_probe();
     let Ok(package) = crate::opc::SourceBackedPackage::from_read_at_with_limits(
         std::sync::Arc::clone(&source),
-        limits,
+        limits.ooxml(),
     ) else {
         return unprepared();
     };
@@ -862,12 +873,11 @@ fn stable_path_origin(path: &std::path::Path) -> Option<std::sync::Arc<std::path
 
 #[cfg(test)]
 mod short_signature_tests {
-    use super::detect_format_smart;
-    #[cfg(all(
-        feature = "rtf",
-        any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")
-    ))]
-    use super::detect_format_smart_with_limits;
+    use crate::detect::SourceLimits;
+
+    fn detect_format_smart(bytes: Vec<u8>) -> Option<super::DetectedFormat> {
+        super::detect_format_smart(bytes, &SourceLimits::default())
+    }
 
     #[cfg(feature = "odt")]
     #[test]
@@ -930,7 +940,7 @@ mod short_signature_tests {
 
         #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
         assert!(
-            detect_format_smart_with_limits(zip_polyglot, crate::opc::SourceLimits::default())
+            super::detect_ooxml_smart(zip_polyglot, &SourceLimits::default(), &super::NoZipTail)
                 .is_none()
         );
 
@@ -940,7 +950,7 @@ mod short_signature_tests {
 
         #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
         assert!(
-            detect_format_smart_with_limits(ole_polyglot, crate::opc::SourceLimits::default())
+            super::detect_ooxml_smart(ole_polyglot, &SourceLimits::default(), &super::NoZipTail)
                 .is_none()
         );
     }

@@ -262,22 +262,28 @@ impl Prepared {
             // the end so every direct path stays valid.
             return self
                 .unified
-                .edit_with_limits(&self.limits, |edit| {
-                    for path in self.paths.iter().rev() {
-                        edit.remove(path)?;
-                    }
-                    Ok(())
-                })
-                .map(|commit| commit.file);
+                .edit_with_options(
+                    litchi_ops::EditOptions::new().semantic_limits(self.limits),
+                    |edit| {
+                        for path in self.paths.iter().rev() {
+                            edit.remove(path)?;
+                        }
+                        Ok(())
+                    },
+                )
+                .map(|commit| commit.into_file());
         }
         self.unified
-            .edit_with_limits(&self.limits, |edit| {
-                for (path, props) in self.paths.iter().zip(&self.props) {
-                    edit.set(path, props)?;
-                }
-                Ok(())
-            })
-            .map(|commit| commit.file)
+            .edit_with_options(
+                litchi_ops::EditOptions::new().semantic_limits(self.limits),
+                |edit| {
+                    for (path, props) in self.paths.iter().zip(&self.props) {
+                        edit.set(path, props)?;
+                    }
+                    Ok(())
+                },
+            )
+            .map(|commit| commit.into_file())
     }
 
     /// One direct `File::set`/`remove` without an edit closure (single target).
@@ -293,14 +299,17 @@ impl Prepared {
     /// The fan-out with the selector compiled once outside the clock.
     fn unified_fanout_plan(&self, plan: &Plan<'static>) -> litchi_ops::Result<File> {
         self.unified
-            .edit_with_limits(&self.limits, |edit| {
-                if self.family == Family::PictureRemoval {
-                    edit.remove(plan)
-                } else {
-                    edit.set(plan, Props::new().with("text", "shared"))
-                }
-            })
-            .map(|commit| commit.file)
+            .edit_with_options(
+                litchi_ops::EditOptions::new().semantic_limits(self.limits),
+                |edit| {
+                    if self.family == Family::PictureRemoval {
+                        edit.remove(plan)
+                    } else {
+                        edit.set(plan, Props::new().with("text", "shared"))
+                    }
+                },
+            )
+            .map(|commit| commit.into_file())
     }
 
     /// The fan-out with the query passed by reference: the plan cache
@@ -308,26 +317,32 @@ impl Prepared {
     /// 0305).
     fn unified_fanout_ref(&self, query: &Query<'static>) -> litchi_ops::Result<File> {
         self.unified
-            .edit_with_limits(&self.limits, |edit| {
-                if self.family == Family::PictureRemoval {
-                    edit.remove(query)
-                } else {
-                    edit.set(query, Props::new().with("text", "shared"))
-                }
-            })
-            .map(|commit| commit.file)
+            .edit_with_options(
+                litchi_ops::EditOptions::new().semantic_limits(self.limits),
+                |edit| {
+                    if self.family == Family::PictureRemoval {
+                        edit.remove(query)
+                    } else {
+                        edit.set(query, Props::new().with("text", "shared"))
+                    }
+                },
+            )
+            .map(|commit| commit.into_file())
     }
 
     fn unified_fanout(&self, query: &Query<'static>) -> litchi_ops::Result<File> {
         self.unified
-            .edit_with_limits(&self.limits, |edit| {
-                if self.family == Family::PictureRemoval {
-                    edit.remove(query.clone())
-                } else {
-                    edit.set(query.clone(), Props::new().with("text", "shared"))
-                }
-            })
-            .map(|commit| commit.file)
+            .edit_with_options(
+                litchi_ops::EditOptions::new().semantic_limits(self.limits),
+                |edit| {
+                    if self.family == Family::PictureRemoval {
+                        edit.remove(query.clone())
+                    } else {
+                        edit.set(query.clone(), Props::new().with("text", "shared"))
+                    }
+                },
+            )
+            .map(|commit| commit.into_file())
     }
 }
 

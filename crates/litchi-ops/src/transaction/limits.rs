@@ -99,7 +99,7 @@ impl std::error::Error for Error {
 /// assert_eq!(limits.max_operations(), 100);
 /// # Ok::<(), litchi_ops::Error>(())
 /// ```
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SemanticLimits {
     operations: usize,
     snapshot_bytes: usize,

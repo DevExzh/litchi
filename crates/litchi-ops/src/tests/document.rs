@@ -310,8 +310,12 @@ mod docx {
         let bytes = minimal_docx(SECTION_XML);
         let source = crate::open_bytes(bytes.clone()).expect("open source-backed DOCX");
         let eager = eager(bytes);
-        let source_inventory = docx(&source).section_inventory().unwrap();
-        let eager_inventory = docx(&eager).section_inventory().unwrap();
+        let source_inventory = docx(&source)
+            .section_inventory(&litchi_docx::section::Limits::default())
+            .unwrap();
+        let eager_inventory = docx(&eager)
+            .section_inventory(&litchi_docx::section::Limits::default())
+            .unwrap();
         assert_eq!(source_inventory.sections(), eager_inventory.sections());
         assert_eq!(source_inventory.paragraph_count(), 2);
         assert_eq!(source_inventory.sections().len(), 2);
@@ -340,7 +344,9 @@ mod docx {
     fn docx_header_footer_inventory_keeps_inert_relationship_ids() {
         let bytes = std::fs::read(test_data("ooxml/docx/headerFooter.docx")).unwrap();
         let file = eager(bytes);
-        let inventory = docx(&file).section_inventory().unwrap();
+        let inventory = docx(&file)
+            .section_inventory(&litchi_docx::section::Limits::default())
+            .unwrap();
         let mut ids = inventory
             .sections()
             .iter()
@@ -398,7 +404,9 @@ mod docx {
         let memory = (minimal_docx(SECTION_XML).len() as u64).saturating_mul(4);
         let (_cancellation, budget, file) =
             managed(SECTION_XML, memory, "facade-managed-docx-section-inventory");
-        let inventory = docx(&file).section_inventory().unwrap();
+        let inventory = docx(&file)
+            .section_inventory(&litchi_docx::section::Limits::default())
+            .unwrap();
         drop(file);
         assert_eq!(inventory.sections().len(), 2);
         assert_eq!(budget.used(litchi_core::Resource::Memory), 0);
@@ -462,7 +470,10 @@ mod docx {
         let malformed = crate::open_bytes(minimal_docx(b"<w:document>"))
             .expect("malformed main XML stays deferred at source open");
         assert_eq!(
-            docx(&malformed).section_inventory().unwrap_err().code(),
+            docx(&malformed)
+                .section_inventory(&litchi_docx::section::Limits::default())
+                .unwrap_err()
+                .code(),
             Code::CorruptFile
         );
 
@@ -471,9 +482,7 @@ mod docx {
             max_input_bytes: 1,
             ..Default::default()
         };
-        let error = docx(&file)
-            .section_inventory_with_limits(&limits)
-            .unwrap_err();
+        let error = docx(&file).section_inventory(&limits).unwrap_err();
         assert_eq!(error.code(), Code::LimitExceeded, "{error:?}");
         assert!(error.message().contains("limit"), "{error:?}");
     }
@@ -486,7 +495,9 @@ mod docx {
         let expected = source_version(&file);
         super::super::mutate(temporary.path());
         super::super::assert_source_changed(
-            &docx(&file).section_inventory().unwrap_err(),
+            &docx(&file)
+                .section_inventory(&litchi_docx::section::Limits::default())
+                .unwrap_err(),
             expected,
         );
     }
@@ -751,6 +762,33 @@ mod docx {
             Some("Source-backed ODT")
         );
         assert_eq!(view.paragraph_text(1).unwrap(), None);
+    }
+
+    #[cfg(feature = "odt")]
+    #[test]
+    fn owned_docx_bytes_do_not_use_odf_limits() {
+        let bytes = minimal_docx(
+            br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>OPC precedence</w:t></w:r></w:p></w:body></w:document>"#,
+        );
+        let polyglot = odt::add_member(
+            &bytes,
+            "mimetype",
+            b"application/vnd.oasis.opendocument.text",
+        );
+        let limits = litchi_odf_common::SourceLimits::builder()
+            .max_input_bytes(1)
+            .unwrap()
+            .max_members(1)
+            .unwrap()
+            .build()
+            .unwrap();
+        let options = OpenOptions::new()
+            .odf_options(litchi_odf_common::OpenOptions::new().source_limits(limits));
+        for input in [bytes, polyglot] {
+            let file = crate::open_bytes_with(input, &options).expect("DOCX uses OPC limits");
+            assert!(matches!(file, File::Docx(_)));
+            assert_eq!(file.text().unwrap(), "OPC precedence");
+        }
     }
 
     #[cfg(feature = "odt")]
@@ -1454,6 +1492,94 @@ mod odt {
     use super::*;
     use std::io::Read as _;
 
+    const FLAT_ODT: &[u8] = br#"<?xml version="1.0" encoding="UTF-8"?>
+<office:document
+  xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+  xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
+  office:version="1.3"
+  office:mimetype="application/vnd.oasis.opendocument.text">
+  <office:body><office:text><text:h>Title</text:h><text:p>Hello flat text</text:p></office:text></office:body>
+</office:document>"#;
+
+    #[test]
+    fn owned_odt_source_limits_remain_typed() {
+        use litchi_odf_common::{LimitKind, SourceLimitKind, SourceLimits};
+
+        let bytes = minimal_odt();
+        let length = u64::try_from(bytes.len()).unwrap();
+        let members =
+            u64::try_from(zip::ZipArchive::new(Cursor::new(&bytes)).unwrap().len()).unwrap();
+        for (kind, observed) in [
+            (SourceLimitKind::InputBytes, length),
+            (SourceLimitKind::Members, members),
+        ] {
+            for maximum in [observed, observed - 1] {
+                let limits = match kind {
+                    SourceLimitKind::InputBytes => SourceLimits::builder().max_input_bytes(maximum),
+                    SourceLimitKind::Members => {
+                        SourceLimits::builder().max_members(usize::try_from(maximum).unwrap())
+                    },
+                    _ => unreachable!(),
+                }
+                .unwrap()
+                .build()
+                .unwrap();
+                let options = crate::OpenOptions::new()
+                    .odf_options(litchi_odf_common::OpenOptions::new().source_limits(limits));
+                let result = crate::open_bytes_with(bytes.clone(), &options);
+                if maximum == observed {
+                    assert_eq!(result.unwrap().text().unwrap(), "Source-backed ODT");
+                } else {
+                    let error = result.expect_err("the selected source ceiling is enforced");
+                    assert_eq!(error.code(), Code::LimitExceeded, "{error:?}");
+                    assert!(
+                        matches!(
+                            error.leaf(),
+                            crate::error::Source::Odf(litchi_odf_common::Error::Limit {
+                                kind: actual_kind,
+                                observed: actual_observed,
+                                maximum: actual_maximum,
+                            }) if *actual_kind == LimitKind::Source(kind)
+                                && *actual_observed == observed && *actual_maximum == maximum
+                        ),
+                        "{error:?}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn flat_odt_source_limits_remain_typed() {
+        let length = u64::try_from(FLAT_ODT.len()).unwrap();
+        for maximum in [length, length - 1] {
+            let limits = litchi_odf_common::SourceLimits::builder()
+                .max_input_bytes(maximum)
+                .unwrap()
+                .build()
+                .unwrap();
+            let options = crate::OpenOptions::new()
+                .odf_options(litchi_odf_common::OpenOptions::new().source_limits(limits));
+            let result = crate::open_bytes_with(FLAT_ODT.to_vec(), &options);
+            if maximum == length {
+                assert_eq!(result.unwrap().to_bytes().unwrap(), FLAT_ODT);
+            } else {
+                let error = result.expect_err("the selected flat input ceiling is enforced");
+                assert_eq!(error.code(), Code::LimitExceeded, "{error:?}");
+                assert!(
+                    matches!(error.leaf(),
+                        crate::error::Source::Odf(litchi_odf_common::Error::Limit {
+                            kind: litchi_odf_common::LimitKind::Source(
+                                litchi_odf_common::SourceLimitKind::InputBytes),
+                            observed, maximum: actual_maximum,
+                        }) if *observed == length && *actual_maximum == maximum
+                    ),
+                    "{error:?}"
+                );
+            }
+        }
+    }
+
     pub(super) fn minimal_odt() -> Vec<u8> {
         let mut builder = litchi_odt::Builder::new();
         builder.add_paragraph("Source-backed ODT").unwrap();
@@ -1710,14 +1836,6 @@ mod odt {
 
     #[test]
     fn flat_odt_opens_through_its_read_projection() {
-        const FLAT_ODT: &[u8] = br#"<?xml version="1.0" encoding="UTF-8"?>
-<office:document
-  xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
-  xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
-  office:version="1.3"
-  office:mimetype="application/vnd.oasis.opendocument.text">
-  <office:body><office:text><text:h>Title</text:h><text:p>Hello flat text</text:p></office:text></office:body>
-</office:document>"#;
         // Record 0292: flat ODT reads through the leaf's packaged projection
         // and publishes its flat bytes.
         let file = crate::open_bytes(FLAT_ODT.to_vec()).expect("flat ODT opens");

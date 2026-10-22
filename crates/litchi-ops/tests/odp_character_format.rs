@@ -130,13 +130,13 @@ fn batches_and_refusals() {
             Ok(())
         })
         .unwrap();
-    assert_eq!(commit.diagnostics.commits(), 1);
+    assert_eq!(commit.diagnostics().commits(), 1);
     for paragraph in 1..=4 {
         let path = format!("/slide[1]/shape[2]/p[{paragraph}]/r[1]");
-        assert_eq!(prop(&commit.file, &path, "bold").as_deref(), Some("true"));
+        assert_eq!(prop(commit.file(), &path, "bold").as_deref(), Some("true"));
     }
-    assert_eq!(prop(&commit.file, RUN, "italic").as_deref(), Some("true"));
-    let restored = commit.patch.inverse().apply(&commit.file).unwrap();
+    assert_eq!(prop(commit.file(), RUN, "italic").as_deref(), Some("true"));
+    let restored = commit.patch().inverse().apply(commit.file()).unwrap();
     assert_eq!(restored.to_bytes().unwrap(), file.to_bytes().unwrap());
 
     // A text set followed by formatting of the same story resolves against
@@ -148,9 +148,9 @@ fn batches_and_refusals() {
             Ok(())
         })
         .unwrap();
-    assert_eq!(commit.diagnostics.commits(), 2);
+    assert_eq!(commit.diagnostics().commits(), 2);
     assert_eq!(
-        prop(&commit.file, "/slide[1]/shape[2]/p[1]/r[1]", "bold").as_deref(),
+        prop(commit.file(), "/slide[1]/shape[2]/p[1]/r[1]", "bold").as_deref(),
         Some("true")
     );
 
@@ -183,7 +183,7 @@ fn shapes_cells_and_notes_take_formatting_as_a_whole() {
             Ok(())
         })
         .unwrap();
-    let changed = reopen(&commit.file);
+    let changed = reopen(commit.file());
     assert_eq!(prop(&changed, shape, "bold").as_deref(), Some("true"));
     assert_eq!(prop(&changed, shape, "size").as_deref(), Some("20pt"));
     // The spans' T1..T4 set the size, so they take the new one too.
@@ -206,11 +206,11 @@ fn shapes_cells_and_notes_take_formatting_as_a_whole() {
         prop(&changed, "/slide[1]/notes", "italic").as_deref(),
         Some("true")
     );
-    let restored = commit.patch.inverse().apply(&commit.file).unwrap();
+    let restored = commit.patch().inverse().apply(commit.file()).unwrap();
     assert_eq!(restored.to_bytes().unwrap(), file.to_bytes().unwrap());
     // The same values again: an exact no-op.
-    let again = commit.file.set(shape, props! { "bold" => true }).unwrap();
-    assert_eq!(again.to_bytes().unwrap(), commit.file.to_bytes().unwrap());
+    let again = commit.file().set(shape, props! { "bold" => true }).unwrap();
+    assert_eq!(again.to_bytes().unwrap(), commit.file().to_bytes().unwrap());
 
     let table = open("odf/odp/cellspan.odp");
     let cell = "/slide[1]/table[1]/tr[1]/tc[2]";
@@ -270,7 +270,7 @@ fn links_fields_and_common_styles() {
             Ok(())
         })
         .unwrap()
-        .file;
+        .into_file();
     let changed = litchi_ops::open_bytes(changed.to_bytes().unwrap()).unwrap();
     assert_eq!(prop(&changed, link, "italic").as_deref(), Some("true"));
     assert_eq!(

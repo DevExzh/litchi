@@ -65,14 +65,17 @@ pub(crate) fn refresh(args: &Refresh, json: bool, out: &mut impl Write) -> Resul
         options = options.clock(Clock::parse(clock)?);
     }
     let file = litchi_ops::open(&args.file)?;
-    let commit = file.refresh_with_limits(&options, &limits)?;
-    let changed = commit.diagnostics.changed();
+    let commit = file.refresh_with_options(
+        &options,
+        litchi_ops::EditOptions::new().semantic_limits(limits),
+    )?;
+    let changed = commit.diagnostics().changed();
     let saved = match &args.output.out {
-        Some(path) => Some(commit.file.save_as(path)?.path),
-        None if changed => Some(commit.file.save()?.path),
+        Some(path) => Some(commit.file().save_as(path)?.path),
+        None if changed => Some(commit.file().save()?.path),
         None => None,
     };
-    let summary = commit.value;
+    let summary = commit.into_value();
     if json {
         render::json(out, &report(saved.as_deref(), changed, &summary))?;
     } else {

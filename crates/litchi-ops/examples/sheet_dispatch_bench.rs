@@ -127,14 +127,14 @@ fn import(format: FileFormat, source: &str) -> File {
     };
     let file = litchi_ops::create(format)
         .expect("create")
-        .import_with_limits(
+        .import_with_options(
             sheet,
             source.as_bytes(),
             &Options::csv().formulas(true),
-            &limits(),
+            litchi_ops::EditOptions::new().semantic_limits(limits()),
         )
         .expect("formulas")
-        .file;
+        .into_file();
     litchi_ops::open_bytes(file.to_bytes().expect("publish")).expect("reopen")
 }
 

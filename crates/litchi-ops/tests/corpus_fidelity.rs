@@ -236,7 +236,7 @@ fn run_bundle(relative: &str, dir: &Path) -> Result<Outcome, String> {
     let (noop, detail) = match guarded(|| file.edit(|_| Ok(()))) {
         Err(error) if untyped(&error) => ("error", format!("edit: {error}")),
         Err(error) => ("refused", format!("edit: {error}")),
-        Ok(commit) => match guarded(|| commit.file.save()) {
+        Ok(commit) => match guarded(|| commit.file().save()) {
             Ok(_) => {
                 let (before, after) = (bundle_files(&source), bundle_files(&copy));
                 if before == after {
@@ -804,7 +804,7 @@ fn run(relative: &str, dir: &Path) -> Result<Outcome, String> {
             };
             ("refused", format!("edit: {error}; {save}"))
         },
-        Ok(commit) => match save_bytes(&commit.file, dir, &extension) {
+        Ok(commit) => match save_bytes(commit.file(), dir, &extension) {
             Ok(bytes) if bytes == input => ("exact", String::new()),
             Ok(bytes) => ("differs", first_difference(&input, &bytes)),
             Err(error) if untyped(&error) => ("error", format!("save: {error}")),

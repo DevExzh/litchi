@@ -49,20 +49,27 @@ fn time(name: &str, payloads: &[Vec<u8>]) {
     let mut sum = 0u64;
     let mut items = 0usize;
     for payload in payloads {
-        let decoded = batch::from_bytes(payload).expect("payload decodes");
+        let decoded =
+            batch::from_bytes(payload, &batch::SourceLimits::default()).expect("payload decodes");
         sum ^= checksum(&decoded);
         items += decoded.len();
     }
     for _ in 0..WARMUP {
         for payload in payloads {
-            black_box(batch::from_bytes(black_box(payload)).expect("decodes"));
+            black_box(
+                batch::from_bytes(black_box(payload), &batch::SourceLimits::default())
+                    .expect("decodes"),
+            );
         }
     }
     let mut samples = Vec::with_capacity(ROUNDS);
     for _ in 0..ROUNDS {
         let start = Instant::now();
         for payload in payloads {
-            black_box(batch::from_bytes(black_box(payload)).expect("decodes"));
+            black_box(
+                batch::from_bytes(black_box(payload), &batch::SourceLimits::default())
+                    .expect("decodes"),
+            );
         }
         samples.push(start.elapsed().as_nanos());
     }

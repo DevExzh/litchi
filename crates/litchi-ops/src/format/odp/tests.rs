@@ -30,7 +30,7 @@ fn open_prepared(bytes: Vec<u8>) -> Odp {
 /// retained: the unified byte route adopts the prepared package instead.
 fn open_detected(bytes: Vec<u8>) -> Odp {
     assert!(matches!(
-        detect_format_smart(bytes.clone()),
+        detect_format_smart(bytes.clone(), &crate::detect::SourceLimits::default()),
         Some(DetectedFormat::Odp(_))
     ));
     match crate::open_bytes(bytes).expect("open detected ODP") {

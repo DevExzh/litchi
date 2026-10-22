@@ -149,14 +149,19 @@ pub(crate) fn import(args: &Import, json: bool, out: &mut impl Write) -> Result<
         None => args.path.clone(),
     };
     let file = litchi_ops::open(&args.file)?;
-    let commit = file.import_with_limits(target.as_str(), &data, &options, &limits)?;
-    let changed = commit.diagnostics.changed();
+    let commit = file.import_with_options(
+        target.as_str(),
+        &data,
+        &options,
+        litchi_ops::EditOptions::new().semantic_limits(limits),
+    )?;
+    let changed = commit.diagnostics().changed();
     let saved = match &args.output.out {
-        Some(path) => Some(commit.file.save_as(path)?.path),
-        None if changed => Some(commit.file.save()?.path),
+        Some(path) => Some(commit.file().save_as(path)?.path),
+        None if changed => Some(commit.file().save()?.path),
         None => None,
     };
-    let summary = commit.value;
+    let summary = commit.into_value();
     if json {
         render::json(
             out,

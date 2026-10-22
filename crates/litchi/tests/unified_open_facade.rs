@@ -235,9 +235,15 @@ fn a_disabled_format_is_reported_with_its_feature() {
 #[test]
 fn detection_and_open_agree_on_iwork() {
     let path = fixture("iwork/pages/basic.pages");
-    assert_eq!(litchi::detect_file_format(&path), Some(FileFormat::Pages));
+    assert_eq!(
+        litchi::detect_file_format(&path, &litchi::common::detection::SourceLimits::default(),),
+        Some(FileFormat::Pages)
+    );
     let file = litchi::open(&path).unwrap();
-    assert_eq!(file.format(), litchi::detect_file_format(&path));
+    assert_eq!(
+        file.format(),
+        litchi::detect_file_format(&path, &litchi::common::detection::SourceLimits::default(),)
+    );
 }
 
 // ----------------------------------------------------- family view refusals --
@@ -263,7 +269,9 @@ fn a_view_of_another_family_reports_the_detected_format() {
 #[test]
 fn a_prepared_detection_opens_without_indexing_again() {
     let path = fixture("ooxml/docx/documentProperties.docx");
-    let detection = litchi::detect_and_prepare(&path).expect("a DOCX is detected");
+    let detection =
+        litchi::detect_and_prepare(&path, &litchi::common::detection::SourceLimits::default())
+            .expect("a DOCX is detected");
     assert!(detection.is_prepared());
     let file = litchi::open_prepared(detection).unwrap();
     assert_eq!(file.format(), Some(FileFormat::Docx));

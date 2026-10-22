@@ -81,14 +81,14 @@ fn numbers_decode_correctly_rounded_and_round_trip_exactly() {
     ];
     for (text, expected) in cases {
         let json = format!(r#"[{{"command":"set","props":{{"n":{text}}}}}]"#);
-        let items = from_bytes(json.as_bytes()).unwrap();
+        let items = from_bytes(json.as_bytes(), &SourceLimits::default()).unwrap();
         let Some(PropValue::Number(number)) = items[0].props.as_ref().unwrap().get("n") else {
             panic!("{text}: not a number");
         };
         assert_eq!(number.to_bits(), expected.to_bits(), "{text}");
         // Serializing and decoding again gives the same double, twice.
         let wire = serde_json::to_vec(&items).unwrap();
-        let again = from_bytes(&wire).unwrap();
+        let again = from_bytes(&wire, &SourceLimits::default()).unwrap();
         assert!(again == items, "{text}: round trip moved the number");
         let rewire = serde_json::to_vec(&again).unwrap();
         assert_eq!(rewire, wire, "{text}: the wire form is not a fixed point");
@@ -97,9 +97,9 @@ fn numbers_decode_correctly_rounded_and_round_trip_exactly() {
     // first round trip.
     let long = format!("9{}", "7".repeat(120));
     let json = format!(r#"[{{"command":"set","props":{{"n":{long}}}}}]"#);
-    let items = from_bytes(json.as_bytes()).unwrap();
+    let items = from_bytes(json.as_bytes(), &SourceLimits::default()).unwrap();
     let wire = serde_json::to_vec(&items).unwrap();
-    assert!(from_bytes(&wire).unwrap() == items);
+    assert!(from_bytes(&wire, &SourceLimits::default()).unwrap() == items);
 }
 
 #[test]
@@ -280,7 +280,7 @@ fn bounded_decoder_enforces_bytes_before_parsing_and_items_before_decoding() {
         .unwrap()
         .build()
         .unwrap();
-    let error = from_bytes_with_limits(b"bad", &limits).unwrap_err();
+    let error = from_bytes(b"bad", &limits).unwrap_err();
     assert_eq!(error.code(), Code::LimitExceeded);
     assert_eq!(error.item(), None);
     assert!(matches!(
@@ -296,8 +296,7 @@ fn bounded_decoder_enforces_bytes_before_parsing_and_items_before_decoding() {
         .unwrap()
         .build()
         .unwrap();
-    let error =
-        from_bytes_with_limits(br#"[{"command":"set"},{"PRIVATE":"bad"}]"#, &limits).unwrap_err();
+    let error = from_bytes(br#"[{"command":"set"},{"PRIVATE":"bad"}]"#, &limits).unwrap_err();
     assert_eq!(error.code(), Code::LimitExceeded);
     assert_eq!(error.item(), Some(1));
     assert!(matches!(
@@ -309,12 +308,12 @@ fn bounded_decoder_enforces_bytes_before_parsing_and_items_before_decoding() {
         })
     ));
     assert_eq!(
-        from_bytes_with_limits(br#"[{"command":"set"}]"#, &limits)
+        from_bytes(br#"[{"command":"set"}]"#, &limits)
             .unwrap()
             .len(),
         1
     );
-    assert!(from_bytes_with_limits(b"[]", &limits).unwrap().is_empty());
+    assert!(from_bytes(b"[]", &limits).unwrap().is_empty());
 }
 
 #[test]
@@ -327,7 +326,7 @@ fn typed_ingress_attributes_item_errors_and_refuses_trailing_data() {
         (r#"[] {"PRIVATE":"extra"}"#, None),
         (r#"["PRIVATE"]"#, Some(0)),
     ] {
-        let error = from_bytes(input.as_bytes()).unwrap_err();
+        let error = from_bytes(input.as_bytes(), &SourceLimits::default()).unwrap_err();
         assert_eq!(error.code(), Code::CorruptBatch);
         assert_eq!(error.item(), index, "{input}");
         assert!(!error.to_string().contains("PRIVATE"));
@@ -359,15 +358,15 @@ fn ingress_limits_are_checked_and_property_payloads_count_toward_bytes() {
         .unwrap()
         .build()
         .unwrap();
-    assert_eq!(from_bytes_with_limits(input, &exact).unwrap().len(), 1);
+    assert_eq!(from_bytes(input, &exact).unwrap().len(), 1);
     let short = SourceLimits::builder()
         .max_input_bytes(input.len() - 1)
         .unwrap()
         .build()
         .unwrap();
     assert_eq!(
-        from_bytes_with_limits(input, &short).unwrap_err().code(),
+        from_bytes(input, &short).unwrap_err().code(),
         Code::LimitExceeded
     );
-    assert!(from_bytes(b"[\xff]").is_err());
+    assert!(from_bytes(b"[\xff]", &SourceLimits::default()).is_err());
 }

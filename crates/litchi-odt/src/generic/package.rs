@@ -5,10 +5,14 @@ use super::model::{Family, Package};
 use crate::constants;
 use crate::core::{Meta, OwnedPackage};
 use litchi_core::{Error, Metadata, Result};
-use litchi_odf_common::Error as OdfError;
 use litchi_odf_common::package::replace_content_xml_with_payload_verification;
+use litchi_odf_common::{Error as OdfError, XmlStreamLimits};
 
 impl Package {
+    pub(crate) fn xml_limits_value(&self) -> XmlStreamLimits {
+        self.xml_limits
+    }
+
     pub fn owned_package(&self) -> &OwnedPackage {
         &self.package
     }
@@ -23,7 +27,7 @@ impl Package {
             .map_err(|_error| Error::InvalidFormat("invalid UTF-8 in content.xml".to_string()))?;
 
         let bytes = replace_content_xml_with_payload_verification(&self.package, &content)?;
-        Package::from_vec(bytes)
+        Package::from_vec_with_xml_limits(bytes, self.xml_limits)
     }
 
     /// Replace `content.xml` while preserving optional core parts and every
@@ -86,7 +90,7 @@ impl Package {
         let file = std::fs::File::open(path)?;
         let package =
             OwnedPackage::from_reader_with_password_and_options(file, password.as_str(), options)?;
-        Ok(Self::from_owned(package)?)
+        Ok(Self::from_owned(package, options.xml_limits_value())?)
     }
 
     /// Read and validate a packaged `OpenDocument` document from a reader.
@@ -108,7 +112,7 @@ impl Package {
         options: litchi_odf_common::OpenOptions,
     ) -> std::result::Result<Self, OdfError> {
         let package = OwnedPackage::from_reader_with_options(reader, options)?;
-        Ok(Self::from_owned(package)?)
+        Ok(Self::from_owned(package, options.xml_limits_value())?)
     }
 
     /// Validate a packaged `OpenDocument` document from bytes (the bytes are copied).
@@ -162,15 +166,22 @@ impl Package {
         let password = zeroize::Zeroizing::new(password.into());
         let package =
             OwnedPackage::from_reader_with_password_and_options(bytes, password.as_str(), options)?;
-        Ok(Self::from_owned(package)?)
+        Ok(Self::from_owned(package, options.xml_limits_value())?)
     }
 
     /// Validate complete package bytes produced inside the crate.
     pub(crate) fn from_vec(bytes: Vec<u8>) -> Result<Self> {
-        Self::from_owned(OwnedPackage::from_bytes(bytes)?)
+        Self::from_owned(
+            OwnedPackage::from_bytes(bytes)?,
+            XmlStreamLimits::owner_default_value(),
+        )
     }
 
-    fn from_owned(package: OwnedPackage) -> Result<Self> {
+    fn from_vec_with_xml_limits(bytes: Vec<u8>, xml_limits: XmlStreamLimits) -> Result<Self> {
+        Self::from_owned(OwnedPackage::from_bytes(bytes)?, xml_limits)
+    }
+
+    fn from_owned(package: OwnedPackage, xml_limits: XmlStreamLimits) -> Result<Self> {
         // Constructing the borrowed package validates the mimetype file and
         // META-INF/manifest.xml together.
         let mimetype = package.mimetype()?;
@@ -193,6 +204,7 @@ impl Package {
             family,
             template,
             mimetype,
+            xml_limits,
         })
     }
 
@@ -316,12 +328,12 @@ impl Package {
         if let Some(styles) = styles.as_deref() {
             parts.push((styles, crate::MetadataPart::Styles));
         }
-        crate::content_metadata::parse_parts(&parts)
+        crate::content_metadata::parse_parts_with_xml_limits(&parts, self.xml_limits)
     }
 
     /// Inspect inert XForms model declarations in `office:forms`.
     pub fn xforms_models(&self) -> Result<Vec<crate::xforms::Model>> {
-        crate::xforms::parse_models(&self.content_xml()?)
+        crate::xforms::parse_models_with_xml_limits(&self.content_xml()?, self.xml_limits)
     }
 
     /// Set or clear paragraph RDFa and atomically publish `content.xml`.
@@ -330,8 +342,12 @@ impl Package {
         position: litchi_core::Position,
         value: &crate::RdfaAttributes,
     ) -> Result<()> {
-        let content =
-            crate::content_metadata::set_paragraph_rdfa(&self.content_xml()?, position, value)?;
+        let content = crate::content_metadata::set_paragraph_rdfa_with_xml_limits(
+            &self.content_xml()?,
+            position,
+            value,
+            self.xml_limits,
+        )?;
         self.replace_content_xml(content)
     }
 
@@ -341,8 +357,12 @@ impl Package {
         name: &str,
         value: &crate::RdfaAttributes,
     ) -> Result<()> {
-        let content =
-            crate::content_metadata::set_bookmark_rdfa(&self.content_xml()?, name, value)?;
+        let content = crate::content_metadata::set_bookmark_rdfa_with_xml_limits(
+            &self.content_xml()?,
+            name,
+            value,
+            self.xml_limits,
+        )?;
         self.replace_content_xml(content)
     }
 
@@ -352,8 +372,12 @@ impl Package {
         position: litchi_core::Position,
         value: &crate::RdfaAttributes,
     ) -> Result<()> {
-        let content =
-            crate::content_metadata::set_text_meta_rdfa(&self.content_xml()?, position, value)?;
+        let content = crate::content_metadata::set_text_meta_rdfa_with_xml_limits(
+            &self.content_xml()?,
+            position,
+            value,
+            self.xml_limits,
+        )?;
         self.replace_content_xml(content)
     }
 
@@ -363,8 +387,12 @@ impl Package {
         paragraph: litchi_core::Position,
         value: &crate::TextMeta,
     ) -> Result<()> {
-        let content =
-            crate::content_metadata::insert_text_meta(&self.content_xml()?, paragraph, value)?;
+        let content = crate::content_metadata::insert_text_meta_with_xml_limits(
+            &self.content_xml()?,
+            paragraph,
+            value,
+            self.xml_limits,
+        )?;
         self.replace_content_xml(content)
     }
 
@@ -374,14 +402,22 @@ impl Package {
         position: litchi_core::Position,
         value: &crate::TextMeta,
     ) -> Result<()> {
-        let content =
-            crate::content_metadata::replace_text_meta(&self.content_xml()?, position, value)?;
+        let content = crate::content_metadata::replace_text_meta_with_xml_limits(
+            &self.content_xml()?,
+            position,
+            value,
+            self.xml_limits,
+        )?;
         self.replace_content_xml(content)
     }
 
     /// Remove one inline `text:meta` and atomically publish `content.xml`.
     pub(crate) fn remove_text_meta(&mut self, position: litchi_core::Position) -> Result<()> {
-        let content = crate::content_metadata::remove_text_meta(&self.content_xml()?, position)?;
+        let content = crate::content_metadata::remove_text_meta_with_xml_limits(
+            &self.content_xml()?,
+            position,
+            self.xml_limits,
+        )?;
         self.replace_content_xml(content)
     }
 
@@ -391,19 +427,32 @@ impl Package {
         position: litchi_core::Position,
         model: &crate::xforms::Model,
     ) -> Result<()> {
-        let content = crate::xforms::replace_model(&self.content_xml()?, position.get(), model)?;
+        let content = crate::xforms::replace_model_with_xml_limits(
+            &self.content_xml()?,
+            position.get(),
+            model,
+            self.xml_limits,
+        )?;
         self.replace_content_xml(content)
     }
 
     /// Insert an inert XForms model into the existing `office:forms` container.
     pub(crate) fn insert_xforms_model(&mut self, model: &crate::xforms::Model) -> Result<()> {
-        let content = crate::xforms::insert_model(&self.content_xml()?, model)?;
+        let content = crate::xforms::insert_model_with_xml_limits(
+            &self.content_xml()?,
+            model,
+            self.xml_limits,
+        )?;
         self.replace_content_xml(content)
     }
 
     /// Remove one inert XForms model from `office:forms` and publish it.
     pub(crate) fn remove_xforms_model(&mut self, position: litchi_core::Position) -> Result<()> {
-        let content = crate::xforms::remove_model(&self.content_xml()?, position.get())?;
+        let content = crate::xforms::remove_model_with_xml_limits(
+            &self.content_xml()?,
+            position.get(),
+            self.xml_limits,
+        )?;
         self.replace_content_xml(content)
     }
 
@@ -415,7 +464,7 @@ impl Package {
         if let Some(styles) = styles.as_deref() {
             parts.push((styles, crate::variable_declaration::Part::Styles));
         }
-        crate::variable_declaration::parse_parts(&parts)
+        crate::variable_declaration::parse_parts_with_xml_limits(&parts, self.xml_limits)
     }
 
     /// Atomically insert or replace one variable declaration container.
@@ -446,7 +495,11 @@ impl Package {
         let styles = self.styles_xml()?;
         let (content, styles) = match group.part {
             crate::variable_declaration::Part::Content => (
-                crate::variable_declaration::set_xml(&content, group)?,
+                crate::variable_declaration::set_xml_with_xml_limits(
+                    &content,
+                    group,
+                    self.xml_limits,
+                )?,
                 styles,
             ),
             crate::variable_declaration::Part::Styles => {
@@ -457,7 +510,11 @@ impl Package {
                 })?;
                 (
                     content,
-                    Some(crate::variable_declaration::set_xml(&styles, group)?),
+                    Some(crate::variable_declaration::set_xml_with_xml_limits(
+                        &styles,
+                        group,
+                        self.xml_limits,
+                    )?),
                 )
             },
             crate::variable_declaration::Part::Flat => unreachable!(),
@@ -497,7 +554,12 @@ impl Package {
         let styles = self.styles_xml()?;
         let (content, styles) = match part {
             crate::variable_declaration::Part::Content => (
-                crate::variable_declaration::remove_xml(&content, scope, kind)?,
+                crate::variable_declaration::remove_xml_with_xml_limits(
+                    &content,
+                    scope,
+                    kind,
+                    self.xml_limits,
+                )?,
                 styles,
             ),
             crate::variable_declaration::Part::Styles => {
@@ -508,8 +570,11 @@ impl Package {
                 })?;
                 (
                     content,
-                    Some(crate::variable_declaration::remove_xml(
-                        &styles, scope, kind,
+                    Some(crate::variable_declaration::remove_xml_with_xml_limits(
+                        &styles,
+                        scope,
+                        kind,
+                        self.xml_limits,
                     )?),
                 )
             },
@@ -532,7 +597,7 @@ impl Package {
         if let Some(styles) = styles.as_deref() {
             parts.push((styles, crate::variable_declaration::Part::Styles));
         }
-        crate::variable_declaration::parse_parts(&parts)?;
+        crate::variable_declaration::parse_parts_with_xml_limits(&parts, self.xml_limits)?;
 
         let mut writer = crate::core::PackageWriter::new();
         writer.set_mimetype(&self.mimetype)?;
@@ -543,6 +608,7 @@ impl Package {
                 &content,
                 scope,
                 kind,
+                self.xml_limits,
             )?
             .publish(&mut writer)?;
         } else {
@@ -560,6 +626,7 @@ impl Package {
                     styles,
                     scope,
                     kind,
+                    self.xml_limits,
                 )?
                 .publish(&mut writer)?;
             } else {
@@ -578,7 +645,8 @@ impl Package {
             .publish(&mut writer)?;
         }
         writer.copy_auxiliary_files_from(&self.package)?;
-        let replacement = Package::from_vec(writer.finish_to_bytes()?)?;
+        let replacement =
+            Package::from_vec_with_xml_limits(writer.finish_to_bytes()?, self.xml_limits)?;
         *self = replacement;
         Ok(old)
     }

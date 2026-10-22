@@ -682,13 +682,15 @@ impl File {
         let mode = write::mode(mode)?;
         let items = Items::extract(&items)?;
         let commit = py.detach(|| items.run(&file, mode))?;
-        let results = write::results(py, &commit.results)?;
+        let results = write::results(py, commit.results())?;
+        let diagnostics = *commit.diagnostics();
+        let (file, patch, _) = commit.into_parts();
         Commit::new(
             py,
-            commit.file,
-            Some(write::Patch::one(commit.patch)),
-            commit.diagnostics.changed(),
-            commit.diagnostics.operations(),
+            file,
+            Some(write::Patch::one(patch)),
+            diagnostics.changed(),
+            diagnostics.operations(),
             Some(results),
             None,
         )
@@ -708,14 +710,16 @@ impl File {
         let file = self.handle()?;
         let item = write::item_of(&item).map_err(|failure| failure.with_item(0))?;
         let commit = py.detach(|| file.apply(item).map_err(|error| Failure::read(&error)))?;
-        let result = litchi::ItemResult::Applied(commit.value);
+        let diagnostics = *commit.diagnostics();
+        let (file, patch, applied) = commit.into_parts();
+        let result = litchi::ItemResult::Applied(applied);
         let results = write::results(py, std::slice::from_ref(&result))?;
         Commit::new(
             py,
-            commit.file,
-            Some(write::Patch::one(commit.patch)),
-            commit.diagnostics.changed(),
-            commit.diagnostics.operations(),
+            file,
+            Some(write::Patch::one(patch)),
+            diagnostics.changed(),
+            diagnostics.operations(),
             Some(results),
             None,
         )
@@ -790,8 +794,13 @@ impl File {
             delimiter, quote, header, encoding, infer, formulas, max_cells, max_bytes,
         )?;
         let commit = py.detach(|| {
-            file.import_with_limits(&*target, &data, &options, &limits)
-                .map_err(|error| Failure::read(&error))
+            file.import_with_options(
+                &*target,
+                &data,
+                &options,
+                litchi::EditOptions::new().semantic_limits(limits),
+            )
+            .map_err(|error| Failure::read(&error))
         })?;
         m4::import_commit(py, commit)
     }
@@ -850,8 +859,12 @@ impl File {
         let (options, limits) = merge::options(missing, fields, max_replacements, max_bytes)?;
         let commit = py.detach(|| {
             let record = merge::record(&source, &limits)?;
-            file.merge_with_limits(&record, &options, &limits)
-                .map_err(|error| Failure::read(&error))
+            file.merge_with_options(
+                &record,
+                &options,
+                litchi::EditOptions::new().semantic_limits(limits),
+            )
+            .map_err(|error| Failure::read(&error))
         })?;
         merge::commit(py, commit)
     }
@@ -923,7 +936,7 @@ impl File {
             max_bytes,
         )?;
         let commit = py.detach(|| {
-            file.refresh_with_limits(&options, &limits)
+            file.refresh_with_options(&options, litchi::EditOptions::new().semantic_limits(limits))
                 .map_err(|error| Failure::read(&error))
         })?;
         refresh::commit(py, commit)

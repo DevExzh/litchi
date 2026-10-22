@@ -56,7 +56,8 @@ fn text(file: &File) -> String {
         .into_owned()
 }
 fn items(json: &str) -> Vec<BatchItem<'_>> {
-    litchi_ops::batch::from_bytes(json.as_bytes()).unwrap()
+    litchi_ops::batch::from_bytes(json.as_bytes(), &litchi_ops::batch::SourceLimits::default())
+        .unwrap()
 }
 fn applied(result: &ItemResult) -> &litchi_ops::Applied {
     match result {
@@ -101,10 +102,10 @@ fn ordered_five_command_batches_match_single_operation_bytes_and_invert() {
             .unwrap();
         for mode in [BatchMode::Atomic, BatchMode::BestEffort] {
             let commit = file.batch(&input, mode).unwrap();
-            assert_eq!(commit.results.len(), 6);
-            assert!(!applied(&commit.results[0]).changed);
+            assert_eq!(commit.results().len(), 6);
+            assert!(!applied(&commit.results()[0]).changed);
             assert_eq!(
-                applied(&commit.results[1])
+                applied(&commit.results()[1])
                     .path
                     .as_ref()
                     .unwrap()
@@ -112,21 +113,24 @@ fn ordered_five_command_batches_match_single_operation_bytes_and_invert() {
                 "/body/p[3]"
             );
             assert!(
-                commit.results[1..]
+                commit.results()[1..]
                     .iter()
                     .all(|result| applied(result).changed)
             );
-            assert_eq!(commit.diagnostics.operations(), 5);
-            assert_eq!(commit.file.to_bytes().unwrap(), oracle.to_bytes().unwrap());
+            assert_eq!(commit.diagnostics().operations(), 5);
             assert_eq!(
-                commit.patch.apply(&file).unwrap().to_bytes().unwrap(),
+                commit.file().to_bytes().unwrap(),
+                oracle.to_bytes().unwrap()
+            );
+            assert_eq!(
+                commit.patch().apply(&file).unwrap().to_bytes().unwrap(),
                 oracle.to_bytes().unwrap()
             );
             assert_eq!(
                 commit
-                    .patch
+                    .patch()
                     .inverse()
-                    .apply(&commit.file)
+                    .apply(commit.file())
                     .unwrap()
                     .to_bytes()
                     .unwrap(),
@@ -174,12 +178,12 @@ fn best_effort_discards_failed_candidates_and_keeps_original_item_indices() {
           {"command":"remove","path":"/body/p[99]"},
           {"command":"set","path":"/body/p[3]/r[1]","props":{"bold":true}}
         ]"#), BatchMode::BestEffort).unwrap();
-        assert_eq!(commit.results.len(), 7);
-        failed(&commit.results[0], 0, Code::UnsupportedCommand);
-        failed(&commit.results[3], 3, Code::UnsupportedProperty);
-        failed(&commit.results[5], 5, Code::PathNotFound);
-        assert_eq!(commit.diagnostics.operations(), 3);
-        assert_eq!(text(&commit.file), "staged");
+        assert_eq!(commit.results().len(), 7);
+        failed(&commit.results()[0], 0, Code::UnsupportedCommand);
+        failed(&commit.results()[3], 3, Code::UnsupportedProperty);
+        failed(&commit.results()[5], 5, Code::PathNotFound);
+        assert_eq!(commit.diagnostics().operations(), 3);
+        assert_eq!(text(commit.file()), "staged");
         let oracle = file
             .set("/body/p[1]/r[1]", props! {"text"=>"staged"})
             .unwrap()
@@ -188,18 +192,21 @@ fn best_effort_discards_failed_candidates_and_keeps_original_item_indices() {
             .file
             .set("/body/p[3]/r[1]", props! {"bold"=>true})
             .unwrap();
-        assert_eq!(commit.file.to_bytes().unwrap(), oracle.to_bytes().unwrap());
+        assert_eq!(
+            commit.file().to_bytes().unwrap(),
+            oracle.to_bytes().unwrap()
+        );
         assert_eq!(
             commit
-                .patch
+                .patch()
                 .inverse()
-                .apply(&commit.file)
+                .apply(commit.file())
                 .unwrap()
                 .to_bytes()
                 .unwrap(),
             bytes()
         );
-        assert!(!format!("{commit:?} {:?}", commit.results).contains("PRIVATE"));
+        assert!(!format!("{commit:?} {:?}", commit.results()).contains("PRIVATE"));
     }
 }
 
@@ -211,15 +218,15 @@ fn single_apply_preserves_path_value_and_has_the_same_strict_admission() {
     add.kind = Some("paragraph".into());
     let commit = file.apply(&add).unwrap();
     assert_eq!(
-        commit.value.path.as_ref().unwrap().to_string(),
+        commit.value().path.as_ref().unwrap().to_string(),
         "/body/p[3]"
     );
-    assert!(commit.value.changed);
+    assert!(commit.value().changed);
     assert_eq!(
         commit
-            .patch
+            .patch()
             .inverse()
-            .apply(&commit.file)
+            .apply(commit.file())
             .unwrap()
             .to_bytes()
             .unwrap(),
@@ -280,7 +287,10 @@ fn placement_and_swap_aliases_use_current_positional_state() {
         .unwrap()
         .swap("/body/p[1]", "/body/p[2]")
         .unwrap();
-    assert_eq!(commit.file.to_bytes().unwrap(), oracle.to_bytes().unwrap());
+    assert_eq!(
+        commit.file().to_bytes().unwrap(),
+        oracle.to_bytes().unwrap()
+    );
 }
 
 #[test]
@@ -318,9 +328,9 @@ fn metadata_outcomes_preserve_indices_and_unsupported_versions_abort_both_modes(
     let file = open(false);
     let input = items(r#"[{"command":"meta","dumpVersion":2},{"command":"meta","dumpVersion":2}]"#);
     let commit = file.batch(input, BatchMode::Atomic).unwrap();
-    assert!(commit.patch.is_noop());
-    assert_eq!(commit.results.len(), 2);
-    assert_eq!(commit.diagnostics.operations(), 0);
+    assert!(commit.patch().is_noop());
+    assert_eq!(commit.results().len(), 2);
+    assert_eq!(commit.diagnostics().operations(), 0);
     for mode in [BatchMode::Atomic, BatchMode::BestEffort] {
         for version in [None, Some(-1), Some(0), Some(1), Some(3)] {
             let mut input =
@@ -342,16 +352,16 @@ fn all_failed_empty_and_cancelling_batches_preserve_exact_input() {
     let empty = file
         .batch(Vec::<BatchItem<'_>>::new(), BatchMode::Atomic)
         .unwrap();
-    assert!(empty.results.is_empty());
-    assert!(empty.patch.is_noop());
+    assert!(empty.results().is_empty());
+    assert!(empty.patch().is_noop());
     let failed = file
         .batch(
             [BatchItem::new("bad"), BatchItem::new("get")],
             BatchMode::BestEffort,
         )
         .unwrap();
-    assert_eq!(failed.diagnostics.operations(), 0);
-    assert!(failed.patch.is_noop());
+    assert_eq!(failed.diagnostics().operations(), 0);
+    assert!(failed.patch().is_noop());
     let cancel = file
         .batch(
             items(
@@ -363,16 +373,16 @@ fn all_failed_empty_and_cancelling_batches_preserve_exact_input() {
             BatchMode::Atomic,
         )
         .unwrap();
-    assert!(cancel.results.iter().all(|r| applied(r).changed));
-    assert!(cancel.patch.is_noop());
-    assert!(!cancel.diagnostics.changed());
+    assert!(cancel.results().iter().all(|r| applied(r).changed));
+    assert!(cancel.patch().is_noop());
+    assert!(!cancel.diagnostics().changed());
     for commit in [empty, failed, cancel] {
-        assert_eq!(commit.file.to_bytes().unwrap(), bytes());
+        assert_eq!(commit.file().to_bytes().unwrap(), bytes());
         assert_eq!(
             commit
-                .patch
+                .patch()
                 .inverse()
-                .apply(&commit.file)
+                .apply(commit.file())
                 .unwrap()
                 .to_bytes()
                 .unwrap(),
@@ -400,7 +410,11 @@ fn input_bound_counts_failures_and_metadata_and_stops_unbounded_iterators() {
             Some(item)
         });
         let error = file
-            .batch_with_limits(input, BatchMode::BestEffort, &limits)
+            .batch_with_options(
+                input,
+                BatchMode::BestEffort,
+                litchi_ops::EditOptions::new().semantic_limits(limits),
+            )
             .unwrap_err();
         assert_eq!(error.code(), Code::LimitExceeded);
         assert_eq!(error.item(), Some(2));
@@ -413,7 +427,11 @@ fn retained_byte_budget_is_aggregate_and_fatal_in_best_effort() {
     let file = open(false);
     let input =
         items(r#"[{"command":"set","path":"/body/p[1]/r[1]","props":{"text":"FIRST_PRIVATE"}}]"#);
-    let charge = file.apply(&input[0]).unwrap().diagnostics.snapshot_bytes();
+    let charge = file
+        .apply(&input[0])
+        .unwrap()
+        .diagnostics()
+        .snapshot_bytes();
     let limits = SemanticLimits::builder()
         .max_snapshot_bytes(charge)
         .unwrap()
@@ -422,7 +440,11 @@ fn retained_byte_budget_is_aggregate_and_fatal_in_best_effort() {
     let pulls = std::cell::Cell::new(0);
     let commands = std::iter::repeat(input[0].clone()).inspect(|_| pulls.set(pulls.get() + 1));
     let error = file
-        .batch_with_limits(commands, BatchMode::BestEffort, &limits)
+        .batch_with_options(
+            commands,
+            BatchMode::BestEffort,
+            litchi_ops::EditOptions::new().semantic_limits(limits),
+        )
         .unwrap_err();
     assert_eq!(error.code(), Code::LimitExceeded);
     assert_eq!(error.item(), Some(1));
@@ -469,9 +491,9 @@ fn selectors_resolve_against_prior_successes_and_failed_fanout_is_atomic() {
           {"command":"remove","path":"/body/p[text='Drop']"},
           {"command":"set","path":"r","props":{"bold":true}}
         ]"#),BatchMode::BestEffort).unwrap();
-        failed(&commit.results[2], 2, Code::UnsupportedProperty);
-        failed(&commit.results[4], 4, Code::BareSelectorRejected);
-        assert!(applied(&commit.results[3]).changed);
+        failed(&commit.results()[2], 2, Code::UnsupportedProperty);
+        failed(&commit.results()[4], 4, Code::BareSelectorRejected);
+        assert!(applied(&commit.results()[3]).changed);
         let oracle = file
             .add("/body", NewNode::new("paragraph").prop("text", "Drop"))
             .unwrap()
@@ -481,7 +503,10 @@ fn selectors_resolve_against_prior_successes_and_failed_fanout_is_atomic() {
             .file
             .remove("/body/p[text='Drop']")
             .unwrap();
-        assert_eq!(commit.file.to_bytes().unwrap(), oracle.to_bytes().unwrap());
+        assert_eq!(
+            commit.file().to_bytes().unwrap(),
+            oracle.to_bytes().unwrap()
+        );
     }
 }
 
@@ -560,7 +585,7 @@ fn command_run_text_controls_follow_literal_policy_with_metadata() {
                 let commit = file.batch(commands, BatchMode::Atomic).unwrap();
                 assert_eq!(
                     commit
-                        .file
+                        .file()
                         .get("/body/p[1]/r[1]")
                         .unwrap()
                         .view()
@@ -571,9 +596,9 @@ fn command_run_text_controls_follow_literal_policy_with_metadata() {
                 );
                 assert_eq!(
                     commit
-                        .patch
+                        .patch()
                         .inverse()
-                        .apply(&commit.file)
+                        .apply(commit.file())
                         .unwrap()
                         .to_bytes()
                         .unwrap(),
@@ -606,26 +631,26 @@ fn atomic_formatting_runs_match_sequential_bytes_and_preserve_item_changes() {
         let file = open(eager);
         let oracle = file.batch(&input, BatchMode::BestEffort).unwrap();
         let grouped = file.batch(&input, BatchMode::Atomic).unwrap();
-        assert_eq!(grouped.diagnostics.operations(), 4);
-        assert_eq!(grouped.diagnostics.commits(), 1);
-        assert_eq!(oracle.diagnostics.commits(), 4);
+        assert_eq!(grouped.diagnostics().operations(), 4);
+        assert_eq!(grouped.diagnostics().commits(), 1);
+        assert_eq!(oracle.diagnostics().commits(), 4);
         assert_eq!(
             grouped
-                .results
+                .results()
                 .iter()
                 .map(|r| applied(r).changed)
                 .collect::<Vec<_>>(),
             vec![true, false, true, false]
         );
         assert_eq!(
-            grouped.file.to_bytes().unwrap(),
-            oracle.file.to_bytes().unwrap()
+            grouped.file().to_bytes().unwrap(),
+            oracle.file().to_bytes().unwrap()
         );
         assert_eq!(
             grouped
-                .patch
+                .patch()
                 .inverse()
-                .apply(&grouped.file)
+                .apply(grouped.file())
                 .unwrap()
                 .to_bytes()
                 .unwrap(),
@@ -651,11 +676,11 @@ fn text_metadata_and_structural_commands_close_formatting_runs() {
         let file = open(eager);
         let grouped = file.batch(&input, BatchMode::Atomic).unwrap();
         let oracle = file.batch(&input, BatchMode::BestEffort).unwrap();
-        assert_eq!(grouped.diagnostics.commits(), 5);
-        assert_eq!(grouped.diagnostics.operations(), 6);
+        assert_eq!(grouped.diagnostics().commits(), 5);
+        assert_eq!(grouped.diagnostics().operations(), 6);
         assert_eq!(
-            grouped.file.to_bytes().unwrap(),
-            oracle.file.to_bytes().unwrap()
+            grouped.file().to_bytes().unwrap(),
+            oracle.file().to_bytes().unwrap()
         );
     }
 }
@@ -700,13 +725,17 @@ fn formatting_flushes_before_native_operation_capacity_and_charges_one_snapshot_
         .build()
         .unwrap();
     let grouped = file
-        .batch_with_limits(input.iter().cycle().take(65_537), BatchMode::Atomic, &wide)
+        .batch_with_options(
+            input.iter().cycle().take(65_537),
+            BatchMode::Atomic,
+            litchi_ops::EditOptions::new().semantic_limits(wide),
+        )
         .unwrap();
-    assert_eq!(grouped.diagnostics.operations(), 65_537);
-    assert_eq!(grouped.diagnostics.commits(), 2);
+    assert_eq!(grouped.diagnostics().operations(), 65_537);
+    assert_eq!(grouped.diagnostics().commits(), 2);
     let expected = file.set("/body/p[1]/r[1]", props! {"bold"=>true}).unwrap();
     assert_eq!(
-        grouped.file.to_bytes().unwrap(),
+        grouped.file().to_bytes().unwrap(),
         expected.to_bytes().unwrap()
     );
     let limits = SemanticLimits::builder()
@@ -715,14 +744,18 @@ fn formatting_flushes_before_native_operation_capacity_and_charges_one_snapshot_
         .build()
         .unwrap();
     let compact = file
-        .batch_with_limits(input.iter().cycle().take(100), BatchMode::Atomic, &limits)
+        .batch_with_options(
+            input.iter().cycle().take(100),
+            BatchMode::Atomic,
+            litchi_ops::EditOptions::new().semantic_limits(limits),
+        )
         .unwrap();
-    assert_eq!(compact.diagnostics.commits(), 1);
+    assert_eq!(compact.diagnostics().commits(), 1);
     assert_eq!(
-        file.batch_with_limits(
+        file.batch_with_options(
             input.iter().cycle().take(100),
             BatchMode::BestEffort,
-            &limits
+            litchi_ops::EditOptions::new().semantic_limits(limits)
         )
         .unwrap_err()
         .code(),
@@ -769,14 +802,14 @@ fn formatting_preserves_opaque_properties_and_uncompacted_text_markup() {
         let grouped = file.batch(&input, BatchMode::Atomic).unwrap();
         let oracle = file.batch(&input, BatchMode::BestEffort).unwrap();
         assert_eq!(
-            grouped.file.to_bytes().unwrap(),
-            oracle.file.to_bytes().unwrap()
+            grouped.file().to_bytes().unwrap(),
+            oracle.file().to_bytes().unwrap()
         );
         assert_eq!(
             grouped
-                .patch
+                .patch()
                 .inverse()
-                .apply(&grouped.file)
+                .apply(grouped.file())
                 .unwrap()
                 .to_bytes()
                 .unwrap(),
@@ -829,9 +862,9 @@ fn command_run_add_normalizes_inline_controls_without_splitting_paragraphs() {
             );
             let commit = file.batch([add], mode).unwrap();
             assert!(
-                matches!(&commit.results[0], ItemResult::Applied(result) if result.path.as_ref().unwrap().to_string() == "/body/p[1]/r[3]")
+                matches!(&commit.results()[0], ItemResult::Applied(result) if result.path.as_ref().unwrap().to_string() == "/body/p[1]/r[3]")
             );
-            let saved = commit.file.to_bytes().unwrap();
+            let saved = commit.file().to_bytes().unwrap();
             let package = litchi_docx::Package::from_bytes(&saved).unwrap();
             let paragraphs = package.document().unwrap().paragraphs().unwrap();
             assert_eq!(paragraphs.len(), 2);
@@ -850,9 +883,9 @@ fn command_run_add_normalizes_inline_controls_without_splitting_paragraphs() {
             assert_eq!(runs[2].text().unwrap(), "α\nβ\nγ\nδ\nε\t\\n");
             assert_eq!(
                 commit
-                    .patch
+                    .patch()
                     .inverse()
-                    .apply(&commit.file)
+                    .apply(commit.file())
                     .unwrap()
                     .to_bytes()
                     .unwrap(),
@@ -878,11 +911,13 @@ fn run_add_controls_preserve_atomic_and_best_effort_failure_boundaries() {
             .unwrap_err();
         assert_eq!(error.item(), Some(1));
         let commit = file.batch([add, invalid], BatchMode::BestEffort).unwrap();
-        assert!(matches!(commit.results[0], ItemResult::Applied(_)));
-        assert!(matches!(&commit.results[1], ItemResult::Failed(error) if error.item() == Some(1)));
+        assert!(matches!(commit.results()[0], ItemResult::Applied(_)));
+        assert!(
+            matches!(&commit.results()[1], ItemResult::Failed(error) if error.item() == Some(1))
+        );
         assert_eq!(
             commit
-                .file
+                .file()
                 .get("/body/p[1]/r[3]")
                 .unwrap()
                 .view()
@@ -891,7 +926,7 @@ fn run_add_controls_preserve_atomic_and_best_effort_failure_boundaries() {
                 .as_deref(),
             Some("a\nb")
         );
-        assert!(commit.file.get("/body/p[1]/r[4]").is_err());
+        assert!(commit.file().get("/body/p[1]/r[4]").is_err());
         assert_eq!(file.to_bytes().unwrap(), bytes());
     }
 }
@@ -905,12 +940,12 @@ fn wire_add_accepts_v2_run_and_paragraph_controls() {
     let batch = file.batch(&commands, BatchMode::Atomic).unwrap();
     let single = file.apply(&commands[1]).unwrap();
     assert_eq!(
-        batch.file.to_bytes().unwrap(),
-        single.file.to_bytes().unwrap()
+        batch.file().to_bytes().unwrap(),
+        single.file().to_bytes().unwrap()
     );
     assert_eq!(
         batch
-            .file
+            .file()
             .get("/body/p[1]/r[3]")
             .unwrap()
             .view()
@@ -925,7 +960,12 @@ fn wire_add_accepts_v2_run_and_paragraph_controls() {
         add.kind = Some(kind.into());
         add.props = Some(litchi_ops::Props::new().with("text", "a\nb"));
         assert_eq!(
-            file.apply(add).unwrap().value.path.unwrap().to_string(),
+            file.apply(add)
+                .unwrap()
+                .into_value()
+                .path
+                .unwrap()
+                .to_string(),
             "/body/p[3]"
         );
     }
@@ -942,7 +982,7 @@ fn direct_paragraph_command_controls_normalize_and_preserve_transaction_boundari
             let commit = file.batch(&commands, mode).unwrap();
             assert_eq!(
                 commit
-                    .file
+                    .file()
                     .get("/body/p[2]")
                     .unwrap()
                     .view()
@@ -953,17 +993,17 @@ fn direct_paragraph_command_controls_normalize_and_preserve_transaction_boundari
             );
             assert!(
                 !commit
-                    .file
+                    .file()
                     .apply(&commands[1])
                     .unwrap()
-                    .diagnostics
+                    .diagnostics()
                     .changed()
             );
             assert_eq!(
                 commit
-                    .patch
+                    .patch()
                     .inverse()
-                    .apply(&commit.file)
+                    .apply(commit.file())
                     .unwrap()
                     .to_bytes()
                     .unwrap(),
@@ -981,7 +1021,7 @@ fn direct_paragraph_command_controls_normalize_and_preserve_transaction_boundari
                     .batch([commands[1].clone(), invalid], BatchMode::BestEffort)
                     .unwrap();
                 assert!(
-                    matches!(&partial.results[1], ItemResult::Failed(error) if error.item() == Some(1))
+                    matches!(&partial.results()[1], ItemResult::Failed(error) if error.item() == Some(1))
                 );
             }
         }
@@ -1001,7 +1041,7 @@ fn paragraph_selector_commands_normalize_controls_and_preserve_inverse() {
             for index in [1, 2] {
                 assert_eq!(
                     commit
-                        .file
+                        .file()
                         .get(format!("/body/p[{index}]").as_str())
                         .unwrap()
                         .view()
@@ -1013,17 +1053,17 @@ fn paragraph_selector_commands_normalize_controls_and_preserve_inverse() {
             }
             assert!(
                 !commit
-                    .file
+                    .file()
                     .apply(&commands[1])
                     .unwrap()
-                    .diagnostics
+                    .diagnostics()
                     .changed()
             );
             assert_eq!(
                 commit
-                    .patch
+                    .patch()
                     .inverse()
-                    .apply(&commit.file)
+                    .apply(commit.file())
                     .unwrap()
                     .to_bytes()
                     .unwrap(),
@@ -1057,7 +1097,7 @@ fn command_text_selector_admission_keeps_diagnostics_and_target_scope() {
         let commit = file.batch(commands, BatchMode::Atomic).unwrap();
         assert_eq!(
             commit
-                .file
+                .file()
                 .get("/body/p[2]")
                 .unwrap()
                 .view()
@@ -1066,7 +1106,7 @@ fn command_text_selector_admission_keeps_diagnostics_and_target_scope() {
                 .as_deref(),
             Some("new\ntext")
         );
-        assert_eq!(text(&commit.file), "FIRST_PRIVATE");
+        assert_eq!(text(commit.file()), "FIRST_PRIVATE");
         assert_eq!(file.to_bytes().unwrap(), bytes());
     }
 }
@@ -1097,23 +1137,30 @@ fn command_run_text_replaces_first_literal_node_and_preserves_other_content() {
         );
         for mode in [BatchMode::Atomic, BatchMode::BestEffort] {
             let commit = file.batch([command.clone()], mode).unwrap();
-            assert_eq!(text(&commit.file), format!("{authored}suffix\t\n"));
-            assert!(!commit.file.apply(&command).unwrap().diagnostics.changed());
+            assert_eq!(text(commit.file()), format!("{authored}suffix\t\n"));
+            assert!(
+                !commit
+                    .file()
+                    .apply(&command)
+                    .unwrap()
+                    .diagnostics()
+                    .changed()
+            );
             assert_eq!(
-                commit.patch.apply(&file).unwrap().to_bytes().unwrap(),
-                commit.file.to_bytes().unwrap()
+                commit.patch().apply(&file).unwrap().to_bytes().unwrap(),
+                commit.file().to_bytes().unwrap()
             );
             assert_eq!(
                 commit
-                    .patch
+                    .patch()
                     .inverse()
-                    .apply(&commit.file)
+                    .apply(commit.file())
                     .unwrap()
                     .to_bytes()
                     .unwrap(),
                 source
             );
-            let reopened = litchi_ops::open_bytes(commit.file.to_bytes().unwrap()).unwrap();
+            let reopened = litchi_ops::open_bytes(commit.file().to_bytes().unwrap()).unwrap();
             assert_eq!(text(&reopened), format!("{authored}suffix\t\n"));
         }
         let native = file
@@ -1134,13 +1181,15 @@ fn command_run_literal_text_obeys_selector_and_failure_boundaries() {
         let error = file.batch(&commands, BatchMode::Atomic).unwrap_err();
         assert_eq!(error.item(), Some(1));
         let commit = file.batch(&commands, BatchMode::BestEffort).unwrap();
-        assert_eq!(text(&commit.file), "literal\r\nline\tend");
-        assert!(matches!(&commit.results[1], ItemResult::Failed(error) if error.item() == Some(1)));
+        assert_eq!(text(commit.file()), "literal\r\nline\tend");
+        assert!(
+            matches!(&commit.results()[1], ItemResult::Failed(error) if error.item() == Some(1))
+        );
         assert_eq!(
             commit
-                .patch
+                .patch()
                 .inverse()
-                .apply(&commit.file)
+                .apply(commit.file())
                 .unwrap()
                 .to_bytes()
                 .unwrap(),
@@ -1192,8 +1241,8 @@ fn command_run_text_refuses_special_content_and_empty_run_is_noop() {
         let command =
             items(r#"[{"command":"set","path":"/body/p[1]/r[1]","props":{"text":"literal"}}]"#);
         let commit = file.apply(&command[0]).unwrap();
-        assert!(!commit.diagnostics.changed());
-        assert_eq!(commit.file.to_bytes().unwrap(), source);
+        assert!(!commit.diagnostics().changed());
+        assert_eq!(commit.file().to_bytes().unwrap(), source);
     }
 }
 
@@ -1224,12 +1273,12 @@ fn command_run_literal_text_keeps_paragraph_local_namespace_context() {
         let command =
             items(r#"[{"command":"set","path":"/body/p[1]/r[1]","props":{"text":"literal\r\n"}}]"#);
         let commit = file.apply(&command[0]).unwrap();
-        assert_eq!(text(&commit.file), "literal\r\n");
+        assert_eq!(text(commit.file()), "literal\r\n");
         assert_eq!(
             commit
-                .patch
+                .patch()
                 .inverse()
-                .apply(&commit.file)
+                .apply(commit.file())
                 .unwrap()
                 .to_bytes()
                 .unwrap(),
@@ -1257,12 +1306,12 @@ fn command_run_literal_text_expands_an_empty_text_node() {
         let command =
             items(r#"[{"command":"set","path":"/body/p[1]/r[1]","props":{"text":"literal\r\n"}}]"#);
         let commit = file.apply(&command[0]).unwrap();
-        assert_eq!(text(&commit.file), "literal\r\ntail-node");
+        assert_eq!(text(commit.file()), "literal\r\ntail-node");
         assert_eq!(
             commit
-                .patch
+                .patch()
                 .inverse()
-                .apply(&commit.file)
+                .apply(commit.file())
                 .unwrap()
                 .to_bytes()
                 .unwrap(),
@@ -1296,32 +1345,35 @@ fn paragraph_add_commands_split_blocks_copy_formatting_and_return_first_path() {
         for mode in [BatchMode::Atomic, BatchMode::BestEffort] {
             let commit = file.batch(&commands, mode).unwrap();
             assert_eq!(
-                applied(&commit.results[0])
+                applied(&commit.results()[0])
                     .path
                     .as_ref()
                     .unwrap()
                     .to_string(),
                 "/body/p[2]"
             );
-            assert_eq!(commit.diagnostics.operations(), 1);
-            assert_eq!(commit.diagnostics.leaf_operations(), lines.len());
-            assert_eq!(commit.diagnostics.commits(), 1);
-            assert_eq!(commit.file.to_bytes().unwrap(), oracle.to_bytes().unwrap());
+            assert_eq!(commit.diagnostics().operations(), 1);
+            assert_eq!(commit.diagnostics().leaf_operations(), lines.len());
+            assert_eq!(commit.diagnostics().commits(), 1);
             assert_eq!(
-                commit.patch.apply(&file).unwrap().to_bytes().unwrap(),
-                commit.file.to_bytes().unwrap()
+                commit.file().to_bytes().unwrap(),
+                oracle.to_bytes().unwrap()
+            );
+            assert_eq!(
+                commit.patch().apply(&file).unwrap().to_bytes().unwrap(),
+                commit.file().to_bytes().unwrap()
             );
             assert_eq!(
                 commit
-                    .patch
+                    .patch()
                     .inverse()
-                    .apply(&commit.file)
+                    .apply(commit.file())
                     .unwrap()
                     .to_bytes()
                     .unwrap(),
                 bytes()
             );
-            let reopened = litchi_ops::open_bytes(commit.file.to_bytes().unwrap()).unwrap();
+            let reopened = litchi_ops::open_bytes(commit.file().to_bytes().unwrap()).unwrap();
             for (index, line) in lines.iter().enumerate() {
                 assert_eq!(
                     reopened
@@ -1364,7 +1416,7 @@ fn paragraph_split_is_one_atomic_item_and_later_paths_see_all_insertions() {
         let commit = file.batch(&commands, BatchMode::Atomic).unwrap();
         assert_eq!(
             commit
-                .file
+                .file()
                 .get("/body/p[3]")
                 .unwrap()
                 .view()
@@ -1375,7 +1427,7 @@ fn paragraph_split_is_one_atomic_item_and_later_paths_see_all_insertions() {
         );
         assert_eq!(
             commit
-                .file
+                .file()
                 .get("/body/p[4]")
                 .unwrap()
                 .view()
@@ -1393,15 +1445,15 @@ fn paragraph_split_is_one_atomic_item_and_later_paths_see_all_insertions() {
         );
         let partial = file.batch(&invalid, BatchMode::BestEffort).unwrap();
         assert!(
-            matches!(&partial.results[0], ItemResult::Failed(error) if error.item() == Some(0))
+            matches!(&partial.results()[0], ItemResult::Failed(error) if error.item() == Some(0))
         );
-        assert!(partial.file.get("/body/p[3]").is_err());
-        assert_eq!(text(&partial.file), "survives");
+        assert!(partial.file().get("/body/p[3]").is_err());
+        assert_eq!(text(partial.file()), "survives");
         assert_eq!(
             partial
-                .patch
+                .patch()
                 .inverse()
-                .apply(&partial.file)
+                .apply(partial.file())
                 .unwrap()
                 .to_bytes()
                 .unwrap(),
@@ -1461,19 +1513,19 @@ fn command_cached_run_text_marks_owner_dirty_even_for_unchanged_text() {
             command.props = Some(litchi_ops::Props::new().with("text", value));
             for mode in [BatchMode::Atomic, BatchMode::BestEffort] {
                 let commit = file.batch([command.clone()], mode).unwrap();
-                assert!(commit.diagnostics.changed());
-                assert_eq!(commit.diagnostics.operations(), 1);
-                assert_eq!(commit.diagnostics.commits(), 1);
+                assert!(commit.diagnostics().changed());
+                assert_eq!(commit.diagnostics().operations(), 1);
+                assert_eq!(commit.diagnostics().commits(), 1);
                 assert_eq!(
-                    commit.diagnostics.leaf_operations(),
+                    commit.diagnostics().leaf_operations(),
                     if value == "cached" { 1 } else { 2 }
                 );
-                let xml = main_document_xml(&commit.file);
+                let xml = main_document_xml(commit.file());
                 assert!(xml.contains("w:dirty=\"true\"") || xml.contains("w:dirty=\"1\""));
                 assert!(xml.contains("<w:instrText>PAGE</w:instrText>"));
                 assert_eq!(
                     commit
-                        .file
+                        .file()
                         .get("/body/p[1]/r[4]")
                         .unwrap()
                         .view()
@@ -1482,22 +1534,29 @@ fn command_cached_run_text_marks_owner_dirty_even_for_unchanged_text() {
                         .as_deref(),
                     Some(value)
                 );
-                assert!(!commit.file.apply(&command).unwrap().diagnostics.changed());
+                assert!(
+                    !commit
+                        .file()
+                        .apply(&command)
+                        .unwrap()
+                        .diagnostics()
+                        .changed()
+                );
                 assert_eq!(
-                    commit.patch.apply(&file).unwrap().to_bytes().unwrap(),
-                    commit.file.to_bytes().unwrap()
+                    commit.patch().apply(&file).unwrap().to_bytes().unwrap(),
+                    commit.file().to_bytes().unwrap()
                 );
                 assert_eq!(
                     commit
-                        .patch
+                        .patch()
                         .inverse()
-                        .apply(&commit.file)
+                        .apply(commit.file())
                         .unwrap()
                         .to_bytes()
                         .unwrap(),
                     source
                 );
-                let reopened = litchi_ops::open_bytes(commit.file.to_bytes().unwrap()).unwrap();
+                let reopened = litchi_ops::open_bytes(commit.file().to_bytes().unwrap()).unwrap();
                 assert_eq!(main_document_xml(&reopened), xml);
             }
         }
@@ -1531,11 +1590,11 @@ fn cached_field_marker_and_text_rollback_together() {
         );
         let partial = file.batch(&commands, BatchMode::BestEffort).unwrap();
         assert!(
-            matches!(&partial.results[1], ItemResult::Failed(error) if error.item() == Some(1))
+            matches!(&partial.results()[1], ItemResult::Failed(error) if error.item() == Some(1))
         );
         assert_eq!(
             partial
-                .file
+                .file()
                 .get("/body/p[1]/r[4]")
                 .unwrap()
                 .view()
@@ -1546,9 +1605,9 @@ fn cached_field_marker_and_text_rollback_together() {
         );
         assert_eq!(
             partial
-                .patch
+                .patch()
                 .inverse()
-                .apply(&partial.file)
+                .apply(partial.file())
                 .unwrap()
                 .to_bytes()
                 .unwrap(),
@@ -1574,7 +1633,7 @@ fn cached_run_command_skips_closed_nested_field_and_stops_at_end() {
         let outer =
             items(r#"[{"command":"set","path":"/body/p[1]/r[7]","props":{"text":"changed"}}]"#);
         let commit = file.apply(&outer[0]).unwrap();
-        let xml = main_document_xml(&commit.file);
+        let xml = main_document_xml(commit.file());
         let begins: Vec<_> = xml
             .split("<w:fldChar")
             .skip(1)
@@ -1586,9 +1645,9 @@ fn cached_run_command_skips_closed_nested_field_and_stops_at_end() {
         assert!(begins[1].contains("w:dirty=\"false\""));
         assert_eq!(
             commit
-                .patch
+                .patch()
                 .inverse()
-                .apply(&commit.file)
+                .apply(commit.file())
                 .unwrap()
                 .to_bytes()
                 .unwrap(),
@@ -1598,7 +1657,7 @@ fn cached_run_command_skips_closed_nested_field_and_stops_at_end() {
             r#"[{"command":"set","path":"/body/p[1]/r[5]","props":{"text":"changed inner"}}]"#,
         );
         let inner_commit = file.apply(&inner[0]).unwrap();
-        let inner_xml = main_document_xml(&inner_commit.file);
+        let inner_xml = main_document_xml(inner_commit.file());
         let inner_begins: Vec<_> = inner_xml
             .split("<w:fldChar")
             .skip(1)
@@ -1612,9 +1671,9 @@ fn cached_run_command_skips_closed_nested_field_and_stops_at_end() {
         );
         assert_eq!(
             inner_commit
-                .patch
+                .patch()
                 .inverse()
-                .apply(&inner_commit.file)
+                .apply(inner_commit.file())
                 .unwrap()
                 .to_bytes()
                 .unwrap(),
@@ -1623,9 +1682,9 @@ fn cached_run_command_skips_closed_nested_field_and_stops_at_end() {
         let outside =
             items(r#"[{"command":"set","path":"/body/p[1]/r[9]","props":{"text":"outside"}}]"#);
         let commit = file.apply(&outside[0]).unwrap();
-        assert_eq!(commit.diagnostics.leaf_operations(), 1);
+        assert_eq!(commit.diagnostics().leaf_operations(), 1);
         assert_eq!(
-            main_document_xml(&commit.file)
+            main_document_xml(commit.file())
                 .matches("w:dirty=\"false\"")
                 .count(),
             2
@@ -1661,13 +1720,21 @@ fn coalesced_paragraph_text_sets_match_single_operations() {
         }
         for mode in [BatchMode::Atomic, BatchMode::BestEffort] {
             let commit = file.batch(&input, mode).unwrap();
-            assert!(commit.results.iter().all(|result| applied(result).changed));
-            assert_eq!(commit.file.to_bytes().unwrap(), oracle.to_bytes().unwrap());
+            assert!(
+                commit
+                    .results()
+                    .iter()
+                    .all(|result| applied(result).changed)
+            );
+            assert_eq!(
+                commit.file().to_bytes().unwrap(),
+                oracle.to_bytes().unwrap()
+            );
             assert_eq!(
                 commit
-                    .patch
+                    .patch()
                     .inverse()
-                    .apply(&commit.file)
+                    .apply(commit.file())
                     .unwrap()
                     .to_bytes()
                     .unwrap(),
@@ -1682,7 +1749,7 @@ fn coalesced_paragraph_text_sets_match_single_operations() {
                 Ok(())
             })
             .unwrap()
-            .file;
+            .into_file();
         assert_eq!(edited.to_bytes().unwrap(), oracle.to_bytes().unwrap());
 
         // A refused text keeps its own wire index; best effort keeps the rest.
@@ -1701,16 +1768,16 @@ fn coalesced_paragraph_text_sets_match_single_operations() {
             .code();
         assert_eq!(error.code(), code);
         let commit = file.batch(&refused, BatchMode::BestEffort).unwrap();
-        applied(&commit.results[0]);
-        failed(&commit.results[1], 1, code);
-        applied(&commit.results[2]);
+        applied(&commit.results()[0]);
+        failed(&commit.results()[1], 1, code);
+        applied(&commit.results()[2]);
         let expected = file
             .set("/body/p[1]", props! {"text"=>"kept"})
             .unwrap()
             .set("/body/p[2]", props! {"text"=>"after"})
             .unwrap();
         assert_eq!(
-            commit.file.to_bytes().unwrap(),
+            commit.file().to_bytes().unwrap(),
             expected.to_bytes().unwrap()
         );
     }

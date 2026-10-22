@@ -297,9 +297,18 @@ mod locked {
             assert_eq!(handle.format(), Some(FileFormat::Docx));
             assert_eq!(handle.encryption(), EncryptionKind::Standard);
             // Detection agrees with the opener: not a DOC.
-            assert_eq!(crate::detect::detect_file_format(temporary.path()), None);
+            assert_eq!(
+                crate::detect::detect_file_format(
+                    temporary.path(),
+                    &crate::detect::SourceLimits::default(),
+                ),
+                None
+            );
         }
-        assert!(crate::detect::detect_format_smart(bytes).is_none());
+        assert!(
+            crate::detect::detect_format_smart(bytes, &crate::detect::SourceLimits::default(),)
+                .is_none()
+        );
     }
 
     /// The facade's suffix preflight still refuses any other compound file

@@ -249,8 +249,8 @@ fn add_is_atomic_in_batches_and_can_be_followed_by_cell_edits() {
         .expect("add then edit cell");
     assert_eq!(
         commit
-            .file
-            .get(&format!("{}/A1", commit.value))
+            .file()
+            .get(&format!("{}/A1", commit.value()))
             .expect("cell after add")
             .view()
             .text()
@@ -258,10 +258,10 @@ fn add_is_atomic_in_batches_and_can_be_followed_by_cell_edits() {
             .as_deref(),
         Some("after add")
     );
-    let reopened = open_owner(&commit.file.to_bytes().expect("publish result"), false);
+    let reopened = open_owner(&commit.file().to_bytes().expect("publish result"), false);
     assert_eq!(
         reopened
-            .get(&format!("{}/A1", commit.value))
+            .get(&format!("{}/A1", commit.value()))
             .expect("reopened cell")
             .view()
             .text()
@@ -279,7 +279,7 @@ fn mixed_set_add_move_batches_commit_sequentially_and_roll_back_atomically() {
             .batch(mixed_batch(false), BatchMode::Atomic)
             .expect("mixed set/add/move batch");
         assert_eq!(
-            order(&committed.file),
+            order(committed.file()),
             ["Renamed", "Tail", "Added", "Sales Chart"]
         );
 
@@ -326,9 +326,10 @@ fn add_honors_semantic_limits_before_materializing_native_editor() {
         .build()
         .expect("limits");
     let error = source
-        .edit_with_limits(&limits, |edit| {
-            edit.add("/", NewNode::new("sheet").prop("name", "Added"))
-        })
+        .edit_with_options(
+            litchi_ops::EditOptions::new().semantic_limits(limits),
+            |edit| edit.add("/", NewNode::new("sheet").prop("name", "Added")),
+        )
         .expect_err("staged limit");
     assert_eq!(error.code(), Code::LimitExceeded);
 }

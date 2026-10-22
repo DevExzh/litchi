@@ -150,7 +150,7 @@ fn workbook() -> Vec<u8> {
             Ok(())
         })
         .expect("workbook");
-    commit.file.to_bytes().expect("bytes")
+    commit.file().to_bytes().expect("bytes")
 }
 
 fn time(mut leg: impl FnMut()) -> f64 {
@@ -224,7 +224,7 @@ fn main() {
             .expect("leaf file");
         assert_eq!(
             document_xml(&leaf_file),
-            document_xml(&unified.file),
+            document_xml(unified.file()),
             "both legs write the same document"
         );
     }
@@ -243,10 +243,16 @@ fn main() {
     );
 
     // The refreshed table again: an exact no-op.
-    let current = file.refresh(&options).expect("refresh").file;
+    let current = file.refresh(&options).expect("refresh").into_file();
     let current =
         litchi_ops::open_bytes_with(current.to_bytes().expect("bytes"), &eager).expect("current");
-    assert!(current.refresh(&options).expect("refresh").patch.is_noop());
+    assert!(
+        current
+            .refresh(&options)
+            .expect("refresh")
+            .patch()
+            .is_noop()
+    );
     if std::env::var_os("REFRESH_BENCH_PROFILE").is_some() {
         for _ in 0..rounds {
             std::hint::black_box(current.refresh(&options).expect("refresh"));
@@ -297,10 +303,10 @@ fn main() {
     {
         let leaf = leaf_cache();
         let unified = file.refresh(&write).expect("refresh");
-        assert_eq!(unified.value.refreshed(), 6_000);
+        assert_eq!(unified.value().refreshed(), 6_000);
         assert_eq!(
             leaf.to_bytes().expect("leaf bytes"),
-            unified.file.to_bytes().expect("unified bytes"),
+            unified.file().to_bytes().expect("unified bytes"),
             "both legs write the same workbook"
         );
     }

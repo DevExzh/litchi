@@ -197,29 +197,29 @@ fn dimension_transaction_replays_inverses_and_keeps_source_immutable() {
                 Ok::<_, litchi_ops::Error>(())
             })
             .expect("stage row and column dimensions");
-        assert!(commit.diagnostics.changed());
-        assert_eq!(commit.diagnostics.operations(), 2);
+        assert!(commit.diagnostics().changed());
+        assert_eq!(commit.diagnostics().operations(), 2);
         assert_eq!(
-            format_property(&commit.file, ROW3, "height").as_deref(),
+            format_property(commit.file(), ROW3, "height").as_deref(),
             Some("22pt")
         );
         assert_eq!(
-            format_property(&commit.file, COL_B, "width").as_deref(),
+            format_property(commit.file(), COL_B, "width").as_deref(),
             Some("16")
         );
 
         let replayed = commit
-            .patch
+            .patch()
             .apply(&original)
             .expect("replay dimension patch");
         assert_eq!(
             replayed.to_bytes().expect("serialize replay"),
-            commit.file.to_bytes().expect("serialize target")
+            commit.file().to_bytes().expect("serialize target")
         );
         let restored = commit
-            .patch
+            .patch()
             .inverse()
-            .apply(&commit.file)
+            .apply(commit.file())
             .expect("inverse dimension patch");
         assert_eq!(
             restored.to_bytes().expect("serialize inverse"),
@@ -245,10 +245,13 @@ fn dimension_target_limits_and_mixed_families_refuse_atomically() {
             .build()
             .expect("valid semantic limits");
         let too_many = original
-            .edit_with_limits(&limits, |transaction| {
-                transaction.set(root_query("row[1], row[3]"), props! { "height" => "20pt" })?;
-                Ok::<_, litchi_ops::Error>(())
-            })
+            .edit_with_options(
+                litchi_ops::EditOptions::new().semantic_limits(limits),
+                |transaction| {
+                    transaction.set(root_query("row[1], row[3]"), props! { "height" => "20pt" })?;
+                    Ok::<_, litchi_ops::Error>(())
+                },
+            )
             .expect_err("two row targets exceed the configured bound");
         assert_eq!(too_many.code(), Code::LimitExceeded);
         assert_eq!(
@@ -432,10 +435,13 @@ fn dimension_staged_byte_limit_and_unknown_predicate_refuse_atomically() {
             .build()
             .expect("valid staged limit");
         let staged = original
-            .edit_with_limits(&staged_limits, |transaction| {
-                transaction.set(ROW3, props! { "height" => "20pt" })?;
-                Ok::<_, litchi_ops::Error>(())
-            })
+            .edit_with_options(
+                litchi_ops::EditOptions::new().semantic_limits(staged_limits),
+                |transaction| {
+                    transaction.set(ROW3, props! { "height" => "20pt" })?;
+                    Ok::<_, litchi_ops::Error>(())
+                },
+            )
             .expect_err("dimension payload must exceed a 64-byte staged budget");
         assert_eq!(staged.code(), Code::LimitExceeded);
 

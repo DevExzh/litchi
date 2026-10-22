@@ -1,11 +1,13 @@
 //! Bounded XML codec and lossless styles.xml mutation.
 
+#![cfg_attr(test, allow(dead_code))]
+
 use super::model::{Configuration, Field, SortKey};
 use super::{
     FO, MAX_AGGREGATE_BYTES, MAX_DEPTH, MAX_SORT_KEYS, MAX_VALUE_BYTES, MAX_XML_BYTES, OFFICE,
     STYLE, TEXT,
 };
-use crate::core::ResolvedReader;
+use crate::core::{ResolvedReader, XmlStreamLimits};
 use crate::generic::FlatMutationBudget;
 use crate::variable_declaration::Part;
 use litchi_core::{Error, Result};
@@ -122,8 +124,27 @@ struct ActiveConfiguration {
 
 type Attributes = HashMap<(String, String), String>;
 
+fn xml_limits_with_policy(policy: XmlStreamLimits) -> Result<XmlStreamLimits> {
+    XmlStreamLimits::new(
+        policy.max_bytes().min(MAX_XML_BYTES as u64),
+        policy.max_depth().min(MAX_DEPTH),
+        policy.max_events().min(4_000_000),
+        policy.max_attributes().min(1_000_000),
+        policy.max_token_bytes().min(MAX_VALUE_BYTES),
+    )?
+    .namespace_limits(
+        policy.max_namespace_scope_depth().min(MAX_DEPTH),
+        policy.max_namespace_declarations().min(1_000_000),
+        policy.max_namespace_bindings().min(MAX_SORT_KEYS),
+        policy.max_namespace_bytes().min(MAX_VALUE_BYTES),
+        policy.max_namespace_prefix_bytes().min(MAX_VALUE_BYTES),
+        policy.max_namespace_uri_bytes().min(MAX_VALUE_BYTES),
+    )
+}
+
+#[cfg(test)]
 pub(crate) fn parse_bibliography_configuration(xml: &str) -> Result<Option<Configuration>> {
-    parse_bibliography_configuration_parts_with_budget(&[(xml, Part::Styles)], None)
+    parse_bibliography_configuration_with_xml_limits(xml, XmlStreamLimits::default())
 }
 
 #[cfg(test)]
@@ -133,9 +154,33 @@ pub(crate) fn parse_bibliography_configuration_parts(
     parse_bibliography_configuration_parts_with_budget(parts, None)
 }
 
+#[cfg(test)]
 pub(crate) fn parse_bibliography_configuration_parts_with_budget(
     parts: &[(&str, Part)],
     budget: Option<&FlatMutationBudget>,
+) -> Result<Option<Configuration>> {
+    parse_bibliography_configuration_parts_with_budget_and_xml_limits(
+        parts,
+        budget,
+        XmlStreamLimits::default(),
+    )
+}
+
+pub(crate) fn parse_bibliography_configuration_with_xml_limits(
+    xml: &str,
+    xml_limits: XmlStreamLimits,
+) -> Result<Option<Configuration>> {
+    parse_bibliography_configuration_parts_with_budget_and_xml_limits(
+        &[(xml, Part::Styles)],
+        None,
+        xml_limits,
+    )
+}
+
+pub(crate) fn parse_bibliography_configuration_parts_with_budget_and_xml_limits(
+    parts: &[(&str, Part)],
+    budget: Option<&FlatMutationBudget>,
+    xml_limits: XmlStreamLimits,
 ) -> Result<Option<Configuration>> {
     if let Some(budget) = budget {
         budget.check()?;
@@ -158,7 +203,7 @@ pub(crate) fn parse_bibliography_configuration_parts_with_budget(
     let mut result = None;
     let mut aggregate = 0usize;
     for (xml, part) in parts {
-        parse_part(xml, *part, &mut result, &mut aggregate, budget)?;
+        parse_part(xml, *part, &mut result, &mut aggregate, budget, xml_limits)?;
     }
     Ok(result)
 }
@@ -169,8 +214,9 @@ fn parse_part(
     result: &mut Option<Configuration>,
     aggregate: &mut usize,
     budget: Option<&FlatMutationBudget>,
+    xml_limits: XmlStreamLimits,
 ) -> Result<()> {
-    let mut reader = ResolvedReader::from_xml(xml);
+    let mut reader = ResolvedReader::from_xml(xml, xml_limits_with_policy(xml_limits)?)?;
     reader.config_mut().check_end_names = true;
     let mut buffer = Vec::new();
     let mut stack = Vec::<Frame>::new();
@@ -186,7 +232,10 @@ fn parse_part(
             reader
                 .read_resolved_event_into(&mut buffer)
                 .map_err(|source| {
-                    make_error(format!("invalid bibliography configuration XML: {source}"))
+                    crate::core::map_resolved_reader_error(
+                        source,
+                        "invalid bibliography configuration XML",
+                    )
                 })?;
         match event {
             Event::Start(ref element) => {
@@ -357,12 +406,20 @@ fn event_start(xml: &str, end: usize) -> Result<usize> {
         .ok_or_else(|| make_error("invalid bibliography XML event boundary"))
 }
 
+#[cfg(test)]
 fn locate_bibliography_configuration(xml: &str) -> Result<(Option<XmlSpan>, StylesSite)> {
+    locate_bibliography_configuration_with_xml_limits(xml, XmlStreamLimits::default())
+}
+
+fn locate_bibliography_configuration_with_xml_limits(
+    xml: &str,
+    xml_limits: XmlStreamLimits,
+) -> Result<(Option<XmlSpan>, StylesSite)> {
     if xml.len() > MAX_XML_BYTES {
         return invalid("bibliography configuration XML exceeds 64 MiB");
     }
-    parse_bibliography_configuration(xml)?;
-    let mut reader = ResolvedReader::from_xml(xml);
+    parse_bibliography_configuration_with_xml_limits(xml, xml_limits)?;
+    let mut reader = ResolvedReader::from_xml(xml, xml_limits_with_policy(xml_limits)?)?;
     reader.config_mut().check_end_names = true;
     let mut buffer = Vec::new();
     let mut stack = Vec::<Frame>::new();
@@ -374,9 +431,10 @@ fn locate_bibliography_configuration(xml: &str) -> Result<(Option<XmlSpan>, Styl
         let (resolved, event) = reader
             .read_resolved_event_into(&mut buffer)
             .map_err(|source| {
-                make_error(format!(
-                    "invalid bibliography configuration XML while locating mutation site: {source}"
-                ))
+                crate::core::map_resolved_reader_error(
+                    source,
+                    "invalid bibliography configuration XML while locating mutation site",
+                )
             })?;
         let namespace = namespace_uri(&resolved)?;
         match event {
@@ -472,12 +530,25 @@ fn locate_bibliography_configuration(xml: &str) -> Result<(Option<XmlSpan>, Styl
 
 /// Insert or replace the document-wide bibliography configuration without
 /// rewriting unrelated styles XML.
+#[cfg(test)]
 pub(crate) fn set_bibliography_configuration_xml(
     xml: &str,
     configuration: &Configuration,
 ) -> Result<String> {
+    set_bibliography_configuration_xml_with_xml_limits(
+        xml,
+        configuration,
+        XmlStreamLimits::default(),
+    )
+}
+
+pub(crate) fn set_bibliography_configuration_xml_with_xml_limits(
+    xml: &str,
+    configuration: &Configuration,
+    xml_limits: XmlStreamLimits,
+) -> Result<String> {
     configuration.validate()?;
-    let (target, site) = locate_bibliography_configuration(xml)?;
+    let (target, site) = locate_bibliography_configuration_with_xml_limits(xml, xml_limits)?;
     let fragment = configuration.to_xml_fragment()?;
     if let Some(span) = target {
         return Ok(format!(
@@ -513,8 +584,16 @@ pub(crate) fn set_bibliography_configuration_xml(
 
 /// Remove the document-wide bibliography configuration without rewriting
 /// unrelated styles XML.
+#[cfg(test)]
 pub(crate) fn remove_bibliography_configuration_xml(xml: &str) -> Result<String> {
-    let (target, _) = locate_bibliography_configuration(xml)?;
+    remove_bibliography_configuration_xml_with_xml_limits(xml, XmlStreamLimits::default())
+}
+
+pub(crate) fn remove_bibliography_configuration_xml_with_xml_limits(
+    xml: &str,
+    xml_limits: XmlStreamLimits,
+) -> Result<String> {
+    let (target, _) = locate_bibliography_configuration_with_xml_limits(xml, xml_limits)?;
     let Some(span) = target else {
         return Ok(xml.to_string());
     };

@@ -227,7 +227,10 @@ mod content_type_matching {
         let uppercase = PPTX_PRESENTATION_MAIN_CONTENT_TYPE.to_ascii_uppercase();
         for content_type in [PPTX_PRESENTATION_MAIN_CONTENT_TYPE.to_owned(), uppercase] {
             assert_eq!(
-                detect_file_format_from_bytes(&pptx_catalog(&content_type)),
+                detect_file_format_from_bytes(
+                    &pptx_catalog(&content_type),
+                    &litchi::common::detection::SourceLimits::default(),
+                ),
                 Some(FileFormat::Pptx),
                 "canonical MIME type casing should identify PPTX: {content_type}"
             );
@@ -238,7 +241,10 @@ mod content_type_matching {
             format!("{PPTX_PRESENTATION_MAIN_CONTENT_TYPE}-suffix"),
         ] {
             assert_eq!(
-                detect_file_format_from_bytes(&pptx_catalog(&content_type)),
+                detect_file_format_from_bytes(
+                    &pptx_catalog(&content_type),
+                    &litchi::common::detection::SourceLimits::default(),
+                ),
                 None,
                 "near-match MIME type must not identify PPTX: {content_type}"
             );
@@ -269,15 +275,24 @@ mod ordinary_ods_detection {
             ),
             Some(false)
         );
-        assert_eq!(detect_file_format_from_bytes(&bytes), Some(FileFormat::Ods));
+        assert_eq!(
+            detect_file_format_from_bytes(
+                &bytes,
+                &litchi::common::detection::SourceLimits::default(),
+            ),
+            Some(FileFormat::Ods)
+        );
 
         let mut reader = Cursor::new(bytes.clone());
         assert_eq!(
-            detect_format_from_reader(&mut reader),
+            detect_format_from_reader(
+                &mut reader,
+                &litchi::common::detection::SourceLimits::default(),
+            ),
             Some(FileFormat::Ods)
         );
         assert!(matches!(
-            detect_format_smart(bytes),
+            detect_format_smart(bytes, &litchi::common::detection::SourceLimits::default(),),
             Some(DetectedFormat::Ods(_))
         ));
     }
@@ -306,15 +321,24 @@ mod ordinary_odp_detection {
             ),
             Some(false)
         );
-        assert_eq!(detect_file_format_from_bytes(&bytes), Some(FileFormat::Odp));
+        assert_eq!(
+            detect_file_format_from_bytes(
+                &bytes,
+                &litchi::common::detection::SourceLimits::default(),
+            ),
+            Some(FileFormat::Odp)
+        );
 
         let mut reader = Cursor::new(bytes.clone());
         assert_eq!(
-            detect_format_from_reader(&mut reader),
+            detect_format_from_reader(
+                &mut reader,
+                &litchi::common::detection::SourceLimits::default(),
+            ),
             Some(FileFormat::Odp)
         );
         assert!(matches!(
-            detect_format_smart(bytes),
+            detect_format_smart(bytes, &litchi::common::detection::SourceLimits::default(),),
             Some(DetectedFormat::Odp(_))
         ));
     }
@@ -329,7 +353,6 @@ mod ooxml_odf_arbitration {
     use litchi::common::FileFormat;
     use litchi::common::detection::{
         DetectedFormat, detect_file_format_from_bytes, detect_format_smart,
-        detect_format_smart_with_limits,
     };
     use litchi::error::Source;
     use litchi::opc::{OpcError, SourceLimitKind};
@@ -363,11 +386,17 @@ mod ooxml_odf_arbitration {
     fn ooxml_precedence_survives_an_odf_mimetype_marker() {
         let bytes = pptx_odf_polyglot();
         assert_eq!(
-            detect_file_format_from_bytes(&bytes),
+            detect_file_format_from_bytes(
+                &bytes,
+                &litchi::common::detection::SourceLimits::default(),
+            ),
             Some(FileFormat::Pptx)
         );
         assert!(matches!(
-            detect_format_smart(bytes.clone()),
+            detect_format_smart(
+                bytes.clone(),
+                &litchi::common::detection::SourceLimits::default(),
+            ),
             Some(DetectedFormat::Pptx(_))
         ));
 
@@ -417,8 +446,22 @@ mod ooxml_odf_arbitration {
             .build()
             .expect("limits are consistent");
 
-        assert!(detect_format_smart_with_limits(bytes.clone(), input_limits).is_none());
-        assert!(detect_format_smart_with_limits(bytes.clone(), catalog_limits).is_none());
+        assert!(
+            detect_format_smart(
+                bytes.clone(),
+                &litchi::common::detection::SourceLimits::default()
+                    .ooxml_source_limits(input_limits)
+            )
+            .is_none()
+        );
+        assert!(
+            detect_format_smart(
+                bytes.clone(),
+                &litchi::common::detection::SourceLimits::default()
+                    .ooxml_source_limits(catalog_limits)
+            )
+            .is_none()
+        );
         let error = match litchi::open_bytes_with(
             bytes,
             &OpenOptions::new().ooxml_limits(catalog_limits),

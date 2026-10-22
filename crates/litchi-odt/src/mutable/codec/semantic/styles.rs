@@ -299,7 +299,12 @@ impl MutableDocument {
     ) -> Result<Option<crate::bibliography_configuration::Configuration>> {
         self.styles_xml.as_deref().map_or_else(
             || Ok(None),
-            crate::bibliography_configuration::parse_bibliography_configuration,
+            |styles| {
+                crate::bibliography_configuration::parse_bibliography_configuration_with_xml_limits(
+                    styles,
+                    self.xml_limits,
+                )
+            },
         )
     }
 
@@ -318,9 +323,10 @@ impl MutableDocument {
             .clone()
             .unwrap_or_else(Structure::default_styles_xml);
         self.styles_xml = Some(
-            crate::bibliography_configuration::set_bibliography_configuration_xml(
+            crate::bibliography_configuration::set_bibliography_configuration_xml_with_xml_limits(
                 &styles,
                 configuration,
+                self.xml_limits,
             )?,
         );
         Ok(old)
@@ -337,8 +343,12 @@ impl MutableDocument {
         let Some(styles) = self.styles_xml.as_deref() else {
             return Ok(None);
         };
-        self.styles_xml =
-            Some(crate::bibliography_configuration::remove_bibliography_configuration_xml(styles)?);
+        self.styles_xml = Some(
+            crate::bibliography_configuration::remove_bibliography_configuration_xml_with_xml_limits(
+                styles,
+                self.xml_limits,
+            )?,
+        );
         Ok(old)
     }
 

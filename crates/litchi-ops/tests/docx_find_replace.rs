@@ -72,7 +72,7 @@ fn find(file: &File, path: &str, props: Props<'_>) -> (File, Option<usize>) {
     let commit = file
         .apply(&item)
         .unwrap_or_else(|error| panic!("{path}: {error}"));
-    (commit.file, commit.value.matched())
+    (commit.file().clone(), commit.value().matched())
 }
 
 fn text(file: &File, path: &str) -> String {
@@ -173,7 +173,7 @@ fn zero_matches_are_an_exact_no_op() {
         let commit = file
             .edit(|tx| tx.set("/", props! { "find" => "absent", "replace" => "x" }))
             .unwrap();
-        assert!(!commit.diagnostics.changed());
+        assert!(!commit.diagnostics().changed());
         // `File::set` takes the same path and drops the count.
         let set = file
             .set("/", props! { "find" => "absent", "replace" => "x" })
@@ -273,11 +273,12 @@ fn finds_join_atomic_batches_and_invert() {
           {"command":"set","path":"/body/p[1]/r[1]","props":{"italic":true}},
           {"command":"set","path":"/body/p[2]","props":{"find":"absent","replace":"x"}}
         ]"#,
+        &litchi_ops::batch::SourceLimits::default(),
     )
     .unwrap();
     let commit = file.batch(items, BatchMode::Atomic).unwrap();
     let counts: Vec<Option<usize>> = commit
-        .results
+        .results()
         .iter()
         .map(|result| match result {
             litchi_ops::ItemResult::Applied(applied) => applied.matched(),
@@ -285,7 +286,7 @@ fn finds_join_atomic_batches_and_invert() {
         })
         .collect();
     assert_eq!(counts, [Some(4), None, Some(0)]);
-    let restored = commit.patch.inverse().apply(&commit.file).unwrap();
+    let restored = commit.patch().inverse().apply(commit.file()).unwrap();
     assert_eq!(restored.to_bytes().unwrap(), file.to_bytes().unwrap());
 }
 

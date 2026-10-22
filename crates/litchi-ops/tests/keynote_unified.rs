@@ -580,7 +580,11 @@ fn slide_tables_are_added_with_seeded_text() {
             Ok(())
         })
         .expect("edit");
-    let restored = edited.patch.inverse().apply(&edited.file).expect("inverse");
+    let restored = edited
+        .patch()
+        .inverse()
+        .apply(edited.file())
+        .expect("inverse");
     assert_eq!(restored.to_bytes().unwrap(), file.to_bytes().unwrap());
     // In a batch, a table add takes its own commit beside other items.
     let batch = file
@@ -593,7 +597,7 @@ fn slide_tables_are_added_with_seeded_text() {
             Ok(())
         })
         .expect("batch");
-    let reopened = reopen(&batch.file);
+    let reopened = reopen(batch.file());
     assert_eq!(count(&reopened, "/slide[1]/table"), before + 1);
     assert_eq!(
         prop(
@@ -626,18 +630,22 @@ fn a_batch_of_sets_publishes_one_commit_per_family() {
             Ok(())
         })
         .expect("edit");
-    assert_eq!(commit.diagnostics.operations(), 400);
+    assert_eq!(commit.diagnostics().operations(), 400);
     // One transaction step for 400 operations, whose leaf work is one
     // slide-drawable commit (the frame) and one slide-text commit (the body
     // text, one span replacement).
-    assert_eq!(commit.diagnostics.commits(), 1);
-    let reopened = reopen(&commit.file);
+    assert_eq!(commit.diagnostics().commits(), 1);
+    let reopened = reopen(commit.file());
     assert_eq!(
         texts(&reopened, &format!("{BODY}/paragraph")),
         ["round 99 topic 1", "round 99 topic 2", "round 99 topic 3"]
     );
     assert_eq!(prop(&reopened, "/slide[1]/shape[1]", "x"), Some(pt(109)));
-    let restored = commit.patch.inverse().apply(&commit.file).expect("inverse");
+    let restored = commit
+        .patch()
+        .inverse()
+        .apply(commit.file())
+        .expect("inverse");
     assert_eq!(restored.to_bytes().unwrap(), file.to_bytes().unwrap());
 }
 
@@ -687,7 +695,7 @@ fn long_paragraph_runs_equal_their_items_one_at_a_time() {
     });
     let batch = file.batch(items, BatchMode::Atomic).expect("batch");
     assert_eq!(
-        batch.file.to_bytes().expect("publish"),
+        batch.file().to_bytes().expect("publish"),
         one_by_one.to_bytes().expect("publish")
     );
     // A run without cancelling sets is one leaf commit.
@@ -698,9 +706,9 @@ fn long_paragraph_runs_equal_their_items_one_at_a_time() {
         item
     });
     let batch = file.batch(items, BatchMode::Atomic).expect("batch");
-    assert_eq!(batch.diagnostics.commits(), 1);
+    assert_eq!(batch.diagnostics().commits(), 1);
     assert_eq!(
-        texts(&reopen(&batch.file), &format!("{BODY}/paragraph")),
+        texts(&reopen(batch.file()), &format!("{BODY}/paragraph")),
         (0..120).map(|i| format!("batch {i}")).collect::<Vec<_>>()
     );
 }
@@ -719,12 +727,12 @@ fn consecutive_new_slides_and_drawables_coalesce() {
             Ok((first, second, third))
         })
         .expect("slides");
-    assert_eq!(commit.diagnostics.commits(), 1);
-    let (first, second, third) = &commit.value;
+    assert_eq!(commit.diagnostics().commits(), 1);
+    let (first, second, third) = commit.value();
     assert_eq!(first.to_string(), "/slide[6]");
     assert_eq!(second.to_string(), "/slide[1]");
     assert_eq!(third.to_string(), "/slide[8]");
-    let reopened = reopen(&commit.file);
+    let reopened = reopen(commit.file());
     assert_eq!(count(&reopened, "slide"), 8);
     assert_eq!(titles(&reopened)[2], "Agenda");
 
@@ -742,15 +750,15 @@ fn consecutive_new_slides_and_drawables_coalesce() {
             Ok(paths)
         })
         .expect("drawables");
-    assert_eq!(commit.diagnostics.commits(), 1);
-    let reopened = reopen(&commit.file);
-    for (index, path) in commit.value[..3].iter().enumerate() {
+    assert_eq!(commit.diagnostics().commits(), 1);
+    let reopened = reopen(commit.file());
+    for (index, path) in commit.value()[..3].iter().enumerate() {
         assert_eq!(
             text(&reopened, &path.to_string()),
             Some(format!("box {index}"))
         );
     }
-    assert_eq!(commit.value[3].to_string(), "/slide[1]/picture[1]");
+    assert_eq!(commit.value()[3].to_string(), "/slide[1]/picture[1]");
     assert_eq!(count(&reopened, "/slide[1]/picture"), 1);
 
     // A set after a new slide publishes the slides first, so it sees them.
@@ -766,7 +774,7 @@ fn consecutive_new_slides_and_drawables_coalesce() {
             Ok(())
         })
         .expect("mixed");
-    let reopened = reopen(&commit.file);
+    let reopened = reopen(commit.file());
     assert_eq!(
         titles(&reopened)[..3],
         ["Copy", "Litchi multi-slide fixture", "Agenda"]
@@ -855,7 +863,11 @@ fn runs_of_shapes_take_character_properties() {
         .file
         .edit(|tx| tx.set(&run, props! { "underline" => true }))
         .expect("underline");
-    let restored = commit.patch.inverse().apply(&commit.file).expect("inverse");
+    let restored = commit
+        .patch()
+        .inverse()
+        .apply(commit.file())
+        .expect("inverse");
     assert_eq!(restored.to_bytes().unwrap(), added.file.to_bytes().unwrap());
     // A text change, then a run style on the new text, in one edit.
     let both = added
@@ -866,7 +878,7 @@ fn runs_of_shapes_take_character_properties() {
             Ok(())
         })
         .expect("text then style");
-    let reopened = reopen(&both.file);
+    let reopened = reopen(both.file());
     assert_eq!(text(&reopened, &shape).as_deref(), Some("changed"));
     assert_eq!(prop(&reopened, &run, "bold").as_deref(), Some("true"));
 }
@@ -885,12 +897,12 @@ fn slide_table_cells_take_values() {
     let written = file
         .edit(|tx| tx.set(&cell, props! { "text" => "Updated" }))
         .expect("write a cell");
-    let reopened = reopen(&written.file);
+    let reopened = reopen(written.file());
     assert_eq!(text(&reopened, &cell).as_deref(), Some("Updated"));
     let restored = written
-        .patch
+        .patch()
         .inverse()
-        .apply(&written.file)
+        .apply(written.file())
         .expect("inverse");
     assert_eq!(restored.to_bytes().unwrap(), file.to_bytes().unwrap());
     let numeric = reopened
@@ -921,13 +933,17 @@ fn movies_and_audio_are_removed() {
             .path()
             .to_string();
         let commit = file.edit(|tx| tx.remove(&path)).expect("remove media");
-        let reopened = reopen(&commit.file);
+        let reopened = reopen(commit.file());
         assert_eq!(
             count(&reopened, "video") + count(&reopened, "audio"),
             before - 1,
             "{name}"
         );
-        let restored = commit.patch.inverse().apply(&commit.file).expect("inverse");
+        let restored = commit
+            .patch()
+            .inverse()
+            .apply(commit.file())
+            .expect("inverse");
         assert_eq!(restored.to_bytes().unwrap(), file.to_bytes().unwrap());
     }
 }
@@ -996,7 +1012,7 @@ fn placeholder_runs_take_character_properties() {
             Ok(())
         })
         .expect("batch");
-    let reopened = reopen(&commit.file);
+    let reopened = reopen(commit.file());
     assert_eq!(text(&reopened, run).as_deref(), Some("Changed"));
     assert_eq!(prop(&reopened, run, "italic").as_deref(), Some("true"));
 }
@@ -1027,9 +1043,9 @@ fn notes_runs_take_character_properties() {
         .edit(|tx| tx.set(run, props! { "italic" => true }))
         .expect("edit");
     let undone = restored
-        .patch
+        .patch()
         .inverse()
-        .apply(&restored.file)
+        .apply(restored.file())
         .expect("inverse");
     assert_eq!(undone.to_bytes().unwrap(), file.to_bytes().unwrap());
     // In a batch, the run addresses the notes text the earlier item wrote.
@@ -1043,7 +1059,7 @@ fn notes_runs_take_character_properties() {
             Ok(())
         })
         .expect("batch");
-    let reopened = reopen(&commit.file);
+    let reopened = reopen(commit.file());
     assert_eq!(text(&reopened, run).as_deref(), Some("the other point"));
     assert_eq!(prop(&reopened, run, "italic").as_deref(), Some("true"));
 }

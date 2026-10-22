@@ -635,6 +635,58 @@ fn cp_table_content(index: usize) -> &'static str {
     }
 }
 
+impl Refusal {
+    /// The shared refusal kind (record 0351 §2.4), by which litchi-ops
+    /// classifies the refusal (record 0362). The budget variants
+    /// (`OperationLimit`, `ReplacementLimit`) are limits, not refusals:
+    /// litchi-ops reports them as `limit_exceeded` before consulting the
+    /// kind, which is `InvalidValue` for them.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+
+        match self {
+            Self::ParagraphNotFound
+            | Self::TargetNotFound
+            | Self::ResourceNotFound { .. }
+            | Self::FontNotFound
+            | Self::StyleNotFound
+            | Self::FieldNotFound
+            | Self::BookmarkNotFound
+            | Self::SectionNotFound => RefusalKind::NotFound,
+            Self::SignedSource | Self::Protected | Self::UnknownProtection | Self::Encrypted => {
+                RefusalKind::Protected
+            },
+            Self::ResourceCollision { .. }
+            | Self::InvalidFontSize
+            | Self::InvalidProperty
+            | Self::BookmarkName
+            | Self::OperationLimit { .. }
+            | Self::ReplacementLimit { .. } => RefusalKind::InvalidValue,
+            Self::EmptyParagraph | Self::SoleParagraph => RefusalKind::UnsupportedTarget,
+            Self::LengthChange { .. }
+            | Self::CrossesPieceBoundary
+            | Self::CompressedPiece
+            | Self::StructuralContent
+            | Self::DrawingDependency { .. }
+            | Self::TrackedText
+            | Self::ReplacementContainsStructuralContent
+            | Self::AmbiguousReviewRanges
+            | Self::FormattingDependency
+            | Self::PositionDependency { .. }
+            | Self::StoryLengthChange { .. }
+            | Self::ComplexField
+            | Self::ComplexTableCell
+            | Self::TransferDependency { .. }
+            | Self::DestructiveRevisionDisposition { .. }
+            | Self::AuxiliaryThreeWayMergeUnsupported
+            | Self::TableBoundary
+            | Self::AnchoredContent
+            | Self::RangeBoundary { .. } => RefusalKind::UnsupportedContent,
+        }
+    }
+}
+
 impl std::fmt::Display for Refusal {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {

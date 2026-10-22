@@ -136,25 +136,25 @@ fn shape_removal_transaction_replays_inverts_and_keeps_source_immutable() {
                 ))
             })
             .unwrap();
-        assert_eq!(shape_texts(&commit.file), ["A", "C"]);
+        assert_eq!(shape_texts(commit.file()), ["A", "C"]);
         assert_eq!(source.to_bytes().unwrap(), before);
 
         assert_eq!(
-            commit.patch.apply(&source).unwrap().to_bytes().unwrap(),
-            commit.file.to_bytes().unwrap()
+            commit.patch().apply(&source).unwrap().to_bytes().unwrap(),
+            commit.file().to_bytes().unwrap()
         );
         assert_eq!(
             commit
-                .patch
+                .patch()
                 .inverse()
-                .apply(&commit.file)
+                .apply(commit.file())
                 .unwrap()
                 .to_bytes()
                 .unwrap(),
             before
         );
 
-        let reopened = litchi_ops::open_bytes(commit.file.to_bytes().unwrap()).unwrap();
+        let reopened = litchi_ops::open_bytes(commit.file().to_bytes().unwrap()).unwrap();
         assert_eq!(shape_texts(&reopened), ["A", "C"]);
     }
 }
@@ -191,15 +191,15 @@ fn disjoint_slide_and_shape_removal_keeps_snapshot_ordinals() {
         let commit = source
             .edit(|edit| edit.remove(scoped_shape_query("slide[1], slide[3] > shape[1]")))
             .unwrap();
-        assert_eq!(text(&commit.file, "/slide[1]/shape[1]"), "second");
-        assert!(commit.file.get("/slide[2]").is_ok());
-        assert!(commit.file.get("/slide[2]/shape[1]").is_err());
-        assert!(commit.file.get("/slide[3]").is_err());
+        assert_eq!(text(commit.file(), "/slide[1]/shape[1]"), "second");
+        assert!(commit.file().get("/slide[2]").is_ok());
+        assert!(commit.file().get("/slide[2]/shape[1]").is_err());
+        assert!(commit.file().get("/slide[3]").is_err());
         assert_eq!(
             commit
-                .patch
+                .patch()
                 .inverse()
-                .apply(&commit.file)
+                .apply(commit.file())
                 .unwrap()
                 .to_bytes()
                 .unwrap(),

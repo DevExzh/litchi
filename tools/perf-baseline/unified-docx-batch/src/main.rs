@@ -67,22 +67,22 @@ fn measure<T, H>(
     for count in [1, 10, 100, 1_000, 10_000] {
         let oracle = leaf(native, count)?;
         let candidate = unified.batch(input.iter().cycle().take(count), BatchMode::Atomic)?;
-        if candidate.results.len() != count
-            || candidate.diagnostics.operations() != count
-            || candidate.diagnostics.leaf_operations() != count
+        if candidate.results().len() != count
+            || candidate.diagnostics().operations() != count
+            || candidate.diagnostics().leaf_operations() != count
             || candidate
-                .results
+                .results()
                 .iter()
                 .any(|r| !matches!(r, litchi_ops::ItemResult::Applied(a) if a.changed))
         {
             return Err("unified operation/result accounting mismatch".into());
         }
         let expected = bytes(&oracle, count)?;
-        if candidate.file.to_bytes()? != expected {
+        if candidate.file().to_bytes()? != expected {
             return Err("leaf/unified byte mismatch".into());
         }
-        let commits = candidate.diagnostics.commits();
-        let snapshot_bytes = candidate.diagnostics.snapshot_bytes();
+        let commits = candidate.diagnostics().commits();
+        let snapshot_bytes = candidate.diagnostics().snapshot_bytes();
         drop((oracle, candidate));
         let mut leaf_ns = Vec::new();
         let mut unified_ns = Vec::new();

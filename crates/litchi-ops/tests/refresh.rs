@@ -108,9 +108,9 @@ fn word_and_libreoffice_tables_of_contents_are_exact_no_ops() {
         for eager in [true, false] {
             let file = open(eager, fixture(name));
             let commit = file.refresh(&Options::new()).unwrap();
-            assert!(commit.patch.is_noop(), "{name}");
-            assert!(!commit.diagnostics.changed(), "{name}");
-            assert_eq!(commit.value.count(Status::Unchanged), 1, "{name}");
+            assert!(commit.patch().is_noop(), "{name}");
+            assert!(!commit.diagnostics().changed(), "{name}");
+            assert_eq!(commit.value().count(Status::Unchanged), 1, "{name}");
         }
     }
 }
@@ -139,18 +139,18 @@ fn a_changed_heading_rebuilds_the_table_and_keeps_page_numbers() {
             }
             panic!("{error}{chain}")
         });
-        assert_eq!(commit.value.refreshed(), 1);
-        assert_eq!(commit.value.missing_page_numbers(), 0);
-        assert_eq!(commit.value.bookmarks(), 0);
-        let xml = member(&commit.file, "word/document.xml");
+        assert_eq!(commit.value().refreshed(), 1);
+        assert_eq!(commit.value().missing_page_numbers(), 0);
+        assert_eq!(commit.value().bookmarks(), 0);
+        let xml = member(commit.file(), "word/document.xml");
         assert!(xml.contains("Chapter One"), "{xml}");
         assert!(xml.contains(r#"PAGEREF _Toc400458847 \h"#), "{xml}");
         assert!(!xml.contains("dirty"), "{xml}");
         // The refreshed table is current; the saved file reopens current.
-        let again = commit.file.refresh(&Options::new()).unwrap();
-        assert!(again.patch.is_noop());
-        let reopened = open(eager, commit.file.to_bytes().unwrap());
-        assert!(reopened.refresh(&Options::new()).unwrap().patch.is_noop());
+        let again = commit.file().refresh(&Options::new()).unwrap();
+        assert!(again.patch().is_noop());
+        let reopened = open(eager, commit.file().to_bytes().unwrap());
+        assert!(reopened.refresh(&Options::new()).unwrap().patch().is_noop());
     }
 }
 
@@ -159,7 +159,7 @@ fn a_placeholder_table_and_fields_are_computed() {
     for eager in [true, false] {
         let file = open(eager, report());
         let commit = file.refresh(&Options::new()).unwrap();
-        let summary = &commit.value;
+        let summary = commit.value();
         let statuses: Vec<(&str, Status)> = summary
             .fields()
             .iter()
@@ -181,7 +181,7 @@ fn a_placeholder_table_and_fields_are_computed() {
         assert_eq!(summary.fields()[0].location(), Some("/body/p[1]"));
         assert_eq!(summary.bookmarks(), 3);
         assert_eq!(summary.missing_page_numbers(), 3);
-        let xml = member(&commit.file, "word/document.xml");
+        let xml = member(commit.file(), "word/document.xml");
         for expected in [
             r#"<w:fldChar w:fldCharType="begin" w:dirty="true"/>"#,
             r#"<w:pStyle w:val="TOC1"/><w:tabs><w:tab w:val="right" w:leader="dot" w:pos="9906"/></w:tabs>"#,
@@ -199,9 +199,9 @@ fn a_placeholder_table_and_fields_are_computed() {
         assert!(!xml.contains("Not a level") || xml.matches("Not a level").count() == 1);
         assert!(!xml.contains("Update field"), "{xml}");
         // Every computed result is current now.
-        let again = commit.file.refresh(&Options::new()).unwrap();
-        assert!(again.patch.is_noop());
-        assert_eq!(again.value.count(Status::Unchanged), 5);
+        let again = commit.file().refresh(&Options::new()).unwrap();
+        assert!(again.patch().is_noop());
+        assert_eq!(again.value().count(Status::Unchanged), 5);
         // The source handle is untouched.
         assert!(member(&file, "word/document.xml").contains("Update field"));
     }
@@ -212,8 +212,8 @@ fn an_explicit_clock_fills_date_fields() {
     let file = open(true, report());
     let clock = Clock::parse("2026-10-14T09:30:00").unwrap();
     let commit = file.refresh(&Options::new().clock(clock)).unwrap();
-    assert_eq!(commit.value.count(Status::NeedsClock), 0);
-    assert!(member(&commit.file, "word/document.xml").contains(">2026-10-14<"));
+    assert_eq!(commit.value().count(Status::NeedsClock), 0);
+    assert!(member(commit.file(), "word/document.xml").contains(">2026-10-14<"));
 }
 
 #[test]
@@ -224,7 +224,7 @@ fn unknown_page_numbers_can_be_refused_or_left_clean() {
         .unwrap_err();
     assert_eq!(error.code(), Code::RefreshFailed);
     let commit = file.refresh(&Options::new().mark_dirty(false)).unwrap();
-    assert!(!member(&commit.file, "word/document.xml").contains("dirty"));
+    assert!(!member(commit.file(), "word/document.xml").contains("dirty"));
 }
 
 #[test]
@@ -244,7 +244,7 @@ fn a_refresh_composes_in_a_transaction() {
             Ok(())
         })
         .unwrap();
-    let xml = member(&commit.file, "word/document.xml");
+    let xml = member(commit.file(), "word/document.xml");
     assert!(xml.contains(">Overview<") && !xml.contains(">Introduction<"));
     assert_eq!(xml.matches(">Overview<").count(), 2);
 }
@@ -256,9 +256,9 @@ fn slide_fields_take_their_number_and_the_clock() {
     for eager in [true, false] {
         let file = open(eager, bytes.clone());
         let commit = file.refresh(&Options::new()).unwrap();
-        assert!(commit.patch.is_noop());
+        assert!(commit.patch().is_noop());
         let statuses: Vec<(&str, Status)> = commit
-            .value
+            .value()
             .fields()
             .iter()
             .map(|field| (field.kind(), field.status()))
@@ -273,15 +273,15 @@ fn slide_fields_take_their_number_and_the_clock() {
         );
         let clock = Clock::parse("2026-10-14").unwrap();
         let commit = file.refresh(&Options::new().clock(clock)).unwrap();
-        assert_eq!(commit.value.refreshed(), 1);
-        let slide = member(&commit.file, "ppt/slides/slide1.xml");
+        assert_eq!(commit.value().refreshed(), 1);
+        let slide = member(commit.file(), "ppt/slides/slide1.xml");
         assert!(slide.contains("<a:t>10/14/2026</a:t>"), "{slide}");
         assert!(
             commit
-                .file
+                .file()
                 .refresh(&Options::new().clock(clock))
                 .unwrap()
-                .patch
+                .patch()
                 .is_noop()
         );
     }

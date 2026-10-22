@@ -644,30 +644,13 @@ impl Docx {
         }
     }
 
-    /// The main document's local section descriptors under the default
-    /// semantic limits; see [`Self::section_inventory_with_limits`].
-    ///
-    /// # Errors
-    ///
-    /// The same as [`Self::section_inventory_with_limits`].
-    ///
-    /// ```no_run
-    /// # fn demo(docx: &litchi_ops::format::docx::Docx) -> litchi_ops::Result<()> {
-    /// let inventory = docx.section_inventory()?;
-    /// println!("{} sections", inventory.sections().len());
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn section_inventory(&self) -> Result<Inventory> {
-        self.section_inventory_with_limits(&SectionLimits::default())
-    }
-
     /// The main document's local section descriptors: ownership, logical
     /// paragraph ranges, locally authored page properties, and inert
     /// header/footer relationship IDs.
     ///
     /// The inventory owns its values. It does not resolve relationship
-    /// targets or compute effective inherited layout.
+    /// targets or compute effective inherited layout. `limits` bound the
+    /// scan (`litchi_docx::section::Limits::default()` for the defaults; record 0362).
     ///
     /// # Errors
     ///
@@ -677,13 +660,12 @@ impl Docx {
     ///
     /// ```no_run
     /// # fn demo(docx: &litchi_ops::format::docx::Docx) -> litchi_ops::Result<()> {
-    /// let limits = litchi_docx::section::Limits::default();
-    /// let inventory = docx.section_inventory_with_limits(&limits)?;
-    /// # let _ = inventory;
+    /// let inventory = docx.section_inventory(&litchi_docx::section::Limits::default())?;
+    /// println!("{} sections", inventory.sections().len());
     /// # Ok(())
     /// # }
     /// ```
-    pub fn section_inventory_with_limits(&self, limits: &SectionLimits) -> Result<Inventory> {
+    pub fn section_inventory(&self, limits: &SectionLimits) -> Result<Inventory> {
         match &self.0.owner {
             DocxOwner::Eager(package) => Ok(package
                 .with_semantic_limits(package.semantic_limits().clone().sections(limits.clone()))

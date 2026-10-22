@@ -133,7 +133,10 @@ impl Family {
 /// let file = litchi_ops::open("report.docx")?;
 /// println!("{:?}: {}", file.format(), file.text()?);
 /// match &file {
-///     File::Docx(docx) => println!("{} sections", docx.section_inventory()?.sections().len()),
+///     File::Docx(docx) => {
+///         let limits = litchi_docx::section::Limits::default();
+///         println!("{} sections", docx.section_inventory(&limits)?.sections().len());
+///     },
 ///     File::Locked(locked) => println!("encrypted with {:?}", locked.encryption()),
 ///     _ => {},
 /// }

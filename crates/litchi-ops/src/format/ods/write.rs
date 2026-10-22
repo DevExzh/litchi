@@ -202,11 +202,16 @@ impl Ods {
     /// flat bytes, element by element (record 0292).
     pub(crate) fn with_package(&self, package: Package) -> Result<Self> {
         if let Some(flat) = self.flat_bytes() {
-            let parts = litchi_odf_common::flat::Parts::split(flat).map_err(core_error)?;
+            let options = self
+                .flat_options()
+                .expect("flat bytes always come from a flat owner");
+            let flat_limits = litchi_odf_common::flat::Limits::from_options(options);
+            let parts =
+                litchi_odf_common::flat::Parts::split(flat, &flat_limits).map_err(odf_error)?;
             let bytes = parts
-                .merge_package(flat, package.as_bytes())
-                .map_err(core_error)?;
-            let next = Self::from_flat(bytes, &crate::OpenOptions::default())?;
+                .merge_package_projection(flat, package.as_bytes(), &flat_limits)
+                .map_err(odf_error)?;
+            let next = Self::from_flat(bytes, &crate::OpenOptions::new().odf_options(options))?;
             return Ok(next.with_origin(self.origin()));
         }
         Self::from_package(package, self.origin())

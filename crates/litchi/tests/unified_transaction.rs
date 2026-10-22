@@ -12,9 +12,10 @@ fn facade_exposes_bounded_edit_results_and_reversible_patches() {
         .build()
         .unwrap();
     let commit: Commit<_> = file
-        .edit_with_limits(&limits, |edit: &mut Edit| {
-            edit.add("/body", NewNode::new("paragraph").prop("text", "facade"))
-        })
+        .edit_with_options(
+            litchi::EditOptions::new().semantic_limits(limits),
+            |edit: &mut Edit| edit.add("/body", NewNode::new("paragraph").prop("text", "facade")),
+        )
         .unwrap();
     assert!(
         file.capabilities()
@@ -26,12 +27,12 @@ fn facade_exposes_bounded_edit_results_and_reversible_patches() {
             .verb(litchi::capabilities::Verb::Batch)
             .is_supported()
     );
-    assert!(commit.file.find(&commit.value).unwrap().is_some());
+    assert!(commit.file().find(commit.value()).unwrap().is_some());
     assert_eq!(
         commit
-            .patch
+            .patch()
             .inverse()
-            .apply(&commit.file)
+            .apply(commit.file())
             .unwrap()
             .to_bytes()
             .unwrap(),
@@ -48,11 +49,12 @@ fn facade_exposes_command_results_for_atomic_and_best_effort_batches() {
       {"command":"add","parent":"/body","type":"paragraph","props":{"text":"facade"}},
       {"command":"unknown"}
     ]"#,
+        &litchi::batch::SourceLimits::default(),
     )
     .unwrap();
     let commit: BatchCommit = file.batch(&items, BatchMode::BestEffort).unwrap();
-    assert!(matches!(commit.results[0], ItemResult::Applied(_)));
-    assert!(matches!(commit.results[1], ItemResult::Failed(_)));
+    assert!(matches!(commit.results()[0], ItemResult::Applied(_)));
+    assert!(matches!(commit.results()[1], ItemResult::Failed(_)));
     let applied: litchi::transaction::Commit<litchi::Applied> = file.apply(&items[0]).unwrap();
-    assert!(applied.value.path.is_some());
+    assert!(applied.value().path.is_some());
 }

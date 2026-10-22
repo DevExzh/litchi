@@ -128,13 +128,15 @@ fn a_batch_takes_a_json_array() {
     let file = create(FileFormat::Xlsx).expect("create");
     let items = litchi_ops::batch::from_bytes(
         br#"[{"command":"set","path":"/metadata","props":{"keywords":["finance","2026"]}}]"#,
+        &litchi_ops::batch::SourceLimits::default(),
     )
     .expect("decode");
     let commit = file.batch(items, BatchMode::Atomic).expect("batch");
-    assert_eq!(keywords(&reopened(&commit.file)), ["finance", "2026"]);
+    assert_eq!(keywords(&reopened(commit.file())), ["finance", "2026"]);
     assert!(
         litchi_ops::batch::from_bytes(
-            br#"[{"command":"set","path":"/metadata","props":{"keywords":["a",1]}}]"#
+            br#"[{"command":"set","path":"/metadata","props":{"keywords":["a",1]}}]"#,
+            &litchi_ops::batch::SourceLimits::default()
         )
         .is_err(),
         "a list holds only strings"

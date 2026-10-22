@@ -1,0 +1,590 @@
+{
+  "binaries": {
+    "base": {
+      "bytes": 3563672,
+      "path": "external:.coord/w8-odf-flat-limits/probe-target-base/release/odf_flat_qualification_probe",
+      "sha256": "7c6e576e709b9bdc3e1aaacb1a22b016c0eeeae921039b5decf1b16217973fef"
+    },
+    "final": {
+      "bytes": 2794872,
+      "path": "external:.coord/w8-odf-flat-limits/probe-target-final/release/odf_flat_qualification_probe",
+      "sha256": "694c9eb532dc6516cdd48d569b9e0f8460161defe344f465a17de7253725684d"
+    }
+  },
+  "build_commands": [
+    "source /home/zhuhe/code/litchi-worktrees/.coord/w8-odf-flat-limits/env.sh; export CARGO_NET_OFFLINE=true CARGO_BUILD_JOBS=1 CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/w8-odf-flat-limits/probe-target-base; cargo build --release --offline",
+    "source /home/zhuhe/code/litchi-worktrees/.coord/w8-odf-flat-limits/env.sh; export CARGO_NET_OFFLINE=true CARGO_BUILD_JOBS=1 CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/w8-odf-flat-limits/probe-target-final; cargo build --release --offline --features final"
+  ],
+  "claims": {
+    "allocation": "four legs are identical within each endpoint for every route; split is lower allocation in final, other successful routes are equal",
+    "fidelity": "successful output bytes and route metadata match within each endpoint; final rejects same-length foreign content and tight retained-depth output as typed errors",
+    "latency": "not measured or claimed"
+  },
+  "committed_probe_copy": {
+    "bytes": 17783,
+    "path": "docs/unified-ops/results/0362hda/flat-qualification-probe.rs",
+    "sha256": "d101b76120a33438bf99c113bfce3892607d1e28706166c610fb4ee673a9a5f8"
+  },
+  "date": "2026-10-22",
+  "earlier_failed_ops_run": {
+    "cause": "projection reopen used original flat source ceiling; fixed by explicit synthetic ZIP projection options",
+    "command": "cargo test -p litchi-ops --all-features --offline --lib",
+    "final_result": "965 passed",
+    "result": "964 passed, 1 failed: tests::document::odt::flat_odt_source_limits_remain_typed"
+  },
+  "fixture": {
+    "bytes": 31441,
+    "path": "crates/litchi-ods/tests/fixtures/odfdo-test-flat-lo-compact.fods",
+    "sha256": "9b65ff2a65ceb92409a78c831ae74bbff82c51abe0203684467903091956ef53"
+  },
+  "lockfiles": {
+    "base": {
+      "bytes": 38627,
+      "sha256": "5b181fd886d5315fd56250db98226fa44aa2fc5d5bd0d5f3eb895732e65dfeab"
+    },
+    "final": {
+      "bytes": 38627,
+      "sha256": "5b181fd886d5315fd56250db98226fa44aa2fc5d5bd0d5f3eb895732e65dfeab"
+    },
+    "identical": true
+  },
+  "ods_gate": {
+    "command": "source /home/zhuhe/code/litchi-worktrees/.coord/w8-odf-flat-limits/env.sh; export CARGO_NET_OFFLINE=true; python3 /home/zhuhe/code/litchi-worktrees/.coord/scripts/chunked-cargo-tests.py -p litchi-ods --all-features",
+    "external_log": {
+      "bytes": 183230,
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/w8-odf-flat-limits/ods-gate-full.log",
+      "sha256": "32921e8cfdab15c4eeaccb52f3dcdef47b7ea4e49661a0aa73a65ad1ba718062"
+    },
+    "result": "1768 passed, 0 failed, 13 filtered compile/doctest cases across 18 commands/120 result blocks"
+  },
+  "probe_source": {
+    "bytes": 17783,
+    "sha256": "d101b76120a33438bf99c113bfce3892607d1e28706166c610fb4ee673a9a5f8"
+  },
+  "purpose": "fresh-process four-leg allocation and fidelity receipt for 0362hda",
+  "routes": {
+    "merge_edit": {
+      "base": {
+        "allocation": {
+          "calls": 17,
+          "peak_bytes": 33250,
+          "requested_bytes": 34388,
+          "retained_bytes": 31441
+        },
+        "legs": [
+          1,
+          4
+        ],
+        "signature": {
+          "changed": true,
+          "edited_content_sha256": "4eb0c1545f88252ff4e7dc90a2e9023e1bd24bc0d5275675d3cc31bfe1024c63",
+          "output_bytes": 31441,
+          "output_equals_source": false,
+          "output_sha256": "bd7215a0efeffa864687c9f34ad54e56cf94daec10cb021a747204a778367998",
+          "status": "ok"
+        }
+      },
+      "final": {
+        "allocation": {
+          "calls": 17,
+          "peak_bytes": 33250,
+          "requested_bytes": 34388,
+          "retained_bytes": 31441
+        },
+        "legs": [
+          2,
+          3
+        ],
+        "signature": {
+          "changed": true,
+          "edited_content_sha256": "4eb0c1545f88252ff4e7dc90a2e9023e1bd24bc0d5275675d3cc31bfe1024c63",
+          "output_bytes": 31441,
+          "output_equals_source": false,
+          "output_sha256": "bd7215a0efeffa864687c9f34ad54e56cf94daec10cb021a747204a778367998",
+          "status": "ok"
+        }
+      },
+      "final_over_base_allocation_ratio": {
+        "calls": 1.0,
+        "peak_bytes": 1.0,
+        "requested_bytes": 1.0,
+        "retained_bytes": 1.0
+      },
+      "within_endpoint_allocation_equal": {
+        "base": true,
+        "final": true
+      },
+      "within_endpoint_signature_equal": {
+        "base": true,
+        "final": true
+      }
+    },
+    "merge_foreign": {
+      "base": {
+        "allocation": {
+          "calls": 1,
+          "peak_bytes": 31441,
+          "requested_bytes": 31441,
+          "retained_bytes": 31441
+        },
+        "legs": [
+          1,
+          4
+        ],
+        "signature": {
+          "foreign_sha256": "397db24bb008b40ceb3009ec2b108195d299603dd6910d49931e0d7fff30eb70",
+          "output_bytes": 31441,
+          "output_equals_source": false,
+          "output_sha256": "397db24bb008b40ceb3009ec2b108195d299603dd6910d49931e0d7fff30eb70",
+          "same_length_foreign": true,
+          "source_content_proof": "397db24bb008b40ceb3009ec2b108195d299603dd6910d49931e0d7fff30eb70",
+          "status": "ok"
+        }
+      },
+      "final": {
+        "allocation": {
+          "calls": 5,
+          "peak_bytes": 208,
+          "requested_bytes": 403,
+          "retained_bytes": 208
+        },
+        "legs": [
+          2,
+          3
+        ],
+        "signature": {
+          "error": "PatchConflict { operation: \"odf-common.flat.merge\", reason: \"the flat document is not the one these parts were split from\" }",
+          "status": "error"
+        }
+      },
+      "within_endpoint_allocation_equal": {
+        "base": true,
+        "final": true
+      },
+      "within_endpoint_signature_equal": {
+        "base": true,
+        "final": true
+      }
+    },
+    "merge_noop": {
+      "base": {
+        "allocation": {
+          "calls": 1,
+          "peak_bytes": 31441,
+          "requested_bytes": 31441,
+          "retained_bytes": 31441
+        },
+        "legs": [
+          1,
+          4
+        ],
+        "signature": {
+          "independent_source": true,
+          "output_bytes": 31441,
+          "output_equals_source": true,
+          "output_sha256": "9b65ff2a65ceb92409a78c831ae74bbff82c51abe0203684467903091956ef53",
+          "source_content_proof": "9b65ff2a65ceb92409a78c831ae74bbff82c51abe0203684467903091956ef53",
+          "status": "ok"
+        }
+      },
+      "final": {
+        "allocation": {
+          "calls": 1,
+          "peak_bytes": 31441,
+          "requested_bytes": 31441,
+          "retained_bytes": 31441
+        },
+        "legs": [
+          2,
+          3
+        ],
+        "signature": {
+          "independent_source": true,
+          "output_bytes": 31441,
+          "output_equals_source": true,
+          "output_sha256": "9b65ff2a65ceb92409a78c831ae74bbff82c51abe0203684467903091956ef53",
+          "source_content_proof": "9b65ff2a65ceb92409a78c831ae74bbff82c51abe0203684467903091956ef53",
+          "status": "ok"
+        }
+      },
+      "final_over_base_allocation_ratio": {
+        "calls": 1.0,
+        "peak_bytes": 1.0,
+        "requested_bytes": 1.0,
+        "retained_bytes": 1.0
+      },
+      "within_endpoint_allocation_equal": {
+        "base": true,
+        "final": true
+      },
+      "within_endpoint_signature_equal": {
+        "base": true,
+        "final": true
+      }
+    },
+    "merge_package": {
+      "base": {
+        "allocation": {
+          "calls": 791,
+          "peak_bytes": 136403,
+          "requested_bytes": 1282589,
+          "retained_bytes": 31441
+        },
+        "legs": [
+          1,
+          4
+        ],
+        "signature": {
+          "output_bytes": 31441,
+          "output_equals_source": true,
+          "output_sha256": "9b65ff2a65ceb92409a78c831ae74bbff82c51abe0203684467903091956ef53",
+          "package_bytes": 7762,
+          "projection_source": true,
+          "status": "ok"
+        }
+      },
+      "final": {
+        "allocation": {
+          "calls": 791,
+          "peak_bytes": 136403,
+          "requested_bytes": 1282589,
+          "retained_bytes": 31441
+        },
+        "legs": [
+          2,
+          3
+        ],
+        "signature": {
+          "output_bytes": 31441,
+          "output_equals_source": true,
+          "output_sha256": "9b65ff2a65ceb92409a78c831ae74bbff82c51abe0203684467903091956ef53",
+          "package_bytes": 7762,
+          "projection_source": true,
+          "status": "ok"
+        }
+      },
+      "final_over_base_allocation_ratio": {
+        "calls": 1.0,
+        "peak_bytes": 1.0,
+        "requested_bytes": 1.0,
+        "retained_bytes": 1.0
+      },
+      "within_endpoint_allocation_equal": {
+        "base": true,
+        "final": true
+      },
+      "within_endpoint_signature_equal": {
+        "base": true,
+        "final": true
+      }
+    },
+    "merge_tight": {
+      "base": {
+        "allocation": {
+          "calls": 1,
+          "peak_bytes": 198,
+          "requested_bytes": 198,
+          "retained_bytes": 198
+        },
+        "legs": [
+          1,
+          4
+        ],
+        "signature": {
+          "empty_element_depth": 3,
+          "expected_tight_depth_refusal": false,
+          "independent_source": true,
+          "output_bytes": 198,
+          "output_equals_source": true,
+          "output_sha256": "3252b8d5da77cae95ecfa0bbf5d08b8bdee7338c514abf4f6f5e80ce5911c27a",
+          "status": "ok",
+          "tight_depth": 2
+        }
+      },
+      "final": {
+        "allocation": {
+          "calls": 4,
+          "peak_bytes": 64,
+          "requested_bytes": 120,
+          "retained_bytes": 64
+        },
+        "legs": [
+          2,
+          3
+        ],
+        "signature": {
+          "error": "Limit { kind: Semantic(Depth), observed: 3, maximum: 2 }",
+          "status": "error"
+        }
+      },
+      "within_endpoint_allocation_equal": {
+        "base": true,
+        "final": true
+      },
+      "within_endpoint_signature_equal": {
+        "base": true,
+        "final": true
+      }
+    },
+    "owner_roundtrip": {
+      "base": {
+        "allocation": {
+          "calls": 1599,
+          "peak_bytes": 1091322,
+          "requested_bytes": 1358254,
+          "retained_bytes": 1080056
+        },
+        "legs": [
+          1,
+          4
+        ],
+        "signature": {
+          "output_bytes": 31441,
+          "output_equals_source": true,
+          "output_sha256": "9b65ff2a65ceb92409a78c831ae74bbff82c51abe0203684467903091956ef53",
+          "sheet_count": 2,
+          "status": "ok",
+          "text_bytes": 1048592,
+          "text_sha256": "dd1635c405124772e244d49df02e82523b438942c45d3bbb41fc08874d282d13"
+        }
+      },
+      "final": {
+        "allocation": {
+          "calls": 1599,
+          "peak_bytes": 1091322,
+          "requested_bytes": 1358254,
+          "retained_bytes": 1080056
+        },
+        "legs": [
+          2,
+          3
+        ],
+        "signature": {
+          "output_bytes": 31441,
+          "output_equals_source": true,
+          "output_sha256": "9b65ff2a65ceb92409a78c831ae74bbff82c51abe0203684467903091956ef53",
+          "sheet_count": 2,
+          "status": "ok",
+          "text_bytes": 1048592,
+          "text_sha256": "dd1635c405124772e244d49df02e82523b438942c45d3bbb41fc08874d282d13"
+        }
+      },
+      "final_over_base_allocation_ratio": {
+        "calls": 1.0,
+        "peak_bytes": 1.0,
+        "requested_bytes": 1.0,
+        "retained_bytes": 1.0
+      },
+      "within_endpoint_allocation_equal": {
+        "base": true,
+        "final": true
+      },
+      "within_endpoint_signature_equal": {
+        "base": true,
+        "final": true
+      }
+    },
+    "split": {
+      "base": {
+        "allocation": {
+          "calls": 56,
+          "peak_bytes": 67895,
+          "requested_bytes": 120147,
+          "retained_bytes": 65388
+        },
+        "legs": [
+          1,
+          4
+        ],
+        "signature": {
+          "content_sha256": "c597807f0ef6c22f0203fefabadc3e00f5d3b08dfad75dba95535a15d2d1bbed",
+          "meta_bytes": 2660,
+          "output_bytes": 8483,
+          "output_equals_source": false,
+          "output_sha256": "c597807f0ef6c22f0203fefabadc3e00f5d3b08dfad75dba95535a15d2d1bbed",
+          "settings_bytes": 13871,
+          "status": "ok",
+          "styles_sha256": "d572e600cd5337c579640a4e7178668541ef1d3ff5bee149792da649d5defb4f"
+        }
+      },
+      "final": {
+        "allocation": {
+          "calls": 34,
+          "peak_bytes": 45147,
+          "requested_bytes": 49113,
+          "retained_bytes": 42640
+        },
+        "legs": [
+          2,
+          3
+        ],
+        "signature": {
+          "content_sha256": "c597807f0ef6c22f0203fefabadc3e00f5d3b08dfad75dba95535a15d2d1bbed",
+          "meta_bytes": 2660,
+          "output_bytes": 8483,
+          "output_equals_source": false,
+          "output_sha256": "c597807f0ef6c22f0203fefabadc3e00f5d3b08dfad75dba95535a15d2d1bbed",
+          "settings_bytes": 13871,
+          "status": "ok",
+          "styles_sha256": "d572e600cd5337c579640a4e7178668541ef1d3ff5bee149792da649d5defb4f"
+        }
+      },
+      "final_over_base_allocation_ratio": {
+        "calls": 0.6071428571428571,
+        "peak_bytes": 0.664953236615362,
+        "requested_bytes": 0.4087742515418612,
+        "retained_bytes": 0.6521074203217716
+      },
+      "within_endpoint_allocation_equal": {
+        "base": true,
+        "final": true
+      },
+      "within_endpoint_signature_equal": {
+        "base": true,
+        "final": true
+      }
+    },
+    "split_tight": {
+      "base": {
+        "allocation": {
+          "calls": 25,
+          "peak_bytes": 878,
+          "requested_bytes": 1507,
+          "retained_bytes": 559
+        },
+        "legs": [
+          1,
+          4
+        ],
+        "signature": {
+          "empty_element_depth": 3,
+          "expected_tight_depth_refusal": false,
+          "output_bytes": 195,
+          "output_equals_source": false,
+          "output_sha256": "8e49b97758677153bc7238155eea468430f649f80aa02e694b2731acb0896182",
+          "status": "ok",
+          "tight_depth": 2
+        }
+      },
+      "final": {
+        "allocation": {
+          "calls": 7,
+          "peak_bytes": 64,
+          "requested_bytes": 197,
+          "retained_bytes": 64
+        },
+        "legs": [
+          2,
+          3
+        ],
+        "signature": {
+          "error": "Limit { kind: Semantic(Depth), observed: 3, maximum: 2 }",
+          "status": "error"
+        }
+      },
+      "within_endpoint_allocation_equal": {
+        "base": true,
+        "final": true
+      },
+      "within_endpoint_signature_equal": {
+        "base": true,
+        "final": true
+      }
+    },
+    "to_package": {
+      "base": {
+        "allocation": {
+          "calls": 143,
+          "peak_bytes": 443184,
+          "requested_bytes": 498582,
+          "retained_bytes": 13664
+        },
+        "legs": [
+          1,
+          4
+        ],
+        "signature": {
+          "output_bytes": 7762,
+          "output_equals_source": false,
+          "output_sha256": "da7f2f6604b005caaa8567660fa6f71155278232530bf391dcf4800f829a7b09",
+          "package_bytes": 7762,
+          "status": "ok"
+        }
+      },
+      "final": {
+        "allocation": {
+          "calls": 143,
+          "peak_bytes": 443184,
+          "requested_bytes": 498582,
+          "retained_bytes": 13664
+        },
+        "legs": [
+          2,
+          3
+        ],
+        "signature": {
+          "output_bytes": 7762,
+          "output_equals_source": false,
+          "output_sha256": "da7f2f6604b005caaa8567660fa6f71155278232530bf391dcf4800f829a7b09",
+          "package_bytes": 7762,
+          "status": "ok"
+        }
+      },
+      "final_over_base_allocation_ratio": {
+        "calls": 1.0,
+        "peak_bytes": 1.0,
+        "requested_bytes": 1.0,
+        "retained_bytes": 1.0
+      },
+      "within_endpoint_allocation_equal": {
+        "base": true,
+        "final": true
+      },
+      "within_endpoint_signature_equal": {
+        "base": true,
+        "final": true
+      }
+    }
+  },
+  "run_protocol": {
+    "fresh_process_per_route_leg": true,
+    "legs": [
+      {
+        "endpoint": "base",
+        "leg": 1
+      },
+      {
+        "endpoint": "final",
+        "leg": 2
+      },
+      {
+        "endpoint": "final",
+        "leg": 3
+      },
+      {
+        "endpoint": "base",
+        "leg": 4
+      }
+    ],
+    "order": "base, final, final, base",
+    "raw_receipts_external": "/home/zhuhe/code/litchi-worktrees/.coord/w8-odf-flat-limits/counting-abba-20261022",
+    "routes": [
+      "split",
+      "to_package",
+      "merge_noop",
+      "merge_edit",
+      "merge_foreign",
+      "merge_tight",
+      "split_tight",
+      "merge_package",
+      "owner_roundtrip"
+    ]
+  },
+  "schema": "odf_flat_qualification.v2",
+  "source_endpoints": {
+    "base_api": "pre-flat-required-limits",
+    "base_commit": "8d6abdab69e1303719bf33913203ace89252f4be",
+    "final_api": "flat-required-limits-and-content-proof",
+    "final_commit": "384205d21802fa461c57637a02c7b29f00cc0788"
+  }
+}

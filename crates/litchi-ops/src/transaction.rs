@@ -13,8 +13,10 @@ use crate::{Code, File, IntoNode, IntoPlacement, IntoProps, IntoTarget, Result};
 mod import;
 mod limits;
 mod merge;
+mod options;
 mod refresh;
 pub use limits::{Error, LimitKind, SemanticLimits, SemanticLimitsBuilder};
+pub use options::EditOptions;
 
 /// Content-free facts about a complete explicit transaction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -56,18 +58,61 @@ impl Diagnostics {
 
 /// The complete result of [`File::edit`], including the closure's value.
 ///
-/// The fields may be destructured to take every result without cloning.
+/// The accessors follow the commit triad of every format crate
+/// (`litchi_core::edit::Commit`): [`Self::file`] is the facade's spelling of
+/// `package`. [`Self::into_parts`] takes every result without cloning.
 /// `Debug` omits the closure value and all authored document content.
-#[non_exhaustive]
 pub struct Commit<T = ()> {
-    /// New immutable file. The original remains unchanged.
-    pub file: File,
-    /// Process-local, owner-bound reversible patch.
-    pub patch: Patch,
+    file: File,
+    patch: Patch,
+    diagnostics: Diagnostics,
+    value: T,
+}
+impl<T> Commit<T> {
+    pub(crate) const fn new(file: File, patch: Patch, diagnostics: Diagnostics, value: T) -> Self {
+        Self {
+            file,
+            patch,
+            diagnostics,
+            value,
+        }
+    }
+    /// The new immutable file. The original remains unchanged.
+    #[must_use]
+    pub const fn file(&self) -> &File {
+        &self.file
+    }
+    /// Take the new file, dropping the patch and the value.
+    #[must_use]
+    pub fn into_file(self) -> File {
+        self.file
+    }
+    /// The process-local, owner-bound reversible patch.
+    #[must_use]
+    pub const fn patch(&self) -> &Patch {
+        &self.patch
+    }
     /// Content-free transaction facts.
-    pub diagnostics: Diagnostics,
-    /// Value returned by the closure.
-    pub value: T,
+    #[must_use]
+    pub const fn diagnostics(&self) -> &Diagnostics {
+        &self.diagnostics
+    }
+    /// The value the closure (or the single command) returned.
+    #[must_use]
+    pub const fn value(&self) -> &T {
+        &self.value
+    }
+    /// Take the value, dropping the file and the patch.
+    #[must_use]
+    pub fn into_value(self) -> T {
+        self.value
+    }
+    /// Take the file, the patch and the value; the diagnostics are `Copy`
+    /// and stay readable through [`Self::diagnostics`] before the call.
+    #[must_use]
+    pub fn into_parts(self) -> (File, Patch, T) {
+        (self.file, self.patch, self.value)
+    }
 }
 impl<T> fmt::Debug for Commit<T> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -321,26 +366,50 @@ impl File {
     ///     tx.set(&path, props! { "align" => "center" })?;
     ///     Ok(path)
     /// })?;
-    /// assert!(commit.diagnostics.changed());
-    /// let restored = commit.patch.inverse().apply(&commit.file)?;
+    /// assert!(commit.diagnostics().changed());
+    /// let restored = commit.patch().inverse().apply(commit.file())?;
     /// assert_eq!(restored.to_bytes()?, file.to_bytes()?);
     /// # }
     /// # Ok::<(), litchi_ops::Error>(())
     /// ```
     pub fn edit<T>(&self, f: impl FnOnce(&mut Edit) -> Result<T>) -> Result<Commit<T>> {
-        self.edit_with_limits(&SemanticLimits::default(), f)
+        self.edit_with_options(EditOptions::default(), f)
     }
 
-    /// [`Self::edit`] with caller-selected operation, retained-snapshot and
-    /// format-specific target-expansion and staging limits.
+    /// [`Self::edit`] under caller-selected [`EditOptions`]: operation,
+    /// retained-snapshot and format-specific target-expansion and staging
+    /// limits.
+    ///
+    /// ```
+    /// # #[cfg(feature = "docx")]
+    /// # {
+    /// use litchi_core::FileFormat;
+    /// use litchi_ops::transaction::SemanticLimits;
+    /// use litchi_ops::{Code, EditOptions, NewNode, create};
+    ///
+    /// let file = create(FileFormat::Docx)?;
+    /// let options = EditOptions::new()
+    ///     .semantic_limits(SemanticLimits::builder().max_operations(1)?.build()?);
+    /// let error = file
+    ///     .edit_with_options(options, |tx| {
+    ///         tx.add("/body", NewNode::new("paragraph").prop("text", "one"))?;
+    ///         tx.add("/body", NewNode::new("paragraph").prop("text", "two"))?;
+    ///         Ok(())
+    ///     })
+    ///     .unwrap_err();
+    /// assert_eq!(error.code(), Code::LimitExceeded);
+    /// # }
+    /// # Ok::<(), litchi_ops::Error>(())
+    /// ```
     ///
     /// # Errors
     /// As [`Self::edit`]. A failed limit check discards the complete candidate.
-    pub fn edit_with_limits<T>(
+    pub fn edit_with_options<T>(
         &self,
-        limits: &SemanticLimits,
+        options: EditOptions,
         f: impl FnOnce(&mut Edit) -> Result<T>,
     ) -> Result<Commit<T>> {
+        let limits = options.semantic_limits_value();
         let result = (|| {
             admit(self)?;
             let identity = Arc::new(());
@@ -348,7 +417,7 @@ impl File {
                 identity: Arc::clone(&identity),
                 current: self.clone(),
                 steps: Vec::new(),
-                limits: *limits,
+                limits,
                 failure: None,
                 snapshot_bytes: 0,
                 operations: 0,
@@ -422,12 +491,7 @@ impl File {
                 inverse: false,
             };
             patch.check_sources()?;
-            Ok(Commit {
-                file,
-                patch,
-                diagnostics,
-                value,
-            })
+            Ok(Commit::new(file, patch, diagnostics, value))
         })();
         check_source(self)?;
         result

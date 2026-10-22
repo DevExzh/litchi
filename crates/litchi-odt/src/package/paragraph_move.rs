@@ -94,7 +94,7 @@ pub(crate) fn move_plain_paragraph(source: &Package, from: usize, to: usize) -> 
     }
     let target_bytes =
         replace_content_xml_spliced(document.transaction_package(), &candidate, publication)?;
-    let target = Package::from_vec(target_bytes)?;
+    let target = Package::from_vec_with_xml_limits(target_bytes, source.xml_limits_value())?;
     let target_document = target.document()?;
     require_raw_untouched_members(
         document.transaction_package(),

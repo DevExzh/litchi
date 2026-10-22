@@ -57,8 +57,12 @@ children into `content.xml` (scripts, font faces, automatic styles, body),
 `styles.xml` (font faces, styles, automatic styles, master styles),
 `meta.xml` and `settings.xml`, each wrapped in its package root with the
 flat root's namespace declarations; every child's bytes are kept.
-`Parts::to_bytes` publishes them as an in-memory package (exact-source
-members, so producer indentation passes the writer's audit).
+The raw helpers take a required `flat::Limits` carrier. It combines the
+caller-selected physical `SourceLimits` with semantic `SemanticLimits`; flat
+owners derive it from the policy retained at open. `Parts::to_bytes` publishes
+exact-source members as an in-memory package under a separate bounded ZIP
+scratch profile, so ZIP framing does not consume the published flat-document
+output ceiling.
 
 - `.fodt` opens as `File::Odt` over `litchi_odt::flat::Document::to_package`
   and the packaged ODT reader (body index, views, queries, Markdown). All
@@ -82,8 +86,12 @@ every other byte is kept; a part the edit creates (`meta.xml` of a flat
 document without `office:meta`) is inserted first. An edit that changes a
 part's root start tag, adds or removes top-level children, changes a shared
 child (font faces, automatic styles) differently in two parts, or adds a
-package member (`Parts::merge_package`) is refused with
-`Error::Unsupported` — a flat document has no form for it.
+package member is refused with a typed refusal — a flat document has no form
+for it. `Parts::merge_package` is the raw external-package route and admits
+the package under the supplied source policy. Owners passing an already
+admitted packaged projection use `Parts::merge_package_projection`, which
+uses a separate bounded synthetic-package policy instead of charging the
+original flat-source ceiling a second time.
 `litchi_odt::flat::Document::republish` applies it for ODT.
 
 The unified flat handles edit their packaged projection with the families'

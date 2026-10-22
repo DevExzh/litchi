@@ -21,8 +21,8 @@
 //!     .file;
 //! // Nothing to refresh: the file comes back unchanged.
 //! let commit = file.refresh(&Options::new().clock(Clock::parse("2026-10-14T09:30:00")?))?;
-//! assert!(commit.patch.is_noop());
-//! assert!(commit.value.fields().is_empty());
+//! assert!(commit.patch().is_noop());
+//! assert!(commit.value().fields().is_empty());
 //! # }
 //! # Ok::<(), litchi_ops::Error>(())
 //! ```

@@ -16,14 +16,12 @@ use crate::{Code, Error as OpsError, Props, Result};
 mod decode;
 mod dump;
 mod execute;
-pub use decode::{
-    Error, SourceLimitKind, SourceLimits, SourceLimitsBuilder, from_bytes, from_bytes_with_limits,
-};
+pub use decode::{Error, SourceLimitKind, SourceLimits, SourceLimitsBuilder, from_bytes};
 pub use dump::Dump;
 pub(crate) use dump::support as dump_support;
 pub use execute::{Applied, BatchCommit, ItemResult};
 
-use crate::transaction::SemanticLimits;
+use crate::transaction::EditOptions;
 #[cfg(feature = "docx")]
 pub(crate) use execute::{has_text_controls, inline_text_props};
 
@@ -80,7 +78,7 @@ pub enum Unsupported {
 
 /// Command-channel options of [`crate::File::apply_with`] and
 /// [`crate::File::batch_with`]: the batch mode, the property policy and the
-/// semantic limits. The default is an atomic batch that refuses unsupported
+/// transaction's [`EditOptions`]. The default is an atomic batch that refuses unsupported
 /// properties under default limits, which is what [`crate::File::batch`]
 /// does.
 ///
@@ -99,7 +97,7 @@ pub enum Unsupported {
 pub struct Options {
     mode: BatchMode,
     unsupported: Unsupported,
-    limits: SemanticLimits,
+    edit: EditOptions,
 }
 
 impl Options {
@@ -124,10 +122,10 @@ impl Options {
         self
     }
 
-    /// Set the semantic limits of the transaction.
+    /// Set the transaction's [`EditOptions`] (its semantic limits).
     #[must_use]
-    pub const fn limits(mut self, limits: SemanticLimits) -> Self {
-        self.limits = limits;
+    pub const fn edit_options(mut self, options: EditOptions) -> Self {
+        self.edit = options;
         self
     }
 }
@@ -150,8 +148,9 @@ impl Options {
 /// non-integers and integers outside that range are malformed transport.
 /// Negative integers are retained for command-specific range admission.
 /// The executor converts positions to checked typed coordinates. Callers
-/// decoding untrusted input should use [`from_bytes_with_limits`], which
-/// bounds the bytes and item count before retaining decoded payloads.
+/// decoding untrusted input choose the [`SourceLimits`] that [`from_bytes`]
+/// requires, which bound the bytes and item count before retaining decoded
+/// payloads.
 /// `Debug` omits all authored values. Use [`Self::into_owned`] to detach from
 /// the input buffer before storing or sending a payload.
 ///

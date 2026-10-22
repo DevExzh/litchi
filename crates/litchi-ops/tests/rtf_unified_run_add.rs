@@ -295,7 +295,7 @@ fn opaque_source_is_byte_exact_and_patch_inverse_reopens() {
         "inserted",
         RunFormatPatch::new().with_bold(true),
     );
-    let bytes = result.file.to_bytes().unwrap();
+    let bytes = result.file().to_bytes().unwrap();
     assert_eq!(bytes, expected);
     assert!(
         bytes
@@ -320,14 +320,14 @@ fn opaque_source_is_byte_exact_and_patch_inverse_reopens() {
     let reopened = open_bytes(bytes.clone()).unwrap();
     assert_eq!(text(&reopened, "/body/p[1]"), "BeforeinsertedItalicTail");
     assert_eq!(
-        property(&reopened, &result.value.to_string(), "bold"),
+        property(&reopened, &result.value().to_string(), "bold"),
         "true"
     );
     assert_eq!(
         result
-            .patch
+            .patch()
             .inverse()
-            .apply(&result.file)
+            .apply(result.file())
             .unwrap()
             .to_bytes()
             .unwrap(),
@@ -354,9 +354,9 @@ fn batch_and_sequential_adds_keep_paths_and_atomic_history() {
     );
     assert_eq!(source.to_bytes().unwrap(), INPUT);
     let best = source.batch([item], BatchMode::BestEffort).unwrap();
-    assert_eq!(text(&best.file, "/body/p[1]"), "FirstItalicBoldnew");
+    assert_eq!(text(best.file(), "/body/p[1]"), "FirstItalicBoldnew");
     assert!(matches!(
-        &best.results[0],
+        best.results()[0],
         litchi_ops::ItemResult::Applied(_)
     ));
 
@@ -368,14 +368,14 @@ fn batch_and_sequential_adds_keep_paths_and_atomic_history() {
             Ok(())
         })
         .unwrap();
-    assert_eq!(text(&commit.file, "/body/p[1]"), "oneFirstItalicBoldtwo");
-    assert_eq!(property(&commit.file, "/body/p[1]/r[1]", "bold"), "true");
-    assert_eq!(commit.diagnostics.operations(), 3);
+    assert_eq!(text(commit.file(), "/body/p[1]"), "oneFirstItalicBoldtwo");
+    assert_eq!(property(commit.file(), "/body/p[1]/r[1]", "bold"), "true");
+    assert_eq!(commit.diagnostics().operations(), 3);
     assert_eq!(
         commit
-            .patch
+            .patch()
             .inverse()
-            .apply(&commit.file)
+            .apply(commit.file())
             .unwrap()
             .to_bytes()
             .unwrap(),
@@ -421,10 +421,13 @@ fn invalid_run_adds_and_limits_are_typed_and_atomic() {
         .build()
         .unwrap();
     let error = source
-        .edit_with_limits(&limits, |edit| {
-            edit.add("/body/p[1]", run_node("one"))?;
-            edit.add("/body/p[1]", run_node("two"))
-        })
+        .edit_with_options(
+            litchi_ops::EditOptions::new().semantic_limits(limits),
+            |edit| {
+                edit.add("/body/p[1]", run_node("one"))?;
+                edit.add("/body/p[1]", run_node("two"))
+            },
+        )
         .unwrap_err();
     assert!(
         matches!(
@@ -457,7 +460,10 @@ fn invalid_run_adds_and_limits_are_typed_and_atomic() {
         ),
     ] {
         let error = source
-            .edit_with_limits(&limits, |edit| edit.add("/body/p[1]", run_node("added")))
+            .edit_with_options(
+                litchi_ops::EditOptions::new().semantic_limits(limits),
+                |edit| edit.add("/body/p[1]", run_node("added")),
+            )
             .unwrap_err();
         assert!(
             matches!(

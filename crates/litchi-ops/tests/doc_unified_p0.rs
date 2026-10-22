@@ -508,7 +508,7 @@ fn transactions_and_batches_stage_structure_and_format_atomically() {
             Ok(())
         })
         .unwrap();
-    let edited = reopen(&edited.file);
+    let edited = reopen(edited.file());
     assert_eq!(
         body_texts(&edited),
         ["after", "plain bold tail", "last", "", "added"]

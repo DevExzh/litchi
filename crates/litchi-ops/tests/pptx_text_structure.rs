@@ -332,7 +332,7 @@ fn edits_compose_in_one_atomic_closure() {
                 Ok::<_, litchi_ops::Error>(())
             })
             .unwrap();
-        assert_eq!(text(&commit.file, SHAPE), "two!");
+        assert_eq!(text(commit.file(), SHAPE), "two!");
         // A failing item leaves the input untouched.
         let failed = file.edit(|tx| {
             tx.add(SHAPE, NewNode::new("paragraph").prop("text", "two"))?;

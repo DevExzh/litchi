@@ -29,8 +29,9 @@ impl staged::Staged for Package {
     }
 
     fn reopen(&self, bytes: &[u8]) -> litchi_core::Result<Self> {
-        let options =
-            litchi_odf_common::OpenOptions::new().source_limits(self.owned_package().limits());
+        let options = litchi_odf_common::OpenOptions::new()
+            .source_limits(self.owned_package().limits())
+            .xml_limits(self.xml_limits);
         Ok(Self::from_bytes_with_options(bytes, options)?)
     }
 

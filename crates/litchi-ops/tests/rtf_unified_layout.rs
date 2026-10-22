@@ -117,30 +117,30 @@ fn alignment_and_layout_fanout_share_one_native_publication_and_exact_history() 
     )
     .unwrap();
     assert_eq!(
-        commit.file.to_bytes().unwrap(),
+        commit.file().to_bytes().unwrap(),
         edit.commit().unwrap().package().to_bytes().unwrap()
     );
     assert_eq!(
         commit
-            .file
+            .file()
             .query("p[keepNext=true][align=center]")
             .unwrap()
             .count(),
         3
     );
-    assert_eq!(commit.diagnostics.operations(), 1);
+    assert_eq!(commit.diagnostics().operations(), 1);
     assert_eq!(
         commit
-            .patch
+            .patch()
             .inverse()
-            .apply(&commit.file)
+            .apply(commit.file())
             .unwrap()
             .to_bytes()
             .unwrap(),
         INPUT
     );
     assert!(matches!(
-        commit.patch.apply(&file()).unwrap_err().leaf(),
+        commit.patch().apply(&file()).unwrap_err().leaf(),
         Source::Transaction(Error::PatchConflict)
     ));
 }
@@ -154,13 +154,13 @@ fn clearing_layout_preserves_mixed_runs_and_true_noops_keep_exact_bytes() {
         .unwrap();
     assert_eq!(
         commit
-            .file
+            .file()
             .query("p[spaceBefore=0pt][keepLines=false]")
             .unwrap()
             .count(),
         2
     );
-    let native = litchi_rtf::Package::from_bytes(&commit.file.to_bytes().unwrap()).unwrap();
+    let native = litchi_rtf::Package::from_bytes(&commit.file().to_bytes().unwrap()).unwrap();
     let runs: Vec<_> = native
         .body()
         .runs()
@@ -175,19 +175,19 @@ fn clearing_layout_preserves_mixed_runs_and_true_noops_keep_exact_bytes() {
             .any(|(text, bold)| text.contains("rest") && !*bold)
     );
     let noop = commit
-        .file
+        .file()
         .edit(|edit| edit.set(query("p"), props! {"spaceBefore"=>"0pt","keepLines"=>false}))
         .unwrap();
-    assert!(!noop.diagnostics.changed());
+    assert!(!noop.diagnostics().changed());
     assert_eq!(
-        noop.file.to_bytes().unwrap(),
-        commit.file.to_bytes().unwrap()
+        noop.file().to_bytes().unwrap(),
+        commit.file().to_bytes().unwrap()
     );
     assert_eq!(
         commit
-            .patch
+            .patch()
             .inverse()
-            .apply(&noop.file)
+            .apply(noop.file())
             .unwrap()
             .to_bytes()
             .unwrap(),
@@ -274,9 +274,10 @@ fn layout_fanout_limits_count_native_deltas_and_alignment_separately() {
         ),
     ] {
         let error = source
-            .edit_with_limits(&limits, |edit| {
-                edit.set(query("p"), all_props().with("align", "right"))
-            })
+            .edit_with_options(
+                litchi_ops::EditOptions::new().semantic_limits(limits),
+                |edit| edit.set(query("p"), all_props().with("align", "right")),
+            )
             .unwrap_err();
         assert!(
             matches!(error.leaf(),Source::Transaction(Error::Limit{kind:actual,..}) if *actual==kind),
@@ -289,9 +290,15 @@ fn layout_fanout_limits_count_native_deltas_and_alignment_separately() {
         .build()
         .unwrap();
     let changed = source
-        .edit_with_limits(&limits, |edit| edit.set(query("p"), all_props()))
+        .edit_with_options(
+            litchi_ops::EditOptions::new().semantic_limits(limits),
+            |edit| edit.set(query("p"), all_props()),
+        )
         .unwrap();
-    assert_eq!(changed.file.query("p[keepLines=true]").unwrap().count(), 3);
+    assert_eq!(
+        changed.file().query("p[keepLines=true]").unwrap().count(),
+        3
+    );
     assert_eq!(source.to_bytes().unwrap(), INPUT);
 }
 
@@ -314,7 +321,7 @@ fn batches_and_sequential_layout_predicates_preserve_atomicity() {
     let best = source
         .batch([item("6pt"), item("invalid")], BatchMode::BestEffort)
         .unwrap();
-    assert_eq!(property(&best.file, "/body/p[1]", "spaceBefore"), "6pt");
+    assert_eq!(property(best.file(), "/body/p[1]", "spaceBefore"), "6pt");
     let changed = source
         .edit(|edit| {
             edit.set("/body/p[2]", props! {"keepNext"=>true})?;
@@ -323,14 +330,14 @@ fn batches_and_sequential_layout_predicates_preserve_atomicity() {
         .unwrap();
     assert_eq!(
         changed
-            .file
+            .file()
             .query("p[pageBreakBefore=true]")
             .unwrap()
             .count(),
         1
     );
     assert_eq!(
-        property(&changed.file, "/body/p[2]", "pageBreakBefore"),
+        property(changed.file(), "/body/p[2]", "pageBreakBefore"),
         "true"
     );
 }

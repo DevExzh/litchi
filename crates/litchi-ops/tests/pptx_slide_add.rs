@@ -152,20 +152,20 @@ fn source_add_composes_with_edit_and_replays_inverse() {
             Ok(())
         })
         .expect("source edit with insertion and a following text edit");
-    assert!(commit.diagnostics.changed());
-    assert_eq!(text(&commit.file, 2), "edited after insertion");
-    assert!(commit.file.get("/slide[1]").is_ok());
+    assert!(commit.diagnostics().changed());
+    assert_eq!(text(commit.file(), 2), "edited after insertion");
+    assert!(commit.file().get("/slide[1]").is_ok());
 
-    let result = commit.file.to_bytes().unwrap();
+    let result = commit.file().to_bytes().unwrap();
     assert_eq!(
-        commit.patch.apply(&source).unwrap().to_bytes().unwrap(),
+        commit.patch().apply(&source).unwrap().to_bytes().unwrap(),
         result
     );
     assert_eq!(
         commit
-            .patch
+            .patch()
             .inverse()
-            .apply(&commit.file)
+            .apply(commit.file())
             .unwrap()
             .to_bytes()
             .unwrap(),
@@ -191,19 +191,19 @@ fn source_add_batches_are_atomic_or_best_effort_with_diagnostics() {
         .batch(commands(), BatchMode::BestEffort)
         .expect("best-effort source insertion");
     assert!(matches!(
-        &best_effort.results[0],
+        &best_effort.results()[0],
         ItemResult::Applied(applied) if applied.changed
     ));
     assert!(matches!(
-        &best_effort.results[1],
+        &best_effort.results()[1],
         ItemResult::Failed(error) if error.item() == Some(1) && error.code() == Code::NotFound
     ));
     assert!(matches!(
-        &best_effort.results[2],
+        &best_effort.results()[2],
         ItemResult::Applied(applied) if applied.changed
     ));
-    assert!(best_effort.diagnostics.changed());
-    assert!(best_effort.file.get("/slide[5]").is_ok());
+    assert!(best_effort.diagnostics().changed());
+    assert!(best_effort.file().get("/slide[5]").is_ok());
     assert_eq!(source.to_bytes().unwrap(), before);
 }
 
@@ -230,7 +230,10 @@ fn source_add_honors_retention_and_staging_limits_before_mutation() {
         .build()
         .unwrap();
     let error = source
-        .edit_with_limits(&limits, |edit| edit.add("/", slide("Blank")))
+        .edit_with_options(
+            litchi_ops::EditOptions::new().semantic_limits(limits),
+            |edit| edit.add("/", slide("Blank")),
+        )
         .expect_err("the staged action charge must be checked before insertion");
     assert_eq!(error.code(), Code::LimitExceeded);
     assert_eq!(source.to_bytes().unwrap(), bytes);
@@ -302,7 +305,10 @@ fn slide_creation_properties_round_trip_and_replay_for_both_owners() {
                 Ok(())
             })
             .unwrap();
-        for file in [&commit.file, &open_source(commit.file.to_bytes().unwrap())] {
+        for file in [
+            commit.file(),
+            &open_source(commit.file().to_bytes().unwrap()),
+        ] {
             assert_eq!(
                 slide_property(file, "/slide[1]", "name").as_deref(),
                 Some(name)
@@ -313,14 +319,14 @@ fn slide_creation_properties_round_trip_and_replay_for_both_owners() {
             );
         }
         assert_eq!(
-            commit.patch.apply(&source).unwrap().to_bytes().unwrap(),
-            commit.file.to_bytes().unwrap()
+            commit.patch().apply(&source).unwrap().to_bytes().unwrap(),
+            commit.file().to_bytes().unwrap()
         );
         assert_eq!(
             commit
-                .patch
+                .patch()
                 .inverse()
-                .apply(&commit.file)
+                .apply(commit.file())
                 .unwrap()
                 .to_bytes()
                 .unwrap(),
@@ -391,12 +397,15 @@ fn slide_creation_properties_fail_atomically_before_publication() {
             .build()
             .unwrap();
         let error = source
-            .edit_with_limits(&limits, |edit| {
-                edit.add(
-                    "/",
-                    slide("Blank").prop("name", "Draft").prop("hidden", true),
-                )
-            })
+            .edit_with_options(
+                litchi_ops::EditOptions::new().semantic_limits(limits),
+                |edit| {
+                    edit.add(
+                        "/",
+                        slide("Blank").prop("name", "Draft").prop("hidden", true),
+                    )
+                },
+            )
             .unwrap_err();
         assert_eq!(error.code(), Code::LimitExceeded);
         assert_eq!(source.to_bytes().unwrap(), before);
@@ -424,19 +433,19 @@ fn batches_preserve_creation_properties_and_isolate_invalid_items() {
         assert!(source.batch(items(), BatchMode::Atomic).is_err());
         assert_eq!(source.to_bytes().unwrap(), before);
         let result = source.batch(items(), BatchMode::BestEffort).unwrap();
-        assert!(matches!(&result.results[0], ItemResult::Applied(applied) if applied.changed));
+        assert!(matches!(&result.results()[0], ItemResult::Applied(applied) if applied.changed));
         assert!(
-            matches!(&result.results[1], ItemResult::Failed(error) if error.code() == Code::InvalidValue)
+            matches!(&result.results()[1], ItemResult::Failed(error) if error.code() == Code::InvalidValue)
         );
         assert_eq!(
-            slide_property(&result.file, "/slide[4]", "name").as_deref(),
+            slide_property(result.file(), "/slide[4]", "name").as_deref(),
             Some("Batch Draft")
         );
         assert_eq!(
-            slide_property(&result.file, "/slide[4]", "hidden").as_deref(),
+            slide_property(result.file(), "/slide[4]", "hidden").as_deref(),
             Some("true")
         );
-        assert!(result.file.get("/slide[5]").is_err());
+        assert!(result.file().get("/slide[5]").is_err());
         assert_eq!(source.to_bytes().unwrap(), before);
     }
 }

@@ -169,8 +169,8 @@ fn comment_noops_and_refusals_are_typed() {
             )
         })
         .expect("equal text");
-    assert!(noop.patch.is_noop());
-    assert_eq!(noop.file.to_bytes().unwrap(), before);
+    assert!(noop.patch().is_noop());
+    assert_eq!(noop.file().to_bytes().unwrap(), before);
 
     let missing_author = source
         .add("/slide[1]", NewNode::new("comment").prop("text", "x"))
@@ -268,7 +268,7 @@ fn table_cell_text_set_round_trips_and_layout_edits_are_refused() {
         let noop = source
             .edit(|edit| edit.set("/slide[1]/table[1]/tr[2]/tc[1]", props! { "text" => "A2" }))
             .unwrap();
-        assert!(noop.patch.is_noop());
+        assert!(noop.patch().is_noop());
 
         for refused in [
             source

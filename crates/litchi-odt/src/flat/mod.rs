@@ -14,7 +14,7 @@ use std::ops::Range;
 use std::path::Path;
 use std::sync::Arc;
 
-use crate::core::ResolvedReader;
+use crate::core::{ResolvedReader, XmlStreamLimits};
 use litchi_core::{Error as CoreError, Metadata, Resource, ResourceLimit, Result};
 use litchi_odf_common::SemanticLimitKind;
 use quick_xml::events::Event;
@@ -83,6 +83,19 @@ impl Limits {
                 .min(Self::HARD_MAX_XML_DEPTH),
             options,
         }
+    }
+
+    fn input_exceeded(self, observed: usize) -> CoreError {
+        let semantic = self.options.semantic_limits_value();
+        if let Err(error) = semantic.check_core(SemanticLimitKind::ContentBytes, observed) {
+            return error;
+        }
+        resource_limit_error(
+            Resource::InputBytes,
+            observed,
+            self.max_document_bytes,
+            "flat ODT input",
+        )
     }
 }
 
@@ -161,7 +174,17 @@ impl Document {
                 "flat ODT input",
             )
         })?;
-        let document = FlatDocument::from_reader_with_limit(reader, maximum)?;
+        let document = FlatDocument::from_reader_with_limit_and_xml_limits(
+            reader,
+            maximum,
+            limits.options.xml_limits_value(),
+        )
+        .map_err(|error| match error {
+            CoreError::ResourceLimit(limit) if limit.resource == Resource::InputBytes => {
+                limits.input_exceeded(usize::try_from(limit.observed).unwrap_or(usize::MAX))
+            },
+            other => other,
+        })?;
         if document.family() != Family::Text {
             return invalid("flat document is not an OpenDocument Text document");
         }
@@ -195,25 +218,14 @@ impl Document {
     ) -> std::result::Result<Self, Error> {
         let limits = Limits::from_options(options);
         if bytes.len() > limits.max_document_bytes {
-            return Err(resource_limit_error(
-                Resource::InputBytes,
-                bytes.len(),
-                limits.max_document_bytes,
-                "flat ODT input",
-            )
-            .into());
+            return Err(limits.input_exceeded(bytes.len()).into());
         }
         Ok(Self::from_bytes_with_limits(bytes.to_vec(), limits)?)
     }
 
     pub(crate) fn from_bytes_with_limits(bytes: Vec<u8>, limits: Limits) -> Result<Self> {
         if bytes.len() > limits.max_document_bytes {
-            return Err(resource_limit_error(
-                Resource::InputBytes,
-                bytes.len(),
-                limits.max_document_bytes,
-                "flat ODT input",
-            ));
+            return Err(limits.input_exceeded(bytes.len()));
         }
         let maximum = u64::try_from(limits.max_document_bytes).map_err(|_error| {
             resource_limit_error(
@@ -223,7 +235,11 @@ impl Document {
                 "flat ODT input",
             )
         })?;
-        let document = FlatDocument::from_bytes_with_limit(bytes, maximum)?;
+        let document = FlatDocument::from_bytes_with_limit_and_xml_limits(
+            bytes,
+            maximum,
+            limits.options.xml_limits_value(),
+        )?;
         if document.family() != Family::Text {
             return invalid("flat document is not an OpenDocument Text document");
         }
@@ -244,24 +260,29 @@ impl Document {
     /// Returns an error when the parts cannot be split or the packaged
     /// reader refuses them.
     pub fn to_package(&self) -> std::result::Result<crate::Package, Error> {
-        let parts = litchi_odf_common::flat::Parts::split(self.inner.xml().as_bytes())?;
-        crate::Package::from_bytes(&parts.to_bytes()?)
+        let limits = litchi_odf_common::flat::Limits::from_options(self.options());
+        let parts = litchi_odf_common::flat::Parts::split(self.inner.xml().as_bytes(), &limits)?;
+        crate::Package::from_bytes_with_options(
+            &parts.to_bytes(&limits)?,
+            limits.projection_options(),
+        )
     }
 
     /// This document with an edit of its packaged projection
     /// ([`Self::to_package`]) applied: every top-level part element the
     /// edit changed replaces its bytes here, and every other byte is kept
-    /// ([`litchi_odf_common::flat::Parts::merge_package`]).
+    /// ([`litchi_odf_common::flat::Parts::merge_package_projection`]).
     ///
     /// # Errors
     ///
-    /// Returns [`litchi_core::Error::Unsupported`] for an edit a flat
-    /// document cannot hold (a changed part root, added or removed
-    /// top-level elements, an added package member), and the flat reader's
-    /// error when the result does not reopen under this document's limits.
+    /// Returns a typed refusal for an edit a flat document cannot hold (a
+    /// changed part root, added or removed top-level elements, an added
+    /// package member), and the flat reader's error when the result does not
+    /// reopen under this document's limits.
     pub fn republish(&self, edited: &crate::Package) -> std::result::Result<Self, Error> {
-        let parts = litchi_odf_common::flat::Parts::split(self.as_bytes())?;
-        let bytes = parts.merge_package(self.as_bytes(), edited.as_bytes())?;
+        let limits = litchi_odf_common::flat::Limits::from_options(self.options());
+        let parts = litchi_odf_common::flat::Parts::split(self.as_bytes(), &limits)?;
+        let bytes = parts.merge_package_projection(self.as_bytes(), edited.as_bytes(), &limits)?;
         Ok(Self::from_bytes_with_limits(bytes, self.limits)?)
     }
 
@@ -645,7 +666,28 @@ fn render_paragraph_edits(
 }
 
 fn index_direct_paragraphs(xml: &str, limits: Limits) -> Result<Vec<ParagraphSite>> {
-    let mut reader = ResolvedReader::from_xml(xml);
+    let retained = limits.options.xml_limits_value();
+    let max_document_bytes = u64::try_from(limits.max_document_bytes).map_err(|_| {
+        CoreError::InvalidFormat("flat ODT input limit exceeds platform limits".to_string())
+    })?;
+    let xml_limits = XmlStreamLimits::new(
+        retained.max_bytes().min(max_document_bytes),
+        retained.max_depth().min(limits.max_xml_depth),
+        retained.max_events().min(4_000_000),
+        retained.max_attributes().min(1_000_000),
+        retained.max_token_bytes().min(64 * 1024),
+    )?
+    .namespace_limits(
+        retained
+            .max_namespace_scope_depth()
+            .min(limits.max_xml_depth),
+        retained.max_namespace_declarations().min(256),
+        retained.max_namespace_bindings().min(256 * 1024),
+        retained.max_namespace_bytes().min(16 * 1024 * 1024),
+        retained.max_namespace_prefix_bytes().min(64 * 1024),
+        retained.max_namespace_uri_bytes().min(64 * 1024),
+    )?;
+    let mut reader = ResolvedReader::from_xml(xml, xml_limits)?;
     reader.config_mut().check_end_names = true;
     let mut buffer = Vec::new();
     let mut depth = 0usize;
@@ -655,7 +697,9 @@ fn index_direct_paragraphs(xml: &str, limits: Limits) -> Result<Vec<ParagraphSit
     loop {
         let (namespace, event) = reader
             .read_resolved_event_into(&mut buffer)
-            .map_err(|error| CoreError::InvalidFormat(format!("invalid flat ODT XML: {error}")))?;
+            .map_err(|error| {
+                crate::core::map_resolved_reader_error(error, "invalid flat ODT XML")
+            })?;
         let is_office = crate::elements::xml::normalized_namespace_matches(
             &namespace,
             OFFICE_NAMESPACE,
@@ -750,9 +794,9 @@ fn classify_paragraph_end(
                 "flat ODT XML position",
             )
         })?;
-        let (_, event) = reader
-            .read_resolved_event_into(buffer)
-            .map_err(|error| CoreError::InvalidFormat(format!("invalid flat ODT XML: {error}")))?;
+        let (_, event) = reader.read_resolved_event_into(buffer).map_err(|error| {
+            crate::core::map_resolved_reader_error(error, "invalid flat ODT XML")
+        })?;
         match event {
             Event::End(_) if nested_depth == 0 => {
                 return Ok(if opaque {

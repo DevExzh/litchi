@@ -99,7 +99,7 @@ fn selector_fanout_and_mixed_properties_match_one_native_commit() {
             )
         })
         .unwrap();
-    assert_eq!(commit.diagnostics.operations(), 1);
+    assert_eq!(commit.diagnostics().operations(), 1);
     let native = litchi_rtf::Package::from_bytes(INPUT).unwrap();
     let mut edit = native.edit();
     edit.replace_body_paragraph_texts(
@@ -111,12 +111,12 @@ fn selector_fanout_and_mixed_properties_match_one_native_commit() {
     )
     .unwrap();
     assert_eq!(
-        commit.file.to_bytes().unwrap(),
+        commit.file().to_bytes().unwrap(),
         edit.commit().unwrap().package().to_bytes().unwrap()
     );
     assert_eq!(
         commit
-            .file
+            .file()
             .query("p[align=right][text=same]")
             .unwrap()
             .count(),
@@ -124,16 +124,16 @@ fn selector_fanout_and_mixed_properties_match_one_native_commit() {
     );
     assert_eq!(
         commit
-            .patch
+            .patch()
             .inverse()
-            .apply(&commit.file)
+            .apply(commit.file())
             .unwrap()
             .to_bytes()
             .unwrap(),
         INPUT
     );
     assert!(matches!(
-        commit.patch.apply(&file()).unwrap_err().leaf(),
+        commit.patch().apply(&file()).unwrap_err().leaf(),
         Source::Transaction(Error::PatchConflict)
     ));
     let alignment_only = source
@@ -159,9 +159,9 @@ fn same_alignment_preserves_exact_bytes_and_protection_policy() {
         let commit = source
             .edit(|edit| edit.set("/body/p[1]", props! {"align" => "left"}))
             .unwrap();
-        assert!(!commit.diagnostics.changed());
-        assert_eq!(commit.diagnostics.operations(), 1);
-        assert_eq!(commit.file.to_bytes().unwrap(), input);
+        assert!(!commit.diagnostics().changed());
+        assert_eq!(commit.diagnostics().operations(), 1);
+        assert_eq!(commit.file().to_bytes().unwrap(), input);
     }
     let protected = open_bytes(br"{\rtf1\ansi\readprot\enforceprot1 First}".as_slice()).unwrap();
     let error = protected
@@ -243,9 +243,10 @@ fn mixed_assignment_budgets_count_both_native_facets() {
         ),
     ] {
         let error = source
-            .edit_with_limits(&limits, |edit| {
-                edit.set(query("p"), props! {"text"=>"updated","align"=>"center"})
-            })
+            .edit_with_options(
+                litchi_ops::EditOptions::new().semantic_limits(limits),
+                |edit| edit.set(query("p"), props! {"text"=>"updated","align"=>"center"}),
+            )
             .unwrap_err();
         assert!(
             matches!(error.leaf(),Source::Transaction(Error::Limit{kind:actual,..}) if *actual==kind),
@@ -279,18 +280,18 @@ fn alignment_batches_keep_error_indices_and_sequential_queries() {
         Some(1)
     );
     let best = source.batch(commands(), BatchMode::BestEffort).unwrap();
-    assert_eq!(align(&best.file, "/body/p[1]"), "right");
-    assert_eq!(align(&best.file, "/body/p[2]"), "left");
-    assert_eq!(align(&best.file, "/body/p[3]"), "center");
+    assert_eq!(align(best.file(), "/body/p[1]"), "right");
+    assert_eq!(align(best.file(), "/body/p[2]"), "left");
+    assert_eq!(align(best.file(), "/body/p[3]"), "center");
     let sequential = source
         .edit(|edit| {
             edit.set("/body/p[1]", props! {"align"=>"right"})?;
             edit.set(query("p[align=right]"), props! {"align"=>"justify"})
         })
         .unwrap();
-    assert_eq!(align(&sequential.file, "/body/p[1]"), "justify");
+    assert_eq!(align(sequential.file(), "/body/p[1]"), "justify");
     assert_eq!(
-        sequential.file.query("p[align=justify]").unwrap().count(),
+        sequential.file().query("p[align=justify]").unwrap().count(),
         1
     );
     assert_eq!(source.to_bytes().unwrap(), INPUT);

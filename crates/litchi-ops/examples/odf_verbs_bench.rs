@@ -242,7 +242,8 @@ mod bench {
                 Ok(())
             })
             .expect("tokens")
-            .file;
+            .file()
+            .clone();
         let bytes = file.to_bytes().expect("bytes");
         let package = litchi_odf_formula::Package::from_bytes(&bytes).expect("leaf");
         let file = open(&bytes);

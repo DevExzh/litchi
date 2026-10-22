@@ -218,15 +218,15 @@ fn ordering_is_atomic_across_set_move_and_swap_batches() {
             )
             .expect("best-effort ordering batch");
         assert!(matches!(
-            &best_effort.results[0],
+            &best_effort.results()[0],
             litchi_ops::ItemResult::Applied(applied) if applied.changed
         ));
         assert!(matches!(
-            &best_effort.results[1],
+            &best_effort.results()[1],
             litchi_ops::ItemResult::Failed(error)
                 if error.item() == Some(1) && error.code() == Code::PathNotFound
         ));
-        assert_eq!(order(&best_effort.file), ["Data", "Sales Chart", "Tail"]);
+        assert_eq!(order(best_effort.file()), ["Data", "Sales Chart", "Tail"]);
     }
 }
 
@@ -239,7 +239,10 @@ fn ordering_honors_selected_limits_and_rejects_non_workbook_destinations() {
         .build()
         .expect("limits");
     let error = source
-        .edit_with_limits(&limits, |edit| edit.move_to(CHART, Placement::End))
+        .edit_with_options(
+            litchi_ops::EditOptions::new().semantic_limits(limits),
+            |edit| edit.move_to(CHART, Placement::End),
+        )
         .expect_err("staged target limit");
     assert_eq!(error.code(), Code::LimitExceeded);
 
@@ -260,9 +263,12 @@ fn ordering_charges_catalog_storage_separately_from_selected_targets() {
         .build()
         .expect("limits");
     let moved = source
-        .edit_with_limits(&limits, |edit| edit.move_to("/sheet[1]", Placement::End))
+        .edit_with_options(
+            litchi_ops::EditOptions::new().semantic_limits(limits),
+            |edit| edit.move_to("/sheet[1]", Placement::End),
+        )
         .expect("one move fits the selected-target quota")
-        .file;
+        .into_file();
     assert_eq!(sheet_name(&moved, "/sheet[32]"), "Tab 1");
 
     let low_staged = SemanticLimits::builder()
@@ -273,9 +279,10 @@ fn ordering_charges_catalog_storage_separately_from_selected_targets() {
         .build()
         .expect("limits");
     let error = source
-        .edit_with_limits(&low_staged, |edit| {
-            edit.move_to("/sheet[1]", Placement::End)
-        })
+        .edit_with_options(
+            litchi_ops::EditOptions::new().semantic_limits(low_staged),
+            |edit| edit.move_to("/sheet[1]", Placement::End),
+        )
         .expect_err("complete catalog storage must be admitted before allocation");
     assert_eq!(error.code(), Code::LimitExceeded);
 }

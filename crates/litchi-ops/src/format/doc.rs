@@ -514,7 +514,7 @@ mod tests {
     /// A password-protected document reports the leaf's refusal, as the
     /// facade did; the unified opener turns it into `File::Locked`.
     fn open_bytes(bytes: Vec<u8>, options: &OpenOptions) -> Result<Doc> {
-        match detect_format_smart(bytes) {
+        match detect_format_smart(bytes, &crate::detect::SourceLimits::default()) {
             Some(DetectedFormat::Doc(ole)) => match Doc::from_ole_file(ole, options, None)? {
                 LegacyOpen::Opened(doc) => Ok(doc),
                 LegacyOpen::PasswordRequired(_) => Err(litchi_doc::Error::PasswordRequired.into()),

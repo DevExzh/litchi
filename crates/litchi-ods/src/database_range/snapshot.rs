@@ -3,6 +3,7 @@
 use super::{Catalog, Selector, validation};
 use crate::{model::database_range::Range, package::Archive};
 use litchi_core::{Error, Result};
+use litchi_odf_common::XmlStreamLimits;
 
 /// Immutable `database-ranges` owner bound to one complete ODS package source.
 #[derive(Clone, Debug)]
@@ -10,6 +11,7 @@ pub struct Snapshot {
     source: Vec<u8>,
     ranges: Vec<Range>,
     has_owner: bool,
+    xml_limits: XmlStreamLimits,
 }
 
 impl Snapshot {
@@ -18,7 +20,14 @@ impl Snapshot {
     /// # Errors
     /// Returns an error when the operation cannot be completed.
     pub fn from_bytes(source: Vec<u8>) -> Result<Self> {
-        let package = Archive::from_bytes(source)?;
+        Self::from_bytes_with_xml_limits(source, XmlStreamLimits::owner_default_value())
+    }
+
+    pub(crate) fn from_bytes_with_xml_limits(
+        source: Vec<u8>,
+        xml_limits: XmlStreamLimits,
+    ) -> Result<Self> {
+        let package = Archive::from_bytes_with_xml_limits(source, xml_limits)?;
         Self::from_package(&package)
     }
 
@@ -28,6 +37,7 @@ impl Snapshot {
             source: package.package().as_bytes().to_vec(),
             ranges: catalog.ranges.clone(),
             has_owner: catalog.present,
+            xml_limits: package.xml_limits_value(),
         })
     }
 
@@ -131,7 +141,10 @@ impl Edit {
         let target = if unchanged {
             self.before.clone()
         } else {
-            let package = Archive::from_bytes(self.before.source.clone())?;
+            let package = Archive::from_bytes_with_xml_limits(
+                self.before.source.clone(),
+                self.before.xml_limits,
+            )?;
             let catalog = Catalog::load(&package)?;
             let bytes = super::package::replace(
                 &package,
@@ -139,7 +152,7 @@ impl Edit {
                 &catalog.location,
                 self.draft.as_deref(),
             )?;
-            let target = Snapshot::from_bytes(bytes)?;
+            let target = Snapshot::from_bytes_with_xml_limits(bytes, self.before.xml_limits)?;
             if target.has_owner != self.draft.is_some()
                 || target.ranges != self.draft.unwrap_or_default()
             {
@@ -157,7 +170,10 @@ impl Edit {
     }
 
     fn before_location(&self) -> Result<super::codec::Location> {
-        let package = Archive::from_bytes(self.before.source.clone())?;
+        let package = Archive::from_bytes_with_xml_limits(
+            self.before.source.clone(),
+            self.before.xml_limits,
+        )?;
         Ok(Catalog::load(&package)?.location)
     }
 

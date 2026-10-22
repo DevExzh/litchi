@@ -39,7 +39,11 @@ fn assert_openers_are_nameable() {
         |path, options| litchi::open_with(path, options);
     let _: fn(Vec<u8>, &OpenOptions) -> litchi::Result<File> =
         |bytes, options| litchi::open_bytes_with(bytes, options);
-    let _ = litchi::common::detection::detect_format_smart_with_limits;
+    let _: fn(
+        Vec<u8>,
+        &litchi::common::detection::SourceLimits,
+    ) -> Option<litchi::common::detection::DetectedFormat> =
+        litchi::common::detection::detect_format_smart;
 }
 
 /// Limits whose input ceiling is one byte below `bytes`.
@@ -137,9 +141,7 @@ fn document_limits_reject_invalid_suffix_and_unknown_extension_ooxml() {
         len(&bytes),
         len(&bytes) - 1,
     );
-    assert!(
-        litchi::detection_smart::ooxml::detect_ooxml_format_with_limits(&bytes, tight).is_none()
-    );
+    assert!(litchi::detection_smart::ooxml::detect_zip_format(&bytes, &tight).is_none());
 }
 
 // ------------------------------------------------------------ presentations --
@@ -205,10 +207,7 @@ fn presentation_limits_reject_invalid_suffix_and_unknown_extension_ooxml() {
         len(&bytes),
         len(&bytes) - 1,
     );
-    assert!(
-        litchi::detection_smart::ooxml::detect_ooxml_format_from_bytes_with_limits(&bytes, tight)
-            .is_none()
-    );
+    assert!(litchi::detection_smart::ooxml::detect_zip_format(&bytes, &tight).is_none());
 }
 
 // ---------------------------------------------------------------- workbooks --

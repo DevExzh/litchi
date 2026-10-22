@@ -118,8 +118,10 @@ impl Ods {
     /// Every in-memory route uses this, including the one the facade served
     /// by turning a prepared package back into bytes and parsing them again
     /// (`DetectedFormat::Ods`).
-    pub(crate) fn from_prepared(prepared: PreparedPackage, _options: &OpenOptions) -> Result<Self> {
-        let package = Package::from_prepared_package(prepared).map_err(odf_error)?;
+    pub(crate) fn from_prepared(prepared: PreparedPackage, options: &OpenOptions) -> Result<Self> {
+        let package =
+            Package::from_prepared_package_with_options(prepared, options.odf_open_options())
+                .map_err(odf_error)?;
         Self::from_package(package, None)
     }
 
@@ -146,21 +148,9 @@ impl Ods {
 
     /// Parses a flat single-XML spreadsheet detection recognized.
     pub(crate) fn from_flat(bytes: Vec<u8>, options: &OpenOptions) -> Result<Self> {
-        if let Some(maximum) = options.max_input_bytes {
-            let maximum = usize::try_from(maximum).unwrap_or(usize::MAX);
-            if maximum < bytes.len() {
-                return Err(Error::from(litchi_core::Error::ResourceLimit(
-                    litchi_core::ResourceLimit {
-                        resource: litchi_core::Resource::InputBytes,
-                        observed: u64::try_from(bytes.len()).unwrap_or(u64::MAX),
-                        limit: u64::try_from(maximum).unwrap_or(u64::MAX),
-                        scope: Arc::from("flat ODS input"),
-                    },
-                ))
-                .with_format(FileFormat::Ods));
-            }
-        }
-        let flat = litchi_ods::flat::Workbook::from_bytes(&bytes).map_err(odf_error)?;
+        let flat =
+            litchi_ods::flat::Workbook::from_bytes_with_options(&bytes, options.odf_open_options())
+                .map_err(odf_error)?;
         Ok(Self::from_owner(OdsOwner::Flat(flat), None))
     }
 
@@ -211,6 +201,14 @@ impl Ods {
     pub(crate) fn flat_bytes(&self) -> Option<&[u8]> {
         match self.owner() {
             OdsOwner::Flat(flat) => Some(flat.as_bytes()),
+            _ => None,
+        }
+    }
+
+    /// The policy retained by a flat single-XML spreadsheet.
+    pub(crate) fn flat_options(&self) -> Option<litchi_odf_common::OpenOptions> {
+        match self.owner() {
+            OdsOwner::Flat(flat) => Some(flat.options()),
             _ => None,
         }
     }
@@ -408,12 +406,13 @@ impl Ods {
             // A flat spreadsheet's edits start from its packaged projection
             // and republish into the flat bytes (record 0292).
             OdsOwner::Flat(flat) => {
-                let parts =
-                    litchi_odf_common::flat::Parts::split(flat.as_bytes()).map_err(core_error)?;
-                let bytes = parts.to_bytes().map_err(core_error)?;
+                let flat_limits = litchi_odf_common::flat::Limits::from_options(flat.options());
+                let parts = litchi_odf_common::flat::Parts::split(flat.as_bytes(), &flat_limits)
+                    .map_err(odf_error)?;
+                let bytes = parts.to_bytes(&flat_limits).map_err(odf_error)?;
                 // The flat reader admitted the document; a projection the
                 // packaged reader refuses is a gap of the edit.
-                Package::from_bytes(&bytes).map_err(|error| {
+                Package::from_bytes_with_options(&bytes, flat_limits.projection_options()).map_err(|error| {
                     odf_error(error)
                         .caused_by_argument(Code::UnsupportedCapability)
                         .with_suggestion(

@@ -448,22 +448,25 @@ fn remove_transactions_coalesce_mixed_cell_operations_and_replay_inverse() {
                 Ok::<_, litchi_ops::Error>(())
             })
             .expect("mixed remove/set transaction");
-        assert!(commit.diagnostics.changed());
-        assert_eq!(commit.diagnostics.operations(), 3);
-        assert_eq!(commit.diagnostics.commits(), 1);
-        assert_eq!(cell_text(&commit.file, A1).as_deref(), Some("(empty)"));
-        assert_eq!(cell_text(&commit.file, B1).as_deref(), Some("8.25"));
-        assert_eq!(cell_text(&commit.file, C1).as_deref(), Some("(empty)"));
+        assert!(commit.diagnostics().changed());
+        assert_eq!(commit.diagnostics().operations(), 3);
+        assert_eq!(commit.diagnostics().commits(), 1);
+        assert_eq!(cell_text(commit.file(), A1).as_deref(), Some("(empty)"));
+        assert_eq!(cell_text(commit.file(), B1).as_deref(), Some("8.25"));
+        assert_eq!(cell_text(commit.file(), C1).as_deref(), Some("(empty)"));
 
-        let replayed = commit.patch.apply(&original).expect("replay remove patch");
+        let replayed = commit
+            .patch()
+            .apply(&original)
+            .expect("replay remove patch");
         assert_eq!(
             replayed.to_bytes().expect("replayed bytes"),
-            commit.file.to_bytes().expect("committed bytes")
+            commit.file().to_bytes().expect("committed bytes")
         );
         let restored = commit
-            .patch
+            .patch()
             .inverse()
-            .apply(&commit.file)
+            .apply(commit.file())
             .expect("inverse remove patch");
         assert_eq!(restored.to_bytes().expect("restored bytes"), before);
         assert_eq!(
@@ -508,26 +511,29 @@ fn remove_batches_are_atomic_or_attribute_failures_per_item() {
             )
             .expect("best-effort remove batch");
         assert!(matches!(
-            &best_effort.results[0],
+            &best_effort.results()[0],
             ItemResult::Applied(result) if result.changed
         ));
         assert!(matches!(
-            &best_effort.results[1],
+            &best_effort.results()[1],
             ItemResult::Failed(error) if error.item() == Some(1) && error.code() == Code::PathNotFound
         ));
         assert!(matches!(
-            &best_effort.results[2],
+            &best_effort.results()[2],
             ItemResult::Applied(result) if result.changed
         ));
-        assert_eq!(cell_text(&best_effort.file, A1).as_deref(), Some("(empty)"));
         assert_eq!(
-            cell_text(&best_effort.file, ARCHIVE_A1).as_deref(),
+            cell_text(best_effort.file(), A1).as_deref(),
+            Some("(empty)")
+        );
+        assert_eq!(
+            cell_text(best_effort.file(), ARCHIVE_A1).as_deref(),
             Some("(empty)")
         );
         let restored = best_effort
-            .patch
+            .patch()
             .inverse()
-            .apply(&best_effort.file)
+            .apply(best_effort.file())
             .expect("inverse best-effort remove batch");
         assert_eq!(restored.to_bytes().expect("restored batch"), before);
     }
@@ -545,7 +551,10 @@ fn remove_limits_refuse_before_native_publication() {
             .build()
             .expect("build target limit");
         let error = original
-            .edit_with_limits(&limits, |transaction| transaction.remove("Data!A1:B1"))
+            .edit_with_options(
+                litchi_ops::EditOptions::new().semantic_limits(limits),
+                |transaction| transaction.remove("Data!A1:B1"),
+            )
             .expect_err("range removal must honor expanded-target limits");
         assert_eq!(error.code(), Code::LimitExceeded);
         assert_eq!(error.item(), Some(0));

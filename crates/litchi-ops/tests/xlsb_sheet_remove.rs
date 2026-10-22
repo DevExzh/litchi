@@ -281,11 +281,11 @@ fn homogeneous_sheet_query_removes_source_ordinals_in_one_commit() {
         let commit = source
             .edit(|edit| edit.remove(selector.clone()))
             .expect("remove query-selected sheets");
-        assert_eq!(sheet_names(&commit.file), ["Sales Chart", "Data"]);
-        assert_eq!(commit.diagnostics.operations(), 1);
-        assert_eq!(commit.diagnostics.commits(), 1);
+        assert_eq!(sheet_names(commit.file()), ["Sales Chart", "Data"]);
+        assert_eq!(commit.diagnostics().operations(), 1);
+        assert_eq!(commit.diagnostics().commits(), 1);
         let reopened = open_owner(
-            &commit.file.to_bytes().expect("publish query removal"),
+            &commit.file().to_bytes().expect("publish query removal"),
             eager,
         );
         assert_eq!(sheet_names(&reopened), ["Sales Chart", "Data"]);
@@ -305,7 +305,7 @@ fn sheet_removal_history_charge_counts_all_source_positions() {
         .edit(|edit| edit.remove(selector.clone()))
         .expect("remove seventeen source tabs");
     let after = committed
-        .file
+        .file()
         .to_bytes()
         .expect("publish many-sheet removal");
     let encoded_remove = 9usize + 17usize * size_of::<u64>();
@@ -314,8 +314,8 @@ fn sheet_removal_history_charge_counts_all_source_positions() {
         .checked_add(after.len())
         .and_then(|bytes| bytes.checked_add(encoded_remove + 32))
         .expect("history charge");
-    assert_eq!(committed.diagnostics.snapshot_bytes(), exact_charge);
-    assert_eq!(committed.diagnostics.leaf_operations(), 1);
+    assert_eq!(committed.diagnostics().snapshot_bytes(), exact_charge);
+    assert_eq!(committed.diagnostics().leaf_operations(), 1);
 
     let bound = exact_charge.checked_sub(1).expect("nonzero history charge");
     let limits = SemanticLimits::builder()
@@ -324,7 +324,10 @@ fn sheet_removal_history_charge_counts_all_source_positions() {
         .build()
         .expect("semantic limits");
     let error = source
-        .edit_with_limits(&limits, |edit| edit.remove(selector))
+        .edit_with_options(
+            litchi_ops::EditOptions::new().semantic_limits(limits),
+            |edit| edit.remove(selector),
+        )
         .expect_err("exact history charge must enforce the bound");
     assert_eq!(error.code(), Code::LimitExceeded);
 }
@@ -398,7 +401,7 @@ fn mixed_set_add_remove_move_commits_or_rolls_back_as_one_transaction() {
         })
         .expect("mixed set/add/remove/move");
     assert_eq!(
-        sheet_names(&committed.file),
+        sheet_names(committed.file()),
         ["Sales Chart", "Input", "Tail", "Added"]
     );
 
@@ -424,9 +427,10 @@ fn removal_honors_expanded_and_staged_limits_before_native_materialization() {
         .build()
         .expect("limits");
     let error = source
-        .edit_with_limits(&limits, |edit| {
-            edit.remove(scoped_sheet_query("sheet[name=Data or name=Tail]"))
-        })
+        .edit_with_options(
+            litchi_ops::EditOptions::new().semantic_limits(limits),
+            |edit| edit.remove(scoped_sheet_query("sheet[name=Data or name=Tail]")),
+        )
         .expect_err("sheet removal limits");
     assert_eq!(error.code(), Code::LimitExceeded);
 }

@@ -238,27 +238,27 @@ fn edit_history_batch_modes_and_rollback_are_atomic() {
                 edit.set(SECOND, props! { "text" => "second staged" })
             })
             .expect("transaction");
-        assert!(commit.diagnostics.changed());
+        assert!(commit.diagnostics().changed());
         let reopened = eager(&before);
         assert!(
-            commit.patch.apply(&reopened).is_err(),
+            commit.patch().apply(&reopened).is_err(),
             "history belongs to the exact immutable handle, not equal bytes"
         );
-        assert_eq!(text(&commit.file, FIRST), "staged");
+        assert_eq!(text(commit.file(), FIRST), "staged");
         assert_eq!(
             commit
-                .patch
+                .patch()
                 .apply(&source)
                 .expect("replay patch")
                 .to_bytes()
                 .expect("replayed bytes"),
-            commit.file.to_bytes().expect("commit bytes")
+            commit.file().to_bytes().expect("commit bytes")
         );
         assert_eq!(
             commit
-                .patch
+                .patch()
                 .inverse()
-                .apply(&commit.file)
+                .apply(commit.file())
                 .expect("inverse patch")
                 .to_bytes()
                 .expect("inverse bytes"),
@@ -268,8 +268,8 @@ fn edit_history_batch_modes_and_rollback_are_atomic() {
         let noop = source
             .edit(|edit| edit.set(FIRST, props! { "text" => "first" }))
             .expect("transactional no-op");
-        assert!(noop.patch.is_noop());
-        assert!(!noop.diagnostics.changed());
+        assert!(noop.patch().is_noop());
+        assert!(!noop.diagnostics().changed());
 
         let poisoned = source.edit(|edit| {
             edit.set(FIRST, props! { "text" => "discarded" })?;
@@ -295,10 +295,10 @@ fn edit_history_batch_modes_and_rollback_are_atomic() {
         let best_effort = source
             .batch(commands(), BatchMode::BestEffort)
             .expect("best effort batch");
-        assert_eq!(text(&best_effort.file, FIRST), "batch changed");
-        assert_eq!(text(&best_effort.file, SECOND), "batch later");
+        assert_eq!(text(best_effort.file(), FIRST), "batch changed");
+        assert_eq!(text(best_effort.file(), SECOND), "batch later");
         assert!(matches!(
-            &best_effort.results[1],
+            &best_effort.results()[1],
             litchi_ops::ItemResult::Failed(error) if error.item() == Some(1)
         ));
         assert_eq!(text(&source, FIRST), "first");
@@ -326,12 +326,14 @@ fn unsupported_properties_invalid_values_and_limits_leave_input_unchanged() {
         );
         assert_eq!(
             source
-                .edit_with_limits(
-                    &SemanticLimits::builder()
-                        .max_operations(1)
-                        .expect("operation limit")
-                        .build()
-                        .expect("limits"),
+                .edit_with_options(
+                    litchi_ops::EditOptions::new().semantic_limits(
+                        SemanticLimits::builder()
+                            .max_operations(1)
+                            .expect("operation limit")
+                            .build()
+                            .expect("limits")
+                    ),
                     |edit| {
                         edit.set(FIRST, props! { "text" => "one" })?;
                         edit.set(SECOND, props! { "text" => "two" })
@@ -522,9 +524,10 @@ fn expansion_staging_and_snapshot_limits_refuse_without_publication() {
             .expect("limits"),
     ] {
         let error = source
-            .edit_with_limits(&limits, |edit| {
-                edit.set(scoped_shapes(), props! { "text" => "bounded" })
-            })
+            .edit_with_options(
+                litchi_ops::EditOptions::new().semantic_limits(limits),
+                |edit| edit.set(scoped_shapes(), props! { "text" => "bounded" }),
+            )
             .expect_err("bounded fanout");
         assert_eq!(error.code(), Code::LimitExceeded);
         assert_eq!(source.to_bytes().expect("unchanged"), before);
@@ -568,11 +571,11 @@ fn empty_properties_preserve_bytes_and_history() {
         let before = source.to_bytes().unwrap();
         for path in [FIRST, "/slide[1]"] {
             let commit = source.edit(|edit| edit.set(path, Props::new())).unwrap();
-            assert!(commit.patch.is_noop());
-            assert!(!commit.diagnostics.changed());
-            assert_eq!(commit.file.to_bytes().unwrap(), before);
+            assert!(commit.patch().is_noop());
+            assert!(!commit.diagnostics().changed());
+            assert_eq!(commit.file().to_bytes().unwrap(), before);
             assert_eq!(
-                commit.patch.apply(&source).unwrap().to_bytes().unwrap(),
+                commit.patch().apply(&source).unwrap().to_bytes().unwrap(),
                 before
             );
         }

@@ -723,7 +723,10 @@ mod ods {
   </office:body>
 </office:document>"#;
         assert_eq!(
-            crate::detect::detect_file_format_from_bytes(FLAT_ODS),
+            crate::detect::detect_file_format_from_bytes(
+                FLAT_ODS,
+                &crate::detect::SourceLimits::default(),
+            ),
             Some(litchi_core::FileFormat::Ods)
         );
         // Flat ODS opens through the leaf's flat owner (record 0277); both

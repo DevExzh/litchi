@@ -243,33 +243,33 @@ fn worksheet_lifecycle_patch_replays_and_mixed_cell_runs_are_barriers() {
             })
             .expect("mixed cell and worksheet edit");
 
-        assert_eq!(commit.diagnostics.operations(), 3);
+        assert_eq!(commit.diagnostics().operations(), 3);
         assert_eq!(
-            commit.diagnostics.commits(),
+            commit.diagnostics().commits(),
             3,
             "cell and structural families must close their native runs"
         );
         assert_eq!(
-            sheet_property(&commit.file, SHEET2, "name").as_deref(),
+            sheet_property(commit.file(), SHEET2, "name").as_deref(),
             Some("Data")
         );
         assert_eq!(
-            sheet_property(&commit.file, SHEET2, "hidden").as_deref(),
+            sheet_property(commit.file(), SHEET2, "hidden").as_deref(),
             Some("true")
         );
 
         let replayed = commit
-            .patch
+            .patch()
             .apply(&original)
             .expect("replay worksheet patch");
         assert_eq!(
             replayed.to_bytes().expect("serialize replay"),
-            commit.file.to_bytes().expect("serialize target")
+            commit.file().to_bytes().expect("serialize target")
         );
         let restored = commit
-            .patch
+            .patch()
             .inverse()
-            .apply(&commit.file)
+            .apply(commit.file())
             .expect("inverse worksheet patch");
         assert_eq!(
             restored.to_bytes().expect("serialize restored"),
@@ -534,20 +534,20 @@ fn worksheet_batches_cover_structural_atomic_and_best_effort_routes() {
                 BatchMode::Atomic,
             )
             .expect("atomic structural commands");
-        assert_eq!(atomic.results.len(), 5);
+        assert_eq!(atomic.results().len(), 5);
         assert!(
             atomic
-                .results
+                .results()
                 .iter()
                 .all(|result| matches!(result, ItemResult::Applied(applied) if applied.changed))
         );
         assert_eq!(
-            sheet_property(&atomic.file, SHEET1, "name").as_deref(),
+            sheet_property(atomic.file(), SHEET1, "name").as_deref(),
             Some("Sheet1")
         );
         assert!(
             atomic
-                .file
+                .file()
                 .find(SHEET2)
                 .expect("find removed sheet")
                 .is_none()
@@ -566,26 +566,26 @@ fn worksheet_batches_cover_structural_atomic_and_best_effort_routes() {
                 BatchMode::BestEffort,
             )
             .expect("best-effort structural commands");
-        assert_eq!(best_effort.results.len(), 6);
+        assert_eq!(best_effort.results().len(), 6);
         assert!(matches!(
-            &best_effort.results[0],
+            &best_effort.results()[0],
             ItemResult::Applied(applied) if applied.changed
         ));
         assert!(matches!(
-            &best_effort.results[1],
+            &best_effort.results()[1],
             ItemResult::Failed(error)
                 if error.item() == Some(1) && error.code() == Code::DuplicateName
         ));
         assert!(
             best_effort
-                .results
+                .results()
                 .iter()
                 .skip(2)
                 .all(|result| matches!(result, ItemResult::Applied(applied) if applied.changed))
         );
         assert!(
             best_effort
-                .file
+                .file()
                 .find(SHEET2)
                 .expect("find removed sheet")
                 .is_none()
@@ -619,15 +619,15 @@ fn worksheet_scoped_queries_remove_and_set_bounded_targets_atomically() {
                 Ok::<_, litchi_ops::Error>(())
             })
             .expect("remove two independent sheets in one native run");
-        assert_eq!(commit.diagnostics.operations(), 1);
-        assert_eq!(commit.diagnostics.commits(), 1);
+        assert_eq!(commit.diagnostics().operations(), 1);
+        assert_eq!(commit.diagnostics().commits(), 1);
         assert_eq!(
-            sheet_property(&commit.file, SHEET1, "name").as_deref(),
+            sheet_property(commit.file(), SHEET1, "name").as_deref(),
             Some("Sheet1")
         );
         assert!(
             commit
-                .file
+                .file()
                 .find("/sheet[2]")
                 .expect("find removed tabs")
                 .is_none()
@@ -639,10 +639,13 @@ fn worksheet_scoped_queries_remove_and_set_bounded_targets_atomically() {
             .build()
             .expect("valid semantic limits");
         let limited = original
-            .edit_with_limits(&limits, |transaction| {
-                transaction.remove(scoped_sheet_query("sheet[name!=Sheet1]"))?;
-                Ok::<_, litchi_ops::Error>(())
-            })
+            .edit_with_options(
+                litchi_ops::EditOptions::new().semantic_limits(limits),
+                |transaction| {
+                    transaction.remove(scoped_sheet_query("sheet[name!=Sheet1]"))?;
+                    Ok::<_, litchi_ops::Error>(())
+                },
+            )
             .expect_err("the scoped removal exceeds its target bound");
         assert_eq!(limited.code(), Code::LimitExceeded);
         assert_eq!(
@@ -668,27 +671,36 @@ fn worksheet_scoped_queries_remove_and_set_bounded_targets_atomically() {
             .build()
             .expect("valid limits");
         let staged_remove = original
-            .edit_with_limits(&staged_limits, |transaction| {
-                transaction.remove(scoped_sheet_query("sheet[name!=Sheet1]"))?;
-                Ok::<_, litchi_ops::Error>(())
-            })
+            .edit_with_options(
+                litchi_ops::EditOptions::new().semantic_limits(staged_limits),
+                |transaction| {
+                    transaction.remove(scoped_sheet_query("sheet[name!=Sheet1]"))?;
+                    Ok::<_, litchi_ops::Error>(())
+                },
+            )
             .expect_err("two removals exceed the staged charge");
         assert_eq!(staged_remove.code(), Code::LimitExceeded);
         let staged_set = original
-            .edit_with_limits(&staged_limits, |transaction| {
-                transaction.set("/sheet[2]", props! { "hidden" => true })?;
-                Ok::<_, litchi_ops::Error>(())
-            })
+            .edit_with_options(
+                litchi_ops::EditOptions::new().semantic_limits(staged_limits),
+                |transaction| {
+                    transaction.set("/sheet[2]", props! { "hidden" => true })?;
+                    Ok::<_, litchi_ops::Error>(())
+                },
+            )
             .expect_err("sheet assignment includes its payload charge");
         assert_eq!(staged_set.code(), Code::LimitExceeded);
         let expanded_set = original
-            .edit_with_limits(&limits, |transaction| {
-                transaction.set(
-                    scoped_sheet_query("sheet[name!=Sheet1]"),
-                    props! { "hidden" => true },
-                )?;
-                Ok::<_, litchi_ops::Error>(())
-            })
+            .edit_with_options(
+                litchi_ops::EditOptions::new().semantic_limits(limits),
+                |transaction| {
+                    transaction.set(
+                        scoped_sheet_query("sheet[name!=Sheet1]"),
+                        props! { "hidden" => true },
+                    )?;
+                    Ok::<_, litchi_ops::Error>(())
+                },
+            )
             .expect_err("sheet set enforces expansion limits");
         assert_eq!(expanded_set.code(), Code::LimitExceeded);
         assert_eq!(
@@ -729,11 +741,11 @@ fn worksheet_name_that_looks_like_a_cell_keeps_root_and_cell_paths_distinct() {
             })
             .expect("transaction routes sheet and cell paths independently");
         assert_eq!(
-            sheet_property(&transaction.file, SHEET2, "hidden").as_deref(),
+            sheet_property(transaction.file(), SHEET2, "hidden").as_deref(),
             Some("true")
         );
         assert_eq!(
-            cell_text(&transaction.file, "/A1/A1").as_deref(),
+            cell_text(transaction.file(), "/A1/A1").as_deref(),
             Some("transaction cell")
         );
 
@@ -747,11 +759,11 @@ fn worksheet_name_that_looks_like_a_cell_keeps_root_and_cell_paths_distinct() {
             )
             .expect("batch routes sheet and cell paths independently");
         assert_eq!(
-            sheet_property(&batched.file, SHEET2, "hidden").as_deref(),
+            sheet_property(batched.file(), SHEET2, "hidden").as_deref(),
             Some("true")
         );
         assert_eq!(
-            cell_text(&batched.file, "/A1/A1").as_deref(),
+            cell_text(batched.file(), "/A1/A1").as_deref(),
             Some("batch cell")
         );
     }

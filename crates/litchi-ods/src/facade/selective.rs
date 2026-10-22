@@ -40,7 +40,7 @@ use crate::{
     authoring::{ValidateHandler, is_office_namespace, validate_size},
     worksheet::{Sheet, codec::OFFICE_NAMESPACE, codec::TABLE_NAMESPACE},
 };
-use litchi_odf_common::{Error as OdfError, OpenOptions};
+use litchi_odf_common::{Error as OdfError, OpenOptions, XmlStreamLimits};
 
 const ODF_SPREADSHEET: &str = "application/vnd.oasis.opendocument.spreadsheet";
 const FAMILY_NAME: &str = "ODS";
@@ -176,6 +176,8 @@ pub struct SourceBackedSpreadsheetCatalog {
     /// Whether each worksheet's content repairs have joined `tolerance`; a
     /// worksheet re-read on the same source repairs the same defects.
     recorded: Box<[AtomicBool]>,
+    /// The caller-selected raw XML policy retained by this catalog owner.
+    xml_limits: XmlStreamLimits,
 }
 
 impl fmt::Debug for SourceBackedSpreadsheetCatalog {
@@ -356,6 +358,7 @@ impl SourceBackedSpreadsheetCatalog {
             meter,
             tolerance,
             recorded,
+            xml_limits: options.xml_limits_value(),
         })
     }
 
@@ -445,7 +448,7 @@ impl SourceBackedSpreadsheetCatalog {
         }
         let content = read_content(&self.package)?;
         let mut repairs = ToleranceReport::default();
-        let result = parse_selected_sheet(&content, index, &mut repairs);
+        let result = parse_selected_sheet(&content, index, &mut repairs, self.xml_limits);
         let result = prefer_current(self.source.as_ref(), self.source_version, result)?;
         // The selected table was parsed on its own, as sheet 0.
         repairs.locate_in_sheet(u32::try_from(index).unwrap_or(u32::MAX));
@@ -527,7 +530,10 @@ impl SourceBackedSpreadsheetCatalog {
         prefer_current(
             source.as_ref(),
             version,
-            crate::Package::from_materialized(package),
+            crate::Package::from_materialized(
+                package,
+                OpenOptions::new().xml_limits(self.xml_limits),
+            ),
         )
     }
 }
@@ -780,6 +786,7 @@ fn parse_selected_sheet(
     xml: &str,
     index: usize,
     tolerance: &mut ToleranceReport,
+    xml_limits: XmlStreamLimits,
 ) -> Result<Option<Sheet>> {
     let (range, wrapper) = find_sheet_range(xml, index)?;
     let Some(range) = range else {
@@ -789,7 +796,8 @@ fn parse_selected_sheet(
         Error::InvalidFormat("ODS selected worksheet source range is invalid".to_string())
     })?;
     let wrapped = wrapper.wrap(table)?;
-    let mut sheets = crate::worksheet::codec::parse_recording(&wrapped, tolerance)?;
+    let mut sheets =
+        crate::worksheet::codec::parse_recording_with_xml_limits(&wrapped, tolerance, xml_limits)?;
     if sheets.len() != 1 {
         return Err(Error::InvalidFormat(
             "ODS selected worksheet parser returned an unexpected sheet count".to_string(),

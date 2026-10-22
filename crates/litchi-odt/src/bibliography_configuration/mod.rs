@@ -20,8 +20,13 @@ mod tests;
 pub use model::{Configuration, Field, SortKey};
 
 #[cfg(test)]
-pub(crate) use codec::parse_bibliography_configuration_parts;
 pub(crate) use codec::{
-    parse_bibliography_configuration, parse_bibliography_configuration_parts_with_budget,
+    parse_bibliography_configuration, parse_bibliography_configuration_parts,
     remove_bibliography_configuration_xml, set_bibliography_configuration_xml,
+};
+pub(crate) use codec::{
+    parse_bibliography_configuration_parts_with_budget_and_xml_limits,
+    parse_bibliography_configuration_with_xml_limits,
+    remove_bibliography_configuration_xml_with_xml_limits,
+    set_bibliography_configuration_xml_with_xml_limits,
 };

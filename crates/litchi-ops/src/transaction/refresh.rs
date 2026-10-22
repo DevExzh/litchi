@@ -3,7 +3,9 @@
 
 use std::sync::Arc;
 
-use super::{Commit, Diagnostics, Edit, Error, History, LimitKind, Patch, SemanticLimits};
+use super::{
+    Commit, Diagnostics, Edit, EditOptions, Error, History, LimitKind, Patch, SemanticLimits,
+};
 use crate::refresh::{Options, Summary};
 use crate::{Code, File, Result};
 
@@ -22,7 +24,7 @@ impl File {
     ///
     /// [`Code::RefreshFailed`] for a table of contents whose page numbers
     /// are unknown under [`PageNumbers::Require`](crate::refresh::PageNumbers::Require),
-    /// [`Code::LimitExceeded`] past the default [`SemanticLimits`],
+    /// [`Code::LimitExceeded`] past the default [`EditOptions`],
     /// [`Code::DocumentProtected`] for a signed or locked file, and
     /// [`Code::UnsupportedCapability`] for other formats (and for formula
     /// cache write-back outside XLSX).
@@ -38,29 +40,30 @@ impl File {
     ///     .set("/Sheet1/A1", props! { "value" => 20 })?
     ///     .set("/Sheet1/A2", props! { "formula" => "A1*2" })?;
     /// let report = file.refresh(&Options::new())?;
-    /// assert_eq!(report.value.count(Status::Stale), 1);
-    /// assert!(report.patch.is_noop());
+    /// assert_eq!(report.value().count(Status::Stale), 1);
+    /// assert!(report.patch().is_noop());
     /// let written = file.refresh(&Options::new().write_cache(true))?;
-    /// assert_eq!(written.value.refreshed(), 1);
-    /// let again = written.file.refresh(&Options::new().write_cache(true))?;
-    /// assert_eq!(again.value.count(Status::Unchanged), 1);
-    /// assert!(again.patch.is_noop());
+    /// assert_eq!(written.value().refreshed(), 1);
+    /// let again = written.file().refresh(&Options::new().write_cache(true))?;
+    /// assert_eq!(again.value().count(Status::Unchanged), 1);
+    /// assert!(again.patch().is_noop());
     /// # }
     /// # Ok::<(), litchi_ops::Error>(())
     /// ```
     pub fn refresh(&self, options: &Options) -> Result<Commit<Summary>> {
-        self.refresh_with_limits(options, &SemanticLimits::default())
+        self.refresh_with_options(options, EditOptions::default())
     }
 
-    /// [`Self::refresh`] under caller-selected transaction limits.
+    /// [`Self::refresh`] under caller-selected [`EditOptions`].
     ///
     /// # Errors
     /// As [`Self::refresh`].
-    pub fn refresh_with_limits(
+    pub fn refresh_with_options(
         &self,
         options: &Options,
-        limits: &SemanticLimits,
+        edit_options: EditOptions,
     ) -> Result<Commit<Summary>> {
+        let limits = &edit_options.semantic_limits_value();
         let result = (|| -> Result<Commit<Summary>> {
             #[cfg(feature = "docx")]
             let admitted = matches!(self, File::Docx(_));
@@ -103,12 +106,7 @@ impl File {
                 inverse: false,
             };
             patch.check_sources()?;
-            Ok(Commit {
-                file,
-                patch,
-                diagnostics,
-                value: summary,
-            })
+            Ok(Commit::new(file, patch, diagnostics, summary))
         })()
         .map_err(|error: crate::Error| {
             if error.item().is_some() {

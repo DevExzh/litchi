@@ -29,7 +29,10 @@ fn docx_detect_then_open_indexes_twice_and_prepared_open_indexes_once() {
 
     let two_call = archive_constructions(|| {
         assert_eq!(
-            crate::detection_smart::detect_file_format(&path),
+            crate::detection_smart::detect_file_format(
+                &path,
+                &crate::detection_smart::SourceLimits::default(),
+            ),
             Some(FileFormat::Docx)
         );
         let file = crate::open(&path).expect("open");
@@ -37,7 +40,11 @@ fn docx_detect_then_open_indexes_twice_and_prepared_open_indexes_once() {
     });
 
     let single_call = archive_constructions(|| {
-        let detected = crate::detection_smart::detect_and_prepare(&path).expect("detect");
+        let detected = crate::detection_smart::detect_and_prepare(
+            &path,
+            &crate::detection_smart::SourceLimits::default(),
+        )
+        .expect("detect");
         assert_eq!(detected.format(), FileFormat::Docx);
         assert!(detected.is_prepared(), "prepared handle");
         let file = crate::open_prepared(detected).expect("adopt");
@@ -61,7 +68,10 @@ fn pptx_detect_then_open_indexes_twice_and_prepared_open_indexes_once() {
 
     let two_call = archive_constructions(|| {
         assert_eq!(
-            crate::detection_smart::detect_file_format(&path),
+            crate::detection_smart::detect_file_format(
+                &path,
+                &crate::detection_smart::SourceLimits::default(),
+            ),
             Some(FileFormat::Pptx)
         );
         let file = crate::open(&path).expect("open");
@@ -69,7 +79,11 @@ fn pptx_detect_then_open_indexes_twice_and_prepared_open_indexes_once() {
     });
 
     let single_call = archive_constructions(|| {
-        let detected = crate::detection_smart::detect_and_prepare(&path).expect("detect");
+        let detected = crate::detection_smart::detect_and_prepare(
+            &path,
+            &crate::detection_smart::SourceLimits::default(),
+        )
+        .expect("detect");
         assert_eq!(detected.format(), FileFormat::Pptx);
         assert!(detected.is_prepared(), "prepared handle");
         let file = crate::open_prepared(detected).expect("adopt");
@@ -93,7 +107,10 @@ fn xlsx_detect_then_open_indexes_twice_and_prepared_open_indexes_once() {
 
     let two_call = archive_constructions(|| {
         assert_eq!(
-            crate::detection_smart::detect_file_format(&path),
+            crate::detection_smart::detect_file_format(
+                &path,
+                &crate::detection_smart::SourceLimits::default(),
+            ),
             Some(FileFormat::Xlsx)
         );
         let file = crate::open(&path).expect("open");
@@ -101,7 +118,11 @@ fn xlsx_detect_then_open_indexes_twice_and_prepared_open_indexes_once() {
     });
 
     let single_call = archive_constructions(|| {
-        let detected = crate::detection_smart::detect_and_prepare(&path).expect("detect");
+        let detected = crate::detection_smart::detect_and_prepare(
+            &path,
+            &crate::detection_smart::SourceLimits::default(),
+        )
+        .expect("detect");
         assert_eq!(detected.format(), FileFormat::Xlsx);
         assert!(detected.is_prepared(), "prepared handle");
         let file = crate::open_prepared(detected).expect("adopt");
@@ -136,8 +157,11 @@ fn non_ooxml_inputs_are_still_classified_without_a_prepared_handle() {
     cases.push((fixture("odf/corpus/calc-formulas.ods"), FileFormat::Ods));
 
     for (path, expected) in cases {
-        let detected = crate::detection_smart::detect_and_prepare(&path)
-            .unwrap_or_else(|| panic!("{} should be classified", path.display()));
+        let detected = crate::detection_smart::detect_and_prepare(
+            &path,
+            &crate::detection_smart::SourceLimits::default(),
+        )
+        .unwrap_or_else(|| panic!("{} should be classified", path.display()));
         assert_eq!(detected.format(), expected, "{}", path.display());
         assert!(
             !detected.is_prepared(),
@@ -145,7 +169,10 @@ fn non_ooxml_inputs_are_still_classified_without_a_prepared_handle() {
             path.display()
         );
         assert_eq!(
-            crate::detection_smart::detect_file_format(&path),
+            crate::detection_smart::detect_file_format(
+                &path,
+                &crate::detection_smart::SourceLimits::default(),
+            ),
             Some(expected),
             "{} must agree with the neutral detector",
             path.display()
@@ -158,8 +185,20 @@ fn non_ooxml_inputs_are_still_classified_without_a_prepared_handle() {
 #[test]
 fn a_non_office_file_is_rejected_by_both_detectors() {
     let path = fixture("images/png/lena.png");
-    assert!(crate::detection_smart::detect_file_format(&path).is_none());
-    assert!(crate::detection_smart::detect_and_prepare(&path).is_none());
+    assert!(
+        crate::detection_smart::detect_file_format(
+            &path,
+            &crate::detection_smart::SourceLimits::default(),
+        )
+        .is_none()
+    );
+    assert!(
+        crate::detection_smart::detect_and_prepare(
+            &path,
+            &crate::detection_smart::SourceLimits::default(),
+        )
+        .is_none()
+    );
 }
 
 /// The prepared handle refuses a source rewritten between preparation and
@@ -172,7 +211,11 @@ fn a_prepared_handle_refuses_a_source_rewritten_before_adoption() {
     let docx = std::fs::read(fixture("ooxml/docx/comment.docx")).expect("fixture");
     std::fs::write(&path, &docx).expect("write fixture");
 
-    let detected = crate::detection_smart::detect_and_prepare(&path).expect("detect");
+    let detected = crate::detection_smart::detect_and_prepare(
+        &path,
+        &crate::detection_smart::SourceLimits::default(),
+    )
+    .expect("detect");
     assert_eq!(detected.format(), FileFormat::Docx);
     assert!(detected.is_prepared(), "prepared handle");
 
@@ -203,7 +246,11 @@ fn a_prepared_handle_refuses_a_source_rewritten_before_adoption() {
 #[cfg(all(feature = "docx", feature = "pptx"))]
 fn a_prepared_docx_handle_is_refused_by_the_presentation_opener() {
     let path = fixture("ooxml/docx/comment.docx");
-    let detected = crate::detection_smart::detect_and_prepare(&path).expect("detect");
+    let detected = crate::detection_smart::detect_and_prepare(
+        &path,
+        &crate::detection_smart::SourceLimits::default(),
+    )
+    .expect("detect");
     assert!(detected.is_prepared(), "prepared handle");
     let file = crate::open_prepared(detected).expect("adopt");
     let Err(error) = file.presentation() else {

@@ -1,0 +1,683 @@
+{
+  "schema": "litchi.w8.odf-semantic-options.v1",
+  "parent": "4d464d60b7bc26b59e31a85981dd6aab8d7e3894",
+  "status": "source candidate; integrated native qualification and final gate remain required",
+  "source_files": [
+    {
+      "path": "crates/litchi-odb/src/facade/mod.rs",
+      "bytes": 26751,
+      "sha256": "dd9e25e1048d8450e24896838d5952b87d1e189618647ce35d1a0c0361d6902b"
+    },
+    {
+      "path": "crates/litchi-odc/src/facade/mod.rs",
+      "bytes": 83993,
+      "sha256": "66b0b08d1d80ac2d3cefbda7998d65ecd56724fc3f3cd68cc6b36ec1f83b9e72"
+    },
+    {
+      "path": "crates/litchi-odf-formula/src/facade/owner.rs",
+      "bytes": 9655,
+      "sha256": "84b5bca4038fac9b546f209d97979e1df1df9de0075e414624af48b74412e54e"
+    },
+    {
+      "path": "crates/litchi-odg/src/package/snapshot.rs",
+      "bytes": 518306,
+      "sha256": "04ef0ba3b93684d667a3e067f16d730df7f58f066a3d7c47ed7f8c24935d08d5"
+    },
+    {
+      "path": "crates/litchi-odi/src/facade/mod.rs",
+      "bytes": 49616,
+      "sha256": "dd8eb6dc97081c8496b4808bf97bea840b1226b3daf4b7fc988fd11f6addd54b"
+    },
+    {
+      "path": "crates/litchi-odp/src/authoring/edit.rs",
+      "bytes": 181302,
+      "sha256": "90798d70a6b35ccbc80aecdcbe2f2c048cabf50b7b14a95b66f546d2089ce11a"
+    },
+    {
+      "path": "crates/litchi-ods/src/document.rs",
+      "bytes": 160796,
+      "sha256": "bca699accd2c93bb23d04cab68fb56c3ac8b367d7d53ef9c8a2d11154476db30"
+    },
+    {
+      "path": "crates/litchi-odt/src/flat/mod.rs",
+      "bytes": 31583,
+      "sha256": "55415a43bc36f800e9e0cc887347adc2df0ed83a42bdd74811c0bd7e70dad5b5"
+    },
+    {
+      "path": "crates/litchi-odt/src/transaction.rs",
+      "bytes": 264536,
+      "sha256": "deea75c29e7e7d3ad84ac9e131bad2e6d4e08e288a419c27b5b2ddc2b8bd5524"
+    },
+    {
+      "path": "crates/litchi-odt/tests/flat_family_readers.rs",
+      "bytes": 7796,
+      "sha256": "fd8d06c73471168c826ee201d6918439376330d3710717fa05ad695031f16597"
+    },
+    {
+      "path": "crates/litchi-ops/src/format/odf_tree.rs",
+      "bytes": 32384,
+      "sha256": "17023f4c663baac051f4af0cc61236d241191c7e69253f1736f201019b29c3d7"
+    },
+    {
+      "path": "crates/litchi-ops/src/format/odp.rs",
+      "bytes": 29863,
+      "sha256": "81ba262310338fa02179687f07b5c450f7d582dc0ad675945279e3171616bf14"
+    },
+    {
+      "path": "crates/litchi-ops/src/format/ods.rs",
+      "bytes": 18832,
+      "sha256": "05a85de97402c82ec7ecf912dfe9cb23f1194bbbcbab075d3840476b5757debb"
+    },
+    {
+      "path": "crates/litchi-ops/src/format/odt.rs",
+      "bytes": 25929,
+      "sha256": "8bd1011d71e465bacbc233adbe33bac794e5a3d4c0b40245c469ad5dfd4324dc"
+    },
+    {
+      "path": "crates/litchi-ops/src/open/path.rs",
+      "bytes": 22193,
+      "sha256": "296e3696adfd304526a463182c30d94d398b45a309b2f98a4e1674f237180042"
+    },
+    {
+      "path": "crates/litchi-ops/src/options.rs",
+      "bytes": 22578,
+      "sha256": "6024adf849edaf9c8589567673df553d6c4c6372d96c15c44a0c8430c8fc2908"
+    },
+    {
+      "path": "crates/litchi-ops/src/tests.rs",
+      "bytes": 7443,
+      "sha256": "860d5cebf945b9948c46dee96137d9de233feb0f28ec557a92ed805379e150b0"
+    },
+    {
+      "path": "crates/litchi-ops/src/tests/odf_policy.rs",
+      "bytes": 5435,
+      "sha256": "1f18694c08c96817fc16578baf4fd0684fc549a7413fa13c50de41539e5ca92b"
+    },
+    {
+      "path": "crates/litchi-oth/src/facade/mod.rs",
+      "bytes": 235033,
+      "sha256": "025ca9e74b724b1b132d36f41dd03c01f8c0767cccdaef5e9e52848b186b2b7a"
+    }
+  ],
+  "earlier_attempts": [
+    {
+      "attempt": 1,
+      "exit": 101,
+      "reason": "Compile failure: the ODP flat republication helper referenced ingress options outside their scope; fixed by using the retained flat owner options.",
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "litchi-ops",
+        "--all-features",
+        "--lib",
+        "tests::odf_policy"
+      ],
+      "logs": [
+        {
+          "path": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/odf-semantic-v1/fmt.log",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/odf-semantic-v1/regression.log",
+          "bytes": 1716,
+          "sha256": "c93d6a7468143a73830e1b564d960abddc64227e319371a2aab06d0c62863238"
+        }
+      ]
+    },
+    {
+      "attempt": 2,
+      "exit": 0,
+      "reason": "Initial two facade regressions passed before adding prepared-index identity and native flat reader typed-boundary coverage.",
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "litchi-ops",
+        "--all-features",
+        "--lib",
+        "tests::odf_policy"
+      ],
+      "logs": [
+        {
+          "path": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/odf-semantic-v2/fmt.log",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/odf-semantic-v2/regression.log",
+          "bytes": 705,
+          "sha256": "d3d8b88b81c55e95bcd127919bf0b5a96737379efaf605ebfa075cdc470050f2"
+        }
+      ]
+    }
+  ],
+  "validation": [
+    {
+      "attempt": "odf-semantic-v3",
+      "checks": [
+        {
+          "command": [
+            "cargo",
+            "fmt",
+            "-p",
+            "litchi-ops",
+            "-p",
+            "litchi-odt",
+            "-p",
+            "litchi-ods",
+            "-p",
+            "litchi-odp",
+            "-p",
+            "litchi-oth",
+            "-p",
+            "litchi-odg",
+            "-p",
+            "litchi-odc",
+            "-p",
+            "litchi-odi",
+            "-p",
+            "litchi-odb",
+            "-p",
+            "litchi-odf-formula"
+          ],
+          "exit": 0,
+          "seconds": 5.540123563027009,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/odf-semantic-v3/check-0.log",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "command": [
+            "cargo",
+            "test",
+            "--offline",
+            "--locked",
+            "-p",
+            "litchi-ops",
+            "--all-features",
+            "--lib",
+            "tests::odf_policy"
+          ],
+          "exit": 0,
+          "seconds": 38.793151122983545,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/odf-semantic-v3/check-1.log",
+          "bytes": 594,
+          "sha256": "85e9397564736127aaf854605621bf590f77c74e093fdb96df6a008b243de50a"
+        },
+        {
+          "command": [
+            "cargo",
+            "test",
+            "--offline",
+            "--locked",
+            "-p",
+            "litchi-odt",
+            "--all-features",
+            "--test",
+            "flat_family_readers"
+          ],
+          "exit": 0,
+          "seconds": 26.015479148947634,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/odf-semantic-v3/check-2.log",
+          "bytes": 2529,
+          "sha256": "d6e045ba1cfcb7005903088248e5e56e24e6eb9005dc23905682bb2c4027b52c"
+        },
+        {
+          "command": [
+            "cargo",
+            "test",
+            "--offline",
+            "--locked",
+            "-p",
+            "litchi-ops",
+            "-p",
+            "litchi-odt",
+            "-p",
+            "litchi-ods",
+            "-p",
+            "litchi-odp",
+            "-p",
+            "litchi-oth",
+            "-p",
+            "litchi-odg",
+            "-p",
+            "litchi-odc",
+            "-p",
+            "litchi-odi",
+            "-p",
+            "litchi-odb",
+            "-p",
+            "litchi-odf-formula",
+            "--all-features",
+            "--lib"
+          ],
+          "exit": 0,
+          "seconds": 57.69749973004218,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/odf-semantic-v3/check-3.log",
+          "bytes": 245804,
+          "sha256": "49a5e9c19a958b602ba41f7fe73b3099a52f38e00bf477541d10ad8c9951953b"
+        },
+        {
+          "command": [
+            "cargo",
+            "clippy",
+            "--offline",
+            "--locked",
+            "-p",
+            "litchi-ops",
+            "-p",
+            "litchi-odt",
+            "-p",
+            "litchi-ods",
+            "-p",
+            "litchi-odp",
+            "-p",
+            "litchi-oth",
+            "-p",
+            "litchi-odg",
+            "-p",
+            "litchi-odc",
+            "-p",
+            "litchi-odi",
+            "-p",
+            "litchi-odb",
+            "-p",
+            "litchi-odf-formula",
+            "--all-features",
+            "--all-targets",
+            "--",
+            "-D",
+            "warnings"
+          ],
+          "exit": 0,
+          "seconds": 163.6154852709733,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/odf-semantic-v3/check-4.log",
+          "bytes": 1187,
+          "sha256": "0548f22a5ab1ee77f366e37caebf0dcab62b3946e9b043bfba72f3df86c0bfb9"
+        }
+      ]
+    },
+    {
+      "attempt": "odf-semantic-v4",
+      "checks": [
+        {
+          "command": [
+            "cargo",
+            "test",
+            "--offline",
+            "--locked",
+            "-p",
+            "litchi-ods",
+            "--all-features"
+          ],
+          "exit": 0,
+          "seconds": 97.64971107500605,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/odf-semantic-v4/check-0.log",
+          "bytes": 180960,
+          "sha256": "bcd5d248fbf798ff9c50e73a6ba7d3a0afe654616d897823e455f10cef3b43ee"
+        },
+        {
+          "command": [
+            "cargo",
+            "test",
+            "--offline",
+            "--locked",
+            "-p",
+            "litchi-ops",
+            "-p",
+            "litchi-odt",
+            "-p",
+            "litchi-ods",
+            "-p",
+            "litchi-odp",
+            "-p",
+            "litchi-oth",
+            "-p",
+            "litchi-odg",
+            "-p",
+            "litchi-odc",
+            "-p",
+            "litchi-odi",
+            "-p",
+            "litchi-odb",
+            "-p",
+            "litchi-odf-formula",
+            "--all-features",
+            "--doc"
+          ],
+          "exit": 0,
+          "seconds": 48.649214985081926,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/odf-semantic-v4/check-1.log",
+          "bytes": 29632,
+          "sha256": "0c34ca180017d837f439ce2472c9f6f518cc3fdf5fa7fbf2ef8f210cdf795a9d"
+        },
+        {
+          "command": [
+            "cargo",
+            "clippy",
+            "--offline",
+            "--locked",
+            "-p",
+            "litchi-ops",
+            "--no-default-features",
+            "--features",
+            "odt",
+            "--all-targets",
+            "--",
+            "-D",
+            "warnings"
+          ],
+          "exit": 0,
+          "seconds": 24.481537229032256,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/odf-semantic-v4/check-2.log",
+          "bytes": 283,
+          "sha256": "1aaf0754e5bde33852d764bce070dbf6a7d39e1301f3e473497b8ae11ac1bf9c"
+        },
+        {
+          "command": [
+            "cargo",
+            "clippy",
+            "--offline",
+            "--locked",
+            "-p",
+            "litchi-ops",
+            "--no-default-features",
+            "--features",
+            "ods",
+            "--all-targets",
+            "--",
+            "-D",
+            "warnings"
+          ],
+          "exit": 0,
+          "seconds": 25.242292102077045,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/odf-semantic-v4/check-3.log",
+          "bytes": 283,
+          "sha256": "f61f7074bd432647b88ad09b8a3ead91a18a836bbbc3b76dfb5557f38cb8acc3"
+        },
+        {
+          "command": [
+            "cargo",
+            "clippy",
+            "--offline",
+            "--locked",
+            "-p",
+            "litchi-ops",
+            "--no-default-features",
+            "--features",
+            "odp",
+            "--all-targets",
+            "--",
+            "-D",
+            "warnings"
+          ],
+          "exit": 0,
+          "seconds": 17.174987324979156,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/odf-semantic-v4/check-4.log",
+          "bytes": 283,
+          "sha256": "062fef4bd8fc5a04fab1d9602260306d2ef087c2a5e69df6d7f0e77ff758681c"
+        },
+        {
+          "command": [
+            "cargo",
+            "clippy",
+            "--offline",
+            "--locked",
+            "-p",
+            "litchi-ops",
+            "--no-default-features",
+            "--features",
+            "odg",
+            "--all-targets",
+            "--",
+            "-D",
+            "warnings"
+          ],
+          "exit": 0,
+          "seconds": 14.910671181045473,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/odf-semantic-v4/check-5.log",
+          "bytes": 283,
+          "sha256": "3417c62cb52acb58230105ca5745380724b3bc7b36d5d7673fea81e0a413e551"
+        },
+        {
+          "command": [
+            "cargo",
+            "clippy",
+            "--offline",
+            "--locked",
+            "-p",
+            "litchi-ops",
+            "--no-default-features",
+            "--features",
+            "odc",
+            "--all-targets",
+            "--",
+            "-D",
+            "warnings"
+          ],
+          "exit": 0,
+          "seconds": 14.149862046004273,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/odf-semantic-v4/check-6.log",
+          "bytes": 283,
+          "sha256": "fcaabb9deea4def5729b023551e0461e8e53c7904e7b59ca1738366888aec5a5"
+        },
+        {
+          "command": [
+            "cargo",
+            "clippy",
+            "--offline",
+            "--locked",
+            "-p",
+            "litchi-ops",
+            "--no-default-features",
+            "--features",
+            "odf-formula",
+            "--all-targets",
+            "--",
+            "-D",
+            "warnings"
+          ],
+          "exit": 0,
+          "seconds": 14.1897997839842,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/odf-semantic-v4/check-7.log",
+          "bytes": 299,
+          "sha256": "29ad19d5e3d7763fd1713b2f9ec00bffd05b5b1f1447c3ab32c9df145887432f"
+        },
+        {
+          "command": [
+            "cargo",
+            "check",
+            "--offline",
+            "--locked",
+            "-p",
+            "litchi-ops",
+            "--no-default-features",
+            "--all-targets"
+          ],
+          "exit": 0,
+          "seconds": 9.74152370588854,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/odf-semantic-v4/check-8.log",
+          "bytes": 171,
+          "sha256": "166ab92215962785f0ee1d3c98fcc1b38edfb2b2750315378a1af7dfd476498e"
+        },
+        {
+          "command": [
+            "cargo",
+            "check",
+            "--offline",
+            "--locked",
+            "-p",
+            "litchi",
+            "-p",
+            "litchi-cli",
+            "-p",
+            "pyo3-litchi",
+            "--all-features",
+            "--all-targets"
+          ],
+          "exit": 101,
+          "seconds": 0.17544660496059805,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/odf-semantic-v4/check-9.log",
+          "bytes": 73,
+          "sha256": "231888a0f7181a1baae40eb8c2f8049e58ce2e019a7e75426d2bb67be17c2df0"
+        }
+      ]
+    },
+    {
+      "attempt": "odf-semantic-v5",
+      "checks": [
+        {
+          "command": [
+            "cargo",
+            "check",
+            "--offline",
+            "--locked",
+            "-p",
+            "litchi",
+            "-p",
+            "litchi-cli",
+            "-p",
+            "litchi-py",
+            "--all-features",
+            "--all-targets"
+          ],
+          "exit": 0,
+          "seconds": 109.61582593491767,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/odf-semantic-v5/check-0.log",
+          "bytes": 2934,
+          "sha256": "f60a8c4b21d930803b5b7fd9d7f27289ca93f2e49cb1e3bdc0389f6617fcc98c"
+        },
+        {
+          "command": [
+            "cargo",
+            "fmt",
+            "--all",
+            "--",
+            "--check"
+          ],
+          "exit": 0,
+          "seconds": 26.62634011998307,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/odf-semantic-v5/check-1.log",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "command": [
+            "python3",
+            "tools/check_api_glossary.py",
+            "--profile",
+            "odt",
+            "--target-dir",
+            "/home/zhuhe/code/litchi-worktrees/unified-ops-api/target"
+          ],
+          "exit": 0,
+          "seconds": 16.868414604919963,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/odf-semantic-v5/check-2.log",
+          "bytes": 1761,
+          "sha256": "207ba8268c8bb0c517f3bbf7d86691713e45f0666f455d858a85c9f73163f625"
+        },
+        {
+          "command": [
+            "python3",
+            "tools/check_api_glossary.py",
+            "--profile",
+            "odp",
+            "--target-dir",
+            "/home/zhuhe/code/litchi-worktrees/unified-ops-api/target"
+          ],
+          "exit": 0,
+          "seconds": 2.249049650039524,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/odf-semantic-v5/check-3.log",
+          "bytes": 295,
+          "sha256": "f8280590bd8458e0786b0c78912585d107b7ff89cd7d67b7f34207eaf3779a77"
+        },
+        {
+          "command": [
+            "python3",
+            "tools/check_api_glossary.py",
+            "--profile",
+            "ops-all",
+            "--target-dir",
+            "/home/zhuhe/code/litchi-worktrees/unified-ops-api/target"
+          ],
+          "exit": 0,
+          "seconds": 166.69260125397705,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/odf-semantic-v5/check-4.log",
+          "bytes": 8202,
+          "sha256": "1b9d136f6efd926427308ba25f49e3cb900a0d3d9d9c5df80b5ba46e2f2b230c"
+        }
+      ]
+    },
+    {
+      "attempt": "odf-semantic-policy-checks",
+      "checks": [
+        {
+          "command": [
+            "python3",
+            "tools/officecli_capability_delta.py",
+            "--check"
+          ],
+          "exit": 0,
+          "seconds": 0.6754283460322767,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/odf-semantic-policy-checks/check-0.log",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "command": [
+            "python3",
+            "tools/officecli_corpus.py",
+            "--check"
+          ],
+          "exit": 0,
+          "seconds": 1.0500679470133036,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/odf-semantic-policy-checks/check-1.log",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "command": [
+            "python3",
+            "tools/check_crate_boundaries.py"
+          ],
+          "exit": 0,
+          "seconds": 282.6931916860631,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/odf-semantic-policy-checks/check-2.log",
+          "bytes": 565,
+          "sha256": "e302003e0f20687b6aac64aff19a826e6fd062e168a7ed12a3a2ecf1ddd75334"
+        },
+        {
+          "command": [
+            "git",
+            "diff",
+            "--check"
+          ],
+          "exit": 0,
+          "seconds": 0.08969626505859196,
+          "log": "/home/zhuhe/code/litchi-worktrees/.coord/w8-part-a-integration/odf-semantic-policy-checks/check-3.log",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    }
+  ],
+  "validation_note": "v4 check-9 named the directory pyo3-litchi instead of package litchi-py and exited before compilation. v5 check-0 corrects the command and passes. ODS full-suite counts include its library and doc targets; suite counts are not added as distinct tests. Corpus --check validates tracked dispositions, not a new corpus execution.",
+  "counts": {
+    "affected_library_tests_passed": 2752,
+    "ops_library_tests_included": 965,
+    "full_ods_tests_passed": 1768,
+    "full_ods_ignored": 0,
+    "affected_doctests_passed": 299
+  },
+  "remaining": [
+    "Final W4/W4b integration and matched File qualification",
+    "Remaining public ODF raw policy audit",
+    "Full corpus execution/error disposition review and final workspace gate"
+  ]
+}

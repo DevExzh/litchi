@@ -24,7 +24,7 @@ use litchi_core::{
 /// [`Package::apply`]: typed limits plus the common-core payload.
 pub use litchi_odf_common::Error;
 use litchi_odf_common::Error as PackageError;
-pub use litchi_odf_common::{LimitKind, OpenOptions};
+pub use litchi_odf_common::{LimitKind, OpenOptions, XmlStreamLimits};
 use litchi_odf_common::{
     core::{PackageWriter, Profile, XmlSourcePart, XmlSplicePublication},
     package::{Addition, raw_identical_members, rebuild_package},
@@ -181,6 +181,9 @@ pub struct Package {
     // publication handoffs do not rebuild the ZIP index for every operation.
     package: Arc<Archive>,
     limits: Limits,
+    /// The caller-selected raw XML policy retained for projections and
+    /// replayed parses.  It is independent of the transaction limits above.
+    xml_limits: XmlStreamLimits,
     /// Whether `package` retains a caller credential (password ingress).
     credentialed: bool,
     /// The read-only projection of exactly these bytes, parsed at open and
@@ -231,7 +234,7 @@ impl Package {
 
     /// Adopt bytes a metadata commit published, under this package's limits.
     pub(crate) fn adopt_metadata_bytes(&self, bytes: Vec<u8>) -> Result<Self> {
-        Self::from_vec_with(bytes, self.limits)
+        Self::from_vec_with(bytes, self.limits, self.xml_limits)
     }
 
     /// Create the minimal valid spreadsheet: one empty worksheet named
@@ -296,7 +299,11 @@ impl Package {
             password.as_str(),
             options,
         )?;
-        Self::from_opened(Archive::from_owned_package(owned)?, true, options)
+        Self::from_opened(
+            Archive::from_owned_package_with_xml_limits(owned, options.xml_limits_value())?,
+            true,
+            options,
+        )
     }
 
     /// Open an ODS package from bytes (the bytes are copied).
@@ -324,12 +331,16 @@ impl Package {
         // once; a matching ODS result transfers its indexed archive and a
         // rejected probe recovers the allocation for the ordinary owner.
         let archive = match litchi_odf_common::detect::prepared_or_original(bytes, limits) {
-            Ok(prepared) => Archive::from_prepared_package(prepared)?,
-            Err(bytes) => Archive::from_owned_package(
+            Ok(prepared) => Archive::from_prepared_package_with_xml_limits(
+                prepared,
+                options.xml_limits_value(),
+            )?,
+            Err(bytes) => Archive::from_owned_package_with_xml_limits(
                 litchi_odf_common::OwnedPackage::from_bytes_with_options(
                     bytes,
                     OpenOptions::new().source_limits(limits),
                 )?,
+                options.xml_limits_value(),
             )?,
         };
         Self::from_opened(archive, false, options)
@@ -366,7 +377,11 @@ impl Package {
             password.as_str(),
             OpenOptions::new().source_limits(limits),
         )?;
-        Self::from_opened(Archive::from_owned_package(owned)?, true, options)
+        Self::from_opened(
+            Archive::from_owned_package_with_xml_limits(owned, options.xml_limits_value())?,
+            true,
+            options,
+        )
     }
 
     /// Open an ODS package from a reader with the default [`OpenOptions`].
@@ -389,7 +404,11 @@ impl Package {
         options: OpenOptions,
     ) -> std::result::Result<Self, PackageError> {
         let owned = litchi_odf_common::OwnedPackage::from_reader_with_options(reader, options)?;
-        Self::from_opened(Archive::from_owned_package(owned)?, false, options)
+        Self::from_opened(
+            Archive::from_owned_package_with_xml_limits(owned, options.xml_limits_value())?,
+            false,
+            options,
+        )
     }
 
     /// Adopt a packaged ODF result prepared by smart detection, reusing its
@@ -402,6 +421,20 @@ impl Package {
     pub fn from_prepared_package(
         prepared: litchi_odf_common::PreparedPackage,
     ) -> std::result::Result<Self, PackageError> {
+        Self::from_prepared_package_with_options(prepared, OpenOptions::new())
+    }
+
+    /// Adopt a prepared package under the semantic limits in `options`.
+    /// The source limits were applied when the archive was prepared; its
+    /// existing index and source allocation are reused.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::from_prepared_package`], plus a typed semantic limit failure.
+    pub fn from_prepared_package_with_options(
+        prepared: litchi_odf_common::PreparedPackage,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, PackageError> {
         if prepared.format() != litchi_core::detection::FileFormat::Ods {
             return Err(CoreError::UnexpectedFormat {
                 detected: prepared.format(),
@@ -409,9 +442,9 @@ impl Package {
             .into());
         }
         Self::from_opened(
-            Archive::from_prepared_package(prepared)?,
+            Archive::from_prepared_package_with_xml_limits(prepared, options.xml_limits_value())?,
             false,
-            OpenOptions::new(),
+            options,
         )
     }
 
@@ -431,7 +464,8 @@ impl Package {
             }
         }
         let archive = Arc::new(archive);
-        let workbook = crate::Workbook::from_shared_package(Arc::clone(&archive))?;
+        let xml_limits = options.xml_limits_value();
+        let workbook = crate::Workbook::from_shared_package(Arc::clone(&archive), xml_limits)?;
         if !semantic.is_default() {
             semantic.check(
                 litchi_odf_common::SemanticLimitKind::Units,
@@ -442,6 +476,7 @@ impl Package {
             source: archive.shared_bytes_owner(),
             package: archive,
             limits: Limits::default(),
+            xml_limits,
             credentialed,
             workbook: Arc::new(OnceLock::from(workbook)),
         })
@@ -449,11 +484,14 @@ impl Package {
 
     /// Adopt a package materialized from a source-backed owner, which may
     /// retain the caller's credential for reading encrypted parts.
-    pub(crate) fn from_materialized(owned: litchi_odf_common::OwnedPackage) -> Result<Self> {
+    pub(crate) fn from_materialized(
+        owned: litchi_odf_common::OwnedPackage,
+        options: OpenOptions,
+    ) -> Result<Self> {
         Ok(Self::from_opened(
-            Archive::from_owned_package(owned)?,
+            Archive::from_owned_package_with_xml_limits(owned, options.xml_limits_value())?,
             true,
-            OpenOptions::new(),
+            options,
         )?)
     }
 
@@ -462,11 +500,15 @@ impl Package {
     /// is parsed on first use.
     pub(crate) fn from_authored(bytes: Vec<u8>) -> Result<Self> {
         let source = Arc::new(bytes);
-        let package = Arc::new(Archive::from_shared_bytes(Arc::clone(&source))?);
+        let package = Arc::new(Archive::from_shared_bytes_with_xml_limits(
+            Arc::clone(&source),
+            XmlStreamLimits::owner_default_value(),
+        )?);
         Ok(Self {
             source,
             package,
             limits: Limits::default(),
+            xml_limits: XmlStreamLimits::owner_default_value(),
             credentialed: false,
             workbook: Arc::new(OnceLock::new()),
         })
@@ -474,13 +516,17 @@ impl Package {
 
     /// Reopen complete bytes as a validated, credential-free transaction
     /// owner under explicit bounds.
-    pub(crate) fn from_vec_with(source: Vec<u8>, limits: Limits) -> Result<Self> {
-        Self::from_arc(Arc::new(source), limits)
+    pub(crate) fn from_vec_with(
+        source: Vec<u8>,
+        limits: Limits,
+        xml_limits: XmlStreamLimits,
+    ) -> Result<Self> {
+        Self::from_arc(Arc::new(source), limits, xml_limits)
     }
 
-    fn from_arc(source: Arc<Vec<u8>>, limits: Limits) -> Result<Self> {
+    fn from_arc(source: Arc<Vec<u8>>, limits: Limits, xml_limits: XmlStreamLimits) -> Result<Self> {
         validate_package_size(source.len(), limits)?;
-        let package = Archive::from_shared_bytes(Arc::clone(&source))?;
+        let package = Archive::from_shared_bytes_with_xml_limits(Arc::clone(&source), xml_limits)?;
         validate_resource_count(&package, limits)?;
         if package
             .package()
@@ -493,18 +539,23 @@ impl Package {
             );
         }
         let package = Arc::new(package);
-        let workbook = crate::Workbook::from_shared_package(Arc::clone(&package))?;
+        let workbook = crate::Workbook::from_shared_package(Arc::clone(&package), xml_limits)?;
         Ok(Self {
             source,
             package,
             limits,
+            xml_limits,
             credentialed: false,
             workbook: Arc::new(OnceLock::from(workbook)),
         })
     }
 
     /// Adopt an already credential-free immutable package owner.
-    pub(crate) fn from_shared_package(package: Arc<Archive>, limits: Limits) -> Result<Self> {
+    pub(crate) fn from_shared_package(
+        package: Arc<Archive>,
+        limits: Limits,
+        xml_limits: XmlStreamLimits,
+    ) -> Result<Self> {
         let source = package.shared_bytes_owner();
         validate_package_size(source.len(), limits)?;
         validate_resource_count(package.as_ref(), limits)?;
@@ -523,11 +574,12 @@ impl Package {
                 "ODS encrypted sources require an explicit credential-retaining transaction",
             );
         }
-        let workbook = crate::Workbook::from_shared_package(Arc::clone(&package))?;
+        let workbook = crate::Workbook::from_shared_package(Arc::clone(&package), xml_limits)?;
         Ok(Self {
             source,
             package,
             limits,
+            xml_limits,
             credentialed: false,
             workbook: Arc::new(OnceLock::from(workbook)),
         })
@@ -544,7 +596,8 @@ impl Package {
         if let Some(workbook) = self.workbook.get() {
             return Ok(workbook.clone());
         }
-        let workbook = crate::Workbook::from_shared_package(Arc::clone(&self.package))?;
+        let workbook =
+            crate::Workbook::from_shared_package(Arc::clone(&self.package), self.xml_limits)?;
         Ok(self.workbook.get_or_init(|| workbook).clone())
     }
 
@@ -1153,8 +1206,10 @@ impl Edit {
             // owner directly to the worksheet transaction; its semantic
             // snapshot still parses and validates the complete worksheet
             // graph, but does not rebuild the archive index.
-            let snapshot =
-                crate::worksheet::Snapshot::from_shared_package(Arc::clone(&self.package))?;
+            let snapshot = crate::worksheet::Snapshot::from_shared_package_with_xml_limits(
+                Arc::clone(&self.package),
+                self.before.xml_limits,
+            )?;
             let mut edit = snapshot.edit();
             update(&mut edit)?;
             let commit = edit.commit()?;
@@ -1191,7 +1246,10 @@ impl Edit {
     where
         F: FnOnce(&mut crate::definitions::Edit) -> Result<()>,
     {
-        let snapshot = crate::definitions::Snapshot::from_bytes(self.candidate.as_ref().clone())?;
+        let snapshot = crate::definitions::Snapshot::from_bytes_with_xml_limits(
+            self.candidate.as_ref().clone(),
+            self.before.xml_limits,
+        )?;
         let mut edit = snapshot.edit();
         update(&mut edit)?;
         let commit = edit.commit()?;
@@ -1310,8 +1368,10 @@ impl Edit {
     where
         F: FnOnce(&mut crate::metadata_graphs::Edit) -> Result<()>,
     {
-        let snapshot =
-            crate::metadata_graphs::Snapshot::from_bytes(self.candidate.as_ref().clone())?;
+        let snapshot = crate::metadata_graphs::Snapshot::from_bytes_with_xml_limits(
+            self.candidate.as_ref().clone(),
+            self.before.xml_limits,
+        )?;
         let mut edit = snapshot.edit();
         update(&mut edit)?;
         let commit = edit.commit();
@@ -1361,7 +1421,10 @@ impl Edit {
     where
         F: FnOnce(&mut crate::data_pilot::Edit) -> Result<()>,
     {
-        let snapshot = crate::data_pilot::Snapshot::from_bytes(self.candidate.as_ref().clone())?;
+        let snapshot = crate::data_pilot::Snapshot::from_bytes_with_xml_limits(
+            self.candidate.as_ref().clone(),
+            self.before.xml_limits,
+        )?;
         let mut edit = snapshot.edit();
         update(&mut edit)?;
         let commit = edit.commit()?;
@@ -1385,8 +1448,10 @@ impl Edit {
     where
         F: FnOnce(&mut crate::database_range::Edit) -> Result<()>,
     {
-        let snapshot =
-            crate::database_range::Snapshot::from_bytes(self.candidate.as_ref().clone())?;
+        let snapshot = crate::database_range::Snapshot::from_bytes_with_xml_limits(
+            self.candidate.as_ref().clone(),
+            self.before.xml_limits,
+        )?;
         let mut edit = snapshot.edit();
         update(&mut edit)?;
         let commit = edit.commit()?;
@@ -1566,7 +1631,11 @@ impl Edit {
     where
         F: FnOnce(&mut crate::charts::Edit) -> Result<()>,
     {
-        let snapshot = crate::charts::Snapshot::from_bytes(self.candidate.as_ref().clone())?;
+        let snapshot = crate::charts::Snapshot::from_bytes_with_xml_limits(
+            self.candidate.as_ref().clone(),
+            crate::charts::Limits::default(),
+            self.before.xml_limits,
+        )?;
         let before = snapshot.charts().to_vec();
         let mut edit = snapshot.edit();
         update(&mut edit)?;
@@ -1806,7 +1875,7 @@ impl Edit {
     /// failure. Every refusal leaves the edit unchanged.
     pub fn move_sheet(&mut self, sheet: &str, position: SheetPosition) -> Result<()> {
         let package = Arc::clone(&self.package);
-        let count = crate::Workbook::from_shared_package(package)?
+        let count = crate::Workbook::from_shared_package(package, self.before.xml_limits)?
             .sheets()
             .len();
         if count == 0 {
@@ -1854,7 +1923,7 @@ impl Edit {
         position: SheetPosition,
     ) -> Result<()> {
         let package = Arc::clone(&self.package);
-        let count = crate::Workbook::from_shared_package(package)?
+        let count = crate::Workbook::from_shared_package(package, self.before.xml_limits)?
             .sheets()
             .len();
         if count == 0 {
@@ -2610,8 +2679,11 @@ impl Edit {
             candidate.before.limits.package_bytes,
         )?;
         candidate.stage_spliced("chart-object.put", &chart.name, bytes)?;
-        let chart_snapshot =
-            crate::charts::Snapshot::from_bytes(candidate.candidate.as_ref().clone())?;
+        let chart_snapshot = crate::charts::Snapshot::from_bytes_with_xml_limits(
+            candidate.candidate.as_ref().clone(),
+            crate::charts::Limits::default(),
+            candidate.before.xml_limits,
+        )?;
         if chart_snapshot
             .charts()
             .iter()
@@ -2914,7 +2986,11 @@ impl Edit {
         // `self.package` was validated when the latest candidate was staged.
         // Re-run the complete facade readback against that same immutable
         // package owner instead of rebuilding its archive/index from bytes.
-        let snapshot = Package::from_shared_package(Arc::clone(&self.package), self.before.limits)?;
+        let snapshot = Package::from_shared_package(
+            Arc::clone(&self.package),
+            self.before.limits,
+            self.before.xml_limits,
+        )?;
         let source: Arc<[u8]> = Arc::from(self.before.source.as_slice());
         let target: Arc<[u8]> = Arc::from(snapshot.source.as_slice());
         let patch = Patch::build(source, target, self.steps, snapshot.limits)?;
@@ -2943,7 +3019,10 @@ impl Edit {
                 self.spliced_parts.remove(path);
             }
         }
-        let validated = Archive::from_shared_bytes(Arc::clone(&candidate))?;
+        let validated = Archive::from_shared_bytes_with_xml_limits(
+            Arc::clone(&candidate),
+            self.before.xml_limits,
+        )?;
         self.candidate = Arc::clone(&candidate);
         self.package = Arc::new(validated);
         self.steps.push(Step {
@@ -3172,7 +3251,11 @@ impl Patch {
         if self.changed() {
             enforce_security_policy(snapshot, policy)?;
         }
-        let target = Package::from_vec_with(self.target.as_ref().to_vec(), self.limits)?;
+        let target = Package::from_vec_with(
+            self.target.as_ref().to_vec(),
+            self.limits,
+            snapshot.xml_limits,
+        )?;
         Ok(Commit {
             snapshot: target,
             patch: self.clone(),
@@ -3307,8 +3390,16 @@ impl Patch {
         }
         let source: Arc<[u8]> = Arc::from(source);
         let target: Arc<[u8]> = Arc::from(target);
-        let _source_snapshot = Package::from_vec_with(source.as_ref().to_vec(), limits)?;
-        let _target_snapshot = Package::from_vec_with(target.as_ref().to_vec(), limits)?;
+        let _source_snapshot = Package::from_vec_with(
+            source.as_ref().to_vec(),
+            limits,
+            XmlStreamLimits::owner_default_value(),
+        )?;
+        let _target_snapshot = Package::from_vec_with(
+            target.as_ref().to_vec(),
+            limits,
+            XmlStreamLimits::owner_default_value(),
+        )?;
         Ok(Self {
             source,
             target,
@@ -4491,5 +4582,68 @@ mod raw_package_diff_tests {
             Patch::build(source, changed, Vec::new(), Limits::default()).is_err(),
             "changed packages still require a semantic owner operation"
         );
+    }
+}
+
+#[cfg(test)]
+mod retained_xml_policy_tests {
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        reason = "small in-memory packages make the policy regression deterministic"
+    )]
+
+    use super::Package;
+    use crate::{Cell, CellValue, OpenOptions};
+    use litchi_odf_common::XmlStreamLimits;
+
+    fn strict_xml_limits() -> XmlStreamLimits {
+        XmlStreamLimits::new(256 * 1024 * 1024, 1_024, 4_000_000, 1_000_000, 64 * 1024).unwrap()
+    }
+
+    fn text_cell(text: impl Into<String>) -> Cell {
+        let text = text.into();
+        Cell::new(CellValue::Text(text.clone()), text)
+    }
+
+    fn assert_large_cell_is_refused(package: &Package) {
+        let large = "x".repeat(70 * 1024);
+        let mut edit = package.edit().unwrap();
+        let error = edit
+            .worksheets(|worksheets| {
+                worksheets.set_cell("Sheet1", 0, 0, text_cell(large))?;
+                Ok(())
+            })
+            .unwrap_err();
+        assert!(
+            matches!(
+                &error,
+                litchi_core::Error::ResourceLimit(limit)
+                    if limit.limit == 64 * 1024
+                        && limit.scope.as_ref() == "ODF raw XML token bytes"
+                        && limit.observed > limit.limit
+            ),
+            "retained XML policy was not enforced: {error:?}"
+        );
+    }
+
+    #[test]
+    fn edited_and_replayed_owners_keep_explicit_xml_policy() {
+        let source = Package::new().unwrap().to_bytes().unwrap();
+        let options = OpenOptions::new().xml_limits(strict_xml_limits());
+        let package = Package::from_bytes_with_options(&source, options).unwrap();
+        assert_large_cell_is_refused(&package);
+
+        let mut edit = package.edit().unwrap();
+        edit.worksheets(|worksheets| {
+            worksheets.set_cell("Sheet1", 0, 0, text_cell("small"))?;
+            Ok(())
+        })
+        .unwrap();
+        let commit = edit.commit().unwrap();
+        let replay = package.apply(commit.patch()).unwrap();
+
+        assert_large_cell_is_refused(commit.package());
+        assert_large_cell_is_refused(replay.package());
     }
 }

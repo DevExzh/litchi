@@ -46,8 +46,9 @@ fn open_bytes(bytes: Vec<u8>, options: &OpenOptions) -> Xlsx {
 
 /// The eager fallback route: smart detection's parsed OPC package.
 fn open_eager(bytes: Vec<u8>, options: &OpenOptions) -> Xlsx {
+    let limits = options.detection_limits();
     let Some(crate::detect::DetectedFormat::Xlsx(package)) =
-        crate::detect::detect_format_smart(bytes)
+        crate::detect::detect_format_smart(bytes, &limits)
     else {
         panic!("smart detection did not find XLSX");
     };
@@ -57,7 +58,9 @@ fn open_eager(bytes: Vec<u8>, options: &OpenOptions) -> Xlsx {
 /// The prepared route: `detect_and_prepare`, then the unified opener.
 #[cfg(any(unix, windows))]
 fn open_prepared(path: &std::path::Path, options: &OpenOptions) -> Xlsx {
-    let detection = crate::detect::detect_and_prepare(path).expect("prepared OOXML source");
+    let limits = options.detection_limits();
+    let detection =
+        crate::detect::detect_and_prepare(path, &limits).expect("prepared OOXML source");
     match crate::open_prepared_with(detection, options).expect("prepared open") {
         crate::File::Xlsx(xlsx) => xlsx,
         other => panic!("{} opened as {other:?}", path.display()),

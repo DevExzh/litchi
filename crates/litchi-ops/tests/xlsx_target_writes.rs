@@ -214,16 +214,16 @@ fn selector_writes_use_the_original_match_set_and_one_transaction_commit() {
                 Ok::<_, litchi_ops::Error>(())
             })
             .expect("set all original selector matches");
-        assert!(commit.diagnostics.changed());
-        assert_eq!(commit.diagnostics.operations(), 1);
-        assert_eq!(commit.diagnostics.commits(), 1);
+        assert!(commit.diagnostics().changed());
+        assert_eq!(commit.diagnostics().operations(), 1);
+        assert_eq!(commit.diagnostics().commits(), 1);
 
         for path in [B1, C1, B2, C2] {
-            assert_eq!(cell_text(&commit.file, path).as_deref(), Some("0"));
+            assert_eq!(cell_text(commit.file(), path).as_deref(), Some("0"));
         }
-        assert_eq!(cell_text(&commit.file, A1).as_deref(), Some("seed"));
+        assert_eq!(cell_text(commit.file(), A1).as_deref(), Some("seed"));
         let remaining = commit
-            .file
+            .file()
             .query(selector)
             .expect("query the committed selector")
             .collect::<Result<Vec<_>>>()
@@ -231,17 +231,20 @@ fn selector_writes_use_the_original_match_set_and_one_transaction_commit() {
         assert!(remaining.is_empty(), "the selector must use old matches");
 
         let replayed = commit
-            .patch
+            .patch()
             .apply(&original)
             .expect("replay selector patch on its owner");
         assert_eq!(
             replayed.to_bytes().expect("publish replayed selector"),
-            commit.file.to_bytes().expect("publish committed selector")
+            commit
+                .file()
+                .to_bytes()
+                .expect("publish committed selector")
         );
         let restored = commit
-            .patch
+            .patch()
             .inverse()
-            .apply(&commit.file)
+            .apply(commit.file())
             .expect("inverse selector patch");
         assert_eq!(
             restored.to_bytes().expect("publish restored selector"),
@@ -349,20 +352,20 @@ fn scoped_multi_sheet_selector_keeps_same_addresses_distinct_in_one_commit() {
                 Ok::<_, litchi_ops::Error>(())
             })
             .expect("mutate both scoped matches in one transaction");
-        assert!(commit.diagnostics.changed());
-        assert_eq!(commit.diagnostics.operations(), 1);
-        assert_eq!(commit.diagnostics.commits(), 1);
+        assert!(commit.diagnostics().changed());
+        assert_eq!(commit.diagnostics().operations(), 1);
+        assert_eq!(commit.diagnostics().commits(), 1);
         assert_eq!(
-            cell_text(&commit.file, "/sheet[1]/A1").as_deref(),
+            cell_text(commit.file(), "/sheet[1]/A1").as_deref(),
             Some("0")
         );
         assert_eq!(
-            cell_text(&commit.file, "/sheet[2]/A1").as_deref(),
+            cell_text(commit.file(), "/sheet[2]/A1").as_deref(),
             Some("0")
         );
 
         let replayed = commit
-            .patch
+            .patch()
             .apply(&original)
             .expect("replay multi-sheet patch");
         assert_eq!(
@@ -370,14 +373,14 @@ fn scoped_multi_sheet_selector_keeps_same_addresses_distinct_in_one_commit() {
                 .to_bytes()
                 .expect("publish replayed multi-sheet patch"),
             commit
-                .file
+                .file()
                 .to_bytes()
                 .expect("publish committed multi-sheet file")
         );
         let restored = commit
-            .patch
+            .patch()
             .inverse()
-            .apply(&commit.file)
+            .apply(commit.file())
             .expect("inverse multi-sheet patch");
         assert_eq!(
             restored
@@ -440,9 +443,10 @@ fn custom_expanded_target_limits_reject_before_mutation_and_allow_the_bound() {
             .build()
             .expect("build target limit");
         let error = original
-            .edit_with_limits(&strict, |transaction| {
-                transaction.set("Sheet1!A1:A3", props! { "value" => "bounded" })
-            })
+            .edit_with_options(
+                litchi_ops::EditOptions::new().semantic_limits(strict),
+                |transaction| transaction.set("Sheet1!A1:A3", props! { "value" => "bounded" }),
+            )
             .expect_err("three targets must exceed a two-target limit");
         assert_eq!(error.item(), Some(0));
         assert!(matches!(
@@ -464,14 +468,15 @@ fn custom_expanded_target_limits_reject_before_mutation_and_allow_the_bound() {
             .build()
             .expect("build raised target limit");
         let commit = original
-            .edit_with_limits(&raised, |transaction| {
-                transaction.set("Sheet1!A1:A3", props! { "value" => "bounded" })
-            })
+            .edit_with_options(
+                litchi_ops::EditOptions::new().semantic_limits(raised),
+                |transaction| transaction.set("Sheet1!A1:A3", props! { "value" => "bounded" }),
+            )
             .expect("the configured bound admits three targets");
-        assert!(commit.diagnostics.changed());
-        assert_eq!(commit.diagnostics.operations(), 1);
+        assert!(commit.diagnostics().changed());
+        assert_eq!(commit.diagnostics().operations(), 1);
         for path in [A1, A2, "/sheet[1]/A3"] {
-            assert_eq!(cell_text(&commit.file, path).as_deref(), Some("bounded"));
+            assert_eq!(cell_text(commit.file(), path).as_deref(), Some("bounded"));
         }
         assert_eq!(
             original.to_bytes().expect("publish detached target input"),
@@ -495,9 +500,12 @@ fn staged_bytes_are_checked_before_a_huge_range_can_reserve_targets() {
         let original = open_owner(&bytes, eager);
         let original_bytes = original.to_bytes().expect("publish original owner");
         let error = original
-            .edit_with_limits(&limits, |transaction| {
-                transaction.set("Sheet1!A1:XFD1048576", Props::new().with("value", "x"))
-            })
+            .edit_with_options(
+                litchi_ops::EditOptions::new().semantic_limits(limits),
+                |transaction| {
+                    transaction.set("Sheet1!A1:XFD1048576", Props::new().with("value", "x"))
+                },
+            )
             .expect_err("staged bytes must fail before huge target reservation");
         assert_eq!(error.item(), Some(0));
         assert!(matches!(
@@ -552,13 +560,14 @@ fn duplicate_selector_matches_are_deduplicated_before_the_target_limit() {
             .build()
             .expect("build duplicate-match limit");
         let commit = original
-            .edit_with_limits(&limits, |transaction| {
-                transaction.set(selector, props! { "value" => 0 })
-            })
+            .edit_with_options(
+                litchi_ops::EditOptions::new().semantic_limits(limits),
+                |transaction| transaction.set(selector, props! { "value" => 0 }),
+            )
             .expect("duplicate matches must count once");
-        assert_eq!(commit.diagnostics.operations(), 1);
+        assert_eq!(commit.diagnostics().operations(), 1);
         for path in [B1, C1, B2, C2] {
-            assert_eq!(cell_text(&commit.file, path).as_deref(), Some("0"));
+            assert_eq!(cell_text(commit.file(), path).as_deref(), Some("0"));
         }
         assert_eq!(
             original.to_bytes().expect("publish duplicate-match input"),
@@ -580,9 +589,10 @@ fn custom_staged_byte_limits_refuse_before_native_staging_and_can_be_raised() {
             .build()
             .expect("build staged-byte limit");
         let error = original
-            .edit_with_limits(&strict, |transaction| {
-                transaction.set(A1, Props::new().with("value", "text"))
-            })
+            .edit_with_options(
+                litchi_ops::EditOptions::new().semantic_limits(strict),
+                |transaction| transaction.set(A1, Props::new().with("value", "text")),
+            )
             .expect_err("a nonempty scalar must exceed the 64-byte entry charge");
         assert_eq!(error.item(), Some(0));
         assert!(matches!(
@@ -606,11 +616,12 @@ fn custom_staged_byte_limits_refuse_before_native_staging_and_can_be_raised() {
             .build()
             .expect("build raised staged-byte limit");
         let commit = original
-            .edit_with_limits(&raised, |transaction| {
-                transaction.set(A1, Props::new().with("value", "text"))
-            })
+            .edit_with_options(
+                litchi_ops::EditOptions::new().semantic_limits(raised),
+                |transaction| transaction.set(A1, Props::new().with("value", "text")),
+            )
             .expect("the raised staged-byte limit admits the scalar");
-        assert_eq!(cell_text(&commit.file, A1).as_deref(), Some("text"));
+        assert_eq!(cell_text(commit.file(), A1).as_deref(), Some("text"));
     }
 }
 
@@ -677,13 +688,13 @@ fn best_effort_keeps_a_successful_range_before_a_failed_selector() {
         )
         .expect("best-effort retains a valid range item");
     assert!(matches!(
-        &result.results[0],
+        &result.results()[0],
         ItemResult::Applied(applied) if applied.changed
     ));
     assert!(matches!(
-        &result.results[1],
+        &result.results()[1],
         ItemResult::Failed(error) if error.item() == Some(1)
     ));
-    assert_eq!(cell_text(&result.file, A1).as_deref(), Some("kept"));
-    assert_eq!(cell_text(&result.file, A2).as_deref(), Some("kept"));
+    assert_eq!(cell_text(result.file(), A1).as_deref(), Some("kept"));
+    assert_eq!(cell_text(result.file(), A2).as_deref(), Some("kept"));
 }

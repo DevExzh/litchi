@@ -212,8 +212,8 @@ fn pptx_chart_noops_and_refusals_leave_the_input_unchanged() {
             Ok(())
         })
         .unwrap();
-    assert!(same.patch.is_noop());
-    assert_eq!(same.file.to_bytes().unwrap(), before);
+    assert!(same.patch().is_noop());
+    assert_eq!(same.file().to_bytes().unwrap(), before);
     for (node, code) in [
         (
             NewNode::new("chart").prop("chartType", "column"),
@@ -300,14 +300,14 @@ fn pptx_chart_batches_replay_and_invert() {
     set.props = Some(Props::new().with("title", "Renamed"));
     let commit = source.batch([add, set], BatchMode::Atomic).unwrap();
     assert_eq!(
-        prop(&commit.file, "/slide[1]/chart[1]", "title").as_deref(),
+        prop(commit.file(), "/slide[1]/chart[1]", "title").as_deref(),
         Some("Renamed")
     );
     assert_eq!(
         commit
-            .patch
+            .patch()
             .inverse()
-            .apply(&commit.file)
+            .apply(commit.file())
             .unwrap()
             .to_bytes()
             .unwrap(),
@@ -812,6 +812,6 @@ fn warn_mode_failures_carry_the_skipped_properties() {
                 .with("series1.color", "4472C4"),
         );
         let applied = source.apply_with(&corpus, &warn).unwrap();
-        assert!(applied.value.warnings.is_empty());
+        assert!(applied.value().warnings.is_empty());
     }
 }

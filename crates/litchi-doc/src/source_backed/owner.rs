@@ -112,6 +112,35 @@ pub enum Refusal {
     UnsupportedSource,
 }
 
+impl Refusal {
+    /// The shared refusal kind (record 0351 §2.4), by which litchi-ops
+    /// classifies the refusal (record 0362).
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+
+        match self {
+            Self::ParagraphNotFound => RefusalKind::NotFound,
+            Self::EmptyParagraph => RefusalKind::UnsupportedTarget,
+            Self::Encrypted | Self::Protected | Self::UnknownProtection | Self::Signed => {
+                RefusalKind::Protected
+            },
+            Self::LengthChange
+            | Self::CompressedPiece
+            | Self::CrossPiece
+            | Self::StructuralContent
+            | Self::Field
+            | Self::Drawing
+            | Self::Revision
+            | Self::FastSave
+            | Self::Prm
+            | Self::Macro
+            | Self::AmbiguousTopology
+            | Self::UnsupportedSource => RefusalKind::UnsupportedContent,
+        }
+    }
+}
+
 impl fmt::Display for Refusal {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         let message = match self {

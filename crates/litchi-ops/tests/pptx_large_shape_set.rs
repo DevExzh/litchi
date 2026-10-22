@@ -151,17 +151,17 @@ fn one_selector_text_fanout_crosses_native_chunk_boundary_for_both_owners() {
         let commit = source
             .edit(|edit| edit.set(SELECTOR, props! { "text" => "transaction text" }))
             .unwrap();
-        assert_eq!(text(&commit.file, 1), "transaction text");
-        assert_eq!(text(&commit.file, LARGE_SHAPE_COUNT), "transaction text");
+        assert_eq!(text(commit.file(), 1), "transaction text");
+        assert_eq!(text(commit.file(), LARGE_SHAPE_COUNT), "transaction text");
         assert_eq!(
-            commit.patch.apply(&source).unwrap().to_bytes().unwrap(),
-            commit.file.to_bytes().unwrap()
+            commit.patch().apply(&source).unwrap().to_bytes().unwrap(),
+            commit.file().to_bytes().unwrap()
         );
         assert_eq!(
             commit
-                .patch
+                .patch()
                 .inverse()
-                .apply(&commit.file)
+                .apply(commit.file())
                 .unwrap()
                 .to_bytes()
                 .unwrap(),
@@ -227,18 +227,21 @@ fn one_selector_mixed_text_and_geometry_fanout_crosses_native_chunk_boundary() {
                 )
             })
             .unwrap();
-        assert_eq!(text(&commit.file, LARGE_SHAPE_COUNT), "transaction mixed");
-        assert_eq!(length(&commit.file, LARGE_SHAPE_COUNT, "x"), 4_572_000);
-        assert_eq!(length(&commit.file, LARGE_SHAPE_COUNT, "height"), 7_315_200);
+        assert_eq!(text(commit.file(), LARGE_SHAPE_COUNT), "transaction mixed");
+        assert_eq!(length(commit.file(), LARGE_SHAPE_COUNT, "x"), 4_572_000);
         assert_eq!(
-            commit.patch.apply(&source).unwrap().to_bytes().unwrap(),
-            commit.file.to_bytes().unwrap()
+            length(commit.file(), LARGE_SHAPE_COUNT, "height"),
+            7_315_200
+        );
+        assert_eq!(
+            commit.patch().apply(&source).unwrap().to_bytes().unwrap(),
+            commit.file().to_bytes().unwrap()
         );
         assert_eq!(
             commit
-                .patch
+                .patch()
                 .inverse()
-                .apply(&commit.file)
+                .apply(commit.file())
                 .unwrap()
                 .to_bytes()
                 .unwrap(),
@@ -360,17 +363,19 @@ fn selector_fanout_keeps_target_and_staged_byte_limits_atomic() {
         let source = open(&bytes, eager);
         let before = source.to_bytes().unwrap();
         let target_error = source
-            .edit_with_limits(&target_limit, |edit| {
-                edit.set(SELECTOR, props! { "text" => "over target limit" })
-            })
+            .edit_with_options(
+                litchi_ops::EditOptions::new().semantic_limits(target_limit),
+                |edit| edit.set(SELECTOR, props! { "text" => "over target limit" }),
+            )
             .unwrap_err();
         assert_eq!(target_error.code(), Code::LimitExceeded);
         assert_eq!(source.to_bytes().unwrap(), before);
 
         let staged_error = source
-            .edit_with_limits(&staged_limit, |edit| {
-                edit.set(SELECTOR, props! { "text" => "over staged limit" })
-            })
+            .edit_with_options(
+                litchi_ops::EditOptions::new().semantic_limits(staged_limit),
+                |edit| edit.set(SELECTOR, props! { "text" => "over staged limit" }),
+            )
             .unwrap_err();
         assert_eq!(staged_error.code(), Code::LimitExceeded);
         assert_eq!(source.to_bytes().unwrap(), before);

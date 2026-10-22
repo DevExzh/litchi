@@ -139,22 +139,22 @@ fn doc_transaction_coalesces_sets_and_rolls_back_atomically() {
             Ok::<_, litchi_ops::Error>(())
         })
         .expect("coalesced DOC edit");
-    assert_eq!(paragraph_text(&commit.file, "/body/p[1]"), "second");
-    assert!(commit.diagnostics.changed());
-    assert_eq!(commit.diagnostics.operations(), 2);
-    assert_eq!(commit.diagnostics.commits(), 1);
-    assert_eq!(commit.diagnostics.leaf_operations(), 2);
-    assert!(commit.diagnostics.snapshot_bytes() > 0);
+    assert_eq!(paragraph_text(commit.file(), "/body/p[1]"), "second");
+    assert!(commit.diagnostics().changed());
+    assert_eq!(commit.diagnostics().operations(), 2);
+    assert_eq!(commit.diagnostics().commits(), 1);
+    assert_eq!(commit.diagnostics().leaf_operations(), 2);
+    assert!(commit.diagnostics().snapshot_bytes() > 0);
 
     let restored = commit
-        .patch
+        .patch()
         .inverse()
-        .apply(&commit.file)
+        .apply(commit.file())
         .expect("inverse DOC patch");
     assert_eq!(restored.to_bytes().unwrap(), original);
     assert_eq!(
-        commit.patch.apply(&file).unwrap().to_bytes().unwrap(),
-        commit.file.to_bytes().unwrap()
+        commit.patch().apply(&file).unwrap().to_bytes().unwrap(),
+        commit.file().to_bytes().unwrap()
     );
 
     let error = file
@@ -184,9 +184,9 @@ fn doc_batch_noop_and_limits_keep_exact_source() {
             Ok::<_, litchi_ops::Error>(())
         })
         .expect("DOC transaction no-op");
-    assert!(!noop_commit.diagnostics.changed());
-    assert!(noop_commit.patch.is_noop());
-    assert_eq!(noop_commit.file.to_bytes().unwrap(), original);
+    assert!(!noop_commit.diagnostics().changed());
+    assert!(noop_commit.patch().is_noop());
+    assert_eq!(noop_commit.file().to_bytes().unwrap(), original);
 
     let mut first = BatchItem::new("set");
     first.path = Some("/body/p[1]".into());
@@ -197,9 +197,9 @@ fn doc_batch_noop_and_limits_keep_exact_source() {
     let batch = file
         .batch([first, second], BatchMode::Atomic)
         .expect("atomic DOC text batch");
-    assert_eq!(batch.results.len(), 2);
-    assert_eq!(batch.diagnostics.commits(), 1);
-    assert_eq!(paragraph_text(&batch.file, "/body/p[1]"), "batch second");
+    assert_eq!(batch.results().len(), 2);
+    assert_eq!(batch.diagnostics().commits(), 1);
+    assert_eq!(paragraph_text(batch.file(), "/body/p[1]"), "batch second");
 
     let limits = SemanticLimits::builder()
         .max_operations(1)
@@ -207,11 +207,14 @@ fn doc_batch_noop_and_limits_keep_exact_source() {
         .build()
         .expect("valid limits");
     let error = file
-        .edit_with_limits(&limits, |edit| {
-            edit.set("/body/p[1]", props! { "text" => "one" })?;
-            edit.set("/body/p[1]", props! { "text" => "two" })?;
-            Ok::<_, litchi_ops::Error>(())
-        })
+        .edit_with_options(
+            litchi_ops::EditOptions::new().semantic_limits(limits),
+            |edit| {
+                edit.set("/body/p[1]", props! { "text" => "one" })?;
+                edit.set("/body/p[1]", props! { "text" => "two" })?;
+                Ok::<_, litchi_ops::Error>(())
+            },
+        )
         .expect_err("the second DOC mutation exceeds the limit");
     assert_eq!(error.code(), Code::LimitExceeded);
     assert_eq!(file.to_bytes().unwrap(), original);
@@ -229,10 +232,13 @@ fn doc_query_expansion_uses_the_unified_target_budget() {
     let query = litchi_ops::query::Query::parse("/body/p").expect("paragraph query");
 
     let error = file
-        .edit_with_limits(&limits, |edit| {
-            edit.set(query, props! { "text" => "must not stage" })?;
-            Ok::<_, litchi_ops::Error>(())
-        })
+        .edit_with_options(
+            litchi_ops::EditOptions::new().semantic_limits(limits),
+            |edit| {
+                edit.set(query, props! { "text" => "must not stage" })?;
+                Ok::<_, litchi_ops::Error>(())
+            },
+        )
         .expect_err("the query must stop before the second paragraph");
     assert_eq!(error.code(), Code::LimitExceeded);
     assert_eq!(file.to_bytes().unwrap(), original);
@@ -506,9 +512,9 @@ fn doc_coalescing_exceeds_leaf_default_and_preserves_path_origin() {
             Ok::<_, litchi_ops::Error>(())
         })
         .expect("coalesced DOC run beyond native default 256");
-    assert_eq!(commit.diagnostics.commits(), 1);
+    assert_eq!(commit.diagnostics().commits(), 1);
     commit
-        .file
+        .file()
         .save()
         .expect("edited DOC preserves path origin");
     assert_eq!(
@@ -596,20 +602,20 @@ fn doc_paragraph_toggles_coalesce_into_one_commit() {
             Ok::<_, litchi_ops::Error>(())
         })
         .expect("coalesced toggles");
-    assert_eq!(commit.diagnostics.commits(), 1);
-    assert_eq!(commit.diagnostics.operations(), 42);
+    assert_eq!(commit.diagnostics().commits(), 1);
+    assert_eq!(commit.diagnostics().operations(), 42);
     for index in 1..=40 {
         assert_eq!(
-            run_prop(&commit.file, &format!("/body/p[{index}]/r[1]"), "bold").as_deref(),
+            run_prop(commit.file(), &format!("/body/p[{index}]/r[1]"), "bold").as_deref(),
             Some("true"),
             "paragraph {index}"
         );
     }
     assert_eq!(
-        run_prop(&commit.file, "/body/p[3]/r[1]", "italic").as_deref(),
+        run_prop(commit.file(), "/body/p[3]/r[1]", "italic").as_deref(),
         Some("true")
     );
-    assert_eq!(run_prop(&commit.file, "/body/p[4]/r[1]", "italic"), None);
+    assert_eq!(run_prop(commit.file(), "/body/p[4]/r[1]", "italic"), None);
 
     // The isolated setter publishes the same document, one commit per set.
     let mut isolated = file.clone();
@@ -628,14 +634,14 @@ fn doc_paragraph_toggles_coalesce_into_one_commit() {
         let path = format!("/body/p[{index}]/r[1]");
         for key in ["bold", "italic"] {
             assert_eq!(
-                run_prop(&commit.file, &path, key),
+                run_prop(commit.file(), &path, key),
                 run_prop(&isolated, &path, key),
                 "{path} {key}"
             );
         }
     }
 
-    let restored = commit.patch.inverse().apply(&commit.file).unwrap();
+    let restored = commit.patch().inverse().apply(commit.file()).unwrap();
     assert_eq!(restored.to_bytes().unwrap(), file.to_bytes().unwrap());
 
     // Text then a toggle of the same paragraph: two runs.
@@ -646,18 +652,18 @@ fn doc_paragraph_toggles_coalesce_into_one_commit() {
             Ok::<_, litchi_ops::Error>(())
         })
         .expect("text then toggle");
-    assert_eq!(mixed.diagnostics.commits(), 2);
-    assert_eq!(paragraph_text(&mixed.file, "/body/p[1]"), "Replaced text.");
+    assert_eq!(mixed.diagnostics().commits(), 2);
+    assert_eq!(paragraph_text(mixed.file(), "/body/p[1]"), "Replaced text.");
     assert_eq!(
-        run_prop(&mixed.file, "/body/p[1]/r[1]", "bold").as_deref(),
+        run_prop(mixed.file(), "/body/p[1]/r[1]", "bold").as_deref(),
         Some("true")
     );
 
     // A toggle the base already holds changes nothing.
-    let bold = commit.file.clone();
+    let bold = commit.file().clone();
     let noop = bold
         .edit(|edit| edit.set("/body/p[2]", props! { "bold" => true }))
         .expect("held toggle");
-    assert!(!noop.diagnostics.changed());
-    assert_eq!(noop.file.to_bytes().unwrap(), bold.to_bytes().unwrap());
+    assert!(!noop.diagnostics().changed());
+    assert_eq!(noop.file().to_bytes().unwrap(), bold.to_bytes().unwrap());
 }

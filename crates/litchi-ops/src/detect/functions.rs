@@ -7,6 +7,7 @@ use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::Path;
 
+use super::SourceLimits;
 #[cfg(all(
     any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"),
     any(unix, windows)
@@ -31,6 +32,7 @@ use litchi_odf_common::detect as odf;
 /// # Arguments
 ///
 /// * `path` - Path to the file to analyze
+/// * `limits` - Resource ceilings for every raw probe used by detection
 ///
 /// # Returns
 ///
@@ -40,16 +42,16 @@ use litchi_odf_common::detect as odf;
 /// # Examples
 ///
 /// ```rust,no_run
-/// use litchi_ops::detect::detect_file_format;
+/// use litchi_ops::detect::{detect_file_format, SourceLimits};
 ///
-/// let format = detect_file_format("document.docx");
+/// let format = detect_file_format("document.docx", &SourceLimits::default());
 /// if let Some(format) = format {
 ///     println!("Detected format: {:?}", format);
 /// }
 /// # Ok::<(), std::io::Error>(())
 /// ```
-pub fn detect_file_format<P: AsRef<Path>>(path: P) -> Option<FileFormat> {
-    detect_file_format_with_tail(path, &NoZipTail)
+pub fn detect_file_format<P: AsRef<Path>>(path: P, limits: &SourceLimits) -> Option<FileFormat> {
+    detect_file_format_with_tail(path, limits, &NoZipTail)
 }
 
 /// [`detect_file_format`] with a lowest-precedence ZIP candidate.
@@ -58,10 +60,11 @@ pub fn detect_file_format<P: AsRef<Path>>(path: P) -> Option<FileFormat> {
 /// [`tail`](super::tail) for when it runs.
 pub fn detect_file_format_with_tail<P: AsRef<Path>, T: ZipTail>(
     path: P,
+    limits: &SourceLimits,
     tail: &T,
 ) -> Option<FileFormat> {
     let mut file = File::open(path).ok()?;
-    detect_format_from_reader_with_tail(&mut file, tail)
+    detect_format_from_reader_with_tail(&mut file, limits, tail)
 }
 
 /// Detect a file format and retain the OOXML package the detection built.
@@ -82,20 +85,24 @@ pub fn detect_file_format_with_tail<P: AsRef<Path>, T: ZipTail>(
 ///   are classified with no handle, because they have no OOXML adopter to
 ///   hand a prepared OPC package to. An iWork package is not recognized: this
 ///   detector runs no [`ZipTail`](super::tail::ZipTail);
-///   [`detect_and_prepare_with_limits_and_tail`] takes one.
+///   [`detect_and_prepare_with_tail`] takes one.
 /// * `None` when the format is not recognized or the file cannot be read —
 ///   exactly when [`detect_file_format`] returns `None`.
 ///
 /// The classification never differs from [`detect_file_format`]: any input
 /// that cannot be prepared falls back to that detector.
 ///
+/// `limits` bounds every raw probe used by preparation. An input that exceeds
+/// the common ceiling or a configured container ceiling is not prepared.
+///
 /// # Examples
 ///
 /// ```rust,no_run
 /// use litchi_core::detection::FileFormat;
+/// use litchi_ops::detect::SourceLimits;
 /// use litchi_ops::detect::detect_and_prepare;
 ///
-/// if let Some(detected) = detect_and_prepare("document.docx") {
+/// if let Some(detected) = detect_and_prepare("document.docx", &SourceLimits::default()) {
 ///     let (format, prepared) = detected.into_parts();
 ///     if format == FileFormat::Docx && prepared.is_some() {
 ///         println!("the DOCX index can be adopted without a second scan");
@@ -106,28 +113,14 @@ pub fn detect_file_format_with_tail<P: AsRef<Path>, T: ZipTail>(
     any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"),
     any(unix, windows)
 ))]
-pub fn detect_and_prepare<P: AsRef<Path>>(path: P) -> Option<PreparedDetection> {
-    detect_and_prepare_with_limits(path, crate::opc::SourceLimits::default())
-}
-
-/// Detect a file format and retain the OOXML package, with an explicit OPC
-/// resource policy.
-///
-/// See [`detect_and_prepare`]. The policy bounds the OPC probe only; an input
-/// that exceeds it is still classified through [`detect_file_format`], with no
-/// prepared handle.
-#[cfg(all(
-    any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"),
-    any(unix, windows)
-))]
-pub fn detect_and_prepare_with_limits<P: AsRef<Path>>(
+pub fn detect_and_prepare<P: AsRef<Path>>(
     path: P,
-    limits: crate::opc::SourceLimits,
+    limits: &SourceLimits,
 ) -> Option<PreparedDetection> {
-    detect_and_prepare_with_limits_and_tail(path, limits, &NoZipTail)
+    detect_and_prepare_with_tail(path, limits, &NoZipTail)
 }
 
-/// [`detect_and_prepare_with_limits`] with a lowest-precedence ZIP candidate.
+/// [`detect_and_prepare`] with a lowest-precedence ZIP candidate.
 ///
 /// `tail` classifies a ZIP input that every other candidate declined; see
 /// [`tail`](super::tail) for when it runs.
@@ -135,12 +128,12 @@ pub fn detect_and_prepare_with_limits<P: AsRef<Path>>(
     any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"),
     any(unix, windows)
 ))]
-pub fn detect_and_prepare_with_limits_and_tail<P: AsRef<Path>, T: ZipTail>(
+pub fn detect_and_prepare_with_tail<P: AsRef<Path>, T: ZipTail>(
     path: P,
-    limits: crate::opc::SourceLimits,
+    limits: &SourceLimits,
     tail: &T,
 ) -> Option<PreparedDetection> {
-    super::detected::detect_and_prepare_path_with_limits(path.as_ref(), limits, tail)
+    super::detected::detect_and_prepare_path(path.as_ref(), limits, tail)
 }
 
 /// Detect file format from a byte slice.
@@ -161,18 +154,18 @@ pub fn detect_and_prepare_with_limits_and_tail<P: AsRef<Path>, T: ZipTail>(
 /// # Examples
 ///
 /// ```rust,no_run
-/// use litchi_ops::detect::detect_file_format_from_bytes;
+/// use litchi_ops::detect::{detect_file_format_from_bytes, SourceLimits};
 /// use std::fs;
 ///
 /// let data = fs::read("document.docx")?;
-/// let format = detect_file_format_from_bytes(&data);
+/// let format = detect_file_format_from_bytes(&data, &SourceLimits::default());
 /// if let Some(format) = format {
 ///     println!("Detected format: {:?}", format);
 /// }
 /// # Ok::<(), std::io::Error>(())
 /// ```
-pub fn detect_file_format_from_bytes(bytes: &[u8]) -> Option<FileFormat> {
-    detect_file_format_from_bytes_with_tail(bytes, &NoZipTail)
+pub fn detect_file_format_from_bytes(bytes: &[u8], limits: &SourceLimits) -> Option<FileFormat> {
+    detect_file_format_from_bytes_with_tail(bytes, limits, &NoZipTail)
 }
 
 /// [`detect_file_format_from_bytes`] with a lowest-precedence ZIP candidate.
@@ -181,14 +174,18 @@ pub fn detect_file_format_from_bytes(bytes: &[u8]) -> Option<FileFormat> {
 /// [`tail`](super::tail) for when it runs.
 pub fn detect_file_format_from_bytes_with_tail<T: ZipTail>(
     bytes: &[u8],
+    limits: &SourceLimits,
     tail: &T,
 ) -> Option<FileFormat> {
+    if !limits.accepts_input_len(bytes.len() as u64) {
+        return None;
+    }
     if bytes.len() < 4 {
         return None;
     }
 
     #[cfg(any(feature = "odt", feature = "ods", feature = "odp", odf_objects))]
-    if let Some(result) = odf::flat(bytes, odf::Limits::default()).ok().flatten() {
+    if let Some(result) = odf::flat(bytes, limits.odf_detect_limits()).ok().flatten() {
         return Some(result);
     }
 
@@ -197,7 +194,7 @@ pub fn detect_file_format_from_bytes_with_tail<T: ZipTail>(
 
     // Check OLE2 first (if matched)
     if mask.is_ole2()
-        && let Some(result) = ole2::detect_ole2_format(bytes)
+        && let Some(result) = ole2::detect_ole2_format(bytes, limits)
     {
         return Some(result);
     }
@@ -211,7 +208,7 @@ pub fn detect_file_format_from_bytes_with_tail<T: ZipTail>(
         #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
         {
             #[cfg(any(feature = "odt", feature = "ods", feature = "odp", odf_objects))]
-            let normal_odf = is_normal_odf_package(bytes);
+            let normal_odf = is_normal_odf_package(bytes, limits);
             #[cfg(not(any(feature = "odt", feature = "ods", feature = "odp", odf_objects)))]
             let normal_odf = false;
 
@@ -220,7 +217,7 @@ pub fn detect_file_format_from_bytes_with_tail<T: ZipTail>(
             if !normal_odf {
                 #[cfg(any(test, feature = "test-support"))]
                 super::record_opc_probe();
-                if let Some(result) = ooxml::detect_zip_format(bytes) {
+                if let Some(result) = ooxml::detect_zip_format(bytes, &limits.ooxml()) {
                     return Some(result);
                 }
             }
@@ -228,7 +225,7 @@ pub fn detect_file_format_from_bytes_with_tail<T: ZipTail>(
 
         // Then try ODF detection
         #[cfg(any(feature = "odt", feature = "ods", feature = "odp", odf_objects))]
-        if let Some(result) = odf::bytes(bytes, odf::Limits::default()).ok().flatten() {
+        if let Some(result) = odf::bytes(bytes, limits.odf_detect_limits()).ok().flatten() {
             return Some(result);
         }
 
@@ -247,12 +244,17 @@ pub fn detect_file_format_from_bytes_with_tail<T: ZipTail>(
     // Check compressed RTF after container formats so ZIP/OLE precedence is
     // unchanged for deliberately crafted polyglots.
     #[cfg(feature = "rtf")]
-    if !mask.is_ole2() && !mask.is_zip() && super::is_compressed_rtf(bytes) {
+    if !mask.is_ole2()
+        && !mask.is_zip()
+        && limits.accepts_rtf_input_len(bytes.len() as u64)
+        && super::is_compressed_rtf(bytes)
+    {
         return Some(FileFormat::Rtf);
     }
 
     // Check RTF format (if matched)
     if mask.is_rtf()
+        && limits.accepts_rtf_input_len(bytes.len() as u64)
         && let Some(result) = rtf::detect_rtf_format(bytes)
     {
         return Some(result);
@@ -265,16 +267,13 @@ pub fn detect_file_format_from_bytes_with_tail<T: ZipTail>(
     any(feature = "odt", feature = "ods", feature = "odp", odf_objects),
     any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")
 ))]
-fn is_normal_odf_package(bytes: &[u8]) -> bool {
-    let limits = crate::opc::SourceLimits::default();
-    litchi_odf_common::detect::packaged_mime(bytes, litchi_odf_common::detect::Limits::default())
+fn is_normal_odf_package(bytes: &[u8], limits: &SourceLimits) -> bool {
+    litchi_odf_common::detect::packaged_mime(bytes, limits.odf_detect_limits())
         .ok()
         .flatten()
         .is_some()
-        && litchi_odf_common::detect::packaged_has_ooxml_catalog(
-            bytes,
-            super::catalog_probe_limits(limits),
-        ) == Some(false)
+        && litchi_odf_common::detect::packaged_has_ooxml_catalog(bytes, limits.odf_catalog_limits())
+            == Some(false)
 }
 
 /// Detect file format from any reader that implements Read + Seek.
@@ -292,8 +291,11 @@ fn is_normal_odf_package(bytes: &[u8]) -> bool {
 /// * `Some(FileFormat)` if a supported format is detected
 /// * `None` if the format is not recognized
 ///
-pub fn detect_format_from_reader<R: Read + Seek>(reader: &mut R) -> Option<FileFormat> {
-    detect_format_from_reader_with_tail(reader, &NoZipTail)
+pub fn detect_format_from_reader<R: Read + Seek>(
+    reader: &mut R,
+    limits: &SourceLimits,
+) -> Option<FileFormat> {
+    detect_format_from_reader_with_tail(reader, limits, &NoZipTail)
 }
 
 /// [`detect_format_from_reader`] with a lowest-precedence ZIP candidate.
@@ -302,12 +304,18 @@ pub fn detect_format_from_reader<R: Read + Seek>(reader: &mut R) -> Option<FileF
 /// [`tail`](super::tail) for when it runs.
 pub fn detect_format_from_reader_with_tail<R: Read + Seek, T: ZipTail>(
     reader: &mut R,
+    limits: &SourceLimits,
     tail: &T,
 ) -> Option<FileFormat> {
     #[cfg(not(any(feature = "pages", feature = "keynote", feature = "numbers")))]
     let _ = tail;
     let original = reader.stream_position().ok()?;
     let detected = (|| {
+        let length = reader.seek(SeekFrom::End(0)).ok()?;
+        reader.seek(SeekFrom::Start(original)).ok()?;
+        if !limits.accepts_input_len(length) {
+            return None;
+        }
         reader.seek(SeekFrom::Start(0)).ok()?;
         #[cfg(feature = "rtf")]
         let mut header = [0u8; 12];
@@ -333,7 +341,7 @@ pub fn detect_format_from_reader_with_tail<R: Read + Seek, T: ZipTail>(
             && signature_matches(&header[..header_len], utils::OLE2_SIGNATURE)
         {
             reader.seek(SeekFrom::Start(0)).ok()?;
-            return ole2::detect_ole2_format_from_reader(reader);
+            return ole2::detect_ole2_format_from_reader(reader, limits);
         }
 
         #[cfg(any(
@@ -351,9 +359,8 @@ pub fn detect_format_from_reader_with_tail<R: Read + Seek, T: ZipTail>(
                 any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")
             ))]
             {
-                let catalog_limits =
-                    super::catalog_probe_limits(crate::opc::SourceLimits::default());
-                match odf::reader_preparation(reader, odf::Limits::default(), catalog_limits) {
+                let catalog_limits = limits.odf_catalog_limits();
+                match odf::reader_preparation(reader, limits.odf_detect_limits(), catalog_limits) {
                     Ok(Some(preparation)) => match preparation {
                         odf::ReaderPreparation::Prepared {
                             package,
@@ -365,7 +372,9 @@ pub fn detect_format_from_reader_with_tail<R: Read + Seek, T: ZipTail>(
                             }
                             #[cfg(any(test, feature = "test-support"))]
                             super::record_opc_probe();
-                            if let Some(format) = ooxml::detect_zip_format(snapshot.as_slice()) {
+                            if let Some(format) =
+                                ooxml::detect_zip_format(snapshot.as_slice(), &limits.ooxml())
+                            {
                                 return Some(format);
                             }
                             return Some(package.format());
@@ -375,12 +384,15 @@ pub fn detect_format_from_reader_with_tail<R: Read + Seek, T: ZipTail>(
                             if catalog != Some(false) {
                                 #[cfg(any(test, feature = "test-support"))]
                                 super::record_opc_probe();
-                                if let Some(format) = ooxml::detect_zip_format(&bytes) {
+                                if let Some(format) =
+                                    ooxml::detect_zip_format(&bytes, &limits.ooxml())
+                                {
                                     return Some(format);
                                 }
                             }
-                            if let Some(format) =
-                                odf::bytes(&bytes, odf::Limits::default()).ok().flatten()
+                            if let Some(format) = odf::bytes(&bytes, limits.odf_detect_limits())
+                                .ok()
+                                .flatten()
                             {
                                 return Some(format);
                             }
@@ -416,16 +428,16 @@ pub fn detect_format_from_reader_with_tail<R: Read + Seek, T: ZipTail>(
                 any(feature = "odt", feature = "ods", feature = "odp", odf_objects),
                 any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")
             ))]
-            let normal_odf = odf::packaged_has_ooxml_catalog_from_reader(
-                reader,
-                super::catalog_probe_limits(crate::opc::SourceLimits::default()),
-            ) == Some(false);
+            let normal_odf =
+                odf::packaged_has_ooxml_catalog_from_reader(reader, limits.odf_catalog_limits())
+                    == Some(false);
             #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
             if !normal_odf {
                 reader.seek(SeekFrom::Start(0)).ok()?;
                 #[cfg(any(test, feature = "test-support"))]
                 super::record_opc_probe();
-                if let Some(format) = ooxml::detect_zip_format_from_reader(reader) {
+                if let Some(format) = ooxml::detect_zip_format_from_reader(reader, &limits.ooxml())
+                {
                     return Some(format);
                 }
             }
@@ -433,7 +445,10 @@ pub fn detect_format_from_reader_with_tail<R: Read + Seek, T: ZipTail>(
             #[cfg(any(feature = "odt", feature = "ods", feature = "odp", odf_objects))]
             {
                 reader.seek(SeekFrom::Start(0)).ok()?;
-                if let Some(format) = odf::reader(reader, odf::Limits::default()).ok().flatten() {
+                if let Some(format) = odf::reader(reader, limits.odf_detect_limits())
+                    .ok()
+                    .flatten()
+                {
                     return Some(format);
                 }
             }
@@ -452,6 +467,7 @@ pub fn detect_format_from_reader_with_tail<R: Read + Seek, T: ZipTail>(
         #[cfg(feature = "rtf")]
         if !signature_mask.is_ole2()
             && !signature_mask.is_zip()
+            && limits.accepts_rtf_input_len(length)
             && super::is_compressed_rtf(&header[..header_len])
         {
             return Some(FileFormat::Rtf);
@@ -466,11 +482,17 @@ pub fn detect_format_from_reader_with_tail<R: Read + Seek, T: ZipTail>(
             || header[..header_len].starts_with(&[0xef, 0xbb, 0xbf])
         {
             reader.seek(SeekFrom::Start(0)).ok()?;
-            if let Some(format) = odf::reader(reader, odf::Limits::default()).ok().flatten() {
+            if let Some(format) = odf::reader(reader, limits.odf_detect_limits())
+                .ok()
+                .flatten()
+            {
                 return Some(format);
             }
         }
 
+        if !limits.accepts_rtf_input_len(length) {
+            return None;
+        }
         reader.seek(SeekFrom::Start(0)).ok()?;
         rtf::detect_rtf_format_from_reader(reader)
     })();
@@ -480,8 +502,17 @@ pub fn detect_format_from_reader_with_tail<R: Read + Seek, T: ZipTail>(
 
 #[cfg(test)]
 mod tests {
+    use super::SourceLimits;
     use super::*;
-    #[cfg(all(feature = "odt", feature = "docx"))]
+
+    fn detect_file_format_from_bytes(bytes: &[u8]) -> Option<FileFormat> {
+        super::detect_file_format_from_bytes(bytes, &SourceLimits::default())
+    }
+
+    fn detect_format_from_reader<R: Read + Seek>(reader: &mut R) -> Option<FileFormat> {
+        super::detect_format_from_reader(reader, &SourceLimits::default())
+    }
+    #[cfg(any(feature = "rtf", all(feature = "odt", feature = "docx")))]
     use std::io::Write;
 
     #[test]
@@ -973,6 +1004,54 @@ mod tests {
             Some(FileFormat::Rtf)
         );
         assert_eq!(reader.position(), 2);
+    }
+
+    #[cfg(feature = "rtf")]
+    #[test]
+    fn rtf_detection_applies_exact_input_limits_to_every_entry_point() {
+        let plain = br"{\rtf1\ansi Bounded transport\par}";
+        let mut sources = vec![plain.to_vec()];
+        for use_lzfu in [false, true] {
+            sources.push(litchi_rtf::transport::compress(plain, use_lzfu).unwrap());
+        }
+        for bytes in sources {
+            let mut file = tempfile::NamedTempFile::new().unwrap();
+            Write::write_all(&mut file, &bytes).unwrap();
+            for ceiling in [bytes.len(), bytes.len() - 1] {
+                let rtf = litchi_rtf::SourceLimits::builder()
+                    .max_input_bytes(ceiling)
+                    .unwrap()
+                    .build()
+                    .unwrap();
+                let limits = SourceLimits::new().rtf_source_limits(rtf);
+                let expected = (ceiling == bytes.len()).then_some(FileFormat::Rtf);
+                assert_eq!(
+                    super::detect_file_format_from_bytes(&bytes, &limits),
+                    expected
+                );
+                assert_eq!(detect_file_format(file.path(), &limits), expected);
+                let mut reader = std::io::Cursor::new(&bytes);
+                reader.set_position(3);
+                assert_eq!(
+                    super::detect_format_from_reader(&mut reader, &limits),
+                    expected
+                );
+                assert_eq!(reader.position(), 3);
+                assert_eq!(
+                    crate::detect::detect_format_smart(bytes.clone(), &limits)
+                        .map(|value| value.format()),
+                    expected,
+                );
+                #[cfg(all(
+                    any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"),
+                    any(unix, windows)
+                ))]
+                assert_eq!(
+                    detect_and_prepare(file.path(), &limits).map(|value| value.format()),
+                    expected,
+                );
+            }
+        }
     }
 
     #[cfg(feature = "rtf")]

@@ -1577,6 +1577,7 @@ impl Classify for litchi_doc::body_text::Error {
 
         match self {
             Self::Invalid(error) => error.classify(),
+            // The protected kinds keep their specific suggestions.
             Self::Refused(Refusal::Protected | Refusal::UnknownProtection) => Class::suggest(
                 Code::DocumentProtected,
                 "authorize the protected edit explicitly",
@@ -1584,33 +1585,30 @@ impl Classify for litchi_doc::body_text::Error {
             Self::Refused(Refusal::SignedSource) => {
                 Class::suggest(Code::DocumentProtected, SIGNED_SUGGESTION)
             },
-            Self::Refused(Refusal::ParagraphNotFound | Refusal::TargetNotFound) => {
-                Class::of(Code::OutOfRange)
-            },
-            Self::Refused(Refusal::ResourceCollision { .. }) => Class::of(Code::DuplicateName),
-            Self::Refused(
-                Refusal::ResourceNotFound { .. }
-                | Refusal::FontNotFound
-                | Refusal::StyleNotFound
-                | Refusal::FieldNotFound
-                | Refusal::BookmarkNotFound,
-            ) => Class::of(Code::NotFound),
-            Self::Refused(Refusal::SectionNotFound) => Class::of(Code::OutOfRange),
-            Self::Refused(Refusal::BookmarkName) => Class::suggest(
-                Code::InvalidValue,
-                "name the bookmark with 1 through 39 letters, digits, `_`, `.` or `-`, unused by another bookmark",
-            ),
-            Self::Refused(Refusal::InvalidProperty) => Class::of(Code::InvalidValue),
-            Self::Refused(Refusal::InvalidFontSize) => Class::of(Code::InvalidValue),
-            Self::Refused(Refusal::SoleParagraph) => Class::of(Code::InvalidArgument),
             Self::Refused(Refusal::Encrypted) => Class::suggest(
                 Code::DocumentProtected,
                 "native encrypted DOC edits are not supported; edit a decrypted copy",
             ),
+            // Not refusals of a well-formed request (record 0362): a missing
+            // position is `out_of_range` as DOCX `OutOfBounds` and the RTF
+            // positional errors are, a taken resource identifier is a
+            // duplicate, an exhausted budget is a limit, and removing the
+            // sole paragraph is the final-element argument error every format
+            // reports.
+            Self::Refused(
+                Refusal::ParagraphNotFound | Refusal::TargetNotFound | Refusal::SectionNotFound,
+            ) => Class::of(Code::OutOfRange),
+            Self::Refused(Refusal::ResourceCollision { .. }) => Class::of(Code::DuplicateName),
             Self::Refused(Refusal::OperationLimit { .. } | Refusal::ReplacementLimit { .. }) => {
                 Class::of(Code::LimitExceeded)
             },
-            Self::Refused(_) => Class::of(Code::UnsupportedCapability),
+            Self::Refused(Refusal::SoleParagraph) => Class::of(Code::InvalidArgument),
+            Self::Refused(Refusal::BookmarkName) => Class::suggest(
+                Code::InvalidValue,
+                "name the bookmark with 1 through 39 letters, digits, `_`, `.` or `-`, unused by another bookmark",
+            ),
+            // Every other refusal by its kind alone (record 0351 §2.4).
+            Self::Refused(refusal) => refusal.kind().classify(),
             Self::Conflict => Class::of(Code::InvalidInput),
             Self::Composition(error) => error.classify(),
             Self::Durable(error) => error.classify(),
@@ -2103,8 +2101,10 @@ impl Classify for litchi_doc::source_backed::Error {
                 Code::DocumentProtected,
                 "authorize the protected edit explicitly",
             ),
+            // A missing position is `out_of_range`, as in the body editor.
             Self::Refused(Refusal::ParagraphNotFound) => Class::of(Code::OutOfRange),
-            Self::Refused(_) => Class::of(Code::UnsupportedCapability),
+            // Every other refusal by its kind alone (record 0351 §2.4).
+            Self::Refused(refusal) => refusal.kind().classify(),
             Self::InvalidData(_) => Class::of(Code::CorruptFile),
             Self::Limit(_) => Class::of(Code::LimitExceeded),
             Self::Allocation { .. } => Class::of(Code::InternalError),

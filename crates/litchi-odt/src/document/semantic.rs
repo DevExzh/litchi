@@ -485,8 +485,9 @@ impl Document {
         self.state.styles.as_ref().map_or_else(
             || Ok(None),
             |styles| {
-                crate::bibliography_configuration::parse_bibliography_configuration(
+                crate::bibliography_configuration::parse_bibliography_configuration_with_xml_limits(
                     styles.xml_content(),
+                    self.state.xml_limits,
                 )
             },
         )
@@ -1011,12 +1012,15 @@ impl Document {
         if let Some(styles) = self.state.styles.as_ref().map(Styles::xml_content) {
             parts.push((styles, crate::MetadataPart::Styles));
         }
-        crate::content_metadata::parse_parts(&parts)
+        crate::content_metadata::parse_parts_with_xml_limits(&parts, self.state.xml_limits)
     }
 
     /// Inspect inert XForms model declarations in `office:forms`.
     pub fn xforms_models(&self) -> Result<Vec<crate::xforms::Model>> {
-        crate::xforms::parse_models(self.state.content.xml_content())
+        crate::xforms::parse_models_with_xml_limits(
+            self.state.content.xml_content(),
+            self.state.xml_limits,
+        )
     }
 
     pub fn rdf_graphs(&self) -> Result<Vec<crate::rdf::Graph>> {
@@ -1032,7 +1036,7 @@ impl Document {
         if let Some(styles) = self.state.styles.as_ref().map(Styles::xml_content) {
             parts.push((styles, crate::variable_declaration::Part::Styles));
         }
-        crate::variable_declaration::parse_parts(&parts)
+        crate::variable_declaration::parse_parts_with_xml_limits(&parts, self.state.xml_limits)
     }
 
     /// Discover package, inline, missing, and inert linked embedded objects.

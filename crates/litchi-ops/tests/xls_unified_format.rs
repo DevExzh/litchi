@@ -164,7 +164,7 @@ fn formatting_ranges_formula_cells_and_inverse() {
     for cell in ["A1", "A2", "A3"] {
         assert_eq!(
             property(
-                &commit.file,
+                commit.file(),
                 &format!("/Data/{cell}"),
                 "alignment.horizontal"
             )
@@ -175,14 +175,14 @@ fn formatting_ranges_formula_cells_and_inverse() {
     }
     // The formula cell keeps its formula.
     assert_eq!(
-        property(&commit.file, "/Data/A3", "formula").as_deref(),
+        property(commit.file(), "/Data/A3", "formula").as_deref(),
         Some("(A1*2)")
     );
     assert_eq!(
         commit
-            .patch
+            .patch()
             .inverse()
-            .apply(&commit.file)
+            .apply(commit.file())
             .unwrap()
             .to_bytes()
             .unwrap(),
@@ -190,10 +190,10 @@ fn formatting_ranges_formula_cells_and_inverse() {
     );
     // Re-applying the current alignment is an exact no-op.
     let same = commit
-        .file
+        .file()
         .set("/Data/A2", props! { "alignment.horizontal" => "right" })
         .unwrap();
-    assert_eq!(same.to_bytes().unwrap(), commit.file.to_bytes().unwrap());
+    assert_eq!(same.to_bytes().unwrap(), commit.file().to_bytes().unwrap());
 }
 
 #[test]

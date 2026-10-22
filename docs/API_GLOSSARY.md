@@ -161,7 +161,7 @@ line. A line is ✅ when the wave's gate registrations pass.
 | W5 | DOC, XLS, RTF, `litchi-ograph`, `litchi-ole-common`, `litchi-crypto` | ✅ (0359; DOC `raw::Package`→`raw::Reader`, RTF `raw::Document`→`raw::Tree`, mutable non-owner codec models under 0351 §2.1 rule 6; DOC/XLS/RTF `Package` and the DOC/XLS/RTF source-backed owners registered, 0359a) | ✅ 12 DOC and 7 XLS scoped families publish a `Package` (0359); codec-level edits alias `litchi_core::edit::Commit<Snapshot, Patch>`; the record-level engines `doc::body_text` and `xls::cell_values` are crate-private behind `Package::edit` and the `Package` routes, and the source-backed publishers are the deferred families DOC `source_backed::paragraph`, XLS `source_backed::{cells, comments, sheet_visibility}` and RTF `source_backed::tail_append` (0359a) | ✅ banned in the doc, xls, rtf, ole-common, crypto and ograph profiles (0359) | ✅ XLS and ograph `Refused`/`PatchConflict`/`Internal` (0359) | ✅ `_with_limits` banned in all six profiles; `<noun>_value()` getters and noun setters (0359); user-defined OLE property overlays take required typed limits and return the shared OLE error (0359h) | ✅ 0359, 0359a, 0359h |
 | W6 | ODF (`litchi-odf-common`, ODT, ODS, ODP, ODG, ODC, ODI, ODM, OTH, ODB, ODF-formula) | ✅ (0358; every `Package`, projection and flat owner, ODT `generic::{Package, flat::Document}` and `odc::Document`; `MutableDocument` crate-private behind `Package::edit`, ODS `builder::Workbook` draft) | ✅ (0358; primary, metadata, flat, generic, chart and ODM title/link families registered; part-level drafts are closure arguments of `Package::edit`; 0358a: the source-backed families `ods::source_backed::{cells, dde, sheet_metadata}` and `odp::tail_append` commit a deferred `SourceBackedSpreadsheet`/`SourceBackedPresentation`, written by its `write_to`/`save`) | ✅ (0358; banned crate-wide in all eleven profiles) | ✅ (0358; `Refused`/`PatchConflict`/`Signed`, refusal `kind()`s; 0358a: no string-carrying `Unsupported` refusal left) | ✅ (0358; flat owners and ODC chart limits on `OpenOptions`/`SemanticLimits`, `_with_limits` banned) | ✅ 0358, 0358a |
 | W7 | iWork (Pages, Keynote, Numbers; host `litchi-iwa`) | ✅ (host `litchi_iwa::Package`, `Document`; host editors are `Builder` drafts, 0361) | ✅ `into_parts` on 93 commits, `family_methods` on `pages`, `numbers-*`, `keynote-*`, six single-operation lifecycle families with an `Edit` (0361) | ✅ | ✅ typed per-family `Refusal` with `kind()` in `Error::Refused`, `Limit` for `LimitExceeded` (0361) | ✅ `MergeReader::*_with_options`, `Workbook::from_sheets_with_options`, `media::OpenOptions`; `_with_limits` banned (0361) | ✅ 0361 |
-| W8 | unified `File` (`litchi-ops`, facade, CLI, Python) | ➖ | ➖ | ➖ | ➖ | 🔴 (`File::*_with_limits`, `detect::*_with_limits`) | 🔴 |
+| W8 | unified `File` (`litchi-ops`, facade, CLI, Python) | ➖ | ✅ `transaction::Commit` and `BatchCommit` expose `file`/`into_file`/`patch`/`diagnostics`/`value` (`results` on `BatchCommit`)/`into_parts`, no public fields (0362) | ➖ | ✅ DOC body and source-backed refusals gain `kind()` and classify by kind except the documented non-refusal arms (0362) | ✅ `File::{edit, batch, import, merge, refresh}_with_options(.., EditOptions)`; raw detection takes required `&detect::SourceLimits`; `batch::from_bytes`, `merge::Data::{from_json, from_csv}` and `Docx::section_inventory` take their limits as a required argument; `_with_limits` banned in `ops-all` (all features), `ops-*` and `facade-*` (0362) | 🟡 Part A candidate (0362ha); qualification and Part B remain required |
 
 ## 3. Open, create, save
 
@@ -975,11 +975,13 @@ retained for command-specific validation.
 
 ## Unified closure transactions (record 0075)
 
-`File::{edit, edit_with_limits}` use `transaction::Edit`, replacing the draft
+`File::{edit, edit_with_options}` use `transaction::Edit`, replacing the draft
 proxy name `Transaction`. `transaction::{Commit, Patch, Diagnostics, Error,
 LimitKind}` name their result/replay family; `SemanticLimits` and its consuming
-builder bound mutation calls and retained main XML. The normalized public
-`Commit<T>` fields retain the file, patch, diagnostics and closure value.
+builder bound mutation calls and retained main XML, configured through
+`EditOptions` (record 0362). `Commit<T>` exposes the file, patch, diagnostics
+and closure value through the triad accessors `file`, `into_file`, `patch`,
+`diagnostics`, `value`, `into_value` and `into_parts` (record 0362).
 `Diagnostics::changed()` and `Patch::is_noop()` describe the final logical
 artifact, not how many operations ran. Other counts remain explicit facts.
 
@@ -993,8 +995,9 @@ advertises this DOCX closure subset; command `Batch` execution stays pending.
 ## Unified command execution (record 0076)
 
 `File::apply` executes one command and returns `transaction::Commit<Applied>`;
-`File::{batch, batch_with_limits}` return `BatchCommit` with `file`, `patch`,
-`diagnostics` and `results`. `ItemResult::{Applied, Failed}` preserves input
+`File::{batch, batch_with_options}` return `BatchCommit` with the accessors
+`file`, `into_file`, `patch`, `diagnostics`, `results`, `into_results` and
+`into_parts` (record 0362). `ItemResult::{Applied, Failed}` preserves input
 order; failures retain their original item index. `Applied` carries `changed`
 and `path: Option<Box<Path<'static>>>`, populated by creation. The optional
 path is indirect so ordinary result entries do not embed the grammar's large
@@ -1053,7 +1056,7 @@ blank coordinates; formulas broadcast without relative translation. All
 selected cells stage in one native commit. `SemanticLimits` now admits
 `max_expanded_targets` and `max_staged_bytes` for XLSX fanout, defaulting to
 65,536 distinct cells and a 16 MiB payload/action charge. Caller-selected
-profiles flow through `File::edit_with_limits` and batch execution. Unknown
+profiles flow through `File::edit_with_options` and batch execution. Unknown
 predicates, zero matches and excessive expansion are typed failures.
 
 Record 0099 adds `font.bold` and `font.italic` assignments alongside cell
@@ -2047,9 +2050,10 @@ its target refuses with `unsupported_property`. `Refuse` is the default
 everywhere and the only behaviour of the library verbs (`set`, `add`, `edit`
 closures); `Warn` is OfficeCLI's "apply the rest and warn" and exists only on
 the command channel. `batch::Options` is the command-channel envelope (batch
-mode, unsupported-property policy, `SemanticLimits`) with consuming setters
-`mode`, `unsupported` and `limits`; `File::apply_with` and `File::batch_with`
-take it, and `File::batch_with_limits` delegates to `batch_with`. Skipped
+mode, unsupported-property policy, the transaction's `EditOptions`) with
+consuming setters `mode`, `unsupported` and `edit_options` (record 0362);
+`File::apply_with` and `File::batch_with` take it, and
+`File::batch_with_options` delegates to `batch_with`. Skipped
 properties are reported per item in `Applied::warnings`, each the refusing
 `Error` with its property and item index; no second diagnostics type is
 introduced and `transaction::Diagnostics` is unchanged.
@@ -2065,7 +2069,7 @@ clear (`None`) a slide's direct transition, mirroring
 | Name | Status |
 |---|---|
 | `batch::Unsupported::{Refuse, Warn}` | adopted (0269) |
-| `batch::Options` (`mode`, `unsupported`, `limits`) | adopted (0269) |
+| `batch::Options` (`mode`, `unsupported`, `edit_options`) | adopted (0269); `limits` → `edit_options` (0362) |
 | `File::{apply_with, batch_with}` | adopted (0269) |
 | `Applied::warnings` | adopted (0269) |
 | `litchi_pptx::opened::ShapeFill` | adopted (0269) |
@@ -2120,7 +2124,7 @@ other error.
 ## Unified CSV/TSV import and formula evaluation (record 0266)
 
 `File::import(target, source, &import::Options)` and
-`File::import_with_limits` import delimited text into a worksheet of an XLSX,
+`File::import_with_options` (record 0362) import delimited text into a worksheet of an XLSX,
 XLSB or XLS workbook as one mutation and one native commit, returning
 `transaction::Commit<import::Summary>`; `transaction::Edit::import` is the
 same mutation inside a closure transaction. `import` is the design §13 verb
@@ -2146,7 +2150,7 @@ engine gains `litchi_eval::FormulaEvaluator::with_max_depth` and the
 
 | Name | Status |
 |---|---|
-| `File::{import, import_with_limits}`, `transaction::Edit::import` | adopted (0266) |
+| `File::{import, import_with_options}`, `transaction::Edit::import` | adopted (0266); `import_with_limits` → `import_with_options` (0362) |
 | `import::{Options, Encoding, Summary, Error, OptionKind}` | adopted (0266) |
 | `File::{evaluate, recalculate}` | adopted (0266) |
 | `calc::{Options, Value, ErrorValue, Evaluated, Origin, Report, Formula, Status, Error, LimitKind}` | adopted (0266) |
@@ -2173,15 +2177,16 @@ See [0267](unified-ops/0267-streaming-cell-cursors.md).
 
 ## Unified template merge (record 0274)
 
-`File::merge(&merge::Record, &merge::Options)` and `File::merge_with_limits`
+`File::merge(&merge::Record, &merge::Options)` and `File::merge_with_options`
 fill a DOCX, PPTX or XLSX template's `{{key}}` placeholders (OfficeCLI's
 grammar) and, for DOCX, its `MERGEFIELD` fields from one record, as one
 mutation and at most one native commit, returning
 `transaction::Commit<merge::Summary>`; `transaction::Edit::merge` is the same
 mutation inside a closure transaction. `merge` is the design §13 verb name
 and always means template (mail) merge; document merging is a separate P2
-concern. Data sources are `merge::Data::{from_json, from_json_with_limits,
-from_csv, from_csv_with}` (records in source order); `merge::Record` is one
+concern. Data sources are `merge::Data::{from_json, from_csv}`, each taking
+its `SemanticLimits` as a required argument (record 0362; records in source
+order); `merge::Record` is one
 record of text values. Options are one `merge::Options` (`missing`,
 `fields`) with `merge::Missing::{Keep, Empty}`; limits are the transaction's
 `SemanticLimits` (`max_expanded_targets` bounds replacements,
@@ -2199,7 +2204,7 @@ owning package once for these writes (`Docx` keeps the promotion).
 
 | Name | Status |
 |---|---|
-| `File::{merge, merge_with_limits}`, `transaction::Edit::merge` | adopted (0274) |
+| `File::{merge, merge_with_options}`, `transaction::Edit::merge` | adopted (0274); `merge_with_limits` → `merge_with_options` (0362) |
 | `merge::{Record, Data, Options, Missing, Summary, Error}` | adopted (0274) |
 | `capabilities::Verb::Merge` | adopted (0274) |
 | `litchi_docx::document::Edit::{story, substitute}`; `Edit<Package>::{story_parts, part_story, substitute_part}` | adopted (0274); `story_parts` returns `StoryPart`s (0285) |
@@ -2210,7 +2215,7 @@ See [0274](unified-ops/0274-template-merge.md).
 
 ## Field and table-of-contents refresh (record 0279)
 
-`File::refresh(&refresh::Options)` and `File::refresh_with_limits` recompute
+`File::refresh(&refresh::Options)` and `File::refresh_with_options` recompute
 the derived results a document caches, as one mutation and at most one native
 commit, returning `transaction::Commit<refresh::Summary>`;
 `transaction::Edit::refresh` is the same mutation inside a closure
@@ -2237,7 +2242,7 @@ field run (`a:fld`) as their target, writing its cached result.
 
 | Name | Status |
 |---|---|
-| `File::{refresh, refresh_with_limits}`, `transaction::Edit::refresh` | adopted (0279) |
+| `File::{refresh, refresh_with_options}`, `transaction::Edit::refresh` | adopted (0279); `refresh_with_limits` → `refresh_with_options` (0362) |
 | `refresh::{Options, Clock, PageNumbers, Summary, Field, Status}` | adopted (0279) |
 | `capabilities::Verb::Refresh` | adopted (0279) |
 | CLI `litchi refresh`, Python `File.refresh` | adopted (0279) |
@@ -3075,3 +3080,33 @@ sheet traits and no boxed future in the formula engine.
 | `litchi_eval::FormulaEvaluator::{evaluate_cell, evaluate_sheet}` | kept `async` (0353a); the engine core is synchronous and the futures only await the caller's `Fetch` for `WEBSERVICE` between passes |
 
 See [0353a](unified-ops/0353a-sheet-errors-and-sync-engine.md).
+
+## Unified `File` configuration and commit accessors (record 0362)
+
+`litchi_ops::EditOptions` (re-exported as `litchi::EditOptions`) is the
+per-call configuration of one `File` transaction: the `SemanticLimits` set
+with the consuming `semantic_limits(limits)` and read with
+`semantic_limits_value()`. Every configured `File` write takes it through a
+`_with_options` form; the forms without options use `EditOptions::default()`.
+`transaction::Commit<T>` and `BatchCommit` have no public fields: the triad
+accessors are `file()` (the facade's spelling of `package()`),
+`into_file()`, `patch()`, `diagnostics()`, `into_parts()` and the value
+(`value()`/`into_value()` on `Commit`, `results()`/`into_results()` on
+`BatchCommit`). Detection functions take the `OpenOptions` the detection
+would be opened with (their OOXML source limits bound the OPC probe); the
+OOXML probes of `detect::ooxml` and the record parsers take their limits as
+a required argument.
+
+| Name | Status |
+|---|---|
+| `EditOptions` (`new`, `semantic_limits`, `semantic_limits_value`) | adopted (0362) |
+| `File::{edit_with_options, batch_with_options, import_with_options, merge_with_options, refresh_with_options}` | adopted (0362); replace the `*_with_limits` forms (banned) |
+| `transaction::Commit::{file, into_file, patch, diagnostics, value, into_value, into_parts}` | adopted (0362); public fields removed |
+| `BatchCommit::{file, into_file, patch, diagnostics, results, into_results, into_parts}` | adopted (0362); public fields removed |
+| `batch::Options::edit_options` | adopted (0362); replaces `limits` (banned) |
+| `batch::from_bytes(bytes, &SourceLimits)` | adopted (0362); `from_bytes_with_limits` merged |
+| `merge::Data::{from_json(source, &SemanticLimits), from_csv(source, &import::Options, &SemanticLimits)}` | adopted (0362); `from_json_with_limits`, `from_csv_with` merged (banned) |
+| `detect::{detect_format_smart, detect_format_smart_with_tail, detect_and_prepare, detect_and_prepare_with_tail}` taking `&OpenOptions` | adopted (0362); the `*_with_limits` and `*_with_limits_and_tail` forms merged (banned) |
+| `detect::ooxml::{detect_zip_format, try_detect_zip_format, detect_zip_format_from_reader, try_detect_zip_format_from_reader}` taking `&SourceLimits` | adopted (0362); the aliases `detect_ooxml_format`, `detect_ooxml_format_from_bytes` and their limit forms deleted (banned) |
+| `format::docx::Docx::section_inventory(&section::Limits)` | adopted (0362); `section_inventory_with_limits` merged |
+| `litchi_doc::{body_text, source_backed}::Refusal::kind` | adopted (0362) |

@@ -189,7 +189,7 @@ fn chains_are_bounded_and_forward_chains_resolve_in_order() {
             Ok(())
         })
         .expect("chain")
-        .file;
+        .into_file();
     let deep = file
         .evaluate("/Sheet1/A400", &Options::new())
         .expect("computed in sheet order");
@@ -217,7 +217,7 @@ fn chains_are_bounded_and_forward_chains_resolve_in_order() {
             Ok(())
         })
         .expect("backward chain")
-        .file;
+        .into_file();
     let bounded = Options::new().max_depth(8);
     assert_eq!(
         backward

@@ -3,6 +3,7 @@
 use std::{fmt, sync::Arc};
 
 use litchi_core::{Error, Position, Result};
+use litchi_odf_common::XmlStreamLimits;
 
 use crate::{
     codec::names as codec,
@@ -69,6 +70,7 @@ impl From<usize> for Selector<'_> {
 pub struct Snapshot {
     source: Arc<[u8]>,
     definitions: Arc<[Definition]>,
+    xml_limits: XmlStreamLimits,
 }
 
 impl fmt::Debug for Snapshot {
@@ -88,15 +90,23 @@ impl Snapshot {
     ///
     /// Returns an error when the package or named-definition catalog is invalid.
     pub fn from_bytes(source: Vec<u8>) -> Result<Self> {
-        Self::from_arc(Arc::from(source))
+        Self::from_bytes_with_xml_limits(source, XmlStreamLimits::owner_default_value())
     }
 
-    fn from_arc(source: Arc<[u8]>) -> Result<Self> {
-        let package = Archive::from_bytes(source.as_ref().to_vec())?;
+    pub(crate) fn from_bytes_with_xml_limits(
+        source: Vec<u8>,
+        xml_limits: XmlStreamLimits,
+    ) -> Result<Self> {
+        Self::from_arc_with_xml_limits(Arc::from(source), xml_limits)
+    }
+
+    fn from_arc_with_xml_limits(source: Arc<[u8]>, xml_limits: XmlStreamLimits) -> Result<Self> {
+        let package = Archive::from_bytes_with_xml_limits(source.as_ref().to_vec(), xml_limits)?;
         let definitions = Arc::from(package.definitions()?);
         Ok(Self {
             source,
             definitions,
+            xml_limits,
         })
     }
 
@@ -264,7 +274,10 @@ impl Edit {
             return Ok(Commit::unchanged(self.before));
         }
 
-        let package = Archive::from_bytes(self.before.source.as_ref().to_vec())?;
+        let package = Archive::from_bytes_with_xml_limits(
+            self.before.source.as_ref().to_vec(),
+            self.before.xml_limits,
+        )?;
         let content_xml = codec::replace(package.content_xml(), &self.draft)?;
         litchi_odf_common::compact_xml::validate(
             crate::package::compact_prolog(&content_xml).as_bytes(),
@@ -272,7 +285,10 @@ impl Edit {
         )
         .map_err(Error::from)?;
         let target_package = package.replace_content_xml(&content_xml)?;
-        let target = Snapshot::from_bytes(target_package.into_bytes())?;
+        let target = Snapshot::from_bytes_with_xml_limits(
+            target_package.into_bytes(),
+            self.before.xml_limits,
+        )?;
         if target.definitions() != self.draft {
             return Err(Error::InvalidFormat(
                 "ODS named-definition typed readback does not match the staged edit".to_string(),

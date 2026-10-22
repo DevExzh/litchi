@@ -13,6 +13,44 @@ const REAL_USER_FIELD: &[u8] =
 const EXACT_MACRO_METADATA: &str = r#"<o:document xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:script:1.0" xmlns:ooo="http://openoffice.org/2004/office" o:mimetype="application/vnd.oasis.opendocument.text"><o:scripts><o:script s:language="ooo:Basic"><ooo:libraries><ooo:library name="Standard"/></ooo:libraries></o:script></o:scripts><o:body><o:text><text:p xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0">Body</text:p></o:text></o:body></o:document>"#;
 
 #[test]
+fn flat_content_budget_preserves_its_dimension_for_bytes_and_readers() {
+    use litchi_odt::{Error, LimitKind, OpenOptions, SemanticLimitKind, SemanticLimits};
+
+    let length = u64::try_from(REAL_FLAT_TEXT.len()).unwrap();
+    for maximum in [length, length - 1] {
+        let options = OpenOptions::new().semantic_limits(
+            SemanticLimits::builder()
+                .max_content_bytes(maximum)
+                .unwrap()
+                .build()
+                .unwrap(),
+        );
+        for result in [
+            Document::from_bytes_with_options(REAL_FLAT_TEXT, options),
+            Document::from_reader_with_options(REAL_FLAT_TEXT, options),
+        ] {
+            if maximum == length {
+                assert_eq!(result.unwrap().as_bytes(), REAL_FLAT_TEXT);
+            } else {
+                let error = result
+                    .map(|_| ())
+                    .expect_err("one byte under the semantic ceiling");
+                assert!(
+                    matches!(error,
+                        Error::Limit {
+                            kind: LimitKind::Semantic(SemanticLimitKind::ContentBytes),
+                            observed,
+                            maximum: actual_maximum,
+                        } if observed == length && actual_maximum == maximum
+                    ),
+                    "{error}"
+                );
+            }
+        }
+    }
+}
+
+#[test]
 fn flat_text_document_exposes_paragraphs_headings_and_tables() {
     let document = Document::from_bytes(FLAT_TEXT.as_bytes()).unwrap();
     let text = document.text().unwrap();

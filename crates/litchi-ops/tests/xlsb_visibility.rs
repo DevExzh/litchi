@@ -456,19 +456,19 @@ fn no_op_visibility_bytes_and_inverse_patches_are_exact() {
         let commit = transition_source
             .edit(|edit| edit.set(FIRST, props! { "visibility" => "hidden" }))
             .expect("stage visibility transition");
-        assert!(commit.diagnostics.changed());
+        assert!(commit.diagnostics().changed());
         let replayed = commit
-            .patch
+            .patch()
             .apply(&transition_source)
             .expect("replay visibility patch");
         assert_eq!(
             replayed.to_bytes().expect("publish replay"),
-            commit.file.to_bytes().expect("publish target")
+            commit.file().to_bytes().expect("publish target")
         );
         let restored = commit
-            .patch
+            .patch()
             .inverse()
-            .apply(&commit.file)
+            .apply(commit.file())
             .expect("apply inverse visibility patch");
         assert_eq!(
             restored.to_bytes().expect("publish inverse"),
@@ -484,13 +484,13 @@ fn no_op_visibility_bytes_and_inverse_patches_are_exact() {
                 edit.set(FIRST, props! { "visibility" => "visible" })
             })
             .expect("stage hide then reveal");
-        assert!(round_trip.diagnostics.changed());
-        assert_eq!(sheet_property(&round_trip.file, FIRST, "visibility"), None);
+        assert!(round_trip.diagnostics().changed());
+        assert_eq!(sheet_property(round_trip.file(), FIRST, "visibility"), None);
         assert_eq!(
             round_trip
-                .patch
+                .patch()
                 .inverse()
-                .apply(&round_trip.file)
+                .apply(round_trip.file())
                 .unwrap()
                 .to_bytes()
                 .unwrap(),
@@ -513,20 +513,20 @@ fn mixed_visibility_cell_batches_keep_family_boundaries_and_atomicity() {
         let commit = source
             .batch(commands, BatchMode::Atomic)
             .expect("mixed visibility and cell batch");
-        assert_eq!(commit.results.len(), 3);
+        assert_eq!(commit.results().len(), 3);
         assert!(
-            commit.results.iter().all(|result| {
+            commit.results().iter().all(|result| {
                 matches!(result, ItemResult::Applied(applied) if applied.changed)
             })
         );
-        assert_eq!(commit.diagnostics.operations(), 3);
-        assert!(commit.diagnostics.commits() >= 2);
+        assert_eq!(commit.diagnostics().operations(), 3);
+        assert!(commit.diagnostics().commits() >= 2);
         assert_eq!(
-            sheet_property(&commit.file, FIRST, "visibility").as_deref(),
+            sheet_property(commit.file(), FIRST, "visibility").as_deref(),
             Some("hidden")
         );
         assert_eq!(
-            sheet_property(&commit.file, SECOND, "visibility").as_deref(),
+            sheet_property(commit.file(), SECOND, "visibility").as_deref(),
             Some("hidden")
         );
         assert_eq!(source.to_bytes().expect("source remains unchanged"), before);
@@ -561,10 +561,13 @@ fn visibility_queries_and_batches_honor_transaction_quotas() {
             .build()
             .expect("valid operation profile");
         let operation_error = source
-            .edit_with_limits(&one_operation, |edit| {
-                edit.set(FIRST, props! { "visibility" => "hidden" })?;
-                edit.set(SECOND, props! { "visibility" => "hidden" })
-            })
+            .edit_with_options(
+                litchi_ops::EditOptions::new().semantic_limits(one_operation),
+                |edit| {
+                    edit.set(FIRST, props! { "visibility" => "hidden" })?;
+                    edit.set(SECOND, props! { "visibility" => "hidden" })
+                },
+            )
             .expect_err("two visibility operations exceed the bound");
         assert_eq!(operation_error.code(), Code::LimitExceeded);
 
@@ -574,12 +577,15 @@ fn visibility_queries_and_batches_honor_transaction_quotas() {
             .build()
             .expect("valid target profile");
         let target_error = source
-            .edit_with_limits(&one_target, |edit| {
-                edit.set(
-                    scoped_sheet_query("sheet[name!=Data]"),
-                    props! { "visibility" => "hidden" },
-                )
-            })
+            .edit_with_options(
+                litchi_ops::EditOptions::new().semantic_limits(one_target),
+                |edit| {
+                    edit.set(
+                        scoped_sheet_query("sheet[name!=Data]"),
+                        props! { "visibility" => "hidden" },
+                    )
+                },
+            )
             .expect_err("multi-target visibility query exceeds the bound");
         assert_eq!(target_error.code(), Code::LimitExceeded);
 
@@ -589,9 +595,10 @@ fn visibility_queries_and_batches_honor_transaction_quotas() {
             .build()
             .expect("valid snapshot profile");
         let snapshot_error = source
-            .edit_with_limits(&tiny_snapshot, |edit| {
-                edit.set(FIRST, props! { "visibility" => "hidden" })
-            })
+            .edit_with_options(
+                litchi_ops::EditOptions::new().semantic_limits(tiny_snapshot),
+                |edit| edit.set(FIRST, props! { "visibility" => "hidden" }),
+            )
             .expect_err("visibility patch exceeds the snapshot bound");
         assert_eq!(snapshot_error.code(), Code::LimitExceeded);
         assert_eq!(
@@ -719,16 +726,16 @@ fn hiding_active_or_selected_tabs_updates_view_state_and_inverse_restores_it() {
         let commit = source
             .edit(|edit| edit.set(FIRST, props! { "hidden" => true }))
             .unwrap();
-        let after = commit.file.to_bytes().unwrap();
+        let after = commit.file().to_bytes().unwrap();
         let workbook = litchi_xlsb::Workbook::new(Cursor::new(after.clone())).unwrap();
         assert_eq!(workbook.active_catalog_position(), Some(1));
         assert_eq!(
-            sheet_property(&commit.file, "/", "activeTab").as_deref(),
+            sheet_property(commit.file(), "/", "activeTab").as_deref(),
             Some("1")
         );
         assert!(!worksheet_selected(&after, "/xl/worksheets/sheet1.bin"));
         assert!(worksheet_selected(&after, "/xl/worksheets/sheet2.bin"));
-        let restored = commit.patch.inverse().apply(&commit.file).unwrap();
+        let restored = commit.patch().inverse().apply(commit.file()).unwrap();
         assert_eq!(restored.to_bytes().unwrap(), before);
 
         let nonactive = source.set(THIRD, props! { "hidden" => true }).unwrap();

@@ -17,7 +17,7 @@ const FIXTURES: [&str; 3] = [
 
 /// The facade's byte route: smart detection hands back the prepared package.
 fn open_prepared(bytes: Vec<u8>) -> Odt {
-    match detect_format_smart(bytes) {
+    match detect_format_smart(bytes, &crate::detect::SourceLimits::default()) {
         Some(DetectedFormat::Odt(prepared)) => {
             Odt::from_prepared(prepared, &OpenOptions::default()).expect("open prepared ODT")
         },
@@ -172,10 +172,11 @@ fn malformed_odt() -> Vec<u8> {
 
 #[test]
 fn malformed_body_is_a_typed_core_error() {
-    let prepared = match detect_format_smart(malformed_odt()) {
-        Some(DetectedFormat::Odt(prepared)) => prepared,
-        other => panic!("expected ODT detection, got {other:?}"),
-    };
+    let prepared =
+        match detect_format_smart(malformed_odt(), &crate::detect::SourceLimits::default()) {
+            Some(DetectedFormat::Odt(prepared)) => prepared,
+            other => panic!("expected ODT detection, got {other:?}"),
+        };
     let error = match Odt::from_prepared(prepared, &OpenOptions::default()) {
         Ok(odt) => odt.text().expect_err("malformed body must not read"),
         Err(error) => error,

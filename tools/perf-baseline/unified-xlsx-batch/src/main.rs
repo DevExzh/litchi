@@ -70,28 +70,28 @@ fn verify_unified(
     expected: &[u8],
 ) -> Result<()> {
     let changed = candidate
-        .results
+        .results()
         .iter()
         .filter(|result| matches!(result, ItemResult::Applied(applied) if applied.changed))
         .count();
-    if candidate.results.len() != workload.count
+    if candidate.results().len() != workload.count
         || changed != workload.count
-        || candidate.diagnostics.operations() != workload.count
-        || candidate.diagnostics.leaf_operations() != workload.count
-        || candidate.diagnostics.commits() != 1
+        || candidate.diagnostics().operations() != workload.count
+        || candidate.diagnostics().leaf_operations() != workload.count
+        || candidate.diagnostics().commits() != 1
     {
         return Err(format!(
             "unified accounting mismatch for {} cells: results={}, changed={}, operations={}, leaf_operations={}, commits={}",
             workload.count,
-            candidate.results.len(),
+            candidate.results().len(),
             changed,
-            candidate.diagnostics.operations(),
-            candidate.diagnostics.leaf_operations(),
-            candidate.diagnostics.commits(),
+            candidate.diagnostics().operations(),
+            candidate.diagnostics().leaf_operations(),
+            candidate.diagnostics().commits(),
         )
         .into());
     }
-    if candidate.file.to_bytes()? != expected {
+    if candidate.file().to_bytes()? != expected {
         return Err(format!("native/unified bytes differ for {} cells", workload.count).into());
     }
     Ok(())

@@ -88,7 +88,7 @@ fn open_bytes(bytes: Vec<u8>, options: &OpenOptions) -> Result<Docx, Error> {
 
 /// The facade's eager route: `DetectedFormat::Docx` from smart detection.
 fn open_eager(bytes: Vec<u8>, options: &OpenOptions) -> Result<Docx, Error> {
-    match detect_format_smart(bytes) {
+    match detect_format_smart(bytes, &crate::detect::SourceLimits::default()) {
         Some(DetectedFormat::Docx(package)) => Docx::from_opc_package(package, options),
         _ => panic!("bytes are not detected as DOCX"),
     }
@@ -98,7 +98,9 @@ fn open_eager(bytes: Vec<u8>, options: &OpenOptions) -> Result<Docx, Error> {
 /// `open_prepared_with`.
 #[cfg(any(unix, windows))]
 fn open_prepared(path: &std::path::Path, options: &OpenOptions) -> Result<Docx, Error> {
-    let detection = crate::detect::detect_and_prepare(path).expect("a DOCX path is prepared");
+    let detection =
+        crate::detect::detect_and_prepare(path, &crate::detect::SourceLimits::default())
+            .expect("a DOCX path is prepared");
     match crate::open_prepared_with(detection, options)? {
         crate::File::Docx(docx) => Ok(docx),
         other => panic!("{} opened as {other:?}", path.display()),
@@ -279,7 +281,9 @@ fn malformed_main_xml_is_deferred_on_source_and_refused_on_eager() {
     assert_eq!(error.format(), Some(FileFormat::Docx));
     assert!(matches!(error.leaf(), Source::Docx(_)), "{error:?}");
     assert_eq!(
-        docx.section_inventory().unwrap_err().code(),
+        docx.section_inventory(&litchi_docx::section::Limits::default())
+            .unwrap_err()
+            .code(),
         Code::CorruptFile
     );
 
@@ -292,10 +296,15 @@ fn section_inventory_matches_on_both_owners() {
     let bytes = minimal_docx(SECTION_XML);
     let source = open_bytes(bytes.clone(), &OpenOptions::new()).unwrap();
     let eager = open_eager(bytes, &OpenOptions::new()).unwrap();
-    let inventory = source.section_inventory().unwrap();
+    let inventory = source
+        .section_inventory(&litchi_docx::section::Limits::default())
+        .unwrap();
     assert_eq!(
         inventory.sections(),
-        eager.section_inventory().unwrap().sections()
+        eager
+            .section_inventory(&litchi_docx::section::Limits::default())
+            .unwrap()
+            .sections()
     );
     assert_eq!(inventory.paragraph_count(), 2);
     assert_eq!(inventory.sections().len(), 2);
@@ -317,7 +326,7 @@ fn section_inventory_matches_on_both_owners() {
         ..Default::default()
     };
     for docx in [&source, &eager] {
-        let error = docx.section_inventory_with_limits(&limits).unwrap_err();
+        let error = docx.section_inventory(&limits).unwrap_err();
         assert_eq!(error.code(), Code::LimitExceeded, "{error:?}");
     }
 }
@@ -347,7 +356,8 @@ fn every_source_read_reports_a_changed_file() {
         docx.text().unwrap_err(),
         docx.metadata().unwrap_err(),
         docx.tolerance_report().unwrap_err(),
-        docx.section_inventory().unwrap_err(),
+        docx.section_inventory(&litchi_docx::section::Limits::default())
+            .unwrap_err(),
         docx.edit().unwrap_err(),
         docx.owner().check_source().unwrap_err(),
     ];
