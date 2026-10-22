@@ -381,7 +381,11 @@ impl Builder {
             crate::codec::names::replace(&self.content_xml, &self.definitions)?
         };
         if let Some(settings) = &self.settings {
-            let snapshot = crate::settings::Snapshot::from_content_xml(&content_xml)?;
+            // Authored content is admitted under the documented owner default.
+            let snapshot = crate::settings::Snapshot::from_content_xml(
+                &content_xml,
+                XmlStreamLimits::owner_default_value(),
+            )?;
             let mut transaction = snapshot.transaction();
             transaction.replace(settings.clone())?;
             content_xml = transaction.commit()?.into_owned();

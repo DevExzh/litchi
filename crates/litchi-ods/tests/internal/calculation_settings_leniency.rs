@@ -185,18 +185,32 @@ fn duplicates_and_undeclared_entities_stay_hard_errors() {
 #[test]
 fn the_standalone_parser_reports_the_same_repairs() {
     let xml = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:x="urn:example:vendor"><office:body><office:spreadsheet><table:calculation-settings><table:iteration/><x:extra><x:inner/></x:extra><table:null-date/></table:calculation-settings></office:spreadsheet></office:body></office:document-content>"#;
-    let (settings, report) = litchi_odf_common::calculation::parse_with_report(xml).unwrap();
+    let (settings, report) = litchi_odf_common::calculation::parse_with_report(
+        xml,
+        litchi_odf_common::XmlStreamLimits::owner_default_value(),
+    )
+    .unwrap();
     let settings = settings.unwrap();
     assert!(settings.iteration.is_some() && settings.null_date.is_some());
     assert_eq!(recorded(&report), [UNKNOWN_FOREIGN, REORDERED]);
-    assert!(litchi_odf_common::calculation::parse(xml).is_ok());
+    assert!(
+        litchi_odf_common::calculation::parse(
+            xml,
+            litchi_odf_common::XmlStreamLimits::owner_default_value()
+        )
+        .is_ok()
+    );
 }
 
 #[test]
 fn a_skipped_child_is_never_silently_dropped_by_an_edit() {
     let bytes = with_settings_children(r#"<loext:vendor-setting loext:mode="fast"/>"#);
     let owned = Package::from_bytes(&bytes).unwrap().workbook().unwrap();
-    let snapshot = crate::settings::Snapshot::from_content_xml(owned.content_xml()).unwrap();
+    let snapshot = crate::settings::Snapshot::from_content_xml(
+        owned.content_xml(),
+        litchi_odf_common::XmlStreamLimits::owner_default_value(),
+    )
+    .unwrap();
 
     // An unchanged commit borrows the source and keeps the vendor child.
     let unchanged = snapshot.transaction().commit().unwrap();

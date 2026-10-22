@@ -147,7 +147,11 @@ impl Document {
 
     /// Return inert calculation settings stored beside the chart.
     pub fn calculation_settings(&self) -> Result<Option<Settings>> {
-        parse(&self.package.content_xml()?)
+        parse(
+            &self.package.content_xml()?,
+            self.package.xml_limits_value(),
+        )
+        .map_err(Error::from)
     }
 
     /// Inspect ordered ODF variable declarations without evaluating fields or formulas.

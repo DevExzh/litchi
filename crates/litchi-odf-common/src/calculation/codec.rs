@@ -4,10 +4,14 @@ use litchi_core::{Error, Result, xml::escape_xml};
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, NamespaceResolver, ResolveResult};
-use quick_xml::reader::NsReader;
 use std::num::NonZeroUsize;
 
 use super::model::{Iteration, IterationStatus, NullDate, Settings};
+use crate::Error as OdfError;
+use crate::core::{ResolvedReader, XmlStreamLimits};
+use crate::limits::RawXmlLimitKind;
+
+type OdfResult<T> = std::result::Result<T, OdfError>;
 use crate::leniency::{ContentDefect, ToleranceReport};
 
 const TABLE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:table:1.0";
@@ -78,18 +82,23 @@ pub fn write(out: &mut String, settings_option: Option<&Settings>) -> Result<()>
     Ok(())
 }
 
-/// Parse a bounded calculation-settings XML fragment.
+/// Parse a bounded calculation-settings XML fragment under the caller's raw
+/// XML policy.
 ///
+/// The policy bounds the source bytes, nesting depth, events, attributes,
+/// token bytes and namespace declarations while the fragment is read; an
+/// exceeded dimension is returned as
+/// [`LimitKind::RawXml`](crate::LimitKind::RawXml) with its observation.
 /// This standalone path keeps the historical inline event loop for latency
 /// parity on non-fused callers; family owners' fused parsers drive the
-/// equivalent [`CalculationHandler`] instead.
+/// equivalent [`CalculationHandler`] under their retained reader policy.
 ///
 /// # Errors
 ///
-/// Returns an error for malformed XML, invalid settings, or exceeded resource
-/// limits.
-pub fn parse(xml: &str) -> Result<Option<Settings>> {
-    parse_with_report(xml).map(|(settings, _tolerance)| settings)
+/// Returns an error for malformed XML, invalid settings, or an exceeded
+/// resource limit.
+pub fn parse(xml: &str, limits: XmlStreamLimits) -> OdfResult<Option<Settings>> {
+    parse_with_report(xml, limits).map(|(settings, _tolerance)| settings)
 }
 
 /// [`parse`], also returning the repairs applied while parsing.
@@ -104,28 +113,21 @@ pub fn parse(xml: &str) -> Result<Option<Settings>> {
 ///
 /// Returns an error for malformed XML, invalid settings, or exceeded resource
 /// limits.
-pub fn parse_with_report(xml: &str) -> Result<(Option<Settings>, ToleranceReport)> {
-    validate_size(xml)?;
+pub fn parse_with_report(
+    xml: &str,
+    limits: XmlStreamLimits,
+) -> OdfResult<(Option<Settings>, ToleranceReport)> {
     let mut tolerance = ToleranceReport::default();
     let mut skip_depth = 0usize;
-    let mut reader = NsReader::from_str(xml);
+    let mut reader = ResolvedReader::from_xml(xml, limits)?;
     let mut buf = Vec::new();
     let mut current = None;
     let mut result = None;
     let mut child_open = false;
     let mut depth = 0usize;
-    let mut events = 0usize;
     let mut document_body_depth = None;
     loop {
-        events = events.saturating_add(1);
-        if events > super::MAX_EVENTS {
-            return Err(Error::InvalidFormat(
-                "calculation settings XML exceeds the event limit".to_string(),
-            ));
-        }
-        let (namespace, event) = reader
-            .read_resolved_event_into(&mut buf)
-            .map_err(|error| Error::InvalidFormat(format!("XML parsing error: {error}")))?;
+        let (namespace, event) = reader.read_resolved_event_into(&mut buf)?;
         let is_table = is_namespace(&namespace);
         let is_start = matches!(&event, Event::Start(_));
         let is_end = matches!(&event, Event::End(_));
@@ -144,15 +146,13 @@ pub fn parse_with_report(xml: &str) -> Result<(Option<Settings>, ToleranceReport
                 if is_table && element.local_name().as_ref() == b"calculation-settings" =>
             {
                 if !is_document_body_child {
-                    return Err(Error::InvalidFormat(
+                    return Err(invalid(
                         "table:calculation-settings must be a direct office document-body child"
                             .to_string(),
                     ));
                 }
                 if current.is_some() || result.is_some() {
-                    return Err(Error::InvalidFormat(
-                        "duplicate table:calculation-settings".to_string(),
-                    ));
+                    return Err(invalid("duplicate table:calculation-settings".to_string()));
                 }
                 current = Some(parse_settings_attributes(
                     reader.resolver(),
@@ -164,15 +164,13 @@ pub fn parse_with_report(xml: &str) -> Result<(Option<Settings>, ToleranceReport
                 if is_table && element.local_name().as_ref() == b"calculation-settings" =>
             {
                 if !is_document_body_child {
-                    return Err(Error::InvalidFormat(
+                    return Err(invalid(
                         "table:calculation-settings must be a direct office document-body child"
                             .to_string(),
                     ));
                 }
                 if current.is_some() || result.is_some() {
-                    return Err(Error::InvalidFormat(
-                        "duplicate table:calculation-settings".to_string(),
-                    ));
+                    return Err(invalid("duplicate table:calculation-settings".to_string()));
                 }
                 result = Some(parse_settings_attributes(
                     reader.resolver(),
@@ -193,12 +191,12 @@ pub fn parse_with_report(xml: &str) -> Result<(Option<Settings>, ToleranceReport
             },
             Event::Start(element) if current.is_some() => {
                 if child_open {
-                    return Err(Error::InvalidFormat(
+                    return Err(invalid(
                         "calculation setting children must be empty".to_string(),
                     ));
                 }
                 let settings = current.as_mut().ok_or_else(|| {
-                    Error::InvalidFormat("calculation settings child has no parent".to_string())
+                    invalid("calculation settings child has no parent".to_string())
                 })?;
                 if settings_child(
                     settings,
@@ -215,12 +213,12 @@ pub fn parse_with_report(xml: &str) -> Result<(Option<Settings>, ToleranceReport
             },
             Event::Empty(element) if current.is_some() => {
                 if child_open {
-                    return Err(Error::InvalidFormat(
+                    return Err(invalid(
                         "calculation setting children must be empty".to_string(),
                     ));
                 }
                 let settings = current.as_mut().ok_or_else(|| {
-                    Error::InvalidFormat("calculation settings child has no parent".to_string())
+                    invalid("calculation settings child has no parent".to_string())
                 })?;
                 settings_child(
                     settings,
@@ -240,26 +238,26 @@ pub fn parse_with_report(xml: &str) -> Result<(Option<Settings>, ToleranceReport
             },
             Event::Text(text) if current.is_some() => {
                 let text_content = text.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
-                    Error::InvalidFormat(format!("invalid calculation settings text: {error}"))
+                    invalid(format!("invalid calculation settings text: {error}"))
                 })?;
                 if !text_content.trim().is_empty() {
-                    return Err(Error::InvalidFormat(
+                    return Err(invalid(
                         "table:calculation-settings cannot contain text".to_string(),
                     ));
                 }
             },
             Event::CData(text) if current.is_some() => {
                 let cdata_content = text.xml_content(XmlVersion::Explicit1_0).map_err(|error| {
-                    Error::InvalidFormat(format!("invalid calculation settings CDATA: {error}"))
+                    invalid(format!("invalid calculation settings CDATA: {error}"))
                 })?;
                 if !cdata_content.trim().is_empty() {
-                    return Err(Error::InvalidFormat(
+                    return Err(invalid(
                         "table:calculation-settings cannot contain CDATA".to_string(),
                     ));
                 }
             },
             Event::GeneralRef(_) if current.is_some() => {
-                return Err(Error::InvalidFormat(
+                return Err(invalid(
                     "table:calculation-settings cannot contain entity references".to_string(),
                 ));
             },
@@ -276,11 +274,6 @@ pub fn parse_with_report(xml: &str) -> Result<(Option<Settings>, ToleranceReport
             | Event::GeneralRef(_) => {},
         }
         if is_start {
-            if depth >= super::MAX_DEPTH {
-                return Err(Error::InvalidFormat(
-                    "calculation settings XML exceeds the nesting limit".to_string(),
-                ));
-            }
             depth = depth.saturating_add(1);
         } else if is_end {
             depth = depth.saturating_sub(1);
@@ -288,7 +281,7 @@ pub fn parse_with_report(xml: &str) -> Result<(Option<Settings>, ToleranceReport
         buf.clear();
     }
     if current.is_some() {
-        return Err(Error::InvalidFormat(
+        return Err(invalid(
             "unterminated table:calculation-settings".to_string(),
         ));
     }
@@ -298,17 +291,35 @@ pub fn parse_with_report(xml: &str) -> Result<(Option<Settings>, ToleranceReport
     Ok((result, tolerance))
 }
 
+/// A malformed-settings failure at the ODF raw boundary.
+fn invalid(message: String) -> OdfError {
+    OdfError::from(Error::InvalidFormat(message))
+}
+
 /// Enforce the pre-parse byte-size limit of the calculation-settings source.
 ///
 /// Internal plumbing for family owners' fused parsers, not a supported API.
 #[doc(hidden)]
 pub fn validate_size(xml: &str) -> Result<()> {
     if xml.len() > super::MAX_XML_BYTES {
-        return Err(Error::InvalidFormat(
-            "calculation settings XML exceeds the size limit".to_string(),
+        return Err(raw_limit(
+            RawXmlLimitKind::InputBytes,
+            xml.len(),
+            super::MAX_XML_BYTES,
         ));
     }
     Ok(())
+}
+
+/// The fused handler's historical envelope reports the same typed raw XML
+/// dimension that [`ResolvedReader`] reports for an explicit policy, so a
+/// fused open and the standalone [`parse`] agree on every bound.
+fn raw_limit(kind: RawXmlLimitKind, observed: usize, maximum: usize) -> Error {
+    Error::from(OdfError::Limit {
+        kind: crate::LimitKind::RawXml(kind),
+        observed: u64::try_from(observed).unwrap_or(u64::MAX),
+        maximum: u64::try_from(maximum).unwrap_or(u64::MAX),
+    })
 }
 
 /// Classify the resolved namespace as `(is_table, is_office)` for
@@ -360,8 +371,10 @@ impl CalculationHandler {
     ) -> Result<()> {
         self.events = self.events.saturating_add(1);
         if self.events > super::MAX_EVENTS {
-            return Err(Error::InvalidFormat(
-                "calculation settings XML exceeds the event limit".to_string(),
+            return Err(raw_limit(
+                RawXmlLimitKind::Events,
+                self.events,
+                super::MAX_EVENTS,
             ));
         }
         let is_start = matches!(event, Event::Start(_));
@@ -508,8 +521,10 @@ impl CalculationHandler {
         }
         if is_start {
             if self.depth >= super::MAX_DEPTH {
-                return Err(Error::InvalidFormat(
-                    "calculation settings XML exceeds the nesting limit".to_string(),
+                return Err(raw_limit(
+                    RawXmlLimitKind::Depth,
+                    self.depth.saturating_add(1),
+                    super::MAX_DEPTH,
                 ));
             }
             self.depth = self.depth.saturating_add(1);

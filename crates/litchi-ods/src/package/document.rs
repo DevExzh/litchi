@@ -330,7 +330,8 @@ impl Archive {
 
     /// Replace the content-level calculation-settings owner atomically.
     pub(crate) fn replace_calculation_settings(&self, settings: Option<&Settings>) -> Result<Self> {
-        let snapshot = crate::settings::Snapshot::from_content_xml(self.content_xml())?;
+        let snapshot =
+            crate::settings::Snapshot::from_content_xml(self.content_xml(), self.xml_limits)?;
         let mut transaction = snapshot.transaction();
         match settings {
             Some(settings) => transaction.replace(settings.clone())?,
