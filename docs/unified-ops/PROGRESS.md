@@ -1812,3 +1812,10 @@ See [0063](0063-source-pptx-modern-comments.md).
   Numbers, Pages and Keynote owner Snappy policies remain active engineering
   work. No new performance exception or redaction deferral is accepted, and
   nothing has been pushed.
+
+- Coordinator documentation follow-up (2026-10-22): design §16.4 now names
+  the implemented `litchi-sheet-text` leaf and its facade re-export, and the
+  retired iWork facade now points to `File` and immutable leaf packages.
+  This closes the queued §16.4 update without changing the historical
+  measurement records. Remaining implementation, performance and final
+  integration work stays open.
