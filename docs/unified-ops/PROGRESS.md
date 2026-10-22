@@ -2203,8 +2203,11 @@ See [0063](0063-source-pptx-modern-comments.md).
   DOCX section migration `96c9c4ac5c`, and IWA package-triad migration
   `5a5715688a`. Their remaining consumer checks and combined validation are
   required before acceptance. DOCX document memoization was returned again:
-  the first cache missed in-place mutation, and its generation repair added
-  allocations and invalidated unchanged branches. Story raw replay is under
+  generation tracking added allocations and invalidated unchanged branches.
+  Pinned Rust 1.95 source review confirms that the existing weak key already
+  invalidates on `Arc::make_mut`; the suspected in-place mutation hole was
+  not present. Memo allocation and branch reuse still need repair. Story raw
+  replay is under
   independent review and still needs original-lifecycle qualification.
 
   Performance returns remain active for XLSX raw admission and reader state,
