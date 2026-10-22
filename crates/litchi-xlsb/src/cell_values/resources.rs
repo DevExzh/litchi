@@ -41,7 +41,11 @@ pub(super) struct StylePlan {
     pub(super) xf_tail: [u8; 6],
 }
 
-pub(super) fn plan_style(style: &super::structure::AuthoredStyle) -> Result<StylePlan> {
+pub(super) fn plan_style(
+    style: &super::structure::AuthoredStyle,
+    limits: RawLimits,
+) -> Result<StylePlan> {
+    limits.validate()?;
     let alignment = style.alignment.as_ref();
     if alignment
         .is_some_and(|value| value.rotation > 180 || value.indent > 250 || value.text_direction > 2)
@@ -61,16 +65,37 @@ pub(super) fn plan_style(style: &super::structure::AuthoredStyle) -> Result<Styl
     }
     if let Some(code) = &style.number_format {
         let units = code.encode_utf16().count();
-        if !(1..=255).contains(&units) || code.contains('\0') {
+        if !(1..=255).contains(&units) || units > limits.string_units() || code.contains('\0') {
             return Err(Error::InvalidFormat(
                 "authored number format must contain 1..=255 UTF-16 units and no NUL",
             ));
         }
     }
+    let font = crate::writer::StylesWriter::encode_font_payload(&style.font)?;
+    if style.font.name.encode_utf16().count() > limits.string_units() {
+        return Err(crate::raw::Error::StringLimit {
+            units: style.font.name.encode_utf16().count(),
+            limit: limits.string_units(),
+            offset: 0,
+        }
+        .into());
+    }
+    let fill = crate::writer::StylesWriter::encode_fill_payload(&style.fill)?;
+    let border = encode_authored_border(&style.border)?;
+    for payload in [&font, &fill, &border] {
+        if payload.len() > limits.payload() {
+            return Err(crate::raw::Error::PayloadLimit {
+                length: payload.len(),
+                limit: limits.payload(),
+                offset: 0,
+            }
+            .into());
+        }
+    }
     Ok(StylePlan {
-        font: crate::writer::StylesWriter::encode_font_payload(&style.font)?,
-        fill: crate::writer::StylesWriter::encode_fill_payload(&style.fill)?,
-        border: encode_authored_border(&style.border)?,
+        font,
+        fill,
+        border,
         number_format: style.number_format.clone(),
         xf_tail,
     })
@@ -176,8 +201,12 @@ pub(super) const fn vertical_bits(value: crate::styles::VerticalAlignment) -> u8
     }
 }
 
-pub(super) fn intern_style_plan(package: &mut OpcPackage, plan: &StylePlan) -> Result<StyleIndex> {
-    ensure_styles_part(package)?;
+pub(super) fn intern_style_plan(
+    package: &mut OpcPackage,
+    plan: &StylePlan,
+    limits: RawLimits,
+) -> Result<StyleIndex> {
+    ensure_styles_part(package, limits)?;
     let uri = PackURI::new(STYLES_URI)?;
     let mut styles = package.get_part(&uri)?.blob().to_vec();
     let font = intern_payload(
@@ -186,6 +215,7 @@ pub(super) fn intern_style_plan(package: &mut OpcPackage, plan: &StylePlan) -> R
         kind::END_FONTS,
         kind::FONT,
         &plan.font,
+        limits,
     )?;
     let fill = intern_payload(
         &mut styles,
@@ -193,6 +223,7 @@ pub(super) fn intern_style_plan(package: &mut OpcPackage, plan: &StylePlan) -> R
         kind::END_FILLS,
         kind::FILL,
         &plan.fill,
+        limits,
     )?;
     let border = intern_payload(
         &mut styles,
@@ -200,9 +231,10 @@ pub(super) fn intern_style_plan(package: &mut OpcPackage, plan: &StylePlan) -> R
         kind::END_BORDERS,
         kind::BORDER,
         &plan.border,
+        limits,
     )?;
     let number_format = match &plan.number_format {
-        Some(code) => intern_number_format(&mut styles, code)?,
+        Some(code) => intern_number_format(&mut styles, code, limits)?,
         None => 0,
     };
     let mut xf = vec![0_u8; 16];
@@ -218,12 +250,13 @@ pub(super) fn intern_style_plan(package: &mut OpcPackage, plan: &StylePlan) -> R
         kind::END_CELL_XFS,
         kind::XF,
         &xf,
+        limits,
     )?;
     package.get_part_mut(&uri)?.set_blob(styles);
     StyleIndex::new(u32::from(index))
 }
 
-fn ensure_styles_part(package: &mut OpcPackage) -> Result<()> {
+fn ensure_styles_part(package: &mut OpcPackage, limits: RawLimits) -> Result<()> {
     let uri = PackURI::new(STYLES_URI)?;
     let workbook_uri = PackURI::new(WORKBOOK_URI)?;
     let relationship_type = workbook_resource_relationship_type(package, false)?;
@@ -236,8 +269,7 @@ fn ensure_styles_part(package: &mut OpcPackage) -> Result<()> {
     };
     if missing {
         let mut bytes = Vec::new();
-        crate::writer::StylesWriter::new()
-            .write(&mut Encoder::new(&mut bytes, crate::raw::Limits::DEFAULT))?;
+        crate::writer::StylesWriter::new().write(&mut Encoder::new(&mut bytes, limits))?;
         package.try_add_part(Box::new(BlobPart::new(
             uri,
             "application/vnd.ms-excel.styles".to_string(),
@@ -304,12 +336,13 @@ pub(super) fn intern_payload(
     end: Kind,
     item: Kind,
     payload: &[u8],
+    limits: RawLimits,
 ) -> Result<u16> {
-    let values = collection(styles, begin, end, item)?;
+    let values = collection(styles, begin, end, item, limits)?;
     let index = if let Some(index) = values.iter().position(|value| value == payload) {
         index
     } else {
-        *styles = append_collection_item(styles, begin, end, item, payload)?;
+        *styles = append_collection_item(styles, begin, end, item, payload, limits)?;
         values.len()
     };
     u16::try_from(index).map_err(|_| {
@@ -321,10 +354,15 @@ pub(super) fn intern_payload(
     })
 }
 
-pub(super) fn intern_number_format(styles: &mut Vec<u8>, code: &str) -> Result<u16> {
-    let formats = collection(styles, kind::BEGIN_FMTS, kind::END_FMTS, kind::FMT)?;
+pub(super) fn intern_number_format(
+    styles: &mut Vec<u8>,
+    code: &str,
+    limits: RawLimits,
+) -> Result<u16> {
+    let formats = collection(styles, kind::BEGIN_FMTS, kind::END_FMTS, kind::FMT, limits)?;
     for payload in &formats {
-        let (id, existing) = crate::styles::parse_num_fmt(payload).map_err(map_style_error)?;
+        let (id, existing) =
+            crate::styles::parse_num_fmt(payload, limits).map_err(map_style_error)?;
         if existing == code {
             return u16::try_from(id).map_err(|_| {
                 Error::refused(
@@ -350,13 +388,14 @@ pub(super) fn intern_number_format(styles: &mut Vec<u8>, code: &str) -> Result<u
             )
         })?;
     let mut payload = id.to_le_bytes().to_vec();
-    Encoder::new(&mut payload, crate::raw::Limits::DEFAULT).write_wide_string(code)?;
+    Encoder::new(&mut payload, limits).write_wide_string(code)?;
     *styles = append_collection_item(
         styles,
         kind::BEGIN_FMTS,
         kind::END_FMTS,
         kind::FMT,
         &payload,
+        limits,
     )?;
     Ok(id)
 }
@@ -403,6 +442,8 @@ pub(super) fn transfer_style(
     source: &OpcPackage,
     target: &mut OpcPackage,
     source_index: StyleIndex,
+    source_limits: RawLimits,
+    target_limits: RawLimits,
 ) -> Result<StyleIndex> {
     let source_uri = PackURI::new(STYLES_URI)?;
     let source_blob = match source.get_part(&source_uri) {
@@ -420,13 +461,14 @@ pub(super) fn transfer_style(
         },
         Err(error) => return Err(error.into()),
     };
-    ensure_styles_part(target)?;
+    ensure_styles_part(target, target_limits)?;
     let mut target_blob = target.get_part(&source_uri)?.blob().to_vec();
     let source_cell_xfs = collection(
         &source_blob,
         kind::BEGIN_CELL_XFS,
         kind::END_CELL_XFS,
         kind::XF,
+        source_limits,
     )?;
     let source_slot = usize::try_from(source_index.get()).map_err(|_| {
         Error::refused(
@@ -442,12 +484,20 @@ pub(super) fn transfer_style(
             "source style index is absent",
         )
     })?;
-    let rewritten = transfer_xf_dependencies(&source_blob, &mut target_blob, source_xf, false)?;
+    let rewritten = transfer_xf_dependencies(
+        &source_blob,
+        &mut target_blob,
+        source_xf,
+        false,
+        source_limits,
+        target_limits,
+    )?;
     let target_cell_xfs = collection(
         &target_blob,
         kind::BEGIN_CELL_XFS,
         kind::END_CELL_XFS,
         kind::XF,
+        target_limits,
     )?;
     let index = if let Some(index) = target_cell_xfs
         .iter()
@@ -461,6 +511,7 @@ pub(super) fn transfer_style(
             kind::END_CELL_XFS,
             kind::XF,
             &rewritten,
+            target_limits,
         )?;
         target_cell_xfs.len()
     };
@@ -480,6 +531,8 @@ pub(super) fn transfer_string_fonts(
     source: &OpcPackage,
     target: &mut OpcPackage,
     value: &SharedString,
+    source_limits: RawLimits,
+    target_limits: RawLimits,
 ) -> Result<SharedString> {
     if value.runs.is_empty() && value.phonetic.is_none() {
         return Ok(value.clone());
@@ -511,6 +564,8 @@ pub(super) fn transfer_string_fonts(
             &mut target_blob,
             run.font_id,
             &mut mapped,
+            source_limits,
+            target_limits,
         )?;
     }
     if let Some(phonetic) = &mut transferred.phonetic {
@@ -519,6 +574,8 @@ pub(super) fn transfer_string_fonts(
             &mut target_blob,
             phonetic.font_id,
             &mut mapped,
+            source_limits,
+            target_limits,
         )?;
     }
     target.get_part_mut(&styles_uri)?.set_blob(target_blob);
@@ -530,11 +587,19 @@ fn transfer_font_index(
     target: &mut Vec<u8>,
     source_index: u16,
     mapped: &mut std::collections::BTreeMap<u16, u16>,
+    source_limits: RawLimits,
+    target_limits: RawLimits,
 ) -> Result<u16> {
     if let Some(index) = mapped.get(&source_index) {
         return Ok(*index);
     }
-    let source_fonts = collection(source, kind::BEGIN_FONTS, kind::END_FONTS, kind::FONT)?;
+    let source_fonts = collection(
+        source,
+        kind::BEGIN_FONTS,
+        kind::END_FONTS,
+        kind::FONT,
+        source_limits,
+    )?;
     let payload = source_fonts.get(usize::from(source_index)).ok_or_else(|| {
         Error::refused(
             litchi_core::edit::RefusalKind::UnsupportedContent,
@@ -542,7 +607,13 @@ fn transfer_font_index(
             "rich-string font index is absent",
         )
     })?;
-    let target_fonts = collection(target, kind::BEGIN_FONTS, kind::END_FONTS, kind::FONT)?;
+    let target_fonts = collection(
+        target,
+        kind::BEGIN_FONTS,
+        kind::END_FONTS,
+        kind::FONT,
+        target_limits,
+    )?;
     let target_index = if let Some(index) = target_fonts.iter().position(|font| font == payload) {
         index
     } else {
@@ -552,6 +623,7 @@ fn transfer_font_index(
             kind::END_FONTS,
             kind::FONT,
             payload,
+            target_limits,
         )?;
         target_fonts.len()
     };
@@ -664,9 +736,9 @@ fn rewrite_sst(source: &[u8], total: u32, unique: u32, appended: Option<&[u8]>) 
                     Encoder::new(&mut output, crate::raw::Limits::DEFAULT)
                         .write_record(kind::SST_ITEM, payload)?;
                 }
-                copy_record(source, &record, &mut output)?;
+                copy_record(source, &record, RawLimits::DEFAULT, &mut output)?;
             },
-            _ => copy_record(source, &record, &mut output)?,
+            _ => copy_record(source, &record, RawLimits::DEFAULT, &mut output)?,
         }
     }
     Ok(output)
@@ -677,6 +749,8 @@ fn transfer_xf_dependencies(
     target: &mut Vec<u8>,
     source_xf: &[u8],
     style_xf: bool,
+    source_limits: RawLimits,
+    target_limits: RawLimits,
 ) -> Result<Vec<u8>> {
     if source_xf.len() < 16 {
         return Err(Error::InvalidLength {
@@ -693,6 +767,8 @@ fn transfer_xf_dependencies(
         kind::END_FONTS,
         kind::FONT,
         4,
+        source_limits,
+        target_limits,
     )?;
     let fill = transfer_indexed_resource(
         source,
@@ -702,6 +778,8 @@ fn transfer_xf_dependencies(
         kind::END_FILLS,
         kind::FILL,
         6,
+        source_limits,
+        target_limits,
     )?;
     let border = transfer_indexed_resource(
         source,
@@ -711,11 +789,13 @@ fn transfer_xf_dependencies(
         kind::END_BORDERS,
         kind::BORDER,
         8,
+        source_limits,
+        target_limits,
     )?;
     rewritten[4..6].copy_from_slice(&font.to_le_bytes());
     rewritten[6..8].copy_from_slice(&fill.to_le_bytes());
     rewritten[8..10].copy_from_slice(&border.to_le_bytes());
-    transfer_number_format(source, target, &mut rewritten)?;
+    transfer_number_format(source, target, &mut rewritten, source_limits, target_limits)?;
 
     let parent = u16::from_le_bytes([source_xf[0], source_xf[1]]);
     if !style_xf && parent != u16::MAX {
@@ -724,6 +804,7 @@ fn transfer_xf_dependencies(
             kind::BEGIN_CELL_STYLE_XFS,
             kind::END_CELL_STYLE_XFS,
             kind::XF,
+            source_limits,
         )?;
         let parent_payload = source_parents.get(usize::from(parent)).ok_or_else(|| {
             Error::refused(
@@ -732,12 +813,20 @@ fn transfer_xf_dependencies(
                 "source cell-style XF is absent",
             )
         })?;
-        let transferred = transfer_xf_dependencies(source, target, parent_payload, true)?;
+        let transferred = transfer_xf_dependencies(
+            source,
+            target,
+            parent_payload,
+            true,
+            source_limits,
+            target_limits,
+        )?;
         let target_parents = collection(
             target,
             kind::BEGIN_CELL_STYLE_XFS,
             kind::END_CELL_STYLE_XFS,
             kind::XF,
+            target_limits,
         )?;
         let target_parent = if let Some(index) = target_parents
             .iter()
@@ -751,6 +840,7 @@ fn transfer_xf_dependencies(
                 kind::END_CELL_STYLE_XFS,
                 kind::XF,
                 &transferred,
+                target_limits,
             )?;
             target_parents.len()
         };
@@ -774,8 +864,10 @@ fn transfer_indexed_resource(
     end: Kind,
     item: Kind,
     xf_offset: usize,
+    source_limits: RawLimits,
+    target_limits: RawLimits,
 ) -> Result<u16> {
-    let source_items = collection(source, begin, end, item)?;
+    let source_items = collection(source, begin, end, item, source_limits)?;
     let source_index = u16::from_le_bytes([
         source_items_index_byte(source_xf, xf_offset)?,
         source_items_index_byte(source_xf, xf_offset + 1)?,
@@ -787,11 +879,11 @@ fn transfer_indexed_resource(
             "style resource index is absent",
         )
     })?;
-    let target_items = collection(target, begin, end, item)?;
+    let target_items = collection(target, begin, end, item, target_limits)?;
     let index = if let Some(index) = target_items.iter().position(|value| value == payload) {
         index
     } else {
-        *target = append_collection_item(target, begin, end, item, payload)?;
+        *target = append_collection_item(target, begin, end, item, payload, target_limits)?;
         target_items.len()
     };
     u16::try_from(index).map_err(|_| {
@@ -810,19 +902,39 @@ fn source_items_index_byte(source_xf: &[u8], offset: usize) -> Result<u8> {
     })
 }
 
-fn transfer_number_format(source: &[u8], target: &mut Vec<u8>, xf: &mut [u8]) -> Result<()> {
+fn transfer_number_format(
+    source: &[u8],
+    target: &mut Vec<u8>,
+    xf: &mut [u8],
+    source_limits: RawLimits,
+    target_limits: RawLimits,
+) -> Result<()> {
     let source_id = u16::from_le_bytes([xf[2], xf[3]]);
-    let source_formats = collection(source, kind::BEGIN_FMTS, kind::END_FMTS, kind::FMT)?;
+    let source_formats = collection(
+        source,
+        kind::BEGIN_FMTS,
+        kind::END_FMTS,
+        kind::FMT,
+        source_limits,
+    )?;
     let Some(source_payload) = source_formats
         .iter()
         .find(|payload| payload.get(..2) == Some(source_id.to_le_bytes().as_slice()))
     else {
         return Ok(());
     };
-    let (_, source_code) = crate::styles::parse_num_fmt(source_payload).map_err(map_style_error)?;
-    let target_formats = collection(target, kind::BEGIN_FMTS, kind::END_FMTS, kind::FMT)?;
+    let (_, source_code) =
+        crate::styles::parse_num_fmt(source_payload, source_limits).map_err(map_style_error)?;
+    let target_formats = collection(
+        target,
+        kind::BEGIN_FMTS,
+        kind::END_FMTS,
+        kind::FMT,
+        target_limits,
+    )?;
     for payload in &target_formats {
-        let (id, code) = crate::styles::parse_num_fmt(payload).map_err(map_style_error)?;
+        let (id, code) =
+            crate::styles::parse_num_fmt(payload, target_limits).map_err(map_style_error)?;
         if code == source_code {
             let id = u16::try_from(id).map_err(|_| {
                 Error::refused(
@@ -857,6 +969,7 @@ fn transfer_number_format(source: &[u8], target: &mut Vec<u8>, xf: &mut [u8]) ->
         kind::END_FMTS,
         kind::FMT,
         &payload,
+        target_limits,
     )?;
     xf[2..4].copy_from_slice(&new_id.to_le_bytes());
     Ok(())
@@ -867,10 +980,11 @@ pub(crate) fn collection(
     begin: Kind,
     end: Kind,
     item: Kind,
+    limits: RawLimits,
 ) -> Result<Vec<Vec<u8>>> {
     let mut in_collection = false;
     let mut values = Vec::new();
-    for record in Records::new(source, crate::raw::Limits::DEFAULT) {
+    for record in Records::new(source, limits) {
         let record = record?;
         match record.kind() {
             found if found == begin => in_collection = true,
@@ -888,11 +1002,12 @@ pub(crate) fn append_collection_item(
     end: Kind,
     item: Kind,
     payload: &[u8],
+    limits: RawLimits,
 ) -> Result<Vec<u8>> {
     let mut output = Vec::new();
     let mut in_collection = false;
     let mut inserted = false;
-    for record in Records::new(source, crate::raw::Limits::DEFAULT) {
+    for record in Records::new(source, limits) {
         let record = record?;
         if record.kind() == begin {
             if record.payload().len() < 4 {
@@ -912,15 +1027,15 @@ pub(crate) fn append_collection_item(
                     )
                 })?;
             count[..4].copy_from_slice(&next.to_le_bytes());
-            Encoder::new(&mut output, crate::raw::Limits::DEFAULT).write_record(begin, &count)?;
+            Encoder::new(&mut output, limits).write_record(begin, &count)?;
             in_collection = true;
         } else if record.kind() == end && in_collection {
-            Encoder::new(&mut output, crate::raw::Limits::DEFAULT).write_record(item, payload)?;
-            copy_record(source, &record, &mut output)?;
+            Encoder::new(&mut output, limits).write_record(item, payload)?;
+            copy_record(source, &record, limits, &mut output)?;
             in_collection = false;
             inserted = true;
         } else {
-            copy_record(source, &record, &mut output)?;
+            copy_record(source, &record, limits, &mut output)?;
         }
     }
     if !inserted {
@@ -929,11 +1044,16 @@ pub(crate) fn append_collection_item(
     Ok(output)
 }
 
-fn copy_record(source: &[u8], record: &crate::raw::Record<'_>, output: &mut Vec<u8>) -> Result<()> {
+fn copy_record(
+    source: &[u8],
+    record: &crate::raw::Record<'_>,
+    limits: RawLimits,
+    output: &mut Vec<u8>,
+) -> Result<()> {
     let record_source = source.get(record.offset()..).ok_or(Error::InvalidFormat(
         "record offset is outside its source part",
     ))?;
-    let (_, header_len) = Header::parse(record_source, RawLimits::DEFAULT)?;
+    let (_, header_len) = Header::parse(record_source, limits)?;
     let end = record
         .offset()
         .checked_add(header_len)
@@ -951,8 +1071,17 @@ fn copy_record(source: &[u8], record: &crate::raw::Record<'_>, output: &mut Vec<
     Ok(())
 }
 
-fn map_style_error(_error: crate::styles::Error) -> Error {
-    Error::InvalidFormat("style resource transfer")
+fn map_style_error(error: crate::styles::Error) -> Error {
+    match error {
+        crate::styles::Error::Wire(error) => Error::Wire(error),
+        crate::styles::Error::InvalidLength { expected, found } => {
+            Error::InvalidLength { expected, found }
+        },
+        crate::styles::Error::Unrecognized { typ, val } => Error::Unrecognized { typ, val },
+        crate::styles::Error::Allocation { resource, source } => {
+            Error::Allocation { resource, source }
+        },
+    }
 }
 
 #[cfg(test)]
@@ -994,11 +1123,35 @@ mod tests {
         );
         assert!(package.get_part(&PackURI::new(STYLES_URI).unwrap()).is_ok());
 
-        ensure_styles_part(&mut package).unwrap();
+        ensure_styles_part(&mut package, RawLimits::DEFAULT).unwrap();
 
         assert!(
             has_workbook_resource_relationship(&package, relationship_type, "styles.bin").unwrap()
         );
+    }
+
+    #[test]
+    fn style_collection_append_preserves_unknown_records_under_explicit_limits() {
+        let limits = RawLimits::new(128, 32);
+        let unknown = Kind::new(0x1234).unwrap();
+        let mut source = Vec::new();
+        let mut writer = Encoder::new(&mut source, limits);
+        writer
+            .write_record(kind::BEGIN_FMTS, &1_u32.to_le_bytes())
+            .unwrap();
+        writer.write_record(unknown, &[0xA5, 0x00, 0x7F]).unwrap();
+        writer.write_record(kind::END_FMTS, &[]).unwrap();
+
+        let output = append_collection_item(
+            &source,
+            kind::BEGIN_FMTS,
+            kind::END_FMTS,
+            kind::FMT,
+            &[164, 0, 0, 0, 0, 0],
+            limits,
+        )
+        .unwrap();
+        assert!(output.windows(3).any(|window| window == [0xA5, 0x00, 0x7F]));
     }
 
     #[test]

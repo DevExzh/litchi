@@ -114,7 +114,10 @@ impl SourceBackedWorkbook {
                 return Ok(Vec::new());
             };
             let part = self.inner.package.part(&styles)?;
-            crate::conditional_formatting::edit::read_differentials(part.data()?.as_bytes())
+            crate::conditional_formatting::edit::read_differentials(
+                part.data()?.as_bytes(),
+                self.inner.raw_limits,
+            )
         })();
         postflight_package(&self.inner.package)?;
         result

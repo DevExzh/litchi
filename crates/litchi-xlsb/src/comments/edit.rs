@@ -434,7 +434,7 @@ impl Edit {
     /// The worksheet's VML drawing: its relationship id and part name.
     fn vml(&self, worksheet: &PackURI) -> Result<Option<(String, PackURI)>> {
         let bytes = self.staged.blob(worksheet)?;
-        let layout = SheetLayout::scan(bytes)?;
+        let layout = SheetLayout::scan_with_limits(bytes, self.staged.raw_limits())?;
         let Some(unit) = layout.units_of(kind::LEGACY_DRAWING).next() else {
             return Ok(None);
         };
@@ -494,11 +494,16 @@ impl Edit {
                     relationship_type::VML_DRAWING,
                 );
                 let bytes = self.staged.blob(worksheet)?;
-                let layout = SheetLayout::scan(bytes)?;
+                let limits = self.staged.raw_limits();
+                let layout = SheetLayout::scan_with_limits(bytes, limits)?;
                 let at = layout.insertion(Rank::LegacyDrawing);
                 let mut payload = Vec::new();
-                Encoder::new(&mut payload, self.staged.raw_limits()).write_wide_string(&id)?;
-                let updated = splice(bytes, at..at, &record(kind::LEGACY_DRAWING, &payload)?);
+                Encoder::new(&mut payload, limits).write_wide_string(&id)?;
+                let updated = splice(
+                    bytes,
+                    at..at,
+                    &crate::part_edit::record_with_limits(kind::LEGACY_DRAWING, &payload, limits)?,
+                );
                 self.staged.replace_worksheet(worksheet, updated)?;
                 self.staged.touch(worksheet);
             },
@@ -523,7 +528,7 @@ impl Edit {
         // The last shape: drop the drawing, its relationship and the
         // worksheet's `BrtLegacyDrawing`.
         let bytes = self.staged.blob(worksheet)?;
-        let layout = SheetLayout::scan(bytes)?;
+        let layout = SheetLayout::scan_with_limits(bytes, self.staged.raw_limits())?;
         let span = layout
             .units_of(kind::LEGACY_DRAWING)
             .next()

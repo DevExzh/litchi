@@ -2530,10 +2530,11 @@ fn replay_workbook(
 }
 
 fn author_style(workbook: &mut Workbook, style: &AuthoredStyle) -> Result<super::StyleIndex> {
-    let plan = super::resources::plan_style(style)?;
+    let raw_limits = workbook.raw_limits_value();
+    let plan = super::resources::plan_style(style, raw_limits)?;
     crate::signature_policy::ensure_unsigned(&workbook.package)?;
     let mut package = workbook.package.clone();
-    let index = super::resources::intern_style_plan(&mut package, &plan)?;
+    let index = super::resources::intern_style_plan(&mut package, &plan, raw_limits)?;
     let validated = workbook.reparse_candidate(package)?;
     *workbook = validated;
     Ok(index)
@@ -2895,8 +2896,13 @@ fn transfer_cell(
         ));
     }
     let mut package = target.package.clone();
-    let style =
-        super::resources::transfer_style(&source.package, &mut package, source_cell.style())?;
+    let style = super::resources::transfer_style(
+        &source.package,
+        &mut package,
+        source_cell.style(),
+        source.raw_limits_value(),
+        target.raw_limits_value(),
+    )?;
     let value = match source_cell.value() {
         Value::SharedStringIndex(index) => {
             let index = usize::try_from(*index).map_err(|_error| {
@@ -2908,8 +2914,13 @@ fn transfer_cell(
                 .ok_or(Error::InvalidCellReference(
                     "source shared-string index is absent",
                 ))?;
-            let string =
-                super::resources::transfer_string_fonts(&source.package, &mut package, string)?;
+            let string = super::resources::transfer_string_fonts(
+                &source.package,
+                &mut package,
+                string,
+                source.raw_limits_value(),
+                target.raw_limits_value(),
+            )?;
             Value::SharedStringIndex(super::resources::intern_shared_string_for_new_cell(
                 &mut package,
                 &string,
@@ -2919,6 +2930,8 @@ fn transfer_cell(
             &source.package,
             &mut package,
             string,
+            source.raw_limits_value(),
+            target.raw_limits_value(),
         )?),
         Value::Blank => Value::Blank,
         Value::RkNumber(value) => Value::RkNumber(*value),

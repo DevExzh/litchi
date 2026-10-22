@@ -344,11 +344,20 @@ pub(crate) fn styles_part(package: &litchi_opc::OpcPackage) -> Result<Option<Pac
 }
 
 /// The differential formats of a styles stream.
-pub(crate) fn read_differentials(styles: &[u8]) -> Result<Vec<DifferentialStyle>> {
-    crate::cell_values::resources::collection(styles, kind::BEGIN_DXFS, kind::END_DXFS, kind::DXF)?
-        .iter()
-        .map(|payload| DifferentialStyle::parse(payload))
-        .collect()
+pub(crate) fn read_differentials(
+    styles: &[u8],
+    limits: crate::raw::Limits,
+) -> Result<Vec<DifferentialStyle>> {
+    crate::cell_values::resources::collection(
+        styles,
+        kind::BEGIN_DXFS,
+        kind::END_DXFS,
+        kind::DXF,
+        limits,
+    )?
+    .iter()
+    .map(|payload| DifferentialStyle::parse(payload))
+    .collect()
 }
 
 /// The classic conditional formats of a worksheet, in stream order.
@@ -386,7 +395,9 @@ impl Edit {
     /// Returns an error for a malformed styles part.
     pub fn differential_formats(&self) -> Result<Vec<DifferentialStyle>> {
         match styles_part(self.staged.opc())? {
-            Some(styles) => read_differentials(self.staged.blob(&styles)?),
+            Some(styles) => {
+                read_differentials(self.staged.blob(&styles)?, self.staged.raw_limits())
+            },
             None => Ok(Vec::new()),
         }
     }
@@ -409,16 +420,18 @@ impl Edit {
             kind::BEGIN_DXFS,
             kind::END_DXFS,
             kind::DXF,
+            self.staged.raw_limits(),
         )?;
         if existing.len() >= MAX_DIFFERENTIALS {
             return Err(invalid(
                 "the styles part holds the most differential formats it can",
             ));
         }
-        if !Records::new(&bytes, crate::raw::Limits::DEFAULT)
+        let limits = self.staged.raw_limits();
+        if !Records::new(&bytes, limits)
             .any(|record| record.is_ok_and(|record| record.kind() == kind::BEGIN_DXFS))
         {
-            bytes = insert_dxfs(&bytes)?;
+            bytes = insert_dxfs(&bytes, limits)?;
         }
         let bytes = crate::cell_values::resources::append_collection_item(
             &bytes,
@@ -426,6 +439,7 @@ impl Edit {
             kind::END_DXFS,
             kind::DXF,
             &payload,
+            limits,
         )?;
         self.staged.replace_blob(&styles, bytes)?;
         u32::try_from(existing.len()).map_err(|_overflow| invalid("too many differential formats"))
@@ -611,10 +625,10 @@ fn first_cell(format: &Formatting) -> Result<(u32, u32)> {
 /// Insert an empty `BrtBeginDXFs` collection at its style-sheet position:
 /// before the table styles, the color palette, the future records or the
 /// end of the style sheet.
-fn insert_dxfs(styles: &[u8]) -> Result<Vec<u8>> {
+fn insert_dxfs(styles: &[u8], limits: crate::raw::Limits) -> Result<Vec<u8>> {
     const COLOR_PALETTE: u16 = 0x01D9;
     let mut at = None;
-    let mut records = Records::new(styles, crate::raw::Limits::DEFAULT);
+    let mut records = Records::new(styles, limits);
     while let Some(record) = records.next() {
         let record = record?;
         if matches!(
@@ -627,8 +641,13 @@ fn insert_dxfs(styles: &[u8]) -> Result<Vec<u8>> {
         }
     }
     let at = at.ok_or_else(|| invalid("the styles part has no end"))?;
-    let mut empty = crate::part_edit::record(kind::BEGIN_DXFS, &0u32.to_le_bytes())?;
-    empty.extend(crate::part_edit::record(kind::END_DXFS, &[])?);
+    let mut empty =
+        crate::part_edit::record_with_limits(kind::BEGIN_DXFS, &0u32.to_le_bytes(), limits)?;
+    empty.extend(crate::part_edit::record_with_limits(
+        kind::END_DXFS,
+        &[],
+        limits,
+    )?);
     Ok(splice(styles, at..at, &empty))
 }
 

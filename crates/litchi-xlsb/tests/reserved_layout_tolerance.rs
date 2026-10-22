@@ -488,9 +488,9 @@ fn standalone_codec_functions_still_refuse_what_they_cannot_report() {
     assert!(litchi_xlsb::calc::read(&calc, litchi_xlsb::raw::Limits::DEFAULT).is_err());
 
     let mut border = border.unwrap();
-    litchi_xlsb::styles::parse_border(&border).unwrap();
+    litchi_xlsb::styles::parse_border(&border, litchi_xlsb::raw::Limits::DEFAULT).unwrap();
     border[0] |= 0x80;
-    assert!(litchi_xlsb::styles::parse_border(&border).is_err());
+    assert!(litchi_xlsb::styles::parse_border(&border, litchi_xlsb::raw::Limits::DEFAULT).is_err());
 }
 
 #[test]

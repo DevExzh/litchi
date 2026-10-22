@@ -2043,7 +2043,11 @@ impl SourceInner {
                 let data = self.package.part(partname)?.data()?;
                 self.package.check_execution()?;
                 self.package.source_version()?;
-                let styles = StylesTable::from_bytes_with_report(data.as_bytes(), &mut report)?;
+                let styles = StylesTable::from_bytes_with_report(
+                    data.as_bytes(),
+                    self.raw_limits,
+                    &mut report,
+                )?;
                 self.package.check_execution()?;
                 self.package.source_version()?;
                 styles

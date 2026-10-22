@@ -1075,8 +1075,11 @@ impl Workbook {
         let styles_uri = litchi_opc::PackURI::new("/xl/styles.bin")?;
         match self.package.get_part(&styles_uri) {
             Ok(styles_part) => {
-                self.styles =
-                    StylesTable::from_bytes_with_report(styles_part.blob(), &mut self.tolerance)?;
+                self.styles = StylesTable::from_bytes_with_report(
+                    styles_part.blob(),
+                    self.raw_limits,
+                    &mut self.tolerance,
+                )?;
             },
             Err(OpcError::PartNotFound(_)) => {},
             Err(error) => return Err(error.into()),

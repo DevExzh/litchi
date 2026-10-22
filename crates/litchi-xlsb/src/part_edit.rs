@@ -1470,7 +1470,12 @@ impl SheetLayout {
     /// Scan a worksheet stream. Unbalanced collections and a stream without
     /// a cell table or end record are refused.
     pub(crate) fn scan(data: &[u8]) -> Result<Self> {
-        let mut records = Records::new(data, crate::raw::Limits::DEFAULT);
+        Self::scan_with_limits(data, crate::raw::Limits::DEFAULT)
+    }
+
+    /// Scan a worksheet stream under the owning workbook's raw policy.
+    pub(crate) fn scan_with_limits(data: &[u8], limits: crate::raw::Limits) -> Result<Self> {
+        let mut records = Records::new(data, limits);
         let mut after_cells = false;
         let mut units = Vec::new();
         let mut stack: Vec<Kind> = Vec::new();
@@ -1567,8 +1572,17 @@ pub(crate) fn splice(data: &[u8], span: Range<usize>, replacement: &[u8]) -> Vec
 
 /// Encode one record.
 pub(crate) fn record(kind: Kind, payload: &[u8]) -> Result<Vec<u8>> {
+    record_with_limits(kind, payload, crate::raw::Limits::DEFAULT)
+}
+
+/// Encode one record under an owning workbook's raw policy.
+pub(crate) fn record_with_limits(
+    kind: Kind,
+    payload: &[u8],
+    limits: crate::raw::Limits,
+) -> Result<Vec<u8>> {
     let mut out = Vec::with_capacity(payload.len() + 6);
-    crate::raw::Encoder::new(&mut out, crate::raw::Limits::DEFAULT).write_record(kind, payload)?;
+    crate::raw::Encoder::new(&mut out, limits).write_record(kind, payload)?;
     Ok(out)
 }
 

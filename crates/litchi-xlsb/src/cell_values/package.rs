@@ -183,7 +183,12 @@ impl StylesDraft {
         })
     }
 
-    fn restyle(&mut self, old: u32, format: &super::Format) -> Result<u32> {
+    fn restyle(
+        &mut self,
+        old: u32,
+        format: &super::Format,
+        limits: crate::raw::Limits,
+    ) -> Result<u32> {
         let slot = match self
             .restyled
             .iter()
@@ -206,7 +211,7 @@ impl StylesDraft {
             return Ok(*index);
         }
         let mut bytes = self.bytes.clone();
-        let index = super::format::restyle(&mut bytes, old, format)?;
+        let index = super::format::restyle(&mut bytes, old, format, limits)?;
         if bytes != self.bytes {
             self.bytes = bytes;
             self.changed = true;
@@ -445,7 +450,7 @@ impl Edit {
             .styles
             .as_mut()
             .ok_or(Error::InvalidFormat("the styles draft was not loaded"))?;
-        let new = styles.restyle(old, format)?;
+        let new = styles.restyle(old, format, self.base.raw_limits_value())?;
         if new == old {
             return Ok(false);
         }

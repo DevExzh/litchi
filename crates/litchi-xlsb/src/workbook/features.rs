@@ -82,6 +82,7 @@ impl Workbook {
         match crate::conditional_formatting::edit::styles_part(&self.package)? {
             Some(styles) => crate::conditional_formatting::edit::read_differentials(
                 self.package.get_part(&styles)?.blob(),
+                self.raw_limits,
             ),
             None => Ok(Vec::new()),
         }
