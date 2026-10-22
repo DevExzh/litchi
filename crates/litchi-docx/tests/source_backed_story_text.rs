@@ -175,18 +175,18 @@ fn selected_story_edit_publishes_one_part_and_restores_exact_source() {
     let snapshot = package
         .story_text_snapshot(StorySelector::Header(0))
         .unwrap();
-    let mut edit = snapshot.edit().unwrap();
+    let mut edit = snapshot.raw_tree(snapshot.limits_value()).unwrap();
     edit.replace_paragraph_text(Position::new(0), "changed")
         .unwrap();
-    let commit = edit.commit().unwrap();
+    let patch = edit.patch().unwrap();
     assert_eq!(
-        commit.snapshot().paragraph_text(0).unwrap().as_deref(),
+        patch.target().paragraph_text(0).unwrap().as_deref(),
         Some("changed")
     );
 
     let mut published = Vec::new();
     let publication = package
-        .apply_story_text(&commit.patch().clone().into())
+        .apply_story_text(&patch.clone().into())
         .and_then(|committed| {
             committed.package().write_to(&mut published)?;
             Ok(committed)
@@ -247,16 +247,61 @@ fn selected_story_noop_copies_the_complete_source_byte_for_byte() {
     let snapshot = package
         .story_text_snapshot(StorySelector::Footer(0))
         .unwrap();
-    let mut edit = snapshot.edit().unwrap();
+    let mut edit = snapshot.raw_tree(snapshot.limits_value()).unwrap();
     edit.replace_paragraph_text(Position::new(0), "footer")
         .unwrap();
-    let commit = edit.commit().unwrap();
+    let patch = edit.patch().unwrap();
     let mut output = Vec::new();
     package
-        .apply_story_text(&commit.patch().clone().into())
+        .apply_story_text(&patch.clone().into())
         .and_then(|committed| Ok(committed.package().write_to(&mut output)?))
         .unwrap();
     assert_eq!(output, source);
+}
+
+#[test]
+fn raw_story_tree_caches_projection_and_invalidates_after_mutation() {
+    let package = open(&fixture());
+    let snapshot = package
+        .story_text_snapshot(StorySelector::Header(0))
+        .unwrap();
+    let mut tree = snapshot.raw_tree(snapshot.limits_value()).unwrap();
+
+    let first = tree.projected().unwrap();
+    let second = tree.projected().unwrap();
+    assert_eq!(first.part_fingerprint(), second.part_fingerprint());
+    assert_eq!(
+        first.paragraph_text(0).unwrap(),
+        second.paragraph_text(0).unwrap()
+    );
+
+    tree.replace_paragraph_text(Position::new(0), "cached mutation")
+        .unwrap();
+    let changed = tree.projected().unwrap();
+    assert_ne!(first.part_fingerprint(), changed.part_fingerprint());
+    assert_eq!(
+        changed.paragraph_text(0).unwrap().as_deref(),
+        Some("cached mutation")
+    );
+    let patch = tree.patch().unwrap();
+    assert_eq!(
+        patch.target().part_fingerprint(),
+        changed.part_fingerprint()
+    );
+}
+
+#[test]
+fn raw_story_tree_intersects_requested_output_policy() {
+    let package = open(&fixture());
+    let snapshot = package
+        .story_text_snapshot(StorySelector::Header(0))
+        .unwrap();
+    let requested =
+        source_backed::StoryTextLimits::new(4096, 10, 10_000, 64, 1, 4096, 4096).unwrap();
+    assert!(matches!(
+        snapshot.raw_tree(requested),
+        Err(source_backed::StoryTextError::Limit { .. })
+    ));
 }
 
 #[test]
@@ -265,7 +310,7 @@ fn managed_story_reads_are_bounded_and_edits_are_typed_refusals() {
     let snapshot = package.story_text_snapshot(StorySelector::Main).unwrap();
     assert_eq!(snapshot.paragraph_text(0).unwrap().as_deref(), Some("main"));
     assert!(matches!(
-            snapshot.edit(),
+            snapshot.raw_tree(snapshot.limits_value()),
             Err(source_backed::StoryTextError::Document(Error::Refused(refusal))) if refusal.operation() == "source-backed story text edit"
     ));
     drop(snapshot);
@@ -364,14 +409,14 @@ fn hostile_publication_writer_is_rejected_without_panicking() {
     let snapshot = package
         .story_text_snapshot(StorySelector::Header(0))
         .unwrap();
-    let mut edit = snapshot.edit().unwrap();
+    let mut edit = snapshot.raw_tree(snapshot.limits_value()).unwrap();
     edit.replace_paragraph_text(Position::new(0), "changed")
         .unwrap();
-    let commit = edit.commit().unwrap();
+    let patch = edit.patch().unwrap();
     let mut writer = HostileWriter;
     assert!(
         package
-            .apply_story_text(&commit.patch().clone().into())
+            .apply_story_text(&patch.clone().into())
             .and_then(|committed| {
                 committed.package().write_to(&mut writer)?;
                 Ok(committed)
@@ -388,13 +433,13 @@ fn trailing_source_bytes_are_preserved_by_an_exact_noop() {
     let snapshot = package
         .story_text_snapshot(StorySelector::Footer(0))
         .unwrap();
-    let mut edit = snapshot.edit().unwrap();
+    let mut edit = snapshot.raw_tree(snapshot.limits_value()).unwrap();
     edit.replace_paragraph_text(Position::new(0), "footer")
         .unwrap();
-    let commit = edit.commit().unwrap();
+    let patch = edit.patch().unwrap();
     let mut output = Vec::new();
     package
-        .apply_story_text(&commit.patch().clone().into())
+        .apply_story_text(&patch.clone().into())
         .and_then(|committed| Ok(committed.package().write_to(&mut output)?))
         .unwrap();
     assert_eq!(output, source);
@@ -425,7 +470,11 @@ fn namespace_aliases_are_resolved_and_wrong_bindings_are_refused() {
         escaped_snapshot.paragraph_text(0).unwrap().as_deref(),
         Some("escaped")
     );
-    assert!(escaped_snapshot.edit().is_err());
+    assert!(
+        escaped_snapshot
+            .raw_tree(escaped_snapshot.limits_value())
+            .is_err()
+    );
 
     let wrong = main_only_fixture(
         r#"<x:document xmlns:x="urn:not-word"><x:body><x:p><x:r><x:t>wrong</x:t></x:r></x:p></x:body></x:document>"#,
@@ -500,12 +549,12 @@ fn patches_reject_foreign_and_stale_snapshots_and_cancel_before_output() {
     let source = fixture();
     let package = open(&source);
     let snapshot = package.story_text_snapshot(StorySelector::Main).unwrap();
-    let mut edit = snapshot.edit().unwrap();
+    let mut edit = snapshot.raw_tree(snapshot.limits_value()).unwrap();
     edit.replace_paragraph_text(Position::new(0), "changed")
         .unwrap();
-    let commit = edit.commit().unwrap();
+    let patch = edit.patch().unwrap();
     assert!(matches!(
-        commit.patch().apply(commit.snapshot()),
+        patch.apply(patch.target()),
         Err(source_backed::StoryTextError::PatchConflict)
     ));
 
@@ -513,7 +562,7 @@ fn patches_reject_foreign_and_stale_snapshots_and_cancel_before_output() {
         .story_text_snapshot(StorySelector::Main)
         .unwrap();
     assert!(matches!(
-        commit.patch().apply(&foreign),
+        patch.apply(&foreign),
         Err(source_backed::StoryTextError::ForeignSource)
     ));
 

@@ -41,8 +41,7 @@ pub mod tail_append_stream;
 pub use litchi_opc::{SourceReadDiagnostics, SourceReadPolicy, SourceReadPolicyError};
 
 pub use story_text::{
-    Commit as StoryTextCommit, Edit as StoryTextEdit, Error as StoryTextError, GlossaryBatchCommit,
-    GlossaryBatchEdit, GlossaryBatchPatch, GlossaryBatchSelector, GlossaryBatchSnapshot,
+    Error as StoryTextError, GlossaryBatchPatch, GlossaryBatchSelector, GlossaryBatchSnapshot,
     GlossarySelector, GlossarySelectorKind, Limits as StoryTextLimits, Patch as StoryTextPatch,
     Selector as StorySelector, Snapshot as StoryTextSnapshot,
 };

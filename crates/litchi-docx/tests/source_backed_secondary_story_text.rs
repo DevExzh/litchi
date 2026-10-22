@@ -588,15 +588,15 @@ fn exercise_change(
     let package = open(&source);
     let snapshot = package.story_text_snapshot(selector.clone()).unwrap();
     assert_eq!(snapshot.paragraph_text(0).unwrap().as_deref(), Some(before));
-    let mut edit = snapshot.edit().unwrap();
+    let mut edit = snapshot.raw_tree(snapshot.limits_value()).unwrap();
     edit.replace_paragraph_text(Position::new(0), after)
         .unwrap();
-    let commit = edit.commit().unwrap();
-    assert_eq!(commit.snapshot().extract_text().unwrap(), after);
+    let patch = edit.patch().unwrap();
+    assert_eq!(patch.target().extract_text().unwrap(), after);
 
     let mut published = Vec::new();
     let publication = package
-        .apply_story_text(&commit.patch().clone().into())
+        .apply_story_text(&patch.clone().into())
         .and_then(|committed| {
             committed.package().write_to(&mut published)?;
             Ok(committed)
@@ -662,13 +662,13 @@ fn secondary_entry_preserves_whitespace_comments_and_opaque_markup() {
     let snapshot = package
         .story_text_snapshot(StorySelector::footnote(41))
         .unwrap();
-    let mut edit = snapshot.edit().unwrap();
+    let mut edit = snapshot.raw_tree(snapshot.limits_value()).unwrap();
     edit.replace_paragraph_text(Position::new(0), "footnote-preserved")
         .unwrap();
-    let commit = edit.commit().unwrap();
+    let patch = edit.patch().unwrap();
     let mut published = Vec::new();
     package
-        .apply_story_text(&commit.patch().clone().into())
+        .apply_story_text(&patch.clone().into())
         .and_then(|committed| Ok(committed.package().write_to(&mut published)?))
         .unwrap();
 
@@ -708,13 +708,15 @@ fn secondary_noop_is_exact_and_inverse_restores_the_source() {
     let noop_snapshot = noop_package
         .story_text_snapshot(StorySelector::comment(61))
         .unwrap();
-    let mut noop = noop_snapshot.edit().unwrap();
+    let mut noop = noop_snapshot
+        .raw_tree(noop_snapshot.limits_value())
+        .unwrap();
     noop.replace_paragraph_text(Position::new(0), "comment-target")
         .unwrap();
-    let noop_commit = noop.commit().unwrap();
+    let noop_patch = noop.patch().unwrap();
     let mut exact = Vec::new();
     noop_package
-        .apply_story_text(&noop_commit.patch().clone().into())
+        .apply_story_text(&noop_patch.clone().into())
         .and_then(|committed| Ok(committed.package().write_to(&mut exact)?))
         .unwrap();
     assert_eq!(exact, source);
@@ -723,13 +725,15 @@ fn secondary_noop_is_exact_and_inverse_restores_the_source() {
     let changed_snapshot = changed_package
         .story_text_snapshot(StorySelector::comment(61))
         .unwrap();
-    let mut edit = changed_snapshot.edit().unwrap();
+    let mut edit = changed_snapshot
+        .raw_tree(changed_snapshot.limits_value())
+        .unwrap();
     edit.replace_paragraph_text(Position::new(0), "comment-changed")
         .unwrap();
-    let commit = edit.commit().unwrap();
+    let patch = edit.patch().unwrap();
     let mut published = Vec::new();
     let publication = changed_package
-        .apply_story_text(&commit.patch().clone().into())
+        .apply_story_text(&patch.clone().into())
         .and_then(|committed| {
             committed.package().write_to(&mut published)?;
             Ok(committed)
@@ -760,13 +764,15 @@ fn signed_secondary_change_is_refused_but_signed_noop_is_exact() {
         .story_text_snapshot(StorySelector::footnote(41))
         .unwrap();
 
-    let mut noop = noop_snapshot.edit().unwrap();
+    let mut noop = noop_snapshot
+        .raw_tree(noop_snapshot.limits_value())
+        .unwrap();
     noop.replace_paragraph_text(Position::new(0), "footnote-target")
         .unwrap();
-    let noop_commit = noop.commit().unwrap();
+    let noop_patch = noop.patch().unwrap();
     let mut exact = Vec::new();
     noop_package
-        .apply_story_text(&noop_commit.patch().clone().into())
+        .apply_story_text(&noop_patch.clone().into())
         .and_then(|committed| Ok(committed.package().write_to(&mut exact)?))
         .unwrap();
     assert_eq!(exact, source);
@@ -775,13 +781,15 @@ fn signed_secondary_change_is_refused_but_signed_noop_is_exact() {
     let changed_snapshot = changed_package
         .story_text_snapshot(StorySelector::footnote(41))
         .unwrap();
-    let mut edit = changed_snapshot.edit().unwrap();
+    let mut edit = changed_snapshot
+        .raw_tree(changed_snapshot.limits_value())
+        .unwrap();
     edit.replace_paragraph_text(Position::new(0), "signed-change")
         .unwrap();
-    let commit = edit.commit().unwrap();
+    let patch = edit.patch().unwrap();
     assert!(
         changed_package
-            .apply_story_text(&commit.patch().clone().into())
+            .apply_story_text(&patch.clone().into())
             .and_then(|committed| {
                 committed.package().write_to(Vec::new())?;
                 Ok(committed)
@@ -922,19 +930,19 @@ fn secondary_patches_reject_stale_and_foreign_snapshots() {
     let snapshot = package
         .story_text_snapshot(StorySelector::footnote(41))
         .unwrap();
-    let mut edit = snapshot.edit().unwrap();
+    let mut edit = snapshot.raw_tree(snapshot.limits_value()).unwrap();
     edit.replace_paragraph_text(Position::new(0), "changed")
         .unwrap();
-    let commit = edit.commit().unwrap();
+    let patch = edit.patch().unwrap();
     assert!(matches!(
-        commit.patch().apply(commit.snapshot()),
+        patch.apply(patch.target()),
         Err(source_backed::StoryTextError::PatchConflict)
     ));
     let foreign = open(&source)
         .story_text_snapshot(StorySelector::footnote(41))
         .unwrap();
     assert!(matches!(
-        commit.patch().apply(&foreign),
+        patch.apply(&foreign),
         Err(source_backed::StoryTextError::ForeignSource)
     ));
 }
@@ -975,7 +983,7 @@ fn managed_secondary_edits_refuse_and_cancellation_stops_selection() {
         .story_text_snapshot(StorySelector::footnote(41))
         .unwrap();
     assert!(matches!(
-        snapshot.edit(),
+        snapshot.raw_tree(snapshot.limits_value()),
         Err(source_backed::StoryTextError::Document(Error::Refused(_)))
     ));
     cancellation.cancel();
@@ -1026,14 +1034,14 @@ fn secondary_publication_rejects_a_source_revision_change() {
     let snapshot = package
         .story_text_snapshot(StorySelector::endnote(51))
         .unwrap();
-    let mut edit = snapshot.edit().unwrap();
+    let mut edit = snapshot.raw_tree(snapshot.limits_value()).unwrap();
     edit.replace_paragraph_text(Position::new(0), "revision-change")
         .unwrap();
-    let commit = edit.commit().unwrap();
+    let patch = edit.patch().unwrap();
     versioned.revision.fetch_add(1, Ordering::SeqCst);
     assert!(matches!(
         package
-            .apply_story_text(&commit.patch().clone().into())
+            .apply_story_text(&patch.clone().into())
             .and_then(|committed| {
                 committed.package().write_to(Vec::new())?;
                 Ok(committed)
@@ -1242,7 +1250,7 @@ fn secondary_edit_refuses_when_synthetic_wrapper_exceeds_output_limit() {
         .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(limits))
         .story_text_snapshot(StorySelector::footnote(41))
         .unwrap();
-    assert!(snapshot.edit().is_err());
+    assert!(snapshot.raw_tree(snapshot.limits_value()).is_err());
 }
 
 #[test]
@@ -1318,7 +1326,9 @@ fn secondary_output_accumulation_and_borrowed_replacement_are_bounded() {
         .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(replacement_limits))
         .story_text_snapshot(StorySelector::footnote(41))
         .unwrap();
-    let mut edit = replacement_snapshot.edit().unwrap();
+    let mut edit = replacement_snapshot
+        .raw_tree(replacement_snapshot.limits_value())
+        .unwrap();
     let borrowed = "borrowed-replacement-too-large";
     assert!(
         edit.replace_paragraph_text(Position::new(0), borrowed)
@@ -1344,7 +1354,7 @@ fn xml_expanding_replacement_is_refused_without_changing_projection() {
         .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(limits))
         .story_text_snapshot(StorySelector::footnote(41))
         .unwrap();
-    let mut edit = snapshot.edit().unwrap();
+    let mut edit = snapshot.raw_tree(snapshot.limits_value()).unwrap();
     let before = edit.projected().unwrap().paragraph_text(0).unwrap();
     let replacement = "&<>\"'".repeat(256);
     assert!(
@@ -1385,13 +1395,13 @@ fn secondary_publication_rejects_a_partial_sink_without_panicking() {
     let snapshot = package
         .story_text_snapshot(StorySelector::endnote(51))
         .unwrap();
-    let mut edit = snapshot.edit().unwrap();
+    let mut edit = snapshot.raw_tree(snapshot.limits_value()).unwrap();
     edit.replace_paragraph_text(Position::new(0), "changed")
         .unwrap();
-    let commit = edit.commit().unwrap();
+    let patch = edit.patch().unwrap();
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         package
-            .apply_story_text(&commit.patch().clone().into())
+            .apply_story_text(&patch.clone().into())
             .and_then(|committed| {
                 committed.package().write_to(PartialWriter {
                     wrote_prefix: false,

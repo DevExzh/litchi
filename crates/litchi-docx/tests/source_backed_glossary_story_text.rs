@@ -616,17 +616,17 @@ fn glossary_entry_edit_splices_only_selected_body_and_round_trips() {
         let source = fixture(dialect, Mutation::Valid);
         let package = open(&source);
         let snapshot = package.story_text_snapshot(alpha_by_name()).unwrap();
-        let mut edit = snapshot.edit().unwrap();
+        let mut edit = snapshot.raw_tree(snapshot.limits_value()).unwrap();
         edit.replace_paragraph_text(Position::new(0), "changed")
             .unwrap();
-        let commit = edit.commit().unwrap();
+        let patch = edit.patch().unwrap();
         assert_eq!(
-            commit.snapshot().paragraph_text(0).unwrap().as_deref(),
+            patch.target().paragraph_text(0).unwrap().as_deref(),
             Some("changed")
         );
         let mut output = Vec::new();
         let publication = package
-            .apply_story_text(&commit.patch().clone().into())
+            .apply_story_text(&patch.clone().into())
             .and_then(|committed| {
                 committed.package().write_to(&mut output)?;
                 Ok(committed)
@@ -679,11 +679,15 @@ fn glossary_noop_and_inverse_preserve_the_complete_artifact() {
     let source = fixture(Dialect::Transitional, Mutation::Valid);
     let package = open(&source);
     let snapshot = package.story_text_snapshot(alpha_by_name()).unwrap();
-    let commit = snapshot.edit().unwrap().commit().unwrap();
-    assert!(commit.patch().is_noop());
+    let patch = snapshot
+        .raw_tree(snapshot.limits_value())
+        .unwrap()
+        .patch()
+        .unwrap();
+    assert!(patch.is_noop());
     let mut exact = Vec::new();
     package
-        .apply_story_text(&commit.patch().clone().into())
+        .apply_story_text(&patch.clone().into())
         .and_then(|committed| Ok(committed.package().write_to(&mut exact)?))
         .unwrap();
     assert_eq!(exact, source);
@@ -691,13 +695,13 @@ fn glossary_noop_and_inverse_preserve_the_complete_artifact() {
     let source = fixture(Dialect::Transitional, Mutation::Valid);
     let package = open(&source);
     let snapshot = package.story_text_snapshot(alpha_by_name()).unwrap();
-    let mut edit = snapshot.edit().unwrap();
+    let mut edit = snapshot.raw_tree(snapshot.limits_value()).unwrap();
     edit.replace_paragraph_text(Position::new(0), "changed")
         .unwrap();
-    let commit = edit.commit().unwrap();
+    let patch = edit.patch().unwrap();
     let mut output = Vec::new();
     let publication = package
-        .apply_story_text(&commit.patch().clone().into())
+        .apply_story_text(&patch.clone().into())
         .and_then(|committed| {
             committed.package().write_to(&mut output)?;
             Ok(committed)
@@ -709,6 +713,37 @@ fn glossary_noop_and_inverse_preserve_the_complete_artifact() {
         .and_then(|committed| Ok(committed.package().write_to(&mut restored)?))
         .unwrap();
     assert_eq!(restored, source);
+}
+
+#[test]
+fn raw_glossary_tree_caches_projection_and_invalidates_after_mutation() {
+    let package = open(&fixture(Dialect::Transitional, Mutation::BatchThreeEntries));
+    let snapshot = package
+        .glossary_text_batch_snapshot(glossary_triplet())
+        .unwrap();
+    let mut tree = snapshot.raw_tree(snapshot.limits_value()).unwrap();
+
+    let first = tree.projected().unwrap();
+    let second = tree.projected().unwrap();
+    assert_eq!(first.part_fingerprint(), second.part_fingerprint());
+    assert_eq!(
+        first.paragraph_text(0, 0).unwrap(),
+        second.paragraph_text(0, 0).unwrap()
+    );
+
+    tree.replace_paragraph_text(0, Position::new(0), "cached glossary mutation")
+        .unwrap();
+    let changed = tree.projected().unwrap();
+    assert_ne!(first.part_fingerprint(), changed.part_fingerprint());
+    assert_eq!(
+        changed.paragraph_text(0, 0).unwrap().as_deref(),
+        Some("cached glossary mutation")
+    );
+    let patch = tree.patch().unwrap();
+    assert_eq!(
+        patch.target().part_fingerprint(),
+        changed.part_fingerprint()
+    );
 }
 
 #[test]
@@ -803,15 +838,15 @@ fn glossary_topology_and_dialect_boundaries_refuse_before_editing() {
 fn glossary_signed_change_refuses_but_signed_noop_is_exact() {
     let source = fixture(Dialect::Transitional, Mutation::Signed);
     let package = open(&source);
-    let commit = package
-        .story_text_snapshot(alpha_by_name())
+    let snapshot = package.story_text_snapshot(alpha_by_name()).unwrap();
+    let patch = snapshot
+        .raw_tree(snapshot.limits_value())
         .unwrap()
-        .edit()
+        .patch()
         .unwrap();
-    let commit = commit.commit().unwrap();
     let mut exact = Vec::new();
     package
-        .apply_story_text(&commit.patch().clone().into())
+        .apply_story_text(&patch.clone().into())
         .and_then(|committed| Ok(committed.package().write_to(&mut exact)?))
         .unwrap();
     assert_eq!(exact, source);
@@ -819,14 +854,14 @@ fn glossary_signed_change_refuses_but_signed_noop_is_exact() {
     let source = fixture(Dialect::Transitional, Mutation::Signed);
     let package = open(&source);
     let snapshot = package.story_text_snapshot(alpha_by_name()).unwrap();
-    let mut edit = snapshot.edit().unwrap();
+    let mut edit = snapshot.raw_tree(snapshot.limits_value()).unwrap();
     edit.replace_paragraph_text(Position::new(0), "changed")
         .unwrap();
-    let commit = edit.commit().unwrap();
+    let patch = edit.patch().unwrap();
     let mut refused = Vec::new();
     assert!(
         package
-            .apply_story_text(&commit.patch().clone().into())
+            .apply_story_text(&patch.clone().into())
             .and_then(|committed| {
                 committed.package().write_to(&mut refused)?;
                 Ok(committed)
@@ -904,7 +939,7 @@ fn glossary_references_and_limits_are_failure_atomic() {
         .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(limits))
         .story_text_snapshot(alpha_by_name())
         .unwrap();
-    let mut edit = snapshot.edit().unwrap();
+    let mut edit = snapshot.raw_tree(snapshot.limits_value()).unwrap();
     assert!(edit.replace_paragraph_text(Position::new(0), "one").is_ok());
     assert!(
         edit.replace_paragraph_text(Position::new(0), "two")
@@ -931,7 +966,7 @@ fn glossary_quote_namespace_wrapper_has_exact_and_one_under_boundaries() {
         .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(exact))
         .story_text_snapshot(alpha_by_name())
         .unwrap();
-    assert!(snapshot.edit().is_ok());
+    assert!(snapshot.raw_tree(snapshot.limits_value()).is_ok());
 
     let one_under = source_backed::StoryTextLimits::new(
         16 * 1024,
@@ -948,7 +983,7 @@ fn glossary_quote_namespace_wrapper_has_exact_and_one_under_boundaries() {
         .story_text_snapshot(alpha_by_name())
         .unwrap();
     assert!(matches!(
-        snapshot.edit(),
+        snapshot.raw_tree(snapshot.limits_value()),
         Err(source_backed::StoryTextError::Limit {
             kind: source_backed::story_text::LimitKind::WrappedStoryXmlBytes,
             ..
@@ -986,18 +1021,18 @@ fn glossary_publication_sink_failure_does_not_panic_and_complex_edit_is_refused(
     let source = fixture(Dialect::Transitional, Mutation::Valid);
     let package = open(&source);
     let snapshot = package.story_text_snapshot(alpha_by_name()).unwrap();
-    let mut edit = snapshot.edit().unwrap();
+    let mut edit = snapshot.raw_tree(snapshot.limits_value()).unwrap();
     assert!(
         edit.replace_paragraph_text(Position::new(0), "a\u{0}b")
             .is_err()
     );
-    let mut edit = snapshot.edit().unwrap();
+    let mut edit = snapshot.raw_tree(snapshot.limits_value()).unwrap();
     edit.replace_paragraph_text(Position::new(0), "changed")
         .unwrap();
-    let commit = edit.commit().unwrap();
+    let patch = edit.patch().unwrap();
     assert!(
         open(&source)
-            .apply_story_text(&commit.patch().clone().into())
+            .apply_story_text(&patch.clone().into())
             .and_then(|committed| {
                 committed.package().write_to(PartialWriter { writes: 0 })?;
                 Ok(committed)
@@ -1046,17 +1081,17 @@ fn glossary_source_mutation_and_foreign_patch_are_rejected() {
     });
     let package = source_backed::Package::from_read_at(versioned.clone()).unwrap();
     let snapshot = package.story_text_snapshot(alpha_by_name()).unwrap();
-    let mut edit = snapshot.edit().unwrap();
+    let mut edit = snapshot.raw_tree(snapshot.limits_value()).unwrap();
     edit.replace_paragraph_text(Position::new(0), "changed")
         .unwrap();
-    let commit = edit.commit().unwrap();
+    let patch = edit.patch().unwrap();
     versioned
         .revision
         .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
     let mut refused = Vec::new();
     assert!(
         package
-            .apply_story_text(&commit.patch().clone().into())
+            .apply_story_text(&patch.clone().into())
             .and_then(|committed| {
                 committed.package().write_to(&mut refused)?;
                 Ok(committed)
@@ -1065,7 +1100,7 @@ fn glossary_source_mutation_and_foreign_patch_are_rejected() {
     );
     assert!(refused.is_empty());
     let foreign = open(&source).story_text_snapshot(alpha_by_name()).unwrap();
-    assert!(commit.patch().apply(&foreign).is_err());
+    assert!(patch.apply(&foreign).is_err());
 }
 
 #[test]
@@ -1105,7 +1140,7 @@ fn glossary_managed_entry_edit_and_cancellation_are_refused() {
     )
     .unwrap();
     let snapshot = package.story_text_snapshot(alpha_by_name()).unwrap();
-    assert!(snapshot.edit().is_err());
+    assert!(snapshot.raw_tree(snapshot.limits_value()).is_err());
     cancel_source.cancel();
     assert!(package.story_text_snapshot(alpha_by_name()).is_err());
 }
@@ -1182,15 +1217,15 @@ fn glossary_batch_is_general_n_canonical_and_preserves_siblings() {
     );
     assert_eq!(snapshot.extract_text(2).unwrap().as_deref(), Some("third"));
 
-    let mut edit = snapshot.edit().unwrap();
+    let mut edit = snapshot.raw_tree(snapshot.limits_value()).unwrap();
     edit.replace_paragraph_text(0, Position::new(0), "alpha changed")
         .unwrap();
     edit.replace_paragraph_text(2, Position::new(0), "gamma changed")
         .unwrap();
-    let commit = edit.commit().unwrap();
+    let patch = edit.patch().unwrap();
     let mut output = Vec::new();
     let publication = package
-        .apply_glossary_text_batch(&commit.patch().clone().into())
+        .apply_glossary_text_batch(&patch.clone().into())
         .and_then(|committed| {
             committed.package().write_to(&mut output)?;
             Ok(committed)
@@ -1230,17 +1265,19 @@ fn glossary_batch_is_general_n_canonical_and_preserves_siblings() {
     let deterministic_snapshot = deterministic_package
         .glossary_text_batch_snapshot(glossary_triplet())
         .unwrap();
-    let mut deterministic_edit = deterministic_snapshot.edit().unwrap();
+    let mut deterministic_edit = deterministic_snapshot
+        .raw_tree(snapshot.limits_value())
+        .unwrap();
     deterministic_edit
         .replace_paragraph_text(0, Position::new(0), "alpha changed")
         .unwrap();
     deterministic_edit
         .replace_paragraph_text(2, Position::new(0), "gamma changed")
         .unwrap();
-    let deterministic_commit = deterministic_edit.commit().unwrap();
+    let deterministic_patch = deterministic_edit.patch().unwrap();
     let mut deterministic = Vec::new();
     deterministic_package
-        .apply_glossary_text_batch(&deterministic_commit.patch().clone().into())
+        .apply_glossary_text_batch(&deterministic_patch.clone().into())
         .and_then(|committed| Ok(committed.package().write_to(&mut deterministic)?))
         .unwrap();
     assert_eq!(output, deterministic);
@@ -1348,11 +1385,15 @@ fn glossary_batch_noop_inverse_and_limits_are_atomic() {
     let snapshot = package
         .glossary_text_batch_snapshot(glossary_triplet())
         .unwrap();
-    let commit = snapshot.edit().unwrap().commit().unwrap();
-    assert!(commit.patch().is_noop());
+    let patch = snapshot
+        .raw_tree(snapshot.limits_value())
+        .unwrap()
+        .patch()
+        .unwrap();
+    assert!(patch.is_noop());
     let mut exact = Vec::new();
     package
-        .apply_glossary_text_batch(&commit.patch().clone().into())
+        .apply_glossary_text_batch(&patch.clone().into())
         .and_then(|committed| Ok(committed.package().write_to(&mut exact)?))
         .unwrap();
     assert_eq!(exact, source);
@@ -1361,13 +1402,13 @@ fn glossary_batch_noop_inverse_and_limits_are_atomic() {
     let snapshot = package
         .glossary_text_batch_snapshot(glossary_triplet())
         .unwrap();
-    let mut edit = snapshot.edit().unwrap();
+    let mut edit = snapshot.raw_tree(snapshot.limits_value()).unwrap();
     edit.replace_paragraph_text(0, Position::new(0), "changed")
         .unwrap();
-    let commit = edit.commit().unwrap();
+    let patch = edit.patch().unwrap();
     let mut output = Vec::new();
     let publication = package
-        .apply_glossary_text_batch(&commit.patch().clone().into())
+        .apply_glossary_text_batch(&patch.clone().into())
         .and_then(|committed| {
             committed.package().write_to(&mut output)?;
             Ok(committed)
@@ -1397,7 +1438,7 @@ fn glossary_batch_noop_inverse_and_limits_are_atomic() {
         )
         .glossary_text_batch_snapshot(glossary_triplet())
         .unwrap();
-    let mut edit = snapshot.edit().unwrap();
+    let mut edit = snapshot.raw_tree(snapshot.limits_value()).unwrap();
     edit.replace_paragraph_text(0, Position::new(0), "one")
         .unwrap();
     assert!(
@@ -1426,7 +1467,7 @@ fn glossary_batch_rejects_repeated_targets_and_aggregate_limits() {
     let snapshot = package
         .glossary_text_batch_snapshot(glossary_triplet())
         .unwrap();
-    let mut edit = snapshot.edit().unwrap();
+    let mut edit = snapshot.raw_tree(snapshot.limits_value()).unwrap();
     edit.replace_paragraph_text(0, Position::new(0), "one")
         .unwrap();
     assert!(
@@ -1450,7 +1491,7 @@ fn glossary_batch_rejects_repeated_targets_and_aggregate_limits() {
         )
         .glossary_text_batch_snapshot(glossary_triplet())
         .unwrap();
-    let mut edit = snapshot.edit().unwrap();
+    let mut edit = snapshot.raw_tree(snapshot.limits_value()).unwrap();
     edit.replace_paragraph_text(0, Position::new(0), "one")
         .unwrap();
     assert!(
@@ -1476,10 +1517,10 @@ fn glossary_batch_rejects_repeated_targets_and_aggregate_limits() {
         .with_semantic_limits(litchi_docx::SemanticLimits::default().story_text(output_limited))
         .glossary_text_batch_snapshot(glossary_triplet())
         .unwrap();
-    let mut edit = snapshot.edit().unwrap();
+    let mut edit = snapshot.raw_tree(snapshot.limits_value()).unwrap();
     edit.replace_paragraph_text(0, Position::new(0), "x".repeat(512))
         .unwrap();
-    assert!(edit.commit().is_err());
+    assert!(edit.patch().is_err());
 }
 
 #[test]
@@ -1493,17 +1534,17 @@ fn glossary_batch_rejects_stale_foreign_managed_cancelled_signed_and_sink_paths(
     let snapshot = package
         .glossary_text_batch_snapshot(glossary_triplet())
         .unwrap();
-    let mut edit = snapshot.edit().unwrap();
+    let mut edit = snapshot.raw_tree(snapshot.limits_value()).unwrap();
     edit.replace_paragraph_text(0, Position::new(0), "changed")
         .unwrap();
-    let commit = edit.commit().unwrap();
+    let patch = edit.patch().unwrap();
     versioned
         .revision
         .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
     let mut refused = Vec::new();
     assert!(
         package
-            .apply_glossary_text_batch(&commit.patch().clone().into())
+            .apply_glossary_text_batch(&patch.clone().into())
             .and_then(|committed| {
                 committed.package().write_to(&mut refused)?;
                 Ok(committed)
@@ -1514,7 +1555,7 @@ fn glossary_batch_rejects_stale_foreign_managed_cancelled_signed_and_sink_paths(
     let foreign = open(&source)
         .glossary_text_batch_snapshot(glossary_triplet())
         .unwrap();
-    assert!(commit.patch().apply(&foreign).is_err());
+    assert!(patch.apply(&foreign).is_err());
 
     let managed = source_backed::Package::from_read_at_with_options(
         Arc::new(OwnedSource::new(source.clone())),
@@ -1543,11 +1584,12 @@ fn glossary_batch_rejects_stale_foreign_managed_cancelled_signed_and_sink_paths(
             )),
     )
     .unwrap();
+    let managed_snapshot = managed
+        .glossary_text_batch_snapshot(glossary_triplet())
+        .unwrap();
     assert!(
-        managed
-            .glossary_text_batch_snapshot(glossary_triplet())
-            .unwrap()
-            .edit()
+        managed_snapshot
+            .raw_tree(managed_snapshot.limits_value())
             .is_err()
     );
 
@@ -1591,33 +1633,35 @@ fn glossary_batch_rejects_stale_foreign_managed_cancelled_signed_and_sink_paths(
     );
 
     let signed = open(&fixture(Dialect::Transitional, Mutation::Signed));
-    let noop = signed
+    let signed_snapshot = signed
         .glossary_text_batch_snapshot(glossary_triplet())
+        .unwrap();
+    let noop = signed_snapshot
+        .raw_tree(signed_snapshot.limits_value())
         .unwrap()
-        .edit()
-        .unwrap()
-        .commit()
+        .patch()
         .unwrap();
     let mut exact = Vec::new();
     signed
-        .apply_glossary_text_batch(&noop.patch().clone().into())
+        .apply_glossary_text_batch(&noop.clone().into())
         .and_then(|committed| Ok(committed.package().write_to(&mut exact)?))
         .unwrap();
     assert_eq!(exact, fixture(Dialect::Transitional, Mutation::Signed));
 
     let signed = open(&fixture(Dialect::Transitional, Mutation::Signed));
-    let mut edit = signed
+    let signed_snapshot = signed
         .glossary_text_batch_snapshot(glossary_triplet())
-        .unwrap()
-        .edit()
+        .unwrap();
+    let mut edit = signed_snapshot
+        .raw_tree(signed_snapshot.limits_value())
         .unwrap();
     edit.replace_paragraph_text(0, Position::new(0), "changed")
         .unwrap();
-    let commit = edit.commit().unwrap();
+    let patch = edit.patch().unwrap();
     let mut refused = Vec::new();
     assert!(
         signed
-            .apply_glossary_text_batch(&commit.patch().clone().into())
+            .apply_glossary_text_batch(&patch.clone().into())
             .and_then(|committed| {
                 committed.package().write_to(&mut refused)?;
                 Ok(committed)
@@ -1630,13 +1674,13 @@ fn glossary_batch_rejects_stale_foreign_managed_cancelled_signed_and_sink_paths(
     let snapshot = package
         .glossary_text_batch_snapshot(glossary_triplet())
         .unwrap();
-    let mut edit = snapshot.edit().unwrap();
+    let mut edit = snapshot.raw_tree(snapshot.limits_value()).unwrap();
     edit.replace_paragraph_text(0, Position::new(0), "changed")
         .unwrap();
-    let commit = edit.commit().unwrap();
+    let patch = edit.patch().unwrap();
     assert!(
         package
-            .apply_glossary_text_batch(&commit.patch().clone().into())
+            .apply_glossary_text_batch(&patch.clone().into())
             .and_then(|committed| {
                 committed.package().write_to(PartialWriter { writes: 0 })?;
                 Ok(committed)
