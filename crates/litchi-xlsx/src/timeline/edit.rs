@@ -17,10 +17,11 @@
 //! ([`crate::Package::unsign`]) to edit a signed workbook.
 
 use super::model::{Cache, CacheDefinition, Part, View};
+use super::raw;
 use crate::Package;
 use crate::error::Result;
 use crate::part_edit::{Staged, family};
-use litchi_opc::{OpcPackage, PackURI};
+use litchi_opc::{OpcPackage, PackURI, SourceLimits};
 
 family!("timeline");
 
@@ -84,6 +85,24 @@ impl Edit {
         self.apply(|candidate| crate::slicer_cache::crud::add_timeline_cache(candidate, definition))
     }
 
+    /// Insert a complete workbook View Cache set with caller-selected native
+    /// relationship IDs and part names.
+    ///
+    /// This is the raw identity escape for the timeline edit family. The
+    /// complete candidate graph is checked against `limits`, and publication
+    /// still happens only through [`Self::commit`].
+    pub fn insert_caches(&mut self, values: &[raw::Cache], limits: &SourceLimits) -> Result<()> {
+        let values = values
+            .iter()
+            .cloned()
+            .map(raw::Cache::into_model)
+            .collect::<Vec<_>>();
+        let workbook = self.workbook.clone();
+        self.apply_raw(limits, move |candidate| {
+            crate::timelines::store_timeline_caches(candidate, &workbook, &values)
+        })
+    }
+
     pub fn update_cache<F>(&mut self, name: &str, update: F) -> Result<bool>
     where
         F: FnOnce(&mut CacheDefinition),
@@ -114,6 +133,16 @@ impl Edit {
         let worksheet = worksheet.clone();
         self.apply(move |candidate| {
             crate::slicer_cache::crud::add_timeline(candidate, &worksheet, view)
+        })
+    }
+
+    /// Insert a worksheet Timelines part with its caller-selected worksheet,
+    /// relationship ID and part name.
+    pub fn insert_part(&mut self, value: raw::Part, limits: &SourceLimits) -> Result<()> {
+        let value = value.into_model();
+        let workbook = self.workbook.clone();
+        self.apply_raw(limits, move |candidate| {
+            crate::timelines::store_worksheet_timelines(candidate, &workbook, &value)
         })
     }
 
@@ -186,6 +215,20 @@ impl Edit {
         let workbook = &self.workbook;
         self.staged.update(|candidate| {
             let value = operation(candidate)?;
+            super::validation::graph(candidate, workbook)?;
+            Ok(value)
+        })
+    }
+
+    fn apply_raw<T>(
+        &mut self,
+        limits: &SourceLimits,
+        operation: impl FnOnce(&mut OpcPackage) -> Result<T>,
+    ) -> Result<T> {
+        let workbook = &self.workbook;
+        self.staged.update(|candidate| {
+            let value = operation(candidate)?;
+            crate::raw::check_package_limits(candidate, limits)?;
             super::validation::graph(candidate, workbook)?;
             Ok(value)
         })

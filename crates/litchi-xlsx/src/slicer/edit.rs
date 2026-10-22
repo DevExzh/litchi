@@ -15,10 +15,11 @@
 //! ([`crate::Package::unsign`]) to edit a signed workbook.
 
 use super::model::{Cache, Definition, Part, Slicer};
+use super::raw;
 use crate::Package;
 use crate::error::Result;
 use crate::part_edit::{Staged, family};
-use litchi_opc::{OpcPackage, PackURI};
+use litchi_opc::{OpcPackage, PackURI, SourceLimits};
 
 family!("slicer");
 
@@ -80,6 +81,19 @@ impl Edit {
         self.apply(|candidate| crate::slicer_cache::crud::add_slicer_cache(candidate, definition))
     }
 
+    /// Insert a workbook-owned Slicer Cache with its caller-selected native
+    /// relationship ID and part name.
+    ///
+    /// This is the raw identity escape for the slicer edit family. The
+    /// complete candidate graph is checked against `limits`, and publication
+    /// still happens only through [`Self::commit`].
+    pub fn insert_cache(&mut self, value: raw::Cache, limits: &SourceLimits) -> Result<()> {
+        let value = value.into_model();
+        self.apply_raw(limits, move |candidate| {
+            crate::slicer_cache::package::store_slicer_cache_in_place(candidate, &value)
+        })
+    }
+
     pub fn update_cache<F>(&mut self, name: &str, update: F) -> Result<bool>
     where
         F: FnOnce(&mut Definition),
@@ -108,6 +122,21 @@ impl Edit {
         let worksheet = worksheet.clone();
         self.apply(move |candidate| {
             crate::slicer_cache::crud::add_slicer(candidate, &worksheet, view)
+        })
+    }
+
+    /// Insert a worksheet Slicers part with its caller-selected native
+    /// relationship ID and part name.
+    pub fn insert_part(
+        &mut self,
+        worksheet: &PackURI,
+        value: raw::Part,
+        limits: &SourceLimits,
+    ) -> Result<()> {
+        let worksheet = worksheet.clone();
+        let value = value.into_model();
+        self.apply_raw(limits, move |candidate| {
+            crate::slicer_cache::views::store_slicer_part(candidate, &worksheet, &value)
         })
     }
 
@@ -179,6 +208,19 @@ impl Edit {
     fn apply<T>(&mut self, operation: impl FnOnce(&mut OpcPackage) -> Result<T>) -> Result<T> {
         self.staged.update(|candidate| {
             let value = operation(candidate)?;
+            super::validation::graph(candidate)?;
+            Ok(value)
+        })
+    }
+
+    fn apply_raw<T>(
+        &mut self,
+        limits: &SourceLimits,
+        operation: impl FnOnce(&mut OpcPackage) -> Result<T>,
+    ) -> Result<T> {
+        self.staged.update(|candidate| {
+            let value = operation(candidate)?;
+            crate::raw::check_package_limits(candidate, limits)?;
             super::validation::graph(candidate)?;
             Ok(value)
         })

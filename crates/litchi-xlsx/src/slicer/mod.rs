@@ -9,6 +9,7 @@ pub mod codec;
 mod edit;
 pub mod model;
 pub mod package;
+pub mod raw;
 pub mod validation;
 
 pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};

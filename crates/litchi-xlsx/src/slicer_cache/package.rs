@@ -120,7 +120,7 @@ pub fn store_slicer_cache(package: &mut OpcPackage, value: &Cache) -> Result<()>
     Ok(())
 }
 
-fn store_slicer_cache_in_place(package: &mut OpcPackage, value: &Cache) -> Result<()> {
+pub(crate) fn store_slicer_cache_in_place(package: &mut OpcPackage, value: &Cache) -> Result<()> {
     let workbook_name = package.main_document_part()?.partname().clone();
     let existing = load_slicer_caches(package)?;
     if existing.iter().any(|cache| {

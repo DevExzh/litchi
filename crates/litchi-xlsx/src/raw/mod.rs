@@ -57,6 +57,43 @@ pub(crate) fn check_source_bytes(
     Ok(())
 }
 
+/// Check the materialized OPC graph against the caller's raw-operation
+/// policy after a staged graph operation.
+pub(crate) fn check_package_limits(
+    package: &litchi_opc::OpcPackage,
+    limits: &litchi_opc::SourceLimits,
+) -> crate::Result<()> {
+    let parts = package.iter_parts().count();
+    if parts > limits.max_parts() {
+        return Err(crate::Error::Package(litchi_opc::OpcError::Limit {
+            kind: litchi_opc::SourceLimitKind::Parts,
+            observed: parts as u64,
+            maximum: limits.max_parts() as u64,
+        }));
+    }
+
+    let mut total = 0_u64;
+    for part in package.iter_parts() {
+        let bytes = package.get_part(part.partname())?.blob().len();
+        check_source_bytes(bytes, limits)?;
+        total = total.checked_add(bytes as u64).ok_or_else(|| {
+            crate::Error::Package(litchi_opc::OpcError::Limit {
+                kind: litchi_opc::SourceLimitKind::TotalPartBytes,
+                observed: u64::MAX,
+                maximum: limits.max_total_part_bytes(),
+            })
+        })?;
+    }
+    if total > limits.max_total_part_bytes() {
+        return Err(crate::Error::Package(litchi_opc::OpcError::Limit {
+            kind: litchi_opc::SourceLimitKind::TotalPartBytes,
+            observed: total,
+            maximum: limits.max_total_part_bytes(),
+        }));
+    }
+    Ok(())
+}
+
 /// Parse only the direct worksheet-grid defaults from one `WorksheetPart`.
 ///
 /// This focused read path shares the canonical [`crate::layout::Defaults`]
