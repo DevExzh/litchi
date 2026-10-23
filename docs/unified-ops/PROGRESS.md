@@ -3028,3 +3028,43 @@ See [0063](0063-source-pptx-modern-comments.md).
   Source integration remains staging. Full gates, inventory dispositions,
   corpus replay, glossary closure and native qualification remain required.
   Comprehensive redaction audit 22 is the only deferral. Nothing is pushed.
+
+- Coordinator checkpoint (2026-10-23, pinned ODS closure and consumer review):
+  Main integration reaches `f741d67f46`. ODS lazy entry and cheap
+  limits/context admission are independently reviewed and merged at
+  `f144cd6029`. Source `2e2f902179` passes 1,767 tests across 119 successful
+  result blocks, including 702 library tests, and strict all-target/all-feature
+  Clippy. The coordinator verified the raw logs and actual root configuration.
+  Sparse fixture expansion had excluded the pinned toolchain and Clippy
+  configuration; both were restored and final checks rerun under Rust 1.95.
+  The earlier Rust 1.98 run is historical evidence, not acceptance. All 37
+  fixture paths were already tracked; no fixture or large artifact was added.
+
+  The completed constructor audit also confirms DOCX and XLSB source-sized
+  entry work; records 0362ugl/0362ugm are assigned alongside the existing
+  correction lanes. ODC, ODI, OTH, formula and ODT entries were checked against
+  their actual separate owners and Arc-backed state. The earlier mistaken
+  audit assumption that those formats all route through ODT was corrected
+  before the clear disposition was recorded. Bounded raw codec drafts remain
+  distinguished from archive Package entry under the existing contract.
+
+  Review continues to return concrete capability and cost defects. Numbers'
+  deferred chart refusal now preserves its host fallback without cloning the
+  full grid. Keynote's standalone profiling consumer is migrated. ODP removes
+  its remaining XML entry scan and preserves typed errors on read projections;
+  final-source validation is active. PPTX now defers OPC graph/catalog cloning,
+  with a remaining refusal-test consumer correction. DOC's scoped tests pass,
+  but final review still requires omitted facade/profiling consumer migrations
+  and preservation of ordinary Edit auto traits with profiled callbacks.
+  These source leaves are not yet accepted into integration.
+
+  ODF paired qualification now has executable preparation and orchestration,
+  but review returned build-receipt trust, actual source/config verification,
+  complete fidelity proof and allocator-observer boundary gaps. ODG's separate
+  executable lane is being implemented. Neither source-only tooling nor debug
+  correctness is credited as native performance qualification. Four capped
+  Cargo slots are rotated among workers; final candidate freeze remains held.
+
+  Source integration remains staging. The final full gate, all-68 inventory,
+  corpus replay, glossary closure and native qualification remain required.
+  Comprehensive redaction audit 22 is the only deferral. Nothing is pushed.
