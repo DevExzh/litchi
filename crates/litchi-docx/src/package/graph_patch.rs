@@ -199,23 +199,33 @@ impl GraphPatch {
         Ok(())
     }
 
-    /// Validate every payload the patch would add or replace without
-    /// applying the graph mutation. Family-specific callers use this to
-    /// enforce their selected raw policy before `apply_to` allocates new
-    /// package parts.
-    pub(crate) fn validate_after_parts(
+    /// Visit every changed part's before and after state without applying the
+    /// graph mutation. Family-specific callers use this to validate a final
+    /// closure ledger before `apply_to` allocates new package parts.
+    pub(crate) fn for_each_part_delta(
         &self,
-        mut validate: impl FnMut(&PackURI, &str, &[u8], &Relationships) -> Result<()>,
+        mut visit: impl FnMut(
+            &PackURI,
+            Option<(&str, &[u8], &Relationships)>,
+            Option<(&str, &[u8], &Relationships)>,
+        ) -> Result<()>,
     ) -> Result<()> {
         for change in self.parts.iter() {
-            if let Some(after) = change.after.as_ref() {
-                validate(
-                    &change.name,
-                    &after.content_type,
-                    after.blob.as_slice(),
-                    &after.rels,
-                )?;
-            }
+            let before = change.before.as_ref().map(|state| {
+                (
+                    state.content_type.as_ref(),
+                    state.blob.as_slice(),
+                    state.rels.as_ref(),
+                )
+            });
+            let after = change.after.as_ref().map(|state| {
+                (
+                    state.content_type.as_ref(),
+                    state.blob.as_slice(),
+                    state.rels.as_ref(),
+                )
+            });
+            visit(&change.name, before, after)?;
         }
         Ok(())
     }
@@ -223,13 +233,13 @@ impl GraphPatch {
     /// Validate the after-state relationship sets without applying the patch.
     pub(crate) fn validate_after_relationships(
         &self,
-        mut validate: impl FnMut(&Relationships) -> Result<()>,
+        mut validate: impl FnMut(Option<&PackURI>, &Relationships) -> Result<()>,
     ) -> Result<()> {
         if let Some((_, after)) = self.package_rels.as_deref() {
-            validate(after)?;
+            validate(None, after)?;
         }
-        for (_, rels) in self.owners.iter() {
-            validate(&rels.1)?;
+        for (owner, rels) in self.owners.iter() {
+            validate(owner.as_ref(), &rels.1)?;
         }
         Ok(())
     }

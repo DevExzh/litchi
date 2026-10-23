@@ -1959,6 +1959,38 @@ fn semantic_payload_limits_fail_before_xml_parsing() {
 }
 
 #[test]
+fn unchanged_background_rebind_checks_existing_catalog() {
+    let mut catalog = Catalog::new();
+    catalog.add(entry("Existing")).unwrap();
+    let background = format!(r#"<w:background xmlns:w="{W}"/>"#).into_bytes();
+    catalog
+        .set_background(background.clone(), &Limits::DEFAULT)
+        .unwrap();
+    let narrow_nodes = Limits::new(
+        MAX,
+        MAX_DEPTH,
+        1,
+        MAX_DOM_ATTRIBUTES,
+        MAX_DOM_CONTENT,
+        MAX_DOM_TOKENS,
+        MAX_DOM_BYTES,
+        MAX_PARTS,
+        MAX_VALUES,
+        MAX_STRING,
+        MAX_NAME_KEY,
+        MAX_GRAPH_BYTES,
+        MAX_GRAPH_METADATA_BYTES,
+    )
+    .unwrap();
+    let error = catalog
+        .set_background(background, &narrow_nodes)
+        .unwrap_err()
+        .to_string();
+    assert!(error.contains("XML node limit exceeded"), "{error}");
+    assert!(catalog.add(entry("Still default")).is_ok());
+}
+
+#[test]
 fn aggregate_catalog_budget_is_checked_atomically() {
     let mut catalog = Catalog::new();
     for index in 0..5 {
@@ -2106,6 +2138,65 @@ fn transaction_creates_catalog_and_auxiliary_graph_atomically() {
             .unwrap()
             .is_empty()
     );
+}
+
+#[test]
+fn transaction_auxiliary_budget_is_admitted_before_staging() {
+    let mut package = package();
+    add_empty_glossary(&mut package, Conformance::Transitional);
+    let mut graph = raw::load(&package, &Limits::DEFAULT).unwrap().unwrap();
+    graph.parts.push(
+        raw::Part::new(
+            "/word/glossary/media/one.bin",
+            "application/octet-stream",
+            vec![1],
+            &Limits::DEFAULT,
+        )
+        .unwrap(),
+    );
+    raw::put(&mut package, &graph, &Limits::DEFAULT).unwrap();
+    let loaded = raw::load(&package, &Limits::DEFAULT).unwrap().unwrap();
+    let graph_bytes = loaded.root_xml().unwrap().len()
+        + loaded
+            .parts()
+            .iter()
+            .map(|part| part.data().len())
+            .sum::<usize>();
+    let limits = Limits::new(
+        MAX,
+        MAX_DEPTH,
+        MAX_NODES,
+        MAX_DOM_ATTRIBUTES,
+        MAX_DOM_CONTENT,
+        MAX_DOM_TOKENS,
+        MAX_DOM_BYTES,
+        MAX_PARTS,
+        MAX_VALUES,
+        MAX_STRING,
+        MAX_NAME_KEY,
+        graph_bytes,
+        MAX_GRAPH_METADATA_BYTES,
+    )
+    .unwrap();
+    let mut transaction = Transaction::new_with_limits(&package, &limits).unwrap();
+    let before = transaction.auxiliary_parts().len();
+    let error = transaction
+        .add_part(
+            raw::Part::new(
+                "/word/glossary/media/two.bin",
+                "application/octet-stream",
+                vec![2],
+                &Limits::DEFAULT,
+            )
+            .unwrap(),
+        )
+        .unwrap_err()
+        .to_string();
+    assert!(
+        error.contains("glossary graph bytes limit exceeded"),
+        "{error}"
+    );
+    assert_eq!(transaction.auxiliary_parts().len(), before);
 }
 
 #[test]

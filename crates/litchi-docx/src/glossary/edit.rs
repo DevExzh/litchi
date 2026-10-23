@@ -26,6 +26,8 @@
 //! # Ok::<(), litchi_docx::Error>(())
 //! ```
 
+use super::codec::invalid;
+use super::graph::{self, ClosureLedger};
 use super::transaction::Transaction as Draft;
 use super::{Catalog, Conformance, Entry, Name, raw};
 use crate::package::family::{Staged, graph_family};
@@ -259,68 +261,71 @@ impl crate::Package {
     pub fn apply_glossary(&self, patch: &Patch) -> Result<Commit> {
         let limits = *self.semantic_limits().glossary_value();
         let main_name = self.opc_package().main_document_part()?.partname().clone();
-        // Admit the current owner graph and check the patch base before any
-        // graph allocation. Changed payloads are then bounded before the
-        // generic graph patch can add or replace package parts.
         patch.0.check(self.opc_package(), "apply_glossary")?;
-        raw::admit_package(self.opc_package(), &limits)?;
-        let mut relationship_count = 0usize;
-        let mut relationship_metadata = 0usize;
+        let source_owner = graph::locate(self.opc_package(), &limits)?;
+        let source_owner_state = source_owner.as_ref().map(|owner| OwnerState {
+            root: owner.root.as_str().to_owned(),
+            id: owner.relationship_id.clone(),
+            target: owner.relationship_target.clone(),
+        });
+        // Admit the current owner graph and check the patch base before any
+        // graph allocation. The source closure ledger is retained so changed
+        // parts can be applied as deltas without charging unrelated package
+        // content or relationship sets.
+        let (owned, mut ledger) =
+            graph::admit_owner_closure(self.opc_package(), source_owner.as_ref(), &limits)?;
+        let source_seed =
+            owner_metadata_seed_for(main_name.as_str(), source_owner_state.as_ref(), &limits)?;
+        let mut final_owner = None;
+        patch.0.for_each_part_delta(|name, before, after| {
+            if name == &main_name {
+                final_owner = Some(
+                    after
+                        .map(|(_, _, relationships)| {
+                            owner_state_from_relationships(relationships, &limits)
+                        })
+                        .transpose()?
+                        .flatten(),
+                );
+                return Ok(());
+            }
+            let was_owned = owned.contains(name);
+            if was_owned {
+                if let Some((content_type, data, relationships)) = before {
+                    let old =
+                        patch_part_ledger(name, content_type, data, relationships, &limits, false)?;
+                    subtract_ledger(&mut ledger, old)?;
+                }
+            }
+            if let Some((content_type, data, relationships)) = after
+                && (was_owned || before.is_none())
+            {
+                let new =
+                    patch_part_ledger(name, content_type, data, relationships, &limits, true)?;
+                add_ledger(&mut ledger, new, &limits)?;
+            }
+            Ok(())
+        })?;
         patch
             .0
-            .validate_after_parts(|name, content_type, data, relationships| {
-                if name.as_str().len() > limits.name_bytes() {
-                    return Err(crate::Error::GlossaryLimit {
-                        kind: LimitKind::StringBytes,
-                        actual: name.as_str().len(),
-                        maximum: limits.name_bytes(),
-                    });
-                }
-                if content_type.len() > limits.string_bytes() {
-                    return Err(crate::Error::GlossaryLimit {
-                        kind: LimitKind::StringBytes,
-                        actual: content_type.len(),
-                        maximum: limits.string_bytes(),
-                    });
-                }
-                if data.len() > limits.graph_bytes() {
-                    return Err(crate::Error::GlossaryLimit {
-                        kind: LimitKind::GraphBytes,
-                        actual: data.len(),
-                        maximum: limits.graph_bytes(),
-                    });
-                }
-                admit_patch_relationships(
-                    relationships,
-                    &limits,
-                    &mut relationship_count,
-                    &mut relationship_metadata,
-                )?;
-                if content_type == super::CT {
-                    super::codec::read_with_limits(data, &limits)?;
-                } else if content_type.ends_with("+xml")
-                    || content_type.eq_ignore_ascii_case("application/xml")
-                    || content_type.eq_ignore_ascii_case("text/xml")
-                {
-                    // A glossary replay can also carry the main document
-                    // part's relationship-only state. Its document XML is
-                    // not glossary content and must not be charged to this
-                    // family's policy; owned XML parts are admitted here
-                    // and checked again by the final closure load below.
-                    if name != &main_name {
-                        raw::admit_xml(data, &limits)?;
-                    }
+            .validate_after_relationships(|owner, relationships| {
+                if owner == Some(&main_name) {
+                    final_owner = Some(owner_state_from_relationships(relationships, &limits)?);
                 }
                 Ok(())
             })?;
-        patch.0.validate_after_relationships(|relationships| {
-            admit_patch_relationships(
-                relationships,
-                &limits,
-                &mut relationship_count,
-                &mut relationship_metadata,
-            )
-        })?;
+        let final_owner = final_owner.unwrap_or(source_owner_state);
+        let final_seed =
+            owner_metadata_seed_for(main_name.as_str(), final_owner.as_ref(), &limits)?;
+        ledger.metadata_bytes = ledger
+            .metadata_bytes
+            .checked_sub(source_seed)
+            .ok_or_else(|| invalid("glossary source metadata ledger underflow"))?;
+        ledger.metadata_bytes = ledger
+            .metadata_bytes
+            .checked_add(final_seed)
+            .ok_or_else(|| invalid("glossary final metadata ledger overflow"))?;
+        check_ledger(&ledger, &limits)?;
         let commit = apply_patch(self, patch, "apply_glossary")?;
         commit.package().glossary_graph()?;
         Ok(commit)
@@ -355,6 +360,11 @@ fn admit_patch_relationships(
         });
     }
     for relationship in relationships.iter() {
+        super::graph::validate_relationship_metadata(
+            relationship.r_id(),
+            relationship.reltype(),
+            relationship.target_ref(),
+        )?;
         for value in [
             relationship.r_id(),
             relationship.reltype(),
@@ -381,6 +391,211 @@ fn admit_patch_relationships(
             kind: LimitKind::GraphMetadataBytes,
             actual: *metadata,
             maximum: limits.metadata_bytes(),
+        });
+    }
+    Ok(())
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct OwnerState {
+    root: String,
+    id: String,
+    target: String,
+}
+
+fn owner_state_from_relationships(
+    relationships: &litchi_opc::rel::Relationships,
+    limits: &super::Limits,
+) -> Result<Option<OwnerState>> {
+    let mut owner = None;
+    for relationship in relationships
+        .iter()
+        .filter(|relationship| matches!(relationship.reltype(), super::REL | super::STRICT_REL))
+    {
+        if owner.is_some() {
+            return Err(invalid("main document has multiple glossary relationships"));
+        }
+        if relationship.is_external() {
+            return Err(invalid("glossary relationship cannot be external"));
+        }
+        super::graph::validate_relationship_metadata(
+            relationship.r_id(),
+            relationship.reltype(),
+            relationship.target_ref(),
+        )?;
+        if relationship.r_id().len() > limits.string_bytes()
+            || relationship.target_ref().len() > limits.string_bytes()
+        {
+            return Err(crate::Error::GlossaryLimit {
+                kind: LimitKind::StringBytes,
+                actual: relationship
+                    .r_id()
+                    .len()
+                    .max(relationship.target_ref().len()),
+                maximum: limits.string_bytes(),
+            });
+        }
+        let root = relationship.target_partname()?.as_str().to_owned();
+        if root.len() > limits.name_bytes() {
+            return Err(crate::Error::GlossaryLimit {
+                kind: LimitKind::StringBytes,
+                actual: root.len(),
+                maximum: limits.name_bytes(),
+            });
+        }
+        owner = Some(OwnerState {
+            root,
+            id: relationship.r_id().to_owned(),
+            target: relationship.target_ref().to_owned(),
+        });
+    }
+    Ok(owner)
+}
+
+fn owner_metadata_seed_for(
+    main_name: &str,
+    owner: Option<&OwnerState>,
+    limits: &super::Limits,
+) -> Result<usize> {
+    let Some(owner) = owner else {
+        return Ok(0);
+    };
+    let mut metadata = 0usize;
+    for value in [main_name, owner.root.as_str()] {
+        if value.len() > limits.name_bytes() {
+            return Err(crate::Error::GlossaryLimit {
+                kind: LimitKind::StringBytes,
+                actual: value.len(),
+                maximum: limits.name_bytes(),
+            });
+        }
+        super::graph::add_selected_metadata(&mut metadata, value, limits)?;
+    }
+    for value in [owner.id.as_str(), owner.target.as_str()] {
+        if value.len() > limits.string_bytes() {
+            return Err(crate::Error::GlossaryLimit {
+                kind: LimitKind::StringBytes,
+                actual: value.len(),
+                maximum: limits.string_bytes(),
+            });
+        }
+        super::graph::add_selected_metadata(&mut metadata, value, limits)?;
+    }
+    Ok(metadata)
+}
+
+fn patch_part_ledger(
+    name: &litchi_opc::PackURI,
+    content_type: &str,
+    data: &[u8],
+    relationships: &litchi_opc::rel::Relationships,
+    limits: &super::Limits,
+    parse_xml: bool,
+) -> Result<ClosureLedger> {
+    if name.as_str().len() > limits.name_bytes() {
+        return Err(crate::Error::GlossaryLimit {
+            kind: LimitKind::StringBytes,
+            actual: name.as_str().len(),
+            maximum: limits.name_bytes(),
+        });
+    }
+    if content_type.len() > limits.string_bytes() {
+        return Err(crate::Error::GlossaryLimit {
+            kind: LimitKind::StringBytes,
+            actual: content_type.len(),
+            maximum: limits.string_bytes(),
+        });
+    }
+    if data.len() > limits.graph_bytes() {
+        return Err(crate::Error::GlossaryLimit {
+            kind: LimitKind::GraphBytes,
+            actual: data.len(),
+            maximum: limits.graph_bytes(),
+        });
+    }
+    let mut metadata_bytes = 0usize;
+    super::graph::add_selected_metadata(&mut metadata_bytes, name.as_str(), limits)?;
+    super::graph::add_selected_metadata(&mut metadata_bytes, content_type, limits)?;
+    let mut relationship_count = 0usize;
+    admit_patch_relationships(
+        relationships,
+        limits,
+        &mut relationship_count,
+        &mut metadata_bytes,
+    )?;
+    if parse_xml {
+        if content_type == super::CT {
+            super::codec::read_with_limits(data, limits)?;
+        } else if content_type.ends_with("+xml")
+            || content_type.eq_ignore_ascii_case("application/xml")
+            || content_type.eq_ignore_ascii_case("text/xml")
+        {
+            raw::admit_xml(data, limits)?;
+        }
+    }
+    Ok(ClosureLedger {
+        total_bytes: data.len(),
+        metadata_bytes,
+        relationship_count,
+    })
+}
+
+fn add_ledger(
+    target: &mut ClosureLedger,
+    value: ClosureLedger,
+    limits: &super::Limits,
+) -> Result<()> {
+    target.total_bytes = target
+        .total_bytes
+        .checked_add(value.total_bytes)
+        .ok_or_else(|| invalid("glossary final graph ledger overflow"))?;
+    target.metadata_bytes = target
+        .metadata_bytes
+        .checked_add(value.metadata_bytes)
+        .ok_or_else(|| invalid("glossary final metadata ledger overflow"))?;
+    target.relationship_count = target
+        .relationship_count
+        .checked_add(value.relationship_count)
+        .ok_or_else(|| invalid("glossary final relationship ledger overflow"))?;
+    check_ledger(target, limits)
+}
+
+fn subtract_ledger(target: &mut ClosureLedger, value: ClosureLedger) -> Result<()> {
+    target.total_bytes = target
+        .total_bytes
+        .checked_sub(value.total_bytes)
+        .ok_or_else(|| invalid("glossary source graph ledger underflow"))?;
+    target.metadata_bytes = target
+        .metadata_bytes
+        .checked_sub(value.metadata_bytes)
+        .ok_or_else(|| invalid("glossary source metadata ledger underflow"))?;
+    target.relationship_count = target
+        .relationship_count
+        .checked_sub(value.relationship_count)
+        .ok_or_else(|| invalid("glossary source relationship ledger underflow"))?;
+    Ok(())
+}
+
+fn check_ledger(ledger: &ClosureLedger, limits: &super::Limits) -> Result<()> {
+    if ledger.total_bytes > limits.graph_bytes() {
+        return Err(crate::Error::GlossaryLimit {
+            kind: LimitKind::GraphBytes,
+            actual: ledger.total_bytes,
+            maximum: limits.graph_bytes(),
+        });
+    }
+    if ledger.metadata_bytes > limits.metadata_bytes() {
+        return Err(crate::Error::GlossaryLimit {
+            kind: LimitKind::GraphMetadataBytes,
+            actual: ledger.metadata_bytes,
+            maximum: limits.metadata_bytes(),
+        });
+    }
+    if ledger.relationship_count > limits.values() {
+        return Err(crate::Error::GlossaryLimit {
+            kind: LimitKind::GraphWideRelationship,
+            actual: ledger.relationship_count,
+            maximum: limits.values(),
         });
     }
     Ok(())

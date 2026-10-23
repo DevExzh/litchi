@@ -660,8 +660,31 @@ impl Catalog {
         xml: Vec<u8>,
         limits: &super::Limits,
     ) -> Result<Option<Vec<u8>>> {
+        // A transaction binds its catalog to the selected policy before
+        // invoking an edit closure.  Do not let a closure's incidental
+        // `Limits::DEFAULT` argument widen or replace that policy.
+        let selected = self.selected_limits.unwrap_or(*limits);
+        let limits = &selected;
         super::graph::raw::admit_xml(&xml, limits)?;
         if self.background.as_ref() == Some(&xml) {
+            // Re-selecting a policy is still an admission operation.  The
+            // unchanged-byte fast path must not install a narrower policy
+            // until every retained entry and its derived XML has passed it.
+            validate_catalog_limits(self, limits)?;
+            let background = background_analysis_with_limits(self.background.as_deref(), limits)?;
+            let mut entry_bytes = [0usize; 2];
+            for entry in &self.entries {
+                entry_bytes = add_sizes(
+                    entry_bytes,
+                    entry_analysis_with_limits(entry, limits)?.sizes,
+                )?;
+            }
+            validate_catalog_sizes_with_limits(
+                entry_bytes,
+                background.sizes,
+                self.entries.len(),
+                limits,
+            )?;
             self.selected_limits = Some(*limits);
             return Ok(self.background.replace(xml));
         }
@@ -825,6 +848,9 @@ impl Catalog {
         entry: Entry,
         limits: &super::Limits,
     ) -> Result<Option<Entry>> {
+        validate_authored_name(&entry)?;
+        validate_entry_limits(&entry, limits)?;
+        self.validate_entry_lineage(&entry)?;
         let name = entry
             .name()
             .ok_or_else(|| invalid("authored building block requires a name"))?;
