@@ -465,7 +465,7 @@ impl Package {
     ///
     /// Returns an error if the package entries cannot be enumerated.
     pub(crate) fn files(&self) -> CoreResult<Vec<String>> {
-        Ok(self.package.files()?)
+        self.package.files()
     }
 
     /// Inventories inert active-content surfaces and enforces an explicit policy.

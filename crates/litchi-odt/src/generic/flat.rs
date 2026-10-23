@@ -280,13 +280,13 @@ impl FlatDocument {
     /// Open and validate a flat `OpenDocument` XML file.
     pub fn open(path: impl AsRef<Path>) -> FamilyResult<Self> {
         let file = std::fs::File::open(path)?;
-        Ok(Self::from_reader(file)?)
+        Self::from_reader(file)
     }
 
     /// Open and validate a flat `OpenDocument` XML file under `options`.
     pub fn open_with_options(path: impl AsRef<Path>, options: OpenOptions) -> FamilyResult<Self> {
         let file = std::fs::File::open(path)?;
-        Ok(Self::from_reader_with_options(file, options)?)
+        Self::from_reader_with_options(file, options)
     }
 
     /// Open and validate a flat `OpenDocument` XML file under `options` and a
@@ -297,9 +297,7 @@ impl FlatDocument {
         context: ExecutionContext,
     ) -> FamilyResult<Self> {
         let file = std::fs::File::open(path)?;
-        Ok(Self::from_reader_with_execution_context(
-            file, options, context,
-        )?)
+        Self::from_reader_with_execution_context(file, options, context)
     }
 
     /// Read and validate a flat `OpenDocument` XML stream.

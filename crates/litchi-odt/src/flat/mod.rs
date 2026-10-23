@@ -332,22 +332,22 @@ impl Document {
 
     /// Returns common flat-document metadata.
     pub fn metadata(&self) -> FamilyResult<Metadata> {
-        Ok(self.inner.metadata()?)
+        self.inner.metadata()
     }
 
     /// Returns the unnamed fallback page layout, when one is declared.
     pub fn default_page_layout(&self) -> FamilyResult<Option<crate::page_layout::PageLayout>> {
-        Ok(self.inner.default_page_layout()?)
+        self.inner.default_page_layout()
     }
 
     /// Discovers inert inline and linked embedded objects without fetching them.
     pub fn embedded_objects(&self) -> FamilyResult<Vec<crate::Object>> {
-        Ok(self.inner.embedded_objects()?)
+        self.inner.embedded_objects()
     }
 
     /// Inspects ordered variable declarations without evaluating fields.
     pub fn variable_declarations(&self) -> FamilyResult<crate::variable_declaration::Declarations> {
-        Ok(self.inner.variable_declarations()?)
+        self.inner.variable_declarations()
     }
 
     /// Inspects inert document script and macro metadata without executing it.

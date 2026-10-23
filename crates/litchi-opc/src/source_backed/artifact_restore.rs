@@ -714,16 +714,17 @@ impl<'a> ArtifactStreamTarget<'a> {
             return Err(ArtifactStreamError::producer(error));
         }
         let policy = self.policy;
-        let mut sink = ArtifactTargetSink { target: self };
-        let mut guarded = GuardedArtifactSink {
-            inner: &mut sink,
-            guard,
-            failure: None,
+        let (operation_result, guard_error) = {
+            let mut sink = ArtifactTargetSink { target: self };
+            let mut guarded = GuardedArtifactSink {
+                inner: &mut sink,
+                guard,
+                failure: None,
+            };
+            let operation_result = operation(&mut guarded, policy);
+            let guard_error = guarded.failure.take();
+            (operation_result, guard_error)
         };
-        let operation_result = operation(&mut guarded, policy);
-        let guard_error = guarded.failure.take();
-        drop(guarded);
-        drop(sink);
         let policy_error = policy
             .take_failure()
             .map(|error| ArtifactStreamError::opc(map_execution_error(error)));
@@ -983,16 +984,17 @@ impl<'a> ArtifactStreamTarget<'a> {
         }
         self.claimed = true;
         let policy = self.policy;
-        let mut sink = ArtifactTargetSink { target: self };
-        let result = package.restore_streamed_artifact_to_stream(
-            current,
-            original,
-            proof,
-            max_output_bytes,
-            &mut sink,
-            Some(policy),
-        );
-        drop(sink);
+        let result = {
+            let mut sink = ArtifactTargetSink { target: self };
+            package.restore_streamed_artifact_to_stream(
+                current,
+                original,
+                proof,
+                max_output_bytes,
+                &mut sink,
+                Some(policy),
+            )
+        };
         match result {
             Ok(()) => Ok(self.mint_publication()),
             Err(error) => Err(error),
@@ -2955,11 +2957,7 @@ impl SourceBackedPackage {
     /// producer while `ArtifactStreamPolicy` charges recipient output once.
     /// Passing an outer policy is required for nested deferred streams so the
     /// recipient allowance and probe/publication phase are shared.
-    pub fn restore_streamed_artifact_to_stream<
-        C: ArtifactStream + ?Sized,
-        O: ArtifactStream + ?Sized,
-        W: Write,
-    >(
+    pub fn restore_streamed_artifact_to_stream<C, O, W>(
         &self,
         current: &C,
         original: &O,
@@ -2969,7 +2967,9 @@ impl SourceBackedPackage {
         outer_policy: Option<&ArtifactStreamPolicy<'_>>,
     ) -> std::result::Result<(), ArtifactStreamError<O::Error>>
     where
-        C: ArtifactStream<Error = O::Error>,
+        C: ArtifactStream<Error = O::Error> + ?Sized,
+        O: ArtifactStream + ?Sized,
+        W: Write,
     {
         self.disable_read_ahead_for_publication()
             .map_err(ArtifactStreamError::opc)?;
