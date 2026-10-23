@@ -28,7 +28,7 @@ use super::spec::{
     Kind, ROW_WRITE_TABLE, RowSetter, TABLE_SWITCHES, TABLE_WRITE_TABLE, TableKey, TableSetter,
 };
 use super::structure::{bound, error};
-use super::write::{Commit, Proof, validate_text};
+use super::write::{Commit, Proof, native_snapshot_budget, opened_edit_options, validate_text};
 use super::{Editable, Nav, Pptx};
 use crate::path::PathArg;
 use crate::registry::Operation;
@@ -70,7 +70,12 @@ enum Change {
 }
 
 impl Pptx {
-    fn change_rows(&self, table: &TreeItem, change: Change) -> Result<Commit> {
+    fn change_rows(
+        &self,
+        table: &TreeItem,
+        change: Change,
+        limits: &SemanticLimits,
+    ) -> Result<Commit> {
         let slide = slide_table(table)?;
         let shape = table.handle.position().get();
         let source = if matches!(&change, Change::Height { .. }) {
@@ -79,7 +84,9 @@ impl Pptx {
             self.editable_owner()?
         };
         let base = super::smartart::eager(&source, self.0.ooxml_limits)?;
-        let mut native = base.edit()?;
+        let mut native = base
+            .edit_with_options(opened_edit_options(native_snapshot_budget(limits)))
+            .map_err(super::write::native_error)?;
         match change {
             Change::Insert {
                 position,
@@ -106,15 +113,13 @@ impl Pptx {
         } else {
             self.adopt_eager(Arc::clone(&target))
         };
-        Ok(Commit {
-            snapshot_bytes: 0,
-            retained_cache: std::sync::OnceLock::new(),
+        Ok(Commit::new(
             after,
             source,
-            target: Editable::Eager(target),
-            proof: Proof::Eager(patch),
-            operations: 1,
-        })
+            Editable::Eager(target),
+            Proof::Eager(patch),
+            1,
+        ))
     }
 
     /// A table-level `set` (record 0342): the frame's `name` and the
@@ -180,7 +185,9 @@ impl Pptx {
         let shape = table.handle.position().get();
         let source = self.editable_owner_for_write()?;
         let base = super::smartart::eager(&source, self.0.ooxml_limits)?;
-        let mut native = base.edit()?;
+        let mut native = base
+            .edit_with_options(opened_edit_options(native_snapshot_budget(limits)))
+            .map_err(super::write::native_error)?;
         if let Some(name) = &name {
             native.set_shape_name(slide, shape, name)?;
         }
@@ -330,6 +337,7 @@ impl Pptx {
                 height,
                 texts,
             },
+            limits,
         )?;
         let text = format!("{parent_path}/tr[{}]", position + 1);
         let path = Path::parse(&text)
@@ -370,6 +378,7 @@ impl Pptx {
                 row: item.row as usize,
                 height,
             },
+            limits,
         )
         .map(Some)
     }
@@ -389,6 +398,7 @@ impl Pptx {
             Change::Remove {
                 row: item.row as usize,
             },
+            limits,
         )
         .map(Some)
     }
@@ -540,7 +550,9 @@ impl Pptx {
         let name = name.unwrap_or_else(|| format!("Table {}", ordinal + 1));
         let source = self.editable_owner()?;
         let base = super::smartart::eager(&source, self.0.ooxml_limits)?;
-        let mut edit = base.edit()?;
+        let mut edit = base
+            .edit_with_options(opened_edit_options(native_snapshot_budget(limits)))
+            .map_err(super::write::native_error)?;
         edit.add_table(slide, &cells, bounds)?;
         // The new table is the last shape of the slide in pre-order.
         edit.set_shape_name(slide, scene.len(), &name)?;
@@ -551,15 +563,13 @@ impl Pptx {
             .map(Path::into_owned)
             .map_err(|_| error(Code::InternalError, "the table path does not parse"))?;
         Ok((
-            Commit {
-                snapshot_bytes: 0,
-                retained_cache: std::sync::OnceLock::new(),
+            Commit::new(
                 after,
                 source,
-                target: Editable::Eager(target),
-                proof: Proof::Eager(patch),
-                operations: 1,
-            },
+                Editable::Eager(target),
+                Proof::Eager(patch),
+                1,
+            ),
             path,
         ))
     }

@@ -25,7 +25,7 @@ use litchi_pptx::hyperlinks::{Click, Link, Target};
 use super::node::{Item, TextItem, TreeItem};
 use super::spec::{ClickKey, HYPERLINK_WRITE_TABLE, HyperlinkKey, Kind};
 use super::structure::{bound, error};
-use super::write::{Commit, Proof};
+use super::write::{Commit, Proof, native_snapshot_budget, opened_edit_options};
 use super::{Editable, Nav, Pptx, PptxOwner};
 use crate::node::Value;
 use crate::path::PathArg;
@@ -325,6 +325,7 @@ impl Pptx {
         owner: &Owner,
         link: Option<&Link>,
         allow_signed_noop: bool,
+        limits: &SemanticLimits,
     ) -> Result<Commit> {
         let tree = match owner {
             Owner::Shape(tree) => tree,
@@ -346,13 +347,16 @@ impl Pptx {
             ));
         }
         let shape = tree.handle.position().get();
+        let native_limit = native_snapshot_budget(limits);
         let source = if allow_signed_noop {
             self.editable_owner_for_write()?
         } else {
             self.editable_owner()?
         };
         let base = super::smartart::eager(&source, self.0.ooxml_limits)?;
-        let mut native = base.edit()?;
+        let mut native = base
+            .edit_with_options(opened_edit_options(native_limit))
+            .map_err(super::write::native_error)?;
         match owner {
             Owner::Shape(_) => native.set_shape_hyperlink(slide as usize, shape, link)?,
             Owner::Run(text) => native.set_run_hyperlink(
@@ -370,15 +374,13 @@ impl Pptx {
         } else {
             self.adopt_eager(Arc::clone(&target))
         };
-        Ok(Commit {
-            snapshot_bytes: 0,
-            retained_cache: std::sync::OnceLock::new(),
+        Ok(Commit::new(
             after,
             source,
-            target: Editable::Eager(target),
-            proof: Proof::Eager(patch),
-            operations: 1,
-        })
+            Editable::Eager(target),
+            Proof::Eager(patch),
+            1,
+        ))
     }
 
     /// `add(shape or run, hyperlink, {link, tooltip})`.
@@ -417,7 +419,7 @@ impl Pptx {
             target,
             tooltip: assignment.tooltip.flatten(),
         };
-        let commit = self.write_link(&owner, Some(&link), false)?;
+        let commit = self.write_link(&owner, Some(&link), false, limits)?;
         let text = format!("{path}/hyperlink");
         let path = Path::parse(&text)
             .map(Path::into_owned)
@@ -450,7 +452,8 @@ impl Pptx {
                 tooltip: assignment.tooltip.flatten(),
             }),
         };
-        self.write_link(&item.owner, link.as_ref(), true).map(Some)
+        self.write_link(&item.owner, link.as_ref(), true, limits)
+            .map(Some)
     }
 
     /// A `remove` of a hyperlink path; `None` for other targets.
@@ -463,7 +466,7 @@ impl Pptx {
             return Ok(None);
         };
         bound(LimitKind::ExpandedTargets, 1, limits.max_expanded_targets())?;
-        self.write_link(&item.owner, None, false).map(Some)
+        self.write_link(&item.owner, None, false, limits).map(Some)
     }
 
     fn hyperlink_target(&self, target: &TargetArg<'_>) -> Result<Option<LinkItem>> {
@@ -596,7 +599,16 @@ impl Pptx {
         } else {
             Some(self.set_with_limits(target.clone(), rest, limits)?)
         };
-        let file = first.as_ref().map_or(self, |commit| &commit.after);
+        let (file, second_limits) = first.as_ref().map_or((self, *limits), |commit| {
+            (
+                &commit.after,
+                limits.with_snapshot_budget(
+                    limits
+                        .max_snapshot_bytes()
+                        .saturating_sub(commit.snapshot_bytes()),
+                ),
+            )
+        });
         let owner = file
             .click_owner(target)?
             .ok_or_else(|| error(Code::InternalError, "the click target moved"))?;
@@ -633,33 +645,22 @@ impl Pptx {
             },
         };
         bound(LimitKind::ExpandedTargets, 1, limits.max_expanded_targets())?;
-        let mut second = file.write_link(&owner, link.as_ref(), true)?;
+        let second = file.write_link(&owner, link.as_ref(), true, &second_limits)?;
         Ok(Some(match first {
             None => second,
-            Some(mut first) => {
-                // Both native edits have already captured a proof.  The
-                // combined facade step retains the first source and the
-                // second target, but its peak staged charge still includes
-                // both edits before the first proof is discarded.
-                let (first_snapshot_bytes, second_snapshot_bytes) =
-                    if file.signature() == super::Signature::Signed {
-                        (
-                            first.measure_snapshot_bytes(),
-                            second.measure_snapshot_bytes(),
-                        )
-                    } else {
-                        (0, 0)
-                    };
-                let snapshot_bytes = first_snapshot_bytes.saturating_add(second_snapshot_bytes);
-                Commit {
-                    snapshot_bytes,
-                    after: second.after,
-                    source: first.source,
-                    target: second.target,
-                    proof: second.proof,
-                    operations: first.operations.saturating_add(second.operations),
-                    retained_cache: std::sync::OnceLock::from(second_snapshot_bytes),
-                }
+            Some(first) => {
+                // Both native edits remain live in the combined proof.  This
+                // is also the unsigned path: dropping the first proof here
+                // used to erase its retained snapshot charge.
+                let first_proof = first.proof;
+                let second_proof = second.proof;
+                Commit::new(
+                    second.after,
+                    first.source,
+                    second.target,
+                    Proof::Combined(vec![first_proof, second_proof].into_boxed_slice()),
+                    first.operations.saturating_add(second.operations),
+                )
             },
         }))
     }

@@ -234,7 +234,10 @@ impl Pptx {
         }
         slides.retain(|(_, edits)| !edits.is_empty());
         notes.retain(|(_, edits)| !edits.is_empty());
-        Ok((self.commit_story_text_edits(&slides, &notes)?, matches))
+        Ok((
+            self.commit_story_text_edits(&slides, &notes, limits)?,
+            matches,
+        ))
     }
 
     /// The text bodies the target nodes search, each once; `may_match`

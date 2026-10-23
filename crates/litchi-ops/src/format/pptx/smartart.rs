@@ -44,7 +44,7 @@ use litchi_pptx::opened::SmartArtParts;
 use super::node::{DiagramItem, Item, TreeItem};
 use super::spec::{Kind, NODE_WRITE_TABLE, NodeSetter, SMARTART_WRITE_TABLE, SmartArtSetter};
 use super::structure::{bound, error};
-use super::write::{Commit, Proof};
+use super::write::{Commit, Proof, native_snapshot_budget, opened_edit_options};
 use super::{Editable, Nav, Pptx};
 use crate::path::PathArg;
 use crate::registry::Operation;
@@ -338,7 +338,12 @@ fn target_of(item: &Item) -> Option<(TreeItem, Option<(Arc<Outline>, usize)>)> {
 
 impl Pptx {
     /// Stage `change` on the SmartArt `tree` in one native edit.
-    fn change_smartart(&self, tree: &TreeItem, change: Change) -> Result<Commit> {
+    fn change_smartart(
+        &self,
+        tree: &TreeItem,
+        change: Change,
+        limits: &SemanticLimits,
+    ) -> Result<Commit> {
         let Some(slide) = tree.container.slide() else {
             return Err(error(
                 Code::UnsupportedCapability,
@@ -358,7 +363,9 @@ impl Pptx {
             self.editable_owner()?
         };
         let base = eager(&source, self.0.ooxml_limits)?;
-        let mut native = base.edit()?;
+        let mut native = base
+            .edit_with_options(opened_edit_options(native_snapshot_budget(limits)))
+            .map_err(super::write::native_error)?;
         let parts = native.smartart(slide as usize, position)?;
         let next = apply(&parts, change, extents(tree))?;
         if next != parts {
@@ -371,15 +378,13 @@ impl Pptx {
         } else {
             self.adopt_eager(Arc::clone(&target))
         };
-        Ok(Commit {
-            snapshot_bytes: 0,
-            retained_cache: std::sync::OnceLock::new(),
+        Ok(Commit::new(
             after,
             source,
-            target: Editable::Eager(target),
-            proof: Proof::Eager(patch),
-            operations: 1,
-        })
+            Editable::Eager(target),
+            Proof::Eager(patch),
+            1,
+        ))
     }
 
     /// `add(/slide[N], smartart, ...)`.
@@ -482,7 +487,9 @@ impl Pptx {
         let name = name.unwrap_or_else(|| format!("Diagram {}", ordinal + 1));
         let source = self.editable_owner()?;
         let base = eager(&source, self.0.ooxml_limits)?;
-        let mut edit = base.edit()?;
+        let mut edit = base
+            .edit_with_options(opened_edit_options(native_snapshot_budget(limits)))
+            .map_err(super::write::native_error)?;
         edit.add_smartart(slide, &spec, &name, bounds)?;
         let (target, patch) = edit.commit()?.into_parts();
         let target = Arc::new(target);
@@ -492,15 +499,13 @@ impl Pptx {
             Step::new("smartart").with(Predicate::Index(Position::new(ordinal))),
         ]);
         Ok((
-            Commit {
-                snapshot_bytes: 0,
-                retained_cache: std::sync::OnceLock::new(),
+            Commit::new(
                 after,
                 source,
-                target: Editable::Eager(target),
-                proof: Proof::Eager(patch),
-                operations: 1,
-            },
+                Editable::Eager(target),
+                Proof::Eager(patch),
+                1,
+            ),
             path,
         ))
     }
@@ -575,6 +580,7 @@ impl Pptx {
                 position,
                 text: value,
             },
+            limits,
         )?;
         // The new node's path: the parent's, then its sibling position.
         let mut steps: Vec<Step<'static>> = Vec::new();
@@ -646,7 +652,7 @@ impl Pptx {
                     })?;
                 }
                 let Some(value) = value else {
-                    return Ok(Some(self.unchanged()?));
+                    return Ok(Some(self.unchanged(limits)?));
                 };
                 Change::Text { index, text: value }
             },
@@ -668,12 +674,12 @@ impl Pptx {
                     })?;
                 }
                 if layout.is_none() && outline.is_none() {
-                    return Ok(Some(self.unchanged()?));
+                    return Ok(Some(self.unchanged(limits)?));
                 }
                 Change::Rebuild { layout, outline }
             },
         };
-        self.change_smartart(&tree, change).map(Some)
+        self.change_smartart(&tree, change, limits).map(Some)
     }
 
     /// A `remove` of one SmartArt-node path; `None` for other targets.
@@ -706,24 +712,31 @@ impl Pptx {
             Change::Remove {
                 index: *index as usize,
             },
+            limits,
         )
         .map(Some)
     }
 
     /// A commit that changes nothing.
-    fn unchanged(&self) -> Result<Commit> {
-        let source = self.editable_owner()?;
+    fn unchanged(&self, limits: &SemanticLimits) -> Result<Commit> {
+        // A genuine signed no-op must still stage through the private
+        // write-capable owner.  The outer set fence re-roots its empty proof
+        // on the original signed owner; refusing here would reject a no-op.
+        let source = self.editable_owner_for_write()?;
         let base = eager(&source, self.0.ooxml_limits)?;
-        let (target, patch) = base.edit()?.commit()?.into_parts();
-        Ok(Commit {
-            snapshot_bytes: 0,
-            retained_cache: std::sync::OnceLock::new(),
-            after: self.clone(),
+        let (target, patch) = base
+            .edit_with_options(opened_edit_options(native_snapshot_budget(limits)))
+            .map_err(super::write::native_error)?
+            .commit()
+            .map_err(super::write::native_error)?
+            .into_parts();
+        Ok(Commit::new(
+            self.clone(),
             source,
-            target: Editable::Eager(Arc::new(target)),
-            proof: Proof::Eager(patch),
-            operations: 1,
-        })
+            Editable::Eager(Arc::new(target)),
+            Proof::Eager(patch),
+            1,
+        ))
     }
 }
 

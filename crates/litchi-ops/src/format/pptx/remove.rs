@@ -12,7 +12,9 @@ use litchi_core::{FileFormat, Position};
 
 use super::node::Item;
 use super::structure::{bound, error};
-use super::write::{Commit, Proof};
+use super::write::{
+    Commit, Proof, native_snapshot_budget, opened_edit_options, source_edit_options,
+};
 use super::{Editable, Nav, Pptx};
 use crate::target::TargetArg;
 use crate::transaction::{Error as TransactionError, LimitKind, SemanticLimits};
@@ -81,9 +83,12 @@ impl Pptx {
         positions.sort_unstable();
         let operations = positions.len();
         let source = self.editable_owner()?;
+        let native_limit = native_snapshot_budget(limits);
         let (target, proof, changed) = match &source {
             Editable::Source(package) => {
-                let mut edit = package.edit()?;
+                let mut edit = package
+                    .edit_with_options(source_edit_options(native_limit))
+                    .map_err(super::write::native_error)?;
                 for position in positions.iter().rev().copied() {
                     match position {
                         Target::Slide(slide) => {
@@ -99,7 +104,9 @@ impl Pptx {
                 (Editable::Source(target), Proof::Source(patch), changed)
             },
             Editable::Eager(package) => {
-                let mut edit = package.edit()?;
+                let mut edit = package
+                    .edit_with_options(opened_edit_options(native_limit))
+                    .map_err(super::write::native_error)?;
                 for position in positions.iter().rev().copied() {
                     match position {
                         Target::Slide(slide) => {
@@ -127,15 +134,7 @@ impl Pptx {
         } else {
             self.clone()
         };
-        Ok(Commit {
-            snapshot_bytes: 0,
-            retained_cache: std::sync::OnceLock::new(),
-            after,
-            source,
-            target,
-            proof,
-            operations,
-        })
+        Ok(Commit::new(after, source, target, proof, operations))
     }
 
     fn admit_remove_owner(&self) -> Result<()> {

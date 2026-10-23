@@ -18,7 +18,7 @@ use litchi_core::Position;
 use super::node::{Item, TreeContainer};
 use super::spec::{LAYOUT_WRITE_TABLE, MASTER_WRITE_TABLE};
 use super::structure::{bound, error};
-use super::write::{Commit, Proof};
+use super::write::{Commit, Proof, native_snapshot_budget, opened_edit_options};
 use super::{Editable, Nav, Pptx};
 use crate::registry::Operation;
 use crate::target::TargetArg;
@@ -126,7 +126,9 @@ impl Pptx {
         drop(node);
         let source = self.editable_owner_for_write()?;
         let base = super::smartart::eager(&source, self.0.ooxml_limits)?;
-        let mut native = base.edit()?;
+        let mut native = base
+            .edit_with_options(opened_edit_options(native_snapshot_budget(limits)))
+            .map_err(super::write::native_error)?;
         match &change {
             Change::MasterName { master, name } => {
                 native.set_master_name(Position::new(*master), name)?;
@@ -166,15 +168,13 @@ impl Pptx {
         } else {
             self.adopt_eager(Arc::clone(&target))
         };
-        Ok(Some(Commit {
-            snapshot_bytes: 0,
-            retained_cache: std::sync::OnceLock::new(),
+        Ok(Some(Commit::new(
             after,
             source,
-            target: Editable::Eager(target),
-            proof: Proof::Eager(patch),
-            operations: 1,
-        }))
+            Editable::Eager(target),
+            Proof::Eager(patch),
+            1,
+        )))
     }
 
     fn admit_name<const N: usize>(

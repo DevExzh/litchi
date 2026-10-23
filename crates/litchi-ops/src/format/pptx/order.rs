@@ -7,7 +7,9 @@
 
 use super::node::Item;
 use super::structure::{bound, error};
-use super::write::{Commit, Proof};
+use super::write::{
+    Commit, Proof, native_snapshot_budget, opened_edit_options, source_edit_options,
+};
 use super::{Editable, Nav, Pptx};
 use crate::path::PathArg;
 use crate::transaction::{LimitKind, SemanticLimits};
@@ -73,16 +75,21 @@ impl Pptx {
 
         admit_order_targets(1, limits)?;
         let source = self.editable()?;
+        let native_limit = native_snapshot_budget(limits);
         let (target, proof, changed) = match &source {
             Editable::Source(package) => {
-                let mut edit = package.edit()?;
+                let mut edit = package
+                    .edit_with_options(source_edit_options(native_limit))
+                    .map_err(super::write::native_error)?;
                 edit.move_slide(Position::new(from), Position::new(to))?;
                 let (target, patch) = edit.commit()?.into_parts();
                 let changed = !patch.is_noop();
                 (Editable::Source(target), Proof::Source(patch), changed)
             },
             Editable::Eager(package) => {
-                let mut edit = package.edit()?;
+                let mut edit = package
+                    .edit_with_options(opened_edit_options(native_limit))
+                    .map_err(super::write::native_error)?;
                 edit.move_slide(Position::new(from), Position::new(to))?;
                 let (target, patch) = edit.commit()?.into_parts();
                 let changed = !patch.is_noop();
@@ -101,15 +108,7 @@ impl Pptx {
                 Editable::Eager(package) => self.adopt_eager(Arc::clone(package)),
             }
         };
-        Ok(Commit {
-            snapshot_bytes: 0,
-            retained_cache: std::sync::OnceLock::new(),
-            after,
-            source,
-            target,
-            proof,
-            operations: 1,
-        })
+        Ok(Commit::new(after, source, target, proof, 1))
     }
 
     /// Exchange two slides in one native transaction.
@@ -146,16 +145,21 @@ impl Pptx {
         admit_order_targets(target_count, limits)?;
 
         let source = self.editable()?;
+        let native_limit = native_snapshot_budget(limits);
         let (target, proof, changed) = match &source {
             Editable::Source(package) => {
-                let mut edit = package.edit()?;
+                let mut edit = package
+                    .edit_with_options(source_edit_options(native_limit))
+                    .map_err(super::write::native_error)?;
                 edit.swap_slides(Position::new(left), Position::new(right))?;
                 let (target, patch) = edit.commit()?.into_parts();
                 let changed = !patch.is_noop();
                 (Editable::Source(target), Proof::Source(patch), changed)
             },
             Editable::Eager(package) => {
-                let mut edit = package.edit()?;
+                let mut edit = package
+                    .edit_with_options(opened_edit_options(native_limit))
+                    .map_err(super::write::native_error)?;
                 edit.swap_slides(Position::new(left), Position::new(right))?;
                 let (target, patch) = edit.commit()?.into_parts();
                 let changed = !patch.is_noop();
@@ -174,15 +178,7 @@ impl Pptx {
                 Editable::Eager(package) => self.adopt_eager(Arc::clone(package)),
             }
         };
-        Ok(Commit {
-            snapshot_bytes: 0,
-            retained_cache: std::sync::OnceLock::new(),
-            after,
-            source,
-            target,
-            proof,
-            operations: 1,
-        })
+        Ok(Commit::new(after, source, target, proof, 1))
     }
 }
 

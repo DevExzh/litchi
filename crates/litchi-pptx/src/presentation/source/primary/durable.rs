@@ -17,7 +17,7 @@ use crate::presentation::order::{
 };
 use crate::{Error, Result};
 use sha2::{Digest, Sha256};
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 const REMOVAL_MAGIC: &[u8; 8] = b"LPSX0004";
 const MAGIC: &[u8; 8] = b"LPSX0002";
@@ -158,6 +158,7 @@ impl Patch {
             return Ok(Self {
                 shape_removals,
                 data: PatchData::Topology(Arc::new(super::topology::Patch::from_bytes(bytes)?)),
+                encoded_len_cache: Arc::new(OnceLock::new()),
             });
         }
         if bytes.len() > maximum() {
@@ -262,10 +263,26 @@ impl Patch {
                 after_order: after_order.into(),
                 changes: changes.into(),
             }),
+            encoded_len_cache: Arc::new(OnceLock::new()),
         })
     }
 
     pub(super) fn encoded_len(&self) -> Result<usize> {
+        // A local patch still fences its source on every access.  The wire
+        // length itself is immutable, so once the edit boundary measured it,
+        // commit/facade accounting can reuse that exact ledger without
+        // walking every XML image again.
+        if let PatchData::Local { source, .. } = &self.data {
+            source.check()?;
+        }
+        if let PatchData::Topology(data) = &self.data {
+            // Keep prepared-source and execution fences active even when the
+            // outer source patch has already cached the exact length.
+            data.check()?;
+        }
+        if let Some(length) = self.encoded_len_cache.get() {
+            return Ok(*length);
+        }
         let mut total = HEADER
             + if self.shape_removals {
                 REMOVAL_MAGIC.len()
@@ -337,6 +354,7 @@ impl Patch {
         if total > maximum() {
             return Err(limit("source-backed durable patch bytes", maximum()));
         }
+        let _ = self.encoded_len_cache.set(total);
         Ok(total)
     }
 }
@@ -734,6 +752,32 @@ fn part(hash: &mut Sha256, value: &PartBinding) {
 
 fn maximum() -> usize {
     crate::opened::Limits::default().max_patch_bytes()
+}
+
+/// Size the local source patch envelope without retaining any payload.  The
+/// primary editor uses this before freezing a focused slide edit so the
+/// caller's aggregate patch ceiling covers the complete before/after root,
+/// order and slide framing, rather than only the new XML.
+pub(super) fn local_wire_len(
+    shape_removals: bool,
+    before_order: &[StableSlideKey],
+    after_order: &[StableSlideKey],
+    before_root: usize,
+    after_root: usize,
+    changes: &[(StableSlideKey, usize, usize)],
+) -> Result<usize> {
+    let mut total = HEADER
+        .checked_add(if shape_removals {
+            REMOVAL_MAGIC.len()
+        } else {
+            0
+        })
+        .ok_or_else(|| invalid("wire length overflows"))?;
+    total = body_len(total, before_order, after_order, before_root, after_root)?;
+    for (key, before, after) in changes {
+        total = entry_len(total, key, *before, *after)?;
+    }
+    Ok(total)
 }
 
 fn body_len(

@@ -147,6 +147,6 @@ pub(crate) fn refresh(
             ));
         }
     }
-    let commit = file.commit_text_edits(&groups)?;
+    let commit = file.commit_text_edits(&groups, limits)?;
     Ok((Some(commit), summary))
 }

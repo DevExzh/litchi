@@ -18,7 +18,7 @@ use litchi_drawingml::theme::{Color, Face, FontSet, Palette, Slot, Theme};
 
 use super::spec::{THEME_WRITE_TABLE, ThemeKey};
 use super::structure::{bound, error};
-use super::write::{Commit, Proof};
+use super::write::{Commit, Proof, native_snapshot_budget, opened_edit_options};
 use super::{Editable, Pptx, PptxOwner};
 use crate::node::Value;
 use crate::registry::Operation;
@@ -239,7 +239,9 @@ impl Pptx {
         }
         let source = self.editable_owner_for_write()?;
         let base = super::smartart::eager(&source, self.0.ooxml_limits)?;
-        let mut native = base.edit()?;
+        let mut native = base
+            .edit_with_options(opened_edit_options(native_snapshot_budget(limits)))
+            .map_err(super::write::native_error)?;
         if !colors.is_empty() || name.is_some() {
             let next = palette(&theme.colors, name.as_deref(), &colors);
             native
@@ -275,14 +277,12 @@ impl Pptx {
         } else {
             self.adopt_eager(Arc::clone(&target))
         };
-        Ok(Some(Commit {
-            snapshot_bytes: 0,
-            retained_cache: std::sync::OnceLock::new(),
+        Ok(Some(Commit::new(
             after,
             source,
-            target: Editable::Eager(target),
-            proof: Proof::Eager(patch),
-            operations: 1,
-        }))
+            Editable::Eager(target),
+            Proof::Eager(patch),
+            1,
+        )))
     }
 }

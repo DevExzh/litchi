@@ -2,7 +2,7 @@
 #![cfg(feature = "pptx")]
 
 use litchi_core::selector::{Path as SelectorPath, Query, Scope};
-use litchi_ops::{Code, File, OpenOptions, SourceMode};
+use litchi_ops::{Code, File, OpenOptions, SemanticLimits, SourceMode, props};
 
 fn fixture() -> Vec<u8> {
     let mut builder = litchi_pptx::builder::Builder::new().unwrap();
@@ -93,6 +93,42 @@ fn disjoint_shape_selector_removal_is_atomic_for_both_owners() {
         assert!(removed.get("/slide[1]/shape[3]").is_err());
         assert_eq!(source.to_bytes().unwrap(), before);
     }
+}
+
+#[test]
+fn native_shape_removal_charges_the_retained_snapshot_before_publication() {
+    let source = open(&fixture(), false);
+    let limits = SemanticLimits::builder()
+        .max_snapshot_bytes(1)
+        .unwrap()
+        .build()
+        .unwrap();
+    let error = source
+        .edit_with_options(
+            litchi_ops::EditOptions::new().semantic_limits(limits),
+            |edit| edit.remove("/slide[1]/shape[2]"),
+        )
+        .expect_err("the native proof must not bypass the snapshot budget");
+    assert_eq!(error.code(), Code::LimitExceeded);
+    assert_eq!(shape_texts(&source), ["A", "B", "C", "D"]);
+}
+
+#[test]
+fn coalesced_shape_write_charges_the_native_patch_before_publication() {
+    let source = open(&fixture(), false);
+    let limits = SemanticLimits::builder()
+        .max_snapshot_bytes(1)
+        .unwrap()
+        .build()
+        .unwrap();
+    let error = source
+        .edit_with_options(
+            litchi_ops::EditOptions::new().semantic_limits(limits),
+            |edit| edit.set("/slide[1]/shape[2]", props! { "text" => "updated" }),
+        )
+        .expect_err("the coalesced native patch must not bypass the snapshot budget");
+    assert_eq!(error.code(), Code::LimitExceeded);
+    assert_eq!(shape_texts(&source), ["A", "B", "C", "D"]);
 }
 
 #[test]

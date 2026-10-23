@@ -4,7 +4,10 @@
 //! `notes` property also creates the page when the slide has none. Source
 //! owners are promoted to an eager package for the edit, since notes pages
 //! are separate parts the source-backed slide edit does not stage.
-use super::{Commit, Editable, Pptx, Proof, allocation, bound, error, validate_text};
+use super::{
+    Commit, Editable, Pptx, Proof, allocation, bound, error, native_error, native_snapshot_budget,
+    opened_edit_options, validate_text,
+};
 use crate::format::pptx::Nav;
 use crate::format::pptx::node::Item;
 use crate::target::TargetArg;
@@ -99,7 +102,9 @@ impl Pptx {
                 super::super::eager_package_from_source(bytes, self.0.ooxml_limits)?
             },
         };
-        let mut edit = base.edit()?;
+        let mut edit = base
+            .edit_with_options(opened_edit_options(native_snapshot_budget(limits)))
+            .map_err(native_error)?;
         let changed = edit.set_notes_text(slide as usize, &text)?;
         let (target, patch) = edit.commit()?.into_parts();
         let changed = changed && !patch.is_noop();
@@ -109,14 +114,12 @@ impl Pptx {
         } else {
             self.clone()
         };
-        Ok(Commit {
-            snapshot_bytes: 0,
-            retained_cache: std::sync::OnceLock::new(),
+        Ok(Commit::new(
             after,
             source,
-            target: Editable::Eager(target),
-            proof: Proof::Eager(patch),
-            operations: 1,
-        })
+            Editable::Eager(target),
+            Proof::Eager(patch),
+            1,
+        ))
     }
 }

@@ -5,6 +5,7 @@
 //! metadata. A slide body is loaded when a selected [`SourceSlide`] is read.
 
 pub mod primary;
+pub use primary::EditOptions;
 
 use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
@@ -416,7 +417,7 @@ fn check_execution_context(context: Option<&ExecutionContext>) -> Result<()> {
 /// the candidate is indexed again during semantic readback, so both bounded
 /// scene policies plus the escaped fragment and lexical output stay inside
 /// the caller's admission. The reservation is deliberately conservative and
-/// capped by the same 128 MiB default patch ceiling used by source proofs.
+/// capped by the caller-selected source output ceiling.
 fn reserve_source_text_box(
     context: Option<&ExecutionContext>,
     input_bytes: usize,
@@ -430,7 +431,7 @@ fn reserve_source_text_box(
     let Some(context) = context else {
         return Ok(None);
     };
-    let maximum = crate::opened::Limits::default().max_patch_bytes();
+    let maximum = max_output_bytes;
     let input_scene = input_bytes
         .checked_mul(64)
         .and_then(|size| size.checked_add(1024))
@@ -489,7 +490,7 @@ fn reserve_source_shape_removal(
     let Some(context) = context else {
         return Ok(None);
     };
-    let maximum = crate::opened::Limits::default().max_patch_bytes();
+    let maximum = max_output_bytes;
     let input_scene = input_bytes
         .checked_mul(64)
         .and_then(|size| size.checked_add(1024))
@@ -534,7 +535,7 @@ fn reserve_source_slide_properties(
     name: Option<&str>,
     max_output_bytes: usize,
 ) -> Result<Option<Arc<litchi_core::Reservation>>> {
-    let maximum = crate::opened::Limits::default().max_patch_bytes();
+    let maximum = max_output_bytes;
     let name_bytes = name.map_or(0, str::len);
     // Attribute escaping can expand each input byte to a six-byte entity. A
     // small fixed charge covers a newly inserted attribute; the native stage
@@ -598,7 +599,7 @@ fn reserve_source_shape_properties(
     replacements: &[crate::opened::ShapePropertiesReplacement<'_>],
     max_output_bytes: usize,
 ) -> Result<Option<Arc<litchi_core::Reservation>>> {
-    let maximum = crate::opened::Limits::default().max_patch_bytes();
+    let maximum = max_output_bytes;
     if replacements.len() > crate::opened::MAX_SHAPE_PROPERTIES_REPLACEMENTS {
         return Err(Error::Limit {
             resource: "source-backed shape property replacements",
@@ -657,7 +658,7 @@ fn reserve_source_shape_text_chunks(
     admission: crate::opened::ChunkAdmission,
     max_output_bytes: usize,
 ) -> Result<Option<Arc<litchi_core::Reservation>>> {
-    let maximum = crate::opened::Limits::default().max_patch_bytes();
+    let maximum = max_output_bytes;
     let replacements = admission.selections();
     let text_bytes = admission.text_bytes();
     let Some(context) = context else {
@@ -716,7 +717,7 @@ fn reserve_source_shape_property_chunks(
     admission: crate::opened::ChunkAdmission,
     max_output_bytes: usize,
 ) -> Result<Option<Arc<litchi_core::Reservation>>> {
-    let maximum = crate::opened::Limits::default().max_patch_bytes();
+    let maximum = max_output_bytes;
     let replacements = admission.selections();
     let text_bytes = admission.text_bytes();
     let Some(context) = context else {
@@ -1121,6 +1122,10 @@ pub(crate) struct SourceBackedSlideEdit {
     working: SourcePayload,
     operation_used: bool,
     context: Option<ExecutionContext>,
+    /// The source policy is restored when the edit is frozen.  The focused
+    /// editor may temporarily lower its output bound to a caller's exact
+    /// retained-patch budget without changing patch identity.
+    source_max_output_bytes: usize,
 }
 
 /// A reversible, exact-source-checked one-slide XML patch.
@@ -2487,6 +2492,7 @@ impl SourceBackedSlideSnapshot {
             working: self.xml.clone(),
             operation_used: false,
             context: self.context.clone(),
+            source_max_output_bytes: self.max_output_bytes,
         }
     }
 
@@ -2496,6 +2502,32 @@ impl SourceBackedSlideSnapshot {
     pub(crate) fn edit_checked(&self) -> Result<SourceBackedSlideEdit> {
         self.check_execution()?;
         Ok(self.edit())
+    }
+
+    /// Start a checked focused edit under a caller-selected output bound.
+    ///
+    /// The bound controls every candidate XML builder and reservation during
+    /// staging.  The immutable source identity keeps its original physical
+    /// output policy when the edit is committed, so changing the transient
+    /// admission ceiling cannot manufacture a patch conflict.
+    pub(crate) fn edit_checked_with_max_patch_bytes(
+        &self,
+        maximum: usize,
+    ) -> Result<SourceBackedSlideEdit> {
+        self.check_execution()?;
+        let mut edit = self.edit();
+        edit.source.max_output_bytes = edit.source.max_output_bytes.min(maximum);
+        edit.source_max_output_bytes = self.max_output_bytes;
+        Ok(edit)
+    }
+
+    /// Borrowed-operation view with a temporary output ceiling.  The view is
+    /// used only for admission/reservation; committed patch identity restores
+    /// the original source policy.
+    pub(crate) fn with_max_patch_bytes(&self, maximum: usize) -> Self {
+        let mut snapshot = self.clone();
+        snapshot.max_output_bytes = snapshot.max_output_bytes.min(maximum);
+        snapshot
     }
 
     fn check_execution(&self) -> Result<()> {
@@ -3075,19 +3107,21 @@ impl SourceBackedSlideEdit {
     }
 
     fn into_commit(self) -> SourceBackedSlideCommit {
+        let mut source = self.source;
+        source.max_output_bytes = self.source_max_output_bytes;
         let snapshot = SourceBackedSlideSnapshot {
-            position: self.source.position,
-            part_uri: self.source.part_uri.clone(),
+            position: source.position,
+            part_uri: source.part_uri.clone(),
             xml: self.working,
-            closure: self.source.closure.clone(),
-            max_output_bytes: self.source.max_output_bytes,
-            source_version: self.source.source_version,
-            lineage: self.source.lineage.clone(),
-            context: self.source.context.clone(),
-            mce: self.source.mce,
+            closure: source.closure.clone(),
+            max_output_bytes: self.source_max_output_bytes,
+            source_version: source.source_version,
+            lineage: source.lineage.clone(),
+            context: source.context.clone(),
+            mce: source.mce,
         };
         let patch = SourceBackedSlidePatch {
-            before: self.source,
+            before: source,
             after: snapshot.clone(),
         };
         SourceBackedSlideCommit { snapshot, patch }

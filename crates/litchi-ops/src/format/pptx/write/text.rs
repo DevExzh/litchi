@@ -843,15 +843,16 @@ impl Pptx {
             edits.try_reserve(1).map_err(allocation)?;
             edits.push(TextAssignment::new(*target, properties));
         }
-        self.commit_story_text_edits(&groups, &notes_groups)
+        self.commit_story_text_edits(&groups, &notes_groups, limits)
     }
 
     /// Publish slide-grouped text edits through one native edit.
     pub(super) fn commit_text_edits(
         &self,
         groups: &[(usize, Vec<TextAssignment<'_>>)],
+        limits: &SemanticLimits,
     ) -> Result<Commit> {
-        self.commit_story_text_edits(groups, &[])
+        self.commit_story_text_edits(groups, &[], limits)
     }
 
     /// Publish slide-grouped text edits and notes-page text edits through
@@ -862,9 +863,11 @@ impl Pptx {
         &self,
         groups: &[(usize, Vec<TextAssignment<'_>>)],
         notes: &[(usize, Vec<TextAssignment<'_>>)],
+        limits: &SemanticLimits,
     ) -> Result<Commit> {
         let capacity = litchi_pptx::opened::MAX_SHAPE_PROPERTIES_REPLACEMENTS;
         let source = self.editable_owner_for_write()?;
+        let native_limit = super::native_snapshot_budget(limits);
         let mut operations = 0;
         let materialized = match (&source, notes.is_empty()) {
             (Editable::Source(package), false) => {
@@ -882,7 +885,9 @@ impl Pptx {
         };
         let (target, proof, changed) = match &owner {
             Editable::Source(package) => {
-                let mut edit = package.edit()?;
+                let mut edit = package
+                    .edit_with_options(super::source_edit_options(native_limit))
+                    .map_err(super::native_error)?;
                 for (slide, edits) in groups {
                     let chunks: Vec<&[TextAssignment<'_>]> = edits.chunks(capacity).collect();
                     operations += edit.set_text_property_chunks(Position::new(*slide), &chunks)?;
@@ -892,7 +897,9 @@ impl Pptx {
                 (Editable::Source(target), Proof::Source(patch), changed)
             },
             Editable::Eager(package) => {
-                let mut edit = package.edit()?;
+                let mut edit = package
+                    .edit_with_options(super::opened_edit_options(native_limit))
+                    .map_err(super::native_error)?;
                 for (slide, edits) in groups {
                     let chunks: Vec<&[TextAssignment<'_>]> = edits.chunks(capacity).collect();
                     operations += edit.set_text_property_chunks(*slide, &chunks)?;
@@ -922,14 +929,6 @@ impl Pptx {
         } else {
             self.clone()
         };
-        Ok(Commit {
-            snapshot_bytes: 0,
-            retained_cache: std::sync::OnceLock::new(),
-            after,
-            source,
-            target,
-            proof,
-            operations,
-        })
+        Ok(Commit::new(after, source, target, proof, operations))
     }
 }

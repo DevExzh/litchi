@@ -21,7 +21,7 @@ use super::spec::{
     COMMENT_WRITE_TABLE, CommentSetter, MODERN_COMMENT_WRITE_TABLE, ModernSetter, REPLY_WRITE_TABLE,
 };
 use super::structure::{bound, error};
-use super::write::{Commit, Proof, validate_text};
+use super::write::{Commit, Proof, native_snapshot_budget, opened_edit_options, validate_text};
 use super::{Editable, Nav, Pptx};
 use crate::path::PathArg;
 use crate::registry::Operation;
@@ -152,7 +152,9 @@ impl Pptx {
         };
         let source = self.editable_owner_for_write()?;
         let base = self.eager_base(&source)?;
-        let mut edit = base.edit()?;
+        let mut edit = base
+            .edit_with_options(opened_edit_options(native_snapshot_budget(limits)))
+            .map_err(super::write::native_error)?;
         let mut changed = edit.set_comment_at(
             slide as usize,
             Position::new(position as usize),
@@ -180,15 +182,13 @@ impl Pptx {
         } else {
             self.clone()
         };
-        Ok(Commit {
-            snapshot_bytes: 0,
-            retained_cache: std::sync::OnceLock::new(),
+        Ok(Commit::new(
             after,
             source,
-            target: Editable::Eager(target),
-            proof: Proof::Eager(patch),
-            operations: 1,
-        })
+            Editable::Eager(target),
+            Proof::Eager(patch),
+            1,
+        ))
     }
 
     pub(super) fn add_comment(
@@ -232,7 +232,9 @@ impl Pptx {
         }
         let source = self.editable_owner()?;
         let base = self.eager_base(&source)?;
-        let mut edit = base.edit()?;
+        let mut edit = base
+            .edit_with_options(opened_edit_options(native_snapshot_budget(limits)))
+            .map_err(super::write::native_error)?;
         let position = edit.add_comment_text(
             slide,
             &author,
@@ -249,15 +251,13 @@ impl Pptx {
             Step::new("comment").with(Predicate::Index(position)),
         ]);
         Ok((
-            Commit {
-                snapshot_bytes: 0,
-                retained_cache: std::sync::OnceLock::new(),
+            Commit::new(
                 after,
                 source,
-                target: Editable::Eager(target),
-                proof: Proof::Eager(patch),
-                operations: 1,
-            },
+                Editable::Eager(target),
+                Proof::Eager(patch),
+                1,
+            ),
             path,
         ))
     }
@@ -312,7 +312,9 @@ impl Pptx {
         bound(LimitKind::ExpandedTargets, 1, limits.max_expanded_targets())?;
         let source = self.editable_owner()?;
         let base = self.eager_base(&source)?;
-        let mut edit = base.edit()?;
+        let mut edit = base
+            .edit_with_options(opened_edit_options(native_snapshot_budget(limits)))
+            .map_err(super::write::native_error)?;
         let changed = match target {
             Target::Legacy(slide, index) => edit.remove_comment_at(slide, Position::new(index))?,
             Target::Modern(slide, index) => {
@@ -331,15 +333,13 @@ impl Pptx {
         } else {
             self.clone()
         };
-        Ok(Some(Commit {
-            snapshot_bytes: 0,
-            retained_cache: std::sync::OnceLock::new(),
+        Ok(Some(Commit::new(
             after,
             source,
-            target: Editable::Eager(target),
-            proof: Proof::Eager(patch),
-            operations: 1,
-        }))
+            Editable::Eager(target),
+            Proof::Eager(patch),
+            1,
+        )))
     }
 }
 
@@ -463,7 +463,9 @@ impl Pptx {
         bound(LimitKind::ExpandedTargets, 1, limits.max_expanded_targets())?;
         let source = self.editable_owner_for_write()?;
         let base = self.eager_base(&source)?;
-        let mut edit = base.edit()?;
+        let mut edit = base
+            .edit_with_options(opened_edit_options(native_snapshot_budget(limits)))
+            .map_err(super::write::native_error)?;
         let change = litchi_pptx::opened::ModernCommentChange {
             text: values.text.as_deref(),
             author: values.author.as_deref(),
@@ -484,15 +486,13 @@ impl Pptx {
         } else {
             self.clone()
         };
-        Ok(Some(Commit {
-            snapshot_bytes: 0,
-            retained_cache: std::sync::OnceLock::new(),
+        Ok(Some(Commit::new(
             after,
             source,
-            target: Editable::Eager(target),
-            proof: Proof::Eager(patch),
-            operations: 1,
-        }))
+            Editable::Eager(target),
+            Proof::Eager(patch),
+            1,
+        )))
     }
 
     /// `add(/slide[N], modernComment, {text, author, initials, created,
@@ -575,7 +575,9 @@ impl Pptx {
         let text = values.text.unwrap_or_default();
         let source = self.editable_owner()?;
         let base = self.eager_base(&source)?;
-        let mut edit = base.edit()?;
+        let mut edit = base
+            .edit_with_options(opened_edit_options(native_snapshot_budget(limits)))
+            .map_err(super::write::native_error)?;
         let slide_step = Step::new("slide").with(Predicate::Index(Position::new(slide as usize)));
         let path = match thread {
             None => {
@@ -613,15 +615,13 @@ impl Pptx {
         let target = Arc::new(target);
         let after = self.adopt_eager(Arc::clone(&target));
         Ok((
-            Commit {
-                snapshot_bytes: 0,
-                retained_cache: std::sync::OnceLock::new(),
+            Commit::new(
                 after,
                 source,
-                target: Editable::Eager(target),
-                proof: Proof::Eager(patch),
-                operations: 1,
-            },
+                Editable::Eager(target),
+                Proof::Eager(patch),
+                1,
+            ),
             path,
         ))
     }

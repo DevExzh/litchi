@@ -96,7 +96,9 @@ impl Pptx {
     }
 
     /// The detached shape scene of the selected slide, or `None` past the
-    /// catalog end.
+    /// catalog end. Source parser and scene reservations remain governed by
+    /// the native source/execution limits; the facade snapshot ceiling is
+    /// reserved for the retained native patch wire proof.
     pub(super) fn slide_scene(&self, position: usize) -> Result<Option<Scene>> {
         self.finish(|| {
             if let Some(revision) = &self.0.revision {

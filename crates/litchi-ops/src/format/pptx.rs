@@ -296,11 +296,6 @@ struct PptxState {
     revision: Option<pptx::source::Package>,
     /// Explicit signature removal never replaces the original source cache.
     unsigned_promotion: OnceLock<Mutex<Option<Arc<pptx::Package>>>>,
-    /// Set once the eager package passed the native edit admission
-    /// (`Package::edit`), which depends on the immutable package only: a
-    /// transaction's admission check then skips a second capture of the
-    /// package (record 0333).
-    admitted: OnceLock<()>,
     /// The last table a coalesced cell batch read on this handle: its slide,
     /// scene position and cells (record 0346), so a batch's first plan and
     /// its run read the table once.
@@ -310,10 +305,6 @@ struct PptxState {
     /// `None` when the slide has none (record 0348), so a batch's first plan
     /// and its run read the notes page once.
     notes: Mutex<Option<(usize, write::coalesce::NotesBody)>>,
-    /// The native edit the eager package's admission built, with that
-    /// package, until a coalesced run on this handle takes it (record 0348):
-    /// an edit is a function of the immutable package only.
-    spare: Mutex<Option<(Arc<pptx::Package>, pptx::opened::Edit)>>,
 }
 
 struct EagerSlide {
@@ -451,21 +442,6 @@ impl Pptx {
         Arc::ptr_eq(&self.0, &other.0)
     }
 
-    /// Return the O(1) source-size lower bound used before a native editor is
-    /// admitted.  This is only an allocation preflight; the exact retained
-    /// proof is still charged after the edit commits.  In particular, eager
-    /// owners may expose their already-indexed OPC source length without
-    /// forcing any lazy presentation payloads.
-    pub(crate) fn retained_source_len(&self) -> Result<Option<usize>> {
-        match &self.0.owner {
-            PptxOwner::Source(presentation) => Ok(Some(
-                usize::try_from(presentation.source_backed_package().source_artifact().len())
-                    .unwrap_or(usize::MAX),
-            )),
-            PptxOwner::Eager(package) => Ok(package.opc()?.exact_source_len()),
-        }
-    }
-
     /// This handle's key for [`crate::path::fence::Scope`].
     pub(crate) fn fence_key(&self) -> usize {
         Arc::as_ptr(&self.0).addr()
@@ -508,10 +484,8 @@ impl Pptx {
             promotion: OnceLock::new(),
             revision: None,
             unsigned_promotion: OnceLock::new(),
-            admitted: OnceLock::new(),
             cells: Mutex::new(None),
             notes: Mutex::new(None),
-            spare: Mutex::new(None),
         }))
         .with_origin(self.origin())
     }
@@ -564,10 +538,8 @@ impl Pptx {
             promotion: OnceLock::new(),
             revision: None,
             unsigned_promotion: OnceLock::new(),
-            admitted: OnceLock::new(),
             cells: Mutex::new(None),
             notes: Mutex::new(None),
-            spare: Mutex::new(None),
         }))
     }
 
@@ -610,10 +582,8 @@ impl Pptx {
             promotion: OnceLock::new(),
             revision: Some(revision),
             unsigned_promotion: OnceLock::new(),
-            admitted: OnceLock::new(),
             cells: Mutex::new(None),
             notes: Mutex::new(None),
-            spare: Mutex::new(None),
         }))
         .with_signature(self.signature())
         .with_origin(self.origin());
@@ -1016,27 +986,10 @@ impl Pptx {
     }
 
     /// Share an immutable native owner for editing without consuming readers.
-    /// Successful source promotion reuses the admitted OPC catalog. Failures
+    /// Successful source promotion reuses the validated OPC catalog. Failures
     /// are retryable; cached results still enforce freshness and execution.
     pub(crate) fn editable(&self) -> Result<Editable> {
-        let owner = self.editable_owner()?;
-        if let Editable::Eager(package) = &owner
-            && self.0.admitted.get().is_none()
-            && self.signature() != Signature::RemovalAuthorized
-        {
-            // Admission-only callers still require the native strict checks.
-            // The admitted edit is kept for the handle's first coalesced run
-            // (record 0348), which would otherwise build the same edit again.
-            let edit = package.edit()?;
-            *self
-                .0
-                .spare
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner) =
-                Some((Arc::clone(package), edit));
-            let _ = self.0.admitted.set(());
-        }
-        Ok(owner)
+        self.editable_owner()
     }
 
     /// The cells of the table at scene position `frame` of slide `slide`,
@@ -1062,20 +1015,6 @@ impl Pptx {
             .as_ref()
             .map(|cells| (slide, frame, Arc::clone(cells)));
         Ok(cells)
-    }
-
-    /// The admission's native edit of `package`, when this handle kept one
-    /// (record 0348).
-    fn take_spare_edit(&self, package: &Arc<pptx::Package>) -> Option<pptx::opened::Edit> {
-        let mut spare = self
-            .0
-            .spare
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
-        match spare.take() {
-            Some((owner, edit)) if Arc::ptr_eq(&owner, package) => Some(edit),
-            _ => None,
-        }
     }
 
     /// The notes body of slide `slide` for coalesced notes plans, read once

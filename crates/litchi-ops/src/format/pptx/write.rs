@@ -24,16 +24,22 @@ pub(crate) enum Proof {
     Eager(litchi_pptx::opened::Patch),
     /// A document-metadata patch (record 0253).
     Metadata(litchi_pptx::metadata::Patch),
+    /// Proofs from two native edits that make up one facade operation.
+    ///
+    /// A click-action setter can first edit the ordinary shape properties and
+    /// then edit the hyperlink.  Both native patches remain live until the
+    /// combined commit is consumed; dropping the first one here used to make
+    /// its retained snapshot charge disappear from the facade budget.
+    Combined(Box<[Self]>),
 }
 impl Proof {
     pub(crate) fn retained_bytes(&self) -> usize {
         match self {
             Self::Source(patch) => patch.retained_bytes(),
             Self::Eager(patch) => patch.retained_bytes(),
-            Self::Metadata(patch) => patch.changes().iter().fold(0_usize, |bytes, change| {
-                bytes
-                    .saturating_add(change.before().map_or(0, <[u8]>::len))
-                    .saturating_add(change.after().map_or(0, <[u8]>::len))
+            Self::Metadata(patch) => patch.retained_bytes(),
+            Self::Combined(proofs) => proofs.iter().fold(0, |bytes, proof| {
+                bytes.saturating_add(proof.retained_bytes())
             }),
         }
     }
@@ -43,6 +49,7 @@ impl Proof {
             Self::Source(patch) => patch.is_noop(),
             Self::Eager(patch) => patch.is_noop(),
             Self::Metadata(patch) => patch.is_noop(),
+            Self::Combined(proofs) => proofs.iter().all(Self::is_noop),
         }
     }
 }
@@ -53,20 +60,55 @@ pub(crate) struct Commit {
     pub(crate) proof: Proof,
     pub(crate) operations: usize,
     pub(crate) snapshot_bytes: usize,
-    /// Retained native patch size is lazy but must not be recomputed by each
-    /// facade limit check.  In particular, direct unsigned writes should not
-    /// repeatedly walk the complete patch just to read the same charge.
+    /// Retained native patch size is cached per commit and must not be
+    /// recomputed by each facade limit check. In particular, direct unsigned
+    /// writes should not repeatedly walk the complete patch just to read the
+    /// same charge.
     pub(crate) retained_cache: OnceLock<usize>,
 }
 impl Commit {
+    /// Build a commit with its native retained-snapshot charge accounted for.
+    /// Native routes retain a proof until the facade step is consumed, so do
+    /// the exact proof walk once at this boundary instead of exposing a zero
+    /// charge while leaving the accessor to discover it later.
+    pub(crate) fn new(
+        after: Pptx,
+        source: Editable,
+        target: Editable,
+        proof: Proof,
+        operations: usize,
+    ) -> Self {
+        let snapshot_bytes = proof.retained_bytes();
+        Self {
+            after,
+            source,
+            target,
+            proof,
+            operations,
+            snapshot_bytes,
+            retained_cache: OnceLock::from(snapshot_bytes),
+        }
+    }
+
     pub(crate) fn into_file(self) -> Pptx {
         self.after
     }
 
     /// Return the already-accounted snapshot charge. The native proof walk is
     /// cached per commit so signed and unsigned writes pay it at most once.
-    pub(crate) const fn snapshot_bytes(&self) -> usize {
-        self.snapshot_bytes
+    pub(crate) fn snapshot_bytes(&self) -> usize {
+        // Older native families initialize this field to zero while they
+        // construct the proof.  The proof is the authoritative retained
+        // charge, so expose its cached measurement to the transaction
+        // wrapper as well as to the setters that call
+        // `measure_snapshot_bytes` directly.  This keeps structural,
+        // ordering, comments, media, and other native routes from bypassing
+        // the facade snapshot budget merely because they do not have a
+        // format-specific preflight hook.
+        let measured = *self
+            .retained_cache
+            .get_or_init(|| self.proof.retained_bytes());
+        self.snapshot_bytes.max(measured)
     }
 
     /// Measure the native proof for a hard snapshot check, caching the result
@@ -86,6 +128,22 @@ impl Editable {
             _ => Ok(false),
         }
     }
+}
+
+/// The facade's semantic snapshot ceiling is also the native patch ceiling.
+/// The native option builders validate the finite, non-zero bound while the
+/// native editor performs the exact encoded-patch preflight.
+pub(super) fn native_snapshot_budget(limits: &SemanticLimits) -> usize {
+    limits.max_snapshot_bytes()
+}
+
+pub(super) fn opened_edit_options(max_patch_bytes: usize) -> litchi_pptx::opened::EditOptions {
+    litchi_pptx::opened::EditOptions::default()
+        .limits(litchi_pptx::opened::Limits::default().with_max_patch_bytes(max_patch_bytes))
+}
+
+pub(super) fn source_edit_options(max_patch_bytes: usize) -> litchi_pptx::source::EditOptions {
+    litchi_pptx::source::EditOptions::default().max_patch_bytes(max_patch_bytes)
 }
 
 /// The only PPTX shape assignments currently handled by the native write
@@ -244,7 +302,16 @@ impl Pptx {
                         // peak charge of both phases, just like a coalesced
                         // run does.
                         let staged_snapshot_bytes = commit.snapshot_bytes();
-                        let mut commit = canonical_signed_noop(self, commit.operations)?;
+                        // The canonical replacement is a separate peak
+                        // phase. Release the staged target/proof before
+                        // retaining the canonical empty patch.
+                        let operations = commit.operations;
+                        drop(commit);
+                        let mut commit = canonical_signed_noop(
+                            self,
+                            operations,
+                            native_snapshot_budget(limits),
+                        )?;
                         commit.snapshot_bytes = commit.snapshot_bytes.max(staged_snapshot_bytes);
                         let snapshot_bytes = commit.snapshot_bytes();
                         if snapshot_bytes > limits.max_snapshot_bytes() {
@@ -272,7 +339,7 @@ impl Pptx {
         props: Props<'_>,
         limits: &SemanticLimits,
     ) -> Result<Commit> {
-        if let Some(commit) = self.try_set_metadata(&target, &props)? {
+        if let Some(commit) = self.try_set_metadata(&target, &props, limits)? {
             return Ok(commit);
         }
         if let Some(path) = target.path()
@@ -464,9 +531,12 @@ impl Pptx {
             self.editable_owner()?
         };
         let mut operations = 0;
+        let native_limit = native_snapshot_budget(limits);
         let (target, proof, changed) = match &source {
             Editable::Source(package) => {
-                let mut edit = package.edit()?;
+                let mut edit = package
+                    .edit_with_options(source_edit_options(native_limit))
+                    .map_err(native_error)?;
                 if has_geometry {
                     stage_properties(&targets, text, |slide, replacements| {
                         operations += if replacements.len() == 1 {
@@ -498,7 +568,9 @@ impl Pptx {
                 (Editable::Source(target), Proof::Source(patch), changed)
             },
             Editable::Eager(package) => {
-                let mut edit = package.edit()?;
+                let mut edit = package
+                    .edit_with_options(opened_edit_options(native_limit))
+                    .map_err(native_error)?;
                 if has_geometry {
                     stage_properties(&targets, text, |slide, replacements| {
                         operations += if replacements.len() == 1 {
@@ -561,12 +633,12 @@ impl Pptx {
     }
 }
 
-fn canonical_signed_noop(base: &Pptx, operations: usize) -> Result<Commit> {
+fn canonical_signed_noop(base: &Pptx, operations: usize, max_patch_bytes: usize) -> Result<Commit> {
     let source = base.original_owner_for_noop()?;
     match &source {
         Editable::Source(package) => {
             let (target, patch) = package
-                .edit()
+                .edit_with_options(source_edit_options(max_patch_bytes))
                 .map_err(native_error)?
                 .commit()
                 .map_err(native_error)?
@@ -584,7 +656,7 @@ fn canonical_signed_noop(base: &Pptx, operations: usize) -> Result<Commit> {
         },
         Editable::Eager(package) => {
             let (target, patch) = package
-                .edit()
+                .edit_with_options(opened_edit_options(max_patch_bytes))
                 .map_err(native_error)?
                 .commit()
                 .map_err(native_error)?
@@ -773,7 +845,7 @@ fn error(code: Code, message: &'static str) -> Error {
     Error::new(code, message).with_format(FileFormat::Pptx)
 }
 
-fn native_error(error: litchi_pptx::Error) -> Error {
+pub(super) fn native_error(error: litchi_pptx::Error) -> Error {
     Error::from(error).with_format(FileFormat::Pptx)
 }
 
