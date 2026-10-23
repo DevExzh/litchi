@@ -2432,3 +2432,38 @@ See [0063](0063-source-pptx-modern-comments.md).
   performance returns, native qualification, corpus dispositions, final
   inventory/glossary, and full assembled gate remain open. Only the comprehensive
   redaction audit is deferred. Nothing has been pushed.
+
+- Coordinator checkpoint (2026-10-23, native stream assembly and third cleanup):
+  The source assembly reaches `44901f50d1`, adding the bounded iWork
+  constructor/inline-version repair, ODP bounded text memo and append repair,
+  authenticated OPC stream publication and DOCX consumers, and concrete XLS
+  cell iteration with deferred target reopening. Independent static reviews
+  found no remaining blocker in these source proposals. Combined compilation,
+  semantic validation and performance qualification still determine acceptance.
+
+  DOCX merge resolution retains existing redaction patch types, typed
+  conflicts, source/effective fingerprint memos, cache/read-ahead policy and
+  native/facade contexts separately. It fixes an incoming context fallback
+  that would replace a native context or manage an originally unmanaged source.
+  New regressions exercise both combinations through deferred edits and both
+  restore paths. Freshness checks remain non-materializing.
+
+  Record 0362uf retains consumer attempts 10–13. The focused OPC library/unit
+  test check progressed to external consumer imports, which record 0362ul
+  repairs. The ignored workspace lock was refreshed offline after the iWork
+  dependency change. The first assembled stream check then failed on new
+  stream helper/type scopes, retained-field mismatches, generic ownership and
+  denied lints. Those compiler repairs are in progress; no workspace, harness
+  or semantic pass is inferred from the stopped checks.
+
+  A third cleanup wave removed five clean, inactive merged leaves without
+  forcing, totaling 12,743,246,777 bytes of checkout contents. Branch refs,
+  exact recreation commands, and measurement evidence remain retained; four
+  ignored generated files were quarantined with hashes.
+
+  DOCX raw helper selected-limit and consumer repairs, signed native no-op
+  coverage/accounting, and ODraw residual review remain active. The XLSX raw
+  baseline qualification build is being prepared. All native qualification,
+  corpus dispositions, final inventory/glossary, and the complete assembled
+  gate remain open. Only the comprehensive redaction audit is deferred.
+  Nothing has been pushed.
