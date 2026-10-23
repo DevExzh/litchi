@@ -445,10 +445,11 @@ def _validate_archive_audit(audit: Mapping[str, Any], label: str) -> None:
             raise RunnerError(f"{label}.archive_audit member row is malformed")
         if item.get("name") != item.get("facade_name"):
             raise RunnerError(f"{label}.archive_audit member order/name differs")
-        expected_content = (
-            audit["decision"] == "byte_exact"
-            or item["name"] not in {"meta.xml", "META-INF/manifest.xml"}
-        )
+        expected_content = {
+            "byte_exact": True,
+            "metadata_member_only": item["name"] != "meta.xml",
+            "archive_member_order_and_manifest_listing": item["name"] != "META-INF/manifest.xml",
+        }[audit["decision"]]
         expected_record = item["name"] != "meta.xml" or audit["decision"] != "metadata_member_only"
         if audit["decision"] == "archive_member_order_and_manifest_listing" and item["name"] == "META-INF/manifest.xml":
             expected_record = False
