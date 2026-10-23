@@ -12,6 +12,8 @@ const CONTENT_AUTOMATIC: &str = r#"<?xml version="1.0" encoding="UTF-8"?><office
 
 const CONTENT_SHARED: &str = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0" office:version="1.4"><office:automatic-styles><style:style style:name="dp1" style:family="drawing-page"><style:drawing-page-properties presentation:transition-type="manual"/></style:style></office:automatic-styles><office:body><office:drawing><draw:page draw:name="Page 1" draw:style-name="dp1"/><draw:page draw:name="Page 2" draw:style-name="dp1"/></office:drawing></office:body></office:document-content>"#;
 
+const CONTENT_SHAPE_ALIAS: &str = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" office:version="1.4"><office:body><office:drawing><draw:page draw:name="Page 1"><draw:rect draw:name="Box"/></draw:page></office:drawing></office:body></office:document-content>"#;
+
 const CONTENT_INHERITED_SHARED: &str = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" office:version="1.4"><office:body><office:drawing><draw:page draw:name="Page 1" draw:style-name="base"/><draw:page draw:name="Page 2" draw:style-name="parent"/></office:drawing></office:body></office:document-content>"#;
 
 const CONTENT_NAMED: &str = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" office:version="1.4"><office:body><office:drawing><draw:page draw:name="Page 1" draw:style-name="dp1"/></office:drawing></office:body></office:document-content>"#;
@@ -1001,6 +1003,130 @@ fn joined_payload_effects_cover_forged_cross_sub_edit_writes() {
             if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedOperation
     ));
     assert!(!cross_owner.commit().unwrap().diagnostics().changed());
+}
+
+#[test]
+fn joined_effect_keys_canonicalize_page_and_shape_selector_aliases() {
+    let limits = CompositionLimits::new(4, 8, 16, 8);
+    let page_source = Package::from_bytes(&package(CONTENT_AUTOMATIC, None)).unwrap();
+    let mut first_page_edit = page_source.edit();
+    first_page_edit.set_page_name(0, "Canonical page").unwrap();
+    let first_page = first_page_edit.commit().unwrap();
+    let mut alias_page_edit = page_source.edit();
+    alias_page_edit.set_page_name(0, "Aliased page").unwrap();
+    let mut alias_page_wire: serde_json::Value = serde_json::from_slice(
+        &alias_page_edit
+            .commit()
+            .unwrap()
+            .patch()
+            .durable()
+            .unwrap()
+            .to_deterministic_json()
+            .unwrap(),
+    )
+    .unwrap();
+    alias_page_wire["operations"][0]["forward"]["target"] =
+        serde_json::Value::String("page/00".to_owned());
+    alias_page_wire["operations"][0]["inverse"]["target"] =
+        serde_json::Value::String("page/00".to_owned());
+    let alias_page =
+        edit::DurablePatch::from_deterministic_json(&serde_json::to_vec(&alias_page_wire).unwrap())
+            .unwrap();
+    let mut page_joined = page_source.joined_edits(limits);
+    let page_lineage = page_joined.lineage().clone();
+    page_joined
+        .join(
+            edit::SubEdit::new(
+                page_lineage.clone(),
+                limits,
+                "canonical-page",
+                Vec::<String>::new(),
+                vec!["page/0#page.name.set".to_owned()],
+                first_page.patch().durable().unwrap(),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+    page_joined
+        .join(
+            edit::SubEdit::new(
+                page_lineage,
+                limits,
+                "aliased-page",
+                Vec::<String>::new(),
+                vec!["page/00#page.name.set".to_owned()],
+                alias_page,
+            )
+            .unwrap(),
+        )
+        .unwrap();
+    let mut page_owner = page_source.edit();
+    let error = match page_owner.join(page_joined) {
+        Ok(_) => panic!("page selector aliases bypassed joined overlap detection"),
+        Err(error) => error,
+    };
+    assert!(matches!(
+        error.error(),
+        Error::Refused(refusal)
+            if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedOperation
+    ));
+    assert!(!page_owner.commit().unwrap().diagnostics().changed());
+
+    let shape_source = Package::from_bytes(&package(CONTENT_SHAPE_ALIAS, None)).unwrap();
+    let mut alias_shape_edit = shape_source.edit();
+    alias_shape_edit
+        .set_shape_name(0, 0, "Aliased shape")
+        .unwrap();
+    let mut alias_shape_wire: serde_json::Value = serde_json::from_slice(
+        &alias_shape_edit
+            .commit()
+            .unwrap()
+            .patch()
+            .durable()
+            .unwrap()
+            .to_deterministic_json()
+            .unwrap(),
+    )
+    .unwrap();
+    alias_shape_wire["operations"][0]["forward"]["target"] =
+        serde_json::Value::String("page/00/shape/00".to_owned());
+    alias_shape_wire["operations"][0]["inverse"]["target"] =
+        serde_json::Value::String("page/00/shape/00".to_owned());
+    let alias_shape = edit::DurablePatch::from_deterministic_json(
+        &serde_json::to_vec(&alias_shape_wire).unwrap(),
+    )
+    .unwrap();
+    let mut shape_joined = shape_source.joined_edits(limits);
+    let shape_lineage = shape_joined.lineage().clone();
+    shape_joined
+        .join(
+            edit::SubEdit::new(
+                shape_lineage,
+                limits,
+                "aliased-shape",
+                Vec::<String>::new(),
+                vec!["page/00/shape/00#shape.name.set".to_owned()],
+                alias_shape,
+            )
+            .unwrap(),
+        )
+        .unwrap();
+    let mut ordinary = shape_source.edit();
+    ordinary.set_shape_name(0, 0, "Ordinary shape").unwrap();
+    let error = match ordinary.join(shape_joined) {
+        Ok(_) => panic!("shape selector aliases bypassed staged overlap detection"),
+        Err(error) => error,
+    };
+    assert!(matches!(
+        error.error(),
+        Error::Refused(refusal)
+            if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedOperation
+    ));
+    let ordinary_commit = ordinary.commit().unwrap();
+    assert_eq!(
+        ordinary_commit.package().pages()[0].shapes()[0].name(),
+        Some("Ordinary shape")
+    );
 }
 
 #[test]

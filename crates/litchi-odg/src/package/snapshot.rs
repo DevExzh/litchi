@@ -1564,13 +1564,17 @@ impl Edit {
         if let Some(error) = validation_error {
             return Err(JoinError::new(error, joined));
         }
-        if joined_contains_mixed_package_effects(&joined) {
-            return Err(JoinError::new(
-                joined_refusal(
-                    "ODG joined package replacement conflicts with independent staged effects",
-                ),
-                joined,
-            ));
+        match joined_contains_mixed_package_effects(&joined) {
+            Ok(true) => {
+                return Err(JoinError::new(
+                    joined_refusal(
+                        "ODG joined package replacement conflicts with independent staged effects",
+                    ),
+                    joined,
+                ));
+            },
+            Ok(false) => {},
+            Err(error) => return Err(JoinError::new(error, joined)),
         }
         match self.joined_conflicts_with_staged(&joined) {
             Ok(true) => {
@@ -1607,25 +1611,27 @@ impl Edit {
                 .iter()
                 .any(|change| matches!(change, Change::Structure(_)))
             || self.package_replacement.is_some();
-        let direct_conflict = joined.sub_edits().any(|sub_edit| {
-            sub_edit
-                .payload()
-                .operations()
-                .iter()
-                .flat_map(durable_effect_keys)
-                .any(|effect| {
-                    if effect == "package" {
-                        return staged_package_effect || !self.changes.is_empty();
+        let direct_conflict =
+            joined
+                .sub_edits()
+                .try_fold(false, |conflict, sub_edit| -> Result<bool> {
+                    if conflict {
+                        return Ok(true);
                     }
-                    if staged_package_effect {
-                        return true;
-                    }
-                    self.changes
-                        .iter()
-                        .flat_map(|change| change_effect_keys(&self.source, change))
-                        .any(|staged| staged == effect)
-                })
-        });
+                    let effects = actual_durable_effect_keys(sub_edit.payload())?;
+                    Ok(effects.into_iter().any(|effect| {
+                        if effect == "package" {
+                            return staged_package_effect || !self.changes.is_empty();
+                        }
+                        if staged_package_effect {
+                            return true;
+                        }
+                        self.changes
+                            .iter()
+                            .flat_map(|change| change_effect_keys(&self.source, change))
+                            .any(|staged| staged == effect)
+                    }))
+                })?;
         if direct_conflict {
             return Ok(true);
         }
@@ -5416,7 +5422,10 @@ impl Patch {
         let writes = durable
             .operations()
             .iter()
-            .flat_map(durable_effect_keys)
+            .map(durable_effect_keys)
+            .collect::<Result<Vec<_>>>()?
+            .into_iter()
+            .flatten()
             .collect::<Vec<_>>();
         SubEdit::new(
             Lineage::new(&self.source),
@@ -6315,13 +6324,10 @@ fn validate_joined_effect_declarations(joined: &JoinedEdits) -> Result<()> {
         let declared = sub_edit
             .effects()
             .writes()
-            .map(str::to_owned)
+            .map(canonical_declared_effect_key)
             .collect::<BTreeSet<_>>();
-        let actual = sub_edit
-            .payload()
-            .operations()
-            .iter()
-            .flat_map(durable_effect_keys)
+        let actual = actual_durable_effect_keys(sub_edit.payload())?
+            .into_iter()
             .collect::<BTreeSet<_>>();
         if !actual.is_subset(&declared) {
             return Err(joined_refusal(
@@ -6335,11 +6341,48 @@ fn validate_joined_effect_declarations(joined: &JoinedEdits) -> Result<()> {
     Ok(())
 }
 
-fn durable_effect_keys(operation: &PatchOperation) -> Vec<String> {
-    match operation.op.as_str() {
-        "package.replace" => vec!["package".to_owned()],
-        "page.name.set" => vec![format!("{}#{}", operation.target, operation.op)],
-        _ => vec![format!("{}#{}", operation.target, operation.op)],
+fn durable_effect_keys(operation: &PatchOperation) -> Result<Vec<String>> {
+    let key = match operation.op.as_str() {
+        "package.replace" => "package".to_owned(),
+        op @ ("page.name.set" | "page.style.set" | "page.transition.set") => {
+            format!("page/{}#{op}", parse_page_target(&operation.target)?)
+        },
+        op @ ("shape.geometry.set" | "shape.control.set" | "shape.layer.set" | "shape.name.set"
+        | "shape.path.set" | "shape.style.set" | "shape.text.set") => {
+            let (page, shape) = parse_shape_target(&operation.target)?;
+            format!("page/{page}/shape/{shape}#{op}")
+        },
+        _ => format!("{}#{}", operation.target, operation.op),
+    };
+    Ok(vec![key])
+}
+
+fn actual_durable_effect_keys(patch: &DurablePatch) -> Result<Vec<String>> {
+    patch
+        .operations()
+        .iter()
+        .try_fold(Vec::new(), |mut effects, operation| {
+            effects.extend(durable_effect_keys(operation)?);
+            Ok(effects)
+        })
+}
+
+fn canonical_declared_effect_key(effect: &str) -> String {
+    if effect == "package" {
+        return effect.to_owned();
+    }
+    let Some((target, operation)) = effect.rsplit_once('#') else {
+        return effect.to_owned();
+    };
+    match operation {
+        "page.name.set" | "page.style.set" | "page.transition.set" => parse_page_target(target)
+            .map(|page| format!("page/{page}#{operation}"))
+            .unwrap_or_else(|_| effect.to_owned()),
+        "shape.geometry.set" | "shape.control.set" | "shape.layer.set" | "shape.name.set"
+        | "shape.path.set" | "shape.style.set" | "shape.text.set" => parse_shape_target(target)
+            .map(|(page, shape)| format!("page/{page}/shape/{shape}#{operation}"))
+            .unwrap_or_else(|_| effect.to_owned()),
+        _ => effect.to_owned(),
     }
 }
 
@@ -6614,19 +6657,12 @@ fn style_event_pair_conflicts(
     }
 }
 
-fn joined_contains_mixed_package_effects(joined: &JoinedEdits) -> bool {
+fn joined_contains_mixed_package_effects(joined: &JoinedEdits) -> Result<bool> {
     let sub_edits = joined
         .sub_edits()
-        .map(|sub_edit| {
-            sub_edit
-                .payload()
-                .operations()
-                .iter()
-                .flat_map(durable_effect_keys)
-                .collect::<Vec<_>>()
-        })
-        .collect::<Vec<_>>();
-    sub_edits.iter().enumerate().any(|(index, left)| {
+        .map(|sub_edit| actual_durable_effect_keys(sub_edit.payload()))
+        .collect::<Result<Vec<_>>>()?;
+    Ok(sub_edits.iter().enumerate().any(|(index, left)| {
         let left_package = left.iter().any(|effect| effect == "package");
         let left_other = left.iter().any(|effect| effect != "package");
         sub_edits[index.saturating_add(1)..].iter().any(|right| {
@@ -6634,7 +6670,7 @@ fn joined_contains_mixed_package_effects(joined: &JoinedEdits) -> bool {
             let right_other = right.iter().any(|effect| effect != "package");
             (left_package && right_other) || (left_other && right_package)
         })
-    })
+    }))
 }
 
 struct Parsed {
