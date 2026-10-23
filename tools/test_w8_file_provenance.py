@@ -425,12 +425,11 @@ class EndpointManifest(unittest.TestCase):
 
             projection = json.loads(paths["projection"].read_text(encoding="utf-8"))
             projection["workspace"]["package_version"] = "9.9.9"
-            projection["lock"]["packages"][0]["version"] = "9.9.9"
             paths["projection"].write_bytes(provenance.canonical(projection))
             endpoint["dependency_projection"] = provenance.artifact(paths["projection"])
             endpoint["dependency_projection_sha256"] = provenance.digest(paths["projection"])
             endpoint_path.write_bytes(provenance.canonical(endpoint))
-            with self.assertRaises(RuntimeError):
+            with self.assertRaisesRegex(RuntimeError, "projection package version differs from the manifests"):
                 runner.endpoint_manifest(endpoint_path, args.binary, "stale-version")
 
 
