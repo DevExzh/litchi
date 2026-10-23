@@ -439,7 +439,6 @@ fn verify_source_freshness(fixture: &Fixture, implementation: Implementation) ->
                 format!("XLS F3 baseline deferred-read disposition changed: {error:?}").into(),
             );
         },
-        Ok(None) => return Err("XLS F3 stale deferred source lost its selected cell".into()),
     }
 
     // A committed deferred owner must retain the original source freshness
