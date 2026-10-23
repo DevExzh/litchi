@@ -127,13 +127,11 @@ fn a_dtd_never_declares_entities() {
     };
     assert!(never_expanded(
         Package::from_bytes(&bytes)
-            .map_err(litchi_core::Error::from)
             .and_then(|package| package.presentation())
             .and_then(|presentation| presentation.slides())
     ));
     assert!(never_expanded(
         SourceBackedPresentation::from_read_at(Arc::new(OwnedSource::new(bytes)))
-            .map_err(litchi_core::Error::from)
             .and_then(|presentation| presentation.slides())
     ));
 }

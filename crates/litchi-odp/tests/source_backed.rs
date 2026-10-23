@@ -490,7 +490,6 @@ fn source_facade_validates_metadata_like_the_owned_family() {
 
     assert!(
         Package::from_bytes(&bytes)
-            .map_err(Error::from)
             .and_then(|package| package.presentation())
             .is_err()
     );

@@ -355,7 +355,6 @@ fn nested_and_foreign_inline_markup_respects_lossless_read_boundary() -> litchi_
     let foreign_source = package(FOREIGN_INLINE_CONTENT)?;
     assert!(
         Package::from_bytes(&foreign_source)
-            .map_err(litchi_core::Error::from)
             .and_then(|package| package.workbook())
             .is_err()
     );

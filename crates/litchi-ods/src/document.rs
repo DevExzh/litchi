@@ -4680,10 +4680,11 @@ mod retained_xml_policy_tests {
         assert!(
             matches!(
                 &error,
-                litchi_core::Error::ResourceLimit(limit)
-                    if limit.limit == 64 * 1024
-                        && limit.scope.as_ref() == "ODF raw XML token bytes"
-                        && limit.observed > limit.limit
+                Error::Limit {
+                    kind: LimitKind::RawXml(litchi_odf_common::RawXmlLimitKind::TokenBytes),
+                    maximum,
+                    observed,
+                } if *maximum == 64 * 1024 && *observed > *maximum
             ),
             "retained XML policy was not enforced: {error:?}"
         );

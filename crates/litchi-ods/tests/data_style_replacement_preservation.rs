@@ -1,6 +1,6 @@
 mod support;
 
-use litchi_core::{Error, Result};
+use litchi_odf_common::Error;
 use litchi_ods::{
     Package,
     document::{NumberStyleNode, StyleGraph},
@@ -42,7 +42,7 @@ fn replacement_graph() -> StyleGraph {
 }
 
 #[test]
-fn decimal_replacement_accepts_namespace_aliases() -> Result<()> {
+fn decimal_replacement_accepts_namespace_aliases() -> Result<(), Error> {
     let snapshot = Package::from_bytes(&package_with_style(decimal_source_style()))?;
     let mut edit = snapshot.edit()?;
     edit.replace_style_graph(&replacement_graph())?;
@@ -56,7 +56,7 @@ fn decimal_replacement_accepts_namespace_aliases() -> Result<()> {
 }
 
 #[test]
-fn modeled_character_data_events_remain_supported() -> Result<()> {
+fn modeled_character_data_events_remain_supported() -> Result<(), Error> {
     let sources = [
         "<n:number-style s:name=\"Decimal\"><n:text><![CDATA[$]]></n:text><n:number n:decimal-places=\"2\" n:min-integer-digits=\"1\"/><n:text>USD</n:text></n:number-style>",
         "<n:number-style s:name=\"Decimal\"><n:text>&amp;</n:text><n:number n:decimal-places=\"2\" n:min-integer-digits=\"1\"/><n:text>USD</n:text></n:number-style>",
@@ -74,7 +74,7 @@ fn modeled_character_data_events_remain_supported() -> Result<()> {
 }
 
 #[test]
-fn unsupported_source_payloads_refuse_atomically_after_pending_edit() -> Result<()> {
+fn unsupported_source_payloads_refuse_atomically_after_pending_edit() -> Result<(), Error> {
     let cases = [
         (
             "fraction",
@@ -148,7 +148,7 @@ fn unsupported_source_payloads_refuse_atomically_after_pending_edit() -> Result<
 }
 
 #[test]
-fn empty_replacement_is_an_exact_noop_for_pending_work() -> Result<()> {
+fn empty_replacement_is_an_exact_noop_for_pending_work() -> Result<(), Error> {
     let snapshot = Package::from_bytes(&package_with_style(decimal_source_style()))?;
     let mut edit = snapshot.edit()?;
     edit.set_cell_style("Data", 0, 0, "Pending")?;

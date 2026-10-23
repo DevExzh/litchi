@@ -207,7 +207,9 @@ fn character_set_names_follow_odf_text_encoding_syntax() {
         assert!(
             matches!(
                 malformed.database().settings(),
-                Err(litchi_core::Error::InvalidFormat(_))
+                Err(litchi_odb::Error::Core(litchi_core::Error::InvalidFormat(
+                    _
+                )))
             ),
             "{encoding:?}"
         );

@@ -277,7 +277,6 @@ fn malformed_xml_stays_a_hard_error() {
     );
     assert!(
         Package::from_bytes(&broken)
-            .map_err(litchi_core::Error::from)
             .and_then(|package| package.workbook())
             .is_err()
     );

@@ -21,9 +21,10 @@ use crate::generic::{Family, FlatDocument, Package};
 use crate::variable_declaration::{Body, Declaration, Group, Kind, Part, Scope, ValueType};
 use crate::{RdfaAttributes, RdfaOccurrence, TextMeta, XFormsModel};
 use litchi_core::{
-    Budget, CancellationSource, Error, ExecutionContext, ExecutionLimits, Limits as BudgetLimits,
-    Position, Resource,
+    Budget, CancellationSource, Error as CoreError, ExecutionContext, ExecutionLimits,
+    Limits as BudgetLimits, Position, Resource,
 };
+use litchi_odf_common::Error as OdfError;
 
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const TEXT: &str = "urn:oasis:names:tc:opendocument:xmlns:text:1.0";
@@ -156,24 +157,43 @@ fn retained_template_bytes(extra_capacity: usize) -> (Vec<u8>, u64) {
     (bytes, capacity)
 }
 
-fn assert_memory_limit(error: Error) {
+fn assert_memory_limit(error: CoreError) {
     assert!(matches!(
         error,
-        Error::ResourceLimit(limit) if limit.resource == Resource::Memory
+        CoreError::ResourceLimit(limit) if limit.resource == Resource::Memory
     ));
 }
 
-fn assert_work_limit(error: Error) {
+fn assert_work_limit(error: CoreError) {
     assert!(matches!(
         error,
-        Error::ResourceLimit(limit) if limit.resource == Resource::Work
+        CoreError::ResourceLimit(limit) if limit.resource == Resource::Work
     ));
 }
 
-fn assert_cancelled(error: Error) {
+fn assert_odf_memory_limit(error: OdfError) {
+    assert!(matches!(
+        error,
+        OdfError::Core(CoreError::ResourceLimit(limit)) if limit.resource == Resource::Memory
+    ));
+}
+
+fn assert_cancelled(error: CoreError) {
     assert!(
         error.to_string().contains("cancelled"),
         "unexpected error: {error}"
+    );
+}
+
+fn assert_odf_cancelled(error: OdfError) {
+    assert!(
+        matches!(
+            &error,
+            OdfError::Core(CoreError::Other(message))
+                if message == "flat OpenDocument operation cancelled"
+                    || message == "flat ODT publication cancelled"
+        ),
+        "unexpected error: {error:?}"
     );
 }
 
@@ -257,7 +277,7 @@ fn assert_growing_mutator_output_limit(name: &str, mutator: FlatMutator) {
     let mut under = FlatDocument::from_bytes_with_limit(source, exact_limit - 1).unwrap();
     let before = under.to_bytes();
     assert!(
-        matches!(mutator(&mut under), Err(Error::ResourceLimit(_))),
+        matches!(mutator(&mut under), Err(CoreError::ResourceLimit(_))),
         "{name} accepted output over its caller cap"
     );
     assert_eq!(
@@ -434,7 +454,7 @@ fn execution_context_transfer_preserves_old_reservation_on_failure_and_moves_on_
 
     let (failed_budget, _failed_cancel, failed_context) =
         execution_context_with_memory(retained_capacity - 1);
-    assert_memory_limit(
+    assert_odf_memory_limit(
         document
             .with_execution_context(failed_context)
             .err()
@@ -542,7 +562,7 @@ fn oversized_flat_reader_charges_growth_peak_and_admits_with_enough_memory() {
     .err()
     .unwrap();
     match refusal {
-        Error::ResourceLimit(limit) => {
+        CoreError::ResourceLimit(limit) => {
             assert_eq!(limit.resource, Resource::Memory);
             assert_eq!(limit.limit, peak_limit);
             assert_eq!(
@@ -866,11 +886,11 @@ fn flat_template_ingress_accepts_exact_cap_and_rejects_cap_plus_one() {
     oversized.push(b'x');
     assert!(matches!(
         FlatDocument::from_bytes_with_limit(oversized.clone(), exact),
-        Err(Error::ResourceLimit(_))
+        Err(CoreError::ResourceLimit(_))
     ));
     assert!(matches!(
         FlatDocument::from_reader_with_limit(Cursor::new(oversized), exact),
-        Err(Error::ResourceLimit(_))
+        Err(CoreError::ResourceLimit(_))
     ));
 
     let limits = document_limit(TEMPLATE_XML.len());
@@ -881,11 +901,11 @@ fn flat_template_ingress_accepts_exact_cap_and_rejects_cap_plus_one() {
     oversized.push(b'x');
     assert!(matches!(
         Document::from_bytes_with_options(&oversized, limits),
-        Err(crate::flat::Error::Core(Error::ResourceLimit(_)))
+        Err(crate::flat::Error::Core(CoreError::ResourceLimit(_)))
     ));
     assert!(matches!(
         Document::from_reader_with_options(Cursor::new(oversized), limits),
-        Err(crate::flat::Error::Core(Error::ResourceLimit(_)))
+        Err(crate::flat::Error::Core(CoreError::ResourceLimit(_)))
     ));
 }
 
@@ -939,7 +959,7 @@ fn specialized_template_output_limit_accepts_exact_output_and_rejects_one_over()
     over_edit.update_paragraph(0, "Omega!").unwrap().unwrap();
     assert!(matches!(
         over_edit.commit(),
-        Err(crate::flat::Error::Core(Error::ResourceLimit(_)))
+        Err(crate::flat::Error::Core(CoreError::ResourceLimit(_)))
     ));
     assert_eq!(source.as_bytes(), TEMPLATE_XML.as_bytes());
 }
@@ -956,7 +976,7 @@ fn formatted_template_no_op_is_exact_but_changed_edit_keeps_compactness_refusal(
     edit.update_paragraph(0, "Omega").unwrap().unwrap();
     assert!(matches!(
         edit.commit(),
-        Err(crate::flat::Error::Core(Error::XmlCompactness { .. }))
+        Err(crate::flat::Error::Core(CoreError::XmlCompactness { .. }))
     ));
     assert_eq!(source.as_bytes(), formatted.as_bytes());
 }
@@ -1009,7 +1029,7 @@ fn cancelled_generic_and_specialized_saves_preserve_destinations_and_temps() {
         .save_with_execution_context(&generic_destination, generic_context)
         .err()
         .unwrap();
-    assert_cancelled(error);
+    assert_odf_cancelled(error);
     assert_eq!(std::fs::read(&generic_destination).unwrap(), b"generic-old");
     assert_eq!(std::fs::read(&foreign_temp).unwrap(), b"foreign");
     assert_no_owned_flat_temporary_files(directory.path());
@@ -1025,7 +1045,7 @@ fn cancelled_generic_and_specialized_saves_preserve_destinations_and_temps() {
         .save_with_execution_context(&specialized_destination, specialized_context)
         .err()
         .unwrap();
-    assert_cancelled(error);
+    assert_odf_cancelled(error);
     assert_eq!(
         std::fs::read(&specialized_destination).unwrap(),
         b"specialized-old"

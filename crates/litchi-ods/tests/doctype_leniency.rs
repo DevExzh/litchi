@@ -121,7 +121,6 @@ fn a_dtd_never_declares_entities() {
     });
     assert!(
         Package::from_bytes(&bytes)
-            .map_err(litchi_core::Error::from)
             .and_then(|package| package.workbook())
             .is_err()
     );

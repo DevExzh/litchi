@@ -927,7 +927,6 @@ fn encrypted_content_is_refused_before_a_tracked_change_transaction_can_begin() 
 
     assert!(
         Package::from_bytes(&encrypted)
-            .map_err(litchi_core::Error::from)
             .and_then(|package| package.workbook())
             .is_err()
     );

@@ -166,7 +166,6 @@ fn duplicates_and_undeclared_entities_stay_hard_errors() {
     ));
     assert!(
         Package::from_bytes(&duplicate)
-            .map_err(litchi_core::Error::from)
             .and_then(|package| package.workbook())
             .is_err()
     );
@@ -175,7 +174,6 @@ fn duplicates_and_undeclared_entities_stay_hard_errors() {
         with_settings_children(r#"<loext:vendor-setting>&undeclared;</loext:vendor-setting>"#);
     assert!(
         Package::from_bytes(&entity)
-            .map_err(litchi_core::Error::from)
             .and_then(|package| package.workbook())
             .is_err()
     );

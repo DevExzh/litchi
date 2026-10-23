@@ -13,10 +13,11 @@ use std::{
 
 use crate::{Package, SourceBackedSpreadsheet, builder::Workbook as Draft, dde};
 use litchi_core::{
-    Budget, CancellationSource, Error, ExecutionContext, ExecutionLimits, Limits, OwnedSource,
-    Profile, ReadAt, Resource, SourceVersion,
+    Budget, CancellationSource, Error as CoreError, ExecutionContext, ExecutionLimits, Limits,
+    OwnedSource, Profile, ReadAt, Resource, SourceVersion,
 };
 use litchi_odf_common::{
+    Error,
     core::{
         SourceContentPublicationError, SourceContentPublicationOptions,
         SourceContentPublicationProgress,
@@ -122,8 +123,11 @@ fn closure_failure_leaves_both_facades_unchanged() {
             .workbook()
             .expect("ordinary fixture"),
     );
-    let error = ordinary.edit_dde(|_| Err(Error::Unsupported("caller abort".to_owned())));
-    assert!(matches!(error, Err(Error::Unsupported(message)) if message == "caller abort"));
+    let error = ordinary.edit_dde(|_| Err(CoreError::Unsupported("caller abort".to_owned())));
+    assert!(matches!(
+        error,
+        Err(Error::Core(CoreError::Unsupported(message))) if message == "caller abort"
+    ));
     assert_eq!(ordinary.workbook().content_xml(), CONTENT);
 
     let mut mutable = Draft::from_workbook(
@@ -134,7 +138,7 @@ fn closure_failure_leaves_both_facades_unchanged() {
     );
     assert!(
         mutable
-            .edit_dde(|_| Err(Error::Unsupported("caller abort".to_owned())))
+            .edit_dde(|_| Err(CoreError::Unsupported("caller abort".to_owned())))
             .is_err()
     );
     assert_eq!(mutable.workbook().content_xml(), CONTENT);
@@ -170,7 +174,7 @@ fn explicit_input_limits_keep_structured_resource_errors() {
             &execution,
         )
         .expect_err("input ceiling");
-    assert!(matches!(error, Error::ResourceLimit(_)));
+    assert!(matches!(error, Error::Core(CoreError::ResourceLimit(_))));
 }
 
 #[test]
@@ -197,7 +201,7 @@ fn execution_limit_errors_retain_the_callers_resource_and_scope() {
     let error = ordinary
         .dde_with(dde::Limits::default(), &execution)
         .expect_err("caller input budget must refuse admission");
-    let Error::ResourceLimit(limit) = error else {
+    let Error::Core(CoreError::ResourceLimit(limit)) = error else {
         panic!("expected structured resource error, got {error:?}");
     };
     assert_eq!(limit.resource, Resource::InputBytes);
@@ -216,7 +220,7 @@ fn failed_closure_after_staging_does_not_publish() {
     );
     let error = ordinary.edit_dde(|edit| {
         edit.set_sheet_source("Data", replacement_source())?;
-        Err(Error::Unsupported("abort staged source".to_owned()))
+        Err(CoreError::Unsupported("abort staged source".to_owned()))
     });
     assert!(error.is_err());
     assert_eq!(ordinary.workbook().content_xml(), CONTENT);
@@ -241,7 +245,7 @@ fn signature_owner_refuses_changed_dde_but_retains_exact_noops() {
     let error = ordinary.edit_dde(|edit| edit.set_sheet_source("Data", replacement_source()));
     assert!(matches!(
         error,
-        Err(Error::Unsupported(_) | Error::Refused(_))
+        Err(Error::Core(CoreError::Unsupported(_)) | Error::Refused(_))
     ));
     assert_eq!(ordinary.workbook().content_xml(), CONTENT);
     ordinary.edit_dde(|_| Ok(())).expect("signed no-op");
@@ -337,7 +341,7 @@ fn source_edit_checks_its_output_limit_and_patches_check_their_owner() {
         .expect("stage source");
     assert!(matches!(
         limited.commit(),
-        Err(litchi_odf_common::Error::Core(Error::ResourceLimit(_))
+        Err(litchi_odf_common::Error::Core(CoreError::ResourceLimit(_))
             | litchi_odf_common::Error::Limit { .. })
     ));
 

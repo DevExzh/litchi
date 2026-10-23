@@ -604,7 +604,10 @@ fn region_text_replaces_header_and_footer_paragraphs() {
         let refused = edit.set_region_text(&regions[0], "x");
         assert!(matches!(
             refused,
-            Err(litchi_core::Error::Unsupported(_) | litchi_core::Error::Refused(_))
+            Err(
+                litchi_odf_common::Error::Core(litchi_core::Error::Unsupported(_))
+                    | litchi_odf_common::Error::Refused(_),
+            )
         ));
         let mut edit = package.edit();
         edit.set_region_text(&regions[1], "New even\ttop").unwrap();
