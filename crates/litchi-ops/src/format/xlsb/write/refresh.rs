@@ -13,8 +13,8 @@ use litchi_xlsb::sheet::Selector as NativeSelector;
 
 use super::super::Xlsb;
 use super::{
-    Commit, NativeCellOptions, Reference, TransferLimits, cell_semantic_charge, native_error,
-    package_from_editor, snapshot_limit,
+    Commit, NativeCellOptions, Reference, cell_snapshot_budget, cell_transfer_limits, native_error,
+    package_from_editor,
 };
 use crate::calc::{ErrorValue, Status as Calc, Value};
 use crate::refresh::{Field, Options, Status, Summary, formula_report, workbook_summary};
@@ -80,23 +80,13 @@ pub(crate) fn refresh(
         if planned.is_empty() {
             return Ok((None, Summary::from_fields(fields)));
         }
-        let semantic_charge = cell_semantic_charge(writes, limits)?;
-        let image_budget = limits
-            .max_snapshot_bytes()
-            .checked_sub(semantic_charge)
-            .filter(|budget| *budget > 0)
-            .ok_or_else(|| {
-                snapshot_limit(
-                    semantic_charge.saturating_add(1),
-                    limits.max_snapshot_bytes(),
-                )
-            })?;
-        let native_limits =
-            TransferLimits::new(image_budget, limits.max_expanded_targets(), 1, image_budget);
+        let mut remaining_snapshot = cell_snapshot_budget(limits.max_snapshot_bytes())?;
+        let canonical_limits = cell_transfer_limits(remaining_snapshot, limits)?;
         let canonical_sheet = planned.keys().next().copied();
         let mut package = package_from_editor(handle.editor_for_write()?);
         let mut patches = Vec::new();
         for (sheet, caches) in planned {
+            let native_limits = cell_transfer_limits(remaining_snapshot, limits)?;
             let Some(mut edit) = package
                 .edit_cell_values_with_options(
                     NativeSelector::from(sheet),
@@ -127,6 +117,17 @@ pub(crate) fn refresh(
                 continue;
             }
             let (next, patch) = edit.commit().map_err(native_error)?.into_parts();
+            let retained = patch.retained_bytes();
+            if retained > remaining_snapshot {
+                let consumed = limits
+                    .max_snapshot_bytes()
+                    .saturating_sub(remaining_snapshot);
+                return Err(super::snapshot_limit(
+                    consumed.saturating_add(retained),
+                    limits.max_snapshot_bytes(),
+                ));
+            }
+            remaining_snapshot -= retained;
             package = next;
             patches.push(patch);
         }
@@ -145,7 +146,7 @@ pub(crate) fn refresh(
             handle,
             package,
             patches,
-            (canonical_sheet, native_limits),
+            (canonical_sheet, canonical_limits),
             limits.max_snapshot_bytes(),
             writes,
         )?;

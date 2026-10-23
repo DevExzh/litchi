@@ -351,6 +351,61 @@ fn signed_coalesced_cell_cancellation_keeps_a_positive_snapshot_peak() {
 }
 
 #[test]
+fn unsigned_cell_snapshot_budget_is_exact_for_runs_and_ranges() {
+    let bytes = fixture();
+
+    for eager in [false, true] {
+        let probe = open_owner(&bytes, eager)
+            .edit(|edit| edit.set("/sheet[1]/A1", props! { "value" => "changed" }))
+            .expect("probe the unsigned coalesced cell patch");
+        let charge = probe.diagnostics().snapshot_bytes();
+        assert!(charge > 0, "cell runs must retain their native proof");
+
+        let exact = SemanticLimits::builder()
+            .max_snapshot_bytes(charge)
+            .expect("exact cell-run snapshot limit")
+            .build()
+            .expect("exact cell-run semantic limits");
+        open_owner(&bytes, eager)
+            .edit_with_options(EditOptions::new().semantic_limits(exact), |edit| {
+                edit.set("/sheet[1]/A1", props! { "value" => "changed" })
+            })
+            .expect("the exact unsigned coalesced proof budget must fit");
+
+        let under = SemanticLimits::builder()
+            .max_snapshot_bytes(charge - 1)
+            .expect("under-budget cell-run snapshot limit")
+            .build()
+            .expect("under-budget cell-run semantic limits");
+        let error = open_owner(&bytes, eager)
+            .edit_with_options(EditOptions::new().semantic_limits(under), |edit| {
+                edit.set("/sheet[1]/A1", props! { "value" => "changed" })
+            })
+            .expect_err("an unsigned coalesced proof must not bypass the limit");
+        assert_eq!(error.code(), Code::LimitExceeded);
+
+        let probe = open_owner(&bytes, eager)
+            .edit(|edit| edit.set("Data!A1:B1", props! { "value" => "range" }))
+            .expect("probe the unsigned grouped cell patch");
+        let charge = probe.diagnostics().snapshot_bytes();
+        assert!(
+            charge > 0,
+            "grouped cell patches must retain their native proof"
+        );
+        let exact = SemanticLimits::builder()
+            .max_snapshot_bytes(charge)
+            .expect("exact grouped snapshot limit")
+            .build()
+            .expect("exact grouped semantic limits");
+        open_owner(&bytes, eager)
+            .edit_with_options(EditOptions::new().semantic_limits(exact), |edit| {
+                edit.set("Data!A1:B1", props! { "value" => "range" })
+            })
+            .expect("the exact unsigned grouped proof budget must fit");
+    }
+}
+
+#[test]
 fn worksheet_name_transactions_replay_inverse_and_collapse_noops() {
     let bytes = fixture();
 

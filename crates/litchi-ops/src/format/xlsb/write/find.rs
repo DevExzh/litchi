@@ -19,8 +19,8 @@ use super::super::node::{Grid, Item, Node};
 use super::super::owner::SheetHandle;
 use super::super::{Nav, Xlsb};
 use super::{
-    Commit, NativeCellOptions, NativeScalar, Reference, TransferLimits, caller_value_error,
-    cell_semantic_charge, native_error, package_from_editor, snapshot_limit,
+    Commit, NativeCellOptions, NativeScalar, Reference, caller_value_error, cell_snapshot_budget,
+    cell_transfer_limits, native_error, package_from_editor,
 };
 use crate::error::{Code, Error, Result};
 use crate::find::Spec;
@@ -224,19 +224,8 @@ fn commit(
             change.text,
         ));
     }
-    let semantic_charge = cell_semantic_charge(by_sheet.values().map(Vec::len).sum(), limits)?;
-    let image_budget = limits
-        .max_snapshot_bytes()
-        .checked_sub(semantic_charge)
-        .filter(|budget| *budget > 0)
-        .ok_or_else(|| {
-            snapshot_limit(
-                semantic_charge.saturating_add(1),
-                limits.max_snapshot_bytes(),
-            )
-        })?;
-    let native_limits =
-        TransferLimits::new(image_budget, limits.max_expanded_targets(), 1, image_budget);
+    let mut remaining_snapshot = cell_snapshot_budget(limits.max_snapshot_bytes())?;
+    let canonical_limits = cell_transfer_limits(remaining_snapshot, limits)?;
     let canonical_sheet = match by_sheet.keys().next().copied() {
         Some(sheet) => Some(sheet),
         None => first_worksheet(file)?,
@@ -244,6 +233,7 @@ fn commit(
     let mut package = package;
     let mut patches = Vec::new();
     for (sheet, assignments) in by_sheet {
+        let native_limits = cell_transfer_limits(remaining_snapshot, limits)?;
         let mut edit = package
             .edit_cell_values_with_options(
                 NativeSelector::from(sheet),
@@ -261,6 +251,17 @@ fn commit(
                 .map_err(|error| caller_value_error(error, "value"))?;
         }
         let (next, patch) = edit.commit().map_err(native_error)?.into_parts();
+        let retained = patch.retained_bytes();
+        if retained > remaining_snapshot {
+            let consumed = limits
+                .max_snapshot_bytes()
+                .saturating_sub(remaining_snapshot);
+            return Err(super::snapshot_limit(
+                consumed.saturating_add(retained),
+                limits.max_snapshot_bytes(),
+            ));
+        }
+        remaining_snapshot -= retained;
         package = next;
         patches.push(patch);
     }
@@ -275,7 +276,7 @@ fn commit(
         let edit = package
             .edit_cell_values_with_options(
                 NativeSelector::from(canonical_sheet),
-                NativeCellOptions::new().transfer_limits(native_limits),
+                NativeCellOptions::new().transfer_limits(canonical_limits),
             )
             .map_err(native_error)?;
         let Some(edit) = edit else {
@@ -294,7 +295,7 @@ fn commit(
         file,
         package,
         patches,
-        (canonical_sheet, native_limits),
+        (canonical_sheet, canonical_limits),
         limits.max_snapshot_bytes(),
         authored_operations,
     )?;
