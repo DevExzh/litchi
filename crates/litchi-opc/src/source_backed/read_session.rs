@@ -100,7 +100,9 @@ impl<'package> PartReadSession<'package> {
 )]
 mod tests {
     use super::{OpcError, SourceBackedPackage};
-    use crate::{OpcOperationAccounting, PackURI, SourceLimits};
+    use crate::{
+        OpcOperationAccounting, PackURI, SourceCacheLimits, SourceLimits, SourceReadPolicy,
+    };
     use litchi_core::{
         Budget, CancellationSource, ExecutionContext, ExecutionError, ExecutionLimits, Limits,
         ReadAt, Resource, SourceVersion,
@@ -359,7 +361,7 @@ mod tests {
         let package = SourceBackedPackage::from_vec(
             mixed_archive(),
             SourceLimits::default(),
-            crate::SourceCacheLimits::default(),
+            SourceCacheLimits::default(),
             None,
         )
         .unwrap();

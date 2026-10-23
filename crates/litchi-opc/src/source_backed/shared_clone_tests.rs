@@ -15,6 +15,7 @@
 )]
 
 use super::*;
+use crate::SourceCacheLimits;
 use litchi_core::{Budget, CancellationSource, ExecutionLimits, Limits};
 use soapberry_zip::office::StreamingArchiveWriter;
 use std::num::{NonZeroU64, NonZeroUsize};
@@ -159,7 +160,7 @@ fn owned_ingress_clone_retains_the_shared_fingerprint_after_original_drop() {
     let original = SourceBackedPackage::from_vec(
         package_bytes(3, 2 * 1024),
         SourceLimits::default(),
-        crate::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .unwrap();

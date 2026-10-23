@@ -614,7 +614,7 @@ mod physical_part_tests {
         reason = "test assertions panic on failure by design"
     )]
     use super::PackageReader;
-    use crate::{BlobPart, OpcPackage, PackURI, PackageWriter};
+    use crate::{BlobPart, OpcPackage, PackURI, PackageWriter, SourceLimits};
     use std::sync::Arc;
 
     const ORPHAN_PART_NAME: &str = "/custom/orphan.xml";

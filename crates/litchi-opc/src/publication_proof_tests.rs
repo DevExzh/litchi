@@ -16,6 +16,7 @@
 
 use super::*;
 use crate::source_backed::SourceBackedPackage;
+use crate::{SourceCacheLimits, SourceReadPolicy};
 use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionError, ExecutionLimits, Limits,
     OwnedSource, ReadAt, Resource, SourceVersion,
@@ -362,7 +363,7 @@ fn content_type_and_lineage_guards_precede_proof_reuse() {
     foreign.source_lineage = SourceBackedPackage::from_vec(
         archive_bytes(SOURCE_XML),
         SourceLimits::default(),
-        crate::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .expect("foreign package must open")
@@ -454,14 +455,14 @@ fn destination_identity_is_checked_for_replacements() {
     let first = SourceBackedPackage::from_vec(
         archive_bytes(SOURCE_XML),
         SourceLimits::default(),
-        crate::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .expect("first package must open");
     let second = SourceBackedPackage::from_vec(
         archive_bytes(SOURCE_XML),
         SourceLimits::default(),
-        crate::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .expect("second package must open");
@@ -520,7 +521,7 @@ fn range_proofs_check_content_type_as_well_as_revision() {
     let package = SourceBackedPackage::from_vec(
         archive_bytes(SOURCE_XML),
         SourceLimits::default(),
-        crate::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .unwrap();

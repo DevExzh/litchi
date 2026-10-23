@@ -16077,6 +16077,7 @@ mod tests {
     )]
 
     use super::*;
+    use crate::{SourceCacheLimits, SourceReadPolicy};
     use std::collections::HashMap;
     use std::num::{NonZeroU64, NonZeroUsize};
     use std::sync::Barrier;
@@ -17003,7 +17004,7 @@ mod tests {
         let package = SourceBackedPackage::from_vec(
             archive_bytes(root_relationships(), b"<document/>", true),
             SourceLimits::default(),
-            crate::SourceCacheLimits::default(),
+            SourceCacheLimits::default(),
             None,
         )
         .unwrap();
@@ -17145,7 +17146,7 @@ mod tests {
         let package = SourceBackedPackage::from_vec(
             source_bytes.clone(),
             SourceLimits::default(),
-            crate::SourceCacheLimits::default(),
+            SourceCacheLimits::default(),
             None,
         )
         .unwrap();
@@ -17195,7 +17196,7 @@ mod tests {
         let reopened = SourceBackedPackage::from_vec(
             output,
             SourceLimits::default(),
-            crate::SourceCacheLimits::default(),
+            SourceCacheLimits::default(),
             None,
         )
         .unwrap();
@@ -17261,7 +17262,7 @@ mod tests {
         let package = SourceBackedPackage::from_vec(
             source_bytes,
             SourceLimits::default(),
-            crate::SourceCacheLimits::default(),
+            SourceCacheLimits::default(),
             None,
         )
         .unwrap();
@@ -17288,7 +17289,7 @@ mod tests {
         let reopened = SourceBackedPackage::from_vec(
             output,
             SourceLimits::default(),
-            crate::SourceCacheLimits::default(),
+            SourceCacheLimits::default(),
             None,
         )
         .unwrap();
@@ -17301,7 +17302,7 @@ mod tests {
         let package = SourceBackedPackage::from_vec(
             source_bytes.clone(),
             SourceLimits::default(),
-            crate::SourceCacheLimits::default(),
+            SourceCacheLimits::default(),
             None,
         )
         .unwrap();
@@ -17449,7 +17450,7 @@ mod tests {
         SourceBackedPackage::from_vec(
             source_bytes.clone(),
             SourceLimits::default(),
-            crate::SourceCacheLimits::default(),
+            SourceCacheLimits::default(),
             None,
         )
         .unwrap()
@@ -17464,7 +17465,7 @@ mod tests {
         SourceBackedPackage::from_vec(
             source_bytes,
             SourceLimits::default(),
-            crate::SourceCacheLimits::default(),
+            SourceCacheLimits::default(),
             None,
         )
         .unwrap()
@@ -17527,7 +17528,7 @@ mod tests {
         SourceBackedPackage::from_vec(
             archive_bytes(root_relationships(), original.as_bytes(), false),
             SourceLimits::default(),
-            crate::SourceCacheLimits::default(),
+            SourceCacheLimits::default(),
             None,
         )
         .unwrap()
@@ -17584,7 +17585,7 @@ mod tests {
             SourceBackedPackage::from_vec(
                 archive_bytes(root_relationships(), original.as_bytes(), false,),
                 SourceLimits::default(),
-                crate::SourceCacheLimits::default(),
+                SourceCacheLimits::default(),
                 None
             )
             .unwrap()
@@ -17610,7 +17611,7 @@ mod tests {
         let package = SourceBackedPackage::from_vec(
             archive_bytes(root_relationships(), document.as_bytes(), false),
             SourceLimits::default(),
-            crate::SourceCacheLimits::default(),
+            SourceCacheLimits::default(),
             None,
         )
         .unwrap();
@@ -17690,7 +17691,7 @@ mod tests {
         let package = SourceBackedPackage::from_vec(
             archive_bytes(root_relationships(), b"<before/>", false),
             SourceLimits::default(),
-            crate::SourceCacheLimits::default(),
+            SourceCacheLimits::default(),
             None,
         )
         .unwrap();
@@ -17776,7 +17777,7 @@ mod tests {
         SourceBackedPackage::from_vec(
             archive_bytes(root_relationships(), b"<before/>", false),
             SourceLimits::default(),
-            crate::SourceCacheLimits::default(),
+            SourceCacheLimits::default(),
             None,
         )
         .unwrap()
@@ -17962,7 +17963,7 @@ mod tests {
         let reopened = SourceBackedPackage::from_vec(
             output,
             SourceLimits::default(),
-            crate::SourceCacheLimits::default(),
+            SourceCacheLimits::default(),
             None,
         )
         .expect("reopen boundary output");
@@ -23828,7 +23829,7 @@ mod tests {
         let package = SourceBackedPackage::from_vec(
             mixed_compression_archive(),
             SourceLimits::default(),
-            crate::SourceCacheLimits::default(),
+            SourceCacheLimits::default(),
             None,
         )
         .unwrap();
@@ -25536,7 +25537,7 @@ mod tests {
         let mut package = SourceBackedPackage::from_vec(
             archive_bytes(root_relationships(), b"<before/>", true),
             SourceLimits::default(),
-            crate::SourceCacheLimits::default(),
+            SourceCacheLimits::default(),
             None,
         )
         .unwrap();
@@ -27059,8 +27060,8 @@ mod selected_part_stream_api_tests {
 mod callback_scoped_verified_reader_tests {
     use super::{
         OpcError, OpcOperationAccounting, OpcPackage, OwnedSourceFingerprintMemo, Resource,
-        SourceArtifactRestoreProof, SourceBackedPackage, SourceLimits, SourceVersion,
-        VerifiedDecodedReaderError,
+        SourceArtifactRestoreProof, SourceBackedPackage, SourceCacheLimits, SourceLimits,
+        SourceReadPolicy, SourceVersion, VerifiedDecodedReaderError,
     };
     use litchi_core::{
         Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits, OwnedSource, ReadAt,
@@ -27094,7 +27095,7 @@ mod callback_scoped_verified_reader_tests {
         SourceBackedPackage::from_vec(
             archive_bytes(PAYLOAD),
             SourceLimits::default(),
-            crate::SourceCacheLimits::default(),
+            SourceCacheLimits::default(),
             None,
         )
         .unwrap()
@@ -27144,7 +27145,7 @@ mod callback_scoped_verified_reader_tests {
         let reader_package = SourceBackedPackage::from_reader(
             Cursor::new(archive_bytes(PAYLOAD)),
             SourceLimits::default(),
-            crate::SourceCacheLimits::default(),
+            SourceCacheLimits::default(),
             None,
         )
         .unwrap();
@@ -27210,7 +27211,7 @@ mod callback_scoped_verified_reader_tests {
         let package = SourceBackedPackage::from_vec(
             source.clone(),
             SourceLimits::default(),
-            crate::SourceCacheLimits::default(),
+            SourceCacheLimits::default(),
             None,
         )
         .unwrap();
@@ -27237,7 +27238,7 @@ mod callback_scoped_verified_reader_tests {
         let changed_package = SourceBackedPackage::from_vec(
             changed,
             SourceLimits::default(),
-            crate::SourceCacheLimits::default(),
+            SourceCacheLimits::default(),
             None,
         )
         .unwrap();
@@ -27262,12 +27263,7 @@ mod callback_scoped_verified_reader_tests {
             .build()
             .unwrap();
         assert!(matches!(
-            SourceBackedPackage::from_vec(
-                source,
-                limited,
-                crate::SourceCacheLimits::default(),
-                None
-            ),
+            SourceBackedPackage::from_vec(source, limited, SourceCacheLimits::default(), None),
             Err(OpcError::Limit {
                 kind: super::SourceLimitKind::InputBytes,
                 ..

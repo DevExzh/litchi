@@ -476,6 +476,12 @@ impl<'source> RelationshipsEditPlan<'source> {
 }
 
 impl OwnedRelationships {
+    /// Re-admit this source-bound relationship member under a recipient's
+    /// limits without exposing the retained XML token to the parent package.
+    pub(super) fn preflight_under(&self, limits: SourceLimits) -> Result<()> {
+        self.xml.preflight_under(limits)
+    }
+
     /// Plan source-preserving relationship additions and removals in one pass.
     ///
     /// Existing comments, declarations, namespace aliases, attribute order,
@@ -1908,6 +1914,7 @@ mod tests {
         reason = "test assertions panic on failure"
     )]
     use super::*;
+    use crate::packuri::PACKAGE_URI;
     use crate::{BlobPart, PackageWriter};
 
     const XML: &[u8] = br#"<?xml version='1.0'?>
