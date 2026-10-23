@@ -99,7 +99,7 @@ FIXTURE_GENERATOR_OUTER_TIMEOUT_S = (
 SCHEMA = "litchi.iwa.native-qualification.v4"
 COMPARISON = "integrated-route"
 SOURCE_DELTA_SCHEMA = "litchi.iwa.source-delta.v1"
-LOCK_DELTA_SCHEMA = "litchi.iwa.lock-delta.v2"
+LOCK_DELTA_SCHEMA = "litchi.iwa.lock-delta.v3"
 REGISTRY_SOURCE = "registry+https://github.com/rust-lang/crates.io-index"
 REVIEWED_REGISTRY_ADDITIONS = {
     "constructor": [
@@ -1029,6 +1029,12 @@ def _registry_comparison(
     }
 
 
+def _registry_identity(row: Mapping[str, Any]) -> tuple[str, str, str, str]:
+    """Return the complete immutable identity of a registry package row."""
+
+    return (row["name"], row["version"], row["source"], row["checksum"])
+
+
 def lock_delta_manifest(
     family: str,
     base_source: Path,
@@ -1060,44 +1066,49 @@ def lock_delta_manifest(
     reviewed_additions = REVIEWED_REGISTRY_ADDITIONS[family]
     if registry_delta["added"] != reviewed_additions:
         raise QualificationError("Cargo.lock additions do not match reviewed registry identities")
-    seed_identities = {
-        (row["name"], row["version"], row["source"], row["checksum"])
-        for row in seed_registry
-    }
+    seed_identities = {_registry_identity(row) for row in seed_registry}
     for row in reviewed_additions:
-        identity = (row["name"], row["version"], row["source"], row["checksum"])
-        if identity not in seed_identities:
+        if _registry_identity(row) not in seed_identities:
             raise QualificationError("reviewed registry addition is absent from the seed lock")
+    missing_common_seed = [
+        row for row in registry_delta["common"] if _registry_identity(row) not in seed_identities
+    ]
+    if missing_common_seed:
+        raise QualificationError(
+            "common Cargo.lock registry identities are absent from the pinned seed lock"
+        )
     package_names = set(source_dependencies["packages"])
-    seed_names = {row["name"] for row in seed_registry}
     base_edges = _dependency_edges(base_rows, package_names)
     candidate_edges = _dependency_edges(candidate_rows, package_names)
     if base_edges != source_dependencies["base_dependency_edges"]:
         raise QualificationError("baseline Cargo.lock dependency edges do not match its source manifest")
     if candidate_edges != source_dependencies["candidate_dependency_edges"]:
         raise QualificationError("candidate Cargo.lock dependency edges do not match its source manifest")
+    required_seed_rows: dict[str, list[dict[str, Any]]] = {}
     for label, edges, rows in (
         ("baseline", base_edges, base_rows),
         ("candidate", candidate_edges, candidate_rows),
     ):
         available_registry = {row["name"] for row in _registry_rows(rows)}
         required = {dependency for values in edges.values() for dependency in values}
-        missing_seed = sorted(
-            dependency
-            for dependency in required
-            if dependency not in package_names and dependency not in seed_names
-        )
-        if missing_seed:
-            raise QualificationError(
-                f"{label} source dependency is absent from the pinned seed lock: {missing_seed}"
-            )
+        required_registry = sorted(required - package_names)
         missing = sorted(
-            dependency
-            for dependency in required
-            if dependency not in package_names and dependency not in available_registry
+            dependency for dependency in required_registry if dependency not in available_registry
         )
         if missing:
             raise QualificationError(f"{label} lock lacks required dependency packages: {missing}")
+        endpoint_required_rows = sorted(
+            (row for row in _registry_rows(rows) if row["name"] in required_registry),
+            key=lambda row: (row["name"], row["version"], row["source"]),
+        )
+        missing_seed = [
+            row for row in endpoint_required_rows if _registry_identity(row) not in seed_identities
+        ]
+        if missing_seed:
+            raise QualificationError(
+                f"{label} required registry identities are absent from the pinned seed lock"
+            )
+        required_seed_rows[label] = endpoint_required_rows
     return {
         "schema": LOCK_DELTA_SCHEMA,
         "family": family,
@@ -1112,6 +1123,10 @@ def lock_delta_manifest(
             "seed_version": seed_version,
         },
         "registry": registry_delta,
+        "seed_registry": {
+            "common": registry_delta["common"],
+            "required": required_seed_rows,
+        },
         "local_edges": {"base": base_edges, "candidate": candidate_edges},
     }
 

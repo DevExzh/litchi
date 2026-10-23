@@ -273,6 +273,9 @@ class NativeQualificationTests(unittest.TestCase):
         omit_snap_edge: bool = False,
         omit_snap_registry: bool = False,
         duplicate_smallvec: bool = False,
+        snap_version: str = "1.1.2",
+        snap_source: str = RUNNER.REGISTRY_SOURCE,
+        snap_checksum: str = "a" * 64,
     ) -> None:
         dependencies = ["litchi-iwa-common"]
         if not omit_snap_edge:
@@ -301,9 +304,9 @@ class NativeQualificationTests(unittest.TestCase):
                 [
                     "[[package]]",
                     'name = "snap"',
-                    'version = "1.1.2"',
-                    'source = "registry+https://github.com/rust-lang/crates.io-index"',
-                    'checksum = "' + "a" * 64 + '"',
+                    f'version = "{snap_version}"',
+                    f'source = "{snap_source}"',
+                    f'checksum = "{snap_checksum}"',
                 ]
             )
         if owner:
@@ -358,14 +361,16 @@ class NativeQualificationTests(unittest.TestCase):
             )
         path.write_text("\n".join(rows) + "\n", encoding="utf-8")
 
-    def _write_seed_lock(self, path: Path) -> None:
+    def _write_seed_lock(
+        self, path: Path, *, snap_source: str = RUNNER.REGISTRY_SOURCE
+    ) -> None:
         checksum = RUNNER.REVIEWED_REGISTRY_ADDITIONS["constructor"][0]["checksum"]
         path.write_text(
             "version = 3\n\n"
             "[[package]]\n"
             'name = "snap"\n'
             'version = "1.1.2"\n'
-            'source = "registry+https://github.com/rust-lang/crates.io-index"\n'
+            f'source = "{snap_source}"\n'
             'checksum = "' + "a" * 64 + '"\n\n'
             "[[package]]\n"
             'name = "smallvec"\n'
@@ -403,6 +408,46 @@ class NativeQualificationTests(unittest.TestCase):
             candidate_lock,
             seed_lock,
         )
+
+        # A row shared by both endpoints is still bound to the pinned seed;
+        # comparing endpoints alone would accept this changed version.
+        shared_bad_base = self.directory / "constructor-shared-bad-base.lock"
+        shared_bad_candidate = self.directory / "constructor-shared-bad-candidate.lock"
+        self._write_dependency_lock(
+            shared_bad_base,
+            candidate=False,
+            snap_version="9.9.9",
+            snap_checksum="b" * 64,
+        )
+        self._write_dependency_lock(
+            shared_bad_candidate,
+            candidate=True,
+            snap_version="9.9.9",
+            snap_checksum="b" * 64,
+        )
+        with self.assertRaisesRegex(RUNNER.QualificationError, "common"):
+            RUNNER.lock_delta_manifest(
+                "constructor",
+                base_source,
+                candidate_source,
+                shared_bad_base,
+                shared_bad_candidate,
+                seed_lock,
+            )
+
+        # A seed with the right name/version but a different registry source
+        # is not an equivalent pinned identity.
+        evil_seed = self.directory / "evil-seed.lock"
+        self._write_seed_lock(evil_seed, snap_source="registry+https://evil.invalid/index")
+        with self.assertRaisesRegex(RUNNER.QualificationError, "common"):
+            RUNNER.lock_delta_manifest(
+                "constructor",
+                base_source,
+                candidate_source,
+                base_lock,
+                candidate_lock,
+                evil_seed,
+            )
 
         tampered = copy.deepcopy(delta)
         tampered["registry"]["common"][0]["checksum"] = "0" * 64

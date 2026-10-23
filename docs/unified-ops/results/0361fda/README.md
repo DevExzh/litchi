@@ -21,9 +21,11 @@ candidate commit ids plus every changed, added, or removed archived source
 file with its byte count and SHA-256. Build admission verifies this delta
 before starting Cargo. Each endpoint then generates and retains its own exact
 offline lockfile from the recorded seed; before release builds, the runner
-requires identical common registry names, versions, sources, and checksums and
-requires every added/removed registry package and local edge/feature to match
-the selected source dependency delta. The required registry edges and complete
+requires every common registry identity, and every registry identity required
+by the selected source closure, to match the pinned seed by name, version,
+source, and checksum. It also requires identical endpoint common identities
+and every added/removed registry package and local edge/feature to match the
+selected source dependency delta. The required registry edges and complete
 selected local closure must be present in both endpoint locks and the pinned
 seed; the reviewed `smallvec` addition is pinned to version 1.16.3 and its
 recorded crates.io checksum. Validation, timing, and collection
