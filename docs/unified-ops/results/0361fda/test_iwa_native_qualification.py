@@ -7,6 +7,7 @@ checkout.
 
 from __future__ import annotations
 
+import copy
 import importlib.util
 import json
 from pathlib import Path
@@ -177,21 +178,64 @@ class NativeQualificationTests(unittest.TestCase):
         args.blocks = RUNNER.FIXED_BLOCKS
         self.assertTrue(RUNNER._fixed_protocol(protocol | {"blocks": RUNNER.FIXED_BLOCKS}, "constructor"))
 
-    def test_unapproved_candidate_source_addition_is_rejected(self) -> None:
-        with self.assertRaises(RUNNER.QualificationError):
-            RUNNER._verify_source_sets(
-                {"shared.rs": "a"},
-                {"shared.rs": "a", "unapproved.txt": "b"},
-                "constructor",
-            )
-        RUNNER._verify_source_sets(
-            {"crates/litchi-iwa-core/old.rs": "a"},
-            {
-                "crates/litchi-iwa-core/old.rs": "b",
-                "crates/litchi-iwa-core/new.rs": "c",
-            },
-            "constructor",
+    def test_integrated_source_delta_records_full_nonempty_change_set(self) -> None:
+        base = {
+            "crates/litchi-iwa-core/same.rs": {"bytes": 5, "sha256": "a" * 64},
+            "crates/litchi-opc/changed.rs": {"bytes": 7, "sha256": "b" * 64},
+            "crates/litchi-pages/removed.rs": {"bytes": 8, "sha256": "c" * 64},
+        }
+        candidate = {
+            "crates/litchi-iwa-core/same.rs": {"bytes": 5, "sha256": "a" * 64},
+            "crates/litchi-opc/changed.rs": {"bytes": 9, "sha256": "d" * 64},
+            "crates/litchi-pages/added.rs": {"bytes": 6, "sha256": "e" * 64},
+        }
+        base_commit = "1" * 40
+        candidate_commit = "2" * 40
+        delta = RUNNER.source_delta(base, candidate, base_commit, candidate_commit)
+        self.assertEqual(delta["comparison"], "integrated-route")
+        self.assertEqual(delta["base_commit"], base_commit)
+        self.assertEqual(delta["candidate_commit"], candidate_commit)
+        self.assertEqual(len(delta["changed"]), 1)
+        self.assertEqual(len(delta["base_only"]), 1)
+        self.assertEqual(len(delta["candidate_only"]), 1)
+        RUNNER.verify_source_delta(
+            delta, {"base": base, "candidate": candidate}, base_commit, candidate_commit
         )
+
+    def test_integrated_source_delta_rejects_ref_and_artifact_tampering(self) -> None:
+        base = {"crates/shared.rs": {"bytes": 5, "sha256": "a" * 64}}
+        candidate = {"crates/shared.rs": {"bytes": 6, "sha256": "b" * 64}}
+        delta = RUNNER.source_delta(base, candidate, "1" * 40, "2" * 40)
+        tampered_deltas = []
+        tampered = copy.deepcopy(delta)
+        tampered["base_commit"] = "3" * 40
+        tampered_deltas.append(tampered)
+        tampered = copy.deepcopy(delta)
+        tampered["changed"][0]["base"]["sha256"] = "0" * 64
+        tampered_deltas.append(tampered)
+        tampered = copy.deepcopy(delta)
+        tampered["changed"][0]["candidate"]["bytes"] = 99
+        tampered_deltas.append(tampered)
+        tampered = copy.deepcopy(delta)
+        tampered["changed"].append(
+            {
+                "path": "extra.rs",
+                "base": base["crates/shared.rs"],
+                "candidate": candidate["crates/shared.rs"],
+            }
+        )
+        tampered_deltas.append(tampered)
+        for tampered in tampered_deltas:
+            with self.assertRaises(RUNNER.QualificationError):
+                RUNNER.verify_source_delta(
+                    tampered, {"base": base, "candidate": candidate}, "1" * 40, "2" * 40
+                )
+        tampered_maps = copy.deepcopy({"base": base, "candidate": candidate})
+        tampered_maps["candidate"]["crates/shared.rs"]["sha256"] = "0" * 64
+        with self.assertRaises(RUNNER.QualificationError):
+            RUNNER.verify_source_delta(
+                delta, tampered_maps, "1" * 40, "2" * 40
+            )
 
     def test_validation_report_requires_all_routes_and_typed_boundaries(self) -> None:
         value = {

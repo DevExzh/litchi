@@ -15,8 +15,13 @@ The probes do all semantic and byte checks before starting their timed loops:
 - every timed result carries source/output SHA-256 identities and a semantic
   checksum.
 
-`iwa_native_qualification.py` snapshots both source commits, freezes the
-shared source and lockfile identities, records toolchain and binary hashes,
+`iwa_native_qualification.py` snapshots both source commits and records an
+`integrated-route` source delta containing the full resolved baseline and
+candidate commit ids plus every changed, added, or removed archived source
+file with its byte count and SHA-256. Build admission verifies this delta
+before starting Cargo; validation, timing, and collection recompute it from
+the retained source manifests. There is no shared-prefix exception. The
+runner also freezes the lockfile identities, records toolchain and binary hashes,
 requires native and allocation validation for both endpoints, and then runs
 the fixed five-block ABBA protocol (two warmups, 500 ms calibration target,
 150 ms sample minimum, and a 120 s child bound). A build/profiler/benchmark
@@ -67,6 +72,17 @@ The runner checks those identities before validation and again before timing,
 and retains/rechecks every build and validation command receipt plus both
 source snapshots. `build --fixtures` is intentionally not accepted: fixtures
 are an input to validation and timing, never a hidden build dependency.
+
+After a complete native attempt, collect the handoff packet with:
+
+```sh
+python3 docs/unified-ops/results/0361fda/iwa_native_qualification.py \
+  collect owner /outside/iwa-owner --attempt native-a1 \
+  --out /outside/iwa-owner/collection.json
+```
+
+Collection verifies the same source delta, source refs, build and validation
+identities retained by the run manifest.
 
 Run the Python unit tests without Cargo:
 
