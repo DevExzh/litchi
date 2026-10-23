@@ -552,7 +552,8 @@ pub fn rebuild_package_with_xml_splices(
         }
     }
 
-    let mut writer = PackageWriter::new_bounded(output_limit);
+    let mut writer =
+        PackageWriter::new_bounded(output_limit, crate::core::StreamingArchiveLimits::default());
     writer.set_mimetype(&source.mimetype()?)?;
     for publication in publications {
         publication.publish(&mut writer)?;

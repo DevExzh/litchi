@@ -48,7 +48,7 @@ fn fixture(slides: usize, boxes_per_slide: usize, options: FixtureOptions) -> Ve
     }
     content.push_str("</office:presentation></office:body></office:document-content>");
 
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(MIME).unwrap();
     writer.add_file("content.xml", content.as_bytes()).unwrap();
     writer
@@ -77,7 +77,7 @@ fn fixture(slides: usize, boxes_per_slide: usize, options: FixtureOptions) -> Ve
 }
 
 fn content_fixture(content: &str) -> Vec<u8> {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(MIME).unwrap();
     writer.add_file("content.xml", content.as_bytes()).unwrap();
     writer.finish_to_bytes().unwrap()
@@ -457,7 +457,7 @@ fn protected_and_opaque_selected_owners_allow_noops_but_refuse_changes() {
 
 #[test]
 fn signed_encrypted_and_malformed_sources_fail_closed() {
-    let mut signed = PackageWriter::new();
+    let mut signed = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     signed.set_mimetype(MIME).unwrap();
     signed
         .add_file(
@@ -502,7 +502,7 @@ fn signed_encrypted_and_malformed_sources_fail_closed() {
     let package = OwnedPackage::from_bytes(malformed).unwrap();
     let content = String::from_utf8(package.get_file("content.xml").unwrap()).unwrap();
     let malformed_content = format!("<!DOCTYPE office:document-content>{content}");
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(MIME).unwrap();
     assert!(
         writer

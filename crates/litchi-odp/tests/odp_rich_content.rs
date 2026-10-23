@@ -436,7 +436,7 @@ fn source_backed_story_table_and_form_models_edit_without_flattening() {
 #[test]
 fn producer_named_drawing_resources_transfer_with_their_payload() {
     const CONTENT: &[u8] = br#"<?xml version="1.0"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:xlink="http://www.w3.org/1999/xlink"><office:automatic-styles><style:style style:name="ProducerStyle" style:family="graphic"><style:graphic-properties draw:fill="bitmap" draw:fill-image-name="ProducerImage"/></style:style><draw:fill-image draw:name="ProducerImage" xlink:type="simple" xlink:href="Pictures/producer.png"/></office:automatic-styles><office:body><office:presentation><draw:page draw:name="Source"><draw:frame draw:name="Producer Box" draw:style-name="ProducerStyle"><draw:text-box><text:p>producer closure</text:p></draw:text-box></draw:frame></draw:page></office:presentation></office:body></office:document-content>"#;
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer
         .set_mimetype("application/vnd.oasis.opendocument.presentation")
         .unwrap();
@@ -614,7 +614,7 @@ fn content_only_text_box_edit_raw_preserves_unchanged_media_and_metadata() {
     builder.add_slide_with_title("Source", "Body").unwrap();
     let base = OwnedPackage::from_bytes(builder.build().unwrap().to_bytes().unwrap()).unwrap();
     let package = base.package().unwrap();
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(MIME).unwrap();
     for path in package.files().unwrap() {
         if matches!(path.as_str(), "mimetype" | "META-INF/manifest.xml") || path.ends_with('/') {

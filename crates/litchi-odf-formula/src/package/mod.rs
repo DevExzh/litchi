@@ -51,7 +51,8 @@ impl Archive {
         } else {
             Flavor::Formula
         };
-        let mut writer = PackageWriter::new();
+        let mut writer =
+            PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
         writer.set_mimetype(flavor.mimetype())?;
         writer.add_file(ODF_CONTENT, content)?;
         Self::from_bytes(writer.finish_to_bytes()?)

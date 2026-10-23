@@ -11,7 +11,7 @@ const CONTENT: &str = r#"<?xml version="1.0"?><office:document-content xmlns:off
 
 #[test]
 fn applets_and_floating_frames_are_bounded_inert_objects() {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer
         .set_mimetype("application/vnd.oasis.opendocument.presentation")
         .unwrap();

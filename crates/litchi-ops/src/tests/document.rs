@@ -1792,7 +1792,9 @@ mod odt {
             br#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"><office:body><office:presentation/></office:body></office:document-content>"#.as_slice(),
             litchi_core::FileFormat::Odp,
         );
-        let mut writer = litchi_odf_common::core::PackageWriter::new();
+        let mut writer = litchi_odf_common::core::PackageWriter::new(
+            litchi_odf_common::core::StreamingArchiveLimits::default(),
+        );
         writer.set_mimetype(mimetype).unwrap();
         writer
             .add_file(litchi_odf_common::constants::ODF_CONTENT, body)

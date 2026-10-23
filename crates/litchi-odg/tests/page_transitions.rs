@@ -22,7 +22,7 @@ const STYLES_NAMED: &str = r##"<?xml version="1.0" encoding="UTF-8"?><office:doc
 const STYLES_PREFIXED_INHERITED: &str = r##"<?xml version="1.0" encoding="UTF-8"?><office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:p="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0" xmlns:s="urn:oasis:names:tc:opendocument:xmlns:smil-compatible:1.0" office:version="1.4"><office:styles><style:style style:name="parent" style:family="drawing-page"><style:drawing-page-properties p:transition-speed="slow" s:type="fade"/></style:style><style:style style:name="dp1" style:family="drawing-page" style:parent-style-name="parent"><style:drawing-page-properties p:transition-type="manual"/></style:style></office:styles></office:document-styles>"##;
 
 fn package(content: &str, styles: Option<&str>) -> Vec<u8> {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer
         .set_mimetype("application/vnd.oasis.opendocument.graphics")
         .unwrap();

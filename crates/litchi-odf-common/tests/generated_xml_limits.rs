@@ -9,7 +9,7 @@
 use litchi_core::Error;
 use litchi_odf_common::core::{
     GeneratedXmlEnvelope, GeneratedXmlLimitResource as Resource, GeneratedXmlLimits,
-    GeneratedXmlReport, PackageWriter, PackageWriterError,
+    GeneratedXmlReport, PackageWriter, PackageWriterError, StreamingArchiveLimits,
 };
 use soapberry_zip::office::ArchiveReader;
 use std::cell::{Cell, RefCell};
@@ -42,7 +42,10 @@ fn publish(
     fragments: Vec<&[u8]>,
 ) -> Result<(Vec<u8>, GeneratedXmlReport), (PackageWriterError, u64, usize)> {
     let accepted = Rc::new(RefCell::new(Vec::new()));
-    let mut writer = PackageWriter::with_writer(SharedSink(Rc::clone(&accepted)));
+    let mut writer = PackageWriter::with_writer(
+        SharedSink(Rc::clone(&accepted)),
+        StreamingArchiveLimits::default(),
+    );
     writer
         .set_mimetype_streaming(MIME)
         .expect("fixed MIME preflight");

@@ -12,7 +12,7 @@ const STYLE: &str = "urn:oasis:names:tc:opendocument:xmlns:style:1.0";
 const SVG: &str = "urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0";
 
 fn package(content: &str, styles: &str) -> Vec<u8> {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer
         .set_mimetype("application/vnd.oasis.opendocument.presentation")
         .unwrap();

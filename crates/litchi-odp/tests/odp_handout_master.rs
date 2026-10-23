@@ -20,7 +20,8 @@ fn package(styles: &str) -> Vec<u8> {
     let content = format!(
         r#"<office:document-content xmlns:office="{OFFICE}" xmlns:draw="{DRAW}"><office:automatic-styles/><office:body><office:presentation><draw:page draw:name="Slide1"/></office:presentation></office:body></office:document-content>"#
     );
-    let mut writer = litchi_odp::core::PackageWriter::new();
+    let mut writer =
+        litchi_odp::core::PackageWriter::new(litchi_odp::core::StreamingArchiveLimits::default());
     writer.set_mimetype(constants::ODF_PRESENTATION).unwrap();
     writer.add_file("content.xml", content.as_bytes()).unwrap();
     writer.add_file("styles.xml", styles.as_bytes()).unwrap();

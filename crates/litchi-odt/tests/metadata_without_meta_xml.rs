@@ -8,7 +8,7 @@ use litchi_odt::metadata::Field;
 const MIMETYPE: &str = "application/vnd.oasis.opendocument.text";
 
 fn package_without_meta() -> Package {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(MIMETYPE).unwrap();
     writer
         .add_file(

@@ -58,7 +58,8 @@ fn package(content: &str, auxiliary: Option<(&str, &[u8])>) -> TestResult<Vec<u8
 }
 
 fn encrypted_envelope(content: &str) -> TestResult<Vec<u8>> {
-    let mut encrypted_writer = PackageWriter::new();
+    let mut encrypted_writer =
+        PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     encrypted_writer.set_mimetype("application/vnd.oasis.opendocument.chart")?;
     encrypted_writer.set_encryption("password", Profile::compatible())?;
     encrypted_writer.add_file("content.xml", content.as_bytes())?;

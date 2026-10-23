@@ -67,7 +67,7 @@ fn mutable_metadata_is_deterministic_and_preserves_source_timestamps() {
     .unwrap();
 
     const SOURCE_META: &str = r#"<?xml version="1.0"?><office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0"><office:meta><meta:generator>Producer/1</meta:generator><dc:date>2024-01-02T03:04:05Z</dc:date></office:meta></office:document-meta>"#;
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer
         .set_mimetype("application/vnd.oasis.opendocument.text")
         .unwrap();
@@ -364,7 +364,7 @@ fn mutable_document_can_add_headings_and_lists() {
 
 #[test]
 fn read_modify_write_preserves_auxiliary_package_parts_and_media_types() {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer
         .set_mimetype("application/vnd.oasis.opendocument.text")
         .unwrap();
@@ -479,7 +479,7 @@ fn mutable_document_round_trips_structured_note_authoring() {
 fn edits_master_page_regions_through_the_public_mutable_document_api() {
     const STYLES: &str = r#"<?xml version="1.0"?><office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0"><office:styles><style:style style:name="preserved"/></office:styles><office:automatic-styles><style:page-layout style:name="pm1" style:page-usage="left"><style:page-layout-properties fo:page-width="21cm" fo:page-height="29.7cm"/></style:page-layout></office:automatic-styles><office:master-styles><style:master-page style:name="Standard" style:page-layout-name="pm1"><style:header><text:p>Old header</text:p></style:header><style:footer><text:p>Old footer</text:p></style:footer></style:master-page></office:master-styles></office:document-styles>"#;
 
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer
         .set_mimetype("application/vnd.oasis.opendocument.text")
         .unwrap();

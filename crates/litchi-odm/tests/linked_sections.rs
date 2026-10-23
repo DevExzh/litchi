@@ -20,7 +20,7 @@ const CONTENT: &str = concat!(
 );
 
 fn package(content: &str, extra_path: Option<&str>) -> Vec<u8> {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(MIME).unwrap();
     writer.add_file("content.xml", content.as_bytes()).unwrap();
     if let Some(path) = extra_path {
@@ -189,7 +189,7 @@ fn linked_section_noop_and_refusals_are_typed() {
 #[test]
 fn authored_package_writer_rejects_pretty_content_xml() {
     let noncompact = CONTENT.replace("<office:body>", "<office:body>\n");
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(MIME).unwrap();
     assert!(
         writer

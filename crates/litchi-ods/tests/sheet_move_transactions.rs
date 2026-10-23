@@ -32,7 +32,7 @@ fn table(name: &str, token: &str) -> String {
 }
 
 fn package(content_xml: &str, additions: &[(&str, &[u8], &str)]) -> Vec<u8> {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer
         .set_mimetype(constants::ODF_SPREADSHEET)
         .expect("fixed ODS mimetype");

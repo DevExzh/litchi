@@ -118,7 +118,8 @@ impl Builder {
     ) -> Result<Vec<u8>> {
         compact_xml::validate(self.content_xml.as_bytes(), compact_xml::Limits::default())?;
         crate::codec::validate(&self.content_xml)?;
-        let mut writer = PackageWriter::new();
+        let mut writer =
+            PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
         writer.set_mimetype(mimetype)?;
         if let Some(configured_signer) = signer {
             writer.set_document_signer(configured_signer)?;

@@ -7,7 +7,7 @@ const CHART: &str = r#"<?xml version="1.0"?><office:document-content xmlns:offic
 const REPLACEMENT: &str = r#"<?xml version="1.0"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:chart="urn:oasis:names:tc:opendocument:xmlns:chart:1.0"><office:body><office:chart><chart:chart chart:class="chart:line"><chart:plot-area/></chart:chart></office:chart></office:body></office:document-content>"#;
 
 fn package() -> Result<Vec<u8>> {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype("application/vnd.oasis.opendocument.spreadsheet")?;
     writer.add_file("content.xml", CONTENT.as_bytes())?;
     writer.add_manifest_directory("Object_1/", "application/vnd.oasis.opendocument.chart")?;

@@ -25,7 +25,7 @@ fn content(body: &str) -> String {
 }
 
 fn package(content_xml: &str, styles_xml: Option<&str>) -> Vec<u8> {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer
         .set_mimetype("application/vnd.oasis.opendocument.text")
         .unwrap();

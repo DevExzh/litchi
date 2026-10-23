@@ -132,7 +132,10 @@ fn package_content(
         compact_xml::validate(styles.as_bytes(), compact_limits)?;
         crate::codec::validate_styles(styles, limits)?;
     }
-    let mut writer = PackageWriter::new_bounded(limits.max_package_bytes());
+    let mut writer = PackageWriter::new_bounded(
+        limits.max_package_bytes(),
+        litchi_odf_common::core::StreamingArchiveLimits::default(),
+    );
     writer.set_mimetype(package_kind.mime_type())?;
     writer.add_file("content.xml", content_xml.as_bytes())?;
     if let Some(styles) = styles_xml {

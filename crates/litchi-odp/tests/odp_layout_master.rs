@@ -13,7 +13,7 @@ fn package() -> Vec<u8> {
     let content = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"><office:automatic-styles/><office:body><office:presentation><draw:page draw:name="Slide1"/></office:presentation></office:body></office:document-content>"#;
     let styles = r#"<office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"><office:styles/><office:automatic-styles><style:page-layout style:name="physical"/><style:style style:name="page-style" style:family="drawing-page"/></office:automatic-styles><office:master-styles/></office:document-styles>"#;
 
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(constants::ODF_PRESENTATION).unwrap();
     writer.add_file("content.xml", content.as_bytes()).unwrap();
     writer.add_file("styles.xml", styles.as_bytes()).unwrap();
@@ -90,7 +90,7 @@ fn layout(name: &str, width: &str) -> Layout {
 fn host_package() -> Vec<u8> {
     const CONTENT: &str = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0" xmlns:foreign="urn:example:foreign"><office:automatic-styles/><office:body><office:presentation><draw:page draw:name="Slide1" foreign:keep="content"><draw:rect draw:name="untouched"/></draw:page></office:presentation></office:body></office:document-content>"#;
     const STYLES: &str = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:foreign="urn:example:foreign" foreign:keep="styles"><office:styles/><office:automatic-styles><style:page-layout style:name="physical"/><style:style style:name="page-style" style:family="drawing-page"/></office:automatic-styles><office:master-styles/></office:document-styles>"#;
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(constants::ODF_PRESENTATION).unwrap();
     writer.add_file("content.xml", CONTENT.as_bytes()).unwrap();
     writer.add_file("styles.xml", STYLES.as_bytes()).unwrap();

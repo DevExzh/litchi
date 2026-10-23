@@ -147,7 +147,8 @@ mod probe {
         content.push_str(
             "</table:table></office:spreadsheet></office:body></office:document-content>",
         );
-        let mut writer = PackageWriter::new();
+        let mut writer =
+            PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
         writer
             .set_mimetype("application/vnd.oasis.opendocument.spreadsheet")
             .expect("mimetype");
@@ -171,7 +172,8 @@ mod probe {
             ));
         }
         content.push_str("</office:presentation></office:body></office:document-content>");
-        let mut writer = PackageWriter::new();
+        let mut writer =
+            PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
         writer
             .set_mimetype("application/vnd.oasis.opendocument.presentation")
             .expect("mimetype");

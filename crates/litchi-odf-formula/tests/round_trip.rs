@@ -75,7 +75,7 @@ fn malformed_content_and_wrong_family_are_rejected() {
     assert!(create("<math/>").is_err());
     assert!(create("not XML").is_err());
 
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(ODF_TEXT).expect("set text MIME type");
     writer
         .add_file("content.xml", MATHML.as_bytes())

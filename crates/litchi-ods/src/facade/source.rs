@@ -1422,7 +1422,9 @@ mod tests {
         let content = format!(
             r#"<office:document-content xmlns:office="{OFFICE}" xmlns:table="{TABLE}" xmlns:text="{TEXT}"><office:body><office:spreadsheet><table:table table:name="Sheet1"><table:table-row table:number-rows-repeated="2"><table:table-cell office:value-type="string"><text:p>hello</text:p></table:table-cell><table:table-cell office:value-type="string"><text:p>world</text:p></table:table-cell></table:table-row></table:table><table:table table:name="Sheet2"/></office:spreadsheet></office:body></office:document-content>"#
         );
-        let mut writer = litchi_odf_common::core::PackageWriter::new();
+        let mut writer = litchi_odf_common::core::PackageWriter::new(
+            litchi_odf_common::core::StreamingArchiveLimits::default(),
+        );
         writer.set_mimetype(MIME).expect("ODS MIME");
         writer
             .add_file("content.xml", content.as_bytes())
@@ -1625,7 +1627,9 @@ mod tests {
         let content = format!(
             r#"<office:document-content xmlns:office="{OFFICE}" xmlns:table="{TABLE}" xmlns:text="{TEXT}"><office:body><office:spreadsheet><table:table table:name="Data"><table:table-row><table:table-cell office:value-type="string"><text:p>alpha</text:p></table:table-cell></table:table-row><table:table-row><table:table-cell office:value-type="string"><text:p>beta</text:p></table:table-cell></table:table-row></table:table></office:spreadsheet></office:body></office:document-content>"#
         );
-        let mut writer = litchi_odf_common::core::PackageWriter::new();
+        let mut writer = litchi_odf_common::core::PackageWriter::new(
+            litchi_odf_common::core::StreamingArchiveLimits::default(),
+        );
         writer.set_mimetype(MIME).expect("ODS MIME");
         writer
             .add_file("content.xml", content.as_bytes())
@@ -2015,7 +2019,9 @@ mod tests {
             Err(litchi_odf_common::Error::Limit { .. })
         ));
 
-        let mut writer = litchi_odf_common::core::PackageWriter::new();
+        let mut writer = litchi_odf_common::core::PackageWriter::new(
+            litchi_odf_common::core::StreamingArchiveLimits::default(),
+        );
         writer.set_mimetype(MIME).expect("ODS MIME");
         writer
             .set_encryption(
@@ -2052,7 +2058,9 @@ mod tests {
 
     #[test]
     fn owned_and_source_reject_manifest_aliases_before_password_use() {
-        let mut writer = litchi_odf_common::core::PackageWriter::new();
+        let mut writer = litchi_odf_common::core::PackageWriter::new(
+            litchi_odf_common::core::StreamingArchiveLimits::default(),
+        );
         writer.set_mimetype(MIME).expect("ODS MIME");
         writer
             .set_encryption(

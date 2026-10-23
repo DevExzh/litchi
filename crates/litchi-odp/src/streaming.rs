@@ -626,7 +626,7 @@ where
     }
 
     let mut budgeted = BudgetedOutput::new(output, context, limits.max_output_bytes);
-    let mut package = PackageWriter::with_writer_and_limits(&mut budgeted, archive_limits);
+    let mut package = PackageWriter::with_writer(&mut budgeted, archive_limits);
     if let Err(error) = package.set_mimetype_streaming(ODP_MIME) {
         drop(package);
         return Err(map_package_error(

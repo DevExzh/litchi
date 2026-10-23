@@ -676,7 +676,7 @@ pub fn rebuild_package(
         exact_exclusions.insert(path.clone());
     }
 
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(crate::core::StreamingArchiveLimits::default());
     writer.set_mimetype(&source.mimetype()?)?;
     if !content_is_exact_source {
         match content_splice_publication(source, content) {
@@ -857,7 +857,7 @@ mod tests {
 
     #[test]
     fn raw_preservation_rejects_local_zip64_size_sentinels() {
-        let mut writer = PackageWriter::new();
+        let mut writer = PackageWriter::new(crate::core::StreamingArchiveLimits::default());
         writer
             .set_mimetype("application/vnd.oasis.opendocument.text")
             .unwrap();

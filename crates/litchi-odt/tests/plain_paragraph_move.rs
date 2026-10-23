@@ -246,7 +246,8 @@ fn refuses_scripts_signatures_and_protection() {
     );
     assert_move_refused(&signed);
 
-    let mut encrypted_writer = PackageWriter::new();
+    let mut encrypted_writer =
+        PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     encrypted_writer.set_mimetype(MIMETYPE).unwrap();
     encrypted_writer
         .set_encryption("secret", Profile::compatible())

@@ -1,3 +1,4 @@
+use litchi_core::Error as CoreError;
 use litchi_odb::{
     ActiveContentDisposition, ActiveContentKind, Builder, ChangeKind, Column, Component,
     ComponentDependencyKind, ComponentKind, ComponentTransferRefusal, ComponentTransferSupport,
@@ -8,7 +9,6 @@ use litchi_odb::{
     QueryRelationRole, QueryStatementKind, QueryUpdateTarget, RelationResolution, SealedPatch,
     SignaturePolicy, SubEdit, Table, TableKind,
 };
-use litchi_core::Error as CoreError;
 
 const SOURCE: &str = r#"<?xml version="1.0" encoding="UTF-8"?><o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:d="urn:oasis:names:tc:opendocument:xmlns:database:1.0" xmlns:x="http://www.w3.org/1999/xlink"><o:body><o:database><d:data-source/><d:queries/></o:database></o:body></o:document-content>"#;
 
@@ -139,7 +139,8 @@ fn composition_rejects_a_joined_payload_from_another_source() {
     let alpha = query_patch(&source, "alpha", "SELECT 1");
     let other = {
         let mut edit = source.edit();
-        edit.add_query(Query::new("foreign-base", "SELECT 9")).unwrap();
+        edit.add_query(Query::new("foreign-base", "SELECT 9"))
+            .unwrap();
         edit.commit().unwrap().into_package()
     };
     let foreign = query_patch(&other, "foreign", "SELECT 2");
@@ -411,7 +412,7 @@ fn signed_real_odb_is_inventoried_and_changed_publication_is_refused() {
 fn encrypted_package_open_and_edit_lifecycle_is_explicit_and_fail_closed() {
     use litchi_odf_common::core::{PackageWriter, Profile};
 
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer
         .set_mimetype(litchi_odf_common::constants::ODF_DATABASE)
         .unwrap();

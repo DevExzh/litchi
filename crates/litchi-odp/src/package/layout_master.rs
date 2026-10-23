@@ -440,7 +440,8 @@ impl Presentation {
     pub(crate) fn commit_design(&mut self, styles: &str, content: &str) -> Result<()> {
         validate_references(styles, content)?;
         let package = self.owned_package().package()?;
-        let mut writer = PackageWriter::new();
+        let mut writer =
+            PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
         writer.set_mimetype(package.mimetype())?;
         writer.add_file("content.xml", content.as_bytes())?;
         writer.add_file("styles.xml", styles.as_bytes())?;

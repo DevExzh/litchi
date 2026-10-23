@@ -398,7 +398,8 @@ impl MutableDocument {
 
     /// Convert the document to bytes.
     pub(crate) fn to_bytes(&self) -> Result<Vec<u8>> {
-        let mut writer = PackageWriter::new();
+        let mut writer =
+            PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
 
         // Set MIME type
         writer.set_mimetype(&self.mimetype)?;

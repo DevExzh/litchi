@@ -41,7 +41,8 @@ impl Builder {
     /// Used by the web-template authoring model to emit the legacy
     /// `application/vnd.oasis.opendocument.text-web` MIME type.
     pub(crate) fn build_package(self, mimetype: &str) -> Result<Vec<u8>> {
-        let mut writer = PackageWriter::new();
+        let mut writer =
+            PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
 
         // Set MIME type
         writer.set_mimetype(mimetype)?;

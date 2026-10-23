@@ -394,7 +394,8 @@ impl Builder {
             None => render_document(&self.blocks, &self.forms, &self.resources)?,
         };
         crate::codec::validate_authored(&content_xml)?;
-        let mut writer = PackageWriter::new();
+        let mut writer =
+            PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
         writer.set_mimetype(crate::package::MIMETYPE)?;
         writer.add_file("content.xml", content_xml.as_bytes())?;
         let typed_meta_xml = self.metadata.as_ref().map(render_metadata).transpose()?;

@@ -13,7 +13,7 @@ const DRAW: &str = "urn:oasis:names:tc:opendocument:xmlns:drawing:1.0";
 const PASSWORD: &str = "retention-password";
 
 fn package(content: &str) -> Vec<u8> {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(MIME).unwrap();
     writer.add_file("content.xml", content.as_bytes()).unwrap();
     writer.finish_to_bytes().unwrap()
@@ -26,7 +26,7 @@ fn simple_package() -> Vec<u8> {
 }
 
 fn password_package() -> Vec<u8> {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(MIME).unwrap();
     writer
         .set_encryption(PASSWORD, Profile::compatible())
@@ -113,7 +113,8 @@ fn stale_patch_still_fails_even_when_the_artifact_is_reopened() {
 
 #[test]
 fn signed_and_encrypted_sources_retain_read_reopen_but_refuse_mutation() {
-    let mut signed_writer = PackageWriter::new();
+    let mut signed_writer =
+        PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     signed_writer.set_mimetype(MIME).unwrap();
     signed_writer
         .add_file(

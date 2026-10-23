@@ -525,10 +525,8 @@ impl Parts {
         }
         let scratch_limit =
             usize::try_from(SourceLimits::MAXIMUM.max_input_bytes()).unwrap_or(usize::MAX);
-        let writer = PackageWriter::with_writer_and_limits(
-            BoundedBytes::new(scratch_limit),
-            Limits::writer_limits(),
-        );
+        let writer =
+            PackageWriter::with_writer(BoundedBytes::new(scratch_limit), Limits::writer_limits());
         let mut writer = writer;
         writer.set_mimetype(&self.mimetype)?;
         // The parts carry the producer's bytes (indentation included), so

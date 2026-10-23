@@ -33,8 +33,7 @@
 //!
 //! ## ✅ Package Writing (`writer.rs`) - COMPLETE
 //! - ✅ `PackageWriter<W>` - Generic ZIP archive writer
-//! - ✅ `new()` / `with_writer()` - Create writers
-//! - ✅ `with_writer_and_limits()` - Create bounded sequential writers
+//! - ✅ `new(limits)` / `with_writer(limits)` - Create bounded writers
 //! - ✅ `set_mimetype()` - Set MIME type (stored uncompressed)
 //! - ✅ `set_mimetype_streaming()` - Set MIME type with typed sink progress
 //! - ✅ `add_file()` - Add files to package

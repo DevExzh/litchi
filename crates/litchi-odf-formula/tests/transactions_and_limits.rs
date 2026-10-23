@@ -67,7 +67,7 @@ fn semantic_noop_reuses_exact_package_and_skips_reopen() {
 
 #[test]
 fn transaction_preserves_auxiliary_members() {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(ODF_FORMULA).expect("mimetype");
     writer
         .add_file("content.xml", MATHML.as_bytes())

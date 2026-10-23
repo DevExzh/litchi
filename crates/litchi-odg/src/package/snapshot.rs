@@ -10208,7 +10208,10 @@ fn rebuild_spliced(
 ) -> Result<Vec<u8>> {
     enforce_security_policy(source, security_policy)?;
     let archive = source.0.package.package();
-    let mut writer = PackageWriter::new_bounded(MAX_OUTPUT_BYTES);
+    let mut writer = PackageWriter::new_bounded(
+        MAX_OUTPUT_BYTES,
+        litchi_odf_common::core::StreamingArchiveLimits::default(),
+    );
     writer.set_mimetype(source.0.mimetype)?;
     content.publish(&mut writer)?;
     if let Some(styles) = styles {
@@ -10251,7 +10254,10 @@ fn rebuild(
 ) -> Result<Vec<u8>> {
     enforce_security_policy(source, security_policy)?;
     let archive = source.0.package.package();
-    let mut writer = PackageWriter::new_bounded(MAX_OUTPUT_BYTES);
+    let mut writer = PackageWriter::new_bounded(
+        MAX_OUTPUT_BYTES,
+        litchi_odf_common::core::StreamingArchiveLimits::default(),
+    );
     writer.set_mimetype(source.0.mimetype)?;
     writer.add_file("content.xml", content.as_bytes())?;
     if let Some(styles) = styles {

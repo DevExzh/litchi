@@ -48,7 +48,7 @@ fn formula_content() -> String {
 }
 
 fn package(content_xml: &str, signed: bool) -> litchi_core::Result<Vec<u8>> {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(constants::ODF_SPREADSHEET)?;
     writer.add_file("content.xml", content_xml.as_bytes())?;
     writer.add_file_with_media_type(

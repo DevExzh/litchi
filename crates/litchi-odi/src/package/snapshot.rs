@@ -381,7 +381,10 @@ impl Snapshot {
             ));
         }
         ensure_compact_rewrite_source(self, &files)?;
-        let mut writer = PackageWriter::new_bounded(MAX_OUTPUT_BYTES);
+        let mut writer = PackageWriter::new_bounded(
+            MAX_OUTPUT_BYTES,
+            litchi_odf_common::core::StreamingArchiveLimits::default(),
+        );
         writer.set_mimetype(MIMETYPE)?;
         writer.add_file("content.xml", content.as_bytes())?;
         match replacement_styles_xml {

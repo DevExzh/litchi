@@ -393,7 +393,8 @@ impl Builder {
         }
         validate_content_xml(&content_xml)?;
         crate::worksheet::codec::parse(&content_xml)?;
-        let mut writer = PackageWriter::new();
+        let mut writer =
+            PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
         writer.set_mimetype(MIMETYPE)?;
         writer.add_file("content.xml", content_xml.as_bytes())?;
         if self.metadata.has_data() {

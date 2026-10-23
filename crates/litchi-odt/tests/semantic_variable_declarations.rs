@@ -222,7 +222,7 @@ fn flat(inner: &str) -> Vec<u8> {
 }
 
 fn package(content: &str, styles: Option<&str>) -> Vec<u8> {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer
         .set_mimetype("application/vnd.oasis.opendocument.text")
         .unwrap();

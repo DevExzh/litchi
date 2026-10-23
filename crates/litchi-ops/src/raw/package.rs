@@ -64,7 +64,10 @@ impl Container {
             },
             #[cfg(any(feature = "odt", feature = "ods", feature = "odp", odf_objects))]
             Self::Odf { bytes } => {
-                let archive = litchi_odf_common::package::Archive::new(bytes)?;
+                let archive = litchi_odf_common::package::Archive::new(
+                    bytes,
+                    litchi_odf_common::package::ArchiveLimits::default(),
+                )?;
                 let manifest = litchi_odf_common::package::read_manifest(
                     &archive,
                     litchi_odf_common::XmlStreamLimits::owner_default_value(),
@@ -106,7 +109,10 @@ impl Container {
             },
             #[cfg(any(feature = "odt", feature = "ods", feature = "odp", odf_objects))]
             Self::Odf { bytes } => {
-                let archive = litchi_odf_common::package::Archive::new(bytes)?;
+                let archive = litchi_odf_common::package::Archive::new(
+                    bytes,
+                    litchi_odf_common::package::ArchiveLimits::default(),
+                )?;
                 let member = odf_member(&archive, spec)?;
                 let manifest = litchi_odf_common::package::read_manifest(
                     &archive,

@@ -36,7 +36,7 @@ fn aliased_content_xml() -> String {
 }
 
 fn package_with(content: &[u8], extras: bool) -> Vec<u8> {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(MIME).unwrap();
     writer.add_file("content.xml", content).unwrap();
     if extras {
@@ -103,7 +103,7 @@ fn oversized_declared_content_package() -> (Vec<u8>, (u64, u64)) {
 }
 
 fn password_package(content: &[u8], password: &str) -> Vec<u8> {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(MIME).unwrap();
     writer
         .set_encryption(password, Profile::compatible())

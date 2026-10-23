@@ -1085,7 +1085,7 @@ fn generic_and_specialized_saves_refuse_directory_destinations_without_mutation(
 
 #[test]
 fn packaged_ott_template_behavior_remains_package_owned() {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(ODF_TEXT_TEMPLATE).unwrap();
     writer
         .add_file(

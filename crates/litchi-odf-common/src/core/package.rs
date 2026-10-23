@@ -2200,7 +2200,7 @@ impl<'data> Package<'data> {
     }
 
     fn new_with_password(data: &'data [u8], password: Option<&'data str>) -> Result<Self> {
-        let archive = Archive::new(data)?;
+        let archive = Archive::new(data, ArchiveLimits::default())?;
 
         Self::from_archive(archive, password, SourceLimits::default())
     }
@@ -2239,7 +2239,7 @@ impl<'data> Package<'data> {
         // Parse the manifest
         let mut manifest = super::manifest::Manifest::parse(
             &archive
-                .read_manifest_xml_with_limit(limits.max_manifest_bytes(), "ODF manifest bytes")?,
+                .read_manifest_xml_bounded(limits.max_manifest_bytes(), "ODF manifest bytes")?,
             XmlStreamLimits::owner_default_value(),
         )?;
         // An absent or empty manifest root media type falls back to the
@@ -2658,7 +2658,7 @@ mod tests {
     #[test]
     fn source_backed_materialized_member_size_uses_encrypted_plaintext_metadata() {
         let plaintext = b"<office:document-content/>";
-        let mut writer = PackageWriter::new();
+        let mut writer = PackageWriter::new(crate::core::StreamingArchiveLimits::default());
         writer
             .set_mimetype("application/vnd.oasis.opendocument.text")
             .unwrap();
@@ -2680,7 +2680,7 @@ mod tests {
 
     #[test]
     fn source_backed_encrypted_preflight_rejects_without_payload_read() {
-        let mut writer = PackageWriter::new();
+        let mut writer = PackageWriter::new(crate::core::StreamingArchiveLimits::default());
         writer
             .set_mimetype("application/vnd.oasis.opendocument.text")
             .unwrap();
@@ -2823,7 +2823,7 @@ mod tests {
             Err(Error::SourceChanged { .. })
         ));
 
-        let mut writer = PackageWriter::new();
+        let mut writer = PackageWriter::new(crate::core::StreamingArchiveLimits::default());
         writer
             .set_mimetype("application/vnd.oasis.opendocument.text")
             .unwrap();

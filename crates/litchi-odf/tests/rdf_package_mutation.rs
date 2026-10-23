@@ -32,7 +32,7 @@ fn package(mimetype: &str, family: &str, rdf: &[(&str, &[u8])], signed: bool) ->
     let content = format!(
         "<?xml version=\"1.0\"?><office:document-content xmlns:office=\"{OFFICE}\" xmlns:text=\"{TEXT}\" xmlns:table=\"{TABLE}\" xmlns:draw=\"{DRAW}\"><office:body>{body}</office:body></office:document-content>"
     );
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(mimetype).unwrap();
     writer
         .add_file(constants::ODF_CONTENT, content.as_bytes())

@@ -28,7 +28,7 @@ fn digest(bytes: &[u8]) -> [u8; 32] {
 }
 
 fn memory_artifact(bytes: &[u8]) -> Vec<u8> {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(MIME).unwrap();
     writer
         .add_file_reader_with_media_type_and_compression(
@@ -194,7 +194,7 @@ fn short_non_seek_sink_round_trips_exact_stream_and_is_deterministic() {
         bytes: Rc::clone(&sink_bytes),
         maximum_write: 7,
     };
-    let mut writer = PackageWriter::with_writer(sink);
+    let mut writer = PackageWriter::with_writer(sink, StreamingArchiveLimits::default());
     writer.set_mimetype(MIME).unwrap();
     writer
         .add_file_reader_with_media_type_and_compression(
@@ -228,7 +228,7 @@ fn exact_output_limit_succeeds_and_one_byte_under_reports_limit_progress() {
     exact_limits.max_metadata_bytes = expected.len() as u64;
 
     let mut exact_sink = Vec::new();
-    let mut exact = PackageWriter::with_writer_and_limits(&mut exact_sink, exact_limits);
+    let mut exact = PackageWriter::with_writer(&mut exact_sink, exact_limits);
     exact.set_mimetype(MIME).unwrap();
     exact
         .add_file_reader_with_media_type_and_compression(
@@ -248,7 +248,7 @@ fn exact_output_limit_succeeds_and_one_byte_under_reports_limit_progress() {
     );
     under_limits.max_metadata_bytes = (expected.len() - 1) as u64;
     let mut under_sink = Vec::new();
-    let mut under = PackageWriter::with_writer_and_limits(&mut under_sink, under_limits);
+    let mut under = PackageWriter::with_writer(&mut under_sink, under_limits);
     under.set_mimetype(MIME).unwrap();
     under
         .add_file_reader_with_media_type_and_compression(
@@ -281,7 +281,7 @@ fn streamed_entry_limit_is_typed_after_the_member_header_starts() {
     );
     limits.max_metadata_bytes = 1024 * 1024;
     let mut sink = Vec::new();
-    let mut writer = PackageWriter::with_writer_and_limits(&mut sink, limits);
+    let mut writer = PackageWriter::with_writer(&mut sink, limits);
     writer.set_mimetype(MIME).unwrap();
     let error = writer
         .add_file_reader_with_media_type_and_compression(
@@ -308,10 +308,13 @@ fn streamed_entry_limit_is_typed_after_the_member_header_starts() {
 #[test]
 fn reader_failure_reports_incomplete_output_and_poisoned_writer() {
     let sink_bytes = Rc::new(RefCell::new(Vec::new()));
-    let mut writer = PackageWriter::with_writer(ShortSink {
-        bytes: Rc::clone(&sink_bytes),
-        maximum_write: usize::MAX,
-    });
+    let mut writer = PackageWriter::with_writer(
+        ShortSink {
+            bytes: Rc::clone(&sink_bytes),
+            maximum_write: usize::MAX,
+        },
+        StreamingArchiveLimits::default(),
+    );
     writer.set_mimetype(MIME).unwrap();
     let error = writer
         .add_file_reader_with_media_type(
@@ -345,10 +348,13 @@ fn reader_failure_reports_incomplete_output_and_poisoned_writer() {
 #[test]
 fn reader_failure_preserves_nested_source_chain() {
     let sink_bytes = Rc::new(RefCell::new(Vec::new()));
-    let mut writer = PackageWriter::with_writer(ShortSink {
-        bytes: Rc::clone(&sink_bytes),
-        maximum_write: usize::MAX,
-    });
+    let mut writer = PackageWriter::with_writer(
+        ShortSink {
+            bytes: Rc::clone(&sink_bytes),
+            maximum_write: usize::MAX,
+        },
+        StreamingArchiveLimits::default(),
+    );
     writer.set_mimetype_streaming(MIME).unwrap();
     let error = writer
         .add_file_reader_with_media_type(
@@ -390,7 +396,7 @@ fn finalization_failure_preserves_accepted_output_progress() {
         bytes: Rc::clone(&sink_bytes),
         remaining: expected.len() - 1,
     };
-    let mut writer = PackageWriter::with_writer(sink);
+    let mut writer = PackageWriter::with_writer(sink, StreamingArchiveLimits::default());
     writer.set_mimetype(MIME).unwrap();
     writer
         .add_file_reader_with_media_type_and_compression(
@@ -418,7 +424,8 @@ fn finalization_failure_preserves_accepted_output_progress() {
 fn finalization_sink_failure_preserves_nested_source_chain() {
     let bytes = payload();
     let expected = {
-        let mut probe = PackageWriter::new();
+        let mut probe =
+            PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
         probe.set_mimetype(MIME).unwrap();
         probe
             .add_file_reader_with_media_type_and_compression(
@@ -435,7 +442,7 @@ fn finalization_sink_failure_preserves_nested_source_chain() {
         bytes: Rc::clone(&sink_bytes),
         remaining: expected.len() - 1,
     };
-    let mut writer = PackageWriter::with_writer(sink);
+    let mut writer = PackageWriter::with_writer(sink, StreamingArchiveLimits::default());
     writer.set_mimetype_streaming(MIME).unwrap();
     writer
         .add_file_reader_with_media_type_and_compression(
@@ -473,10 +480,13 @@ fn finalization_sink_failure_preserves_nested_source_chain() {
 #[test]
 fn duplicate_and_xml_refusals_do_not_emit_new_member_headers() {
     let sink_bytes = Rc::new(RefCell::new(Vec::new()));
-    let mut writer = PackageWriter::with_writer(ShortSink {
-        bytes: Rc::clone(&sink_bytes),
-        maximum_write: usize::MAX,
-    });
+    let mut writer = PackageWriter::with_writer(
+        ShortSink {
+            bytes: Rc::clone(&sink_bytes),
+            maximum_write: usize::MAX,
+        },
+        StreamingArchiveLimits::default(),
+    );
     writer.set_mimetype(MIME).unwrap();
     writer
         .add_file_reader_with_media_type(
@@ -521,10 +531,13 @@ fn duplicate_and_xml_refusals_do_not_emit_new_member_headers() {
 #[test]
 fn encryption_and_signing_are_refused_before_streamed_member_output() {
     let encrypted_bytes = Rc::new(RefCell::new(Vec::new()));
-    let mut encrypted = PackageWriter::with_writer(ShortSink {
-        bytes: Rc::clone(&encrypted_bytes),
-        maximum_write: usize::MAX,
-    });
+    let mut encrypted = PackageWriter::with_writer(
+        ShortSink {
+            bytes: Rc::clone(&encrypted_bytes),
+            maximum_write: usize::MAX,
+        },
+        StreamingArchiveLimits::default(),
+    );
     encrypted.set_mimetype(MIME).unwrap();
     encrypted
         .set_encryption("secret", litchi_odf_common::core::Profile::compatible())
@@ -541,10 +554,13 @@ fn encryption_and_signing_are_refused_before_streamed_member_output() {
     assert_eq!(encrypted_bytes.borrow().len(), encrypted_before);
 
     let signed_bytes = Rc::new(RefCell::new(Vec::new()));
-    let mut signed = PackageWriter::with_writer(ShortSink {
-        bytes: Rc::clone(&signed_bytes),
-        maximum_write: usize::MAX,
-    });
+    let mut signed = PackageWriter::with_writer(
+        ShortSink {
+            bytes: Rc::clone(&signed_bytes),
+            maximum_write: usize::MAX,
+        },
+        StreamingArchiveLimits::default(),
+    );
     signed.set_mimetype(MIME).unwrap();
     signed.set_document_signer(signer()).unwrap();
     let signed_before = signed_bytes.borrow().len();
@@ -575,10 +591,13 @@ fn encryption_and_signing_are_refused_before_streamed_member_output() {
 #[test]
 fn canonical_paths_reopen_through_owned_indexed_and_family_packages() {
     let sink_bytes = Rc::new(RefCell::new(Vec::new()));
-    let mut writer = PackageWriter::with_writer(ShortSink {
-        bytes: Rc::clone(&sink_bytes),
-        maximum_write: usize::MAX,
-    });
+    let mut writer = PackageWriter::with_writer(
+        ShortSink {
+            bytes: Rc::clone(&sink_bytes),
+            maximum_write: usize::MAX,
+        },
+        StreamingArchiveLimits::default(),
+    );
     writer.set_mimetype_streaming(MIME).unwrap();
     let content = Structure::default_content_xml("office:text");
     writer.add_file("content.xml", content.as_bytes()).unwrap();
@@ -675,10 +694,13 @@ fn canonical_paths_reopen_through_owned_indexed_and_family_packages() {
 #[test]
 fn manifest_only_paths_use_strict_odf_validation_and_reopen() {
     let sink_bytes = Rc::new(RefCell::new(Vec::new()));
-    let mut writer = PackageWriter::with_writer(ShortSink {
-        bytes: Rc::clone(&sink_bytes),
-        maximum_write: usize::MAX,
-    });
+    let mut writer = PackageWriter::with_writer(
+        ShortSink {
+            bytes: Rc::clone(&sink_bytes),
+            maximum_write: usize::MAX,
+        },
+        StreamingArchiveLimits::default(),
+    );
     writer.set_mimetype_streaming(MIME).unwrap();
     let content = Structure::default_content_xml("office:text");
     writer.add_file("content.xml", content.as_bytes()).unwrap();
@@ -747,10 +769,13 @@ fn manifest_only_paths_use_strict_odf_validation_and_reopen() {
 #[test]
 fn metadata_is_validated_and_bounded_before_member_output() {
     let sink_bytes = Rc::new(RefCell::new(Vec::new()));
-    let mut writer = PackageWriter::with_writer(ShortSink {
-        bytes: Rc::clone(&sink_bytes),
-        maximum_write: usize::MAX,
-    });
+    let mut writer = PackageWriter::with_writer(
+        ShortSink {
+            bytes: Rc::clone(&sink_bytes),
+            maximum_write: usize::MAX,
+        },
+        StreamingArchiveLimits::default(),
+    );
     let invalid_mime = writer.set_mimetype_streaming("not-a-mime").unwrap_err();
     assert!(matches!(invalid_mime, PackageWriterError::Core(_)));
     assert!(sink_bytes.borrow().is_empty());
@@ -765,10 +790,13 @@ fn metadata_is_validated_and_bounded_before_member_output() {
         "application/vnd.oasis.opendocument.text; charset=utf-8",
     ] {
         let candidate_bytes = Rc::new(RefCell::new(Vec::new()));
-        let mut candidate = PackageWriter::with_writer(ShortSink {
-            bytes: Rc::clone(&candidate_bytes),
-            maximum_write: usize::MAX,
-        });
+        let mut candidate = PackageWriter::with_writer(
+            ShortSink {
+                bytes: Rc::clone(&candidate_bytes),
+                maximum_write: usize::MAX,
+            },
+            StreamingArchiveLimits::default(),
+        );
         let error = candidate.set_mimetype_streaming(mimetype).unwrap_err();
         assert!(
             matches!(error, PackageWriterError::Core(_)),
@@ -823,7 +851,7 @@ fn metadata_is_validated_and_bounded_before_member_output() {
         ..StreamingArchiveLimits::default()
     };
     let mut bounded_sink = Vec::new();
-    let mut bounded = PackageWriter::with_writer_and_limits(&mut bounded_sink, metadata_limits);
+    let mut bounded = PackageWriter::with_writer(&mut bounded_sink, metadata_limits);
     bounded.set_mimetype_streaming(MIME).unwrap();
     let long_path = format!("Pictures/{}.bin", "p".repeat(700));
     let error = bounded
@@ -848,10 +876,13 @@ fn metadata_is_validated_and_bounded_before_member_output() {
 #[test]
 fn manifest_collisions_and_finish_entry_limit_are_atomic_with_progress() {
     let collision_bytes = Rc::new(RefCell::new(Vec::new()));
-    let mut collision_writer = PackageWriter::with_writer(ShortSink {
-        bytes: Rc::clone(&collision_bytes),
-        maximum_write: usize::MAX,
-    });
+    let mut collision_writer = PackageWriter::with_writer(
+        ShortSink {
+            bytes: Rc::clone(&collision_bytes),
+            maximum_write: usize::MAX,
+        },
+        StreamingArchiveLimits::default(),
+    );
     collision_writer.set_mimetype_streaming(MIME).unwrap();
     collision_writer
         .add_manifest_entry("Pictures/collision.bin", "application/octet-stream")
@@ -873,7 +904,7 @@ fn manifest_collisions_and_finish_entry_limit_are_atomic_with_progress() {
         ..StreamingArchiveLimits::default()
     };
     let mut sink = Vec::new();
-    let mut limited = PackageWriter::with_writer_and_limits(&mut sink, limits);
+    let mut limited = PackageWriter::with_writer(&mut sink, limits);
     limited.set_mimetype_streaming(MIME).unwrap();
     limited
         .add_file_reader_with_media_type(
@@ -899,10 +930,13 @@ fn manifest_collisions_and_finish_entry_limit_are_atomic_with_progress() {
 #[test]
 fn typed_mimetype_and_reader_failures_preserve_archive_sources() {
     let sink_bytes = Rc::new(RefCell::new(Vec::new()));
-    let mut writer = PackageWriter::with_writer(FailingSink {
-        bytes: Rc::clone(&sink_bytes),
-        remaining: 10,
-    });
+    let mut writer = PackageWriter::with_writer(
+        FailingSink {
+            bytes: Rc::clone(&sink_bytes),
+            remaining: 10,
+        },
+        StreamingArchiveLimits::default(),
+    );
     let error = writer.set_mimetype_streaming(MIME).unwrap_err();
     match error {
         PackageWriterError::IncompleteOutput { written, source } => {

@@ -13,7 +13,7 @@ fn inherited_drawing(indirect: bool) -> Result<Package> {
     let styles = format!(
         r#"<office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0" office:version="1.4"><office:styles><style:style style:name="parent" style:family="drawing-page"><style:drawing-page-properties presentation:transition-type="manual"/></style:style>{intermediate}<style:style style:name="child" style:family="drawing-page" style:parent-style-name="{parent}"/></office:styles></office:document-styles>"#
     );
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype("application/vnd.oasis.opendocument.graphics")?;
     writer.add_file("content.xml", content.as_bytes())?;
     writer.add_file("styles.xml", styles.as_bytes())?;

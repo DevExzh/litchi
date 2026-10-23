@@ -49,7 +49,7 @@ fn package_with(
     meta: Option<&[u8]>,
     media: Option<&[u8]>,
 ) -> Vec<u8> {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(MIME).unwrap();
     writer.add_file("content.xml", content).unwrap();
     if let Some(styles) = styles {
@@ -106,7 +106,7 @@ fn oversized_text_package() -> Vec<u8> {
 }
 
 fn password_package(password: &str) -> Vec<u8> {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(MIME).unwrap();
     writer
         .set_encryption(password, Profile::compatible())
@@ -527,7 +527,8 @@ fn source_facade_enforces_source_limits_and_family_validation() {
     ));
 
     let wrong_mime = {
-        let mut writer = PackageWriter::new();
+        let mut writer =
+            PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
         writer
             .set_mimetype("application/vnd.oasis.opendocument.spreadsheet")
             .unwrap();

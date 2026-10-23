@@ -2,7 +2,7 @@
 
 use litchi_core::Error;
 use litchi_odf_common::core::metadata::Metadata as OdfMetadata;
-use litchi_odf_common::package::{Archive, parse_manifest, read_manifest};
+use litchi_odf_common::package::{Archive, ArchiveLimits, parse_manifest, read_manifest};
 use litchi_odf_common::{Error as OdfError, XmlStreamLimits, chart, drawing, embedded, media};
 use std::io::{Cursor, Write as _};
 
@@ -35,7 +35,7 @@ fn package() -> Result<Vec<u8>, Box<dyn std::error::Error>> {
 }
 
 fn exercise_archive(bytes: &[u8]) {
-    if let Ok(archive) = Archive::new(bytes) {
+    if let Ok(archive) = Archive::new(bytes, ArchiveLimits::default()) {
         drop(read_manifest(&archive, XmlStreamLimits::default()));
     }
 }

@@ -204,7 +204,8 @@ fn cross_drawing_transfer_closes_inherited_producer_namespaces() {
     const DESTINATION: &str = r#"<?xml version="1.0"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" office:version="1.4"><office:body><office:drawing><draw:page draw:name="Destination"/></office:drawing></office:body></office:document-content>"#;
 
     let package = |content: &str| {
-        let mut writer = PackageWriter::new();
+        let mut writer =
+            PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
         writer
             .set_mimetype("application/vnd.oasis.opendocument.graphics")
             .unwrap();
@@ -293,7 +294,7 @@ fn genuine_complex_group_transfer_remaps_all_colliding_dependency_families() {
     let content = format!(
         r#"<?xml version="1.0"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:form="urn:oasis:names:tc:opendocument:xmlns:form:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0"><office:automatic-styles>{automatic_styles}</office:automatic-styles><office:body><office:drawing><office:forms><form:form form:name="Destination">{forms}</form:form></office:forms><draw:page draw:name="Destination"><draw:layer-set>{layers}</draw:layer-set></draw:page></office:drawing></office:body></office:document-content>"#
     );
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer
         .set_mimetype("application/vnd.oasis.opendocument.graphics")
         .unwrap();

@@ -37,7 +37,7 @@ fn media_payload() -> Vec<u8> {
 }
 
 fn source_package(with_signature: bool) -> Vec<u8> {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(constants::ODF_SPREADSHEET).unwrap();
     writer
         .add_file("content.xml", SOURCE_CONTENT.as_bytes())

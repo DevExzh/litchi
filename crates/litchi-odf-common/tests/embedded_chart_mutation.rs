@@ -24,7 +24,7 @@ fn chart(title: &str) -> Definition {
 }
 
 fn package(title: &str) -> Vec<u8> {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(constants::ODF_TEXT).unwrap();
     writer
         .add_file(

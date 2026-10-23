@@ -11,7 +11,7 @@ use litchi_odg::{
 const CONTENT: &str = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" office:version="1.4"><office:body><office:drawing><draw:page draw:name="One"><draw:layer-set><draw:layer draw:name="base"/></draw:layer-set><draw:rect draw:name="Box" draw:layer="base" draw:style-name="gr1" svg:x="1cm" svg:y="2cm" svg:width="3cm" svg:height="4cm"><text:p>old</text:p></draw:rect><draw:frame draw:name="Image"><draw:image xlink:href="Pictures/pixel.bin" xlink:type="simple"/></draw:frame></draw:page></office:drawing></office:body></office:document-content>"#;
 
 fn package() -> Vec<u8> {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer
         .set_mimetype("application/vnd.oasis.opendocument.graphics")
         .unwrap();
@@ -96,7 +96,7 @@ fn removals_are_checked_and_group_subtrees_are_owned() {
         "<draw:frame draw:name=\"Image\">",
         "<draw:g draw:name=\"Group\"><draw:rect draw:name=\"Child\"/></draw:g><draw:frame draw:name=\"Image\">",
     );
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer
         .set_mimetype("application/vnd.oasis.opendocument.graphics")
         .unwrap();
@@ -376,7 +376,7 @@ fn unreferenced_resource_add_remove_is_safe_and_exactly_reversible() {
 }
 
 fn drawing_with_resource(content: &str, resource: Option<&[u8]>) -> Package {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer
         .set_mimetype("application/vnd.oasis.opendocument.graphics")
         .unwrap();
@@ -397,7 +397,7 @@ fn shape_text_with_several_paragraphs_is_unsupported() {
         "<text:p>old</text:p>",
         "<text:p>one</text:p><text:p>two</text:p>",
     );
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer
         .set_mimetype("application/vnd.oasis.opendocument.graphics")
         .unwrap();

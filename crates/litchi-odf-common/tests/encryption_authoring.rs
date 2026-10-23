@@ -34,7 +34,7 @@ fn profile(cipher: Cipher, argon2: bool) -> Profile {
 }
 
 fn author(profile: Profile) -> Vec<u8> {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(MIME).unwrap();
     writer.set_encryption(PASSWORD, profile).unwrap();
     writer.add_file("content.xml", CONTENT).unwrap();
@@ -144,7 +144,7 @@ fn rejects_invalid_profiles_and_late_configuration_without_mutation() {
         .is_err()
     );
 
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(MIME).unwrap();
     writer
         .set_encryption(PASSWORD, Profile::compatible())

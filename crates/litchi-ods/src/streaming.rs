@@ -577,7 +577,7 @@ where
     .with_compressed_size_limit(limits.max_output_bytes);
 
     let mut budgeted = BudgetedOutput::new(output, context, limits.max_output_bytes);
-    let mut package = PackageWriter::with_writer_and_limits(&mut budgeted, archive_limits);
+    let mut package = PackageWriter::with_writer(&mut budgeted, archive_limits);
     let mime_result = package.set_mimetype_streaming(ODS_MIME);
     if let Err(error) = mime_result {
         drop(package);

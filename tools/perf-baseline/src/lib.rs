@@ -21111,7 +21111,8 @@ fn odt_media_archive_for_shape(shape: SemanticShape) -> Result<Vec<u8>, Box<dyn 
     }
     let base = document.build()?.to_bytes()?;
     let source = ArchiveReader::new(&base)?;
-    let mut writer = litchi_odt::core::PackageWriter::new();
+    let mut writer =
+        litchi_odt::core::PackageWriter::new(litchi_odt::core::StreamingArchiveLimits::default());
     writer.set_mimetype("application/vnd.oasis.opendocument.text")?;
     for path in source.file_names() {
         if matches!(path, "mimetype" | "META-INF/manifest.xml") || path.ends_with('/') {
@@ -21156,7 +21157,8 @@ fn odt_resource_batch_archive() -> Result<Vec<u8>, Box<dyn Error>> {
         .collect::<String>();
     content.insert_str(insertion, &frames);
 
-    let mut writer = litchi_odt::core::PackageWriter::new();
+    let mut writer =
+        litchi_odt::core::PackageWriter::new(litchi_odt::core::StreamingArchiveLimits::default());
     writer.set_mimetype("application/vnd.oasis.opendocument.text")?;
     for path in source.file_names() {
         if matches!(path, "mimetype" | "META-INF/manifest.xml" | "content.xml")
@@ -21555,7 +21557,9 @@ fn odp_text_box_batch_page(index: usize) -> usize {
 fn ods_media_archive() -> Result<Vec<u8>, Box<dyn Error>> {
     let base = semantic_ods_bytes(SemanticShape::Medium)?;
     let source = ArchiveReader::new(&base)?;
-    let mut writer = litchi_odf_common::core::PackageWriter::new();
+    let mut writer = litchi_odf_common::core::PackageWriter::new(
+        litchi_odf_common::core::StreamingArchiveLimits::default(),
+    );
     writer.set_mimetype("application/vnd.oasis.opendocument.spreadsheet")?;
     for path in source.file_names() {
         if matches!(path, "mimetype" | "META-INF/manifest.xml") || path.ends_with('/') {
@@ -21590,7 +21594,8 @@ fn semantic_odp_bytes(shape: SemanticShape) -> Result<Vec<u8>, Box<dyn Error>> {
     let reader = ArchiveReader::new(&generated)?;
     let content = reader.read("content.xml")?;
     let styles = reader.read("styles.xml")?;
-    let mut writer = litchi_odp::core::PackageWriter::new();
+    let mut writer =
+        litchi_odp::core::PackageWriter::new(litchi_odp::core::StreamingArchiveLimits::default());
     writer.set_mimetype("application/vnd.oasis.opendocument.presentation")?;
     writer.add_file("content.xml", &content)?;
     writer.add_file("styles.xml", &styles)?;
@@ -21604,7 +21609,8 @@ fn semantic_odp_bytes(shape: SemanticShape) -> Result<Vec<u8>, Box<dyn Error>> {
 fn odp_media_archive() -> Result<Vec<u8>, Box<dyn Error>> {
     let base = semantic_odp_bytes(SemanticShape::Medium)?;
     let source = ArchiveReader::new(&base)?;
-    let mut writer = litchi_odp::core::PackageWriter::new();
+    let mut writer =
+        litchi_odp::core::PackageWriter::new(litchi_odp::core::StreamingArchiveLimits::default());
     writer.set_mimetype("application/vnd.oasis.opendocument.presentation")?;
     for path in source.file_names() {
         if matches!(path, "mimetype" | "META-INF/manifest.xml") || path.ends_with('/') {
@@ -21640,7 +21646,8 @@ fn odp_text_box_batch_archive() -> Result<Vec<u8>, Box<dyn Error>> {
         return Err("ODP text-box batch corpus construction was an exact no-op".into());
     }
     let staged = ArchiveReader::new(commit.package().as_bytes())?;
-    let mut writer = litchi_odp::core::PackageWriter::new();
+    let mut writer =
+        litchi_odp::core::PackageWriter::new(litchi_odp::core::StreamingArchiveLimits::default());
     writer.set_mimetype("application/vnd.oasis.opendocument.presentation")?;
     for path in staged.file_names() {
         if matches!(path, "mimetype" | "META-INF/manifest.xml") || path.ends_with('/') {
@@ -22189,7 +22196,9 @@ fn detection_merge_ooxml_members(
     let odf = ArchiveReader::new(odf_archive)?;
     let ooxml_archive = detection_ooxml_archive(family)?;
     let ooxml = ArchiveReader::new(&ooxml_archive)?;
-    let mut writer = litchi_odf_common::core::PackageWriter::new();
+    let mut writer = litchi_odf_common::core::PackageWriter::new(
+        litchi_odf_common::core::StreamingArchiveLimits::default(),
+    );
     writer.set_mimetype(family.odf_mimetype())?;
     for path in odf.file_names() {
         if matches!(path, "mimetype" | "META-INF/manifest.xml") || path.ends_with('/') {
@@ -35871,7 +35880,8 @@ fn verify_odt_mixed_raw_members(source: &[u8], published: &[u8]) -> Result<(), B
 
 fn signed_odt_mixed_snapshot(source: &[u8]) -> Result<litchi_odt::Package, Box<dyn Error>> {
     let archive = ArchiveReader::new(source)?;
-    let mut writer = litchi_odt::core::PackageWriter::new();
+    let mut writer =
+        litchi_odt::core::PackageWriter::new(litchi_odt::core::StreamingArchiveLimits::default());
     writer.set_mimetype("application/vnd.oasis.opendocument.text")?;
     for path in archive.file_names() {
         if matches!(path, "mimetype" | "META-INF/manifest.xml") || path.ends_with('/') {

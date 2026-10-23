@@ -21,7 +21,7 @@ fn package(inline: bool) -> Result<Vec<u8>> {
     } else {
         "<draw:object xlink:href=\"./Object_1\" xlink:type=\"simple\" xlink:show=\"embed\" xlink:actuate=\"onLoad\"/>".to_string()
     };
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(ODF_PRESENTATION)?;
     writer.add_file("content.xml", content(&object).as_bytes())?;
     if !inline {

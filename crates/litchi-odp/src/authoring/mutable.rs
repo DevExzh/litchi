@@ -1882,7 +1882,10 @@ impl MutablePresentation {
     /// verbatim, so the accounting below intentionally claims only authored
     /// members plus a conservative default manifest bound.
     fn serialize_bounded(&self, limit: usize) -> Result<SerializedPublication> {
-        let mut writer = PackageWriter::new_bounded(limit);
+        let mut writer = PackageWriter::new_bounded(
+            limit,
+            litchi_odf_common::core::StreamingArchiveLimits::default(),
+        );
         let source_manifest = self
             .source_package
             .as_ref()

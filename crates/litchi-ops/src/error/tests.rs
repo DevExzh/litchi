@@ -2063,7 +2063,8 @@ fn odp_public_source_replay_classifies_actual_stale_and_conflicting_inputs() {
         let content = format!(
             r#"<office:document-content xmlns:office="{OFFICE}" xmlns:draw="{DRAW}"><office:body><office:presentation><draw:page draw:name="{page_name}"/></office:presentation></office:body></office:document-content>"#
         );
-        let mut writer = PackageWriter::new();
+        let mut writer =
+            PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
         writer.set_mimetype(ODF_PRESENTATION).unwrap();
         writer.add_file(ODF_CONTENT, content.as_bytes()).unwrap();
         writer.finish_to_bytes().unwrap()

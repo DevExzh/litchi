@@ -907,7 +907,7 @@ fn signed_exact_noop_is_byte_exact_but_changed_publication_drops_signatures() {
 
 #[test]
 fn encrypted_content_is_refused_before_a_tracked_change_transaction_can_begin() {
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer
         .set_mimetype(MIMETYPE)
         .expect("test fixture or operation should succeed");

@@ -86,7 +86,7 @@ pub(crate) fn rewrite_owned_package(
         Some(super::codec::empty_package(policy)?)
     };
 
-    let mut writer = PackageWriter::new();
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
     writer.set_mimetype(mimetype)?;
     for path in [
         constants::ODF_CONTENT,
