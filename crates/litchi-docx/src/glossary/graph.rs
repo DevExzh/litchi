@@ -942,25 +942,32 @@ pub(in crate::glossary) fn put_graph_checked(
         .owner_id
         .as_ref()
         .filter(|owner_id| owner_relationships.get(owner_id).is_none());
-    if let Some(owner_id) = preserve_owner_id {
+    let owner_id = if let Some(owner_id) = preserve_owner_id {
         owner_relationships.try_add_relationship(
             value.conformance.glossary_relationship().to_owned(),
             owner_target.to_owned(),
             owner_id.clone(),
             litchi_opc::TargetMode::Internal,
         )?;
+        owner_id.clone()
     } else {
-        owner_relationships.get_or_add(value.conformance.glossary_relationship(), owner_target);
-    }
+        owner_relationships
+            .get_or_add(value.conformance.glossary_relationship(), owner_target)
+            .r_id()
+            .to_owned()
+    };
 
     validate_all_internal_targets(&candidate)?;
     let round_trip = load_graph_with_limits(&candidate, limits)?
         .ok_or_else(|| invalid("staged glossary graph is missing"))?;
-    if !graph_matches_catalog(
+    if !graph_matches_catalog_with_owner(
         &round_trip,
         value,
         effective_catalog,
         Some(&staged_root_xml),
+        main.as_str(),
+        &owner_id,
+        owner_target,
     )? {
         return Err(invalid("staged glossary graph did not round-trip"));
     }
@@ -1019,21 +1026,43 @@ pub(in crate::glossary) fn graph_matches_catalog(
     expected_catalog: &Catalog,
     expected_root_xml: Option<&Arc<Vec<u8>>>,
 ) -> Result<bool> {
+    graph_matches_catalog_inner(actual, expected, expected_catalog, expected_root_xml, None)
+}
+
+fn graph_matches_catalog_with_owner(
+    actual: &raw::Graph,
+    expected: &raw::Graph,
+    expected_catalog: &Catalog,
+    expected_root_xml: Option<&Arc<Vec<u8>>>,
+    owner_main: &str,
+    owner_id: &str,
+    owner_target: &str,
+) -> Result<bool> {
+    graph_matches_catalog_inner(
+        actual,
+        expected,
+        expected_catalog,
+        expected_root_xml,
+        Some((owner_main, owner_id, owner_target)),
+    )
+}
+
+fn graph_matches_catalog_inner(
+    actual: &raw::Graph,
+    expected: &raw::Graph,
+    expected_catalog: &Catalog,
+    expected_root_xml: Option<&Arc<Vec<u8>>>,
+    owner_identity: Option<(&str, &str, &str)>,
+) -> Result<bool> {
+    let owner_matches = owner_identity.is_none_or(|(owner_main, owner_id, owner_target)| {
+        actual.owner_main.as_deref() == Some(owner_main)
+            && actual.owner_id.as_deref() == Some(owner_id)
+            && actual.owner_target.as_deref() == Some(owner_target)
+    });
     Ok(actual.catalog == *expected_catalog
         && actual.conformance == expected.conformance
         && actual.root_name == expected.root_name
-        && expected
-            .owner_main
-            .as_ref()
-            .is_none_or(|value| actual.owner_main.as_ref() == Some(value))
-        && expected
-            .owner_id
-            .as_ref()
-            .is_none_or(|value| actual.owner_id.as_ref() == Some(value))
-        && expected
-            .owner_target
-            .as_ref()
-            .is_none_or(|value| actual.owner_target.as_ref() == Some(value))
+        && owner_matches
         && expected_root_xml.is_none_or(|xml| {
             actual.root_xml.as_ref().is_some_and(|actual| {
                 Arc::ptr_eq(actual, xml) || actual.as_slice() == xml.as_slice()

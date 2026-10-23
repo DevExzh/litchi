@@ -802,7 +802,11 @@ fn generated_graph_usage(seed: &EmptyGraphSeed, limits: &super::Limits) -> Resul
 }
 
 fn next_relationship_id(part: &dyn super::Part) -> Result<String> {
-    let mut next = 1u32;
+    next_relationship_id_from(part, 1)
+}
+
+fn next_relationship_id_from(part: &dyn super::Part, start: u32) -> Result<String> {
+    let mut next = start;
     loop {
         let used = part.rels().iter().any(|relationship| {
             relationship
@@ -817,6 +821,29 @@ fn next_relationship_id(part: &dyn super::Part) -> Result<String> {
         next = next
             .checked_add(1)
             .ok_or_else(|| invalid("no glossary relationship ID is available"))?;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::next_relationship_id_from;
+    use litchi_opc::{BlobPart, PackURI, Part};
+
+    #[test]
+    fn saturated_native_relationship_id_is_bounded() {
+        let mut part = BlobPart::new(
+            PackURI::new("/word/document.xml").unwrap(),
+            "application/xml".to_owned(),
+            Vec::new(),
+        );
+        part.rels_mut().add_relationship(
+            "urn:test".to_owned(),
+            "native.bin".to_owned(),
+            "rId4294967295".to_owned(),
+            false,
+        );
+        let error = next_relationship_id_from(&part, u32::MAX).unwrap_err();
+        assert!(error.to_string().contains("no glossary relationship ID"));
     }
 }
 

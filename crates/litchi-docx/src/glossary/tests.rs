@@ -547,7 +547,10 @@ fn aggregate_projection_and_dense_content_are_bounded() {
     let error = project(&root, &Limits::DEFAULT, None)
         .unwrap_err()
         .to_string();
-    assert!(error.contains("semantic XML exceeds"), "{error}");
+    assert!(
+        error.contains("glossary graph bytes limit exceeded"),
+        "{error}"
+    );
 
     let dense = "x<!--c-->".repeat((MAX_DOM_CONTENT / 2) + 1);
     let dense = format!(
@@ -2130,7 +2133,10 @@ fn aggregate_catalog_budget_is_checked_atomically() {
         )
         .unwrap_err()
         .to_string();
-    assert!(error.contains("exceeds 32 MiB"), "{error}");
+    assert!(
+        error.contains("glossary XML bytes limit exceeded"),
+        "{error}"
+    );
     assert_eq!(catalog.len(), before);
     assert!(catalog.get(rejected_name).unwrap().is_none());
 
@@ -2148,7 +2154,7 @@ fn aggregate_catalog_budget_is_checked_atomically() {
         .unwrap_err()
         .to_string();
     assert!(
-        replacement_error.contains("exceeds 32 MiB"),
+        replacement_error.contains("glossary XML bytes limit exceeded"),
         "{replacement_error}"
     );
     assert!(
@@ -2171,7 +2177,7 @@ fn aggregate_catalog_budget_is_checked_atomically() {
         .unwrap_err()
         .to_string();
     assert!(
-        background_error.contains("exceeds 32 MiB"),
+        background_error.contains("glossary XML bytes limit exceeded"),
         "{background_error}"
     );
     assert!(catalog.background().is_none());
@@ -2261,12 +2267,18 @@ fn transaction_auxiliary_budget_is_admitted_before_staging() {
     graph.parts.push(
         raw::Part::new(
             "/word/glossary/media/one.bin",
-            "application/octet-stream",
+            "image/png",
             vec![1],
             &Limits::DEFAULT,
         )
         .unwrap(),
     );
+    graph.rels.push(raw::Rel {
+        id: "rIdOne".to_owned(),
+        kind: rt::IMAGE.to_owned(),
+        target: "media/one.bin".to_owned(),
+        external: false,
+    });
     raw::put(&mut package, &graph, &Limits::DEFAULT).unwrap();
     let loaded = raw::load(&package, &Limits::DEFAULT).unwrap().unwrap();
     let graph_bytes = loaded.root_xml().unwrap().len()
