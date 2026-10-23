@@ -11,6 +11,7 @@
 //! content stays reachable, and anything the reader declined to model as a part
 //! is still reported.
 
+use litchi_opc::SourceLimits;
 use litchi_opc::constants::content_type as ct;
 use litchi_opc::leniency::{ContentTypeDefect, Defect};
 use litchi_opc::phys_pkg::PhysPkgReader;

@@ -12,6 +12,7 @@
 //! ordinary members; a fallible part access must inflate exactly the selected
 //! member; and a failed first access must remain a typed, stable refusal.
 
+use litchi_opc::SourceLimits;
 use litchi_opc::{OpcError, OpcPackage, PackURI, PackageWriter};
 use soapberry_zip::office::StreamingArchiveWriter;
 
@@ -222,7 +223,8 @@ fn part_metadata_separates_absence_from_a_failed_decode_without_decoding() {
 #[test]
 fn misdeclared_lazy_member_is_rejected_after_a_bounded_decode_probe() {
     let source = misdeclare_bad_member(archive());
-    let package = OpcPackage::from_vec(source.clone()).expect("misdeclaration is deferred");
+    let package = OpcPackage::from_vec(source.clone(), SourceLimits::default())
+        .expect("misdeclaration is deferred");
     let bad = package
         .part_metadata(&uri(BAD_URI))
         .expect("the misdeclared member is still present");

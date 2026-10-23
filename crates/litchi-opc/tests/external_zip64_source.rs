@@ -10,6 +10,7 @@
 
 use std::collections::HashMap;
 
+use litchi_opc::SourceCacheLimits;
 use litchi_opc::{PackURI, SourceBackedPackage, SourceLimits};
 use soapberry_zip::office::ArchiveLimits;
 use soapberry_zip::{PreservationIndex, ZipArchive};
@@ -146,13 +147,9 @@ fn independent_zip64_source_metadata_and_small_xml_edit_preserve_large_member() 
         .write_part_overlay_to_stream(&mut output, &pack(DOCUMENT_URI), REPLACEMENT.to_vec())
         .expect("small XML edit should publish while retaining ZIP64 source members");
 
-    let output_package = SourceBackedPackage::from_vec(
-        output.clone(),
-        limits,
-        litchi_opc::SourceCacheLimits::default(),
-        None,
-    )
-    .expect("edited ZIP64 publication should reopen as an OPC package");
+    let output_package =
+        SourceBackedPackage::from_vec(output.clone(), limits, SourceCacheLimits::default(), None)
+            .expect("edited ZIP64 publication should reopen as an OPC package");
     output_package
         .validate_topology_source_boundary()
         .expect("edited ZIP64 publication should retain a valid source topology");

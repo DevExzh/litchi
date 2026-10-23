@@ -19,6 +19,7 @@
 //!     test-data/ooxml/docx/documentProperties.docx /word/document.xml /tmp/document.xml
 //! ```
 
+use litchi_opc::SourceLimits;
 use litchi_opc::{OpcPackage, PackURI};
 use std::io::Write;
 use std::path::PathBuf;

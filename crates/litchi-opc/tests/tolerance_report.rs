@@ -11,6 +11,7 @@
 
 use litchi_opc::leniency::{ContentTypeDefect, Defect, RelationshipDefect, ToleranceReport};
 use litchi_opc::{OpcPackage, PackURI, SourceBackedPackage, TargetMode};
+use litchi_opc::{SourceCacheLimits, SourceLimits};
 use soapberry_zip::office::StreamingArchiveWriter;
 
 const CONTENT_TYPES: &str = r#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>"#;
@@ -52,7 +53,7 @@ fn reports(bytes: &[u8]) -> ToleranceReport {
     let source = SourceBackedPackage::from_vec(
         bytes.to_vec(),
         SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .expect("source-backed open");
@@ -537,7 +538,7 @@ fn content_type_grammar_deviations_are_kept_verbatim_and_recorded() {
             SourceBackedPackage::from_vec(
                 package_bytes(&fatal),
                 SourceLimits::default(),
-                litchi_opc::SourceCacheLimits::default(),
+                SourceCacheLimits::default(),
                 None
             )
             .is_err(),
@@ -593,7 +594,7 @@ fn structural_manifest_corruption_stays_fatal() {
             SourceBackedPackage::from_vec(
                 bytes,
                 SourceLimits::default(),
-                litchi_opc::SourceCacheLimits::default(),
+                SourceCacheLimits::default(),
                 None
             )
             .is_err(),
@@ -615,7 +616,7 @@ fn structural_manifest_corruption_stays_fatal() {
             SourceBackedPackage::from_vec(
                 bytes,
                 SourceLimits::default(),
-                litchi_opc::SourceCacheLimits::default(),
+                SourceCacheLimits::default(),
                 None
             )
             .is_err(),
@@ -713,7 +714,7 @@ fn non_xml_id_relationship_ids_are_kept_verbatim_and_recorded() {
     let materialized = SourceBackedPackage::from_vec(
         bytes.clone(),
         SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .unwrap()
@@ -739,7 +740,7 @@ fn non_xml_id_relationship_ids_are_kept_verbatim_and_recorded() {
             SourceBackedPackage::from_vec(
                 bytes,
                 SourceLimits::default(),
-                litchi_opc::SourceCacheLimits::default(),
+                SourceCacheLimits::default(),
                 None
             )
             .is_err(),
@@ -775,7 +776,7 @@ fn edited_relationships_keep_source_ids_verbatim_but_check_authored_ones() {
         .unwrap();
     let relationships = edited.get_part(&document).unwrap().rels();
     relationships
-        .plan_canonical(litchi_opc::SourceLimits::default())
+        .plan_canonical(SourceLimits::default())
         .expect("a source Id admitted verbatim is carried forward");
     let mut saved = Vec::new();
     edited
@@ -799,11 +800,7 @@ fn edited_relationships_keep_source_ids_verbatim_but_check_authored_ones() {
             TargetMode::External,
         )
         .unwrap();
-    assert!(
-        authored
-            .plan_canonical(litchi_opc::SourceLimits::default())
-            .is_err()
-    );
+    assert!(authored.plan_canonical(SourceLimits::default()).is_err());
 }
 
 /// A source-backed topology edit re-reads the opened manifest under the same
@@ -818,7 +815,7 @@ fn source_backed_topology_edits_accept_admitted_ids_but_check_added_ones() {
         let source = SourceBackedPackage::from_vec(
             bytes.to_vec(),
             SourceLimits::default(),
-            litchi_opc::SourceCacheLimits::default(),
+            SourceCacheLimits::default(),
             None,
         )
         .unwrap();
@@ -898,7 +895,7 @@ fn prepared_materialization_retains_ingress_repairs_after_edit() {
         let source = SourceBackedPackage::from_vec(
             package(CONTENT_TYPES, ROOT_RELS, &rels),
             SourceLimits::default(),
-            litchi_opc::SourceCacheLimits::default(),
+            SourceCacheLimits::default(),
             None,
         )
         .unwrap();

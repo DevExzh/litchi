@@ -24,6 +24,7 @@ use litchi_opc::{
     OpcPackage, OwnedAttributeUpdate, PackURI, PackageWriter, SourceBackedPackage,
     SourceTopologyPlan,
 };
+use litchi_opc::{SourceCacheLimits, SourceLimits, SourceReadPolicy};
 use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
 
 const BOM: &[u8] = b"\xEF\xBB\xBF";

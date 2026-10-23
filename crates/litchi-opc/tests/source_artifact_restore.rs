@@ -28,6 +28,7 @@ use litchi_opc::{
     OpcError, SourceArtifact, SourceArtifactFingerprint, SourceArtifactRestoreProof,
     SourceBackedPackage, SpliceResource,
 };
+use litchi_opc::{SourceCacheLimits, SourceLimits, SourceReadPolicy};
 use soapberry_zip::office::StreamingArchiveWriter;
 
 const CONTENT_TYPES_NS: &str = "http://schemas.openxmlformats.org/package/2006/content-types";
@@ -778,7 +779,7 @@ fn restore_uses_current_context_for_all_io_work_and_output() {
         managed_context(64 * 1024 * 1024, u64::MAX);
     let current = SourceBackedPackage::from_read_at(
         Arc::new(OwnedSource::new(bytes.clone())),
-        litchi_opc::SourceLimits::default(),
+        SourceLimits::default(),
         SourceCacheLimits::default(),
         SourceReadPolicy::exact(),
         Some(current_context),
@@ -786,7 +787,7 @@ fn restore_uses_current_context_for_all_io_work_and_output() {
     .expect("managed current package must open");
     let original = SourceBackedPackage::from_read_at(
         Arc::new(OwnedSource::new(bytes.clone())),
-        litchi_opc::SourceLimits::default(),
+        SourceLimits::default(),
         SourceCacheLimits::default(),
         SourceReadPolicy::exact(),
         Some(original_context),
@@ -833,7 +834,7 @@ fn restore_observes_original_context_cancellation_after_an_exact_short_prefix() 
         managed_context(64 * 1024 * 1024, u64::MAX);
     let current = SourceBackedPackage::from_read_at(
         Arc::new(OwnedSource::new(bytes.clone())),
-        litchi_opc::SourceLimits::default(),
+        SourceLimits::default(),
         SourceCacheLimits::default(),
         SourceReadPolicy::exact(),
         Some(current_context),
@@ -841,7 +842,7 @@ fn restore_observes_original_context_cancellation_after_an_exact_short_prefix() 
     .expect("managed current package must open");
     let original = SourceBackedPackage::from_read_at(
         Arc::new(OwnedSource::new(bytes)),
-        litchi_opc::SourceLimits::default(),
+        SourceLimits::default(),
         SourceCacheLimits::default(),
         SourceReadPolicy::exact(),
         Some(original_context),
@@ -881,7 +882,7 @@ fn managed_restore_releases_workspace_on_memory_hash_and_sink_failures() {
     let (budget, _cancellation, context) = managed_context(64 * 1024 * 1024, u64::MAX);
     let current = SourceBackedPackage::from_read_at(
         Arc::new(OwnedSource::new(bytes.clone())),
-        litchi_opc::SourceLimits::default(),
+        SourceLimits::default(),
         SourceCacheLimits::default(),
         SourceReadPolicy::exact(),
         Some(context.clone()),
@@ -970,7 +971,7 @@ fn managed_restore_authenticates_with_bounded_stack_when_memory_is_full() {
     let (budget, _cancellation, context) = managed_context(64 * 1024 * 1024, u64::MAX);
     let current = SourceBackedPackage::from_read_at(
         Arc::new(OwnedSource::new(current_bytes)),
-        litchi_opc::SourceLimits::default(),
+        SourceLimits::default(),
         SourceCacheLimits::default(),
         SourceReadPolicy::exact(),
         Some(context.clone()),
@@ -1007,7 +1008,7 @@ fn managed_restore_charges_shared_output_once_and_releases_memory_lease() {
     let (budget, _cancellation, context) = managed_context(64 * 1024 * 1024, u64::MAX);
     let current = SourceBackedPackage::from_read_at(
         Arc::new(OwnedSource::new(bytes.clone())),
-        litchi_opc::SourceLimits::default(),
+        SourceLimits::default(),
         SourceCacheLimits::default(),
         SourceReadPolicy::exact(),
         Some(context.clone()),
@@ -1015,7 +1016,7 @@ fn managed_restore_charges_shared_output_once_and_releases_memory_lease() {
     .expect("managed current package must open");
     let original = SourceBackedPackage::from_read_at(
         Arc::new(OwnedSource::new(bytes.clone())),
-        litchi_opc::SourceLimits::default(),
+        SourceLimits::default(),
         SourceCacheLimits::default(),
         SourceReadPolicy::exact(),
         Some(context),
@@ -1054,7 +1055,7 @@ fn restore_observes_cancellation_before_output_and_from_sink_callbacks() {
     let (budget, cancellation, context) = managed_context(64 * 1024 * 1024, u64::MAX);
     let current = SourceBackedPackage::from_read_at(
         Arc::new(OwnedSource::new(bytes.clone())),
-        litchi_opc::SourceLimits::default(),
+        SourceLimits::default(),
         SourceCacheLimits::default(),
         SourceReadPolicy::exact(),
         Some(context),
@@ -1084,7 +1085,7 @@ fn restore_observes_cancellation_before_output_and_from_sink_callbacks() {
     let (budget, cancellation, context) = managed_context(64 * 1024 * 1024, u64::MAX);
     let current = SourceBackedPackage::from_read_at(
         Arc::new(OwnedSource::new(bytes.clone())),
-        litchi_opc::SourceLimits::default(),
+        SourceLimits::default(),
         SourceCacheLimits::default(),
         SourceReadPolicy::exact(),
         Some(context),
@@ -1112,7 +1113,7 @@ fn restore_observes_cancellation_before_output_and_from_sink_callbacks() {
     let (budget, cancellation, context) = managed_context(64 * 1024 * 1024, u64::MAX);
     let current = SourceBackedPackage::from_read_at(
         Arc::new(OwnedSource::new(bytes.clone())),
-        litchi_opc::SourceLimits::default(),
+        SourceLimits::default(),
         SourceCacheLimits::default(),
         SourceReadPolicy::exact(),
         Some(context),

@@ -30,6 +30,7 @@
 use std::io::Cursor;
 use std::sync::Arc;
 
+use litchi_opc::SourceCacheLimits;
 use litchi_opc::{OpcError, OpcPackage, PackURI, SourceBackedPackage, SourceLimits};
 use soapberry_zip::office::StreamingArchiveWriter;
 
@@ -119,7 +120,7 @@ fn open_all(archive: &[u8]) -> Vec<(&'static str, Result<(), String>)> {
             map(SourceBackedPackage::from_vec(
                 archive.to_vec(),
                 SourceLimits::default(),
-                litchi_opc::SourceCacheLimits::default(),
+                SourceCacheLimits::default(),
                 None,
             )
             .map(drop)),
@@ -139,7 +140,7 @@ fn first_positional_read(archive: Vec<u8>) -> Result<(), OpcError> {
     let package = SourceBackedPackage::from_vec(
         archive,
         SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )?;
     package

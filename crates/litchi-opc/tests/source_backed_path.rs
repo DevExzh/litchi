@@ -9,6 +9,7 @@
 
 use std::fs;
 
+use litchi_opc::SourceCacheLimits;
 use litchi_opc::{OpcError, PackURI, SourceBackedPackage, SourceLimits};
 use soapberry_zip::office::StreamingArchiveWriter;
 use tempfile::NamedTempFile;
@@ -135,7 +136,7 @@ fn path_default_catalog_and_selected_data_match_from_vec_without_eager_unselecte
     let from_vec = SourceBackedPackage::from_vec(
         source,
         SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .unwrap();
@@ -179,7 +180,7 @@ fn path_with_limits_matches_from_vec_and_rejects_exact_too_small_input_and_part_
             .unwrap()
             .build()
             .unwrap(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .unwrap();
@@ -203,7 +204,7 @@ fn path_with_limits_matches_from_vec_and_rejects_exact_too_small_input_and_part_
                 .unwrap()
                 .build()
                 .unwrap(),
-            litchi_opc::SourceCacheLimits::default(),
+            SourceCacheLimits::default(),
             None
         ),
         Err(OpcError::Limit { .. })
@@ -226,7 +227,7 @@ fn path_with_limits_matches_from_vec_and_rejects_exact_too_small_input_and_part_
                 .unwrap()
                 .build()
                 .unwrap(),
-            litchi_opc::SourceCacheLimits::default(),
+            SourceCacheLimits::default(),
             None
         ),
         Err(OpcError::Limit { .. })

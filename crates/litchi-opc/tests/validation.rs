@@ -126,7 +126,7 @@ fn assert_structural_phase(bytes: Vec<u8>, check: &str, phases: [&str; 4]) {
     let report = validate_read_at(
         Arc::new(OwnedSource::new(bytes)),
         SourceLimits::default(),
-        litchi_core::ValidationLimits::default(),
+        ValidationLimits::default(),
     )
     .unwrap();
     assert!(report.has_errors());
@@ -155,13 +155,13 @@ fn valid_catalog_is_complete_deterministic_and_does_not_read_payload() {
     let first = validate_read_at(
         source.clone(),
         SourceLimits::default(),
-        litchi_core::ValidationLimits::default(),
+        ValidationLimits::default(),
     )
     .unwrap();
     let second = validate_read_at(
         Arc::new(OwnedSource::new(bytes)),
         SourceLimits::default(),
-        litchi_core::ValidationLimits::default(),
+        ValidationLimits::default(),
     )
     .unwrap();
 
@@ -195,7 +195,7 @@ fn malformed_content_types_and_relationships_are_conclusive_issues() {
         let report = validate_read_at(
             Arc::new(OwnedSource::new(bytes)),
             SourceLimits::default(),
-            litchi_core::ValidationLimits::default(),
+            ValidationLimits::default(),
         )
         .unwrap();
         assert!(!report.is_complete());
@@ -246,7 +246,7 @@ fn parser_errors_and_invalid_uris_keep_exact_manifest_phase() {
             b"document",
         ))),
         SourceLimits::default(),
-        litchi_core::ValidationLimits::default(),
+        ValidationLimits::default(),
     )
     .unwrap();
     assert!(!report.has_errors());
@@ -409,7 +409,7 @@ fn relationship_part_source_topology_belongs_to_catalog_admission() {
     let report = validate_read_at(
         Arc::new(OwnedSource::new(writer.finish_to_bytes().unwrap())),
         SourceLimits::default(),
-        litchi_core::ValidationLimits::default(),
+        ValidationLimits::default(),
     )
     .unwrap();
     assert!(report.has_errors());
@@ -433,7 +433,7 @@ fn duplicate_physical_entries_are_reported_as_structural_rejection() {
     let report = validate_read_at(
         Arc::new(OwnedSource::new(bytes)),
         SourceLimits::default(),
-        litchi_core::ValidationLimits::default(),
+        ValidationLimits::default(),
     )
     .unwrap();
     assert!(report.has_errors());
@@ -597,7 +597,7 @@ fn signature_presence_is_information_not_signature_validity() {
     let report = validate_read_at(
         Arc::new(OwnedSource::new(writer.finish_to_bytes().unwrap())),
         SourceLimits::default(),
-        litchi_core::ValidationLimits::default(),
+        ValidationLimits::default(),
     )
     .unwrap();
 
@@ -633,7 +633,7 @@ fn macro_payload_is_inert_and_not_claimed_as_a_validation_capability() {
     let report = validate_read_at(
         Arc::new(OwnedSource::new(writer.finish_to_bytes().unwrap())),
         SourceLimits::default(),
-        litchi_core::ValidationLimits::default(),
+        ValidationLimits::default(),
     )
     .unwrap();
 
@@ -652,7 +652,7 @@ fn io_and_source_change_failures_remain_errors() {
     let io_error = validate_read_at(
         Arc::new(FailingSource::new(bytes.clone())),
         SourceLimits::default(),
-        litchi_core::ValidationLimits::default(),
+        ValidationLimits::default(),
     )
     .unwrap_err();
     assert!(matches!(
@@ -663,7 +663,7 @@ fn io_and_source_change_failures_remain_errors() {
     let stale = validate_read_at(
         Arc::new(MutatingSource::new(bytes)),
         SourceLimits::default(),
-        litchi_core::ValidationLimits::default(),
+        ValidationLimits::default(),
     )
     .unwrap_err();
     assert!(matches!(stale, OpcError::SourceChanged { .. }));
@@ -685,7 +685,7 @@ fn io_and_source_change_failures_remain_errors() {
     let structural_stale = validate_read_at(
         Arc::new(MutatingSource::new(b"not a zip".to_vec())),
         SourceLimits::default(),
-        litchi_core::ValidationLimits::default(),
+        ValidationLimits::default(),
     )
     .unwrap_err();
     assert!(matches!(structural_stale, OpcError::SourceChanged { .. }));

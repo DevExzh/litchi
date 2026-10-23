@@ -30,6 +30,7 @@ use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionError, ExecutionLimits, Limits, ReadAt,
     Resource, SourceVersion,
 };
+use litchi_opc::SourceReadPolicy;
 use litchi_opc::{
     OpcError, PackURI, SourceBackedPackage, SourceCacheLimits, SourceLimitKind, SourceLimits,
 };
@@ -1011,7 +1012,7 @@ fn batch_preserves_request_order_duplicates_and_exact_serial_bytes() {
     let serial = SourceBackedPackage::from_vec(
         archive.clone(),
         SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .unwrap();
@@ -1037,7 +1038,7 @@ fn batch_preserves_request_order_duplicates_and_exact_serial_bytes() {
     let package = SourceBackedPackage::from_vec(
         archive,
         SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .unwrap();
@@ -1175,7 +1176,7 @@ fn batch_missing_and_corrupt_parts_fail_without_partial_results_or_flights() {
     let package = SourceBackedPackage::from_vec(
         archive,
         SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .unwrap();
@@ -1524,7 +1525,7 @@ fn batch_empty_one_worker_and_oversized_single_part_use_serial_fallbacks() {
     let empty = SourceBackedPackage::from_vec(
         archive.clone(),
         SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .unwrap();

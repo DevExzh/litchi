@@ -22,6 +22,7 @@ use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionLimits, FileSource, Limits, OwnedSource,
     ReadAt, Resource, SourceVersion,
 };
+use litchi_opc::SourceReadPolicy;
 use litchi_opc::{
     OpcOperationAccounting, PackURI, PartBatch, PartData, SourceBackedPackage,
     SourceCacheDiagnostics, SourceCacheLimits, SourceLimits,

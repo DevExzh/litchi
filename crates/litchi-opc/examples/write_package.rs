@@ -11,6 +11,7 @@
 //! cargo run -p litchi-opc --example write_package
 //! ```
 
+use litchi_opc::SourceLimits;
 use litchi_opc::{OpcPackage, PackURI, PackageWriter, XmlPart};
 use std::io::Write as _;
 use std::path::PathBuf;

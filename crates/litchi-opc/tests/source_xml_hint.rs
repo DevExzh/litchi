@@ -26,6 +26,7 @@ use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits, OwnedSource, ReadAt,
     Resource, SourceVersion,
 };
+use litchi_opc::SourceReadPolicy;
 use litchi_opc::{
     AuthoredXmlFragment, OpcError, PackURI, SourceBackedPackage, SourceCacheLimits, SourceLimits,
 };
@@ -730,7 +731,7 @@ fn malformed_current_source_is_revalidated_after_foreign_hint_mismatch() {
     let hint_package = SourceBackedPackage::from_vec(
         archive_bytes(FORMATTED_DOCUMENT),
         SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .unwrap();
@@ -742,7 +743,7 @@ fn malformed_current_source_is_revalidated_after_foreign_hint_mismatch() {
     let current = SourceBackedPackage::from_vec(
         archive_bytes(MALFORMED_DOCUMENT),
         SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .unwrap();
@@ -834,7 +835,7 @@ fn cancellation_before_and_during_hint_read_remains_typed_and_budgeted() {
     let foreign = SourceBackedPackage::from_vec(
         archive_bytes(FORMATTED_DOCUMENT),
         SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .unwrap();
@@ -860,7 +861,7 @@ fn signed_and_encrypted_packages_refuse_hints_before_payload_transfer() {
     let hint_package = SourceBackedPackage::from_vec(
         archive_bytes(FORMATTED_DOCUMENT),
         SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .unwrap();
@@ -873,7 +874,7 @@ fn signed_and_encrypted_packages_refuse_hints_before_payload_transfer() {
     let signed = SourceBackedPackage::from_vec(
         archive_with_options(FORMATTED_DOCUMENT, "application/xml", None, true),
         SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .expect("signed fixture must open");
@@ -895,7 +896,7 @@ fn signed_and_encrypted_packages_refuse_hints_before_payload_transfer() {
     let encrypted_error = match SourceBackedPackage::from_vec(
         encrypted_archive,
         SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     ) {
         Ok(_) => panic!("an encrypted member must be refused during admission"),

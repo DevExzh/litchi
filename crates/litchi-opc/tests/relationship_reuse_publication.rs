@@ -16,6 +16,7 @@
 //! 2,189 of the 2,216 relationships members in this repository's OOXML corpus
 //! are spelled differently from their canonical form, so if keeping the capture
 //! could move a published byte, it would move one here.
+use litchi_opc::SourceLimits;
 use litchi_opc::phys_pkg::PhysPkgReader;
 use litchi_opc::{OpcPackage, PackURI, PackageWriter};
 

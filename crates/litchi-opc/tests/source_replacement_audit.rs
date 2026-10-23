@@ -10,6 +10,7 @@
 //! `verify_source` audits it replaces, through every public door.
 
 use litchi_opc::{OpcError, PackURI, SourceBackedPackage, SourceTopologyPlan};
+use litchi_opc::{SourceCacheLimits, SourceLimits};
 use soapberry_zip::office::StreamingArchiveWriter;
 use xml_minifier::audit::{Limits, verify_source};
 
@@ -79,7 +80,7 @@ fn publish(door: Door, original: &[u8], replacement: Vec<u8>) -> (Result<(), Opc
     let package = SourceBackedPackage::from_vec(
         archive(original),
         SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .expect("fixture opens");
@@ -129,14 +130,14 @@ fn a_local_edit_publishes_the_replacement_and_leaves_every_other_member_exact() 
         let before = SourceBackedPackage::from_vec(
             archive(&original),
             SourceLimits::default(),
-            litchi_opc::SourceCacheLimits::default(),
+            SourceCacheLimits::default(),
             None,
         )
         .unwrap();
         let after = SourceBackedPackage::from_vec(
             output,
             SourceLimits::default(),
-            litchi_opc::SourceCacheLimits::default(),
+            SourceCacheLimits::default(),
             None,
         )
         .expect("published package reopens");

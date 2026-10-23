@@ -17,6 +17,7 @@
 use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
 
+use litchi_opc::SourceLimits;
 use litchi_opc::phys_pkg::PhysPkgReader;
 use quick_xml::events::Event;
 use xml_minifier::audit::{self, Limits, package};

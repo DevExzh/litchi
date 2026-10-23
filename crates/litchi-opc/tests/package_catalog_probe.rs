@@ -9,6 +9,7 @@
 use std::io::{self, Cursor, Read, Seek, SeekFrom};
 use std::ops::Range;
 
+use litchi_opc::SourceCacheLimits;
 use litchi_opc::{
     OpcError, OpcPackage, SourceBackedPackage, SourceLimitKind, SourceLimits,
     probe_package_catalog_from_reader,
@@ -293,13 +294,8 @@ fn archive_total_entry_limit_is_consistent_across_ingress_paths() {
     let bytes = directory_entry_fixture();
     let exact = directory_entry_limits(6);
     assert!(
-        SourceBackedPackage::from_vec(
-            bytes.clone(),
-            exact,
-            litchi_opc::SourceCacheLimits::default(),
-            None
-        )
-        .is_ok()
+        SourceBackedPackage::from_vec(bytes.clone(), exact, SourceCacheLimits::default(), None)
+            .is_ok()
     );
     assert!(OpcPackage::from_bytes(&bytes, exact).is_ok());
     let mut exact_reader = Cursor::new(bytes.clone());
@@ -309,12 +305,8 @@ fn archive_total_entry_limit_is_consistent_across_ingress_paths() {
     );
 
     let under = directory_entry_limits(5);
-    let source = SourceBackedPackage::from_vec(
-        bytes.clone(),
-        under,
-        litchi_opc::SourceCacheLimits::default(),
-        None,
-    );
+    let source =
+        SourceBackedPackage::from_vec(bytes.clone(), under, SourceCacheLimits::default(), None);
     assert!(matches!(
         source,
         Err(OpcError::Limit {
@@ -387,7 +379,7 @@ fn limited_probe_matches_eager_and_source_catalog_semantics() {
     let source = SourceBackedPackage::from_vec(
         fixture.bytes.clone(),
         SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .unwrap();

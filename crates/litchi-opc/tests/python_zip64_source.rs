@@ -15,6 +15,7 @@
 use std::collections::HashMap;
 
 use litchi_opc::{OpcPackage, PackURI, PackageWriter, SourceBackedPackage};
+use litchi_opc::{SourceCacheLimits, SourceLimits};
 use soapberry_zip::office::ArchiveLimits;
 use soapberry_zip::{PreservationIndex, RECOMMENDED_BUFFER_SIZE, ZipArchive};
 
@@ -74,7 +75,7 @@ fn python_force_zip64_source_overlay_is_exact_on_noop_and_preserves_untouched_me
     SourceBackedPackage::from_vec(
         SOURCE.to_vec(),
         SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .unwrap()
@@ -85,7 +86,7 @@ fn python_force_zip64_source_overlay_is_exact_on_noop_and_preserves_untouched_me
     let package = SourceBackedPackage::from_vec(
         SOURCE.to_vec(),
         SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .expect("open source-backed OPC");
@@ -114,7 +115,7 @@ fn python_force_zip64_source_overlay_is_exact_on_noop_and_preserves_untouched_me
     SourceBackedPackage::from_vec(
         SOURCE.to_vec(),
         SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .unwrap()
@@ -137,7 +138,7 @@ fn python_force_zip64_source_overlay_is_exact_on_noop_and_preserves_untouched_me
     let reopened_source = SourceBackedPackage::from_vec(
         output.clone(),
         SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .expect("reopen targeted source-backed output");

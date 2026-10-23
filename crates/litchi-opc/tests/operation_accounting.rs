@@ -11,6 +11,7 @@ use std::sync::Arc;
 
 use litchi_core::OwnedSource;
 use litchi_opc::{OpcError, OpcOperationAccounting, PackURI, SourceBackedPackage};
+use litchi_opc::{SourceCacheLimits, SourceLimits, SourceReadPolicy};
 use soapberry_zip::office::StreamingArchiveWriter;
 
 const CONTENT_TYPES: &[u8] = br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/></Types>"#;

@@ -14,6 +14,7 @@ use std::sync::{
 
 use litchi_core::{OwnedSource, ReadAt};
 use litchi_opc::{OpcError, PackURI, SourceBackedPackage, SourceLimitKind, SourceLimits};
+use litchi_opc::{SourceCacheLimits, SourceReadPolicy};
 use soapberry_zip::office::StreamingArchiveWriter;
 
 const CONTENT_TYPES_NS: &str = "http://schemas.openxmlformats.org/package/2006/content-types";
@@ -139,13 +140,9 @@ fn reader_ingress_consumes_once_and_keeps_ordinary_payloads_cold() {
         .unwrap();
     let mut reader = SinglePassReader::new(source);
 
-    let package = SourceBackedPackage::from_reader(
-        &mut reader,
-        limits,
-        litchi_opc::SourceCacheLimits::default(),
-        None,
-    )
-    .unwrap();
+    let package =
+        SourceBackedPackage::from_reader(&mut reader, limits, SourceCacheLimits::default(), None)
+            .unwrap();
 
     assert_eq!(reader.bytes_read, input_length);
     assert_eq!(reader.offset, input_length);
@@ -172,14 +169,10 @@ fn reader_ingress_rejects_input_above_max_input_bytes() {
         .unwrap();
     let mut reader = SinglePassReader::new(source);
 
-    let error = SourceBackedPackage::from_reader(
-        &mut reader,
-        limits,
-        litchi_opc::SourceCacheLimits::default(),
-        None,
-    )
-    .err()
-    .expect("input larger than max_input_bytes must be rejected");
+    let error =
+        SourceBackedPackage::from_reader(&mut reader, limits, SourceCacheLimits::default(), None)
+            .err()
+            .expect("input larger than max_input_bytes must be rejected");
 
     assert!(matches!(
         error,
@@ -205,13 +198,9 @@ fn reader_ingress_retries_one_interrupted_read() {
         .unwrap();
     let mut reader = InterruptOnceReader::new(source);
 
-    let package = SourceBackedPackage::from_reader(
-        &mut reader,
-        limits,
-        litchi_opc::SourceCacheLimits::default(),
-        None,
-    )
-    .expect("a transient interrupted read must be retried");
+    let package =
+        SourceBackedPackage::from_reader(&mut reader, limits, SourceCacheLimits::default(), None)
+            .expect("a transient interrupted read must be retried");
 
     assert!(reader.interrupted);
     assert_eq!(reader.inner.bytes_read, input_length);
@@ -225,7 +214,7 @@ fn reader_ingress_rejects_invalid_read_count_without_panicking() {
         SourceBackedPackage::from_reader(
             InvalidCountReader,
             SourceLimits::default(),
-            litchi_opc::SourceCacheLimits::default(),
+            SourceCacheLimits::default(),
             None,
         )
     }));
@@ -251,7 +240,7 @@ fn assert_index_limit_is_typed_for_both_sources(
     let from_vec = match SourceBackedPackage::from_vec(
         source.to_vec(),
         limits,
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     ) {
         Ok(_) => panic!("the vec source must exceed {expected:?}"),
@@ -429,7 +418,7 @@ fn stream_to_keeps_raw_source_and_sink_io_errors_typed() {
     let package = SourceBackedPackage::from_vec(
         archive_bytes(),
         SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .unwrap();
