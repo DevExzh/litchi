@@ -455,3 +455,20 @@ The focused core-type route test passed 2/2. The candidate core unit run passed
 the original `ddf2ac8a...` baseline and on candidate `d56448c7e1`; the new
 packed-field-length mutation regression also passed. The former nested length
 mismatch is therefore repaired rather than attributed as a baseline failure.
+
+## Follow-up public-version mutation guard
+
+The default-profile fast path also compares the current public `versions`
+vector with `DEFAULT_MESSAGE_VERSIONS`. The earlier predicate checked only the
+vector length, so a caller that changed one version value could still enter
+the fixed-shape admission branch. Commit `e1da0c08f2` adds the exact value
+check and a regression that mutates a version to `u32::MAX` and confirms the
+constructor preserves that value while taking the complete checked path.
+The test import correction is in `ceb87be1d3`.
+
+The focused core test command was rerun sequentially against that source:
+`cargo test --offline --locked --manifest-path
+crates/litchi-iwa-core/Cargo.toml --lib`; all 83 tests passed, including the
+retained-header and public-version mutation regressions. This is correctness
+evidence only. The existing v22 Callgrind/allocation binaries predate
+`e1da0c08f2`, and no native timing claim is made for the follow-up source.
