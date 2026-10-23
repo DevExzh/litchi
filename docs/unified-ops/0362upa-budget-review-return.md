@@ -49,3 +49,13 @@ freshness helper assumed a numeric cell in `Simple.xls`, which has none.
 The helper must create or select a valid numeric source before exercising
 cold, cached, inflight and handoff fences; no freshness assertion is waived.
 The complete XLS run and all subsequent qualification remain required.
+
+The corrected generated XLS fixture passes the complete unit/integration
+run on `374fb0e5d9`: 1,863 tests across 85 suites, one ignored. The XLSX
+library suite on that source passes 1,842 tests and fails five. Picture-only
+transfers lose their target; shared-string transfers lose their exact
+index/dependency and projected identity; two staged/joined capture-budget
+boundaries fail. The transfer and ledger owners must repair behavior while
+preserving these existing assertions. The source remains diagnostic.
+[xls-xlsx-runtime-v2.json](results/0362up/xls-xlsx-runtime-v2.json) retains
+both commands, summaries and external log hashes.
