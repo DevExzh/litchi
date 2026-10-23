@@ -73,8 +73,9 @@ use litchi_core::{ExecutionContext, ExecutionError, ReadAt, Reservation, Resourc
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{
-    ArtifactStreamPolicy, BlobPart, PackURI, Part, PartData, PartView, SourceArtifactFingerprint,
-    SourceBackedPackage, SourceCacheDiagnostics, SourceTopologyPlan,
+    ArtifactStreamPolicy, ArtifactStreamPublication, ArtifactStreamTarget, BlobPart, PackURI, Part,
+    PartData, PartView, SourceArtifactFingerprint, SourceBackedPackage, SourceCacheDiagnostics,
+    SourceTopologyPlan,
 };
 use quick_xml::events::{BytesRef, BytesStart, Event};
 use quick_xml::name::{Namespace, NamespaceResolver, ResolveResult};
@@ -1343,6 +1344,65 @@ impl Package {
             )?,
         }
         Ok(())
+    }
+
+    /// Publish one changed Part through the sealed OPC artifact target.
+    ///
+    /// The target owns the recipient sink and the complete ZIP/OPC census;
+    /// this helper only constructs the bounded native topology plan that the
+    /// ordinary publisher already uses for the same replacement.
+    pub(crate) fn stream_part_overlay(
+        &self,
+        target: &mut ArtifactStreamTarget<'_>,
+        partname: &PackURI,
+        payload: &Arc<Vec<u8>>,
+    ) -> Result<ArtifactStreamPublication> {
+        let package = self.physical_package()?.clone();
+        let mut plan = SourceTopologyPlan::new();
+        plan.try_replace_part_shared(partname.clone(), Arc::clone(payload))
+            .map_err(Error::Opc)?;
+        target.publish_overlay(package, plan).map_err(Error::Opc)
+    }
+
+    /// Publish several changed Parts and their explicitly removed external
+    /// relationships through the sealed OPC artifact target.
+    pub(crate) fn stream_relationship_overlays(
+        &self,
+        target: &mut ArtifactStreamTarget<'_>,
+        overlays: impl IntoIterator<Item = (PackURI, Vec<u8>, Vec<String>)>,
+    ) -> Result<ArtifactStreamPublication> {
+        let package = self.physical_package()?.clone();
+        let mut plan = SourceTopologyPlan::new();
+        for (partname, replacement, removed_relationship_ids) in overlays {
+            plan.try_replace_part(partname.clone(), replacement)
+                .map_err(Error::Opc)?;
+            for relationship_id in removed_relationship_ids {
+                plan.try_remove_external_relationship(partname.clone(), relationship_id)
+                    .map_err(Error::Opc)?;
+            }
+        }
+        target.publish_overlay(package, plan).map_err(Error::Opc)
+    }
+
+    /// Create a deferred one-Part publication with both ordinary and sealed
+    /// OPC output routes. The two routes deliberately share only immutable
+    /// package/payload ownership; neither route borrows a caller sink.
+    pub(crate) fn deferred_part_overlay(
+        &self,
+        partname: PackURI,
+        payload: Arc<Vec<u8>>,
+    ) -> Result<Self> {
+        let ordinary_base = self.clone();
+        let stream_base = ordinary_base.clone();
+        let ordinary_part = partname.clone();
+        let stream_part = partname;
+        let ordinary_payload = Arc::clone(&payload);
+        self.deferred(
+            move |writer, policy| {
+                ordinary_base.write_part_overlay(writer, &ordinary_part, &ordinary_payload, policy)
+            },
+            move |target| stream_base.stream_part_overlay(target, &stream_part, &payload),
+        )
     }
 
     /// Check a section-layout patch against the current main document and

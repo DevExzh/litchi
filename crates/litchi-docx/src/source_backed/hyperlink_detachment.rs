@@ -33,9 +33,7 @@ impl Change for DetachmentChange {
         if self.is_noop() {
             return Ok(package.clone());
         }
-        let base = package.clone();
-        package
-            .deferred(move |writer, policy| base.write_part_overlay(writer, &main, &target, policy))
+        package.deferred_part_overlay(main, target)
     }
 }
 

@@ -55,10 +55,27 @@ impl Change for RedactionChange {
                     return Ok(package.clone());
                 }
                 let base = package.clone();
-                let commit = Arc::clone(commit);
-                package.deferred(move |writer, policy| {
-                    base.write_external_hyperlink_redaction(writer, &main, &commit, policy)
-                })
+                let stream_base = base.clone();
+                let ordinary_commit = Arc::clone(commit);
+                let stream_commit = Arc::clone(commit);
+                let stream_main = main.clone();
+                package.deferred(
+                    move |writer, policy| {
+                        base.write_external_hyperlink_redaction(
+                            writer,
+                            &main,
+                            &ordinary_commit,
+                            policy,
+                        )
+                    },
+                    move |target| {
+                        let (replacement, removed_ids) = redact::publication_parts(&stream_commit);
+                        stream_base.stream_relationship_overlays(
+                            target,
+                            [(stream_main.clone(), replacement, removed_ids)],
+                        )
+                    },
+                )
             },
             Self::Inverse { noop: true, .. } => Ok(package.clone()),
             // Only the commit's own package can be restored.

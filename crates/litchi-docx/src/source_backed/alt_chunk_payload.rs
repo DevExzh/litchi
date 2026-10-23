@@ -50,10 +50,8 @@ impl Change for PayloadChange {
         if self.is_noop() {
             return Ok(package.clone());
         }
-        let base = package.clone();
         let (part, after) = (self.part.clone(), Arc::clone(&self.after));
-        package
-            .deferred(move |writer, policy| base.write_part_overlay(writer, &part, &after, policy))
+        package.deferred_part_overlay(part, after)
     }
 }
 

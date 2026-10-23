@@ -29,7 +29,8 @@ use litchi_ooxml_common::xml_name::is_qualified_name;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::source_backed::VerifiedDecodedReaderError;
 use litchi_opc::{
-    SourcePartSpliceFragment, SourcePartSpliceLimits, SourcePartSplicePlan, SourcePartSpliceProof,
+    ArtifactStreamGuard, ArtifactStreamPublication, ArtifactStreamTarget, SourcePartSpliceFragment,
+    SourcePartSpliceLimits, SourcePartSplicePlan, SourcePartSpliceProof,
 };
 use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
@@ -503,6 +504,55 @@ impl PreparedTail {
     ) -> Result<()> {
         publish_splice(self.splice.duplicate(), &self.options, writer, policy)
     }
+
+    fn stream_to_target(
+        &self,
+        target: &mut ArtifactStreamTarget<'_>,
+    ) -> crate::Result<ArtifactStreamPublication> {
+        let guard = TailPublicationGuard::from_options(&self.options);
+        target
+            .publish_splice_with_guard(&self.splice, &guard)
+            .map_err(crate::Error::from)
+    }
+}
+
+/// Carries the tail edit's optional cancellation fences into the native OPC
+/// splice writer. The package execution context remains the target policy's
+/// authority; this guard only repeats the format-owned checks that ordinary
+/// publication performs before each sink callback.
+struct TailPublicationGuard {
+    execution: Option<ExecutionContext>,
+    cancellation: Option<CancellationToken>,
+}
+
+impl TailPublicationGuard {
+    fn from_options(options: &EditOptions) -> Self {
+        Self {
+            execution: options.execution.clone(),
+            cancellation: options.cancellation.clone(),
+        }
+    }
+}
+
+impl ArtifactStreamGuard for TailPublicationGuard {
+    type Error = crate::Error;
+
+    fn check(&self) -> std::result::Result<(), Self::Error> {
+        if let Some(execution) = self.execution.as_ref() {
+            execution.check().map_err(stream_execution_error)?;
+        }
+        if let Some(cancellation) = self.cancellation.as_ref() {
+            cancellation.check().map_err(stream_execution_error)?;
+        }
+        Ok(())
+    }
+}
+
+fn stream_execution_error(error: ExecutionError) -> crate::Error {
+    match error {
+        ExecutionError::Cancelled => crate::Error::Opc(litchi_opc::OpcError::Cancelled),
+        error => crate::Error::Opc(litchi_opc::OpcError::Execution(error)),
+    }
 }
 
 /// The append (its text and policy, with the plan prepared for the commit's
@@ -563,10 +613,12 @@ impl crate::source_backed::deferred::Change for TailChange {
         if prepared.splice.is_noop() {
             return Ok(package.clone());
         }
+        let stream_prepared = Arc::clone(&prepared);
         package
-            .deferred(move |writer, policy| {
-                prepared.write(writer, policy).map_err(tail_to_document)
-            })
+            .deferred(
+                move |writer, policy| prepared.write(writer, policy).map_err(tail_to_document),
+                move |target| stream_prepared.stream_to_target(target),
+            )
             .map_err(Error::Document)
     }
 }
@@ -574,7 +626,7 @@ impl crate::source_backed::deferred::Change for TailChange {
 fn tail_to_document(error: Error) -> DocumentError {
     match error {
         Error::Document(error) => error,
-        other => DocumentError::Other(other.to_string()),
+        other => DocumentError::TailAppend(Box::new(other)),
     }
 }
 

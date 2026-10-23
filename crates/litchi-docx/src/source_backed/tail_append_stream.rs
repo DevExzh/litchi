@@ -8,11 +8,11 @@
 use super::{Package, tail_append};
 use crate::namespace::{STRICT_WORDPROCESSINGML_NAMESPACE, WORDPROCESSINGML_NAMESPACE};
 use litchi_core::{CancellationToken, ExecutionContext, Reservation, Resource};
-use litchi_opc::SourceArtifactFingerprint;
 use litchi_opc::source_backed::{
     SourcePartSpliceLimits, SourcePartSpliceProof, SourcePartSpliceReplay,
     SourcePartSpliceReplayError, SourcePartSpliceReplayProof, VerifiedDecodedReaderError,
 };
+use litchi_opc::{ArtifactStreamPublication, ArtifactStreamTarget, SourceArtifactFingerprint};
 use sha2::{Digest as _, Sha256};
 use std::fmt;
 use std::io::{self, BufRead, Read, Write};
@@ -1698,6 +1698,32 @@ impl PreparedStream {
             publication.candidate_artifact_fingerprint().into_sha256(),
         ));
         Ok(())
+    }
+
+    /// Publish the prepared splice through the sealed OPC artifact target.
+    ///
+    /// The expected candidate archive proof, when present, is authenticated
+    /// by the native splice publisher before the target sink is touched. The
+    /// no-expectation route remains the same bounded splice operation used by
+    /// the ordinary writer path.
+    pub(super) fn stream_to_target(
+        &self,
+        target: &mut ArtifactStreamTarget<'_>,
+    ) -> std::result::Result<ArtifactStreamPublication, litchi_opc::OpcError> {
+        let splice = self.splice.duplicate();
+        let publication = match self.expected_candidate_archive {
+            Some(expected) => target.publish_splice_with_expected_artifact(
+                &splice,
+                expected.len,
+                SourceArtifactFingerprint::from_sha256(expected.sha256),
+            ),
+            None => target.publish_splice(&splice),
+        }?;
+        let _ = self.written.set(patch::ArtifactProof::new(
+            publication.written(),
+            publication.fingerprint().into_sha256(),
+        ));
+        Ok(publication)
     }
 
     /// The durable forward patch of this append, whose candidate archive is

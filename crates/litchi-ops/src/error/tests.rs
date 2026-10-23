@@ -1931,6 +1931,20 @@ fn docx_refusals_classify_by_kind_and_patch_conflicts_are_invalid_input() {
         Code::InternalError,
     );
     assert_code(
+        litchi_docx::Error::TailAppend(Box::new(
+            litchi_docx::source_backed::tail_append::Error::Execution(
+                litchi_core::ExecutionError::Cancelled,
+            ),
+        )),
+        Code::Cancelled,
+    );
+    assert_code(
+        litchi_docx::Error::TailAppend(Box::new(
+            litchi_docx::source_backed::tail_append::Error::PatchConflict,
+        )),
+        Code::InvalidInput,
+    );
+    assert_code(
         litchi_docx::document::Error::PatchConflict,
         Code::InvalidInput,
     );

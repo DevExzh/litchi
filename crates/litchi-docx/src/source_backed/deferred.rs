@@ -11,10 +11,10 @@
 use std::io::Write;
 use std::sync::{Arc, OnceLock};
 
-use litchi_core::OwnedSource;
+use litchi_core::{ExecutionContext, OwnedSource};
 use litchi_opc::{
-    ArtifactStream, ArtifactStreamPolicy, SourceBackedPackage, SourceLimitKind, SourceLimits,
-    SourceReadPolicy,
+    ArtifactStream, ArtifactStreamPolicy, ArtifactStreamPublication, ArtifactStreamTarget,
+    SourceBackedPackage, SourceCacheLimits, SourceLimitKind, SourceLimits, SourceReadPolicy,
 };
 
 use super::Package;
@@ -29,12 +29,26 @@ use crate::{Error, Result};
 pub(crate) type Publish =
     dyn for<'a> Fn(&mut dyn Write, Option<&ArtifactStreamPolicy<'a>>) -> Result<()> + Send + Sync;
 
+/// Publishes a deferred artifact through the sealed OPC artifact target.
+///
+/// This is deliberately a separate route from [`Publish`]. Ordinary DOCX
+/// output still owns its caller-provided `Write` sink; cross-owner artifact
+/// streams must instead select one native OPC publication method and return
+/// its target-bound proof.
+pub(crate) type StreamPublish = dyn for<'a> Fn(&mut ArtifactStreamTarget<'a>) -> Result<ArtifactStreamPublication>
+    + Send
+    + Sync;
+
 /// The pending output of a committed package.
 pub(crate) struct Deferred {
     /// The package the commit was made on.
     pub(crate) base: Package,
     publish: Box<Publish>,
+    stream_publish: Box<StreamPublish>,
     limits: SourceLimits,
+    cache_limits: SourceCacheLimits,
+    source_read_policy: SourceReadPolicy,
+    execution_context: Option<ExecutionContext>,
     materialized: OnceLock<SourceBackedPackage>,
     /// The length and SHA-256 of the written artifact.
     fingerprint: OnceLock<(u64, [u8; 32])>,
@@ -61,17 +75,13 @@ impl Deferred {
         // zero-copy unmanaged path; reopening the same moved bytes through the
         // explicit context constructor keeps cancellation, work and output
         // accounting attached to the recipient for later exact restoration.
-        let package = match self.base.execution_context() {
-            Some(context) =>
-                SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_source_read_policy_and_execution_context(
-                    Arc::new(OwnedSource::new(bytes)),
-                    self.limits,
-                    Default::default(),
-                    SourceReadPolicy::exact(),
-                    context,
-                )?,
-            None => SourceBackedPackage::from_vec_with_limits(bytes, self.limits)?,
-        };
+        let package = SourceBackedPackage::from_read_at(
+            Arc::new(OwnedSource::new(bytes)),
+            self.limits,
+            self.cache_limits,
+            self.source_read_policy,
+            self.execution_context.clone(),
+        )?;
         Ok(self.materialized.get_or_init(|| package))
     }
 
@@ -100,6 +110,19 @@ impl Deferred {
             },
         }
     }
+
+    /// Publish the committed artifact through the sealed OPC target.
+    pub(crate) fn stream_to(
+        &self,
+        target: &mut ArtifactStreamTarget<'_>,
+    ) -> Result<ArtifactStreamPublication> {
+        let publication = (self.stream_publish)(target)?;
+        let _ = self.fingerprint.set((
+            publication.written(),
+            publication.fingerprint().into_sha256(),
+        ));
+        Ok(publication)
+    }
 }
 
 impl Package {
@@ -107,6 +130,12 @@ impl Package {
     pub(crate) fn deferred(
         &self,
         publish: impl for<'a> Fn(&mut dyn Write, Option<&ArtifactStreamPolicy<'a>>) -> Result<()>
+        + Send
+        + Sync
+        + 'static,
+        stream_publish: impl for<'a> Fn(
+            &mut ArtifactStreamTarget<'a>,
+        ) -> Result<ArtifactStreamPublication>
         + Send
         + Sync
         + 'static,
@@ -125,13 +154,22 @@ impl Package {
         }
         let base = self.clone();
         let limits = physical.read_limits();
+        let cache_limits = physical.cache_limits();
+        let source_read_policy = physical.source_read_policy();
+        let execution_context = self
+            .execution_context()
+            .or_else(|| physical.execution_context());
         let mut next =
             Self::with_execution(self.physical_source()?.clone(), self.execution.clone())?
                 .with_semantic_limits(self.semantic_limits().clone());
         next.deferred = Some(Arc::new(Deferred {
             base,
             publish: Box::new(publish),
+            stream_publish: Box::new(stream_publish),
             limits,
+            cache_limits,
+            source_read_policy,
+            execution_context,
             materialized: OnceLock::new(),
             fingerprint: OnceLock::new(),
         }));
@@ -148,10 +186,15 @@ impl ArtifactStream for Package {
 
     fn stream_to(
         &self,
-        writer: &mut dyn Write,
-        policy: &ArtifactStreamPolicy<'_>,
-    ) -> std::result::Result<(), Self::Error> {
-        self.write_to_with_policy(writer, policy)
+        target: &mut ArtifactStreamTarget<'_>,
+    ) -> std::result::Result<ArtifactStreamPublication, Self::Error> {
+        match (&self.effective, &self.deferred) {
+            (Some(topology), _) => target.publish_topology(topology).map_err(Error::Opc),
+            (None, Some(deferred)) => deferred.stream_to(target),
+            (None, None) => target
+                .publish_source_package(self.physical.clone())
+                .map_err(Error::Opc),
+        }
     }
 }
 
@@ -234,6 +277,14 @@ impl Package {
             let max_output_bytes = proof.original_len.max(1);
             let current_package = self.clone();
             let original_package = after.clone();
+            let cache_limits = current.cache_limits();
+            let source_read_policy = current.source_read_policy();
+            let execution_context = self
+                .execution_context()
+                .or_else(|| current.execution_context());
+            let stream_current = current_package.clone();
+            let stream_original = original_package.clone();
+            let stream_physical = current.clone();
             let mut next = Self::with_execution(current.clone(), self.execution.clone())?
                 .with_semantic_limits(self.semantic_limits().clone());
             next.deferred = Some(Arc::new(Deferred {
@@ -254,7 +305,21 @@ impl Package {
                         writer,
                     )?),
                 }),
+                stream_publish: Box::new(move |target| {
+                    target
+                        .publish_restore(
+                            &stream_physical,
+                            &stream_current,
+                            &stream_original,
+                            proof,
+                            max_output_bytes,
+                        )
+                        .map_err(Error::from)
+                }),
                 limits: recipient_read_limits,
+                cache_limits,
+                source_read_policy,
+                execution_context,
                 materialized: OnceLock::new(),
                 fingerprint: OnceLock::from((
                     proof.original_len,
@@ -298,6 +363,14 @@ impl Package {
         };
         let max_output_bytes = proof.original_len.max(1);
         let recipient = self.physical.clone();
+        let cache_limits = recipient.cache_limits();
+        let source_read_policy = recipient.source_read_policy();
+        let execution_context = self
+            .execution_context()
+            .or_else(|| recipient.execution_context());
+        let stream_current = current_package.clone();
+        let stream_original = original_package.clone();
+        let stream_recipient = recipient.clone();
         let mut next = Self::with_execution(recipient, self.execution.clone())?
             .with_semantic_limits(self.semantic_limits().clone());
         next.deferred = Some(Arc::new(Deferred {
@@ -315,7 +388,21 @@ impl Package {
                         policy,
                     )?)
             }),
+            stream_publish: Box::new(move |target| {
+                target
+                    .publish_restore(
+                        &stream_recipient,
+                        &stream_current,
+                        &stream_original,
+                        proof,
+                        max_output_bytes,
+                    )
+                    .map_err(Error::from)
+            }),
             limits: recipient_read_limits,
+            cache_limits,
+            source_read_policy,
+            execution_context,
             materialized: OnceLock::new(),
             fingerprint: OnceLock::from((proof.original_len, proof.original_sha256.into_sha256())),
         }));
@@ -509,14 +596,20 @@ pub(crate) use source_family;
 
 #[cfg(test)]
 mod tests {
+    use std::io;
+    use std::sync::{
+        Arc,
+        atomic::{AtomicU64, AtomicUsize, Ordering},
+    };
+
     use super::Package;
     use crate::source_backed::story_text;
-    use litchi_core::Position;
+    use litchi_core::{Position, ReadAt, SourceVersion};
     use litchi_opc::constants::content_type as ct;
     use litchi_opc::constants::relationship_type as rt;
     use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter};
 
-    fn package() -> Package {
+    fn package_bytes() -> Vec<u8> {
         let mut archive = OpcPackage::new();
         archive
             .try_add_part(Box::new(BlobPart::new(
@@ -526,7 +619,56 @@ mod tests {
             )))
             .unwrap();
         archive.relate_to("word/document.xml", rt::OFFICE_DOCUMENT);
-        Package::from_bytes(&PackageWriter::to_bytes(&archive).unwrap()).unwrap()
+        PackageWriter::to_bytes(&archive).unwrap()
+    }
+
+    fn package() -> Package {
+        Package::from_bytes(&package_bytes()).unwrap()
+    }
+
+    struct CountingVersionedSource {
+        bytes: Vec<u8>,
+        revision: AtomicU64,
+        reads: AtomicUsize,
+    }
+
+    impl CountingVersionedSource {
+        fn new(bytes: Vec<u8>) -> Self {
+            Self {
+                bytes,
+                revision: AtomicU64::new(0),
+                reads: AtomicUsize::new(0),
+            }
+        }
+
+        fn bump(&self) {
+            self.revision.fetch_add(1, Ordering::SeqCst);
+        }
+    }
+
+    impl ReadAt for CountingVersionedSource {
+        fn len(&self) -> io::Result<u64> {
+            Ok(self.bytes.len() as u64)
+        }
+
+        fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
+            self.reads.fetch_add(1, Ordering::SeqCst);
+            let offset = usize::try_from(offset)
+                .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "offset overflow"))?;
+            if offset >= self.bytes.len() {
+                return Ok(0);
+            }
+            let count = output.len().min(self.bytes.len() - offset);
+            output[..count].copy_from_slice(&self.bytes[offset..offset + count]);
+            Ok(count)
+        }
+
+        fn version(&self) -> io::Result<SourceVersion> {
+            Ok(SourceVersion::new(
+                0xD0C5,
+                self.revision.load(Ordering::SeqCst),
+            ))
+        }
     }
 
     #[test]
@@ -548,5 +690,37 @@ mod tests {
         let restored = commit.package().apply_story_text(&inverse).unwrap();
         assert!(deferred.materialized.get().is_none());
         assert!(restored.package().deferred.is_none());
+    }
+
+    #[test]
+    fn stale_same_owner_replay_checks_without_materializing_deferred_output() {
+        let source = Arc::new(CountingVersionedSource::new(package_bytes()));
+        let package = Package::from_read_at(source.clone()).unwrap();
+        let mut edit = package.edit_story_text(story_text::Selector::Main).unwrap();
+        edit.replace_paragraph_text(Position::new(0), "after")
+            .unwrap();
+        let commit = edit.commit().unwrap();
+        let deferred = commit
+            .package()
+            .deferred
+            .as_ref()
+            .expect("a source-backed edit publishes a deferred owner");
+        assert!(deferred.materialized.get().is_none());
+        let reads_before_replay = source.reads.load(Ordering::SeqCst);
+
+        source.bump();
+        let result = commit.package().apply_story_text(&commit.patch().inverse());
+        assert!(matches!(
+            result,
+            Err(story_text::Error::Document(crate::Error::Opc(
+                litchi_opc::OpcError::SourceChanged { .. }
+            )))
+        ));
+        assert!(deferred.materialized.get().is_none());
+        assert_eq!(
+            source.reads.load(Ordering::SeqCst),
+            reads_before_replay,
+            "freshness proof must not materialize or read the deferred archive"
+        );
     }
 }

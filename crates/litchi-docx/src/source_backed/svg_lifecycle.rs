@@ -13,8 +13,9 @@ use litchi_core::{Reservation, Resource, SourceVersion};
 use litchi_drawingml::svg_blip;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{
-    AuthoredXmlFragment, EffectiveTopology, PackURI, PartData, PartView, SourceArtifact,
-    SourceArtifactFingerprint, SourceTopologyPlan, TargetMode,
+    ArtifactStreamPublication, ArtifactStreamTarget, AuthoredXmlFragment, EffectiveTopology,
+    PackURI, PartData, PartView, SourceArtifact, SourceArtifactFingerprint, SourceTopologyPlan,
+    TargetMode,
 };
 use sha2::{Digest as _, Sha256};
 
@@ -1795,6 +1796,25 @@ impl super::Package {
             policy,
         )?;
         Ok(())
+    }
+
+    /// Publish an SVG batch through the sealed OPC artifact target. Candidate
+    /// graph validation remains DOCX-owned and runs before the target is
+    /// allowed to emit any bytes; OPC owns the recipient census and ZIP
+    /// publication itself.
+    pub(crate) fn stream_svg_batch(
+        &self,
+        target_sink: &mut ArtifactStreamTarget<'_>,
+        current: &SourceBackedSvgAttachmentBatchSnapshot,
+        target: &SourceBackedSvgAttachmentBatchSnapshot,
+    ) -> Result<ArtifactStreamPublication> {
+        let package = self.physical_package()?.clone();
+        let plan = build_batch_topology_plan(&package, current, target)?;
+        let prepared = package.prepare_topology(plan)?;
+        prepared.with_candidate(|candidate| {
+            Ok(validate_effective_candidate(candidate, current, target))
+        })??;
+        target_sink.publish_topology(&prepared).map_err(Error::Opc)
     }
 }
 

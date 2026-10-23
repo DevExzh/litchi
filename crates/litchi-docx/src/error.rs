@@ -127,6 +127,12 @@ pub enum Error {
     #[error(transparent)]
     ParagraphStream(Box<crate::source_backed::tail_append_stream::Error>),
 
+    /// A committed plain-paragraph tail append failed while its deferred
+    /// source splice was being written.  Keep the operation's typed refusal,
+    /// execution, limit, I/O, and incomplete-output causes intact.
+    #[error(transparent)]
+    TailAppend(Box<crate::source_backed::tail_append::Error>),
+
     /// A semantic selector matched more than one producer object.
     #[error("{object} selector '{key}' is ambiguous")]
     Ambiguous {

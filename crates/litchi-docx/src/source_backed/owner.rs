@@ -57,17 +57,25 @@ impl Package {
 
     /// Recheck the physical archive and every retained transfer source/context.
     pub fn check_source(&self) -> Result<()> {
-        match &self.effective {
-            Some(topology) => Ok(topology.check_source()?),
-            None => {
-                if let Some(deferred) = &self.deferred {
-                    deferred.base.check_source()?;
-                }
-                let physical = self.physical_source()?;
-                physical.source_version()?;
-                Ok(physical.check_execution()?)
-            },
+        if let Some(deferred) = &self.deferred {
+            deferred.base.check_source()?;
         }
+        if let Some(topology) = &self.effective {
+            topology.check_source()?;
+        }
+        // A deferred owner retains the opened physical source as its
+        // freshness dependency.  Calling `physical_source` here would
+        // publish and reopen the complete deferred archive merely to prove
+        // that dependency is still current.  Keep this fence non-materializing
+        // for every apply path, including same-owner replay.  The physical
+        // package and facade context are checked even for an effective owner,
+        // because both remain retained dependencies of that facade.
+        self.physical.source_version()?;
+        self.physical.check_execution()?;
+        if let Some(context) = &self.execution {
+            context.check().map_err(source_document_execution_error)?;
+        }
+        Ok(())
     }
 
     /// Publish the effective package, preserving unchanged physical members.

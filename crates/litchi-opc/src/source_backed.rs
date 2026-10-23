@@ -7141,6 +7141,21 @@ impl SourceBackedPackage {
         self.limits
     }
 
+    /// Return the source-read policy captured when this package was opened.
+    ///
+    /// Publication can drain a read-ahead window and switch the live adapter
+    /// back to exact reads, but deferred materialization must retain the
+    /// original configured policy rather than silently reopening with the
+    /// default.
+    #[must_use]
+    pub fn source_read_policy(&self) -> SourceReadPolicy {
+        self.read_ahead
+            .as_ref()
+            .map_or_else(SourceReadPolicy::exact, |read_ahead| {
+                read_ahead.source_read_policy()
+            })
+    }
+
     /// Validation-only source open. Ordinary callers retain the existing open
     /// path; this variant adds phase provenance without changing its hot path.
     pub(crate) fn from_read_at_for_validation(

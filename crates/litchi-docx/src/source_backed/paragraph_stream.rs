@@ -122,15 +122,23 @@ impl Change for StreamChange {
                 if prepared.is_noop() {
                     return Ok(package.clone());
                 }
-                Ok(package.deferred(move |writer, policy| {
-                    prepared.write(writer, policy).map_err(|error| match error {
-                        stream::Error::TailAppend(
-                            crate::source_backed::tail_append::Error::Document(error),
-                        ) => error,
-                        stream::Error::Opc(error) => crate::Error::Opc(error),
-                        other => crate::Error::ParagraphStream(Box::new(other)),
-                    })
-                })?)
+                let stream_prepared = Arc::clone(&prepared);
+                Ok(package.deferred(
+                    move |writer, policy| {
+                        prepared.write(writer, policy).map_err(|error| match error {
+                            stream::Error::TailAppend(
+                                crate::source_backed::tail_append::Error::Document(error),
+                            ) => error,
+                            stream::Error::Opc(error) => crate::Error::Opc(error),
+                            other => crate::Error::ParagraphStream(Box::new(other)),
+                        })
+                    },
+                    move |target| {
+                        stream_prepared
+                            .stream_to_target(target)
+                            .map_err(crate::Error::Opc)
+                    },
+                )?)
             },
             Self::Inverse { noop: true, .. } => Ok(package.clone()),
             Self::Inverse { .. } => Err(Error::Invalid(

@@ -51,10 +51,18 @@ impl Change for StoryRedactionChange {
                     return Ok(package.clone());
                 }
                 let base = package.clone();
-                let commit = Arc::clone(commit);
-                package.deferred(move |writer, policy| {
-                    base.write_story_hyperlink_redaction(writer, &commit, policy)
-                })
+                let stream_base = base.clone();
+                let ordinary_commit = Arc::clone(commit);
+                let stream_commit = Arc::clone(commit);
+                package.deferred(
+                    move |writer, policy| {
+                        base.write_story_hyperlink_redaction(writer, &ordinary_commit, policy)
+                    },
+                    move |target| {
+                        let parts = record::publication_parts(&stream_commit)?;
+                        stream_base.stream_relationship_overlays(target, parts)
+                    },
+                )
             },
             Self::Inverse { noop: true, .. } => Ok(package.clone()),
             Self::Inverse { .. } => Err(crate::Error::ExternalHyperlinkRedactionConflict),

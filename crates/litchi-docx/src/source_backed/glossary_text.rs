@@ -32,10 +32,7 @@ impl Change for GlossaryTextChange {
         if self.is_noop() {
             return Ok(package.clone());
         }
-        let base = package.clone();
-        Ok(package.deferred(move |writer, policy| {
-            base.write_part_overlay(writer, &part, &bytes, policy)
-        })?)
+        Ok(package.deferred_part_overlay(part, bytes)?)
     }
 }
 
