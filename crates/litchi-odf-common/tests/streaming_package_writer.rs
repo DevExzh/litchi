@@ -28,7 +28,7 @@ fn digest(bytes: &[u8]) -> [u8; 32] {
 }
 
 fn memory_artifact(bytes: &[u8]) -> Vec<u8> {
-    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
+    let mut writer = PackageWriter::new(StreamingArchiveLimits::default());
     writer.set_mimetype(MIME).unwrap();
     writer
         .add_file_reader_with_media_type_and_compression(
@@ -424,8 +424,7 @@ fn finalization_failure_preserves_accepted_output_progress() {
 fn finalization_sink_failure_preserves_nested_source_chain() {
     let bytes = payload();
     let expected = {
-        let mut probe =
-            PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
+        let mut probe = PackageWriter::new(StreamingArchiveLimits::default());
         probe.set_mimetype(MIME).unwrap();
         probe
             .add_file_reader_with_media_type_and_compression(

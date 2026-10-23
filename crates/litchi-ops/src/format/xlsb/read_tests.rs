@@ -16,7 +16,7 @@ use litchi_core::{
     OwnedSource, ReadAt,
 };
 use litchi_opc::constants::relationship_type;
-use litchi_opc::{OpcPackage, PackURI, SourceBackedPackage, SourceLimits};
+use litchi_opc::{OpcPackage, PackURI, SourceBackedPackage, SourceCacheLimits, SourceLimits};
 use litchi_xlsb::builder::{self, Builder};
 use litchi_xlsb::chart::{Anchor, Chart};
 

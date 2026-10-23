@@ -222,6 +222,11 @@ impl Odp {
         self.0.origin.as_ref()
     }
 
+    /// The ODF ingress policy retained by this handle.
+    pub(crate) fn odf_options(&self) -> litchi_odf_common::OpenOptions {
+        self.0.odf_options
+    }
+
     /// Whether this is a flat (single XML) document.
     pub(crate) fn is_flat(&self) -> bool {
         matches!(self.0.owner, OdpOwner::Flat(_))

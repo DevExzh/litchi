@@ -46,3 +46,16 @@ The v17 policy values, assertions, source retention, and cache behavior are
 unchanged. No concurrent budget changes were copied. Validation remained
 limited to formatting, whitespace, source-constructor/qualification audits,
 and repository artifact guards; no Cargo target was started.
+
+The completed v21 workspace check reported 60 remaining consumer diagnostics.
+The ODF raw validator now imports its OPC `SourceLimits`, and the unified ODP
+facade exposes the exact `OpenOptions` retained by its owner for re-admission.
+All 35 ODF common qualifications, three XLSB test qualifications, and four
+DOCX glossary qualifications now use their in-scope names. The XLSB and DOCX
+source-backed tests import `SourceCacheLimits` while preserving their existing
+cache and source policies. The ODF writer tests likewise retain the same
+`StreamingArchiveLimits`; only redundant module paths were removed.
+
+The v21 policies, assertions, and constructor arguments are unchanged. No
+default was widened, no lint allowance or alias was added, and no Cargo target
+was started.

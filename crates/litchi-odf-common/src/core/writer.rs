@@ -2548,7 +2548,7 @@ mod tests {
 
     #[test]
     fn test_package_writer_new() {
-        let writer = PackageWriter::new(crate::core::StreamingArchiveLimits::default());
+        let writer = PackageWriter::new(StreamingArchiveLimits::default());
         assert!(!writer.wrote_mimetype);
         assert!(!writer.wrote_any_entry);
         assert!(writer.mimetype.is_none());
@@ -2575,7 +2575,7 @@ mod tests {
 
     #[test]
     fn test_package_writer_set_mimetype() {
-        let mut writer = PackageWriter::new(crate::core::StreamingArchiveLimits::default());
+        let mut writer = PackageWriter::new(StreamingArchiveLimits::default());
         assert!(
             writer
                 .set_mimetype("application/vnd.oasis.opendocument.text")
@@ -2590,7 +2590,7 @@ mod tests {
 
     #[test]
     fn test_package_writer_set_mimetype_twice() {
-        let mut writer = PackageWriter::new(crate::core::StreamingArchiveLimits::default());
+        let mut writer = PackageWriter::new(StreamingArchiveLimits::default());
         writer
             .set_mimetype("application/vnd.oasis.opendocument.text")
             .unwrap();
@@ -2603,13 +2603,13 @@ mod tests {
 
     #[test]
     fn test_package_writer_add_file_without_mimetype() {
-        let mut writer = PackageWriter::new(crate::core::StreamingArchiveLimits::default());
+        let mut writer = PackageWriter::new(StreamingArchiveLimits::default());
         assert!(writer.add_file("content.xml", b"test").is_err());
     }
 
     #[test]
     fn test_package_writer_add_mimetype_as_file() {
-        let mut writer = PackageWriter::new(crate::core::StreamingArchiveLimits::default());
+        let mut writer = PackageWriter::new(StreamingArchiveLimits::default());
         writer
             .set_mimetype("application/vnd.oasis.opendocument.text")
             .unwrap();
@@ -2618,13 +2618,13 @@ mod tests {
 
     #[test]
     fn test_package_writer_finish_without_mimetype() {
-        let writer = PackageWriter::new(crate::core::StreamingArchiveLimits::default());
+        let writer = PackageWriter::new(StreamingArchiveLimits::default());
         assert!(writer.finish().is_err());
     }
 
     #[test]
     fn test_package_writer_finish_to_bytes() {
-        let mut writer = PackageWriter::new(crate::core::StreamingArchiveLimits::default());
+        let mut writer = PackageWriter::new(StreamingArchiveLimits::default());
         writer
             .set_mimetype("application/vnd.oasis.opendocument.text")
             .unwrap();
@@ -2636,7 +2636,7 @@ mod tests {
 
     #[test]
     fn test_package_writer_add_file_with_media_type() {
-        let mut writer = PackageWriter::new(crate::core::StreamingArchiveLimits::default());
+        let mut writer = PackageWriter::new(StreamingArchiveLimits::default());
         writer
             .set_mimetype("application/vnd.oasis.opendocument.text")
             .unwrap();
@@ -2657,7 +2657,7 @@ mod tests {
                 "application/vnd.oasis.opendocument.digital-signature+xml",
             ),
         ] {
-            let mut writer = PackageWriter::new(crate::core::StreamingArchiveLimits::default());
+            let mut writer = PackageWriter::new(StreamingArchiveLimits::default());
             writer
                 .set_mimetype("application/vnd.oasis.opendocument.text")
                 .unwrap();
@@ -2670,7 +2670,7 @@ mod tests {
 
     #[test]
     fn real_package_enumeration_includes_rdf_and_manifest_declared_xml() {
-        let mut writer = PackageWriter::new(crate::core::StreamingArchiveLimits::default());
+        let mut writer = PackageWriter::new(StreamingArchiveLimits::default());
         writer
             .set_mimetype("application/vnd.oasis.opendocument.text")
             .unwrap();
@@ -2735,7 +2735,7 @@ mod tests {
             zip.finish().unwrap();
         }
         let source = OwnedPackage::from_bytes(source_bytes).unwrap();
-        let mut writer = PackageWriter::new(crate::core::StreamingArchiveLimits::default());
+        let mut writer = PackageWriter::new(StreamingArchiveLimits::default());
         writer
             .set_mimetype("application/vnd.oasis.opendocument.text")
             .unwrap();
@@ -2763,7 +2763,7 @@ mod tests {
         }
 
         let source = OwnedPackage::from_bytes(bytes).unwrap();
-        let mut writer = PackageWriter::new(crate::core::StreamingArchiveLimits::default());
+        let mut writer = PackageWriter::new(StreamingArchiveLimits::default());
         writer
             .set_mimetype("application/vnd.oasis.opendocument.text")
             .unwrap();
@@ -2796,7 +2796,7 @@ mod tests {
             zip.finish().unwrap();
         }
         let source = OwnedPackage::from_bytes(bytes).unwrap();
-        let mut writer = PackageWriter::new(crate::core::StreamingArchiveLimits::default());
+        let mut writer = PackageWriter::new(StreamingArchiveLimits::default());
         writer
             .set_mimetype("application/vnd.oasis.opendocument.text")
             .unwrap();
@@ -2826,7 +2826,7 @@ mod tests {
 
     #[test]
     fn test_generate_manifest() {
-        let mut writer = PackageWriter::new(crate::core::StreamingArchiveLimits::default());
+        let mut writer = PackageWriter::new(StreamingArchiveLimits::default());
         writer
             .set_mimetype("application/vnd.oasis.opendocument.text")
             .unwrap();
@@ -2843,7 +2843,7 @@ mod tests {
 
     #[test]
     fn finalized_manifest_does_not_describe_itself_or_meta_inf() {
-        let mut writer = PackageWriter::new(crate::core::StreamingArchiveLimits::default());
+        let mut writer = PackageWriter::new(StreamingArchiveLimits::default());
         writer
             .set_mimetype("application/vnd.oasis.opendocument.graphics")
             .unwrap();
@@ -2860,7 +2860,7 @@ mod tests {
 
     #[test]
     fn source_manifest_version_is_retained_during_auxiliary_copy() {
-        let mut source_writer = PackageWriter::new(crate::core::StreamingArchiveLimits::default());
+        let mut source_writer = PackageWriter::new(StreamingArchiveLimits::default());
         source_writer.manifest_version = "1.2".to_string();
         source_writer
             .set_mimetype("application/vnd.oasis.opendocument.graphics")
@@ -2870,7 +2870,7 @@ mod tests {
             .unwrap();
         let source = OwnedPackage::from_bytes(source_writer.finish().unwrap()).unwrap();
 
-        let mut destination = PackageWriter::new(crate::core::StreamingArchiveLimits::default());
+        let mut destination = PackageWriter::new(StreamingArchiveLimits::default());
         destination
             .set_mimetype("application/vnd.oasis.opendocument.graphics")
             .unwrap();
@@ -2922,7 +2922,7 @@ mod tests {
         assert_eq!(Structure::default_meta_xml(), Structure::default_meta_xml());
 
         let build = || {
-            let mut writer = PackageWriter::new(crate::core::StreamingArchiveLimits::default());
+            let mut writer = PackageWriter::new(StreamingArchiveLimits::default());
             writer
                 .set_mimetype("application/vnd.oasis.opendocument.text")
                 .unwrap();
@@ -3022,7 +3022,7 @@ mod tests {
 
     #[test]
     fn test_package_writer_full_package() {
-        let mut writer = PackageWriter::new(crate::core::StreamingArchiveLimits::default());
+        let mut writer = PackageWriter::new(StreamingArchiveLimits::default());
 
         // Set mimetype
         writer
@@ -3070,7 +3070,7 @@ mod tests {
     #[test]
     fn preserved_manifest_requires_physical_inventory_equivalence() {
         let (source, source_manifest) = physical_inventory_source();
-        let mut writer = PackageWriter::new(crate::core::StreamingArchiveLimits::default());
+        let mut writer = PackageWriter::new(StreamingArchiveLimits::default());
         writer
             .set_mimetype("application/vnd.oasis.opendocument.text")
             .unwrap();
@@ -3086,7 +3086,7 @@ mod tests {
             source_manifest
         );
 
-        let mut writer = PackageWriter::new(crate::core::StreamingArchiveLimits::default());
+        let mut writer = PackageWriter::new(StreamingArchiveLimits::default());
         writer
             .set_mimetype("application/vnd.oasis.opendocument.text")
             .unwrap();
@@ -3123,7 +3123,7 @@ mod tests {
             zip.finish().unwrap();
         }
         let source = OwnedPackage::from_bytes(bytes).unwrap();
-        let mut writer = PackageWriter::new(crate::core::StreamingArchiveLimits::default());
+        let mut writer = PackageWriter::new(StreamingArchiveLimits::default());
         writer
             .set_mimetype("application/vnd.oasis.opendocument.text")
             .unwrap();
@@ -3142,7 +3142,7 @@ mod encrypted_copy_tests {
 
     #[test]
     fn encrypted_auxiliary_entries_require_plaintext_and_are_reencrypted() {
-        let mut source_writer = PackageWriter::new(crate::core::StreamingArchiveLimits::default());
+        let mut source_writer = PackageWriter::new(StreamingArchiveLimits::default());
         source_writer
             .set_mimetype("application/vnd.oasis.opendocument.text")
             .unwrap();
@@ -3161,13 +3161,13 @@ mod encrypted_copy_tests {
         )
         .unwrap();
 
-        let mut unencrypted = PackageWriter::new(crate::core::StreamingArchiveLimits::default());
+        let mut unencrypted = PackageWriter::new(StreamingArchiveLimits::default());
         unencrypted
             .set_mimetype("application/vnd.oasis.opendocument.text")
             .unwrap();
         assert!(unencrypted.copy_auxiliary_files_from(&source).is_err());
 
-        let mut destination = PackageWriter::new(crate::core::StreamingArchiveLimits::default());
+        let mut destination = PackageWriter::new(StreamingArchiveLimits::default());
         destination
             .set_mimetype("application/vnd.oasis.opendocument.text")
             .unwrap();

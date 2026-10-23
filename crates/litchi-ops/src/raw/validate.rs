@@ -40,6 +40,8 @@ use std::sync::Arc;
     reason = "each import serves some format features only"
 )]
 use litchi_core::{FileFormat, ValidateReport, ValidationLimits, ValidationReportError};
+#[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
+use litchi_opc::SourceLimits;
 
 use super::{Validation, with_format};
 use crate::{Code, Error as OpsError, File, Result};

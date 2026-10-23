@@ -314,7 +314,7 @@ mod glossary_family {
             name,
             format!(r#"<w:docPartBody xmlns:w="{W}"><w:p><w:r><w:t>{name}</w:t></w:r></w:p></w:docPartBody>"#)
                 .into_bytes(),
-            &litchi_docx::glossary::Limits::DEFAULT,
+            &glossary::Limits::DEFAULT,
         )
         .unwrap()
     }

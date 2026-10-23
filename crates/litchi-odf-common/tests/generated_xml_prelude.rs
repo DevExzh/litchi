@@ -226,7 +226,7 @@ fn fixed_children_under_open_ancestors_precede_the_final_start_sequence() {
 fn fixed_shell_depth_can_dominate_a_shallow_fragment() {
     let prefix = b"<root><fixed><a><b><c/></b></a></fixed><slot>";
     let suffix = b"</slot></root>";
-    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
+    let mut writer = PackageWriter::new(StreamingArchiveLimits::default());
     writer.set_mimetype_streaming(MIME).unwrap();
     let mut emitted = false;
     let report = writer
@@ -441,8 +441,7 @@ fn error_chain_contains(error: &dyn StdError, needle: &str) -> bool {
 
 #[test]
 fn first_and_later_prelude_producer_errors_keep_source_and_poison_writer() {
-    let mut first_writer =
-        PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
+    let mut first_writer = PackageWriter::new(StreamingArchiveLimits::default());
     first_writer.set_mimetype_streaming(MIME).unwrap();
     let first_error = first_writer
         .add_generated_xml(
@@ -458,8 +457,7 @@ fn first_and_later_prelude_producer_errors_keep_source_and_poison_writer() {
     assert!(first_error.written().is_some_and(|written| written > 0));
     assert!(first_writer.finish_to_writer().is_err());
 
-    let mut later_writer =
-        PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
+    let mut later_writer = PackageWriter::new(StreamingArchiveLimits::default());
     later_writer.set_mimetype_streaming(MIME).unwrap();
     let mut calls = 0usize;
     let later_error = later_writer
