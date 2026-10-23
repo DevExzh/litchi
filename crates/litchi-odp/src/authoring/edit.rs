@@ -10,6 +10,9 @@ pub use litchi_odf_common::Error as PackageError;
 
 type FamilyResult<T> = Result<T, PackageError>;
 pub use litchi_odf_common::{LimitKind, OpenOptions};
+use quick_xml::events::Event;
+use quick_xml::name::{Namespace, ResolveResult};
+use quick_xml::reader::NsReader;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
@@ -26,6 +29,7 @@ const DURABLE_PATCH_VERSION: u16 = 1;
 const DURABLE_HISTORY_MAGIC: &[u8; 16] = b"LITCHI-ODP-HIST\0";
 const DURABLE_HISTORY_VERSION: u16 = 1;
 const MAX_DURABLE_HISTORY_BYTES: usize = 512 * 1024 * 1024;
+const OFFICE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 
 /// Semantic dependency domain touched by a root package patch.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -751,15 +755,16 @@ impl Package {
     }
 
     pub(crate) fn edit_core(&self) -> CoreResult<Edit> {
-        let editing = self.editing()?;
-        let presentation = Presentation::from_owned_package(self.package.clone())?;
-        ensure_editable_source(presentation.owned_package())?;
+        // Archive policy is indexed metadata and must still be checked at the
+        // edit boundary.  The semantic projection and mutable staging are
+        // deliberately deferred until the first operation that needs them.
+        ensure_editable_source(&self.package)?;
+        if let Some(presentation) = self.presentation.get() {
+            validate_edit_entry(presentation)?;
+        }
         Ok(Edit {
             source: self.clone(),
-            draft: MutablePresentation::from_presentation_with_validated_slides(
-                &presentation,
-                &editing.slides,
-            )?,
+            draft: None,
             changed: false,
             rdf: None,
             charts: None,
@@ -768,8 +773,8 @@ impl Package {
             content: None,
             layer_operations: Vec::new(),
             media_bytes: 0,
-            resource_bytes: editing.resource_bytes,
-            source_resource_bytes: editing.resource_bytes,
+            resource_bytes: 0,
+            source_resource_bytes: 0,
             non_media_changed: false,
             media_changed: false,
             slide_order_changed: false,
@@ -823,7 +828,7 @@ impl<'a> From<&'a str> for Selector<'a> {
 /// An isolated mutable draft that cannot alter its source snapshot.
 pub struct Edit {
     source: Package,
-    draft: MutablePresentation,
+    draft: Option<MutablePresentation>,
     changed: bool,
     rdf: Option<RdfDraft>,
     charts: Option<ChartDraft>,
@@ -1023,7 +1028,39 @@ impl Edit {
     /// Borrow the current staged slide projection.
     #[must_use]
     pub fn slides(&self) -> &[Slide] {
-        self.draft.slides()
+        self.draft
+            .as_ref()
+            .map(MutablePresentation::slides)
+            .unwrap_or_else(|| self.source.slides().unwrap_or(&[]))
+    }
+
+    fn ensure_draft(&mut self) -> CoreResult<()> {
+        if self.draft.is_some() {
+            return Ok(());
+        }
+        let presentation = self.source.projection()?.clone();
+        ensure_editable_source(presentation.owned_package())?;
+        let editing = self.source.editing()?;
+        let resource_bytes = editing.resource_bytes;
+        let slides = Arc::clone(&editing.slides);
+        let draft =
+            MutablePresentation::from_presentation_with_validated_slides(&presentation, &slides)?;
+        self.resource_bytes = resource_bytes;
+        self.source_resource_bytes = resource_bytes;
+        self.draft = Some(draft);
+        Ok(())
+    }
+
+    fn draft_ref(&self) -> &MutablePresentation {
+        self.draft
+            .as_ref()
+            .expect("ODP mutable draft initialized before access")
+    }
+
+    fn draft_mut(&mut self) -> &mut MutablePresentation {
+        self.draft
+            .as_mut()
+            .expect("ODP mutable draft initialized before access")
     }
 
     /// Inspect drawing-layer declarations in the current transaction draft.
@@ -1172,15 +1209,16 @@ impl Edit {
     /// Returns an error for invalid text, exhausted limits, or ambiguous retained bindings.
     pub fn add(&mut self, title: &str, text: &str) -> FamilyResult<()> {
         Self::check_text(title, text)?;
+        self.ensure_draft()?;
         self.check_no_slide_order_change("slide insertion")?;
         self.check_structure_edit()?;
-        if self.draft.slides().len() == MAX_SLIDES {
+        if self.draft_ref().slides().len() == MAX_SLIDES {
             return invalid("ODP transaction exceeds the slide-count limit")
                 .map_err(PackageError::from);
         }
         let candidate = self.resource_candidate(0, text_resource(title, text)?)?;
-        self.draft
-            .insert_slide(self.draft.slides().len(), title, text)?;
+        let index = self.draft_ref().slides().len();
+        self.draft_mut().insert_slide(index, title, text)?;
         self.resource_bytes = candidate;
         self.mark_non_media_changed();
         Ok(())
@@ -1202,17 +1240,18 @@ impl Edit {
         S: Into<Selector<'a>>,
     {
         Self::check_text(title, text)?;
+        self.ensure_draft()?;
         self.check_no_slide_order_change("slide insertion")?;
         self.check_structure_edit()?;
-        if self.draft.slides().len() == MAX_SLIDES {
+        if self.draft_ref().slides().len() == MAX_SLIDES {
             return invalid("ODP transaction exceeds the slide-count limit")
                 .map_err(PackageError::from);
         }
-        let Some(index) = select(self.draft.slides(), selector.into())? else {
+        let Some(index) = select(self.draft_ref().slides(), selector.into())? else {
             return Ok(None);
         };
         let candidate = self.resource_candidate(0, text_resource(title, text)?)?;
-        self.draft.insert_slide(index, title, text)?;
+        self.draft_mut().insert_slide(index, title, text)?;
         self.resource_bytes = candidate;
         self.mark_non_media_changed();
         Ok(Some(()))
@@ -1237,17 +1276,18 @@ impl Edit {
     {
         self.check_no_slide_order_change("slide replacement")?;
         Self::check_text(title, text)?;
-        let Some(index) = select(self.draft.slides(), selector.into())? else {
+        self.ensure_draft()?;
+        let Some(index) = select(self.draft_ref().slides(), selector.into())? else {
             return Ok(None);
         };
-        let slide = &self.draft.slides()[index];
+        let slide = &self.draft_ref().slides()[index];
         if slide.title.as_deref() == Some(title) && slide.text == text {
             return Ok(Some(()));
         }
         self.check_slide_rewrite(index)?;
         let removed = slide_primary_text_resource(slide)?;
         let candidate = self.resource_candidate(removed, text_resource(title, text)?)?;
-        self.draft.update_slide(index, title, text)?;
+        self.draft_mut().update_slide(index, title, text)?;
         self.resource_bytes = candidate;
         self.mark_non_media_changed();
         Ok(Some(()))
@@ -1262,14 +1302,15 @@ impl Edit {
     where
         S: Into<Selector<'a>>,
     {
+        self.ensure_draft()?;
         self.check_no_slide_order_change("slide removal")?;
         self.check_structure_edit()?;
-        let Some(index) = select(self.draft.slides(), selector.into())? else {
+        let Some(index) = select(self.draft_ref().slides(), selector.into())? else {
             return Ok(None);
         };
-        let removed_bytes = slide_resource(&self.draft.slides()[index])?;
+        let removed_bytes = slide_resource(&self.draft_ref().slides()[index])?;
         let candidate = self.resource_candidate(removed_bytes, 0)?;
-        let removed = self.draft.remove_slide(index)?;
+        let removed = self.draft_mut().remove_slide(index)?;
         self.resource_bytes = candidate;
         self.mark_non_media_changed();
         Ok(Some(removed))
@@ -1305,22 +1346,23 @@ impl Edit {
     where
         S: Into<Selector<'a>>,
     {
+        self.ensure_draft()?;
         if self.dependency_free_slide_copy_changed || self.dependency_free_slide_removal_changed {
             return unsupported(
                 "ODP slide move cannot be staged after a dependency-free blank-slide copy or removal",
             ).map_err(PackageError::from);
         }
-        let Some(from) = select(self.draft.slides(), selector.into())? else {
+        let Some(from) = select(self.draft_ref().slides(), selector.into())? else {
             return Ok(None);
         };
         let to = match position {
             SlidePosition::First => 0,
-            SlidePosition::Last => self.draft.slides().len() - 1,
-            SlidePosition::Index(index) if index < self.draft.slides().len() => index,
+            SlidePosition::Last => self.draft_ref().slides().len() - 1,
+            SlidePosition::Index(index) if index < self.draft_ref().slides().len() => index,
             SlidePosition::Index(index) => {
                 return invalid(format!(
                     "ODP slide move destination {index} exceeds slide count {}",
-                    self.draft.slides().len()
+                    self.draft_ref().slides().len()
                 ))
                 .map_err(PackageError::from);
             },
@@ -1329,8 +1371,8 @@ impl Edit {
             return Ok(Some(()));
         }
         self.check_page_indexed_move_conflict()?;
-        self.draft.check_slide_move_supported()?;
-        self.draft.move_slide(from, to)?;
+        self.draft_mut().check_slide_move_supported()?;
+        self.draft_mut().move_slide(from, to)?;
         self.slide_order_changed = true;
         self.mark_non_media_changed();
         Ok(Some(()))
@@ -1364,6 +1406,7 @@ impl Edit {
     where
         S: Into<Selector<'a>>,
     {
+        self.ensure_draft()?;
         if self.dependency_free_slide_copy_changed {
             return unsupported(
                 "ODP transaction already contains a dependency-free blank-slide copy",
@@ -1376,7 +1419,7 @@ impl Edit {
             )
             .map_err(PackageError::from);
         }
-        let Some(index) = select(self.draft.slides(), selector.into())? else {
+        let Some(index) = select(self.draft_ref().slides(), selector.into())? else {
             return Ok(None);
         };
         if self.changed || self.has_page_indexed_operations() {
@@ -1384,13 +1427,17 @@ impl Edit {
                 "ODP dependency-free blank-slide copy cannot combine with slide or page-indexed operations",
             ).map_err(PackageError::from);
         }
-        if self.draft.slides().len() == MAX_SLIDES {
+        if self.draft_ref().slides().len() == MAX_SLIDES {
             return invalid("ODP transaction exceeds the slide-count limit")
                 .map_err(PackageError::from);
         }
-        let copy = self.draft.prepare_dependency_free_blank_slide_copy(index)?;
+        let copy = self
+            .draft_mut()
+            .prepare_dependency_free_blank_slide_copy(index)?;
         let candidate = self.resource_candidate(0, copy.resource_bytes())?;
-        let copied_index = self.draft.apply_dependency_free_blank_slide_copy(copy)?;
+        let copied_index = self
+            .draft_mut()
+            .apply_dependency_free_blank_slide_copy(copy)?;
         self.resource_bytes = candidate;
         self.dependency_free_slide_copy_changed = true;
         self.mark_non_media_changed();
@@ -1425,6 +1472,7 @@ impl Edit {
     where
         S: Into<Selector<'a>>,
     {
+        self.ensure_draft()?;
         if self.dependency_free_slide_copy_changed {
             return unsupported(
                 "ODP transaction already contains a dependency-free blank-slide copy",
@@ -1451,7 +1499,7 @@ impl Edit {
                 "ODP foreign blank-slide transfer cannot combine with slide or page-indexed operations",
             ).map_err(PackageError::from);
         }
-        if self.draft.slides().len() == MAX_SLIDES {
+        if self.draft_ref().slides().len() == MAX_SLIDES {
             return invalid("ODP transaction exceeds the slide-count limit")
                 .map_err(PackageError::from);
         }
@@ -1505,7 +1553,7 @@ impl Edit {
             invalid_error("ODP foreign blank-slide transfer donor page is outside content coverage")
         })?;
         let copy = self
-            .draft
+            .draft_mut()
             .prepare_foreign_dependency_free_blank_slide_copy(
                 donor_page,
                 &source.slides()?[source_index],
@@ -1513,7 +1561,7 @@ impl Edit {
             )?;
         let candidate = self.resource_candidate(0, copy.resource_bytes())?;
         let copied_index = self
-            .draft
+            .draft_mut()
             .apply_foreign_dependency_free_blank_slide_copy(copy)?;
         self.resource_bytes = candidate;
         self.dependency_free_slide_copy_changed = true;
@@ -1548,6 +1596,7 @@ impl Edit {
     where
         S: Into<Selector<'a>>,
     {
+        self.ensure_draft()?;
         if self.dependency_free_slide_removal_changed {
             return unsupported(
                 "ODP transaction already contains a dependency-free blank-slide removal",
@@ -1560,7 +1609,7 @@ impl Edit {
             )
             .map_err(PackageError::from);
         }
-        let Some(index) = select(self.draft.slides(), selector.into())? else {
+        let Some(index) = select(self.draft_ref().slides(), selector.into())? else {
             return Ok(None);
         };
         if self.changed || self.has_page_indexed_operations() {
@@ -1568,13 +1617,13 @@ impl Edit {
                 "ODP dependency-free blank-slide removal cannot combine with slide or page-indexed operations",
             ).map_err(PackageError::from);
         }
-        let removed_bytes = slide_resource(&self.draft.slides()[index])?;
+        let removed_bytes = slide_resource(&self.draft_ref().slides()[index])?;
         let candidate = self.resource_candidate(removed_bytes, 0)?;
         let removal = self
-            .draft
+            .draft_mut()
             .prepare_dependency_free_blank_slide_removal(index)?;
         let removed = self
-            .draft
+            .draft_mut()
             .apply_dependency_free_blank_slide_removal(removal);
         self.resource_bytes = candidate;
         self.dependency_free_slide_removal_changed = true;
@@ -1594,17 +1643,18 @@ impl Edit {
     where
         S: Into<Selector<'a>>,
     {
+        self.ensure_draft()?;
         self.check_no_slide_order_change("shape insertion")?;
-        let Some(index) = select(self.draft.slides(), selector.into())? else {
+        let Some(index) = select(self.draft_ref().slides(), selector.into())? else {
             return Ok(None);
         };
         self.check_slide_rewrite(index)?;
         let candidate = self.resource_candidate(0, shape_resource(&shape)?)?;
         super::builder::Builder::generate_shape_xml(
             &shape,
-            self.draft.slides()[index].shapes.len(),
+            self.draft_ref().slides()[index].shapes.len(),
         )?;
-        self.draft.add_shape(index, shape)?;
+        self.draft_mut().add_shape(index, shape)?;
         self.resource_bytes = candidate;
         self.mark_non_media_changed();
         Ok(Some(()))
@@ -1623,17 +1673,19 @@ impl Edit {
     where
         S: Into<Selector<'a>>,
     {
+        self.ensure_draft()?;
         self.check_no_slide_order_change("shape removal")?;
-        let Some(slide_index) = select(self.draft.slides(), selector.into())? else {
+        let Some(slide_index) = select(self.draft_ref().slides(), selector.into())? else {
             return Ok(None);
         };
-        if shape_index >= self.draft.slides()[slide_index].shapes.len() {
+        if shape_index >= self.draft_ref().slides()[slide_index].shapes.len() {
             return Ok(None);
         }
         self.check_slide_rewrite(slide_index)?;
-        let removed_bytes = shape_resource(&self.draft.slides()[slide_index].shapes[shape_index])?;
+        let removed_bytes =
+            shape_resource(&self.draft_ref().slides()[slide_index].shapes[shape_index])?;
         let candidate = self.resource_candidate(removed_bytes, 0)?;
-        let removed = self.draft.remove_shape(slide_index, shape_index)?;
+        let removed = self.draft_mut().remove_shape(slide_index, shape_index)?;
         self.resource_bytes = candidate;
         self.mark_non_media_changed();
         Ok(Some(removed))
@@ -1648,18 +1700,19 @@ impl Edit {
     where
         S: Into<Selector<'a>>,
     {
+        self.ensure_draft()?;
         self.check_no_slide_order_change("slide clear")?;
-        let Some(index) = select(self.draft.slides(), selector.into())? else {
+        let Some(index) = select(self.draft_ref().slides(), selector.into())? else {
             return Ok(None);
         };
-        let slide = &self.draft.slides()[index];
+        let slide = &self.draft_ref().slides()[index];
         if slide.title.is_none() && slide.text.is_empty() && slide.shapes.is_empty() {
             return Ok(Some(()));
         }
         self.check_slide_rewrite(index)?;
         let removed = slide_primary_resource(slide)?;
         let candidate = self.resource_candidate(removed, 0)?;
-        self.draft.clear_slide(index)?;
+        self.draft_mut().clear_slide(index)?;
         self.resource_bytes = candidate;
         self.mark_non_media_changed();
         Ok(Some(()))
@@ -1676,6 +1729,7 @@ impl Edit {
         payload: &[u8],
         media_type: &str,
     ) -> FamilyResult<Reference> {
+        self.ensure_draft()?;
         crate::model::media::validate_package_media_path(path)?;
         let addition = path
             .len()
@@ -1687,7 +1741,7 @@ impl Edit {
             .checked_add(addition)
             .ok_or_else(|| invalid_error("ODP aggregate media size overflow"))?;
         self.check_projected(self.resource_bytes, media_bytes)?;
-        let reference = self.draft.embed_media(
+        let reference = self.draft_mut().embed_media(
             try_owned_str(path, "ODP media path")?,
             try_owned_bytes(payload, "ODP media payload")?,
             try_owned_str(media_type, "ODP media type")?,
@@ -1712,17 +1766,18 @@ impl Edit {
     /// sources, or any invalid operation.  A failed batch leaves this
     /// transaction unchanged.
     pub fn apply_media_changes(&mut self, changes: &[MediaChange]) -> FamilyResult<usize> {
+        self.ensure_draft()?;
         if changes.len() > MAX_MEDIA_CHANGES {
             return invalid(format!(
                 "ODP media change batch exceeds {MAX_MEDIA_CHANGES} operations"
             ))
             .map_err(PackageError::from);
         }
-        let plan = self.draft.prepare_media_changes(changes)?;
+        let plan = self.draft_mut().prepare_media_changes(changes)?;
         self.check_projected(self.resource_bytes, plan.staged_media_bytes)?;
         let changed = plan.changed;
-        self.draft.apply_media_plan(plan);
-        self.media_bytes = self.draft.staged_media_bytes()?;
+        self.draft_mut().apply_media_plan(plan);
+        self.media_bytes = self.draft_ref().staged_media_bytes()?;
         self.refresh_media_changed();
         Ok(changed)
     }
@@ -2997,10 +3052,12 @@ impl Edit {
             return Ok(Commit::unchanged(self.source));
         }
         let (mut bytes, mut package, slide_candidate, mut audit_proof) = if self.changed {
-            let (package, audit_proof) = self.draft.to_owned_package_bounded(MAX_PACKAGE_BYTES)?;
+            let (package, audit_proof) = self
+                .draft_ref()
+                .to_owned_package_bounded(MAX_PACKAGE_BYTES)?;
             let bytes = package.shared_bytes();
             let candidate = Package::from_owned_package(package.clone())?;
-            if candidate.slides()? != self.draft.slides() {
+            if candidate.slides()? != self.draft_ref().slides() {
                 return invalid("ODP transaction readback differs from the staged slide model");
             }
             (bytes, package, Some(candidate), audit_proof)
@@ -3186,8 +3243,10 @@ impl Edit {
                 validate_compact_xml_parts(&reopened, &source_package)?;
             }
         }
-        self.draft.verify_embedded_media(&reopened)?;
-        self.draft.verify_removed_media(&reopened)?;
+        if let Some(draft) = &self.draft {
+            draft.verify_embedded_media(&reopened)?;
+            draft.verify_removed_media(&reopened)?;
+        }
         if let Some(rdf) = &self.rdf
             && crate::rdf::graphs(&reopened)? != rdf.graphs
         {
@@ -3267,7 +3326,7 @@ impl Edit {
 
     fn layer_base_package(&self) -> CoreResult<OwnedPackage> {
         if self.changed {
-            OwnedPackage::from_bytes(self.draft.to_bytes_bounded(MAX_PACKAGE_BYTES)?)
+            OwnedPackage::from_bytes(self.draft_ref().to_bytes_bounded(MAX_PACKAGE_BYTES)?)
         } else {
             Ok(self.source.package.clone())
         }
@@ -3375,7 +3434,7 @@ impl Edit {
             return crate::charts::Snapshot::from_owned_package(current_package, limits);
         }
         let mut package =
-            OwnedPackage::from_bytes(self.draft.to_bytes_bounded(MAX_PACKAGE_BYTES)?)?;
+            OwnedPackage::from_bytes(self.draft_ref().to_bytes_bounded(MAX_PACKAGE_BYTES)?)?;
         for operation in &operations {
             package =
                 OwnedPackage::from_bytes(apply_chart_operation(&package, limits, operation)?)?;
@@ -3533,7 +3592,7 @@ impl Edit {
             return Ok(Arc::clone(&content.bytes));
         }
         let package = if self.changed {
-            OwnedPackage::from_bytes(self.draft.to_bytes_bounded(MAX_PACKAGE_BYTES)?)?
+            OwnedPackage::from_bytes(self.draft_ref().to_bytes_bounded(MAX_PACKAGE_BYTES)?)?
         } else {
             self.source.package.clone()
         };
@@ -3688,7 +3747,7 @@ impl Edit {
     }
 
     fn check_structure_edit(&self) -> CoreResult<()> {
-        if self.draft.has_source_declarations() {
+        if self.draft_ref().has_source_declarations() {
             return unsupported(
                 "ODP structural editing with retained header/footer declarations is not lossless",
             );
@@ -3744,7 +3803,7 @@ impl Edit {
     }
 
     fn check_slide_rewrite(&self, index: usize) -> CoreResult<()> {
-        if self.draft.retains_source_slide(index) {
+        if self.draft_ref().retains_source_slide(index) {
             return unsupported(
                 "ODP retained slide contains XML that cannot yet be proven lossless under rewrite",
             );
@@ -3780,7 +3839,7 @@ impl Edit {
     }
 
     fn refresh_media_changed(&mut self) {
-        self.media_changed = self.draft.has_staged_media_changes();
+        self.media_changed = self.draft_ref().has_staged_media_changes();
         self.changed = self.non_media_changed || self.media_changed;
     }
 }
@@ -4468,6 +4527,50 @@ fn ensure_editable_source(package: &OwnedPackage) -> CoreResult<()> {
     }
 }
 
+/// Preserve the edit-entry refusals that are independent of mutable draft
+/// materialization.  Opened and byte-adopted packages already retain their
+/// validated semantic projection, so this only checks the first XML root and
+/// active processing-instruction policy.  The full source scanner, slide
+/// projection, and draft are still deferred to [`Edit::ensure_draft`].
+fn validate_edit_entry(presentation: &Presentation) -> CoreResult<()> {
+    let xml = presentation.content_xml();
+    let mut offset = 0;
+    while let Some(relative) = xml.get(offset..).and_then(|rest| rest.find("<?")) {
+        let start = offset.saturating_add(relative);
+        if !xml
+            .get(start..)
+            .is_some_and(|instruction| instruction.starts_with("<?xml"))
+        {
+            return invalid("ODP editing refuses active processing instructions");
+        }
+        offset = start.saturating_add(2);
+    }
+
+    let mut reader = NsReader::from_str(xml);
+    reader.config_mut().check_end_names = true;
+    reader.config_mut().trim_text(false);
+    loop {
+        let event = reader
+            .read_event()
+            .map_err(|error| invalid_error(format!("invalid ODP content.xml: {error}")))?;
+        match event {
+            Event::Start(element) | Event::Empty(element) => {
+                let (resolved, local) = reader.resolver().resolve_element(element.name());
+                let expected = matches!(resolved, ResolveResult::Bound(Namespace(uri))
+                    if uri == OFFICE_NAMESPACE
+                        && local.as_ref() == b"document-content");
+                if !expected {
+                    return invalid("ODP editing requires an office:document-content root");
+                }
+                return Ok(());
+            },
+            Event::Eof => return invalid("ODP editing requires an office:document-content root"),
+            Event::PI(_) => return invalid("ODP editing refuses active processing instructions"),
+            _ => {},
+        }
+    }
+}
+
 fn package_security_policy(package: &OwnedPackage) -> CoreResult<SecurityPolicy> {
     let archive = package.package()?;
     let encrypted =
@@ -5052,6 +5155,37 @@ mod tests {
     fn owned_package_size_gate_accepts_n_and_rejects_n_plus_one() -> litchi_core::Result<()> {
         validate_package_size(MAX_PACKAGE_BYTES)?;
         assert!(validate_package_size(MAX_PACKAGE_BYTES + 1).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn edit_entry_and_no_op_commit_defer_mutable_materialization()
+    -> Result<(), litchi_odf_common::Error> {
+        let mut builder = Builder::new();
+        builder.add_slide_with_title("Original", "Body")?;
+        let source = builder.build()?;
+        let source_bytes = source.as_bytes().to_vec();
+        let edit = source.edit()?;
+        assert!(edit.draft.is_none());
+        assert!(edit.source.presentation.get().is_none());
+        assert!(edit.source.editing.get().is_none());
+
+        let commit = edit.commit()?;
+        assert!(!commit.diagnostics().changed());
+        assert_eq!(commit.package().as_bytes(), source_bytes.as_slice());
+        Ok(())
+    }
+
+    #[test]
+    fn first_slide_operation_materializes_the_deferred_draft()
+    -> Result<(), litchi_odf_common::Error> {
+        let mut builder = Builder::new();
+        builder.add_slide_with_title("Original", "Body")?;
+        let source = builder.build()?;
+        let mut edit = source.edit()?;
+        assert!(edit.draft.is_none());
+        edit.add("Added", "Body")?;
+        assert!(edit.draft.is_some());
         Ok(())
     }
 

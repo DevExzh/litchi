@@ -1,0 +1,30 @@
+{
+  "record": "0362uga",
+  "worktree": "uo2/odp-lazy-entry",
+  "status": "source-repair-complete",
+  "checks": [
+    {
+      "command": "cargo test --offline --locked -p litchi-odp --all-targets --all-features",
+      "result": "passed",
+      "unit_tests": 236,
+      "integration_failures": 0
+    },
+    {
+      "command": "cargo clippy --offline --locked -p litchi-odp --all-targets --all-features -- -D warnings",
+      "result": "passed"
+    },
+    {
+      "command": "cargo fmt --all",
+      "result": "passed"
+    },
+    {
+      "command": "git diff --check",
+      "result": "passed"
+    }
+  ],
+  "performance": {
+    "native_timing": false,
+    "baseline_build": false,
+    "exception": false
+  }
+}
