@@ -3269,7 +3269,7 @@ impl PreparedTopology {
     pub fn publish_to_stream_with_policy<W: Write>(
         &self,
         writer: W,
-        policy: &artifact_restore::ArtifactStreamPolicy<'_>,
+        policy: &ArtifactStreamPolicy<'_>,
     ) -> Result<()> {
         policy.admit_prepared_topology(&self.package, &self.state)?;
         self.state.check_readback_sources(&self.package)?;
@@ -3409,7 +3409,7 @@ fn publish_prepared_topology_with_policy<W: Write>(
     omitted_members: &[String],
     appended: &[Arc<soapberry_zip::RegeneratedEntry>],
     transfer_sources: Option<Arc<Vec<SourceSnapshot>>>,
-    policy: &artifact_restore::ArtifactStreamPolicy<'_>,
+    policy: &ArtifactStreamPolicy<'_>,
 ) -> Result<()> {
     let Some(transfer_sources) = transfer_sources else {
         return package.write_changed_overlays_with_appended_inner(
@@ -4549,7 +4549,7 @@ impl SourceArtifact {
     pub fn write_to_with_policy<W: Write>(
         &self,
         writer: W,
-        policy: &artifact_restore::ArtifactStreamPolicy<'_>,
+        policy: &ArtifactStreamPolicy<'_>,
     ) -> Result<()> {
         policy.admit_source_artifact(self)?;
         artifact_restore::write_exact_snapshot_with_policy(&self.snapshot, writer, policy)
@@ -11473,7 +11473,7 @@ impl SourceBackedPackage {
         self,
         writer: W,
         plan: SourceTopologyPlan,
-        policy: &artifact_restore::ArtifactStreamPolicy<'_>,
+        policy: &ArtifactStreamPolicy<'_>,
     ) -> Result<()> {
         if plan.is_empty() {
             self.disable_read_ahead_for_publication()?;
@@ -11487,7 +11487,7 @@ impl SourceBackedPackage {
     pub fn write_exact_source_with_policy<W: Write>(
         self,
         writer: W,
-        policy: &artifact_restore::ArtifactStreamPolicy<'_>,
+        policy: &ArtifactStreamPolicy<'_>,
     ) -> Result<()> {
         policy.admit_source_catalog(&self)?;
         self.disable_read_ahead_for_publication()?;
@@ -11575,7 +11575,7 @@ impl SourceBackedPackage {
         writer: W,
         partname: &PackURI,
         replacement: Vec<u8>,
-        policy: &artifact_restore::ArtifactStreamPolicy<'_>,
+        policy: &ArtifactStreamPolicy<'_>,
     ) -> Result<()> {
         self.write_single_part_overlay_to_stream(
             writer,
@@ -11618,7 +11618,7 @@ impl SourceBackedPackage {
         writer: W,
         partname: &PackURI,
         replacement: Arc<Vec<u8>>,
-        policy: &artifact_restore::ArtifactStreamPolicy<'_>,
+        policy: &ArtifactStreamPolicy<'_>,
     ) -> Result<()> {
         self.write_single_part_overlay_to_stream(
             writer,
@@ -11673,7 +11673,7 @@ impl SourceBackedPackage {
         replacement: P,
         into_shared: F,
         mut accounting: Option<&mut OpcOperationAccounting>,
-        policy: Option<&artifact_restore::ArtifactStreamPolicy<'_>>,
+        policy: Option<&ArtifactStreamPolicy<'_>>,
     ) -> Result<()>
     where
         F: FnOnce(P) -> Arc<Vec<u8>>,
@@ -11772,7 +11772,7 @@ impl SourceBackedPackage {
         writer: W,
         partname: &PackURI,
         replacement: Vec<u8>,
-        mut removed_relationship_ids: Vec<String>,
+        removed_relationship_ids: Vec<String>,
     ) -> Result<()> {
         self.write_part_overlay_with_external_relationship_removals_to_stream_inner(
             writer,
@@ -11791,7 +11791,7 @@ impl SourceBackedPackage {
         partname: &PackURI,
         replacement: Vec<u8>,
         removed_relationship_ids: Vec<String>,
-        policy: &artifact_restore::ArtifactStreamPolicy<'_>,
+        policy: &ArtifactStreamPolicy<'_>,
     ) -> Result<()> {
         self.write_part_overlay_with_external_relationship_removals_to_stream_inner(
             writer,
@@ -11808,7 +11808,7 @@ impl SourceBackedPackage {
         partname: &PackURI,
         replacement: Vec<u8>,
         mut removed_relationship_ids: Vec<String>,
-        policy: Option<&artifact_restore::ArtifactStreamPolicy<'_>>,
+        policy: Option<&ArtifactStreamPolicy<'_>>,
     ) -> Result<()> {
         self.disable_read_ahead_for_publication()?;
         if removed_relationship_ids.len() > MAX_SOURCE_RELATIONSHIP_REMOVALS {
@@ -11945,7 +11945,7 @@ impl SourceBackedPackage {
         self,
         writer: W,
         overlays: Vec<(PackURI, Vec<u8>, Vec<String>)>,
-        policy: &artifact_restore::ArtifactStreamPolicy<'_>,
+        policy: &ArtifactStreamPolicy<'_>,
     ) -> Result<()> {
         self.write_part_overlays_with_external_relationship_removals_to_stream_inner(
             writer,
@@ -11958,7 +11958,7 @@ impl SourceBackedPackage {
         self,
         writer: W,
         mut overlays: Vec<(PackURI, Vec<u8>, Vec<String>)>,
-        policy: Option<&artifact_restore::ArtifactStreamPolicy<'_>>,
+        policy: Option<&ArtifactStreamPolicy<'_>>,
     ) -> Result<()> {
         self.disable_read_ahead_for_publication()?;
         if overlays.len() > MAX_SOURCE_OVERLAY_PARTS {
@@ -12231,7 +12231,7 @@ impl SourceBackedPackage {
         self,
         writer: W,
         replacements: Vec<(PackURI, Vec<u8>)>,
-        policy: &artifact_restore::ArtifactStreamPolicy<'_>,
+        policy: &ArtifactStreamPolicy<'_>,
     ) -> Result<()> {
         self.write_part_overlays_impl(
             writer,
@@ -12272,7 +12272,7 @@ impl SourceBackedPackage {
         self,
         writer: W,
         replacements: Vec<(PackURI, Arc<Vec<u8>>)>,
-        policy: &artifact_restore::ArtifactStreamPolicy<'_>,
+        policy: &ArtifactStreamPolicy<'_>,
     ) -> Result<()> {
         self.write_part_overlays_impl(
             writer,
@@ -12322,7 +12322,7 @@ impl SourceBackedPackage {
         writer: W,
         replacements: Vec<(PackURI, Vec<u8>)>,
         deletions: Vec<PackURI>,
-        policy: &artifact_restore::ArtifactStreamPolicy<'_>,
+        policy: &ArtifactStreamPolicy<'_>,
     ) -> Result<()> {
         self.write_part_overlays_impl(
             writer,
@@ -12360,7 +12360,7 @@ impl SourceBackedPackage {
         writer: W,
         replacements: Vec<(PackURI, Arc<Vec<u8>>)>,
         deletions: Vec<PackURI>,
-        policy: &artifact_restore::ArtifactStreamPolicy<'_>,
+        policy: &ArtifactStreamPolicy<'_>,
     ) -> Result<()> {
         self.write_part_overlays_impl(
             writer,
@@ -12377,7 +12377,7 @@ impl SourceBackedPackage {
         mut replacements: Vec<(PackURI, P)>,
         mut deletions: Vec<PackURI>,
         mut into_shared: F,
-        policy: Option<&artifact_restore::ArtifactStreamPolicy<'_>>,
+        policy: Option<&ArtifactStreamPolicy<'_>>,
     ) -> Result<()>
     where
         F: FnMut(P) -> Arc<Vec<u8>>,
@@ -13860,7 +13860,7 @@ impl SourceBackedPackage {
         replacements: &[ChangedOverlay],
         omitted_member_names: &[String],
         appended: &[PolicyAppendedEntry],
-        policy: &artifact_restore::ArtifactStreamPolicy<'_>,
+        policy: &ArtifactStreamPolicy<'_>,
     ) -> Result<()> {
         policy.admit_changed_overlays(&self, replacements, omitted_member_names, appended)?;
         let mut appended_entries = Vec::new();
@@ -13951,7 +13951,7 @@ impl SourceBackedPackage {
         writer: W,
         replacements: &[ChangedOverlay],
         omitted_member_names: &[String],
-        policy: &artifact_restore::ArtifactStreamPolicy<'_>,
+        policy: &ArtifactStreamPolicy<'_>,
     ) -> Result<()> {
         policy.admit_changed_overlays(&self, replacements, omitted_member_names, &[])?;
         self.write_changed_overlays_with_appended_inner(
@@ -13988,7 +13988,7 @@ impl SourceBackedPackage {
         omitted_member_names: &[String],
         appended: &[Arc<soapberry_zip::RegeneratedEntry>],
         mut accounting: Option<&mut OpcOperationAccounting>,
-        policy: Option<&artifact_restore::ArtifactStreamPolicy<'_>>,
+        policy: Option<&ArtifactStreamPolicy<'_>>,
     ) -> Result<()> {
         self.disable_read_ahead_for_publication()?;
         let _monitored = self.source.monitor_publication();
@@ -16170,7 +16170,7 @@ fn map_source_backed_error(error: OpcError) -> OpcError {
     }
 }
 
-fn finish_source_publication(
+pub(super) fn finish_source_publication(
     result: Result<()>,
     source: &SourceSnapshot,
     written: u64,

@@ -39,8 +39,8 @@ impl PreparedMetadataData {
                 self.topology.state.changed[*index].replacement.as_slice()
             },
             PreparedMetadataPayload::Appended(index) => {
-                self.topology.state.retained().appended_metadata[*index]
-                    .1
+                self.topology.state.retained().policy_appended[*index]
+                    .payload
                     .as_slice()
             },
         }
@@ -184,9 +184,9 @@ impl PreparedTopology {
             });
             let appended = retained.and_then(|state| {
                 state
-                    .appended_metadata
+                    .policy_appended
                     .iter()
-                    .position(|(name, _)| name.eq_ignore_ascii_case(member))
+                    .position(|entry| entry.name.eq_ignore_ascii_case(member))
             });
             let payload = if let Some(index) = changed {
                 PreparedMetadataPayload::Changed(index)

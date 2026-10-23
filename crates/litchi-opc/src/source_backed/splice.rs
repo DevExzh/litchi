@@ -777,7 +777,7 @@ impl<'package> SourcePartSplicePlan<'package> {
             policy.admit_splice_candidate(
                 &self.package,
                 self.target,
-                proof.candidate_len,
+                self.proof.candidate_len,
             )?;
         }
 
@@ -1362,7 +1362,7 @@ impl SourceBackedPackage {
         let candidate_len_usize = usize::try_from(candidate_len).map_err(|_| {
             overlay_unavailable("decoded replay candidate length does not fit this platform")
         })?;
-        self.validate_overlay_limits(std::iter::once((target, candidate_len_usize)))?;
+        self.validate_overlay_limits(std::iter::once((target, candidate_len_usize)), self.limits)?;
         let is_noop = proof.is_exact_insertion_noop();
         if !is_noop {
             if self.has_signature_infrastructure() {
@@ -1508,7 +1508,7 @@ impl SourceBackedPackage {
         let candidate_len_usize = usize::try_from(candidate_len).map_err(|_| {
             overlay_unavailable("decoded splice candidate length does not fit this platform")
         })?;
-        self.validate_overlay_limits(std::iter::once((target, candidate_len_usize)))?;
+        self.validate_overlay_limits(std::iter::once((target, candidate_len_usize)), self.limits)?;
         let is_noop = proof.is_exact_insertion_noop();
         if !is_noop {
             if self.has_signature_infrastructure() {
@@ -3252,6 +3252,7 @@ fn map_replay_error(error: ReplayPublicationError<OpcError, OpcError>) -> OpcErr
             overlay_unavailable("decoded splice replay produced non-deterministic output")
         },
         ReplayPublicationError::Admission { source, .. } => source,
+        _ => overlay_unavailable("decoded splice replay returned an unknown publication error"),
     }
 }
 

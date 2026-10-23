@@ -1341,7 +1341,7 @@ fn combined_capture_short_reads_bypass_and_mid_read_refusals_release_reservation
         let package = SourceBackedPackage::from_read_at(
             source.clone(),
             SourceLimits::default(),
-            litchi_opc::SourceCacheLimits::new(1, 1).unwrap(),
+            SourceCacheLimits::new(1, 1).unwrap(),
             SourceReadPolicy::exact(),
             Some(context),
         )
