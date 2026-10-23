@@ -509,6 +509,13 @@ def prepare(args: argparse.Namespace) -> dict[str, Any]:
     descriptor = provenance.fixture_descriptor(probe)
     fixture_artifact = write_new(output_dir / "litchi_w8_fixture_descriptor.json", descriptor)
     mapped = route_map(probe)
+    mapped["consumer_adapter"] = {
+        "path": ADAPTER_RELATIVE.as_posix(),
+        "artifact": adapter_artifact,
+        "transforms": transforms,
+        "source_sha256": digest_bytes(adapter_bytes),
+        "production_source_unchanged": True,
+    }
     route_artifact = write_new(output_dir / "original-baseline-route-map.json", mapped)
     projection_args = argparse.Namespace(workspace=workspace, package_manifest=workspace / provenance.PACKAGE_MANIFEST_RELATIVE, lock=lock, toolchain=workspace / "rust-toolchain.toml", probe=probe, fixture=Path(fixture_artifact["path"]), features=[], all_features=True, target=args.target, profile=args.profile)
     projection = provenance.dependency_projection(projection_args)
