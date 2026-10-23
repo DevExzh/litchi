@@ -178,3 +178,15 @@ inner documentation or unused test imports. No lint waiver is accepted.
 [clippy-composed-v22.json](results/0362up/clippy-composed-v22.json) retains
 the complete command and external log identity. A successful final composed
 lint run remains required.
+
+## Shared-type composition lint pass
+
+On `ad52437f5e`, the complete all-target/all-feature workspace Clippy run
+finishes with three remaining lint sites: automatic dereference in XLSX
+facade chart admission and two redundant Diagnostics qualifications in a
+PPTX test seam. The qualifications became equivalent after the shared-type
+migration. Only their spelling changes; no admission, error, or data flow
+changes. [clippy-shared-types-v23.json](results/0362up/clippy-shared-types-v23.json)
+retains the complete command and external log identity. The composed glossary
+and final-inventory tool suites pass 54 tests; the hardened IWA qualification
+suite passes 20 tests.

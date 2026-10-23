@@ -409,8 +409,8 @@ impl SlotChange {
 
     /// Test seam: whether the change edits its owner.
     #[cfg(test)]
-    pub(crate) fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
-        crate::diagnostics::Diagnostics::new(!self.is_noop())
+    pub(crate) fn diagnostics(&self) -> Diagnostics {
+        Diagnostics::new(!self.is_noop())
     }
 
     /// Test seam: the exact inverse change.

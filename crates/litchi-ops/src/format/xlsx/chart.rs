@@ -790,7 +790,7 @@ impl Xlsx {
         // and reference charge is checked again while the promoted owner is
         // read below.
         for (_, range, key) in &range_series {
-            Self::admit_series_range(range, *key, &mut expanded, &staged)?;
+            Self::admit_series_range(range, key, &mut expanded, &staged)?;
         }
         if let Some(range) = range.as_deref() {
             Self::admit_data_range(range, &mut expanded, &staged)?;
