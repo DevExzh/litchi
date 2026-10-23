@@ -2452,7 +2452,7 @@ impl Edit {
                 // admission failure in the following command.
                 self.flush_pending()?;
             }
-            let Some(plan) = planned? else {
+            let Some(mut plan) = planned? else {
                 return Ok(None);
             };
             if self.operations >= self.limits.max_operations() {
@@ -2474,12 +2474,14 @@ impl Edit {
                 let File::Xlsx(handle) = &self.current else {
                     return Err(pending());
                 };
+                let promoted_source = plan.take_promoted_source();
                 self.cells = Some(crate::format::xlsx::write::coalesce::Run::new(
                     handle,
                     &self.limits,
                     self.limits
                         .max_snapshot_bytes()
                         .saturating_sub(self.snapshot_bytes),
+                    promoted_source,
                 )?);
             }
             let run = self

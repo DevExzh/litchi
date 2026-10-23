@@ -26,6 +26,7 @@ use litchi_core::FileFormat;
 use litchi_core::metadata::{Metadata, Timestamp};
 use litchi_ooxml_common::custom;
 use litchi_ooxml_common::properties;
+use std::mem::size_of;
 
 use crate::error::{Code, Error, Result};
 use crate::props::{PropValue, Props};
@@ -235,6 +236,37 @@ pub(crate) struct Assignments {
 }
 
 impl Assignments {
+    /// Conservative logical bytes retained by the admitted metadata request.
+    /// This is used before the leaf metadata editor materializes its before /
+    /// after property scope; it includes names, authored text and the
+    /// structural descriptors retained by the patch.
+    pub(crate) fn retained_bytes(&self) -> usize {
+        let fields =
+            self.fields
+                .iter()
+                .fold(size_of::<(Field, Assigned)>(), |bytes, (_, value)| {
+                    bytes.saturating_add(match value {
+                        Assigned::Text(text) => text.as_ref().map_or(0, String::len),
+                        Assigned::Time(_) => size_of::<Timestamp>(),
+                        Assigned::Keywords(values) => values
+                            .iter()
+                            .fold(0usize, |total, value| total.saturating_add(value.len())),
+                    })
+                });
+        self.custom.iter().fold(
+            fields.saturating_add(size_of::<(String, Option<custom::Value>)>()),
+            |bytes, (name, value)| {
+                bytes
+                    .saturating_add(name.len())
+                    .saturating_add(size_of::<custom::Value>())
+                    .saturating_add(match value {
+                        Some(custom::Value::Text(text)) => text.len(),
+                        _ => 0,
+                    })
+            },
+        )
+    }
+
     /// Apply the field assignments to `metadata`.
     pub(crate) fn apply(&self, metadata: &mut Metadata) {
         for (field, value) in &self.fields {
@@ -606,5 +638,20 @@ mod tests {
             let error = native_error(properties::Error::PatchConflict, format);
             assert_eq!(error.code(), Code::InvalidInput, "{format:?}");
         }
+    }
+
+    #[test]
+    fn retained_metadata_charge_includes_names_values_and_custom_shape() {
+        let short = admit(&Props::new().with("title", "x"), FileFormat::Xlsx).unwrap();
+        let long = admit(
+            &Props::new()
+                .with("title", "a much longer authored title")
+                .with("custom.ReviewedBy", "an authored reviewer"),
+            FileFormat::Xlsx,
+        )
+        .unwrap();
+
+        assert!(long.retained_bytes() > short.retained_bytes());
+        assert!(long.retained_bytes() >= "ReviewedBy".len() + "an authored reviewer".len());
     }
 }
