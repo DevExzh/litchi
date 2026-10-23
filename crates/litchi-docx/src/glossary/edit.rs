@@ -29,7 +29,7 @@
 use super::codec::invalid;
 use super::graph::{self, ClosureLedger};
 use super::transaction::Transaction as Draft;
-use super::{Catalog, Conformance, Entry, Name, raw};
+use super::{Catalog, Conformance, Entry, MAX_VALUES, Name, raw};
 use crate::package::family::{Staged, graph_family};
 
 graph_family!("glossary", own_limits);
@@ -277,6 +277,20 @@ impl crate::Package {
         let source_seed =
             owner_metadata_seed_for(main_name.as_str(), source_owner_state.as_ref(), &limits)?;
         let mut final_owner = None;
+        let mut changed_main_owner = None;
+        patch.0.for_each_part_delta(|name, _, after| {
+            if name == &main_name {
+                changed_main_owner = Some(
+                    after
+                        .map(|(_, _, relationships)| {
+                            owner_state_from_relationships(relationships, &limits)
+                        })
+                        .transpose()?
+                        .flatten(),
+                );
+            }
+            Ok(())
+        })?;
         patch
             .0
             .validate_after_relationships(|owner, relationships| {
@@ -285,7 +299,9 @@ impl crate::Package {
                 }
                 Ok(())
             })?;
-        let final_owner = final_owner.unwrap_or_else(|| source_owner_state.clone());
+        let final_owner = changed_main_owner
+            .or(final_owner)
+            .unwrap_or_else(|| source_owner_state.clone());
         patch.0.for_each_part_delta(|name, before, after| {
             if name == &main_name {
                 return Ok(());
@@ -619,11 +635,12 @@ fn check_ledger(ledger: &ClosureLedger, limits: &super::Limits) -> Result<()> {
             maximum: limits.values(),
         });
     }
-    if ledger.part_count > limits.parts() {
+    let part_limit = limits.parts().min(MAX_VALUES);
+    if ledger.part_count > part_limit {
         return Err(crate::Error::GlossaryLimit {
             kind: LimitKind::AuxiliaryPart,
             actual: ledger.part_count,
-            maximum: limits.parts(),
+            maximum: part_limit,
         });
     }
     Ok(())

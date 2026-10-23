@@ -1992,6 +1992,52 @@ fn unchanged_background_rebind_checks_existing_catalog() {
 }
 
 #[test]
+fn changed_background_rebind_checks_existing_entries() {
+    let mut catalog = Catalog::new();
+    let props = Props {
+        description: Some("oversized".to_owned()),
+        ..Props::new(Name::new("Existing").unwrap())
+    };
+    catalog
+        .add(
+            entry("Existing")
+                .with_props(props, &Limits::DEFAULT)
+                .unwrap(),
+        )
+        .unwrap();
+    let old_background = format!(r#"<w:background xmlns:w="{W}"/>"#).into_bytes();
+    let new_background = format!(r#"<w:background xmlns:w="{W}" w:color="A"/>"#).into_bytes();
+    catalog
+        .set_background(old_background.clone(), &Limits::DEFAULT)
+        .unwrap();
+    let narrow_strings = Limits::new(
+        MAX,
+        MAX_DEPTH,
+        MAX_NODES,
+        MAX_DOM_ATTRIBUTES,
+        MAX_DOM_CONTENT,
+        MAX_DOM_TOKENS,
+        MAX_DOM_BYTES,
+        MAX_PARTS,
+        MAX_VALUES,
+        1,
+        MAX_NAME_KEY,
+        MAX_GRAPH_BYTES,
+        MAX_GRAPH_METADATA_BYTES,
+    )
+    .unwrap();
+    let error = catalog
+        .set_background(new_background, &narrow_strings)
+        .unwrap_err()
+        .to_string();
+    assert!(
+        error.contains("glossary string bytes limit exceeded"),
+        "{error}"
+    );
+    assert_eq!(catalog.background(), Some(old_background.as_slice()));
+}
+
+#[test]
 fn aggregate_catalog_budget_is_checked_atomically() {
     let mut catalog = Catalog::new();
     for index in 0..5 {

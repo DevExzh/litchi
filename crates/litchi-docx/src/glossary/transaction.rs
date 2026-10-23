@@ -141,7 +141,8 @@ pub(crate) struct Transaction {
     before: Snapshot,
     draft: Option<raw::Graph>,
     limits: super::Limits,
-    empty_usage: GraphUsage,
+    empty_seed: EmptyGraphSeed,
+    empty_usage: Option<GraphUsage>,
 }
 
 impl Transaction {
@@ -159,12 +160,13 @@ impl Transaction {
         limits: &super::Limits,
     ) -> Result<Self> {
         let before = Snapshot::load(target, limits)?;
-        let empty_usage = generated_graph_usage(target, before.conformance, limits)?;
+        let empty_seed = empty_graph_seed(target, before.conformance)?;
         Ok(Self {
             draft: before.graph.clone(),
             before,
             limits: *limits,
-            empty_usage,
+            empty_seed,
+            empty_usage: None,
         })
     }
 
@@ -322,9 +324,10 @@ impl Transaction {
         if unchanged {
             return Ok(false);
         }
+        let empty_usage = self.empty_usage_for_current()?;
         preflight_root_relationships(
             self.draft.as_ref(),
-            &self.empty_usage,
+            &empty_usage,
             &relationships,
             &self.limits,
         )?;
@@ -341,9 +344,10 @@ impl Transaction {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn add_relationship(&mut self, relationship: raw::Rel) -> Result<bool> {
+        let empty_usage = self.empty_usage_for_current()?;
         preflight_add_relationship(
             self.draft.as_ref(),
-            &self.empty_usage,
+            &empty_usage,
             &relationship,
             &self.limits,
         )?;
@@ -376,7 +380,8 @@ impl Transaction {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn add_part(&mut self, part: raw::Part) -> Result<bool> {
-        preflight_add_part(self.draft.as_ref(), &self.empty_usage, &part, &self.limits)?;
+        let empty_usage = self.empty_usage_for_current()?;
+        preflight_add_part(self.draft.as_ref(), &empty_usage, &part, &self.limits)?;
         let mut graph = self.candidate_graph();
         graph.parts.push(part);
         validate_candidate(&graph, &self.limits)?;
@@ -563,6 +568,18 @@ impl Transaction {
         graph
     }
 
+    fn empty_usage_for_current(&mut self) -> Result<GraphUsage> {
+        if self.draft.is_some() {
+            return Ok(GraphUsage::default());
+        }
+        if let Some(usage) = self.empty_usage {
+            return Ok(usage);
+        }
+        let usage = generated_graph_usage(&self.empty_seed, &self.limits)?;
+        self.empty_usage = Some(usage);
+        Ok(usage)
+    }
+
     fn update_catalog<T>(&mut self, edit: impl FnOnce(&mut Catalog) -> Result<T>) -> Result<T> {
         let mut graph = self.candidate_graph();
         let result = edit(&mut graph.catalog)?;
@@ -713,6 +730,15 @@ struct GraphUsage {
     parts: usize,
 }
 
+#[derive(Clone, Debug)]
+struct EmptyGraphSeed {
+    root: String,
+    main: String,
+    owner_id: String,
+    owner_target: String,
+    conformance: Conformance,
+}
+
 fn graph_usage(graph: &raw::Graph) -> Result<GraphUsage> {
     let mut usage = GraphUsage {
         metadata: graph.root_name.len(),
@@ -749,49 +775,47 @@ fn graph_usage(graph: &raw::Graph) -> Result<GraphUsage> {
     Ok(usage)
 }
 
-fn generated_graph_usage(
-    package: &OpcPackage,
-    conformance: Conformance,
-    limits: &super::Limits,
-) -> Result<GraphUsage> {
+fn empty_graph_seed(package: &OpcPackage, conformance: Conformance) -> Result<EmptyGraphSeed> {
     let root = PackURI::new(DEFAULT_ROOT_NAME).map_err(crate::Error::Uri)?;
     let main = package.main_document_part()?;
-    let root_xml = write_with_limits(&Catalog::new(), conformance, limits)?;
-    let owner_target = root.relative_ref(main.partname().base_uri());
-    let owner_id = next_relationship_id(main);
+    Ok(EmptyGraphSeed {
+        root: root.as_str().to_owned(),
+        main: main.partname().as_str().to_owned(),
+        owner_id: next_relationship_id(main),
+        owner_target: root.relative_ref(main.partname().base_uri()),
+        conformance,
+    })
+}
+
+fn generated_graph_usage(seed: &EmptyGraphSeed, limits: &super::Limits) -> Result<GraphUsage> {
+    let root_xml = write_with_limits(&Catalog::new(), seed.conformance, limits)?;
     let mut usage = GraphUsage {
         bytes: root_xml.len(),
         ..GraphUsage::default()
     };
-    selected_metadata(&mut usage, root.as_str(), true, limits)?;
-    selected_metadata(&mut usage, main.partname().as_str(), true, limits)?;
-    selected_metadata(&mut usage, &owner_id, false, limits)?;
-    selected_metadata(&mut usage, &owner_target, false, limits)?;
+    selected_metadata(&mut usage, &seed.root, true, limits)?;
+    selected_metadata(&mut usage, &seed.main, true, limits)?;
+    selected_metadata(&mut usage, &seed.owner_id, false, limits)?;
+    selected_metadata(&mut usage, &seed.owner_target, false, limits)?;
     check_usage(usage, limits)?;
     Ok(usage)
 }
 
 fn next_relationship_id(part: &dyn super::Part) -> String {
-    let mut used = Vec::new();
-    for relationship in part.rels().iter() {
-        if let Some(number) = relationship
-            .r_id()
-            .strip_prefix("rId")
-            .and_then(|value| atoi_simd::parse::<u32, false, false>(value.as_bytes()).ok())
-        {
-            used.push(number);
-        }
-    }
-    used.sort_unstable();
     let mut next = 1u32;
-    for number in used {
-        match number.cmp(&next) {
-            std::cmp::Ordering::Equal => next = next.saturating_add(1),
-            std::cmp::Ordering::Greater => break,
-            std::cmp::Ordering::Less => {},
+    loop {
+        let used = part.rels().iter().any(|relationship| {
+            relationship
+                .r_id()
+                .strip_prefix("rId")
+                .and_then(|value| atoi_simd::parse::<u32, false, false>(value.as_bytes()).ok())
+                == Some(next)
+        });
+        if !used {
+            return format!("rId{next}");
         }
+        next = next.saturating_add(1);
     }
-    format!("rId{next}")
 }
 
 fn staged_graph_usage(
@@ -1006,7 +1030,6 @@ fn part_usage_values(
     limits: &super::Limits,
     admit_payload: bool,
 ) -> Result<GraphUsage> {
-    validate_physical_part(name, content_type, data.len())?;
     let mut usage = GraphUsage {
         bytes: data.len(),
         parts: 1,
@@ -1014,6 +1037,8 @@ fn part_usage_values(
     };
     selected_metadata(&mut usage, name, true, limits)?;
     selected_metadata(&mut usage, content_type, false, limits)?;
+    check_usage(usage, limits)?;
+    validate_physical_part(name, content_type, data.len())?;
     let relationship_usage = relationship_usage(relationships, limits)?;
     usage.metadata = usage
         .metadata

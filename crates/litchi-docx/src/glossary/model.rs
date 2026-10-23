@@ -701,8 +701,22 @@ impl Catalog {
                 "relationship-bearing background requires glossary::raw graph publication",
             ));
         }
+        if self.entries.len() > limits.values() {
+            return Err(crate::Error::GlossaryLimit {
+                kind: crate::glossary::LimitKind::Entry,
+                actual: self.entries.len(),
+                maximum: limits.values(),
+            });
+        }
+        let mut entry_bytes = [0usize; 2];
+        for entry in &self.entries {
+            entry_bytes = add_sizes(
+                entry_bytes,
+                entry_analysis_with_limits(entry, limits)?.sizes,
+            )?;
+        }
         validate_catalog_sizes_with_limits(
-            self.state.entry_bytes,
+            entry_bytes,
             analysis.sizes,
             self.entries.len(),
             limits,
