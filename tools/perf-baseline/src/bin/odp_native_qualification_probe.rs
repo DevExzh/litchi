@@ -22,13 +22,17 @@ use litchi_core::{OwnedSource, ReadAt};
 use litchi_odp::SourceBackedPresentation;
 use serde_json::{Value, json};
 use sha2::{Digest as Sha2Digest, Sha256};
-use soapberry_zip::office::ArchiveReader;
+use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
 
 const SCHEMA: &str = "litchi.odp.native-qualification.probe.v1";
 const ROUTES: &[&str] = &["open", "read", "write", "append", "replay"];
 const DEFAULT_TITLE: &str = "Qualification appended title";
 const DEFAULT_BODY: &str = "Qualification appended body";
 const DEFAULT_MAX_ITERATIONS: usize = 1_000_000;
+const SCOPED_REPLAY_FALLBACK_MEMBER: &str = "Qualification/unrelated.bin";
+const SCOPED_REPLAY_MARKER: &[u8] =
+    b"\n<!-- litchi native qualification unrelated-member variant -->\n";
+const SCOPED_REPLAY_PROVENANCE: &str = "deterministic generated recipient: one unrelated archive member changed; content.xml unchanged";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Mode {
@@ -281,6 +285,60 @@ fn fixture_content_digest(fixture: &[u8]) -> Result<Digest, Box<dyn Error>> {
     let mut archive = ArchiveReader::new(fixture)?;
     let content = archive.read("content.xml")?;
     Ok(Digest::from_bytes(&content))
+}
+
+fn member_digest(bytes: &[u8], name: &str) -> Result<Digest, Box<dyn Error>> {
+    let mut archive = ArchiveReader::new(bytes)?;
+    let member = archive.read(name)?;
+    Ok(Digest::from_bytes(&member))
+}
+
+fn scoped_recipient_fixture(
+    fixture: &[u8],
+) -> Result<(Vec<u8>, String, Option<Digest>), Box<dyn Error>> {
+    let mut reader = ArchiveReader::new(fixture)?;
+    let mut names: Vec<String> = reader.file_names().map(str::to_owned).collect();
+    names.retain(|name| !name.ends_with('/'));
+    let target = names
+        .iter()
+        .find(|name| name.as_str() == "META-INF/manifest.xml")
+        .or_else(|| names.iter().find(|name| name.as_str() == "styles.xml"))
+        .or_else(|| {
+            names
+                .iter()
+                .find(|name| name.as_str() != "mimetype" && name.as_str() != "content.xml")
+        })
+        .cloned()
+        .unwrap_or_else(|| SCOPED_REPLAY_FALLBACK_MEMBER.to_owned());
+    let source_member = names
+        .iter()
+        .find(|name| name.as_str() == target)
+        .map(|name| member_digest(fixture, name.as_str()))
+        .transpose()?;
+
+    let mut ordered = Vec::with_capacity(names.len());
+    if names.iter().any(|name| name == "mimetype") {
+        ordered.push("mimetype".to_owned());
+    }
+    ordered.extend(names.into_iter().filter(|name| name != "mimetype"));
+    let mut writer = StreamingArchiveWriter::new();
+    let mut changed_existing = false;
+    for name in ordered {
+        let mut bytes = reader.read(&name)?;
+        if name == target {
+            bytes.extend_from_slice(SCOPED_REPLAY_MARKER);
+            changed_existing = true;
+        }
+        if name == "mimetype" {
+            writer.write_stored(&name, &bytes)?;
+        } else {
+            writer.write_deflated(&name, &bytes)?;
+        }
+    }
+    if !changed_existing {
+        writer.write_stored(SCOPED_REPLAY_FALLBACK_MEMBER, SCOPED_REPLAY_MARKER)?;
+    }
+    Ok((writer.finish_to_bytes()?, target, source_member))
 }
 
 fn source_for_fixture(bytes: &[u8]) -> Arc<dyn ReadAt> {
@@ -570,6 +628,26 @@ fn verify(fixture: &[u8], title: &str, body: &str) -> Result<Value, Box<dyn Erro
     let matching = independent.apply_tail_append(patch)?;
     let matching_digest = write_owner(matching.package())?;
 
+    // Rebase onto a deterministic recipient whose content.xml is identical
+    // but one unrelated archive member differs.  The member is deliberately
+    // inspected through the published bytes so this proves content-scoped
+    // replay and preservation of the recipient's opaque archive state.
+    let (scoped_recipient_bytes, scoped_member_name, scoped_source_member) =
+        scoped_recipient_fixture(fixture)?;
+    let scoped_recipient_archive = Digest::from_bytes(&scoped_recipient_bytes);
+    let scoped_recipient_content = member_digest(&scoped_recipient_bytes, "content.xml")?;
+    let scoped_recipient_member = member_digest(&scoped_recipient_bytes, &scoped_member_name)?;
+    let scoped_recipient = owner(&scoped_recipient_bytes)?;
+    let scoped_forward = scoped_recipient.apply_tail_append(patch)?;
+    let scoped_forward_bytes = write_owner_bytes(scoped_forward.package())?;
+    let scoped_forward_content = member_digest(&scoped_forward_bytes, "content.xml")?;
+    let scoped_forward_member = member_digest(&scoped_forward_bytes, &scoped_member_name)?;
+    let scoped_forward_owner = owner(&scoped_forward_bytes)?;
+    let scoped_inverse = scoped_forward_owner.apply_tail_append(&patch.inverse())?;
+    let scoped_inverse_bytes = write_owner_bytes(scoped_inverse.package())?;
+    let scoped_inverse_content = member_digest(&scoped_inverse_bytes, "content.xml")?;
+    let scoped_inverse_member = member_digest(&scoped_inverse_bytes, &scoped_member_name)?;
+
     let output_owner = owner(&append)?;
     let inverse = output_owner.apply_tail_append(&patch.inverse())?;
     let inverse_digest = write_owner(inverse.package())?;
@@ -584,12 +662,30 @@ fn verify(fixture: &[u8], title: &str, body: &str) -> Result<Value, Box<dyn Erro
     let patch_source_matches_fixture =
         hex_bytes(&patch.source_content_sha256()) == content_digest.sha256;
     let append_output_changed = append_digest != source_digest;
+    let scoped_recipient_content_matches = scoped_recipient_content == content_digest;
+    let scoped_recipient_member_changed = match scoped_source_member.as_ref() {
+        Some(source_member) => source_member != &scoped_recipient_member,
+        None => true,
+    };
+    let scoped_forward_content_matches_patch =
+        hex_bytes(&patch.target_content_sha256()) == scoped_forward_content.sha256;
+    let scoped_forward_preserves_unrelated_member =
+        scoped_forward_member == scoped_recipient_member;
+    let scoped_inverse_preserves_unrelated_member =
+        scoped_inverse_member == scoped_recipient_member;
+    let scoped_inverse_restores_content_scope = scoped_inverse_content == content_digest;
     let checks = json!({
         "no_op_exact_source": no_op_exact_source,
         "read_semantics": slide_count > 0 && first_slide_present,
         "append_changed": patch_changed && patch_source_matches_fixture && append_output_changed,
         "patch_source_matches_fixture": patch_source_matches_fixture,
         "append_output_changed": append_output_changed,
+        "scoped_recipient_content_matches": scoped_recipient_content_matches,
+        "scoped_recipient_member_changed": scoped_recipient_member_changed,
+        "scoped_forward_content_matches_patch": scoped_forward_content_matches_patch,
+        "scoped_forward_preserves_unrelated_member": scoped_forward_preserves_unrelated_member,
+        "scoped_inverse_preserves_unrelated_member": scoped_inverse_preserves_unrelated_member,
+        "scoped_inverse_restores_content_scope": scoped_inverse_restores_content_scope,
         "same_owner_replay_exact": same_owner_digest == append_digest,
         "content_matching_forward_exact": matching_digest == append_digest,
         "inverse_exact_source": inverse_digest == source_digest,
@@ -625,6 +721,21 @@ fn verify(fixture: &[u8], title: &str, body: &str) -> Result<Value, Box<dyn Erro
             "is_noop": patch.is_noop(),
             "source_content_sha256": hex_bytes(&patch.source_content_sha256()),
             "target_content_sha256": hex_bytes(&patch.target_content_sha256()),
+        },
+        "scoped_replay": {
+            "provenance": SCOPED_REPLAY_PROVENANCE,
+            "member_name": scoped_member_name,
+            "recipient_archive": scoped_recipient_archive.json(),
+            "source_member": scoped_source_member
+                .as_ref()
+                .map(Digest::json)
+                .unwrap_or(Value::Null),
+            "recipient_member": scoped_recipient_member.json(),
+            "forward_member": scoped_forward_member.json(),
+            "inverse_member": scoped_inverse_member.json(),
+            "recipient_content": scoped_recipient_content.json(),
+            "forward_content": scoped_forward_content.json(),
+            "inverse_content": scoped_inverse_content.json(),
         },
         "outputs": {
             "source": source_digest.json(),

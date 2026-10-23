@@ -29,6 +29,9 @@ def digest(value: bytes) -> dict[str, object]:
 def correctness_report(fixture: bytes) -> dict[str, object]:
     source = digest(fixture)
     append = digest(fixture + b"-append")
+    recipient_archive = digest(fixture + b"-recipient")
+    source_member = digest(b"source-member")
+    recipient_member = digest(b"changed-member")
     return {
         "schema": RUNNER.PROBE_SCHEMA,
         "mode": "verify",
@@ -39,6 +42,12 @@ def correctness_report(fixture: bytes) -> dict[str, object]:
             "append_changed": True,
             "patch_source_matches_fixture": True,
             "append_output_changed": True,
+            "scoped_recipient_content_matches": True,
+            "scoped_recipient_member_changed": True,
+            "scoped_forward_content_matches_patch": True,
+            "scoped_forward_preserves_unrelated_member": True,
+            "scoped_inverse_preserves_unrelated_member": True,
+            "scoped_inverse_restores_content_scope": True,
             "same_owner_replay_exact": True,
             "content_matching_forward_exact": True,
             "inverse_exact_source": True,
@@ -54,6 +63,18 @@ def correctness_report(fixture: bytes) -> dict[str, object]:
             "is_noop": False,
             "source_content_sha256": source["sha256"],
             "target_content_sha256": append["sha256"],
+        },
+        "scoped_replay": {
+            "provenance": "deterministic generated recipient",
+            "member_name": "Qualification/unrelated.bin",
+            "recipient_archive": recipient_archive,
+            "source_member": source_member,
+            "recipient_member": recipient_member,
+            "forward_member": recipient_member,
+            "inverse_member": recipient_member,
+            "recipient_content": source,
+            "forward_content": append,
+            "inverse_content": source,
         },
         "outputs": {
             "source": source,
@@ -175,6 +196,22 @@ class OdpNativeQualificationTests(unittest.TestCase):
         with self.assertRaises(RUNNER.RunFailure):
             RUNNER.validate_correctness_report(
                 broken,
+                RUNNER.Fixture(
+                    path=Path("fixture.odp"),
+                    bytes=len(fixture),
+                    sha256=hashlib.sha256(fixture).hexdigest(),
+                    provenance="test",
+                ),
+                {"content": digest(fixture)},
+                "candidate",
+            )
+        broken_scope = json.loads(json.dumps(report))
+        broken_scope["scoped_replay"]["forward_member"] = broken_scope["scoped_replay"][
+            "source_member"
+        ]
+        with self.assertRaises(RUNNER.RunFailure):
+            RUNNER.validate_correctness_report(
+                broken_scope,
                 RUNNER.Fixture(
                     path=Path("fixture.odp"),
                     bytes=len(fixture),

@@ -24,7 +24,10 @@ sample count all come from command-line arguments. The routes are:
 source/no-op bytes, semantic reading, append change, the patch's source
 `content.xml` hash against an independently read fixture member, appended
 output change, same-owner replay, equal-content cross-copy replay, inverse
-restoration, and refusal of a changed recipient. Every output is reported as a
+restoration, and refusal of a changed recipient. It also generates a
+deterministic recipient with identical `content.xml` and one changed unrelated
+archive member, then checks that forward and inverse replay preserve that
+member while restoring only the content scope. Every output is reported as a
 byte count and SHA-256 digest. Calibration and timed reports carry a route
 proof matching this preflight, so timing validation does not rely on output
 length alone.

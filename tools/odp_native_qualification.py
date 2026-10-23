@@ -622,6 +622,58 @@ def _digest_object(value: Any, location: str) -> dict[str, Any]:
     return {"bytes": bytes_value, "sha256": digest}
 
 
+def _scoped_replay_receipt(report: Mapping[str, Any], label: str) -> dict[str, Any]:
+    scoped = _object(report.get("scoped_replay"), f"{label}.scoped_replay")
+    expected_keys = {
+        "provenance",
+        "member_name",
+        "recipient_archive",
+        "source_member",
+        "recipient_member",
+        "forward_member",
+        "inverse_member",
+        "recipient_content",
+        "forward_content",
+        "inverse_content",
+    }
+    if set(scoped) != expected_keys:
+        raise RunFailure(f"{label}: scoped replay receipt fields are incomplete")
+    provenance = _string(scoped.get("provenance"), f"{label}.scoped_replay.provenance")
+    member_name = _string(scoped.get("member_name"), f"{label}.scoped_replay.member_name")
+    source_value = scoped.get("source_member")
+    source_member = (
+        None
+        if source_value is None
+        else _digest_object(source_value, f"{label}.scoped_replay.source_member")
+    )
+    return {
+        "provenance": provenance,
+        "member_name": member_name,
+        "recipient_archive": _digest_object(
+            scoped.get("recipient_archive"), f"{label}.scoped_replay.recipient_archive"
+        ),
+        "source_member": source_member,
+        "recipient_member": _digest_object(
+            scoped.get("recipient_member"), f"{label}.scoped_replay.recipient_member"
+        ),
+        "forward_member": _digest_object(
+            scoped.get("forward_member"), f"{label}.scoped_replay.forward_member"
+        ),
+        "inverse_member": _digest_object(
+            scoped.get("inverse_member"), f"{label}.scoped_replay.inverse_member"
+        ),
+        "recipient_content": _digest_object(
+            scoped.get("recipient_content"), f"{label}.scoped_replay.recipient_content"
+        ),
+        "forward_content": _digest_object(
+            scoped.get("forward_content"), f"{label}.scoped_replay.forward_content"
+        ),
+        "inverse_content": _digest_object(
+            scoped.get("inverse_content"), f"{label}.scoped_replay.inverse_content"
+        ),
+    }
+
+
 def _assert_endpoint_unchanged(endpoint: ResolvedEndpoint) -> dict[str, Any]:
     status = _run_git(endpoint.endpoint.root, "status", "--porcelain", "--untracked-files=all")
     if status:
@@ -691,6 +743,12 @@ def validate_correctness_report(
         "append_changed",
         "patch_source_matches_fixture",
         "append_output_changed",
+        "scoped_recipient_content_matches",
+        "scoped_recipient_member_changed",
+        "scoped_forward_content_matches_patch",
+        "scoped_forward_preserves_unrelated_member",
+        "scoped_inverse_preserves_unrelated_member",
+        "scoped_inverse_restores_content_scope",
         "same_owner_replay_exact",
         "content_matching_forward_exact",
         "inverse_exact_source",
@@ -742,6 +800,21 @@ def validate_correctness_report(
     for name in ("same_owner_replay", "content_matching_replay"):
         if outputs[name] != outputs["append"]:
             raise RunFailure(f"{label}: {name} output differs from append output")
+    scoped = _scoped_replay_receipt(report, label)
+    if scoped["recipient_content"] != expected_content:
+        raise RunFailure(f"{label}: scoped recipient content differs from the fixture")
+    if scoped["recipient_archive"] == outputs["source"]:
+        raise RunFailure(f"{label}: scoped recipient archive was not changed")
+    if scoped["source_member"] is not None and scoped["source_member"] == scoped["recipient_member"]:
+        raise RunFailure(f"{label}: scoped recipient member was not changed")
+    if scoped["forward_member"] != scoped["recipient_member"]:
+        raise RunFailure(f"{label}: forward replay did not preserve the unrelated member")
+    if scoped["inverse_member"] != scoped["recipient_member"]:
+        raise RunFailure(f"{label}: inverse replay did not preserve the unrelated member")
+    if scoped["forward_content"]["sha256"] != target_content_sha256:
+        raise RunFailure(f"{label}: scoped forward content differs from the patch target")
+    if scoped["inverse_content"] != expected_content:
+        raise RunFailure(f"{label}: scoped inverse did not restore source content")
     return outputs
 
 
@@ -945,6 +1018,7 @@ def _run_correctness(
     outputs: dict[str, dict[str, dict[str, Any]]] = {}
     read_receipts: dict[str, dict[str, Any]] = {}
     patch_receipts: dict[str, dict[str, Any]] = {}
+    scoped_receipts: dict[str, dict[str, Any]] = {}
     events = []
     for name in ("baseline", "candidate"):
         report, event = run_child(
@@ -969,6 +1043,9 @@ def _run_correctness(
             "source_content_sha256": patch["source_content_sha256"],
             "target_content_sha256": patch["target_content_sha256"],
         }
+        scoped_receipts[name] = _scoped_replay_receipt(
+            report, f"correctness.{name}"
+        )
         events.append(event)
         _write_json(out_dir / f"correctness-{name}.json", report)
     if outputs["baseline"] != outputs["candidate"]:
@@ -977,10 +1054,13 @@ def _run_correctness(
         raise RunFailure("baseline and candidate read receipts differ")
     if patch_receipts["baseline"] != patch_receipts["candidate"]:
         raise RunFailure("baseline and candidate patch receipts differ")
+    if scoped_receipts["baseline"] != scoped_receipts["candidate"]:
+        raise RunFailure("baseline and candidate scoped replay receipts differ")
     return {
         "outputs": outputs["baseline"],
         "read": read_receipts["baseline"],
         "patch": patch_receipts["baseline"],
+        "scoped_replay": scoped_receipts["baseline"],
         "events": events,
     }
 
