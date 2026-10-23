@@ -712,6 +712,33 @@ fn eager_owner_editor_is_the_snapshot_and_retention_can_be_refused() {
     }
 }
 
+#[cfg(feature = "encryption")]
+#[test]
+fn supplied_package_source_policy_survives_default_facade_adoption() {
+    let bytes = litchi_xlsx::Package::new()
+        .expect("create workbook")
+        .to_bytes()
+        .expect("serialize workbook");
+    let exact_input = u64::try_from(bytes.len()).expect("input length fits u64");
+    let limits = litchi_opc::SourceLimits::builder()
+        .max_input_bytes(exact_input)
+        .expect("exact input limit")
+        .build()
+        .expect("valid source limits");
+    let package = litchi_xlsx::Package::from_bytes_with_options(
+        &bytes,
+        litchi_xlsx::OpenOptions::new().source_limits(limits),
+    )
+    .expect("open under the tight source policy");
+    assert_eq!(package.source_limits(), limits);
+
+    let handle = Xlsx::from_package(package, &OpenOptions::default())
+        .expect("adopt supplied package with default facade options");
+    assert_eq!(handle.ooxml_read_limits(), limits);
+    let file = crate::File::Xlsx(handle);
+    assert_eq!(file.ooxml_read_limits(), limits);
+}
+
 #[test]
 fn clones_share_one_state() {
     let handle = open_bytes(two_sheets(), &OpenOptions::new());

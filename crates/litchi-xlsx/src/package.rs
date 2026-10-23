@@ -36,7 +36,7 @@ use std::path::Path;
 
 use litchi_ooxml_common::custom::Host;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
-use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, TargetMode};
+use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, SourceLimits, TargetMode};
 
 use crate::OpenOptions;
 use crate::Workbook;
@@ -276,6 +276,12 @@ impl Package {
     #[must_use]
     pub fn semantic_limits(&self) -> &crate::SemanticLimits {
         self.workbook.semantic_limits()
+    }
+
+    /// The OPC source policy retained by this immutable package.
+    #[must_use]
+    pub fn source_limits(&self) -> SourceLimits {
+        self.workbook.opc_package().read_limits()
     }
 
     /// This package under other semantic budgets; the package state is

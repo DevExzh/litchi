@@ -47,6 +47,12 @@ The six `VerifiedDecodedReaderError` accessor aliases and the three
 canonical accessors. The two OPC glossary profiles now register the
 `_with_limits` suffix ban.
 
+Native XLSX packages also expose their retained OPC source policy through
+`Package::source_limits()`. The unified XLSX owner adopts that policy for both
+fresh-workbook and decrypted-package routes, so default facade options cannot
+widen a supplied package's bounds. A tight exact-input regression covers the
+decrypted-package route and the resulting `File` raw-admission policy.
+
 ## Consumers and boundary
 
 The same source change migrates the litchi-opc examples, fuzz targets, tests

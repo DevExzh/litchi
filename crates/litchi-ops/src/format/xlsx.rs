@@ -351,12 +351,13 @@ impl Xlsx {
         options: &OpenOptions,
         origin: Option<Arc<Path>>,
     ) -> Result<Self> {
+        let ooxml_limits = workbook.source_limits();
         Ok(Self::with_owner(
             XlsxOwner::Eager(workbook),
             Metadata::default(),
             MetadataRepairs::default(),
             options,
-            options.ooxml_limits.unwrap_or_default(),
+            ooxml_limits,
         )
         .with_origin(origin))
     }
@@ -376,6 +377,7 @@ impl Xlsx {
         options: &OpenOptions,
         origin: Option<Arc<Path>>,
     ) -> Result<Self> {
+        let ooxml_limits = package.source_limits();
         let mut metadata_repairs = MetadataRepairs::default();
         let metadata = package
             .core_properties_with_report(&mut metadata_repairs)?
@@ -393,7 +395,7 @@ impl Xlsx {
             metadata,
             metadata_repairs,
             options,
-            options.ooxml_limits.unwrap_or_default(),
+            ooxml_limits,
         )
         .with_origin(origin))
     }
