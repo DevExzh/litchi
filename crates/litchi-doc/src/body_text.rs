@@ -46,7 +46,7 @@ pub use litchi_core::patch::{CompositionLimits, HistoryLimits, SubEditJoinFailur
 #[cfg(feature = "performance-diagnostics")]
 pub use litchi_ole_common::object::{CfbParseEvent, CfbParseOutcome};
 use std::collections::{BTreeMap, BTreeSet};
-use std::io::Cursor;
+use std::io::{Cursor, Read, Seek};
 use std::sync::{Arc, OnceLock};
 
 pub(crate) fn intersect_revision_limits(left: Limits, right: Limits) -> Limits {
@@ -1109,6 +1109,7 @@ impl Snapshot {
                     (editor, ole, Some(candidate))
                 },
             };
+        reject_malformed_signature_containers(&ole)?;
         crate::raw::Reader::validate_ole_file(&mut ole, source_limits).map_err(Error::Invalid)?;
         let signed = candidate_source.is_some() || strict_editor.dofr_source_is_signed();
         Ok(Self {
@@ -1150,6 +1151,7 @@ impl Snapshot {
         input: impl Into<Vec<u8>>,
         limits: Limits,
         transaction_limits: TransactionLimits,
+        source_limits: crate::package::SourceLimits,
         observer: impl FnMut(DiagnosticEvent),
         cfb_observer: impl FnMut(CfbParseEvent),
     ) -> Result<Self> {
@@ -1157,7 +1159,7 @@ impl Snapshot {
             input,
             limits,
             transaction_limits,
-            crate::package::SourceLimits::default(),
+            source_limits,
             observer,
             cfb_observer,
         )
@@ -1229,6 +1231,7 @@ impl Snapshot {
                 }
             },
         )?;
+        reject_malformed_signature_containers(&ole)?;
         observe_phase(
             &mut observer,
             DiagnosticPhase::PublicReaderValidation,
@@ -5858,9 +5861,34 @@ fn validate_original_source_for_fallback(
         source_limits,
     )
     .map_err(Error::Invalid)?;
+    reject_malformed_signature_containers(&ole)?;
     crate::package::preflight_declared_streams(&ole, source_limits)
         .map(|_| ())
         .map_err(Error::Invalid)
+}
+
+/// Reject signature names that are present in an impossible CFB shape before
+/// the unsigned fallback can discard them. A legacy signature is a root
+/// stream; an XML signature is a root storage containing only streams. An
+/// empty or recursively nested signature storage cannot be authenticated or
+/// safely preserved by the bounded fallback editor.
+fn reject_malformed_signature_containers<R: Read + Seek>(ole: &OleFile<R>) -> Result<()> {
+    if ole.directory_exists(&["_signatures"]) {
+        return Err(Error::Invalid(PackageError::InvalidFormat(
+            "legacy DOC signature marker is a storage".into(),
+        )));
+    }
+    if ole.directory_exists(&["_xmlsignatures"]) {
+        let entries = ole
+            .list_directory_entries(&["_xmlsignatures"])
+            .map_err(|error| Error::Invalid(PackageError::from(error)))?;
+        if entries.is_empty() || entries.iter().any(|entry| entry.entry_type != 2) {
+            return Err(Error::Invalid(PackageError::InvalidFormat(
+                "DOC XML signature storage has an invalid entry shape".into(),
+            )));
+        }
+    }
+    Ok(())
 }
 
 fn drawing_dependency(text: &str) -> Option<DrawingDependency> {
@@ -6432,6 +6460,7 @@ mod tests {
             bytes,
             Limits::default(),
             TransactionLimits::default(),
+            crate::package::SourceLimits::default(),
             |event| events.push(event),
             |event| cfb_events.push(event),
         )
@@ -6487,6 +6516,7 @@ mod tests {
             bytes,
             Limits::default(),
             TransactionLimits::default(),
+            crate::package::SourceLimits::default(),
             |event| events.push(event),
             |event| cfb_events.push(event),
         );
@@ -6805,6 +6835,7 @@ mod tests {
             bytes,
             Limits::default(),
             TransactionLimits::default(),
+            crate::package::SourceLimits::default(),
             |event| events.push(event),
             |event| cfb_events.push(event),
         )
@@ -6854,6 +6885,7 @@ mod tests {
             bytes,
             Limits::default(),
             TransactionLimits::default(),
+            crate::package::SourceLimits::default(),
             |event| events.push(event),
             |event| cfb_events.push(event),
         )

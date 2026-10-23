@@ -974,11 +974,15 @@ impl Package {
     }
 
     /// Starts an isolated source-backed transaction for one paragraph.
+    ///
+    /// Construction retains the source and position only. Paragraph
+    /// resolution is deferred until [`Edit::text`], [`Edit::set_text`], or
+    /// [`Edit::commit`].
     pub fn edit_paragraph(&self, position: Position) -> Result<Edit> {
-        let resolved = self.resolve(position)?;
         Ok(Edit {
             source: self.clone(),
-            resolved,
+            position,
+            resolved: None,
             replacement: None,
         })
     }
@@ -1125,7 +1129,8 @@ impl Package {
 /// discards it.
 pub struct Edit {
     source: Package,
-    resolved: ResolvedParagraph,
+    position: Position,
+    resolved: Option<ResolvedParagraph>,
     replacement: Option<String>,
 }
 
@@ -1133,37 +1138,53 @@ impl fmt::Debug for Edit {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("Edit")
-            .field("position", &self.resolved.position)
-            .field("text_units", &self.resolved.text.encode_utf16().count())
+            .field("position", &self.position)
+            .field(
+                "text_units",
+                &self
+                    .resolved
+                    .as_ref()
+                    .map(|resolved| resolved.text.encode_utf16().count()),
+            )
             .field("staged", &self.replacement.is_some())
             .finish()
     }
 }
 
 impl Edit {
+    fn ensure_resolved(&mut self) -> Result<&ResolvedParagraph> {
+        if self.resolved.is_none() {
+            self.resolved = Some(self.source.resolve(self.position)?);
+        }
+        self.resolved
+            .as_ref()
+            .ok_or_else(|| Error::InvalidData("DOC paragraph edit was not initialized".into()))
+    }
+
     /// Source text currently read for the selected paragraph.
-    #[must_use]
-    pub fn text(&self) -> &str {
-        &self.resolved.text
+    pub fn text(&mut self) -> Result<&str> {
+        Ok(&self.ensure_resolved()?.text)
     }
 
     /// Selected ordinary paragraph position.
     #[must_use]
     pub const fn position(&self) -> Position {
-        self.resolved.position
+        self.position
     }
 
     /// Stages a replacement only when UTF-16 width is unchanged.
     pub fn set_text(&mut self, value: impl Into<String>) -> Result<()> {
         let candidate = value.into();
+        let max_replacement_units = self.source.inner.limits.max_replacement_units;
         let units = candidate.encode_utf16().count();
-        if units > self.source.inner.limits.max_replacement_units {
+        if units > max_replacement_units {
             return Err(Error::Limit(format!(
                 "replacement units {units} exceed {}",
-                self.source.inner.limits.max_replacement_units
+                max_replacement_units
             )));
         }
-        if units != self.resolved.text.encode_utf16().count() {
+        let resolved = self.ensure_resolved()?;
+        if units != resolved.text.encode_utf16().count() {
             return Err(Error::Refused(Refusal::LengthChange));
         }
         self.replacement = Some(candidate);
@@ -1171,11 +1192,14 @@ impl Edit {
     }
 
     /// Publishes the checked same-length replacement.
-    pub fn commit(self) -> Result<Commit> {
-        let replacement = self
-            .replacement
-            .unwrap_or_else(|| self.resolved.text.clone());
-        publish(self.source, self.resolved, replacement)
+    pub fn commit(mut self) -> Result<Commit> {
+        self.ensure_resolved()?;
+        let resolved = self
+            .resolved
+            .take()
+            .ok_or_else(|| Error::InvalidData("DOC paragraph edit was not initialized".into()))?;
+        let replacement = self.replacement.unwrap_or_else(|| resolved.text.clone());
+        publish(self.source, resolved, replacement)
     }
 }
 
@@ -2850,7 +2874,7 @@ mod tests {
         let mut transaction = source
             .edit_paragraph(Position::new(0))
             .expect("first paragraph");
-        let original = transaction.text().to_owned();
+        let original = transaction.text().expect("resolve paragraph").to_owned();
         let mut replacement = original.clone();
         if let Some((offset, character)) = original
             .char_indices()
@@ -2911,7 +2935,7 @@ mod tests {
         let mut transaction = source
             .edit_paragraph(Position::new(0))
             .expect("first paragraph");
-        let too_long = format!("{}x", transaction.text());
+        let too_long = format!("{}x", transaction.text().expect("resolve paragraph"));
         assert_eq!(
             transaction.set_text(too_long).unwrap_err().to_string(),
             Refusal::LengthChange.to_string()
@@ -2935,7 +2959,7 @@ mod tests {
         let mut transaction = source
             .edit_paragraph(Position::new(1))
             .expect("second paragraph");
-        let original = transaction.text().to_owned();
+        let original = transaction.text().expect("resolve paragraph").to_owned();
         let Some((offset, character)) = original
             .char_indices()
             .find(|(_, value)| value.is_ascii_alphabetic())
@@ -4006,8 +4030,11 @@ mod tests {
                 OverlayError::SourceFingerprintChanged { .. }
             ))
         ));
+        let mut edit = snapshot
+            .edit_paragraph(Position::new(0))
+            .expect("deferred edit construction");
         assert!(matches!(
-            snapshot.edit_paragraph(Position::new(0)),
+            edit.text(),
             Err(Error::Overlay(
                 OverlayError::SourceFingerprintChanged { .. }
             ))
