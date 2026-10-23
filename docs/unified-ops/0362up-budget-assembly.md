@@ -108,3 +108,14 @@ The correction uses that existing helper and retains every exact-boundary
 and one-below assertion. [native-check-v10.json](results/0362up/native-check-v10.json)
 retains the full terminal results and log hashes. Runtime qualification and
 the returned cell normalization work remain required.
+
+The corrected metadata fixtures and reviewed PPTX successor `ae9a31849b`
+are composed on `4470ecce16`. All eleven metadata-focused XLSX library
+tests pass (73.80 seconds including compilation), and all 27 PPTX facade
+tests pass (877.53 seconds including compilation; 1.09 seconds in tests).
+This closes both the exact native/coalescer budget failure and empty
+`/metadata` no-op failure. No lint suppression or compiler overlay is used.
+[native-runtime-v11.json](results/0362up/native-runtime-v11.json) records
+the commands, source, log and debug executable hashes. Shared cell
+normalization remains returned; these passes do not constitute final
+combined runtime, full-gate or performance acceptance.
