@@ -2248,6 +2248,7 @@ mod tests {
     use litchi_opc::constants::content_type as ct;
     use litchi_opc::{
         OpcError, OpcPackage, PackURI, SourceBackedPackage, SourceCacheLimits, SourceLimitKind,
+        SourceReadPolicy,
     };
     use soapberry_zip::office::StreamingArchiveWriter;
 
@@ -3424,8 +3425,8 @@ mod tests {
         use std::sync::atomic::Ordering;
 
         use litchi_opc::OpcError;
-        use litchi_opc::SourceCacheLimits;
         use litchi_opc::constants::content_type as ct;
+        use litchi_opc::{SourceCacheLimits, SourceReadPolicy};
         use soapberry_zip::office::StreamingArchiveWriter;
 
         use super::{

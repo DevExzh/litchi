@@ -16,10 +16,18 @@ fixtures also pass the required `SourceLimits::default()` to
 to `SourceBackedPackage::from_read_at`, preserving default limits, exact read
 policy, cache limits, and managed execution contexts.
 
+The completed v16 workspace check reported one final consumer batch. The 31
+XLSB test qualifications now use the imported `SourceLimits`. The XLSX cell
+value and row-visibility subtests, PPTX source tests, and XLSX workbook tests
+now import the required `SourceLimits`, `SourceCacheLimits`, and
+`SourceReadPolicy` from the owning modules. The old private DOCX owner
+`write_to_with_policy` helper had no callers after the adapter migration and
+was removed rather than silenced.
+
 The policy values and assertions are unchanged.  No aliases, blanket lint
 allowances, or new targets were introduced. The independent DOCX production,
 XLSB theme, and ODP example diagnostics from that check remain with their
 owning workers.
 
-Validation was limited to formatting, whitespace, and repository artifact
-guards as requested; no Cargo target was started.
+Validation was limited to formatting, whitespace, no-caller search, and
+repository artifact guards as requested; no Cargo target was started.

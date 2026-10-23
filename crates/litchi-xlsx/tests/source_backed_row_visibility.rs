@@ -19,7 +19,7 @@ use litchi_core::{
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{
     BlobPart, OpcError, OpcPackage, PackURI, PackageWriter, SourceBackedPackage, SourceCacheLimits,
-    TargetMode,
+    SourceLimits, TargetMode,
 };
 use litchi_xlsx::row_visibility::{Change, MAX_BATCH_EDITS, Snapshot};
 use litchi_xlsx::{Error, RowIndex};

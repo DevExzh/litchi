@@ -24,8 +24,8 @@ use litchi_core::{
 };
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{
-    PackURI, Part, PartData, PartView, Relationships, SourceBackedPackage, SourceLimits,
-    SourceLineage, SourceTopologyPlan, TargetMode,
+    PackURI, Part, PartData, PartView, Relationships, SourceBackedPackage, SourceCacheLimits,
+    SourceLimits, SourceLineage, SourceTopologyPlan, TargetMode,
 };
 use quick_xml::events::Event;
 use quick_xml::name::{Namespace, ResolveResult};
@@ -5780,7 +5780,9 @@ mod tests {
         Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits, ReadAt, Resource,
         SourceVersion,
     };
-    use litchi_opc::{PackURI, SourceBackedPackage, SourceLimitKind, SourceLimits};
+    use litchi_opc::{
+        PackURI, SourceBackedPackage, SourceCacheLimits, SourceLimitKind, SourceLimits,
+    };
     use soapberry_zip::office::StreamingArchiveWriter;
     #[cfg(any(unix, windows))]
     use tempfile::NamedTempFile;
@@ -8015,6 +8017,7 @@ mod tests {
 mod picture_fragment_tests {
     use crate::Error;
     use crate::shape::{Scene, Shape};
+    use litchi_opc::SourceLimits;
 
     /// Parse one standalone picture descriptor under the output bound a
     /// source-backed editor passes: the part-byte ceiling of the default read

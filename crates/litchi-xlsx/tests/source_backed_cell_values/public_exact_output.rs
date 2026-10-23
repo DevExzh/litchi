@@ -4,6 +4,7 @@
 //! `source_backed_cell_values/public_exact_output.rs`.
 
 use super::*;
+use litchi_opc::SourceLimits;
 
 #[test]
 fn public_multi_edit_matches_baseline_whole_worksheet_output() {

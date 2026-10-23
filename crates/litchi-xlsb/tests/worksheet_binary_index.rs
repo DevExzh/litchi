@@ -69,11 +69,8 @@ fn limited_sheet(relative: &str, limits: BinaryIndexLimits) -> litchi_xlsb::Sour
 }
 
 fn package_part(package_bytes: &[u8], path: &str) -> Vec<u8> {
-    let package = OpcPackage::from_reader(
-        Cursor::new(package_bytes),
-        litchi_opc::SourceLimits::default(),
-    )
-    .expect("OPC package");
+    let package = OpcPackage::from_reader(Cursor::new(package_bytes), SourceLimits::default())
+        .expect("OPC package");
     package
         .get_part(&PackURI::new(path).expect("part URI"))
         .expect("part")
@@ -128,11 +125,8 @@ fn records(data: &[u8]) -> Vec<RawRecord> {
 }
 
 fn rewrite_index(package_bytes: &[u8], transform: impl FnOnce(&[u8]) -> Vec<u8>) -> Vec<u8> {
-    let mut package = OpcPackage::from_reader(
-        Cursor::new(package_bytes),
-        litchi_opc::SourceLimits::default(),
-    )
-    .expect("OPC package");
+    let mut package = OpcPackage::from_reader(Cursor::new(package_bytes), SourceLimits::default())
+        .expect("OPC package");
     let uri = PackURI::new(INDEX1).expect("index URI");
     let changed = transform(package.get_part(&uri).expect("index part").blob());
     package
@@ -145,11 +139,8 @@ fn rewrite_index(package_bytes: &[u8], transform: impl FnOnce(&[u8]) -> Vec<u8>)
 }
 
 fn remove_index_relationship(package_bytes: &[u8]) -> Vec<u8> {
-    let mut package = OpcPackage::from_reader(
-        Cursor::new(package_bytes),
-        litchi_opc::SourceLimits::default(),
-    )
-    .expect("OPC package");
+    let mut package = OpcPackage::from_reader(Cursor::new(package_bytes), SourceLimits::default())
+        .expect("OPC package");
     let worksheet = PackURI::new(SHEET1).expect("worksheet URI");
     let relationship_id = package
         .get_part(&worksheet)
