@@ -12,6 +12,16 @@ staged/canonical maximum for signed no-ops. The change covers structural,
 ordering, removal, picture, media, comments, charts, masters, SmartArt, links,
 table, notes, and slide-text routes without duplicating proof ownership.
 
+The coalesced PPTX editor now also passes the transaction's remaining
+snapshot budget into native source/eager edit options. Source-backed edits
+apply that ceiling to their exact encoded retained-patch preflight; eager edits
+use the opened editor's native patch limit (while reusing the admission edit
+only when its default bound is no larger than the remaining budget). The old
+`source_bytes + size_of::<Patch>()` check was only a lower bound and is gone;
+the source-length check remains as an allocation guard, while native capture
+owns the exact before/after proof. Signed canonical no-ops use the same
+bounded native empty edit and retain the larger staged/canonical charge.
+
 The regression in `crates/litchi-ops/tests/pptx_shape_remove.rs` applies a
 one-byte snapshot limit to native shape removal and verifies a typed limit
 refusal leaves all source shapes intact.

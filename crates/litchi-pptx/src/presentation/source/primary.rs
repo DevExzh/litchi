@@ -100,6 +100,47 @@ pub struct Package {
     deferred: Option<Arc<deferred::Deferred>>,
 }
 
+/// Configuration of one source-backed primary edit.
+///
+/// The retained-patch ceiling is checked by the native editor's exact
+/// encoded-length preflight before a commit is published.  It is intentionally
+/// an edit option rather than a second package-wide source policy: callers can
+/// pass the remaining budget of an outer transaction without reopening the
+/// source owner.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[must_use]
+pub struct EditOptions {
+    max_patch_bytes: usize,
+}
+
+impl EditOptions {
+    /// The native default retained-patch ceiling.
+    pub const fn new() -> Self {
+        Self {
+            max_patch_bytes: crate::opened::Limits::DEFAULT.max_patch_bytes(),
+        }
+    }
+
+    /// Set the exact encoded retained-patch ceiling for this edit.
+    #[must_use]
+    pub const fn max_patch_bytes(mut self, maximum: usize) -> Self {
+        self.max_patch_bytes = maximum;
+        self
+    }
+
+    /// The selected retained-patch ceiling.
+    #[must_use]
+    pub const fn max_patch_bytes_value(self) -> usize {
+        self.max_patch_bytes
+    }
+}
+
+impl Default for EditOptions {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Package {
     /// Open an ordinary PPTX without materializing unselected parts.
     ///
@@ -212,9 +253,18 @@ impl Package {
 
     /// Begin an isolated primary edit; dropping it leaves this package intact.
     pub fn edit(&self) -> Result<Edit> {
+        self.edit_with_options(EditOptions::default())
+    }
+
+    /// Begin an isolated primary edit under explicit retained-patch options.
+    ///
+    /// The source owner and its physical catalog are reused.  The selected
+    /// ceiling is enforced by the same exact patch sizing used by `commit`,
+    /// before the candidate is returned to the caller.
+    pub fn edit_with_options(&self, options: EditOptions) -> Result<Edit> {
         let this = self.effective()?;
         if !std::ptr::eq(this, self) {
-            return this.edit();
+            return this.edit_with_options(options);
         }
         self.check()?;
         Ok(Edit {
@@ -222,6 +272,7 @@ impl Package {
             working: self.clone(),
             changes: Vec::new(),
             shape_removals: false,
+            max_patch_bytes: options.max_patch_bytes_value(),
         })
     }
 
@@ -1404,6 +1455,7 @@ pub struct Edit {
     working: Package,
     changes: Vec<SourceBackedSlidePatch>,
     shape_removals: bool,
+    max_patch_bytes: usize,
 }
 impl Edit {
     /// Insert an empty slide at a checked logical position using an exact
@@ -1485,11 +1537,12 @@ impl Edit {
             ));
         }
         let root_bytes = self.working.root.edited_bytes();
-        check_payload_budget(
+        check_payload_budget_with_limit(
             root_bytes.as_deref().map(Vec::as_slice),
             changes
                 .iter()
                 .flat_map(|change| [&change.before, &change.after]),
+            self.max_patch_bytes,
         )?;
         self.working.check()?;
         self.changes = changes;
@@ -2062,11 +2115,12 @@ impl Edit {
             ));
         }
         let root_bytes = self.working.root.edited_bytes();
-        check_payload_budget(
+        check_payload_budget_with_limit(
             root_bytes.as_deref().map(Vec::as_slice),
             changes
                 .iter()
                 .flat_map(|change| [&change.before, &change.after]),
+            self.max_patch_bytes,
         )?;
         self.working.check()?;
         self.changes = changes;
@@ -2077,6 +2131,7 @@ impl Edit {
     /// Publish a new immutable package, exact-source patch, and diagnostics.
     pub fn commit(mut self) -> Result<Commit> {
         self.working.check()?;
+        let max_patch_bytes = self.max_patch_bytes;
         if self.working.topology.is_some() {
             let source = self.source;
             let topology_patch = topology::patch_from_packages(&source, &self.working)?;
@@ -2084,7 +2139,13 @@ impl Edit {
                 shape_removals: self.shape_removals,
                 data: PatchData::Topology(Arc::new(topology_patch)),
             };
-            patch.encoded_len()?;
+            let encoded = patch.encoded_len()?;
+            if encoded > max_patch_bytes {
+                return Err(limit(
+                    "source-backed primary retained patch bytes",
+                    max_patch_bytes,
+                ));
+            }
             return Ok(commit_of(self.working, patch));
         }
         self.changes
@@ -2105,7 +2166,13 @@ impl Edit {
                 changes: self.changes.into(),
             },
         };
-        patch.encoded_len()?;
+        let encoded = patch.encoded_len()?;
+        if encoded > max_patch_bytes {
+            return Err(limit(
+                "source-backed primary retained patch bytes",
+                max_patch_bytes,
+            ));
+        }
         Ok(commit_of(self.working, patch))
     }
 }
@@ -2260,7 +2327,18 @@ fn check_payload_budget<'a>(
     root: Option<&[u8]>,
     mut slides: impl Iterator<Item = &'a SourceBackedSlideSnapshot>,
 ) -> Result<()> {
-    let maximum = crate::opened::Limits::default().max_patch_bytes();
+    check_payload_budget_with_limit(
+        root,
+        slides,
+        crate::opened::Limits::default().max_patch_bytes(),
+    )
+}
+
+fn check_payload_budget_with_limit<'a>(
+    root: Option<&[u8]>,
+    mut slides: impl Iterator<Item = &'a SourceBackedSlideSnapshot>,
+    maximum: usize,
+) -> Result<()> {
     let root_bytes = root.map_or(0, <[u8]>::len);
     if root_bytes > maximum {
         return Err(limit("source-backed primary retained root bytes", maximum));

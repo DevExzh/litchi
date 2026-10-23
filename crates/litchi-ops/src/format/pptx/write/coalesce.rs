@@ -34,7 +34,6 @@ use litchi_core::selector::{Path, Predicate};
 use litchi_pptx::opened::{TextAssignment, TextTarget};
 use litchi_pptx::shape::owned::{Handle, Scene};
 use std::collections::{HashMap, HashSet};
-use std::mem::size_of;
 use std::sync::Arc;
 
 /// One direct shape or placeholder assignment admitted for a coalesced run.
@@ -308,22 +307,15 @@ impl Run {
     ) -> Result<Self> {
         base.check_source_for_write()?;
         let source_bytes = base.retained_source_len()?.unwrap_or(0);
-        let minimum = source_bytes.saturating_add(size_of::<litchi_pptx::opened::Patch>());
-        if minimum > remaining_snapshot {
-            return Err(super::snapshot_limit(minimum, remaining_snapshot));
+        if source_bytes > remaining_snapshot {
+            return Err(super::snapshot_limit(source_bytes, remaining_snapshot));
         }
         let source = if base.signature() == crate::format::signature::Signature::Signed {
             base.editable_owner_for_write()?
         } else {
             base.editable_owner()?
         };
-        let edit = match &source {
-            Editable::Eager(package) => match base.take_spare_edit(package) {
-                Some(edit) => NativeEdit::Eager(edit),
-                None => new_native_edit(&source)?,
-            },
-            Editable::Source(_) => new_native_edit(&source)?,
-        };
+        let edit = new_native_edit_with_snapshot_budget(base, &source, remaining_snapshot)?;
         base.check_source_for_write()?;
         Ok(Self {
             base: base.clone(),
@@ -470,7 +462,7 @@ impl Run {
                 (after, commit) = commit_native(
                     &base,
                     original.clone(),
-                    new_native_edit(&original)?,
+                    new_native_edit_with_snapshot_budget(&base, &original, max_snapshot_bytes)?,
                     operations,
                 )?;
                 commit.operations = authored_operations;
@@ -486,7 +478,7 @@ impl Run {
         let freshness = base.check_source_for_write();
         match freshness.and(result) {
             Ok(value) => Ok(value),
-            Err(error) => Err(locate_failure(&base, &items, error)),
+            Err(error) => Err(locate_failure(&base, &items, error, max_snapshot_bytes)),
         }
     }
 }
@@ -1475,10 +1467,41 @@ fn bound(kind: LimitKind, observed: usize, maximum: usize) -> Result<()> {
     Ok(())
 }
 
-fn new_native_edit(source: &Editable) -> Result<NativeEdit> {
+/// Build a native editor whose own encoded-patch limit is the transaction's
+/// remaining snapshot budget.  The native packages perform the exact
+/// before/after wire-size preflight at commit; the facade only contributes the
+/// remaining budget and never substitutes a Rust struct size for that proof.
+fn new_native_edit_with_snapshot_budget(
+    base: &Pptx,
+    source: &Editable,
+    remaining_snapshot: usize,
+) -> Result<NativeEdit> {
+    let native_limit =
+        remaining_snapshot.min(litchi_pptx::opened::Limits::default().max_patch_bytes());
     match source {
-        Editable::Source(package) => package.edit().map(NativeEdit::Source).map_err(native_error),
-        Editable::Eager(package) => package.edit().map(NativeEdit::Eager).map_err(native_error),
+        Editable::Source(package) => package
+            .edit_with_options(
+                litchi_pptx::source::EditOptions::default().max_patch_bytes(native_limit),
+            )
+            .map(NativeEdit::Source)
+            .map_err(native_error),
+        Editable::Eager(package) => {
+            // Admission stores one default-bounded eager edit. Reuse it only
+            // when the caller's remaining budget still covers that native
+            // bound; otherwise capture a fresh edit carrying the exact
+            // caller-selected limit.
+            if remaining_snapshot >= litchi_pptx::opened::Limits::default().max_patch_bytes()
+                && let Some(edit) = base.take_spare_edit(package)
+            {
+                return Ok(NativeEdit::Eager(edit));
+            }
+            let options = litchi_pptx::opened::EditOptions::default()
+                .limits(litchi_pptx::opened::Limits::default().with_max_patch_bytes(native_limit));
+            package
+                .edit_with_options(options)
+                .map(NativeEdit::Eager)
+                .map_err(native_error)
+        },
     }
 }
 
@@ -1894,8 +1917,13 @@ fn commit_native(
     }
 }
 
-fn replay_prefix(source: &Editable, items: &[Item]) -> Result<()> {
-    let mut edit = new_native_edit(source)?;
+fn replay_prefix(
+    base: &Pptx,
+    source: &Editable,
+    items: &[Item],
+    remaining_snapshot: usize,
+) -> Result<()> {
+    let mut edit = new_native_edit_with_snapshot_budget(base, source, remaining_snapshot)?;
     for item in items {
         stage_one(&mut edit, &item.plan).map_err(|error| error.with_item(item.index))?;
     }
@@ -1905,7 +1933,7 @@ fn replay_prefix(source: &Editable, items: &[Item]) -> Result<()> {
     }
 }
 
-fn locate_failure(base: &Pptx, items: &[Item], error: Error) -> Error {
+fn locate_failure(base: &Pptx, items: &[Item], error: Error, remaining_snapshot: usize) -> Error {
     let Some(first) = items.first() else {
         return error;
     };
@@ -1926,7 +1954,7 @@ fn locate_failure(base: &Pptx, items: &[Item], error: Error) -> Error {
     // Usually failure occurred while staging a particular native item.
     // Replay once in wire order to recover that exact index, rather than
     // replaying every prefix (quadratic native calls on a late failure).
-    let mut failure = match replay_prefix(&source, items) {
+    let mut failure = match replay_prefix(base, &source, items, remaining_snapshot) {
         Ok(()) => return error.with_item(first.index),
         Err(failure) if failure.item().is_some() => return failure,
         Err(failure) => failure,
@@ -1937,7 +1965,7 @@ fn locate_failure(base: &Pptx, items: &[Item], error: Error) -> Error {
     let mut high = items.len();
     while low < high {
         let middle = low + (high - low) / 2;
-        match replay_prefix(&source, &items[..middle]) {
+        match replay_prefix(base, &source, &items[..middle], remaining_snapshot) {
             Ok(()) => low = middle + 1,
             Err(error) if error.item().is_some() => return error,
             Err(error) => {

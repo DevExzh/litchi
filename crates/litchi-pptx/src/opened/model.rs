@@ -195,6 +195,18 @@ impl Limits {
         self.max_patch_bytes
     }
 
+    /// Set the encoded retained-patch ceiling inherited by a detached edit.
+    ///
+    /// The caller supplies a budget that has already been validated by its
+    /// own option builder.  The edit still performs the complete native
+    /// encoded-length preflight before retaining a patch, so this is an
+    /// exact capture bound rather than an allocation-size estimate.
+    #[must_use]
+    pub const fn with_max_patch_bytes(mut self, maximum: usize) -> Self {
+        self.max_patch_bytes = maximum;
+        self
+    }
+
     /// Maximum replacement text size.
     #[must_use]
     pub const fn max_text_bytes(self) -> usize {
