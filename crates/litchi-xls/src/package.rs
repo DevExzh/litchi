@@ -390,7 +390,9 @@ impl Package {
     /// Adopt a source-backed semantic reader and the exact CFB view it came
     /// from. A deferred cell publication is materialized at this explicit
     /// facade handoff so the package's retained CFB and semantic owner always
-    /// describe the same bytes; ordinary source-backed commits remain lazy.
+    /// describe the same bytes; the semantic owner also retains any original
+    /// dynamic-source fence needed by package output and compatibility routes.
+    /// Ordinary source-backed commits remain lazy.
     pub fn from_source(workbook: SourceBackedWorkbook) -> Result<Self> {
         let workbook = workbook.materialized()?;
         let cfb = workbook.shared_cfb();
@@ -529,30 +531,34 @@ impl Package {
                 Ok(self.inner.metadata.get().cloned().unwrap_or_default())
             },
             PackageState::Source { cfb, .. } => {
-                let expected = cfb
-                    .source_version()
-                    .map_err(|error| Error::Source(SourceBackedError::from(error)))?;
-                let metadata = if let Some(metadata) = self.inner.metadata.get() {
-                    metadata.clone()
-                } else {
-                    match cfb.get_metadata() {
-                        Ok(metadata) => Metadata::from(metadata),
-                        Err(error) if metadata_error_is_soft(&error) => Metadata::default(),
-                        Err(error) => {
-                            return Err(Error::Source(SourceBackedError::from(error)));
-                        },
+                ensure_source_fence(&self.inner)?;
+                let result = (|| -> Result<Metadata> {
+                    let expected = cfb
+                        .source_version()
+                        .map_err(|error| Error::Source(SourceBackedError::from(error)))?;
+                    let metadata = if let Some(metadata) = self.inner.metadata.get() {
+                        metadata.clone()
+                    } else {
+                        match cfb.get_metadata() {
+                            Ok(metadata) => Metadata::from(metadata),
+                            Err(error) if metadata_error_is_soft(&error) => Metadata::default(),
+                            Err(error) => {
+                                return Err(Error::Source(SourceBackedError::from(error)));
+                            },
+                        }
+                    };
+                    let observed = cfb
+                        .source_version()
+                        .map_err(|error| Error::Source(SourceBackedError::from(error)))?;
+                    if observed != expected {
+                        return Err(Error::Source(SourceBackedError::SourceChanged {
+                            expected,
+                            observed,
+                        }));
                     }
-                };
-                let observed = cfb
-                    .source_version()
-                    .map_err(|error| Error::Source(SourceBackedError::from(error)))?;
-                if observed != expected {
-                    return Err(Error::Source(SourceBackedError::SourceChanged {
-                        expected,
-                        observed,
-                    }));
-                }
-                Ok(self.inner.metadata.get_or_init(|| metadata).clone())
+                    Ok(self.inner.metadata.get_or_init(|| metadata).clone())
+                })();
+                finish_source_fence(&self.inner, result)
             },
         }
     }
@@ -634,41 +640,46 @@ impl Package {
     /// once per package and shared.
     pub(crate) fn workbook_stream(&self) -> Result<Arc<[u8]>> {
         if let Some(stream) = self.inner.workbook_stream.get() {
+            ensure_source_fence(&self.inner)?;
             return Ok(Arc::clone(stream));
         }
-        let bytes = match &self.inner.state {
-            PackageState::Eager { reader, .. } => {
-                let data = reader.get_ref().get_ref();
-                let mut ole = OleFile::open(Cursor::new(data.as_slice()))?;
-                let name = if ole.exists(&["Workbook"]) {
-                    "Workbook"
-                } else {
-                    "Book"
-                };
-                ole.open_stream(&[name])?
-            },
-            PackageState::Source { cfb, .. } => {
-                let expected = cfb
-                    .source_version()
-                    .map_err(|error| Error::Source(SourceBackedError::from(error)))?;
-                let name = if cfb.exists(&["Workbook"]) {
-                    "Workbook"
-                } else {
-                    "Book"
-                };
-                let bytes = cfb.open_stream(&[name])?;
-                let observed = cfb
-                    .source_version()
-                    .map_err(|error| Error::Source(SourceBackedError::from(error)))?;
-                if observed != expected {
-                    return Err(Error::Source(SourceBackedError::SourceChanged {
-                        expected,
-                        observed,
-                    }));
-                }
-                bytes
-            },
-        };
+        ensure_source_fence(&self.inner)?;
+        let result = (|| -> Result<Vec<u8>> {
+            match &self.inner.state {
+                PackageState::Eager { reader, .. } => {
+                    let data = reader.get_ref().get_ref();
+                    let mut ole = OleFile::open(Cursor::new(data.as_slice()))?;
+                    let name = if ole.exists(&["Workbook"]) {
+                        "Workbook"
+                    } else {
+                        "Book"
+                    };
+                    Ok(ole.open_stream(&[name])?)
+                },
+                PackageState::Source { cfb, .. } => {
+                    let expected = cfb
+                        .source_version()
+                        .map_err(|error| Error::Source(SourceBackedError::from(error)))?;
+                    let name = if cfb.exists(&["Workbook"]) {
+                        "Workbook"
+                    } else {
+                        "Book"
+                    };
+                    let bytes = cfb.open_stream(&[name])?;
+                    let observed = cfb
+                        .source_version()
+                        .map_err(|error| Error::Source(SourceBackedError::from(error)))?;
+                    if observed != expected {
+                        return Err(Error::Source(SourceBackedError::SourceChanged {
+                            expected,
+                            observed,
+                        }));
+                    }
+                    Ok(bytes)
+                },
+            }
+        })();
+        let bytes = finish_source_fence(&self.inner, result)?;
         let stream: Arc<[u8]> = Arc::from(bytes);
         Ok(Arc::clone(
             self.inner.workbook_stream.get_or_init(|| stream),
@@ -754,9 +765,10 @@ impl Package {
                 )
             },
             PackageState::Source { cfb, .. } => {
+                ensure_source_fence(&self.inner)?;
                 let source = cfb.source_arc();
                 let expected = cfb.captured_source_version();
-                litchi_cfb::atomic::save(
+                let result = litchi_cfb::atomic::save(
                     path,
                     durability,
                     litchi_cfb::atomic::Overwrite::Replace,
@@ -780,7 +792,8 @@ impl Package {
                         }
                         Ok(())
                     },
-                )
+                );
+                finish_source_fence(&self.inner, result)
             },
         }
     }
@@ -796,46 +809,50 @@ impl Package {
     ) -> Result<crate::cell_values::Snapshot> {
         let (limits, cfb_limits) =
             self.edit_profile(options.object_limits_value(), options.cfb_limits_value())?;
-        if let Some(cfb) = self.source() {
-            cfb.source_version().map_err(SourceBackedError::from)?;
-        }
-        if let Some(snapshot) = &self.inner.edit_snapshot {
-            let result = snapshot.constrain_limits(limits, cfb_limits);
+        ensure_source_fence(&self.inner)?;
+        let result = (|| -> Result<crate::cell_values::Snapshot> {
             if let Some(cfb) = self.source() {
                 cfb.source_version().map_err(SourceBackedError::from)?;
             }
-            return result.map_err(Error::Reader);
-        }
-        match &self.inner.state {
-            PackageState::Eager { reader, .. } => {
-                if self.inner.signed {
-                    let probe = litchi_ole_common::object::Probe::open_with_options(
-                        reader.get_ref().get_ref().clone(),
-                        litchi_ole_common::object::OpenOptions::new()
-                            .limits(limits)
-                            .cfb_limits(cfb_limits),
-                    )
-                    .map_err(Error::Object)?;
-                    crate::cell_values::Snapshot::from_probe(probe).map_err(Error::Reader)
-                } else {
-                    crate::cell_values::Snapshot::from_slice_with_limits_and_cfb(
-                        reader.get_ref().get_ref(),
-                        limits,
-                        cfb_limits,
-                    )
-                    .map_err(Error::Reader)
+            if let Some(snapshot) = &self.inner.edit_snapshot {
+                let result = snapshot.constrain_limits(limits, cfb_limits);
+                if let Some(cfb) = self.source() {
+                    cfb.source_version().map_err(SourceBackedError::from)?;
                 }
-            },
-            PackageState::Source { cfb, .. } => {
-                if self.inner.signed {
-                    crate::cell_values::Snapshot::from_shared_probe(cfb, limits, cfb_limits)
+                return result.map_err(Error::Reader);
+            }
+            match &self.inner.state {
+                PackageState::Eager { reader, .. } => {
+                    if self.inner.signed {
+                        let probe = litchi_ole_common::object::Probe::open_with_options(
+                            reader.get_ref().get_ref().clone(),
+                            litchi_ole_common::object::OpenOptions::new()
+                                .limits(limits)
+                                .cfb_limits(cfb_limits),
+                        )
+                        .map_err(Error::Object)?;
+                        crate::cell_values::Snapshot::from_probe(probe).map_err(Error::Reader)
+                    } else {
+                        crate::cell_values::Snapshot::from_slice_with_limits_and_cfb(
+                            reader.get_ref().get_ref(),
+                            limits,
+                            cfb_limits,
+                        )
                         .map_err(Error::Reader)
-                } else {
-                    crate::cell_values::Snapshot::from_shared_ole_file(cfb, limits, cfb_limits)
-                        .map_err(Error::Reader)
-                }
-            },
-        }
+                    }
+                },
+                PackageState::Source { cfb, .. } => {
+                    if self.inner.signed {
+                        crate::cell_values::Snapshot::from_shared_probe(cfb, limits, cfb_limits)
+                            .map_err(Error::Reader)
+                    } else {
+                        crate::cell_values::Snapshot::from_shared_ole_file(cfb, limits, cfb_limits)
+                            .map_err(Error::Reader)
+                    }
+                },
+            }
+        })();
+        finish_source_fence(&self.inner, result)
     }
 
     pub(crate) fn edit_profile(
@@ -1034,21 +1051,25 @@ impl Workbook {
     pub fn tolerance_report(&self) -> Result<ToleranceReport> {
         match &self.package.state {
             PackageState::Source { cfb, workbook, .. } => {
-                let expected = cfb
-                    .source_version()
-                    .map_err(|error| Error::Source(SourceBackedError::from(error)))?;
-                let mut report = workbook.tolerance_report();
-                report.append_property_sets(|path| cfb.property_set_stream(path));
-                let observed = cfb
-                    .source_version()
-                    .map_err(|error| Error::Source(SourceBackedError::from(error)))?;
-                if observed != expected {
-                    return Err(Error::Source(SourceBackedError::SourceChanged {
-                        expected,
-                        observed,
-                    }));
-                }
-                Ok(report)
+                ensure_source_fence(&self.package)?;
+                let result = (|| -> Result<ToleranceReport> {
+                    let expected = cfb
+                        .source_version()
+                        .map_err(|error| Error::Source(SourceBackedError::from(error)))?;
+                    let mut report = workbook.tolerance_report();
+                    report.append_property_sets(|path| cfb.property_set_stream(path));
+                    let observed = cfb
+                        .source_version()
+                        .map_err(|error| Error::Source(SourceBackedError::from(error)))?;
+                    if observed != expected {
+                        return Err(Error::Source(SourceBackedError::SourceChanged {
+                            expected,
+                            observed,
+                        }));
+                    }
+                    Ok(report)
+                })();
+                finish_source_fence(&self.package, result)
             },
             PackageState::Eager { reader, .. } => Ok(reader.tolerance_report().clone()),
         }
@@ -1212,6 +1233,29 @@ impl Worksheet {
     }
 }
 
+fn source_fence_workbook(inner: &PackageInner) -> Option<&SourceBackedWorkbook> {
+    // A package created from a deferred workbook owns the composed CFB and
+    // semantic target, but the retained workbook is the only owner that also
+    // knows the original dynamic source. Route package-level bytes and eager
+    // compatibility escapes through that owner when its fence is present.
+    match &inner.state {
+        PackageState::Source { workbook, .. } if workbook.needs_source_fence() => Some(workbook),
+        PackageState::Eager { .. } | PackageState::Source { .. } => None,
+    }
+}
+
+fn ensure_source_fence(inner: &PackageInner) -> Result<()> {
+    if let Some(workbook) = source_fence_workbook(inner) {
+        workbook.ensure_current().map_err(Error::Source)?;
+    }
+    Ok(())
+}
+
+fn finish_source_fence<T>(inner: &PackageInner, result: Result<T>) -> Result<T> {
+    ensure_source_fence(inner)?;
+    result
+}
+
 fn reader_ref(inner: &Arc<PackageInner>) -> Result<&RawReader> {
     match &inner.state {
         PackageState::Eager { reader, .. } => Ok(reader.as_ref()),
@@ -1221,77 +1265,89 @@ fn reader_ref(inner: &Arc<PackageInner>) -> Result<&RawReader> {
             cfb,
             ..
         } => {
-            cfb.source_version().map_err(SourceBackedError::from)?;
-            let result = materialized
-                .get_or_init(|| workbook.materialize_eager().map(Arc::new).map_err(Arc::new));
-            cfb.source_version().map_err(SourceBackedError::from)?;
-            match result {
-                Ok(reader) => Ok(reader.as_ref()),
-                Err(error) => Err(Error::CachedSource(Arc::clone(error))),
-            }
+            ensure_source_fence(inner)?;
+            let result = (|| -> Result<&RawReader> {
+                cfb.source_version().map_err(SourceBackedError::from)?;
+                let result = materialized
+                    .get_or_init(|| workbook.materialize_eager().map(Arc::new).map_err(Arc::new));
+                cfb.source_version().map_err(SourceBackedError::from)?;
+                match result {
+                    Ok(reader) => Ok(reader.as_ref()),
+                    Err(error) => Err(Error::CachedSource(Arc::clone(error))),
+                }
+            })();
+            finish_source_fence(inner, result)
         },
     }
 }
 
 fn exact_bytes(inner: &Arc<PackageInner>) -> Result<Vec<u8>> {
-    match &inner.state {
-        PackageState::Eager { reader, .. } => Ok(reader.get_ref().get_ref().clone()),
-        PackageState::Source { cfb, .. } => {
-            let length = usize::try_from(cfb.file_size()).map_err(|_| {
-                Error::InvalidData("XLS source size does not fit the current address space")
-            })?;
-            let mut bytes = Vec::new();
-            bytes
-                .try_reserve_exact(length)
-                .map_err(|source| Error::Allocation {
-                    resource: "XLS package output",
-                    source,
+    ensure_source_fence(inner)?;
+    let result = (|| -> Result<Vec<u8>> {
+        match &inner.state {
+            PackageState::Eager { reader, .. } => Ok(reader.get_ref().get_ref().clone()),
+            PackageState::Source { cfb, .. } => {
+                let length = usize::try_from(cfb.file_size()).map_err(|_| {
+                    Error::InvalidData("XLS source size does not fit the current address space")
                 })?;
-            bytes.resize(length, 0);
-            let source = cfb.source_arc();
-            let expected = cfb
-                .source_version()
-                .map_err(|error| Error::Source(SourceBackedError::from(error)))?;
-            if let Err(error) = source.read_exact_at(0, &mut bytes) {
-                return Err(source_read_error(cfb, expected, error));
-            }
-            let observed = cfb
-                .source_version()
-                .map_err(|error| Error::Source(SourceBackedError::from(error)))?;
-            if observed != expected {
-                return Err(Error::Source(SourceBackedError::SourceChanged {
-                    expected,
-                    observed,
-                }));
-            }
-            Ok(bytes)
-        },
-    }
+                let mut bytes = Vec::new();
+                bytes
+                    .try_reserve_exact(length)
+                    .map_err(|source| Error::Allocation {
+                        resource: "XLS package output",
+                        source,
+                    })?;
+                bytes.resize(length, 0);
+                let source = cfb.source_arc();
+                let expected = cfb
+                    .source_version()
+                    .map_err(|error| Error::Source(SourceBackedError::from(error)))?;
+                if let Err(error) = source.read_exact_at(0, &mut bytes) {
+                    return Err(source_read_error(cfb, expected, error));
+                }
+                let observed = cfb
+                    .source_version()
+                    .map_err(|error| Error::Source(SourceBackedError::from(error)))?;
+                if observed != expected {
+                    return Err(Error::Source(SourceBackedError::SourceChanged {
+                        expected,
+                        observed,
+                    }));
+                }
+                Ok(bytes)
+            },
+        }
+    })();
+    finish_source_fence(inner, result)
 }
 
 fn stream_exact<W: Write>(inner: &Arc<PackageInner>, writer: &mut W) -> Result<()> {
-    match &inner.state {
-        PackageState::Eager { reader, .. } => writer
-            .write_all(reader.get_ref().get_ref())
-            .map_err(Error::Io),
-        PackageState::Source { cfb, .. } => {
-            let source = cfb.source_arc();
-            let expected = cfb
-                .source_version()
-                .map_err(|error| Error::Source(SourceBackedError::from(error)))?;
-            stream_source(cfb, &*source, cfb.file_size(), writer)?;
-            let observed = cfb
-                .source_version()
-                .map_err(|error| Error::Source(SourceBackedError::from(error)))?;
-            if observed != expected {
-                return Err(Error::Source(SourceBackedError::SourceChanged {
-                    expected,
-                    observed,
-                }));
-            }
-            Ok(())
-        },
-    }
+    ensure_source_fence(inner)?;
+    let result = (|| -> Result<()> {
+        match &inner.state {
+            PackageState::Eager { reader, .. } => writer
+                .write_all(reader.get_ref().get_ref())
+                .map_err(Error::Io),
+            PackageState::Source { cfb, .. } => {
+                let source = cfb.source_arc();
+                let expected = cfb
+                    .source_version()
+                    .map_err(|error| Error::Source(SourceBackedError::from(error)))?;
+                stream_source(cfb, &*source, cfb.file_size(), writer)?;
+                let observed = cfb
+                    .source_version()
+                    .map_err(|error| Error::Source(SourceBackedError::from(error)))?;
+                if observed != expected {
+                    return Err(Error::Source(SourceBackedError::SourceChanged {
+                        expected,
+                        observed,
+                    }));
+                }
+                Ok(())
+            },
+        }
+    })();
+    finish_source_fence(inner, result)
 }
 
 fn stream_source<W: Write + ?Sized>(
@@ -1505,6 +1561,7 @@ fn sheet_catalog(inner: &PackageInner) -> Result<&[crate::SheetMetadata]> {
         PackageState::Source {
             workbook, catalog, ..
         } => {
+            ensure_source_fence(inner)?;
             if let Some(catalog) = catalog.get() {
                 return Ok(catalog);
             }

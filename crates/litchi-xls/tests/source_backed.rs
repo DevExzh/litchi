@@ -6,7 +6,10 @@ use litchi_core::{
 };
 use litchi_xls::{
     CellFormatDefect, Defect, FormattingDefect, Leniency, SourceBackedCell, SourceBackedError,
-    SourceBackedLimits, SourceBackedOptions, SourceBackedWorkbook, raw::Reader,
+    SourceBackedLimits, SourceBackedOptions, SourceBackedWorkbook, SourceBackedWorksheet,
+    cell_values::Reference,
+    package::{Error as PackageError, Package},
+    raw::Reader,
 };
 use std::io::{self, Cursor};
 use std::num::{NonZeroU64, NonZeroUsize};
@@ -2135,6 +2138,330 @@ fn stale_sources_are_rejected_before_selected_reads() {
         owner.materialize_eager(),
         Err(SourceBackedError::SourceChanged { .. })
     ));
+}
+
+fn deferred_numeric_fixture() -> (
+    Arc<CountingSource>,
+    SourceBackedWorkbook,
+    usize,
+    Reference,
+    String,
+) {
+    let source = Arc::new(CountingSource::new(fixture("Simple.xls")));
+    let workbook = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
+    let mut numeric = None;
+    for worksheet in workbook.worksheets().unwrap() {
+        let sheet_index = worksheet.index().unwrap();
+        let sheet_name = worksheet.name().unwrap();
+        worksheet
+            .visit_cells(|cell| {
+                if numeric.is_none() {
+                    numeric = match cell.value() {
+                        CellValue::Float(value) => Some((
+                            sheet_index,
+                            Reference::new(cell.row(), cell.column()).unwrap(),
+                            *value,
+                        )),
+                        CellValue::Int(value) => Some((
+                            sheet_index,
+                            Reference::new(cell.row(), cell.column()).unwrap(),
+                            *value as f64,
+                        )),
+                        CellValue::Empty
+                        | CellValue::Bool(_)
+                        | CellValue::DateTime(_)
+                        | CellValue::String(_)
+                        | CellValue::Error(_)
+                        | CellValue::Formula { .. } => None,
+                    };
+                }
+                Ok(())
+            })
+            .unwrap();
+        if numeric.is_some() {
+            let (index, reference, value) = numeric.take().unwrap();
+            let mut edit = workbook.edit_cells().unwrap();
+            edit.set_number(index, reference, value + 1.0).unwrap();
+            let committed = edit.commit().unwrap().into_package();
+            return (source, committed, index, reference, sheet_name);
+        }
+    }
+    panic!("Simple.xls has no numeric cell for deferred projection test");
+}
+
+fn assert_inflight_projection_source_change(
+    operation: impl FnOnce(&SourceBackedWorksheet) -> Result<(), SourceBackedError>,
+) {
+    let (source, package, sheet_index, _reference, _sheet_name) = deferred_numeric_fixture();
+    let worksheet = package.worksheet_by_index(sheet_index).unwrap().unwrap();
+    // Materialize the deferred target before arming the mutation. The next
+    // projection operation's leading original-owner fence then mutates the
+    // source immediately after its observation, leaving only its trailing
+    // fence to classify the target read's composed-source failure.
+    source.clear_version_calls();
+    source.bump_after_observation(1);
+    let error = operation(&worksheet).unwrap_err();
+    assert!(
+        matches!(error, SourceBackedError::SourceChanged { .. }),
+        "expected typed SourceChanged after an in-flight mutation, got {error:?}"
+    );
+}
+
+fn assert_inflight_workbook_source_change(
+    operation: impl FnOnce(
+        &SourceBackedWorkbook,
+        usize,
+        Reference,
+        &str,
+    ) -> Result<(), SourceBackedError>,
+) {
+    let (source, package, sheet_index, reference, sheet_name) = deferred_numeric_fixture();
+    // Open the deferred target once so the operation below takes the cached
+    // target path. Its leading original-source fence then mutates immediately
+    // after observation, forcing the operation's trailing promotion path.
+    package.worksheet_by_index(sheet_index).unwrap();
+    source.clear_version_calls();
+    source.bump_after_observation(1);
+    let error = operation(&package, sheet_index, reference, &sheet_name).unwrap_err();
+    assert!(
+        matches!(error, SourceBackedError::SourceChanged { .. }),
+        "expected typed SourceChanged after an in-flight workbook mutation, got {error:?}"
+    );
+}
+
+fn assert_cold_inflight_workbook_source_change(
+    operation: impl FnOnce(&SourceBackedWorkbook, usize, Reference) -> Result<(), SourceBackedError>,
+) {
+    let (source, package, sheet_index, reference, _sheet_name) = deferred_numeric_fixture();
+    // Do not materialize the deferred target first: the mutation lands after
+    // effective_inner's leading fence while from_read_at opens the composed
+    // source. That open may report I/O, so effective_inner must fence again
+    // before propagating its error.
+    source.clear_version_calls();
+    source.bump_after_observation(1);
+    let error = operation(&package, sheet_index, reference).unwrap_err();
+    assert!(
+        matches!(error, SourceBackedError::SourceChanged { .. }),
+        "expected typed SourceChanged after cold in-flight mutation, got {error:?}"
+    );
+}
+
+#[test]
+fn deferred_projection_handles_keep_the_original_source_fence() {
+    let (source, package, sheet_index, reference, sheet_name) = deferred_numeric_fixture();
+    let by_index = package.worksheet_by_index(sheet_index).unwrap().unwrap();
+    let by_name = package.worksheet_by_name(&sheet_name).unwrap().unwrap();
+    let from_list = package.worksheets().unwrap().into_iter().next().unwrap();
+
+    // The first read materializes the deferred target; all three projections
+    // must retain the original owner rather than only that cache.
+    assert!(
+        by_index
+            .cell_value(reference.row(), reference.column())
+            .unwrap()
+            .is_some()
+    );
+    assert!(
+        by_name
+            .cell_value(reference.row(), reference.column())
+            .unwrap()
+            .is_some()
+    );
+    assert!(
+        from_list
+            .cell_value(reference.row(), reference.column())
+            .unwrap()
+            .is_some()
+    );
+
+    source.bump();
+    for worksheet in [by_index, by_name, from_list] {
+        assert!(matches!(
+            worksheet.cell_value(reference.row(), reference.column()),
+            Err(SourceBackedError::SourceChanged { .. })
+        ));
+    }
+}
+
+#[test]
+fn deferred_projection_promotes_inflight_source_changes_for_all_reads() {
+    assert_inflight_projection_source_change(|worksheet| worksheet.cell(0, 0).map(|_| ()));
+    assert_inflight_projection_source_change(|worksheet| {
+        let (_cancellation, execution) = execution_pair();
+        worksheet.cell_with_execution(0, 0, &execution).map(|_| ())
+    });
+    assert_inflight_projection_source_change(|worksheet| {
+        worksheet.visit_cells(|_cell| Ok(())).map(|_| ())
+    });
+    assert_inflight_projection_source_change(|worksheet| {
+        let (_cancellation, execution) = execution_pair();
+        worksheet
+            .visit_cells_with_execution(&execution, |_cell| Ok(()))
+            .map(|_| ())
+    });
+    assert_inflight_projection_source_change(|worksheet| worksheet.name().map(|_| ()));
+}
+
+#[test]
+fn deferred_workbook_facade_promotes_inflight_source_changes() {
+    assert_inflight_workbook_source_change(|workbook, sheet, reference, _name| {
+        workbook
+            .cell_by_index(sheet, reference.row(), reference.column())
+            .map(|_| ())
+    });
+    assert_inflight_workbook_source_change(|workbook, sheet, reference, _name| {
+        workbook
+            .cell_value_by_index(sheet, reference.row(), reference.column())
+            .map(|_| ())
+    });
+    assert_inflight_workbook_source_change(|workbook, sheet, reference, _name| {
+        let (_cancellation, execution) = execution_pair();
+        workbook
+            .cell_by_index_with_execution(sheet, reference.row(), reference.column(), &execution)
+            .map(|_| ())
+    });
+    assert_inflight_workbook_source_change(|workbook, sheet, reference, _name| {
+        workbook.worksheet_by_index(sheet).map(|_| ())
+    });
+    assert_inflight_workbook_source_change(|workbook, _sheet, _reference, name| {
+        workbook.worksheet_by_name(name).map(|_| ())
+    });
+    assert_inflight_workbook_source_change(|workbook, _sheet, _reference, _name| {
+        workbook.worksheets().map(|_| ())
+    });
+    assert_inflight_workbook_source_change(|workbook, _sheet, _reference, _name| {
+        workbook.worksheet_count().map(|_| ())
+    });
+    assert_inflight_workbook_source_change(|workbook, _sheet, _reference, _name| {
+        workbook.worksheet_names().map(|_| ())
+    });
+    assert_inflight_workbook_source_change(|workbook, _sheet, _reference, _name| {
+        workbook.worksheet_descriptors().map(|_| ())
+    });
+    assert_inflight_workbook_source_change(|workbook, _sheet, _reference, _name| {
+        workbook.sheet_count().map(|_| ())
+    });
+    assert_inflight_workbook_source_change(|workbook, _sheet, _reference, _name| {
+        workbook.date_system().map(|_| ())
+    });
+    assert_inflight_workbook_source_change(|workbook, _sheet, _reference, _name| {
+        workbook.formatting().map(|_| ())
+    });
+    assert_inflight_workbook_source_change(|workbook, _sheet, _reference, _name| {
+        workbook.source_version().map(|_| ())
+    });
+    assert_inflight_workbook_source_change(|workbook, _sheet, _reference, _name| {
+        workbook.materialize_eager().map(|_| ())
+    });
+    assert_inflight_workbook_source_change(|workbook, _sheet, _reference, _name| {
+        workbook.text().map(|_| ())
+    });
+}
+
+#[test]
+fn deferred_materialized_package_handoff_keeps_the_original_source_fence() {
+    let (source, package, sheet_index, reference, _sheet_name) = deferred_numeric_fixture();
+    let package = Package::from_source(package).unwrap();
+    let workbook = package.workbook();
+    let source_backed = workbook.source_backed_ref().unwrap();
+
+    assert!(
+        source_backed
+            .cell_value_by_index(sheet_index, reference.row(), reference.column())
+            .unwrap()
+            .is_some()
+    );
+    source.bump();
+    assert!(matches!(
+        source_backed.cell_value_by_index(sheet_index, reference.row(), reference.column()),
+        Err(SourceBackedError::SourceChanged { .. })
+    ));
+}
+
+fn assert_handoff_package_source_change(
+    operation: impl FnOnce(&Package) -> Result<(), PackageError>,
+) {
+    let (source, deferred, _sheet_index, _reference, _sheet_name) = deferred_numeric_fixture();
+    let package = Package::from_source(deferred).unwrap();
+    source.clear_version_calls();
+    source.bump_after_observation(1);
+    let error = operation(&package).unwrap_err();
+    assert!(
+        matches!(
+            error,
+            PackageError::Source(SourceBackedError::SourceChanged { .. })
+        ),
+        "expected typed package SourceChanged after an in-flight output mutation, got {error:?}"
+    );
+}
+
+fn assert_handoff_source_owner_output_source_change(
+    operation: impl FnOnce(&SourceBackedWorkbook) -> Result<(), litchi_xls::source_backed::OutputError>,
+) {
+    let (source, deferred, _sheet_index, _reference, _sheet_name) = deferred_numeric_fixture();
+    let package = Package::from_source(deferred).unwrap();
+    let workbook = package.source_workbook().unwrap();
+    source.clear_version_calls();
+    source.bump_after_observation(1);
+    let error = operation(workbook).unwrap_err();
+    assert!(
+        matches!(
+            error,
+            litchi_xls::source_backed::OutputError::Package(PackageError::Source(
+                SourceBackedError::SourceChanged { .. }
+            ))
+        ),
+        "expected typed source-owner SourceChanged after an in-flight output mutation, got {error:?}"
+    );
+}
+
+fn source_fence_temp_path(prefix: &str) -> std::path::PathBuf {
+    static NEXT: AtomicU64 = AtomicU64::new(0);
+    std::env::temp_dir().join(format!(
+        "{prefix}-{}-{}.xls",
+        std::process::id(),
+        NEXT.fetch_add(1, Ordering::Relaxed)
+    ))
+}
+
+#[test]
+fn deferred_package_output_boundaries_promote_inflight_source_changes() {
+    assert_handoff_package_source_change(|package| package.source_bytes().map(|_| ()));
+    assert_handoff_package_source_change(|package| package.to_bytes().map(|_| ()));
+    assert_handoff_package_source_change(|package| {
+        let mut output = Vec::new();
+        package.write_to(&mut output)
+    });
+    assert_handoff_package_source_change(|package| package.reader_ref().map(|_| ()));
+    assert_handoff_package_source_change(|package| {
+        let path = source_fence_temp_path("litchi-xls-source-fence");
+        let result = package.save(&path);
+        let _ = std::fs::remove_file(path);
+        result
+    });
+}
+
+#[test]
+fn handed_off_source_owner_output_boundaries_promote_inflight_source_changes() {
+    assert_handoff_source_owner_output_source_change(|workbook| {
+        let mut output = Vec::new();
+        workbook.write_to(&mut output).map(|_| ())
+    });
+    assert_handoff_source_owner_output_source_change(|workbook| {
+        let path = source_fence_temp_path("litchi-xls-source-owner-fence");
+        let result = workbook.save(&path).map(|_| ());
+        let _ = std::fs::remove_file(path);
+        result
+    });
+}
+
+#[test]
+fn deferred_cold_materialization_promotes_inflight_source_changes() {
+    assert_cold_inflight_workbook_source_change(|workbook, sheet, reference| {
+        workbook
+            .cell_by_index(sheet, reference.row(), reference.column())
+            .map(|_| ())
+    });
 }
 
 #[test]

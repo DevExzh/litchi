@@ -2248,8 +2248,9 @@ impl Edit {
     ///
     /// # Errors
     ///
-    /// Returns an error for an invalid Xnum, a missing or ambiguous worksheet,
-    /// a duplicate cell, a non-`Number` cell family, or allocation failure.
+    /// Returns a typed refusal for an invalid Xnum, a missing or ambiguous
+    /// worksheet cell, a duplicate cell, or a non-`Number` cell family, or an
+    /// allocation failure.
     pub(crate) fn set_number(
         &mut self,
         selector: Selector<'_>,
@@ -2257,8 +2258,10 @@ impl Edit {
         value: f64,
     ) -> Result<()> {
         if !valid_xnum(value) {
-            return Err(Error::UnsupportedFeature(
-                "BIFF8 Number edits require a normal IEEE-754 value or positive zero".into(),
+            return Err(Error::refused(
+                RefusalKind::InvalidValue,
+                "edit cells",
+                "BIFF8 Number edits require a normal IEEE-754 value or positive zero",
             ));
         }
         let sheet_index = self
@@ -2269,18 +2272,18 @@ impl Edit {
         let entry = self.source.inner.sheets[sheet_index]
             .unique_entry_index(reference)?
             .ok_or_else(|| {
-                Error::UnsupportedFeature(format!(
-                    "cell ({}, {}) is absent or is not encoded as a BIFF8 Number record",
-                    reference.row(),
-                    reference.column()
-                ))
+                Error::refused(
+                    RefusalKind::UnsupportedTarget,
+                    "edit cells",
+                    "the selected cell is not an existing standalone BIFF8 Number",
+                )
             })?;
         if entries[entry].cell.storage != Storage::Number {
-            return Err(Error::UnsupportedFeature(format!(
-                "cell ({}, {}) is not encoded as a standalone BIFF8 Number record",
-                reference.row(),
-                reference.column()
-            )));
+            return Err(Error::refused(
+                RefusalKind::UnsupportedTarget,
+                "edit cells",
+                "the selected cell is not an existing standalone BIFF8 Number",
+            ));
         }
         self.stage(sheet_index, entry, Storage::Number, Value::Number(value))
     }
@@ -8090,13 +8093,17 @@ fn commit_source_backed_numeric_plan(transaction: Edit) -> Result<SourceBackedPl
         || tab_change.is_some()
         || !layout_changes.is_empty()
     {
-        return Err(Error::UnsupportedFeature(
-            "source-backed numeric plan accepts no structural or resource edits".into(),
+        return Err(Error::refused(
+            RefusalKind::UnsupportedOperation,
+            "edit cells",
+            "source-backed numeric plan accepts no structural or resource edits",
         ));
     }
     if !changes_are_fixed_numeric(&source, &changes) {
-        return Err(Error::UnsupportedFeature(
-            "source-backed numeric plan requires unchanged Number, RK, or MulRk storage".into(),
+        return Err(Error::refused(
+            RefusalKind::UnsupportedOperation,
+            "edit cells",
+            "source-backed numeric plan requires unchanged Number, RK, or MulRk storage",
         ));
     }
 
@@ -8222,14 +8229,17 @@ fn commit_source_backed_numeric(transaction: Edit) -> Result<SourceBackedCommit>
         || tab_change.is_some()
         || !layout_changes.is_empty()
     {
-        return Err(Error::UnsupportedFeature(
-            "source-backed numeric publication accepts no structural or resource edits".into(),
+        return Err(Error::refused(
+            RefusalKind::UnsupportedOperation,
+            "edit cells",
+            "source-backed numeric publication accepts no structural or resource edits",
         ));
     }
     if !changes_are_fixed_numeric(&source, &changes) {
-        return Err(Error::UnsupportedFeature(
-            "source-backed numeric publication requires unchanged Number, RK, or MulRk storage"
-                .into(),
+        return Err(Error::refused(
+            RefusalKind::UnsupportedOperation,
+            "edit cells",
+            "source-backed numeric publication requires unchanged Number, RK, or MulRk storage",
         ));
     }
 
@@ -8465,16 +8475,20 @@ fn fixed_numeric_splice(source: &Snapshot, change: &Change) -> Result<SameLength
     let replacement = match change.storage {
         Storage::Number => {
             if !valid_xnum(value) {
-                return Err(Error::UnsupportedFeature(
-                    "source-backed Number replacement is not a valid Xnum".into(),
+                return Err(Error::refused(
+                    RefusalKind::InvalidValue,
+                    "edit cells",
+                    "source-backed Number replacement is not a valid Xnum",
                 ));
             }
             value.to_le_bytes().to_vec()
         },
         Storage::Rk | Storage::MulRk => encode_rk(value)
             .ok_or_else(|| {
-                Error::UnsupportedFeature(
-                    "source-backed RK replacement is not exactly representable".into(),
+                Error::refused(
+                    RefusalKind::InvalidValue,
+                    "edit cells",
+                    "source-backed RK replacement is not exactly representable",
                 )
             })?
             .to_le_bytes()

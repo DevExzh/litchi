@@ -1,0 +1,18 @@
+[package]
+name = "litchi-perf-baseline-f3"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+litchi-cfb = { path = "../../crates/litchi-cfb", features = ["write"] }
+litchi-core = { path = "../../crates/litchi-core" }
+litchi-ole-common = { path = "../../crates/litchi-ole-common" }
+litchi-xls = { path = "../../crates/litchi-xls" }
+sha2 = "0.11"
+
+[[example]]
+name = "xls_f3_qualification"
+path = "examples/xls_f3_qualification.rs"
+
+[workspace]
