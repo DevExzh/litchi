@@ -460,6 +460,16 @@ impl Package {
         self.physical_package()
     }
 
+    /// Return the OPC read limits retained by this owner.
+    ///
+    /// An effective owner still uses the physical source's admission policy;
+    /// reading that policy must not ask the effective graph to masquerade as
+    /// the physical package or perform another catalog read.
+    #[must_use]
+    pub const fn read_limits(&self) -> litchi_opc::SourceLimits {
+        self.physical.read_limits()
+    }
+
     /// Clone the execution context retained by this owner, including an
     /// owner with an effective edited topology.
     ///

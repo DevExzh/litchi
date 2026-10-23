@@ -3296,6 +3296,18 @@ impl Edit {
             .xml_bytes()
             .get(paragraph_start..paragraph_end)
             .ok_or_else(|| crate::Error::InvalidFormat("paragraph range is outside XML".into()))?;
+        // A visible no-op is safe even when the paragraph contains preserved
+        // Word range markers that the changed-text writer cannot rewrite.
+        // Check it before the structural owner scan so signed no-ops retain
+        // their exact source bytes and classification.
+        if self
+            .projected
+            .paragraph(position)
+            .and_then(|paragraph| paragraph.text().ok())
+            .is_some_and(|current| current == text)
+        {
+            return Ok(self);
+        }
         let owner = scan_text_owner(paragraph, b"p").map_err(|reason| Error::Refused {
             position: position.get(),
             reason,
@@ -3377,6 +3389,20 @@ impl Edit {
             .as_ref()
             .map(|admission| admission.owner_scan(paragraph.len()))
             .transpose()?;
+        if self.operations.is_empty()
+            && self
+                .projected
+                .paragraph(position)
+                .and_then(|paragraph| paragraph.text().ok())
+                .is_some_and(|current| current == authored_text)
+        {
+            drop((
+                input_admission,
+                input_capacity_admission,
+                text_scan_admission,
+            ));
+            return Ok(self);
+        }
         let owner = scan_text_owner(paragraph, b"p").map_err(|reason| Error::Refused {
             position: position.get(),
             reason,
@@ -10749,6 +10775,12 @@ fn scan_text_owner(xml: &[u8], root_name: &[u8]) -> std::result::Result<TextOwne
                         continue;
                     }
                     if is_fragment_word_element(&namespace, &fragment_prefix)
+                        && !is_preserved_paragraph_marker(
+                            root_name,
+                            &namespace,
+                            element.name(),
+                            &fragment_prefix,
+                        )
                         && !(root_name == b"p"
                             && is_transaction_fragment_word_name(
                                 &namespace,
@@ -10830,6 +10862,24 @@ fn scan_text_owner(xml: &[u8], root_name: &[u8]) -> std::result::Result<TextOwne
         return Err(Refusal::ComplexRun);
     }
     Ok(TextOwner { slots, text })
+}
+
+/// Paragraph-level range markers carry identity but no visible text. They can
+/// remain byte-for-byte in place while run text slots are rewritten, so
+/// accepting them here preserves bookmarks without admitting arbitrary
+/// structural children into the text writer.
+fn is_preserved_paragraph_marker(
+    root_name: &[u8],
+    namespace: &ResolveResult<'_>,
+    name: quick_xml::name::QName<'_>,
+    fragment_prefix: &FragmentPrefix,
+) -> bool {
+    root_name == b"p"
+        && is_fragment_word_element(namespace, fragment_prefix)
+        && matches!(
+            name.local_name().as_ref(),
+            b"bookmarkStart" | b"bookmarkEnd"
+        )
 }
 
 /// Whether an element is an `mc:AlternateContent` wrapper. A transaction
