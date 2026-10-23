@@ -17,9 +17,10 @@
 //! Typed semantic glossary catalog and failure-atomic in-memory CRUD.
 
 use super::codec::{
-    GALLERIES, add_sizes, authored_analysis, background_analysis, bounded, canonical_id,
-    entry_analysis, invalid, name_key, replace_sizes, validate_authored_name,
-    validate_catalog_sizes, validate_name,
+    GALLERIES, add_sizes, authored_analysis, authored_analysis_with_limits,
+    background_analysis_with_limits, bounded, canonical_id, entry_analysis_with_limits, invalid,
+    name_key, replace_sizes, validate_authored_name, validate_catalog_limits,
+    validate_catalog_sizes, validate_catalog_sizes_with_limits, validate_name,
 };
 use super::graph::raw;
 use super::{Arc, Error, HashMap, MAX_PARTS, R, REL, RS, Result, STRICT_REL, W, WS};
@@ -530,22 +531,55 @@ impl CatalogState {
 }
 
 impl Catalog {
-    pub(in crate::glossary) fn rebuild_state(&mut self) -> Result<()> {
+    pub(in crate::glossary) fn validate_for_limits(&self, limits: &super::Limits) -> Result<()> {
+        validate_catalog_limits(self, limits)?;
+        validate_catalog_sizes_with_limits(
+            self.state.entry_bytes,
+            self.state.background_bytes,
+            self.entries.len(),
+            limits,
+        )
+    }
+
+    pub(in crate::glossary) fn rebuild_state(&mut self, limits: &super::Limits) -> Result<()> {
+        validate_catalog_limits(self, limits)?;
         let mut state = CatalogState::default();
         state.rebuild_names(&self.entries)?;
-        let background = background_analysis(self.background.as_deref())?;
+        let background = background_analysis_with_limits(self.background.as_deref(), limits)?;
         state.background_bytes = background.sizes;
         self.background_refs = background.refs;
         for entry in &mut self.entries {
-            let analysis = entry_analysis(entry)?;
+            let analysis = entry_analysis_with_limits(entry, limits)?;
             entry.sizes = analysis.sizes;
             entry.refs = analysis.refs;
             state.entry_bytes = add_sizes(state.entry_bytes, entry.sizes)?;
         }
-        validate_catalog_sizes(
+        validate_catalog_sizes_with_limits(
             state.entry_bytes,
             state.background_bytes,
             self.entries.len(),
+            limits,
+        )?;
+        self.state = state;
+        Ok(())
+    }
+
+    pub(in crate::glossary) fn rebuild_state_from_cached(
+        &mut self,
+        limits: &super::Limits,
+    ) -> Result<()> {
+        validate_catalog_limits(self, limits)?;
+        let mut state = CatalogState::default();
+        state.rebuild_names(&self.entries)?;
+        for entry in &self.entries {
+            state.entry_bytes = add_sizes(state.entry_bytes, entry.sizes)?;
+        }
+        state.background_bytes = self.state.background_bytes;
+        validate_catalog_sizes_with_limits(
+            state.entry_bytes,
+            state.background_bytes,
+            self.entries.len(),
+            limits,
         )?;
         self.state = state;
         Ok(())
@@ -618,7 +652,7 @@ impl Catalog {
         if self.background.as_ref() == Some(&xml) {
             return Ok(self.background.replace(xml));
         }
-        let analysis = background_analysis(Some(&xml))?;
+        let analysis = background_analysis_with_limits(Some(&xml), limits)?;
         if self.binding.is_some() && !analysis.refs.is_empty() {
             return Err(invalid(
                 "relationship-bearing background requires glossary::raw graph publication",
@@ -843,7 +877,7 @@ impl Catalog {
         let Some(index) = self.state.offset(name)? else {
             return Ok(false);
         };
-        self.rename_at(index, replacement)
+        self.rename_at_with_limits(index, replacement, &super::Limits::DEFAULT)
     }
 
     /// Checked numeric fallback for renaming an ambiguous producer entry.
@@ -852,6 +886,27 @@ impl Catalog {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn rename_at(&mut self, index: usize, replacement: Name) -> Result<bool> {
+        self.rename_at_with_limits(index, replacement, &super::Limits::DEFAULT)
+    }
+
+    pub(in crate::glossary) fn rename_with_limits(
+        &mut self,
+        name: &str,
+        replacement: Name,
+        limits: &super::Limits,
+    ) -> Result<bool> {
+        let Some(index) = self.state.offset(name)? else {
+            return Ok(false);
+        };
+        self.rename_at_with_limits(index, replacement, limits)
+    }
+
+    pub(in crate::glossary) fn rename_at_with_limits(
+        &mut self,
+        index: usize,
+        replacement: Name,
+        limits: &super::Limits,
+    ) -> Result<bool> {
         let entry = self.entries.get(index).ok_or(Error::OutOfBounds {
             object: "glossary entry",
             index,
@@ -897,10 +952,11 @@ impl Catalog {
             let producer = entry.producer.take();
             (previous_name, producer)
         };
-        let analysis = match entry_analysis(
+        let analysis = match entry_analysis_with_limits(
             self.entries
                 .get(index)
                 .ok_or_else(|| invalid("glossary rename index changed"))?,
+            limits,
         ) {
             Ok(analysis) => analysis,
             Err(error) => {
@@ -1086,7 +1142,7 @@ impl Entry {
             lineage: None,
         };
         let mut entry = entry;
-        let analysis = authored_analysis(&entry)?;
+        let analysis = authored_analysis_with_limits(&entry, limits)?;
         entry.sizes = analysis.sizes;
         entry.refs = analysis.refs;
         Ok(entry)
@@ -1135,7 +1191,7 @@ impl Entry {
             self.lineage = None;
         }
         self.body = Some(body);
-        let analysis = authored_analysis(&self)?;
+        let analysis = authored_analysis_with_limits(&self, limits)?;
         self.sizes = analysis.sizes;
         self.refs = analysis.refs;
         Ok(self)

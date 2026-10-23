@@ -10,8 +10,7 @@
 
 use super::codec::invalid;
 use super::graph::{
-    catalog_relationship_references, load_graph, put_graph, raw, relationship_kind, remove_graph,
-    validate_package_conformance,
+    catalog_relationship_references, raw, relationship_kind, validate_package_conformance,
 };
 use super::model::{Binding, Catalog, Conformance};
 use super::{Arc, Error, OpcError, OpcPackage, PackURI, Part, Result, ct};
@@ -65,10 +64,11 @@ pub(crate) fn put(
     package: &mut OpcPackage,
     mut catalog: Catalog,
     conformance: Conformance,
+    limits: &super::Limits,
 ) -> Result<bool> {
     validate_package_conformance(package, conformance)?;
     catalog.validate_bound_lineages()?;
-    let existing = load_graph(package)?;
+    let existing = super::graph::load_graph_with_limits(package, limits)?;
     let binding = catalog.binding.take();
     let bound_to_destination = binding
         .as_deref()
@@ -96,7 +96,7 @@ pub(crate) fn put(
     };
     graph.catalog = catalog;
     graph.conformance = conformance;
-    put_graph(package, &graph)
+    super::graph::put_graph_checked(package, &graph, limits)
 }
 
 pub(in crate::glossary) fn seed_semantic_graph(
@@ -236,6 +236,6 @@ pub(in crate::glossary) fn free_part_name(
 /// # Errors
 ///
 /// Returns an error if the operation cannot be completed.
-pub(crate) fn remove(package: &mut OpcPackage) -> Result<bool> {
-    Ok(remove_graph(package)?.is_some())
+pub(crate) fn remove(package: &mut OpcPackage, limits: &super::Limits) -> Result<bool> {
+    Ok(super::graph::remove_graph_with_limits(package, limits)?.is_some())
 }

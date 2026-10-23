@@ -532,7 +532,9 @@ fn aggregate_projection_and_dense_content_are_bounded() {
     );
     assert!(amplified.len() < MAX);
     let root = parse_dom(amplified.as_bytes()).unwrap();
-    let error = project(&root).unwrap_err().to_string();
+    let error = project(&root, &Limits::DEFAULT, None)
+        .unwrap_err()
+        .to_string();
     assert!(error.contains("semantic XML exceeds"), "{error}");
 
     let dense = "x<!--c-->".repeat((MAX_DOM_CONTENT / 2) + 1);
@@ -2079,7 +2081,7 @@ fn transaction_creates_catalog_and_auxiliary_graph_atomically() {
     assert!(raw::load(&package, &Limits::default()).unwrap().is_some());
 
     let patch = commit.patch().clone();
-    patch.undo(&mut package).unwrap();
+    patch.undo(&mut package, &Limits::DEFAULT).unwrap();
     assert!(
         Snapshot::load(&package, &Limits::DEFAULT)
             .unwrap()
@@ -2127,7 +2129,12 @@ fn transaction_noop_preserves_signature_and_patch_rejects_stale_source() {
     editing.add_entry(entry("New")).unwrap();
     let changed = editing.commit(&mut target).unwrap();
     assert!(changed.changed());
-    assert!(changed.patch().apply(&mut changed_package).is_err());
+    assert!(
+        changed
+            .patch()
+            .apply(&mut changed_package, &Limits::DEFAULT)
+            .is_err()
+    );
     assert_eq!(source.entries()[0].name(), Some("Keep"));
 }
 

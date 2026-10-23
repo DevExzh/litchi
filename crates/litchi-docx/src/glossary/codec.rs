@@ -35,7 +35,7 @@ pub(in crate::glossary) fn read_with_limits(
     super::graph::raw::admit_xml(xml, limits)?;
     let original = parse_dom_with_limits(xml, limits)?;
     let original_conformance = Conformance::from_word(original.ns.as_ref())?;
-    let producer_entries = extract_producer_entries(original, original_conformance)?;
+    let producer_entries = extract_producer_entries(original, original_conformance, limits)?;
     let mce_limits = litchi_ooxml_common::mce::Limits {
         max_input_bytes: limits.xml_bytes(),
         // The projected DOM retains the processed XML, so the expansion
@@ -67,11 +67,9 @@ pub(in crate::glossary) fn read_with_limits(
         ));
     }
     validate_word_dialect(&root, conformance)?;
-    let mut catalog = project(&root)?;
+    let catalog = project(&root, limits, producer_entries.as_deref())?;
     drop(root);
-    attach_producer_entries(&mut catalog, producer_entries);
     validate_catalog_limits(&catalog, limits)?;
-    catalog.rebuild_state()?;
     Ok((catalog, conformance))
 }
 

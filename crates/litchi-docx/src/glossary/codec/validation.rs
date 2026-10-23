@@ -242,6 +242,37 @@ pub(in crate::glossary) fn name_key(value: &str) -> Result<String> {
     Ok(key)
 }
 
+pub(in crate::glossary) fn name_key_with_limits(value: &str, limits: &Limits) -> Result<String> {
+    if value.len() > limits.name_bytes() {
+        return Err(crate::Error::GlossaryLimit {
+            kind: crate::glossary::LimitKind::StringBytes,
+            actual: value.len(),
+            maximum: limits.name_bytes(),
+        });
+    }
+    let mut key = String::new();
+    key.try_reserve(value.len())
+        .map_err(|source| Error::Allocation {
+            resource: "glossary semantic-name key",
+            source,
+        })?;
+    for character in value.chars().nfd().default_case_fold().nfd() {
+        let len = key
+            .len()
+            .checked_add(character.len_utf8())
+            .ok_or_else(|| invalid("glossary semantic-name key size overflow"))?;
+        if len > limits.name_bytes() {
+            return Err(crate::Error::GlossaryLimit {
+                kind: crate::glossary::LimitKind::StringBytes,
+                actual: len,
+                maximum: limits.name_bytes(),
+            });
+        }
+        key.push(character);
+    }
+    Ok(key)
+}
+
 pub(in crate::glossary) fn canonical_id(value: &str) -> bool {
     let bytes = value.as_bytes();
     bytes.len() == 38
@@ -371,6 +402,14 @@ pub(in crate::glossary) fn wval(n: &Node) -> Result<String> {
     leaf(n)?;
     Ok(v)
 }
+
+pub(in crate::glossary) fn wval_with_limits(n: &Node, limits: &Limits) -> Result<String> {
+    let v = wattr_get_with_limits(n, "val", limits)?.ok_or_else(|| invalid("missing w:val"))?;
+    bounded_with_limits(&v, limits)?;
+    only_w(n, &["val"])?;
+    leaf(n)?;
+    Ok(v)
+}
 pub(in crate::glossary) fn wattr_get(n: &Node, l: &str) -> Result<Option<String>> {
     let mut v = None;
     for a in &n.attrs {
@@ -383,8 +422,42 @@ pub(in crate::glossary) fn wattr_get(n: &Node, l: &str) -> Result<Option<String>
     }
     Ok(v)
 }
+
+pub(in crate::glossary) fn wattr_get_with_limits(
+    n: &Node,
+    l: &str,
+    limits: &Limits,
+) -> Result<Option<String>> {
+    let mut value = None;
+    for attribute in &n.attrs {
+        if matches!(attribute.ns.as_ref(), W | WS) && attribute.l == l {
+            if value.is_some() {
+                return Err(invalid("duplicate WordprocessingML attribute"));
+            }
+            bounded_with_limits(&attribute.v, limits)?;
+            value = Some(attribute.v.clone());
+        }
+    }
+    Ok(value)
+}
 pub(in crate::glossary) fn onoff(n: &Node, l: &str) -> Result<Option<bool>> {
     let value = wattr_get(n, l)?;
+    match value.as_deref() {
+        None => Ok(None),
+        Some("1" | "true") => Ok(Some(true)),
+        Some("0" | "false") => Ok(Some(false)),
+        Some("on") if n.ns.as_ref() == W => Ok(Some(true)),
+        Some("off") if n.ns.as_ref() == W => Ok(Some(false)),
+        _ => Err(invalid(format!("invalid on/off attribute '{l}'"))),
+    }
+}
+
+pub(in crate::glossary) fn onoff_with_limits(
+    n: &Node,
+    l: &str,
+    limits: &Limits,
+) -> Result<Option<bool>> {
+    let value = wattr_get_with_limits(n, l, limits)?;
     match value.as_deref() {
         None => Ok(None),
         Some("1" | "true") => Ok(Some(true)),
@@ -496,6 +569,22 @@ pub(in crate::glossary) fn split(q: &str) -> Result<(&str, &str)> {
 pub(in crate::glossary) fn bounded(v: &str) -> Result<()> {
     if v.len() > MAX_STRING {
         return Err(invalid("glossary metadata string exceeds 1 MiB"));
+    }
+    if !v.chars().all(xml_char) {
+        return Err(invalid(
+            "glossary metadata contains a character forbidden by XML 1.0",
+        ));
+    }
+    Ok(())
+}
+
+pub(in crate::glossary) fn bounded_with_limits(v: &str, limits: &Limits) -> Result<()> {
+    if v.len() > limits.string_bytes() {
+        return Err(crate::Error::GlossaryLimit {
+            kind: crate::glossary::LimitKind::StringBytes,
+            actual: v.len(),
+            maximum: limits.string_bytes(),
+        });
     }
     if !v.chars().all(xml_char) {
         return Err(invalid(

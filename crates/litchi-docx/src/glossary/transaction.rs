@@ -12,11 +12,11 @@
 )]
 //! Source-checked glossary catalog and auxiliary-graph transactions.
 
-use super::codec::{invalid, validate_physical_part};
-use super::codec::{read, write};
+use super::codec::read_with_limits;
+use super::codec::{invalid, plan_write_with_limits, validate_physical_part, write_with_limits};
 use super::graph::{
-    graph_matches_catalog, package_conformance, put_graph, raw, relationship_kind, remove_graph,
-    validate_raw_graph_metadata, validate_relationship_metadata,
+    graph_matches_catalog, package_conformance, put_graph_checked, raw, relationship_kind,
+    remove_graph_with_limits, validate_raw_graph_metadata, validate_relationship_metadata,
 };
 use super::model::{Catalog, Conformance, Entry, Name};
 use super::{OpcPackage, PackURI, Result};
@@ -137,6 +137,7 @@ impl Snapshot {
 pub(crate) struct Transaction {
     before: Snapshot,
     draft: Option<raw::Graph>,
+    limits: super::Limits,
 }
 
 impl Transaction {
@@ -146,10 +147,18 @@ impl Transaction {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn new(target: &OpcPackage) -> Result<Self> {
-        let before = Snapshot::load(target, &super::Limits::DEFAULT)?;
+        Self::new_with_limits(target, &super::Limits::DEFAULT)
+    }
+
+    pub(in crate::glossary) fn new_with_limits(
+        target: &OpcPackage,
+        limits: &super::Limits,
+    ) -> Result<Self> {
+        let before = Snapshot::load(target, limits)?;
         Ok(Self {
             draft: before.graph.clone(),
             before,
+            limits: *limits,
         })
     }
 
@@ -193,9 +202,11 @@ impl Transaction {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn replace_catalog(&mut self, value: Catalog) -> Result<bool> {
+        let limits = self.limits;
         let changed = self.update_catalog(|catalog| {
             let changed = *catalog != value;
             *catalog = value;
+            catalog.rebuild_state(&limits)?;
             Ok(changed)
         })?;
         Ok(changed)
@@ -250,7 +261,8 @@ impl Transaction {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn rename_entry(&mut self, name: &str, value: Name) -> Result<bool> {
-        self.update_catalog(|catalog| catalog.rename(name, value))
+        let limits = self.limits;
+        self.update_catalog(|catalog| catalog.rename_with_limits(name, value, &limits))
     }
 
     /// Remove one uniquely selected entry.
@@ -291,7 +303,7 @@ impl Transaction {
             return Ok(false);
         }
         graph.rels = relationships;
-        validate_candidate(&graph)?;
+        validate_candidate(&graph, &self.limits)?;
         self.draft = Some(graph);
         Ok(true)
     }
@@ -308,7 +320,7 @@ impl Transaction {
         }
         validate_relationship_metadata(&relationship.id, &relationship.kind, &relationship.target)?;
         graph.rels.push(relationship);
-        validate_candidate(&graph)?;
+        validate_candidate(&graph, &self.limits)?;
         self.draft = Some(graph);
         Ok(true)
     }
@@ -324,7 +336,7 @@ impl Transaction {
             return Ok(None);
         };
         let removed = graph.rels.remove(index);
-        validate_candidate(&graph)?;
+        validate_candidate(&graph, &self.limits)?;
         self.draft = Some(graph);
         Ok(Some(removed))
     }
@@ -349,7 +361,7 @@ impl Transaction {
             )));
         }
         graph.parts.push(part);
-        validate_candidate(&graph)?;
+        validate_candidate(&graph, &self.limits)?;
         self.draft = Some(graph);
         Ok(true)
     }
@@ -366,8 +378,8 @@ impl Transaction {
         data: Vec<u8>,
         relationships: Vec<raw::Rel>,
     ) -> Result<bool> {
-        let mut part = raw::Part::new(name, content_type, data, &super::Limits::DEFAULT)?;
-        part.set_relationships(relationships, &super::Limits::DEFAULT)?;
+        let mut part = raw::Part::new(name, content_type, data, &self.limits)?;
+        part.set_relationships(relationships, &self.limits)?;
         let mut graph = self.candidate_graph();
         let requested = PackURI::new(name).map_err(crate::Error::Uri)?;
         let index = graph.parts.iter().position(|value| {
@@ -385,7 +397,7 @@ impl Transaction {
         }
         part.name = graph.parts[index].name.clone();
         graph.parts[index] = part;
-        validate_candidate(&graph)?;
+        validate_candidate(&graph, &self.limits)?;
         self.draft = Some(graph);
         Ok(true)
     }
@@ -402,8 +414,8 @@ impl Transaction {
         if part.data() == data.as_slice() {
             return Ok(false);
         }
-        part.replace_data(data, &super::Limits::DEFAULT)?;
-        validate_candidate(&graph)?;
+        part.replace_data(data, &self.limits)?;
+        validate_candidate(&graph, &self.limits)?;
         self.draft = Some(graph);
         Ok(true)
     }
@@ -423,8 +435,8 @@ impl Transaction {
         if graph.parts[index].relationships() == relationships.as_slice() {
             return Ok(false);
         }
-        graph.parts[index].set_relationships(relationships, &super::Limits::DEFAULT)?;
-        validate_candidate(&graph)?;
+        graph.parts[index].set_relationships(relationships, &self.limits)?;
+        validate_candidate(&graph, &self.limits)?;
         self.draft = Some(graph);
         Ok(true)
     }
@@ -441,7 +453,7 @@ impl Transaction {
             Err(_) => return Ok(None),
         };
         let removed = graph.parts.remove(index);
-        validate_candidate(&graph)?;
+        validate_candidate(&graph, &self.limits)?;
         self.draft = Some(graph);
         Ok(Some(removed))
     }
@@ -469,23 +481,23 @@ impl Transaction {
             return Ok(Commit::new(self.before, patch, false));
         }
         crate::signature_policy::ensure_unsigned(target)?;
-        let current = Snapshot::load(target, &super::Limits::DEFAULT)?;
+        let current = Snapshot::load(target, &self.limits)?;
         if !current.same_source(&self.before) {
             return Err(invalid("glossary transaction source is stale"));
         }
         let mut candidate = target.clone();
         match self.draft.as_ref() {
             Some(graph) => {
-                put_graph(&mut candidate, graph)?;
+                put_graph_checked(&mut candidate, graph, &self.limits)?;
             },
             None => {
-                remove_graph(&mut candidate)?;
+                remove_graph_with_limits(&mut candidate, &self.limits)?;
             },
         }
-        let snapshot = Snapshot::load(&candidate, &super::Limits::DEFAULT)?;
+        let snapshot = Snapshot::load(&candidate, &self.limits)?;
         match (self.draft.as_ref(), snapshot.graph.as_ref()) {
             (Some(expected), Some(actual)) => {
-                let expected_catalog = published_catalog(expected)?;
+                let expected_catalog = published_catalog(expected, &self.limits)?;
                 if !graph_matches_catalog(actual, expected, &expected_catalog, None)? {
                     return Err(invalid("glossary publication changed the staged graph"));
                 }
@@ -508,7 +520,15 @@ impl Transaction {
         let mut graph = self.candidate_graph();
         let result = edit(&mut graph.catalog)?;
         graph.catalog.validate_bound_lineages()?;
-        write(&graph.catalog, self.before.conformance)?;
+        graph.catalog.validate_for_limits(&self.limits)?;
+        let plan = plan_write_with_limits(&graph.catalog, graph.conformance, &self.limits)?;
+        if plan.bytes > self.limits.xml_bytes() {
+            return Err(crate::Error::GlossaryLimit {
+                kind: crate::glossary::LimitKind::XmlBytes,
+                actual: plan.bytes,
+                maximum: self.limits.xml_bytes(),
+            });
+        }
         self.draft = Some(graph);
         Ok(result)
     }
@@ -598,8 +618,8 @@ impl Patch {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn apply(&self, target: &mut OpcPackage) -> Result<Snapshot> {
-        let current = Snapshot::load(target, &super::Limits::DEFAULT)?;
+    pub fn apply(&self, target: &mut OpcPackage, limits: &super::Limits) -> Result<Snapshot> {
+        let current = Snapshot::load(target, limits)?;
         if !current.same_source(&self.before) {
             return Err(invalid("glossary patch source is stale"));
         }
@@ -610,13 +630,13 @@ impl Patch {
         let mut candidate = target.clone();
         match self.after.graph.as_ref() {
             Some(graph) => {
-                put_graph(&mut candidate, graph)?;
+                put_graph_checked(&mut candidate, graph, limits)?;
             },
             None => {
-                remove_graph(&mut candidate)?;
+                remove_graph_with_limits(&mut candidate, limits)?;
             },
         }
-        let resulting = Snapshot::load(&candidate, &super::Limits::DEFAULT)?;
+        let resulting = Snapshot::load(&candidate, limits)?;
         if !resulting.same_source(&self.after) {
             return Err(invalid(
                 "glossary patch publication changed its target graph",
@@ -631,8 +651,8 @@ impl Patch {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn undo(&self, target: &mut OpcPackage) -> Result<Snapshot> {
-        self.inverse().apply(target)
+    pub fn undo(&self, target: &mut OpcPackage, limits: &super::Limits) -> Result<Snapshot> {
+        self.inverse().apply(target, limits)
     }
 }
 
@@ -649,9 +669,18 @@ fn part_index(graph: &raw::Graph, name: &str) -> Result<usize> {
         .ok_or_else(|| invalid(format!("glossary auxiliary part '{requested}' is absent")))
 }
 
-fn validate_candidate(graph: &raw::Graph) -> Result<()> {
+fn validate_candidate(graph: &raw::Graph, limits: &super::Limits) -> Result<()> {
+    raw::admit_graph(graph, limits)?;
     validate_raw_graph_metadata(graph)?;
-    write(&graph.catalog, graph.conformance)?;
+    graph.catalog.validate_for_limits(limits)?;
+    let plan = plan_write_with_limits(&graph.catalog, graph.conformance, limits)?;
+    if plan.bytes > limits.xml_bytes() {
+        return Err(crate::Error::GlossaryLimit {
+            kind: crate::glossary::LimitKind::XmlBytes,
+            actual: plan.bytes,
+            maximum: limits.xml_bytes(),
+        });
+    }
     for part in &graph.parts {
         validate_physical_part(&part.name, &part.content_type, part.data().len())?;
     }
@@ -671,15 +700,15 @@ fn validate_candidate(graph: &raw::Graph) -> Result<()> {
     Ok(())
 }
 
-fn published_catalog(graph: &raw::Graph) -> Result<Catalog> {
+fn published_catalog(graph: &raw::Graph, limits: &super::Limits) -> Result<Catalog> {
     if let Some(xml) = &graph.root_xml {
-        let (catalog, conformance) = read(xml.as_slice())?;
+        let (catalog, conformance) = read_with_limits(xml.as_slice(), limits)?;
         if conformance == graph.conformance && catalog == graph.catalog {
             return Ok(graph.catalog.clone());
         }
     }
-    let encoded = write(&graph.catalog, graph.conformance)?;
-    let (catalog, conformance) = read(&encoded)?;
+    let encoded = write_with_limits(&graph.catalog, graph.conformance, limits)?;
+    let (catalog, conformance) = read_with_limits(&encoded, limits)?;
     if conformance != graph.conformance {
         return Err(invalid("canonical glossary changed conformance"));
     }

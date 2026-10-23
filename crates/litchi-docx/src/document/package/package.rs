@@ -30,7 +30,7 @@ impl Document {
     pub fn glossary(
         &self,
     ) -> Result<Option<(crate::glossary::Catalog, crate::glossary::Conformance)>> {
-        crate::glossary::load(&self.opc, &crate::glossary::Limits::DEFAULT)
+        crate::glossary::load(&self.opc, self.limits.glossary_value())
     }
 
     /// Load the typed, inert `SmartArt` (`DrawingML` diagram) inventory anchored

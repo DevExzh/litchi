@@ -41,6 +41,7 @@ pub use super::limit::LimitKind;
 pub struct Edit {
     staged: Staged,
     draft: Option<Draft>,
+    limits: super::Limits,
 }
 
 impl std::fmt::Debug for Edit {
@@ -73,7 +74,10 @@ impl Edit {
 
     fn draft(&mut self) -> Result<&mut Draft> {
         if self.draft.is_none() {
-            self.draft = Some(Draft::new(self.staged.working().opc_package())?);
+            self.draft = Some(Draft::new_with_limits(
+                self.staged.working().opc_package(),
+                &self.limits,
+            )?);
         }
         Ok(self
             .draft
@@ -241,6 +245,7 @@ impl crate::Package {
         Edit {
             staged: Staged::new(self),
             draft: None,
+            limits: *self.semantic_limits().glossary_value(),
         }
     }
 
@@ -252,6 +257,8 @@ impl crate::Package {
     /// Returns [`crate::Error::PatchConflict`] for a package that does not
     /// hold the before state.
     pub fn apply_glossary(&self, patch: &Patch) -> Result<Commit> {
-        apply_patch(self, patch, "apply_glossary")
+        let commit = apply_patch(self, patch, "apply_glossary")?;
+        commit.package().glossary_graph()?;
+        Ok(commit)
     }
 }

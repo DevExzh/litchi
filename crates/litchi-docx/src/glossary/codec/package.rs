@@ -52,6 +52,15 @@ pub(in crate::glossary) fn validate_catalog_sizes(
     background_bytes: [usize; 2],
     entry_count: usize,
 ) -> Result<()> {
+    validate_catalog_sizes_with_limits(entry_bytes, background_bytes, entry_count, &Limits::DEFAULT)
+}
+
+pub(in crate::glossary) fn validate_catalog_sizes_with_limits(
+    entry_bytes: [usize; 2],
+    background_bytes: [usize; 2],
+    entry_count: usize,
+    limits: &Limits,
+) -> Result<()> {
     for conformance in [Conformance::Transitional, Conformance::Strict] {
         let mut size = XmlSize::default();
         write_catalog_open(&mut size, conformance)?;
@@ -65,8 +74,12 @@ pub(in crate::glossary) fn validate_catalog_sizes(
             .checked_add(background_bytes[index])
             .and_then(|bytes| bytes.checked_add(entry_bytes[index]))
             .ok_or_else(|| invalid("glossary catalog size overflow"))?;
-        if bytes > MAX {
-            return Err(invalid("serialized glossary document exceeds 32 MiB"));
+        if bytes > MAX || bytes > limits.xml_bytes() {
+            return Err(crate::Error::GlossaryLimit {
+                kind: crate::glossary::LimitKind::XmlBytes,
+                actual: bytes,
+                maximum: limits.xml_bytes().min(MAX),
+            });
         }
     }
     Ok(())

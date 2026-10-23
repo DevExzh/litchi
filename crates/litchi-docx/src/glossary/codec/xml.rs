@@ -558,9 +558,20 @@ impl XmlSink for String {
     }
 }
 
-pub(in crate::glossary) fn node_xml(n: &Node, s: bool) -> Result<Vec<u8>> {
+pub(in crate::glossary) fn node_xml_with_limits(
+    n: &Node,
+    s: bool,
+    limits: &Limits,
+) -> Result<Vec<u8>> {
     let mut size = XmlSize::default();
     node_write(&mut size, n, s)?;
+    if size.bytes > limits.xml_bytes() {
+        return Err(crate::Error::GlossaryLimit {
+            kind: crate::glossary::LimitKind::XmlBytes,
+            actual: size.bytes,
+            maximum: limits.xml_bytes(),
+        });
+    }
     let mut x = String::new();
     x.try_reserve_exact(size.bytes)
         .map_err(|source| Error::Allocation {

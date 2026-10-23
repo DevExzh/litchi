@@ -233,7 +233,7 @@ impl Package {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn glossary(&self) -> Result<Option<(glossary::Catalog, glossary::Conformance)>> {
-        glossary::load(&self.opc, &glossary::Limits::DEFAULT)
+        glossary::load(&self.opc, self.semantic_limits().glossary_value())
     }
 
     /// Move a complete semantic catalog into the package.
@@ -250,7 +250,8 @@ impl Package {
         catalog: glossary::Catalog,
         conformance: glossary::Conformance,
     ) -> Result<bool> {
-        glossary::package::put(&mut self.opc, catalog, conformance)
+        let limits = *self.semantic_limits().glossary_value();
+        glossary::package::put(&mut self.opc, catalog, conformance, &limits)
     }
 
     /// Load the complete low-level glossary OPC graph without copying payloads.
@@ -259,7 +260,7 @@ impl Package {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn glossary_graph(&self) -> Result<Option<glossary::raw::Graph>> {
-        glossary::raw::load(&self.opc, &glossary::Limits::default())
+        glossary::raw::load(&self.opc, self.semantic_limits().glossary_value())
     }
 
     /// Publish a complete low-level glossary OPC graph into the package.
@@ -274,7 +275,8 @@ impl Package {
     ///
     /// Returns an error if the operation cannot be completed.
     pub(crate) fn put_glossary_graph(&mut self, graph: &glossary::raw::Graph) -> Result<bool> {
-        glossary::raw::put(&mut self.opc, graph, &glossary::Limits::default())
+        let limits = *self.semantic_limits().glossary_value();
+        glossary::raw::put(&mut self.opc, graph, &limits)
     }
 
     /// Remove and return the complete low-level glossary OPC graph.
@@ -285,7 +287,8 @@ impl Package {
     ///
     /// Returns an error if the operation cannot be completed.
     pub(crate) fn take_glossary_graph(&mut self) -> Result<Option<glossary::raw::Graph>> {
-        glossary::raw::remove(&mut self.opc, &glossary::Limits::default())
+        let limits = *self.semantic_limits().glossary_value();
+        glossary::raw::remove(&mut self.opc, &limits)
     }
 
     /// Remove the complete glossary-owned graph.
@@ -299,6 +302,7 @@ impl Package {
     ///
     /// Returns an error if the operation cannot be completed.
     pub(crate) fn remove_glossary(&mut self) -> Result<bool> {
-        glossary::package::remove(&mut self.opc)
+        let limits = *self.semantic_limits().glossary_value();
+        glossary::package::remove(&mut self.opc, &limits)
     }
 }
