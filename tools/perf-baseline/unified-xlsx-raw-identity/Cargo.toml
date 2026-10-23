@@ -18,6 +18,10 @@ name = "xlsx-raw-identity-alloc"
 path = "src/bin/xlsx_raw_identity_alloc.rs"
 required-features = ["allocator-metrics"]
 
+[[bin]]
+name = "xlsx-raw-identity-native"
+path = "src/bin/xlsx_raw_identity_native.rs"
+
 [dependencies]
 litchi-opc = { path = "../../../crates/litchi-opc" }
 litchi-xlsx = { path = "../../../crates/litchi-xlsx" }
