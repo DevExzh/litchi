@@ -39,8 +39,8 @@ owners keep the same source association.
 
 Regression coverage pins malformed XML open fallback with semantic-read
 failure, DOCTYPE open acceptance with append refusal, and the fact that open
-leaves the append scan deferred until a successful prepare.  The source
-repair is commit `b8a41e01a5` on branch `uo2/odp-heap-repair`; the earlier
+leaves the append scan deferred until a successful prepare. The source
+repair is on branch `uo2/odp-heap-repair`; the earlier
 structural-facts commits `126a2bb945`, `f58aa3b76c`, and `3178136432` remain
 returned evidence.
 
@@ -68,24 +68,27 @@ not an admission-equivalent performance control because it does not read
 `content.xml` at open; this row is recorded for attribution, not as a native
 qualification.
 
-The candidate probe binary is outside the repository at
-`/home/zhuhe/code/litchi-worktrees/.coord/odp-0362yd-candidate-target/release/examples/odp_0362ye_probe`,
+The current candidate probe binary is outside the repository at
+`/home/zhuhe/code/litchi-worktrees/uo2-odp-heap-repair/target/release/examples/odp_0362ye_probe`,
 size 3,599,992 bytes, SHA-256
-`032047b9f559c291cc07b1052e5425b688a2e91784220c7ef57672d091136bf0`.
+`f4b3e47bdcceb9e9e536a3c94b181bde040360ffd66c78ead73feb74562737f9`.
 The accepted e4a baseline binary is at
 `/home/zhuhe/code/litchi-worktrees/.coord/odp-0362yd-baseline-target/release/examples/odp_0362ye_probe`,
 size 3,096,104 bytes, SHA-256
 `ecb034b0f57588c7d131ba9981d7004f5181ee214a88d14519f73660f35e0669`.
 Both were run with the tracked route drivers and one build job with
-incremental compilation disabled.  Native timing and route-local Callgrind
-remain pending a quiet host; no performance acceptance is claimed here.
+incremental compilation disabled. Route-local Callgrind completed on the
+same fixed baseline binary; the reduced rows are in
+`results/0362ye/allocator-fixed-probe.md`. Native timing remains pending a
+quiet host; no native performance acceptance is claimed here.
 
 ## Validation to complete
 
 The focused checks pass on the fixed-buffer source.  The source unit suite
 has 5 tests, the append unit suite has 14 tests, and the combined
 `doctype_leniency`, `sequential_text`, and `source_backed` integration run
-has 32 tests.  The current release probe preserves the baseline output
+has 32 tests. Strict Clippy passes with the tracked `route_after.rs` probe
+include. The current release probe preserves the baseline output
 lengths and SipHashes for open, semantic slide/text reads, unchanged write,
-append publication, and replay.  Strict Clippy, route-local Callgrind, and
-native timing remain pending a quiet host window.
+append publication, and replay. Route-local Callgrind is recorded above;
+native timing remains pending a quiet host window.
