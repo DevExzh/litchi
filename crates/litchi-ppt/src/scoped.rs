@@ -487,12 +487,15 @@ impl Base {
     }
 
     fn bytes_arc(&self) -> Result<&Arc<[u8]>, Failure> {
-        self.bytes.get_or_try_init(|| {
+        self.ensure_source_version()?;
+        let bytes = self.bytes.get_or_try_init(|| {
             self.ensure_source_version()?;
             let bytes = self.package.to_encrypted_bytes().map_err(Failure::from)?;
             self.ensure_source_version()?;
             Ok(Arc::from(bytes))
-        })
+        })?;
+        self.ensure_source_version()?;
+        Ok(bytes)
     }
 
     fn ensure_source_version(&self) -> Result<(), Failure> {
@@ -1213,6 +1216,25 @@ mod tests {
         ));
         let package = Package::from_read_at(source.clone()).unwrap();
         let base = super::Base::capture(&package).unwrap();
+        source.change();
+
+        assert!(matches!(
+            base.bytes(),
+            Err(super::Failure::Package(Error::Ole(
+                OleError::SourceChanged { .. }
+            )))
+        ));
+    }
+
+    #[test]
+    fn lazy_source_capture_rechecks_a_change_after_materialization() {
+        let source_package = Package::new().unwrap();
+        let source = Arc::new(VersionedSource::new(
+            source_package.to_encrypted_bytes().unwrap(),
+        ));
+        let package = Package::from_read_at(source.clone()).unwrap();
+        let base = super::Base::capture(&package).unwrap();
+        assert!(!base.bytes().unwrap().is_empty());
         source.change();
 
         assert!(matches!(
