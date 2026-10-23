@@ -52,14 +52,40 @@ common insertion pass, with approximately 113.9 KiB of open-phase allocation
 attributed to the extra Deflate decoder/state.  This repair removes the
 extra parser from open while retaining the append scan and common proof.  It
 must still be rebuilt and rerun against the accepted e4a baseline with the
-same allocator and route-local Callgrind lifecycles.  The 0362yd receipts are
-not used as qualification for this repair.
+same route-local Callgrind lifecycles.  The 0362yd receipts are not used as
+qualification for this repair.
+
+The open admission probe was then made allocation-free for its fixed
+boundary state: UTF-8 validation uses a six-byte stack bridge for a scalar
+split across fills, and the body/DOCTYPE window is a fixed stack array
+scanned in bounded subchunks.  This removes the old 16 KiB UTF-8 scratch and
+4 KiB sliding-window allocations without changing the probe's marker,
+DOCTYPE, UTF-8, or body-missing decisions.  On the matched allocator probe,
+the current candidate's cold open fell from 116,001 peak / 200,373 allocated
+bytes to 83,233 peak / 168,181 allocated bytes; the append commit and
+publication rows were unchanged.  The baseline `tail_append` route is still
+not an admission-equivalent performance control because it does not read
+`content.xml` at open; this row is recorded for attribution, not as a native
+qualification.
+
+The candidate probe binary is outside the repository at
+`/home/zhuhe/code/litchi-worktrees/.coord/odp-0362yd-candidate-target/release/examples/odp_0362ye_probe`,
+size 3,599,992 bytes, SHA-256
+`032047b9f559c291cc07b1052e5425b688a2e91784220c7ef57672d091136bf0`.
+The accepted e4a baseline binary is at
+`/home/zhuhe/code/litchi-worktrees/.coord/odp-0362yd-baseline-target/release/examples/odp_0362ye_probe`,
+size 3,096,104 bytes, SHA-256
+`ecb034b0f57588c7d131ba9981d7004f5181ee214a88d14519f73660f35e0669`.
+Both were run with the tracked route drivers and one build job with
+incremental compilation disabled.  Native timing and route-local Callgrind
+remain pending a quiet host; no performance acceptance is claimed here.
 
 ## Validation to complete
 
-After the coordinator releases the owned target, run one-job release builds
-for the tracked 0362ye probe, the affected ODP unit/integration tests, strict
-Clippy, allocator routes, and route-local Callgrind.  Record the source and
-binary SHA-256 values, semantic output lengths/hashes, per-route allocation
-and instruction rows, and the exact commands in the small 0362ye receipts.
-Native timing remains pending a quiet host window.
+The focused checks pass on the fixed-buffer source.  The source unit suite
+has 5 tests, the append unit suite has 14 tests, and the combined
+`doctype_leniency`, `sequential_text`, and `source_backed` integration run
+has 32 tests.  The current release probe preserves the baseline output
+lengths and SipHashes for open, semantic slide/text reads, unchanged write,
+append publication, and replay.  Strict Clippy, route-local Callgrind, and
+native timing remain pending a quiet host window.

@@ -63,34 +63,60 @@ enum StreamProbeError {
 struct Utf8Probe {
     pending: [u8; 3],
     pending_len: usize,
-    scratch: Vec<u8>,
 }
 
 impl Utf8Probe {
     fn feed(&mut self, bytes: &[u8], part: &str) -> std::result::Result<(), StreamProbeError> {
-        self.scratch.clear();
-        self.scratch
-            .extend_from_slice(&self.pending[..self.pending_len]);
-        self.scratch.extend_from_slice(bytes);
-        match std::str::from_utf8(&self.scratch) {
-            Ok(_) => {
-                self.pending_len = 0;
-                Ok(())
-            },
-            Err(error) if error.error_len().is_none() => {
-                let tail = &self.scratch[error.valid_up_to()..];
-                if tail.len() > self.pending.len() {
-                    return Err(StreamProbeError::Invalid(Error::InvalidFormat(format!(
-                        "{FAMILY_NAME} {part} is not valid UTF-8"
-                    ))));
+        let mut rest = bytes;
+        loop {
+            if self.pending_len != 0 {
+                if rest.is_empty() {
+                    return Ok(());
                 }
-                self.pending[..tail.len()].copy_from_slice(tail);
-                self.pending_len = tail.len();
-                Ok(())
-            },
-            Err(error) => Err(StreamProbeError::Invalid(Error::InvalidFormat(format!(
-                "{FAMILY_NAME} {part} is not UTF-8: {error}"
-            )))),
+                // A UTF-8 scalar is at most four bytes.  Check the pending
+                // prefix with only a tiny stack boundary buffer so admission
+                // does not allocate a second copy of every streamed chunk.
+                let take = rest.len().min(3);
+                let mut boundary = [0_u8; 6];
+                let pending_len = self.pending_len;
+                boundary[..pending_len].copy_from_slice(&self.pending[..pending_len]);
+                boundary[pending_len..pending_len + take].copy_from_slice(&rest[..take]);
+                match std::str::from_utf8(&boundary[..pending_len + take]) {
+                    Ok(_) => {
+                        self.pending_len = 0;
+                        rest = &rest[take..];
+                    },
+                    Err(error) if error.error_len().is_none() => {
+                        let tail = &boundary[error.valid_up_to()..pending_len + take];
+                        debug_assert!(tail.len() <= self.pending.len());
+                        self.pending[..tail.len()].copy_from_slice(tail);
+                        self.pending_len = tail.len();
+                        rest = &rest[take..];
+                    },
+                    Err(error) => {
+                        return Err(StreamProbeError::Invalid(Error::InvalidFormat(format!(
+                            "{FAMILY_NAME} {part} is not UTF-8: {error}"
+                        ))));
+                    },
+                }
+                continue;
+            }
+
+            match std::str::from_utf8(rest) {
+                Ok(_) => return Ok(()),
+                Err(error) if error.error_len().is_none() => {
+                    let tail = &rest[error.valid_up_to()..];
+                    debug_assert!(tail.len() <= self.pending.len());
+                    self.pending[..tail.len()].copy_from_slice(tail);
+                    self.pending_len = tail.len();
+                    return Ok(());
+                },
+                Err(error) => {
+                    return Err(StreamProbeError::Invalid(Error::InvalidFormat(format!(
+                        "{FAMILY_NAME} {part} is not UTF-8: {error}"
+                    ))));
+                },
+            }
         }
     }
 
@@ -107,7 +133,8 @@ impl Utf8Probe {
 
 #[derive(Debug)]
 struct BodyProbe {
-    window: Vec<u8>,
+    window: [u8; STREAM_PROBE_WINDOW_BYTES],
+    window_len: usize,
     alias_marker: Option<Vec<u8>>,
     found: bool,
     root_seen: bool,
@@ -117,7 +144,8 @@ struct BodyProbe {
 impl BodyProbe {
     fn new() -> Self {
         Self {
-            window: Vec::with_capacity(STREAM_PROBE_WINDOW_BYTES),
+            window: [0; STREAM_PROBE_WINDOW_BYTES],
+            window_len: 0,
             alias_marker: None,
             found: false,
             root_seen: false,
@@ -126,32 +154,47 @@ impl BodyProbe {
     }
 
     fn feed(&mut self, bytes: &[u8]) {
-        if self.found {
-            return;
-        }
-        self.window.extend_from_slice(bytes);
-        if !self.root_seen {
-            let doctype_start = find_subslice(&self.window, b"<!DOCTYPE");
-            let root_start = root_tag_position(&self.window);
-            if doctype_start.is_some_and(|doctype| root_start.is_none_or(|root| doctype < root)) {
-                self.doctype = true;
+        let mut bytes = bytes;
+        while !bytes.is_empty() && !self.found {
+            // Retain each incoming subchunk while it is scanned. A single
+            // archive fill may be larger than the probe window; taking at
+            // most half keeps both the previous suffix and incoming prefix
+            // available for markers crossing that boundary.
+            let take = bytes.len().min(STREAM_PROBE_WINDOW_BYTES / 2);
+            let chunk = &bytes[..take];
+            let total = self.window_len + chunk.len();
+            if total > STREAM_PROBE_WINDOW_BYTES {
+                let remove = total - STREAM_PROBE_WINDOW_BYTES;
+                self.window.copy_within(remove..self.window_len, 0);
+                self.window_len -= remove;
             }
-            self.root_seen = root_start.is_some();
-        }
-        if find_subslice(&self.window, BODY_MARKER.as_bytes()).is_some() {
-            self.found = true;
-        } else {
-            self.find_alias_marker();
-            if let Some(marker) = self.alias_marker.as_deref()
-                && find_subslice(&self.window, marker).is_some()
-            {
+            self.window[self.window_len..self.window_len + chunk.len()].copy_from_slice(chunk);
+            self.window_len += chunk.len();
+
+            if !self.root_seen {
+                let window = &self.window[..self.window_len];
+                let doctype_start = find_subslice(window, b"<!DOCTYPE");
+                let root_start = root_tag_position(window);
+                if doctype_start.is_some_and(|doctype| root_start.is_none_or(|root| doctype < root))
+                {
+                    self.doctype = true;
+                }
+                self.root_seen = root_start.is_some();
+            }
+            let body_found =
+                find_subslice(&self.window[..self.window_len], BODY_MARKER.as_bytes()).is_some();
+            if body_found {
                 self.found = true;
+            } else {
+                self.find_alias_marker();
+                let window = &self.window[..self.window_len];
+                if let Some(marker) = self.alias_marker.as_deref()
+                    && find_subslice(window, marker).is_some()
+                {
+                    self.found = true;
+                }
             }
-        }
-        let keep = STREAM_PROBE_WINDOW_BYTES;
-        if self.window.len() > keep {
-            let remove = self.window.len() - keep;
-            self.window.drain(..remove);
+            bytes = &bytes[take..];
         }
     }
 
@@ -159,13 +202,14 @@ impl BodyProbe {
         if self.alias_marker.is_some() {
             return;
         }
-        let Some(uri_start) = find_subslice(&self.window, OFFICE_NAMESPACE) else {
+        let window = &self.window[..self.window_len];
+        let Some(uri_start) = find_subslice(window, OFFICE_NAMESPACE) else {
             return;
         };
-        let Some(namespace_start) = find_subslice(&self.window[..uri_start], b"xmlns:") else {
+        let Some(namespace_start) = find_subslice(&window[..uri_start], b"xmlns:") else {
             return;
         };
-        let declaration = &self.window[namespace_start + b"xmlns:".len()..uri_start];
+        let declaration = &window[namespace_start + b"xmlns:".len()..uri_start];
         let Some(equals) = declaration.iter().rposition(|byte| *byte == b'=') else {
             return;
         };
@@ -229,6 +273,15 @@ fn encrypted_member_cannot_stream(error: &Error) -> bool {
         Error::InvalidFormat(message)
             if message.contains("cannot be streamed without decryption")
     )
+}
+
+fn source_reader_error(error: SourceMemberReaderError<Error>) -> Error {
+    match error {
+        SourceMemberReaderError::Core { error, .. } | SourceMemberReaderError::Callback(error) => {
+            error
+        },
+        _ => Error::InvalidFormat("ODP content.xml source read failed".to_string()),
+    }
 }
 
 fn validate_source_content(package: &SourceBackedPackage) -> Result<(u64, bool)> {
@@ -1349,15 +1402,6 @@ fn ensure_current(expected: SourceVersion, observed: SourceVersion) -> Result<()
     }
 }
 
-fn source_reader_error(error: SourceMemberReaderError<Error>) -> Error {
-    match error {
-        SourceMemberReaderError::Core { error, .. } | SourceMemberReaderError::Callback(error) => {
-            error
-        },
-        _ => Error::InvalidFormat("ODP content.xml source read failed".to_string()),
-    }
-}
-
 /// Check the caller's semantic part-size limits against the declared member
 /// sizes before any part is inflated.
 fn check_semantic_part_sizes(
@@ -1411,6 +1455,35 @@ mod tests {
             reconcile_source(&FixedSource, expected, secondary),
             Err(Error::SourceChanged { .. })
         ));
+    }
+
+    #[test]
+    fn streamed_admission_probes_keep_utf8_boundaries_without_heap_scratch() {
+        let bytes = "prefix € and 𐍈 suffix".as_bytes();
+        for split in 0..=bytes.len() {
+            let mut probe = Utf8Probe::default();
+            probe.feed(&bytes[..split], "content.xml").unwrap();
+            probe.feed(&bytes[split..], "content.xml").unwrap();
+            probe.finish("content.xml").unwrap();
+        }
+
+        let mut invalid = Utf8Probe::default();
+        invalid.feed(&[0xe2], "content.xml").unwrap();
+        assert!(matches!(
+            invalid.feed(&[0x28], "content.xml"),
+            Err(StreamProbeError::Invalid(Error::InvalidFormat(message)))
+                if message.contains("not UTF-8")
+        ));
+    }
+
+    #[test]
+    fn streamed_body_probe_scans_a_fill_larger_than_its_window() {
+        let mut probe = BodyProbe::new();
+        let mut bytes = vec![b'x'; STREAM_PROBE_WINDOW_BYTES * 3];
+        let marker = b"<office:body><office:presentation";
+        bytes[128..128 + marker.len()].copy_from_slice(marker);
+        probe.feed(&bytes);
+        assert!(!probe.finish().unwrap());
     }
 
     #[test]
