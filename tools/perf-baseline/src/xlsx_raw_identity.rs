@@ -8,7 +8,7 @@
 //! bytes, and deferred decode counters.
 
 use crate::allocation_metrics::{self, Sample as AllocationSample};
-use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, SourceLimits};
+use litchi_opc::{BlobPart, OpcPackage, PackURI, SourceLimits};
 use litchi_xlsx::Package;
 use litchi_xlsx::slicer;
 use litchi_xlsx::timeline::{self, CacheDefinition, FilterType, Range, State};
@@ -461,7 +461,8 @@ fn native_identity(
             )
             .into());
         }
-        let part = opc.get_part(relationship.target_partname()?)?;
+        let target_partname = relationship.target_partname()?;
+        let part = opc.get_part(&target_partname)?;
         if part.content_type() != expected_type {
             return Err(format!(
                 "native relationship {id} has content type {}, expected {expected_type}",
