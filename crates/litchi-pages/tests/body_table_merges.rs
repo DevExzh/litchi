@@ -228,7 +228,7 @@ fn merge_transaction_rewrites_one_component_and_inverse_restores_exact_source() 
 
     let mut edit = package.edit_body_table_merges(BodyTableSelector::name("Table 1"))?;
     assert!(edit.unmerge(existing)?);
-    assert_eq!(edit.merge(replacement)?.regions(), &[replacement]);
+    assert_eq!(edit.merge(replacement)?.regions()?, &[replacement]);
     let commit = edit.commit()?;
 
     assert_eq!(

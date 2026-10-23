@@ -165,6 +165,20 @@ fn style_error(error: super::section_text_style::Error) -> Error {
     }
 }
 
+fn map_target_error(error: table_lock::Error) -> Error {
+    match error {
+        table_lock::Error::Refused(table_lock::Refusal::TableNotFound)
+        | table_lock::Error::Refused(table_lock::Refusal::AmbiguousTableName) => {
+            Error::Refused(Refusal::TableNotFound)
+        },
+        table_lock::Error::Refused(table_lock::Refusal::UnsupportedSource) => {
+            Error::Refused(Refusal::UnsupportedSource)
+        },
+        table_lock::Error::Allocation { amount } => Error::Allocation { amount },
+        _ => Error::InvalidSource,
+    }
+}
+
 /// A reversible, exact-source body-table value patch.
 #[derive(Clone, PartialEq, Eq)]
 pub struct Patch {
@@ -256,11 +270,8 @@ impl Commit {
 /// One immutable edit that writes cell values of one body table.
 pub struct Edit<'a> {
     source: &'a Package,
-    info: u64,
-    model: u64,
-    rows: u32,
-    columns: u32,
-    position: usize,
+    selector: table_lock::OwnedBodyTableSelector,
+    target: Option<table_lock::BodyTableTarget>,
     cells: Vec<(u32, u32, Value)>,
 }
 
@@ -274,6 +285,17 @@ impl fmt::Debug for Edit<'_> {
 }
 
 impl Edit<'_> {
+    fn target(&mut self) -> Result<&table_lock::BodyTableTarget, Error> {
+        if self.target.is_none() {
+            self.target = Some(
+                self.selector
+                    .resolve(self.source)
+                    .map_err(map_target_error)?,
+            );
+        }
+        self.target.as_ref().ok_or(Error::InvalidSource)
+    }
+
     /// Stage `value` in the cell at zero-based `row` and `column`; a later
     /// stage of the same cell replaces the earlier one.
     ///
@@ -281,7 +303,8 @@ impl Edit<'_> {
     ///
     /// [`Refusal::InvalidCell`] outside the table or for a non-finite number.
     pub fn set(&mut self, row: u32, column: u32, value: Value) -> Result<&mut Self, Error> {
-        if row >= self.rows || column >= self.columns {
+        let target = self.target()?.clone();
+        if row >= target.table_rows || column >= target.table_columns {
             return Err(Error::Refused(Refusal::InvalidCell));
         }
         if let Value::Number(number) = value
@@ -305,14 +328,22 @@ impl Edit<'_> {
     /// formula graph; [`Refusal::UnsupportedStorage`]; source, resource and
     /// verification errors. Failure never publishes a partial package.
     pub fn commit(self) -> Result<Commit, Error> {
-        if self.cells.is_empty() {
+        let mut this = self;
+        this.target()?;
+        let edit = this;
+        if edit.cells.is_empty() {
             return Err(Error::Refused(Refusal::NoStagedOperation));
         }
-        let candidate = publish(&self)?;
+        let candidate = publish(&edit)?;
         let read = candidate
-            .body_table_cells(BodyTableSelector::index(self.position))
+            .body_table_cells(BodyTableSelector::index(
+                edit.target
+                    .as_ref()
+                    .ok_or(Error::InvalidSource)?
+                    .table_position,
+            ))
             .map_err(|_error| Error::Verification)?;
-        for (row, column, value) in &self.cells {
+        for (row, column, value) in &edit.cells {
             let stored = read
                 .table()
                 .get(litchi_iwa_common::table::coordinate::At::new(*row, *column));
@@ -332,7 +363,7 @@ impl Edit<'_> {
                 return Err(Error::Verification);
             }
         }
-        let source_owner = SharedBytes::from_shared_slice(self.source.state.source.shared_source());
+        let source_owner = SharedBytes::from_shared_slice(edit.source.state.source.shared_source());
         let target_owner = SharedBytes::from_shared_slice(candidate.state.source.shared_source());
         Ok(Commit {
             package: candidate,
@@ -340,7 +371,7 @@ impl Edit<'_> {
                 artifacts: OwnedExactArtifacts::new(source_owner, target_owner),
             },
             diagnostics: Diagnostics {
-                cells: self.cells.len(),
+                cells: edit.cells.len(),
             },
         })
     }
@@ -424,6 +455,7 @@ fn message(payload: &[u8], number: u32) -> Result<Vec<&[u8]>, Error> {
 
 #[allow(clippy::too_many_lines, reason = "one staged publication")]
 fn publish(edit: &Edit<'_>) -> Result<Package, Error> {
+    let target = edit.target.as_ref().ok_or(Error::InvalidSource)?;
     let package = edit.source;
     let mut owners: Vec<&[u8]> = Vec::new();
     for component in package.state.source.components().iter() {
@@ -444,7 +476,7 @@ fn publish(edit: &Edit<'_>) -> Result<Package, Error> {
         package,
         payloads: BTreeMap::new(),
     };
-    let (_, model_payload) = staged.payload(edit.model, &[TABLE_MODEL])?;
+    let (_, model_payload) = staged.payload(target.model_identifier.get(), &[TABLE_MODEL])?;
     let model_payload = model_payload.to_vec();
     let store = message(&model_payload, 4)?
         .first()
@@ -486,8 +518,14 @@ fn publish(edit: &Edit<'_>) -> Result<Package, Error> {
         .unwrap_or_default();
     let column_headers = reference(&store, 2)?;
     for (row, column, value) in &edit.cells {
-        match table_write::cell_formula_state(&owners, &object, edit.info, *row, *column)
-            .map_err(storage_error)?
+        match table_write::cell_formula_state(
+            &owners,
+            &object,
+            target.drawable_identifier.get(),
+            *row,
+            *column,
+        )
+        .map_err(storage_error)?
         {
             FormulaState::Inert => {},
             _ => return Err(Error::Refused(Refusal::Formulas)),
@@ -524,7 +562,7 @@ fn publish(edit: &Edit<'_>) -> Result<Package, Error> {
             &tile_payload,
             local,
             *column,
-            edit.columns,
+            target.table_columns,
             cell.as_deref(),
         )
         .map_err(storage_error)?;
@@ -633,26 +671,11 @@ impl Package {
     where
         S: Into<BodyTableSelector<'table>>,
     {
-        let target = self
-            .resolve_body_table(selector.into())
-            .map_err(|error| match error {
-                table_lock::Error::Refused(crate::table::lock::Refusal::TableNotFound)
-                | table_lock::Error::Refused(crate::table::lock::Refusal::AmbiguousTableName) => {
-                    Error::Refused(Refusal::TableNotFound)
-                },
-                table_lock::Error::Refused(crate::table::lock::Refusal::UnsupportedSource) => {
-                    Error::Refused(Refusal::UnsupportedSource)
-                },
-                _ => Error::InvalidSource,
-            })?;
-        let info = target.drawable_identifier.get();
         Ok(Edit {
             source: self,
-            info,
-            model: target.model_identifier.get(),
-            rows: target.table_rows,
-            columns: target.table_columns,
-            position: target.table_position,
+            selector: table_lock::OwnedBodyTableSelector::try_from(selector.into())
+                .map_err(map_target_error)?,
+            target: None,
             cells: Vec::new(),
         })
     }

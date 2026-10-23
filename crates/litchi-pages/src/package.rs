@@ -4199,8 +4199,11 @@ mod tests {
         let mut edit = package
             .edit_body_footnote_text(crate::footnote::body::Selector::index(1))
             .map_err(|error| PackageError::InvalidFormat(error.to_string()))?;
-        assert_eq!(edit.position(), Position::from_utf16_index(5).unwrap());
-        assert_eq!(edit.before(), &source_footnotes[1]);
+        assert_eq!(
+            edit.position().unwrap(),
+            Position::from_utf16_index(5).unwrap()
+        );
+        assert_eq!(edit.before().unwrap(), &source_footnotes[1]);
         edit.set("Updated😀")
             .map_err(|error| PackageError::InvalidFormat(error.to_string()))?;
         let commit = edit
@@ -4260,7 +4263,7 @@ mod tests {
         let mut edit = package
             .edit_body_footnote_text(crate::footnote::body::Selector::index(1))
             .map_err(|error| PackageError::InvalidFormat(error.to_string()))?;
-        assert_eq!(edit.custom_mark(), Some("†"));
+        assert_eq!(edit.custom_mark().unwrap(), Some("†"));
         edit.set("UpdatedSecond")
             .map_err(|error| PackageError::InvalidFormat(error.to_string()))?;
         edit.set_custom_mark(Some("‡"))

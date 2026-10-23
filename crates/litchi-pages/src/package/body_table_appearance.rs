@@ -189,41 +189,70 @@ struct BodyTableAppearanceTarget {
 /// Immutable appearance settings staged against one package snapshot.
 pub struct Edit<'a> {
     source: &'a Package,
-    target: BodyTableAppearanceTarget,
-    before: Appearance,
-    appearance: Appearance,
-    budget: TransactionBudget,
+    selector: table_lock::OwnedBodyTableSelector,
+    target: Option<BodyTableAppearanceTarget>,
+    before: Option<Appearance>,
+    appearance: Option<Appearance>,
+    budget: Option<TransactionBudget>,
 }
 
 impl fmt::Debug for Edit<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("Edit")
-            .field("path", &self.path())
+            .field("resolved", &self.target.is_some())
             .field("appearance", &self.appearance)
             .finish_non_exhaustive()
     }
 }
 
 impl Edit<'_> {
-    /// Return the selected table path.
-    #[must_use]
-    pub const fn path(&self) -> Path {
-        Path::Table {
-            table: self.target.native.table_position,
+    fn resolve(&mut self) -> Result<(), Error> {
+        if self.target.is_none() {
+            let mut budget = TransactionBudget::new(self.source)?;
+            let selector = match &self.selector {
+                table_lock::OwnedBodyTableSelector::Name(name) => BodyTableSelector::Name(name),
+                table_lock::OwnedBodyTableSelector::Position(position) => {
+                    BodyTableSelector::Position(*position)
+                },
+            };
+            let target = resolve_target_with_budget(self.source, selector, &mut budget, true)?;
+            let before = target.appearance;
+            if self.appearance.is_none() {
+                self.appearance = Some(before);
+            }
+            self.before = Some(before);
+            self.target = Some(target);
+            self.budget = Some(budget);
         }
+        Ok(())
+    }
+
+    /// Return the selected table path.
+    pub fn path(&mut self) -> Result<Path, Error> {
+        self.resolve()?;
+        self.target
+            .as_ref()
+            .map(|target| Path::Table {
+                table: target.native.table_position,
+            })
+            .ok_or(Error::InvalidSource {
+                path: Path::Package,
+            })
     }
 
     /// Return the staged appearance.
-    #[must_use]
-    pub const fn appearance(&self) -> Appearance {
-        self.appearance
+    pub fn appearance(&mut self) -> Result<Appearance, Error> {
+        self.resolve()?;
+        self.appearance.ok_or(Error::InvalidSource {
+            path: Path::Package,
+        })
     }
 
     /// Replace the staged appearance without touching package bytes.
     #[must_use]
     pub fn set(mut self, appearance: Appearance) -> Self {
-        self.appearance = appearance;
+        self.appearance = Some(appearance);
         self
     }
 
@@ -232,7 +261,8 @@ impl Edit<'_> {
     /// Exact semantic no-ops reuse the immutable source allocation. Changed
     /// edits revalidate the selected rooted target, enforce ownership and
     /// lock safety, then rewrite and fully reopen the candidate.
-    pub fn commit(self) -> Result<Commit, Error> {
+    pub fn commit(mut self) -> Result<Commit, Error> {
+        self.resolve()?;
         commit_edit(self)
     }
 }
@@ -424,18 +454,14 @@ impl Package {
         &self,
         selector: impl Into<BodyTableSelector<'table>>,
     ) -> Result<Edit<'_>, Error> {
-        let mut budget = TransactionBudget::new(self)?;
-        // Stage only after the same strict graph/metadata admission used by
-        // a read. Changed commits repeat this proof because an edit is an
-        // immutable snapshot boundary, not an authority token; exact no-ops
-        // retain this staged immutable proof and skip changed-only work.
-        let target = resolve_target_with_budget(self, selector, &mut budget, true)?;
         Ok(Edit {
             source: self,
-            before: target.appearance,
-            appearance: target.appearance,
-            target,
-            budget,
+            selector: table_lock::OwnedBodyTableSelector::try_from(selector.into())
+                .map_err(|error| map_lock_error(error, Path::Package))?,
+            before: None,
+            appearance: None,
+            target: None,
+            budget: None,
         })
     }
 
@@ -509,17 +535,31 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
     // Capture the content-free path before moving the operation ledger out of
     // the edit.  The ledger is deliberately not Clone/Copy: every subsequent
     // check must debit the same transaction rather than a fresh budget.
-    let edit_path = edit.path();
+    let target = edit.target.ok_or(Error::InvalidSource {
+        path: Path::Package,
+    })?;
+    let before = edit.before.ok_or(Error::InvalidSource {
+        path: Path::Package,
+    })?;
+    let appearance = edit.appearance.ok_or(Error::InvalidSource {
+        path: Path::Package,
+    })?;
+    let budget = edit.budget.ok_or(Error::InvalidSource {
+        path: Path::Package,
+    })?;
+    let edit_path = Path::Table {
+        table: target.native.table_position,
+    };
     let catalog = physical_source(edit.source)?;
     let source_owner = SharedBytes::from_shared_slice(catalog.shared_source());
-    if edit.before == edit.appearance {
+    if before == appearance {
         return Ok(Commit {
             package: edit.source.clone(),
             patch: Patch {
                 artifacts: OwnedExactArtifacts::new(source_owner.clone(), source_owner),
-                target: edit.target.clone(),
-                before: edit.before,
-                after: edit.appearance,
+                target: target.clone(),
+                before,
+                after: appearance,
                 source_previews: 0,
                 target_previews: 0,
                 touched_components: 0,
@@ -530,16 +570,12 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
     if !catalog.source_is_exact() {
         return Err(Error::Refused(Refusal::UnsupportedSource));
     }
-    let mut budget = edit.budget;
-    let revalidated = resolve_at_with_budget(
-        edit.source,
-        edit.target.native.table_position,
-        &mut budget,
-        true,
-    )?;
-    if revalidated.appearance != edit.before
-        || revalidated.native != edit.target.native
-        || revalidated.style_identifier != edit.target.style_identifier
+    let mut budget = budget;
+    let revalidated =
+        resolve_at_with_budget(edit.source, target.native.table_position, &mut budget, true)?;
+    if revalidated.appearance != before
+        || revalidated.native != target.native
+        || revalidated.style_identifier != target.style_identifier
     {
         return Err(Error::PatchConflict);
     }
@@ -547,7 +583,7 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
         return Err(Error::Refused(Refusal::TableLocked { path: edit_path }));
     }
     budget.charge_transaction_work(edit.source.source_bytes().len(), edit_path)?;
-    let target = edit.target.clone();
+    let target = target.clone();
     let old_style =
         target
             .style_identifier
@@ -565,7 +601,7 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
         edit.source,
         target.clone(),
         old_style,
-        edit.appearance,
+        appearance,
         edit_path,
         &mut budget,
     )?;
@@ -625,7 +661,7 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
     let package =
         Package::from_source_catalog(candidate_source).map_err(|_| Error::Verification)?;
     let after = resolve_at_with_budget(&package, target.native.table_position, &mut budget, true)?;
-    if after.appearance != edit.appearance || after.native != target.native {
+    if after.appearance != appearance || after.native != target.native {
         return Err(Error::Verification);
     }
     verify_candidate_locality(
@@ -644,8 +680,8 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
     let patch = Patch {
         artifacts: OwnedExactArtifacts::new(source_owner, target_owner),
         target,
-        before: edit.before,
-        after: edit.appearance,
+        before,
+        after: appearance,
         source_previews: previews.len(),
         target_previews: 0,
         touched_components,

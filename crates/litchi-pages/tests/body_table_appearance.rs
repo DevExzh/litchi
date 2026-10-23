@@ -851,7 +851,12 @@ fn assert_rejected(source: &[u8]) -> TestResult {
     };
     let before = package.exact_bytes();
     assert!(package.body_table_appearance(0usize).is_err());
-    assert!(package.edit_body_table_appearance(0usize).is_err());
+    assert!(
+        package
+            .edit_body_table_appearance(0usize)
+            .and_then(|mut edit| edit.appearance())
+            .is_err()
+    );
     assert_eq!(package.exact_bytes(), before);
     Ok(())
 }
@@ -944,9 +949,9 @@ fn exact_no_op_skips_changed_target_resolution_but_changes_fail_closed() -> Test
         &source,
         litchi_pages::OpenOptions::new().__archive_limits(limits),
     )?;
-    let edit = package.edit_body_table_appearance(0usize)?;
+    let mut edit = package.edit_body_table_appearance(0usize)?;
     let before = package.exact_bytes();
-    let appearance = edit.appearance();
+    let appearance = edit.appearance()?;
     let noop = edit.set(appearance).commit()?;
     assert!(noop.patch().is_noop());
     assert_eq!(

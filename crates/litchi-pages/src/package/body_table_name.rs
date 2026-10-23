@@ -191,47 +191,65 @@ impl From<Refusal> for Error {
 /// Mutable semantic name staged against one immutable package.
 pub struct Edit<'a> {
     source: &'a Package,
-    target: table_lock::BodyTableTarget,
-    before: Name,
-    name: Name,
-    budget: table_lock::WireBudget,
+    selector: table_lock::OwnedBodyTableSelector,
+    target: Option<table_lock::BodyTableTarget>,
+    before: Option<Name>,
+    name: Option<Name>,
 }
 
 impl fmt::Debug for Edit<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("Edit")
-            .field("before", &self.before)
+            .field("resolved", &self.target.is_some())
             .field("name", &self.name)
             .finish_non_exhaustive()
     }
 }
 
 impl Edit<'_> {
-    /// Return the selected table path.
-    #[must_use]
-    pub const fn path(&self) -> Path {
-        Path::Table {
-            table: self.target.table_position,
+    fn resolve(&mut self) -> Result<(), Error> {
+        if self.target.is_none() {
+            let mut budget = table_lock::WireBudget::new(self.source.state.source.limits())
+                .map_err(map_lock_error)?;
+            let target = resolve_target_owned(self.source, &self.selector, &mut budget)?;
+            let before = resolved_name_at_target_with_budget(self.source, &target, &mut budget)?;
+            if self.name.is_none() {
+                self.name = Some(before.clone());
+            }
+            self.before = Some(before);
+            self.target = Some(target);
         }
+        Ok(())
+    }
+
+    /// Return the selected table path.
+    pub fn path(&mut self) -> Result<Path, Error> {
+        self.resolve()?;
+        self.target
+            .as_ref()
+            .map(|target| Path::Table {
+                table: target.table_position,
+            })
+            .ok_or(Error::InvalidSource)
     }
 
     /// Return the source name.
-    #[must_use]
-    pub fn before(&self) -> &Name {
-        &self.before
+    pub fn before(&mut self) -> Result<&Name, Error> {
+        self.resolve()?;
+        self.before.as_ref().ok_or(Error::InvalidSource)
     }
 
     /// Return the staged name.
-    #[must_use]
-    pub fn name(&self) -> &Name {
-        &self.name
+    pub fn name(&mut self) -> Result<&Name, Error> {
+        self.resolve()?;
+        self.name.as_ref().ok_or(Error::InvalidSource)
     }
 
     /// Replace the complete staged lossless name.
     #[must_use]
     pub fn set(mut self, name: Name) -> Self {
-        self.name = name;
+        self.name = Some(name);
         self
     }
 
@@ -243,7 +261,8 @@ impl Edit<'_> {
     }
 
     /// Validate and publish the staged name atomically.
-    pub fn commit(self) -> Result<Commit, Error> {
+    pub fn commit(mut self) -> Result<Commit, Error> {
+        self.resolve()?;
         commit_edit(self)
     }
 }
@@ -441,16 +460,13 @@ impl Package {
         &self,
         selector: impl Into<BodyTableSelector<'table>>,
     ) -> Result<Edit<'_>, Error> {
-        let mut budget =
-            table_lock::WireBudget::new(self.state.source.limits()).map_err(map_lock_error)?;
-        let target = resolve_target_with_budget(self, selector.into(), &mut budget)?;
-        let before = resolved_name_at_target_with_budget(self, &target, &mut budget)?;
         Ok(Edit {
             source: self,
-            target,
-            before: before.clone(),
-            name: before,
-            budget,
+            selector: table_lock::OwnedBodyTableSelector::try_from(selector.into())
+                .map_err(map_lock_error)?,
+            target: None,
+            before: None,
+            name: None,
         })
     }
 
@@ -508,12 +524,16 @@ impl Package {
 
 fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
     let source = edit.source;
-    let mut budget = edit.budget;
+    let target = edit.target.ok_or(Error::InvalidSource)?;
+    let before = edit.before.ok_or(Error::InvalidSource)?;
+    let name = edit.name.ok_or(Error::InvalidSource)?;
+    let mut budget =
+        table_lock::WireBudget::new(source.state.source.limits()).map_err(map_lock_error)?;
     charge_fingerprint(source.source_bytes(), &mut budget)?;
     let source_preview_count = preview_count_with_budget(source, &mut budget)?;
     let source_bytes: Arc<[u8]> = source.state.source.shared_source();
     let source_fingerprint = page_layout::fingerprint(source_bytes.as_ref());
-    if edit.before == edit.name {
+    if before == name {
         return Ok(Commit {
             package: source.clone(),
             patch: Patch {
@@ -521,9 +541,9 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
                 target: source_bytes,
                 source_fingerprint,
                 target_fingerprint: source_fingerprint,
-                proof: edit.target,
-                before: edit.before.clone(),
-                after: edit.name.clone(),
+                proof: target,
+                before: before.clone(),
+                after: name.clone(),
                 source_preview_count,
                 target_preview_count: source_preview_count,
             },
@@ -533,26 +553,26 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
     if !source.state.source.source_is_exact() {
         return Err(Error::Refused(Refusal::UnsupportedSource));
     }
-    if edit.target.explicit_locked == Some(true) {
+    if target.explicit_locked == Some(true) {
         return Err(Error::Refused(Refusal::TableLocked));
     }
-    reject_name_collision(source, &edit.target, &edit.name, &mut budget)?;
-    dependencies::validate(source, &edit.target, &mut budget)?;
-    let package = rewrite_name(source, &edit.target, &edit.before, &edit.name, &mut budget)?;
-    let target = package.state.source.shared_source();
-    charge_fingerprint(target.as_ref(), &mut budget)?;
-    let target_fingerprint = page_layout::fingerprint(target.as_ref());
+    reject_name_collision(source, &target, &name, &mut budget)?;
+    dependencies::validate(source, &target, &mut budget)?;
+    let package = rewrite_name(source, &target, &before, &name, &mut budget)?;
+    let target_owner = package.state.source.shared_source();
+    charge_fingerprint(target_owner.as_ref(), &mut budget)?;
+    let target_fingerprint = page_layout::fingerprint(target_owner.as_ref());
     let target_preview_count = preview_count_with_budget(&package, &mut budget)?;
     Ok(Commit {
         package,
         patch: Patch {
             source: source_bytes,
-            target,
+            target: target_owner,
             source_fingerprint,
             target_fingerprint,
-            proof: edit.target,
-            before: edit.before,
-            after: edit.name,
+            proof: target,
+            before,
+            after: name,
             source_preview_count,
             target_preview_count,
         },
@@ -569,6 +589,18 @@ fn resolve_target_with_budget(
 ) -> Result<table_lock::BodyTableTarget, Error> {
     let target = package
         .resolve_body_table_with_budget(selector, budget)
+        .map_err(map_lock_error)?;
+    validate_name_authority(package, &target, budget)?;
+    Ok(target)
+}
+
+fn resolve_target_owned(
+    package: &Package,
+    selector: &table_lock::OwnedBodyTableSelector,
+    budget: &mut table_lock::WireBudget,
+) -> Result<table_lock::BodyTableTarget, Error> {
+    let target = selector
+        .resolve_with_budget(package, budget)
         .map_err(map_lock_error)?;
     validate_name_authority(package, &target, budget)?;
     Ok(target)

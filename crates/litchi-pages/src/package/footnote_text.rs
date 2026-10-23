@@ -165,8 +165,9 @@ impl From<Refusal> for Error {
 /// immutable package.
 pub struct Edit<'a> {
     source: &'a Package,
-    position: Position,
-    before: Footnote,
+    selector: Selector,
+    position: Option<Position>,
+    before: Option<Footnote>,
     text: String,
     custom_mark: Option<String>,
 }
@@ -181,45 +182,54 @@ impl fmt::Debug for Edit<'_> {
 }
 
 impl<'a> Edit<'a> {
+    fn resolve(&mut self) -> Result<(), Error> {
+        if self.position.is_none() {
+            let (position, before, _) = resolve_footnote(self.source, self.selector)?;
+            self.text = try_owned_text(&before.text)?;
+            self.custom_mark = before
+                .custom_mark
+                .as_deref()
+                .map(try_owned_text)
+                .transpose()?;
+            self.position = Some(position);
+            self.before = Some(before);
+        }
+        Ok(())
+    }
+
     fn new(source: &'a Package, selector: Selector) -> Result<Self, Error> {
-        let (position, before, _) = resolve_footnote(source, selector)?;
-        let text = try_owned_text(&before.text)?;
-        let custom_mark = before
-            .custom_mark
-            .as_deref()
-            .map(try_owned_text)
-            .transpose()?;
         Ok(Self {
             source,
-            position,
-            before,
-            text,
-            custom_mark,
+            selector,
+            position: None,
+            before: None,
+            text: String::new(),
+            custom_mark: None,
         })
     }
 
-    /// Return the checked UTF-16 body-anchor position resolved at edit start.
-    #[must_use]
-    pub const fn position(&self) -> Position {
-        self.position
+    /// Return the checked UTF-16 body-anchor position, resolving on first access.
+    pub fn position(&mut self) -> Result<Position, Error> {
+        self.resolve()?;
+        self.position.ok_or(Error::InvalidSource)
     }
 
     /// Borrow the original semantic footnote value.
-    #[must_use]
-    pub const fn before(&self) -> &Footnote {
-        &self.before
+    pub fn before(&mut self) -> Result<&Footnote, Error> {
+        self.resolve()?;
+        self.before.as_ref().ok_or(Error::InvalidSource)
     }
 
     /// Borrow the text currently staged for publication.
-    #[must_use]
-    pub fn text(&self) -> &str {
-        &self.text
+    pub fn text(&mut self) -> Result<&str, Error> {
+        self.resolve()?;
+        Ok(&self.text)
     }
 
     /// Borrow the custom marker currently staged for publication.
-    #[must_use]
-    pub fn custom_mark(&self) -> Option<&str> {
-        self.custom_mark.as_deref()
+    pub fn custom_mark(&mut self) -> Result<Option<&str>, Error> {
+        self.resolve()?;
+        Ok(self.custom_mark.as_deref())
     }
 
     /// Stage replacement of the selected footnote's user-visible text.
@@ -227,6 +237,7 @@ impl<'a> Edit<'a> {
     /// The native body anchor and footnote graph are not changed. Structural
     /// U+000E and U+FFFC markers remain reserved for native graph edges.
     pub fn set(&mut self, text: &str) -> Result<&mut Self, Error> {
+        self.resolve()?;
         validate_text(text)?;
         let owned = try_owned_text(text)?;
         self.text = owned;
@@ -239,6 +250,7 @@ impl<'a> Edit<'a> {
     /// present empty native string. The reference, storage, and marker graph
     /// identities are not changed.
     pub fn set_custom_mark(&mut self, custom_mark: Option<&str>) -> Result<&mut Self, Error> {
+        self.resolve()?;
         validate_custom_mark(custom_mark)?;
         self.custom_mark = custom_mark.map(try_owned_text).transpose()?;
         Ok(self)
@@ -251,27 +263,30 @@ impl<'a> Edit<'a> {
     /// footnote storage and/or reference message through source-preserving
     /// wire editors, then reopen and verify the complete candidate before
     /// return.
-    pub fn commit(self) -> Result<Commit, Error> {
+    pub fn commit(mut self) -> Result<Commit, Error> {
+        self.resolve()?;
         validate_text(&self.text)?;
         validate_custom_mark(self.custom_mark.as_deref())?;
         self.source.validate().map_err(map_package_error)?;
-        let (position, current, native_footnote) =
-            resolve_footnote(self.source, Selector::Anchor(self.position))?;
-        if position != self.position || current != self.before {
+        let position = self.position.ok_or(Error::InvalidSource)?;
+        let before_source = self.before.as_ref().ok_or(Error::InvalidSource)?;
+        let (current_position, current, native_footnote) =
+            resolve_footnote(self.source, Selector::Anchor(position))?;
+        if current_position != position || current != *before_source {
             return Err(Error::InvalidSource);
         }
-        if current.text.as_ref() != self.before.text.as_ref() {
+        if current.text.as_ref() != before_source.text.as_ref() {
             return Err(Error::InvalidSource);
         }
-        if current.custom_mark != self.before.custom_mark {
+        if current.custom_mark != before_source.custom_mark {
             return Err(Error::InvalidSource);
         }
 
         let source_bytes = self.source.state.source.shared_source();
         let source_fingerprint = super::section_transaction::fingerprint(&source_bytes);
-        let before = clone_footnote(&self.before)?;
+        let before = clone_footnote(before_source)?;
         let after = Footnote::with_custom_mark(
-            self.position,
+            position,
             try_owned_text(&self.text)?.into_boxed_str(),
             self.custom_mark
                 .as_deref()
@@ -289,7 +304,7 @@ impl<'a> Edit<'a> {
                     target_bytes: source_bytes,
                     source_fingerprint,
                     target_fingerprint: source_fingerprint,
-                    position: self.position,
+                    position,
                     before,
                     after,
                 },
@@ -303,11 +318,11 @@ impl<'a> Edit<'a> {
         let package = rewrite_package_footnote(
             self.source,
             native_footnote,
-            self.before.text.as_ref(),
+            before_source.text.as_ref(),
             self.text.as_str(),
-            self.before.custom_mark.as_deref(),
+            before_source.custom_mark.as_deref(),
             self.custom_mark.as_deref(),
-            self.position,
+            position,
         )?;
         let touched_components = changed_component_count(self.source, &package)?;
         if touched_components == 0 {
@@ -322,7 +337,7 @@ impl<'a> Edit<'a> {
                 target_bytes,
                 source_fingerprint,
                 target_fingerprint,
-                position: self.position,
+                position,
                 before,
                 after,
             },

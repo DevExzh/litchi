@@ -647,10 +647,10 @@ fn malformed_dependency_scalars_and_external_references_fail_closed() -> TestRes
         let before = package.exact_bytes();
         let result = package
             .edit_body_table_header_settings(0usize)
-            .and_then(|edit| {
+            .and_then(|mut edit| {
                 let settings = Settings {
                     header_rows_frozen: Some(true),
-                    ..edit.settings()
+                    ..edit.settings()?
                 };
                 edit.set(settings).commit()
             });

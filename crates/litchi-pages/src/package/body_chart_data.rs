@@ -154,8 +154,9 @@ impl From<Refusal> for Error {
 /// Pages package snapshot.
 pub struct Edit<'a> {
     source: &'a Package,
-    target: ChartTarget,
-    before: Arc<ChartData>,
+    selector: BodyChartSelector,
+    target: Option<ChartTarget>,
+    before: Option<Arc<ChartData>>,
     after: Option<ChartData>,
 }
 
@@ -163,30 +164,63 @@ impl fmt::Debug for Edit<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("Edit")
-            .field("position", &self.target.position)
-            .field("before", self.before.as_ref())
+            .field("resolved", &self.target.is_some())
+            .field("before", &self.before)
             .field("after", &self.after)
             .finish_non_exhaustive()
     }
 }
 
 impl Edit<'_> {
+    fn resolve(&mut self) -> Result<(), Error> {
+        if self.target.is_none() {
+            let mut budget = ArrangementBudget::new(self.source).map_err(map_arrangement_error)?;
+            let target =
+                body_chart_arrangement::resolve_target(self.source, self.selector, &mut budget)
+                    .map_err(map_arrangement_error)?;
+            let before = read_target_data(self.source, &target, &mut budget)?;
+            budget
+                .preflight_allocations(1)
+                .map_err(map_arrangement_error)?;
+            budget
+                .preflight_retained(size_of::<ChartData>())
+                .map_err(map_arrangement_error)?;
+            let before = Arc::new(before);
+            budget.allocations(1).map_err(map_arrangement_error)?;
+            budget
+                .retained(size_of::<ChartData>())
+                .map_err(map_arrangement_error)?;
+            if self.after.is_none() {
+                self.before = Some(before.clone());
+            }
+            self.target = Some(target);
+            self.before = Some(before);
+        }
+        Ok(())
+    }
+
     /// Return the selected body-chart source position.
-    #[must_use]
-    pub const fn position(&self) -> Position {
-        self.target.position
+    pub fn position(&mut self) -> Result<Position, Error> {
+        self.resolve()?;
+        self.target
+            .as_ref()
+            .map(|target| target.position)
+            .ok_or(Error::InvalidSource)
     }
 
     /// Return the chart data read before this edit.
-    #[must_use]
-    pub fn before(&self) -> &ChartData {
-        self.before.as_ref()
+    pub fn before(&mut self) -> Result<&ChartData, Error> {
+        self.resolve()?;
+        self.before.as_deref().ok_or(Error::InvalidSource)
     }
 
     /// Return the chart data currently staged for publication.
-    #[must_use]
-    pub fn after(&self) -> &ChartData {
-        self.after.as_ref().unwrap_or(self.before.as_ref())
+    pub fn after(&mut self) -> Result<&ChartData, Error> {
+        self.resolve()?;
+        self.after
+            .as_ref()
+            .or(self.before.as_deref())
+            .ok_or(Error::InvalidSource)
     }
 
     /// Replace the staged chart data.
@@ -197,7 +231,8 @@ impl Edit<'_> {
     }
 
     /// Validate and publish the staged exact-source edit.
-    pub fn commit(self) -> Result<Commit, Error> {
+    pub fn commit(mut self) -> Result<Commit, Error> {
+        self.resolve()?;
         commit_data_edit(self)
     }
 }
@@ -405,25 +440,11 @@ impl Package {
         &self,
         selector: impl Into<BodyChartSelector>,
     ) -> Result<Edit<'_>, Error> {
-        let mut budget = ArrangementBudget::new(self).map_err(map_arrangement_error)?;
-        let target = body_chart_arrangement::resolve_target(self, selector.into(), &mut budget)
-            .map_err(map_arrangement_error)?;
-        let before = read_target_data(self, &target, &mut budget)?;
-        budget
-            .preflight_allocations(1)
-            .map_err(map_arrangement_error)?;
-        budget
-            .preflight_retained(size_of::<ChartData>())
-            .map_err(map_arrangement_error)?;
-        let before = Arc::new(before);
-        budget.allocations(1).map_err(map_arrangement_error)?;
-        budget
-            .retained(size_of::<ChartData>())
-            .map_err(map_arrangement_error)?;
         Ok(Edit {
             source: self,
-            target,
-            before,
+            selector: selector.into(),
+            target: None,
+            before: None,
             after: None,
         })
     }
@@ -564,8 +585,8 @@ impl Package {
 fn commit_data_edit(mut edit: Edit<'_>) -> Result<Commit, Error> {
     let source = edit.source;
     let source_bytes = source.state.source.shared_source();
-    let target = edit.target;
-    let before = edit.before;
+    let target = edit.target.ok_or(Error::InvalidSource)?;
+    let before = edit.before.ok_or(Error::InvalidSource)?;
     let mut budget = ArrangementBudget::new(source).map_err(map_arrangement_error)?;
 
     // The edit owns the immutable `before` grid through an Arc. Its child

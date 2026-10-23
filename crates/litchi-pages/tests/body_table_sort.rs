@@ -616,7 +616,8 @@ fn assert_rejected_atomically(source: &[u8]) -> TestResult {
     if package.body_table_sort_order(0usize).is_ok() {
         return Err("hostile package was accepted by the read route".into());
     }
-    if package.edit_body_table_sort_order(0usize).is_ok() {
+    let mut edit = package.edit_body_table_sort_order(0usize)?;
+    if edit.order().is_ok() {
         return Err("hostile package was accepted by the edit route".into());
     }
     if package.exact_bytes() != before {

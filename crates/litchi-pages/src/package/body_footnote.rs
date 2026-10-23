@@ -513,9 +513,11 @@ impl From<Refusal> for Error {
 /// package snapshot.
 pub struct Edit<'a> {
     source: &'a Package,
-    position: Position,
-    before: Footnote,
+    selector: Selector,
+    position: Option<Position>,
+    before: Option<Footnote>,
     after: Option<Footnote>,
+    staged: bool,
 }
 
 /// Immutable semantic body-footnote values projected from one Pages package.
@@ -606,53 +608,69 @@ impl fmt::Debug for Edit<'_> {
 }
 
 impl<'a> Edit<'a> {
+    fn resolve(&mut self) -> Result<(), Error> {
+        if self.position.is_none() {
+            let snapshot = self
+                .source
+                .body_footnote_snapshot()
+                .map_err(|_| Error::InvalidSource)?;
+            let before = snapshot
+                .select(self.selector)
+                .ok_or(Error::Refused(Refusal::NotFound))?
+                .clone();
+            self.position = Some(before.position);
+            self.before = Some(before.clone());
+            if !self.staged {
+                self.after = Some(before);
+            }
+        }
+        Ok(())
+    }
+
     fn new(source: &'a Package, selector: Selector) -> Result<Self, Error> {
-        let snapshot = source
-            .body_footnote_snapshot()
-            .map_err(|_error| Error::InvalidSource)?;
-        let before = snapshot
-            .select(selector)
-            .ok_or(Error::Refused(Refusal::NotFound))?
-            .clone();
-        let position = before.position;
         Ok(Self {
             source,
-            position,
-            after: Some(before.clone()),
-            before,
+            selector,
+            position: None,
+            before: None,
+            after: None,
+            staged: false,
         })
     }
 
-    /// Return the checked UTF-16 anchor position resolved at edit start.
-    #[must_use]
-    pub const fn position(&self) -> Position {
-        self.position
+    /// Return the checked UTF-16 anchor position, resolving on first access.
+    pub fn position(&mut self) -> Result<Position, Error> {
+        self.resolve()?;
+        self.position.ok_or(Error::InvalidSource)
     }
 
     /// Borrow the original semantic footnote.
-    #[must_use]
-    pub const fn before(&self) -> &Footnote {
-        &self.before
+    pub fn before(&mut self) -> Result<&Footnote, Error> {
+        self.resolve()?;
+        self.before.as_ref().ok_or(Error::InvalidSource)
     }
 
     /// Borrow the staged semantic result. `None` represents graph removal.
-    #[must_use]
-    pub const fn after(&self) -> Option<&Footnote> {
-        self.after.as_ref()
+    pub fn after(&mut self) -> Result<Option<&Footnote>, Error> {
+        self.resolve()?;
+        Ok(self.after.as_ref())
     }
 
     /// Stage replacement of the selected footnote text.
     pub fn set(&mut self, text: &str) -> Result<&mut Self, Error> {
+        self.resolve()?;
         validate_authored(text, MAX_TEXT_BYTES, Error::Refused(Refusal::TextTooLarge))?;
         let Some(after) = self.after.as_mut() else {
             return Err(Error::Refused(Refusal::UnsupportedDependency));
         };
         after.text = try_boxed(text)?;
+        self.staged = true;
         Ok(self)
     }
 
     /// Stage replacement/removal of the optional custom marker.
     pub fn set_custom_mark(&mut self, custom_mark: Option<&str>) -> Result<&mut Self, Error> {
+        self.resolve()?;
         if let Some(value) = custom_mark {
             validate_authored(
                 value,
@@ -664,31 +682,46 @@ impl<'a> Edit<'a> {
             return Err(Error::Refused(Refusal::UnsupportedDependency));
         };
         after.custom_mark = custom_mark.map(try_boxed).transpose()?;
+        self.staged = true;
         Ok(self)
     }
 
     /// Stage complete removal of the selected body-footnote graph.
     pub fn clear(&mut self) -> &mut Self {
+        let _ = self.resolve();
         self.after = None;
+        self.staged = true;
         self
     }
 
     /// Validate and atomically publish the staged lifecycle change.
     pub fn commit(&self) -> Result<Commit, Error> {
+        let mut resolved = Self {
+            source: self.source,
+            selector: self.selector,
+            position: self.position,
+            before: self.before.clone(),
+            after: self.after.clone(),
+            staged: self.staged,
+        };
+        resolved.resolve()?;
+        let position = resolved.position.ok_or(Error::InvalidSource)?;
+        let before = resolved.before.ok_or(Error::InvalidSource)?;
+        let after = resolved.after;
         self.source.validate().map_err(map_package_error)?;
-        let current = current_footnote(self.source, self.position)?;
-        if current != self.before {
+        let current = current_footnote(self.source, position)?;
+        if current != before {
             return Err(Error::PatchConflict);
         }
-        let Some(after) = self.after.as_ref() else {
-            return publish_rewrite(self.source, self.position, None, Some(&self.before));
+        let Some(after) = after.as_ref() else {
+            return publish_rewrite(self.source, position, None, Some(&before));
         };
-        if *after == self.before {
-            return noop_commit(self.source, self.position, Some(&self.before));
+        if *after == before {
+            return noop_commit(self.source, position, Some(&before));
         }
         let mut text_edit = self
             .source
-            .edit_body_footnote_text(Selector::Anchor(self.position))
+            .edit_body_footnote_text(Selector::Anchor(position))
             .map_err(map_text_error)?;
         text_edit.set(&after.text).map_err(map_text_error)?;
         text_edit
@@ -710,8 +743,8 @@ impl<'a> Edit<'a> {
                 target_sequence,
                 source_fingerprint,
                 target_fingerprint,
-                position: self.position,
-                before: Some(self.before.clone()),
+                position,
+                before: Some(before.clone()),
                 after: Some(after.clone()),
             },
             diagnostics: Diagnostics::published(1),

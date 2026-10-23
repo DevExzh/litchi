@@ -172,40 +172,57 @@ struct Target {
 /// A mutable semantic persisted-sort edit.
 pub struct Edit<'a> {
     source: &'a Package,
-    target: Target,
+    selector: table_lock::OwnedBodyTableSelector,
+    target: Option<Target>,
     after: Option<Order>,
+    staged: bool,
 }
 
 impl fmt::Debug for Edit<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("Edit")
-            .field("table_position", &self.target.native.table_position)
-            .field("before", &self.target.before)
+            .field("resolved", &self.target.is_some())
             .field("after", &self.after)
             .finish_non_exhaustive()
     }
 }
 
 impl Edit<'_> {
-    /// Return the selected table path without exposing native identifiers.
-    #[must_use]
-    pub const fn path(&self) -> Path {
-        Path::Table {
-            table: self.target.native.table_position,
+    fn target(&mut self) -> Result<&Target, Error> {
+        if self.target.is_none() {
+            let mut budget = transaction_budget(self.source)?;
+            let target = resolve_target_owned(self.source, &self.selector, &mut budget)?;
+            if !self.staged {
+                self.after = target.before.clone();
+            }
+            self.target = Some(target);
         }
+        self.target.as_ref().ok_or(Error::InvalidSource)
+    }
+
+    /// Return the selected table path without exposing native identifiers.
+    pub fn path(&mut self) -> Result<Path, Error> {
+        self.target()?;
+        self.target
+            .as_ref()
+            .map(|target| Path::Table {
+                table: target.native.table_position,
+            })
+            .ok_or(Error::InvalidSource)
     }
 
     /// Return the staged order, or `None` when the native field is absent or cleared.
-    #[must_use]
-    pub fn order(&self) -> Option<&Order> {
-        self.after.as_ref()
+    pub fn order(&mut self) -> Result<Option<&Order>, Error> {
+        self.target()?;
+        Ok(self.after.as_ref())
     }
 
     /// Stage a persisted sort order without moving table rows.
     #[must_use]
     pub fn set(mut self, order: Order) -> Self {
         self.after = Some(order);
+        self.staged = true;
         self
     }
 
@@ -213,6 +230,7 @@ impl Edit<'_> {
     #[must_use]
     pub fn clear(mut self) -> Self {
         self.after = None;
+        self.staged = true;
         self
     }
 
@@ -223,7 +241,8 @@ impl Edit<'_> {
     }
 
     /// Validate and publish this edit atomically.
-    pub fn commit(self) -> Result<Commit, Error> {
+    pub fn commit(mut self) -> Result<Commit, Error> {
+        self.target()?;
         commit_edit(self)
     }
 }
@@ -401,12 +420,13 @@ impl Package {
         &self,
         selector: impl Into<BodyTableSelector<'table>>,
     ) -> Result<Edit<'_>, Error> {
-        let mut budget = transaction_budget(self)?;
-        let target = resolve_target(self, selector.into(), &mut budget)?;
         Ok(Edit {
             source: self,
-            after: target.before.clone(),
-            target,
+            selector: table_lock::OwnedBodyTableSelector::try_from(selector.into())
+                .map_err(map_lock_error)?,
+            target: None,
+            after: None,
+            staged: false,
         })
     }
 
@@ -492,6 +512,30 @@ fn resolve_target(
     })
 }
 
+fn resolve_target_owned(
+    package: &Package,
+    selector: &table_lock::OwnedBodyTableSelector,
+    budget: &mut table_lock::WireBudget,
+) -> Result<Target, Error> {
+    let native = selector
+        .resolve_with_budget(package, budget)
+        .map_err(map_lock_error)?;
+    if native.model_message_type != TABLE_MODEL_MESSAGE_TYPE {
+        return Err(Error::InvalidSource);
+    }
+    table_lock::validate_body_table_target(package, &native, budget).map_err(map_lock_error)?;
+    let message = model_message(package, &native)?;
+    validate_sort_tracker(package, &native, message, budget)?;
+    validate_model_ownership(package, &native, budget)?;
+    let columns = model_columns(&message.data, budget)?;
+    let before = decode_sort(&message.data, columns, budget)?;
+    Ok(Target {
+        native,
+        columns,
+        before,
+    })
+}
+
 fn transaction_budget(package: &Package) -> Result<table_lock::WireBudget, Error> {
     let mut budget =
         table_lock::WireBudget::new(package.state.source.limits()).map_err(map_lock_error)?;
@@ -503,7 +547,8 @@ fn transaction_budget(package: &Package) -> Result<table_lock::WireBudget, Error
 
 fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
     let source = edit.source;
-    if edit.target.before == edit.after {
+    let target = edit.target.ok_or(Error::InvalidSource)?;
+    if target.before == edit.after {
         return Ok(Commit {
             package: source.clone(),
             patch: Patch {
@@ -511,18 +556,18 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
                     SharedBytes::from_shared_slice(source.state.source.shared_source()),
                     SharedBytes::from_shared_slice(source.state.source.shared_source()),
                 ),
-                target: edit.target,
+                target,
                 before: edit.after.clone(),
                 after: edit.after,
             },
             diagnostics: Diagnostics::unchanged(),
         });
     }
-    if edit.target.native.explicit_locked == Some(true) {
+    if target.native.explicit_locked == Some(true) {
         return Err(Error::Refused(Refusal::TableLocked));
     }
     if let Some(order) = &edit.after {
-        validate_order_columns(order, edit.target.columns)?;
+        validate_order_columns(order, target.columns)?;
     }
     if !source.state.source.source_is_exact() {
         return Err(Error::Refused(Refusal::UnsupportedSource));
@@ -532,20 +577,20 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
     budget
         .charge_source_catalog(&source.state.source)
         .map_err(map_lock_error)?;
-    table_lock::validate_body_table_target(source, &edit.target.native, &mut budget)
+    table_lock::validate_body_table_target(source, &target.native, &mut budget)
         .map_err(map_lock_error)?;
-    let package = rewrite_model(source, &edit.target, edit.after.clone(), &mut budget)?;
+    let package = rewrite_model(source, &target, edit.after.clone(), &mut budget)?;
     let candidate_target = resolve_target(
         &package,
-        BodyTableSelector::index(edit.target.native.table_position),
+        BodyTableSelector::index(target.native.table_position),
         &mut budget,
     )?;
-    if candidate_target.native.model_identifier != edit.target.native.model_identifier
+    if candidate_target.native.model_identifier != target.native.model_identifier
         || candidate_target.before != edit.after
     {
         return Err(Error::Verification);
     }
-    verify_locality(source, &package, &edit.target.native, &mut budget)?;
+    verify_locality(source, &package, &target.native, &mut budget)?;
     let package_source = SharedBytes::from_shared_slice(package.state.source.shared_source());
     Ok(Commit {
         package,
@@ -554,8 +599,8 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
                 SharedBytes::from_shared_slice(source.state.source.shared_source()),
                 package_source,
             ),
-            target: edit.target.clone(),
-            before: edit.target.before,
+            target: target.clone(),
+            before: target.before,
             after: edit.after,
         },
         diagnostics: Diagnostics::published(),
