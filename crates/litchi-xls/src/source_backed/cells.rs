@@ -79,8 +79,18 @@ impl Edit {
     /// Returns a refusal for an unsupported, protected, signed, encrypted,
     /// macro-bearing, stale or length-changing edit, or a failed readback.
     pub fn commit(self) -> Result<Commit> {
-        let (plan, diagnostics) = self.inner.commit_source_backed_plan()?.into_plan();
-        published_deferred(&self.source, plan, diagnostics)
+        // The cell-values edit owns a parsed snapshot, while this family edit
+        // retains the dynamic source-backed owner. Fence the latter around
+        // planning and publication so stage -> mutate -> commit cannot
+        // publish an overlay validated against stale source bytes.
+        let source = self.source.clone();
+        source.ensure_original_source_current()?;
+        let planned = self.inner.commit_source_backed_plan()?;
+        source.ensure_original_source_current()?;
+        let (plan, diagnostics) = planned.into_plan();
+        let commit = published_deferred(&source, plan, diagnostics)?;
+        source.ensure_original_source_current()?;
+        Ok(commit)
     }
 }
 

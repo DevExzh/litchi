@@ -1455,7 +1455,15 @@ impl SourceBackedWorkbook {
     ) -> std::result::Result<Option<litchi_cfb::PublishReport>, crate::source_backed::OutputError>
     {
         match &self.inner.pending {
-            Some(plan) => Ok(Some(plan.write_to(writer)?)),
+            Some(plan) => {
+                self.ensure_current().map_err(source_output_error)?;
+                let result = plan.write_to(writer);
+                let freshness = self.ensure_current();
+                match freshness {
+                    Err(error) => Err(source_output_error(error)),
+                    Ok(()) => result.map(Some).map_err(Into::into),
+                }
+            },
             None => {
                 crate::Package::from_source(self.clone())?.write_to(writer)?;
                 Ok(None)
@@ -1488,7 +1496,15 @@ impl SourceBackedWorkbook {
     ) -> std::result::Result<Option<litchi_cfb::PublishReport>, crate::source_backed::OutputError>
     {
         match &self.inner.pending {
-            Some(plan) => Ok(Some(plan.save_with_durability(path, durability)?)),
+            Some(plan) => {
+                self.ensure_current().map_err(source_output_error)?;
+                let result = plan.save_with_durability(path, durability);
+                let freshness = self.ensure_current();
+                match freshness {
+                    Err(error) => Err(source_output_error(error)),
+                    Ok(()) => result.map(Some).map_err(Into::into),
+                }
+            },
             None => {
                 crate::Package::from_source(self.clone())?
                     .save_with_durability(path, durability)?;
@@ -1837,11 +1853,26 @@ impl SourceBackedWorkbook {
     /// Returns the source version captured at open after a consistency check.
     pub fn source_version(&self) -> Result<SourceVersion> {
         if let Some(plan) = self.inner.pending.as_ref() {
+            // A deferred owner still reads the original source through the
+            // retained overlay plan. Fence that source before and after
+            // asking the composed view for its version.
+            self.ensure_current()?;
             let composed = plan.composed_source().map_err(deferred_overlay_error)?;
-            return composed.version().map_err(SourceBackedError::Io);
+            let version = composed.version().map_err(SourceBackedError::Io)?;
+            self.ensure_current()?;
+            return Ok(version);
         }
         self.ensure_current()?;
         Ok(self.inner.expected_version)
+    }
+
+    /// Checks the original source retained by this owner for source-backed
+    /// family commit paths. The deferred composed owner must not be used for
+    /// this check: its source is the dynamic original that can change after
+    /// the staged cell snapshot was captured.
+    pub(crate) fn ensure_original_source_current(&self) -> crate::Result<()> {
+        self.ensure_current()
+            .map_err(crate::source_backed::workbook_error)
     }
 
     fn ensure_current(&self) -> Result<()> {
@@ -1930,6 +1961,11 @@ fn effective_inner(owner: &Arc<SourceInner>) -> Result<Arc<SourceInner>> {
     if !owner.deferred {
         return Ok(Arc::clone(owner));
     }
+    // The cached target and the original parsed globals are both derived from
+    // the source captured by this deferred owner. Check that dynamic source
+    // before using either path so the first read cannot observe stale bytes.
+    // The non-deferred path above intentionally keeps its existing fast path.
+    owner.ensure_current()?;
     if let Some(materialized) = owner.materialized.get() {
         return Ok(Arc::clone(materialized));
     }
@@ -1944,8 +1980,13 @@ fn effective_inner(owner: &Arc<SourceInner>) -> Result<Arc<SourceInner>> {
             .leniency(owner.leniency),
     )?;
     let target = target.inner;
+    owner.ensure_current()?;
     let _ = owner.materialized.set(Arc::clone(&target));
     Ok(owner.materialized.get().cloned().unwrap_or(target))
+}
+
+fn source_output_error(error: SourceBackedError) -> crate::source_backed::OutputError {
+    crate::source_backed::OutputError::Package(crate::package::Error::Source(error))
 }
 
 fn deferred_overlay_error(error: litchi_cfb::OverlayError) -> SourceBackedError {
