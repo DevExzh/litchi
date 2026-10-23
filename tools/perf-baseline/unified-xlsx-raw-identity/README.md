@@ -29,91 +29,117 @@ bytes, native relationship IDs and paths, untouched worksheet bytes, patch
 replay, inverse restoration, stale-patch refusal, no-op preservation, and
 deferred decode counters.
 
-The harness is in `tools/perf-baseline/src/xlsx_raw_identity.rs`; the normal
-perf-baseline binary and the existing allocator binary both dispatch the
-`xlsx-raw-identity` selector. The allocator binary reports operation-scoped
-allocation samples. The normal binary reports the same elapsed samples with
-an explicit unavailable allocation status.
+The qualification uses the thin standalone manifest in this directory. It
+depends only on `litchi-xlsx`, `litchi-opc`, and the serde/hash crates needed by
+the probe. Its library imports the existing allocation and raw-probe modules;
+its one binary includes the existing counting allocator wrapper and dispatches
+only the `xlsx-raw-identity` selector. It therefore does not compile the
+full `tools/perf-baseline` package or its unrelated DOCX macro targets.
+
+The standalone manifest intentionally has no lockfile until the coordinator
+supplies the final v9 candidate revision. Generate the lockfile in the exact
+source overlay immediately before the first build, record its SHA-256 beside
+the source and binary identities, and then use `--locked` for every measured
+build. No result is qualified until that lockfile and the final candidate
+revision are recorded.
 
 The coordinator must keep captures outside the checkout and reuse existing
 target directories. The recorded directories for this pair are
 `/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/targets/reader-paths-e63`
 for the pinned historical source and
 `/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/targets/hist-current` for the
-current assembly. This change creates no target, evidence directory, or
-binary.
+current assembly. At preparation time they are 1.3 GiB and 1.6 GiB,
+respectively. The existing historical `release/xlsx_source_reader_paths_alloc`
+binary is retained; the commands below use the new
+`release/xlsx-raw-identity-alloc` name and abort if that path is already
+occupied. Do not clean either target or overwrite any recorded binary.
 
-The feature selection is part of the reproducibility contract. In the current
-manifest, `default = ["current-api", "current-xlsx-raw-opc"]`, so the ordinary
+The feature selection is part of the reproducibility contract. In the
+standalone manifest, `default = ["current-xlsx-raw-opc"]`, so the ordinary
 default build and `--all-features` both select the required-limit constructor;
 when both current and legacy markers are present, the current cfg wins. A
-pinned historical checkout is built with `--no-default-features` and the
-explicit `legacy-xlsx-raw-opc` marker, so it selects the one-argument
-constructor. A `--no-default-features` build without either marker also uses
-the current required-limit constructor, so existing no-default builds remain
-valid. The historical manifest must contain the legacy marker before the
-historical command (the source revision predates the marker):
+`--no-default-features` build without either marker also uses the current
+required-limit constructor. Only `--no-default-features --features
+allocator-metrics,legacy-xlsx-raw-opc` selects the historical one-argument
+constructor.
+
+The historical checkout is an external source overlay, not a modified
+full-workspace build. The overlay copies the exact standalone manifest and
+the two probe modules from the final candidate into an archive of the pinned
+`0befb112d96d2409e6f40c9abfeb4813665905ad` tree. This keeps the probe source
+identical while avoiding the unrelated DOCX macro failures. Root must replace
+`<FINAL_CANDIDATE_REVISION>` with the post-v9 final assembly hash; no earlier
+raw branch or 5726-only result is an acceptable substitute:
 
 ```sh
 HIST_TARGET=/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/targets/reader-paths-e63
 CURRENT_TARGET=/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/targets/hist-current
+FINAL_CHECKOUT=/path/to/final-assembly-checkout
+FINAL_CANDIDATE_REVISION=<FINAL_CANDIDATE_REVISION>
+BASELINE_REVISION=0befb112d96d2409e6f40c9abfeb4813665905ad
+EVIDENCE=/path/to/coordinator-evidence/raw-identity
 
-# Run this in the exact 0bef or 5726 checkout after adding the recorded
-# legacy marker to its temporary manifest overlay. The overlay is not part of
-# the pinned revision and must not be committed.
-CHECKOUT=/path/to/checkout-at-0bef-or-5726
-python3 - "$CHECKOUT/tools/perf-baseline/Cargo.toml" <<'PY'
-from pathlib import Path
-import sys
+test ! -e "$HIST_TARGET/release/xlsx-raw-identity-alloc"
+test ! -e "$CURRENT_TARGET/release/xlsx-raw-identity-alloc"
+mkdir -p "$EVIDENCE"
 
-path = Path(sys.argv[1])
-text = path.read_text()
-if "legacy-xlsx-raw-opc = []" not in text:
-    text = text.replace(
-        "allocator-metrics = []\n",
-        "allocator-metrics = []\n"
-        "current-xlsx-raw-opc = []\n"
-        "legacy-xlsx-raw-opc = []\n",
-        1,
-    )
-path.write_text(text)
-PY
+# Make a disposable baseline source overlay. This does not touch the pinned
+# checkout, the final checkout, or any format source. The final candidate
+# supplies the standalone manifest, allocation module, and identical v2 probe.
+BASELINE_OVERLAY=$(mktemp -d /tmp/litchi-xlsx-raw-baseline.XXXXXX)
+git -C "$FINAL_CHECKOUT" archive --format=tar "$BASELINE_REVISION" \
+  | tar -xf - -C "$BASELINE_OVERLAY"
+git -C "$FINAL_CHECKOUT" archive --format=tar "$FINAL_CANDIDATE_REVISION" \
+  tools/perf-baseline/unified-xlsx-raw-identity \
+  tools/perf-baseline/src/allocation_metrics.rs \
+  tools/perf-baseline/src/xlsx_raw_identity.rs \
+  | tar -xf - -C "$BASELINE_OVERLAY"
 
+# The overlay's manifest has path dependencies into its archived crates.
+# Generate its lockfile once for this exact source pair; record the resulting
+# Cargo.lock SHA-256 before using --locked below.
 source /home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/env.sh
-CARGO_NET_OFFLINE=true cargo build --release --locked --no-default-features \
-  --features allocator-metrics,legacy-xlsx-raw-opc \
-  --manifest-path tools/perf-baseline/Cargo.toml \
-  --bin litchi-perf-baseline-alloc \
-  --target-dir "$HIST_TARGET"
+CARGO_BUILD_JOBS=1 CARGO_NET_OFFLINE=true cargo generate-lockfile \
+  --manifest-path "$BASELINE_OVERLAY/tools/perf-baseline/unified-xlsx-raw-identity/Cargo.toml"
+sha256sum "$BASELINE_OVERLAY/tools/perf-baseline/unified-xlsx-raw-identity/Cargo.lock" \
+  > "$EVIDENCE/raw-baseline-lock.sha256"
 
-taskset -c 0 "$HIST_TARGET/release/litchi-perf-baseline-alloc" \
+CARGO_BUILD_JOBS=1 CARGO_NET_OFFLINE=true cargo build --release --locked \
+  --no-default-features --features allocator-metrics,legacy-xlsx-raw-opc \
+  --manifest-path "$BASELINE_OVERLAY/tools/perf-baseline/unified-xlsx-raw-identity/Cargo.toml" \
+  --bin xlsx-raw-identity-alloc --target-dir "$HIST_TARGET"
+
+sha256sum "$HIST_TARGET/release/xlsx-raw-identity-alloc" \
+  > "$EVIDENCE/raw-baseline-binary.sha256"
+taskset -c 0 "$HIST_TARGET/release/xlsx-raw-identity-alloc" \
   xlsx-raw-identity --api-variant original \
-  --source-revision 0befb112d96d2409e6f40c9abfeb4813665905ad \
-  --iterations 5 --warmups 2 --json <coordinator-evidence>/raw-original.json
+  --source-revision "$BASELINE_REVISION" \
+  --iterations 5 --warmups 2 --json "$EVIDENCE/raw-original.json"
 
-taskset -c 0 "$HIST_TARGET/release/litchi-perf-baseline-alloc" \
-  xlsx-raw-identity --api-variant candidate \
-  --source-revision 5726f03c7db2dd7dd539000b45f109f14ea8c33a \
-  --iterations 5 --warmups 2 --json <coordinator-evidence>/raw-candidate.json
+# Build the final assembly through its thin manifest. The default command
+# proves the required-limit adapter; --all-features proves current wins over
+# legacy. Both builds use one job and the same existing target directory.
+CURRENT_MANIFEST="$FINAL_CHECKOUT/tools/perf-baseline/unified-xlsx-raw-identity/Cargo.toml"
+CARGO_BUILD_JOBS=1 CARGO_NET_OFFLINE=true cargo generate-lockfile \
+  --manifest-path "$CURRENT_MANIFEST"
+sha256sum "$FINAL_CHECKOUT/tools/perf-baseline/unified-xlsx-raw-identity/Cargo.lock" \
+  > "$EVIDENCE/raw-current-lock.sha256"
+CARGO_BUILD_JOBS=1 CARGO_NET_OFFLINE=true cargo build --release --locked \
+  --features allocator-metrics --manifest-path "$CURRENT_MANIFEST" \
+  --bin xlsx-raw-identity-alloc --target-dir "$CURRENT_TARGET"
+sha256sum "$CURRENT_TARGET/release/xlsx-raw-identity-alloc" \
+  > "$EVIDENCE/raw-current-default-binary.sha256"
 
-# Run this in the current assembly. The default command has the same adapter;
-# --all-features proves that current wins if the legacy marker is also enabled.
-source /home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/env.sh
-CARGO_NET_OFFLINE=true cargo build --release --locked \
-  --features allocator-metrics \
-  --manifest-path tools/perf-baseline/Cargo.toml \
-  --bin litchi-perf-baseline-alloc \
-  --target-dir "$CURRENT_TARGET"
+CARGO_BUILD_JOBS=1 CARGO_NET_OFFLINE=true cargo build --release --locked \
+  --all-features --manifest-path "$CURRENT_MANIFEST" \
+  --bin xlsx-raw-identity-alloc --target-dir "$CURRENT_TARGET"
+sha256sum "$CURRENT_TARGET/release/xlsx-raw-identity-alloc" \
+  > "$EVIDENCE/raw-current-all-features-binary.sha256"
 
-CARGO_NET_OFFLINE=true cargo build --release --locked --all-features \
-  --manifest-path tools/perf-baseline/Cargo.toml \
-  --bin litchi-perf-baseline-alloc \
-  --target-dir "$CURRENT_TARGET"
-
-taskset -c 0 "$CURRENT_TARGET/release/litchi-perf-baseline-alloc" \
+taskset -c 0 "$CURRENT_TARGET/release/xlsx-raw-identity-alloc" \
   xlsx-raw-identity --api-variant current \
-  --source-revision <current-assembly-commit> \
-  --iterations 5 --warmups 2 --json <coordinator-evidence>/raw-current.json
+  --source-revision "$FINAL_CANDIDATE_REVISION" \
+  --iterations 5 --warmups 2 --json "$EVIDENCE/raw-current.json"
 ```
 
 Run the same selected case under Callgrind for instruction counts, using the
