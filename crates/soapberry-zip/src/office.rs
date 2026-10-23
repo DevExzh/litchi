@@ -4687,7 +4687,6 @@ where
             };
             PreservationEntryMetadata {
                 raw_name_len,
-                central_metadata_bytes: entry.central_metadata_bytes,
                 compressed_size: entry.wayfinder.compressed_size_hint(),
                 uncompressed_size: entry.wayfinder.uncompressed_size_hint(),
                 directory,
