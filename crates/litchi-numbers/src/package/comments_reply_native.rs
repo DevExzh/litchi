@@ -3262,6 +3262,8 @@ pub(super) fn rewrite_native_comment_reply(
 
 #[cfg(test)]
 mod tests {
+    use crate::package::table_cell_pop_up_menu_native::NativePopUpError;
+
     use super::{
         BudgetError, BudgetLimitKind, BudgetPath, IdIndex, NativeReplyError, ReplyProbe,
         StorageReferenceAggregate, map_bnc_cell_error, map_budget_error, map_constructor_error,
@@ -3297,13 +3299,11 @@ mod tests {
                     maximum: 17,
                 }
             );
-            let forwarded = map_popup_native_error(
-                super::table_cell_pop_up_menu_native::NativePopUpError::CoreLimit {
-                    kind,
-                    observed: 43,
-                    maximum: 17,
-                },
-            );
+            let forwarded = map_popup_native_error(NativePopUpError::CoreLimit {
+                kind,
+                observed: 43,
+                maximum: 17,
+            });
             assert_eq!(forwarded, direct);
         }
     }
