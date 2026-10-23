@@ -2257,19 +2257,19 @@ fn deferred_projection_handles_keep_the_original_source_fence() {
     // must retain the original owner rather than only that cache.
     assert!(
         by_index
-            .cell_value(reference.row(), reference.column())
+            .cell_value(u32::from(reference.row()), u32::from(reference.column()))
             .unwrap()
             .is_some()
     );
     assert!(
         by_name
-            .cell_value(reference.row(), reference.column())
+            .cell_value(u32::from(reference.row()), u32::from(reference.column()))
             .unwrap()
             .is_some()
     );
     assert!(
         from_list
-            .cell_value(reference.row(), reference.column())
+            .cell_value(u32::from(reference.row()), u32::from(reference.column()))
             .unwrap()
             .is_some()
     );
@@ -2277,7 +2277,7 @@ fn deferred_projection_handles_keep_the_original_source_fence() {
     source.bump();
     for worksheet in [by_index, by_name, from_list] {
         assert!(matches!(
-            worksheet.cell_value(reference.row(), reference.column()),
+            worksheet.cell_value(u32::from(reference.row()), u32::from(reference.column())),
             Err(SourceBackedError::SourceChanged { .. })
         ));
     }
@@ -2306,18 +2306,31 @@ fn deferred_projection_promotes_inflight_source_changes_for_all_reads() {
 fn deferred_workbook_facade_promotes_inflight_source_changes() {
     assert_inflight_workbook_source_change(|workbook, sheet, reference, _name| {
         workbook
-            .cell_by_index(sheet, reference.row(), reference.column())
+            .cell_by_index(
+                sheet,
+                u32::from(reference.row()),
+                u32::from(reference.column()),
+            )
             .map(|_| ())
     });
     assert_inflight_workbook_source_change(|workbook, sheet, reference, _name| {
         workbook
-            .cell_value_by_index(sheet, reference.row(), reference.column())
+            .cell_value_by_index(
+                sheet,
+                u32::from(reference.row()),
+                u32::from(reference.column()),
+            )
             .map(|_| ())
     });
     assert_inflight_workbook_source_change(|workbook, sheet, reference, _name| {
         let (_cancellation, execution) = execution_pair();
         workbook
-            .cell_by_index_with_execution(sheet, reference.row(), reference.column(), &execution)
+            .cell_by_index_with_execution(
+                sheet,
+                u32::from(reference.row()),
+                u32::from(reference.column()),
+                &execution,
+            )
             .map(|_| ())
     });
     assert_inflight_workbook_source_change(|workbook, sheet, reference, _name| {
@@ -2367,13 +2380,21 @@ fn deferred_materialized_package_handoff_keeps_the_original_source_fence() {
 
     assert!(
         source_backed
-            .cell_value_by_index(sheet_index, reference.row(), reference.column())
+            .cell_value_by_index(
+                sheet_index,
+                u32::from(reference.row()),
+                u32::from(reference.column()),
+            )
             .unwrap()
             .is_some()
     );
     source.bump();
     assert!(matches!(
-        source_backed.cell_value_by_index(sheet_index, reference.row(), reference.column()),
+        source_backed.cell_value_by_index(
+            sheet_index,
+            u32::from(reference.row()),
+            u32::from(reference.column()),
+        ),
         Err(SourceBackedError::SourceChanged { .. })
     ));
 }
@@ -2459,7 +2480,11 @@ fn handed_off_source_owner_output_boundaries_promote_inflight_source_changes() {
 fn deferred_cold_materialization_promotes_inflight_source_changes() {
     assert_cold_inflight_workbook_source_change(|workbook, sheet, reference| {
         workbook
-            .cell_by_index(sheet, reference.row(), reference.column())
+            .cell_by_index(
+                sheet,
+                u32::from(reference.row()),
+                u32::from(reference.column()),
+            )
             .map(|_| ())
     });
 }
