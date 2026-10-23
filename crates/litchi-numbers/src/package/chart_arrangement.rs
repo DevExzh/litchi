@@ -1182,7 +1182,7 @@ impl Package {
     }
 }
 
-fn resolve_sheet_position(
+pub(super) fn resolve_sheet_position(
     package: &Package,
     selector: SheetSelector<'_>,
 ) -> Result<Position, Error> {

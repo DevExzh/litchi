@@ -347,77 +347,106 @@ const fn image_enhancement_to_native(value: ImageEnhancement) -> bool {
 /// package.
 pub struct Edit<'a> {
     source: &'a Package,
-    selection: ImageSelection,
-    after: ImageAdjustments,
+    sheet_position: Position,
+    image_position: Position,
+    selection: Option<ImageSelection>,
+    after: Option<ImageAdjustments>,
+    budget: Option<ImageBudget>,
 }
 
 impl fmt::Debug for Edit<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("Edit")
-            .field("sheet_position", &self.selection.sheet_position)
-            .field("image_position", &self.selection.image_position)
-            .field("before", &self.selection.before)
+            .field("sheet_position", &self.sheet_position)
+            .field("image_position", &self.image_position)
+            .field("loaded", &self.selection.is_some())
             .field("after", &self.after)
             .finish_non_exhaustive()
     }
 }
 
 impl<'a> Edit<'a> {
+    fn ensure_loaded(&mut self) -> Result<(), Error> {
+        if self.selection.is_some() {
+            return Ok(());
+        }
+        let mut budget = self.budget.take().ok_or(Error::InvalidSource)?;
+        let selection = select_image_with_budget(
+            self.source,
+            SheetSelector::position(self.sheet_position),
+            ImageSelector::position(self.image_position),
+            true,
+            &mut budget,
+        )?;
+        if self.after.is_none() {
+            self.after = Some(selection.before);
+        }
+        self.selection = Some(selection);
+        self.budget = Some(budget);
+        Ok(())
+    }
+
     fn new<'sheet>(
         source: &'a Package,
         sheet_selector: impl Into<SheetSelector<'sheet>>,
         image_selector: impl Into<ImageSelector>,
     ) -> Result<Self, Error> {
-        let mut budget = ImageBudget::for_package(source)?;
-        let selection = select_image_with_budget(
-            source,
-            sheet_selector.into(),
-            image_selector.into(),
-            true,
-            &mut budget,
-        )?;
+        let sheet_position = resolve_sheet_position(source, sheet_selector.into())?;
+        let image_position = image_selector.into().as_position();
+        let budget = ImageBudget::for_package(source)?;
         Ok(Self {
             source,
-            after: selection.before,
-            selection,
+            sheet_position,
+            image_position,
+            selection: None,
+            after: None,
+            budget: Some(budget),
         })
     }
 
     /// Return the selected sheet source position.
     #[must_use]
     pub const fn sheet_position(&self) -> Position {
-        self.selection.sheet_position
+        self.sheet_position
     }
 
     /// Return the selected image source position.
     #[must_use]
     pub const fn image_position(&self) -> Position {
-        self.selection.image_position
+        self.image_position
     }
 
     /// Return the controls read before this edit.
     #[must_use]
-    pub const fn before(&self) -> ImageAdjustments {
-        self.selection.before
+    pub fn before(&mut self) -> Result<ImageAdjustments, Error> {
+        self.ensure_loaded()?;
+        self.selection
+            .as_ref()
+            .map(|selection| selection.before)
+            .ok_or(Error::InvalidSource)
     }
 
     /// Return the controls currently staged for publication.
     #[must_use]
-    pub const fn after(&self) -> ImageAdjustments {
-        self.after
+    pub fn after(&mut self) -> Result<ImageAdjustments, Error> {
+        self.ensure_loaded()?;
+        self.after.ok_or(Error::InvalidSource)
     }
 
     /// Replace all three optional inspector controls.
     pub fn set(mut self, adjustments: ImageAdjustments) -> Result<Self, Error> {
-        self.after = adjustments;
+        self.after = Some(adjustments);
         Ok(self)
     }
 
     /// Commit this exact-source edit after reopening and verifying its
     /// candidate.
-    pub fn commit(self) -> Result<Commit, Error> {
-        commit_edit(self.source, &self.selection, self.after)
+    pub fn commit(mut self) -> Result<Commit, Error> {
+        self.ensure_loaded()?;
+        let selection = self.selection.take().ok_or(Error::InvalidSource)?;
+        let after = self.after.ok_or(Error::InvalidSource)?;
+        commit_edit(self.source, &selection, after)
     }
 }
 

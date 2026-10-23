@@ -57,9 +57,9 @@ fn native_read_noop_apply_and_selectors_are_exact() -> TestResult<()> {
     assert_eq!(by_index.visible(), Some(true));
     assert_eq!(by_index.outlined(), None);
 
-    let edit = package.edit_table_title(0usize, 0usize)?;
+    let mut edit = package.edit_table_title(0usize, 0usize)?;
     assert_eq!(edit.path(), Path::Table { sheet: 0, table: 0 });
-    assert_eq!(edit.settings(), by_index);
+    assert_eq!(edit.settings()?, by_index);
     let commit = edit.set(by_index).commit()?;
     assert!(commit.patch().is_noop());
     assert_eq!(commit.patch().before(), by_index);

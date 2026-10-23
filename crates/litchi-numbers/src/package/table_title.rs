@@ -194,10 +194,12 @@ struct ReopenCost {
 /// Immutable settings staged against one package snapshot.
 pub struct Edit<'a> {
     source: &'a Package,
-    target: Target,
-    before: Settings,
-    settings: Settings,
-    budget: TransactionBudget,
+    sheet_position: usize,
+    table_position: usize,
+    target: Option<Target>,
+    before: Option<Settings>,
+    settings: Option<Settings>,
+    budget: Option<TransactionBudget>,
 }
 
 impl fmt::Debug for Edit<'_> {
@@ -205,31 +207,53 @@ impl fmt::Debug for Edit<'_> {
         formatter
             .debug_struct("Edit")
             .field("path", &self.path())
+            .field("loaded", &self.target.is_some())
             .field("settings", &self.settings)
             .finish_non_exhaustive()
     }
 }
 
 impl Edit<'_> {
+    fn ensure_loaded(&mut self) -> Result<(), Error> {
+        if self.target.is_some() {
+            return Ok(());
+        }
+        let mut budget = self.budget.take().ok_or_else(invalid_source)?;
+        let target = resolve_title_at_positions_with_budget(
+            self.source,
+            self.sheet_position,
+            self.table_position,
+            &mut budget,
+        )?;
+        if self.settings.is_none() {
+            self.settings = Some(target.settings);
+        }
+        self.before = Some(target.settings);
+        self.target = Some(target);
+        self.budget = Some(budget);
+        Ok(())
+    }
+
     /// Return the selected table path.
     #[must_use]
     pub const fn path(&self) -> Path {
         Path::Table {
-            sheet: self.target.native.sheet_position,
-            table: self.target.native.table_position,
+            sheet: self.sheet_position,
+            table: self.table_position,
         }
     }
 
     /// Return the settings that would be published.
     #[must_use]
-    pub const fn settings(&self) -> Settings {
-        self.settings
+    pub fn settings(&mut self) -> Result<Settings, Error> {
+        self.ensure_loaded()?;
+        self.settings.ok_or_else(invalid_source)
     }
 
     /// Replace the staged settings without touching package bytes.
     #[must_use]
     pub fn set(mut self, settings: Settings) -> Self {
-        self.settings = settings;
+        self.settings = Some(settings);
         self
     }
 
@@ -238,7 +262,8 @@ impl Edit<'_> {
     /// # Errors
     ///
     /// Returns a typed source, lock, resource, or verification error.
-    pub fn commit(self) -> Result<Commit, Error> {
+    pub fn commit(mut self) -> Result<Commit, Error> {
+        self.ensure_loaded()?;
         commit_edit(self)
     }
 }
@@ -436,18 +461,14 @@ impl Package {
         let mut budget = TransactionBudget::new(self);
         budget.charge_transaction_work(self.source_bytes().len().saturating_mul(2))?;
         let (sheet_position, table_position) = resolve_title_selectors(self, sheet, table)?;
-        let target = resolve_title_at_positions_with_budget(
-            self,
-            sheet_position,
-            table_position,
-            &mut budget,
-        )?;
         Ok(Edit {
             source: self,
-            before: target.settings,
-            settings: target.settings,
-            target,
-            budget,
+            sheet_position,
+            table_position,
+            target: None,
+            before: None,
+            settings: None,
+            budget: Some(budget),
         })
     }
 
@@ -1492,17 +1513,21 @@ fn reopen_cost(source: &Package) -> Result<ReopenCost, Error> {
 }
 
 fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
+    let target = edit.target.ok_or_else(invalid_source)?;
+    let before = edit.before.ok_or_else(invalid_source)?;
+    let settings = edit.settings.ok_or_else(invalid_source)?;
+    let mut budget = edit.budget.ok_or_else(invalid_source)?;
     let catalog =
         super::table_headers::rewrite::physical_source(edit.source).map_err(map_header_error)?;
     let source = catalog.__source_owner();
-    if edit.before == edit.settings {
+    if before == settings {
         return Ok(Commit {
             package: edit.source.snapshot(),
             patch: Patch {
                 artifacts: OwnedExactArtifacts::new(source.clone(), source),
-                target: edit.target,
-                before: edit.before,
-                after: edit.settings,
+                target,
+                before,
+                after: settings,
                 source_reopen: ReopenCost {
                     work: 0,
                     references: 0,
@@ -1520,31 +1545,26 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
     if !catalog.source_is_exact() {
         return Err(Error::Refused(Refusal::UnsupportedSource));
     }
-    let mut budget = edit.budget;
     budget.charge_transaction_work(source.len().saturating_mul(2))?;
-    if edit.target.settings != edit.before {
+    if target.settings != before {
         return Err(invalid_source());
     }
-    validate_changed_source(edit.source, edit.target, &mut budget)?;
-    let requested_target = Target {
-        settings: edit.settings,
-        ..edit.target
-    };
+    validate_changed_source(edit.source, target, &mut budget)?;
+    let requested_target = Target { settings, ..target };
     validate_visible_prerequisites(edit.source, requested_target, &mut budget)?;
     let previews =
         super::table_headers::rewrite::root_preview_deletions(catalog).map_err(map_header_error)?;
     let source_reopen = reopen_cost(edit.source)?;
     let package = rewrite::rewrite(
         edit.source,
-        edit.target,
-        edit.settings,
+        target,
+        settings,
         &previews,
         &mut budget,
         source_reopen,
     )?;
-    let target_payload =
-        super::table_headers::rewrite::selected_payload(&package, edit.target.native)
-            .map_err(map_header_error)?;
+    let target_payload = super::table_headers::rewrite::selected_payload(&package, target.native)
+        .map_err(map_header_error)?;
     let target_bytes = super::table_headers::rewrite::physical_source(&package)
         .map_err(map_header_error)?
         .__source_owner();
@@ -1559,7 +1579,7 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
     super::table_headers::rewrite::verify_exact_locality(
         edit.source,
         &package,
-        edit.target.native,
+        target.native,
         &previews,
         0,
         target_payload,
@@ -1569,9 +1589,9 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
         package,
         patch: Patch {
             artifacts: OwnedExactArtifacts::new(source, target_bytes.clone()),
-            target: edit.target,
-            before: edit.before,
-            after: edit.settings,
+            target,
+            before,
+            after: settings,
             source_reopen,
             target_reopen,
             source_previews: previews.len(),
