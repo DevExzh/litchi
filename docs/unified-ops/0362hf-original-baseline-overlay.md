@@ -93,3 +93,42 @@ Untimed 109-route validation and quiet-host ABBA timing are separate pending
 steps.  Their receipts must bind the same f2 tree, adapter, corrected probe,
 fixture, lock, feature selection and toolchain before any qualification status
 is considered.
+
+## Compile and untimed validation receipt
+
+The one permitted original-f2 build and the untimed validation have now been
+run in the external workspace
+`/home/zhuhe/code/litchi-worktrees/.coord/w8-f2-baseline-sAirXf`.  This is a
+before-leg capability/fidelity receipt only; it makes no native qualification,
+acceptance, or performance claim.
+
+The release build used one job, `--offline --locked --all-features`, debug
+information disabled, the 20 GB cargo memory cap, and a workspace-local
+temporary directory.  It succeeded in 22m47s.  The executable is retained
+outside Git at
+`target/release/examples/file_w8_original_baseline_probe` (65 MiB,
+SHA-256 `f4c5a8ed31888f04337466265e03a8d02fc2df14fbac0c3eb3d6be83c358676d`).
+The compact build receipt is
+`out/provenance/original-baseline-build-receipt.json` (3,993 bytes,
+SHA-256 `621c5a75a4ef57d7ffcc4f1b4168a23ce9b76b13e88acb4b7d3c592ae3f2abd7`).
+
+The probe then ran each of the 109 routes once with `--mode validate`, without
+calibration or timing mode.  Every route reported semantic equality,
+semantic-state validity, exact source preservation, paired leaf/facade
+read/output fidelity, nonempty payload hashes, and repeated publication
+equality.  The receipt is
+`out/provenance/original-baseline-untimed-validation.json` (71,489 bytes,
+SHA-256 `4277f5f4d3518bc58cd6ab60e56c45f4a3e3ede95752427fa3f12ffb2df6d1c`).
+The existing fail-closed endpoint verifier accepted the complete source,
+lock, fixture, build, and validation identity; its compact endpoint manifest
+is `out/provenance/original-baseline-endpoint.json` (3,192 bytes,
+SHA-256 `56543e806b774716c9e381b3da33400dc99ff337a82031bc0eb8409951dbc608`).
+
+The source archive remains external (6,614,528,000 bytes,
+SHA-256 `de625729ec8e6f8055e619443ad31bf1a91719cd31465975f951d54dbc1c2280`).
+The deterministic fixture and locked registry-resolution identities are
+recorded separately in
+`out/provenance/original-baseline-seed-registry-identity.json` (1,883 bytes,
+SHA-256 `26354ad50b20bd59969178da2462f3155270e72c17619c5ecd3b8ab1bcb41838`).
+Raw per-route JSON, the source archive, target directory, and executable stay
+outside the repository.  No candidate build or ABBA timing was run.
