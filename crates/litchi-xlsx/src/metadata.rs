@@ -602,7 +602,7 @@ mod tests {
 
     #[test]
     fn bounded_metadata_admission_is_cache_independent_at_boundaries() {
-        let long = title_commit(&Package::new().unwrap(), &"long title ".repeat(64)).into_package();
+        let long = title_commit(&warm_package(), &"long title ".repeat(64)).into_package();
         warm_cells(&long);
         let cold_long = Package::from_opc(long.opc().clone()).unwrap();
         assert_eq!(
@@ -638,7 +638,7 @@ mod tests {
             })
         ));
 
-        let short = title_commit(&Package::new().unwrap(), "short").into_package();
+        let short = title_commit(&warm_package(), "short").into_package();
         warm_cells(&short);
         let expanding = title_commit(&short, &"expanded title ".repeat(64));
         let expanding_required = short

@@ -98,3 +98,13 @@ batch `6995c497f5` also passes independent review and its strict compiler run.
 All are composed for diagnostic validation. Cell normalization/atomicity,
 two PPTX runtime failures, strict combined validation and performance gates
 remain required; no full-wave acceptance is inferred.
+
+The tenth combined check on `2cadd934b7` passes strict all-target/all-feature
+native/facade checking (238.42 seconds) and the facade without default
+features (21.96 seconds). The metadata-focused library run passes ten tests
+and fails one cache-warming setup assertion: the shrinking and expanding
+fixtures start from an empty workbook rather than the populated helper.
+The correction uses that existing helper and retains every exact-boundary
+and one-below assertion. [native-check-v10.json](results/0362up/native-check-v10.json)
+retains the full terminal results and log hashes. Runtime qualification and
+the returned cell normalization work remain required.
