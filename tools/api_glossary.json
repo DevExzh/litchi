@@ -2978,6 +2978,10 @@
         "litchi_pptx::Package",
         "litchi_pptx::source::Package"
       ],
+      "shared_types": [
+        {"path": "litchi_pptx::diagnostics::Diagnostics", "target": "litchi_core::edit::Diagnostics"},
+        {"path": "litchi_pptx::opened::Diagnostics", "target": "litchi_core::edit::Diagnostics"}
+      ],
       "family_methods": true,
       "result_methods": [
         {
@@ -3911,6 +3915,10 @@
         "litchi_pptx::Presentation",
         "litchi_pptx::Package",
         "litchi_pptx::source::Package"
+      ],
+      "shared_types": [
+        {"path": "litchi_pptx::diagnostics::Diagnostics", "target": "litchi_core::edit::Diagnostics"},
+        {"path": "litchi_pptx::opened::Diagnostics", "target": "litchi_core::edit::Diagnostics"}
       ],
       "family_methods": true,
       "result_methods": [
@@ -7241,6 +7249,12 @@
         "litchi_xlsb::Package",
         "litchi_xlsb::Workbook"
       ],
+      "shared_types": [
+        {"path": "litchi_xlsb::cell_values::Commit", "target": "litchi_core::edit::Commit"},
+        {"path": "litchi_xlsb::cell_values::Diagnostics", "target": "litchi_core::edit::Diagnostics"},
+        {"path": "litchi_xlsb::cell_values::structure::Commit", "target": "litchi_core::edit::Commit"},
+        {"path": "litchi_xlsb::cell_values::structure::Diagnostics", "target": "litchi_core::edit::Diagnostics"}
+      ],
       "family_methods": true
     },
     {
@@ -7759,6 +7773,12 @@
       "immutable_owners": [
         "litchi_xlsb::Package",
         "litchi_xlsb::Workbook"
+      ],
+      "shared_types": [
+        {"path": "litchi_xlsb::cell_values::Commit", "target": "litchi_core::edit::Commit"},
+        {"path": "litchi_xlsb::cell_values::Diagnostics", "target": "litchi_core::edit::Diagnostics"},
+        {"path": "litchi_xlsb::cell_values::structure::Commit", "target": "litchi_core::edit::Commit"},
+        {"path": "litchi_xlsb::cell_values::structure::Diagnostics", "target": "litchi_core::edit::Diagnostics"}
       ],
       "family_methods": true
     },
@@ -9258,6 +9278,10 @@
         "litchi_xls::Workbook",
         "litchi_xls::SourceBackedWorkbook"
       ],
+      "shared_types": [
+        {"path": "litchi_xls::package::metadata::Commit", "target": "litchi_core::edit::Commit"},
+        {"path": "litchi_xls::package::metadata::Diagnostics", "target": "litchi_core::edit::Diagnostics"}
+      ],
       "family_methods": true
     },
     {
@@ -10115,6 +10139,10 @@
       "immutable_owners": [
         "litchi_ppt::Package",
         "litchi_ppt::Presentation"
+      ],
+      "shared_types": [
+        {"path": "litchi_ppt::package::metadata::Commit", "target": "litchi_core::edit::Commit"},
+        {"path": "litchi_ppt::package::metadata::Diagnostics", "target": "litchi_core::edit::Diagnostics"}
       ],
       "family_methods": true
     },
@@ -10980,6 +11008,10 @@
       "immutable_owners": [
         "litchi_ppt::Package",
         "litchi_ppt::Presentation"
+      ],
+      "shared_types": [
+        {"path": "litchi_ppt::package::metadata::Commit", "target": "litchi_core::edit::Commit"},
+        {"path": "litchi_ppt::package::metadata::Diagnostics", "target": "litchi_core::edit::Diagnostics"}
       ],
       "family_methods": true
     },
@@ -13523,6 +13555,10 @@
         "litchi_oth::Package",
         "litchi_oth::Document"
       ],
+      "shared_types": [
+        {"path": "litchi_oth::Commit", "target": "litchi_core::edit::Commit"},
+        {"path": "litchi_oth::Diagnostics", "target": "litchi_core::edit::Diagnostics"}
+      ],
       "family_methods": true
     },
     {
@@ -13776,6 +13812,10 @@
         "litchi_odm::Package",
         "litchi_odm::Document"
       ],
+      "shared_types": [
+        {"path": "litchi_odm::transaction::Commit", "target": "litchi_core::edit::Commit"},
+        {"path": "litchi_odm::transaction::Diagnostics", "target": "litchi_core::edit::Diagnostics"}
+      ],
       "family_methods": true
     },
     {
@@ -13993,6 +14033,12 @@
         "litchi_odi::Package",
         "litchi_odi::Image",
         "litchi_odi::flat::Image"
+      ],
+      "shared_types": [
+        {"path": "litchi_odi::Commit", "target": "litchi_core::edit::Commit"},
+        {"path": "litchi_odi::Diagnostics", "target": "litchi_core::edit::Diagnostics"},
+        {"path": "litchi_odi::flat::Commit", "target": "litchi_core::edit::Commit"},
+        {"path": "litchi_odi::flat::Diagnostics", "target": "litchi_core::edit::Diagnostics"}
       ],
       "family_methods": true
     },
@@ -14832,6 +14878,10 @@
         "litchi_odc::Package",
         "litchi_odc::Chart",
         "litchi_odc::flat::Chart"
+      ],
+      "shared_types": [
+        {"path": "litchi_odc::Commit", "target": "litchi_core::edit::Commit"},
+        {"path": "litchi_odc::Diagnostics", "target": "litchi_core::edit::Diagnostics"}
       ],
       "family_methods": true
     },
@@ -18925,7 +18975,11 @@
           "ok": "litchi_pages::metadata::Commit"
         }
       ],
-      "family_methods": true
+      "family_methods": true,
+      "shared_types": [
+        {"path": "litchi_pages::metadata::Commit", "target": "litchi_core::edit::Commit"},
+        {"path": "litchi_pages::metadata::Diagnostics", "target": "litchi_core::edit::Diagnostics"}
+      ]
     },
     {
       "id": "keynote-minimal",

@@ -10,6 +10,9 @@ from __future__ import annotations
 from typing import Any
 
 
+NOMINAL_KINDS = frozenset({"struct", "enum", "union", "type_alias"})
+
+
 class ReturnTypes:
     def __init__(self, surface):
         self.surface = surface
@@ -40,6 +43,70 @@ class ReturnTypes:
     def raw_type_at(self, path: tuple[str, ...]):
         item_id = self.type_id(path)
         return {"resolved_path": {"id": item_id, "args": None}} if item_id is not None else None
+
+    def _resolve_nominal_identity(self, item_id):
+        """Resolve local type aliases to one rustdoc nominal identity.
+
+        The identity includes the dependency crate id and rustdoc item id. A
+        missing alias target, non-nominal target, or alias cycle is unknown and
+        therefore fails closed. Names and the final component of a path are
+        deliberately never consulted.
+        """
+        visited = set()
+        while True:
+            item_id = str(item_id)
+            if item_id in visited:
+                return None
+            visited.add(item_id)
+            item = self.surface.index.get(item_id)
+            entry = self.surface.paths.get(item_id)
+            if item is None:
+                if not isinstance(entry, dict) or entry.get("kind") not in NOMINAL_KINDS:
+                    return None
+                crate_id = entry.get("crate_id")
+                return (crate_id, item_id) if type(crate_id) is int else None
+            inner = item.get("inner", {})
+            if not isinstance(inner, dict) or len(inner) != 1:
+                return None
+            kind, data = next(iter(inner.items()))
+            if kind == "type_alias":
+                if not isinstance(data, dict):
+                    return None
+                resolved = data.get("type", {}).get("resolved_path", {})
+                if not isinstance(resolved, dict) or resolved.get("id") is None:
+                    return None
+                item_id = resolved["id"]
+                continue
+            if kind not in NOMINAL_KINDS or not isinstance(entry, dict):
+                return None
+            crate_id = entry.get("crate_id")
+            return (crate_id, item_id) if type(crate_id) is int else None
+
+    def nominal_identity(self, path: tuple[str, ...], *, canonical=False):
+        """Return a public type's nominal identity, or None if ambiguous."""
+        if canonical:
+            candidates = [
+                item_id for item_id, entry in self.surface.paths.items()
+                if tuple(entry.get("path", ())) == path
+                and entry.get("crate_id") != self.surface.crate_id
+                and entry.get("kind") in NOMINAL_KINDS
+            ]
+            # Multiple rustdoc IDs for one canonical path are ambiguous, even
+            # when their spelling happens to match.
+            if len(candidates) != 1:
+                return None
+            item_id = candidates[0]
+        else:
+            item_id = self.surface.item_ids.get(path)
+            if item_id is None or self.surface.exports.get(path) not in NOMINAL_KINDS:
+                return None
+        return self._resolve_nominal_identity(item_id)
+
+    def matches_shared(self, public_path: tuple[str, ...], canonical_path: tuple[str, ...]):
+        """Match a nominated alias/re-export by nominal ID, never by name."""
+        actual = self.nominal_identity(public_path)
+        expected = self.nominal_identity(canonical_path, canonical=True)
+        return actual is not None and actual == expected
 
     def policy_type(self, spec, method):
         """Build a checked type from paths, nested types and method binders."""
