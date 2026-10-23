@@ -46,7 +46,9 @@ xls_numeric_plan_only_number_edit_save
 xls_numeric_plan_only_rk_mulrk_edit_save
 ```
 
-The executable three-route probe is committed as `d8fe3bcacb` in
+The executable three-route probe was introduced by `d8fe3bcacb` and its
+freshness/refusal/replay gates plus the ABBA runner are committed as
+`b03aaf1aac` in
 `tools/perf-baseline/examples/xls_f3_qualification.rs`, with its library
 implementation in `tools/perf-baseline/src/xls_f3_qualification.rs`. It calls
 the existing Number and RK/MulRK corpus builders through narrow helpers, so it
@@ -55,16 +57,19 @@ already-created baseline and candidate source snapshots, use the same commit
 in both snapshots; this does not create a second baseline worktree:
 
 ```sh
-PROBE_COMMIT=d8fe3bcacb0c51cf354314393f93cef0a393e157
+PROBE_COMMITS=(
+  d8fe3bcacb0c51cf354314393f93cef0a393e157
+  b03aaf1aace43fab45666dc3a1507f3da5922d5a
+)
 BASE=/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/source-base-9b1f96d6dc
 CAND=/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/source-candidate-8acd229235
-git -C "$BASE" cherry-pick "$PROBE_COMMIT"
-git -C "$CAND" cherry-pick "$PROBE_COMMIT"
+git -C "$BASE" cherry-pick "${PROBE_COMMITS[@]}"
+git -C "$CAND" cherry-pick "${PROBE_COMMITS[@]}"
 ```
 
-If the candidate snapshot already contains that commit, the second cherry-pick
-is a no-op in the regeneration log and must be recorded as such. The copied
-source must remain byte-identical between the two builds.
+If either snapshot already contains one of these commits, that cherry-pick is a
+no-op in the regeneration log and must be recorded as such. The copied source
+must remain byte-identical between the two builds.
 
 The Number corpus edits `Untouched!E21`, `Number 42` to `43`; the native
 RK/MulRK corpus edits one RK and two MulRK values with fixed-width integer
@@ -103,9 +108,12 @@ selected value and storage-family readback through `cell_values`; raw
 `litchi_xls::raw::Reader` readback; forward replay and inverse replay to the
 original bytes; refusal when applying a patch to its committed owner; partial
 sink failure; exact no-op and fingerprint behavior; protected, signed, macro,
-encrypted and unsupported-value refusals; and the real-producer `54016.xls`
-RK/MulRK forward and inverse gate. Any route that omits one of these checks is
-diagnostic only and cannot qualify F3.
+encrypted and unsupported-value refusals; a mutable versioned-source
+`SourceChanged` oracle; typed stale-recipient `PatchConflict`; typed
+`IncompleteOutput` with an authored prefix; no-op source/target fingerprint
+equality; and the real-producer `54016.xls` RK/MulRK forward and inverse gate.
+Any route that omits one of these checks is diagnostic only and cannot qualify
+F3.
 
 The old external W5 probe at
 `/home/zhuhe/code/litchi-worktrees/.coord/w5-ole-source-arc-final-20261021`
@@ -157,30 +165,37 @@ The existing numeric selectors remain the retained corpus/oracle control and
 are run separately with the README command. No evidence belongs under
 `docs/performance/results/` until a reduced receipt is ready.
 
-The native run is four process legs per route in strict A-B-B-A order, with
-baseline A and candidate B using the same route, sink and affinity. Calibrate
-the batch independently for each endpoint, then use the larger admitted batch
-for both sides; reject a leg shorter than 250 ms, retain every raw leg, and
-record host quiet checks before and after each child. A coordinator-granted
-quiet CPU is represented below as `${CPU}` and must be fixed in the manifest:
+The native run is four process legs per route and corpus in strict A1/B1/B2/A2
+order, with baseline A and candidate B using the same route, sink and
+affinity. Calibrate the batch independently for each endpoint, then use the
+larger admitted batch for both sides; reject a leg shorter than 250 ms, retain
+every raw leg, and record host quiet checks before and after each child. The
+executable runner is `tools/xls_f3_qualification_abba.py`; it fails closed on
+child errors, malformed CSV, unstable output digests, equal control/candidate
+binary hashes, and any order other than A1/B1/B2/A2. It writes each child
+stdout/stderr and a JSON receipt containing source, binary, runner-script and
+host hashes. A coordinator-granted quiet CPU is represented below as `${CPU}`
+and must be fixed in the manifest:
 
 ```sh
 BASE=/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/binaries/base/xls_f3_qualification
 CAND=/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/binaries/candidate/xls_f3_qualification
 OUT=/home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/abba
-mkdir -p "$OUT"
-for route in write-only first-read read-after-write; do
-  for corpus in number rk-mulrk; do
-    taskset -c "${CPU}" "$BASE" --route "$route" --corpus "$corpus" --warmup 20 --samples 40 --batch "${BATCH}" > "$OUT/base-${route}-${corpus}.csv"
-    taskset -c "${CPU}" "$CAND" --route "$route" --corpus "$corpus" --warmup 20 --samples 40 --batch "${BATCH}" > "$OUT/candidate-${route}-${corpus}.csv"
-  done
-done
+python3 /home/zhuhe/code/litchi-worktrees/uo2-xls-f3-qualification/tools/xls_f3_qualification_abba.py \
+  --control-binary "$BASE" \
+  --candidate-binary "$CAND" \
+  --control-source /home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/source-base-9b1f96d6dc \
+  --candidate-source /home/zhuhe/code/litchi-worktrees/.coord/xls-f3-qualification/source-candidate-8acd229235 \
+  --output-dir "$OUT" \
+  --cpu "${CPU}" \
+  --warmup 20 --samples 40 --batch "${BATCH}"
 ```
 
-The loop is only a command shape: the actual runner must emit A1/B1/B2/A2,
-calibrate `BATCH` per route, and store its script hash, binary hashes, source
-hashes, CPU, memory scope, raw stdout/stderr and discarded attempts in
-`$OUT`. It must not report a speedup from the old eager `ole_w5_probe`.
+The runner emits A1/B1/B2/A2 for each route/corpus pair, and stores its script
+hash, binary hashes, source hashes, CPU, memory scope, raw stdout/stderr and
+the output digest in `$OUT/xls-f3-abba-receipt.json`. Batch calibration is an
+operator gate before this command; the receipt records the admitted common
+batch. It must not report a speedup from the old eager `ole_w5_probe`.
 
 For resource evidence, use the same release probe binaries and run direct
 heaptrack children (not a wrapper hidden behind `taskset`) in fresh
