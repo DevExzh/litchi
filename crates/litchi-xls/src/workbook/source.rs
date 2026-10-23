@@ -1837,9 +1837,7 @@ impl SourceBackedWorkbook {
     /// Returns the source version captured at open after a consistency check.
     pub fn source_version(&self) -> Result<SourceVersion> {
         if let Some(plan) = self.inner.pending.as_ref() {
-            let composed = plan
-                .composed_source()
-                .map_err(|error| SourceBackedError::Parse(error.into()))?;
+            let composed = plan.composed_source().map_err(deferred_overlay_error)?;
             return composed.version().map_err(SourceBackedError::Io);
         }
         self.ensure_current()?;
@@ -1938,9 +1936,7 @@ fn effective_inner(owner: &Arc<SourceInner>) -> Result<Arc<SourceInner>> {
     let Some(plan) = owner.pending.as_ref().cloned() else {
         return Ok(Arc::clone(owner));
     };
-    let composed = plan
-        .composed_source()
-        .map_err(|error| SourceBackedError::Parse(error.into()))?;
+    let composed = plan.composed_source().map_err(deferred_overlay_error)?;
     let target = SourceBackedWorkbook::from_read_at_with_options(
         Arc::new(composed),
         SourceBackedOptions::new()
@@ -1950,6 +1946,30 @@ fn effective_inner(owner: &Arc<SourceInner>) -> Result<Arc<SourceInner>> {
     let target = target.inner;
     let _ = owner.materialized.set(Arc::clone(&target));
     Ok(owner.materialized.get().cloned().unwrap_or(target))
+}
+
+fn deferred_overlay_error(error: litchi_cfb::OverlayError) -> SourceBackedError {
+    match error {
+        litchi_cfb::OverlayError::Ole(error) => SourceBackedError::from(error),
+        litchi_cfb::OverlayError::Io(error)
+        | litchi_cfb::OverlayError::Committed { source: error } => SourceBackedError::Io(error),
+        litchi_cfb::OverlayError::SourceChanged { expected, observed } => {
+            SourceBackedError::SourceChanged { expected, observed }
+        },
+        litchi_cfb::OverlayError::Allocation { resource, .. } => SourceBackedError::Allocation {
+            resource,
+            requested: u64::MAX,
+        },
+        litchi_cfb::OverlayError::IncompleteOutput { source, .. } => {
+            deferred_overlay_error(*source)
+        },
+        litchi_cfb::OverlayError::Unavailable { reason } => SourceBackedError::InvalidData(reason),
+        litchi_cfb::OverlayError::SourceFingerprintChanged { .. }
+        | litchi_cfb::OverlayError::PreconditionFailed { .. }
+        | litchi_cfb::OverlayError::TargetFingerprintChanged { .. } => {
+            SourceBackedError::InvalidData("source-backed overlay identity changed".into())
+        },
+    }
 }
 
 /// Fences the retained source once for both the workbook snapshot and the CFB
