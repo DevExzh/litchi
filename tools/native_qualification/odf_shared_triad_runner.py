@@ -210,8 +210,8 @@ def validate_manifest(data: Mapping[str, Any]) -> dict[str, Any]:
     features = probe.get("features")
     if features != list(FAMILIES):
         raise RunnerError(f"probe features must be {list(FAMILIES)!r}")
-    if probe.get("modes") != ["validate", "timed"]:
-        raise RunnerError("probe modes must be validate and timed")
+    if probe.get("modes") != ["validate", "timed", "allocator"]:
+        raise RunnerError("probe modes must be validate, timed and allocator")
     if probe.get("max_iterations") != 128:
         raise RunnerError("probe max_iterations must remain 128")
     _require_hash(probe.get("sha256"), "probe.sha256")
@@ -241,7 +241,13 @@ def validate_manifest(data: Mapping[str, Any]) -> dict[str, Any]:
     if tuple(phases.get("setup_outside_clock", ())) != SETUP_PHASES:
         raise RunnerError("phases.setup_outside_clock does not match the timed boundary")
     allocation = phases.get("allocation_observation")
-    if not isinstance(allocation, Mapping) or allocation.get("facade") != "Commit::diagnostics().snapshot_bytes":
+    if (
+        not isinstance(allocation, Mapping)
+        or allocation.get("facade") != "Commit::diagnostics().snapshot_bytes"
+        or allocation.get("leaf") != "not exposed by litchi_core::edit::Diagnostics"
+        or allocation.get("process_allocator")
+        != "paired runner operation-scoped system allocator observer"
+    ):
         raise RunnerError("allocation observation is not the reviewed boundary")
 
     output = data.get("output")
@@ -386,17 +392,52 @@ def _validate_timing(timing: Mapping[str, Any], mode: str, label: str) -> None:
         if tuple(timing.get("setup_outside_clock", ())) != SETUP_PHASES:
             raise RunnerError(f"{label}.timing setup boundary differs")
         return
-    if timing.get("status") != "measured":
+    if mode == "allocator":
+        if timing.get("status") != "allocator_observed":
+            raise RunnerError(f"{label}.timing status must be allocator_observed in allocator mode")
+        if timing.get("elapsed_claimable") is not False or timing.get("allocator_enabled") is not True:
+            raise RunnerError(f"{label}.timing allocator elapsed/enablement contract is invalid")
+    elif timing.get("status") != "measured":
         raise RunnerError(f"{label}.timing status must be measured in timed mode")
     for side_name in ("leaf", "facade"):
         measured = timing.get(side_name)
         if not isinstance(measured, Mapping) or not isinstance(measured.get("iterations"), int):
             raise RunnerError(f"{label}.timing.{side_name} is incomplete")
+        if measured["iterations"] <= 0 or measured["iterations"] > 128:
+            raise RunnerError(f"{label}.timing.{side_name} iteration count is invalid")
         phases = measured.get("ns_per_operation")
         if not isinstance(phases, Mapping) or tuple(phases) != PHASES:
             raise RunnerError(f"{label}.timing.{side_name} phases differ")
         if any(not isinstance(value, int) or value < 0 for value in phases.values()):
             raise RunnerError(f"{label}.timing.{side_name} contains invalid values")
+        if mode == "allocator":
+            samples = measured.get("operation_allocator_samples")
+            if not isinstance(samples, Mapping) or tuple(samples) != PHASES:
+                raise RunnerError(f"{label}.timing.{side_name} allocator phases differ")
+            for phase in PHASES:
+                values = samples[phase]
+                if not isinstance(values, list) or len(values) != measured["iterations"]:
+                    raise RunnerError(f"{label}.timing.{side_name}.{phase} allocator samples are incomplete")
+                for sample in values:
+                    if not isinstance(sample, Mapping):
+                        raise RunnerError(f"{label}.timing.{side_name}.{phase} allocator sample is malformed")
+                    for counter in (
+                        "allocations",
+                        "deallocations",
+                        "allocated_bytes",
+                        "deallocated_bytes",
+                        "reallocations",
+                    ):
+                        if not isinstance(sample.get(counter), int) or sample[counter] < 0:
+                            raise RunnerError(
+                                f"{label}.timing.{side_name}.{phase}.{counter} is not a non-negative integer"
+                            )
+        elif measured.get("operation_allocator_samples") != {
+            "commit_only": [],
+            "commit_plus_diagnostics": [],
+            "publication": [],
+        }:
+            raise RunnerError(f"{label}.timing.{side_name} unexpectedly contains allocator samples")
 
 
 def _validate_archive_audit(audit: Mapping[str, Any], label: str) -> None:
@@ -508,7 +549,7 @@ def validate_probe_output(
     if payload.get("schema") != OUTPUT_SCHEMA:
         raise RunnerError("probe output schema differs from the manifest")
     mode = payload.get("mode")
-    if mode not in ("validate", "timed"):
+    if mode not in ("validate", "timed", "allocator"):
         raise RunnerError("probe output mode is invalid")
     if expected_mode is not None and mode != expected_mode:
         raise RunnerError(f"probe output mode {mode!r} differs from requested mode {expected_mode!r}")
@@ -722,7 +763,7 @@ def validate_receipt_bindings(
         raise RunnerError("receipt lock path identity differs from manifest")
     run = receipt.get("run")
     if run is not None:
-        if not isinstance(run, Mapping) or run.get("mode") not in ("validate", "timed"):
+        if not isinstance(run, Mapping) or run.get("mode") not in ("validate", "timed", "allocator"):
             raise RunnerError("receipt run identity is malformed")
         output = run.get("output")
         if not isinstance(output, Mapping) or not HASH.fullmatch(str(output.get("sha256", ""))):
@@ -756,7 +797,7 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--target-dir", type=Path)
     parser.add_argument("--tmpdir", type=Path)
     parser.add_argument("--stderr", type=Path)
-    parser.add_argument("--mode", choices=("validate", "timed"), default="validate")
+    parser.add_argument("--mode", choices=("validate", "timed", "allocator"), default="validate")
     return parser.parse_args(argv)
 
 

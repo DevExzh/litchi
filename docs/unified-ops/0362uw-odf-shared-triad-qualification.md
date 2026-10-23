@@ -71,18 +71,33 @@ Fixture/builder setup, opening, property construction and target resolution
 are outside those closures. This makes the ODM moved comparison explicit:
 `commit_only` cannot hide a lazy diagnostics scan, while
 `commit_plus_diagnostics` measures the accessor boundary separately. The
+typed owned inputs are prepared in bounded batches of at most the fixed
+128-iteration probe limit; the timed closures consume those inputs without
+constructing selectors, properties or strings. The
 facade's `snapshot_bytes` is reported as the available retained-snapshot
-observation; the leaf core diagnostics intentionally expose no allocation
-counter, so process allocator capture remains an external runner concern.
+observation. `--mode allocator` runs the same real commit, diagnostics and
+publication closures with the paired runner's
+`odf_shared_triad_allocator` system allocator observer. It reports
+operation-scoped allocation/deallocation counters for every phase and marks
+allocator-instrumented elapsed time non-claimable; it is not a timing or
+acceptance result.
 
 The generic W4b/W5 native runner is not reused for this lane: it intentionally
 rejects unknown historical lanes and hard-codes their workload argv. The
 dedicated `tools/native_qualification/odf_shared_triad_runner.py` binds the
 source HEAD/tree, package manifest, lock hash, probe hash, exact features,
 route order, phase boundary, and validated output receipt. Its unit tests
-mutate each of those contracts and verify rejection. It runs Cargo only with
-`--offline --locked`, one build job, an external target/TMPDIR, and fixed
-19.2-GB preflight/20-GB hard limits.
+mutate each of those contracts and verify rejection. The paired
+`tools/native_qualification/odf_shared_triad_paired_runner.py` additionally
+binds the preparation overlay, both endpoint trees, toolchain, binary/output
+hashes, pinned CPU, live quiet-host/resource observations, and the exact
+calibration plus ABBA protocol. It builds only with `--offline --locked`, one
+job, an external target/TMPDIR, and fixed 19.2-GB preflight/20-GB hard limits.
+The protocol is one untimed validation calibration per endpoint, three
+warmups and thirty samples per leg in baseline/candidate/candidate/baseline
+order, for both normal timing and allocator-observer phases. Every destination
+is fresh and every stderr/stdout stream is hashed; no result is accepted when
+an endpoint identity, route descriptor, phase, or source overlay drifts.
 
 ## Baseline compatibility and validation
 
@@ -92,7 +107,13 @@ inverse}`, package `apply`, and the facade's `Commit::{file,patch,
 diagnostics}` plus `Patch::apply`. A source audit against 173dd found no
 post-baseline accessor in the probe. The baseline endpoint has not been built
 in this source-only phase; no compatibility result is claimed until the
-coordinator authorizes the external baseline build.
+coordinator authorizes the external baseline build. The source-only
+`tools/native_qualification/prepare_odf_shared_triad_inputs.py` command creates
+that endpoint from a clean 173dd worktree by copying only the reviewed probe
+adapter and a separately hashed external Cargo.lock. It verifies that the
+tracked production tree is unchanged and rejects any additional overlay or a
+stale `15ab` candidate. The paired runner consumes that preparation receipt;
+it never transplants candidate production files into the baseline.
 
 An earlier source-only development check was run with one cargo job and the
 memory shim, but without `--locked`; it is historical debug evidence only and
@@ -114,23 +135,37 @@ cargo run --offline --locked -p litchi-ops \
   -- --mode validate --family all
 ```
 
-The executable orchestration is:
+The earlier single-endpoint correctness orchestration remains useful for a
+source-only sanity check. Final paired orchestration is:
 
 ```text
-python3 tools/native_qualification/odf_shared_triad_runner.py \
+python3 tools/native_qualification/odf_shared_triad_paired_runner.py \
   --manifest tools/native_qualification/manifests/odf-shared-triad.json \
-  --phase run --role candidate \
-  --source-root "$SOURCE_ROOT" --source-commit "$FINAL_CANDIDATE_SHA" \
-  --lock-sha256 "$CARGO_LOCK_SHA256" \
-  --output "$OUT/probe.json" --receipt "$OUT/receipt.json" \
-  --target-dir "$TARGET" --tmpdir "$TMPDIR" --stderr "$OUT/probe.stderr" \
-  --mode validate
+  --preparation "$PREPARATION" \
+  --baseline-root "$BASELINE_ROOT" --candidate-root "$SOURCE_ROOT" \
+  --candidate-commit "$FINAL_CANDIDATE_SHA" \
+  --candidate-lock-sha256 "$CARGO_LOCK_SHA256" \
+  --output "$OUT" --target-root "$TARGET_ROOT" --tmp-root "$TMP_ROOT" \
+  --cpu "$CPU" --phase build
+
+python3 tools/native_qualification/odf_shared_triad_paired_runner.py \
+  --manifest tools/native_qualification/manifests/odf-shared-triad.json \
+  --preparation "$PREPARATION" \
+  --baseline-root "$BASELINE_ROOT" --candidate-root "$SOURCE_ROOT" \
+  --candidate-commit "$FINAL_CANDIDATE_SHA" \
+  --candidate-lock-sha256 "$CARGO_LOCK_SHA256" \
+  --output "$OUT" --target-root "$TARGET_ROOT" --tmp-root "$TMP_ROOT" \
+  --cpu "$CPU" --phase abba
 ```
 
-The runner supplies the final selected source SHA and lock SHA, rejects the
-historical `15ab` tip, verifies the clean source tree and package/probe/lock
-identities, rejects overlapping artifacts, captures stdout/stderr outside the
-checkout, and validates all four rows before writing the receipt.
+The paired runner supplies the final selected source SHA and lock SHA, rejects
+the historical `15ab` tip, verifies the baseline's exact two-file overlay and
+unchanged production tree, verifies the candidate's clean source tree and
+package/probe/lock identities, rejects overlapping artifacts, captures
+stdout/stderr and live resource samples outside the checkout, and validates
+all four rows before writing a receipt. These commands are a future execution
+recipe; this source-only slice ran no Cargo build, native probe, timing or
+allocator phase.
 
 On 2026-10-23, the runner completed that locked, untimed correctness check on
 source tip `c9b352265eb833423c6852f91227a28bbf1ead02` with lock SHA

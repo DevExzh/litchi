@@ -10,9 +10,9 @@
   },
   "probe": {
     "path": "crates/litchi-ops/examples/odf_shared_triad_qualification.rs",
-    "sha256": "897a850aef14f26d9171882e9c1d9d98b0ffacf3c031ed6f9f86b29988403087",
+    "sha256": "96e7dc0b66e44d24b7073a11f31cf6d52b31cf1ce26ce30303d71074762b0147",
     "features": ["odc", "odi", "oth", "odm"],
-    "modes": ["validate", "timed"],
+    "modes": ["validate", "timed", "allocator"],
     "max_iterations": 128
   },
   "routes": [
@@ -63,7 +63,46 @@
     "allocation_observation": {
       "facade": "Commit::diagnostics().snapshot_bytes",
       "leaf": "not exposed by litchi_core::edit::Diagnostics",
-      "process_allocator": "external runner only"
+      "process_allocator": "paired runner operation-scoped system allocator observer"
+    }
+  },
+  "paired": {
+    "abba_order": ["baseline", "candidate", "candidate", "baseline"],
+    "warmup_iterations_per_leg": 3,
+    "samples_per_leg": 30,
+    "probe_iterations": 128,
+    "families": ["odc", "odi", "oth", "odm"],
+    "phases": ["normal", "allocator"],
+    "calibration": {
+      "mode": "validate",
+      "iterations": 1,
+      "roles": ["baseline", "candidate"],
+      "families": ["odc", "odi", "oth", "odm"]
+    },
+    "quiet": {
+      "process_guard": "tools.native_qualification_runner.ProcessGuard",
+      "cpu_affinity_required": true,
+      "resource_monitor": "loadavg+proc-descendants+target-bytes"
+    },
+    "allocator": {
+      "scope": "operation_global_system_allocator",
+      "source_cfg": "odf_shared_triad_allocator",
+      "elapsed_claimable": false,
+      "operation_metrics": [
+        "allocations",
+        "deallocations",
+        "allocated_bytes",
+        "deallocated_bytes",
+        "reallocations"
+      ]
+    },
+    "baseline_overlay": {
+      "preparation_schema": "litchi.odf.shared-triad-qualification.preparation.v1",
+      "allowed_paths": [
+        "Cargo.lock",
+        "crates/litchi-ops/examples/odf_shared_triad_qualification.rs"
+      ],
+      "production_tree": "baseline HEAD tree must remain unchanged"
     }
   },
   "output": {

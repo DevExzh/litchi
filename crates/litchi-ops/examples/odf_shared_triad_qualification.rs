@@ -1,3 +1,5 @@
+#![allow(unexpected_cfgs)]
+
 //! Correctness and optional bounded phase timing for the ODF shared-triad lane.
 //!
 //! This probe is intentionally separate from the W8 109-route packet.  It
@@ -6,7 +8,97 @@
 //! untimed and proves source identity, exact no-ops, patch replay/inverse,
 //! diagnostics and repeated publication.  `timed` is an execution aid for a
 //! later quiet-host qualification: fixture I/O and owner opening stay outside
-//! the measured closures, and the iteration count is bounded.
+//! the measured closures, and the iteration count is bounded.  `allocator`
+//! runs the same operation-scoped closures with the optional system allocator
+//! observer enabled by the paired runner; its elapsed values are explicitly
+//! non-claimable.
+
+#[cfg(odf_shared_triad_allocator)]
+mod allocation {
+    use std::alloc::{GlobalAlloc, Layout, System};
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    use serde_json::{Value, json};
+
+    pub const ENABLED: bool = true;
+
+    static ALLOCATIONS: AtomicUsize = AtomicUsize::new(0);
+    static DEALLOCATIONS: AtomicUsize = AtomicUsize::new(0);
+    static ALLOCATED_BYTES: AtomicUsize = AtomicUsize::new(0);
+    static DEALLOCATED_BYTES: AtomicUsize = AtomicUsize::new(0);
+    static REALLOCATIONS: AtomicUsize = AtomicUsize::new(0);
+
+    pub struct CountingAllocator;
+
+    // SAFETY: each operation delegates to the standard system allocator and
+    // only updates independent atomic counters around the real call.
+    unsafe impl GlobalAlloc for CountingAllocator {
+        unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+            // SAFETY: the caller upholds GlobalAlloc's layout contract.
+            let pointer = unsafe { System.alloc(layout) };
+            if !pointer.is_null() {
+                ALLOCATIONS.fetch_add(1, Ordering::Relaxed);
+                ALLOCATED_BYTES.fetch_add(layout.size(), Ordering::Relaxed);
+            }
+            pointer
+        }
+
+        unsafe fn dealloc(&self, pointer: *mut u8, layout: Layout) {
+            // SAFETY: the caller upholds GlobalAlloc's pointer/layout contract.
+            unsafe { System.dealloc(pointer, layout) };
+            DEALLOCATIONS.fetch_add(1, Ordering::Relaxed);
+            DEALLOCATED_BYTES.fetch_add(layout.size(), Ordering::Relaxed);
+        }
+
+        unsafe fn realloc(&self, pointer: *mut u8, layout: Layout, new_size: usize) -> *mut u8 {
+            // SAFETY: the caller upholds GlobalAlloc's pointer/layout contract.
+            let replacement = unsafe { System.realloc(pointer, layout, new_size) };
+            if !replacement.is_null() {
+                REALLOCATIONS.fetch_add(1, Ordering::Relaxed);
+                if new_size >= layout.size() {
+                    ALLOCATED_BYTES.fetch_add(new_size - layout.size(), Ordering::Relaxed);
+                } else {
+                    DEALLOCATED_BYTES.fetch_add(layout.size() - new_size, Ordering::Relaxed);
+                }
+            }
+            replacement
+        }
+    }
+
+    #[global_allocator]
+    static GLOBAL: CountingAllocator = CountingAllocator;
+
+    pub fn begin() {
+        ALLOCATIONS.store(0, Ordering::Relaxed);
+        DEALLOCATIONS.store(0, Ordering::Relaxed);
+        ALLOCATED_BYTES.store(0, Ordering::Relaxed);
+        DEALLOCATED_BYTES.store(0, Ordering::Relaxed);
+        REALLOCATIONS.store(0, Ordering::Relaxed);
+    }
+
+    pub fn end() -> Value {
+        json!({
+            "allocations": ALLOCATIONS.load(Ordering::Relaxed),
+            "deallocations": DEALLOCATIONS.load(Ordering::Relaxed),
+            "allocated_bytes": ALLOCATED_BYTES.load(Ordering::Relaxed),
+            "deallocated_bytes": DEALLOCATED_BYTES.load(Ordering::Relaxed),
+            "reallocations": REALLOCATIONS.load(Ordering::Relaxed),
+        })
+    }
+}
+
+#[cfg(not(odf_shared_triad_allocator))]
+mod allocation {
+    use serde_json::{Value, json};
+
+    pub const ENABLED: bool = false;
+
+    pub fn begin() {}
+
+    pub fn end() -> Value {
+        json!(null)
+    }
+}
 
 #[cfg(all(feature = "odc", feature = "odi", feature = "oth", feature = "odm"))]
 mod probe {
@@ -520,24 +612,55 @@ mod probe {
 
     fn phase_timings(
         iterations: usize,
+        collect_allocations: bool,
         mut commit_only: impl FnMut(),
         mut commit_plus_diagnostics: impl FnMut(),
         mut publication: impl FnMut(),
     ) -> Value {
-        fn measure(iterations: usize, mut operation: impl FnMut()) -> u128 {
+        fn measure(
+            iterations: usize,
+            collect_allocations: bool,
+            mut operation: impl FnMut(),
+        ) -> (u128, Vec<Value>) {
+            let mut allocation_samples = if collect_allocations {
+                Vec::with_capacity(iterations)
+            } else {
+                Vec::new()
+            };
             let start = Instant::now();
             for _ in 0..iterations {
+                allocation::begin();
                 operation();
+                if collect_allocations {
+                    allocation_samples.push(allocation::end());
+                }
             }
-            start.elapsed().as_nanos() / iterations as u128
+            (
+                start.elapsed().as_nanos() / iterations as u128,
+                allocation_samples,
+            )
         }
 
+        let (commit_only_ns, commit_only_allocations) =
+            measure(iterations, collect_allocations, &mut commit_only);
+        let (diagnostics_ns, diagnostics_allocations) = measure(
+            iterations,
+            collect_allocations,
+            &mut commit_plus_diagnostics,
+        );
+        let (publication_ns, publication_allocations) =
+            measure(iterations, collect_allocations, &mut publication);
         json!({
             "iterations": iterations,
             "ns_per_operation": {
-                "commit_only": measure(iterations, &mut commit_only),
-                "commit_plus_diagnostics": measure(iterations, &mut commit_plus_diagnostics),
-                "publication": measure(iterations, &mut publication),
+                "commit_only": commit_only_ns,
+                "commit_plus_diagnostics": diagnostics_ns,
+                "publication": publication_ns,
+            },
+            "operation_allocator_samples": {
+                "commit_only": commit_only_allocations,
+                "commit_plus_diagnostics": diagnostics_allocations,
+                "publication": publication_allocations,
             },
         })
     }
@@ -559,7 +682,8 @@ mod probe {
             "allocation_boundary": {
                 "facade_observation": "diagnostics.snapshot_bytes",
                 "leaf_observation": "not exposed by the shared core Diagnostics",
-                "process_allocator_capture": "external runner only",
+                "process_allocator_capture":
+                    "paired runner operation-scoped system allocator observer",
             },
         })
     }
@@ -574,17 +698,29 @@ mod probe {
         facade_commit_plus_diagnostics: impl FnMut(),
         facade_publication: impl FnMut(),
     ) -> Value {
-        if mode == "timed" {
+        if mode == "timed" || mode == "allocator" {
+            assert!(
+                mode != "allocator" || allocation::ENABLED,
+                "allocator mode requires the operation-scoped allocator build"
+            );
             json!({
-                "status": "measured",
+                "status": if mode == "allocator" {
+                    "allocator_observed"
+                } else {
+                    "measured"
+                },
+                "elapsed_claimable": mode == "timed",
+                "allocator_enabled": allocation::ENABLED,
                 "leaf": phase_timings(
                     iterations,
+                    mode == "allocator",
                     leaf_commit_only,
                     leaf_commit_plus_diagnostics,
                     leaf_publication,
                 ),
                 "facade": phase_timings(
                     iterations,
+                    mode == "allocator",
                     facade_commit_only,
                     facade_commit_plus_diagnostics,
                     facade_publication,
@@ -1510,8 +1646,8 @@ mod probe {
             }
         }
         assert!(
-            mode == "validate" || mode == "timed",
-            "mode must be validate or timed"
+            mode == "validate" || mode == "timed" || mode == "allocator",
+            "mode must be validate, timed or allocator"
         );
         assert!(
             (1..=MAX_ITERATIONS).contains(&iterations),
