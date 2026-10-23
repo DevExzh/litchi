@@ -185,6 +185,8 @@ struct TransferStyles {
     number_format: Option<Option<Arc<str>>>,
 }
 
+type StagedTransfer = (Address, Address, Action, TransferStyles, bool, bool);
+
 impl TransferStyles {
     const fn is_empty(&self) -> bool {
         self.font.is_none()
@@ -466,35 +468,37 @@ impl CellCapture {
                 self.remove = 0;
             },
             CaptureFacet::Font => {
-                self.font = self.font.max(authored_bytes);
+                self.font = authored_bytes;
                 self.remove = 0;
             },
             CaptureFacet::Alignment => {
-                self.alignment = self.alignment.max(authored_bytes);
+                self.alignment = authored_bytes;
                 self.remove = 0;
             },
             CaptureFacet::Fill => {
-                self.fill = self.fill.max(authored_bytes);
+                self.fill = authored_bytes;
                 self.remove = 0;
             },
             CaptureFacet::Border => {
-                self.border = self.border.max(authored_bytes);
+                self.border = authored_bytes;
                 self.remove = 0;
             },
             CaptureFacet::Protection => {
-                self.protection = self.protection.max(authored_bytes);
+                self.protection = authored_bytes;
                 self.remove = 0;
             },
             CaptureFacet::QuotePrefix => {
-                self.quote_prefix = self.quote_prefix.max(authored_bytes);
+                self.quote_prefix = authored_bytes;
                 self.remove = 0;
             },
             CaptureFacet::NumberFormat => {
-                self.number_format = self.number_format.max(authored_bytes);
+                self.number_format = authored_bytes;
                 self.remove = 0;
             },
             CaptureFacet::Structural => self.structural = self.structural.max(authored_bytes),
-            CaptureFacet::Relationship => self.relationship = authored_bytes,
+            CaptureFacet::Relationship => {
+                self.relationship = self.relationship.saturating_add(authored_bytes);
+            },
             CaptureFacet::Remove => {
                 self.payload = 0;
                 self.style_effect = 0;
@@ -790,7 +794,8 @@ impl CaptureBudget {
                     current.quote_prefix = current.quote_prefix.max(capture.quote_prefix);
                     current.number_format = current.number_format.max(capture.number_format);
                     current.structural = current.structural.max(capture.structural);
-                    current.relationship = current.relationship.max(capture.relationship);
+                    current.relationship =
+                        current.relationship.saturating_add(capture.relationship);
                     current.remove = current.remove.max(capture.remove);
                     current.active |= capture.active;
                 })
@@ -820,7 +825,8 @@ impl CaptureBudget {
                     current.quote_prefix = current.quote_prefix.max(capture.quote_prefix);
                     current.number_format = current.number_format.max(capture.number_format);
                     current.structural = current.structural.max(capture.structural);
-                    current.relationship = current.relationship.max(capture.relationship);
+                    current.relationship =
+                        current.relationship.saturating_add(capture.relationship);
                     current.remove = current.remove.max(capture.remove);
                     current.active |= capture.active;
                 })
@@ -875,6 +881,50 @@ impl CaptureBudget {
             // owner; storing only `worksheet_bytes` made the first-cell
             // reservation impossible to roll back and dropped the
             // descriptor from joined ledgers.
+            self.worksheets.insert(position, worksheet_next);
+        }
+        Ok(CaptureReservation {
+            key,
+            previous,
+            worksheet_previous,
+            next,
+            worksheet_next,
+            active: true,
+        })
+    }
+
+    fn admit_cell_relationship(
+        &mut self,
+        position: usize,
+        address: Address,
+        worksheet_bytes: usize,
+        previous_relationship: usize,
+        authored_bytes: usize,
+    ) -> Result<CaptureReservation> {
+        let key = (position, address);
+        let previous = self.cells.get(&key).copied();
+        let worksheet_previous = self.worksheets.get(&position).copied();
+        let worksheet_next = if worksheet_previous.is_none() {
+            worksheet_bytes.saturating_add(size_of::<PartChange>())
+        } else {
+            worksheet_previous.unwrap_or(0)
+        };
+        let mut next = previous.unwrap_or_default();
+        if previous_relationship > next.relationship {
+            return Err(invalid("worksheet hyperlink capture ledger underflow"));
+        }
+        next.relationship = next
+            .relationship
+            .saturating_sub(previous_relationship)
+            .saturating_add(authored_bytes);
+        next.active = true;
+        let old_total = previous
+            .map_or(0, CellCapture::retained_bytes)
+            .saturating_add(worksheet_previous.unwrap_or(0));
+        let new_total = next.retained_bytes().saturating_add(worksheet_next);
+        self.replace(old_total, new_total)?;
+        self.cells.insert(key, next);
+        if worksheet_previous.is_none() {
             self.worksheets.insert(position, worksheet_next);
         }
         Ok(CaptureReservation {
@@ -1111,6 +1161,57 @@ impl Edit {
             .admit_cell(position, address, worksheet_bytes, facet, authored_bytes)
     }
 
+    /// Admit a hyperlink replacement against the final relationship set for
+    /// this cell. More than one range can start at the same cell, so a new
+    /// relationship is additive while replacing one staged key releases only
+    /// that key's prior retained payload.
+    fn preflight_hyperlink_capture(
+        &mut self,
+        position: usize,
+        address: Address,
+        previous_bytes: usize,
+        authored_bytes: usize,
+    ) -> Result<CaptureReservation> {
+        if self.capture_budget.is_none() {
+            return Ok(CaptureReservation {
+                key: (position, address),
+                previous: None,
+                worksheet_previous: None,
+                next: CellCapture::default(),
+                worksheet_next: 0,
+                active: false,
+            });
+        }
+        let sheet = self
+            .base
+            .inner
+            .sheets
+            .get(position)
+            .ok_or_else(|| invalid("worksheet capture target disappeared"))?;
+        let worksheet_bytes = if !self
+            .capture_budget
+            .as_ref()
+            .is_some_and(|budget| budget.worksheets.contains_key(&position))
+        {
+            match self.base.inner.package.part_metadata(&sheet.part_uri) {
+                Some(metadata) => metadata.payload_len()?,
+                None => return Err(invalid("worksheet capture part disappeared")),
+            }
+        } else {
+            0
+        };
+        self.capture_budget
+            .as_mut()
+            .expect("capture budget checked above")
+            .admit_cell_relationship(
+                position,
+                address,
+                worksheet_bytes,
+                previous_bytes,
+                authored_bytes,
+            )
+    }
+
     /// Admit a payload captured by a transfer planner before its action map is
     /// populated.  Transfer planners build their complete action list first,
     /// so a failed admission can release every earlier reservation atomically.
@@ -1202,6 +1303,49 @@ impl Edit {
         capture.clear(facet);
         let empty = !capture.active;
         if empty {
+            budget.cells.remove(&key);
+        }
+        if !budget.cells.keys().any(|candidate| candidate.0 == position) {
+            budget.worksheets.remove(&position);
+        }
+        budget.recompute_reserved();
+    }
+
+    /// Reconcile the relationship facet with the final pending hyperlink
+    /// actions for one start cell. Range keys are independent even when they
+    /// share that start, so clearing one key must not clear its siblings.
+    fn recompute_relationship_capture(&mut self, position: usize, address: Address) {
+        let Some(budget) = self.capture_budget.as_mut() else {
+            return;
+        };
+        let retained = self.sheets.get(&position).map_or(0, |actions| {
+            actions
+                .hyperlinks
+                .iter()
+                .filter_map(|((row, column, _, _), action)| {
+                    (Address::at(*row, *column).ok() == Some(address))
+                        .then(|| hyperlink_action_retained_bytes(action))
+                })
+                .fold(0usize, usize::saturating_add)
+        });
+        let key = (position, address);
+        let Some(capture) = budget.cells.get_mut(&key) else {
+            return;
+        };
+        capture.relationship = retained;
+        capture.active = capture.payload != 0
+            || capture.style_effect != 0
+            || capture.font != 0
+            || capture.alignment != 0
+            || capture.fill != 0
+            || capture.border != 0
+            || capture.protection != 0
+            || capture.quote_prefix != 0
+            || capture.number_format != 0
+            || capture.structural != 0
+            || capture.relationship != 0
+            || capture.remove != 0;
+        if !capture.active {
             budget.cells.remove(&key);
         }
         if !budget.cells.keys().any(|candidate| candidate.0 == position) {
@@ -2295,10 +2439,114 @@ impl Edit {
         Ok(())
     }
 
+    /// Prove the aggregate deferred-style ledger before transfer mutation.
+    /// `stage_fill` and `stage_border` are fallible because their counters are
+    /// bounded resources; doing the same replacement arithmetic here keeps a
+    /// late style admission from leaving cells, sheets, or drawings half
+    /// mutated.
+    fn preflight_transfer_style_memory(
+        &self,
+        mode: CellTransfer,
+        source_position: usize,
+        target_position: usize,
+        staged: &[StagedTransfer],
+    ) -> Result<()> {
+        let maximum = style_staged_memory_limit(&self.base);
+        let mut per_sheet = BTreeMap::<usize, usize>::new();
+        let mut total = 0usize;
+        for (position, actions) in &self.sheets {
+            let bytes = actions
+                .staged_fill_bytes
+                .checked_add(actions.staged_border_bytes)
+                .ok_or_else(|| invalid("worksheet style retained bytes overflow"))?;
+            if bytes != 0 {
+                per_sheet.insert(*position, bytes);
+                total = total
+                    .checked_add(bytes)
+                    .ok_or_else(|| invalid("worksheet style retained bytes overflow"))?;
+            }
+        }
+
+        let mut discarded = BTreeSet::<(usize, Address)>::new();
+        for (source_address, target_address, _, _, source_noop, target_noop) in staged {
+            if matches!(mode, CellTransfer::Move) && !source_noop {
+                discarded.insert((source_position, *source_address));
+            }
+            if !target_noop {
+                discarded.insert((target_position, *target_address));
+            }
+        }
+        for (position, address) in discarded {
+            let Some(actions) = self.sheets.get(&position) else {
+                continue;
+            };
+            let fill = actions
+                .fills
+                .get(&address)
+                .map(FillChange::retained_bytes)
+                .unwrap_or(0);
+            let border = usize::from(actions.borders.contains_key(&address))
+                .saturating_mul(border_staged_entry_bytes());
+            let removed = fill
+                .checked_add(border)
+                .ok_or_else(|| invalid("worksheet style retained bytes overflow"))?;
+            if removed == 0 {
+                continue;
+            }
+            let sheet_bytes = per_sheet.get(&position).copied().unwrap_or(0);
+            let next_sheet = sheet_bytes
+                .checked_sub(removed)
+                .ok_or_else(|| invalid("worksheet style retained bytes underflow"))?;
+            if next_sheet == 0 {
+                per_sheet.remove(&position);
+            } else {
+                per_sheet.insert(position, next_sheet);
+            }
+            total = total
+                .checked_sub(removed)
+                .ok_or_else(|| invalid("worksheet style retained bytes underflow"))?;
+        }
+
+        for (_, target_address, _, styles, _, target_noop) in staged {
+            if *target_noop {
+                continue;
+            }
+            if let Some(fill) = &styles.fill {
+                let bytes = fill.retained_bytes();
+                enforce_style_staged_memory(bytes, maximum, "worksheet fill staged bytes")?;
+                let sheet = per_sheet.entry(target_position).or_default();
+                *sheet = sheet
+                    .checked_add(bytes)
+                    .ok_or_else(|| invalid("worksheet fill retained bytes overflow"))?;
+                total = total
+                    .checked_add(bytes)
+                    .ok_or_else(|| invalid("worksheet style retained bytes overflow"))?;
+                enforce_style_staged_memory(total, maximum, "worksheet style staged bytes")?;
+            }
+            if styles.border.is_some() {
+                let bytes = border_staged_entry_bytes();
+                let sheet = per_sheet.entry(target_position).or_default();
+                *sheet = sheet
+                    .checked_add(bytes)
+                    .ok_or_else(|| invalid("worksheet border retained bytes overflow"))?;
+                total = total
+                    .checked_add(bytes)
+                    .ok_or_else(|| invalid("worksheet style retained bytes overflow"))?;
+                enforce_style_staged_memory(total, maximum, "worksheet style staged bytes")?;
+            }
+            // Keep the address in the loop so the replacement/discard set is
+            // visibly tied to the exact target plan; it also guards future
+            // changes from accidentally admitting a second target generation.
+            let _ = target_address;
+        }
+        Ok(())
+    }
+
     fn pending_transfer_rich_text(
         &self,
         sheet: &Worksheet,
         address: Address,
+        cache: &mut BTreeMap<(usize, Address), Option<crate::RichText>>,
     ) -> Result<Option<crate::RichText>> {
         if let Some(action) = self
             .sheets
@@ -2311,15 +2559,21 @@ impl Edit {
                 None => {},
             }
         }
-        let inline_rich = sheet
+        let key = (sheet.position(), address);
+        if let Some(value) = cache.get(&key) {
+            return Ok(value.clone());
+        }
+        let has_rich = sheet
             .store()?
             .entry(address)
-            .is_some_and(|stored| stored.inline_rich);
-        if inline_rich {
-            sheet.rich_text(address)
+            .is_some_and(|stored| stored.inline_rich || stored.shared_string.is_some());
+        let value = if has_rich {
+            sheet.rich_text(address)?
         } else {
-            Ok(None)
-        }
+            None
+        };
+        cache.insert(key, value.clone());
+        Ok(value)
     }
 
     fn transfer_cells<'source, 'range, 'target, 'anchor>(
@@ -2388,10 +2642,11 @@ impl Edit {
 
         let capacity = usize::try_from(cells)
             .map_err(|error| invalid(format!("cell-transfer count exceeds usize: {error}")))?;
-        let mut staged = Vec::new();
+        let mut staged = Vec::<StagedTransfer>::new();
         staged
             .try_reserve_exact(capacity)
             .map_err(|source| allocation("cell-transfer plan", source))?;
+        let mut rich_cache = BTreeMap::new();
         for row_offset in 0..source_range.rows() {
             for column_offset in 0..source_range.columns() {
                 let source_address = Address::at(
@@ -2419,10 +2674,18 @@ impl Edit {
                 let target_state = self.pending_cell_state(&target_sheet, target_address)?;
                 let target_styles =
                     self.pending_transfer_styles(target_sheet.position(), target_address);
-                let source_rich = self.pending_transfer_rich_text(&source_sheet, source_address)?;
-                let target_rich = self.pending_transfer_rich_text(&target_sheet, target_address)?;
+                let source_rich = self.pending_transfer_rich_text(
+                    &source_sheet,
+                    source_address,
+                    &mut rich_cache,
+                )?;
+                let target_rich = self.pending_transfer_rich_text(
+                    &target_sheet,
+                    target_address,
+                    &mut rich_cache,
+                )?;
                 let action = if let Some(rich) = source_rich.clone() {
-                    Action::rich(rich)
+                    transfer_rich_action(rich, &source_state)
                 } else {
                     transfer_action(source_state.clone(), source_address, target_address)?
                 };
@@ -2467,6 +2730,16 @@ impl Edit {
         }
         self.recompute_capture_budget();
 
+        if let Err(error) = self.preflight_transfer_style_memory(
+            mode,
+            source_sheet.position(),
+            target_sheet.position(),
+            &staged,
+        ) {
+            self.capture_budget = capture_budget_before;
+            return Err(error);
+        }
+
         let mut capture_reservations = Vec::new();
         let admission = (|| -> Result<()> {
             for (source_address, target_address, action, styles, source_noop, target_noop) in
@@ -2499,9 +2772,6 @@ impl Edit {
             return Err(error);
         }
         let mutation = (|| -> Result<()> {
-            if let Some(drawing) = drawing {
-                self.drawings.insert(target_sheet.position(), drawing);
-            }
             if matches!(mode, CellTransfer::Move) {
                 for (source_address, _, _, _, source_noop, _) in &staged {
                     if !source_noop {
@@ -2523,6 +2793,9 @@ impl Edit {
                 let target_actions = self.actions(target_sheet.position());
                 target_actions.insert(target_address, action);
                 self.stage_transfer_styles(target_sheet.position(), target_address, styles)?;
+            }
+            if let Some(drawing) = drawing {
+                self.drawings.insert(target_sheet.position(), drawing);
             }
             Ok(())
         })();
@@ -5174,12 +5447,13 @@ impl Edit {
             + hyperlink.display().map_or(0, str::len)
             + hyperlink.tooltip().map_or(0, str::len)
             + size_of::<crate::hyperlinks::Hyperlink>();
-        let capture = self.preflight_cell_capture_with_facet(
-            position,
-            address,
-            CaptureFacet::Relationship,
-            authored_bytes,
-        )?;
+        let previous_bytes = self
+            .sheets
+            .get(&position)
+            .and_then(|actions| actions.hyperlinks.get(&key))
+            .map_or(0, hyperlink_action_retained_bytes);
+        let capture =
+            self.preflight_hyperlink_capture(position, address, previous_bytes, authored_bytes)?;
         let source = match self.source_hyperlink(position, key) {
             Ok(source) => source,
             Err(error) => {
@@ -5193,7 +5467,7 @@ impl Edit {
                 .or_default()
                 .hyperlinks
                 .remove(&key);
-            self.release_cell_capture_facet(position, address, CaptureFacet::Relationship);
+            self.recompute_relationship_capture(position, address);
         } else {
             self.sheets
                 .entry(position)
@@ -5216,13 +5490,20 @@ impl Edit {
             return Ok(None);
         };
         let source = self.source_hyperlink(position, key)?;
+        let previous_bytes = self
+            .sheets
+            .get(&position)
+            .and_then(|actions| actions.hyperlinks.get(&key))
+            .map_or(0, hyperlink_action_retained_bytes);
         if source.is_none() {
+            let capture = self.preflight_hyperlink_capture(position, address, previous_bytes, 0)?;
             self.sheets
                 .entry(position)
                 .or_default()
                 .hyperlinks
                 .remove(&key);
-            self.release_cell_capture_facet(position, address, CaptureFacet::Relationship);
+            self.recompute_relationship_capture(position, address);
+            drop(capture);
         } else {
             let already_staged = self
                 .sheets
@@ -5237,10 +5518,10 @@ impl Edit {
                     "worksheet hyperlink edit exceeds the {MAX_HYPERLINK_EDITS}-operation limit"
                 )));
             }
-            let _capture = self.preflight_cell_capture_with_facet(
+            let capture = self.preflight_hyperlink_capture(
                 position,
                 address,
-                CaptureFacet::Relationship,
+                previous_bytes,
                 reference.as_str().len() + size_of::<crate::hyperlinks::Hyperlink>(),
             )?;
             self.sheets
@@ -5248,6 +5529,7 @@ impl Edit {
                 .or_default()
                 .hyperlinks
                 .insert(key, HyperlinkAction::Remove(reference));
+            drop(capture);
         }
         Ok(Some(current))
     }
@@ -5902,22 +6184,28 @@ fn staged_cell_capture(
         if Address::at(*row, *column).ok() != Some(address) {
             continue;
         }
-        let authored = match action {
-            HyperlinkAction::Put(value) => {
-                value.reference().as_str().len()
-                    + value.location().map_or(0, str::len)
-                    + value.external_target().map_or(0, str::len)
-                    + value.display().map_or(0, str::len)
-                    + value.tooltip().map_or(0, str::len)
-                    + size_of::<crate::hyperlinks::Hyperlink>()
-            },
-            HyperlinkAction::Remove(reference) => {
-                reference.as_str().len() + size_of::<crate::hyperlinks::Hyperlink>()
-            },
-        };
-        capture.apply(CaptureFacet::Relationship, authored);
+        capture.apply(
+            CaptureFacet::Relationship,
+            hyperlink_action_retained_bytes(action),
+        );
     }
     capture.active.then_some(capture)
+}
+
+fn hyperlink_action_retained_bytes(action: &HyperlinkAction) -> usize {
+    match action {
+        HyperlinkAction::Put(value) => {
+            value.reference().as_str().len()
+                + value.location().map_or(0, str::len)
+                + value.external_target().map_or(0, str::len)
+                + value.display().map_or(0, str::len)
+                + value.tooltip().map_or(0, str::len)
+                + size_of::<crate::hyperlinks::Hyperlink>()
+        },
+        HyperlinkAction::Remove(reference) => {
+            reference.as_str().len() + size_of::<crate::hyperlinks::Hyperlink>()
+        },
+    }
 }
 
 fn apply_action_capture(capture: &mut CellCapture, action: &Action) {
@@ -6751,6 +7039,24 @@ fn transfer_action(state: State, source: Address, target: Address) -> Result<Act
         payload: Some(payload),
         style,
     })
+}
+
+fn transfer_rich_action(rich: crate::RichText, state: &State) -> Action {
+    let style = match state {
+        State::Cell {
+            style: crate::StyleState::Default,
+            ..
+        }
+        | State::Missing => Some(StyleEffect::Reset),
+        State::Cell {
+            style: crate::StyleState::Shared(key),
+            ..
+        } => Some(StyleEffect::Set(key.raw())),
+    };
+    Action::Update {
+        payload: Some(Payload::Rich(Box::new(rich))),
+        style,
+    }
 }
 
 const fn rectangles_overlap(left: Rect, right: Rect) -> bool {

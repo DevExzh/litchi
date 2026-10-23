@@ -1345,6 +1345,131 @@ fn same_text_rich_run_property_change_is_not_collapsed_as_a_noop() {
 }
 
 #[test]
+fn plain_set_over_same_visible_rich_text_erases_runs() {
+    let baseline = crate::Package::new().expect("baseline workbook");
+    let mut package = baseline.inner.package.clone();
+    package
+        .get_part_mut(&baseline.inner.sheets[0].part_uri)
+        .expect("worksheet part")
+        .set_blob(
+            br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="inlineStr"><is><r><rPr><b/></rPr><t>same</t></r></is></c></row></sheetData></worksheet>"#.to_vec(),
+        );
+    let source = crate::Package::from_opc(package).expect("rich inline workbook");
+    let mut edit = source
+        .edit_with_options(EditOptions::default().with_max_retained_bytes(usize::MAX))
+        .expect("bounded edit");
+    edit.sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet")
+        .set("A1", "same")
+        .expect("plain replacement");
+    let committed = edit.commit().expect("commit plain replacement");
+    assert!(!committed.patch().is_noop());
+    assert!(
+        committed
+            .package()
+            .sheet("Sheet1")
+            .expect("sheet lookup")
+            .expect("worksheet")
+            .rich_text("A1")
+            .expect("rich read")
+            .is_none()
+    );
+}
+
+#[test]
+fn rich_transfer_keeps_the_source_shared_style() {
+    let source = styled_workbook();
+    let mut package = source.inner.package.clone();
+    package
+        .get_part_mut(&source.inner.sheets[0].part_uri)
+        .expect("worksheet part")
+        .set_blob(
+            br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" s="1" t="inlineStr"><is><r><rPr><b/></rPr><t>styled rich</t></r></is></c><c r="B1"><v>2</v></c></row></sheetData></worksheet>"#.to_vec(),
+        );
+    let source = crate::Package::from_opc(package).expect("styled rich workbook");
+    let mut edit = source.edit().expect("edit");
+    edit.copy_cells("Sheet1", "A1", "Sheet1", "B1")
+        .expect("rich transfer")
+        .expect("selectors");
+    let committed = edit.commit().expect("commit rich transfer");
+    let target = committed
+        .package()
+        .sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet");
+    assert!(matches!(
+        target.local_style("B1").expect("target style"),
+        Some(crate::LocalStyle::Shared(_))
+    ));
+    assert_eq!(
+        target
+            .style("B1")
+            .expect("target style")
+            .expect("shared style")
+            .format()
+            .expect("target format")
+            .number_format()
+            .code(),
+        source
+            .sheet("Sheet1")
+            .expect("source lookup")
+            .expect("source worksheet")
+            .style("A1")
+            .expect("source style")
+            .expect("source shared style")
+            .format()
+            .expect("source format")
+            .number_format()
+            .code()
+    );
+    assert_eq!(
+        target
+            .rich_text("B1")
+            .expect("rich read")
+            .expect("rich value")
+            .text(),
+        "styled rich"
+    );
+}
+
+#[test]
+fn hyperlink_ranges_with_one_start_keep_independent_captures() {
+    let source = crate::Package::new().expect("source workbook");
+    let mut edit = source
+        .edit_with_options(EditOptions::default().with_max_retained_bytes(usize::MAX))
+        .expect("bounded edit");
+    let first = crate::hyperlinks::Hyperlink::external(
+        crate::hyperlinks::HyperlinkReference::new("A1:B1").expect("first reference"),
+        "https://example.test/first",
+    )
+    .expect("first hyperlink");
+    let second = crate::hyperlinks::Hyperlink::external(
+        crate::hyperlinks::HyperlinkReference::new("A1:C1").expect("second reference"),
+        "https://example.test/second",
+    )
+    .expect("second hyperlink");
+    edit.sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet")
+        .put_hyperlink(first)
+        .and_then(|sheet| sheet.put_hyperlink(second))
+        .expect("independent hyperlinks");
+    let committed = edit.commit().expect("commit hyperlinks");
+    assert_eq!(
+        committed
+            .package()
+            .sheet("Sheet1")
+            .expect("sheet lookup")
+            .expect("worksheet")
+            .hyperlinks()
+            .expect("hyperlinks")
+            .len(),
+        2
+    );
+}
+
+#[test]
 fn cell_transfer_clones_selected_picture_graph_and_is_reversible() {
     let baseline = two_sheet_workbook(WorksheetKind::Worksheet);
     let mut package = baseline.inner.package.clone();
