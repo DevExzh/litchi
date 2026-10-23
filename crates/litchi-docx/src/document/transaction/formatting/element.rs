@@ -923,7 +923,7 @@ impl Edit {
         }
         ensure_utf8(after)?;
         let replacement_text_bytes = self.checked_text_total(after.len())?;
-        let candidate = self.projected.with_rewritten_xml(replace_range(
+        let candidate = self.projected_with_xml(replace_range(
             self.projected.xml_bytes(),
             located.start,
             located.end,
@@ -963,7 +963,7 @@ impl Edit {
             .insertion_offset(child.get())
             .ok_or(Error::SemanticPrecondition)?;
         let count = children.children.len();
-        let candidate = self.projected.with_rewritten_xml(replace_range(
+        let candidate = self.projected_with_xml(replace_range(
             self.projected.xml_bytes(),
             offset,
             offset,
@@ -1012,12 +1012,8 @@ impl Edit {
             return Err(Error::SemanticPrecondition);
         }
         let count = children.children.len();
-        let candidate = self.projected.with_rewritten_xml(replace_range(
-            self.projected.xml_bytes(),
-            start,
-            end,
-            &[],
-        )?)?;
+        let candidate =
+            self.projected_with_xml(replace_range(self.projected.xml_bytes(), start, end, &[])?)?;
         let (after, _) = container_children(&candidate, container)?;
         if after.children.len().checked_add(1) != Some(count) {
             return Err(invalid("element removal failed readback"));

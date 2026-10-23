@@ -14,6 +14,7 @@ use super::{
     admit_assignments, admit_targets,
 };
 use crate::registry::Operation;
+use crate::transaction::SemanticLimits;
 use crate::{Code, Error, Props, Result, TargetArg};
 
 pub(crate) struct Plan {
@@ -152,9 +153,18 @@ fn plan(target: Target, props: &Props<'_>) -> Result<Option<Plan>> {
 
 impl Run {
     pub(crate) fn new(base: &Docx) -> Result<Self> {
+        Self::new_with_snapshot_budget(base, SemanticLimits::default().max_snapshot_bytes())
+    }
+
+    /// Start a formatting run with the caller's remaining semantic snapshot
+    /// budget already attached to the native edit.  Formatting is coalesced
+    /// before commit, so admitting only the final pair would let an
+    /// intermediate `Snapshot` escape the facade's retention ceiling.
+    pub(crate) fn new_with_snapshot_budget(base: &Docx, snapshot_budget: usize) -> Result<Self> {
+        let editor = base.edit()?.with_snapshot_budget(snapshot_budget)?;
         Ok(Self {
             base: base.clone(),
-            edit: WorkEdit::from(base.edit()?)?,
+            edit: WorkEdit::from(editor)?,
             items: Vec::new(),
             last_target: None,
             texted: BTreeSet::new(),

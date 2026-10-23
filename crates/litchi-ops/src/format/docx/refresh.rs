@@ -36,7 +36,8 @@ fn refresh_inner(
     options: &Options,
     limits: &SemanticLimits,
 ) -> Result<(Option<Commit>, Summary)> {
-    let editor = super::merge::owning_editor(file)?;
+    let editor =
+        super::merge::owning_editor(file)?.with_snapshot_budget(limits.max_snapshot_bytes())?;
     let levels = match &editor {
         DocxEditor::Unsigned(package) => style_levels(package)?,
         _ => match file.owner() {

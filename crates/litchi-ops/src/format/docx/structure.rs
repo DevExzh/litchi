@@ -25,6 +25,7 @@ use crate::placement::Placement;
 use crate::props::{Key, PropValue, Props};
 use crate::registry::{Access, Entry, Operation};
 use crate::target::TargetArg;
+use crate::transaction::SemanticLimits;
 
 /// A checked structural target.  The selection is computed from the source
 /// snapshot before the editor is staged, so later removals cannot shift an
@@ -64,7 +65,16 @@ impl Docx {
         parent: PathArg<'p>,
         node: NewNode<'n>,
     ) -> Result<(Commit, Path<'static>)> {
-        let result = self.add_inner(parent, node, false);
+        self.add_with_limits(parent, node, &SemanticLimits::default())
+    }
+
+    pub(crate) fn add_with_limits<'p, 'n>(
+        &self,
+        parent: PathArg<'p>,
+        node: NewNode<'n>,
+        limits: &SemanticLimits,
+    ) -> Result<(Commit, Path<'static>)> {
+        let result = self.add_inner(parent, node, false, limits.max_snapshot_bytes());
         self.owner().finish(result)
     }
 
@@ -73,7 +83,17 @@ impl Docx {
         parent: PathArg<'p>,
         node: NewNode<'n>,
     ) -> Result<(Commit, Path<'static>)> {
-        self.owner().finish(self.add_inner(parent, node, true))
+        self.add_command_with_limits(parent, node, &SemanticLimits::default())
+    }
+
+    pub(crate) fn add_command_with_limits<'p, 'n>(
+        &self,
+        parent: PathArg<'p>,
+        node: NewNode<'n>,
+        limits: &SemanticLimits,
+    ) -> Result<(Commit, Path<'static>)> {
+        self.owner()
+            .finish(self.add_inner(parent, node, true, limits.max_snapshot_bytes()))
     }
 
     fn add_inner<'p, 'n>(
@@ -81,11 +101,12 @@ impl Docx {
         parent: PathArg<'p>,
         node: NewNode<'n>,
         command_text: bool,
+        snapshot_budget: usize,
     ) -> Result<(Commit, Path<'static>)> {
         // Security and retention policy are checked before any property
         // conversion or source read.  Dropping this editor rolls back every
         // admission failure below.
-        let editor = self.edit()?;
+        let editor = self.edit()?.with_snapshot_budget(snapshot_budget)?;
         let parent = resolve_path(self, &parent)?;
         // Header, footer and note paragraphs and runs (record 0325).
         let editor = match self.try_add_story(editor, &parent, &node)? {
@@ -205,12 +226,20 @@ impl Docx {
     /// are subsumed by their selected paragraph, and removals are staged in
     /// reverse document order so no earlier operation shifts a later proof.
     pub(crate) fn remove<'p>(&self, target: TargetArg<'p>) -> Result<Commit> {
-        let result = self.remove_inner(target);
+        self.remove_with_limits(target, &SemanticLimits::default())
+    }
+
+    pub(crate) fn remove_with_limits<'p>(
+        &self,
+        target: TargetArg<'p>,
+        limits: &SemanticLimits,
+    ) -> Result<Commit> {
+        let result = self.remove_inner(target, limits.max_snapshot_bytes());
         self.owner().finish(result)
     }
 
-    fn remove_inner<'p>(&self, target: TargetArg<'p>) -> Result<Commit> {
-        let editor = self.edit()?;
+    fn remove_inner<'p>(&self, target: TargetArg<'p>, snapshot_budget: usize) -> Result<Commit> {
+        let editor = self.edit()?.with_snapshot_budget(snapshot_budget)?;
         let nodes = self.resolve_targets(&target)?;
         // Header, footer and note paragraphs and runs (record 0325).
         let editor = match self.try_remove_story(editor, &nodes)? {
@@ -253,12 +282,26 @@ impl Docx {
         path: PathArg<'p>,
         placement: Placement<'q>,
     ) -> Result<Commit> {
-        let result = self.move_inner(path, placement);
+        self.move_to_with_limits(path, placement, &SemanticLimits::default())
+    }
+
+    pub(crate) fn move_to_with_limits<'p, 'q>(
+        &self,
+        path: PathArg<'p>,
+        placement: Placement<'q>,
+        limits: &SemanticLimits,
+    ) -> Result<Commit> {
+        let result = self.move_inner(path, placement, limits.max_snapshot_bytes());
         self.owner().finish(result)
     }
 
-    fn move_inner<'p, 'q>(&self, path: PathArg<'p>, placement: Placement<'q>) -> Result<Commit> {
-        let editor = self.edit()?;
+    fn move_inner<'p, 'q>(
+        &self,
+        path: PathArg<'p>,
+        placement: Placement<'q>,
+        snapshot_budget: usize,
+    ) -> Result<Commit> {
+        let editor = self.edit()?.with_snapshot_budget(snapshot_budget)?;
         let node = resolve_path(self, &path)?;
         let selection = match Selection::from_node(&node) {
             Ok(selection) => selection,
@@ -308,12 +351,26 @@ impl Docx {
     /// Swap two direct body paragraphs or direct runs while retaining each
     /// selected fragment's exact source bytes.
     pub(crate) fn swap<'p, 'q>(&self, a: PathArg<'p>, b: PathArg<'q>) -> Result<Commit> {
-        let result = self.swap_inner(a, b);
+        self.swap_with_limits(a, b, &SemanticLimits::default())
+    }
+
+    pub(crate) fn swap_with_limits<'p, 'q>(
+        &self,
+        a: PathArg<'p>,
+        b: PathArg<'q>,
+        limits: &SemanticLimits,
+    ) -> Result<Commit> {
+        let result = self.swap_inner(a, b, limits.max_snapshot_bytes());
         self.owner().finish(result)
     }
 
-    fn swap_inner<'p, 'q>(&self, a: PathArg<'p>, b: PathArg<'q>) -> Result<Commit> {
-        let editor = self.edit()?;
+    fn swap_inner<'p, 'q>(
+        &self,
+        a: PathArg<'p>,
+        b: PathArg<'q>,
+        snapshot_budget: usize,
+    ) -> Result<Commit> {
+        let editor = self.edit()?.with_snapshot_budget(snapshot_budget)?;
         let left = resolve_path(self, &a)?;
         let right = resolve_path(self, &b)?;
         let left = Selection::from_node(&left)?;

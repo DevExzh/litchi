@@ -55,6 +55,19 @@ impl<P: Clone> Edit<P> {
         Self { package, inner }
     }
 
+    /// Apply the unified facade's remaining semantic snapshot ceiling to the
+    /// retained main-document edit. The limit is checked before each native
+    /// projection is retained, while the package owner remains unchanged.
+    pub(crate) fn with_snapshot_budget(mut self, maximum: usize) -> Self {
+        self.inner = self.inner.with_snapshot_budget(maximum);
+        self
+    }
+
+    /// The unified facade budget currently attached to this edit.
+    pub(crate) const fn snapshot_budget(&self) -> Option<usize> {
+        self.inner.snapshot_budget()
+    }
+
     /// Apply one already-planned composition batch without opening a second
     /// document snapshot. Package owners use this to retain one validation and
     /// publication pass for all joined operations.

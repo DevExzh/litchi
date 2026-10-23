@@ -2047,7 +2047,7 @@ impl Edit {
         }
         ranges.sort_by_key(|range| (range.0, range.1));
         let rewritten = replace_ranges(xml, &ranges)?;
-        let candidate = self.projected.with_rewritten_xml(rewritten)?;
+        let candidate = self.projected_with_xml(rewritten)?;
         // Regions apply last to first, so earlier child indices hold.
         for list in region_operations.into_iter().rev() {
             new_operations.extend(list);
