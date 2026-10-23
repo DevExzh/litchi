@@ -21,11 +21,14 @@ Each receipt records `FREEZE`, the exact command, `rustc -Vv`, `cargo -V`,
 feature configuration, peak RSS, and the output SHA-256. The existing
 isolated wsdoc target at
 `/home/zhuhe/code/litchi-worktrees/.coord/isolated-wsdoc/target` is about
-4.44 GiB and is valid for the safe-53 profile set, not merely for ordinary
-docs. Reuse it only when its receipt matches the frozen source and toolchain.
-Do not create a fresh multi-gigabyte target per crate when one coordinated
-target fits; run the captures sequentially. Keep `litchi-iwa-protos` isolated
-from other rustdoc jobs because its prior kill was load-related.
+4.44 GB (decimal) and is valid for the safe-53 profile set, not merely for
+ordinary docs. A Cargo target cache may be reused across source commits:
+Cargo fingerprints rebuild changed inputs. Reusing captured JSON or other
+evidence is different and requires a receipt matching the frozen source,
+toolchain, flags and output hash. Do not create a fresh multi-gigabyte target
+per crate when one coordinated target fits; run the captures sequentially.
+Keep `litchi-iwa-protos` isolated from other rustdoc jobs because its prior
+kill was load-related.
 
 Use the memory-capped Cargo shim and the single-job settings for every build
 or rustdoc capture:
@@ -39,22 +42,37 @@ export CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 \
 export CARGO_TARGET_DIR="$OUT/target"
 ```
 
-Before each cargo command, perform the 19.2-GiB target preflight and retain a
-hard 20-GiB ceiling:
+Before each Cargo command, perform the 19,200,000,000-byte decimal target
+preflight; after each command enforce the 20,000,000,000-byte decimal hard
+ceiling using apparent bytes:
 
 ```sh
-python3 - "$CARGO_TARGET_DIR" <<'PY'
-import pathlib, subprocess, sys
-target = pathlib.Path(sys.argv[1])
-size = (int(subprocess.check_output(["du", "-s", "-B1", str(target)], text=True).split()[0])
-        if target.is_dir() else 0)
-if size >= int(19.2 * 1024**3):
-    raise SystemExit(f"target preflight failed: {size} bytes")
-PY
+target_bytes() {
+  if test -d "$CARGO_TARGET_DIR"; then
+    du -sb "$CARGO_TARGET_DIR" | awk '{print $1}'
+  else
+    echo 0
+  fi
+}
+preflight_target() {
+  bytes=$(target_bytes)
+  test "$bytes" -lt 19200000000 || {
+    echo "target preflight failed: $bytes bytes" >&2
+    exit 1
+  }
+}
+postflight_target() {
+  bytes=$(target_bytes)
+  test "$bytes" -lt 20000000000 || {
+    echo "target hard cap failed: $bytes bytes" >&2
+    exit 1
+  }
+}
+preflight_target
 ```
 
-Every Cargo invocation is additionally `--locked`; no concurrent Cargo jobs
-are allowed. The final target must remain below the 20-GiB host cap.
+Every Cargo invocation is explicitly `--offline --locked`; no concurrent
+Cargo jobs are allowed. Call `postflight_target` immediately after each one.
 
 ## JSON inventory
 
@@ -62,9 +80,10 @@ For every direct library package not covered by a glossary profile, and for
 every package lacking a receipt-proven all-features capture, run sequentially:
 
 ```sh
-cargo rustdoc -p <package> --lib --all-features --locked \
+cargo rustdoc -p <package> --lib --all-features --offline --locked \
   --target-dir "$CARGO_TARGET_DIR" -- \
   -Zunstable-options --output-format json --document-hidden-items
+postflight_target
 ```
 
 Copy the generated crate JSON immediately to `$OUT/inventory/` and record its
