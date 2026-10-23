@@ -24,6 +24,19 @@ use super::source::SourceBackedPresentationEditor;
 use crate::{Error, Result, SlideOrderRefusal};
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
+#[cfg(test)]
+macro_rules! assert_refused_kind {
+    ($operation:expr, $expected:expr) => {{
+        match $operation {
+            Err(Error::Refused(refusal)) => {
+                assert_eq!(refusal.kind(), $expected);
+            },
+            Err(error) => panic!("unexpected error: {error:?}"),
+            Ok(_) => panic!("operation unexpectedly succeeded"),
+        }
+    }};
+}
+
 const MAX_XML_DEPTH: usize = 256;
 const MAX_XML_NODES: usize = 1_000_000;
 
@@ -1648,12 +1661,10 @@ mod tests {
             r#"<p:viewPr xmlns:p="{}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/200&#54;" mc:Ignorable="p"/>"#,
             std::str::from_utf8(PRESENTATIONML_NAMESPACE).unwrap(),
         );
-        assert!(matches!(
+        assert_refused_kind!(
             inspect_metadata_xml(xml.as_bytes(), MetadataOwner::ViewProperties, None),
-            Err(
-                Error::Refused(refusal) if refusal.kind() == SlideOrderRefusal::ViewProperties.kind(),
-            )
-        ));
+            SlideOrderRefusal::ViewProperties.kind()
+        );
     }
 
     #[test]
@@ -1663,40 +1674,34 @@ mod tests {
             std::str::from_utf8(PRESENTATIONML_NAMESPACE).unwrap(),
             std::str::from_utf8(MCE_NAMESPACE).unwrap(),
         );
-        assert!(matches!(
+        assert_refused_kind!(
             reject_root_features(canonical_root.as_bytes(), None),
-            Err(
-                Error::Refused(refusal) if refusal.kind() == SlideOrderRefusal::MarkupCompatibility.kind(),
-            )
-        ));
+            SlideOrderRefusal::MarkupCompatibility.kind()
+        );
 
         let foreign_root = format!(
             r#"<p:presentation xmlns:p="{}" xmlns:foreign="{}" foreign:Ignorable="p"/>"#,
             std::str::from_utf8(PRESENTATIONML_NAMESPACE).unwrap(),
             std::str::from_utf8(FOREIGN_MCE).unwrap(),
         );
-        assert!(matches!(
+        assert_refused_kind!(
             reject_root_features(foreign_root.as_bytes(), None),
-            Err(
-                Error::Refused(refusal) if refusal.kind() == SlideOrderRefusal::PositionalOwner.kind(),
-            )
-        ));
+            SlideOrderRefusal::PositionalOwner.kind()
+        );
 
         let canonical_metadata = format!(
             r#"<p:viewPr xmlns:p="{}" xmlns:mc="{}" mc:Ignorable="p"/>"#,
             std::str::from_utf8(PRESENTATIONML_NAMESPACE).unwrap(),
             std::str::from_utf8(MCE_NAMESPACE).unwrap(),
         );
-        assert!(matches!(
+        assert_refused_kind!(
             inspect_metadata_xml(
                 canonical_metadata.as_bytes(),
                 MetadataOwner::ViewProperties,
                 None,
             ),
-            Err(
-                Error::Refused(refusal) if refusal.kind() == SlideOrderRefusal::ViewProperties.kind(),
-            )
-        ));
+            SlideOrderRefusal::ViewProperties.kind()
+        );
 
         let foreign_metadata = format!(
             r#"<p:viewPr xmlns:p="{}" xmlns:foreign="{}" foreign:Ignorable="p"/>"#,
@@ -1736,57 +1741,47 @@ mod tests {
         let foreign = format!(
             r#"<p:presentationPr xmlns:p="{presentation}"><p:showPr><p:penClr><a:srgbClr xmlns:a="{drawing}" val="112233"><a:extLst/></a:srgbClr></p:penClr></p:showPr></p:presentationPr>"#
         );
-        assert!(matches!(
+        assert_refused_kind!(
             inspect_presentation_properties_xml(foreign.as_bytes(), None),
-            Err(
-                Error::Refused(refusal) if refusal.kind() == SlideOrderRefusal::PresentationProperties.kind(),
-            )
-        ));
+            SlideOrderRefusal::PresentationProperties.kind()
+        );
         let foreign_namespace = format!(
             r#"<p:presentationPr xmlns:p="{presentation}"><p:showPr><p:penClr><a:srgbClr xmlns:a="{drawing}" xmlns:v="urn:foreign" v:href="https://example.invalid" val="112233"/></p:penClr></p:showPr></p:presentationPr>"#
         );
-        assert!(matches!(
+        assert_refused_kind!(
             inspect_presentation_properties_xml(foreign_namespace.as_bytes(), None),
-            Err(
-                Error::Refused(refusal) if refusal.kind() == SlideOrderRefusal::PresentationProperties.kind(),
-            )
-        ));
+            SlideOrderRefusal::PresentationProperties.kind()
+        );
         let foreign_child = format!(
             r#"<p:presentationPr xmlns:p="{presentation}" xmlns:p14="{p14}" xmlns:a="{drawing}" xmlns:v="urn:foreign"><p:showPr><p:extLst><p:ext uri="{show_uri}"><p14:laserClr><a:srgbClr val="112233"><v:payload/></a:srgbClr></p14:laserClr></p:ext></p:extLst></p:showPr></p:presentationPr>"#,
             p14 = std::str::from_utf8(POWERPOINT_2010_NAMESPACE).unwrap(),
             drawing = std::str::from_utf8(DRAWINGML_NAMESPACE).unwrap(),
             show_uri = crate::presentation_properties::LASER_COLOR_URI,
         );
-        assert!(matches!(
+        assert_refused_kind!(
             inspect_presentation_properties_xml(foreign_child.as_bytes(), None),
-            Err(
-                Error::Refused(refusal) if refusal.kind() == SlideOrderRefusal::PresentationProperties.kind(),
-            )
-        ));
+            SlideOrderRefusal::PresentationProperties.kind()
+        );
         let relationship_wrapper = format!(
             r#"<p:presentationPr xmlns:p="{presentation}" xmlns:p14="{p14}" xmlns:a="{drawing}" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><p:showPr><p:extLst><p:ext uri="{show_uri}"><p14:laserClr r:id="rId2"><a:srgbClr val="112233"/></p14:laserClr></p:ext></p:extLst></p:showPr></p:presentationPr>"#,
             p14 = std::str::from_utf8(POWERPOINT_2010_NAMESPACE).unwrap(),
             drawing = std::str::from_utf8(DRAWINGML_NAMESPACE).unwrap(),
             show_uri = crate::presentation_properties::LASER_COLOR_URI,
         );
-        assert!(matches!(
+        assert_refused_kind!(
             inspect_presentation_properties_xml(relationship_wrapper.as_bytes(), None),
-            Err(
-                Error::Refused(refusal) if refusal.kind() == SlideOrderRefusal::PresentationProperties.kind(),
-            )
-        ));
+            SlideOrderRefusal::PresentationProperties.kind()
+        );
         let foreign_wrapper = format!(
             r#"<p:presentationPr xmlns:p="{presentation}" xmlns:p14="{p14}" xmlns:a="{drawing}" xmlns:v="urn:foreign"><p:showPr><p:extLst><p:ext uri="{show_uri}"><p14:laserClr v:href="https://example.invalid"><a:srgbClr val="112233"/></p14:laserClr></p:ext></p:extLst></p:showPr></p:presentationPr>"#,
             p14 = std::str::from_utf8(POWERPOINT_2010_NAMESPACE).unwrap(),
             drawing = std::str::from_utf8(DRAWINGML_NAMESPACE).unwrap(),
             show_uri = crate::presentation_properties::LASER_COLOR_URI,
         );
-        assert!(matches!(
+        assert_refused_kind!(
             inspect_presentation_properties_xml(foreign_wrapper.as_bytes(), None),
-            Err(
-                Error::Refused(refusal) if refusal.kind() == SlideOrderRefusal::PresentationProperties.kind(),
-            )
-        ));
+            SlideOrderRefusal::PresentationProperties.kind()
+        );
     }
 
     #[test]
@@ -1798,11 +1793,9 @@ mod tests {
         inspect_presentation_properties_xml(unknown.as_bytes(), None).unwrap();
         let properties =
             crate::presentation_properties::Properties::parse_strict(unknown.as_bytes()).unwrap();
-        assert!(matches!(
+        assert_refused_kind!(
             validate_modeled_presentation_properties(&properties),
-            Err(
-                Error::Refused(refusal) if refusal.kind() == SlideOrderRefusal::PresentationProperties.kind(),
-            )
-        ));
+            SlideOrderRefusal::PresentationProperties.kind()
+        );
     }
 }

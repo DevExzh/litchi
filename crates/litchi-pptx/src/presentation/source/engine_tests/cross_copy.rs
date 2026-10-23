@@ -5567,10 +5567,12 @@ fn source_backed_cross_copy_unnamed_admission_still_requires_common_slide_data()
         let source = open_source(&source_bytes)?;
         let editor = open_editor(&destination_bytes)?;
         match editor.plan_cross_slide_copy(&source, 0, 1, 1) {
-            Err(
-                Error::Refused(refusal) if refusal.kind() == crate::SlideCopyRefusal::AmbiguousTopology.kind(),
-            ) => {
-                assert!(refusal.reason().contains("selected slide cannot be copied"))
+            Err(Error::Refused(refusal)) => {
+                assert_eq!(
+                    refusal.kind(),
+                    crate::SlideCopyRefusal::AmbiguousTopology.kind()
+                );
+                assert!(refusal.reason().contains("selected slide cannot be copied"));
             },
             Err(error) => panic!("unexpected structural refusal: {error:?}"),
             Ok(_) => panic!("missing common slide data must be refused"),

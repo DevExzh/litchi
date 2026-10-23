@@ -25,6 +25,18 @@ use litchi_pptx::builder::Builder;
 use litchi_pptx::{Error, SlideRemovalRefusal, source::Package};
 use soapberry_zip::office::ArchiveReader;
 
+macro_rules! assert_refused_kind {
+    ($operation:expr, $expected:expr) => {{
+        match $operation {
+            Err(Error::Refused(refusal)) => {
+                assert_eq!(refusal.kind(), $expected);
+            },
+            Err(error) => panic!("unexpected error: {error:?}"),
+            Ok(_) => panic!("operation unexpectedly succeeded"),
+        }
+    }};
+}
+
 const MAIN: &str = "/ppt/presentation.xml";
 
 fn fixture() -> Vec<u8> {
@@ -636,12 +648,10 @@ fn alternate_layout_target_spelling_is_refused_before_noninvertible_removal() {
     let bytes = archive.finish_to_bytes().unwrap();
     let source = fresh(&bytes);
     let mut edit = source.edit().unwrap();
-    assert!(matches!(
+    assert_refused_kind!(
         edit.remove_slide(Position::new(1)),
-        Err(
-            Error::Refused(refusal) if refusal.kind() == SlideRemovalRefusal::AmbiguousTopology.kind(),
-        )
-    ));
+        SlideRemovalRefusal::AmbiguousTopology.kind()
+    );
     let commit = edit.commit().unwrap();
     assert!(commit.patch().is_noop());
     assert_eq!(commit.into_package().to_bytes().unwrap(), bytes);

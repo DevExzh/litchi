@@ -9,6 +9,18 @@ use sha2::{Digest, Sha256};
 use super::{History, Limits, Patch, Resolution, ShapeTextReplacement};
 use crate::{Error, Package, Result, SlideCopyRefusal, SlideRemovalRefusal};
 
+macro_rules! assert_refused_kind {
+    ($operation:expr, $expected:expr) => {{
+        match $operation {
+            Err(Error::Refused(refusal)) => {
+                assert_eq!(refusal.kind(), $expected);
+            },
+            Err(error) => panic!("unexpected error: {error:?}"),
+            Ok(_) => panic!("operation unexpectedly succeeded"),
+        }
+    }};
+}
+
 /// Reproduce the capture sequence that preceded the capture-local projection
 /// helper.  This deliberately uses the ordinary public presentation slide
 /// resolver and keeps the relationship, identity, notes, and name checks in
@@ -810,12 +822,10 @@ fn opened_transaction_does_not_upgrade_borrowed_physical_provenance() -> Result<
 
     let destination = opened_plain_slides_package(2)?;
     let destination_snapshot = destination.opened_presentation()?;
-    assert!(matches!(
+    assert_refused_kind!(
         destination_snapshot.plan_cross_slide_copy(commit.snapshot(), 0, 0, 1),
-        Err(
-            Error::Refused(refusal) if refusal.kind() == SlideCopyRefusal::UnknownPhysicalMember.kind(),
-        )
-    ));
+        SlideCopyRefusal::UnknownPhysicalMember.kind()
+    );
     Ok(())
 }
 
@@ -835,12 +845,10 @@ fn cross_slide_copy_refuses_slide_name_and_unknown_physical_collisions() -> Resu
     let destination_before = part_states(&destination);
     let source_snapshot = source.opened_presentation()?;
     let destination_snapshot = destination.opened_presentation()?;
-    assert!(matches!(
+    assert_refused_kind!(
         destination_snapshot.plan_cross_slide_copy(&source_snapshot, 0, 0, 1),
-        Err(
-            Error::Refused(refusal) if refusal.kind() == SlideCopyRefusal::AmbiguousTopology.kind(),
-        )
-    ));
+        SlideCopyRefusal::AmbiguousTopology.kind()
+    );
     assert_eq!(part_states(&destination), destination_before);
 
     let unknown_source_bytes = add_unknown_member(&source_bytes, "scratch.bin")?;
@@ -848,27 +856,23 @@ fn cross_slide_copy_refuses_slide_name_and_unknown_physical_collisions() -> Resu
     let mut ordinary_destination = opened_plain_slides_package(2)?;
     rename_slide(&mut ordinary_destination, 0, "destination-first")?;
     rename_slide(&mut ordinary_destination, 1, "destination-second")?;
-    assert!(matches!(
+    assert_refused_kind!(
         ordinary_destination
             .opened_presentation()?
             .plan_cross_slide_copy(&unknown_source.opened_presentation()?, 0, 0, 1),
-        Err(
-            Error::Refused(refusal) if refusal.kind() == SlideCopyRefusal::UnknownPhysicalMember.kind(),
-        )
-    ));
+        SlideCopyRefusal::UnknownPhysicalMember.kind()
+    );
 
     let unknown_destination_bytes =
         add_unknown_member(&ordinary_destination.to_bytes()?, "scratch.bin")?;
     let unknown_destination =
         Package::from_reader(std::io::Cursor::new(unknown_destination_bytes))?;
-    assert!(matches!(
+    assert_refused_kind!(
         unknown_destination
             .opened_presentation()?
             .plan_cross_slide_copy(&source.opened_presentation()?, 0, 0, 1),
-        Err(
-            Error::Refused(refusal) if refusal.kind() == SlideCopyRefusal::UnknownPhysicalMember.kind(),
-        )
-    ));
+        SlideCopyRefusal::UnknownPhysicalMember.kind()
+    );
 
     // The raw member name is an ASCII-case variant of the deterministic
     // `/ppt/embeddings/copy-source-copy1.bin` destination selected for the
@@ -882,24 +886,20 @@ fn cross_slide_copy_refuses_slide_name_and_unknown_physical_collisions() -> Resu
     )?;
     let colliding_unknown_destination =
         Package::from_reader(std::io::Cursor::new(colliding_unknown_destination_bytes))?;
-    assert!(matches!(
+    assert_refused_kind!(
         colliding_unknown_destination
             .opened_presentation()?
             .plan_cross_slide_copy(&source.opened_presentation()?, 0, 0, 1),
-        Err(
-            Error::Refused(refusal) if refusal.kind() == SlideCopyRefusal::UnknownPhysicalMember.kind(),
-        )
-    ));
+        SlideCopyRefusal::UnknownPhysicalMember.kind()
+    );
     let unknown_removal = Package::from_reader(std::io::Cursor::new(add_unknown_member(
         &ordinary_destination.to_bytes()?,
         "removal-junk.bin",
     )?))?;
-    assert!(matches!(
+    assert_refused_kind!(
         unknown_removal.opened_presentation()?.plan_slide_removal(0),
-        Err(
-            Error::Refused(refusal) if refusal.kind() == SlideRemovalRefusal::UnknownPhysicalMember.kind(),
-        )
-    ));
+        SlideRemovalRefusal::UnknownPhysicalMember.kind()
+    );
     Ok(())
 }
 
@@ -932,14 +932,12 @@ fn cross_slide_copy_authorizes_known_noncanonical_source_archives() -> Result<()
 
     let borrowed_source = Package::from_bytes(&source_bytes)?;
     let borrowed_destination = Package::from_bytes(&destination.to_bytes()?)?;
-    assert!(matches!(
+    assert_refused_kind!(
         borrowed_destination
             .opened_presentation()?
             .plan_cross_slide_copy(&borrowed_source.opened_presentation()?, 0, 0, 1),
-        Err(
-            Error::Refused(refusal) if refusal.kind() == SlideCopyRefusal::UnknownPhysicalMember.kind(),
-        )
-    ));
+        SlideCopyRefusal::UnknownPhysicalMember.kind()
+    );
     Ok(())
 }
 
@@ -1119,12 +1117,12 @@ fn cross_slide_copy_rejects_layout_mismatch_and_stale_or_forged_publication() ->
     std::sync::Arc::make_mut(&mut mismatched_destination.opc)
         .get_part_mut(&layout_name)?
         .set_blob(changed_layout);
-    assert!(matches!(
+    assert_refused_kind!(
         mismatched_destination
             .opened_presentation()?
             .plan_cross_slide_copy(&source_snapshot, 0, 0, 1),
-        Err(Error::Refused(refusal) if refusal.kind() == SlideCopyRefusal::SharedOwner.kind())
-    ));
+        SlideCopyRefusal::SharedOwner.kind()
+    );
     std::sync::Arc::make_mut(&mut mismatched_destination.opc)
         .get_part_mut(&layout_name)?
         .set_blob(layout_xml);
@@ -1154,12 +1152,12 @@ fn cross_slide_copy_rejects_layout_mismatch_and_stale_or_forged_publication() ->
         "rIdMasterMismatch".into(),
         relationship_mode,
     )?;
-    assert!(matches!(
+    assert_refused_kind!(
         mismatched_destination
             .opened_presentation()?
             .plan_cross_slide_copy(&source_snapshot, 0, 0, 1),
-        Err(Error::Refused(refusal) if refusal.kind() == SlideCopyRefusal::SharedOwner.kind())
-    ));
+        SlideCopyRefusal::SharedOwner.kind()
+    );
     let layout_part =
         std::sync::Arc::make_mut(&mut mismatched_destination.opc).get_part_mut(&layout_name)?;
     layout_part.rels_mut().remove("rIdMasterMismatch");
@@ -1241,31 +1239,25 @@ fn cross_slide_copy_refuses_mixed_strict_and_transitional_packages_both_directio
     let strict_destination =
         Package::from_reader(std::io::Cursor::new(strict_destination.to_bytes()?))?;
 
-    assert!(matches!(
+    assert_refused_kind!(
         transitional_destination
             .opened_presentation()?
             .plan_cross_slide_copy(&strict_source.opened_presentation()?, 0, 0, 1),
-        Err(
-            Error::Refused(refusal) if refusal.kind() == SlideCopyRefusal::UnknownSemanticSurface.kind(),
-        )
-    ));
-    assert!(matches!(
+        SlideCopyRefusal::UnknownSemanticSurface.kind()
+    );
+    assert_refused_kind!(
         strict_destination
             .opened_presentation()?
             .plan_cross_slide_copy(&transitional_source.opened_presentation()?, 0, 0, 1),
-        Err(
-            Error::Refused(refusal) if refusal.kind() == SlideCopyRefusal::UnknownSemanticSurface.kind(),
-        )
-    ));
+        SlideCopyRefusal::UnknownSemanticSurface.kind()
+    );
 
-    assert!(matches!(
+    assert_refused_kind!(
         opened_plain_slides_package(2)?
             .opened_presentation()?
             .plan_cross_slide_copy(&mixed_strict_source.opened_presentation()?, 0, 0, 1),
-        Err(
-            Error::Refused(refusal) if refusal.kind() == SlideCopyRefusal::UnknownSemanticSurface.kind(),
-        )
-    ));
+        SlideCopyRefusal::UnknownSemanticSurface.kind()
+    );
     Ok(())
 }
 
@@ -2108,10 +2100,10 @@ fn slide_copy_plan_refuses_cycles_and_unknown_internal_relationships() -> Result
             "rIdBack".into(),
             TargetMode::Internal,
         )?;
-    assert!(matches!(
+    assert_refused_kind!(
         cyclic.opened_presentation()?.plan_slide_copy(0_usize, 1),
-        Err(Error::Refused(refusal) if refusal.kind() == SlideCopyRefusal::DependencyCycle.kind())
-    ));
+        SlideCopyRefusal::DependencyCycle.kind()
+    );
 
     let mut unknown = opened_plain_slide_package()?;
     let slide = unknown.opened_presentation()?.slides()[0]
@@ -2132,22 +2124,20 @@ fn slide_copy_plan_refuses_cycles_and_unknown_internal_relationships() -> Result
             "rIdUnknown".into(),
             TargetMode::Internal,
         )?;
-    assert!(matches!(
+    assert_refused_kind!(
         unknown.opened_presentation()?.plan_slide_copy(0_usize, 1),
-        Err(
-            Error::Refused(refusal) if refusal.kind() == SlideCopyRefusal::UnsupportedRelationship.kind(),
-        )
-    ));
+        SlideCopyRefusal::UnsupportedRelationship.kind()
+    );
     Ok(())
 }
 
 #[test]
 fn slide_copy_plan_refuses_shared_owners_mce_protection_and_signatures() -> Result<()> {
     let notes = opened_two_slide_package()?;
-    assert!(matches!(
+    assert_refused_kind!(
         notes.opened_presentation()?.plan_slide_copy(0_usize, 2),
-        Err(Error::Refused(refusal) if refusal.kind() == SlideCopyRefusal::SharedOwner.kind())
-    ));
+        SlideCopyRefusal::SharedOwner.kind()
+    );
 
     let mut mce = opened_plain_slide_package()?;
     let slide = mce.opened_presentation()?.slides()[0].part_name().clone();
@@ -2161,12 +2151,10 @@ fn slide_copy_plan_refuses_shared_owners_mce_protection_and_signatures() -> Resu
     std::sync::Arc::make_mut(&mut mce.opc)
         .get_part_mut(&slide)?
         .set_blob(xml.into_bytes());
-    assert!(matches!(
+    assert_refused_kind!(
         mce.opened_presentation()?.plan_slide_copy(0_usize, 1),
-        Err(
-            Error::Refused(refusal) if refusal.kind() == SlideCopyRefusal::MarkupCompatibility.kind(),
-        )
-    ));
+        SlideCopyRefusal::MarkupCompatibility.kind()
+    );
 
     let mut protected = opened_plain_slide_package()?;
     let presentation = protected.opened_presentation()?.presentation_name.clone();
@@ -2180,12 +2168,10 @@ fn slide_copy_plan_refuses_shared_owners_mce_protection_and_signatures() -> Resu
     std::sync::Arc::make_mut(&mut protected.opc)
         .get_part_mut(&presentation)?
         .set_blob(xml.into_bytes());
-    assert!(matches!(
+    assert_refused_kind!(
         protected.opened_presentation()?.plan_slide_copy(0_usize, 1),
-        Err(
-            Error::Refused(refusal) if refusal.kind() == SlideCopyRefusal::ProtectedPresentation.kind(),
-        )
-    ));
+        SlideCopyRefusal::ProtectedPresentation.kind()
+    );
 
     let mut signed = opened_plain_slide_package()?;
     std::sync::Arc::make_mut(&mut signed.opc)
@@ -2196,10 +2182,10 @@ fn slide_copy_plan_refuses_shared_owners_mce_protection_and_signatures() -> Resu
             "rIdSignature".into(),
             TargetMode::Internal,
         )?;
-    assert!(matches!(
+    assert_refused_kind!(
         signed.opened_presentation()?.plan_slide_copy(0_usize, 1),
-        Err(Error::Refused(refusal) if refusal.kind() == SlideCopyRefusal::SignedPackage.kind())
-    ));
+        SlideCopyRefusal::SignedPackage.kind()
+    );
     Ok(())
 }
 
@@ -2213,10 +2199,10 @@ fn slide_copy_plan_refuses_global_tables_and_enforces_closure_limits() -> Result
     std::sync::Arc::make_mut(&mut table.opc)
         .get_part_mut(&slide)?
         .set_blob(xml.into_bytes());
-    assert!(matches!(
+    assert_refused_kind!(
         table.opened_presentation()?.plan_slide_copy(0_usize, 1),
-        Err(Error::Refused(refusal) if refusal.kind() == SlideCopyRefusal::GlobalTableStyle.kind())
-    ));
+        SlideCopyRefusal::GlobalTableStyle.kind()
+    );
 
     let mut extension = opened_plain_slide_package()?;
     let slide = extension.opened_presentation()?.slides()[0]
@@ -2232,12 +2218,10 @@ fn slide_copy_plan_refuses_global_tables_and_enforces_closure_limits() -> Result
     std::sync::Arc::make_mut(&mut extension.opc)
         .get_part_mut(&slide)?
         .set_blob(xml.into_bytes());
-    assert!(matches!(
+    assert_refused_kind!(
         extension.opened_presentation()?.plan_slide_copy(0_usize, 1),
-        Err(
-            Error::Refused(refusal) if refusal.kind() == SlideCopyRefusal::UnknownSemanticSurface.kind(),
-        )
-    ));
+        SlideCopyRefusal::UnknownSemanticSurface.kind()
+    );
 
     let bounds = opened_plain_slide_package()?;
     assert!(matches!(
@@ -2285,36 +2269,32 @@ fn slide_copy_plan_validates_owned_xml_and_external_topology() -> Result<()> {
         &mut extension,
         br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><future:opaque xmlns:future="urn:future"/></c:chartSpace>"#,
     )?;
-    assert!(matches!(
+    assert_refused_kind!(
         extension.opened_presentation()?.plan_slide_copy(0_usize, 1),
-        Err(
-            Error::Refused(refusal) if refusal.kind() == SlideCopyRefusal::UnknownSemanticSurface.kind(),
-        )
-    ));
+        SlideCopyRefusal::UnknownSemanticSurface.kind()
+    );
 
     let mut encoded_mce = opened_plain_slide_package()?;
     attach_copy_chart(
         &mut encoded_mce,
         br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/200&#x36;"/>"#,
     )?;
-    assert!(matches!(
+    assert_refused_kind!(
         encoded_mce
             .opened_presentation()?
             .plan_slide_copy(0_usize, 1),
-        Err(
-            Error::Refused(refusal) if refusal.kind() == SlideCopyRefusal::MarkupCompatibility.kind(),
-        )
-    ));
+        SlideCopyRefusal::MarkupCompatibility.kind()
+    );
 
     let mut table = opened_plain_slide_package()?;
     attach_copy_chart(
         &mut table,
         br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:tbl/></c:chartSpace>"#,
     )?;
-    assert!(matches!(
+    assert_refused_kind!(
         table.opened_presentation()?.plan_slide_copy(0_usize, 1),
-        Err(Error::Refused(refusal) if refusal.kind() == SlideCopyRefusal::GlobalTableStyle.kind())
-    ));
+        SlideCopyRefusal::GlobalTableStyle.kind()
+    );
 
     let mut opaque_xml_media = opened_plain_slide_package()?;
     let slide = opaque_xml_media.opened_presentation()?.slides()[0]
@@ -2335,14 +2315,12 @@ fn slide_copy_plan_validates_owned_xml_and_external_topology() -> Result<()> {
             "rIdSvg".into(),
             TargetMode::Internal,
         )?;
-    assert!(matches!(
+    assert_refused_kind!(
         opaque_xml_media
             .opened_presentation()?
             .plan_slide_copy(0_usize, 1),
-        Err(
-            Error::Refused(refusal) if refusal.kind() == SlideCopyRefusal::UnknownSemanticSurface.kind(),
-        )
-    ));
+        SlideCopyRefusal::UnknownSemanticSurface.kind()
+    );
 
     let mut opaque_xml_package = opened_plain_slide_package()?;
     let slide = opaque_xml_package.opened_presentation()?.slides()[0]
@@ -2363,14 +2341,12 @@ fn slide_copy_plan_validates_owned_xml_and_external_topology() -> Result<()> {
             "rIdXmlPackage".into(),
             TargetMode::Internal,
         )?;
-    assert!(matches!(
+    assert_refused_kind!(
         opaque_xml_package
             .opened_presentation()?
             .plan_slide_copy(0_usize, 1),
-        Err(
-            Error::Refused(refusal) if refusal.kind() == SlideCopyRefusal::UnknownSemanticSurface.kind(),
-        )
-    ));
+        SlideCopyRefusal::UnknownSemanticSurface.kind()
+    );
 
     let mut external_layout = opened_plain_slide_package()?;
     let slide = external_layout.opened_presentation()?.slides()[0]
@@ -2385,12 +2361,12 @@ fn slide_copy_plan_validates_owned_xml_and_external_topology() -> Result<()> {
             "rIdExternalLayout".into(),
             TargetMode::External,
         )?;
-    assert!(matches!(
+    assert_refused_kind!(
         external_layout
             .opened_presentation()?
             .plan_slide_copy(0_usize, 1),
-        Err(Error::Refused(refusal) if refusal.kind() == SlideCopyRefusal::SharedOwner.kind())
-    ));
+        SlideCopyRefusal::SharedOwner.kind()
+    );
 
     let mut unknown_external = opened_plain_slide_package()?;
     let slide = unknown_external.opened_presentation()?.slides()[0]
@@ -2405,14 +2381,12 @@ fn slide_copy_plan_validates_owned_xml_and_external_topology() -> Result<()> {
             "rIdExternalOpaque".into(),
             TargetMode::External,
         )?;
-    assert!(matches!(
+    assert_refused_kind!(
         unknown_external
             .opened_presentation()?
             .plan_slide_copy(0_usize, 1),
-        Err(
-            Error::Refused(refusal) if refusal.kind() == SlideCopyRefusal::UnsupportedRelationship.kind(),
-        )
-    ));
+        SlideCopyRefusal::UnsupportedRelationship.kind()
+    );
     Ok(())
 }
 
@@ -2447,10 +2421,10 @@ fn slide_copy_plan_reuses_only_a_registered_layout() -> Result<()> {
         .get_part_mut(&slide)?
         .rels_mut()
         .retarget(&layout_id, orphan.relative_ref(slide.base_uri()))?;
-    assert!(matches!(
+    assert_refused_kind!(
         package.opened_presentation()?.plan_slide_copy(0_usize, 1),
-        Err(Error::Refused(refusal) if refusal.kind() == SlideCopyRefusal::SharedOwner.kind())
-    ));
+        SlideCopyRefusal::SharedOwner.kind()
+    );
     Ok(())
 }
 
@@ -2840,10 +2814,10 @@ fn slide_removal_plan_removes_owned_parts_and_refuses_shared_owners() -> Result<
             "rIdSharedSlide".into(),
             TargetMode::Internal,
         )?;
-    assert!(matches!(
+    assert_refused_kind!(
         shared.opened_presentation()?.plan_slide_removal(0_usize),
-        Err(Error::Refused(refusal) if refusal.kind() == SlideRemovalRefusal::SharedOwner.kind())
-    ));
+        SlideRemovalRefusal::SharedOwner.kind()
+    );
 
     let mut arbitrary_owner = opened_plain_slides_package(2)?;
     let selected = arbitrary_owner.opened_presentation()?.slides()[0]
@@ -2864,12 +2838,12 @@ fn slide_removal_plan_removes_owned_parts_and_refuses_shared_owners() -> Result<
             "rIdOwnedSlide".into(),
             TargetMode::Internal,
         )?;
-    assert!(matches!(
+    assert_refused_kind!(
         arbitrary_owner
             .opened_presentation()?
             .plan_slide_removal(0_usize),
-        Err(Error::Refused(refusal) if refusal.kind() == SlideRemovalRefusal::SharedOwner.kind())
-    ));
+        SlideRemovalRefusal::SharedOwner.kind()
+    );
 
     let mut custom_show = opened_plain_slides_package(2)?;
     let snapshot = custom_show.opened_presentation()?;
@@ -2887,12 +2861,12 @@ fn slide_removal_plan_removes_owned_parts_and_refuses_shared_owners() -> Result<
     std::sync::Arc::make_mut(&mut custom_show.opc)
         .get_part_mut(&presentation)?
         .set_blob(xml.into_bytes());
-    assert!(matches!(
+    assert_refused_kind!(
         custom_show
             .opened_presentation()?
             .plan_slide_removal(0_usize),
-        Err(Error::Refused(refusal) if refusal.kind() == SlideRemovalRefusal::SharedOwner.kind())
-    ));
+        SlideRemovalRefusal::SharedOwner.kind()
+    );
 
     for (start, end) in [(256, 258), (900, 999)] {
         let mut slide_range = opened_plain_slides_package(3)?;
@@ -2910,14 +2884,12 @@ fn slide_removal_plan_removes_owned_parts_and_refuses_shared_owners() -> Result<
             .get_part_mut(&presentation)?
             .set_blob(xml.into_bytes());
         let before = part_states(&slide_range);
-        assert!(matches!(
+        assert_refused_kind!(
             slide_range
                 .opened_presentation()?
                 .plan_slide_removal(1_usize),
-            Err(
-                Error::Refused(refusal) if refusal.kind() == SlideRemovalRefusal::SharedOwner.kind(),
-            )
-        ));
+            SlideRemovalRefusal::SharedOwner.kind()
+        );
         assert_eq!(part_states(&slide_range), before);
     }
 
@@ -2949,22 +2921,20 @@ fn slide_removal_plan_removes_owned_parts_and_refuses_shared_owners() -> Result<
             &layout_relationship,
             hostile_layout.relative_ref(selected.base_uri()),
         )?;
-    assert!(matches!(
+    assert_refused_kind!(
         hostile.opened_presentation()?.plan_slide_removal(0_usize),
-        Err(
-            Error::Refused(refusal) if refusal.kind() == SlideRemovalRefusal::AmbiguousTopology.kind(),
-        )
-    ));
+        SlideRemovalRefusal::AmbiguousTopology.kind()
+    );
     Ok(())
 }
 
 #[test]
 fn slide_removal_plan_refuses_policy_surfaces_bounds_and_stale_graphs() -> Result<()> {
     let sole = opened_plain_slide_package()?;
-    assert!(matches!(
+    assert_refused_kind!(
         sole.opened_presentation()?.plan_slide_removal(0_usize),
-        Err(Error::Refused(refusal) if refusal.kind() == SlideRemovalRefusal::FinalSlide.kind())
-    ));
+        SlideRemovalRefusal::FinalSlide.kind()
+    );
     assert!(matches!(
         sole.opened_presentation()?.plan_slide_removal(1_usize),
         Err(Error::SlideIndexOutOfBounds { index: 1, len: 1 })
@@ -2979,14 +2949,12 @@ fn slide_removal_plan_refuses_policy_surfaces_bounds_and_stale_graphs() -> Resul
             "rIdRootFragment".into(),
             TargetMode::Internal,
         )?;
-    assert!(matches!(
+    assert_refused_kind!(
         root_fragment
             .opened_presentation()?
             .plan_slide_removal(0_usize),
-        Err(
-            Error::Refused(refusal) if refusal.kind() == SlideRemovalRefusal::AmbiguousTopology.kind(),
-        )
-    ));
+        SlideRemovalRefusal::AmbiguousTopology.kind()
+    );
 
     for attributes in [
         "futureOwner=\"opaque\"",
@@ -3012,12 +2980,7 @@ fn slide_removal_plan_refuses_policy_surfaces_bounds_and_stale_graphs() -> Resul
             .opened_presentation()
             .and_then(|snapshot| snapshot.plan_slide_removal(0_usize));
         if attributes.starts_with("xmlns:") || !attributes.contains(':') {
-            assert!(matches!(
-                result,
-                Err(
-                    Error::Refused(refusal) if refusal.kind() == SlideRemovalRefusal::UnknownSemanticSurface.kind(),
-                )
-            ));
+            assert_refused_kind!(result, SlideRemovalRefusal::UnknownSemanticSurface.kind());
         } else {
             assert!(match result {
                 Err(Error::Invalid(_) | Error::Xml(_)) => true,
@@ -3060,22 +3023,20 @@ fn slide_removal_plan_refuses_policy_surfaces_bounds_and_stale_graphs() -> Resul
             "rIdRemovalSignature".into(),
             TargetMode::Internal,
         )?;
-    assert!(matches!(
+    assert_refused_kind!(
         signed.opened_presentation()?.plan_slide_removal(0_usize),
-        Err(Error::Refused(refusal) if refusal.kind() == SlideRemovalRefusal::SignedPackage.kind())
-    ));
+        SlideRemovalRefusal::SignedPackage.kind()
+    );
 
     let mut macros = opened_plain_slides_package(2)?;
     let presentation = macros.opened_presentation()?.presentation_name.clone();
     std::sync::Arc::make_mut(&mut macros.opc)
         .get_part_mut(&presentation)?
         .set_content_type(litchi_opc::constants::content_type::PML_PRES_MACRO_MAIN.into())?;
-    assert!(matches!(
+    assert_refused_kind!(
         macros.opened_presentation()?.plan_slide_removal(0_usize),
-        Err(
-            Error::Refused(refusal) if refusal.kind() == SlideRemovalRefusal::MacroEnabledPackage.kind(),
-        )
-    ));
+        SlideRemovalRefusal::MacroEnabledPackage.kind()
+    );
 
     for mutate_slide in [false, true] {
         let mut mce = opened_plain_slides_package(2)?;
@@ -3114,12 +3075,10 @@ fn slide_removal_plan_refuses_policy_surfaces_bounds_and_stale_graphs() -> Resul
     std::sync::Arc::make_mut(&mut mce.opc)
         .get_part_mut(&presentation)?
         .set_blob(xml.into_bytes());
-    assert!(matches!(
+    assert_refused_kind!(
         mce.opened_presentation()?.plan_slide_removal(0_usize),
-        Err(
-            Error::Refused(refusal) if refusal.kind() == SlideRemovalRefusal::MarkupCompatibility.kind(),
-        )
-    ));
+        SlideRemovalRefusal::MarkupCompatibility.kind()
+    );
 
     let mut protected = opened_plain_slides_package(2)?;
     let presentation = protected.opened_presentation()?.presentation_name.clone();
@@ -3133,12 +3092,10 @@ fn slide_removal_plan_refuses_policy_surfaces_bounds_and_stale_graphs() -> Resul
     std::sync::Arc::make_mut(&mut protected.opc)
         .get_part_mut(&presentation)?
         .set_blob(xml.into_bytes());
-    assert!(matches!(
+    assert_refused_kind!(
         protected.opened_presentation()?.plan_slide_removal(0_usize),
-        Err(
-            Error::Refused(refusal) if refusal.kind() == SlideRemovalRefusal::ProtectedPresentation.kind(),
-        )
-    ));
+        SlideRemovalRefusal::ProtectedPresentation.kind()
+    );
 
     let limited = opened_plain_slides_package(2)?;
     let limits = Limits::new(4_096, 1, 1024, 1, 1024, 64 * 1024 * 1024)

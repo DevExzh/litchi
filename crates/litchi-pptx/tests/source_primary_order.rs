@@ -14,6 +14,18 @@ use litchi_core::{
 use litchi_opc::{OpcPackage, PackURI, SourceLimits};
 use litchi_pptx::{Error, builder::Builder, source::Package};
 
+macro_rules! assert_refused_kind {
+    ($operation:expr, $expected:expr) => {{
+        match $operation {
+            Err(Error::Refused(refusal)) => {
+                assert_eq!(refusal.kind(), $expected);
+            },
+            Err(error) => panic!("unexpected error: {error:?}"),
+            Ok(_) => panic!("operation unexpectedly succeeded"),
+        }
+    }};
+}
+
 const SIGNED_FIXTURE: &[u8] =
     include_bytes!("../../../test-data/poi/test-data/xmldsign/hello-world-signed.pptx");
 const MODELED_PRES_PROPS: &[u8] = br#"<p:presentationPr xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:p14="http://schemas.microsoft.com/office/powerpoint/2010/main" xmlns:p15="http://schemas.microsoft.com/office/powerpoint/2012/main" xmlns:p1710="http://schemas.microsoft.com/office/powerpoint/2017/10/main" xmlns:a14="http://schemas.microsoft.com/office/drawing/2010/main" xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><p:showPr><p:present/><p:sldAll/><p:extLst><p:ext uri="{F99C55AA-B7CB-42B0-86F8-08522FDF87E8}"><p14:browseMode showStatus="0"/></p:ext><p:ext uri="{EC167BDD-8182-4AB7-AECC-EB403E3ABB37}"><p14:laserClr><a:srgbClr val="FF0000"/></p14:laserClr></p:ext><p:ext uri="{2FDB2607-1784-4EEB-B798-7EB5836EED8A}"><p14:showMediaCtrls val="1"/></p:ext></p:extLst></p:showPr><p:extLst><p:ext uri="{E76CE94A-603C-4142-B9EB-6D1370010A27}"><p14:discardImageEditData val="0"/></p:ext><p:ext uri="{D31A062A-798A-4329-ABDD-BBA856620510}"><p14:defaultImageDpi val="220"/></p:ext><p:ext uri="{FD5EFAAD-0ECE-453E-9831-46B23BE46B34}"><p15:chartTrackingRefBased val="1"/></p:ext><p:ext uri="{4599F94E-CEE6-441E-89CC-EB005ECD8F06}"><a14:m><m:mathPr><m:brkBin m:val="repeat"/></m:mathPr></a14:m></p:ext><p:ext uri="{1BD7E111-0CB8-44D6-8891-C1BB2F81B7CC}"><p1710:readonlyRecommended val="1"/></p:ext></p:extLst></p:presentationPr>"#;
@@ -363,14 +375,9 @@ fn order_refuses_unsafe_presentation_properties_atomically() {
         let source = fresh(&bytes);
         let before = source.to_bytes().unwrap();
         let mut edit = source.edit().unwrap();
-        assert!(
-            matches!(
-                edit.move_slide(Position::new(0), Position::new(2)),
-                Err(
-                    Error::Refused(refusal) if refusal.kind() == litchi_pptx::SlideOrderRefusal::PresentationProperties.kind(),
-                )
-            ),
-            "unsafe presentation properties unexpectedly admitted: {label}"
+        assert_refused_kind!(
+            edit.move_slide(Position::new(0), Position::new(2)),
+            litchi_pptx::SlideOrderRefusal::PresentationProperties.kind()
         );
         let commit = edit.commit().unwrap();
         assert!(

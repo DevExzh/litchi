@@ -16,6 +16,18 @@ use litchi_core::{
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcError, OpcPackage, PackURI, PackageWriter};
 
+macro_rules! assert_refused_kind {
+    ($operation:expr, $expected:expr) => {{
+        match $operation {
+            Err(Error::Refused(refusal)) => {
+                assert_eq!(refusal.kind(), $expected);
+            },
+            Err(error) => panic!("unexpected error: {error:?}"),
+            Ok(_) => panic!("operation unexpectedly succeeded"),
+        }
+    }};
+}
+
 const PML: &str = "http://schemas.openxmlformats.org/presentationml/2006/main";
 const STRICT_PML: &str = "http://purl.oclc.org/ooxml/presentationml/main";
 const DRAWINGML: &str = "http://schemas.openxmlformats.org/drawingml/2006/main";
@@ -2305,12 +2317,10 @@ fn source_slide_order_rejects_limits_malformed_mce_and_invalid_owners() {
     let editor =
         SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(mce))).unwrap();
     let mut edit = editor.edit_slide_order().unwrap();
-    assert!(matches!(
+    assert_refused_kind!(
         edit.move_slide(Position::new(0), Position::new(2)),
-        Err(
-            Error::Refused(refusal) if refusal.kind() == SlideOrderRefusal::MarkupCompatibility.kind(),
-        )
-    ));
+        SlideOrderRefusal::MarkupCompatibility.kind()
+    );
 
     let additional = multi_fixture_with_presentation_suffix(3, false, "<p:sldIdLst/>");
     assert!(matches!(
@@ -2373,10 +2383,10 @@ fn source_slide_order_rejects_limits_malformed_mce_and_invalid_owners() {
     edit.move_slide(Position::new(0), Position::new(2)).unwrap();
     let commit = edit.commit().unwrap();
     output.clear();
-    assert!(matches!(
+    assert_refused_kind!(
         editor.publish_slide_order_commit_to_stream(&mut output, &commit),
-        Err(Error::Refused(refusal) if refusal.kind() == SlideOrderRefusal::ViewProperties.kind())
-    ));
+        SlideOrderRefusal::ViewProperties.kind()
+    );
     assert!(output.is_empty());
 
     let range = format!(
@@ -2390,11 +2400,9 @@ fn source_slide_order_rejects_limits_malformed_mce_and_invalid_owners() {
     edit.move_slide(Position::new(0), Position::new(2)).unwrap();
     let commit = edit.commit().unwrap();
     output.clear();
-    assert!(matches!(
+    assert_refused_kind!(
         editor.publish_slide_order_commit_to_stream(&mut output, &commit),
-        Err(
-            Error::Refused(refusal) if refusal.kind() == SlideOrderRefusal::PresentationProperties.kind(),
-        )
-    ));
+        SlideOrderRefusal::PresentationProperties.kind()
+    );
     assert!(output.is_empty());
 }

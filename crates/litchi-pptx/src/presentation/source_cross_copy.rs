@@ -30,6 +30,19 @@ use crate::parts::{PresentationPart, SlideReference};
 use crate::{Error, Result, SlideCopyRefusal};
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
+#[cfg(test)]
+macro_rules! assert_refused_kind {
+    ($operation:expr, $expected:expr) => {{
+        match $operation {
+            Err(Error::Refused(refusal)) => {
+                assert_eq!(refusal.kind(), $expected);
+            },
+            Err(error) => panic!("unexpected error: {error:?}"),
+            Ok(_) => panic!("operation unexpectedly succeeded"),
+        }
+    }};
+}
+
 const MAX_XML_DEPTH: usize = 256;
 const MAX_XML_NODES: usize = 1_000_000;
 const MAX_STAGING_OVERHEAD: usize = 256;
@@ -6230,12 +6243,10 @@ mod tests {
     #[test]
     fn foreign_markup_compatibility_wrapper_is_unknown_not_mce() {
         let xml = br#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:foreign="http://purl.oclc.org/ooxml/markup-compatibility/2006"><p:cSld><p:spTree><foreign:wrapper><p:pic/></foreign:wrapper></p:spTree></p:cSld></p:sld>"#;
-        assert!(matches!(
+        assert_refused_kind!(
             validate_source_slide_xml(xml, "foreign MCE wrapper", None),
-            Err(
-                Error::Refused(refusal) if refusal.kind() == SlideCopyRefusal::UnknownSemanticSurface.kind(),
-            )
-        ));
+            SlideCopyRefusal::UnknownSemanticSurface.kind()
+        );
     }
 
     #[test]
