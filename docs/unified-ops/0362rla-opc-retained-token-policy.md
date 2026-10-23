@@ -24,6 +24,13 @@ both replacement XML members and the content-type binding under the recipient
 before validating graph changes or reserving package state; a producer token's
 retained binding is not used as a recipient policy proof.
 
+The source relationship edit plan now also reparses an unchanged/no-op member
+when `materialize` receives a narrower profile. Generic XML preflight alone
+does not check typed relationship targets or per-member relationship count, so
+this second admission closes the broad-plan/tight-materialize path. The
+parallel content-types no-op path already reparses `ContentTypeMap` under the
+narrowed profile; the regression keeps that behavior covered by review.
+
 The focused regressions cover:
 
 * custom-limited XML tokens rejecting an oversized element edit without
@@ -35,7 +42,10 @@ The focused regressions cover:
 * default capture and plan wrappers inheriting an explicitly admitted owner
   policy; and
 * a broad content-types/relationships batch token being refused atomically by
-  a tighter recipient before its publication changes.
+  a tighter recipient before its publication changes; and
+* a broad no-op relationship plan refusing tight materialization when its
+  target-byte or relationship-count ceiling is smaller than the retained
+  source.
 
 No public compatibility alias or new default-limit entry point was added. The
 existing default wrappers are fresh-package/test conveniences; opened source

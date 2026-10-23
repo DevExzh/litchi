@@ -372,6 +372,16 @@ impl<'source> RelationshipsEditPlan<'source> {
                 source.bytes(),
                 limits,
             )?;
+            // The generic XML preflight above checks byte, depth, event, and
+            // attribute bounds, but it does not admit relationship semantics.
+            // Reparse the unchanged token under the narrowed recipient policy
+            // before publishing it so a broad plan cannot be materialized into
+            // a tighter owner while bypassing target/count/type validation.
+            crate::pkgreader::PackageReader::parse_owned_relationships_with_limits(
+                source.bytes(),
+                &source.owner,
+                limits,
+            )?;
             return Ok(OwnedRelationships {
                 owner: source.owner.clone(),
                 xml: source.xml.with_limits(limits),
@@ -2342,6 +2352,48 @@ mod tests {
         assert!(authored_root.member_present());
         assert_eq!(authored_root.relationship_count(), 0);
         assert_eq!(authored_root.final_len(), authored_root_token.bytes().len());
+    }
+
+    #[test]
+    fn no_op_relationship_plan_revalidates_tight_materialize_policy() {
+        let package = OpcPackage::from_vec(source(XML)).unwrap();
+        let owner = PackURI::new("/").unwrap();
+        let before = package.source_relationships(&owner).unwrap();
+
+        // The plan is admitted under the broad source profile. Materializing
+        // the unchanged token under a narrower recipient profile must still
+        // parse relationship targets and cardinality before publication.
+        let target_under = SourceLimits::builder()
+            .max_relationship_target_bytes(8)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(matches!(
+            before
+                .plan_edit(&[], &[], SourceLimits::default())
+                .unwrap()
+                .materialize(target_under),
+            Err(OpcError::Limit {
+                kind: SourceLimitKind::RelationshipTargetBytes,
+                ..
+            })
+        ));
+
+        let count_under = SourceLimits::builder()
+            .max_relationships_per_part(1)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(matches!(
+            before
+                .plan_edit(&[], &[], SourceLimits::default())
+                .unwrap()
+                .materialize(count_under),
+            Err(OpcError::Limit {
+                kind: SourceLimitKind::RelationshipsPerPart,
+                ..
+            })
+        ));
     }
 
     #[test]
