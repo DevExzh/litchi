@@ -561,12 +561,7 @@ fn replay_admission_runs_after_measurement_and_before_publication() {
                 rejected_calls += 1;
                 writer.write_all(payload)
             },
-            |_profile| {
-                Err::<(), _>(io::Error::new(
-                    io::ErrorKind::PermissionDenied,
-                    "secret policy",
-                ))
-            },
+            |_profile| Err::<(), _>("secret policy".to_owned()),
         )
         .expect_err("admission must reject before publication");
     assert_eq!(
@@ -575,6 +570,7 @@ fn replay_admission_runs_after_measurement_and_before_publication() {
     );
     assert!(sink.is_empty());
     assert!(matches!(error, ReplayPublicationError::Admission { .. }));
+    assert_eq!(error.admission().map(String::as_str), Some("secret policy"));
     assert_eq!(
         error.to_string(),
         "replay output admission failed during Preflight"
