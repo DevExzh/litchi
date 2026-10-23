@@ -2761,3 +2761,58 @@ See [0063](0063-source-pptx-modern-comments.md).
   replay/dispositions and fresh inventory/glossary validation remain required.
   Source integration is still staging, not accepted into trunk. Only the
   comprehensive redaction audit is deferred. Nothing has been pushed.
+
+- Coordinator checkpoint (2026-10-23, complete facade return and qualification readiness):
+  Main integration reaches `8300a93345`. Reviewed W4b/W5 execution tooling
+  now prepares explicitly selected historical/current source pairs, guards
+  the recorded baseline consumer adaptations, preserves real analyzer output
+  and rejects stale result files. Its upstream-checkout rejection guard no
+  longer matches the lexical test itself; all three reference tests pass on
+  the assembled content. The final inventory note records decimal target
+  limits, valid cache reuse and completed design/replay source work without
+  claiming a fresh inventory or final gate pass.
+
+  Diagnostic composition reaches `d4d1820dbe`. All eleven metadata-focused
+  XLSX tests and all 27 PPTX module tests pass on `4470ecce16`. The broader
+  all-feature facade suite on `55051a8e4f` passes 993 tests and fails nine.
+  Record 0362upa returns the complete batch: DOCX classification, retained
+  hyperlinks and signed no-op behavior; ODF typed-cause assertions; signed
+  DOC/XLS no-op/cancellation policy; and signed PPTX cancellation. The two
+  ODF assertions now retain their contract-correct core cause, and reviewed
+  PPTX private unsigned staging permits cancellation proof before the signed
+  publication fence. Their runtime rerun remains required. DOCX and legacy
+  repairs are active. The runner stopped before XLSB, which remains queued.
+
+  Shared XLSX normalization remains returned on the separate current-source
+  repair leaf `b2a1e6e735`: explicit empty-cell fidelity, native string
+  identity, failed-setter atomicity, compact join planning, bounded lookup
+  cost and typed normalization errors must all be corrected. Temporary
+  compiler overlays are no longer needed on that composed source.
+
+  DOCX Ink qualification retains the original baseline and explicitly
+  records shared-source changes for the integrated-route comparison. The
+  streamed digest correction and all producer/runner/collector provenance
+  consumers passed review; a fresh matched build is active. Earlier partial
+  runs remain preserved. ODP's candidate release build succeeded, but its
+  probe needs separate same-owner whole-artifact inverse proof and reopened
+  content-scope proof; untimed correctness must run without a quiet-host
+  requirement. The old binary cannot qualify the corrected probe. IWork
+  baseline mapping preserves the original constructor and owner sources;
+  its integrated source-delta successor is under review before real builds.
+
+  W8 readiness preserves `f2bbbc8d07` as the original baseline, with a
+  workload-equivalent compatibility overlay still required. The 0359qe
+  matrix rows are reviewed as diagnostics, with busy-host wall results
+  explicitly unqualified. Final provenance tooling still needs exact ops
+  package binding. No source archive, binary or measurement result is
+  silently reused under a different baseline label.
+
+  Additional cleanup assessment retains leaves with active evidence handles
+  and all protected build/measurement artifacts. Verified stale read-only
+  Git commands from completed reviews were stopped; source and build work
+  were not interrupted. The earlier ten cleanup receipts remain authoritative.
+
+  Full combined runtime/gates, quiet-host native qualification, corpus
+  replay/dispositions and fresh inventory/glossary validation remain open.
+  Source integration is staging, not accepted into trunk. Only the
+  comprehensive redaction audit is deferred. Nothing has been pushed.
