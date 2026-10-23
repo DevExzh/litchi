@@ -3296,18 +3296,6 @@ impl Edit {
             .xml_bytes()
             .get(paragraph_start..paragraph_end)
             .ok_or_else(|| crate::Error::InvalidFormat("paragraph range is outside XML".into()))?;
-        // A visible no-op is safe even when the paragraph contains preserved
-        // Word range markers that the changed-text writer cannot rewrite.
-        // Check it before the structural owner scan so signed no-ops retain
-        // their exact source bytes and classification.
-        if self
-            .projected
-            .paragraph(position)
-            .and_then(|paragraph| paragraph.text().ok())
-            .is_some_and(|current| current == text)
-        {
-            return Ok(self);
-        }
         let owner = scan_text_owner(paragraph, b"p").map_err(|reason| Error::Refused {
             position: position.get(),
             reason,
@@ -3389,20 +3377,6 @@ impl Edit {
             .as_ref()
             .map(|admission| admission.owner_scan(paragraph.len()))
             .transpose()?;
-        if self.operations.is_empty()
-            && self
-                .projected
-                .paragraph(position)
-                .and_then(|paragraph| paragraph.text().ok())
-                .is_some_and(|current| current == authored_text)
-        {
-            drop((
-                input_admission,
-                input_capacity_admission,
-                text_scan_admission,
-            ));
-            return Ok(self);
-        }
         let owner = scan_text_owner(paragraph, b"p").map_err(|reason| Error::Refused {
             position: position.get(),
             reason,

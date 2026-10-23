@@ -16,14 +16,16 @@ weakening their typed error and signed-source policies.
   the effective owner for an unavailable physical package. Hyperlink
   relationship resolution therefore remains on the effective owner while
   source admission still uses the original policy.
-- DOCX paragraph no-ops compare the projected visible text before scanning the
-  paragraph owner. Signed paragraphs containing empty Word bookmark range
-  markers consequently preserve their exact bytes and no-op classification.
-  Changed text still uses the existing structural writer; only empty
-  `w:bookmarkStart`/`w:bookmarkEnd` children directly under `w:p` are
-  admitted, while nested or unrelated structural content remains refused.
-  Managed edits retain the existing staged-operation path so an edit that
-  changes and then cancels is still checked and charged as before.
+- DOCX paragraph no-ops use the same authoritative owner scan as changed
+  text. Signed paragraphs containing empty Word bookmark range markers
+  consequently preserve their exact bytes and no-op classification without a
+  second parser or a fast path that could discard typed refusal, namespace,
+  limit, or cancellation errors. Changed text still uses the existing
+  structural writer; only empty `w:bookmarkStart`/`w:bookmarkEnd` children
+  directly under `w:p` are admitted, while nested or unrelated structural
+  content remains refused. Managed edits retain the existing staged-operation
+  path so an edit that changes and then cancels is still checked and charged
+  as before.
 
 No source-backed capability, signature protection, or publication path was
 removed. No compatibility alias, alternate commit route, or lint suppression
