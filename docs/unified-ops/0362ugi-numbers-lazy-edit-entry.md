@@ -12,8 +12,8 @@ move to the first value request, mutation, or commit.  Dropping an untouched
 edit therefore does not copy a chart grid, image graph, title payload, or
 merge-region vector.
 
-The chart-data edit keeps a bounded `OnceCell` for its `Arc<ChartData>` and
-loads it only for `before`, `after`, or `commit`.  Image adjustments retain the
+The chart-data edit keeps optional bounded selection and `Arc<ChartData>` state
+and loads it only for `before`, `after`, or `commit`.  Image adjustments retain the
 sheet/image positions and load the graph selection only when a value is
 requested or published.  Table-title settings retain the selected positions;
 its target and decoded settings are loaded by `settings` or `commit`.

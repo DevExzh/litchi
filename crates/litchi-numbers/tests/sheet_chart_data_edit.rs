@@ -219,6 +219,7 @@ fn native_retirement_chart_data_is_table_backed_and_refused() -> TestResult {
     let package = Package::from_bytes(&source)?;
     let error = package
         .edit_sheet_chart_data(SheetSelector::index(0), ChartSelector::index(0))
+        .and_then(|edit| edit.commit())
         .expect_err("the resaved retirement chart is table-backed");
     assert!(matches!(
         error,
