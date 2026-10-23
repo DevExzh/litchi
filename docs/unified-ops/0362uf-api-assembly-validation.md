@@ -197,3 +197,25 @@ and the stale XLSX raw constructor calls. The ODP probe's required compile-time
 route environment is being isolated from ordinary all-target builds.
 [consumer-v15.json](results/0362uf/consumer-v15.json) records both commands;
 neither harness check was reached.
+
+## Runtime and tooling admission checks
+
+On `42b1c5a3c2`, the OPC library runtime pass completed with 710 tests
+passing and four failing. Two token fixtures used a retained owner or
+recipient target limit that intercepted the intended XML-limit assertion;
+record 0362rla isolates those dimensions without changing production policy.
+The other two failures expose a real final-output census bypass: an omitted
+base relationship entry with an appended replacement skipped XML and graph
+admission. The replacement payload must be counted before the omission is
+honored. ZIP tests were not reached.
+[artifact-stream-semantic-v1.json](results/0362uf/artifact-stream-semantic-v1.json)
+retains the exact command, source and log hash.
+
+The parallel Python pass ran 1,334 tooling tests with one benchmark-matrix
+coverage failure. The standalone matrix check reports the same missing
+evidence coverage. The crate-boundary check also finds missing retained
+archive-header coverage and an unclassified optional ops-to-ZIP dependency.
+Capability-delta and corpus manifest checks pass; this does not establish
+full corpus replay or performance acceptance.
+[python-assembly-v1.json](results/0362uf/python-assembly-v1.json) preserves all
+five command outcomes. Repairs and assembled reruns remain required.
