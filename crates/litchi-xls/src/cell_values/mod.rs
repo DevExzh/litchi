@@ -7937,13 +7937,17 @@ fn commit_source_backed_numeric_plan(transaction: Edit) -> Result<SourceBackedPl
         || tab_change.is_some()
         || !layout_changes.is_empty()
     {
-        return Err(Error::UnsupportedFeature(
-            "source-backed numeric plan accepts no structural or resource edits".into(),
+        return Err(Error::refused(
+            RefusalKind::UnsupportedOperation,
+            "edit cells",
+            "source-backed numeric plan accepts no structural or resource edits",
         ));
     }
     if !changes_are_fixed_numeric(&source, &changes) {
-        return Err(Error::UnsupportedFeature(
-            "source-backed numeric plan requires unchanged Number, RK, or MulRk storage".into(),
+        return Err(Error::refused(
+            RefusalKind::UnsupportedOperation,
+            "edit cells",
+            "source-backed numeric plan requires unchanged Number, RK, or MulRk storage",
         ));
     }
 
@@ -8069,14 +8073,17 @@ fn commit_source_backed_numeric(transaction: Edit) -> Result<SourceBackedCommit>
         || tab_change.is_some()
         || !layout_changes.is_empty()
     {
-        return Err(Error::UnsupportedFeature(
-            "source-backed numeric publication accepts no structural or resource edits".into(),
+        return Err(Error::refused(
+            RefusalKind::UnsupportedOperation,
+            "edit cells",
+            "source-backed numeric publication accepts no structural or resource edits",
         ));
     }
     if !changes_are_fixed_numeric(&source, &changes) {
-        return Err(Error::UnsupportedFeature(
-            "source-backed numeric publication requires unchanged Number, RK, or MulRk storage"
-                .into(),
+        return Err(Error::refused(
+            RefusalKind::UnsupportedOperation,
+            "edit cells",
+            "source-backed numeric publication requires unchanged Number, RK, or MulRk storage",
         ));
     }
 

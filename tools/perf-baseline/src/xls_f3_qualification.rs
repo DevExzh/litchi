@@ -923,8 +923,8 @@ fn verify_noop_and_unsupported(fixture: &Fixture) -> Result<()> {
             require_refusal(
                 error,
                 &format!("{} unsupported target commit", fixture.name),
-                RefusalKind::UnsupportedTarget,
-                "value is not representable in the fixed-width slot",
+                RefusalKind::UnsupportedOperation,
+                "source-backed numeric plan accepts no structural or resource edits",
             )?;
         },
     }
