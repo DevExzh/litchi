@@ -30,5 +30,37 @@ same graph's effective authored publication; those source byte images are
 intentionally different even though the publication is identical. The graph
 helper now permits only that explicit original-versus-effective distinction,
 requires source presence and equal effective publication, and additionally
-compares the complete serialized archive. All untouched part and relationship
+compares the complete effective archive. All untouched part and relationship
 source images remain exact, including the inverse path.
+
+## v17 follow-up
+
+The facade runtime run at `v17` passed 771 tests and left one failure in the
+transitive projection test. Its old check required one retained
+`[Content_Types].xml` source image to equal the current publication whenever
+the two images differed. That is not a valid provenance rule: replay and the
+direct candidate can retain different earlier generations even when they
+publish the same effective archive. The transitive fixture now permits source
+lineage differences only for the changed package root and
+`/custom/transitive-root.bin` relationship owner. It continues to require the
+same semantic graph and publication, exact source presence and bytes for every
+untouched relationship owner, and the complete effective archive member set
+and decompressed payloads. ZIP member order is deliberately excluded from
+the effective comparison because targeted preservation may append a changed
+owner after the source tail.
+
+The granted focused receipt was generated outside the checkout (so no large
+evidence is committed):
+
+```text
+CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/signed-xlsb-budget/target \
+TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/signed-xlsb-budget/tmp \
+CARGO_BUILD_JOBS=1 RUST_TEST_THREADS=1 \
+cargo test --offline --locked -p litchi-xlsb --all-features --lib 'opc::tests::' \
+  --message-format=json-render-diagnostics -- --test-threads=1
+```
+
+Result: 13 passed, 0 failed, 759 filtered out, finished in 0.12s. Receipt:
+`opc-focused-v19.log`, 159901 bytes,
+SHA-256 `de5143c536f00eea1eb3b8babb4053dadb6f2e501c3473a5c6b71d1e18523743`,
+stored under `/home/zhuhe/code/litchi-worktrees/.coord/signed-xlsb-budget/`.
