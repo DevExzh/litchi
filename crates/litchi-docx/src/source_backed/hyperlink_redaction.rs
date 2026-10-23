@@ -4,9 +4,8 @@
 //! records.
 //!
 //! The redaction is forward-only: its record patch keeps no removed
-//! content, so its inverse restores only the exact source of the commit it
-//! came from ([`Package::apply_external_hyperlink_redaction`] on that
-//! commit's package).
+//! content, so its inverse restores the exact source on the commit's
+//! retained owner. A detached equal artifact still refuses that inverse.
 //!
 //! [`Package::apply_external_hyperlink_redaction`]: crate::source_backed::Package::apply_external_hyperlink_redaction
 
@@ -33,6 +32,13 @@ impl Change for RedactionChange {
     fn is_noop(&self) -> bool {
         match self {
             Self::Forward(patch) => patch.is_noop(),
+            Self::Inverse { noop, .. } => *noop,
+        }
+    }
+
+    fn allows_foreign_restore(&self) -> bool {
+        match self {
+            Self::Forward(_) => true,
             Self::Inverse { noop, .. } => *noop,
         }
     }
@@ -162,7 +168,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns [`crate::Error::PatchConflict`] for another source, or a typed
-    /// refusal for an inverse applied to anything but its commit's package.
+    /// refusal for a non-noop inverse applied outside its retained owner.
     pub fn apply_external_hyperlink_redaction(&self, patch: &Patch) -> Result<Commit> {
         apply_change(self, patch)
     }

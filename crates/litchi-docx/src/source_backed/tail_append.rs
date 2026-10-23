@@ -584,8 +584,10 @@ impl crate::source_backed::deferred::Change for TailChange {
 
     fn publish(&self, package: &Package) -> Result<Package> {
         if self.inverse {
-            // The appended paragraph's removal is restored only on the
-            // commit's own package (the exact source artifact).
+            // The appended paragraph's removal is restored by the retained
+            // owner fast path or by the generic content-matching fallback.
+            // This branch is for recipients that reach the family publisher
+            // without a recorded candidate artifact.
             return if self.noop {
                 Ok(package.clone())
             } else {
@@ -652,7 +654,8 @@ impl Package {
 
     /// Replay a tail-append patch onto this package: the same paragraph is
     /// appended to this package's main story (record 0355a). The inverse
-    /// restores only the commit's own package.
+    /// restores the retained owner, or an independently opened package whose
+    /// complete content matches the recorded candidate.
     ///
     /// # Errors
     ///

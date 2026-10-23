@@ -641,6 +641,36 @@ fn stale_commits_fail_and_matching_sources_replay_before_output() {
 }
 
 #[test]
+fn inverse_restores_its_owner_but_refuses_an_equal_foreign_redacted_artifact() {
+    let original = fixture(false);
+    let package = open(original.clone());
+    let commit = package
+        .edit_story_hyperlink_redaction(&["https://shared.invalid/"], Mode::Strict)
+        .unwrap()
+        .commit()
+        .unwrap();
+    let inverse = commit.patch().inverse();
+
+    let restored = commit
+        .package()
+        .apply_story_hyperlink_redaction(&inverse)
+        .expect("the inverse must restore its retained owner");
+    let mut restored_bytes = Vec::new();
+    restored.package().write_to(&mut restored_bytes).unwrap();
+    assert_eq!(restored_bytes, original);
+
+    let mut redacted = Vec::new();
+    commit.package().write_to(&mut redacted).unwrap();
+    let foreign = open(redacted);
+    assert!(matches!(
+        foreign.apply_story_hyperlink_redaction(&inverse),
+        Err(Error::Refused(refusal))
+            if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedOperation
+                && refusal.operation() == "story_hyperlink_redaction"
+    ));
+}
+
+#[test]
 fn redaction_limits_cover_selected_relationships_and_changed_stories() {
     let package = open(fixture(false));
     let selected_limit = StoryHyperlinkLimits::default()

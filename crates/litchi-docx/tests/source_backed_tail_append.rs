@@ -1102,6 +1102,31 @@ fn explicit_noop_is_exact_and_reversible_without_a_generated_paragraph() {
 }
 
 #[test]
+fn inverse_replays_on_a_reopened_equal_candidate_for_ordinary_tail_append() {
+    let source_xml = word_document(r#"<w:p><w:r><w:t>seed</w:t></w:r></w:p>"#);
+    let source_archive = archive(&source_xml, Compression::Store, false, Topology::Plain);
+    let package = bounded_package(source_archive.clone());
+    let plan = append_plan(&package, "tail", source_xml.len());
+    let commit = plan.commit().expect("tail append must commit");
+
+    let mut candidate = Vec::new();
+    commit
+        .package()
+        .write_to(&mut candidate)
+        .expect("tail append candidate must publish");
+    let reopened = bounded_package(candidate);
+    let restored = reopened
+        .apply_tail_append(&commit.patch().inverse())
+        .expect("ordinary inverse must replay on equal foreign content");
+    let mut output = Vec::new();
+    restored
+        .package()
+        .write_to(&mut output)
+        .expect("foreign inverse must publish");
+    assert_eq!(output, source_archive);
+}
+
+#[test]
 fn cancellation_is_checked_before_preparation_and_before_publication_output() {
     let source_xml = word_document(r#"<w:p><w:r><w:t>seed</w:t></w:r></w:p>"#);
     let source_archive = archive(&source_xml, Compression::Store, false, Topology::Plain);

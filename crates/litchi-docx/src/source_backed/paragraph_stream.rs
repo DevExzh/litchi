@@ -142,7 +142,7 @@ impl Change for StreamChange {
             },
             Self::Inverse { noop: true, .. } => Ok(package.clone()),
             Self::Inverse { .. } => Err(Error::Invalid(
-                "a paragraph-stream inverse restores only its commit's own package",
+                "a paragraph-stream inverse needs its recorded candidate artifact",
             )),
         }
     }
@@ -205,8 +205,9 @@ impl Package {
     ///
     /// # Errors
     ///
-    /// Returns the preparation errors, or an inverse applied elsewhere than
-    /// its commit's own package.
+    /// A commit inverse restores the exact retained owner, or an independently
+    /// opened package whose complete content matches the recorded candidate.
+    /// Other recipients return the preparation or patch errors.
     pub fn apply_paragraph_stream(&self, patch: &Patch) -> Result<Commit, Error> {
         apply_change(self, patch)
     }

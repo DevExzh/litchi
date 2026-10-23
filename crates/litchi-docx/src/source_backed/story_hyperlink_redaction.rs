@@ -4,7 +4,8 @@
 //! glossary), with their relationship records.
 //!
 //! The redaction is forward-only and sealed to the exact source it was
-//! planned on; its inverse restores only that commit's own source.
+//! planned on; its inverse restores the exact source on that commit's
+//! retained owner, while a detached equal artifact remains refused.
 
 use std::sync::Arc;
 
@@ -29,6 +30,13 @@ impl Change for StoryRedactionChange {
     fn is_noop(&self) -> bool {
         match self {
             Self::Forward(patch) => patch.effect_report().is_noop(),
+            Self::Inverse { noop, .. } => *noop,
+        }
+    }
+
+    fn allows_foreign_restore(&self) -> bool {
+        match self {
+            Self::Forward(_) => true,
             Self::Inverse { noop, .. } => *noop,
         }
     }
@@ -156,7 +164,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns [`crate::Error::PatchConflict`] for another source, or a typed
-    /// refusal for an inverse applied to anything but its commit's package.
+    /// refusal for a non-noop inverse applied outside its retained owner.
     pub fn apply_story_hyperlink_redaction(&self, patch: &Patch) -> Result<Commit> {
         apply_change(self, patch)
     }
