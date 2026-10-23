@@ -1,0 +1,117 @@
+{
+  "schema": "litchi.iwa.native-qualification.failed-build.v1",
+  "status": "refused",
+  "family": "constructor",
+  "comparison": "integrated-route",
+  "base_commit": "ddf2ac8ae2117cd78829ef94bcb610d6cbdfa0e2",
+  "candidate_commit": "0b7dba5af7971cc69b811de77709614cac82317e",
+  "source_delta_counts": {
+    "base_only": 21,
+    "candidate_only": 72,
+    "changed": 2212
+  },
+  "input_lock": {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/matched-v5/source-base/Cargo.lock",
+    "bytes": 139505,
+    "sha256": "d85b4300c58dbdf0dcc3cb8243ad4ea00cd9c29c9d1d4a77c38e51fe12f708aa",
+    "lockfile_version": 3
+  },
+  "build_manifest": {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-0361f-constructor-0ba-build-20261023/build.json",
+    "bytes": 902357,
+    "sha256": "4c9377c5de821776f116c10d62e916610339d03cbe2b358160fb3229b6a37e0f"
+  },
+  "generated_endpoint_locks": {
+    "base": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-0361f-constructor-0ba-build-20261023/project-base/Cargo.lock",
+      "bytes": 22087,
+      "sha256": "97ee8dd9248535f20c62e682698650ddfd61f6e4d322747a9c1cdcb04a6f735c",
+      "lockfile_version": 4,
+      "packages": 97,
+      "registry_packages": 91
+    },
+    "candidate": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-lockdiag.Blar6B/Cargo.lock",
+      "bytes": 22293,
+      "sha256": "da8da00dee6227c537feaccd85537196d70c1fb590b50860384ffad5d9a14705",
+      "lockfile_version": 4,
+      "packages": 98,
+      "registry_packages": 92
+    }
+  },
+  "lock_delta": {
+    "local_dependency_edges": [
+      {
+        "package": "litchi-iwa-core 0.0.1",
+        "base": [
+          "litchi-iwa-common",
+          "litchi-iwa-protos",
+          "snap",
+          "thiserror"
+        ],
+        "candidate": [
+          "litchi-iwa-common",
+          "litchi-iwa-protos",
+          "smallvec",
+          "snap",
+          "thiserror"
+        ]
+      }
+    ],
+    "registry_added": [
+      {
+        "name": "smallvec",
+        "version": "1.16.3",
+        "source": "registry+https://github.com/rust-lang/crates.io-index",
+        "checksum": "5b3dc8af474f516a851ff4bd12db780f948b9250ad37211e4eec0bccea54e01b"
+      }
+    ],
+    "registry_removed": [],
+    "registry_changed": [],
+    "registry_common": 91,
+    "source_declared_features": [
+      {
+        "package": "litchi-iwa-core",
+        "dependency": "smallvec",
+        "base": null,
+        "candidate": ["union"]
+      }
+    ],
+    "note": "Cargo.lock records dependency edges but not feature selections; the union feature is bound to the candidate source manifest and the smallvec registry identity above."
+  },
+  "failure": {
+    "phase": "candidate-native",
+    "command": [
+      "cargo",
+      "build",
+      "--offline",
+      "--locked",
+      "--release",
+      "--message-format=json-render-diagnostics"
+    ],
+    "exit_code": 101,
+    "receipt": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-0361f-constructor-0ba-build-20261023/build-candidate/native.receipt.json",
+      "bytes": 885,
+      "sha256": "d8788cd3df800a64dd74a38d4412c549a9818bfc593bb7ab6ba9f029b3274831"
+    },
+    "stderr": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-0361f-constructor-0ba-build-20261023/build-candidate/native.stderr",
+      "bytes": 305,
+      "sha256": "c881ec279218a35e003da6559982be348f6d0796aa9f777e0ee416289f322b09"
+    },
+    "reason": "The candidate source adds the smallvec edge, so the copied generated base lock must be updated; --locked refuses that update."
+  },
+  "reverse_lock_check": {
+    "case": "baseline source with generated candidate lock",
+    "command": ["cargo", "metadata", "--offline", "--locked", "--format-version=1"],
+    "exit_code": 101,
+    "stderr": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/iwa-lockdiag-base-candidate-lock/metadata.stderr",
+      "bytes": 279,
+      "sha256": "4a94d9a13d9086f1df0e8692db1eedc382c35212f1b3c78de05ed060b3ebe663"
+    },
+    "reason": "The candidate lock is not an exact locked resolution for the unchanged baseline source."
+  },
+  "conclusion": "Full byte equality of endpoint lockfiles is overstrict for this intentional local iwa-core-to-smallvec source delta. Keep each endpoint lock exact and pinned, and compare common registry resolutions plus explicitly traced local dependency additions before rebuilding."
+}
