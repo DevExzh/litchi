@@ -389,7 +389,7 @@ impl Xlsb {
     }
 
     /// The OPC ingress policy retained by this handle for raw re-admission.
-    pub(crate) const fn ooxml_read_limits(&self) -> SourceLimits {
+    pub(crate) fn ooxml_read_limits(&self) -> SourceLimits {
         self.0.ooxml_limits
     }
 

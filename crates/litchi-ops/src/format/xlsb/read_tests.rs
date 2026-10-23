@@ -47,7 +47,7 @@ fn open_with_execution_context(bytes: Vec<u8>, context: ExecutionContext) -> Fil
     let package = SourceBackedPackage::from_read_at(
         source,
         SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         litchi_opc::SourceReadPolicy::exact(),
         Some(context),
     )
@@ -163,7 +163,7 @@ fn chart_workbook() -> Vec<u8> {
 fn malformed_second_sheet() -> Vec<u8> {
     let mut package = OpcPackage::from_reader(
         Cursor::new(fixture("xlsb/Simple.xlsb")),
-        litchi_opc::SourceLimits::default(),
+        SourceLimits::default(),
     )
     .expect("read OPC package");
     package
@@ -184,7 +184,7 @@ fn malformed_second_sheet() -> Vec<u8> {
 fn indexed_pivot_workbook() -> Vec<u8> {
     let mut package = OpcPackage::from_reader(
         Cursor::new(fixture("xlsb/sample.xlsb")),
-        litchi_opc::SourceLimits::default(),
+        SourceLimits::default(),
     )
     .expect("read indexed OPC package");
     package
@@ -207,7 +207,7 @@ fn indexed_pivot_workbook() -> Vec<u8> {
 fn corrupt_index_workbook() -> Vec<u8> {
     let mut package = OpcPackage::from_reader(
         Cursor::new(indexed_pivot_workbook()),
-        litchi_opc::SourceLimits::default(),
+        SourceLimits::default(),
     )
     .expect("read indexed pivot OPC package");
     package

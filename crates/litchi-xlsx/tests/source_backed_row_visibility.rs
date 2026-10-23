@@ -542,7 +542,7 @@ fn managed_editor_retains_payload_closure_and_releases_budget() {
     let editor = RowVisibilityEditor::from_read_at_with_options(
         Arc::new(VersionedSource::new(bytes)),
         litchi_xlsx::OpenOptions::new()
-            .source_limits(litchi_xlsx::SourceLimits::default())
+            .source_limits(SourceLimits::default())
             .cache_limits(SourceCacheLimits::new(usize::try_from(exact).unwrap(), 8).unwrap())
             .execution_context(context),
     )
@@ -576,7 +576,7 @@ fn managed_one_under_budget_refuses_before_selected_worksheet_io() {
     let editor = RowVisibilityEditor::from_read_at_with_options(
         source.clone(),
         litchi_xlsx::OpenOptions::new()
-            .source_limits(litchi_xlsx::SourceLimits::default())
+            .source_limits(SourceLimits::default())
             .execution_context(context),
     )
     .unwrap();
@@ -607,7 +607,7 @@ fn managed_cancellation_is_checked_before_snapshot_and_stream_output() {
     let editor = RowVisibilityEditor::from_read_at_with_options(
         Arc::new(VersionedSource::new(bytes.clone())),
         litchi_xlsx::OpenOptions::new()
-            .source_limits(litchi_xlsx::SourceLimits::default())
+            .source_limits(SourceLimits::default())
             .execution_context(context),
     )
     .unwrap();
@@ -623,7 +623,7 @@ fn managed_cancellation_is_checked_before_snapshot_and_stream_output() {
     let editor = RowVisibilityEditor::from_read_at_with_options(
         Arc::new(VersionedSource::new(bytes.clone())),
         litchi_xlsx::OpenOptions::new()
-            .source_limits(litchi_xlsx::SourceLimits::default())
+            .source_limits(SourceLimits::default())
             .execution_context(context),
     )
     .unwrap();
@@ -645,7 +645,7 @@ fn managed_cancellation_is_checked_before_snapshot_and_stream_output() {
     let editor = RowVisibilityEditor::from_read_at_with_options(
         Arc::new(VersionedSource::new(bytes.clone())),
         litchi_xlsx::OpenOptions::new()
-            .source_limits(litchi_xlsx::SourceLimits::default())
+            .source_limits(SourceLimits::default())
             .execution_context(context),
     )
     .unwrap();
@@ -664,7 +664,7 @@ fn managed_cancellation_is_checked_before_snapshot_and_stream_output() {
     let editor = RowVisibilityEditor::from_read_at_with_options(
         Arc::new(VersionedSource::new(bytes)),
         litchi_xlsx::OpenOptions::new()
-            .source_limits(litchi_xlsx::SourceLimits::default())
+            .source_limits(SourceLimits::default())
             .execution_context(context),
     )
     .unwrap();
@@ -692,7 +692,7 @@ fn managed_exact_noop_publication_is_byte_exact_and_releases_budget() {
     let editor = RowVisibilityEditor::from_read_at_with_options(
         Arc::new(VersionedSource::new(bytes.clone())),
         litchi_xlsx::OpenOptions::new()
-            .source_limits(litchi_xlsx::SourceLimits::default())
+            .source_limits(SourceLimits::default())
             .execution_context(context),
     )
     .unwrap();
@@ -730,7 +730,7 @@ fn managed_changed_publication_preserves_unknown_members_and_releases_budget() {
     let editor = RowVisibilityEditor::from_read_at_with_options(
         Arc::new(VersionedSource::new(bytes.clone())),
         litchi_xlsx::OpenOptions::new()
-            .source_limits(litchi_xlsx::SourceLimits::default())
+            .source_limits(SourceLimits::default())
             .execution_context(context),
     )
     .unwrap();
@@ -790,7 +790,7 @@ fn managed_changed_publication_refuses_without_planning_headroom() {
     let editor = RowVisibilityEditor::from_read_at_with_options(
         Arc::new(VersionedSource::new(bytes)),
         litchi_xlsx::OpenOptions::new()
-            .source_limits(litchi_xlsx::SourceLimits::default())
+            .source_limits(SourceLimits::default())
             .execution_context(context),
     )
     .unwrap();
@@ -822,7 +822,7 @@ fn managed_editor_adopts_an_indexed_package_and_releases_budget() {
     let (budget, _cancellation_source, context) = managed_context(exact);
     let package = SourceBackedPackage::from_read_at(
         Arc::new(VersionedSource::new(bytes)),
-        litchi_xlsx::SourceLimits::default(),
+        SourceLimits::default(),
         SourceCacheLimits::default(),
         litchi_opc::SourceReadPolicy::exact(),
         Some(context),
@@ -851,7 +851,7 @@ fn managed_signature_noop_and_changed_protection_contracts_remain_fail_closed() 
     let editor = RowVisibilityEditor::from_read_at_with_options(
         Arc::new(VersionedSource::new(signed.clone())),
         litchi_xlsx::OpenOptions::new()
-            .source_limits(litchi_xlsx::SourceLimits::default())
+            .source_limits(SourceLimits::default())
             .execution_context(context),
     )
     .unwrap();
@@ -867,7 +867,7 @@ fn managed_signature_noop_and_changed_protection_contracts_remain_fail_closed() 
     let editor = RowVisibilityEditor::from_read_at_with_options(
         Arc::new(VersionedSource::new(signed)),
         litchi_xlsx::OpenOptions::new()
-            .source_limits(litchi_xlsx::SourceLimits::default())
+            .source_limits(SourceLimits::default())
             .execution_context(context),
     )
     .unwrap();
@@ -889,7 +889,7 @@ fn managed_signature_noop_and_changed_protection_contracts_remain_fail_closed() 
     let editor = RowVisibilityEditor::from_read_at_with_options(
         Arc::new(VersionedSource::new(protected)),
         litchi_xlsx::OpenOptions::new()
-            .source_limits(litchi_xlsx::SourceLimits::default())
+            .source_limits(SourceLimits::default())
             .execution_context(context),
     )
     .unwrap();
@@ -908,7 +908,7 @@ fn managed_source_revision_is_refused_before_output() {
     let editor = RowVisibilityEditor::from_read_at_with_options(
         source.clone(),
         litchi_xlsx::OpenOptions::new()
-            .source_limits(litchi_xlsx::SourceLimits::default())
+            .source_limits(SourceLimits::default())
             .execution_context(context),
     )
     .unwrap();

@@ -783,7 +783,7 @@ fn verify_untouched_members(fixture: &Fixture, output: &[u8]) -> AnyResult<bool>
 }
 
 fn part_blob(bytes: &[u8], name: &str) -> AnyResult<Vec<u8>> {
-    let package = OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default())?;
+    let package = OpcPackage::from_bytes(bytes, SourceLimits::default())?;
     let part = package.get_part(&PackURI::new(format!("/{name}"))?)?;
     Ok(part.blob().to_vec())
 }

@@ -236,7 +236,7 @@ fn relationship_bytes(bytes: &[u8], owner: &str) -> Vec<u8> {
         .opc_package()
         .source_relationships(
             &PackURI::new(owner).expect("relationship owner URI"),
-            litchi_opc::SourceLimits::default(),
+            SourceLimits::default(),
         )
         .expect("relationship source bytes")
         .bytes()
@@ -247,7 +247,7 @@ fn content_types_bytes(bytes: &[u8]) -> Vec<u8> {
     let package = Package::from_reader(Cursor::new(bytes)).expect("open DOCX content types");
     package
         .opc_package()
-        .source_content_types(litchi_opc::SourceLimits::default())
+        .source_content_types(SourceLimits::default())
         .expect("content-types source bytes")
         .bytes()
         .to_vec()

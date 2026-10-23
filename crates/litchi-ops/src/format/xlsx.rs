@@ -469,7 +469,7 @@ impl Xlsx {
     }
 
     /// The OPC ingress policy retained by this handle for raw re-admission.
-    pub(crate) const fn ooxml_read_limits(&self) -> litchi_opc::SourceLimits {
+    pub(crate) fn ooxml_read_limits(&self) -> litchi_opc::SourceLimits {
         self.0.ooxml_limits
     }
 

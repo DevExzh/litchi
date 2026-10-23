@@ -163,6 +163,7 @@ impl Xlsb {
                 metadata,
                 self.0.metadata_repairs.clone(),
                 &options,
+                self.0.ooxml_limits,
             )
             .with_origin(self.origin())
             .with_signature(self.signature());
@@ -195,6 +196,7 @@ impl Xlsb {
             metadata,
             self.0.metadata_repairs.clone(),
             &options,
+            self.0.ooxml_limits,
         )
         .with_origin(self.origin())
         .with_signature(signature))

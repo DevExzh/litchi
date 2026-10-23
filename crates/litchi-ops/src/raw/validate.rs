@@ -162,7 +162,7 @@ pub(super) fn validate(file: &File) -> Result<Validation> {
             let leaf = litchi_opc::validate_read_at(
                 Arc::new(litchi_core::OwnedSource::from_arc(Arc::clone(&bytes))),
                 limits,
-                litchi_core::ValidationLimits::default(),
+                ValidationLimits::default(),
             )
             .map_err(Error::Opc)?;
             with_parts(leaf, bytes, limits)?
@@ -240,7 +240,7 @@ fn refused(file: &File) -> OpsError {
 fn with_parts(
     leaf: ValidateReport,
     bytes: Arc<Vec<u8>>,
-    limits: litchi_opc::SourceLimits,
+    limits: SourceLimits,
 ) -> Result<ValidateReport> {
     let Ok(package) = litchi_opc::OpcPackage::from_shared_vec(bytes, limits) else {
         // The leaf report already records the ingress rejection.

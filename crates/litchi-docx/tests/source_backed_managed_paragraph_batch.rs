@@ -214,7 +214,7 @@ fn managed(bytes: Vec<u8>) -> (Budget, CancellationSource, source_backed::Packag
 }
 
 fn part_bytes(bytes: &[u8], name: &str) -> Vec<u8> {
-    let package = OpcPackage::from_bytes(bytes, litchi_opc::SourceLimits::default()).unwrap();
+    let package = OpcPackage::from_bytes(bytes, SourceLimits::default()).unwrap();
     package
         .get_part(&PackURI::new(format!("/{name}")).unwrap())
         .unwrap()

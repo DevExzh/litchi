@@ -423,13 +423,9 @@ fn revision_without_author_is_kept_unattributed_and_recorded() {
     assert_eq!(opened.tolerance_report().defects(), &recorded);
 
     // The pinned source-backed view reports the same repairs.
-    let source = SourceBackedPackage::from_read_at(
-        std::sync::Arc::new(litchi_core::OwnedSource::new(bytes)),
-        litchi_opc::SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
-        litchi_opc::SourceReadPolicy::exact(),
-        None,
-    )
+    let source = SourceBackedPackage::from_read_at(std::sync::Arc::new(
+        litchi_core::OwnedSource::new(bytes),
+    ))
     .expect("source package");
     let pinned = source.document().expect("pinned document");
     assert_eq!(pinned.revisions().expect("revisions").len(), 3);

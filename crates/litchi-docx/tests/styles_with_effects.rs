@@ -363,7 +363,7 @@ fn relationship_xml_events(xml: &[u8], name: &str) -> FixtureResult<usize> {
 }
 
 fn package_metrics(bytes: &[u8]) -> FixtureResult<PackageMetrics> {
-    let opc = litchi_opc::OpcPackage::from_vec(bytes.to_vec(), litchi_opc::SourceLimits::default())
+    let opc = litchi_opc::OpcPackage::from_vec(bytes.to_vec(), SourceLimits::default())
         .map_err(|error| FixtureError(format!("open OPC metrics source: {error:?}")))?;
     let total_part_bytes = opc.try_iter_parts().try_fold(0_u64, |total, part| {
         let part = part.map_err(|error| FixtureError(format!("decode part payload: {error:?}")))?;

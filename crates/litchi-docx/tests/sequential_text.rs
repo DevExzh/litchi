@@ -79,14 +79,8 @@ fn source_text(
     bytes: Vec<u8>,
     options: TextOutputOptions<'_>,
 ) -> (Vec<u8>, litchi_core::TextOutputReport) {
-    let package = SourceBackedPackage::from_read_at(
-        Arc::new(OwnedSource::new(bytes)),
-        litchi_opc::SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
-        litchi_opc::SourceReadPolicy::exact(),
-        None,
-    )
-    .expect("source-backed package");
+    let package = SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(bytes)))
+        .expect("source-backed package");
     let mut output = Vec::new();
     let report = package
         .write_text_to(&mut output, options)
@@ -153,18 +147,12 @@ fn paragraph_separated_text_matches_the_sink_on_both_owners() {
         .expect("eager document")
         .text_with_paragraph_separator("\n")
         .expect("eager paragraph text");
-    let source = SourceBackedPackage::from_read_at(
-        Arc::new(OwnedSource::new(bytes)),
-        litchi_opc::SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
-        litchi_opc::SourceReadPolicy::exact(),
-        None,
-    )
-    .expect("source-backed package")
-    .document()
-    .expect("source document")
-    .extract_text_with_paragraph_separator("\n")
-    .expect("source paragraph text");
+    let source = SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(bytes)))
+        .expect("source-backed package")
+        .document()
+        .expect("source document")
+        .extract_text_with_paragraph_separator("\n")
+        .expect("source paragraph text");
     assert_eq!(eager, "one & 世界\ttwo\n\ncell\nlast");
     assert_eq!(eager.as_bytes(), sink.as_slice());
     assert_eq!(source, eager);
@@ -175,18 +163,12 @@ fn paragraph_separated_text_matches_the_sink_on_both_owners() {
         ),
         false,
     );
-    let source = SourceBackedPackage::from_read_at(
-        Arc::new(OwnedSource::new(nested)),
-        litchi_opc::SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
-        litchi_opc::SourceReadPolicy::exact(),
-        None,
-    )
-    .expect("source-backed package")
-    .document()
-    .expect("source document")
-    .extract_text_with_paragraph_separator("\n")
-    .expect("nested paragraphs stay in their anchor");
+    let source = SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(nested)))
+        .expect("source-backed package")
+        .document()
+        .expect("source document")
+        .extract_text_with_paragraph_separator("\n")
+        .expect("nested paragraphs stay in their anchor");
     assert_eq!(source, "anchor box\nafter");
 }
 
@@ -619,14 +601,7 @@ fn source_stale_before_during_and_after_output_takes_precedence() {
         &document_xml(r#"<w:p><w:r><w:t>stale</w:t></w:r></w:p>"#),
         false,
     )));
-    let package = SourceBackedPackage::from_read_at(
-        source.clone(),
-        litchi_opc::SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
-        litchi_opc::SourceReadPolicy::exact(),
-        None,
-    )
-    .expect("source package");
+    let package = SourceBackedPackage::from_read_at(source.clone()).expect("source package");
     source.changed();
     let mut output = Vec::new();
     assert!(matches!(
@@ -638,14 +613,7 @@ fn source_stale_before_during_and_after_output_takes_precedence() {
         &document_xml(r#"<w:p><w:r><w:t>during</w:t></w:r></w:p>"#),
         false,
     )));
-    let package = SourceBackedPackage::from_read_at(
-        source.clone(),
-        litchi_opc::SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
-        litchi_opc::SourceReadPolicy::exact(),
-        None,
-    )
-    .expect("source package");
+    let package = SourceBackedPackage::from_read_at(source.clone()).expect("source package");
     source.arm_change_on_read();
     let mut output = Vec::new();
     assert!(matches!(
@@ -658,14 +626,7 @@ fn source_stale_before_during_and_after_output_takes_precedence() {
         &document_xml(r#"<w:p><w:r><w:t>after</w:t></w:r></w:p>"#),
         false,
     )));
-    let package = SourceBackedPackage::from_read_at(
-        source.clone(),
-        litchi_opc::SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
-        litchi_opc::SourceReadPolicy::exact(),
-        None,
-    )
-    .expect("source package");
+    let package = SourceBackedPackage::from_read_at(source.clone()).expect("source package");
     let mut sink = ChangeOnWrite {
         source,
         bytes: Vec::new(),
@@ -688,14 +649,7 @@ fn source_change_overrides_simultaneous_sink_failure() {
         &document_xml(r#"<w:p><w:r><w:t>sink</w:t></w:r></w:p>"#),
         false,
     )));
-    let package = SourceBackedPackage::from_read_at(
-        source.clone(),
-        litchi_opc::SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
-        litchi_opc::SourceReadPolicy::exact(),
-        None,
-    )
-    .expect("source package");
+    let package = SourceBackedPackage::from_read_at(source.clone()).expect("source package");
     let mut sink = ChangeAndFail {
         source,
         changed: false,
@@ -818,14 +772,7 @@ fn declared_size_is_rejected_before_payload_and_media_stays_cold() {
         &document_xml(r#"<w:p><w:r><w:t>tiny</w:t></w:r></w:p>"#),
         true,
     ))));
-    let package = SourceBackedPackage::from_read_at(
-        source.clone(),
-        litchi_opc::SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
-        litchi_opc::SourceReadPolicy::exact(),
-        None,
-    )
-    .expect("oversized package");
+    let package = SourceBackedPackage::from_read_at(source.clone()).expect("oversized package");
     let reads_before_sink = source.reads.load(Ordering::SeqCst);
     let mut output = Vec::new();
     let error = package
@@ -908,14 +855,8 @@ fn truncated_documents_refuse_at_end_of_input_with_unchanged_message_and_progres
         assert_eq!(progress.objects_written(), 0);
         assert!(output.is_empty());
 
-        let package = SourceBackedPackage::from_read_at(
-            Arc::new(OwnedSource::new(bytes)),
-            litchi_opc::SourceLimits::default(),
-            litchi_opc::SourceCacheLimits::default(),
-            litchi_opc::SourceReadPolicy::exact(),
-            None,
-        )
-        .expect("source-backed package");
+        let package = SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(bytes)))
+            .expect("source-backed package");
         let mut output = Vec::new();
         let error = package
             .write_text_to(&mut output, parity_options(false))
@@ -963,14 +904,8 @@ fn omml_equation_is_skipped_and_recorded_in_both_facades() {
         }]
     );
 
-    let source_package = SourceBackedPackage::from_read_at(
-        Arc::new(OwnedSource::new(bytes)),
-        litchi_opc::SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
-        litchi_opc::SourceReadPolicy::exact(),
-        None,
-    )
-    .expect("source package");
+    let source_package = SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(bytes)))
+        .expect("source package");
     let mut output = Vec::new();
     source_package
         .write_text_to(&mut output, parity_options(false))
@@ -1005,14 +940,8 @@ fn conformant_extraction_leaves_both_reports_clean() {
         .expect("conformant text");
     assert!(document.tolerance_report().is_clean());
 
-    let source_package = SourceBackedPackage::from_read_at(
-        Arc::new(OwnedSource::new(bytes)),
-        litchi_opc::SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
-        litchi_opc::SourceReadPolicy::exact(),
-        None,
-    )
-    .expect("source package");
+    let source_package = SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(bytes)))
+        .expect("source package");
     let mut output = Vec::new();
     source_package
         .write_text_to(&mut output, parity_options(false))
@@ -1071,14 +1000,8 @@ fn omml_and_drawingml_text_subtrees_are_opaque_and_each_recorded() {
     assert_eq!(&contexts[..6], expected.as_slice());
     assert_eq!(&contexts[6..], expected.as_slice());
 
-    let source_package = SourceBackedPackage::from_read_at(
-        Arc::new(OwnedSource::new(bytes)),
-        litchi_opc::SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
-        litchi_opc::SourceReadPolicy::exact(),
-        None,
-    )
-    .expect("source package");
+    let source_package = SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(bytes)))
+        .expect("source package");
     let mut output = Vec::new();
     source_package
         .write_text_to(&mut output, parity_options(false))
@@ -1112,14 +1035,8 @@ fn ill_formed_foreign_text_subtrees_remain_fatal() {
             ),
             "{body}"
         );
-        let source_package = SourceBackedPackage::from_read_at(
-            Arc::new(OwnedSource::new(bytes)),
-            litchi_opc::SourceLimits::default(),
-            litchi_opc::SourceCacheLimits::default(),
-            litchi_opc::SourceReadPolicy::exact(),
-            None,
-        )
-        .expect("source package");
+        let source_package = SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(bytes)))
+            .expect("source package");
         let mut output = Vec::new();
         assert!(
             matches!(
@@ -1163,14 +1080,8 @@ fn references_and_cdata_outside_text_are_accepted_without_repair() {
     assert_eq!(output, b"link");
     assert!(document.tolerance_report().is_clean());
 
-    let source_package = SourceBackedPackage::from_read_at(
-        Arc::new(OwnedSource::new(bytes)),
-        litchi_opc::SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
-        litchi_opc::SourceReadPolicy::exact(),
-        None,
-    )
-    .expect("source package");
+    let source_package = SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(bytes)))
+        .expect("source package");
     let mut output = Vec::new();
     source_package
         .write_text_to(&mut output, parity_options(false))
@@ -1213,14 +1124,7 @@ fn committed_owner_streams_current_text_and_preserves_old_owner() {
             )
             .unwrap()
         } else {
-            SourceBackedPackage::from_read_at(
-                source,
-                litchi_opc::SourceLimits::default(),
-                litchi_opc::SourceCacheLimits::default(),
-                litchi_opc::SourceReadPolicy::exact(),
-                None,
-            )
-            .unwrap()
+            SourceBackedPackage::from_read_at(source).unwrap()
         };
         let mut edit = owner.edit().unwrap();
         edit.replace_paragraph_text(litchi_core::Position::new(0), "after & current")
@@ -1260,7 +1164,7 @@ fn effective_main_donor_cancellation_during_output_keeps_progress() {
             false,
         ))),
         SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceCacheLimits::default(),
         litchi_opc::SourceReadPolicy::exact(),
         Some(context),
     )
@@ -1277,8 +1181,8 @@ fn effective_main_donor_cancellation_during_output_keeps_progress() {
     );
     let physical = litchi_opc::SourceBackedPackage::from_vec(
         litchi_opc::PackageWriter::to_bytes(&base).unwrap(),
-        litchi_opc::SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
         None,
     )
     .unwrap();
@@ -1332,8 +1236,8 @@ fn effective_declared_size_is_rejected_before_payload_read() {
     ))));
     let physical = litchi_opc::SourceBackedPackage::from_read_at(
         source.clone(),
-        litchi_opc::SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
         litchi_opc::SourceReadPolicy::exact(),
         None,
     )
@@ -1364,8 +1268,8 @@ fn effective_mce_stream_checks_source_after_sink_failure() {
     let source = Arc::new(VersionedSource::new(package_bytes(xml.as_bytes(), true)));
     let physical = litchi_opc::SourceBackedPackage::from_read_at(
         source.clone(),
-        litchi_opc::SourceLimits::default(),
-        litchi_opc::SourceCacheLimits::default(),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
         litchi_opc::SourceReadPolicy::exact(),
         None,
     )
