@@ -1550,6 +1550,9 @@ impl Edit {
         if !joined.lineage().matches(&self.source) {
             return Err(JoinError::new(Error::PatchConflict, joined));
         }
+        if let Err(error) = validate_joined_effect_declarations(&joined) {
+            return Err(JoinError::new(error, joined));
+        }
         let source_fingerprint = fingerprint(self.source.as_bytes());
         let validation_error = joined.sub_edits().find_map(|sub_edit| {
             validate_durable_patch(&sub_edit.payload().inner)
@@ -1605,18 +1608,23 @@ impl Edit {
                 .any(|change| matches!(change, Change::Structure(_)))
             || self.package_replacement.is_some();
         let direct_conflict = joined.sub_edits().any(|sub_edit| {
-            sub_edit.effects().writes().any(|effect| {
-                if effect == "package" {
-                    return staged_package_effect || !self.changes.is_empty();
-                }
-                if staged_package_effect {
-                    return true;
-                }
-                self.changes
-                    .iter()
-                    .flat_map(|change| change_effect_keys(&self.source, change))
-                    .any(|staged| staged == effect)
-            })
+            sub_edit
+                .payload()
+                .operations()
+                .iter()
+                .flat_map(durable_effect_keys)
+                .any(|effect| {
+                    if effect == "package" {
+                        return staged_package_effect || !self.changes.is_empty();
+                    }
+                    if staged_package_effect {
+                        return true;
+                    }
+                    self.changes
+                        .iter()
+                        .flat_map(|change| change_effect_keys(&self.source, change))
+                        .any(|staged| staged == effect)
+                })
         });
         if direct_conflict {
             return Ok(true);
@@ -1625,6 +1633,13 @@ impl Edit {
     }
 
     fn validate_joined_page_names(&self, joined: &JoinedEdits) -> Result<()> {
+        // A replacement changes the page universe, so validating any later
+        // selector against the source would be both incorrect and an extra
+        // package reopen. The execution segments validate against the active
+        // replacement exactly once before staging their operations.
+        if joined_contains_package_replacement(joined) {
+            return Ok(());
+        }
         let mut segment = Vec::new();
         let mut active_replacement = None;
         for sub_edit in joined.sub_edits() {
@@ -1698,10 +1713,11 @@ impl Edit {
             names[page] = Some(after.clone());
             targets.insert(page, after);
         }
-        let mut owners = BTreeMap::new();
-        for (page, name) in names.into_iter().enumerate() {
-            if let Some(name) = name
-                && owners.insert(name.clone(), page).is_some()
+        for (page, name) in &targets {
+            if names
+                .iter()
+                .enumerate()
+                .any(|(other, value)| other != *page && value.as_deref() == Some(name.as_str()))
             {
                 return Err(joined_refusal("ODG joined page names would duplicate"));
             }
@@ -6293,6 +6309,35 @@ fn validate_joined_preconditions(patch: &DurablePatch, source_fingerprint: &str)
     Ok(())
 }
 
+fn validate_joined_effect_declarations(joined: &JoinedEdits) -> Result<()> {
+    for sub_edit in joined.sub_edits() {
+        let declared = sub_edit
+            .effects()
+            .writes()
+            .map(str::to_owned)
+            .collect::<BTreeSet<_>>();
+        let mut actual = BTreeSet::new();
+        for effect in sub_edit
+            .payload()
+            .operations()
+            .iter()
+            .flat_map(durable_effect_keys)
+        {
+            if !actual.insert(effect.clone()) && effect != "package" {
+                return Err(joined_refusal(
+                    "ODG joined payload repeats a semantic write",
+                ));
+            }
+        }
+        if actual != declared {
+            return Err(joined_refusal(
+                "ODG joined payload effects do not match declarations",
+            ));
+        }
+    }
+    Ok(())
+}
+
 fn durable_effect_keys(operation: &PatchOperation) -> Vec<String> {
     match operation.op.as_str() {
         "package.replace" => vec!["package".to_owned()],
@@ -6357,6 +6402,15 @@ fn joined_has_dependent_conflict(source: &Package, joined: &JoinedEdits) -> Resu
     {
         return Ok(false);
     }
+    // Cross-sub-edit package/semantic mixing has already been rejected by
+    // `joined_contains_mixed_package_effects`. Any remaining style/transition
+    // operations around a replacement are in one ordered sub-edit, where
+    // intra-sub-edit dependencies are intentional and valid. Do not reopen
+    // replacement blobs merely to walk a dependency graph that cannot cross a
+    // composition boundary.
+    if joined_contains_package_replacement(joined) {
+        return Ok(false);
+    }
     let events = projected_joined_style_events(source, joined)?;
     style_events_conflict(&events)
 }
@@ -6408,6 +6462,16 @@ fn has_style_dependency_operation<'a>(
             operation.op.as_str(),
             "page.style.set" | "page.transition.set"
         )
+    })
+}
+
+fn joined_contains_package_replacement(joined: &JoinedEdits) -> bool {
+    joined.sub_edits().any(|sub_edit| {
+        sub_edit
+            .payload()
+            .operations()
+            .iter()
+            .any(|operation| operation.op == "package.replace")
     })
 }
 
@@ -6554,13 +6618,23 @@ fn style_event_pair_conflicts(
 }
 
 fn joined_contains_mixed_package_effects(joined: &JoinedEdits) -> bool {
-    let sub_edits = joined.sub_edits().collect::<Vec<_>>();
+    let sub_edits = joined
+        .sub_edits()
+        .map(|sub_edit| {
+            sub_edit
+                .payload()
+                .operations()
+                .iter()
+                .flat_map(durable_effect_keys)
+                .collect::<Vec<_>>()
+        })
+        .collect::<Vec<_>>();
     sub_edits.iter().enumerate().any(|(index, left)| {
-        let left_package = left.effects().writes().any(|effect| effect == "package");
-        let left_other = left.effects().writes().any(|effect| effect != "package");
+        let left_package = left.iter().any(|effect| effect == "package");
+        let left_other = left.iter().any(|effect| effect != "package");
         sub_edits[index.saturating_add(1)..].iter().any(|right| {
-            let right_package = right.effects().writes().any(|effect| effect == "package");
-            let right_other = right.effects().writes().any(|effect| effect != "package");
+            let right_package = right.iter().any(|effect| effect == "package");
+            let right_other = right.iter().any(|effect| effect != "package");
             (left_package && right_other) || (left_other && right_package)
         })
     })

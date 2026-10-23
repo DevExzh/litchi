@@ -1,11 +1,12 @@
 #![allow(clippy::unwrap_used, reason = "test assertions use unwrap for clarity")]
 
 use litchi_core::{
-    CompositionError, CompositionLimitKind, CompositionLimits, DiagnosticFingerprint, Error,
-    SubEditJoinFailure,
+    BlobId, CompositionError, CompositionLimitKind, CompositionLimits, DiagnosticFingerprint,
+    Error, SubEditJoinFailure,
 };
 use litchi_odf_common::core::PackageWriter;
 use litchi_odg::{Package, Transition, edit};
+use soapberry_zip::office::StreamingArchiveWriter;
 
 const CONTENT_AUTOMATIC: &str = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0" xmlns:smil="urn:oasis:names:tc:opendocument:xmlns:smil-compatible:1.0" office:version="1.4"><office:automatic-styles><style:style style:name="dp1" style:family="drawing-page"><style:drawing-page-properties presentation:transition-type="manual" presentation:transition-style="fade-from-left"/></style:style><style:style style:name="dp2" style:family="drawing-page"><style:drawing-page-properties presentation:transition-type="automatic" presentation:transition-style="dissolve"/></style:style></office:automatic-styles><office:body><office:drawing><draw:page draw:name="Page 1" draw:style-name="dp1"/><draw:page draw:name="Page 2" draw:style-name="dp2"/></office:drawing></office:body></office:document-content>"#;
 
@@ -61,6 +62,116 @@ fn assert_exact_durable_round_trip(source: Package, value: Transition) {
     assert_eq!(replayed.as_bytes(), commit.package().as_bytes());
     let restored = durable.inverse().apply(&replayed).unwrap();
     assert_eq!(restored.as_bytes(), source.as_bytes());
+}
+
+fn mixed_replacement_page_name(
+    source: &Package,
+    template_page: usize,
+    target_page: usize,
+    target_before: &str,
+    target_after: &str,
+    added_name: &str,
+) -> (edit::DurablePatch, Package) {
+    let mut structural_edit = source.edit();
+    structural_edit
+        .add_page(litchi_odg::page::Page::new(added_name))
+        .unwrap();
+    let structural = structural_edit.commit().unwrap();
+    let mut mixed_wire: serde_json::Value = serde_json::from_slice(
+        &structural
+            .patch()
+            .durable()
+            .unwrap()
+            .to_deterministic_json()
+            .unwrap(),
+    )
+    .unwrap();
+
+    let mut name_edit = source.edit();
+    name_edit
+        .set_page_name(template_page, "Template rename")
+        .unwrap();
+    let name_wire: serde_json::Value = serde_json::from_slice(
+        &name_edit
+            .commit()
+            .unwrap()
+            .patch()
+            .durable()
+            .unwrap()
+            .to_deterministic_json()
+            .unwrap(),
+    )
+    .unwrap();
+    mixed_wire["operations"]
+        .as_array_mut()
+        .unwrap()
+        .push(name_wire["operations"][0].clone());
+    let target = format!("page/{target_page}");
+    mixed_wire["operations"][1]["forward"]["target"] = serde_json::Value::String(target.clone());
+    mixed_wire["operations"][1]["forward"]["value"] =
+        serde_json::Value::String(target_after.to_owned());
+    mixed_wire["operations"][1]["inverse"]["target"] = serde_json::Value::String(target);
+    mixed_wire["operations"][1]["inverse"]["value"] =
+        serde_json::Value::String(target_before.to_owned());
+    mixed_wire["operations"][1]["inverse"]["preconditions"]["source"] =
+        serde_json::Value::String("0".repeat(64));
+
+    let provisional =
+        edit::DurablePatch::from_deterministic_json(&serde_json::to_vec(&mixed_wire).unwrap())
+            .unwrap();
+    let expected = provisional.apply(source).unwrap();
+    let final_source = DiagnosticFingerprint::of(expected.as_bytes()).as_hex();
+    mixed_wire["operations"][0]["inverse"]["preconditions"]["source"] =
+        serde_json::Value::String(final_source.clone());
+    mixed_wire["operations"][1]["inverse"]["preconditions"]["source"] =
+        serde_json::Value::String(final_source);
+    let mixed =
+        edit::DurablePatch::from_deterministic_json(&serde_json::to_vec(&mixed_wire).unwrap())
+            .unwrap();
+    (mixed, expected)
+}
+
+fn signed_package(content: &str) -> Vec<u8> {
+    const MIMETYPE: &[u8] = b"application/vnd.oasis.opendocument.graphics";
+    let manifest = br#"<?xml version="1.0"?><manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><manifest:file-entry manifest:full-path="/" manifest:media-type="application/vnd.oasis.opendocument.graphics"/><manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"/><manifest:file-entry manifest:full-path="META-INF/documentsignatures.xml" manifest:media-type="application/vnd.oasis.opendocument.package"/></manifest:manifest>"#;
+    let mut archive = StreamingArchiveWriter::new();
+    archive.write_stored("mimetype", MIMETYPE).unwrap();
+    archive
+        .write_deflated("content.xml", content.as_bytes())
+        .unwrap();
+    archive
+        .write_deflated("META-INF/manifest.xml", manifest)
+        .unwrap();
+    archive
+        .write_deflated(
+            "META-INF/documentsignatures.xml",
+            br"<document-signatures/>",
+        )
+        .unwrap();
+    archive.finish_to_bytes().unwrap()
+}
+
+fn base64_encode(bytes: &[u8]) -> String {
+    const TABLE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut output = String::with_capacity(bytes.len().div_ceil(3) * 4);
+    for chunk in bytes.chunks(3) {
+        let first = chunk[0];
+        let second = chunk.get(1).copied().unwrap_or(0);
+        let third = chunk.get(2).copied().unwrap_or(0);
+        output.push(TABLE[(first >> 2) as usize] as char);
+        output.push(TABLE[((first & 0x03) << 4 | (second >> 4)) as usize] as char);
+        output.push(if chunk.len() > 1 {
+            TABLE[((second & 0x0f) << 2 | (third >> 6)) as usize] as char
+        } else {
+            '='
+        });
+        output.push(if chunk.len() > 2 {
+            TABLE[(third & 0x3f) as usize] as char
+        } else {
+            '='
+        });
+    }
+    output
 }
 
 #[test]
@@ -582,6 +693,370 @@ fn joined_page_name_renames_validate_final_names() {
             if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedOperation
     ));
     assert!(!unchanged.commit().unwrap().diagnostics().changed());
+}
+
+#[test]
+fn page_rename_preserves_unrelated_existing_duplicate_names() {
+    let content = CONTENT_AUTOMATIC
+        .replace("draw:name=\"Page 1\"", "draw:name=\"A\"")
+        .replace("draw:name=\"Page 2\"", "draw:name=\"A\"")
+        .replace(
+            "</office:drawing>",
+            r#"<draw:page draw:name="C" draw:style-name="dp1"/></office:drawing>"#,
+        );
+    let source = Package::from_bytes(&package(&content, None)).unwrap();
+    assert_eq!(
+        source
+            .pages()
+            .iter()
+            .map(|page| page.name())
+            .collect::<Vec<_>>(),
+        [Some("A"), Some("A"), Some("C"),]
+    );
+
+    let mut direct = source.edit();
+    direct.set_page_name(2, "D").unwrap();
+    let direct_commit = direct.commit().unwrap();
+    let durable = direct_commit.patch().durable().unwrap();
+    assert_eq!(
+        durable.apply(&source).unwrap().as_bytes(),
+        direct_commit.package().as_bytes()
+    );
+    assert_eq!(
+        durable
+            .inverse()
+            .apply(direct_commit.package())
+            .unwrap()
+            .as_bytes(),
+        source.as_bytes()
+    );
+
+    let limits = CompositionLimits::new(4, 8, 16, 8);
+    let mut joined = source.joined_edits(limits);
+    joined
+        .join(direct_commit.patch().prepare("rename-c", limits).unwrap())
+        .unwrap();
+    let mut joined_owner = source.edit();
+    joined_owner.join(joined).unwrap();
+    let joined_commit = joined_owner.commit().unwrap();
+    assert_eq!(
+        joined_commit.package().as_bytes(),
+        direct_commit.package().as_bytes()
+    );
+    assert_eq!(
+        source
+            .apply(joined_commit.patch())
+            .unwrap()
+            .package()
+            .as_bytes(),
+        direct_commit.package().as_bytes()
+    );
+    assert_eq!(
+        joined_commit
+            .package()
+            .apply(&joined_commit.patch().inverse())
+            .unwrap()
+            .package()
+            .as_bytes(),
+        source.as_bytes()
+    );
+
+    let mut direct_duplicate = source.edit();
+    assert!(direct_duplicate.set_page_name(2, "A").is_err());
+    let mut duplicate_wire: serde_json::Value =
+        serde_json::from_slice(&durable.to_deterministic_json().unwrap()).unwrap();
+    duplicate_wire["operations"][0]["forward"]["value"] = serde_json::Value::String("A".to_owned());
+    let duplicate =
+        edit::DurablePatch::from_deterministic_json(&serde_json::to_vec(&duplicate_wire).unwrap())
+            .unwrap();
+    let mut duplicate_joined = source.joined_edits(limits);
+    let duplicate_lineage = duplicate_joined.lineage().clone();
+    let duplicate_sub_edit = edit::SubEdit::new(
+        duplicate_lineage,
+        limits,
+        "duplicate-c",
+        Vec::<String>::new(),
+        vec!["page/2#page.name.set".to_owned()],
+        duplicate,
+    )
+    .unwrap();
+    duplicate_joined.join(duplicate_sub_edit).unwrap();
+    let mut duplicate_owner = source.edit();
+    let error = match duplicate_owner.join(duplicate_joined) {
+        Ok(_) => panic!("duplicate touched page name was accepted"),
+        Err(error) => error,
+    };
+    assert!(matches!(
+        error.error(),
+        Error::Refused(refusal)
+            if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedOperation
+    ));
+    assert!(!duplicate_owner.commit().unwrap().diagnostics().changed());
+
+    let (mixed, expected) = mixed_replacement_page_name(&source, 0, 2, "C", "D", "New");
+    assert_eq!(
+        mixed.apply(&source).unwrap().as_bytes(),
+        expected.as_bytes()
+    );
+    assert_eq!(
+        mixed.inverse().apply(&expected).unwrap().as_bytes(),
+        source.as_bytes()
+    );
+    let mut replacement_joined = source.joined_edits(limits);
+    let replacement_lineage = replacement_joined.lineage().clone();
+    let replacement_sub_edit = edit::SubEdit::new(
+        replacement_lineage,
+        limits,
+        "replacement-rename-c",
+        Vec::<String>::new(),
+        vec!["package".to_owned(), "page/2#page.name.set".to_owned()],
+        mixed,
+    )
+    .unwrap();
+    replacement_joined.join(replacement_sub_edit).unwrap();
+    let mut replacement_owner = source.edit();
+    replacement_owner.join(replacement_joined).unwrap();
+    let replacement_commit = replacement_owner.commit().unwrap();
+    assert_eq!(replacement_commit.package().as_bytes(), expected.as_bytes());
+    assert_eq!(
+        replacement_commit
+            .package()
+            .apply(&replacement_commit.patch().inverse())
+            .unwrap()
+            .package()
+            .as_bytes(),
+        source.as_bytes()
+    );
+
+    let (replacement_duplicate, _) = mixed_replacement_page_name(&source, 0, 2, "C", "D", "New");
+    let mut replacement_duplicate_wire: serde_json::Value =
+        serde_json::from_slice(&replacement_duplicate.to_deterministic_json().unwrap()).unwrap();
+    replacement_duplicate_wire["operations"][1]["forward"]["value"] =
+        serde_json::Value::String("A".to_owned());
+    let replacement_duplicate = edit::DurablePatch::from_deterministic_json(
+        &serde_json::to_vec(&replacement_duplicate_wire).unwrap(),
+    )
+    .unwrap();
+    let mut replacement_duplicate_joined = source.joined_edits(limits);
+    let replacement_duplicate_lineage = replacement_duplicate_joined.lineage().clone();
+    let replacement_duplicate_sub_edit = edit::SubEdit::new(
+        replacement_duplicate_lineage,
+        limits,
+        "replacement-duplicate-c",
+        Vec::<String>::new(),
+        vec!["package".to_owned(), "page/2#page.name.set".to_owned()],
+        replacement_duplicate,
+    )
+    .unwrap();
+    replacement_duplicate_joined
+        .join(replacement_duplicate_sub_edit)
+        .unwrap();
+    let mut replacement_duplicate_owner = source.edit();
+    replacement_duplicate_owner
+        .join(replacement_duplicate_joined)
+        .unwrap();
+    assert!(replacement_duplicate_owner.commit().is_err());
+}
+
+#[test]
+fn joined_payload_effects_cannot_hide_replacement_or_duplicate_writes() {
+    let source = Package::from_bytes(&package(CONTENT_AUTOMATIC, None)).unwrap();
+    let limits = CompositionLimits::new(4, 8, 16, 8);
+    let (forged_replacement, _) =
+        mixed_replacement_page_name(&source, 0, 2, "Added", "Added renamed", "Added");
+    let mut forged_plan = source.joined_edits(limits);
+    let forged_lineage = forged_plan.lineage().clone();
+    let forged_sub_edit = edit::SubEdit::new(
+        forged_lineage,
+        limits,
+        "forged-replacement",
+        Vec::<String>::new(),
+        vec!["page/2#page.name.set".to_owned()],
+        forged_replacement,
+    )
+    .unwrap();
+    forged_plan.join(forged_sub_edit).unwrap();
+    let mut ordinary = source.edit();
+    ordinary.set_page_style_name(0, "dp2").unwrap();
+    let error = match ordinary.join(forged_plan) {
+        Ok(_) => panic!("underdeclared replacement payload was accepted"),
+        Err(error) => error,
+    };
+    assert!(matches!(
+        error.error(),
+        Error::Refused(refusal)
+            if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedOperation
+    ));
+    let recovered = error.into_rejected();
+    let ordinary_commit = ordinary.commit().unwrap();
+    assert_eq!(
+        ordinary_commit.package().pages()[0].style_name(),
+        Some("dp2")
+    );
+    let mut retry = source.edit();
+    assert!(retry.join(recovered).is_err());
+
+    let mut one_edit = source.edit();
+    one_edit.set_page_name(0, "Duplicate once").unwrap();
+    let mut duplicate_wire: serde_json::Value = serde_json::from_slice(
+        &one_edit
+            .commit()
+            .unwrap()
+            .patch()
+            .durable()
+            .unwrap()
+            .to_deterministic_json()
+            .unwrap(),
+    )
+    .unwrap();
+    let operation = duplicate_wire["operations"][0].clone();
+    duplicate_wire["operations"]
+        .as_array_mut()
+        .unwrap()
+        .push(operation);
+    let duplicate =
+        edit::DurablePatch::from_deterministic_json(&serde_json::to_vec(&duplicate_wire).unwrap())
+            .unwrap();
+    let mut duplicate_plan = source.joined_edits(limits);
+    let duplicate_lineage = duplicate_plan.lineage().clone();
+    duplicate_plan
+        .join(
+            edit::SubEdit::new(
+                duplicate_lineage,
+                limits,
+                "concealed-duplicate",
+                Vec::<String>::new(),
+                vec!["page/0#page.name.set".to_owned()],
+                duplicate,
+            )
+            .unwrap(),
+        )
+        .unwrap();
+    let mut duplicate_owner = source.edit();
+    let error = match duplicate_owner.join(duplicate_plan) {
+        Ok(_) => panic!("concealed semantic duplicate was accepted"),
+        Err(error) => error,
+    };
+    assert!(matches!(
+        error.error(),
+        Error::Refused(refusal)
+            if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedOperation
+    ));
+    assert!(!duplicate_owner.commit().unwrap().diagnostics().changed());
+}
+
+#[test]
+fn ordered_replacements_use_the_current_security_policy_state() {
+    let source = Package::from_bytes(&package(CONTENT_AUTOMATIC, None)).unwrap();
+    let signed_bytes = signed_package(CONTENT_AUTOMATIC);
+    let signed = Package::from_bytes(&signed_bytes).unwrap();
+    assert!(signed.security().is_signed());
+    let mut plain_edit = source.edit();
+    plain_edit
+        .add_page(litchi_odg::page::Page::new("Plain target"))
+        .unwrap();
+    let plain_target = plain_edit.commit().unwrap().into_package();
+
+    let source_id = BlobId::of(source.as_bytes()).as_hex();
+    let signed_id = BlobId::of(&signed_bytes).as_hex();
+    let plain_id = BlobId::of(plain_target.as_bytes()).as_hex();
+    let source_fingerprint = DiagnosticFingerprint::of(source.as_bytes()).as_hex();
+    let plain_fingerprint = DiagnosticFingerprint::of(plain_target.as_bytes()).as_hex();
+    let wire = serde_json::json!({
+        "format": "litchi.odg",
+        "forward_blobs": [
+            {"bytes": base64_encode(&signed_bytes), "sha256": signed_id},
+            {"bytes": base64_encode(plain_target.as_bytes()), "sha256": plain_id}
+        ],
+        "operations": [
+            {
+                "forward": {
+                    "op": "package.replace",
+                    "target": "package",
+                    "preconditions": {"source": source_fingerprint},
+                    "value": signed_id
+                },
+                "inverse": {
+                    "op": "package.replace",
+                    "target": "package",
+                    "preconditions": {"source": plain_fingerprint},
+                    "value": source_id
+                }
+            },
+            {
+                "forward": {
+                    "op": "package.replace",
+                    "target": "package",
+                    "preconditions": {"source": source_fingerprint},
+                    "value": plain_id
+                },
+                "inverse": {
+                    "op": "package.replace",
+                    "target": "package",
+                    "preconditions": {"source": plain_fingerprint},
+                    "value": signed_id
+                }
+            }
+        ],
+        "reverse_blobs": [
+            {"bytes": base64_encode(source.as_bytes()), "sha256": source_id},
+            {"bytes": base64_encode(&signed_bytes), "sha256": signed_id}
+        ],
+        "version": 1
+    });
+    let durable =
+        edit::DurablePatch::from_deterministic_json(&serde_json::to_vec(&wire).unwrap()).unwrap();
+    assert!(durable.apply(&source).is_err());
+    assert_eq!(
+        durable
+            .apply_with_security_policy(&source, edit::SecurityWritePolicy::RemoveSignatures)
+            .unwrap()
+            .as_bytes(),
+        plain_target.as_bytes()
+    );
+
+    let limits = CompositionLimits::new(2, 4, 4, 4);
+    let mut refused_joined = source.joined_edits(limits);
+    let refused_lineage = refused_joined.lineage().clone();
+    refused_joined
+        .join(
+            edit::SubEdit::new(
+                refused_lineage,
+                limits,
+                "two-replacements",
+                Vec::<String>::new(),
+                vec!["package".to_owned()],
+                durable.clone(),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+    let mut refused_owner = source.edit();
+    refused_owner.join(refused_joined).unwrap();
+    assert!(refused_owner.commit().is_err());
+
+    let mut permitted_joined = source.joined_edits(limits);
+    let permitted_lineage = permitted_joined.lineage().clone();
+    permitted_joined
+        .join(
+            edit::SubEdit::new(
+                permitted_lineage,
+                limits,
+                "two-replacements-permitted",
+                Vec::<String>::new(),
+                vec!["package".to_owned()],
+                durable,
+            )
+            .unwrap(),
+        )
+        .unwrap();
+    let mut permitted_owner =
+        source.edit_with_security_policy(edit::SecurityWritePolicy::RemoveSignatures);
+    permitted_owner.join(permitted_joined).unwrap();
+    assert_eq!(
+        permitted_owner.commit().unwrap().package().as_bytes(),
+        plain_target.as_bytes()
+    );
 }
 
 #[test]
