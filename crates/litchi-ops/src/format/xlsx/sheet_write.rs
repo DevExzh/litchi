@@ -143,17 +143,29 @@ impl Xlsx {
         let Some(positions) = resolve_sheet_targets(self, target, limits)? else {
             return Ok(None);
         };
-        let middle = if rest.is_empty() {
-            self.clone()
+        let (middle, source, tab_proof_bytes) = if rest.is_empty() {
+            (
+                self.clone(),
+                self.editor_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?,
+                0,
+            )
         } else {
             match try_set_sheet(self, target, &rest, limits)? {
-                Some(commit) => commit.into_file(),
+                Some(commit) => {
+                    let (middle, source, _tab_target, tab_patch) = commit.into_parts();
+                    // The workbook patch retains both of its complete
+                    // workbook endpoints, so its retained-byte value is the
+                    // whole first proof charge. Do not add the endpoints a
+                    // second time below.
+                    (middle, source, tab_patch.retained_bytes())
+                },
                 None => return Ok(None),
             }
         };
-        let source = self.editor_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?;
         let base = middle.editor_for_write_with_snapshot_limit(limits.max_snapshot_bytes())?;
-        let mut edit = base.edit_auto_filter()?;
+        let mut edit = base.edit_auto_filter_with_options(
+            super::feature_write::part_edit_options(&base, limits.max_snapshot_bytes()),
+        )?;
         for position in positions {
             let value = filter
                 .as_deref()
@@ -166,7 +178,29 @@ impl Xlsx {
             edit.set_auto_filter(position, value)
                 .map_err(|error| native_property_error(error, "autoFilter"))?;
         }
-        let target = edit.commit()?.into_package();
+        let filter_commit = edit.commit()?;
+        let filter_patch_bytes = filter_commit.patch().retained_bytes();
+        let target = filter_commit.into_package();
+        let source_bytes = source.retained_bytes();
+        let target_bytes = target.retained_bytes();
+        let final_endpoints = source_bytes.saturating_add(target_bytes);
+        let filter_proof = if filter_patch_bytes == 0 {
+            0
+        } else {
+            base.retained_bytes()
+                .saturating_add(target_bytes)
+                .saturating_add(filter_patch_bytes)
+        };
+        // The two native captures are sequential and their proofs are
+        // discarded before the unified commit is published. Retain the peak
+        // complete proof charge, not the sum of both payloads; each proof
+        // keeps its own repeated source/target endpoints. `from_metadata`
+        // already charges the final source and target, so pass only the peak
+        // excess as its discarded native payload.
+        let peak_proof = final_endpoints
+            .max(tab_proof_bytes)
+            .max(filter_proof);
+        let native_patch_bytes = peak_proof.saturating_sub(final_endpoints);
         let changed = !source.same_content(&target).map_err(native_error)?;
         let after = if changed {
             middle.adopt_workbook(target.clone())
@@ -180,7 +214,7 @@ impl Xlsx {
             target,
             changed,
             1,
-            0,
+            native_patch_bytes,
             limits.max_snapshot_bytes(),
         )?))
     }
