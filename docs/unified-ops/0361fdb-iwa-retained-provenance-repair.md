@@ -437,6 +437,15 @@ The Callgrind and allocation manifests are recorded in the v22 receipt; the
 captures remain outside the repository under
 `/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator`.
 
+The collection comparison is diagnostic because its base adapter retains the
+historical constructor signature. On the candidate, `push_new` is cheaper
+than generic `push` at every measured message count: generic push must inspect
+the public `MessageInfo` shape and length, while the certified collection then
+publishes aggregate totals without another `ArchiveInfo` scan. The generic
+path remains necessary for callers that can mutate records; conventional
+authoring can use `push_new`. These rows and their fairness boundary are
+included in the receipt and are not used to waive the fair raw regression.
+
 The consumer audit found no production raw `Vec<MessageInfo>` constructor call
 that can become `push_new`: `ArchiveObject::new` already uses its internal
 single-pass conventional constructor, while the external core-type sample

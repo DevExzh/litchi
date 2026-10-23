@@ -639,6 +639,110 @@
       ],
       "result": "Base and candidate peak bytes, allocated bytes and allocation calls are identical for every matched row; all checksums and serialized output hashes match."
     },
-    "status": "Instruction-count regression remains returned; matched allocation evidence shows no added heap or allocation-count cost, and the source attribution separates required public-field admission from MessageInfo construction and fixture assembly."
+    "status": "Instruction-count regression remains returned; matched allocation evidence shows no added heap or allocation-count cost, and the source attribution separates required public-field admission from MessageInfo construction and fixture assembly.",
+    "collection_diagnostic": {
+      "capture_directory": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/count-callgrind-v22-collection",
+      "capture_files": 96,
+      "capture_bytes": 3503990,
+      "capture_manifest_sha256": "d070b25a50c16c4f2a2ffb6455b2e7b9defb95d365dcc7d9f8b60db798797ca9",
+      "routes": [
+        {
+          "route": "archive_info_e2e",
+          "messages": 1,
+          "base_ir_per_op": 1070.0056,
+          "candidate_ir_per_op": 1567.0041,
+          "delta_ir": 496.9985,
+          "candidate_base": 1.464482
+        },
+        {
+          "route": "archive_info_e2e",
+          "messages": 8,
+          "base_ir_per_op": 2181.0041,
+          "candidate_ir_per_op": 3665.0051,
+          "delta_ir": 1484.001,
+          "candidate_base": 1.680421
+        },
+        {
+          "route": "archive_info_e2e",
+          "messages": 32,
+          "base_ir_per_op": 10337.0062,
+          "candidate_ir_per_op": 15420.0051,
+          "delta_ir": 5082.9989,
+          "candidate_base": 1.491728
+        },
+        {
+          "route": "archive_info_e2e",
+          "messages": 128,
+          "base_ir_per_op": 51547.0041,
+          "candidate_ir_per_op": 69981.0052,
+          "delta_ir": 18434.0011,
+          "candidate_base": 1.357615
+        },
+        {
+          "route": "archive_info_generic_e2e",
+          "messages": 1,
+          "base_ir_per_op": 1065.0056,
+          "candidate_ir_per_op": 1963.8185,
+          "delta_ir": 898.8129,
+          "candidate_base": 1.843951
+        },
+        {
+          "route": "archive_info_generic_e2e",
+          "messages": 8,
+          "base_ir_per_op": 2176.0041,
+          "candidate_ir_per_op": 5462.8195,
+          "delta_ir": 3286.8154,
+          "candidate_base": 2.510482
+        },
+        {
+          "route": "archive_info_generic_e2e",
+          "messages": 32,
+          "base_ir_per_op": 10332.0062,
+          "candidate_ir_per_op": 21292.0041,
+          "delta_ir": 10959.9979,
+          "candidate_base": 2.060781
+        },
+        {
+          "route": "archive_info_generic_e2e",
+          "messages": 128,
+          "base_ir_per_op": 51542.0041,
+          "candidate_ir_per_op": 91715.0052,
+          "delta_ir": 40173.0011,
+          "candidate_base": 1.779423
+        }
+      ],
+      "semantics": {
+        "archive_info_e2e": "Candidate uses MessageInfoCollection::push_new; the historical base adapter uses its pre-limits constructor signature.",
+        "archive_info_generic_e2e": "Candidate assembles MessageInfo::new values and passes them through MessageInfoCollection::push; the historical base adapter again uses its pre-limits constructor signature.",
+        "fairness": "These base/candidate ratios are diagnostic only. The fair raw Vec<MessageInfo> lifecycle remains the v21 route recorded above."
+      },
+      "candidate_push_new_vs_generic": [
+        {
+          "messages": 1,
+          "push_new_ir_per_op": 1567.0041,
+          "generic_push_ir_per_op": 1963.8185,
+          "generic_extra_ir": 396.8144
+        },
+        {
+          "messages": 8,
+          "push_new_ir_per_op": 3665.0051,
+          "generic_push_ir_per_op": 5462.8195,
+          "generic_extra_ir": 1797.8144
+        },
+        {
+          "messages": 32,
+          "push_new_ir_per_op": 15420.0051,
+          "generic_push_ir_per_op": 21292.0041,
+          "generic_extra_ir": 5871.999
+        },
+        {
+          "messages": 128,
+          "push_new_ir_per_op": 69981.0052,
+          "generic_push_ir_per_op": 91715.0052,
+          "generic_extra_ir": 21734.0
+        }
+      ],
+      "attribution": "The candidate-only generic-vs-push_new delta is the cost of rechecking public MessageInfo shape and length in push; the certified collection then publishes aggregate totals without a second ArchiveInfo scan. Conventional callers can use push_new, while the generic push path preserves mutable-field validation."
+    }
   }
 }
