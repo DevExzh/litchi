@@ -1,0 +1,64 @@
+{
+  "schema": "litchi.odf.shared-triad-qualification.manifest.v1",
+  "lane": "odf-shared-triad",
+  "baseline_commit": "173dd5330476713714871007316794b9a3a1bdaa",
+  "candidate_commit": "15ab9324ef4f8c927acd6ecfc19d9707c3f886ee",
+  "probe": {
+    "path": "crates/litchi-ops/examples/odf_shared_triad_qualification.rs",
+    "features": ["odc", "odi", "oth", "odm"],
+    "modes": ["validate", "timed"],
+    "max_iterations": 128
+  },
+  "routes": [
+    {
+      "id": "odc_chart_title",
+      "family": "odc",
+      "source": "litchi_odc::Package::new",
+      "leaf": "Package::edit -> replace_chart(title) -> commit",
+      "facade": "File::edit -> set(/, title) -> commit",
+      "changed_marker": "shared-triad qualification",
+      "no_op": "Package::edit/File::edit with an empty closure"
+    },
+    {
+      "id": "odi_frame_geometry",
+      "family": "odi",
+      "source": "litchi_odi::Package::new",
+      "leaf": "Package::edit -> set_geometry(frame 0) -> commit",
+      "facade": "File::edit -> set(/frame[1], geometry) -> commit",
+      "changed_marker": "1cm,2cm,3cm,4cm frame geometry",
+      "no_op": "Package::edit/File::edit with an empty closure"
+    },
+    {
+      "id": "oth_paragraph_text",
+      "family": "oth",
+      "source": "litchi_oth::Builder::paragraph(before)",
+      "leaf": "Package::edit -> set_paragraph_text(position 0) -> commit",
+      "facade": "File::edit -> set(/body/p[1], text) -> commit",
+      "changed_marker": "shared-triad qualification",
+      "no_op": "Package::edit/File::edit with an empty closure"
+    },
+    {
+      "id": "odm_title",
+      "family": "odm",
+      "source": "litchi_odm::Builder::new + timestamp-free Structure::default_meta_xml",
+      "leaf": "Package::edit -> set_title -> commit",
+      "facade": "File::edit -> set(/metadata, title) -> commit",
+      "changed_marker": "shared-triad qualification",
+      "no_op": "Package::edit/File::edit with an empty closure"
+    }
+  ],
+  "phases": {
+    "setup_outside_clock": [
+      "deterministic builder or tracked fixture read",
+      "Package::from_bytes and File::open_bytes",
+      "edit target and property construction"
+    ],
+    "inside_clock": ["commit_only", "commit_plus_diagnostics", "publication"],
+    "allocation_observation": {
+      "facade": "Commit::diagnostics().snapshot_bytes",
+      "leaf": "not exposed by litchi_core::edit::Diagnostics",
+      "process_allocator": "external runner only"
+    }
+  },
+  "claim_scope": "validation and reproducible phase protocol only; no native acceptance claim"
+}
