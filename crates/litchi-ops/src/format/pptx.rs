@@ -1095,7 +1095,17 @@ impl Pptx {
         } else {
             self.check_source()?;
         }
-        if self.0.signature() == Signature::RemovalAuthorized {
+        // Signed writes are staged on a private unsigned package so a
+        // transaction can prove a cancellation (change, then restore) before
+        // the publication fence decides whether the final result is allowed.
+        // The canonical exact no-op path still calls
+        // `original_owner_for_noop`, which is rooted in the signed source;
+        // a genuinely changed result is rejected by the caller's signature
+        // fence and can never publish this staging copy as signed output.
+        if matches!(
+            self.0.signature(),
+            Signature::Signed | Signature::RemovalAuthorized
+        ) {
             return self.promote_unsigned().map(Editable::Eager);
         }
         if let Some(revision) = &self.0.revision {
