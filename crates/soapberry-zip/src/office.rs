@@ -946,7 +946,6 @@ enum IndexedLayoutName {
 struct IndexedLayoutEntry {
     wayfinder: crate::ZipArchiveEntryWayfinder,
     name: IndexedLayoutName,
-    central_metadata_bytes: u64,
 }
 
 /// The bytes of one fixed ZIP local file header.
@@ -1761,7 +1760,6 @@ impl<R> ExactSizeIterator for IndexedArchiveNames<'_, R> {}
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PreservationEntryMetadata {
     raw_name_len: u64,
-    central_metadata_bytes: u64,
     compressed_size: u64,
     uncompressed_size: u64,
     directory: bool,
@@ -1772,21 +1770,6 @@ impl PreservationEntryMetadata {
     #[must_use]
     pub const fn raw_name_len(self) -> u64 {
         self.raw_name_len
-    }
-
-    /// Returns the variable central-directory metadata length in bytes.
-    ///
-    /// This includes the raw name, extra fields and file comment, but not the
-    /// fixed 46-byte central-directory record.
-    #[must_use]
-    pub const fn central_metadata_bytes(self) -> u64 {
-        self.central_metadata_bytes
-    }
-
-    /// Returns the complete central-directory record length in bytes.
-    #[must_use]
-    pub const fn central_record_bytes(self) -> u64 {
-        CENTRAL_FIXED_RECORD_BYTES + self.central_metadata_bytes
     }
 
     /// Returns the declared compressed payload size.
@@ -4264,7 +4247,6 @@ where
                     layout.push(IndexedLayoutEntry {
                         wayfinder: entry.wayfinder(),
                         name: IndexedLayoutName::Directory(central_name),
-                        central_metadata_bytes: metadata_bytes - CENTRAL_FIXED_RECORD_BYTES,
                     });
                     directories.insert(
                         name,
@@ -4368,7 +4350,6 @@ where
                 layout.push(IndexedLayoutEntry {
                     wayfinder: entry.wayfinder(),
                     name: IndexedLayoutName::Entry(entry_id),
-                    central_metadata_bytes: metadata_bytes - CENTRAL_FIXED_RECORD_BYTES,
                 });
                 index.insert(index_name, entry_id);
                 ordered_entries.push((local_header_offset, entry_id));
@@ -13031,20 +13012,14 @@ mod tests {
         assert_eq!(entries[0].raw_name_len(), b"first.bin".len() as u64);
         assert_eq!(entries[0].compressed_size(), 5);
         assert_eq!(entries[0].uncompressed_size(), 5);
-        assert_eq!(entries[0].central_metadata_bytes(), 9);
-        assert_eq!(entries[0].central_record_bytes(), 46 + 9);
         assert!(entries[1].is_directory());
         assert_eq!(entries[1].raw_name_len(), b"folder/".len() as u64);
         assert_eq!(entries[1].compressed_size(), 0);
         assert_eq!(entries[1].uncompressed_size(), 0);
-        assert_eq!(entries[1].central_metadata_bytes(), 7);
-        assert_eq!(entries[1].central_record_bytes(), 46 + 7);
         assert!(!entries[2].is_directory());
         assert_eq!(entries[2].raw_name_len(), b"second.bin".len() as u64);
         assert_eq!(entries[2].compressed_size(), 6);
         assert_eq!(entries[2].uncompressed_size(), 6);
-        assert_eq!(entries[2].central_metadata_bytes(), 10);
-        assert_eq!(entries[2].central_record_bytes(), 46 + 10);
     }
 
     #[test]
