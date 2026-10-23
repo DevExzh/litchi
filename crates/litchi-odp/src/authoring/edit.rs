@@ -748,7 +748,10 @@ impl Package {
     ///
     /// # Errors
     ///
-    /// Returns an error when the source signature/encryption policy makes it read-only.
+    /// Returns an error when deferred entry admission finds malformed source
+    /// XML or a signature/encryption policy that makes it read-only.  The
+    /// admission check runs on the first fallible operation or commit, not at
+    /// this O(1) constructor.
     /// Source XML and staging errors are deferred until the first fallible
     /// transaction operation or [`Edit::commit`].
     pub fn edit(&self) -> Result<Edit, PackageError> {
@@ -756,10 +759,10 @@ impl Package {
     }
 
     pub(crate) fn edit_core(&self) -> CoreResult<Edit> {
-        // Archive policy is indexed metadata and must still be checked at the
-        // edit boundary.  The semantic projection and mutable staging are
-        // deliberately deferred until the first operation that needs them.
-        ensure_editable_source(&self.package)?;
+        // The security census walks the manifest and archive members, so it
+        // is part of deferred entry admission rather than this O(1) handle
+        // construction.  The semantic projection and mutable staging are
+        // likewise deferred until the first operation that needs them.
         Ok(Edit {
             source: self.clone(),
             draft: None,
@@ -1046,6 +1049,7 @@ impl Edit {
         }
         let presentation = self.source.projection()?;
         validate_edit_entry(presentation)?;
+        ensure_editable_source(&self.source.package)?;
         let _ = self.entry_validated.set(());
         Ok(())
     }
@@ -1056,7 +1060,6 @@ impl Edit {
             return Ok(());
         }
         let presentation = self.source.projection()?.clone();
-        ensure_editable_source(presentation.owned_package())?;
         let editing = self.source.editing()?;
         let resource_bytes = editing.resource_bytes;
         let slides = Arc::clone(&editing.slides);
@@ -3001,7 +3004,7 @@ impl Edit {
     ///
     /// Returns an error if validation, bounded serialization, package parsing, or semantic
     /// readback fails. The source package is never changed. A changed write
-    /// on a signed or encrypted source is refused when the edit starts.
+    /// on a signed or encrypted source is refused during entry admission.
     pub fn commit(self) -> Result<Commit, PackageError> {
         Ok(self.commit_core()?)
     }
@@ -4555,9 +4558,11 @@ fn ensure_editable_source(package: &OwnedPackage) -> CoreResult<()> {
     }
 }
 
-/// Preserve the edit-entry refusals without doing source work at `Package::edit()`.
-/// This check runs when a transaction is first observed or published, after
-/// the immutable source projection is already needed for that operation.
+/// Preserve the edit-entry refusals without doing source-sized work at
+/// `Package::edit()`.  This check runs when a transaction is first observed
+/// or published, after the immutable source projection is already needed for
+/// that operation, and performs the deferred security census before success
+/// is cached.
 fn validate_edit_entry(presentation: &Presentation) -> CoreResult<()> {
     let xml = presentation.content_xml();
 

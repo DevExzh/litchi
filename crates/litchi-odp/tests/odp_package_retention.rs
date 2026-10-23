@@ -133,6 +133,9 @@ fn signed_and_encrypted_sources_retain_read_reopen_but_refuse_mutation() {
         .unwrap();
     let signed = Package::from_bytes(&signed_writer.finish_to_bytes().unwrap()).unwrap();
     let signed_identity = signed.prepared_index_identity();
+    // The constructor must not enumerate archive names to discover the
+    // signature owner. Admission performs that census on first use.
+    let signed_edit = signed.edit().unwrap();
     assert_eq!(
         signed.security_policy().unwrap(),
         edit::SecurityPolicy::SignedReadOnly
@@ -141,7 +144,7 @@ fn signed_and_encrypted_sources_retain_read_reopen_but_refuse_mutation() {
         signed.presentation().unwrap().prepared_index_identity(),
         signed_identity
     );
-    assert!(signed.edit().is_err());
+    assert!(signed_edit.commit().is_err());
 
     const MANIFEST: &[u8] = br#"<m:manifest xmlns:m="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><m:file-entry m:full-path="/" m:media-type="application/vnd.oasis.opendocument.presentation"/><m:file-entry m:full-path="content.xml" m:media-type="text/xml"/><m:file-entry m:full-path="secret.bin" m:media-type="application/octet-stream" m:size="1"><m:encryption-data><m:algorithm m:algorithm-name="http://www.w3.org/2009/xmlenc11#aes256-gcm" m:initialisation-vector="AAAAAAAAAAAAAAAA"/><m:start-key-generation m:start-key-generation-name="SHA1" m:key-size="20"/><m:key-derivation m:key-derivation-name="PBKDF2" m:salt="AQ==" m:iteration-count="1000" m:key-size="32"/></m:encryption-data></m:file-entry></m:manifest>"#;
     let mut encrypted_writer = StreamingArchiveWriter::new();
@@ -163,6 +166,8 @@ fn signed_and_encrypted_sources_retain_read_reopen_but_refuse_mutation() {
         .unwrap();
     let encrypted = Package::from_bytes(&encrypted_writer.finish_to_bytes().unwrap()).unwrap();
     let encrypted_identity = encrypted.prepared_index_identity();
+    // Encrypted-entry census is likewise deferred until first admission.
+    let encrypted_edit = encrypted.edit().unwrap();
     assert_eq!(
         encrypted.security_policy().unwrap(),
         edit::SecurityPolicy::EncryptedReadOnly
@@ -171,7 +176,7 @@ fn signed_and_encrypted_sources_retain_read_reopen_but_refuse_mutation() {
         encrypted.presentation().unwrap().prepared_index_identity(),
         encrypted_identity
     );
-    assert!(encrypted.edit().is_err());
+    assert!(encrypted_edit.commit().is_err());
 }
 
 #[test]
@@ -230,7 +235,8 @@ fn password_opened_editing_and_chart_snapshots_drop_credentials_after_validation
         snapshot.security_policy().unwrap(),
         edit::SecurityPolicy::EncryptedReadOnly
     );
-    assert!(snapshot.edit().is_err());
+    let snapshot_edit = snapshot.edit().unwrap();
+    assert!(snapshot_edit.commit().is_err());
 
     let charts = presentation.chart_snapshot().unwrap();
     assert_eq!(charts.prepared_index_identity(), identity);
