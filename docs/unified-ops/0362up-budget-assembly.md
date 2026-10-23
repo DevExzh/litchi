@@ -39,3 +39,34 @@ commit ownership, and XLSB metadata planning. The complete batch is assigned
 from that exact assembled source.
 [native-check-v3.json](results/0362up/native-check-v3.json) retains the
 93.21-second failure. The dependent facade compilation was not reached.
+
+## Scoped review after composition
+
+The diagnostic branch composes the following reviewed repairs without yet
+claiming combined compiler/runtime or performance acceptance:
+
+- DOCX `90641c24e8` plus composition fixes `d68a6a05fd` and `2145666675`:
+  selected main-XML admission precedes capture, default edits avoid extra
+  metadata probes, and ordinary coalesced commits retain native operation
+  counts. Signed canonical no-ops retain their authored count.
+- XLSB `6521e6b07a`: explicit content-types capture includes both canonical
+  digest endpoints and reuses the changed-part census. Grouped cells reuse
+  their precomputed native patch charge; current required raw policies and
+  admitted deferred payload lengths remain in the composition.
+- XLSX features `5ae87e6e08`: manifest charge mirrors actual retained pairs;
+  exact no-ops charge the returned source owner twice. Chart staged/expanded
+  ledgers, range admission and endpoint accounting passed scoped review.
+- PPTX presentation `6cb74b378e`: affected-member lexical sizing preserves
+  exact wire framing and skips content-types reads when no override changes.
+
+Review returned the shared XLSX cell/facet/join ledger and metadata capture
+ordering for further repair. Compiler adaptation `4cd986a67c` is assembled
+for diagnostics; its PPTX metadata path still commits the common native
+properties edit before enforcing the selected cap. Exact native metadata
+admission is being repaired with the shared XLSX consumer. No public
+`finish`/snapshot escape or conservative package-size multiplier is accepted
+as a substitute for the retained-payload contract.
+
+Builds are temporarily held while the coordinator runs workspace rustdoc
+alone in a separate capped target. Final combined compilation and semantic
+tests follow the remaining fixes.
