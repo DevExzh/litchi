@@ -29,6 +29,7 @@ pub(super) fn commit_removals(edit: Edit) -> Result<Commit> {
         svg_projected_owners: _,
         svg_staged_payload_bytes: _,
         svg_base_part_bytes: _,
+        ..
     } = edit;
     let first_position = removed
         .iter()

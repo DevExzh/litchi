@@ -12,6 +12,7 @@ use litchi_xlsx::{self as xlsx, Address, Rect};
 use std::borrow::Cow;
 use std::collections::{HashSet, TryReserveError};
 use std::mem::size_of;
+use std::sync::OnceLock;
 
 use super::node::{Node, SheetHandle};
 use super::spec::{CELL_WRITE_TABLE, CellSetter};
@@ -35,6 +36,10 @@ pub(crate) struct Commit {
     native_patch: xlsx::workbook::Patch,
     operations: usize,
     snapshot_bytes: usize,
+    /// The native retained proof is shared by the transaction diagnostics
+    /// and the final limit check.  Keep its expensive endpoint walk lazy and
+    /// at most once for this immutable commit.
+    retained_cache: OnceLock<usize>,
 }
 
 impl Commit {
@@ -50,10 +55,10 @@ impl Commit {
         let result = (|| {
             let (target, native_patch) = native.into_parts();
             let native_operations = native_patch.operation_count();
-            // Unsigned history does not need a retained-patch accounting walk:
-            // its native owner remains the published endpoint and no signed
-            // probe is discarded.  Signed writes still charge the exact
-            // native capture before any canonical no-op rebuild.
+            // Signed writes may discard this private probe for canonical
+            // replay, while unsigned writes still need a nonzero retained
+            // charge for the facade's hard snapshot limit. The final
+            // measurement is cached per commit for both routes.
             let signed = base.signature() == super::Signature::Signed;
             let native_snapshot_bytes = signed.then(|| native_patch.retained_bytes()).unwrap_or(0);
             if signed && native_snapshot_bytes > max_snapshot_bytes {
@@ -86,14 +91,20 @@ impl Commit {
             } else {
                 base.clone()
             };
-            Ok(Self {
+            let mut commit = Self {
                 after_xlsx,
                 source,
                 target,
                 native_patch,
                 operations: native_operations,
                 snapshot_bytes,
-            })
+                retained_cache: OnceLock::new(),
+            };
+            let snapshot_bytes = commit.measure_snapshot_bytes();
+            if snapshot_bytes > max_snapshot_bytes {
+                return Err(snapshot_limit(snapshot_bytes, max_snapshot_bytes));
+            }
+            Ok(commit)
         })();
         base.check_source_for_replay()?;
         result
@@ -137,23 +148,35 @@ impl Commit {
             if snapshot_bytes > max_snapshot_bytes {
                 return Err(snapshot_limit(snapshot_bytes, max_snapshot_bytes));
             }
-            return Ok(Self {
+            let mut commit = Self {
                 after_xlsx: base.clone(),
                 source: original,
                 target,
                 native_patch,
                 operations: authored_operations,
                 snapshot_bytes,
-            });
+                retained_cache: OnceLock::new(),
+            };
+            let snapshot_bytes = commit.measure_snapshot_bytes();
+            if snapshot_bytes > max_snapshot_bytes {
+                return Err(snapshot_limit(snapshot_bytes, max_snapshot_bytes));
+            }
+            return Ok(commit);
         }
-        Ok(Self {
+        let mut commit = Self {
             after_xlsx,
             source,
             target,
             native_patch: xlsx::workbook::Patch::default(),
             operations: authored_operations,
             snapshot_bytes: 0,
-        })
+            retained_cache: OnceLock::new(),
+        };
+        let snapshot_bytes = commit.measure_snapshot_bytes();
+        if snapshot_bytes > max_snapshot_bytes {
+            return Err(snapshot_limit(snapshot_bytes, max_snapshot_bytes));
+        }
+        Ok(commit)
     }
 
     /// Consume the adapter result for explicit transaction history.
@@ -171,6 +194,24 @@ impl Commit {
     }
 
     pub(crate) const fn snapshot_bytes(&self) -> usize {
+        self.snapshot_bytes
+    }
+
+    /// Materialize the retained native proof once for diagnostics and the
+    /// snapshot-limit decision. Native cell/worksheet commits carry their
+    /// complete endpoint proof; metadata/feature commits carry the two
+    /// package owners directly.
+    pub(crate) fn measure_snapshot_bytes(&mut self) -> usize {
+        let measured = *self.retained_cache.get_or_init(|| {
+            if self.native_patch.source().is_err() {
+                self.source
+                    .retained_bytes()
+                    .saturating_add(self.target.retained_bytes())
+            } else {
+                self.native_patch.retained_bytes()
+            }
+        });
+        self.snapshot_bytes = self.snapshot_bytes.max(measured);
         self.snapshot_bytes
     }
 
@@ -335,8 +376,8 @@ impl Xlsx {
         } else {
             self.check_source_for_replay()?;
         }
-        result.and_then(|commit| {
-            let snapshot_bytes = commit.snapshot_bytes();
+        result.and_then(|mut commit| {
+            let snapshot_bytes = commit.measure_snapshot_bytes();
             if snapshot_bytes > limits.max_snapshot_bytes() {
                 return Err(snapshot_limit(snapshot_bytes, limits.max_snapshot_bytes()));
             }
@@ -3064,13 +3105,13 @@ pub(crate) mod coalesce {
         CellOperation, CellTarget, Xlsx, admit_properties_with_limits, native_error, snapshot_limit,
     };
     use crate::error::{Code, Error, Result};
+    use crate::format::signature::Signature;
     use crate::props::Props;
     use crate::target::TargetArg;
     use crate::transaction::{Error as TransactionError, SemanticLimits};
     use litchi_core::FileFormat;
     use litchi_xlsx as xlsx;
     use std::collections::{HashMap, HashSet};
-    use std::mem::size_of;
 
     /// One admitted direct cell payload assignment.
     pub(crate) struct Plan {
@@ -3205,9 +3246,7 @@ pub(crate) mod coalesce {
                 // against that owner so a retained source does not stream
                 // the worksheet again for each command in this run.
                 let prepared = match &self.0.owner {
-                    super::super::XlsxOwner::Source(_)
-                        if self.signature() == super::Signature::Signed =>
-                    {
+                    super::super::XlsxOwner::Source(_) if self.signature() == Signature::Signed => {
                         Some(self.adopt_workbook(self.editor_for_write()?))
                     },
                     super::super::XlsxOwner::Source(_) => Some(self.adopt_workbook(self.editor()?)),
@@ -3238,21 +3277,17 @@ pub(crate) mod coalesce {
             remaining_snapshot: usize,
         ) -> Result<Self> {
             base.check_source_for_replay()?;
-            // The source length plus native patch header is only an
-            // allocation lower bound. Check it before promotion/editor
-            // construction; the exact retained proof is charged below after
-            // commit, including signed canonical no-op replay.
-            let source_bytes = base.retained_source_len()?.unwrap_or(0);
-            let minimum = source_bytes.saturating_add(size_of::<xlsx::workbook::Patch>());
-            if minimum > remaining_snapshot {
-                return Err(snapshot_limit(minimum, remaining_snapshot));
-            }
-            let source = if base.signature() == super::Signature::Signed {
+            let source = if base.signature() == Signature::Signed {
                 base.editor_for_write()?
             } else {
                 base.editor()?
             };
-            let edit = source.edit().map_err(native_error)?;
+            let edit = source
+                .edit_with_options(
+                    xlsx::workbook::edit::EditOptions::default()
+                        .with_max_retained_bytes(remaining_snapshot),
+                )
+                .map_err(native_error)?;
             base.check_source_for_replay()?;
             Ok(Self {
                 base: base.clone(),
@@ -3261,12 +3296,12 @@ pub(crate) mod coalesce {
                 edit,
                 items: Vec::new(),
                 seen: HashSet::new(),
-                initial: (base.signature() == super::Signature::Signed).then(HashMap::new),
-                final_states: (base.signature() == super::Signature::Signed).then(HashMap::new),
+                initial: (base.signature() == Signature::Signed).then(HashMap::new),
+                final_states: (base.signature() == Signature::Signed).then(HashMap::new),
                 staged_bytes: 0,
                 max_staged_bytes: limits.max_staged_bytes(),
                 max_snapshot_bytes: remaining_snapshot,
-                allow_repeated: base.signature() == crate::format::signature::Signature::Signed,
+                allow_repeated: base.signature() == Signature::Signed,
             })
         }
 
@@ -3457,6 +3492,10 @@ pub(crate) mod coalesce {
             max_snapshot_bytes,
         )?;
         commit.operations = operations;
+        let snapshot_bytes = commit.measure_snapshot_bytes();
+        if snapshot_bytes > max_snapshot_bytes {
+            return Err(snapshot_limit(snapshot_bytes, max_snapshot_bytes));
+        }
         Ok((base.clone(), commit))
     }
 

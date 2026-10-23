@@ -338,8 +338,8 @@ pub use workbook::data_model::{
     write_data_model,
 };
 pub use workbook::{
-    ActiveTab, Change, Commit, Conflict, ConflictSet, DateSystem, DurablePatch, Edit, Flavor,
-    History, HistoryLimits, JoinError, JoinFailure, MergeChoice, MergeLimits, NewSheet,
+    ActiveTab, Change, Commit, Conflict, ConflictSet, DateSystem, DurablePatch, Edit, EditOptions,
+    Flavor, History, HistoryLimits, JoinError, JoinFailure, MergeChoice, MergeLimits, NewSheet,
     PackageChange, Patch, SealedPatch, Selector, SourceBackedWorkbook, SourceCell, SourceCellView,
     SourceWorksheet, State, ThreeWayPlan, Visibility, Workbook, Worksheet, WorksheetContentPart,
     WorksheetContentPartOutboundRelationship, WorksheetContentPartPayload,

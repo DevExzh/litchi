@@ -2,6 +2,7 @@
 
 use std::fmt;
 use std::hash::{Hash, Hasher};
+use std::mem::size_of;
 use std::ops::Deref;
 use std::sync::Arc;
 
@@ -231,6 +232,15 @@ impl Value {
         }
         Ok(())
     }
+
+    pub(crate) fn retained_bytes(&self) -> usize {
+        size_of::<Self>().saturating_add(match self {
+            Self::Number(number) => number.as_str().len(),
+            Self::Text(text) | Self::Date(Date(text)) => text.as_str().len(),
+            Self::Error(error) => error.as_str().len(),
+            Self::Bool(_) => 0,
+        })
+    }
 }
 
 /// A checked ISO 8601 lexical value for a `SpreadsheetML` date cell.
@@ -367,6 +377,17 @@ impl Content {
             Self::Value(value) => Cell::Value(value.clone()),
             Self::Formula(formula) => Cell::Formula(formula.clone()),
         }
+    }
+
+    pub(crate) fn retained_bytes(&self) -> usize {
+        size_of::<Self>().saturating_add(match self {
+            Self::Value(value) => value.retained_bytes(),
+            Self::Formula(formula) => formula.text().len().saturating_add(
+                formula
+                    .cached()
+                    .map_or(0, |cache| cache.value().retained_bytes()),
+            ),
+        })
     }
 }
 

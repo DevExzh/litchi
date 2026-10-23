@@ -63,16 +63,14 @@ impl Commit {
         self.after
     }
 
-    /// Return the already-accounted snapshot charge.  Retained-patch walks
-    /// are deliberately explicit: unsigned writes do not need the charge and
-    /// therefore do not pay for an otherwise unconditional scan.
+    /// Return the already-accounted snapshot charge. The native proof walk is
+    /// cached per commit so signed and unsigned writes pay it at most once.
     pub(crate) const fn snapshot_bytes(&self) -> usize {
         self.snapshot_bytes
     }
 
-    /// Measure the native proof when a signed write needs a hard snapshot
-    /// check, caching the result for the transaction wrapper and any later
-    /// canonical no-op accounting.
+    /// Measure the native proof for a hard snapshot check, caching the result
+    /// for the transaction wrapper and any later canonical no-op accounting.
     pub(crate) fn measure_snapshot_bytes(&mut self) -> usize {
         let proof = &self.proof;
         let measured = *self.retained_cache.get_or_init(|| proof.retained_bytes());
@@ -228,12 +226,15 @@ impl Pptx {
         let result = (|| self.set_inner(target, Props::from_props(props)?, limits))()
             .map_err(|error| error.with_format(FileFormat::Pptx));
         result.and_then(|commit| {
+            // Every native proof retains source/target endpoints, including
+            // unsigned writes.  Charge it once here so the facade's snapshot
+            // limit cannot be bypassed merely by omitting a signature.
+            let mut commit = commit;
+            let snapshot_bytes = commit.measure_snapshot_bytes();
+            if snapshot_bytes > limits.max_snapshot_bytes() {
+                return Err(snapshot_limit(snapshot_bytes, limits.max_snapshot_bytes()));
+            }
             if self.signature() == crate::format::signature::Signature::Signed {
-                let mut commit = commit;
-                let snapshot_bytes = commit.measure_snapshot_bytes();
-                if snapshot_bytes > limits.max_snapshot_bytes() {
-                    return Err(snapshot_limit(snapshot_bytes, limits.max_snapshot_bytes()));
-                }
                 self.check_source_for_replay()?;
                 if commit.after.same_snapshot(self) {
                     if commit.proof.is_noop() {

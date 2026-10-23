@@ -663,13 +663,6 @@ impl Xlsb {
     /// [`Code::UnsupportedCapability`] when the handle was opened with
     /// [`OpenOptions::retain_source`] `false`; [`Code::IoError`] when the
     /// file changed; and the XLSB error of a failed materialization.
-    #[cfg_attr(
-        not(test),
-        expect(
-            dead_code,
-            reason = "native callers retain the strict signed editor guard"
-        )
-    )]
     pub(crate) fn editor(&self) -> Result<XlsbEditor<'_>> {
         if self.0.signature() == Signature::Signed {
             return Err(signature::refusal(FileFormat::Xlsb));

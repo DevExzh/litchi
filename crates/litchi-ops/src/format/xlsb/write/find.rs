@@ -117,7 +117,14 @@ pub(crate) fn merge(
         if changes.is_empty() {
             return Ok((None, summary));
         }
-        let commit = commit(file, package_from_editor(editor), &cells, changes, limits)?;
+        let commit = commit(
+            file,
+            package_from_editor(editor),
+            &cells,
+            changes,
+            summary.replacements().saturating_add(summary.fields()),
+            limits,
+        )?;
         Ok((Some(commit), summary))
     })()
     .map_err(|error: Error| error.with_format(FileFormat::Xlsb));

@@ -357,6 +357,18 @@ impl Run {
     }
 }
 
+fn limit(kind: LimitKind, observed: usize, maximum: usize) -> Result<()> {
+    if observed > maximum {
+        return Err(TransactionError::Limit {
+            kind,
+            observed,
+            maximum,
+        }
+        .into());
+    }
+    Ok(())
+}
+
 fn empty_commit(
     base: &Doc,
     source: &litchi_doc::Package,

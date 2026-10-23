@@ -1,6 +1,7 @@
 //! Transaction-scoped worksheet and workbook-tab editors.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, btree_map::Entry};
+use std::mem::size_of;
 use std::sync::Arc;
 
 use litchi_ooxml_common::web as common_web;
@@ -351,6 +352,8 @@ impl Sheet<'_> {
         let address = at.into().resolve()?;
         let content = content.into();
         content.validate_for_write()?;
+        self.edit
+            .preflight_cell_capture(self.position, content.retained_bytes())?;
         match self.edit.actions(self.position).entry(address) {
             Entry::Vacant(entry) => {
                 entry.insert(Action::set(content));
@@ -457,6 +460,8 @@ impl Sheet<'_> {
     /// local style, metadata, comments, and unknown non-payload children.
     pub fn clear<'a>(&mut self, at: impl Into<At<'a>>) -> Result<&mut Self> {
         let address = at.into().resolve()?;
+        self.edit
+            .preflight_cell_capture(self.position, size_of::<Content>())?;
         let actions = self.edit.actions(self.position);
         let create = actions.get(&address).is_some_and(|action| {
             matches!(

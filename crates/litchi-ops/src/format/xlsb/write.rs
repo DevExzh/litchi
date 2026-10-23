@@ -107,6 +107,10 @@ impl Patch {
         }
     }
 
+    #[allow(
+        dead_code,
+        reason = "structure and feature history adapters use their own authored counts"
+    )]
     pub(crate) fn operation_count(&self) -> usize {
         match self {
             Self::Metadata(images) => images.patch.changes().len(),
@@ -163,6 +167,7 @@ impl Commit {
     }
 
     /// The retained native proof.
+    #[allow(dead_code, reason = "reserved for format-local patch inspection")]
     pub(super) const fn patch(&self) -> &Patch {
         &self.patch
     }
@@ -194,16 +199,12 @@ impl Commit {
             let (package, patch) = native.into_parts();
             let operations = patch.operation_count();
             let signed = base.signature() == super::Signature::Signed;
-            // Native retained-byte accounting is needed only while a signed
-            // private probe is being replaced by the canonical identity
-            // patch.  Unsigned commits keep their endpoint directly and do
-            // not pay an otherwise unconditional patch walk.
-            let native_snapshot_bytes = if signed {
-                patch.retained_bytes().map_err(native_error)?
-            } else {
-                0
-            };
-            if signed && native_snapshot_bytes > max_snapshot_bytes {
+            // Structure patches already retain their checked native history
+            // charge. Keep that charge for unsigned publication as well: the
+            // transaction diagnostics and snapshot limit must not silently
+            // report a zero-sized retained proof.
+            let native_snapshot_bytes = patch.retained_bytes().map_err(native_error)?;
+            if native_snapshot_bytes > max_snapshot_bytes {
                 return Err(snapshot_limit(native_snapshot_bytes, max_snapshot_bytes));
             }
             let (package, patch, retained_bytes) = if patch.is_noop() && signed {
@@ -223,7 +224,7 @@ impl Commit {
                 (package, patch, native_snapshot_bytes)
             };
             let snapshot_bytes = native_snapshot_bytes.max(retained_bytes);
-            if signed && snapshot_bytes > max_snapshot_bytes {
+            if snapshot_bytes > max_snapshot_bytes {
                 return Err(snapshot_limit(snapshot_bytes, max_snapshot_bytes));
             }
             // A native edit may retain a semantic operation whose replay is
@@ -260,8 +261,8 @@ impl Commit {
         let result = (|| {
             let (package, patch) = native.into_parts();
             let signed = base.signature() == super::Signature::Signed;
-            let native_snapshot_bytes = if signed { patch.retained_bytes() } else { 0 };
-            if signed && native_snapshot_bytes > limits.bytes() {
+            let native_snapshot_bytes = patch.retained_bytes();
+            if native_snapshot_bytes > limits.bytes() {
                 return Err(snapshot_limit(native_snapshot_bytes, limits.bytes()));
             }
             let (patch, retained_bytes) = if patch.is_noop() && signed {
@@ -277,7 +278,7 @@ impl Commit {
                 base.adopt_package(package)?
             };
             let snapshot_bytes = native_snapshot_bytes.max(retained_bytes);
-            if signed && snapshot_bytes > limits.bytes() {
+            if snapshot_bytes > limits.bytes() {
                 return Err(snapshot_limit(snapshot_bytes, limits.bytes()));
             }
             Ok(Self {
@@ -314,12 +315,8 @@ impl Commit {
         let result = (|| {
             let native_patch = Patch::Cells(patches);
             let signed = base.signature() == super::Signature::Signed;
-            let native_snapshot_bytes = if signed {
-                native_patch.retained_bytes()
-            } else {
-                0
-            };
-            if signed && native_snapshot_bytes > max_snapshot_bytes {
+            let native_snapshot_bytes = native_patch.retained_bytes();
+            if native_snapshot_bytes > max_snapshot_bytes {
                 return Err(snapshot_limit(native_snapshot_bytes, max_snapshot_bytes));
             }
             let all_noop = match &native_patch {
@@ -339,7 +336,7 @@ impl Commit {
                 base.adopt_package(package)?
             };
             let snapshot_bytes = native_snapshot_bytes.max(retained_bytes);
-            if signed && snapshot_bytes > max_snapshot_bytes {
+            if snapshot_bytes > max_snapshot_bytes {
                 return Err(snapshot_limit(snapshot_bytes, max_snapshot_bytes));
             }
             Ok(Self {
@@ -2409,12 +2406,13 @@ pub(crate) mod sheet_coalesce {
         package_from_editor, resolve_sheet_targets, sheet_state_shape, validate_sheet_state,
     };
     use crate::error::{Code, Error};
-    use crate::node::Project as _;
     use crate::props::Props;
     use crate::registry::Operation;
     use crate::transaction::Error as TransactionError;
     use litchi_xlsb::cell_values::TransferLimits as NativeTransferLimits;
-    use litchi_xlsb::cell_values::structure::EditOptions as NativeStructureOptions;
+    use litchi_xlsb::cell_values::structure::{
+        EditOptions as NativeStructureOptions, Patch as NativeStructurePatch,
+    };
     use std::collections::HashSet;
 
     #[derive(Debug, Clone, Copy)]
@@ -2801,7 +2799,10 @@ pub(crate) mod coalesce {
     use crate::error::{Code, Error};
     use crate::props::Props;
     use crate::transaction::Error as TransactionError;
-    use litchi_xlsb::cell_values::{EditOptions as NativeCellOptions, TransferLimits};
+    use litchi_core::sheet::Cell as _;
+    use litchi_xlsb::cell_values::{
+        EditOptions as NativeCellOptions, Patch as NativeCellPatch, TransferLimits,
+    };
     use std::collections::HashSet;
 
     #[derive(Debug, Clone)]

@@ -243,20 +243,6 @@ impl Xlsx {
         self.0.owner.ensure_current()
     }
 
-    /// Return the length of the exact retained archive when this handle is
-    /// still source-backed.  A materialized owner has no cheap source-length
-    /// proof, so callers use the absence as a conservative zero lower bound
-    /// and charge the final native patch normally.
-    pub(crate) fn retained_source_len(&self) -> Result<Option<usize>> {
-        match &self.0.owner {
-            XlsxOwner::Source(workbook) => Ok(Some(
-                usize::try_from(workbook.source_backed_package()?.source_artifact().len())
-                    .unwrap_or(usize::MAX),
-            )),
-            XlsxOwner::Eager(_) => Ok(None),
-        }
-    }
-
     /// Admit an edit without publishing one. The transaction coordinator uses
     /// the same signature, retention and leaf encryption policy as the write
     /// adapter before it begins a multi-step edit.

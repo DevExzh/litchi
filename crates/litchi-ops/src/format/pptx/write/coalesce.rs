@@ -450,12 +450,11 @@ impl Run {
             let operations = stage_all(&mut edit, &items, &mut changes)?;
             let (mut after, mut commit) = commit_native(&base, source, edit, operations)?;
             commit.operations = authored_operations;
-            let staged_snapshot_bytes =
-                if base.signature() == crate::format::signature::Signature::Signed {
-                    commit.measure_snapshot_bytes()
-                } else {
-                    0
-                };
+            // The native proof retains endpoints for both signed and
+            // unsigned packages.  Measure it once through the commit cache
+            // so unsigned runs are charged and cannot bypass the snapshot
+            // limit.
+            let staged_snapshot_bytes = commit.measure_snapshot_bytes();
             bound(
                 LimitKind::SnapshotBytes,
                 staged_snapshot_bytes,

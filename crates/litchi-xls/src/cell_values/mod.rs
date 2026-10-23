@@ -929,7 +929,7 @@ impl Snapshot {
             None => KeptCells::none(),
         };
         let workbook = Reader::validation_only_with_cfb_limits(
-            Cursor::new(source.as_slice()),
+            Cursor::new(source.as_ref()),
             kept,
             cfb_limits,
         )?;

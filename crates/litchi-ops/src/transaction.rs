@@ -791,6 +791,7 @@ impl Edit {
         #[cfg(any(
             feature = "doc",
             feature = "pptx",
+            feature = "xlsx",
             feature = "xlsb",
             feature = "rtf",
             feature = "ppt",
@@ -1335,6 +1336,7 @@ impl Edit {
         #[cfg(any(
             feature = "doc",
             feature = "pptx",
+            feature = "xlsx",
             feature = "xlsb",
             feature = "xls",
             feature = "ppt",
@@ -1442,6 +1444,7 @@ impl Edit {
         #[cfg(any(
             feature = "doc",
             feature = "pptx",
+            feature = "xlsx",
             feature = "xlsb",
             feature = "xls",
             feature = "ppt",

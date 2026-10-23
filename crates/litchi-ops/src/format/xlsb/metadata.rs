@@ -156,7 +156,10 @@ impl Xlsb {
                     .commit()
                     .map_err(native)?
                     .into_parts();
-                let canonical_retained = patch.retained_bytes();
+                // The metadata leaf has no native retained-byte accessor;
+                // its canonical identity keeps the same package endpoints
+                // already charged by the signed staging probe.
+                let canonical_retained = staged_retained;
                 (target, patch, staged_retained.max(canonical_retained))
             } else {
                 (target, patch, staged_retained)
