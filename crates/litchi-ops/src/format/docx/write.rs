@@ -260,9 +260,7 @@ impl Docx {
         props: &Props<'_>,
         snapshot_budget: usize,
     ) -> Result<Self> {
-        let editor = self
-            .edit_for_write()?
-            .with_snapshot_budget(snapshot_budget)?;
+        let editor = self.edit_for_write_with_snapshot_budget(snapshot_budget)?;
         let assignments = admit_assignments(TargetKind::Paragraph, props)?;
         let target = Target {
             selection: Selection::Body(WriteSelection::Paragraph(position)),
@@ -317,9 +315,7 @@ impl Docx {
         } else {
             Err(props)
         };
-        let editor = self
-            .edit_for_write()?
-            .with_snapshot_budget(snapshot_budget)?;
+        let editor = self.edit_for_write_with_snapshot_budget(snapshot_budget)?;
         let nodes = self.resolve_targets(target)?;
         let props = match props {
             Ok(props) => props,

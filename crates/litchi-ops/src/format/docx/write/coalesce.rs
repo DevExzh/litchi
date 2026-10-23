@@ -163,11 +163,10 @@ impl Run {
     /// intermediate `Snapshot` escape the facade's retention ceiling.
     pub(crate) fn new_with_snapshot_budget(base: &Docx, snapshot_budget: usize) -> Result<Self> {
         let editor = if base.signature() == crate::format::signature::Signature::Signed {
-            base.edit_for_write()?
+            base.edit_for_write_with_snapshot_budget(snapshot_budget)?
         } else {
-            base.edit()?
-        }
-        .with_snapshot_budget(snapshot_budget)?;
+            base.edit_with_snapshot_budget(snapshot_budget)?
+        };
         Ok(Self {
             base: base.clone(),
             edit: WorkEdit::from(editor)?,
@@ -302,9 +301,7 @@ impl Run {
                 // no-op endpoint.  The staged commit has validated the operations; release its
                 // proof before constructing the canonical replacement.
                 drop(commit);
-                let editor = base
-                    .edit_for_write()?
-                    .with_snapshot_budget(snapshot_budget)?;
+                let editor = base.edit_for_write_with_snapshot_budget(snapshot_budget)?;
                 let mut empty = WorkEdit::from(editor)?.commit(&base)?;
                 empty.operations = authored_operations;
                 Ok((base, empty))
@@ -329,11 +326,10 @@ fn replay_with_snapshot_budget(
 ) -> Result<Commit> {
     let result = (|| {
         let editor = if base.signature() == crate::format::signature::Signature::Signed {
-            base.edit_for_write()?
+            base.edit_for_write_with_snapshot_budget(snapshot_budget)?
         } else {
-            base.edit()?
-        }
-        .with_snapshot_budget(snapshot_budget)?;
+            base.edit_with_snapshot_budget(snapshot_budget)?
+        };
         let mut edit = WorkEdit::from(editor)?;
         for item in items {
             item.plan

@@ -106,7 +106,7 @@ impl Docx {
         // Security and retention policy are checked before any property
         // conversion or source read.  Dropping this editor rolls back every
         // admission failure below.
-        let editor = self.edit()?.with_snapshot_budget(snapshot_budget)?;
+        let editor = self.edit_with_snapshot_budget(snapshot_budget)?;
         let parent = resolve_path(self, &parent)?;
         // Header, footer and note paragraphs and runs (record 0325).
         let editor = match self.try_add_story(editor, &parent, &node)? {
@@ -239,7 +239,7 @@ impl Docx {
     }
 
     fn remove_inner<'p>(&self, target: TargetArg<'p>, snapshot_budget: usize) -> Result<Commit> {
-        let editor = self.edit()?.with_snapshot_budget(snapshot_budget)?;
+        let editor = self.edit_with_snapshot_budget(snapshot_budget)?;
         let nodes = self.resolve_targets(&target)?;
         // Header, footer and note paragraphs and runs (record 0325).
         let editor = match self.try_remove_story(editor, &nodes)? {
@@ -301,7 +301,7 @@ impl Docx {
         placement: Placement<'q>,
         snapshot_budget: usize,
     ) -> Result<Commit> {
-        let editor = self.edit()?.with_snapshot_budget(snapshot_budget)?;
+        let editor = self.edit_with_snapshot_budget(snapshot_budget)?;
         let node = resolve_path(self, &path)?;
         let selection = match Selection::from_node(&node) {
             Ok(selection) => selection,
@@ -370,7 +370,7 @@ impl Docx {
         b: PathArg<'q>,
         snapshot_budget: usize,
     ) -> Result<Commit> {
-        let editor = self.edit()?.with_snapshot_budget(snapshot_budget)?;
+        let editor = self.edit_with_snapshot_budget(snapshot_budget)?;
         let left = resolve_path(self, &a)?;
         let right = resolve_path(self, &b)?;
         let left = Selection::from_node(&left)?;

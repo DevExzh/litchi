@@ -576,6 +576,30 @@ fn source_package_materializes_through_the_owned_docx_facade_on_explicit_request
     );
 }
 
+#[test]
+fn source_edit_budget_refuses_before_main_payload_capture() {
+    let document = format!(
+        r#"<w:document xmlns:w="{W}"><w:body><w:p><w:r><w:t>payload</w:t></w:r></w:p></w:body></w:document>"#
+    );
+    let bytes = package_bytes(document.clone(), None, false);
+    let source = Arc::new(ProbeSource::new(bytes, None));
+    let package = source_backed::Package::from_read_at(source.clone()).unwrap();
+    let maximum = document.len().saturating_sub(1);
+
+    let result = package.edit_with_options(
+        litchi_docx::document::EditOptions::default().max_snapshot_bytes(maximum),
+    );
+    assert!(matches!(
+        result,
+        Err(litchi_docx::document::Error::Limit {
+            kind: litchi_docx::document::LimitKind::ProjectedXmlBytes,
+            observed,
+            maximum: actual,
+        }) if observed == document.len() && actual == maximum
+    ));
+    assert_eq!(source.main_reads.load(Ordering::SeqCst), 0);
+}
+
 fn assert_send_sync<T: Send + Sync>() {}
 
 #[test]

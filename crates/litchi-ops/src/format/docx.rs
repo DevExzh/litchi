@@ -181,23 +181,6 @@ impl fmt::Debug for DocxEditor {
     }
 }
 
-impl DocxEditor {
-    /// Attach the unified transaction's remaining main-document snapshot
-    /// budget to the native edit before any operation can retain a projected
-    /// XML snapshot. Unsigned owners are converted to their owning edit here,
-    /// preserving the existing explicit signature-removal route.
-    pub(crate) fn with_snapshot_budget(self, maximum: usize) -> Result<Self> {
-        let options = litchi_docx::document::EditOptions::default().max_snapshot_bytes(maximum);
-        match self {
-            Self::Edit(edit) => Ok(Self::Edit(Box::new(edit.with_options(options)))),
-            Self::Source(edit) => Ok(Self::Source(Box::new(edit.with_options(options)))),
-            Self::Unsigned(package) => Ok(Self::Edit(Box::new(
-                package.edit_with_options(options).map_err(Error::from)?,
-            ))),
-        }
-    }
-}
-
 /// The two owner states of a DOCX handle (record 0003 §2.3).
 #[allow(
     clippy::large_enum_variant,
@@ -739,14 +722,42 @@ impl Docx {
     /// lose its encryption profile in the unsigned copy; [`Code::IoError`]
     /// when the source changed; and the leaf's typed failures otherwise.
     pub(crate) fn edit(&self) -> Result<DocxEditor> {
+        self.edit_with_options(litchi_docx::document::EditOptions::default())
+    }
+
+    /// Build a native editor under one explicit main-document edit profile.
+    /// The profile reaches the package owner before it captures the document
+    /// snapshot, so a refused source-size floor does not inflate the payload.
+    pub(crate) fn edit_with_options(
+        &self,
+        options: litchi_docx::document::EditOptions,
+    ) -> Result<DocxEditor> {
         self.edit_policy()?;
-        self.edit_inner()
+        self.edit_inner(options)
+    }
+
+    /// Build an editor with the unified transaction's remaining snapshot
+    /// budget admitted before native document capture.
+    pub(crate) fn edit_with_snapshot_budget(&self, maximum: usize) -> Result<DocxEditor> {
+        self.edit_with_options(
+            litchi_docx::document::EditOptions::default().max_snapshot_bytes(maximum),
+        )
     }
 
     /// Build a native writer for the unified setter's signed no-op path. The
     /// native commit still rejects a changed result, while an unchanged
     /// result returns the original package and signature byte-identically.
     pub(crate) fn edit_for_write(&self) -> Result<DocxEditor> {
+        self.edit_for_write_with_options(litchi_docx::document::EditOptions::default())
+    }
+
+    /// Build a native writer under one explicit main-document edit profile.
+    /// Signed documents retain their exact no-op exception while the selected
+    /// profile is admitted before any owning or source-backed snapshot.
+    pub(crate) fn edit_for_write_with_options(
+        &self,
+        options: litchi_docx::document::EditOptions,
+    ) -> Result<DocxEditor> {
         if self.0.signature() != Signature::Signed {
             self.edit_policy()?;
         } else if !self.0.retain_source {
@@ -757,19 +768,34 @@ impl Docx {
             .with_format(FileFormat::Docx)
             .with_suggestion("reopen the document without `OpenOptions::retain_source(false)`"));
         }
-        self.edit_inner()
+        self.edit_inner(options)
     }
 
-    fn edit_inner(&self) -> Result<DocxEditor> {
+    /// Build a native writer with the unified transaction's remaining
+    /// snapshot budget admitted before native document capture.
+    pub(crate) fn edit_for_write_with_snapshot_budget(&self, maximum: usize) -> Result<DocxEditor> {
+        self.edit_for_write_with_options(
+            litchi_docx::document::EditOptions::default().max_snapshot_bytes(maximum),
+        )
+    }
+
+    fn edit_inner(&self, options: litchi_docx::document::EditOptions) -> Result<DocxEditor> {
         if self.0.signature() == Signature::RemovalAuthorized {
-            return self
-                .unsigned_package()
-                .map(|package| DocxEditor::Unsigned(Box::new(package)));
+            let package = self.unsigned_package()?;
+            return if options.max_snapshot_bytes_value().is_some() {
+                Ok(DocxEditor::Edit(Box::new(
+                    package.edit_with_options(options).map_err(Error::from)?,
+                )))
+            } else {
+                Ok(DocxEditor::Unsigned(Box::new(package)))
+            };
         }
         match &self.0.owner {
-            DocxOwner::Eager(package) => Ok(DocxEditor::Edit(Box::new(package.edit()?))),
+            DocxOwner::Eager(package) => Ok(DocxEditor::Edit(Box::new(
+                package.edit_with_options(options).map_err(Error::from)?,
+            ))),
             DocxOwner::Source(package) => {
-                let result = package.edit().map_err(Error::from);
+                let result = package.edit_with_options(options).map_err(Error::from);
                 self.0
                     .owner
                     .finish(result)

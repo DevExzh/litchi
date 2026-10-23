@@ -136,12 +136,13 @@ impl Docx {
         }
         // Header, footer, note and comment stories publish only through
         // the owning package's editor.
+        let options = litchi_docx::document::EditOptions::default()
+            .max_snapshot_bytes(limits.max_snapshot_bytes());
         let editor = if reach.stories() {
-            owning_editor(self)?
+            owning_editor(self, options)?
         } else {
-            self.edit()?
-        }
-        .with_snapshot_budget(limits.max_snapshot_bytes())?;
+            self.edit_with_options(options)?
+        };
         let mut work = WorkEdit::from(editor)?;
         let matcher = spec.matcher();
         let mut totals = Totals {
