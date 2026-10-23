@@ -2625,3 +2625,39 @@ See [0063](0063-source-pptx-modern-comments.md).
   corpus replay/dispositions, final inventory/glossary and the complete
   assembled gate remain required. Source integration is not yet accepted into
   trunk. Only the comprehensive redaction audit is deferred. Nothing is pushed.
+
+- Coordinator checkpoint (2026-10-23, isolated documentation pass):
+  The exact workspace documentation gate passes on `0f8ce50050`, with
+  warnings denied, one Cargo job and a 20 GB memory cap. The 316.00-second
+  passing run has no diagnostic output and a 3,440,007,569-byte target.
+  Preceding isolated runs exposed stale ODB, ODC and OPC links and a public
+  OLE link to private state; all are corrected and their failures retained
+  in 0362uf. No memory kill occurred in these reruns. This closes the
+  documentation failure on that source, not the full 53-check gate.
+
+  Integration now reaches `045d3721ae`, including the independently reviewed
+  Clippy v3 batch and the Numbers native limit payload repair. Numbers now
+  preserves exact kind/observed/maximum values through popup/reply helpers;
+  reply-specific field/nesting mapping retains its existing public axes.
+  The fourth broad Clippy run and a combined Numbers library run are queued
+  together on the fresh documentation target. Results remain pending.
+
+  Diagnostic budget composition reaches `152eb8a53b`. Scoped DOCX, XLSB and
+  XLSX feature reviews are clear, but shared XLSX cell transfer/cancellation
+  accounting, rich-text fidelity and native metadata preparation still need
+  repair. Review returned late target admission, duplicate metadata planning
+  and noncanonical limit entry points; no such behavior is accepted. A new
+  combined native/facade compiler check is running. XLS deferred freshness
+  review additionally covers cold materialization and package output handoff.
+
+  The eighth cleanup removed three clean inactive leaves, retaining their
+  branch references and exact recreation commands, and reclaimed
+  18,784,234,793 checkout bytes. Generated cache was moved reversibly to an
+  external hashed quarantine, reducing the main target by 440,535,840
+  apparent bytes. Hard-link accounting and restoration evidence are retained;
+  measured/release binaries and dirty worktrees were preserved.
+
+  Source integration is still staging, not accepted into trunk. Final
+  combined runtime validation, native qualification, corpus dispositions,
+  inventory/glossary and the complete gate remain required. Only the
+  comprehensive redaction audit is deferred. Nothing has been pushed.
