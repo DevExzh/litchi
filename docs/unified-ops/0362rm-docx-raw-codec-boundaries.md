@@ -77,4 +77,34 @@ event, text, graph, and metadata bounds.
   glossary/inventory capture, Clippy, and the paired raw lifecycle probes
   before acceptance.
 
+## Runtime receipt
+
+The allocated DOCX Cargo lane supplied the following bounded test receipts.
+The copied logs are outside the checkout at
+`/home/zhuhe/code/litchi-worktrees/.coord/w8-docx-helper-final-evidence/` and
+are intentionally not tracked.
+
+| Run | Source commit / tree | Command | Exit | Tests | Log size / SHA-256 |
+| --- | --- | --- | ---: | ---: | --- |
+| Glossary focus | `7fb00ee4ad2f6229613b58ad78d548bc116f0a6d` / `9e8e69f0529f5e2e639fa6361412f508200615dd` | `cargo test -p litchi-docx --lib glossary::tests -- --test-threads=1` | 0 | 55 passed | 5,178 bytes / `e187a2fa98baa8dd2800d83b150bc0c3088466a2d95953fedbe27c6beff1f18b` |
+| DOCX library | `d331043548139488f0127e245b945ba6dedf1b0b` / `52f0673013ea98a3793d162de2420af1cfbe8f2c` | `cargo test -p litchi-docx --lib -- --test-threads=1` | 0 | 1,487 passed | 133,008 bytes / `15f8474416a1330e11cb0eaa818c3115f7cb4d0cb3be2774fd2681ff03367306` |
+
+Both commands used `PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH`,
+`CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/uo2-docx-p0/target`,
+`CARGO_BUILD_JOBS=1`, `CARGO_INCREMENTAL=0`,
+`CARGO_PROFILE_DEV_DEBUG=0`, `CARGO_PROFILE_TEST_DEBUG=0`,
+`RUST_TEST_THREADS=1`, `LITCHI_MEM_MAX=20G`, and an external `TMPDIR`.
+The focused run used `TMPDIR=/tmp/litchi-docx-glossary-7fb00ee4ad`; the
+library run used `TMPDIR=/tmp/litchi-docx-lib-54d6037fcc`.
+The focused log is
+`glossary-55.cargo.log` (`/tmp/litchi-docx-glossary-7fb00ee4ad/cargo.log`)
+and the library log is
+`docx-lib-1487.cargo.log` (`/tmp/litchi-docx-lib-54d6037fcc/cargo.log`).
+The final target directory measured 2,195,105,726 bytes (2.1G).
+
+After the full-library receipt, the source advanced through
+`4e447dd42e`, `1a567f58c0`, and `7fb00ee4ad`; the final-source focused receipt
+above covers those admission/validator-only changes. No test was rerun for
+this record-only update.
+
 No executable, fixture, or large performance artifact is part of this record.
