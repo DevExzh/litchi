@@ -260,9 +260,9 @@ impl crate::Package {
     /// hold the before state.
     pub fn apply_glossary(&self, patch: &Patch) -> Result<Commit> {
         let limits = *self.semantic_limits().glossary_value();
-        let main_name = self.opc_package().main_document_part()?.partname().clone();
         patch.0.check(self.opc_package(), "apply_glossary")?;
         let source_owner = graph::locate(self.opc_package(), &limits)?;
+        let main_name = self.opc_package().main_document_part()?.partname().clone();
         let source_owner_state = source_owner.as_ref().map(|owner| OwnerState {
             root: owner.root.as_str().to_owned(),
             id: owner.relationship_id.clone(),
@@ -277,35 +277,6 @@ impl crate::Package {
         let source_seed =
             owner_metadata_seed_for(main_name.as_str(), source_owner_state.as_ref(), &limits)?;
         let mut final_owner = None;
-        patch.0.for_each_part_delta(|name, before, after| {
-            if name == &main_name {
-                final_owner = Some(
-                    after
-                        .map(|(_, _, relationships)| {
-                            owner_state_from_relationships(relationships, &limits)
-                        })
-                        .transpose()?
-                        .flatten(),
-                );
-                return Ok(());
-            }
-            let was_owned = owned.contains(name);
-            if was_owned {
-                if let Some((content_type, data, relationships)) = before {
-                    let old =
-                        patch_part_ledger(name, content_type, data, relationships, &limits, false)?;
-                    subtract_ledger(&mut ledger, old)?;
-                }
-            }
-            if let Some((content_type, data, relationships)) = after
-                && (was_owned || before.is_none())
-            {
-                let new =
-                    patch_part_ledger(name, content_type, data, relationships, &limits, true)?;
-                add_ledger(&mut ledger, new, &limits)?;
-            }
-            Ok(())
-        })?;
         patch
             .0
             .validate_after_relationships(|owner, relationships| {
@@ -314,7 +285,46 @@ impl crate::Package {
                 }
                 Ok(())
             })?;
-        let final_owner = final_owner.unwrap_or(source_owner_state);
+        let final_owner = final_owner.unwrap_or_else(|| source_owner_state.clone());
+        patch.0.for_each_part_delta(|name, before, after| {
+            if name == &main_name {
+                return Ok(());
+            }
+            let was_owned = owned.contains(name);
+            if was_owned {
+                if let Some((content_type, data, relationships)) = before {
+                    let old = patch_part_ledger(
+                        name,
+                        content_type,
+                        data,
+                        relationships,
+                        source_owner_state
+                            .as_ref()
+                            .is_some_and(|owner| owner.root == name.as_str()),
+                        &limits,
+                        false,
+                    )?;
+                    subtract_ledger(&mut ledger, old)?;
+                }
+            }
+            if let Some((content_type, data, relationships)) = after
+                && (was_owned || before.is_none())
+            {
+                let new = patch_part_ledger(
+                    name,
+                    content_type,
+                    data,
+                    relationships,
+                    final_owner
+                        .as_ref()
+                        .is_some_and(|owner| owner.root == name.as_str()),
+                    &limits,
+                    true,
+                )?;
+                add_ledger(&mut ledger, new, &limits)?;
+            }
+            Ok(())
+        })?;
         let final_seed =
             owner_metadata_seed_for(main_name.as_str(), final_owner.as_ref(), &limits)?;
         ledger.metadata_bytes = ledger
@@ -435,14 +445,15 @@ fn owner_state_from_relationships(
                 maximum: limits.string_bytes(),
             });
         }
-        let root = relationship.target_partname()?.as_str().to_owned();
-        if root.len() > limits.name_bytes() {
+        let root_part = relationship.target_partname()?;
+        if root_part.as_str().len() > limits.name_bytes() {
             return Err(crate::Error::GlossaryLimit {
                 kind: LimitKind::StringBytes,
-                actual: root.len(),
+                actual: root_part.as_str().len(),
                 maximum: limits.name_bytes(),
             });
         }
+        let root = root_part.as_str().to_owned();
         owner = Some(OwnerState {
             root,
             id: relationship.r_id().to_owned(),
@@ -489,6 +500,7 @@ fn patch_part_ledger(
     content_type: &str,
     data: &[u8],
     relationships: &litchi_opc::rel::Relationships,
+    is_root: bool,
     limits: &super::Limits,
     parse_xml: bool,
 ) -> Result<ClosureLedger> {
@@ -537,6 +549,7 @@ fn patch_part_ledger(
         total_bytes: data.len(),
         metadata_bytes,
         relationship_count,
+        part_count: usize::from(!is_root),
     })
 }
 
@@ -557,6 +570,10 @@ fn add_ledger(
         .relationship_count
         .checked_add(value.relationship_count)
         .ok_or_else(|| invalid("glossary final relationship ledger overflow"))?;
+    target.part_count = target
+        .part_count
+        .checked_add(value.part_count)
+        .ok_or_else(|| invalid("glossary final part ledger overflow"))?;
     check_ledger(target, limits)
 }
 
@@ -573,6 +590,10 @@ fn subtract_ledger(target: &mut ClosureLedger, value: ClosureLedger) -> Result<(
         .relationship_count
         .checked_sub(value.relationship_count)
         .ok_or_else(|| invalid("glossary source relationship ledger underflow"))?;
+    target.part_count = target
+        .part_count
+        .checked_sub(value.part_count)
+        .ok_or_else(|| invalid("glossary source part ledger underflow"))?;
     Ok(())
 }
 
@@ -596,6 +617,13 @@ fn check_ledger(ledger: &ClosureLedger, limits: &super::Limits) -> Result<()> {
             kind: LimitKind::GraphWideRelationship,
             actual: ledger.relationship_count,
             maximum: limits.values(),
+        });
+    }
+    if ledger.part_count > limits.parts() {
+        return Err(crate::Error::GlossaryLimit {
+            kind: LimitKind::AuxiliaryPart,
+            actual: ledger.part_count,
+            maximum: limits.parts(),
         });
     }
     Ok(())

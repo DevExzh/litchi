@@ -284,6 +284,7 @@ pub struct Catalog {
     /// Physical resource binding captured by package-aware loads.
     pub(in crate::glossary) binding: Option<Box<Binding>>,
     pub(in crate::glossary) selected_limits: Option<super::Limits>,
+    pub(in crate::glossary) enforced_limits: Option<super::Limits>,
     pub(in crate::glossary) state: CatalogState,
 }
 
@@ -531,6 +532,11 @@ impl Catalog {
         self.selected_limits = Some(*limits);
     }
 
+    pub(in crate::glossary) fn bind_edit_limits(&mut self, limits: &super::Limits) {
+        self.selected_limits = Some(*limits);
+        self.enforced_limits = Some(*limits);
+    }
+
     fn effective_limits(&self) -> super::Limits {
         self.selected_limits.unwrap_or(super::Limits::DEFAULT)
     }
@@ -605,6 +611,7 @@ impl Catalog {
             entries: Vec::new(),
             binding: None,
             selected_limits: None,
+            enforced_limits: None,
             state: CatalogState::default(),
         }
     }
@@ -663,7 +670,7 @@ impl Catalog {
         // A transaction binds its catalog to the selected policy before
         // invoking an edit closure.  Do not let a closure's incidental
         // `Limits::DEFAULT` argument widen or replace that policy.
-        let selected = self.selected_limits.unwrap_or(*limits);
+        let selected = self.enforced_limits.unwrap_or(*limits);
         let limits = &selected;
         super::graph::raw::admit_xml(&xml, limits)?;
         if self.background.as_ref() == Some(&xml) {

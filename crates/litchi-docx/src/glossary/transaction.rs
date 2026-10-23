@@ -22,7 +22,7 @@ use super::graph::{
     remove_graph_with_limits, validate_raw_graph_metadata, validate_relationship_metadata,
 };
 use super::model::{Catalog, Conformance, Entry, Name};
-use super::{OpcPackage, PackURI, Result};
+use super::{MAX_VALUES, OpcPackage, PackURI, Result};
 
 /// Stable fingerprint of the complete glossary source graph.
 pub type Revision = u64;
@@ -45,9 +45,9 @@ impl Snapshot {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn load(package: &OpcPackage, limits: &super::Limits) -> Result<Self> {
-        let main_part = package.main_document_part()?.partname().as_str().to_owned();
         let package_conformance = package_conformance(package)?;
         let graph = super::raw::load(package, limits)?;
+        let main_part = package.main_document_part()?.partname().as_str().to_owned();
         let conformance = graph
             .as_ref()
             .map_or(package_conformance, |value| value.conformance);
@@ -141,6 +141,7 @@ pub(crate) struct Transaction {
     before: Snapshot,
     draft: Option<raw::Graph>,
     limits: super::Limits,
+    empty_usage: GraphUsage,
 }
 
 impl Transaction {
@@ -158,10 +159,12 @@ impl Transaction {
         limits: &super::Limits,
     ) -> Result<Self> {
         let before = Snapshot::load(target, limits)?;
+        let empty_usage = generated_graph_usage(target, before.conformance, limits)?;
         Ok(Self {
             draft: before.graph.clone(),
             before,
             limits: *limits,
+            empty_usage,
         })
     }
 
@@ -209,7 +212,7 @@ impl Transaction {
         let changed = self.update_catalog(|catalog| {
             let changed = *catalog != value;
             *catalog = value;
-            catalog.bind_limits(&limits);
+            catalog.bind_edit_limits(&limits);
             catalog.rebuild_state(&limits)?;
             Ok(changed)
         })?;
@@ -319,7 +322,12 @@ impl Transaction {
         if unchanged {
             return Ok(false);
         }
-        preflight_root_relationships(self.draft.as_ref(), &relationships, &self.limits)?;
+        preflight_root_relationships(
+            self.draft.as_ref(),
+            &self.empty_usage,
+            &relationships,
+            &self.limits,
+        )?;
         let mut graph = self.candidate_graph();
         graph.rels = relationships;
         validate_candidate(&graph, &self.limits)?;
@@ -333,7 +341,12 @@ impl Transaction {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn add_relationship(&mut self, relationship: raw::Rel) -> Result<bool> {
-        preflight_add_relationship(self.draft.as_ref(), &relationship, &self.limits)?;
+        preflight_add_relationship(
+            self.draft.as_ref(),
+            &self.empty_usage,
+            &relationship,
+            &self.limits,
+        )?;
         let mut graph = self.candidate_graph();
         graph.rels.push(relationship);
         validate_candidate(&graph, &self.limits)?;
@@ -363,7 +376,7 @@ impl Transaction {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn add_part(&mut self, part: raw::Part) -> Result<bool> {
-        preflight_add_part(self.draft.as_ref(), &part, &self.limits)?;
+        preflight_add_part(self.draft.as_ref(), &self.empty_usage, &part, &self.limits)?;
         let mut graph = self.candidate_graph();
         graph.parts.push(part);
         validate_candidate(&graph, &self.limits)?;
@@ -384,36 +397,35 @@ impl Transaction {
         relationships: Vec<raw::Rel>,
     ) -> Result<bool> {
         let requested = PackURI::new(name).map_err(crate::Error::Uri)?;
-        let old_index = self
+        let graph = self
             .draft
             .as_ref()
-            .map(|graph| part_index(graph, name))
-            .transpose()?
             .ok_or_else(|| invalid(format!("glossary auxiliary part '{requested}' is absent")))?;
-        let mut part = raw::Part::new(name, content_type, data, &self.limits)?;
-        part.set_relationships(relationships, &self.limits)?;
-        let old_name = self
-            .draft
-            .as_ref()
-            .and_then(|graph| graph.parts.get(old_index))
-            .map(|value| value.name.clone())
+        let old_index = part_index(graph, name)?;
+        let old = graph
+            .parts
+            .get(old_index)
             .ok_or_else(|| invalid("glossary auxiliary part index changed"))?;
-        part.name = old_name;
-        if self
-            .draft
-            .as_ref()
-            .is_some_and(|graph| graph.parts[old_index] == part)
+        let content_type = content_type.into();
+        if old.content_type == content_type
+            && old.data() == data.as_slice()
+            && old.relationships() == relationships.as_slice()
         {
             return Ok(false);
         }
-        preflight_replace_part(
-            self.draft
-                .as_ref()
-                .ok_or_else(|| invalid("glossary auxiliary part is absent"))?,
+        preflight_replace_part_input(
+            graph,
             old_index,
-            &part,
+            name,
+            &content_type,
+            &data,
+            &relationships,
             &self.limits,
         )?;
+        let mut part = raw::Part::new(name, content_type, data, &self.limits)?;
+        part.set_relationships(relationships, &self.limits)?;
+        let old_name = old.name.clone();
+        part.name = old_name;
         let mut graph = self.candidate_graph();
         graph.parts[old_index] = part;
         validate_candidate(&graph, &self.limits)?;
@@ -547,7 +559,7 @@ impl Transaction {
             .draft
             .clone()
             .unwrap_or_else(|| raw::Graph::new(Catalog::new(), self.before.conformance));
-        graph.catalog.bind_limits(&self.limits);
+        graph.catalog.bind_edit_limits(&self.limits);
         graph
     }
 
@@ -737,16 +749,57 @@ fn graph_usage(graph: &raw::Graph) -> Result<GraphUsage> {
     Ok(usage)
 }
 
-fn staged_graph_usage(draft: Option<&raw::Graph>, limits: &super::Limits) -> Result<GraphUsage> {
-    let usage = draft.map_or_else(
-        || {
-            Ok(GraphUsage {
-                metadata: DEFAULT_ROOT_NAME.len(),
-                ..GraphUsage::default()
-            })
-        },
-        graph_usage,
-    )?;
+fn generated_graph_usage(
+    package: &OpcPackage,
+    conformance: Conformance,
+    limits: &super::Limits,
+) -> Result<GraphUsage> {
+    let root = PackURI::new(DEFAULT_ROOT_NAME).map_err(crate::Error::Uri)?;
+    let main = package.main_document_part()?;
+    let root_xml = write_with_limits(&Catalog::new(), conformance, limits)?;
+    let owner_target = root.relative_ref(main.partname().base_uri());
+    let owner_id = next_relationship_id(main);
+    let mut usage = GraphUsage {
+        bytes: root_xml.len(),
+        ..GraphUsage::default()
+    };
+    selected_metadata(&mut usage, root.as_str(), true, limits)?;
+    selected_metadata(&mut usage, main.partname().as_str(), true, limits)?;
+    selected_metadata(&mut usage, &owner_id, false, limits)?;
+    selected_metadata(&mut usage, &owner_target, false, limits)?;
+    check_usage(usage, limits)?;
+    Ok(usage)
+}
+
+fn next_relationship_id(part: &dyn super::Part) -> String {
+    let mut used = Vec::new();
+    for relationship in part.rels().iter() {
+        if let Some(number) = relationship
+            .r_id()
+            .strip_prefix("rId")
+            .and_then(|value| atoi_simd::parse::<u32, false, false>(value.as_bytes()).ok())
+        {
+            used.push(number);
+        }
+    }
+    used.sort_unstable();
+    let mut next = 1u32;
+    for number in used {
+        match number.cmp(&next) {
+            std::cmp::Ordering::Equal => next = next.saturating_add(1),
+            std::cmp::Ordering::Greater => break,
+            std::cmp::Ordering::Less => {},
+        }
+    }
+    format!("rId{next}")
+}
+
+fn staged_graph_usage(
+    draft: Option<&raw::Graph>,
+    empty_usage: &GraphUsage,
+    limits: &super::Limits,
+) -> Result<GraphUsage> {
+    let usage = draft.map_or_else(|| Ok(*empty_usage), graph_usage)?;
     let root_name = draft.map_or(DEFAULT_ROOT_NAME, |graph| graph.root_name.as_str());
     if root_name.len() > limits.name_bytes() {
         return Err(crate::Error::GlossaryLimit {
@@ -795,18 +848,20 @@ fn check_usage(usage: GraphUsage, limits: &super::Limits) -> Result<()> {
             maximum: limits.metadata_bytes(),
         });
     }
-    if usage.relationships > limits.values() {
+    let relationship_limit = limits.values().min(MAX_VALUES);
+    if usage.relationships > relationship_limit {
         return Err(crate::Error::GlossaryLimit {
             kind: crate::glossary::LimitKind::GraphWideRelationship,
             actual: usage.relationships,
-            maximum: limits.values(),
+            maximum: relationship_limit,
         });
     }
-    if usage.parts > limits.parts() {
+    let part_limit = limits.parts().min(MAX_VALUES);
+    if usage.parts > part_limit {
         return Err(crate::Error::GlossaryLimit {
             kind: crate::glossary::LimitKind::AuxiliaryPart,
             actual: usage.parts,
-            maximum: limits.parts(),
+            maximum: part_limit,
         });
     }
     Ok(())
@@ -877,21 +932,23 @@ fn replace_relationship_usage(
 
 fn preflight_root_relationships(
     draft: Option<&raw::Graph>,
+    empty_usage: &GraphUsage,
     relationships: &[raw::Rel],
     limits: &super::Limits,
 ) -> Result<()> {
-    let usage = staged_graph_usage(draft, limits)?;
+    let usage = staged_graph_usage(draft, empty_usage, limits)?;
     let old = draft.map_or(&[][..], |graph| graph.rels.as_slice());
     replace_relationship_usage(usage, old, relationships, limits)
 }
 
 fn preflight_add_relationship(
     draft: Option<&raw::Graph>,
+    empty_usage: &GraphUsage,
     relationship: &raw::Rel,
     limits: &super::Limits,
 ) -> Result<()> {
     let Some(graph) = draft else {
-        let usage = staged_graph_usage(None, limits)?;
+        let usage = staged_graph_usage(None, empty_usage, limits)?;
         let new = relationship_usage(std::slice::from_ref(relationship), limits)?;
         let usage = GraphUsage {
             relationships: usage
@@ -909,7 +966,7 @@ fn preflight_add_relationship(
     if graph.rels.iter().any(|value| value.id == relationship.id) {
         return Err(invalid("duplicate glossary relationship ID"));
     }
-    let usage = staged_graph_usage(Some(graph), limits)?;
+    let usage = staged_graph_usage(Some(graph), empty_usage, limits)?;
     let new = relationship_usage(std::slice::from_ref(relationship), limits)?;
     let usage = GraphUsage {
         relationships: usage
@@ -931,21 +988,39 @@ fn part_usage_with_data(
     limits: &super::Limits,
     admit_payload: bool,
 ) -> Result<GraphUsage> {
-    validate_physical_part(&part.name, &part.content_type, data.len())?;
+    part_usage_values(
+        &part.name,
+        &part.content_type,
+        data,
+        part.relationships(),
+        limits,
+        admit_payload,
+    )
+}
+
+fn part_usage_values(
+    name: &str,
+    content_type: &str,
+    data: &[u8],
+    relationships: &[raw::Rel],
+    limits: &super::Limits,
+    admit_payload: bool,
+) -> Result<GraphUsage> {
+    validate_physical_part(name, content_type, data.len())?;
     let mut usage = GraphUsage {
         bytes: data.len(),
         parts: 1,
         ..GraphUsage::default()
     };
-    selected_metadata(&mut usage, &part.name, true, limits)?;
-    selected_metadata(&mut usage, &part.content_type, false, limits)?;
-    let relationships = relationship_usage(part.relationships(), limits)?;
+    selected_metadata(&mut usage, name, true, limits)?;
+    selected_metadata(&mut usage, content_type, false, limits)?;
+    let relationship_usage = relationship_usage(relationships, limits)?;
     usage.metadata = usage
         .metadata
-        .checked_add(relationships.metadata)
+        .checked_add(relationship_usage.metadata)
         .ok_or_else(|| invalid("glossary graph metadata size overflow"))?;
-    usage.relationships = relationships.relationships;
-    if admit_payload && is_xml_content_type(&part.content_type) {
+    usage.relationships = relationship_usage.relationships;
+    if admit_payload && is_xml_content_type(content_type) {
         raw::admit_xml(data, limits)?;
     }
     check_usage(usage, limits)?;
@@ -960,10 +1035,11 @@ fn is_xml_content_type(content_type: &str) -> bool {
 
 fn preflight_add_part(
     draft: Option<&raw::Graph>,
+    empty_usage: &GraphUsage,
     part: &raw::Part,
     limits: &super::Limits,
 ) -> Result<()> {
-    let usage = staged_graph_usage(draft, limits)?;
+    let usage = staged_graph_usage(draft, empty_usage, limits)?;
     let root_name = draft.map_or(DEFAULT_ROOT_NAME, |graph| graph.root_name.as_str());
     let uri = PackURI::new(&part.name).map_err(crate::Error::Uri)?;
     if uri.is_equivalent_to(&PackURI::new(root_name).map_err(crate::Error::Uri)?)
@@ -1001,19 +1077,34 @@ fn preflight_add_part(
     check_usage(usage, limits)
 }
 
-fn preflight_replace_part(
+fn preflight_replace_part_input(
     graph: &raw::Graph,
     index: usize,
-    replacement: &raw::Part,
+    requested_name: &str,
+    content_type: &str,
+    data: &[u8],
+    relationships: &[raw::Rel],
     limits: &super::Limits,
 ) -> Result<()> {
     let old = graph
         .parts
         .get(index)
         .ok_or_else(|| invalid("glossary auxiliary part index changed"))?;
-    let mut usage = staged_graph_usage(Some(graph), limits)?;
+    // Reproduce `raw::Part::new` and `set_relationships` admission while the
+    // caller still owns the input buffers.  The requested name is checked as
+    // authored, but the aggregate ledger uses the existing canonical name
+    // retained by replacement.
+    part_usage_values(
+        requested_name,
+        content_type,
+        data,
+        relationships,
+        limits,
+        true,
+    )?;
+    let mut usage = staged_graph_usage(Some(graph), &GraphUsage::default(), limits)?;
     let old_usage = part_usage_with_data(old, old.data(), limits, false)?;
-    let new_usage = part_usage_with_data(replacement, replacement.data(), limits, true)?;
+    let new_usage = part_usage_values(&old.name, content_type, data, relationships, limits, false)?;
     usage.bytes = usage
         .bytes
         .checked_sub(old_usage.bytes)
@@ -1042,7 +1133,7 @@ fn preflight_replace_part_data(
         .parts
         .get(index)
         .ok_or_else(|| invalid("glossary auxiliary part index changed"))?;
-    let mut usage = staged_graph_usage(Some(graph), limits)?;
+    let mut usage = staged_graph_usage(Some(graph), &GraphUsage::default(), limits)?;
     let old_usage = part_usage_with_data(old, old.data(), limits, false)?;
     let new_usage = part_usage_with_data(old, data, limits, true)?;
     usage.bytes = usage
@@ -1063,7 +1154,7 @@ fn preflight_part_relationships(
         .parts
         .get(index)
         .ok_or_else(|| invalid("glossary auxiliary part index changed"))?;
-    let usage = staged_graph_usage(Some(graph), limits)?;
+    let usage = staged_graph_usage(Some(graph), &GraphUsage::default(), limits)?;
     replace_relationship_usage(usage, part.relationships(), relationships, limits)
 }
 

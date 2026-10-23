@@ -380,6 +380,7 @@ fn opaque_namespace_mapping_does_not_rewrite_literal_values() {
         entries: vec![Entry::new("Literal", body.into_bytes(), &Limits::DEFAULT).unwrap()],
         binding: None,
         selected_limits: None,
+        enforced_limits: None,
         state: CatalogState::default(),
     };
     let strict = String::from_utf8(write(&catalog, Conformance::Strict).unwrap()).unwrap();

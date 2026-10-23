@@ -45,6 +45,7 @@ pub(in crate::glossary) struct ClosureLedger {
     pub(in crate::glossary) total_bytes: usize,
     pub(in crate::glossary) metadata_bytes: usize,
     pub(in crate::glossary) relationship_count: usize,
+    pub(in crate::glossary) part_count: usize,
 }
 
 pub mod raw {
@@ -2211,6 +2212,7 @@ pub(in crate::glossary) fn glossary_owned_parts(
             total_bytes,
             metadata_bytes,
             relationship_count,
+            part_count: owned.len().saturating_sub(1),
         },
     ))
 }
