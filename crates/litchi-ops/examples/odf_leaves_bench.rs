@@ -144,7 +144,7 @@ mod bench {
             let mut edit = leaf_package.edit();
             edit.set_paragraph_text(Position::new(499), "Replaced text")
                 .expect("stage");
-            black_box(edit.commit().expect("commit"));
+            let _ = black_box(edit.commit().expect("commit"));
         };
         let mut engine = || {
             let document = engine_package.document().expect("document");
@@ -152,7 +152,7 @@ mod bench {
             let id = body.root().children().nth(499).expect("paragraph").id();
             let mut edit = engine_package.edit();
             edit.set_text(id, "Replaced text").expect("stage");
-            black_box(edit.commit().expect("commit"));
+            let _ = black_box(edit.commit().expect("commit"));
         };
         let mut unified = || {
             black_box(
@@ -219,7 +219,7 @@ mod bench {
                 .id();
             let mut edit = engine_package.edit();
             edit.set_text(id, "Replaced text").expect("stage");
-            black_box(edit.commit().expect("commit"));
+            let _ = black_box(edit.commit().expect("commit"));
         };
         let mut unified = || {
             black_box(
@@ -266,7 +266,7 @@ mod bench {
         let mut leaf = || {
             let mut edit = package.edit();
             edit.set_shape_name(0, 0, "Renamed").expect("stage");
-            black_box(edit.commit().expect("commit"));
+            let _ = black_box(edit.commit().expect("commit"));
         };
         let mut unified = || {
             black_box(
@@ -314,7 +314,7 @@ mod bench {
             let mut edit = package.edit();
             edit.update_axis(0, litchi_odc::AxisUpdate::named("horizontal"))
                 .expect("stage");
-            black_box(edit.commit().expect("commit"));
+            let _ = black_box(edit.commit().expect("commit"));
         };
         let mut unified = || {
             black_box(
@@ -358,7 +358,7 @@ mod bench {
             let mut edit = package.edit();
             edit.set_frame_name(0, Some("Logo".to_owned()))
                 .expect("stage");
-            black_box(edit.commit().expect("commit"));
+            let _ = black_box(edit.commit().expect("commit"));
         };
         let mut unified = || {
             black_box(
@@ -400,7 +400,7 @@ mod bench {
             let mut edit = package.edit();
             edit.set_query_command("AliasTest", "SELECT 1")
                 .expect("stage");
-            black_box(edit.commit().expect("commit"));
+            let _ = black_box(edit.commit().expect("commit"));
         };
         let mut unified = || {
             black_box(
@@ -451,7 +451,7 @@ mod bench {
             let mut edit = package.edit();
             edit.set_text(&litchi_odf_formula::NodePath::new(path), "g")
                 .expect("stage");
-            black_box(edit.commit().expect("commit"));
+            let _ = black_box(edit.commit().expect("commit"));
         };
         let mut unified = || {
             black_box(file.set(target, props! { "text" => "g" }).expect("set"));

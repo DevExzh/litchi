@@ -3041,8 +3041,7 @@ mod tests {
         let before = package_fingerprint(target.opc_package()).expect("target fingerprint");
         let error = target
             .apply_durable_ink(&forged)
-            .err()
-            .expect("forged source must fail forward replay");
+            .expect_err("forged source must fail forward replay");
         assert!(
             error
                 .to_string()

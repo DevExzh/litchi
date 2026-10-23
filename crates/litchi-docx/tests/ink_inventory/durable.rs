@@ -596,8 +596,7 @@ fn assert_rejected_with_message(bytes: &[u8], durable: &CorePatch<Reversible>, e
     let before = members(&save(&mut package));
     let error = package
         .apply_durable_ink(durable)
-        .err()
-        .expect("tampered durable patch should be rejected");
+        .expect_err("tampered durable patch should be rejected");
     assert!(
         error.to_string().contains(expected),
         "expected {expected:?} in {error}"

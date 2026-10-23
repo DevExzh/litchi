@@ -45,3 +45,16 @@ for migration into an Edit staging verb (0362ut); that independent correction,
 all 68 final inventory captures/dispositions, the complete gate, corpus and
 native qualification remain required. This record does not claim final
 workspace acceptance.
+
+## Composed consumer verification
+
+The six core edit tests pass on `5dae0abf78`, including the non-formatting
+payload regression. The complete workspace Clippy run then finds three ODF
+benchmark result-discard sites and three DOCX error-expectation assertions.
+Commit-only benchmark measurements now explicitly discard their black-boxed
+results at the same statement boundary. The DOCX assertions use `expect_err`
+now that their successful Commit payload has content-free Debug. Assertion
+messages and failure conditions are unchanged.
+[The v24 receipt](results/0362up/core-clippy-shared-v24.json) retains both full
+commands, tested source and external log hashes. Final combined verification
+and native qualification remain required.

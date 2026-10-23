@@ -1852,8 +1852,7 @@ fn assert_replacement_honors_total_part_bytes_cap(
     limited_edit.replace_resource(Some(replacement));
     let commit_error = limited_edit
         .commit()
-        .err()
-        .expect("one-under replacement must fail at transaction commit");
+        .expect_err("one-under replacement must fail at transaction commit");
     assert!(
         matches!(
             commit_error,
