@@ -61,3 +61,18 @@ preflight and 20-billion-byte hard ceiling. Isolated documentation steps
 must start without unrelated builders; passing them is not a quiet-host
 native timing claim. After an interrupted gate, verify its children have
 exited before resuming or reusing the target.
+
+The separate tooling commands passed 63 native-harness tests and 20 iWork
+qualification tests. `results/0362uv/tooling-checks.json` records exact
+commands and external log identities. The six-suite run straddled the
+documentation-only `947b98f94f` commit; all tested tool sources are unchanged
+from `a2f0984719`. The iWork suite ran on the clean successor. Independent
+review confirms the runner patch and its regression proof.
+
+The coordinator must additionally verify that no gate-owned build children
+remain and remeasure target size after the gate exits, before accepting the
+final receipt or starting a measurement. The runner's per-step size sample
+alone does not prove that a detached child has exited. A blocked retry may
+retain prior child output beside its new failure log; that row is not a new
+command pass. Use a fresh state directory when a distinct attempt receipt is
+needed rather than attributing previous output to a new execution.
