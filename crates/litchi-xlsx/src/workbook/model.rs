@@ -1,7 +1,7 @@
 //! Semantic workbook snapshot and worksheet models.
 
-use std::collections::HashMap;
 use std::collections::VecDeque;
+use std::collections::{HashMap, HashSet};
 use std::convert::Infallible;
 use std::mem::size_of;
 use std::sync::{Arc, Mutex, OnceLock};
@@ -10,7 +10,7 @@ use super::worksheet;
 use super::{codec, package};
 use litchi_core::Selector as CoreSelector;
 use litchi_opc::{OpcPackage, PackURI, Relationships};
-use litchi_sheet::{Area, At, ColumnAt, Rect, RowAt};
+use litchi_sheet::{Area, At, Cell as Address, ColumnAt, Rect, RowAt};
 use once_cell::sync::OnceCell;
 
 use crate::cell::{Extents, SharedStringLineage, Store, Text};
@@ -1648,6 +1648,77 @@ impl Worksheet {
         rich_item(self.owner.package.get_part(uri)?.blob(), index)
     }
 
+    /// Read rich text for a bounded set of cells in one pass per source part.
+    ///
+    /// The scalar [`Self::rich_text`] accessor is intentionally exact for one
+    /// address, but its inline and shared-string readers both start at the
+    /// beginning of their XML member. Transfers ask for a range of cells, so
+    /// restarting that scan for every address turns a rich range into a
+    /// quadratic walk. This helper retains only requested run values: cells
+    /// outside `addresses` are traversed by the XML reader but never parsed
+    /// into a `RichText` value.
+    pub(crate) fn rich_text_many(
+        &self,
+        addresses: &[Address],
+    ) -> Result<HashMap<Address, Option<crate::RichText>>> {
+        let mut values = HashMap::with_capacity(addresses.len());
+        if addresses.is_empty() {
+            return Ok(values);
+        }
+
+        let store = self.store()?;
+        let mut inline = HashSet::new();
+        let mut shared = HashSet::new();
+        let mut shared_addresses = Vec::new();
+        shared_addresses
+            .try_reserve(addresses.len())
+            .map_err(|source| Error::Allocation {
+                resource: "rich shared-string addresses",
+                source,
+            })?;
+        for &address in addresses {
+            values.entry(address).or_insert(None);
+            let Some(entry) = store.entry(address) else {
+                continue;
+            };
+            if entry.inline_rich {
+                inline.insert(address);
+            } else if let Some(index) = entry.shared_string {
+                shared.insert(index);
+                shared_addresses.push((address, index));
+            }
+        }
+
+        if !inline.is_empty() {
+            let part = self.owner.package.get_part(&self.data.part_uri)?;
+            values.extend(inline_rich_many(part.blob(), &inline)?);
+        }
+
+        if !shared.is_empty() {
+            // The cached rich-index census keeps ordinary shared-string
+            // transfers on the existing no-part-read path. Only when a
+            // requested index is actually rich do we make the one payload
+            // pass that projects its runs.
+            let rich_indexes = self.owner.rich_shared_strings()?;
+            shared.retain(|index| rich_indexes.binary_search(index).is_ok());
+            if shared.is_empty() {
+                return Ok(values);
+            }
+            let Some(uri) = self.owner.shared_strings_uri.as_ref() else {
+                return Ok(values);
+            };
+            let part = self.owner.package.get_part(uri)?;
+            let items = rich_items_many(part.blob(), &shared)?;
+            for (address, index) in shared_addresses {
+                if let Some(value) = items.get(&index) {
+                    values.insert(address, value.clone());
+                }
+            }
+        }
+
+        Ok(values)
+    }
+
     /// Lazily traverse stored cells selected by A1 range, raw zero-based
     /// half-open bounds, or a reusable checked rectangle.
     pub fn cells<'a>(&self, area: impl Into<Area<'a>>) -> Result<Cells<'_>> {
@@ -2038,7 +2109,7 @@ pub(crate) fn rich_item(xml: &[u8], wanted: usize) -> Result<Option<crate::RichT
                 depth += 1;
                 if depth == 2 && element.local_name().as_ref() == b"si" {
                     if count == wanted {
-                        return read_runs(&mut reader);
+                        return read_runs(&mut reader, false);
                     }
                     count += 1;
                 }
@@ -2053,6 +2124,60 @@ pub(crate) fn rich_item(xml: &[u8], wanted: usize) -> Result<Option<crate::RichT
             },
             Event::End(_) => depth = depth.saturating_sub(1),
             Event::Eof => return Ok(None),
+            _ => {},
+        }
+    }
+}
+
+/// Read the requested shared-string items in one XML pass. The item indexes
+/// are the workbook's stable shared-string identities; unrelated items are
+/// skipped without constructing run values.
+pub(crate) fn rich_items_many(
+    xml: &[u8],
+    wanted: &HashSet<usize>,
+) -> Result<HashMap<usize, Option<crate::RichText>>> {
+    let mut values = wanted
+        .iter()
+        .copied()
+        .map(|index| (index, None))
+        .collect::<HashMap<_, _>>();
+    if wanted.is_empty() {
+        return Ok(values);
+    }
+
+    use quick_xml::events::Event;
+    let mut reader = quick_xml::Reader::from_reader(xml);
+    let mut depth = 0usize;
+    let mut count = 0usize;
+    loop {
+        match reader
+            .read_event()
+            .map_err(|error| invalid(format!("malformed shared-string part: {error}")))?
+        {
+            Event::Start(element) => {
+                depth += 1;
+                if depth == 2 && element.local_name().as_ref() == b"si" {
+                    let index = count;
+                    count += 1;
+                    if wanted.contains(&index) {
+                        let value = read_runs(&mut reader, true)?;
+                        values.insert(index, value);
+                        // `read_runs` consumes the closing `</si>`.
+                        depth = 1;
+                    }
+                }
+            },
+            Event::Empty(element) => {
+                if depth == 1 && element.local_name().as_ref() == b"si" {
+                    let index = count;
+                    count += 1;
+                    if wanted.contains(&index) {
+                        values.insert(index, None);
+                    }
+                }
+            },
+            Event::End(_) => depth = depth.saturating_sub(1),
+            Event::Eof => return Ok(values),
             _ => {},
         }
     }
@@ -2082,7 +2207,7 @@ pub(crate) fn inline_rich(xml: &[u8], a1: &str) -> Result<Option<crate::RichText
                         .is_some_and(|attribute| attribute.value.as_ref() == a1.as_bytes());
                     cell_depth = depth;
                 } else if in_cell && depth == cell_depth + 1 && local.as_ref() == b"is" {
-                    return read_runs(&mut reader);
+                    return read_runs(&mut reader, false);
                 }
             },
             Event::End(_) => {
@@ -2097,9 +2222,73 @@ pub(crate) fn inline_rich(xml: &[u8], a1: &str) -> Result<Option<crate::RichText
     }
 }
 
+/// Read requested inline rich cells in one worksheet XML pass. The parser
+/// keeps only the requested addresses and leaves unrelated inline strings as
+/// raw events, preserving the scalar reader's exact run/failure behavior.
+pub(crate) fn inline_rich_many(
+    xml: &[u8],
+    wanted: &HashSet<Address>,
+) -> Result<HashMap<Address, Option<crate::RichText>>> {
+    let mut values = wanted
+        .iter()
+        .copied()
+        .map(|address| (address, None))
+        .collect::<HashMap<_, _>>();
+    if wanted.is_empty() {
+        return Ok(values);
+    }
+
+    use quick_xml::events::Event;
+    let mut reader = quick_xml::Reader::from_reader(xml);
+    let mut in_cell = None;
+    let mut depth = 0usize;
+    let mut cell_depth = 0usize;
+    loop {
+        match reader
+            .read_event()
+            .map_err(|error| invalid(format!("malformed worksheet part: {error}")))?
+        {
+            Event::Start(element) => {
+                depth += 1;
+                let local = element.local_name();
+                if local.as_ref() == b"c" {
+                    in_cell = element
+                        .try_get_attribute("r")
+                        .ok()
+                        .flatten()
+                        .and_then(|attribute| {
+                            std::str::from_utf8(attribute.value.as_ref())
+                                .ok()
+                                .and_then(|value| Address::from_a1(value).ok())
+                        })
+                        .filter(|address| wanted.contains(address));
+                    cell_depth = depth;
+                } else if in_cell.is_some() && depth == cell_depth + 1 && local.as_ref() == b"is" {
+                    let address = in_cell.expect("inline rich cell is present");
+                    let value = read_runs(&mut reader, true)?;
+                    values.insert(address, value);
+                    // `read_runs` consumes the closing `</is>`.
+                    depth = cell_depth;
+                }
+            },
+            Event::End(_) => {
+                if in_cell.is_some() && depth == cell_depth {
+                    in_cell = None;
+                }
+                depth = depth.saturating_sub(1);
+            },
+            Event::Eof => return Ok(values),
+            _ => {},
+        }
+    }
+}
+
 /// Read the runs of the string item whose start tag `reader` just read, up
 /// to its end tag.
-fn read_runs(reader: &mut quick_xml::Reader<&[u8]>) -> Result<Option<crate::RichText>> {
+fn read_runs(
+    reader: &mut quick_xml::Reader<&[u8]>,
+    consume_invalid: bool,
+) -> Result<Option<crate::RichText>> {
     use quick_xml::events::Event;
     let attributes = |element: &quick_xml::events::BytesStart<'_>| -> Result<Box<str>> {
         let raw = std::str::from_utf8(element.attributes_raw())
@@ -2118,6 +2307,7 @@ fn read_runs(reader: &mut quick_xml::Reader<&[u8]>) -> Result<Option<crate::Rich
     // 2 its `rPr`, 3 its `t`.
     let mut depth = 0usize;
     let mut place = 0u8;
+    let mut valid = true;
     loop {
         match reader
             .read_event()
@@ -2125,6 +2315,12 @@ fn read_runs(reader: &mut quick_xml::Reader<&[u8]>) -> Result<Option<crate::Rich
         {
             Event::Start(element) => {
                 depth += 1;
+                if !valid {
+                    if !consume_invalid {
+                        return Ok(None);
+                    }
+                    continue;
+                }
                 match (depth, element.local_name().as_ref(), place) {
                     (1, b"r", 0) => {
                         place = 1;
@@ -2138,39 +2334,58 @@ fn read_runs(reader: &mut quick_xml::Reader<&[u8]>) -> Result<Option<crate::Rich
                     (2, b"t", 1) => place = 3,
                     // A plain `t` beside runs, `rPh`, `phoneticPr` or
                     // children with content are not kept by a run rewrite.
+                    _ if consume_invalid => valid = false,
                     _ => return Ok(None),
                 }
             },
-            Event::Empty(element) => match (depth, place) {
-                (2, 2) => {
-                    if let Some(properties) = properties.as_mut() {
-                        properties.push((local(&element)?, attributes(&element)?));
+            Event::Empty(element) => {
+                if !valid {
+                    if !consume_invalid {
+                        return Ok(None);
                     }
-                },
-                (1, 1) if element.local_name().as_ref() == b"rPr" => {
-                    properties = Some(Vec::new());
-                },
-                (1, 1) if element.local_name().as_ref() == b"t" => {},
-                _ => return Ok(None),
+                    continue;
+                }
+                match (depth, place) {
+                    (2, 2) => {
+                        if let Some(properties) = properties.as_mut() {
+                            properties.push((local(&element)?, attributes(&element)?));
+                        }
+                    },
+                    (1, 1) if element.local_name().as_ref() == b"rPr" => {
+                        properties = Some(Vec::new());
+                    },
+                    (1, 1) if element.local_name().as_ref() == b"t" => {},
+                    _ if consume_invalid => valid = false,
+                    _ => return Ok(None),
+                }
             },
-            Event::Text(value) if place == 3 => text.push_str(
+            Event::Text(value) if valid && place == 3 => text.push_str(
                 &value
                     .decode()
                     .map_err(|error| invalid(format!("string text: {error}")))?,
             ),
-            Event::CData(value) if place == 3 => text.push_str(
+            Event::CData(value) if valid && place == 3 => text.push_str(
                 &value
                     .decode()
                     .map_err(|error| invalid(format!("string text: {error}")))?,
             ),
-            Event::GeneralRef(reference) if place == 3 => {
+            Event::GeneralRef(reference) if valid && place == 3 => {
                 text.push_str(&litchi_ooxml_common::xml::decode_xml_reference(&reference)?);
             },
             Event::End(_) => {
+                if depth == 0 {
+                    return Ok(
+                        (valid && !runs.is_empty()).then(|| crate::RichText::from_runs(runs))
+                    );
+                }
+                if !valid {
+                    if !consume_invalid {
+                        return Ok(None);
+                    }
+                    depth = depth.saturating_sub(1);
+                    continue;
+                }
                 match (depth, place) {
-                    (0, _) => {
-                        return Ok((!runs.is_empty()).then(|| crate::RichText::from_runs(runs)));
-                    },
                     (2, 2 | 3) => place = 1,
                     (1, 1) => {
                         let decoded = raw::strings::decode_spreadsheet_text(&text)?;
@@ -2192,6 +2407,38 @@ fn read_runs(reader: &mut quick_xml::Reader<&[u8]>) -> Result<Option<crate::Rich
 
 #[cfg(test)]
 mod rich_item_tests {
+    use std::collections::HashSet;
+
+    use litchi_sheet::Cell as Address;
+
+    #[test]
+    fn bulk_rich_readers_keep_requested_runs_only() {
+        let inline = br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="inlineStr"><is><r><rPr><b/></rPr><t>outside</t></r></is></c><c r="B1" t="inlineStr"><is><r><rPr><i/></rPr><t>inside</t></r></is></c><c r="C1"><v>3</v></c></row></sheetData></worksheet>"#;
+        let requested = HashSet::from([
+            Address::from_a1("B1").expect("B1"),
+            Address::from_a1("C1").expect("C1"),
+        ]);
+        let values = super::inline_rich_many(inline, &requested).expect("inline values");
+        assert_eq!(
+            values[&Address::from_a1("B1").expect("B1")]
+                .as_ref()
+                .expect("requested runs")
+                .text(),
+            "inside"
+        );
+        assert!(values[&Address::from_a1("C1").expect("C1")].is_none());
+        assert!(!values.contains_key(&Address::from_a1("A1").expect("A1")));
+
+        let shared = br#"<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><si><t>outside</t></si><si><r><rPr><b/></rPr><t>inside</t></r></si><si><r><rPr><i/></rPr><t>also outside</t></r></si></sst>"#;
+        let requested = HashSet::from([1usize]);
+        let values = super::rich_items_many(shared, &requested).expect("shared values");
+        assert_eq!(
+            values[&1].as_ref().expect("requested runs").text(),
+            "inside"
+        );
+        assert!(!values.contains_key(&2));
+    }
+
     #[test]
     fn rich_items_lists_the_items_with_runs() {
         let xml = br#"<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="4" uniqueCount="4"><si><t>plain</t></si><si><r><rPr><b/></rPr><t>rich</t></r><r><t> text</t></r></si><si/><si><t>x</t><rPh sb="0" eb="1"><t>y</t></rPh></si><si><r><t>z</t></r></si></sst>"#;

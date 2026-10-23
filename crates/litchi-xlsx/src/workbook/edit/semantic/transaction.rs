@@ -2563,17 +2563,11 @@ impl Edit {
         if let Some(value) = cache.get(&key) {
             return Ok(value.clone());
         }
-        let has_rich = sheet
-            .store()?
-            .entry(address)
-            .is_some_and(|stored| stored.inline_rich || stored.shared_string.is_some());
-        let value = if has_rich {
-            sheet.rich_text(address)?
-        } else {
-            None
-        };
-        cache.insert(key, value.clone());
-        Ok(value)
+        // The transfer planner seeds every requested source and destination
+        // address through `Worksheet::rich_text_many` before this lookup.
+        // Missing cache entries therefore mean a non-rich cell, not a reason
+        // to restart an XML scan for one address.
+        Ok(None)
     }
 
     fn transfer_cells<'source, 'range, 'target, 'anchor>(
@@ -2646,72 +2640,106 @@ impl Edit {
         staged
             .try_reserve_exact(capacity)
             .map_err(|source| allocation("cell-transfer plan", source))?;
-        let mut rich_cache = BTreeMap::new();
+
+        // Prime the rich-text cache from one source-part pass per worksheet.
+        // `Worksheet::rich_text` is deliberately exact for a single lookup,
+        // but restarting its XML reader for every transfer address makes a
+        // rich range quadratic. The bulk projection retains only requested
+        // run values; ordinary scalar transfers still avoid part reads.
+        let mut source_addresses = Vec::new();
+        source_addresses
+            .try_reserve_exact(capacity)
+            .map_err(|source| allocation("cell-transfer source addresses", source))?;
+        let mut target_addresses = Vec::new();
+        target_addresses
+            .try_reserve_exact(capacity)
+            .map_err(|source| allocation("cell-transfer target addresses", source))?;
         for row_offset in 0..source_range.rows() {
             for column_offset in 0..source_range.columns() {
-                let source_address = Address::at(
+                source_addresses.push(Address::at(
                     source_range.start().row().get() + row_offset,
                     source_range.start().column().get() + column_offset,
-                )?;
-                let target_address = Address::at(
+                )?);
+                target_addresses.push(Address::at(
                     target_start.row().get() + row_offset,
                     target_start.column().get() + column_offset,
-                )?;
-                if matches!(
-                    self.pending_cell_state(&target_sheet, target_address)?,
-                    State::Cell {
-                        content: Cell::Unknown(_),
-                        ..
-                    }
-                ) {
-                    return Err(Error::Unsupported {
-                        feature: "overwriting unmodeled cell encodings",
-                    });
-                }
-                let source_state = self.pending_cell_state(&source_sheet, source_address)?;
-                let source_styles =
-                    self.pending_transfer_styles(source_sheet.position(), source_address);
-                let target_state = self.pending_cell_state(&target_sheet, target_address)?;
-                let target_styles =
-                    self.pending_transfer_styles(target_sheet.position(), target_address);
-                let source_rich = self.pending_transfer_rich_text(
-                    &source_sheet,
-                    source_address,
-                    &mut rich_cache,
-                )?;
-                let target_rich = self.pending_transfer_rich_text(
-                    &target_sheet,
-                    target_address,
-                    &mut rich_cache,
-                )?;
-                let action = if let Some(rich) = source_rich.clone() {
-                    transfer_rich_action(rich, &source_state)
-                } else {
-                    transfer_action(source_state.clone(), source_address, target_address)?
-                };
-                let source_noop = matches!(&source_state, State::Missing)
-                    && self
-                        .sheets
-                        .get(&source_sheet.position())
-                        .and_then(|actions| actions.cells.get(&source_address))
-                        .is_none()
-                    && source_styles.is_empty();
-                let rich_noop = match (&source_rich, &target_rich) {
-                    (Some(source), Some(target)) => source == target,
-                    (None, None) => true,
-                    _ => false,
-                };
-                let target_noop =
-                    source_state == target_state && source_styles == target_styles && rich_noop;
-                staged.push((
-                    source_address,
-                    target_address,
-                    action,
-                    source_styles,
-                    source_noop,
-                    target_noop,
-                ));
+                )?);
             }
+        }
+        let mut rich_cache = BTreeMap::new();
+        if source_sheet.position() == target_sheet.position() {
+            let combined = source_addresses
+                .len()
+                .checked_add(target_addresses.len())
+                .ok_or_else(|| invalid("cell-transfer address count overflow"))?;
+            let mut addresses = Vec::new();
+            addresses
+                .try_reserve_exact(combined)
+                .map_err(|source| allocation("cell-transfer rich addresses", source))?;
+            addresses.extend(source_addresses.iter().copied());
+            addresses.extend(target_addresses.iter().copied());
+            for (address, value) in source_sheet.rich_text_many(&addresses)? {
+                rich_cache.insert((source_sheet.position(), address), value);
+            }
+        } else {
+            for (address, value) in source_sheet.rich_text_many(&source_addresses)? {
+                rich_cache.insert((source_sheet.position(), address), value);
+            }
+            for (address, value) in target_sheet.rich_text_many(&target_addresses)? {
+                rich_cache.insert((target_sheet.position(), address), value);
+            }
+        }
+        for (&source_address, &target_address) in
+            source_addresses.iter().zip(target_addresses.iter())
+        {
+            if matches!(
+                self.pending_cell_state(&target_sheet, target_address)?,
+                State::Cell {
+                    content: Cell::Unknown(_),
+                    ..
+                }
+            ) {
+                return Err(Error::Unsupported {
+                    feature: "overwriting unmodeled cell encodings",
+                });
+            }
+            let source_state = self.pending_cell_state(&source_sheet, source_address)?;
+            let source_styles =
+                self.pending_transfer_styles(source_sheet.position(), source_address);
+            let target_state = self.pending_cell_state(&target_sheet, target_address)?;
+            let target_styles =
+                self.pending_transfer_styles(target_sheet.position(), target_address);
+            let source_rich =
+                self.pending_transfer_rich_text(&source_sheet, source_address, &mut rich_cache)?;
+            let target_rich =
+                self.pending_transfer_rich_text(&target_sheet, target_address, &mut rich_cache)?;
+            let action = if let Some(rich) = source_rich.clone() {
+                transfer_rich_action(rich, &source_state)
+            } else {
+                transfer_action(source_state.clone(), source_address, target_address)?
+            };
+            let source_noop = matches!(&source_state, State::Missing)
+                && self
+                    .sheets
+                    .get(&source_sheet.position())
+                    .and_then(|actions| actions.cells.get(&source_address))
+                    .is_none()
+                && source_styles.is_empty();
+            let rich_noop = match (&source_rich, &target_rich) {
+                (Some(source), Some(target)) => source == target,
+                (None, None) => true,
+                _ => false,
+            };
+            let target_noop =
+                source_state == target_state && source_styles == target_styles && rich_noop;
+            staged.push((
+                source_address,
+                target_address,
+                action,
+                source_styles,
+                source_noop,
+                target_noop,
+            ));
         }
 
         // A transfer replaces the destination cell's prior payload and all

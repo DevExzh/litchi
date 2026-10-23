@@ -1434,6 +1434,54 @@ fn rich_transfer_keeps_the_source_shared_style() {
 }
 
 #[test]
+fn inline_rich_range_transfer_preserves_runs_and_noop_identity() {
+    let baseline = two_sheet_workbook(WorksheetKind::Worksheet);
+    let mut package = baseline.inner.package.clone();
+    package
+        .get_part_mut(&baseline.inner.sheets[0].part_uri)
+        .expect("source worksheet")
+        .set_blob(
+            br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="inlineStr"><is><r><rPr><b/></rPr><t>one</t></r></is></c><c r="B1"><v>1</v></c></row><row r="2"><c r="A2" t="inlineStr"><is><r><rPr><i/></rPr><t>two</t></r></is></c><c r="B2"><v>2</v></c></row><row r="3"><c r="A3" t="inlineStr"><is><r><rPr><u val="single"/></rPr><t>three</t></r></is></c><c r="B3"><v>3</v></c></row><row r="4"><c r="A4" t="inlineStr"><is><r><rPr><color rgb="FFFF0000"/></rPr><t>four</t></r></is></c><c r="B4"><v>4</v></c></row></sheetData></worksheet>"#.to_vec(),
+        );
+    let source = crate::Package::from_opc(package).expect("rich range workbook");
+    let expected = ["A1", "A2", "A3", "A4"].map(|address| {
+        source
+            .workbook()
+            .sheet("Sheet1")
+            .expect("sheet lookup")
+            .expect("worksheet")
+            .rich_text(address)
+            .expect("source rich text")
+            .expect("source runs")
+    });
+
+    let mut edit = source.edit().expect("edit");
+    edit.copy_cells("Sheet1", "A1:A4", "Sheet1", "B1")
+        .expect("bulk rich transfer")
+        .expect("selectors");
+    let committed = edit.commit().expect("commit bulk rich transfer");
+    let target = committed
+        .package()
+        .workbook()
+        .sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("worksheet");
+    for (index, address) in ["B1", "B2", "B3", "B4"].into_iter().enumerate() {
+        assert_eq!(
+            target.rich_text(address).expect("target rich text"),
+            Some(expected[index].clone())
+        );
+    }
+
+    let mut noop = committed.package().edit().expect("noop edit");
+    noop.copy_cells("Sheet1", "A1:A4", "Sheet1", "B1")
+        .expect("repeat bulk rich transfer")
+        .expect("selectors");
+    let noop = noop.commit().expect("noop commit");
+    assert!(noop.patch().is_noop());
+}
+
+#[test]
 fn hyperlink_ranges_with_one_start_keep_independent_captures() {
     let source = crate::Package::new().expect("source workbook");
     let mut edit = source
