@@ -38,6 +38,7 @@ import signal
 import subprocess
 import sys
 import tarfile
+import tempfile
 import time
 from typing import Any, Iterable, Mapping
 
@@ -86,6 +87,8 @@ FIXED_BLOCKS = 5
 FIXED_WARMUPS = 2
 FIXED_GROWTH = 1.2
 FIXED_TIMEOUT_S = 120.0
+COMMAND_TIMEOUT_S = 900.0
+FIXTURE_GENERATOR_TIMEOUT_S = 1_200.0
 SCHEMA = "litchi.iwa.native-qualification.v1"
 OWNER_FIXTURES = (
     "basic.numbers",
@@ -205,9 +208,9 @@ def _fixture_provenance() -> dict[str, Any]:
             raise QualificationError(f"tracked owner fixture provenance is malformed: {name}")
         if name == "footnote-fixture.pages":
             generator = spec.get("generator")
-            source = spec.get("source")
-            if not isinstance(generator, Mapping) or not isinstance(source, Mapping):
-                raise QualificationError("footnote fixture provenance lacks generator and source")
+            sources = spec.get("sources")
+            if not isinstance(generator, Mapping) or not isinstance(sources, list) or not sources:
+                raise QualificationError("footnote fixture provenance lacks generator sources")
             generator_path = (ROOT / str(generator.get("path", ""))).resolve()
             if generator_path != FIXTURE_GENERATOR.resolve():
                 raise QualificationError("footnote fixture uses an unapproved generator")
@@ -219,13 +222,16 @@ def _fixture_provenance() -> dict[str, Any]:
             }
             if generator_identity != expected_generator:
                 raise QualificationError("footnote fixture generator changed")
-            _tracked_identity(source, name)
+            for source in sources:
+                if not isinstance(source, Mapping):
+                    raise QualificationError("footnote fixture generator source is malformed")
+                _tracked_identity(source, name)
         else:
             _tracked_identity(spec, name)
     return provenance
 
 
-def fixture_identity(path: Path) -> dict[str, Any]:
+def fixture_identity(path: Path, *, regenerate: bool = False) -> dict[str, Any]:
     """Verify an external owner fixture set and its immutable manifest."""
 
     directory = outside_checkout(path)
@@ -254,16 +260,37 @@ def fixture_identity(path: Path) -> dict[str, Any]:
         spec = provenance["files"][name]
         if name == "footnote-fixture.pages":
             generator = spec["generator"]
-            source = spec["source"]
+            sources = spec["sources"]
             expected_generated = {
                 "generator": artifact(FIXTURE_GENERATOR),
-                "source": _tracked_identity(source, name),
+                "sources": [
+                    _tracked_identity(source, name)
+                    for source in sources
+                ],
+                "command": spec.get("command"),
                 "method": spec.get("method"),
             }
             if row.get("generated") != expected_generated:
                 raise QualificationError("footnote fixture output is not tied to its generator")
             if generator.get("path") != str(FIXTURE_GENERATOR.relative_to(ROOT)):
                 raise QualificationError("footnote fixture generator provenance is malformed")
+            if regenerate:
+                with tempfile.TemporaryDirectory(prefix="litchi-iwa-footnote-") as temporary:
+                    generated = Path(temporary) / name
+                    try:
+                        subprocess.run(
+                            [sys.executable, str(FIXTURE_GENERATOR), "--output", str(generated)],
+                            cwd=ROOT,
+                            check=True,
+                            timeout=FIXTURE_GENERATOR_TIMEOUT_S,
+                        )
+                    except (OSError, subprocess.SubprocessError) as error:
+                        raise QualificationError("footnote fixture generator replay failed") from error
+                    generated_identity = artifact(generated)
+                    if generated_identity != {
+                        key: row.get(key) for key in ("path", "bytes", "sha256")
+                    }:
+                        raise QualificationError("generated footnote fixture bytes changed")
         else:
             expected_source = _tracked_identity(spec, name)
             if row.get("source") != expected_source:
@@ -290,17 +317,26 @@ def prepare_fixtures(path: Path) -> None:
     }
     for name, source in sources.items():
         shutil.copyfile(source, directory / name)
-    subprocess.run(
-        [sys.executable, str(FIXTURE_GENERATOR), "--output", str(directory / "footnote-fixture.pages")],
-        check=True,
-    )
+    try:
+        subprocess.run(
+            [sys.executable, str(FIXTURE_GENERATOR), "--output", str(directory / "footnote-fixture.pages")],
+            cwd=ROOT,
+            check=True,
+            timeout=FIXTURE_GENERATOR_TIMEOUT_S,
+        )
+    except (OSError, subprocess.SubprocessError) as error:
+        raise QualificationError("footnote fixture generator failed") from error
     files: dict[str, Any] = {}
     for name in OWNER_FIXTURES:
         row: dict[str, Any] = artifact(directory / name)
         if name == "footnote-fixture.pages":
             row["generated"] = {
                 "generator": artifact(FIXTURE_GENERATOR),
-                "source": artifact(sources["basic.pages"]),
+                "sources": [
+                    _tracked_identity(source, name)
+                    for source in tracked[name]["sources"]
+                ],
+                "command": tracked[name]["command"],
                 "method": tracked[name]["method"],
             }
         else:
@@ -332,27 +368,46 @@ def run_command(
     argv: list[str],
     cwd: Path,
     env: Mapping[str, str] | None = None,
+    timeout_s: float = COMMAND_TIMEOUT_S,
 ) -> dict[str, Any]:
     """Run one non-shell command and retain a receipt before checking status."""
 
+    if not math.isfinite(timeout_s) or timeout_s <= 0:
+        raise QualificationError("command timeout must be finite and positive")
     stdout = directory / f"{label}.stdout"
     stderr = directory / f"{label}.stderr"
     started = time.time_ns()
     with stdout.open("wb") as out, stderr.open("wb") as err:
-        completed = subprocess.run(argv, cwd=cwd, env=env, stdout=out, stderr=err, check=False)
+        child = subprocess.Popen(
+            argv,
+            cwd=cwd,
+            env=env,
+            stdout=out,
+            stderr=err,
+            start_new_session=True,
+            preexec_fn=_child_limits(timeout_s, file_bytes=None),
+        )
+        timed_out = False
+        try:
+            status = child.wait(timeout=timeout_s)
+        except subprocess.TimeoutExpired:
+            timed_out = True
+            status = _terminate_child(child)
     receipt = {
         "command": argv,
         "cwd": str(cwd.resolve()),
         "started_ns": started,
         "finished_ns": time.time_ns(),
-        "exit_code": completed.returncode,
+        "exit_code": status,
+        "timed_out": timed_out,
+        "timeout_s": timeout_s,
         "stdout": artifact(stdout),
         "stderr": artifact(stderr),
     }
     receipt_path = directory / f"{label}.receipt.json"
     save_json(receipt_path, receipt)
     receipt["receipt"] = artifact(receipt_path)
-    if completed.returncode:
+    if status:
         raise QualificationError(f"{label} failed; see {stderr}")
     return receipt
 
@@ -367,7 +422,16 @@ def verify_command_receipt(row: Mapping[str, Any]) -> None:
     saved = load_json(Path(row["receipt"]["path"]))
     if saved.get("exit_code") != row["exit_code"]:
         raise QualificationError("retained command receipt status changed")
-    for key in ("command", "cwd", "started_ns", "finished_ns", "stdout", "stderr"):
+    for key in (
+        "command",
+        "cwd",
+        "started_ns",
+        "finished_ns",
+        "stdout",
+        "stderr",
+        "timed_out",
+        "timeout_s",
+    ):
         if saved.get(key) != row.get(key):
             raise QualificationError(f"retained command receipt field changed: {key}")
 
@@ -379,8 +443,9 @@ def git_revision(ref: str) -> str:
             cwd=ROOT,
             text=True,
             stderr=subprocess.STDOUT,
+            timeout=COMMAND_TIMEOUT_S,
         ).strip()
-    except subprocess.CalledProcessError as error:
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
         raise QualificationError(f"cannot resolve source revision {ref!r}: {error.output}") from error
     if not re.fullmatch(r"[0-9a-f]{40}", value):
         raise QualificationError(f"git returned a non-commit revision for {ref!r}")
@@ -402,13 +467,17 @@ def snapshot_source(output: Path, label: str, revision: str, lock: Path) -> tupl
     archive = output / f"source-{label}.tar"
     source.mkdir()
     with archive.open("wb") as stream:
-        subprocess.run(
-            ["git", "archive", "--format=tar", commit, "Cargo.toml", "rust-toolchain.toml", "crates"],
-            cwd=ROOT,
-            stdout=stream,
-            stderr=subprocess.PIPE,
-            check=True,
-        )
+        try:
+            subprocess.run(
+                ["git", "archive", "--format=tar", commit, "Cargo.toml", "rust-toolchain.toml", "crates"],
+                cwd=ROOT,
+                stdout=stream,
+                stderr=subprocess.PIPE,
+                check=True,
+                timeout=COMMAND_TIMEOUT_S,
+            )
+        except (OSError, subprocess.SubprocessError) as error:
+            raise QualificationError(f"cannot snapshot {label} source") from error
     with tarfile.open(archive) as stream:
         stream.extractall(source, filter="data")
     shutil.copyfile(lock, source / "Cargo.lock")
@@ -637,6 +706,98 @@ def _validation_command(family: str, binary: Path, fixtures: Path | None, destin
     return [str(binary), "validate_outputs", str(destination)]
 
 
+def _validate_report_value(value: Any, family: str) -> None:
+    expected_schema = f"litchi.iwa.{family}.validation.v1"
+    if not isinstance(value, dict) or value.get("schema") != expected_schema or value.get("status") != "ok":
+        raise QualificationError(f"invalid {family} validation report schema")
+    routes = value.get("routes")
+    if routes != list(ROUTES[family]):
+        raise QualificationError(f"{family} validation report does not cover every route")
+    if family == "constructor":
+        for key in (
+            "source_sha256",
+            "encoded_sha256",
+            "retained_source_sha256",
+            "retained_encoded_sha256",
+        ):
+            if re.fullmatch(r"[0-9a-f]{64}", str(value.get(key))) is None:
+                raise QualificationError(f"constructor validation lacks {key}")
+        for key in ("source_bytes", "encoded_bytes"):
+            if not isinstance(value.get(key), int) or value[key] <= 0:
+                raise QualificationError(f"constructor validation lacks {key}")
+        if value.get("roundtrip_equal") is not True or value.get("retained_roundtrip_equal") is not True:
+            raise QualificationError("constructor validation did not prove round trips")
+        boundary = value.get("header_boundary")
+        below = boundary.get("below") if isinstance(boundary, Mapping) else None
+        if (
+            not isinstance(boundary, Mapping)
+            or boundary.get("kind") != "HeaderBytes"
+            or not isinstance(boundary.get("accepted"), int)
+            or boundary["accepted"] <= 1
+            or not isinstance(below, Mapping)
+            or not isinstance(below.get("observed"), int)
+            or not isinstance(below.get("maximum"), int)
+            or below["observed"] <= below["maximum"]
+            or below["maximum"] != boundary["accepted"] - 1
+        ):
+            raise QualificationError("constructor validation lacks the tight header boundary proof")
+        retained_boundary = value.get("retained_header_boundary")
+        retained_below = (
+            retained_boundary.get("below") if isinstance(retained_boundary, Mapping) else None
+        )
+        if (
+            not isinstance(retained_boundary, Mapping)
+            or retained_boundary.get("kind") != "HeaderFields"
+            or not isinstance(retained_boundary.get("accepted"), int)
+            or retained_boundary["accepted"] <= 1
+            or not isinstance(retained_below, Mapping)
+            or not isinstance(retained_below.get("observed"), int)
+            or not isinstance(retained_below.get("maximum"), int)
+            or retained_below["observed"] <= retained_below["maximum"]
+            or retained_below["maximum"] != retained_boundary["accepted"] - 1
+        ):
+            raise QualificationError("constructor validation lacks the retained header-field boundary proof")
+    checks = value.get("route_checks")
+    if not isinstance(checks, list) or len(checks) != len(ROUTES[family]):
+        raise QualificationError(f"{family} validation report has incomplete route checks")
+    seen: list[str] = []
+    for check in checks:
+        if not isinstance(check, Mapping) or not isinstance(check.get("route"), str):
+            raise QualificationError(f"{family} validation route check is malformed")
+        seen.append(check["route"])
+        if family == "constructor":
+            if check.get("status") != "ok" or not isinstance(check.get("output_bytes"), int) or check["output_bytes"] <= 0:
+                raise QualificationError("constructor validation route fields are incomplete")
+        else:
+            correctness = check.get("correctness")
+            if not isinstance(correctness, Mapping):
+                raise QualificationError("owner validation route lacks correctness fields")
+            for key in (
+                "source_sha256",
+                "changed_sha256",
+                "replay_sha256",
+                "inverse_sha256",
+                "noop_sha256",
+            ):
+                if re.fullmatch(r"[0-9a-f]{64}", str(correctness.get(key))) is None:
+                    raise QualificationError(f"owner validation route lacks {key}")
+            for key in ("source_bytes", "changed_bytes", "noop_bytes"):
+                if not isinstance(correctness.get(key), int) or correctness[key] <= 0:
+                    raise QualificationError(f"owner validation route lacks {key}")
+            for key in (
+                "changed_differs",
+                "replay_matches_changed",
+                "inverse_matches_source",
+                "noop_is_noop",
+                "noop_matches_expected",
+                "semantic_ok",
+            ):
+                if correctness.get(key) is not True:
+                    raise QualificationError(f"owner validation route lacks successful {key}")
+    if seen != list(ROUTES[family]):
+        raise QualificationError(f"{family} validation route checks are duplicated or reordered")
+
+
 def validate(args: argparse.Namespace) -> None:
     family = require_family(args.family)
     output = outside_checkout(args.output)
@@ -646,7 +807,7 @@ def validate(args: argparse.Namespace) -> None:
     if family == "owner" and fixtures is None:
         raise QualificationError("owner validation requires --fixtures")
     if fixtures is not None:
-        fixture_manifest = fixture_identity(fixtures)
+        fixture_manifest = fixture_identity(fixtures, regenerate=True)
     rows: dict[str, Any] = {}
     validation_root = output / "validation"
     validation_root.mkdir(exist_ok=False)
@@ -664,9 +825,7 @@ def validate(args: argparse.Namespace) -> None:
             )
             report = destination / "validation.json"
             value = load_json(report)
-            expected_schema = f"litchi.iwa.{family}.validation.v1"
-            if value.get("schema") != expected_schema or value.get("status") != "ok":
-                raise QualificationError(f"invalid {label}/{variant} validation report")
+            _validate_report_value(value, family)
             rows[label][variant] = {
                 "report": artifact(report),
                 "receipt": receipt["receipt"],
@@ -703,9 +862,7 @@ def load_validation(output: Path, family: str, build: Mapping[str, Any]) -> dict
                     "receipt": row["receipt"],
                 }
             )
-            expected = f"litchi.iwa.{family}.validation.v1"
-            if row["value"].get("schema") != expected or row["value"].get("status") != "ok":
-                raise QualificationError("malformed correctness validation value")
+            _validate_report_value(row["value"], family)
     if data["endpoints"]["base"]["native"]["value"] != data["endpoints"]["candidate"]["native"]["value"]:
         raise QualificationError("baseline/candidate native correctness differs")
     if data["endpoints"]["base"]["allocation"]["value"] != data["endpoints"]["candidate"]["allocation"]["value"]:
@@ -793,12 +950,17 @@ def host_snapshot(output: Path, label: str, child: int | None = None) -> None:
 def _strict_probe_value(value: Any, family: str, route: str, count: int) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise QualificationError("probe did not emit one JSON object")
+    expected_schema = f"litchi.iwa.{family}.probe.v2" if family == "owner" else "litchi.iwa.constructor.probe.v3"
+    if value.get("schema") != expected_schema:
+        raise QualificationError("probe schema does not match the selected family")
     if value.get("route") != route or value.get("iterations") != count:
         raise QualificationError(f"probe identity mismatch for {route}/{count}")
     if not isinstance(value.get("ns"), int) or value["ns"] <= 0:
         raise QualificationError("probe did not report a positive integer duration")
     if not isinstance(value.get("checksum"), int):
         raise QualificationError("probe did not report a semantic checksum")
+    if not isinstance(value.get("output_bytes"), int) or value["output_bytes"] <= 0:
+        raise QualificationError("probe did not report a positive output byte count")
     for key in ("source_sha256", "output_sha256"):
         if not isinstance(value.get(key), str) or re.fullmatch(r"[0-9a-f]{64}", value[key]) is None:
             raise QualificationError(f"probe has an invalid {key}")
@@ -813,24 +975,35 @@ def _strict_probe_value(value: Any, family: str, route: str, count: int) -> dict
             "inverse_matches_source",
             "noop_is_noop",
             "noop_matches_expected",
+            "semantic_ok",
         ):
             if correctness.get(key) is not True:
                 raise QualificationError(f"owner probe correctness field {key} is false")
+        if correctness.get("changed_sha256") != value["output_sha256"]:
+            raise QualificationError("owner probe output digest disagrees with correctness digest")
+        for key in ("changed_sha256", "replay_sha256", "inverse_sha256", "noop_sha256"):
+            if re.fullmatch(r"[0-9a-f]{64}", str(correctness.get(key))) is None:
+                raise QualificationError(f"owner probe correctness field {key} is not a digest")
+        for key in ("source_bytes", "changed_bytes", "noop_bytes"):
+            if not isinstance(correctness.get(key), int) or correctness[key] <= 0:
+                raise QualificationError(f"owner probe correctness field {key} is not positive")
+        if correctness["changed_bytes"] != value["output_bytes"]:
+            raise QualificationError("owner probe output bytes disagree with correctness bytes")
     else:
         if correctness.get("roundtrip") is not True or value.get("output_matches_source") is not True:
             raise QualificationError("constructor probe did not prove exact roundtrip")
     return value
 
 
-def _child_limits(timeout_s: float):
+def _child_limits(timeout_s: float, *, file_bytes: int | None = 64 * 1024 * 1024):
     if resource is None:
         return None
 
     def configure() -> None:
         cpu_seconds = max(1, math.ceil(timeout_s))
         resource.setrlimit(resource.RLIMIT_CPU, (cpu_seconds, cpu_seconds + 1))
-        file_bytes = 64 * 1024 * 1024
-        resource.setrlimit(resource.RLIMIT_FSIZE, (file_bytes, file_bytes))
+        if file_bytes is not None:
+            resource.setrlimit(resource.RLIMIT_FSIZE, (file_bytes, file_bytes))
 
     return configure
 
@@ -1021,7 +1194,7 @@ def run_native(args: argparse.Namespace) -> None:
     if family == "owner" and fixtures is None:
         raise QualificationError("owner timing requires --fixtures")
     if fixtures is not None:
-        fixture_manifest = fixture_identity(fixtures)
+        fixture_manifest = fixture_identity(fixtures, regenerate=True)
         validation_fixtures = validation.get("fixtures")
         if validation_fixtures != fixture_manifest:
             raise QualificationError("timing fixtures do not match correctness-validation fixtures")
@@ -1193,7 +1366,7 @@ def run_native(args: argparse.Namespace) -> None:
             if final_build["endpoints"][label]["source"] != manifest["sources"][label]:
                 raise QualificationError(f"{label} source identity changed during timing")
         if family == "owner":
-            if fixtures is None or fixture_identity(fixtures) != manifest["fixtures"]:
+            if fixtures is None or fixture_identity(fixtures, regenerate=True) != manifest["fixtures"]:
                 raise QualificationError("owner fixture identity changed during timing")
             if final_validation.get("fixtures") != manifest["fixtures"]:
                 raise QualificationError("validation fixture identity changed during timing")

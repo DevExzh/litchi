@@ -11,6 +11,7 @@ import importlib.util
 import json
 from pathlib import Path
 import stat
+import shutil
 import tempfile
 import unittest
 from unittest import mock
@@ -33,6 +34,14 @@ def _fake_probe(path: Path, *, owner: bool, valid: bool = True) -> None:
             "inverse_matches_source": valid,
             "noop_is_noop": valid,
             "noop_matches_expected": valid,
+            "semantic_ok": valid,
+            "changed_sha256": output,
+            "replay_sha256": output,
+            "inverse_sha256": source,
+            "noop_sha256": source,
+            "source_bytes": 12,
+            "changed_bytes": 12,
+            "noop_bytes": 12,
         }
         body = {
             "schema": "litchi.iwa.owner.probe.v2",
@@ -96,7 +105,37 @@ class NativeQualificationTests(unittest.TestCase):
         with self.assertRaises(RUNNER.QualificationError):
             RUNNER.fixture_identity(self.directory)
         fixture_dir = self.directory / "fixtures"
-        RUNNER.prepare_fixtures(fixture_dir)
+        fixture_dir.mkdir()
+        provenance = RUNNER._fixture_provenance()
+        sources = provenance["files"]
+        for name in ("basic.numbers", "media-replacement-native.key", "tone.wav", "basic.pages"):
+            source = RUNNER.ROOT / sources[name]["path"]
+            shutil.copyfile(source, fixture_dir / name)
+        shutil.copyfile(fixture_dir / "basic.pages", fixture_dir / "footnote-fixture.pages")
+        files = {}
+        for name in RUNNER.OWNER_FIXTURES:
+            row = RUNNER.artifact(fixture_dir / name)
+            if name == "footnote-fixture.pages":
+                row["generated"] = {
+                    "generator": RUNNER.artifact(RUNNER.FIXTURE_GENERATOR),
+                    "sources": [
+                        RUNNER._tracked_identity(source, name)
+                        for source in sources[name]["sources"]
+                    ],
+                    "command": sources[name]["command"],
+                    "method": sources[name]["method"],
+                }
+            else:
+                row["source"] = RUNNER.artifact(RUNNER.ROOT / sources[name]["path"])
+            files[name] = row
+        RUNNER.save_json(
+            fixture_dir / "manifest.json",
+            {
+                "schema": "litchi.iwa.owner-fixtures.v1",
+                "provenance": RUNNER.artifact(RUNNER.FIXTURE_PROVENANCE),
+                "files": files,
+            },
+        )
         identity = RUNNER.fixture_identity(fixture_dir)
         self.assertEqual(set(identity["files"]), set(RUNNER.OWNER_FIXTURES))
         (fixture_dir / "tone.wav").write_bytes(b"changed")
@@ -139,6 +178,39 @@ class NativeQualificationTests(unittest.TestCase):
             "constructor",
         )
 
+    def test_validation_report_requires_all_routes_and_typed_boundaries(self) -> None:
+        value = {
+            "schema": "litchi.iwa.constructor.validation.v1",
+            "status": "ok",
+            "routes": list(RUNNER.ROUTES["constructor"]),
+            "route_checks": [
+                {"route": route, "status": "ok", "output_bytes": 12}
+                for route in RUNNER.ROUTES["constructor"]
+            ],
+            "source_sha256": "a" * 64,
+            "encoded_sha256": "a" * 64,
+            "source_bytes": 12,
+            "encoded_bytes": 12,
+            "roundtrip_equal": True,
+            "retained_source_sha256": "b" * 64,
+            "retained_encoded_sha256": "b" * 64,
+            "retained_roundtrip_equal": True,
+            "header_boundary": {
+                "kind": "HeaderBytes",
+                "accepted": 3,
+                "below": {"observed": 4, "maximum": 2},
+            },
+            "retained_header_boundary": {
+                "kind": "HeaderFields",
+                "accepted": 3,
+                "below": {"observed": 4, "maximum": 2},
+            },
+        }
+        RUNNER._validate_report_value(value, "constructor")
+        value["routes"] = value["routes"][:-1]
+        with self.assertRaises(RUNNER.QualificationError):
+            RUNNER._validate_report_value(value, "constructor")
+
     def test_duplicate_json_keys_are_rejected(self) -> None:
         path = self.directory / "duplicate.json"
         path.write_text('{"a": 1, "a": 2}', encoding="utf-8")
@@ -147,10 +219,12 @@ class NativeQualificationTests(unittest.TestCase):
 
     def test_constructor_probe_requires_exact_roundtrip(self) -> None:
         value = {
+            "schema": "litchi.iwa.constructor.probe.v3",
             "route": "field_path",
             "iterations": 3,
             "ns": 10,
             "checksum": 1,
+            "output_bytes": 12,
             "source_sha256": "a" * 64,
             "output_sha256": "a" * 64,
             "output_matches_source": True,
@@ -163,10 +237,12 @@ class NativeQualificationTests(unittest.TestCase):
 
     def test_owner_probe_requires_replay_inverse_and_noop(self) -> None:
         value = {
+            "schema": "litchi.iwa.owner.probe.v2",
             "route": "numbers_headers",
             "iterations": 3,
             "ns": 10,
             "checksum": 1,
+            "output_bytes": 12,
             "source_sha256": "a" * 64,
             "output_sha256": "b" * 64,
             "output_differs": True,
@@ -176,6 +252,14 @@ class NativeQualificationTests(unittest.TestCase):
                 "inverse_matches_source": True,
                 "noop_is_noop": True,
                 "noop_matches_expected": True,
+                "semantic_ok": True,
+                "changed_sha256": "b" * 64,
+                "replay_sha256": "b" * 64,
+                "inverse_sha256": "a" * 64,
+                "noop_sha256": "a" * 64,
+                "source_bytes": 12,
+                "changed_bytes": 12,
+                "noop_bytes": 12,
             },
         }
         self.assertIs(RUNNER._strict_probe_value(value, "owner", "numbers_headers", 3), value)
@@ -245,6 +329,19 @@ class NativeQualificationTests(unittest.TestCase):
                     timeout_s=0.05,
                 )
         receipt = RUNNER.load_json(self.directory / "timeout.receipt.json")
+        self.assertTrue(receipt["timed_out"])
+        self.assertEqual(receipt["timeout_s"], 0.05)
+
+    def test_command_runner_enforces_build_bound(self) -> None:
+        with self.assertRaises(RUNNER.QualificationError):
+            RUNNER.run_command(
+                self.directory,
+                "slow-command",
+                ["/usr/bin/python3", "-c", "import time; time.sleep(1)"],
+                self.directory,
+                timeout_s=0.05,
+            )
+        receipt = RUNNER.load_json(self.directory / "slow-command.receipt.json")
         self.assertTrue(receipt["timed_out"])
         self.assertEqual(receipt["timeout_s"], 0.05)
 

@@ -12,16 +12,44 @@
     },
     "footnote-fixture.pages": {
       "generator": {
-        "bytes": 1388,
+        "bytes": 2425,
         "path": "docs/unified-ops/results/0361fda/generate_footnote_fixture.py",
-        "sha256": "516e4f771ce140bff0d53ce49481d54f79df0fe0ced046f4a2c243d40707f5b4"
+        "sha256": "4ccacda3726db5afc4e4e651b202c0b517350e02810277175d988ea1cd190f29"
       },
-      "method": "copy-tracked-pages-fixture",
-      "source": {
-        "bytes": 96417,
-        "path": "test-data/iwork/pages/basic.pages",
-        "sha256": "21107bc9323fba6f1589152454c0b0b0cc8e239313c6a369bc4a891116601b42"
-      }
+      "command": [
+        "python3",
+        "docs/unified-ops/results/0361fda/generate_footnote_fixture.py",
+        "--output",
+        "footnote-fixture.pages"
+      ],
+      "method": "cargo-example-body-footnote-test-builder",
+      "sources": [
+        {
+          "bytes": 10672,
+          "path": "Cargo.toml",
+          "sha256": "f5ec007892023b38f1deaef1ce20714db58b58448a3bea088be3b847b84570de"
+        },
+        {
+          "bytes": 86,
+          "path": "rust-toolchain.toml",
+          "sha256": "e3a213e0d222e94d213cafbc20932eb3f76c643b4dd63756acf95192df2aa310"
+        },
+        {
+          "bytes": 2337,
+          "path": "crates/litchi-pages/Cargo.toml",
+          "sha256": "3b5289d120cf5dc518eb3c6fcc7f3e14e21349a3b0cf01b0d8f2a30d54ff06fe"
+        },
+        {
+          "bytes": 843,
+          "path": "crates/litchi-pages/examples/generate_footnote_fixture.rs",
+          "sha256": "415a695ea1d8bd83cc968974d4d4f46e7f02ea8b156af44d7cfd5d3715a934de"
+        },
+        {
+          "bytes": 54612,
+          "path": "crates/litchi-pages/tests/body_footnote.rs",
+          "sha256": "a26546e6bc9c9776d3d8213062f1b4858e19791e0d1062859ee39f5ededa1eed"
+        }
+      ]
     },
     "media-replacement-native.key": {
       "bytes": 752060,

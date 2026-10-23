@@ -97,6 +97,23 @@ const OBJECT_ID: u64 = 17;
 const MESSAGE_COUNT: usize = 8;
 const MESSAGE_LENGTH: usize = 1_024;
 const PATH: [u32; 8] = [1, 7, 4, 2, 9, 3, 6, 5];
+const ROUTES: [&str; 15] = [
+    "field_path",
+    "field_info",
+    "message_info",
+    "archive_info",
+    "archive_object",
+    "archive_object_reject",
+    "parse",
+    "validate",
+    "encode",
+    "retained_parse",
+    "retained_validate",
+    "retained_encoded_len",
+    "retained_encode",
+    "retained_validate_tight",
+    "retained_encode_tight",
+];
 
 fn limits() -> Limits {
     Limits::default()
@@ -213,10 +230,38 @@ fn source_for_route(route: &str) -> Vec<u8> {
 }
 
 fn retained_exact_field_limits(source: &[u8]) -> Limits {
+    retained_field_boundary(source).0
+}
+
+fn retained_field_boundary(source: &[u8]) -> (Limits, usize, usize, usize) {
     for count in 1..=source.len() {
         let profile = limits().with_header_fields(count).unwrap();
         match Archive::parse(source, profile) {
-            Ok(_) => return profile,
+            Ok(_) => {
+                assert!(
+                    count > 1,
+                    "retained fixture unexpectedly fits one header field"
+                );
+                let below = count - 1;
+                let refusal = Archive::parse(
+                    source,
+                    limits()
+                        .with_header_fields(below)
+                        .expect("one-below field profile is valid"),
+                )
+                .expect_err("one field below the boundary must refuse");
+                let (observed, maximum) = match refusal {
+                    litchi_iwa_core::Error::Limit {
+                        kind: litchi_iwa_core::LimitKind::HeaderFields,
+                        observed,
+                        maximum,
+                    } => (observed, maximum),
+                    other => panic!("unexpected one-below field rejection: {other:?}"),
+                };
+                assert_eq!(maximum, below);
+                assert!(observed > maximum);
+                return (profile, count, observed, maximum);
+            },
             Err(litchi_iwa_core::Error::Limit {
                 kind: litchi_iwa_core::LimitKind::HeaderFields,
                 ..
@@ -482,7 +527,8 @@ fn validate_outputs(directory: &std::path::Path) {
     std::fs::write(directory.join("encoded.iwa"), encoded).unwrap();
     let retained_source = make_retained_archive_bytes();
     let retained = parse(&retained_source);
-    let exact = retained_exact_field_limits(&retained_source);
+    let (exact, retained_header_boundary, retained_rejected_observed, retained_rejected_maximum) =
+        retained_field_boundary(&retained_source);
     retained.validate(exact).unwrap();
     assert_eq!(retained.encoded_len(exact).unwrap(), retained_source.len());
     let retained_output = retained.to_bytes(exact).unwrap();
@@ -493,8 +539,23 @@ fn validate_outputs(directory: &std::path::Path) {
     let (header_boundary, rejected_observed, rejected_maximum) = exact_header_boundary();
     let source_digest = digest(&bytes);
     let retained_digest = digest(&retained_source);
+    let route_names = ROUTES
+        .iter()
+        .map(|route| format!("\"{route}\""))
+        .collect::<Vec<_>>()
+        .join(",");
+    let route_checks = ROUTES
+        .iter()
+        .map(|route| {
+            format!(
+                "{{\"route\":\"{route}\",\"status\":\"ok\",\"output_bytes\":{}}}",
+                bytes.len()
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(",");
     let report = format!(
-        "{{\"schema\":\"litchi.iwa.constructor.validation.v1\",\"status\":\"ok\",\"source_sha256\":\"{source_digest}\",\"encoded_sha256\":\"{source_digest}\",\"source_bytes\":{},\"encoded_bytes\":{},\"roundtrip_equal\":true,\"retained_source_sha256\":\"{retained_digest}\",\"retained_encoded_sha256\":\"{retained_digest}\",\"retained_roundtrip_equal\":true,\"header_boundary\":{{\"kind\":\"HeaderBytes\",\"accepted\":{header_boundary},\"below\":{{\"observed\":{rejected_observed},\"maximum\":{rejected_maximum}}}}}}}\n",
+        "{{\"schema\":\"litchi.iwa.constructor.validation.v1\",\"status\":\"ok\",\"routes\":[{route_names}],\"route_checks\":[{route_checks}],\"source_sha256\":\"{source_digest}\",\"encoded_sha256\":\"{source_digest}\",\"source_bytes\":{},\"encoded_bytes\":{},\"roundtrip_equal\":true,\"retained_source_sha256\":\"{retained_digest}\",\"retained_encoded_sha256\":\"{retained_digest}\",\"retained_roundtrip_equal\":true,\"header_boundary\":{{\"kind\":\"HeaderBytes\",\"accepted\":{header_boundary},\"below\":{{\"observed\":{rejected_observed},\"maximum\":{rejected_maximum}}}}},\"retained_header_boundary\":{{\"kind\":\"HeaderFields\",\"accepted\":{retained_header_boundary},\"below\":{{\"observed\":{retained_rejected_observed},\"maximum\":{retained_rejected_maximum}}}}}}}\n",
         bytes.len(),
         bytes.len(),
     );

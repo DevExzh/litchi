@@ -65,11 +65,15 @@ struct Correctness {
     replay_sha256: String,
     inverse_sha256: String,
     noop_sha256: String,
+    source_bytes: usize,
+    changed_bytes: usize,
+    noop_bytes: usize,
     changed_differs: bool,
     replay_matches_changed: bool,
     inverse_matches_source: bool,
     noop_is_noop: bool,
     noop_matches_expected: bool,
+    semantic_ok: bool,
 }
 
 impl Correctness {
@@ -88,21 +92,29 @@ impl Correctness {
             self.noop_matches_expected,
             "owner no-op did not preserve the expected package bytes"
         );
+        assert!(
+            self.semantic_ok,
+            "owner route did not prove its semantic result"
+        );
     }
 
     fn json(&self) -> String {
         format!(
-            "{{\"source_sha256\":\"{}\",\"changed_sha256\":\"{}\",\"replay_sha256\":\"{}\",\"inverse_sha256\":\"{}\",\"noop_sha256\":\"{}\",\"changed_differs\":{},\"replay_matches_changed\":{},\"inverse_matches_source\":{},\"noop_is_noop\":{},\"noop_matches_expected\":{}}}",
+            "{{\"source_sha256\":\"{}\",\"changed_sha256\":\"{}\",\"replay_sha256\":\"{}\",\"inverse_sha256\":\"{}\",\"noop_sha256\":\"{}\",\"source_bytes\":{},\"changed_bytes\":{},\"noop_bytes\":{},\"changed_differs\":{},\"replay_matches_changed\":{},\"inverse_matches_source\":{},\"noop_is_noop\":{},\"noop_matches_expected\":{},\"semantic_ok\":{}}}",
             self.source_sha256,
             self.changed_sha256,
             self.replay_sha256,
             self.inverse_sha256,
             self.noop_sha256,
+            self.source_bytes,
+            self.changed_bytes,
+            self.noop_bytes,
             self.changed_differs,
             self.replay_matches_changed,
             self.inverse_matches_source,
             self.noop_is_noop,
             self.noop_matches_expected,
+            self.semantic_ok,
         )
     }
 }
@@ -119,6 +131,13 @@ fn numbers_correctness(
         .set(changed)
         .commit()
         .unwrap();
+    let semantic_ok = commit
+        .package()
+        .table_header_settings(0usize, 0usize)
+        .unwrap()
+        .header_rows_are_frozen()
+        == changed.header_rows_frozen.unwrap_or(false)
+        && before.header_rows_are_frozen() != changed.header_rows_frozen.unwrap_or(false);
     let changed_bytes = write_numbers(commit.package());
     let replay = litchi_numbers::Package::from_bytes(source)
         .unwrap()
@@ -144,11 +163,15 @@ fn numbers_correctness(
         replay_sha256: sha256(&replay_bytes),
         inverse_sha256: sha256(&inverse_bytes),
         noop_sha256: sha256(&noop_bytes),
+        source_bytes: source.len(),
+        changed_bytes: changed_bytes.len(),
+        noop_bytes: noop_bytes.len(),
         changed_differs: changed_bytes != source,
         replay_matches_changed: replay_bytes == changed_bytes,
         inverse_matches_source: inverse_bytes == source,
         noop_is_noop: noop.patch().is_noop(),
         noop_matches_expected: noop_bytes == source,
+        semantic_ok,
     }
 }
 
@@ -172,6 +195,12 @@ fn keynote_correctness(
         .unwrap()
         .commit()
         .unwrap();
+    let semantic_ok = commit
+        .package()
+        .slide_media_data(selector, movie, part)
+        .unwrap()
+        == replacement
+        && before != replacement;
     let changed_bytes = write_keynote(commit.package());
     let replay = litchi_keynote::Package::from_bytes(source)
         .unwrap()
@@ -198,11 +227,15 @@ fn keynote_correctness(
         replay_sha256: sha256(&replay_bytes),
         inverse_sha256: sha256(&inverse_bytes),
         noop_sha256: sha256(&noop_bytes),
+        source_bytes: source.len(),
+        changed_bytes: changed_bytes.len(),
+        noop_bytes: noop_bytes.len(),
         changed_differs: changed_bytes != source,
         replay_matches_changed: replay_bytes == changed_bytes,
         inverse_matches_source: inverse_bytes == source,
         noop_is_noop: noop.patch().is_noop(),
         noop_matches_expected: noop_bytes == source,
+        semantic_ok,
     }
 }
 
@@ -219,6 +252,16 @@ fn pages_footnote_correctness(source: &[u8], package: &litchi_pages::Package) ->
     let commit = package
         .insert_body_footnote(position, "Inserted", Some("\u{2021}"))
         .unwrap();
+    let semantic_ok = commit
+        .package()
+        .body_footnotes()
+        .unwrap()
+        .iter()
+        .any(|note| {
+            note.position == position
+                && note.text.as_ref() == "Inserted"
+                && note.custom_mark.as_deref() == Some("\u{2021}")
+        });
     let changed_bytes = write_pages(commit.package());
     let replay = litchi_pages::Package::from_bytes(source)
         .unwrap()
@@ -248,11 +291,15 @@ fn pages_footnote_correctness(source: &[u8], package: &litchi_pages::Package) ->
         replay_sha256: sha256(&replay_bytes),
         inverse_sha256: sha256(&inverse_bytes),
         noop_sha256: sha256(&noop_bytes),
+        source_bytes: source.len(),
+        changed_bytes: changed_bytes.len(),
+        noop_bytes: noop_bytes.len(),
         changed_differs: changed_bytes != source,
         replay_matches_changed: replay_bytes == changed_bytes,
         inverse_matches_source: inverse_bytes == source,
         noop_is_noop,
         noop_matches_expected: noop_bytes == changed_bytes,
+        semantic_ok,
     }
 }
 
@@ -265,6 +312,8 @@ fn pages_section_correctness(source: &[u8], package: &litchi_pages::Package) -> 
     let mut edit = package.edit_section_name(SECTION_SELECTOR).unwrap();
     edit.set_name(Some(name)).unwrap();
     let commit = edit.commit().unwrap();
+    let semantic_ok = commit.package().section_name(SECTION_SELECTOR).unwrap() == Some(name)
+        && old_name != Some(name);
     let changed_bytes = write_pages(commit.package());
     let replay = litchi_pages::Package::from_bytes(source)
         .unwrap()
@@ -281,11 +330,15 @@ fn pages_section_correctness(source: &[u8], package: &litchi_pages::Package) -> 
         replay_sha256: sha256(&replay_bytes),
         inverse_sha256: sha256(&inverse_bytes),
         noop_sha256: sha256(&noop_bytes),
+        source_bytes: source.len(),
+        changed_bytes: changed_bytes.len(),
+        noop_bytes: noop_bytes.len(),
         changed_differs: changed_bytes != source,
         replay_matches_changed: replay_bytes == changed_bytes,
         inverse_matches_source: inverse_bytes == source,
         noop_is_noop,
         noop_matches_expected: noop_bytes == source,
+        semantic_ok,
     }
 }
 
@@ -329,14 +382,16 @@ fn print_report(
     correctness: &Correctness,
 ) {
     assert_eq!(sha256(output), correctness.changed_sha256);
+    assert_eq!(output.len(), correctness.changed_bytes);
     println!(
-        "{{\"schema\":\"litchi.iwa.owner.probe.v2\",\"route\":\"{route}\",\"iterations\":{iterations},\"ns\":{ns},\"checksum\":{checksum},\"output_bytes\":{},\"source_sha256\":\"{source_sha256}\",\"output_sha256\":\"{}\",\"output_differs\":true,\"correctness\":{{\"status\":\"ok\",\"replay_matches_changed\":{},\"inverse_matches_source\":{},\"noop_is_noop\":{},\"noop_matches_expected\":{},\"changed_sha256\":\"{}\",\"replay_sha256\":\"{}\",\"inverse_sha256\":\"{}\",\"noop_sha256\":\"{}\"}}}}",
+        "{{\"schema\":\"litchi.iwa.owner.probe.v2\",\"route\":\"{route}\",\"iterations\":{iterations},\"ns\":{ns},\"checksum\":{checksum},\"output_bytes\":{},\"source_sha256\":\"{source_sha256}\",\"output_sha256\":\"{}\",\"output_differs\":true,\"correctness\":{{\"status\":\"ok\",\"replay_matches_changed\":{},\"inverse_matches_source\":{},\"noop_is_noop\":{},\"noop_matches_expected\":{},\"semantic_ok\":{},\"changed_sha256\":\"{}\",\"replay_sha256\":\"{}\",\"inverse_sha256\":\"{}\",\"noop_sha256\":\"{}\"}}}}",
         output.len(),
         correctness.changed_sha256,
         correctness.replay_matches_changed,
         correctness.inverse_matches_source,
         correctness.noop_is_noop,
         correctness.noop_matches_expected,
+        correctness.semantic_ok,
         correctness.changed_sha256,
         correctness.replay_sha256,
         correctness.inverse_sha256,
@@ -497,7 +552,12 @@ fn validate_outputs(directory: &std::path::Path, output: &std::path::Path) {
         ));
     }
     let report = format!(
-        "{{\"schema\":\"litchi.iwa.owner.validation.v1\",\"status\":\"ok\",\"routes\":[{}]}}\n",
+        "{{\"schema\":\"litchi.iwa.owner.validation.v1\",\"status\":\"ok\",\"routes\":[{}],\"route_checks\":[{}]}}\n",
+        ROUTES
+            .iter()
+            .map(|route| format!("\"{route}\""))
+            .collect::<Vec<_>>()
+            .join(","),
         rows.join(",")
     );
     std::fs::write(output.join("validation.json"), report).expect("validation report");
