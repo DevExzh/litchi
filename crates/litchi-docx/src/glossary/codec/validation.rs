@@ -204,20 +204,6 @@ pub(in crate::glossary) fn validate_name(value: &str) -> Result<()> {
     }
 }
 
-pub(in crate::glossary) fn validate_raw_part(
-    name: &str,
-    content_type: &str,
-    len: usize,
-) -> Result<()> {
-    let uri = validate_physical_part(name, content_type, len)?;
-    if uri.as_str() == "/word/glossary/document.xml" {
-        return Err(invalid(
-            "glossary auxiliary part conflicts with the default root",
-        ));
-    }
-    Ok(())
-}
-
 pub(in crate::glossary) fn validate_physical_part(
     name: &str,
     content_type: &str,
