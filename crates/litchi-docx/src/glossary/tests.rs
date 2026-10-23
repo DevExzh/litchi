@@ -998,9 +998,9 @@ fn raw_graph_new_admits_generated_root_and_owner_before_staging() {
         metadata - 1,
     )
     .expect("metadata boundary policy");
-    let mut package = package();
+    let mut metadata_package = package();
     let error = raw::put(
-        &mut package,
+        &mut metadata_package,
         &raw::Graph::new(Catalog::new(), Conformance::Transitional),
         &metadata_limit,
     )
@@ -1012,7 +1012,11 @@ fn raw_graph_new_admits_generated_root_and_owner_before_staging() {
             ..
         }
     ));
-    assert!(raw::load(&package, &Limits::DEFAULT).unwrap().is_none());
+    assert!(
+        raw::load(&metadata_package, &Limits::DEFAULT)
+            .unwrap()
+            .is_none()
+    );
 }
 
 #[test]
