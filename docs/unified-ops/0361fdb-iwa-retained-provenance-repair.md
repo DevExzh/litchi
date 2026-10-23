@@ -560,12 +560,16 @@ and per-message component:
 | 32 | 51.0050 | 919.0066 | 868.0016 |
 | 128 | 51.0046 | 3,415.0025 | 3,363.9979 |
 
-Within measurement noise this is `36 + 26*N` Ir/op. Debug-symbol Callgrind
-attributes 1 Ir/message to the exact versions comparison, 6 to the eight
-current shape fields and 5 to the message-length ceiling; the remaining
-roughly 14 Ir/message is loop and ownership work. The public `Vec` can be
-mutated before ownership transfer, so these checks cannot be replaced by the
-private collection certificate. The reduced receipt is
+Within measurement noise this is `36 + 26*N` Ir/op. The debug-symbol source
+line accounts for 1 Ir/message at the exact versions comparison, while its
+comparator helper contributes the rest of about 5 Ir/message; the eight
+current shape fields cost about 6 and the message-length ceiling about 5. The
+remaining roughly 10 Ir/message is loop and ownership work. A shape-only
+diagnostic that intentionally omits exact version values measured about
+`34 + 21*N`; it is not a qualifying candidate, but isolates the exact-value
+guard at about 2 fixed plus 5 Ir/message. The public `Vec` can be mutated
+before ownership transfer, so these checks cannot be replaced by the private
+collection certificate. The reduced receipt is
 [`constructor-ceb87-pathfast.json`](results/0361fd/constructor-ceb87-pathfast.json).
 
 The rebuilt allocator probe covered all 15 routes with stable ABBA counters

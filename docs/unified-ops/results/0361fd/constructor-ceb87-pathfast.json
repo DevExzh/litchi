@@ -58,7 +58,13 @@
       {"messages":32,"base_ir":51.0050,"candidate_ir":919.0066,"delta_ir":868.0016},
       {"messages":128,"base_ir":51.0046,"candidate_ir":3415.0025,"delta_ir":3363.9979}
     ],
-    "attribution": "The optimized default raw Vec path remains 36 Ir fixed plus about 26 Ir per public MessageInfo. The current-field check is irreducible public validation: debug-symbol Callgrind attributes 1 Ir/message to versions equality, 6 to the eight shape fields and 5 to the message-length ceiling. The remaining loop/ownership work is about 14 Ir/message."
+    "attribution": "The optimized default raw Vec path remains 36 Ir fixed plus about 26 Ir per public MessageInfo. The current-field check is irreducible public validation: the debug-symbol source line accounts for 1 Ir/message at the versions comparison, while its comparator helper contributes the rest of about 5 Ir/message; the eight shape fields cost about 6 and the message-length ceiling about 5. The remaining roughly 10 Ir/message is loop and ownership work. A shape-only diagnostic (which does not enforce version values) measured about 34 + 21*N Ir/op and is retained only to isolate the exact-value guard."
+  },
+  "shape_only_diagnostic": {
+    "status": "non-qualifying diagnostic; intentionally omits exact public versions values",
+    "summary_path": "/home/zhuhe/code/litchi-worktrees/.coord/constructor-0361f-coordinator/count-callgrind-v22-oldshape/summary.json",
+    "summary_sha256": "72f088afa7fe0ad1cf1f8e917da058b42360700a2d0294299ee867f0c6995449",
+    "formula": "about 34 + 21*N Ir/op; compared with the exact guard's 36 + 26*N, the value check costs about 2 fixed plus 5 Ir/message"
   },
   "fixed_constructor_attribution": {
     "message_info": "106.0000 Ir/op over the old unchecked signature; allocator evidence is one 12-byte versions allocation per operation, so the fallible allocation is fixed per constructor rather than per archive message.",
